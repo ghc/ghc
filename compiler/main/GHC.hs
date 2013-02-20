@@ -17,7 +17,6 @@ module GHC (
         runGhc, runGhcT, initGhcMonad,
         gcatch, gbracket, gfinally,
         printException,
-        printExceptionAndWarnings,
         handleSourceError,
         needsTemplateHaskell,
 

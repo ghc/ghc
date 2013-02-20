@@ -18,7 +18,7 @@ module GhcMonad (
         Session(..), withSession, modifySession, withTempSession,
 
         -- ** Warnings
-        logWarnings, printException, printExceptionAndWarnings,
+        logWarnings, printException,
         WarnErrLogger, defaultWarnErrLogger
   ) where
 
@@ -188,10 +188,6 @@ printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
   liftIO $ printBagOfErrors dflags (srcErrorMessages err)
-
-{-# DEPRECATED printExceptionAndWarnings "use printException instead" #-} -- deprecated in 7.2
-printExceptionAndWarnings :: GhcMonad m => SourceError -> m ()
-printExceptionAndWarnings = printException
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = GhcMonad m => Maybe SourceError -> m ()
