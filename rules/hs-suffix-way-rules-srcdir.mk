@@ -19,22 +19,22 @@ define hs-suffix-way-rules-srcdir
 ifneq "$$(BINDIST)" "YES"
 
 $1/$2/build/%.hs : $1/$4/%.ly | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
+	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
 
 $1/$2/build/%.hs : $1/$4/%.y | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
+	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
 
 $1/$2/build/%.hs : $1/$2/build/%.ly | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
+	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
 
 $1/$2/build/%.hs : $1/$2/build/%.y | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
+	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
 
 $1/$2/build/%.hs : $1/$4/%.x | $$$$(dir $$$$@)/.
-	$$(call cmd,ALEX) $$($1_$2_$3_ALL_ALEX_OPTS) $$< -o $$@
+	$$(call cmd,ALEX) $$($1_$2_ALL_ALEX_OPTS) $$< -o $$@
 
 $1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$4/%.hsc $$(HSC2HS_INPLACE) | $$$$(dir $$$$@)/.
-	$$(call cmd,HSC2HS_INPLACE) $$($1_$2_$3_ALL_HSC2HS_OPTS) $$< -o $$@
+	$$(call cmd,HSC2HS_INPLACE) $$($1_$2_ALL_HSC2HS_OPTS) $$< -o $$@
 
 # Compiling Haskell source
 

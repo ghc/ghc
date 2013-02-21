@@ -140,6 +140,7 @@ $(call c-sources,$1,$2)
 
 # --- IMPLICIT RULES
 
+$(call distdir-opts,$1,$2,,$3)
 $(call distdir-way-opts,$1,$2,$$($1_$2_PROGRAM_WAY),$3)
 
 ifeq "$3" "0"

@@ -105,6 +105,7 @@ endif
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 $(call includes-sources,$1,$2)
+$(call distdir-opts,$1,$2,$3)
 
 $(call dependencies,$1,$2,$3)
 
