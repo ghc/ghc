@@ -7,6 +7,7 @@ module Exception
     where
 
 import Control.Exception
+import Control.Monad.IO.Class
 
 catchIO :: IO a -> (IOException -> IO a) -> IO a
 catchIO = Control.Exception.catch
@@ -20,14 +21,14 @@ tryIO = try
 -- | A monad that can catch exceptions.  A minimal definition
 -- requires a definition of 'gcatch'.
 --
--- Implementations on top of 'IO' should implement 'gblock' and 'gunblock' to
--- eventually call the primitives 'Control.Exception.block' and
--- 'Control.Exception.unblock' respectively.  These are used for
+-- Implementations on top of 'IO' should implement 'gmask' to
+-- eventually call the primitive 'Control.Exception.mask'.
+-- These are used for
 -- implementations that support asynchronous exceptions.  The default
--- implementations of 'gbracket' and 'gfinally' use 'gblock' and 'gunblock'
+-- implementations of 'gbracket' and 'gfinally' use 'gmask'
 -- thus rarely require overriding.
 --
-class Monad m => ExceptionMonad m where
+class MonadIO m => ExceptionMonad m where
 
   -- | Generalised version of 'Control.Exception.catch', allowing an arbitrary
   -- exception handling monad instead of just 'IO'.
@@ -45,20 +46,6 @@ class Monad m => ExceptionMonad m where
   -- exception handling monad instead of just 'IO'.
   gfinally :: m a -> m b -> m a
 
-  -- | DEPRECATED, here for backwards compatibilty.  Instances can
-  -- define either 'gmask', or both 'block' and 'unblock'.
-  gblock   :: m a -> m a
-  -- | DEPRECATED, here for backwards compatibilty  Instances can
-  -- define either 'gmask', or both 'block' and 'unblock'.
-  gunblock :: m a -> m a
-  -- XXX we're keeping these two methods for the time being because we
-  -- have to interact with Haskeline's MonadException class which
-  -- still has block/unblock; see GhciMonad.hs.
-
-  gmask    f = gblock (f gunblock)
-  gblock   f = gmask (\_ -> f)
-  gunblock f = f -- XXX wrong; better override this if you need it
-
   gbracket before after thing =
     gmask $ \restore -> do
       a <- before
@@ -75,8 +62,6 @@ class Monad m => ExceptionMonad m where
 instance ExceptionMonad IO where
   gcatch    = Control.Exception.catch
   gmask f   = mask (\x -> f x)
-  gblock    = block
-  gunblock  = unblock
 
 gtry :: (ExceptionMonad m, Exception e) => m a -> m (Either e a)
 gtry act = gcatch (act >>= \a -> return (Right a))
@@ -92,5 +77,5 @@ ghandle = flip gcatch
 gonException :: (ExceptionMonad m) => m a -> m b -> m a
 gonException ioA cleanup = ioA `gcatch` \e ->
                              do _ <- cleanup
-                                throw (e :: SomeException)
+                                liftIO $ throwIO (e :: SomeException)
 

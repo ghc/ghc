@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2009-2012 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -30,6 +30,11 @@ ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
 # in ghc/stage1
 ghc_stage1_CONFIGURE_OPTS += --constraint "ghc == $(compiler_stage1_MUNGED_VERSION)"
 endif
+
+# This package doesn't pass the Cabal checks because data-dir
+# points outside the source directory. This isn't a real problem, so
+# we just skip the check.
+ghc_NO_CHECK = YES
 
 ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
@@ -64,7 +69,7 @@ ghc_stage3_MORE_HC_OPTS += -threaded
 endif
 
 ifeq "$(GhcProfiled)" "YES"
-ghc_stage2_MORE_HC_OPTS += -prof
+ghc_stage2_PROGRAM_WAY = p
 endif
 
 ghc_stage1_PROG = ghc-stage1$(exeext)
@@ -77,8 +82,11 @@ ghc_stage3_SHELL_WRAPPER = YES
 ghc_stage1_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage2_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage3_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
+ghc_stage1_INSTALL_INPLACE = YES
+ghc_stage2_INSTALL_INPLACE = YES
+ghc_stage3_INSTALL_INPLACE = YES
 
-ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER = YES
+ghc_stage$(INSTALL_GHC_STAGE)_INSTALL = YES
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME = ghc-$(ProjectVersion)
 
 # We override the program name to be ghc, rather than ghc-stage2.
@@ -96,7 +104,7 @@ ifneq "$(filter-out 2,$(stage))" ""
 ghc_stage2_NOT_NEEDED = YES
 endif
 # When cross-compiling, the stage 1 compiler is our release compiler, so omit stage 2
-ifeq "$(BuildingCrossCompiler)" "YES"
+ifeq "$(Stage1Only)" "YES"
 ghc_stage2_NOT_NEEDED = YES
 endif
 # stage 3 has to be requested explicitly with stage=3
@@ -127,12 +135,19 @@ all_ghc_stage3 : $(GHC_STAGE3)
 $(INPLACE_LIB)/settings : settings
 	"$(CP)" $< $@
 
+$(INPLACE_LIB)/platformConstants: $(includes_GHCCONSTANTS_HASKELL_VALUE)
+	"$(CP)" $< $@
+
 # The GHC programs need to depend on all the helper programs they might call,
 # and the settings files they use
 
-$(GHC_STAGE1) : | $(UNLIT) $(INPLACE_LIB)/settings
-$(GHC_STAGE2) : | $(UNLIT) $(INPLACE_LIB)/settings
-$(GHC_STAGE3) : | $(UNLIT) $(INPLACE_LIB)/settings
+GHC_DEPENDENCIES += $(UNLIT)
+GHC_DEPENDENCIES += $(INPLACE_LIB)/settings
+GHC_DEPENDENCIES += $(INPLACE_LIB)/platformConstants
+
+$(GHC_STAGE1) : | $(GHC_DEPENDENCIES)
+$(GHC_STAGE2) : | $(GHC_DEPENDENCIES)
+$(GHC_STAGE3) : | $(GHC_DEPENDENCIES)
 
 ifeq "$(GhcUnregisterised)" "NO"
 $(GHC_STAGE1) : | $(SPLIT)
@@ -146,11 +161,6 @@ $(GHC_STAGE2) : | $(TOUCHY)
 $(GHC_STAGE3) : | $(TOUCHY)
 endif
 
-ifeq "$(BootingFromHc)" "YES"
-$(GHC_STAGE2) : $(ALL_STAGE1_LIBS)
-ghc_stage2_OTHER_OBJS += $(compiler_stage2_v_LIB) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
-endif
-
 endif
 
 INSTALL_LIBS += settings
@@ -159,7 +169,7 @@ ifeq "$(Windows)" "NO"
 install: install_ghc_link
 .PHONY: install_ghc_link
 install_ghc_link: 
-	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc")
+	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc")
 	$(LN_S) $(CrossCompilePrefix)ghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc"
 else
 # On Windows we install the main binary as $(bindir)/ghc.exe

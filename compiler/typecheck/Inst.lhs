@@ -25,15 +25,12 @@ module Inst (
        tcSyntaxName,
 
        -- Simple functions over evidence variables
-       hasEqualities, unitImplication,
+       hasEqualities, 
        
        tyVarsOfWC, tyVarsOfBag, 
-       tyVarsOfEvVar, tyVarsOfEvVars, tyVarsOfImplication,
-       tyVarsOfCt, tyVarsOfCts, tyVarsOfCDict, tyVarsOfCDicts,
+       tyVarsOfCt, tyVarsOfCts, 
 
-       tidyEvVar, tidyCt, tidyGivenLoc,
-
-       substEvVar, substImplication, substCt
+       tidyEvVar, tidyCt, tidySkolemInfo
     ) where
 
 #include "HsVersions.h"
@@ -57,7 +54,7 @@ import Unify
 import HscTypes
 import Id
 import Name
-import Var      ( Var, EvVar, varType, setVarType )
+import Var      ( EvVar, varType, setVarType )
 import VarEnv
 import VarSet
 import PrelNames
@@ -86,7 +83,7 @@ emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred 
   = do { loc <- getCtLoc origin
        ; ev  <- newWantedEvVar pred
-       ; emitFlat (mkNonCanonical (Wanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev }))
+       ; emitFlat (mkNonCanonical loc (CtWanted { ctev_pred = pred, ctev_evar = ev }))
        ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -215,19 +212,21 @@ instCallConstraints :: CtOrigin -> TcThetaType -> TcM HsWrapper
 -- Instantiates the TcTheta, puts all constraints thereby generated
 -- into the LIE, and returns a HsWrapper to enclose the call site.
 
-instCallConstraints _ [] = return idHsWrapper
-
-instCallConstraints origin (pred : preds)
-  | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
-  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred ty1 ty2)
-        ; co <- unifyType ty1 ty2
-	; co_fn <- instCallConstraints origin preds
-        ; return (co_fn <.> WpEvApp (EvCoercion co)) }
-
+instCallConstraints orig preds
+  | null preds 
+  = return idHsWrapper
   | otherwise
-  = do	{ ev_var <- emitWanted origin pred
-	; co_fn <- instCallConstraints origin preds
-	; return (co_fn <.> WpEvApp (EvId ev_var)) }
+  = do { evs <- mapM go preds
+       ; traceTc "instCallConstraints" (ppr evs)
+       ; return (mkWpEvApps evs) }
+  where
+    go pred 
+     | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
+     = do  { co <- unifyType ty1 ty2
+           ; return (EvCoercion co) }
+     | otherwise
+     = do { ev_var <- emitWanted orig pred
+     	  ; return (EvId ev_var) }
 
 ----------------
 instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()
@@ -251,15 +250,24 @@ cases (the rest are caught in lookupInst).
 
 \begin{code}
 newOverloadedLit :: CtOrigin
-		 -> HsOverLit Name
-		 -> TcRhoType
-		 -> TcM (HsOverLit TcId)
-newOverloadedLit orig 
+                 -> HsOverLit Name
+                 -> TcRhoType
+                 -> TcM (HsOverLit TcId)
+newOverloadedLit orig lit res_ty
+    = do dflags <- getDynFlags
+         newOverloadedLit' dflags orig lit res_ty
+
+newOverloadedLit' :: DynFlags
+                  -> CtOrigin
+                  -> HsOverLit Name
+                  -> TcRhoType
+                  -> TcM (HsOverLit TcId)
+newOverloadedLit' dflags orig
   lit@(OverLit { ol_val = val, ol_rebindable = rebindable
 	       , ol_witness = meth_name }) res_ty
 
   | not rebindable
-  , Just expr <- shortCutLit val res_ty 
+  , Just expr <- shortCutLit dflags val res_ty 
 	-- Do not generate a LitInst for rebindable syntax.  
 	-- Reason: If we do, tcSimplify will call lookupInst, which
 	--	   will call tcSyntaxName, which does unification, 
@@ -328,9 +336,8 @@ tcSyntaxName :: CtOrigin
 	     -> TcType			-- Type to instantiate it at
 	     -> (Name, HsExpr Name)	-- (Standard name, user name)
 	     -> TcM (Name, HsExpr TcId)	-- (Standard name, suitable expression)
---	*** NOW USED ONLY FOR CmdTop (sigh) ***
--- NB: tcSyntaxName calls tcExpr, and hence can do unification.
--- So we do not call it from lookupInst, which is called from tcSimplify
+-- USED ONLY FOR CmdTop (sigh) ***
+-- See Note [CmdSyntaxTable] in HsExpr
 
 tcSyntaxName orig ty (std_nm, HsVar user_nm)
   | std_nm == user_nm
@@ -357,14 +364,14 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
 
 syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
-syntaxNameCtxt name orig ty tidy_env = do
-    inst_loc <- getCtLoc orig
-    let
-	msg = vcat [ptext (sLit "When checking that") <+> quotes (ppr name) <+> 
-				ptext (sLit "(needed by a syntactic construct)"),
-		    nest 2 (ptext (sLit "has the required type:") <+> ppr (tidyType tidy_env ty)),
-		    nest 2 (pprArisingAt inst_loc)]
-    return (tidy_env, msg)
+syntaxNameCtxt name orig ty tidy_env
+  = do { inst_loc <- getCtLoc orig
+       ; let msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr name)
+			  <+> ptext (sLit "(needed by a syntactic construct)")
+		        , nest 2 (ptext (sLit "has the required type:")
+                                  <+> ppr (tidyType tidy_env ty))
+		        , nest 2 (pprArisingAt inst_loc) ]
+       ; return (tidy_env, msg) }
 \end{code}
 
 
@@ -407,64 +414,60 @@ addLocalInst :: InstEnv -> ClsInst -> TcM InstEnv
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
 -- If overwrite_inst, then we can overwrite a direct match
-addLocalInst home_ie ispec = do
-    -- Instantiate the dfun type so that we extend the instance
-    -- envt with completely fresh template variables
-    -- This is important because the template variables must
-    -- not overlap with anything in the things being looked up
-    -- (since we do unification).  
-        --
-        -- We use tcInstSkolType because we don't want to allocate fresh
-        --  *meta* type variables.
-        --
-        -- We use UnkSkol --- and *not* InstSkol or PatSkol --- because
-        -- these variables must be bindable by tcUnifyTys.  See
-        -- the call to tcUnifyTys in InstEnv, and the special
-        -- treatment that instanceBindFun gives to isOverlappableTyVar
-        -- This is absurdly delicate.
+addLocalInst home_ie ispec
+   = do {
+         -- Instantiate the dfun type so that we extend the instance
+         -- envt with completely fresh template variables
+         -- This is important because the template variables must
+         -- not overlap with anything in the things being looked up
+         -- (since we do unification).  
+             --
+             -- We use tcInstSkolType because we don't want to allocate fresh
+             --  *meta* type variables.
+             --
+             -- We use UnkSkol --- and *not* InstSkol or PatSkol --- because
+             -- these variables must be bindable by tcUnifyTys.  See
+             -- the call to tcUnifyTys in InstEnv, and the special
+             -- treatment that instanceBindFun gives to isOverlappableTyVar
+             -- This is absurdly delicate.
 
-    let dfun = instanceDFunId ispec
-    (tvs', theta', tau') <- tcInstSkolType (idType dfun)
-    let (cls, tys') = tcSplitDFunHead tau'
-        dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
-        ispec'      = setInstanceDFunId ispec dfun'
+             -- Load imported instances, so that we report
+             -- duplicates correctly
+           eps <- getEps
+         ; let inst_envs = (eps_inst_env eps, home_ie)
+               (tvs, cls, tys) = instanceHead ispec
 
-        -- Load imported instances, so that we report
-        -- duplicates correctly
-    eps <- getEps
-    let inst_envs = (eps_inst_env eps, home_ie)
+             -- Check functional dependencies
+         ; case checkFunDeps inst_envs ispec of
+             Just specs -> funDepErr ispec specs
+             Nothing    -> return ()
 
-        -- Check functional dependencies
-    case checkFunDeps inst_envs ispec' of
-        Just specs -> funDepErr ispec' specs
-        Nothing    -> return ()
-
-        -- Check for duplicate instance decls
-    let (matches, unifs, _) = lookupInstEnv inst_envs cls tys'
-        dup_ispecs = [ dup_ispec 
-                        | (dup_ispec, _) <- matches
-                        , let (_,_,_,dup_tys) = instanceHead dup_ispec
-                        , isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)]
-                        
-        -- Find memebers of the match list which ispec itself matches.
-        -- If the match is 2-way, it's a duplicate
-        -- If it's a duplicate, but we can overwrite home package dups, then overwrite
-    isGHCi <- getIsGHCi
-    overlapFlag <- getOverlapFlag
-    case isGHCi of
-        False -> case dup_ispecs of
-            dup : _ -> dupInstErr ispec' dup >> return (extendInstEnv home_ie ispec')
-            []      -> return (extendInstEnv home_ie ispec')
-        True  -> case (dup_ispecs, home_ie_matches, unifs, overlapFlag) of
-            (_, _:_, _, _)      -> return (overwriteInstEnv home_ie ispec')
-            (dup:_, [], _, _)   -> dupInstErr ispec' dup >> return (extendInstEnv home_ie ispec')
-            ([], _, u:_, NoOverlap _)    -> overlappingInstErr ispec' u >> return (extendInstEnv home_ie ispec')
-            _                   -> return (extendInstEnv home_ie ispec')
-          where (homematches, _) = lookupInstEnv' home_ie cls tys'
-                home_ie_matches = [ dup_ispec 
-                    | (dup_ispec, _) <- homematches
-                    , let (_,_,_,dup_tys) = instanceHead dup_ispec
-                    , isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)]
+             -- Check for duplicate instance decls
+         ; let (matches, unifs, _) = lookupInstEnv inst_envs cls tys
+               dup_ispecs = [ dup_ispec 
+                            | (dup_ispec, _) <- matches
+                            , let dup_tys = is_tys dup_ispec
+                            , isJust (tcMatchTys (mkVarSet tvs) tys dup_tys)]
+                             
+             -- Find memebers of the match list which ispec itself matches.
+             -- If the match is 2-way, it's a duplicate
+             -- If it's a duplicate, but we can overwrite home package dups, then overwrite
+         ; isGHCi <- getIsGHCi
+         ; overlapFlag <- getOverlapFlag
+         ; case isGHCi of
+             False -> case dup_ispecs of
+                 dup : _ -> dupInstErr ispec dup >> return (extendInstEnv home_ie ispec)
+                 []      -> return (extendInstEnv home_ie ispec)
+             True  -> case (dup_ispecs, home_ie_matches, unifs, overlapFlag) of
+                 (_, _:_, _, _)      -> return (overwriteInstEnv home_ie ispec)
+                 (dup:_, [], _, _)   -> dupInstErr ispec dup >> return (extendInstEnv home_ie ispec)
+                 ([], _, u:_, NoOverlap _)    -> overlappingInstErr ispec u >> return (extendInstEnv home_ie ispec)
+                 _                   -> return (extendInstEnv home_ie ispec)
+               where (homematches, _) = lookupInstEnv' home_ie cls tys
+                     home_ie_matches = [ dup_ispec 
+                         | (dup_ispec, _) <- homematches
+                         , let dup_tys = is_tys dup_ispec
+                         , isJust (tcMatchTys (mkVarSet tvs) tys dup_tys)] }
 
 traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
@@ -506,11 +509,6 @@ addClsInstsErr herald ispecs
 %************************************************************************
 
 \begin{code}
-unitImplication :: Implication -> Bag Implication
-unitImplication implic
-  | isEmptyWC (ic_wanted implic) = emptyBag
-  | otherwise                    = unitBag implic
-
 hasEqualities :: [EvVar] -> Bool
 -- Has a bunch of canonical constraints (all givens) got any equalities in it?
 hasEqualities givens = any (has_eq . evVarPred) givens
@@ -522,40 +520,37 @@ hasEqualities givens = any (has_eq . evVarPred) givens
     has_eq' (ClassPred cls _tys) = any has_eq (classSCTheta cls)
     has_eq' (TuplePred ts)       = any has_eq ts
     has_eq' (IrredPred _)        = True -- Might have equalities in it after reduction?
+       -- This is conservative.  e.g. if there's a constraint function FC with
+       --    type instance FC Int = Show
+       -- then we won't float from inside a given constraint (FC Int a), even though
+       -- it's really the innocuous (Show a).  Too bad!  Add a type signature
 
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet
+-- NB: the 
 tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOfType xi) tv
 tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
-tyVarsOfCt (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
-tyVarsOfCt (CNonCanonical { cc_ev = fl })           = tyVarsOfType (ctEvPred fl)
-
-tyVarsOfCDict :: Ct -> TcTyVarSet 
-tyVarsOfCDict (CDictCan { cc_tyargs = tys }) = tyVarsOfTypes tys
-tyVarsOfCDict _ct                            = emptyVarSet 
-
-tyVarsOfCDicts :: Cts -> TcTyVarSet 
-tyVarsOfCDicts = foldrBag (unionVarSet . tyVarsOfCDict) emptyVarSet
+tyVarsOfCt (CIrredEvCan { cc_ev = ev })                 = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CHoleCan { cc_ev = ev })                    = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CNonCanonical { cc_ev = ev })               = tyVarsOfType (ctEvPred ev)
 
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
 
 tyVarsOfWC :: WantedConstraints -> TyVarSet
+-- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
   = tyVarsOfCts flat `unionVarSet`
-    tyVarsOfBag tyVarsOfImplication implic `unionVarSet`
+    tyVarsOfBag tyVarsOfImplic implic `unionVarSet`
     tyVarsOfCts insol
 
-tyVarsOfImplication :: Implication -> TyVarSet
-tyVarsOfImplication (Implic { ic_skols = skols, ic_wanted = wanted })
-  = tyVarsOfWC wanted `delVarSetList` skols
-
-tyVarsOfEvVar :: EvVar -> TyVarSet
-tyVarsOfEvVar ev = tyVarsOfType $ evVarPred ev
-
-tyVarsOfEvVars :: [EvVar] -> TyVarSet
-tyVarsOfEvVars = foldr (unionVarSet . tyVarsOfEvVar) emptyVarSet
+tyVarsOfImplic :: Implication -> TyVarSet
+-- Only called on *zonked* things, hence no need to worry about flatten-skolems
+tyVarsOfImplic (Implic { ic_skols = skols, ic_fsks = fsks
+                             , ic_given = givens, ic_wanted = wanted })
+  = (tyVarsOfWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
+    `delVarSetList` skols `delVarSetList` fsks
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
@@ -566,95 +561,45 @@ tidyCt :: TidyEnv -> Ct -> Ct
 -- Used only in error reporting
 -- Also converts it to non-canonical
 tidyCt env ct 
-  = CNonCanonical { cc_ev = tidy_flavor env (cc_ev ct)
-                  , cc_depth  = cc_depth ct } 
+  = case ct of
+     CHoleCan { cc_ev = ev }
+       -> ct { cc_ev = tidy_ev env ev }
+     _ -> CNonCanonical { cc_ev = tidy_ev env (cc_ev ct)
+                        , cc_loc  = cc_loc ct }
   where 
-    tidy_flavor :: TidyEnv -> CtEvidence -> CtEvidence
+    tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evtm/var field because we don't 
      --     show it in error messages
-    tidy_flavor env ctev@(Given { ctev_gloc = gloc, ctev_pred = pred })
-      = ctev { ctev_gloc = tidyGivenLoc env gloc
-             , ctev_pred = tidyType env pred }
-    tidy_flavor env ctev@(Wanted { ctev_pred = pred })
+    tidy_ev env ctev@(CtGiven { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
-    tidy_flavor env ctev@(Derived { ctev_pred = pred })
+    tidy_ev env ctev@(CtWanted { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
+    tidy_ev env ctev@(CtDerived { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
 
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = setVarType var (tidyType env (varType var))
 
-tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
-tidyGivenLoc env (CtLoc skol span ctxt) 
-  = CtLoc (tidySkolemInfo env skol) span ctxt
+tidySkolemInfo :: TidyEnv -> SkolemInfo -> (TidyEnv, SkolemInfo)
+tidySkolemInfo env (SigSkol cx ty) 
+  = (env', SigSkol cx ty')
+  where
+    (env', ty') = tidyOpenType env ty
 
-tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
-tidySkolemInfo env (SigSkol cx ty) = SigSkol cx (tidyType env ty)
-tidySkolemInfo env (InferSkol ids) = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfo env (InferSkol ids) 
+  = (env', InferSkol ids')
+  where
+    (env', ids') = mapAccumL do_one env ids
+    do_one env (name, ty) = (env', (name, ty'))
+       where
+         (env', ty') = tidyOpenType env ty
+
 tidySkolemInfo env (UnifyForAllSkol skol_tvs ty) 
-  = UnifyForAllSkol (map tidy_tv skol_tvs) (tidyType env ty)
+  = (env1, UnifyForAllSkol skol_tvs' ty')
   where
-    tidy_tv tv = case getTyVar_maybe ty' of
-                   Just tv' -> tv'
-                   Nothing  -> pprPanic "ticySkolemInfo" (ppr tv <+> ppr ty')
-               where
-                 ty' = tidyTyVarOcc env tv
-tidySkolemInfo _   info            = info
+    env1 = tidyFreeTyVars env (tyVarsOfType ty `delVarSetList` skol_tvs)
+    (env2, skol_tvs') = tidyTyVarBndrs env1 skol_tvs
+    ty'               = tidyType env2 ty
 
----------------- Substitution -------------------------
--- This is used only in TcSimpify, for substituations that are *also* 
--- reflected in the unification variables.  So we don't substitute
--- in the evidence.
-
-substCt :: TvSubst -> Ct -> Ct 
--- Conservatively converts it to non-canonical:
--- Postcondition: if the constraint does not get rewritten
-substCt subst ct
-  | pty <- ctPred ct
-  , sty <- substTy subst pty 
-  = if sty `eqType` pty then 
-        ct { cc_ev = substFlavor subst (cc_ev ct) }
-    else 
-        CNonCanonical { cc_ev = substFlavor subst (cc_ev ct)
-                      , cc_depth  = cc_depth ct }
-
-substWC :: TvSubst -> WantedConstraints -> WantedConstraints
-substWC subst (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
-  = WC { wc_flat  = mapBag (substCt subst) flat
-       , wc_impl  = mapBag (substImplication subst) implic
-       , wc_insol = mapBag (substCt subst) insol }
-
-substImplication :: TvSubst -> Implication -> Implication
-substImplication subst implic@(Implic { ic_skols = tvs
-                                      , ic_given = given
-                                      , ic_wanted = wanted
-                                      , ic_loc = loc })
-  = implic { ic_skols  = tvs'
-           , ic_given  = map (substEvVar subst1) given
-           , ic_wanted = substWC subst1 wanted
-           , ic_loc    = substGivenLoc subst1 loc }
-  where
-   (subst1, tvs') = mapAccumL substTyVarBndr subst tvs
-
-substEvVar :: TvSubst -> EvVar -> EvVar
-substEvVar subst var = setVarType var (substTy subst (varType var))
-
-substFlavor :: TvSubst -> CtEvidence -> CtEvidence
-substFlavor subst ctev@(Given { ctev_gloc = gloc, ctev_pred = pred })
-  = ctev { ctev_gloc = substGivenLoc subst gloc
-          , ctev_pred = substTy subst pred }
-
-substFlavor subst ctev@(Wanted { ctev_pred = pred })
-  = ctev  { ctev_pred = substTy subst pred }
-
-substFlavor subst ctev@(Derived { ctev_pred = pty })
-  = ctev { ctev_pred = substTy subst pty }
-
-substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
-substGivenLoc subst (CtLoc skol span ctxt) 
-  = CtLoc (substSkolemInfo subst skol) span ctxt
-
-substSkolemInfo :: TvSubst -> SkolemInfo -> SkolemInfo
-substSkolemInfo subst (SigSkol cx ty) = SigSkol cx (substTy subst ty)
-substSkolemInfo subst (InferSkol ids) = InferSkol (mapSnd (substTy subst) ids)
-substSkolemInfo _     info            = info
+tidySkolemInfo env info = (env, info)
 \end{code}

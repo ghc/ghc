@@ -57,7 +57,7 @@ module Lexer (
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
    typeLiteralsEnabled,
-   explicitNamespacesEnabled,
+   explicitNamespacesEnabled, sccProfilingOn, hpcEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -77,6 +77,7 @@ import Util             ( readRational )
 
 import Control.Monad
 import Data.Bits
+import Data.ByteString (ByteString)
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -552,7 +553,7 @@ data Token
   | ITrational   FractionalLit
 
   | ITprimchar   Char
-  | ITprimstring FastBytes
+  | ITprimstring ByteString
   | ITprimint    Integer
   | ITprimword   Integer
   | ITprimfloat  FractionalLit
@@ -1244,8 +1245,8 @@ lex_string s = do
                    setInput i
                    if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
-                    else let fb = unsafeMkFastBytesString (reverse s)
-                         in return (ITprimstring fb)
+                    else let bs = unsafeMkByteString (reverse s)
+                         in return (ITprimstring bs)
               _other ->
                 return (ITstring (mkFastString (reverse s)))
           else
@@ -1849,6 +1850,10 @@ inRulePragBit :: Int
 inRulePragBit = 19
 rawTokenStreamBit :: Int
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
+sccProfilingOnBit :: Int
+sccProfilingOnBit = 21
+hpcBit :: Int
+hpcBit = 22
 alternativeLayoutRuleBit :: Int
 alternativeLayoutRuleBit = 23
 relaxedLayoutBit :: Int
@@ -1865,8 +1870,6 @@ explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
 lambdaCaseBit :: Int
 lambdaCaseBit = 30
-multiWayIfBit :: Int
-multiWayIfBit = 31
 
 
 always :: Int -> Bool
@@ -1905,10 +1908,14 @@ rawTokenStreamEnabled :: Int -> Bool
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
 alternativeLayoutRule :: Int -> Bool
 alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
+hpcEnabled :: Int -> Bool
+hpcEnabled flags = testBit flags hpcBit
 relaxedLayout :: Int -> Bool
 relaxedLayout flags = testBit flags relaxedLayoutBit
 nondecreasingIndentation :: Int -> Bool
 nondecreasingIndentation flags = testBit flags nondecreasingIndentationBit
+sccProfilingOn :: Int -> Bool
+sccProfilingOn flags = testBit flags sccProfilingOnBit
 traditionalRecordSyntaxEnabled :: Int -> Bool
 traditionalRecordSyntaxEnabled flags = testBit flags traditionalRecordSyntaxBit
 typeLiteralsEnabled :: Int -> Bool
@@ -1918,8 +1925,6 @@ explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
 lambdaCaseEnabled :: Int -> Bool
 lambdaCaseEnabled flags = testBit flags lambdaCaseBit
-multiWayIfEnabled :: Int -> Bool
-multiWayIfEnabled flags = testBit flags multiWayIfBit
 
 -- PState for parsing options pragmas
 --
@@ -1963,7 +1968,7 @@ mkPState flags buf loc =
                .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
                .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
                .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
-               .|. haddockBit                  `setBitIf` dopt Opt_Haddock                  flags
+               .|. haddockBit                  `setBitIf` gopt Opt_Haddock                  flags
                .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
                .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
                .|. recursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
@@ -1972,16 +1977,17 @@ mkPState flags buf loc =
                .|. datatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
                .|. transformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
                .|. transformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
-               .|. rawTokenStreamBit           `setBitIf` dopt Opt_KeepRawTokenStream       flags
+               .|. rawTokenStreamBit           `setBitIf` gopt Opt_KeepRawTokenStream       flags
+               .|. hpcBit                      `setBitIf` gopt Opt_Hpc                      flags
                .|. alternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
                .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
+               .|. sccProfilingOnBit           `setBitIf` gopt Opt_SccProfilingOn           flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. safeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
-               .|. multiWayIfBit               `setBitIf` xopt Opt_MultiWayIf               flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -2328,7 +2334,7 @@ reportLexError loc1 loc2 buf str
 
 lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
-    where dflags' = dopt_set (dopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
+    where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
           initState = mkPState dflags' buf loc
           go = do
             ltok <- lexer return

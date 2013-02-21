@@ -26,6 +26,8 @@ types that
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
+        ConTag, fIRST_TAG,
+
 	Arity, RepArity,
 	
 	Alignment,
@@ -62,16 +64,14 @@ module BasicTypes(
 
         EP(..),
 
-	HsBang(..), isBanged, isMarkedUnboxed, 
-        StrictnessMark(..), isMarkedStrict,
-
 	DefMethSpec(..),
+        SwapFlag(..), flipSwap, unSwap,
 
         CompilerPhase(..), PhaseNum,
         Activation(..), isActive, isActiveIn,
         isNeverActive, isAlwaysActive, isEarlyActive,
         RuleMatchInfo(..), isConLike, isFunLike, 
-        InlineSpec(..), 
+        InlineSpec(..), isEmptyInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
         neverInlinePragma, dfunInlinePragma, 
 	isDefaultInlinePragma, 
@@ -115,6 +115,21 @@ type RepArity = Int
 
 %************************************************************************
 %*									*
+              Constructor tags
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | Type of the tags associated with each constructor possibility
+type ConTag = Int
+
+fIRST_TAG :: ConTag
+-- ^ Tags are allocated from here for real constructors
+fIRST_TAG =  1
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection[Alignment]{Alignment}
 %*									*
 %************************************************************************
@@ -122,6 +137,31 @@ type RepArity = Int
 \begin{code}
 type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 \end{code}
+
+%************************************************************************
+%*									*
+           Swap flag
+%*									*
+%************************************************************************
+
+\begin{code}
+data SwapFlag 
+  = NotSwapped	-- Args are: actual,   expected
+  | IsSwapped   -- Args are: expected, actual
+
+instance Outputable SwapFlag where
+  ppr IsSwapped  = ptext (sLit "Is-swapped")
+  ppr NotSwapped = ptext (sLit "Not-swapped")
+
+flipSwap :: SwapFlag -> SwapFlag
+flipSwap IsSwapped  = NotSwapped
+flipSwap NotSwapped = IsSwapped
+
+unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
+unSwap NotSwapped f a b = f a b
+unSwap IsSwapped  f a b = f b a
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -545,61 +585,6 @@ instance Outputable OccInfo where
 	  pp_args | int_cxt   = char '!'
 		  | otherwise = empty
 \end{code}
-
-%************************************************************************
-%*									*
-		Strictness indication
-%*									*
-%************************************************************************
-
-The strictness annotations on types in data type declarations
-e.g. 	data T = MkT !Int !(Bool,Bool)
-
-\begin{code}
--------------------------
--- HsBang describes what the *programmer* wrote
--- This info is retained in the DataCon.dcStrictMarks field
-data HsBang = HsNoBang	
-
-	    | HsStrict	
-
-	    | HsUnpack	       -- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
-
-	    | HsUnpackFailed   -- An UNPACK pragma that we could not make 
-	      		       -- use of, because the type isn't unboxable; 
-                               -- equivalant to HsStrict except for checkValidDataCon
-            | HsNoUnpack       -- {-# NOUNPACK #-} ! (GHC extension, meaning "strict but not unboxed")
-  deriving (Eq, Data, Typeable)
-
-instance Outputable HsBang where
-    ppr HsNoBang       = empty
-    ppr HsStrict       = char '!'
-    ppr HsUnpack       = ptext (sLit "{-# UNPACK #-} !")
-    ppr HsUnpackFailed = ptext (sLit "{-# UNPACK (failed) #-} !")
-    ppr HsNoUnpack     = ptext (sLit "{-# NOUNPACK #-} !")
-
-isBanged :: HsBang -> Bool
-isBanged HsNoBang = False
-isBanged _        = True
-
-isMarkedUnboxed :: HsBang -> Bool
-isMarkedUnboxed HsUnpack = True
-isMarkedUnboxed _        = False
-
--------------------------
--- StrictnessMark is internal only, used to indicate strictness 
--- of the DataCon *worker* fields
-data StrictnessMark = MarkedStrict | NotMarkedStrict	
-
-instance Outputable StrictnessMark where
-  ppr MarkedStrict     = ptext (sLit "!")
-  ppr NotMarkedStrict  = empty
-
-isMarkedStrict :: StrictnessMark -> Bool
-isMarkedStrict NotMarkedStrict = False
-isMarkedStrict _               = True   -- All others are strict
-\end{code}
-
 
 %************************************************************************
 %*									*

@@ -24,6 +24,7 @@
 # where
 #   * 'localpath' is where to put the repository in a checked out tree.
 #   * 'remotepath' is where the repository is in the central repository.
+#     It is - for submodules.
 #   * 'VCS' is what version control system the repo uses.
 #
 #   * The 'tag' determines when "darcs-all get" will get the
@@ -42,21 +43,20 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #    localpath                tag           remotepath                          VCS
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.                               -           ghc.git                             git
 ghc-tarballs                    -           ghc-tarballs.git                    git
 utils/hsc2hs                    -           hsc2hs.git                          git
 utils/haddock                   -           haddock.git                         git
 libraries/array                 -           packages/array.git                  git
 libraries/base                  -           packages/base.git                   git
-libraries/binary                -           packages/binary.git                 git
-libraries/bytestring            -           packages/bytestring.git             git
-libraries/Cabal                 -           packages/Cabal.git                  git
-libraries/containers            -           packages/containers.git             git
+libraries/binary                -           -                                   git
+libraries/bytestring            -           -                                   git
+libraries/Cabal                 -           -                                   git
+libraries/containers            -           -                                   git
 libraries/deepseq               -           packages/deepseq.git                git
 libraries/directory             -           packages/directory.git              git
 libraries/filepath              -           packages/filepath.git               git
 libraries/ghc-prim              -           packages/ghc-prim.git               git
-libraries/haskeline             -           packages/haskeline.git              git
+libraries/haskeline             -           -                                   git
 libraries/haskell98             -           packages/haskell98.git              git
 libraries/haskell2010           -           packages/haskell2010.git            git
 libraries/hoopl                 -           packages/hoopl.git                  git
@@ -66,20 +66,21 @@ libraries/integer-simple        -           packages/integer-simple.git         
 libraries/lwconc                -           packages/lwconc.git                 git
 libraries/old-locale            -           packages/old-locale.git             git
 libraries/old-time              -           packages/old-time.git               git
-libraries/pretty                -           packages/pretty.git                 git
+libraries/pretty                -           -                                   git
 libraries/process               -           packages/process.git                git
 libraries/template-haskell      -           packages/template-haskell.git       git
-libraries/terminfo              -           packages/terminfo.git               git
-libraries/transformers          -           packages/transformers.git           git
+libraries/terminfo              -           -                                   git
+libraries/time                  -           -                                   git
+libraries/transformers          -           -                                   git
 libraries/unix                  -           packages/unix.git                   git
-libraries/utf8-string           -           packages/utf8-string.git            git
-libraries/Win32                 -           packages/Win32.git                  git
-libraries/xhtml                 -           packages/xhtml.git                  git
+libraries/Win32                 -           -                                   git
+libraries/xhtml                 -           -                                   git
 testsuite                       testsuite   testsuite.git                       git
 nofib                           nofib       nofib.git                           git
 libraries/parallel              extra       packages/parallel.git               git
 libraries/stm                   extra       packages/stm.git                    git
-libraries/random                dph         packages/random.git                 git
-libraries/primitive             dph         packages/primitive.git              git
-libraries/vector                dph         packages/vector.git                 git
+libraries/random                dph         -                                   git
+libraries/primitive             dph         -                                   git
+libraries/vector                dph         -                                   git
 libraries/dph                   dph         packages/dph.git                    git
+.                               -           ghc.git                             git

@@ -16,6 +16,9 @@
 # Fast build with optimised libraries, no profiling (RECOMMENDED):
 #BuildFlavour = quick
 
+# Fast build with optimised libraries, no profiling, with LLVM:
+#BuildFlavour = quick-llvm
+
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
 # (including stage2) will run very slowly:
@@ -30,10 +33,11 @@
 # A development build, working on the stage 2 compiler:
 #BuildFlavour = devel2
 
-# An unregisterised, optimised build of ghc, for porting:
-#BuildFlavour = unreg
+GhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),dyn,v)
 
-GhcLibWays = v
+# Uncomment this to get prettier build output.
+# Please use V = 1 when reporting GHC bugs.
+# V = 0
 
 # -------- 1. A Performance/Distribution build--------------------------------
 
@@ -103,6 +107,22 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
+# -------- A Fast build with optimised libs using LLVM -----------------------
+
+ifeq "$(BuildFlavour)" "quick-llvm"
+
+SRC_HC_OPTS        = -H64m -O0 -fllvm
+GhcStage1HcOpts    = -O -fllvm
+GhcStage2HcOpts    = -O0 -fllvm
+GhcLibHcOpts       = -O -fllvm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+endif
+
 # -------- Profile the stage2 compiler ---------------------------------------
 
 ifeq "$(BuildFlavour)" "prof"
@@ -164,30 +184,6 @@ LAX_DEPENDENCIES   = YES
 # you comment the line again.  This is a useful trick for when you're
 # working on stage 2 and want to freeze stage 1 and the libraries for
 # a while.
-
-endif
-
-# -------- A Unregisterised build) -------------------------------------------
-
-ifeq "$(BuildFlavour)" "unreg"
-
-# Note that the LLVM backend works in unregisterised mode as well as
-# registerised mode. This often makes it a good choice for porting
-# GHC.
-
-GhcUnregisterised    = YES
-GhcWithNativeCodeGen = NO
-
-SRC_HC_OPTS          = -O -H64m # -fllvm
-GhcStage1HcOpts      = -O
-GhcStage2HcOpts      = -O2
-GhcHcOpts            = -Rghc-timing
-GhcLibHcOpts         = -O2
-SplitObjs            = NO
-HADDOCK_DOCS         = NO
-BUILD_DOCBOOK_HTML   = NO
-BUILD_DOCBOOK_PS     = NO
-BUILD_DOCBOOK_PDF    = NO
 
 endif
 

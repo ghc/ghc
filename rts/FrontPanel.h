@@ -19,7 +19,7 @@
 void initFrontPanel( void );
 void stopFrontPanel( void );
 void updateFrontPanelBeforeGC( nat N );
-void updateFrontPanelAfterGC( nat N, lnat live );
+void updateFrontPanelAfterGC( nat N, W_ live );
 void updateFrontPanel( void );
 
 

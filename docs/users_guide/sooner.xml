@@ -292,14 +292,11 @@ f (Wibble x y)  # ugly, and proud of it
 
 	  <para>Look for your function in the interface file, then for
           the third field in the pragma; it should say
-          <literal>&lowbar;&lowbar;S &lt;string&gt;</literal>.  The
+          <literal>Strictness: &lt;string&gt;</literal>.  The
           <literal>&lt;string&gt;</literal> gives the strictness of
-          the function's arguments.  <function>L</function> is lazy
-          (bad), <function>S</function> and <function>E</function> are
-          strict (good), <function>P</function> is
-          &ldquo;primitive&rdquo; (good), <function>U(...)</function>
-          is strict and &ldquo;unpackable&rdquo; (very good), and
-          <function>A</function> is absent (very good).</para>
+          the function's arguments: see <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/Demand">
+          the GHC Commentary</ulink> for a description of the strictness notation.
+          </para>
 
 	  <para>For an &ldquo;unpackable&rdquo;
           <function>U(...)</function> argument, the info inside tells

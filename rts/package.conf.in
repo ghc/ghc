@@ -16,7 +16,7 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		LIB_DIR PAPI_LIB_DIR
+library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR
 #else /* !INSTALLING */
 library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR
 #endif
@@ -32,6 +32,9 @@ extra-libraries:
 #endif
 #ifdef HAVE_LIBDL
 			      , "dl"
+#endif
+#ifdef HAVE_LIBFFI
+                              , "ffi"
 #endif
 #ifdef mingw32_HOST_OS
 			      ,"wsock32"	/* for the linker */
@@ -53,7 +56,7 @@ extra-libraries:
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:		TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-ghcconstants/header" TOP"/includes/dist-derivedconstants/header"
+include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-derivedconstants/header"
 #endif
 
 includes:		Stg.h
@@ -106,6 +109,7 @@ ld-options:
          , "-u", "_base_GHCziTopHandler_runIO_closure"
          , "-u", "_base_GHCziTopHandler_runNonIO_closure"
 	 , "-u", "_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-u", "_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
 	 , "-u", "_base_GHCziConcziSync_runSparks_closure"
 	 , "-u", "_base_GHCziConcziSignal_runHandlers_closure"
 #else
@@ -153,6 +157,7 @@ ld-options:
          , "-u", "base_GHCziTopHandler_runIO_closure"
          , "-u", "base_GHCziTopHandler_runNonIO_closure"
 	 , "-u", "base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-u", "base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
 	 , "-u", "base_GHCziConcziSync_runSparks_closure"
 	 , "-u", "base_GHCziConcziSignal_runHandlers_closure"
 #endif

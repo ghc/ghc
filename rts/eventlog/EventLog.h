@@ -49,6 +49,8 @@ void postUserMsg(Capability *cap, char *msg, va_list ap);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
+void postUserMarker(Capability *cap, char *markername);
+
 void postEventStartup(EventCapNo n_caps);
 
 /*
@@ -106,24 +108,24 @@ void postThreadLabel(Capability    *cap,
 void postHeapEvent (Capability    *cap,
                     EventTypeNum   tag,
                     EventCapsetID  heap_capset,
-                    lnat           info1);
+                    W_           info1);
 
 void postEventHeapInfo (EventCapsetID heap_capset,
                         nat           gens,
-                        lnat          maxHeapSize,
-                        lnat          allocAreaSize,
-                        lnat          mblockSize,
-                        lnat          blockSize);
+                        W_          maxHeapSize,
+                        W_          allocAreaSize,
+                        W_          mblockSize,
+                        W_          blockSize);
 
 void postEventGcStats  (Capability    *cap,
                         EventCapsetID  heap_capset,
                         nat            gen,
-                        lnat           copied,
-                        lnat           slop,
-                        lnat           fragmentation,
+                        W_           copied,
+                        W_           slop,
+                        W_           fragmentation,
                         nat            par_n_threads,
-                        lnat           par_max_copied,
-                        lnat           par_tot_copied);
+                        W_           par_max_copied,
+                        W_           par_tot_copied);
 
 void postTaskCreateEvent (EventTaskId taskId,
                           EventCapNo cap,

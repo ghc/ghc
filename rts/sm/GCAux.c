@@ -93,6 +93,14 @@ isAlive(StgClosure *p)
       p = ((StgInd *)q)->indirectee;
       continue;
 
+    case BLACKHOLE:
+        p = ((StgInd*)q)->indirectee;
+        if (GET_CLOSURE_TAG(p) != 0) {
+            continue;
+        } else {
+            return NULL;
+        }
+
     default:
       // dead. 
       return NULL;
@@ -113,7 +121,7 @@ revertCAFs( void )
          c != (StgIndStatic *)END_OF_STATIC_LIST; 
 	 c = (StgIndStatic *)c->static_link) 
     {
-	SET_INFO(c, c->saved_info);
+	SET_INFO((StgClosure *)c, c->saved_info);
 	c->saved_info = NULL;
 	// could, but not necessary: c->static_link = NULL; 
     }

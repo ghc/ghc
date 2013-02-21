@@ -821,7 +821,7 @@ dumpCensus( Census *census )
 	}
 #endif
 
-	fprintf(hp_file, "\t%" FMT_SizeT "\n", (lnat)count * sizeof(W_));
+	fprintf(hp_file, "\t%" FMT_SizeT "\n", (W_)count * sizeof(W_));
     }
 
     printSample(rtsFalse, census->time);
@@ -988,7 +988,8 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case MVAR_CLEAN:
             case MVAR_DIRTY:
-	    case WEAK:
+            case TVAR:
+            case WEAK:
 	    case PRIM:
 	    case MUT_PRIM:
 	    case MUT_VAR_CLEAN:

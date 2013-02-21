@@ -48,6 +48,8 @@ module Module
         pprModule,
         mkModule,
         stableModuleCmp,
+        HasModule(..),
+        ContainsModule(..),
 
         -- * The ModuleLocation type
         ModLocation(..),
@@ -276,6 +278,12 @@ pprPackagePrefix p mod = getPprStyle doc
                 -- the PrintUnqualified tells us which modules have to
                 -- be qualified with package names
        | otherwise = empty
+
+class ContainsModule t where
+    extractModule :: t -> Module
+
+class HasModule m where
+    getModule :: m Module
 \end{code}
 
 %************************************************************************

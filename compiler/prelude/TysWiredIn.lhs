@@ -48,7 +48,7 @@ module TysWiredIn (
 	wordTyCon, wordDataCon, wordTyConName, wordTy,
 
         -- * List
-	listTyCon, nilDataCon, consDataCon, consDataConName,
+	listTyCon, nilDataCon, nilDataConName, consDataCon, consDataConName,
 	listTyCon_RDR, consDataCon_RDR, listTyConName,
 	mkListTy, mkPromotedListTy,
 
@@ -64,6 +64,9 @@ module TysWiredIn (
         -- * Unit
 	unitTy,
 
+        -- * Kinds
+	typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
+
         -- * Parallel arrays
 	mkPArrTy,
 	parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon,
@@ -76,7 +79,7 @@ module TysWiredIn (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId( mkDataConIds )
+import {-# SOURCE #-} MkId( mkDataConWorkId )
 
 -- friends:
 import PrelNames
@@ -93,7 +96,7 @@ import TypeRep
 import RdrName
 import Name
 import BasicTypes       ( TupleSort(..), tupleSortBoxity,
-                          Arity, RecFlag(..), Boxity(..), HsBang(..) )
+                          Arity, RecFlag(..), Boxity(..) )
 import ForeignCall
 import Unique           ( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
@@ -148,6 +151,8 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
     	      , listTyCon
 	      , parrTyCon
               , eqTyCon
+              , typeNatKindCon
+              , typeSymbolKindCon
     	      ]
            ++ (case cIntegerLibraryType of
                IntegerGMP -> [integerTyCon]
@@ -193,6 +198,11 @@ floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#") floa
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey doubleTyCon
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
 
+-- Kinds
+typeNatKindConName, typeSymbolKindConName :: Name
+typeNatKindConName    = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "Nat")    typeNatKindConNameKey    typeNatKindCon
+typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "Symbol") typeSymbolKindConNameKey typeSymbolKindCon 
+
 -- For integer-gmp only:
 integerRealTyConName :: Name
 integerRealTyConName    = case cIntegerLibraryType of
@@ -230,23 +240,22 @@ eqTyCon_RDR     = nameRdrName eqTyConName
 
 \begin{code}
 pcNonRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
-pcNonRecDataTyCon = pcTyCon False NonRecursive
-pcRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
-pcRecDataTyCon    = pcTyCon False Recursive
+-- Not an enumeration, not promotable
+pcNonRecDataTyCon = pcTyCon False NonRecursive False
 
-pcTyCon :: Bool -> RecFlag -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
-pcTyCon is_enum is_rec name cType tyvars cons
+pcTyCon :: Bool -> RecFlag -> Bool -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
+pcTyCon is_enum is_rec is_prom name cType tyvars cons
   = tycon
   where
-    tycon = mkAlgTyCon name
-		(mkArrowKinds (map tyVarKind tyvars) liftedTypeKind)
+    tycon = buildAlgTyCon name
                 tyvars
                 cType
                 []		-- No stupid theta
 		(DataTyCon cons is_enum)
-		NoParentTyCon
                 is_rec
+                is_prom
 		False		-- Not in GADT syntax
+		NoParentTyCon
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon = pcDataConWithFixity False
@@ -277,16 +286,33 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
 		arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)) 
 		tycon
 		[]	-- No stupid theta
-		(mkDataConIds bogus_wrap_name wrk_name data_con)
-		
+                (mkDataConWorkId wrk_name data_con)
+		NoDataConRep	-- Wired-in types are too simple to need wrappers
 
     modu     = ASSERT( isExternalName dc_name ) 
 	       nameModule dc_name
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_name = mkWiredInName modu wrk_occ wrk_key
 			     (AnId (dataConWorkId data_con)) UserSyntax
-    bogus_wrap_name = pprPanic "Wired-in data wrapper id" (ppr dc_name)
-	-- Wired-in types are too simple to need wrappers
+\end{code}
+
+
+%************************************************************************
+%*									*
+      Kinds
+%*									*
+%************************************************************************
+
+\begin{code}
+typeNatKindCon, typeSymbolKindCon :: TyCon 
+-- data Nat
+-- data Symbol
+typeNatKindCon    = pcTyCon False NonRecursive True typeNatKindConName    Nothing [] []
+typeSymbolKindCon = pcTyCon False NonRecursive True typeSymbolKindConName Nothing [] []
+
+typeNatKind, typeSymbolKind :: Kind
+typeNatKind    = TyConApp (promoteTyCon typeNatKindCon)    []
+typeSymbolKind = TyConApp (promoteTyCon typeSymbolKindCon) []
 \end{code}
 
 
@@ -322,10 +348,10 @@ tupleTyCon UnboxedTuple i = fst (unboxedTupleArr ! i)
 tupleTyCon ConstraintTuple    i = fst (factTupleArr    ! i)
 
 promotedTupleTyCon :: TupleSort -> Arity -> TyCon
-promotedTupleTyCon sort i = buildPromotedTyCon (tupleTyCon sort i)
+promotedTupleTyCon sort i = promoteTyCon (tupleTyCon sort i)
 
 promotedTupleDataCon :: TupleSort -> Arity -> TyCon
-promotedTupleDataCon sort i = buildPromotedDataCon (tupleCon sort i)
+promotedTupleDataCon sort i = promoteDataCon (tupleCon sort i)
 
 tupleCon :: TupleSort -> Arity -> DataCon
 tupleCon sort i | i > mAX_TUPLE_SIZE = snd (mk_tuple sort i)	-- Build one specially
@@ -341,7 +367,12 @@ factTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple ConstraintTuple i | i <- [
 mk_tuple :: TupleSort -> Int -> (TyCon,DataCon)
 mk_tuple sort arity = (tycon, tuple_con)
   where
-	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con sort 
+	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con sort prom_tc
+        prom_tc = case sort of
+	  BoxedTuple   	  -> Just (mkPromotedTyCon tycon (promoteKind tc_kind))
+	  UnboxedTuple 	  -> Nothing
+	  ConstraintTuple -> Nothing
+
 	modu	= mkTupleModule sort arity
 	tc_name = mkWiredInName modu (mkTupleOcc tcName sort arity) tc_uniq
 				(ATyCon tycon) BuiltInSyntax
@@ -407,6 +438,7 @@ eqTyCon = mkAlgTyCon eqTyConName
             NoParentTyCon
             NonRecursive
             False
+            Nothing   -- No parent for constraint-kinded types
   where
     kv = kKiVar
     k = mkTyVarTy kv
@@ -552,7 +584,7 @@ boolTy :: Type
 boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
-boolTyCon = pcTyCon True NonRecursive boolTyConName
+boolTyCon = pcTyCon True NonRecursive True boolTyConName
                     (Just (CType Nothing (fsLit "HsBool")))
                     [] [falseDataCon, trueDataCon]
 
@@ -565,7 +597,7 @@ falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
 
 orderingTyCon :: TyCon
-orderingTyCon = pcTyCon True NonRecursive orderingTyConName Nothing
+orderingTyCon = pcTyCon True NonRecursive True orderingTyConName Nothing
                         [] [ltDataCon, eqDataCon, gtDataCon]
 
 ltDataCon, eqDataCon, gtDataCon :: DataCon
@@ -599,13 +631,14 @@ mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
 listTyCon :: TyCon
-listTyCon = pcRecDataTyCon listTyConName Nothing alpha_tyvar [nilDataCon, consDataCon]
+listTyCon = pcTyCon False Recursive True
+                    listTyConName Nothing alpha_tyvar [nilDataCon, consDataCon]
 
 mkPromotedListTy :: Type -> Type
 mkPromotedListTy ty = mkTyConApp promotedListTyCon [ty]
 
 promotedListTyCon :: TyCon
-promotedListTyCon = buildPromotedTyCon listTyCon
+promotedListTyCon = promoteTyCon listTyCon
 
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon

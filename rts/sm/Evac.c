@@ -35,7 +35,7 @@ StgWord64 whitehole_spin = 0;
 #define HEAP_ALLOCED_GC(p) HEAP_ALLOCED(p)
 #endif
 
-#if !defined(PARALLEL_GC)
+#if !defined(PARALLEL_GC) || defined(PROFILING)
 #define copy_tag_nolock(p, info, src, size, stp, tag) \
         copy_tag(p, info, src, size, stp, tag)
 #endif
@@ -113,6 +113,17 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
         const StgInfoTable *new_info;
         new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, (W_)info, MK_FORWARDING_PTR(to));
         if (new_info != info) {
+#ifdef PROFILING
+            // We copied this object at the same time as another
+            // thread.  We'll evacuate the object again and the copy
+            // we just made will be discarded at the next GC, but we
+            // may have copied it after the other thread called
+            // SET_EVACUAEE_FOR_LDV(), which would confuse the LDV
+            // profiler when it encounters this closure in
+            // processHeapClosureForDead.  So we reset the LDVW field
+            // here.
+            LDVW(to) = 0;
+#endif
             return evacuate(p); // does the failed_to_evac stuff
         } else {
             *p = TAG_CLOSURE(tag,(StgClosure*)to);
@@ -126,11 +137,13 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #ifdef PROFILING
     // We store the size of the just evacuated object in the LDV word so that
     // the profiler can guess the position of the next object later.
+    // This is safe only if we are sure that no other thread evacuates
+    // the object again, so we cannot use copy_tag_nolock when PROFILING.
     SET_EVACUAEE_FOR_LDV(from, size);
 #endif
 }
 
-#if defined(PARALLEL_GC)
+#if defined(PARALLEL_GC) && !defined(PROFILING)
 STATIC_INLINE void
 copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, nat size, nat gen_no, StgWord tag)
@@ -540,13 +553,6 @@ loop:
   case WHITEHOLE:
       goto loop;
 
-  case MUT_VAR_CLEAN:
-  case MUT_VAR_DIRTY:
-  case MVAR_CLEAN:
-  case MVAR_DIRTY:
-      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
-      return;
-
   // For ints and chars of low value, save space by replacing references to
   //	these with closures with references to common, shared ones in the RTS.
   //
@@ -646,6 +652,11 @@ loop:
       goto loop;
   }
 
+  case MUT_VAR_CLEAN:
+  case MUT_VAR_DIRTY:
+  case MVAR_CLEAN:
+  case MVAR_DIRTY:
+  case TVAR:
   case BLOCKING_QUEUE:
   case WEAK:
   case PRIM:
@@ -670,7 +681,6 @@ loop:
   case RET_BCO:
   case RET_SMALL:
   case RET_BIG:
-  case RET_DYN:
   case UPDATE_FRAME:
   case UNDERFLOW_FRAME:
   case STOP_FRAME:
@@ -794,11 +804,11 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
             // entered, and should result in a NonTermination exception.
             ((StgThunk *)p)->payload[0] = val;
             write_barrier();
-            SET_INFO(p, &stg_sel_0_upd_info);
+            SET_INFO((StgClosure *)p, &stg_sel_0_upd_info);
         } else {
             ((StgInd *)p)->indirectee = val;
             write_barrier();
-            SET_INFO(p, &stg_IND_info);
+            SET_INFO((StgClosure *)p, &stg_IND_info);
         }
 
         // For the purposes of LDV profiling, we have created an
@@ -875,7 +885,7 @@ selector_chain:
 
         // make sure someone else didn't get here first...
         if (IS_FORWARDING_PTR(info_ptr) ||
-            INFO_PTR_TO_STRUCT(info_ptr)->type != THUNK_SELECTOR) {
+            INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->type != THUNK_SELECTOR) {
             // v. tricky now.  The THUNK_SELECTOR has been evacuated
             // by another thread, and is now either a forwarding ptr or IND.
             // We need to extract ourselves from the current situation
@@ -885,7 +895,7 @@ selector_chain:
             //   - if evac, we need to call evacuate(), because we
             //     need the write-barrier stuff.
             //   - undo the chain we've built to point to p.
-            SET_INFO(p, (const StgInfoTable *)info_ptr);
+            SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
             *q = (StgClosure *)p;
             if (evac) evacuate(q);
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
@@ -895,10 +905,10 @@ selector_chain:
 #else
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = (StgWord)p->header.info;
-    SET_INFO(p,&stg_WHITEHOLE_info);
+    SET_INFO((StgClosure *)p,&stg_WHITEHOLE_info);
 #endif
 
-    field = INFO_PTR_TO_STRUCT(info_ptr)->layout.selector_offset;
+    field = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->layout.selector_offset;
 
     // The selectee might be a constructor closure,
     // so we untag the pointer.
@@ -945,9 +955,9 @@ selector_loop:
 #ifdef PROFILING
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
-              SET_INFO(p, (StgInfoTable *)info_ptr);
+              SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
               OVERWRITING_CLOSURE((StgClosure*)p);
-              SET_INFO(p, &stg_WHITEHOLE_info);
+              SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
 #endif
 
               // the closure in val is now the "value" of the
@@ -959,7 +969,7 @@ selector_loop:
               info_ptr = (StgWord)UNTAG_CLOSURE(val)->header.info;
               if (!IS_FORWARDING_PTR(info_ptr))
               {
-                  info = INFO_PTR_TO_STRUCT(info_ptr);
+                  info = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
                   switch (info->type) {
                   case IND:
                   case IND_PERM:
@@ -1073,7 +1083,7 @@ selector_loop:
 bale_out:
     // We didn't manage to evaluate this thunk; restore the old info
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
-    SET_INFO(p, (const StgInfoTable *)info_ptr);
+    SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
     // THREADED_RTS: we just unlocked the thunk, so another thread
     // might get in and update it.  copy() will lock it again and
     // check whether it was updated in the meantime.

@@ -397,8 +397,8 @@ void pushClosure   (StgTSO *tso, StgWord c) {
   tso->stackobj->sp[0] = (W_) c;
 }
 
-  StgTSO *
-createGenThread (Capability *cap, nat stack_size,  StgClosure *closure)
+StgTSO *
+createGenThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
@@ -407,8 +407,8 @@ createGenThread (Capability *cap, nat stack_size,  StgClosure *closure)
   return t;
 }
 
-  StgTSO *
-createIOThread (Capability *cap, nat stack_size,  StgClosure *closure)
+StgTSO *
+createIOThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
@@ -451,8 +451,8 @@ createUserLevelThread (Capability *cap, nat stack_size,  StgClosure *closure)
  * to whnf while we're at it.
  */
 
-  StgTSO *
-createStrictIOThread(Capability *cap, nat stack_size,  StgClosure *closure)
+StgTSO *
+createStrictIOThread(Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread(cap, stack_size);

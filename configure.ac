@@ -34,13 +34,11 @@ fi
 AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
 dnl ----------------------------------------------------------
-dnl ** Find unixy sort and find commands,
+dnl ** Find unixy sort and find commands, 
 dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
-
-dnl ** Find sort command (for the benefit of Win32 environs)
 FP_PROG_SORT
 
 dnl ----------------------------------------------------------
@@ -52,10 +50,13 @@ AC_SUBST([release], [1])
 # First off, a distrib sanity check..
 AC_CONFIG_SRCDIR([mk/config.mk.in])
 
-dnl * We require autoconf version 2.52
+dnl * We require autoconf version 2.60
 dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
 dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
-AC_PREREQ([2.52])
+dnl Using autoconf 2.59 started to give nonsense like this
+dnl  #define SIZEOF_CHAR 0
+dnl recently.
+AC_PREREQ([2.60])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
@@ -89,26 +90,9 @@ AC_ARG_WITH([ghc],
   fi
   WithGhc="$GHC"])
 
-
 dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
+dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
 AC_SUBST(OSTYPE)
-
-dnl ** Booting from .hc files?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(hc-boot,
-[AC_HELP_STRING([--enable-hc-boot],
-[Boot the Glasgow Haskell Compiler from intermediate .hc files.
- (This option is mostly of interest to porters.) [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        BootingFromHc=YES
-  else
-        BootingFromHc=NO
-  fi
-],
-[BootingFromHc=NO]
-)
-AC_SUBST(BootingFromHc)
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
@@ -131,12 +115,12 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os],['unkown'])
-  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command],['$(CC)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os])
+  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   if test "x$OS_STAGE0" != "xOSDarwin"; then
-  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command],['$(AR)'])
-  BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags],['$(AR_OPTS)'])
-  BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file],['$(ArSupportsAtFile)'])
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
+    BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
   else
     AR_STAGE0='$(AR)'
     AR_OPTS_STAGE0='$(AR_OPTS)'
@@ -144,28 +128,29 @@ if test "$WithGhc" != ""; then
   fi
 fi
 
-dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO"; then
-  if test "$WithGhc" = ""; then
-     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
-  fi
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
+dnl ** Must have GHC to build GHC
+if test "$WithGhc" = ""
+then
+    AC_MSG_ERROR([GHC is required.])
+fi
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
     [AC_MSG_ERROR([GHC version 7.4 or later is required to compile GHC.])])dnl
 
-  if test `expr $GhcMinVersion % 2` = "1"; then
-     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
+if test `expr $GhcMinVersion % 2` = "1"
+then
+    if test "$EnableBootstrapWithDevelSnaphost" = "NO"
+    then
         AC_MSG_ERROR([
      $WithGhc is a development snapshot of GHC, version $GhcVersion.
      Bootstrapping using this version of GHC is not supported, and may not
      work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
      or --with-ghc to specify a different GHC to use.])
-     fi
-  fi
+    fi
+fi
 
-  GHC_PACKAGE_DB_FLAG=package-db
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
-  AC_SUBST(GHC_PACKAGE_DB_FLAG)
-fi;
+GHC_PACKAGE_DB_FLAG=package-db
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
+AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -189,9 +174,6 @@ AC_SUBST([WithGhc])
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
 
-FP_ICONV
-FP_GMP
-
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
@@ -214,33 +196,16 @@ AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-# Testing ARM ABI
-# required for code generation (LLVM options)
-ARM_ABI=SOFT
-echo HOST: $host
-
-case $host in
-     arm*-*-linux-gnueabihf)
-     ARM_ABI=HARD
-     ;;
-     arm*-*-linux-gnueabi)
-     ARM_ABI=SOFTFP
-     ;;
-esac
-
 FPTOOLS_SET_PLATFORM_VARS
 
 # Verify that the installed (bootstrap) GHC is capable of generating
 # code for the requested build platform.
-if test "$BootingFromHc" = "NO"
+if test "$BuildPlatform" != "$bootstrap_target"
 then
-    if test "$BuildPlatform" != "$bootstrap_target"
-    then
-        echo "This GHC (${WithGhc}) does not generate code for the build platform"
-        echo "   GHC target platform    : $bootstrap_target"
-        echo "   Desired build platform : $BuildPlatform"
-        exit 1
-    fi
+    echo "This GHC (${WithGhc}) does not generate code for the build platform"
+    echo "   GHC target platform    : $bootstrap_target"
+    echo "   Desired build platform : $BuildPlatform"
+    exit 1
 fi
 
 # Testing if we shall enable shared libs support on Solaris.
@@ -259,6 +224,29 @@ case $host in
 esac
 
 AC_SUBST(SOLARIS_BROKEN_SHLD)
+
+dnl ** Do an unregisterised build?
+dnl --------------------------------------------------------------
+case "$HostArch" in
+    i386|x86_64|powerpc|arm)
+        UnregisterisedDefault=NO
+        ;;
+    *)
+        UnregisterisedDefault=YES
+        ;;
+esac
+AC_ARG_ENABLE(unregisterised,
+[AC_HELP_STRING([--enable-unregisterised],
+[Build an unregisterised compiler (enabled by default on platforms without registerised support) [default="$UnregisterisedDefault"]])],
+[ if test x"$enableval" = x"yes"; then
+        Unregisterised=YES
+  else
+        Unregisterised=NO
+  fi
+],
+[Unregisterised="$UnregisterisedDefault"]
+)
+AC_SUBST(Unregisterised)
 
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
@@ -280,39 +268,39 @@ then
     if test "$HostArch" = "i386"
     then
         # NB. If you update the tarballs to a new version of gcc, don't
-    # forget to tweak the paths in driver/gcc/gcc.c.
-    if ! test -d inplace/mingw ||
-         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
-         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
-         test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
-         test inplace/mingw -ot ghc-tarballs/mingw/libgcc*.tar.gz      ||
-         test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
-         test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
-         test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
-         test inplace/mingw -ot ghc-tarballs/mingw/libstdc*.tar.lzma   ||
-         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
-    then
-        AC_MSG_NOTICE([Making in-tree mingw tree])
-        rm -rf inplace/mingw
-        mkdir inplace/mingw
-        (
-            cd inplace/mingw &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/libgcc*.tar.lzma    &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/libstdc*.tar.lzma   &&
-            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
-            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
-            mv bin/gcc.exe bin/realgcc.exe
-        )
-        PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
+        # forget to tweak the paths in driver/gcc/gcc.c.
+        if ! test -d inplace/mingw ||
+             test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
+             test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
+             test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
+             test inplace/mingw -ot ghc-tarballs/mingw/libgcc*.tar.gz      ||
+             test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
+             test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
+             test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
+             test inplace/mingw -ot ghc-tarballs/mingw/libstdc*.tar.lzma   ||
+             test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
+             test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
+             test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
+        then
+            AC_MSG_NOTICE([Making in-tree mingw tree])
+            rm -rf inplace/mingw
+            mkdir inplace/mingw
+            (
+                cd inplace/mingw &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/libgcc*.tar.lzma    &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/libstdc*.tar.lzma   &&
+                tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
+                tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
+                tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
+                mv bin/gcc.exe bin/realgcc.exe
+            )
+            PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
             AC_MSG_NOTICE([In-tree mingw tree created])
         fi
     else
@@ -353,6 +341,65 @@ then
     fi
 fi
 
+# system libffi
+
+AC_ARG_WITH([system-libffi],
+[AC_HELP_STRING([--with-system-libffi],
+  [Use system provided libffi for RTS [default=no]])
+])
+
+AS_IF([test "x$with_system_libffi" = "xyes"],
+  [UseSystemLibFFI="YES"], [UseSystemLibFFI="NO"]
+)
+
+
+AC_SUBST(UseSystemLibFFI)
+
+AC_ARG_WITH([ffi-includes],
+[AC_HELP_STRING([--with-ffi-includes=ARG]
+  [Find includes for libffi in ARG [default=system default]])
+],
+[
+ if test "x$UseSystemLibFFI" != "xYES"; then
+    AC_MSG_WARN([--with-ffi-includes will be ignored, --with-system-libffi not set])
+ else
+    FFIIncludeDir="$withval"
+    LIBFFI_CFLAGS="-I $withval" 
+ fi
+])
+
+AC_SUBST(FFIIncludeDir)
+
+AC_ARG_WITH([ffi-libraries],
+[AC_HELP_STRING([--with-ffi-libraries=ARG]
+  [Find libffi in ARG [default=system default]])
+],
+[
+ if test "x$UseSystemLibFFI" != "xYES"; then
+    AC_MSG_WARN([--with-ffi-libraries will be ignored, --with-system-libffi not set])
+ else
+    FFILibDir="$withval" LIBFFI_LDFLAGS="-L$withval"
+ fi
+])
+
+AC_SUBST(FFILibDir)
+
+AS_IF([test "$UseSystemLibFFI" = "YES"], [
+ CFLAGS2="$CFLAGS"
+ CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
+ LDFLAGS2="$LDFLAGS"
+ LDFLAGS="$LIBFFI_LDFLAGS $LDFLAGS"
+ AC_CHECK_LIB(ffi, ffi_call,
+  [AC_CHECK_HEADERS([ffi.h], [break], [])
+   AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])],
+  [AC_MSG_ERROR([Cannot find system libffi])])
+ CFLAGS="$CFLAGS2"
+ LDFLAGS="$LDFLAGS2"
+])
+
+FP_ICONV
+FP_GMP
+
 XCODE_VERSION()
 
 SplitObjsBroken=NO
@@ -376,12 +423,9 @@ AC_SUBST([SplitObjsBroken])
 
 dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
-BuildingCrossCompiler=NO
-PortingCompiler=NO
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$host" != "$target" ; then
-    BuildingCrossCompiler=YES
+if test "$target" != "$host" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
@@ -389,25 +433,17 @@ if test "$host" != "$target" ; then
                           #   If you meant to cross compile, use `--host'.
 fi
 if test "$build" != "$host" ; then
-    CrossCompiling=YES
-    PortingCompiler=YES
-fi
-# Note: cross_compiling is set to 'yes' in both 'port' and 'toolchain' cases
-if ! test "$host" = "$target" -o "$host" = "$build" ; then
    AC_MSG_ERROR([
 You've selected:
 
-  build:  $build   (the architecture we're building on)
-  host:   $host    (the architecture the compiler we're building will execute on)
-  target: $target  (the architecture the compiler we're building will produce code for)
+  BUILD:  $build   (the architecture we're building on)
+  HOST:   $host    (the architecture the compiler we're building will execute on)
+  TARGET: $target  (the architecture the compiler we're building will produce code for)
 
-host must equal build or target. The two allowed cases are:
-
-  --host=<arch> --target=<arch>   to _port_ GHC to run on a foreign architecture
-                                  and produce code for that architecture
-  --target=<arch>                 to build a cross compiler _toolchain_ that runs
-                                  locally but produces code for a foreign
-                                  architecture
+BUILD must equal HOST; that is, we do not support building GHC itself
+with a cross-compiler.  To cross-compile GHC itself, set TARGET: stage
+1 will be a cross-compiler, and stage 2 will be the cross-compiled
+GHC.
 ])
 fi
 if test "$CrossCompiling" = "YES"
@@ -417,17 +453,9 @@ else
   CrossCompilePrefix=""
 fi
 TargetPlatformFull="${target}"
-AC_SUBST(BuildingCrossCompiler)  # 'toolchain' case
-AC_SUBST(PortingCompiler)        # 'port' case
-AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
+AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
-AC_ARG_WITH([alien],
-[AC_HELP_STRING([--with-alien=ARG],
-  [Supply script for running target binaries locally when cross-compiling])],
-  [AlienScript="$withval"],
-  [AlienScript=""])
-AC_SUBST(AlienScript)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
@@ -460,32 +488,15 @@ esac
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc])
+FIND_LLVM_PROG([LLC], [llc], [llc])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt])
+FIND_LLVM_PROG([OPT], [opt], [opt])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
-
-dnl ** Mac OS X: explicit deployment target
-dnl --------------------------------------------------------------
-AC_ARG_WITH([macosx-deployment-target],
-[AC_HELP_STRING([--with-macosx-deployment-target=VERSION],
-        [Build for Mac OS VERSION and higher  (default= version of build host)])],
-[FP_MACOSX_DEPLOYMENT_TARGET="$withval"
- if test "x$TargetOS_CPP-$TargetVendor_CPP" != "xdarwin-apple"; then
-   # ignore everywhere, but on Mac OS
-   AC_MSG_WARN([--macosx-deployment-target is only available on Mac OS X])
-   FP_MACOSX_DEPLOYMENT_TARGET=none
- fi],
-[FP_MACOSX_DEPLOYMENT_TARGET=none]
-)
-FP_CHECK_MACOSX_DEPLOYMENT_TARGET
-AC_SUBST(MACOSX_DEPLOYMENT_VERSION)
-AC_SUBST(MACOSX_DEPLOYMENT_SDK)
 
 dnl --------------------------------------------------------------
 dnl End of configure script option section
@@ -501,9 +512,9 @@ dnl --------------------------------------------------------------
 
 if test "$TargetOS" = "mingw32"
 then
-   GhcLibsWithUnix=NO
+    GhcLibsWithUnix=NO
 else
-   GhcLibsWithUnix=YES
+    GhcLibsWithUnix=YES
 fi
 AC_SUBST([GhcLibsWithUnix])
 
@@ -528,12 +539,6 @@ cygwin32|mingw32)
     ;;
 esac
 
-dnl ** does #! path/to/perl work? (sometimes it's too long...)
-FPTOOLS_SHEBANG_PERL
-
-dnl ** check for Python
-AC_PATH_PROG(PythonCmd,python)
-
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 3.0
@@ -546,6 +551,10 @@ FP_CC_LLVM_BACKEND
 
 FP_PROG_LD_HashSize31
 FP_PROG_LD_ReduceMemoryOverheads
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
+
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -625,8 +634,8 @@ AC_SUBST(HaveDtrace)
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path
 if test "$HostOS"      = "mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${HSCOLOUR}"    != ""
+   test "${OSTYPE}"   != "msys"    && \
+   test "${HSCOLOUR}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
@@ -641,16 +650,10 @@ dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
 dnl ** check for installed happy binary + version
-dnl    (don't do it if we're booting from .hc files though.)
-if test "$BootingFromHc" = "NO"; then
 FPTOOLS_HAPPY
-fi;
 
 dnl ** check for installed alex binary + version
-dnl    (don't do it if we're booting from .hc files though.)
-if test "$BootingFromHc" = "NO"; then
 FPTOOLS_ALEX
-fi;
 
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
@@ -752,20 +755,6 @@ dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
 
-if test "$cross_compiling" = "no" ; then
-    AC_TRY_RUN([
-    #include <sys/types.h>
-    #include <sys/time.h>
-    int main(void) {
-  struct itimerval tval;
-  tval.it_value.tv_sec = 1;
-  tval.it_value.tv_usec = 0;
-  tval.it_interval = tval.it_value;
-  return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
-    }
-    ],[AC_DEFINE([HAVE_SETITIMER_VIRTUAL], [1], [Define to 1 if setitimer accepts ITIMER_VIRTUAL, 0 else.])])
-fi
-
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
 AC_CHECK_DECLS([ctime_r], , ,
@@ -830,17 +819,11 @@ FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 
-dnl ** check for ld, whether it has an -x option, and if it is GNU ld
-FP_PROG_LD_X
-FP_PROG_LD_IS_GNU
-FP_PROG_LD_BUILD_ID
-FP_PROG_LD_NO_COMPACT_UNWIND
-
 FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt
 AC_CHECK_LIB(rt, clock_gettime)
-AC_CHECK_FUNCS(clock_gettime timer_create timer_settime)
+AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
 dnl ** check for Apple's "interesting" long double compatibility scheme
@@ -952,31 +935,36 @@ Configure completed successfully.
    Target platform       : $TargetPlatform
 "]
 
-if test "$BootingFromHc" = "YES"; then
-echo ["\
-   Bootstrapping from HC files.
-"]
-else
 echo ["\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
 "]
+
+if test "x$CC_LLVM_BACKEND" = "x1"; then
+    if test "x$CC_CLANG_BACKEND" = "x1"; then
+        CompilerName="clang        "
+    else
+        CompilerName="llvm-gcc     "
+    fi
+else
+    CompilerName="gcc          "
 fi
 
 echo ["\
-   Using GCC             : $WhatGccIsCalled
-      which is version   : $GccVersion
-   Building a cross compiler : $BuildingCrossCompiler
-   Porting to foreign arch   : $PortingCompiler
-   Alien script              : $AlienScript
+   Using $CompilerName       : $WhatGccIsCalled
+      which is version       : $GccVersion
+   Building a cross compiler : $CrossCompiling
 
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)
    Alex     : $AlexCmd ($AlexVersion)
-   Python   : $PythonCmd
    Perl     : $PerlCmd
    dblatex  : $DblatexCmd
-   xsltproc : $XsltprocCmd"]
+   xsltproc : $XsltprocCmd
+
+   Using LLVM tools
+      llc   : $LlcCmd
+      opt   : $OptCmd"]
 
 if test "$HSCOLOUR" = ""; then
 echo ["

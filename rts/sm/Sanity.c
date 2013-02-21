@@ -98,98 +98,69 @@ checkClosureShallow( StgClosure* p )
 StgOffset
 checkStackFrame( StgPtr c )
 {
-    nat size;
-    const StgRetInfoTable* info;
+  nat size;
+  const StgRetInfoTable* info;
 
-    info = get_ret_itbl((StgClosure *)c);
+  info = get_ret_itbl((StgClosure *)c);
 
-    /* All activation records have 'bitmap' style layout info. */
-    switch (info->i.type) {
-        case RET_DYN: /* Dynamic bitmap: the mask is stored on the stack */
-            {
-                StgWord dyn;
-                StgPtr p;
-                StgRetDyn* r;
+  /* All activation records have 'bitmap' style layout info. */
+  switch (info->i.type) {
 
-                r = (StgRetDyn *)c;
-                dyn = r->liveness;
+    case UPDATE_FRAME:
+      ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgUpdateFrame*)c)->updatee));
+    case ATOMICALLY_FRAME:
+    case CATCH_RETRY_FRAME:
+    case CATCH_STM_FRAME:
+    case CATCH_FRAME:
+      // small bitmap cases (<= 32 entries)
+    case UNDERFLOW_FRAME:
+    case STOP_FRAME:
+    case RET_SMALL:
+      size = BITMAP_SIZE(info->i.layout.bitmap);
+      checkSmallBitmap((StgPtr)c + 1,
+                       BITMAP_BITS(info->i.layout.bitmap), size);
+      return 1 + size;
 
-                p = (P_)(r->payload);
-                checkSmallBitmap(p,RET_DYN_LIVENESS(r->liveness),RET_DYN_BITMAP_SIZE);
-                p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
+    case RET_BCO:
+      StgBCO *bco;
+      nat size;
+      bco = (StgBCO *)*(c+1);
+      size = BCO_BITMAP_SIZE(bco);
+      checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
+      return 2 + size;
 
-                // skip over the non-pointers
-                p += RET_DYN_NONPTRS(dyn);
+    case RET_BIG: // large bitmap (> 32 entries)
+      size = GET_LARGE_BITMAP(&info->i)->size;
+      checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
+      return 1 + size;
 
-                // follow the ptr words
-                for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-                    checkClosureShallow((StgClosure *)*p);
-                    p++;
-                }
+    case RET_FUN:
+      StgFunInfoTable *fun_info;
+      StgRetFun *ret_fun;
 
-                return sizeofW(StgRetDyn) + RET_DYN_BITMAP_SIZE +
-                    RET_DYN_NONPTR_REGS_SIZE +
-                    RET_DYN_NONPTRS(dyn) + RET_DYN_PTRS(dyn);
-            }
-
-        case UPDATE_FRAME:
-            ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgUpdateFrame*)c)->updatee));
-        case ATOMICALLY_FRAME:
-        case CATCH_RETRY_FRAME:
-        case CATCH_STM_FRAME:
-        case CATCH_FRAME:
-            // small bitmap cases (<= 32 entries)
-        case UNDERFLOW_FRAME:
-        case STOP_FRAME:
-        case RET_SMALL:
-            size = BITMAP_SIZE(info->i.layout.bitmap);
-            checkSmallBitmap((StgPtr)c + 1,
-                             BITMAP_BITS(info->i.layout.bitmap), size);
-            return 1 + size;
-
-        case RET_BCO: {
-                          StgBCO *bco;
-                          nat size;
-                          bco = (StgBCO *)*(c+1);
-                          size = BCO_BITMAP_SIZE(bco);
-                          checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
-                          return 2 + size;
-                      }
-
-        case RET_BIG: // large bitmap (> 32 entries)
-                      size = GET_LARGE_BITMAP(&info->i)->size;
-                      checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
-                      return 1 + size;
-
-        case RET_FUN:
-                      {
-                          StgFunInfoTable *fun_info;
-                          StgRetFun *ret_fun;
-
-                          ret_fun = (StgRetFun *)c;
-                          fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-                          size = ret_fun->size;
-                          switch (fun_info->f.fun_type) {
-                              case ARG_GEN:
-                                  checkSmallBitmap((StgPtr)ret_fun->payload,
-                                                   BITMAP_BITS(fun_info->f.b.bitmap), size);
-                                  break;
-                              case ARG_GEN_BIG:
-                                  checkLargeBitmap((StgPtr)ret_fun->payload,
-                                                   GET_FUN_LARGE_BITMAP(fun_info), size);
-                                  break;
-                              default:
-                                  checkSmallBitmap((StgPtr)ret_fun->payload,
-                                                   BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
-                                                   size);
-                                  break;
-                          }
-                          return sizeofW(StgRetFun) + size;
-                      }
-
+      ret_fun = (StgRetFun *)c;
+      fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+      size = ret_fun->size;
+      switch (fun_info->f.fun_type) {
+        case ARG_GEN:
+          checkSmallBitmap((StgPtr)ret_fun->payload,
+                           BITMAP_BITS(fun_info->f.b.bitmap), size);
+          break;
+        case ARG_GEN_BIG:
+          checkLargeBitmap((StgPtr)ret_fun->payload,
+                           GET_FUN_LARGE_BITMAP(fun_info), size);
+          break;
         default:
-                      barf("checkStackFrame: weird activation record found on stack (%p %d).",c,info->i.type);
-    }
+          checkSmallBitmap((StgPtr)ret_fun->payload,
+                           BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
+                           size);
+          break;
+      }
+      return sizeofW(StgRetFun) + size;
+
+    default:
+      barf("checkStackFrame: weird activation record found on stack (%p %d).",c,info->i.type);
+  }
 }
 
 // check sections of stack between update frames
@@ -266,15 +237,137 @@ checkClosure( StgClosure* p )
 
     switch (info->type) {
 
-        case MVAR_CLEAN:
-        case MVAR_DIRTY:
-            {
-                StgMVar *mvar = (StgMVar *)p;
-                ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
-                ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
-                ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
-                return sizeofW(StgMVar);
-            }
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+      {
+	StgMVar *mvar = (StgMVar *)p;
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
+	return sizeofW(StgMVar);
+      }
+
+    case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_2_0:
+      {
+	nat i;
+	for (i = 0; i < info->layout.payload.ptrs; i++) {
+	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
+	}
+	return thunk_sizeW_fromITBL(info);
+      }
+
+    case FUN:
+    case FUN_1_0:
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_2_0:
+    case IND_PERM:
+    case BLACKHOLE:
+    case PRIM:
+    case MUT_PRIM:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case TVAR:
+    case CONSTR_STATIC:
+    case CONSTR_NOCAF_STATIC:
+    case THUNK_STATIC:
+    case FUN_STATIC:
+	{
+	    nat i;
+	    for (i = 0; i < info->layout.payload.ptrs; i++) {
+		ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
+	    }
+	    return sizeW_fromITBL(info);
+	}
+
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+
+        // NO: the BH might have been updated now
+        // ASSERT(get_itbl(bq->bh)->type == BLACKHOLE);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
+
+        ASSERT(get_itbl((StgClosure *)(bq->owner))->type == TSO);
+        ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE
+               || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
+        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE ||
+               get_itbl((StgClosure *)(bq->link))->type == IND ||
+               get_itbl((StgClosure *)(bq->link))->type == BLOCKING_QUEUE);
+
+        return sizeofW(StgBlockingQueue);
+    }
+
+    case BCO: {
+	StgBCO *bco = (StgBCO *)p;
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->instrs));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->literals));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->ptrs));
+	return bco_sizeW(bco);
+    }
+
+    case IND_STATIC: /* (1, 0) closure */
+      ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgIndStatic*)p)->indirectee));
+      return sizeW_fromITBL(info);
+
+    case WEAK:
+      /* deal with these specially - the info table isn't
+       * representative of the actual layout.
+       */
+      { StgWeak *w = (StgWeak *)p;
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
+	if (w->link) {
+	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->link));
+	}
+	return sizeW_fromITBL(info);
+      }
+
+    case THUNK_SELECTOR:
+	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
+	    return THUNK_SELECTOR_sizeW();
+
+    case IND:
+	{
+  	    /* we don't expect to see any of these after GC
+	     * but they might appear during execution
+	     */
+	    StgInd *ind = (StgInd *)p;
+	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
+	    return sizeofW(StgInd);
+	}
+
+    case RET_BCO:
+    case RET_SMALL:
+    case RET_BIG:
+    case UPDATE_FRAME:
+    case UNDERFLOW_FRAME:
+    case STOP_FRAME:
+    case CATCH_FRAME:
+    case ATOMICALLY_FRAME:
+    case CATCH_RETRY_FRAME:
+    case CATCH_STM_FRAME:
+	    barf("checkClosure: stack frame");
+
+    case AP:
+    {
+	StgAP* ap = (StgAP *)p;
+	checkPAP (ap->fun, ap->payload, ap->n_args);
+	return ap_sizeW(ap);
+    }
 
         case THUNK:
         case THUNK_1_0:
@@ -527,6 +620,9 @@ checkSTACK (StgStack *stack)
 void
 checkTSO(StgTSO *tso)
 {
+    StgTSO *next;
+    const StgInfoTable *info;
+
     if (tso->what_next == ThreadKilled) {
         /* The garbage collector doesn't bother following any pointers
          * from dead threads, so don't check sanity here.
@@ -534,9 +630,13 @@ checkTSO(StgTSO *tso)
         return;
     }
 
-    ASSERT(tso->_link == END_TSO_QUEUE ||
-           tso->_link->header.info == &stg_MVAR_TSO_QUEUE_info ||
-           tso->_link->header.info == &stg_TSO_info);
+    next = tso->_link;
+    info = (const StgInfoTable*) tso->_link->header.info;
+
+    ASSERT(next == END_TSO_QUEUE ||
+           info == &stg_MVAR_TSO_QUEUE_info ||
+           info == &stg_TSO_info ||
+           info == &stg_WHITEHOLE_info); // happens due to STM doing lockTSO()
 
     if (   tso->why_blocked == BlockedOnMVar
            || tso->why_blocked == BlockedOnBlackHole
@@ -563,43 +663,43 @@ checkTSO(StgTSO *tso)
 void
 checkGlobalTSOList (rtsBool checkTSOs)
 {
-    StgTSO *tso;
-    nat g;
+  StgTSO *tso;
+  nat g;
 
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (tso=generations[g].threads; tso != END_TSO_QUEUE;
-             tso = tso->global_link) {
-            ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
-            ASSERT(get_itbl(tso)->type == TSO);
-            if (checkTSOs)
-                checkTSO(tso);
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (tso=generations[g].threads; tso != END_TSO_QUEUE;
+           tso = tso->global_link) {
+          ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
+          ASSERT(get_itbl((StgClosure *)tso)->type == TSO);
+          if (checkTSOs)
+              checkTSO(tso);
 
-            // If this TSO is dirty and in an old generation, it better
-            // be on the mutable list.
-            if (tso->dirty) {
-                ASSERT(Bdescr((P_)tso)->gen_no == 0 || (tso->flags & TSO_MARKED));
-                tso->flags &= ~TSO_MARKED;
-            }
+          // If this TSO is dirty and in an old generation, it better
+          // be on the mutable list.
+          if (tso->dirty) {
+              ASSERT(Bdescr((P_)tso)->gen_no == 0 || (tso->flags & TSO_MARKED));
+              tso->flags &= ~TSO_MARKED;
+          }
 
-            {
-                StgStack *stack;
-                StgUnderflowFrame *frame;
+          {
+              StgStack *stack;
+              StgUnderflowFrame *frame;
 
-                stack = tso->stackobj;
-                while (1) {
-                    if (stack->dirty & 1) {
-                        ASSERT(Bdescr((P_)stack)->gen_no == 0 || (stack->dirty & TSO_MARKED));
-                        stack->dirty &= ~TSO_MARKED;
-                    }
-                    frame = (StgUnderflowFrame*) (stack->stack + stack->stack_size
-                                                  - sizeofW(StgUnderflowFrame));
-                    if (frame->info != &stg_stack_underflow_frame_info
-                        || frame->next_chunk == (StgStack*)END_TSO_QUEUE) break;
-                    stack = frame->next_chunk;
-                }
-            }
-        }
-    }
+              stack = tso->stackobj;
+              while (1) {
+                  if (stack->dirty & 1) {
+                      ASSERT(Bdescr((P_)stack)->gen_no == 0 || (stack->dirty & TSO_MARKED));
+                      stack->dirty &= ~TSO_MARKED;
+                  }
+                  frame = (StgUnderflowFrame*) (stack->stack + stack->stack_size
+                                                - sizeofW(StgUnderflowFrame));
+                  if (frame->info != &stg_stack_underflow_frame_info
+                      || frame->next_chunk == (StgStack*)END_TSO_QUEUE) break;
+                  stack = frame->next_chunk;
+              }
+          }
+      }
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -833,7 +933,7 @@ checkRunQueue(Capability *cap)
 void findSlop(bdescr *bd);
 void findSlop(bdescr *bd)
 {
-    lnat slop;
+    W_ slop;
 
     for (; bd != NULL; bd = bd->link) {
         slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
@@ -844,7 +944,7 @@ void findSlop(bdescr *bd)
     }
 }
 
-static lnat
+static W_
 genBlocks (generation *gen)
 {
     ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
@@ -856,37 +956,37 @@ genBlocks (generation *gen)
 void
 memInventory (rtsBool show)
 {
-    nat g, i;
-    lnat gen_blocks[RtsFlags.GcFlags.generations];
-    lnat nursery_blocks, retainer_blocks,
-         arena_blocks, exec_blocks;
-    lnat live_blocks = 0, free_blocks = 0;
-    rtsBool leak;
+  nat g, i;
+  W_ gen_blocks[RtsFlags.GcFlags.generations];
+  W_ nursery_blocks, retainer_blocks,
+       arena_blocks, exec_blocks;
+  W_ live_blocks = 0, free_blocks = 0;
+  rtsBool leak;
 
-    // count the blocks we current have
+  // count the blocks we current have
 
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        gen_blocks[g] = 0;
-        for (i = 0; i < n_capabilities; i++) {
-            gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
-            gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].part_list);
-            gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].scavd_list);
-            gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].todo_bd);
-        }
-        gen_blocks[g] += genBlocks(&generations[g]);
-    }
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      gen_blocks[g] = 0;
+      for (i = 0; i < n_capabilities; i++) {
+	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
+          gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].part_list);
+          gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].scavd_list);
+          gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].todo_bd);
+      }
+      gen_blocks[g] += genBlocks(&generations[g]);
+  }
 
-    nursery_blocks = 0;
-    for (i = 0; i < n_capabilities; i++) {
-        ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
-        nursery_blocks += nurseries[i].n_blocks;
-        if (capabilities[i].pinned_object_block != NULL) {
-            nursery_blocks += capabilities[i].pinned_object_block->blocks;
-        }
-        nursery_blocks += countBlocks(capabilities[i].pinned_object_blocks);
-    }
+  nursery_blocks = 0;
+  for (i = 0; i < n_capabilities; i++) {
+      ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
+      nursery_blocks += nurseries[i].n_blocks;
+      if (capabilities[i].pinned_object_block != NULL) {
+          nursery_blocks += capabilities[i].pinned_object_block->blocks;
+      }
+      nursery_blocks += countBlocks(capabilities[i].pinned_object_blocks);
+  }
 
-    retainer_blocks = 0;
+  retainer_blocks = 0;
 #ifdef PROFILING
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
         retainer_blocks = retainerStackBlocks();
@@ -909,45 +1009,45 @@ memInventory (rtsBool show)
     live_blocks += nursery_blocks +
         + retainer_blocks + arena_blocks + exec_blocks;
 
-#define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
+#define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
 
-    leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
+  leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
 
-    if (show || leak)
-    {
-        if (leak) {
-            debugBelch("Memory leak detected:\n");
-        } else {
-            debugBelch("Memory inventory:\n");
-        }
-        for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-            debugBelch("  gen %d blocks : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", g,
-                       gen_blocks[g], MB(gen_blocks[g]));
-        }
-        debugBelch("  nursery      : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                   nursery_blocks, MB(nursery_blocks));
-        debugBelch("  retainer     : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                   retainer_blocks, MB(retainer_blocks));
-        debugBelch("  arena blocks : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                   arena_blocks, MB(arena_blocks));
-        debugBelch("  exec         : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                   exec_blocks, MB(exec_blocks));
-        debugBelch("  free         : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                   free_blocks, MB(free_blocks));
-        debugBelch("  total        : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                   live_blocks + free_blocks, MB(live_blocks+free_blocks));
-        if (leak) {
-            debugBelch("\n  in system    : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
-                       mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
-        }
-    }
+  if (show || leak)
+  {
+      if (leak) {
+          debugBelch("Memory leak detected:\n");
+      } else {
+          debugBelch("Memory inventory:\n");
+      }
+      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+          debugBelch("  gen %d blocks : %5" FMT_Word " blocks (%6.1lf MB)\n", g,
+                     gen_blocks[g], MB(gen_blocks[g]));
+      }
+      debugBelch("  nursery      : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 nursery_blocks, MB(nursery_blocks));
+      debugBelch("  retainer     : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 retainer_blocks, MB(retainer_blocks));
+      debugBelch("  arena blocks : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 arena_blocks, MB(arena_blocks));
+      debugBelch("  exec         : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 exec_blocks, MB(exec_blocks));
+      debugBelch("  free         : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 free_blocks, MB(free_blocks));
+      debugBelch("  total        : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 live_blocks + free_blocks, MB(live_blocks+free_blocks));
+      if (leak) {
+          debugBelch("\n  in system    : %5" FMT_Word " blocks (%" FMT_Word " MB)\n",
+                     mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
+      }
+  }
 
-    if (leak) {
-        debugBelch("\n");
-        findMemoryLeak();
-    }
-    ASSERT(n_alloc_blocks == live_blocks);
-    ASSERT(!leak);
+  if (leak) {
+      debugBelch("\n");
+      findMemoryLeak();
+  }
+  ASSERT(n_alloc_blocks == live_blocks);
+  ASSERT(!leak);
 }
 
 

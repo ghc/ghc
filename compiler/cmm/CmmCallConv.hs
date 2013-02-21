@@ -8,7 +8,8 @@
 module CmmCallConv (
   ParamLocation(..),
   assignArgumentsPos,
-  globalArgRegs
+  assignStack,
+  globalArgRegs, realArgRegsCover
 ) where
 
 #include "HsVersions.h"
@@ -18,9 +19,7 @@ import SMRep
 import Cmm (Convention(..))
 import PprCmm ()
 
-import Constants
-import qualified Data.List as L
-import StaticFlags (opt_Unregisterised)
+import DynFlags
 import Outputable
 
 -- Calculate the 'GlobalReg' or stack locations for function call
@@ -34,66 +33,84 @@ instance Outputable ParamLocation where
   ppr (RegisterParam g) = ppr g
   ppr (StackParam p)    = ppr p
 
--- | JD: For the new stack story, I want arguments passed on the stack to manifest as
--- positive offsets in a CallArea, not negative offsets from the stack pointer.
--- Also, I want byte offsets, not word offsets.
-assignArgumentsPos :: Convention -> (a -> CmmType) -> [a] ->
-                      [(a, ParamLocation)]
+-- |
 -- Given a list of arguments, and a function that tells their types,
 -- return a list showing where each argument is passed
-assignArgumentsPos conv arg_ty reps = assignments
-    where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
+--
+assignArgumentsPos :: DynFlags
+                   -> ByteOff           -- stack offset to start with
+                   -> Convention
+                   -> (a -> CmmType)    -- how to get a type from an arg
+                   -> [a]               -- args
+                   -> (
+                        ByteOff              -- bytes of stack args
+                      , [(a, ParamLocation)] -- args and locations
+                      )
+
+assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
+    where
       regs = case (reps, conv) of
-               (_,   NativeNodeCall)   -> getRegsWithNode
-               (_,   NativeDirectCall) -> getRegsWithoutNode
-               ([_], NativeReturn)     -> allRegs
-               (_,   NativeReturn)     -> getRegsWithNode
+               (_,   NativeNodeCall)   -> getRegsWithNode dflags
+               (_,   NativeDirectCall) -> getRegsWithoutNode dflags
+               ([_], NativeReturn)     -> allRegs dflags
+               (_,   NativeReturn)     -> getRegsWithNode dflags
                -- GC calling convention *must* put values in registers
-               (_,   GC)               -> allRegs
-               (_,   PrimOpCall)       -> allRegs
-               ([_], PrimOpReturn)     -> allRegs
-               (_,   PrimOpReturn)     -> getRegsWithNode
-               (_,   Slow)             -> noRegs
+               (_,   GC)               -> allRegs dflags
+               (_,   Slow)             -> nodeOnly
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers
-      -- (even if there are still available registers for args of a different type).
-      -- When returning an unboxed tuple, we also separate the stack
-      -- arguments by pointerhood.
-      (reg_assts, stk_args) = assign_regs [] reps regs
-      stk_args' = case conv of NativeReturn -> part
-                               PrimOpReturn -> part
-                               GC | length stk_args /= 0 -> panic "Failed to allocate registers for GC call"
-                               _            -> stk_args
-                  where part = uncurry (++)
-                                       (L.partition (not . isGcPtrType . arg_ty) stk_args)
-      stk_assts = assign_stk 0 [] (reverse stk_args')
+      -- (even if there are still available registers for args of a
+      -- different type).  When returning an unboxed tuple, we also
+      -- separate the stack arguments by pointerhood.
+      (reg_assts, stk_args)  = assign_regs [] reps regs
+      (stk_off,   stk_assts) = assignStack dflags off arg_ty stk_args
       assignments = reg_assts ++ stk_assts
 
       assign_regs assts []     _    = (assts, [])
-      assign_regs assts (r:rs) regs = if isFloatType ty then float else int
-        where float = case (w, regs) of
-                        (W32, (vs, f:fs, ds, ls)) -> k (RegisterParam f, (vs, fs, ds, ls))
-                        (W64, (vs, fs, d:ds, ls)) -> k (RegisterParam d, (vs, fs, ds, ls))
+      assign_regs assts (r:rs) regs | isVecType ty   = vec
+                                    | isFloatType ty = float
+                                    | otherwise      = int
+        where vec = case (w, regs) of
+                      (W128, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
+                      _ -> (assts, (r:rs))
+              float = case (w, regs) of
+                        (W32, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (FloatReg s), (vs, fs, ds, ls, ss))
+                        (W32, (vs, f:fs, ds, ls, ss))
+                            | not hasSseRegs          -> k (RegisterParam f, (vs, fs, ds, ls, ss))
+                        (W64, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ls, ss))
+                        (W64, (vs, fs, d:ds, ls, ss))
+                            | not hasSseRegs          -> k (RegisterParam d, (vs, fs, ds, ls, ss))
                         (W80, _) -> panic "F80 unsupported register type"
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
                       (W128, _) -> panic "W128 unsupported register type"
-                      (_, (v:vs, fs, ds, ls)) | widthInBits w <= widthInBits wordWidth
-                          -> k (RegisterParam (v gcp), (vs, fs, ds, ls))
-                      (_, (vs, fs, ds, l:ls)) | widthInBits w > widthInBits wordWidth
-                          -> k (RegisterParam l, (vs, fs, ds, ls))
+                      (_, (v:vs, fs, ds, ls, ss)) | widthInBits w <= widthInBits (wordWidth dflags)
+                          -> k (RegisterParam (v gcp), (vs, fs, ds, ls, ss))
+                      (_, (vs, fs, ds, l:ls, ss)) | widthInBits w > widthInBits (wordWidth dflags)
+                          -> k (RegisterParam l, (vs, fs, ds, ls, ss))
                       _   -> (assts, (r:rs))
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
               ty = arg_ty r
               w  = typeWidth ty
               gcp | isGcPtrType ty = VGcPtr
                   | otherwise  	   = VNonGcPtr
+              hasSseRegs = mAX_Real_SSE_REG dflags /= 0
 
-      assign_stk _      assts [] = assts
-      assign_stk offset assts (r:rs) = assign_stk off' ((r, StackParam off') : assts) rs
+
+assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
+            -> (
+                 ByteOff              -- bytes of stack args
+               , [(a, ParamLocation)] -- args and locations
+               )
+assignStack dflags offset arg_ty args = assign_stk offset [] (reverse args)
+ where
+      assign_stk offset assts [] = (offset, assts)
+      assign_stk offset assts (r:rs)
+        = assign_stk off' ((r, StackParam off') : assts) rs
         where w    = typeWidth (arg_ty r)
-              size = (((widthInBytes w - 1) `div` wORD_SIZE) + 1) * wORD_SIZE
+              size = (((widthInBytes w - 1) `div` word_size) + 1) * word_size
               off' = offset + size
+              word_size = wORD_SIZE dflags
 
 -----------------------------------------------------------------------------
 -- Local information about the registers available
@@ -102,6 +119,7 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
                  , [GlobalReg]   -- floats
                  , [GlobalReg]   -- doubles
                  , [GlobalReg]   -- longs (int64 and word64)
+                 , [Int]         -- SSE (floats and doubles)
                  )
 
 -- Vanilla registers can contain pointers, Ints, Chars.
@@ -110,45 +128,77 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
-vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: [Int]
-vanillaRegNos | opt_Unregisterised = []
-              | otherwise          = regList mAX_Real_Vanilla_REG
-floatRegNos	  | opt_Unregisterised = []
-              | otherwise          = regList mAX_Real_Float_REG
-doubleRegNos  | opt_Unregisterised = []
-              | otherwise          = regList mAX_Real_Double_REG
-longRegNos	  | opt_Unregisterised = []
-              | otherwise          = regList mAX_Real_Long_REG
+getRegsWithoutNode, getRegsWithNode :: DynFlags -> AvailRegs
+getRegsWithoutNode dflags =
+  ( filter (\r -> r VGcPtr /= node) (realVanillaRegs dflags)
+  , realFloatRegs dflags
+  , realDoubleRegs dflags
+  , realLongRegs dflags 
+  , sseRegNos dflags)
 
--- 
-getRegsWithoutNode, getRegsWithNode :: AvailRegs
-getRegsWithoutNode =
-  (filter (\r -> r VGcPtr /= node) intRegs,
-   map FloatReg  floatRegNos, map DoubleReg doubleRegNos, map LongReg longRegNos)
-    where intRegs = map VanillaReg vanillaRegNos
-getRegsWithNode =
-  (intRegs, map FloatReg  floatRegNos, map DoubleReg doubleRegNos, map LongReg longRegNos)
-    where intRegs = map VanillaReg vanillaRegNos
+-- getRegsWithNode uses R1/node even if it isn't a register
+getRegsWithNode dflags =
+  ( if null (realVanillaRegs dflags)
+    then [VanillaReg 1]
+    else realVanillaRegs dflags
+  , realFloatRegs dflags
+  , realDoubleRegs dflags
+  , realLongRegs dflags
+  , sseRegNos dflags)
 
-allFloatRegs, allDoubleRegs, allLongRegs :: [GlobalReg]
-allVanillaRegs :: [VGcPtr -> GlobalReg]
+allFloatRegs, allDoubleRegs, allLongRegs :: DynFlags -> [GlobalReg]
+allVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
+allSseRegs :: DynFlags -> [Int]
 
-allVanillaRegs = map VanillaReg $ regList mAX_Vanilla_REG
-allFloatRegs   = map FloatReg   $ regList mAX_Float_REG
-allDoubleRegs  = map DoubleReg  $ regList mAX_Double_REG
-allLongRegs    = map LongReg    $ regList mAX_Long_REG
+allVanillaRegs dflags = map VanillaReg $ regList (mAX_Vanilla_REG dflags)
+allFloatRegs   dflags = map FloatReg   $ regList (mAX_Float_REG   dflags)
+allDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Double_REG  dflags)
+allLongRegs    dflags = map LongReg    $ regList (mAX_Long_REG    dflags)
+allSseRegs     dflags =                  regList (mAX_SSE_REG     dflags)
+
+realFloatRegs, realDoubleRegs, realLongRegs :: DynFlags -> [GlobalReg]
+realVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
+
+realVanillaRegs dflags = map VanillaReg $ regList (mAX_Real_Vanilla_REG dflags)
+realFloatRegs   dflags = map FloatReg   $ regList (mAX_Real_Float_REG   dflags)
+realDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Real_Double_REG  dflags)
+realLongRegs    dflags = map LongReg    $ regList (mAX_Real_Long_REG    dflags)
+
+sseRegNos :: DynFlags -> [Int]
+sseRegNos dflags =regList (mAX_SSE_REG dflags)
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
 
-allRegs :: AvailRegs
-allRegs  = (allVanillaRegs, allFloatRegs, allDoubleRegs, allLongRegs)
+allRegs :: DynFlags -> AvailRegs
+allRegs dflags = (allVanillaRegs dflags,
+                  allFloatRegs dflags,
+                  allDoubleRegs dflags,
+                  allLongRegs dflags,
+                  allSseRegs dflags)
 
-noRegs :: AvailRegs
-noRegs  = ([], [], [], [])
+nodeOnly :: AvailRegs
+nodeOnly = ([VanillaReg 1], [], [], [], [])
 
-globalArgRegs :: [GlobalReg]
-globalArgRegs = map ($VGcPtr) allVanillaRegs ++
-                allFloatRegs ++
-                allDoubleRegs ++
-                allLongRegs
+globalArgRegs :: DynFlags -> [GlobalReg]
+globalArgRegs dflags = map ($ VGcPtr) (allVanillaRegs dflags) ++
+                       allFloatRegs dflags ++
+                       allDoubleRegs dflags ++
+                       allLongRegs dflags
+
+-- This returns the set of global registers that *cover* the machine registers
+-- used for argument passing. On platforms where registers can overlap---right
+-- now just x86-64, where Float and Double registers overlap---passing this set
+-- of registers is guaranteed to preserve the contents of all live registers. We
+-- only use this functionality in hand-written C-- code in the RTS.
+realArgRegsCover :: DynFlags -> [GlobalReg]
+realArgRegsCover dflags
+    | hasSseRegs = map ($VGcPtr) (realVanillaRegs dflags) ++
+                   realDoubleRegs dflags ++
+                   realLongRegs dflags
+    | otherwise  = map ($VGcPtr) (realVanillaRegs dflags) ++
+                   realFloatRegs dflags ++
+                   realDoubleRegs dflags ++
+                   realLongRegs dflags
+  where
+    hasSseRegs = mAX_Real_SSE_REG dflags /= 0

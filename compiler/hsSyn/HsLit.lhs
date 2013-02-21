@@ -24,6 +24,7 @@ import Type	( Type, Kind )
 import Outputable
 import FastString
 
+import Data.ByteString (ByteString)
 import Data.Data
 \end{code}
 
@@ -60,7 +61,7 @@ data HsLit
   = HsChar	    Char		-- Character
   | HsCharPrim	    Char		-- Unboxed character
   | HsString	    FastString		-- String
-  | HsStringPrim    FastBytes		-- Packed bytes
+  | HsStringPrim    ByteString		-- Packed bytes
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 
 					--	and from TRANSLATION
   | HsIntPrim       Integer             -- literal Int#

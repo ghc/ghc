@@ -31,7 +31,7 @@ module CoreSyn (
 	mkFloatLit, mkFloatLitFloat,
 	mkDoubleLit, mkDoubleLitDouble,
 	
-	mkConApp, mkTyBind, mkCoBind,
+	mkConApp, mkConApp2, mkTyBind, mkCoBind,
 	varToCoreExpr, varsToCoreExprs,
 
         isId, cmpAltCon, cmpAlt, ltAlt,
@@ -101,6 +101,7 @@ import DataCon
 import Module
 import TyCon
 import BasicTypes
+import DynFlags
 import FastString
 import Outputable
 import Util
@@ -146,6 +147,7 @@ These data types are the heart of the compiler
 --      f_1 x_2 = let f_3 x_4 = x_4 + 1
 --                in f_3 (x_2 - 2)
 -- @
+--    But see Note [Shadowing] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
 --    type class arguments) to yield a 'HsExpr.HsExpr' type that has 'Id.Id' as it's names.
@@ -259,6 +261,9 @@ These data types are the heart of the compiler
 -- *  A type: this should only show up at the top level of an Arg
 --
 -- *  A coercion
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Expr b
   = Var	  Id
   | Lit   Literal
@@ -279,9 +284,15 @@ type Arg b = Expr b
 -- | A case split alternative. Consists of the constructor leading to the alternative,
 -- the variables bound from the constructor, and the expression to be executed given that binding.
 -- The default alternative is @(DEFAULT, [], rhs)@
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 type Alt b = (AltCon, [b], Expr b)
 
 -- | A case alternative constructor (i.e. pattern match)
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data AltCon 
   = DataAlt DataCon   --  ^ A plain data constructor: @case e of { Foo x -> ... }@.
                       -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
@@ -294,10 +305,33 @@ data AltCon
    deriving (Eq, Ord, Data, Typeable)
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Bind b = NonRec b (Expr b)
 	    | Rec [(b, (Expr b))]
   deriving (Data, Typeable)
 \end{code}
+
+Note [Shadowing]
+~~~~~~~~~~~~~~~~
+While various passes attempt to rename on-the-fly in a manner that
+avoids "shadowing" (thereby simplifying downstream optimizations),
+neither the simplifier nor any other pass GUARANTEES that shadowing is
+avoided. Thus, all passes SHOULD work fine even in the presence of
+arbitrary shadowing in their inputs.
+
+In particular, scrutinee variables `x` in expressions of the form
+`Case e x t` are often renamed to variables with a prefix
+"wild_". These "wild" variables may appear in the body of the
+case-expression, and further, may be shadowed within the body.
+
+So the Unique in an Var is not really unique at all.  Still, it's very
+useful to give a constant-time equality/ordering for Vars, and to give
+a key that can be used to make sets of Vars (VarSet), or mappings from
+Vars to other things (VarEnv).   Moreover, if you do want to eliminate
+shadowing, you can give a new Unique to an Id without changing its
+printable name, which makes debugging easier.
 
 Note [Literal alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -401,6 +435,9 @@ unboxed type.
 
 \begin{code}
 -- | Allows attaching extra information to points in expressions
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Tickish id =
     -- | An @{-# SCC #-}@ profiling annotation, either automatically
     -- added by the desugarer as a result of -auto-all, or added by
@@ -442,7 +479,7 @@ data Tickish id =
 -- cannot discard a tick, and the compiler should preserve the number
 -- of ticks as far as possible.
 --
--- Hwever, we stil allow the simplifier to increase or decrease
+-- However, we still allow the simplifier to increase or decrease
 -- sharing, so in practice the actual number of ticks may vary, except
 -- that we never change the value from zero to non-zero or vice versa.
 --
@@ -540,7 +577,7 @@ data CoreRule
 	ru_fn    :: Name,       -- ^ As above
 	ru_nargs :: Int,	-- ^ Number of arguments that 'ru_try' consumes,
 				-- if it fires, including type arguments
-	ru_try  :: Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+	ru_try  :: DynFlags -> Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 		-- ^ This function does the rewrite.  It given too many
 		-- arguments, it simply discards them; the returned 'CoreExpr'
 		-- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
@@ -592,11 +629,11 @@ Representation of desugared vectorisation declarations that are fed to the vecto
 'ModGuts').
 
 \begin{code}
-data CoreVect = Vect      Id   (Maybe CoreExpr)
+data CoreVect = Vect      Id   CoreExpr
               | NoVect    Id
               | VectType  Bool TyCon (Maybe TyCon)
               | VectClass TyCon                     -- class tycon
-              | VectInst  Id                        -- instance dfun (always SCALAR)
+              | VectInst  Id                        -- instance dfun (always SCALAR)  !!!FIXME: should be superfluous now
 \end{code}
 
 
@@ -1027,6 +1064,9 @@ a list of CoreBind
    chunks.  
 
 \begin{code}
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 type CoreProgram = [CoreBind]	-- See Note [CoreProgram]
 
 -- | The common case for the type of binders and variables when
@@ -1093,26 +1133,31 @@ mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
+mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
+mkConApp2 con tys arg_ids = Var (dataConWorkId con) 
+                            `mkApps` map Type tys
+                            `mkApps` map varToCoreExpr arg_ids
+
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
 -- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
-mkIntLit      :: Integer -> Expr b
+mkIntLit      :: DynFlags -> Integer -> Expr b
 -- | Create a machine integer literal expression of type @Int#@ from an @Int@.
 -- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
-mkIntLitInt   :: Int     -> Expr b
+mkIntLitInt   :: DynFlags -> Int     -> Expr b
 
-mkIntLit    n = Lit (mkMachInt n)
-mkIntLitInt n = Lit (mkMachInt (toInteger n))
+mkIntLit    dflags n = Lit (mkMachInt dflags n)
+mkIntLitInt dflags n = Lit (mkMachInt dflags (toInteger n))
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
 -- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
-mkWordLit     :: Integer -> Expr b
+mkWordLit     :: DynFlags -> Integer -> Expr b
 -- | Create a machine word literal expression of type  @Word#@ from a @Word@.
 -- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
-mkWordLitWord :: Word -> Expr b
+mkWordLitWord :: DynFlags -> Word -> Expr b
 
-mkWordLit     w = Lit (mkMachWord w)
-mkWordLitWord w = Lit (mkMachWord (toInteger w))
+mkWordLit     dflags w = Lit (mkMachWord dflags w)
+mkWordLitWord dflags w = Lit (mkMachWord dflags (toInteger w))
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkMachWord64 (toInteger w))
@@ -1191,6 +1236,8 @@ varsToCoreExprs vs = map varToCoreExpr vs
 \begin{code}
 -- | Extract every variable by this group
 bindersOf  :: Bind b -> [b]
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
@@ -1282,8 +1329,9 @@ isRuntimeVar = isId
 isRuntimeArg :: CoreExpr -> Bool
 isRuntimeArg = isValArg
 
--- | Returns @False@ iff the expression is a 'Type' or 'Coercion'
--- expression at its top level
+-- | Returns @True@ for value arguments, false for type args
+-- NB: coercions are value arguments (zero width, to be sure,
+-- like State#, but still value args).
 isValArg :: Expr b -> Bool
 isValArg e = not (isTypeArg e)
 

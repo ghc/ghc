@@ -18,7 +18,7 @@ module StgCmmEnv (
 
 	cgIdInfoId, cgIdInfoLF,
 
-	litIdInfo, lneIdInfo, regIdInfo,
+        litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
 	idInfoToAmode,
 
         NonVoid(..), isVoidId, nonVoidIds,
@@ -41,10 +41,11 @@ import StgCmmClosure
 
 import CLabel
 
+import DynFlags
+import MkGraph
 import BlockId
 import CmmExpr
 import CmmUtils
-import MkGraph (CmmAGraph, mkAssign, (<*>))
 import FastString
 import Id
 import VarEnv
@@ -75,41 +76,39 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 --	Manipulating CgIdInfo
 -------------------------------------
 
-mkCgIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
-mkCgIdInfo id lf expr
+mkCgIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
+mkCgIdInfo dflags id lf expr
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc expr, 
-	       cg_tag = lfDynTag lf }
+               cg_tag = lfDynTag dflags lf }
 
-litIdInfo :: Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
-litIdInfo id lf lit
+litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
+litIdInfo dflags id lf lit
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = CmmLoc (addDynTag (CmmLit lit) tag) 
+             , cg_loc = CmmLoc (addDynTag dflags (CmmLit lit) tag) 
 	     , cg_tag = tag }
   where
-    tag = lfDynTag lf
+    tag = lfDynTag dflags lf
 
-lneIdInfo :: Id -> [LocalReg] -> CgIdInfo
-lneIdInfo id regs 
+lneIdInfo :: DynFlags -> Id -> [NonVoid Id] -> CgIdInfo
+lneIdInfo dflags id regs
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = LneLoc blk_id regs
-	     , cg_tag = lfDynTag lf }
+             , cg_loc = LneLoc blk_id (map (idToReg dflags) regs)
+             , cg_tag = lfDynTag dflags lf }
   where
     lf     = mkLFLetNoEscape
     blk_id = mkBlockId (idUnique id)
 
--- Because the register may be spilled to the stack in untagged form, we
--- modify the initialization code 'init' to immediately tag the
--- register, and store a plain register in the CgIdInfo.  We allocate
--- a new register in order to keep single-assignment and help out the
--- inliner. -- EZY
-regIdInfo :: Id -> LambdaFormInfo -> LocalReg -> CmmAGraph -> FCode (CgIdInfo, CmmAGraph)
-regIdInfo id lf_info reg init 
-  = do { reg' <- newTemp (localRegType reg)
-       ; let init' = init <*> mkAssign (CmmLocal reg') 
-                                       (addDynTag (CmmReg (CmmLocal reg)) 
-                                                  (lfDynTag lf_info))
-       ; return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg')), init') }
+
+rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
+rhsIdInfo id lf_info
+  = do dflags <- getDynFlags
+       reg <- newTemp (gcWord dflags)
+       return (mkCgIdInfo dflags id lf_info (CmmReg (CmmLocal reg)), reg)
+
+mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
+mkRhsInit dflags reg lf_info expr
+  = mkAssign (CmmLocal reg) (addDynTag dflags expr (lfDynTag dflags lf_info))
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
@@ -117,9 +116,9 @@ idInfoToAmode (CgIdInfo { cg_loc = CmmLoc e }) = e
 idInfoToAmode cg_info
   = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))	-- LneLoc
 
-addDynTag :: CmmExpr -> DynTag -> CmmExpr
+addDynTag :: DynFlags -> CmmExpr -> DynTag -> CmmExpr
 -- A tag adds a byte offset to the pointer
-addDynTag expr tag = cmmOffsetB expr tag
+addDynTag dflags expr tag = cmmOffsetB dflags expr tag
 
 cgIdInfoId :: CgIdInfo -> Id
 cgIdInfoId = cg_id 
@@ -173,7 +172,8 @@ getCgIdInfo id
 	in
 	if isExternalName name then do
 	    let ext_lbl = CmmLabel (mkClosureLabel name $ idCafInfo id)
-	    return (litIdInfo id (mkLFImported id) ext_lbl)
+            dflags <- getDynFlags
+	    return (litIdInfo dflags id (mkLFImported id) ext_lbl)
 	else
 	-- Bug	
 	cgLookupPanic id
@@ -183,15 +183,13 @@ cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
   = do	static_binds <- getStaticBinds
 	local_binds <- getBinds
-	srt <- getSRTLabel
-	pprPanic "StgCmmEnv: variable not found"
+        pprPanic "StgCmmEnv: variable not found"
 		(vcat [ppr id,
 		ptext (sLit "static binds for:"),
 		vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
 		ptext (sLit "local binds for:"),
-		vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ],
-	        ptext (sLit "SRT label") <+> ppr srt
-	      ])
+                vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ]
+              ])
 
 
 --------------------
@@ -217,9 +215,10 @@ getNonVoidArgAmodes (arg:args)
 bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 -- Bind an Id to a fresh LocalReg
 bindToReg nvid@(NonVoid id) lf_info
-  = do	{ let reg = idToReg nvid
-	; addBindC id (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
-	; return reg }
+  = do dflags <- getDynFlags
+       let reg = idToReg dflags nvid
+       addBindC id (mkCgIdInfo dflags id lf_info (CmmReg (CmmLocal reg)))
+       return reg
 
 rebindToReg :: NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so 
@@ -234,7 +233,7 @@ bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
 bindArgsToRegs :: [NonVoid Id] -> FCode [LocalReg]
 bindArgsToRegs args = mapM bindArgToReg args
 
-idToReg :: NonVoid Id -> LocalReg
+idToReg :: DynFlags -> NonVoid Id -> LocalReg
 -- Make a register from an Id, typically a function argument,
 -- free variable, or case binder
 --
@@ -242,8 +241,9 @@ idToReg :: NonVoid Id -> LocalReg
 --
 -- By now the Ids should be uniquely named; else one would worry
 -- about accidental collision 
-idToReg (NonVoid id) = LocalReg (idUnique id) 
+idToReg dflags (NonVoid id)
+             = LocalReg (idUnique id)
                         (case idPrimRep id of VoidRep -> pprPanic "idToReg" (ppr id)
-                                              _ -> primRepCmmType (idPrimRep id))
+                                              _ -> primRepCmmType dflags (idPrimRep id))
 
 

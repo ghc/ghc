@@ -14,7 +14,6 @@ import Module
 import Name
 import Fingerprint
 -- import Outputable
-import StaticFlags
 
 import qualified Data.IntSet as IntSet
 import System.FilePath (normalise)
@@ -44,7 +43,7 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         paths = [ hcSuf ]
 
         -- -fprof-auto etc.
-        prof = if opt_SccProfilingOn then fromEnum profAuto else 0
+        prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
 
     in -- pprTrace "flags" (ppr (mainis, safeHs, lang, cpp, paths)) $
        computeFingerprint nameio (mainis, safeHs, lang, cpp, paths, prof)

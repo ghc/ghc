@@ -3,8 +3,11 @@
 module Main (main) where
 
 import Control.Monad.State
+import Data.Char
 import Data.List
+import System.Directory
 import System.Environment
+import System.FilePath
 
 import BuildInfo
 import FilenameDescr
@@ -26,13 +29,61 @@ sizeChangeThresholds = [(     1000, 150),
 
 main :: IO ()
 main = do args <- getArgs
-          case args of
-              [bd1, bd2]                          -> doit False bd1 bd2
-              ["--ignore-size-changes", bd1, bd2] -> doit True  bd1 bd2
-              _ -> die ["Bad args. Need 2 bindists."]
+          (ignoreSizeChanges, p1, p2) <-
+              case args of
+              [p1, p2]                          -> return (False, p1, p2)
+              ["--ignore-size-changes", p1, p2] -> return (True,  p1, p2)
+              _ -> die ["Bad args. Need 2 filepaths."]
+          doFileOrDirectory ignoreSizeChanges p1 p2
 
-doit :: Bool -> FilePath -> FilePath -> IO ()
-doit ignoreSizeChanges bd1 bd2
+doFileOrDirectory :: Bool -> FilePath -> FilePath -> IO ()
+doFileOrDirectory ignoreSizeChanges p1 p2
+ = do b <- doesDirectoryExist p1
+      let doit = if b then doDirectory else doFile
+      doit ignoreSizeChanges p1 p2
+
+doDirectory :: Bool -> FilePath -> FilePath -> IO ()
+doDirectory ignoreSizeChanges p1 p2
+ = do fs1 <- getDirectoryContents p1
+      fs2 <- getDirectoryContents p2
+      let isVersionChar c = isDigit c || c == '.'
+          mkFileInfo "." = return []
+          mkFileInfo ".." = return []
+          mkFileInfo fp@('g':'h':'c':'-':x:xs)
+           | isDigit x = return [(("ghc-", "VERSION", dropWhile isVersionChar xs), fp)]
+           | otherwise = die ["No version number in " ++ show fp]
+          mkFileInfo fp = die ["Unrecognised filename " ++ show fp]
+      fss1' <- mapM mkFileInfo fs1
+      fss2' <- mapM mkFileInfo fs2
+      let fs1' = sort $ concat fss1'
+          fs2' = sort $ concat fss2'
+
+          putBreak = putStrLn "=========="
+          extraFile d fp = do putBreak
+                              putStrLn ("Extra file in " ++ show d
+                                     ++ ": " ++ show fp)
+          doFiles [] [] = do putBreak
+                             putStrLn "Done."
+          doFiles ((_, fp) : xs) [] = do extraFile p1 fp
+                                         doFiles xs []
+          doFiles [] ((_, fp) : ys) = do extraFile p2 fp
+                                         doFiles [] ys
+          doFiles xs@((fpc1, fp1) : xs') ys@((fpc2, fp2) : ys')
+              = do case fpc1 `compare` fpc2 of
+                       EQ ->
+                           do putBreak
+                              putStrLn $ unwords ["Doing", show fp1, show fp2]
+                              doFile ignoreSizeChanges (p1 </> fp1)
+                                                       (p2 </> fp2)
+                              doFiles xs' ys'
+                       LT -> do extraFile p1 fp1
+                                doFiles xs' ys
+                       GT -> do extraFile p2 fp2
+                                doFiles xs ys'
+      doFiles fs1' fs2'
+
+doFile :: Bool -> FilePath -> FilePath -> IO ()
+doFile ignoreSizeChanges bd1 bd2
  = do tls1 <- readTarLines bd1
       tls2 <- readTarLines bd2
       let mWays1 = findWays tls1
@@ -124,7 +175,7 @@ mkFilePathDescr fp
          middle' <- mkMiddleDescr middle
          filename' <- mkFileNameDescr filename
          let fd = FP "ghc-" : VersionOf "ghc" : middle' ++ FP "/" : filename'
-         return $ normalise fd
+         return $ normaliseDescr fd
  | otherwise = return [FP fp]
 
 mkMiddleDescr :: FilePath -> BIMonad FilenameDescr

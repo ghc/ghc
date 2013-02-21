@@ -12,7 +12,7 @@
 #ifdef CMINUSMINUS
 
 #define unlockClosure(ptr,info)                 \
-    prim %write_barrier() [];                   \
+    prim %write_barrier();                      \
     StgHeader_info(ptr) = info;    
 
 #else

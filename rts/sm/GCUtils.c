@@ -263,7 +263,7 @@ alloc_todo_block (gen_workspace *ws, nat size)
 //        bd = hd;
 
         if (size > BLOCK_SIZE_W) {
-            bd = allocGroup_sync((lnat)BLOCK_ROUND_UP(size*sizeof(W_))
+            bd = allocGroup_sync((W_)BLOCK_ROUND_UP(size*sizeof(W_))
                                  / BLOCK_SIZE);
         } else {
             bd = allocBlock_sync();

@@ -16,6 +16,9 @@
 # We build the RTS with stage 1
 rts_dist_HC = $(GHC_STAGE1)
 
+rts_INSTALL_INFO = rts
+rts_VERSION = 1.0
+
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 rts_dist_WAYS = $(rts_WAYS)
@@ -104,8 +107,10 @@ $(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
 endif
 
 ifneq "$(BINDIST)" "YES"
+ifneq "$(UseSystemLibFFI)" "YES"
 rts_ffi_objs_stamp = rts/dist/ffi/stamp
 rts_ffi_objs       = rts/dist/ffi/*.o
+
 $(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) $(TOUCH_DEP) | $$(dir $$@)/.
 	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
 	"$(TOUCH_CMD)" $@
@@ -118,6 +123,7 @@ rts/dist/build/libffi$(soext): libffi/build/inst/lib/libffi$(soext)
 rts/dist/build/$(LIBFFI_DLL): libffi/build/inst/bin/$(LIBFFI_DLL)
 	cp $< $@
 endif
+endif
 
 #-----------------------------------------------------------------------------
 # Building one way
@@ -125,13 +131,13 @@ define build-rts-way # args: $1 = way
 
 ifneq "$$(BINDIST)" "YES"
 
+rts_dist_$1_HC_OPTS := $$(GhcRtsHcOpts)
+rts_dist_$1_CC_OPTS := $$(GhcRtsCcOpts)
+
 # The per-way CC_OPTS
 ifneq "$$(findstring debug, $1)" ""
-rts_dist_$1_HC_OPTS =
-rts_dist_$1_CC_OPTS = -g -O0
-else
-rts_dist_$1_HC_OPTS = $$(GhcRtsHcOpts)
-rts_dist_$1_CC_OPTS = $$(GhcRtsCcOpts)
+rts_dist_$1_HC_OPTS += -O0
+rts_dist_$1_CC_OPTS += -fno-omit-frame-pointer -g -O0
 endif
 
 ifneq "$$(findstring dyn, $1)" ""
@@ -147,8 +153,6 @@ endif
 $(call distdir-way-opts,rts,dist,$1)
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
-$(call hs-suffix-rules-srcdir,rts,dist,$1,.)
-# hs-suffix-rules-srcdir is needed when BootingFromHc to get the .hc rules
 
 rts_$1_LIB_NAME = libHSrts$$($1_libsuf)
 rts_$1_LIB = rts/dist/build/$$(rts_$1_LIB_NAME)
@@ -174,6 +178,12 @@ endif
 
 rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
+ifneq "$(UseSystemLibFFI)" "YES"
+rts_dist_FFI_SO = rts/dist/build/libffi$(soext)
+else
+rts_dist_FFI_SO =
+endif
+
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HostOS_CPP)" "mingw32" 
@@ -182,15 +192,21 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/b
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages -Lrts/dist/build -l$(LIBFFI_WINDOWS_LIB) `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend rts/dist/build/libffi$$(soext)
+ifneq "$(UseSystemLibFFI)" "YES"
+LIBFFI_LIBS = -Lrts/dist/build -lffi 
+ifeq "$$(TargetOS_CPP)" "linux"
+LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN'
+endif
+
+else
+# flags will be taken care of in rts/libs.depend
+LIBFFI_LIBS =
+endif
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend $$(rts_dist_FFI_SO)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages -Lrts/dist/build -lffi `cat rts/libs.depend` $$(rts_$1_OBJS) \
+	  -no-auto-link-packages $$(LIBFFI_LIBS) `cat rts/libs.depend` $$(rts_$1_OBJS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
-ifeq "$$(darwin_HOST_OS)" "1"
-	# Ensure library's install name is correct before anyone links with it.
-	install_name_tool -id $$(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
-endif
 endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_ffi_objs_stamp)
@@ -205,6 +221,8 @@ endef
 
 # And expand the above for each way:
 $(foreach way,$(rts_WAYS),$(eval $(call build-rts-way,$(way))))
+
+$(eval $(call distdir-opts,rts,dist))
 
 #-----------------------------------------------------------------------------
 # Flags for compiling every file
@@ -263,11 +281,6 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
-# Mac OS X: make sure we compile for the right OS version
-rts_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
-rts_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
-rts_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
-
 # We *want* type-checking of hand-written cmm.
 rts_HC_OPTS += -dcmm-lint 
 
@@ -315,6 +328,10 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+rts/Linker_CC_OPTS += -DDYNAMIC_BY_DEFAULT
+endif
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the
@@ -374,10 +391,16 @@ rts/dist/build/AutoApply_HC_OPTS += -fno-PIC -static
 endif
 endif
 
+# add CFLAGS for libffi
 # ffi.h triggers prototype warnings, so disable them here:
-rts/Interpreter_CC_OPTS += -Wno-strict-prototypes
-rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes
-rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes
+ifeq "$(UseSystemLibFFI)" "YES"
+LIBFFI_CFLAGS = $(addprefix -I,$(FFIIncludeDir))
+else
+LIBFFI_CFLAGS =
+endif
+rts/Interpreter_CC_OPTS += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 
 # inlining warnings happen in Compact
 rts/sm/Compact_CC_OPTS += -Wno-inline
@@ -435,6 +458,21 @@ rts_PACKAGE_CPP_OPTS += -DPAPI_LIB_DIR=""
 
 endif
 
+#-----------------------------------------------------------------------------
+# Use system provided libffi
+
+ifeq "$(UseSystemLibFFI)" "YES"
+
+rts_PACKAGE_CPP_OPTS    += -DFFI_INCLUDE_DIR=$(FFIIncludeDir)
+rts_PACKAGE_CPP_OPTS    += -DFFI_LIB_DIR=$(FFILibDir)
+
+else # UseSystemLibFFI==YES
+
+rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=""
+rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=""
+
+endif
+
 # -----------------------------------------------------------------------------
 # dependencies
 
@@ -460,7 +498,10 @@ endif
 
 $(eval $(call dependencies,rts,dist,1))
 
-$(rts_dist_depfile_c_asm) : $(libffi_HEADERS) $(DTRACEPROBES_H)
+$(rts_dist_depfile_c_asm) : $(DTRACEPROBES_H)
+ifneq "$(UseSystemLibFFI)" "YES"
+$(rts_dist_depfile_c_asm) : $(libffi_HEADERS)
+endif
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
@@ -501,18 +542,18 @@ endif
 
 $(eval $(call manual-package-config,rts))
 
-ifneq "$(BootingFromHc)" "YES"
 rts/package.conf.inplace : $(includes_H_CONFIG) $(includes_H_PLATFORM)
-endif
 
 # -----------------------------------------------------------------------------
 # installing
 
-INSTALL_LIBS += $(ALL_RTS_LIBS)
-INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
-INSTALL_LIBS += $(wildcard rts/dist/build/$(LIBFFI_DLL))
+RTS_INSTALL_LIBS += $(ALL_RTS_LIBS)
+RTS_INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
+RTS_INSTALL_LIBS += $(wildcard rts/dist/build/$(LIBFFI_DLL))
 
+ifneq "$(UseSystemLibFFI)" "YES"
 install: install_libffi_headers
+endif
 
 .PHONY: install_libffi_headers
 install_libffi_headers :

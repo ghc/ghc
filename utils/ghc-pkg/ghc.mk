@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2009-2012 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -13,63 +13,8 @@
 # -----------------------------------------------------------------------------
 # Bootstrapping ghc-pkg
 
-utils/ghc-pkg_dist_PROG = ghc-pkg$(exeext)
-
-ifeq "$(BootingFromHc)" "YES"
-
-inplace/bin/ghc-pkg : utils/ghc-pkg/dist-install/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext)
-ifeq "$(Windows)" "YES"
-	cp $< $@
-else
-	$(call removeFiles,$@)
-	echo "#!/bin/sh" >>$@
-	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
-	echo '$(TOP)/$< --global-package-db $$PKGCONF $${1+"$$@"}' >> $@
-	chmod +x $@
-endif
-
-else
-
-$(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext) | $$(dir $$@)/. $(INPLACE_PACKAGE_CONF)/.
-	$(call removeFiles,$(wildcard $(INPLACE_PACKAGE_CONF)/*))
-ifeq "$(Windows)" "YES"
-	cp $< $@
-else
-	$(call removeFiles,$@)
-	echo "#!/bin/sh" >>$@
-	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
-	echo '$(TOP)/$< --global-package-db $$PKGCONF $${1+"$$@"}' >> $@
-	chmod +x $@
-endif
-
-endif
-
-# depend on ghc-cabal, otherwise we build Cabal twice when building in parallel.
-# (ghc-cabal is an order-only dependency, we don't need to rebuild ghc-pkg
-# if ghc-cabal is newer).
-# The binary package is not warning-clean, so we need a few -fno-warns here.
-#
-# ToDo: we might want to do this using ghc-cabal instead.
-#
-utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
-	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
-	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
-	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
-	       $(SRC_HC_WARNING_OPTS) \
-	       -DCABAL_VERSION=$(CABAL_VERSION) \
-	       -DBOOTSTRAPPING \
-	       -odir  bootstrapping \
-	       -hidir bootstrapping \
-               -iutils/ghc-pkg \
-	       -XCPP -XExistentialQuantification -XDeriveDataTypeable \
-	       -ilibraries/Cabal/Cabal \
-	       -ilibraries/filepath \
-	       -ilibraries/hpc \
-	       -ilibraries/binary/src \
-	       -ilibraries/bin-package-db
-
-
-utils/ghc-pkg/Version.hs: mk/project.mk
+utils/ghc-pkg/dist/build/Version.hs \
+utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	echo "module Version where"                    >> $@
 	echo "version, targetOS, targetARCH :: String" >> $@
@@ -77,38 +22,58 @@ utils/ghc-pkg/Version.hs: mk/project.mk
 	echo "targetOS   = \"$(TargetOS_CPP)\""        >> $@
 	echo "targetARCH = \"$(TargetArch_CPP)\""      >> $@
 
-$(eval $(call clean-target,utils/ghc-pkg,dist,\
-   utils/ghc-pkg/dist \
-   utils/ghc-pkg/Version.hs))
-
-# -----------------------------------------------------------------------------
-# Cross-compile case: Install our dist version
-# Normal case: Build ghc-pkg with stage 1
-
-ifeq "$(BuildingCrossCompiler)" "YES"
-GHC_PKG_DISTDIR=dist
-else
-GHC_PKG_DISTDIR=dist-install
-endif
-
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_USES_CABAL = YES
 utils/ghc-pkg_PACKAGE = ghc-pkg
 
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_PROG = ghc-pkg
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_SHELL_WRAPPER = YES
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER = YES
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_INPLACE = NO
+# -----------------------------------------------------------------------------
+# Cross-compile case: install our dist version
 
-ifeq "$(BootingFromHc)" "YES"
-utils/ghc-pkg_dist-install_OTHER_OBJS += $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
-endif
+ifeq "$(Stage1Only)" "YES"
 
-ifeq "$(BuildingCrossCompiler)" "YES"
+utils/ghc-pkg_dist_INSTALL = YES
+utils/ghc-pkg_dist_SHELL_WRAPPER = YES
+utils/ghc-pkg_dist_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
+utils/ghc-pkg_dist_WANT_INSTALLED_WRAPPER = YES
+
+INSTALL_LIBEXECS += utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)
+
 $(eval $(call shell-wrapper,utils/ghc-pkg,dist))
-else
-$(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
+
 endif
+
+utils/ghc-pkg_dist_USES_CABAL = YES
+utils/ghc-pkg_dist_PROG = ghc-pkg$(exeext)
+utils/ghc-pkg_dist_SHELL_WRAPPER = YES
+utils/ghc-pkg_dist_INSTALL_INPLACE = YES
+
+$(eval $(call build-prog,utils/ghc-pkg,dist,0))
+
+$(GHC_PKG_INPLACE) : | $(INPLACE_PACKAGE_CONF)/.
+
+utils/ghc-pkg/dist/package-data.mk: \
+    utils/ghc-pkg/dist/build/Version.hs
+
+# -----------------------------------------------------------------------------
+# Normal case: Build ghc-pkg with stage 1 and install it
+
+ifneq "$(Stage1Only)" "YES"
+
+utils/ghc-pkg_dist-install_USES_CABAL = YES
+
+utils/ghc-pkg_dist-install_PROG = ghc-pkg
+utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
+utils/ghc-pkg_dist-install_INSTALL = YES
+utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
+utils/ghc-pkg_dist-install_INSTALL_INPLACE = NO
+
+$(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
+
+utils/ghc-pkg/dist-install/package-data.mk: \
+    utils/ghc-pkg/dist-install/build/Version.hs
+
+endif
+
+# -----------------------------------------------------------------------------
+# Link ghc-pkg to ghc-pkg-$(ProjectVersion) when installing
 
 ifeq "$(Windows)" "NO"
 install: install_utils/ghc-pkg_link
@@ -116,7 +81,6 @@ install: install_utils/ghc-pkg_link
 .PHONY: install_utils/ghc-pkg_link
 install_utils/ghc-pkg_link: 
 	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
-	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc-pkg")
+	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg")
 	$(LN_S) $(CrossCompilePrefix)ghc-pkg-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg"
 endif
-

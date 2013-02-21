@@ -15,6 +15,19 @@
 #include "Rts.h"
 #include "HsFFI.h"
 
+#include "GC.h"
+#include "GCThread.h"
+#include "GCTDecl.h"            // NB. before RtsSignals.h which
+                                // clobbers REG_R1 on arm/Linux
+#include "Compact.h"
+#include "Evac.h"
+#include "Scav.h"
+#include "GCUtils.h"
+#include "MarkStack.h"
+#include "MarkWeak.h"
+#include "Sparks.h"
+#include "Sweep.h"
+
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "Apply.h"
@@ -37,18 +50,6 @@
 #include "RaiseAsync.h"
 #include "Papi.h"
 #include "Stable.h"
-
-#include "GC.h"
-#include "GCThread.h"
-#include "GCTDecl.h"
-#include "Compact.h"
-#include "Evac.h"
-#include "Scav.h"
-#include "GCUtils.h"
-#include "MarkStack.h"
-#include "MarkWeak.h"
-#include "Sparks.h"
-#include "Sweep.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -102,13 +103,19 @@ rtsBool major_gc;
 
 /* Data used for allocation area sizing.
  */
-static lnat g0_pcnt_kept = 30; // percentage of g0 live at last minor GC 
+static W_ g0_pcnt_kept = 30; // percentage of g0 live at last minor GC 
 
 /* Mut-list stats */
 #ifdef DEBUG
 nat mutlist_MUTVARS,
     mutlist_MUTARRS,
     mutlist_MVARS,
+    mutlist_TVAR,
+    mutlist_TVAR_WATCH_QUEUE,
+    mutlist_TREC_CHUNK,
+    mutlist_TREC_HEADER,
+    mutlist_ATOMIC_INVARIANT,
+    mutlist_INVARIANT_CHECK_QUEUE,
     mutlist_OTHERS;
 #endif
 
@@ -137,7 +144,6 @@ DECLARE_GCT
 
 static void mark_root               (void *user, StgClosure **root);
 static void zero_static_object_list (StgClosure* first_static);
-static nat  initialise_N            (rtsBool force_major_gc);
 static void prepare_collected_gen   (generation *gen);
 static void prepare_uncollected_gen (generation *gen);
 static void init_gc_thread          (gc_thread *t);
@@ -150,7 +156,7 @@ static StgWord dec_running          (void);
 static void wakeup_gc_threads       (nat me);
 static void shutdown_gc_threads     (nat me);
 static void collect_gct_blocks      (void);
-static lnat collect_pinned_object_blocks (void);
+static void collect_pinned_object_blocks (void);
 
 #if 0 && defined(DEBUG)
 static void gcCAFs                  (void);
@@ -167,18 +173,20 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
 
+   The collect_gen parameter is gotten by calling calcNeeded().
+
    Locks held: all capabilities are held throughout GarbageCollect().
    -------------------------------------------------------------------------- */
 
 void
-GarbageCollect (rtsBool force_major_gc, 
+GarbageCollect (nat collect_gen,
                 rtsBool do_heap_census,
                 nat gc_type USED_IF_THREADS,
                 Capability *cap)
 {
   bdescr *bd;
   generation *gen;
-  lnat live_blocks, live_words, allocated, par_max_copied, par_tot_copied;
+  StgWord live_blocks, live_words, par_max_copied, par_tot_copied;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -212,11 +220,18 @@ GarbageCollect (rtsBool force_major_gc,
   stat_startGC(cap, gct);
 
   // lock the StablePtr table
-  stablePtrPreGC();
+  stableLock();
 
 #ifdef DEBUG
   mutlist_MUTVARS = 0;
   mutlist_MUTARRS = 0;
+  mutlist_MVARS = 0;
+  mutlist_TVAR = 0;
+  mutlist_TVAR_WATCH_QUEUE = 0;
+  mutlist_TREC_CHUNK = 0;
+  mutlist_TREC_HEADER = 0;
+  mutlist_ATOMIC_INVARIANT = 0;
+  mutlist_INVARIANT_CHECK_QUEUE = 0;
   mutlist_OTHERS = 0;
 #endif
 
@@ -228,14 +243,10 @@ GarbageCollect (rtsBool force_major_gc,
   }
 #endif
 
-  /* Approximate how much we allocated.  
-   * Todo: only when generating stats? 
-   */
-  allocated = countLargeAllocated(); /* don't count the nursery yet */
-
   /* Figure out which generation to collect
    */
-  n = initialise_N(force_major_gc);
+  N = collect_gen;
+  major_gc = (N == RtsFlags.GcFlags.generations-1);
 
 #if defined(THREADED_RTS)
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
@@ -269,8 +280,8 @@ GarbageCollect (rtsBool force_major_gc,
   n_gc_threads = 1;
 #endif
 
-  debugTrace(DEBUG_gc, "GC (gen %d): %d KB to collect, %ld MB in use, using %d thread(s)",
-        N, n * (BLOCK_SIZE / 1024), mblocks_allocated, n_gc_threads);
+  debugTrace(DEBUG_gc, "GC (gen %d, using %d thread(s))",
+             N, n_gc_threads);
 
 #ifdef RTS_GTK_FRONTPANEL
   if (RtsFlags.GcFlags.frontpanel) {
@@ -379,7 +390,7 @@ GarbageCollect (rtsBool force_major_gc,
   initWeakForGC();
 
   // Mark the stable pointer table.
-  markStablePtrTable(mark_root, gct);
+  markStableTables(mark_root, gct);
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -402,10 +413,14 @@ GarbageCollect (rtsBool force_major_gc,
       break;
   }
 
+  if (!DEBUG_IS_ON && n_gc_threads != 1) {
+      clearNursery(cap);
+  }
+
   shutdown_gc_threads(gct->thread_index);
 
   // Now see which stable names are still alive.
-  gcStablePtrTable();
+  gcStableTables();
 
 #ifdef THREADED_RTS
   if (n_gc_threads == 1) {
@@ -486,16 +501,21 @@ GarbageCollect (rtsBool force_major_gc,
     // Count the mutable list as bytes "copied" for the purposes of
     // stats.  Every mutable list is copied during every GC.
     if (g > 0) {
-	nat mut_list_size = 0;
+        W_ mut_list_size = 0;
         for (n = 0; n < n_capabilities; n++) {
             mut_list_size += countOccupied(capabilities[n].mut_lists[g]);
         }
 	copied +=  mut_list_size;
 
 	debugTrace(DEBUG_gc,
-		   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d others)",
+		   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d ATOMIC_INVARIANTs, %d INVARIANT_CHECK_QUEUEs, %d others)",
 		   (unsigned long)(mut_list_size * sizeof(W_)),
-		   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS);
+                   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
+                   mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
+                   mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
+                   mutlist_ATOMIC_INVARIANT,
+                   mutlist_INVARIANT_CHECK_QUEUE,
+                   mutlist_OTHERS);
     }
 
     bdescr *next, *prev;
@@ -572,6 +592,7 @@ GarbageCollect (rtsBool force_major_gc,
         freeChain(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
+        gen->n_large_words  = countOccupied(gen->large_objects);
         gen->n_new_large_words = 0;
     }
     else // for generations > N
@@ -583,13 +604,15 @@ GarbageCollect (rtsBool force_major_gc,
 	for (bd = gen->scavenged_large_objects; bd; bd = next) {
             next = bd->link;
             dbl_link_onto(bd, &gen->large_objects);
-	}
+            gen->n_large_words += bd->free - bd->start;
+        }
         
 	// add the new blocks we promoted during this GC 
 	gen->n_large_blocks += gen->n_scavenged_large_blocks;
     }
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
+    ASSERT(countOccupied(gen->large_objects) == gen->n_large_words);
 
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
@@ -629,14 +652,17 @@ GarbageCollect (rtsBool force_major_gc,
   }
 
   // Reset the nursery: make the blocks empty
-  if (n_gc_threads == 1) {
+  if (DEBUG_IS_ON || n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
-          allocated += clearNursery(&capabilities[n]);
+          clearNursery(&capabilities[n]);
       }
   } else {
-      gct->allocated = clearNursery(cap);
+      // When doing parallel GC, clearNursery() is called by the
+      // worker threads
       for (n = 0; n < n_capabilities; n++) {
-          allocated += gc_threads[n]->allocated;
+          if (gc_threads[n]->idle) {
+              clearNursery(&capabilities[n]);
+          }
       }
   }
 
@@ -672,15 +698,15 @@ GarbageCollect (rtsBool force_major_gc,
   }
 
   // Update the stable pointer hash table.
-  updateStablePtrTable(major_gc);
+  updateStableTables(major_gc);
 
   // unlock the StablePtr table.  Must be before scheduleFinalizers(),
   // because a finalizer may call hs_free_fun_ptr() or
   // hs_free_stable_ptr(), both of which access the StablePtr table.
-  stablePtrPostGC();
+  stableUnlock();
 
   // Start any pending finalizers.  Must be after
-  // updateStablePtrTable() and stablePtrPostGC() (see #4221).
+  // updateStableTables() and stableUnlock() (see #4221).
   RELEASE_SM_LOCK;
   scheduleFinalizers(cap, old_weak_ptr_list);
   ACQUIRE_SM_LOCK;
@@ -708,7 +734,7 @@ GarbageCollect (rtsBool force_major_gc,
   ACQUIRE_SM_LOCK;
 
   if (major_gc) {
-      nat need, got;
+      W_ need, got;
       need = BLOCKS_TO_MBLOCKS(n_alloc_blocks);
       got = mblocks_allocated;
       /* If the amount of data remains constant, next major GC we'll
@@ -747,12 +773,9 @@ GarbageCollect (rtsBool force_major_gc,
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(cap, gct, allocated, live_words, copied,
+  stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
              N, n_gc_threads, par_max_copied, par_tot_copied);
-
-  // Guess which generation we'll collect *next* time
-  initialise_N(force_major_gc);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -764,47 +787,6 @@ GarbageCollect (rtsBool force_major_gc,
   RELEASE_SM_LOCK;
 
   SET_GCT(saved_gct);
-}
-
-/* -----------------------------------------------------------------------------
-   Figure out which generation to collect, initialise N and major_gc.
-
-   Also returns the total number of blocks in generations that will be
-   collected.
-   -------------------------------------------------------------------------- */
-
-static nat
-initialise_N (rtsBool force_major_gc)
-{
-    int g;
-    nat blocks, blocks_total;
-
-    blocks = 0;
-    blocks_total = 0;
-
-    if (force_major_gc) {
-        N = RtsFlags.GcFlags.generations - 1;
-    } else {
-        N = 0;
-    }
-
-    for (g = RtsFlags.GcFlags.generations - 1; g >= 0; g--) {
-
-        blocks = generations[g].n_words / BLOCK_SIZE_W
-               + generations[g].n_large_blocks;
-
-        if (blocks >= generations[g].max_blocks) {
-            N = stg_max(N,g);
-        }
-        if ((nat)g <= N) {
-            blocks_total += blocks;
-        }
-    }
-
-    blocks_total += countNurseryBlocks();
-
-    major_gc = (N == RtsFlags.GcFlags.generations-1);
-    return blocks_total;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1103,7 +1085,9 @@ gcWorkerThread (Capability *cap)
 
     scavenge_until_all_done();
     
-    gct->allocated = clearNursery(cap);
+    if (!DEBUG_IS_ON) {
+        clearNursery(cap);
+    }
 
 #ifdef THREADED_RTS
     // Now that the whole heap is marked, we discard any sparks that
@@ -1317,14 +1301,14 @@ prepare_collected_gen (generation *gen)
 
     // for a compacted generation, we need to allocate the bitmap
     if (gen->mark) {
-        lnat bitmap_size; // in bytes
+        StgWord bitmap_size; // in bytes
         bdescr *bitmap_bdescr;
         StgWord *bitmap;
 	
         bitmap_size = gen->n_old_blocks * BLOCK_SIZE / (sizeof(W_)*BITS_PER_BYTE);
-	
+
         if (bitmap_size > 0) {
-            bitmap_bdescr = allocGroup((lnat)BLOCK_ROUND_UP(bitmap_size) 
+            bitmap_bdescr = allocGroup((StgWord)BLOCK_ROUND_UP(bitmap_size)
                                        / BLOCK_SIZE);
             gen->bitmap = bitmap_bdescr;
             bitmap = bitmap_bdescr->start;
@@ -1447,17 +1431,15 @@ collect_gct_blocks (void)
    purposes.
    -------------------------------------------------------------------------- */
 
-static lnat
+static void
 collect_pinned_object_blocks (void)
 {
     nat n;
     bdescr *bd, *prev;
-    lnat allocated = 0;
 
     for (n = 0; n < n_capabilities; n++) {
         prev = NULL;
         for (bd = capabilities[n].pinned_object_blocks; bd != NULL; bd = bd->link) {
-            allocated += bd->free - bd->start;
             prev = bd;
         }
         if (prev != NULL) {
@@ -1469,8 +1451,6 @@ collect_pinned_object_blocks (void)
             capabilities[n].pinned_object_blocks = 0;
         }
     }
-
-    return allocated;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1488,7 +1468,6 @@ init_gc_thread (gc_thread *t)
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;
-    t->allocated = 0;
     t->copied = 0;
     t->scanned = 0;
     t->any_work = 0;
@@ -1552,9 +1531,9 @@ resize_generations (void)
     nat g;
 
     if (major_gc && RtsFlags.GcFlags.generations > 1) {
-	nat live, size, min_alloc, words;
-	const nat max  = RtsFlags.GcFlags.maxHeapSize;
-	const nat gens = RtsFlags.GcFlags.generations;
+        W_ live, size, min_alloc, words;
+        const W_ max  = RtsFlags.GcFlags.maxHeapSize;
+        const W_ gens = RtsFlags.GcFlags.generations;
 	
 	// live in the oldest generations
         if (oldest_gen->live_estimate != 0) {
@@ -1570,7 +1549,11 @@ resize_generations (void)
 		       RtsFlags.GcFlags.minOldGenSize);
 	
         if (RtsFlags.GcFlags.heapSizeSuggestionAuto) {
-            RtsFlags.GcFlags.heapSizeSuggestion = size;
+            if (max > 0) {
+                RtsFlags.GcFlags.heapSizeSuggestion = stg_min(max, size);
+            } else {
+                RtsFlags.GcFlags.heapSizeSuggestion = size;
+            }
         }
 
 	// minimum size for generation zero
@@ -1642,11 +1625,11 @@ resize_generations (void)
 static void
 resize_nursery (void)
 {
-    const lnat min_nursery = RtsFlags.GcFlags.minAllocAreaSize * n_capabilities;
+    const StgWord min_nursery = RtsFlags.GcFlags.minAllocAreaSize * n_capabilities;
 
     if (RtsFlags.GcFlags.generations == 1)
     {   // Two-space collector:
-	nat blocks;
+        W_ blocks;
     
 	/* set up a new nursery.  Allocate a nursery size based on a
 	 * function of the amount of live data (by default a factor of 2)
@@ -1702,7 +1685,9 @@ resize_nursery (void)
 	if (RtsFlags.GcFlags.heapSizeSuggestion)
 	{
 	    long blocks;
-	    const nat needed = calcNeeded(); 	// approx blocks needed at next GC 
+            StgWord needed;
+
+            calcNeeded(rtsFalse, &needed); // approx blocks needed at next GC
 	    
 	    /* Guess how much will be live in generation 0 step 0 next time.
 	     * A good approximation is obtained by finding the
@@ -1725,7 +1710,7 @@ resize_nursery (void)
 	     * close on average.
 	     *
 	     * Formula:            suggested - needed
-	     *                ----------------------------
+             *                ----------------------------
 	     *                    1 + g0_pcnt_kept/100
 	     *
 	     * where 'needed' is the amount of memory needed at the next
@@ -1739,7 +1724,7 @@ resize_nursery (void)
 		blocks = min_nursery;
 	    }
 	    
-	    resizeNurseries((nat)blocks);
+            resizeNurseries((W_)blocks);
 	}
 	else
 	{

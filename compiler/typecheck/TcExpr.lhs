@@ -15,8 +15,8 @@
 module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC, 
                 tcInferRho, tcInferRhoNC, 
                 tcSyntaxOp, tcCheckId,
-                addExprErrCtxt ) where
-
+                addExprErrCtxt) where
+                
 #include "HsVersions.h"
 
 #ifdef GHCI 	/* Only if bootstrapped */
@@ -32,7 +32,7 @@ import BasicTypes
 import Inst
 import TcBinds
 import FamInst          ( tcLookupFamInst )
-import FamInstEnv       ( famInstAxiom, dataFamInstRepTyCon )
+import FamInstEnv       ( famInstAxiom, dataFamInstRepTyCon, FamInstMatch(..) )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -43,6 +43,7 @@ import TcType
 import DsMonad hiding (Splice)
 import Id
 import DataCon
+import RdrName
 import Name
 import TyCon
 import Type
@@ -133,6 +134,16 @@ tcInfExpr (HsPar e) 	= do { (e', ty) <- tcInferRhoNC e
                              ; return (HsPar e', ty) }
 tcInfExpr (HsApp e1 e2) = tcInferApp e1 [e2]                                  
 tcInfExpr e             = tcInfer (tcExpr e)
+
+tcHole :: OccName -> TcRhoType -> TcM (HsExpr TcId)
+tcHole occ res_ty 
+ = do { ty <- newFlexiTyVarTy liftedTypeKind
+      ; name <- newSysName occ
+      ; let ev = mkLocalId name ty
+      ; loc <- getCtLoc HoleOrigin
+      ; let can = CHoleCan { cc_ev = CtWanted ty ev, cc_loc = loc, cc_occ = occ }
+      ; emitInsoluble can
+      ; tcWrapResult (HsVar ev) ty res_ty }
 \end{code}
 
 
@@ -194,7 +205,7 @@ tcExpr (HsIPVar x) res_ty
   -- Coerces a dictionry for `IP "x" t` into `t`.
   fromDict ipClass x ty =
     case unwrapNewTyCon_maybe (classTyCon ipClass) of
-      Just (_,_,ax) -> HsWrap $ WpCast $ mkTcAxInstCo ax [x,ty]
+      Just (_,_,ax) -> HsWrap $ WpCast $ mkTcUnbranchedAxInstCo ax [x,ty]
       Nothing       -> panic "The dictionary for `IP` is not a newtype?"
 
 tcExpr (HsLam match) res_ty
@@ -231,6 +242,8 @@ tcExpr (HsType ty) _
 	-- so it's not enabled yet.
 	-- Can't eliminate it altogether from the parser, because the
 	-- same parser parses *patterns*.
+tcExpr (HsUnboundVar v) res_ty
+  = tcHole (rdrNameOcc v) res_ty
 \end{code}
 
 
@@ -304,20 +317,31 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
        ; let doc = ptext (sLit "The first argument of ($) takes")
        ; (co_arg1, [arg2_ty], op_res_ty) <- matchExpectedFunTys doc 1 arg1_ty
-       	 -- arg2_ty maybe polymorphic; that's the point
+         -- arg1_ty = arg2_ty -> op_res_ty
+       	 -- And arg2_ty maybe polymorphic; that's the point
 
        -- Make sure that the argument and result types have kind '*'
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
-       ; _ <- unifyKind (typeKind arg2_ty) liftedTypeKind
-       ; _ <- unifyKind (typeKind res_ty)  liftedTypeKind
+       --    (which gives a seg fault)
+       -- We do this by unifying with a MetaTv; but of course
+       -- it must allow foralls in the type it unifies with (hence PolyTv)!
 
+       -- ($) :: forall ab. (a->b) -> a -> b
+       ; a_ty <- newPolyFlexiTyVarTy
+       ; b_ty <- newPolyFlexiTyVarTy
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
-       ; co_res <- unifyType op_res_ty res_ty
-       ; op_id <- tcLookupId op_name
 
-       ; let op' = L loc (HsWrap (mkWpTyApps [arg2_ty, op_res_ty]) (HsVar op_id))
-       ; return $ mkHsWrapCo co_res $
-         OpApp (mkLHsWrapCo co_arg1 arg1') op' fix arg2' }
+       ; co_res <- unifyType b_ty res_ty        -- b ~ res
+       ; co_a   <- unifyType arg2_ty   a_ty     -- arg2 ~ a
+       ; co_b   <- unifyType op_res_ty b_ty     -- op_res ~ b
+       ; op_id  <- tcLookupId op_name
+
+       ; let op' = L loc (HsWrap (mkWpTyApps [a_ty, b_ty]) (HsVar op_id))
+       ; return $ mkHsWrapCo (co_res) $
+         OpApp (mkLHsWrapCo (mkTcFunCo co_a co_b) $
+                mkLHsWrapCo co_arg1 arg1') 
+               op' fix 
+               (mkLHsWrapCo co_a arg2') }
 
   | otherwise
   = do { traceTc "Non Application rule" (ppr op)
@@ -377,12 +401,18 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
        
        ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
 
-tcExpr (ExplicitList _ exprs) res_ty
-  = do 	{ (coi, elt_ty) <- matchExpectedListTy res_ty
-	; exprs' <- mapM (tc_elt elt_ty) exprs
-	; return $ mkHsWrapCo coi (ExplicitList elt_ty exprs') }
-  where
-    tc_elt elt_ty expr = tcPolyExpr expr elt_ty
+tcExpr (ExplicitList _ witness exprs) res_ty   
+  = case witness of
+      Nothing   -> do  { (coi, elt_ty) <- matchExpectedListTy res_ty
+                       ; exprs' <- mapM (tc_elt elt_ty) exprs                       
+                       ; return $ mkHsWrapCo coi (ExplicitList elt_ty Nothing exprs') }
+
+      Just fln -> do  { list_ty <- newFlexiTyVarTy liftedTypeKind
+                     ; fln' <- tcSyntaxOp ListOrigin fln (mkFunTys [intTy, list_ty] res_ty)
+                     ; (coi, elt_ty) <- matchExpectedListTy list_ty
+                     ; exprs' <- mapM (tc_elt elt_ty) exprs
+                     ; return $ mkHsWrapCo coi (ExplicitList elt_ty (Just fln') exprs') }
+     where tc_elt elt_ty expr = tcPolyExpr expr elt_ty          
 
 tcExpr (ExplicitPArr _ exprs) res_ty	-- maybe empty
   = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
@@ -456,14 +486,6 @@ tcExpr (HsDo do_or_lc stmts _) res_ty
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty
 	; return $ mkHsWrapCo coi (HsProc pat' cmd') }
-
-tcExpr e@(HsArrApp _ _ _ _ _) _
-  = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
-                      ptext (sLit "was found where an expression was expected")])
-
-tcExpr e@(HsArrForm _ _ _) _
-  = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
-                      ptext (sLit "was found where an expression was expected")])
 \end{code}
 
 Note [Rebindable syntax for if]
@@ -520,7 +542,7 @@ handle the *non-updated* fields.  Consider:
 
 The result type should be (T a b' c)
 not (T a b c),   because 'b' *is not* mentioned in a non-updated field
-not (T a b' c'), becuase 'c' *is*     mentioned in a non-updated field
+not (T a b' c'), because 'c' *is*     mentioned in a non-updated field
 NB that it's not good enough to look at just one constructor; we must
 look at them all; cf Trac #3219
 
@@ -702,7 +724,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
 	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
 	; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
-		       = WpCast (mkTcAxInstCo co_con scrut_inst_tys)
+		       = WpCast (mkTcUnbranchedAxInstCo co_con scrut_inst_tys)
 		       | otherwise
 		       = idHsWrapper
 	-- Phew!
@@ -741,40 +763,8 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 %************************************************************************
 
 \begin{code}
-tcExpr (ArithSeq _ seq@(From expr)) res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedListTy res_ty
-	; expr' <- tcPolyExpr expr elt_ty
-	; enum_from <- newMethodFromName (ArithSeqOrigin seq) 
-			      enumFromName elt_ty 
-	; return $ mkHsWrapCo coi (ArithSeq enum_from (From expr')) }
-
-tcExpr (ArithSeq _ seq@(FromThen expr1 expr2)) res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedListTy res_ty
-	; expr1' <- tcPolyExpr expr1 elt_ty
-	; expr2' <- tcPolyExpr expr2 elt_ty
-	; enum_from_then <- newMethodFromName (ArithSeqOrigin seq) 
-			      enumFromThenName elt_ty 
-	; return $ mkHsWrapCo coi 
-                    (ArithSeq enum_from_then (FromThen expr1' expr2')) }
-
-tcExpr (ArithSeq _ seq@(FromTo expr1 expr2)) res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedListTy res_ty
-	; expr1' <- tcPolyExpr expr1 elt_ty
-	; expr2' <- tcPolyExpr expr2 elt_ty
-	; enum_from_to <- newMethodFromName (ArithSeqOrigin seq) 
-		  	      enumFromToName elt_ty 
-	; return $ mkHsWrapCo coi 
-                     (ArithSeq enum_from_to (FromTo expr1' expr2')) }
-
-tcExpr (ArithSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedListTy res_ty
-	; expr1' <- tcPolyExpr expr1 elt_ty
-	; expr2' <- tcPolyExpr expr2 elt_ty
-	; expr3' <- tcPolyExpr expr3 elt_ty
-	; eft <- newMethodFromName (ArithSeqOrigin seq) 
-		      enumFromThenToName elt_ty 
-	; return $ mkHsWrapCo coi 
-                     (ArithSeq eft (FromThenTo expr1' expr2' expr3')) }
+tcExpr (ArithSeq _ witness seq) res_ty
+  = tcArithSeq witness seq res_ty
 
 tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
   = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
@@ -814,8 +804,7 @@ tcExpr (PArrSeq _ _) _
 #ifdef GHCI	/* Only if bootstrapped */
 	-- Rename excludes these cases otherwise
 tcExpr (HsSpliceE splice) res_ty = tcSpliceExpr splice res_ty
-tcExpr (HsBracket brack)  res_ty = do	{ e <- tcBracket brack res_ty
-					; return (unLoc e) }
+tcExpr (HsBracket brack)  res_ty = tcBracket brack res_ty
 tcExpr e@(HsQuasiQuoteE _) _ =
     pprPanic "Should never see HsQuasiQuoteE in type checker" (ppr e)
 #endif /* GHCI */
@@ -830,8 +819,64 @@ tcExpr e@(HsQuasiQuoteE _) _ =
 
 \begin{code}
 tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
+  -- Include ArrForm, ArrApp, which shouldn't appear at all
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Arithmetic sequences [a..b] etc
+%*									*
+%************************************************************************
+
+\begin{code}
+tcArithSeq :: Maybe (SyntaxExpr Name) -> ArithSeqInfo Name -> TcRhoType
+           -> TcM (HsExpr TcId)
+
+tcArithSeq witness seq@(From expr) res_ty
+  = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
+       ; expr' <- tcPolyExpr expr elt_ty
+       ; enum_from <- newMethodFromName (ArithSeqOrigin seq) 
+			      enumFromName elt_ty 
+       ; return $ mkHsWrapCo coi (ArithSeq enum_from wit' (From expr')) }
+     
+tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
+  = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
+       ; expr1' <- tcPolyExpr expr1 elt_ty
+       ; expr2' <- tcPolyExpr expr2 elt_ty
+       ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq) 
+			      enumFromThenName elt_ty 
+       ; return $ mkHsWrapCo coi (ArithSeq enum_from_then wit' (FromThen expr1' expr2')) }
+     
+tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
+  = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
+       ; expr1' <- tcPolyExpr expr1 elt_ty
+       ; expr2' <- tcPolyExpr expr2 elt_ty
+       ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq) 
+			      enumFromToName elt_ty 
+       ; return $ mkHsWrapCo coi (ArithSeq enum_from_to wit' (FromTo expr1' expr2')) }
+
+tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
+  = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
+        ; expr1' <- tcPolyExpr expr1 elt_ty
+        ; expr2' <- tcPolyExpr expr2 elt_ty
+        ; expr3' <- tcPolyExpr expr3 elt_ty
+        ; eft <- newMethodFromName (ArithSeqOrigin seq) 
+			      enumFromThenToName elt_ty
+        ; return $ mkHsWrapCo coi (ArithSeq eft wit' (FromThenTo expr1' expr2' expr3')) }
+
+-----------------
+arithSeqEltType :: Maybe (SyntaxExpr Name) -> TcRhoType 
+              -> TcM (TcCoercion, TcType, Maybe (SyntaxExpr Id))
+arithSeqEltType Nothing res_ty
+  = do { (coi, elt_ty) <- matchExpectedListTy res_ty
+       ; return (coi, elt_ty, Nothing) }
+arithSeqEltType (Just fl) res_ty
+  = do { list_ty <- newFlexiTyVarTy liftedTypeKind
+       ; fl' <- tcSyntaxOp ListOrigin fl (mkFunTy list_ty res_ty)
+       ; (coi, elt_ty) <- matchExpectedListTy list_ty
+       ; return (coi, elt_ty, Just fl') }
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1197,8 +1242,10 @@ tcTagToEnum loc fun_name arg res_ty
       = do { mb_fam <- tcLookupFamInst tc tc_args
            ; case mb_fam of 
 	       Nothing -> failWithTc (tagToEnumError ty doc3)
-               Just (rep_fam, rep_args) 
-                   -> return ( mkTcSymCo (mkTcAxInstCo co_tc rep_args)
+               Just (FamInstMatch { fim_instance = rep_fam
+                                  , fim_index    = index
+                                  , fim_tys      = rep_args })
+                   -> return ( mkTcSymCo (mkTcAxInstCo co_tc index rep_args)
                              , rep_tc, rep_args )
                  where
                    co_tc  = famInstAxiom rep_fam

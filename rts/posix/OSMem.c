@@ -75,7 +75,7 @@ void osMemInit(void)
 // the mmap() interface.
 
 static void *
-my_mmap (void *addr, lnat size)
+my_mmap (void *addr, W_ size)
 {
     void *ret;
 
@@ -99,7 +99,7 @@ my_mmap (void *addr, lnat size)
     
     kern_return_t err = 0;
     ret = addr;
-    if(addr)	// try to allocate at adress
+    if(addr)	// try to allocate at address
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
     if(!addr || err)	// try to allocate anywhere
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
@@ -107,7 +107,7 @@ my_mmap (void *addr, lnat size)
     if(err) {
 	// don't know what the error codes mean exactly, assume it's
 	// not our problem though.
-	errorBelch("memory allocation failed (requested %lu bytes)", size);
+	errorBelch("memory allocation failed (requested %" FMT_Word " bytes)", size);
 	stg_exit(EXIT_FAILURE);
     } else {
 	vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
@@ -122,7 +122,7 @@ my_mmap (void *addr, lnat size)
 	    (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
 	    // If we request more than 3Gig, then we get EINVAL
 	    // instead of ENOMEM (at least on Linux).
-            errorBelch("out of memory (requested %" FMT_SizeT " bytes)", size);
+            errorBelch("out of memory (requested %" FMT_Word " bytes)", size);
             stg_exit(EXIT_FAILURE);
 	} else {
 	    barf("getMBlock: mmap: %s", strerror(errno));
@@ -136,7 +136,7 @@ my_mmap (void *addr, lnat size)
 // mblocks.
 
 static void *
-gen_map_mblocks (lnat size)
+gen_map_mblocks (W_ size)
 {
     int slop;
     StgWord8 *ret;
@@ -177,7 +177,7 @@ void *
 osGetMBlocks(nat n)
 {
   caddr_t ret;
-  lnat size = MBLOCK_SIZE * (lnat)n;
+  W_ size = MBLOCK_SIZE * (W_)n;
 
   if (next_request == 0) {
       // use gen_map_mblocks the first time.
@@ -226,9 +226,9 @@ void osFreeAllMBlocks(void)
     }
 }
 
-lnat getPageSize (void)
+W_ getPageSize (void)
 {
-    static lnat pageSize = 0;
+    static W_ pageSize = 0;
     if (pageSize) {
 	return pageSize;
     } else {
@@ -241,7 +241,7 @@ lnat getPageSize (void)
     }
 }
 
-void setExecutable (void *p, lnat len, rtsBool exec)
+void setExecutable (void *p, W_ len, rtsBool exec)
 {
     StgWord pageSize = getPageSize();
 

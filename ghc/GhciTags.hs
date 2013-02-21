@@ -82,7 +82,7 @@ listModuleTags m = do
   -- should we just skip these?
   when (not is_interpreted) $
     let mName = GHC.moduleNameString (GHC.moduleName m) in
-    ghcError (CmdLineError ("module '" ++ mName ++ "' is not interpreted"))
+    throwGhcException (CmdLineError ("module '" ++ mName ++ "' is not interpreted"))
   mbModInfo <- GHC.getModuleInfo m
   case mbModInfo of
     Nothing -> return []
@@ -148,7 +148,7 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
   tryIO (writeFile file $ concat tagGroups)
 
   where
-    processGroup [] = ghcError (CmdLineError "empty tag file group??")
+    processGroup [] = throwGhcException (CmdLineError "empty tag file group??")
     processGroup group@(tagInfo:_) =
       let tags = unlines $ map showETag group in
       "\x0c\n" ++ tagFile tagInfo ++ "," ++ show (length tags) ++ "\n" ++ tags
@@ -160,7 +160,7 @@ makeTagGroupsWithSrcInfo tagInfos = do
   mapM addTagSrcInfo groups
 
   where
-    addTagSrcInfo [] = ghcError (CmdLineError "empty tag file group??")
+    addTagSrcInfo [] = throwGhcException (CmdLineError "empty tag file group??")
     addTagSrcInfo group@(tagInfo:_) = do
       file <- readFile $tagFile tagInfo
       let sortedGroup = sortBy (comparing tagLine) group
@@ -200,5 +200,5 @@ showETag TagInfo{ tagName = tag, tagLine = lineNo, tagCol = colNo,
     ++ "\x7f" ++ tag
     ++ "\x01" ++ show lineNo
     ++ "," ++ show charPos
-showETag _ = ghcError (CmdLineError "missing source file info in showETag")
+showETag _ = throwGhcException (CmdLineError "missing source file info in showETag")
 

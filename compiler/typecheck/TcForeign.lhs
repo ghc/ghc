@@ -26,7 +26,6 @@ import TcRnMonad
 import TcHsType
 import TcExpr
 import TcEnv
-import RnEnv
 
 import FamInst
 import FamInstEnv
@@ -48,7 +47,6 @@ import Platform
 import SrcLoc
 import Bag
 import FastString
-import Util
 
 import Control.Monad
 \end{code}
@@ -69,102 +67,107 @@ isForeignExport _                             = False
 -- normaliseFfiType takes the type from an FFI declaration, and
 -- evaluates any type synonyms, type functions, and newtypes. However,
 -- we are only allowed to look through newtypes if the constructor is
--- in scope.
-normaliseFfiType :: Type -> TcM (Coercion, Type)
+-- in scope.  We return a bag of all the newtype constructors thus found.
+normaliseFfiType :: Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
 normaliseFfiType ty
     = do fam_envs <- tcGetFamInstEnvs
          normaliseFfiType' fam_envs ty
 
-normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type)
+normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
 normaliseFfiType' env ty0 = go [] ty0
   where
-    go :: [TyCon] -> Type -> TcM (Coercion, Type)
+    go :: [TyCon] -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
     go rec_nts ty | Just ty' <- coreView ty     -- Expand synonyms
         = go rec_nts ty'
 
-    go rec_nts ty@(TyConApp tc tys)
+    go rec_nts (TyConApp tc tys)
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
         | tc_key `elem` [ioTyConKey, funPtrTyConKey]
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes
-        -- We can't just use isRecursiveTyCon here, as we need to allow
-        -- some recursive types as described below
-        = if tc `elem` rec_nts  -- See Note [Expanding newtypes] in Type.lhs
-          then -- If this is a recursive newtype then it will normally
-               -- be rejected later as not being a valid FFI type.
-               -- Sometimes recursion is OK though, e.g. with
-               --     newtype T = T (Ptr T)
-               -- we don't reject the type for being recursive.
-               return (Refl ty, ty)
-          else do newtypeOK <- do env <- getGblEnv
-                                  case tyConSingleDataCon_maybe tc of
-                                      Just dataCon ->
-                                          case lookupGRE_Name (tcg_rdr_env env) $ dataConName dataCon of
-                                              [gre] ->
-                                                  do -- If we look through a newtype constructor, then we need it to be in scope.
-                                                     -- But if this is the only use if that import then we'll get an unused import
-                                                     -- warning, so we need to mark a valid RdrName for it as used.
-                                                     case gre_prov gre of
-                                                         Imported (is : _) ->
-                                                             do let modName = is_as (is_decl is)
-                                                                    occName = nameOccName (dataConName dataCon)
-                                                                    rdrName = mkRdrQual modName occName
-                                                                addUsedRdrNames [rdrName]
-                                                         Imported [] ->
-                                                             panic "normaliseFfiType': Imported []"
-                                                         LocalDef ->
-                                                             return ()
-                                                     return True
-                                              [] ->
-                                                  return False
-                                              _ ->
-                                                  panic "normaliseFfiType': Got more GREs than expected"
-                                      _ ->
-                                          return False
-                  if newtypeOK
-                      then do let nt_co = mkAxInstCo (newTyConCo tc) tys
-                              add_co nt_co rec_nts' nt_rhs
-                      else children_only
+        = do { rdr_env <- getGlobalRdrEnv 
+             ; case checkNewtypeFFI rdr_env rec_nts tc of
+                 Nothing  -> children_only
+                 Just gre -> do { (co', ty', gres) <- go rec_nts' nt_rhs
+                                ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
 
         | isFamilyTyCon tc              -- Expand open tycons
         , (co, ty) <- normaliseTcApp env tc tys
         , not (isReflCo co)
-        = add_co co rec_nts ty
+        = do (co', ty', gres) <- go rec_nts ty
+             return (mkTransCo co co', ty', gres)  
 
         | otherwise
         = children_only
         where
           tc_key = getUnique tc
-          children_only = do xs <- mapM (go rec_nts) tys
-                             let (cos, tys') = unzip xs
-                             return (mkTyConAppCo tc cos, mkTyConApp tc tys')
+          children_only 
+            = do xs <- mapM (go rec_nts) tys
+                 let (cos, tys', gres) = unzip3 xs
+                 return (mkTyConAppCo tc cos, mkTyConApp tc tys', unionManyBags gres)
+          nt_co  = mkUnbranchedAxInstCo (newTyConCo tc) tys
           nt_rhs = newTyConInstRhs tc tys
+
           rec_nts' | isRecursiveTyCon tc = tc:rec_nts
                    | otherwise           = rec_nts
 
     go rec_nts (AppTy ty1 ty2)
-      = do (coi1, nty1) <- go rec_nts ty1
-           (coi2, nty2) <- go rec_nts ty2
-           return (mkAppCo coi1 coi2, mkAppTy nty1 nty2)
+      = do (coi1, nty1, gres1) <- go rec_nts ty1
+           (coi2, nty2, gres2) <- go rec_nts ty2
+           return (mkAppCo coi1 coi2, mkAppTy nty1 nty2, gres1 `unionBags` gres2)
 
     go rec_nts (FunTy ty1 ty2)
-      = do (coi1,nty1) <- go rec_nts ty1
-           (coi2,nty2) <- go rec_nts ty2
-           return (mkFunCo coi1 coi2, mkFunTy nty1 nty2)
+      = do (coi1,nty1,gres1) <- go rec_nts ty1
+           (coi2,nty2,gres2) <- go rec_nts ty2
+           return (mkFunCo coi1 coi2, mkFunTy nty1 nty2, gres1 `unionBags` gres2)
 
     go rec_nts (ForAllTy tyvar ty1)
-      = do (coi,nty1) <- go rec_nts ty1
-           return (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
+      = do (coi,nty1,gres1) <- go rec_nts ty1
+           return (mkForAllCo tyvar coi, ForAllTy tyvar nty1, gres1)
 
-    go _ ty@(TyVarTy {}) = return (Refl ty, ty)
-    go _ ty@(LitTy {})   = return (Refl ty, ty)
+    go _ ty@(TyVarTy {}) = return (Refl ty, ty, emptyBag)
+    go _ ty@(LitTy {})   = return (Refl ty, ty, emptyBag)
 
-    add_co co rec_nts ty
-        = do (co', ty') <- go rec_nts ty
-             return (mkTransCo co co', ty')
+
+checkNewtypeFFI :: GlobalRdrEnv -> [TyCon] -> TyCon -> Maybe GlobalRdrElt
+checkNewtypeFFI rdr_env rec_nts tc 
+  | not (tc `elem` rec_nts) 
+      -- See Note [Expanding newtypes] in Type.lhs
+      -- We can't just use isRecursiveTyCon; sometimes recursion is ok:
+      --     newtype T = T (Ptr T)
+      --   Here, we don't reject the type for being recursive.
+      -- If this is a recursive newtype then it will normally
+      -- be rejected later as not being a valid FFI type.
+  , Just con <- tyConSingleDataCon_maybe tc
+  , [gre] <- lookupGRE_Name rdr_env (dataConName con)
+  = Just gre    -- See Note [Newtype constructor usage in foreign declarations]
+  | otherwise
+  = Nothing
 \end{code}
+
+Note [Newtype constructor usage in foreign declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC automatically "unwraps" newtype constructors in foreign import/export
+declarations.  In effect that means that a newtype data constructor is 
+used even though it is not mentioned expclitly in the source, so we don't
+want to report it as "defined but not used" or "imported but not used".
+eg     newtype D = MkD Int
+       foreign import foo :: D -> IO ()
+Here 'MkD' us used.  See Trac #7408.
+
+GHC also expands type functions during this process, so it's not enough
+just to look at the free variables of the declaration.  
+eg     type instance F Bool = D
+       foreign import bar :: F Bool -> IO ()
+Here again 'MkD' is used.
+
+So we really have wait until the type checker to decide what is used.
+That's why tcForeignImports and tecForeignExports return a (Bag GRE)
+for the newtype constructors they see. Then TcRnDriver can add them 
+to the module's usages.
+
 
 %************************************************************************
 %*                                                                      *
@@ -173,15 +176,19 @@ normaliseFfiType' env ty0 = go [] ty0
 %************************************************************************
 
 \begin{code}
-tcForeignImports :: [LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id])
+tcForeignImports :: [LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id], Bag GlobalRdrElt)
+-- For the (Bag GlobalRdrElt) result, 
+-- see Note [Newtype constructor usage in foreign declarations]
 tcForeignImports decls
-  = mapAndUnzipM (wrapLocSndM tcFImport) (filter isForeignImport decls)
+  = do { (ids, decls, gres) <- mapAndUnzip3M tcFImport $
+                               filter isForeignImport decls
+       ; return (ids, decls, unionManyBags gres) }
 
-tcFImport :: ForeignDecl Name -> TcM (Id, ForeignDecl Id)
-tcFImport fo@(ForeignImport (L loc nm) hs_ty _ imp_decl)
-  = addErrCtxt (foreignDeclCtxt fo)  $
+tcFImport :: LForeignDecl Name -> TcM (Id, LForeignDecl Id, Bag GlobalRdrElt)
+tcFImport (L dloc fo@(ForeignImport (L nloc nm) hs_ty _ imp_decl))
+  = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
-       ; (norm_co, norm_sig_ty) <- normaliseFfiType sig_ty
+       ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
@@ -195,7 +202,8 @@ tcFImport fo@(ForeignImport (L loc nm) hs_ty _ imp_decl)
        ; imp_decl' <- tcCheckFIType sig_ty arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
-       ; return (id, ForeignImport (L loc id) undefined (mkSymCo norm_co) imp_decl') }
+       ; let fi_decl = ForeignImport (L nloc id) undefined (mkSymCo norm_co) imp_decl'
+       ; return (id, L dloc fi_decl, gres) }
 tcFImport d = pprPanic "tcFImport" (ppr d)
 \end{code}
 
@@ -205,11 +213,11 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh l@(CLabel _))
-  = ASSERT( null arg_tys )
-    do checkCg checkCOrAsmOrLlvmOrInterp
+  -- Foreign import label
+  = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
+       check (null arg_tys && isFFILabelTy res_ty) (illegalForeignLabelErr sig_ty)
        cconv' <- checkCConv cconv
        return (CImport cconv' safety mh l)
 
@@ -248,7 +256,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
       dflags <- getDynFlags
       check (xopt Opt_GHCForeignImportPrim dflags)
             (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
-      checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
+      checkCg checkCOrAsmOrLlvmOrInterp
       checkCTarget target
       check (playSafe safety)
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
@@ -257,7 +265,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
-      checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
+      checkCg checkCOrAsmOrLlvmOrInterp
       cconv' <- checkCConv cconv
       checkCTarget target
       dflags <- getDynFlags
@@ -276,7 +284,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
 checkCTarget (StaticTarget str _ _) = do
-    checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
+    checkCg checkCOrAsmOrLlvmOrInterp
     check (isCLabelString str) (badCName str)
 
 checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
@@ -299,22 +307,24 @@ checkMissingAmpersand dflags arg_tys res_ty
 
 \begin{code}
 tcForeignExports :: [LForeignDecl Name]
-                 -> TcM (LHsBinds TcId, [LForeignDecl TcId])
+                 -> TcM (LHsBinds TcId, [LForeignDecl TcId], Bag GlobalRdrElt)
+-- For the (Bag GlobalRdrElt) result, 
+-- see Note [Newtype constructor usage in foreign declarations]
 tcForeignExports decls
-  = foldlM combine (emptyLHsBinds, []) (filter isForeignExport decls)
+  = foldlM combine (emptyLHsBinds, [], emptyBag) (filter isForeignExport decls)
   where
-   combine (binds, fs) fe = do
-       (b, f) <- wrapLocSndM tcFExport fe
-       return (b `consBag` binds, f:fs)
+   combine (binds, fs, gres1) (L loc fe) = do
+       (b, f, gres2) <- setSrcSpan loc (tcFExport fe)
+       return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
 
-tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id)
+tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id, Bag GlobalRdrElt)
 tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcPolyExpr (nlHsVar nm) sig_ty
 
-    (norm_co, norm_sig_ty) <- normaliseFfiType sig_ty
+    (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
 
     spec' <- tcCheckFEType norm_sig_ty spec
 
@@ -328,7 +338,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
     id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
-    return (mkVarBind id rhs, ForeignExport (L loc id) undefined norm_co spec')
+    return (mkVarBind id rhs, ForeignExport (L loc id) undefined norm_co spec', gres)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 \end{code}
 
@@ -418,7 +428,7 @@ checkCOrAsmOrLlvm HscC    = Nothing
 checkCOrAsmOrLlvm HscAsm  = Nothing
 checkCOrAsmOrLlvm HscLlvm = Nothing
 checkCOrAsmOrLlvm _
-  = Just (text "requires via-C, llvm (-fllvm) or native code generation (-fvia-C)")
+  = Just (text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)")
 
 checkCOrAsmOrLlvmOrInterp :: HscTarget -> Maybe SDoc
 checkCOrAsmOrLlvmOrInterp HscC           = Nothing
@@ -426,15 +436,7 @@ checkCOrAsmOrLlvmOrInterp HscAsm         = Nothing
 checkCOrAsmOrLlvmOrInterp HscLlvm        = Nothing
 checkCOrAsmOrLlvmOrInterp HscInterpreted = Nothing
 checkCOrAsmOrLlvmOrInterp _
-  = Just (text "requires interpreted, C, Llvm or native code generation")
-
-checkCOrAsmOrLlvmOrDotNetOrInterp :: HscTarget -> Maybe SDoc
-checkCOrAsmOrLlvmOrDotNetOrInterp HscC           = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp HscAsm         = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp HscLlvm        = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp HscInterpreted = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp _
-  = Just (text "requires interpreted, C, Llvm or native code generation")
+  = Just (text "requires interpreted, unregisterised, llvm or native code generation")
 
 checkCg :: (HscTarget -> Maybe SDoc) -> TcM ()
 checkCg check = do
@@ -464,7 +466,6 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                                          return CCallConv
 checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
                              return PrimCallConv
-checkCConv CmmCallConv  = panic "checkCConv CmmCallConv"
 \end{code}
 
 Warnings
@@ -473,6 +474,11 @@ Warnings
 check :: Bool -> MsgDoc -> TcM ()
 check True _       = return ()
 check _    the_err = addErrTc the_err
+
+illegalForeignLabelErr :: Type -> SDoc
+illegalForeignLabelErr ty
+  = vcat [ illegalForeignTyErr empty ty
+         , ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)") ]
 
 illegalForeignTyErr :: SDoc -> Type -> SDoc
 illegalForeignTyErr arg_or_res ty

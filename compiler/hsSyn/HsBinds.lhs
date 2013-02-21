@@ -18,7 +18,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module HsBinds where
 
-import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
+import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr, 
                                MatchGroup, pprFunBind,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
@@ -106,7 +106,7 @@ data HsBindLR idL idR
 
         fun_infix :: Bool,      -- ^ True => infix declaration
 
-        fun_matches :: MatchGroup idR,  -- ^ The payload
+        fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
         fun_co_fn :: HsWrapper, -- ^ Coercion from the type of the MatchGroup to the type of
                                 -- the Id.  Example:
@@ -131,7 +131,7 @@ data HsBindLR idL idR
   | PatBind {   -- The pattern is never a simple variable;
                 -- That case is done by FunBind
         pat_lhs    :: LPat idL,
-        pat_rhs    :: GRHSs idR,
+        pat_rhs    :: GRHSs idR (LHsExpr idR),
         pat_rhs_ty :: PostTcType,       -- Type of the GRHSs
         bind_fvs   :: NameSet,          -- See Note [Bind free vars]
         pat_ticks  :: (Maybe (Tickish Id), [Maybe (Tickish Id)])
@@ -572,22 +572,6 @@ hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
 Check if signatures overlap; this is used when checking for duplicate
 signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
-
-\begin{code}
-overlapHsSig :: Eq a => LSig a -> LSig a -> Bool
-overlapHsSig sig1 sig2 = case (unLoc sig1, unLoc sig2) of
-  (FixSig (FixitySig n1 _), FixSig (FixitySig n2 _)) -> unLoc n1 == unLoc n2
-  (IdSig n1,                IdSig n2)                -> n1 == n2
-  (TypeSig ns1 _,           TypeSig ns2 _)           -> ns1 `overlaps_with` ns2
-  (GenericSig ns1 _,        GenericSig ns2 _)        -> ns1 `overlaps_with` ns2
-  (InlineSig n1 _,          InlineSig n2 _)          -> unLoc n1 == unLoc n2
-  -- For specialisations, we don't have equality over HsType, so it's not
-  -- convenient to spot duplicate specialisations here.  Check for this later,
-  -- when we're in Type land
-  (_other1,                 _other2)                 -> False
-  where
-    ns1 `overlaps_with` ns2 = not (null (intersect (map unLoc ns1) (map unLoc ns2)))
-\end{code}
 
 \begin{code}
 instance (OutputableBndr name) => Outputable (Sig name) where

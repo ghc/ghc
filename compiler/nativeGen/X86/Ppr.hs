@@ -32,8 +32,10 @@ import Reg
 import PprBase
 
 
+import BlockId
 import BasicTypes       (Alignment)
-import OldCmm
+import DynFlags
+import Cmm              hiding (topInfoTable)
 import CLabel
 import Unique           ( pprUnique, Uniquable(..) )
 import Platform
@@ -47,74 +49,82 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
-pprNatCmmDecl platform (CmmData section dats) =
-  pprSectionHeader platform section $$ pprDatas platform dats
+pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
+pprNatCmmDecl (CmmData section dats) =
+  pprSectionHeader section $$ pprDatas dats
 
- -- special case for split markers:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+  case topInfoTable proc of
+    Nothing ->
+       case blocks of
+         []     -> -- special case for split markers:
+           pprLabel lbl
+         blocks -> -- special case for code without info table:
+           pprSectionHeader Text $$
+           pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+           vcat (map (pprBasicBlock top_info) blocks) $$
+           pprSizeDecl lbl
 
- -- special case for code without info table:
-pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph blocks)) =
-  pprSectionHeader platform Text $$
-  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-  vcat (map pprBasicBlock blocks) $$
-  pprSizeDecl platform lbl
-
-pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
-  pprSectionHeader platform Text $$
-  (
-       (if platformHasSubsectionsViaSymbols platform
-        then ppr (mkDeadStripPreventer info_lbl) <> char ':'
-        else empty) $$
-       vcat (map (pprData platform) info) $$
-       pprLabel info_lbl
-  ) $$
-  vcat (map pprBasicBlock blocks) $$
-     -- above: Even the first block gets a label, because with branch-chain
-     -- elimination, it might be the target of a goto.
-        (if platformHasSubsectionsViaSymbols platform
-         then
-         -- If we are using the .subsections_via_symbols directive
-         -- (available on recent versions of Darwin),
-         -- we have to make sure that there is some kind of reference
-         -- from the entry code to a label on the _top_ of of the info table,
-         -- so that the linker will not think it is unreferenced and dead-strip
-         -- it. That's why the label is called a DeadStripPreventer (_dsp).
-                  text "\t.long "
-              <+> ppr info_lbl
-              <+> char '-'
-              <+> ppr (mkDeadStripPreventer info_lbl)
-         else empty) $$
-  pprSizeDecl platform info_lbl
+    Just (Statics info_lbl _) ->
+      sdocWithPlatform $ \platform ->
+      (if platformHasSubsectionsViaSymbols platform
+          then pprSectionHeader Text $$
+               ppr (mkDeadStripPreventer info_lbl) <> char ':'
+          else empty) $$
+      vcat (map (pprBasicBlock top_info) blocks) $$
+         -- above: Even the first block gets a label, because with branch-chain
+         -- elimination, it might be the target of a goto.
+            (if platformHasSubsectionsViaSymbols platform
+             then
+             -- If we are using the .subsections_via_symbols directive
+             -- (available on recent versions of Darwin),
+             -- we have to make sure that there is some kind of reference
+             -- from the entry code to a label on the _top_ of of the info table,
+             -- so that the linker will not think it is unreferenced and dead-strip
+             -- it. That's why the label is called a DeadStripPreventer (_dsp).
+                      text "\t.long "
+                  <+> ppr info_lbl
+                  <+> char '-'
+                  <+> ppr (mkDeadStripPreventer info_lbl)
+             else empty) $$
+      pprSizeDecl info_lbl
 
 -- | Output the ELF .size directive.
-pprSizeDecl :: Platform -> CLabel -> SDoc
-pprSizeDecl platform lbl
- | osElfTarget (platformOS platform) =
-    ptext (sLit "\t.size") <+> ppr lbl
-    <> ptext (sLit ", .-") <> ppr lbl
- | otherwise = empty
+pprSizeDecl :: CLabel -> SDoc
+pprSizeDecl lbl
+ = sdocWithPlatform $ \platform ->
+   if osElfTarget (platformOS platform)
+   then ptext (sLit "\t.size") <+> ppr lbl
+     <> ptext (sLit ", .-") <> ppr lbl
+   else empty
 
-pprBasicBlock :: NatBasicBlock Instr -> SDoc
-pprBasicBlock (BasicBlock blockid instrs) =
-  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
-  vcat (map pprInstr instrs)
+pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock info_env (BasicBlock blockid instrs)
+  = maybe_infotable $$
+    pprLabel (mkAsmTempLabel (getUnique blockid)) $$
+    vcat (map pprInstr instrs)
+  where
+    maybe_infotable = case mapLookup blockid info_env of
+       Nothing   -> empty
+       Just (Statics info_lbl info) ->
+           pprSectionHeader Text $$
+           vcat (map pprData info) $$
+           pprLabel info_lbl
 
-
-pprDatas :: Platform -> (Alignment, CmmStatics) -> SDoc
-pprDatas platform (align, (Statics lbl dats))
- = vcat (pprAlign platform align : pprLabel lbl : map (pprData platform) dats)
+pprDatas :: (Alignment, CmmStatics) -> SDoc
+pprDatas (align, (Statics lbl dats))
+ = vcat (pprAlign align : pprLabel lbl : map pprData dats)
  -- TODO: could remove if align == 1
 
-pprData :: Platform -> CmmStatic -> SDoc
-pprData _ (CmmString str)          = pprASCII str
+pprData :: CmmStatic -> SDoc
+pprData (CmmString str) = pprASCII str
 
-pprData platform (CmmUninitialised bytes)
- | platformOS platform == OSDarwin = ptext (sLit ".space ") <> int bytes
- | otherwise                       = ptext (sLit ".skip ")  <> int bytes
+pprData (CmmUninitialised bytes)
+ = sdocWithPlatform $ \platform ->
+   if platformOS platform == OSDarwin then ptext (sLit ".space ") <> int bytes
+                                      else ptext (sLit ".skip ")  <> int bytes
 
-pprData platform (CmmStaticLit lit) = pprDataItem platform lit
+pprData (CmmStaticLit lit) = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
@@ -141,13 +151,14 @@ pprASCII str
        do1 :: Word8 -> SDoc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
-pprAlign :: Platform -> Int -> SDoc
-pprAlign platform bytes
-        = ptext (sLit ".align ") <> int alignment
+pprAlign :: Int -> SDoc
+pprAlign bytes
+        = sdocWithPlatform $ \platform ->
+          ptext (sLit ".align ") <> int (alignment platform)
   where
-        alignment = if platformOS platform == OSDarwin
-                    then log2 bytes
-                    else      bytes
+        alignment platform = if platformOS platform == OSDarwin
+                             then log2 bytes
+                             else      bytes
 
         log2 :: Int -> Int  -- cache the common ones
         log2 1 = 0
@@ -362,9 +373,10 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm imm
 
 
-pprSectionHeader :: Platform -> Section -> SDoc
-pprSectionHeader platform seg
- = case platformOS platform of
+pprSectionHeader :: Section -> SDoc
+pprSectionHeader seg
+ = sdocWithPlatform $ \platform ->
+   case platformOS platform of
    OSDarwin
     | target32Bit platform ->
        case seg of
@@ -407,10 +419,14 @@ pprSectionHeader platform seg
 
 
 
-pprDataItem :: Platform -> CmmLit -> SDoc
-pprDataItem platform lit
-  = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
+pprDataItem :: CmmLit -> SDoc
+pprDataItem lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags lit
+
+pprDataItem' :: DynFlags -> CmmLit -> SDoc
+pprDataItem' dflags lit
+  = vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit)
     where
+        platform = targetPlatform dflags
         imm = litToImm lit
 
         -- These seem to be common:
@@ -600,13 +616,13 @@ pprInstr (JXX cond blockid)
 
 pprInstr        (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
-pprInstr        (JMP (OpImm imm) _) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
+pprInstr        (JMP (OpImm imm) _) = ptext (sLit "\tjmp ") <> pprImm imm
 pprInstr (JMP op _)          = sdocWithPlatform $ \platform ->
-                               (<>) (ptext (sLit "\tjmp *")) (pprOperand (archWordSize (target32Bit platform)) op)
+                               ptext (sLit "\tjmp *") <> pprOperand (archWordSize (target32Bit platform)) op
 pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op [])
-pprInstr        (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
+pprInstr        (CALL (Left imm) _)    = ptext (sLit "\tcall ") <> pprImm imm
 pprInstr (CALL (Right reg) _)   = sdocWithPlatform $ \platform ->
-                                  (<>) (ptext (sLit "\tcall *")) (pprReg (archWordSize (target32Bit platform)) reg)
+                                  ptext (sLit "\tcall *") <> pprReg (archWordSize (target32Bit platform)) reg
 
 pprInstr (IDIV sz op)   = pprSizeOp (sLit "idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp (sLit "div")  sz op

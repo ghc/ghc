@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2006-2012
 %
 
 \begin{code}
@@ -17,7 +17,6 @@ module Kind (
 	-- Kinds
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind, constraintKind,
         mkArrowKind, mkArrowKinds,
-        typeNatKind, typeStringKind,
 
         -- Kind constructors...
         anyKindTyCon, liftedTypeKindTyCon, openTypeKindTyCon,
@@ -70,6 +69,30 @@ import Util
 %*									*
 %************************************************************************
 
+Note [Kind Constraint and kind *]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The kind Constraint is the kind of classes and other type constraints.
+The special thing about types of kind Constraint is that 
+ * They are displayed with double arrow:
+     f :: Ord a => a -> a
+ * They are implicitly instantiated at call sites; so the type inference
+   engine inserts an extra argument of type (Ord a) at every call site
+   to f.
+
+However, once type inference is over, there is *no* distinction between 
+Constraint and *.  Indeed we can have coercions between the two. Consider
+   class C a where
+     op :: a -> a
+For this single-method class we may generate a newtype, which in turn 
+generates an axiom witnessing
+    Ord a ~ (a -> a)
+so on the left we have Constraint, and on the right we have *.
+See Trac #7451.
+
+Bottom line: although '*' and 'Constraint' are distinct TyCons, with
+distinct uniques, they are treated as equal at all times except 
+during type inference.  Hence cmpTc treats them as equal.
+
 \begin{code}
 -- | Essentially 'funResultTy' on kinds handling pi-types too
 kindFunResult :: Kind -> KindOrType -> Kind
@@ -111,7 +134,7 @@ isOpenTypeKind, isUnliftedTypeKind,
 
 isOpenTypeKindCon, isUnliftedTypeKindCon,
   isSubOpenTypeKindCon, isConstraintKindCon,
-  isLiftedTypeKindCon, isAnyKindCon :: TyCon -> Bool
+  isLiftedTypeKindCon, isAnyKindCon, isSuperKindTyCon :: TyCon -> Bool
 
 
 isLiftedTypeKindCon   tc = tyConUnique tc == liftedTypeKindTyConKey
@@ -119,6 +142,7 @@ isAnyKindCon          tc = tyConUnique tc == anyKindTyConKey
 isOpenTypeKindCon     tc = tyConUnique tc == openTypeKindTyConKey
 isUnliftedTypeKindCon tc = tyConUnique tc == unliftedTypeKindTyConKey
 isConstraintKindCon   tc = tyConUnique tc == constraintKindTyConKey
+isSuperKindTyCon      tc = tyConUnique tc == superKindTyConKey
 
 isAnyKind (TyConApp tc _) = isAnyKindCon tc
 isAnyKind _               = False
@@ -167,7 +191,8 @@ okArrowResultKind _                = False
 --              Subkinding
 -- The tc variants are used during type-checking, where we don't want the
 -- Constraint kind to be a subkind of anything
--- After type-checking (in core), Constraint is a subkind of argTypeKind
+-- After type-checking (in core), Constraint is a subkind of openTypeKind
+
 isSubOpenTypeKind :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
 isSubOpenTypeKind (TyConApp kc []) = isSubOpenTypeKindCon kc
@@ -180,6 +205,7 @@ isSubOpenTypeKindCon kc
   || isConstraintKindCon kc   -- Needed for error (Num a) "blah"
                               -- and so that (Ord a -> Eq a) is well-kinded
                               -- and so that (# Eq a, Ord b #) is well-kinded
+                              -- See Note [Kind Constraint and kind *]
 
 -- | Is this a kind (i.e. a type-of-types)?
 isKind :: Kind -> Bool
@@ -187,37 +213,34 @@ isKind k = isSuperKind (typeKind k)
 
 isSubKind :: Kind -> Kind -> Bool
 -- ^ @k1 \`isSubKind\` k2@ checks that @k1@ <: @k2@
+-- Sub-kinding is extremely simple and does not look
+-- under arrrows or type constructors
 
-isSuperKindTyCon :: TyCon -> Bool
-isSuperKindTyCon tc = tc `hasKey` superKindTyConKey
-
-isSubKind (FunTy a1 r1) (FunTy a2 r2)
-  = (isSubKind a2 a1) && (isSubKind r1 r2)
-
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 isSubKind k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
   | isPromotedTyCon kc1 || isPromotedTyCon kc2
     -- handles promoted kinds (List *, Nat, etc.)
   = eqKind k1 k2
 
-  | isSuperKindTyCon kc1 || isSuperKindTyCon kc2
-    -- handles BOX
-  = ASSERT2( isSuperKindTyCon kc2 && isSuperKindTyCon kc2 
-             && null k1s && null k2s, 
-             ppr kc1 <+> ppr kc2 )
-    True   -- If one is BOX, the other must be too
-
-  | otherwise = -- handles usual kinds (*, #, (#), etc.)
-                ASSERT2( null k1s && null k2s, ppr k1 <+> ppr k2 )
-                kc1 `isSubKindCon` kc2
+  | otherwise -- handles usual kinds (*, #, (#), etc.)
+  = ASSERT2( null k1s && null k2s, ppr k1 <+> ppr k2 )
+    kc1 `isSubKindCon` kc2
 
 isSubKind k1 k2 = eqKind k1 k2
 
 isSubKindCon :: TyCon -> TyCon -> Bool
 -- ^ @kc1 \`isSubKindCon\` kc2@ checks that @kc1@ <: @kc2@
+
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 isSubKindCon kc1 kc2
-  | kc1 == kc2            = True
-  | isOpenTypeKindCon kc2 = isSubOpenTypeKindCon kc1 
-  | otherwise             = False
+  | kc1 == kc2              = True
+  | isOpenTypeKindCon kc2   = isSubOpenTypeKindCon kc1 
+  | isConstraintKindCon kc1 = isLiftedTypeKindCon kc2
+  | isLiftedTypeKindCon kc1 = isConstraintKindCon kc2
+  | otherwise               = False
+    -- See Note [Kind Constraint and kind *]
 
 -------------------------
 -- Hack alert: we need a tiny variant for the typechecker

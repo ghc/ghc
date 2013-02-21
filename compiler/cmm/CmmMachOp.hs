@@ -13,10 +13,10 @@ module CmmMachOp
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
     , mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
-    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32
+    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
 
     -- CallishMachOp
-    , CallishMachOp(..)
+    , CallishMachOp(..), callishMachOpHints
     , pprCallishMachOp
    )
 where
@@ -25,6 +25,7 @@ where
 
 import CmmType
 import Outputable
+import DynFlags
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -102,6 +103,31 @@ data MachOp
   | MO_SS_Conv Width Width      -- Signed int -> Signed int
   | MO_UU_Conv Width Width      -- unsigned int -> unsigned int
   | MO_FF_Conv Width Width      -- Float -> Float
+
+  -- Vector element insertion and extraction operations
+  | MO_V_Insert  Length Width   -- Insert scalar into vector
+  | MO_V_Extract Length Width   -- Extract scalar from vector
+  
+  -- Integer vector operations
+  | MO_V_Add Length Width  
+  | MO_V_Sub Length Width  
+  | MO_V_Mul Length Width
+
+  -- Signed vector multiply/divide
+  | MO_VS_Quot Length Width
+  | MO_VS_Rem  Length Width
+  | MO_VS_Neg  Length Width
+
+  -- Floting point vector element insertion and extraction operations
+  | MO_VF_Insert  Length Width   -- Insert scalar into vector
+  | MO_VF_Extract Length Width   -- Extract scalar from vector
+
+  -- Floating point vector operations
+  | MO_VF_Add  Length Width  
+  | MO_VF_Sub  Length Width  
+  | MO_VF_Neg  Length Width             -- unary -
+  | MO_VF_Mul  Length Width
+  | MO_VF_Quot Length Width
   deriving (Eq, Show)
 
 pprMachOp :: MachOp -> SDoc
@@ -122,58 +148,62 @@ mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
     , mo_wordSGe, mo_wordSLe, mo_wordSGt, mo_wordSLt, mo_wordUGe
     , mo_wordULe, mo_wordUGt, mo_wordULt
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
-    , mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
-    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32
+    , mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
+    :: DynFlags -> MachOp
+
+mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
+    , mo_32To8, mo_32To16
     :: MachOp
 
-mo_wordAdd      = MO_Add wordWidth
-mo_wordSub      = MO_Sub wordWidth
-mo_wordEq       = MO_Eq  wordWidth
-mo_wordNe       = MO_Ne  wordWidth
-mo_wordMul      = MO_Mul wordWidth
-mo_wordSQuot    = MO_S_Quot wordWidth
-mo_wordSRem     = MO_S_Rem wordWidth
-mo_wordSNeg     = MO_S_Neg wordWidth
-mo_wordUQuot    = MO_U_Quot wordWidth
-mo_wordURem     = MO_U_Rem wordWidth
+mo_wordAdd      dflags = MO_Add (wordWidth dflags)
+mo_wordSub      dflags = MO_Sub (wordWidth dflags)
+mo_wordEq       dflags = MO_Eq  (wordWidth dflags)
+mo_wordNe       dflags = MO_Ne  (wordWidth dflags)
+mo_wordMul      dflags = MO_Mul (wordWidth dflags)
+mo_wordSQuot    dflags = MO_S_Quot (wordWidth dflags)
+mo_wordSRem     dflags = MO_S_Rem (wordWidth dflags)
+mo_wordSNeg     dflags = MO_S_Neg (wordWidth dflags)
+mo_wordUQuot    dflags = MO_U_Quot (wordWidth dflags)
+mo_wordURem     dflags = MO_U_Rem (wordWidth dflags)
 
-mo_wordSGe      = MO_S_Ge  wordWidth
-mo_wordSLe      = MO_S_Le  wordWidth
-mo_wordSGt      = MO_S_Gt  wordWidth
-mo_wordSLt      = MO_S_Lt  wordWidth
+mo_wordSGe      dflags = MO_S_Ge  (wordWidth dflags)
+mo_wordSLe      dflags = MO_S_Le  (wordWidth dflags)
+mo_wordSGt      dflags = MO_S_Gt  (wordWidth dflags)
+mo_wordSLt      dflags = MO_S_Lt  (wordWidth dflags)
 
-mo_wordUGe      = MO_U_Ge  wordWidth
-mo_wordULe      = MO_U_Le  wordWidth
-mo_wordUGt      = MO_U_Gt  wordWidth
-mo_wordULt      = MO_U_Lt  wordWidth
+mo_wordUGe      dflags = MO_U_Ge  (wordWidth dflags)
+mo_wordULe      dflags = MO_U_Le  (wordWidth dflags)
+mo_wordUGt      dflags = MO_U_Gt  (wordWidth dflags)
+mo_wordULt      dflags = MO_U_Lt  (wordWidth dflags)
 
-mo_wordAnd      = MO_And wordWidth
-mo_wordOr       = MO_Or  wordWidth
-mo_wordXor      = MO_Xor wordWidth
-mo_wordNot      = MO_Not wordWidth
-mo_wordShl      = MO_Shl wordWidth
-mo_wordSShr     = MO_S_Shr wordWidth
-mo_wordUShr     = MO_U_Shr wordWidth
+mo_wordAnd      dflags = MO_And (wordWidth dflags)
+mo_wordOr       dflags = MO_Or  (wordWidth dflags)
+mo_wordXor      dflags = MO_Xor (wordWidth dflags)
+mo_wordNot      dflags = MO_Not (wordWidth dflags)
+mo_wordShl      dflags = MO_Shl (wordWidth dflags)
+mo_wordSShr     dflags = MO_S_Shr (wordWidth dflags)
+mo_wordUShr     dflags = MO_U_Shr (wordWidth dflags)
 
-mo_u_8To32      = MO_UU_Conv W8 W32
-mo_s_8To32      = MO_SS_Conv W8 W32
-mo_u_16To32     = MO_UU_Conv W16 W32
-mo_s_16To32     = MO_SS_Conv W16 W32
+mo_u_8To32             = MO_UU_Conv W8 W32
+mo_s_8To32             = MO_SS_Conv W8 W32
+mo_u_16To32            = MO_UU_Conv W16 W32
+mo_s_16To32            = MO_SS_Conv W16 W32
 
-mo_u_8ToWord    = MO_UU_Conv W8  wordWidth
-mo_s_8ToWord    = MO_SS_Conv W8  wordWidth
-mo_u_16ToWord   = MO_UU_Conv W16 wordWidth
-mo_s_16ToWord   = MO_SS_Conv W16 wordWidth
-mo_s_32ToWord   = MO_SS_Conv W32 wordWidth
-mo_u_32ToWord   = MO_UU_Conv W32 wordWidth
+mo_u_8ToWord    dflags = MO_UU_Conv W8  (wordWidth dflags)
+mo_s_8ToWord    dflags = MO_SS_Conv W8  (wordWidth dflags)
+mo_u_16ToWord   dflags = MO_UU_Conv W16 (wordWidth dflags)
+mo_s_16ToWord   dflags = MO_SS_Conv W16 (wordWidth dflags)
+mo_s_32ToWord   dflags = MO_SS_Conv W32 (wordWidth dflags)
+mo_u_32ToWord   dflags = MO_UU_Conv W32 (wordWidth dflags)
 
-mo_WordTo8      = MO_UU_Conv wordWidth W8
-mo_WordTo16     = MO_UU_Conv wordWidth W16
-mo_WordTo32     = MO_UU_Conv wordWidth W32
+mo_WordTo8      dflags = MO_UU_Conv (wordWidth dflags) W8
+mo_WordTo16     dflags = MO_UU_Conv (wordWidth dflags) W16
+mo_WordTo32     dflags = MO_UU_Conv (wordWidth dflags) W32
+mo_WordTo64     dflags = MO_UU_Conv (wordWidth dflags) W64
 
-mo_32To8        = MO_UU_Conv W32 W8
-mo_32To16       = MO_UU_Conv W32 W16
+mo_32To8               = MO_UU_Conv W32 W8
+mo_32To16              = MO_UU_Conv W32 W16
 
 
 -- ----------------------------------------------------------------------------
@@ -198,6 +228,8 @@ isCommutableMachOp mop =
         MO_And _                -> True
         MO_Or _                 -> True
         MO_Xor _                -> True
+        MO_F_Add _              -> True
+        MO_F_Mul _              -> True
         _other                  -> False
 
 -- ----------------------------------------------------------------------------
@@ -272,12 +304,6 @@ maybeInvertComparison op
         MO_S_Gt r -> Just (MO_S_Le r)
         MO_S_Le r -> Just (MO_S_Gt r)
         MO_S_Ge r -> Just (MO_S_Lt r)
-        MO_F_Eq r -> Just (MO_F_Ne r)
-        MO_F_Ne r -> Just (MO_F_Eq r)
-        MO_F_Ge r -> Just (MO_F_Le r)
-        MO_F_Le r -> Just (MO_F_Ge r)
-        MO_F_Gt r -> Just (MO_F_Lt r)
-        MO_F_Lt r -> Just (MO_F_Gt r)
         _other    -> Nothing
 
 -- ----------------------------------------------------------------------------
@@ -286,8 +312,8 @@ maybeInvertComparison op
 {- |
 Returns the MachRep of the result of a MachOp.
 -}
-machOpResultType :: MachOp -> [CmmType] -> CmmType
-machOpResultType mop tys =
+machOpResultType :: DynFlags -> MachOp -> [CmmType] -> CmmType
+machOpResultType dflags mop tys =
   case mop of
     MO_Add {}           -> ty1  -- Preserve GC-ptr-hood
     MO_Sub {}           -> ty1  -- of first arg
@@ -300,29 +326,29 @@ machOpResultType mop tys =
     MO_U_Quot r         -> cmmBits r
     MO_U_Rem  r         -> cmmBits r
 
-    MO_Eq {}            -> comparisonResultRep
-    MO_Ne {}            -> comparisonResultRep
-    MO_S_Ge {}          -> comparisonResultRep
-    MO_S_Le {}          -> comparisonResultRep
-    MO_S_Gt {}          -> comparisonResultRep
-    MO_S_Lt {}          -> comparisonResultRep
+    MO_Eq {}            -> comparisonResultRep dflags
+    MO_Ne {}            -> comparisonResultRep dflags
+    MO_S_Ge {}          -> comparisonResultRep dflags
+    MO_S_Le {}          -> comparisonResultRep dflags
+    MO_S_Gt {}          -> comparisonResultRep dflags
+    MO_S_Lt {}          -> comparisonResultRep dflags
 
-    MO_U_Ge {}          -> comparisonResultRep
-    MO_U_Le {}          -> comparisonResultRep
-    MO_U_Gt {}          -> comparisonResultRep
-    MO_U_Lt {}          -> comparisonResultRep
+    MO_U_Ge {}          -> comparisonResultRep dflags
+    MO_U_Le {}          -> comparisonResultRep dflags
+    MO_U_Gt {}          -> comparisonResultRep dflags
+    MO_U_Lt {}          -> comparisonResultRep dflags
 
     MO_F_Add r          -> cmmFloat r
     MO_F_Sub r          -> cmmFloat r
     MO_F_Mul r          -> cmmFloat r
     MO_F_Quot r         -> cmmFloat r
     MO_F_Neg r          -> cmmFloat r
-    MO_F_Eq  {}         -> comparisonResultRep
-    MO_F_Ne  {}         -> comparisonResultRep
-    MO_F_Ge  {}         -> comparisonResultRep
-    MO_F_Le  {}         -> comparisonResultRep
-    MO_F_Gt  {}         -> comparisonResultRep
-    MO_F_Lt  {}         -> comparisonResultRep
+    MO_F_Eq  {}         -> comparisonResultRep dflags
+    MO_F_Ne  {}         -> comparisonResultRep dflags
+    MO_F_Ge  {}         -> comparisonResultRep dflags
+    MO_F_Le  {}         -> comparisonResultRep dflags
+    MO_F_Gt  {}         -> comparisonResultRep dflags
+    MO_F_Lt  {}         -> comparisonResultRep dflags
 
     MO_And {}           -> ty1  -- Used for pointer masking
     MO_Or {}            -> ty1
@@ -337,10 +363,30 @@ machOpResultType mop tys =
     MO_FS_Conv _ to     -> cmmBits to
     MO_SF_Conv _ to     -> cmmFloat to
     MO_FF_Conv _ to     -> cmmFloat to
+
+    MO_V_Insert  l w    -> cmmVec l (cmmBits w)
+    MO_V_Extract _ w    -> cmmBits w
+
+    MO_V_Add l w        -> cmmVec l (cmmBits w)
+    MO_V_Sub l w        -> cmmVec l (cmmBits w)
+    MO_V_Mul l w        -> cmmVec l (cmmBits w)
+
+    MO_VS_Quot l w      -> cmmVec l (cmmBits w)
+    MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
+    MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
+
+    MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
+    MO_VF_Extract _ w   -> cmmFloat w
+
+    MO_VF_Add  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Sub  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Mul  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
   where
     (ty1:_) = tys
 
-comparisonResultRep :: CmmType
+comparisonResultRep :: DynFlags -> CmmType
 comparisonResultRep = bWord  -- is it?
 
 
@@ -352,8 +398,8 @@ comparisonResultRep = bWord  -- is it?
 -- its arguments are the same as the MachOp expects.  This is used when
 -- linting a CmmExpr.
 
-machOpArgReps :: MachOp -> [Width]
-machOpArgReps op =
+machOpArgReps :: DynFlags -> MachOp -> [Width]
+machOpArgReps dflags op =
   case op of
     MO_Add    r         -> [r,r]
     MO_Sub    r         -> [r,r]
@@ -394,15 +440,35 @@ machOpArgReps op =
     MO_Or    r          -> [r,r]
     MO_Xor   r          -> [r,r]
     MO_Not   r          -> [r]
-    MO_Shl   r          -> [r,wordWidth]
-    MO_U_Shr r          -> [r,wordWidth]
-    MO_S_Shr r          -> [r,wordWidth]
+    MO_Shl   r          -> [r, wordWidth dflags]
+    MO_U_Shr r          -> [r, wordWidth dflags]
+    MO_S_Shr r          -> [r, wordWidth dflags]
 
     MO_SS_Conv from _   -> [from]
     MO_UU_Conv from _   -> [from]
     MO_SF_Conv from _   -> [from]
     MO_FS_Conv from _   -> [from]
     MO_FF_Conv from _   -> [from]
+
+    MO_V_Insert  l r    -> [typeWidth (vec l (cmmBits r)),r,wordWidth dflags]
+    MO_V_Extract l r    -> [typeWidth (vec l (cmmBits r)),wordWidth dflags]
+
+    MO_V_Add _ r        -> [r,r]
+    MO_V_Sub _ r        -> [r,r]
+    MO_V_Mul _ r        -> [r,r]
+
+    MO_VS_Quot _ r      -> [r,r]
+    MO_VS_Rem  _ r      -> [r,r]
+    MO_VS_Neg  _ r      -> [r]
+
+    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
+    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
+
+    MO_VF_Add  _ r      -> [r,r]
+    MO_VF_Sub  _ r      -> [r,r]
+    MO_VF_Mul  _ r      -> [r,r]
+    MO_VF_Quot _ r      -> [r,r]
+    MO_VF_Neg  _ r      -> [r]
 
 -----------------------------------------------------------------------------
 -- CallishMachOp
@@ -440,6 +506,8 @@ data CallishMachOp
   | MO_F32_Exp
   | MO_F32_Sqrt
 
+  | MO_UF_Conv Width
+
   | MO_S_QuotRem Width
   | MO_U_QuotRem Width
   | MO_U_QuotRem2 Width
@@ -448,6 +516,10 @@ data CallishMachOp
 
   | MO_WriteBarrier
   | MO_Touch         -- Keep variables live (when using interior pointers)
+
+  -- Prefetch
+  | MO_Prefetch_Data -- Prefetch hint. May change program performance but not
+                     -- program behavior.
 
   -- Note that these three MachOps all take 1 extra parameter than the
   -- standard C lib versions. The extra (last) parameter contains
@@ -462,3 +534,10 @@ data CallishMachOp
 pprCallishMachOp :: CallishMachOp -> SDoc
 pprCallishMachOp mo = text (show mo)
 
+callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])
+callishMachOpHints op = case op of
+  MO_Memcpy  -> ([], [AddrHint,AddrHint,NoHint,NoHint])
+  MO_Memset  -> ([], [AddrHint,NoHint,NoHint,NoHint])
+  MO_Memmove -> ([], [AddrHint,AddrHint,NoHint,NoHint])
+  _          -> ([],[])
+  -- empty lists indicate NoHint

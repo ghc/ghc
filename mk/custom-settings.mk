@@ -5,7 +5,7 @@ ifeq "$(Validating)" "YES"
 include mk/validate-settings.mk
 -include mk/validate.mk
 else
--include mk/build.mk
+-include $(firstword $(wildcard mk/$(TargetPlatformFull)-build.mk) mk/build.mk)
 endif
 
 ifeq "$(BINDIST)" "YES"

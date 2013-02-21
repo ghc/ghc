@@ -20,9 +20,8 @@ import Linker           ( linkModule, getHValue )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findImportedModule, cannotFindModule )
 import DriverPhases     ( HscSource(HsSrcFile) )
-import TcRnDriver       ( getModuleInterface )
 import TcRnMonad        ( initTc, initIfaceTcRn )
-import LoadIface        ( loadUserInterface )
+import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName, gre_name )
 import RnNames          ( gresFromAvails )
@@ -36,7 +35,7 @@ import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
 import Id               ( idType )
 import Module           ( Module, ModuleName )
-import Panic            ( GhcException(..), throwGhcException )
+import Panic
 import FastString
 import ErrUtils
 import Outputable
@@ -50,7 +49,7 @@ import GHC.Exts          ( unsafeCoerce# )
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
 forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
 forceLoadModuleInterfaces hsc_env doc modules
-    = (initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ mapM_ (loadUserInterface False doc) modules) >> return ()
+    = (initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ mapM_ (loadPluginInterface doc) modules) >> return ()
 
 -- | Force the interface for the module containing the name to be loaded. The 'SDoc' parameter is used
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
@@ -138,7 +137,7 @@ lookupRdrNameInModule hsc_env mod_name rdr_name = do
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
-            (_, mb_iface) <- getModuleInterface hsc_env mod
+            (_, mb_iface) <- initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ loadPluginInterface (ptext (sLit "contains a name used in an invocation of lookupRdrNameInModule")) mod
             case mb_iface of
                 Just iface -> do
                     -- Try and find the required name in the exports
@@ -166,5 +165,5 @@ throwCmdLineErrorS :: DynFlags -> SDoc -> IO a
 throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags
 
 throwCmdLineError :: String -> IO a
-throwCmdLineError = throwGhcException . CmdLineError
+throwCmdLineError = throwGhcExceptionIO . CmdLineError
 #endif

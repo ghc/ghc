@@ -170,6 +170,12 @@ Now CSE may transform to
 But the WorkerInfo for f still says $wf, which is now dead!  This won't
 happen now that we don't look inside INLINEs (which wrappers are).
 
+Note [CSE for case expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  case f x of y { pat -> ...let y = f x in ... }
+Then we can CSE the inner (f x) to y.  In fact 'case' is like a strict
+let-binding, and we can use cseRhs for dealing with the scrutinee.
 
 %************************************************************************
 %*									*
@@ -226,7 +232,7 @@ cseExpr env (Coercion c)           = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)		   = lookupSubst env v
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
-cseExpr env (Tick t e)           = Tick t (cseExpr env e)
+cseExpr env (Tick t e)             = Tick t (cseExpr env e)
 cseExpr env (Cast e co)            = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
@@ -234,13 +240,14 @@ cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
 				     in Let bind' (cseExpr env' e)
 cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty alts'
 				   where
-                                     alts' = cseAlts env' scrut' bndr bndr'' alts
-				     scrut' = tryForCSE env scrut
-				     (env', bndr') = addBinder env bndr
+                                     alts' = cseAlts env2 scrut' bndr bndr'' alts
+				     (env1, bndr') = addBinder env bndr
 				     bndr'' = zapIdOccInfo bndr'
 					-- The swizzling from Note [Case binders 2] may
 					-- cause a dead case binder to be alive, so we
 					-- play safe here and bring them all to life
+                                     (env2, scrut') = cseRhs env1 (bndr'', scrut)
+                                        -- Note [CSE for case expressions]
 
 cseAlts :: CSEnv -> OutExpr -> InBndr -> InBndr -> [InAlt] -> [OutAlt]
 

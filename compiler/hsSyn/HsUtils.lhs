@@ -50,7 +50,7 @@ module HsUtils(
   nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsTyConApp, 
 
   -- Stmts
-  mkTransformStmt, mkTransformByStmt, mkExprStmt, mkBindStmt, mkLastStmt,
+  mkTransformStmt, mkTransformByStmt, mkBodyStmt, mkBindStmt, mkLastStmt,
   emptyTransStmt, mkGroupUsingStmt, mkGroupByUsingStmt, 
   emptyRecStmt, mkRecStmt, 
 
@@ -68,7 +68,7 @@ module HsUtils(
   collectLStmtBinders, collectStmtBinders,
 
   hsLTyClDeclBinders, hsTyClDeclBinders, hsTyClDeclsBinders, 
-  hsForeignDeclsBinders, hsGroupBinders, hsFamInstBinders,
+  hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
   
   -- Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
@@ -112,7 +112,7 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr id -> LHsExpr id
 mkHsPar e = L (getLoc e) (HsPar e)
 
-mkSimpleMatch :: [LPat id] -> LHsExpr id -> LMatch id
+mkSimpleMatch :: [LPat id] -> Located (body id) -> LMatch id (Located (body id))
 mkSimpleMatch pats rhs 
   = L loc $
     Match pats Nothing (unguardedGRHSs rhs)
@@ -121,14 +121,14 @@ mkSimpleMatch pats rhs
 		[]      -> getLoc rhs
 		(pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
-unguardedGRHSs :: LHsExpr id -> GRHSs id
+unguardedGRHSs :: Located (body id) -> GRHSs id (Located (body id))
 unguardedGRHSs rhs = GRHSs (unguardedRHS rhs) emptyLocalBinds
 
-unguardedRHS :: LHsExpr id -> [LGRHS id]
+unguardedRHS :: Located (body id) -> [LGRHS id (Located (body id))]
 unguardedRHS rhs@(L loc _) = [L loc (GRHS [] rhs)]
 
-mkMatchGroup :: [LMatch id] -> MatchGroup id
-mkMatchGroup matches = MatchGroup matches placeHolderType
+mkMatchGroup :: [LMatch id (Located (body id))] -> MatchGroup id (Located (body id))
+mkMatchGroup matches = MG { mg_alts = matches, mg_arg_tys = [], mg_res_ty = placeHolderType }
 
 mkHsAppTy :: LHsType name -> LHsType name -> LHsType name
 mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
@@ -139,7 +139,7 @@ mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
 	where
-	  matches = mkMatchGroup [mkSimpleMatch pats body]
+          matches = mkMatchGroup [mkSimpleMatch pats body]
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr Id -> LHsExpr Id
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars <.> mkWpLams dicts) expr
@@ -151,7 +151,7 @@ mkHsConApp data_con tys args
   where
     mk_app f a = noLoc (HsApp f (noLoc a))
 
-mkSimpleHsAlt :: LPat id -> LHsExpr id -> LMatch id
+mkSimpleHsAlt :: LPat id -> (Located (body id)) -> LMatch id (Located (body id))
 -- A simple lambda with a single pattern, no binds, no guards; pre-typechecking
 mkSimpleHsAlt pat expr 
   = mkSimpleMatch [pat] expr
@@ -178,18 +178,18 @@ mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat lp)
 mkHsIntegral   :: Integer -> PostTcType -> HsOverLit id
 mkHsFractional :: FractionalLit -> PostTcType -> HsOverLit id
 mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
-mkHsDo         :: HsStmtContext Name -> [LStmt id] -> HsExpr id
-mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
+mkHsDo         :: HsStmtContext Name -> [ExprLStmt id] -> HsExpr id
+mkHsComp       :: HsStmtContext Name -> [ExprLStmt id] -> LHsExpr id -> HsExpr id
 
 mkNPat      :: HsOverLit id -> Maybe (SyntaxExpr id) -> Pat id
 mkNPlusKPat :: Located id -> HsOverLit id -> Pat id
 
-mkLastStmt :: LHsExpr idR -> StmtLR idL idR
-mkExprStmt :: LHsExpr idR -> StmtLR idL idR
-mkBindStmt :: LPat idL -> LHsExpr idR -> StmtLR idL idR
+mkLastStmt :: Located (bodyR idR) -> StmtLR idL idR (Located (bodyR idR))
+mkBodyStmt :: Located (bodyR idR) -> StmtLR idL idR (Located (bodyR idR))
+mkBindStmt :: LPat idL -> Located (bodyR idR) -> StmtLR idL idR (Located (bodyR idR))
 
-emptyRecStmt :: StmtLR idL idR
-mkRecStmt    :: [LStmtLR idL idR] -> StmtLR idL idR
+emptyRecStmt :: StmtLR idL idR bodyR
+mkRecStmt    :: [LStmtLR idL idR bodyR] -> StmtLR idL idR bodyR
 
 
 mkHsIntegral   i       = OverLit (HsIntegral   i)  noRebindableInfo noSyntaxExpr
@@ -210,12 +210,16 @@ mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt    :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
-mkTransformByStmt  :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
-mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL idR
-mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
+mkTransformStmt    :: [ExprLStmt idL] -> LHsExpr idR
+                   -> StmtLR idL idR (LHsExpr idL)
+mkTransformByStmt  :: [ExprLStmt idL] -> LHsExpr idR -> LHsExpr idR
+                   -> StmtLR idL idR (LHsExpr idL)
+mkGroupUsingStmt   :: [ExprLStmt idL]                -> LHsExpr idR
+                   -> StmtLR idL idR (LHsExpr idL)
+mkGroupByUsingStmt :: [ExprLStmt idL] -> LHsExpr idR -> LHsExpr idR
+                   -> StmtLR idL idR (LHsExpr idL)
 
-emptyTransStmt :: StmtLR idL idR
+emptyTransStmt :: StmtLR idL idR (LHsExpr idR)
 emptyTransStmt = TransStmt { trS_form = panic "emptyTransStmt: form"
                            , trS_stmts = [], trS_bndrs = [] 
                            , trS_by = Nothing, trS_using = noLoc noSyntaxExpr
@@ -226,9 +230,9 @@ mkTransformByStmt  ss u b = emptyTransStmt { trS_form = ThenForm,  trS_stmts = s
 mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u }
 mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
 
-mkLastStmt expr	    = LastStmt expr noSyntaxExpr
-mkExprStmt expr	    = ExprStmt expr noSyntaxExpr noSyntaxExpr placeHolderType
-mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
+mkLastStmt body     = LastStmt body noSyntaxExpr
+mkBodyStmt body     = BodyStmt body noSyntaxExpr noSyntaxExpr placeHolderType
+mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr
 
 emptyRecStmt = RecStmt { recS_stmts = [], recS_later_ids = [], recS_rec_ids = []
                        , recS_ret_fn = noSyntaxExpr, recS_mfix_fn = noSyntaxExpr
@@ -324,23 +328,23 @@ nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
 nlWildPat :: LPat id
 nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
-nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id
+nlHsDo :: HsStmtContext Name -> [LStmt id (LHsExpr id)] -> LHsExpr id
 nlHsDo ctxt stmts = noLoc (mkHsDo ctxt stmts)
 
 nlHsOpApp :: LHsExpr id -> id -> LHsExpr id -> LHsExpr id
 nlHsOpApp e1 op e2 = noLoc (mkHsOpApp e1 op e2)
 
-nlHsLam  :: LMatch id -> LHsExpr id
+nlHsLam  :: LMatch id (LHsExpr id) -> LHsExpr id
 nlHsPar  :: LHsExpr id -> LHsExpr id
 nlHsIf   :: LHsExpr id -> LHsExpr id -> LHsExpr id -> LHsExpr id
-nlHsCase :: LHsExpr id -> [LMatch id] -> LHsExpr id
+nlHsCase :: LHsExpr id -> [LMatch id (LHsExpr id)] -> LHsExpr id
 nlList   :: [LHsExpr id] -> LHsExpr id
 
 nlHsLam	match		= noLoc (HsLam (mkMatchGroup [match]))
 nlHsPar e		= noLoc (HsPar e)
 nlHsIf cond true false	= noLoc (mkHsIf cond true false)
 nlHsCase expr matches	= noLoc (HsCase expr (mkMatchGroup matches))
-nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
+nlList exprs		= noLoc (ExplicitList placeHolderType Nothing exprs)
 
 nlHsAppTy :: LHsType name -> LHsType name -> LHsType name
 nlHsTyVar :: name                         -> LHsType name
@@ -413,7 +417,7 @@ l
 %************************************************************************
 
 \begin{code}
-mkFunBind :: Located RdrName -> [LMatch RdrName] -> HsBind RdrName
+mkFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> HsBind RdrName
 -- Not infix, with place holders for coercion and free vars
 mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
                           , fun_matches = mkMatchGroup ms
@@ -421,7 +425,7 @@ mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
                           , bind_fvs = placeHolderNames
 			  , fun_tick = Nothing }
 
-mkTopFunBind :: Located Name -> [LMatch Name] -> HsBind Name
+mkTopFunBind :: Located Name -> [LMatch Name (LHsExpr Name)] -> HsBind Name
 -- In Name-land, with empty bind_fvs
 mkTopFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
                              , fun_matches = mkMatchGroup ms
@@ -443,7 +447,7 @@ mk_easy_FunBind loc fun pats expr
   = L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds]
 
 ------------
-mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id
+mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id (LHsExpr id)
 mkMatch pats expr binds
   = noLoc (Match (map paren pats) Nothing 
 		 (GRHSs (unguardedRHS expr) binds))
@@ -521,20 +525,20 @@ collectMethodBinders binds = foldrBag get [] binds
        -- Someone else complains about non-FunBinds
 
 ----------------- Statements --------------------------
-collectLStmtsBinders :: [LStmtLR idL idR] -> [idL]
+collectLStmtsBinders :: [LStmtLR idL idR body] -> [idL]
 collectLStmtsBinders = concatMap collectLStmtBinders
 
-collectStmtsBinders :: [StmtLR idL idR] -> [idL]
+collectStmtsBinders :: [StmtLR idL idR body] -> [idL]
 collectStmtsBinders = concatMap collectStmtBinders
 
-collectLStmtBinders :: LStmtLR idL idR -> [idL]
+collectLStmtBinders :: LStmtLR idL idR body -> [idL]
 collectLStmtBinders = collectStmtBinders . unLoc
 
-collectStmtBinders :: StmtLR idL idR -> [idL]
+collectStmtBinders :: StmtLR idL idR body -> [idL]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt pat _ _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
-collectStmtBinders (ExprStmt {})        = []
+collectStmtBinders (BodyStmt {})        = []
 collectStmtBinders (LastStmt {})        = []
 collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
                                         $ [s | ParStmtBlock ss _ _ <- xs, s <- ss]
@@ -562,7 +566,7 @@ collect_lpat (L _ pat) bndrs
     go (ViewPat _ pat _)          = collect_lpat pat bndrs
     go (ParPat  pat)     	  = collect_lpat pat bndrs
 				  
-    go (ListPat pats _)    	  = foldr collect_lpat bndrs pats
+    go (ListPat pats _ _)         = foldr collect_lpat bndrs pats
     go (PArrPat pats _)    	  = foldr collect_lpat bndrs pats
     go (TuplePat pats _ _)  	  = foldr collect_lpat bndrs pats
 				  
@@ -635,32 +639,35 @@ hsLTyClDeclBinders (L _ d) = hsTyClDeclBinders d
 
 -------------------
 hsTyClDeclBinders :: Eq name => TyClDecl name -> [Located name]
-hsTyClDeclBinders (TyFamily    {tcdLName = name}) = [name]
+hsTyClDeclBinders (FamDecl { tcdFam = FamilyDecl { fdLName = name} }) = [name]
 hsTyClDeclBinders (ForeignType {tcdLName = name}) = [name]
+hsTyClDeclBinders (SynDecl     {tcdLName = name}) = [name]
 
 hsTyClDeclBinders (ClassDecl { tcdLName = cls_name, tcdSigs = sigs
-                             , tcdATs = ats, tcdATDefs = fam_insts })
+                             , tcdATs = ats })
   = cls_name : 
-    concatMap hsLTyClDeclBinders ats ++ 
-    concatMap (hsFamInstBinders . unLoc) fam_insts ++
+    map (fdLName . unLoc) ats ++ 
     [n | L _ (TypeSig ns _) <- sigs, n <- ns]
 
-hsTyClDeclBinders (TyDecl { tcdLName = name, tcdTyDefn = defn }) 
-  = name : hsTyDefnBinders defn
+hsTyClDeclBinders (DataDecl { tcdLName = name, tcdDataDefn = defn }) 
+  = name : hsDataDefnBinders defn
 
 -------------------
 hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
-hsInstDeclBinders (ClsInstD { cid_fam_insts = fis }) = concatMap (hsFamInstBinders . unLoc) fis
-hsInstDeclBinders (FamInstD { lid_inst = fi }) = hsFamInstBinders fi
+hsInstDeclBinders (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } })
+  = concatMap (hsDataFamInstBinders . unLoc) dfis
+hsInstDeclBinders (DataFamInstD { dfid_inst = fi }) = hsDataFamInstBinders fi
+hsInstDeclBinders (TyFamInstD {}) = []
 
 -------------------
-hsFamInstBinders :: Eq name => FamInstDecl name -> [Located name]
-hsFamInstBinders (FamInstDecl { fid_defn = defn }) = hsTyDefnBinders defn
+hsDataFamInstBinders :: Eq name => DataFamInstDecl name -> [Located name]
+hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
+  = hsDataDefnBinders defn
+  -- There can't be repeated symbols because only data instances have binders
 
 -------------------
-hsTyDefnBinders :: Eq name => HsTyDefn name -> [Located name]
-hsTyDefnBinders (TySynonym {})              = []
-hsTyDefnBinders (TyData { td_cons = cons }) = hsConDeclsBinders cons
+hsDataDefnBinders :: Eq name => HsDataDefn name -> [Located name]
+hsDataDefnBinders (HsDataDefn { dd_cons = cons }) = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
@@ -702,15 +709,15 @@ The main purpose is to find names introduced by record wildcards so that we can 
 warning the user when they don't use those names (#4404)
 
 \begin{code}
-lStmtsImplicits :: [LStmtLR Name idR] -> NameSet
+lStmtsImplicits :: [LStmtLR Name idR (Located (body idR))] -> NameSet
 lStmtsImplicits = hs_lstmts
   where
-    hs_lstmts :: [LStmtLR Name idR] -> NameSet
+    hs_lstmts :: [LStmtLR Name idR (Located (body idR))] -> NameSet
     hs_lstmts = foldr (\stmt rest -> unionNameSets (hs_stmt (unLoc stmt)) rest) emptyNameSet
     
     hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
     hs_stmt (LetStmt binds)      = hs_local_binds binds
-    hs_stmt (ExprStmt {})        = emptyNameSet
+    hs_stmt (BodyStmt {})        = emptyNameSet
     hs_stmt (LastStmt {})        = emptyNameSet
     hs_stmt (ParStmt xs _ _)     = hs_lstmts [s | ParStmtBlock ss _ _ <- xs, s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
@@ -744,7 +751,7 @@ lPatImplicits = hs_lpat
     hs_pat (AsPat _ pat)       = hs_lpat pat
     hs_pat (ViewPat _ pat _)   = hs_lpat pat
     hs_pat (ParPat  pat)       = hs_lpat pat
-    hs_pat (ListPat pats _)    = hs_lpats pats
+    hs_pat (ListPat pats _ _)  = hs_lpats pats
     hs_pat (PArrPat pats _)    = hs_lpats pats
     hs_pat (TuplePat pats _ _) = hs_lpats pats
 

@@ -141,7 +141,7 @@ struct Capability_ {
     SparkCounters spark_stats;
 #endif
     // Total words allocated by this cap since rts start
-    lnat total_allocated;
+    W_ total_allocated;
 
     // Per-capability STM-related data
     StgTVarWatchQueue *free_tvar_watch_queues;
@@ -230,8 +230,7 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 
 // declared in includes/rts/Threads.h:
 // extern nat n_capabilities;
-
-extern nat enabled_capabilities;
+// extern nat enabled_capabilities;
 
 // Array of all the capabilities
 //

@@ -9,9 +9,9 @@
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-module X86.Instr (Instr(..), Operand(..),
+module X86.Instr (Instr(..), Operand(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
-                  shortcutJump, i386_insert_ffrees,
+                  shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordSize)
 where
 
@@ -24,17 +24,22 @@ import Reg
 import TargetReg
 
 import BlockId
-import OldCmm
+import CodeGen.Platform
+import Cmm
 import FastString
 import FastBool
 import Outputable
 import Platform
-import Constants        (rESERVED_C_STACK_BYTES)
 
 import BasicTypes       (Alignment)
 import CLabel
+import DynFlags
 import UniqSet
 import Unique
+import UniqSupply
+
+import Control.Monad
+import Data.Maybe       (fromMaybe)
 
 -- Size of an x86/x86_64 memory address, in bytes.
 --
@@ -57,6 +62,8 @@ instance Instruction Instr where
         mkRegRegMoveInstr       = x86_mkRegRegMoveInstr
         takeRegRegMoveInstr     = x86_takeRegRegMoveInstr
         mkJumpInstr             = x86_mkJumpInstr
+        mkStackAllocInstr       = x86_mkStackAllocInstr
+        mkStackDeallocInstr     = x86_mkStackDeallocInstr
 
 
 -- -----------------------------------------------------------------------------
@@ -320,8 +327,8 @@ data Operand
 
 
 
-x86_regUsageOfInstr :: Instr -> RegUsage
-x86_regUsageOfInstr instr
+x86_regUsageOfInstr :: Platform -> Instr -> RegUsage
+x86_regUsageOfInstr platform instr
  = case instr of
     MOV    _ src dst    -> usageRW src dst
     MOVZxL _ src dst    -> usageRW src dst
@@ -359,8 +366,8 @@ x86_regUsageOfInstr instr
     JXX_GBL _ _         -> mkRU [] []
     JMP     op regs     -> mkRUR (use_R op regs)
     JMP_TBL op _ _ _    -> mkRUR (use_R op [])
-    CALL (Left _)  params   -> mkRU params callClobberedRegs
-    CALL (Right reg) params -> mkRU (reg:params) callClobberedRegs
+    CALL (Left _)  params   -> mkRU params (callClobberedRegs platform)
+    CALL (Right reg) params -> mkRU (reg:params) (callClobberedRegs platform)
     CLTD   _            -> mkRU [eax] [edx]
     NOP                 -> mkRU [] []
 
@@ -449,16 +456,16 @@ x86_regUsageOfInstr instr
               use_index (EAIndex i _) tl = i : tl
 
     mkRUR src = src' `seq` RU src' []
-        where src' = filter interesting src
+        where src' = filter (interesting platform) src
 
     mkRU src dst = src' `seq` dst' `seq` RU src' dst'
-        where src' = filter interesting src
-              dst' = filter interesting dst
+        where src' = filter (interesting platform) src
+              dst' = filter (interesting platform) dst
 
-interesting :: Reg -> Bool
-interesting (RegVirtual _)              = True
-interesting (RegReal (RealRegSingle i)) = isFastTrue (freeReg i)
-interesting (RegReal (RealRegPair{}))   = panic "X86.interesting: no reg pairs on this arch"
+interesting :: Platform -> Reg -> Bool
+interesting _        (RegVirtual _)              = True
+interesting platform (RegReal (RealRegSingle i)) = isFastTrue (freeReg platform i)
+interesting _        (RegReal (RealRegPair{}))   = panic "X86.interesting: no reg pairs on this arch"
 
 
 
@@ -612,62 +619,63 @@ x86_patchJumpInstr insn patchF
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
 x86_mkSpillInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- register to spill
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkSpillInstr platform reg delta slot
-  = let off     = spillSlotToOffset is32Bit slot
+x86_mkSpillInstr dflags reg delta slot
+  = let off     = spillSlotToOffset platform slot - delta
     in
-    let off_w = (off - delta) `div` (if is32Bit then 4 else 8)
-    in case targetClassOfReg platform reg of
+    case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordSize is32Bit)
-                              (OpReg reg) (OpAddr (spRel platform off_w))
-           RcDouble    -> GST FF80 reg (spRel platform off_w) {- RcFloat/RcDouble -}
-           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off_w))
+                              (OpReg reg) (OpAddr (spRel dflags off))
+           RcDouble    -> GST FF80 reg (spRel dflags off) {- RcFloat/RcDouble -}
+           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
            _         -> panic "X86.mkSpillInstr: no match"
-    where is32Bit = target32Bit platform
+    where platform = targetPlatform dflags
+          is32Bit = target32Bit platform
 
 -- | Make a spill reload instruction.
 x86_mkLoadInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- register to load
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkLoadInstr platform reg delta slot
-  = let off     = spillSlotToOffset is32Bit slot
+x86_mkLoadInstr dflags reg delta slot
+  = let off     = spillSlotToOffset platform slot - delta
     in
-        let off_w = (off-delta) `div` (if is32Bit then 4 else 8)
-        in case targetClassOfReg platform reg of
+        case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordSize is32Bit)
-                               (OpAddr (spRel platform off_w)) (OpReg reg)
-              RcDouble  -> GLD FF80 (spRel platform off_w) reg {- RcFloat/RcDouble -}
-              RcDoubleSSE -> MOV FF64 (OpAddr (spRel platform off_w)) (OpReg reg)
+                               (OpAddr (spRel dflags off)) (OpReg reg)
+              RcDouble  -> GLD FF80 (spRel dflags off) reg {- RcFloat/RcDouble -}
+              RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
-    where is32Bit = target32Bit platform
+    where platform = targetPlatform dflags
+          is32Bit = target32Bit platform
 
-spillSlotSize :: Bool -> Int
-spillSlotSize is32Bit = if is32Bit then 12 else 8
+spillSlotSize :: Platform -> Int
+spillSlotSize dflags = if is32Bit then 12 else 8
+    where is32Bit = target32Bit dflags
 
-maxSpillSlots :: Bool -> Int
-maxSpillSlots is32Bit
-    = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize is32Bit) - 1
+maxSpillSlots :: DynFlags -> Int
+maxSpillSlots dflags
+    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize (targetPlatform dflags)) - 1
+--     = 0 -- useful for testing allocMoreStack
+
+-- number of bytes that the stack pointer should be aligned to
+stackAlign :: Int
+stackAlign = 16
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
 -- the C stack pointer.
-spillSlotToOffset :: Bool -> Int -> Int
-spillSlotToOffset is32Bit slot
-   | slot >= 0 && slot < maxSpillSlots is32Bit
-   = 64 + spillSlotSize is32Bit * slot
-   | otherwise
-   = pprPanic "spillSlotToOffset:"
-              (   text "invalid spill location: " <> int slot
-              $$  text "maxSpillSlots:          " <> int (maxSpillSlots is32Bit))
+spillSlotToOffset :: Platform -> Int -> Int
+spillSlotToOffset platform slot
+   = 64 + spillSlotSize platform * slot
 
 --------------------------------------------------------------------------------
 
@@ -709,11 +717,10 @@ x86_mkRegRegMoveInstr
 
 x86_mkRegRegMoveInstr platform src dst
  = case targetClassOfReg platform src of
-#if   i386_TARGET_ARCH
-        RcInteger -> MOV II32 (OpReg src) (OpReg dst)
-#else
-        RcInteger -> MOV II64 (OpReg src) (OpReg dst)
-#endif
+        RcInteger -> case platformArch platform of
+                     ArchX86    -> MOV II32 (OpReg src) (OpReg dst)
+                     ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
+                     _          -> panic "x86_mkRegRegMoveInstr: Bad arch"
         RcDouble    -> GMOV src dst
         RcDoubleSSE -> MOV FF64 (OpReg src) (OpReg dst)
         _     -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
@@ -741,8 +748,25 @@ x86_mkJumpInstr id
         = [JXX ALWAYS id]
 
 
+x86_mkStackAllocInstr
+        :: Platform
+        -> Int
+        -> Instr
+x86_mkStackAllocInstr platform amount
+  = case platformArch platform of
+      ArchX86    -> SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
+      ArchX86_64 -> SUB II64 (OpImm (ImmInt amount)) (OpReg rsp)
+      _ -> panic "x86_mkStackAllocInstr"
 
-
+x86_mkStackDeallocInstr
+        :: Platform
+        -> Int
+        -> Instr
+x86_mkStackDeallocInstr platform amount
+  = case platformArch platform of
+      ArchX86    -> ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
+      ArchX86_64 -> ADD II64 (OpImm (ImmInt amount)) (OpReg rsp)
+      _ -> panic "x86_mkStackDeallocInstr"
 
 i386_insert_ffrees
         :: [GenBasicBlock Instr]
@@ -750,18 +774,22 @@ i386_insert_ffrees
 
 i386_insert_ffrees blocks
    | or (map (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ])
-   = map ffree_before_nonlocal_transfers blocks
-
+   = map insertGFREEs blocks
    | otherwise
    = blocks
-  where
-   ffree_before_nonlocal_transfers (BasicBlock id insns)
-     = BasicBlock id (foldr p [] insns)
+ where
+   insertGFREEs (BasicBlock id insns)
+     = BasicBlock id (insertBeforeNonlocalTransfers GFREE insns)
+
+insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
+insertBeforeNonlocalTransfers insert insns
+     = foldr p [] insns
      where p insn r = case insn of
-                        CALL _ _ -> GFREE : insn : r
-                        JMP _ _  -> GFREE : insn : r
-                        JXX_GBL _ _ -> panic "i386_insert_ffrees: cannot handle JXX_GBL"
-                        _        -> insn : r
+                        CALL _ _    -> insert : insn : r
+                        JMP _ _     -> insert : insn : r
+                        JXX_GBL _ _ -> panic "insertBeforeNonlocalTransfers: cannot handle JXX_GBL"
+                        _           -> insn : r
+
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
 -- you must update this too
@@ -791,6 +819,94 @@ is_G_instr instr
         GTAN{}          -> True
         GFREE           -> panic "is_G_instr: GFREE (!)"
         _               -> False
+
+
+--
+-- Note [extra spill slots]
+--
+-- If the register allocator used more spill slots than we have
+-- pre-allocated (rESERVED_C_STACK_BYTES), then we must allocate more
+-- C stack space on entry and exit from this proc.  Therefore we
+-- insert a "sub $N, %rsp" at every entry point, and an "add $N, %rsp"
+-- before every non-local jump.
+--
+-- This became necessary when the new codegen started bundling entire
+-- functions together into one proc, because the register allocator
+-- assigns a different stack slot to each virtual reg within a proc.
+-- To avoid using so many slots we could also:
+--
+--   - split up the proc into connected components before code generator
+--
+--   - rename the virtual regs, so that we re-use vreg names and hence
+--     stack slots for non-overlapping vregs.
+--
+-- Note that when a block is both a non-local entry point (with an
+-- info table) and a local branch target, we have to split it into
+-- two, like so:
+--
+--    <info table>
+--    L:
+--       <code>
+--
+-- becomes
+--
+--    <info table>
+--    L:
+--       subl $rsp, N
+--       jmp Lnew
+--    Lnew:
+--       <code>
+--
+-- and all branches pointing to L are retargetted to point to Lnew.
+-- Otherwise, we would repeat the $rsp adjustment for each branch to
+-- L.
+--
+allocMoreStack
+  :: Platform
+  -> Int
+  -> NatCmmDecl statics X86.Instr.Instr
+  -> UniqSM (NatCmmDecl statics X86.Instr.Instr)
+
+allocMoreStack _ _ top@(CmmData _ _) = return top
+allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
+    let
+        infos = mapKeys info
+        entries = case code of
+                    [] -> infos
+                    BasicBlock entry _ : _ -- first block is the entry point
+                       | entry `elem` infos -> infos
+                       | otherwise          -> entry : infos
+
+    uniqs <- replicateM (length entries) getUniqueUs
+
+    let
+      delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up
+        where x = slots * spillSlotSize platform -- sp delta
+
+      alloc   = mkStackAllocInstr   platform delta
+      dealloc = mkStackDeallocInstr platform delta
+  
+      new_blockmap :: BlockEnv BlockId
+      new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
+  
+      insert_stack_insns (BasicBlock id insns)
+         | Just new_blockid <- mapLookup id new_blockmap
+         = [ BasicBlock id [alloc, JXX ALWAYS new_blockid]
+           , BasicBlock new_blockid block' ]
+         | otherwise
+         = [ BasicBlock id block' ]
+         where
+           block' = foldr insert_dealloc [] insns
+
+      insert_dealloc insn r = case insn of
+         JMP _ _     -> dealloc : insn : r
+         JXX_GBL _ _ -> panic "insert_dealloc: cannot handle JXX_GBL"
+         _other      -> x86_patchJumpInstr insn retarget : r
+           where retarget b = fromMaybe b (mapLookup b new_blockmap)
+
+      new_code = concatMap insert_stack_insns code
+    -- in
+    return (CmmProc info lbl live (ListGraph new_code))
 
 
 data JumpDest = DestBlockId BlockId | DestImm Imm

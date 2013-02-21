@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2006-2012
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
 
@@ -65,17 +65,18 @@ module Outputable (
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError,
-        pprTrace, pprDefiniteTrace, warnPprTrace,
+        pprTrace, warnPprTrace,
         trace, pgmError, panic, sorry, panicFastInt, assertPanic,
         pprDebugAndThen,
     ) where
 
-import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags,
-                                  targetPlatform, pprUserLength, pprCols )
+import {-# SOURCE #-}   DynFlags( DynFlags,
+                                  targetPlatform, pprUserLength, pprCols,
+                                  unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
+import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
-import StaticFlags
 import FastString
 import FastTypes
 import qualified Pretty
@@ -84,6 +85,8 @@ import Platform
 import Pretty           ( Doc, Mode(..) )
 import Panic
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Char
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
@@ -92,7 +95,9 @@ import qualified Data.Set as Set
 import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
+import Text.Printf
 
+import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 \end{code}
 
@@ -255,7 +260,9 @@ pprDeeper d = SDoc $ \ctx -> case ctx of
 
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 -- Truncate a list that list that is longer than the current depth
-pprDeeperList f ds = SDoc work
+pprDeeperList f ds 
+  | null ds   = f []
+  | otherwise = SDoc work
  where
   work ctx@SDC{sdocStyle=PprUser q (PartWay n)}
    | n==0      = Pretty.text "..."
@@ -597,24 +604,27 @@ class Outputable a where
 \end{code}
 
 \begin{code}
+instance Outputable Char where
+    ppr c = text [c]
+
 instance Outputable Bool where
     ppr True  = ptext (sLit "True")
     ppr False = ptext (sLit "False")
 
 instance Outputable Int where
-   ppr n = int n
+    ppr n = int n
 
 instance Outputable Word16 where
-   ppr n = integer $ fromIntegral n
+    ppr n = integer $ fromIntegral n
 
 instance Outputable Word32 where
-   ppr n = integer $ fromIntegral n
+    ppr n = integer $ fromIntegral n
 
 instance Outputable Word where
-   ppr n = integer $ fromIntegral n
+    ppr n = integer $ fromIntegral n
 
 instance Outputable () where
-   ppr _ = text "()"
+    ppr _ = text "()"
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
@@ -626,12 +636,12 @@ instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
 instance Outputable a => Outputable (Maybe a) where
-  ppr Nothing = ptext (sLit "Nothing")
-  ppr (Just x) = ptext (sLit "Just") <+> ppr x
+    ppr Nothing = ptext (sLit "Nothing")
+    ppr (Just x) = ptext (sLit "Just") <+> ppr x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
-  ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
-  ppr (Right y) = ptext (sLit "Right") <+> ppr y
+    ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
+    ppr (Right y) = ptext (sLit "Right") <+> ppr y
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
@@ -686,6 +696,9 @@ instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
+
+instance Outputable Fingerprint where
+    ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
 \end{code}
 
 %************************************************************************
@@ -731,8 +744,8 @@ pprHsString :: FastString -> SDoc
 pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
 
 -- | Special combinator for showing string literals.
-pprHsBytes :: FastBytes -> SDoc
-pprHsBytes fb = let escaped = concatMap escape $ bytesFB fb
+pprHsBytes :: ByteString -> SDoc
+pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                 in vcat (map text (showMultiLineString escaped)) <> char '#'
     where escape :: Word8 -> String
           escape w = let c = chr (fromIntegral w)
@@ -771,15 +784,15 @@ pprWithCommas :: (a -> SDoc) -- ^ The pretty printing function to use
                              -- comma-separated and finally packed into a paragraph.
 pprWithCommas pp xs = fsep (punctuate comma (map pp xs))
 
--- | Returns the seperated concatenation of the pretty printed things.
+-- | Returns the separated concatenation of the pretty printed things.
 interppSP  :: Outputable a => [a] -> SDoc
 interppSP  xs = sep (map ppr xs)
 
--- | Returns the comma-seperated concatenation of the pretty printed things.
+-- | Returns the comma-separated concatenation of the pretty printed things.
 interpp'SP :: Outputable a => [a] -> SDoc
 interpp'SP xs = sep (punctuate comma (map ppr xs))
 
--- | Returns the comma-seperated concatenation of the quoted pretty printed things.
+-- | Returns the comma-separated concatenation of the quoted pretty printed things.
 --
 -- > [x,y,z]  ==>  `x', `y', `z'
 pprQuotedList :: Outputable a => [a] -> SDoc
@@ -906,11 +919,7 @@ pprTrace :: String -> SDoc -> a -> a
 -- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
-   | otherwise         = pprDebugAndThen tracingDynFlags trace str doc x
-
-pprDefiniteTrace :: DynFlags -> String -> SDoc -> a -> a
--- ^ Same as pprTrace, but show even if -dno-debug-output is on
-pprDefiniteTrace dflags str doc x = pprDebugAndThen dflags trace str doc x
+   | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
@@ -923,9 +932,9 @@ warnPprTrace _     _     _     _    x | not debugIsOn     = x
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = pprDebugAndThen tracingDynFlags trace str msg x
+  = pprDebugAndThen unsafeGlobalDynFlags trace str msg x
   where
-    str = showSDoc tracingDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
+    str = showSDoc unsafeGlobalDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.

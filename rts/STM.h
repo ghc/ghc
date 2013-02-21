@@ -97,7 +97,7 @@ void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
   threads at GC (in case they are stuck looping)
 */
 
-StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
+StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec);
 
 /*----------------------------------------------------------------------
 
@@ -180,14 +180,6 @@ void stmWaitUnlock(Capability *cap, StgTRecHeader *trec);
  */
 
 StgBool stmReWait(Capability *cap, StgTSO *tso);
-
-/*----------------------------------------------------------------------
-
-   TVar management operations
-   --------------------------
-*/
-
-StgTVar *stmNewTVar(Capability *cap, StgClosure *new_value);
 
 /*----------------------------------------------------------------------
 

@@ -20,11 +20,6 @@ Category: Development
 Build-Type: Simple
 Cabal-Version: >= 1.2.3
 
-Flag dynlibs
-    Description: Dynamic library support
-    Default: False
-    Manual: True
-
 Flag ghci
     Description: Build GHCi support.
     Default: False
@@ -49,15 +44,16 @@ Library
     Exposed: False
 
     Build-Depends: base       >= 4   && < 5,
-                   directory  >= 1   && < 1.2,
-                   process    >= 1   && < 1.2,
+                   directory  >= 1   && < 1.3,
+                   process    >= 1   && < 1.3,
                    bytestring >= 0.9 && < 0.11,
                    time                 < 1.5,
                    containers >= 0.1 && < 0.6,
                    array      >= 0.1 && < 0.5,
                    filepath   >= 1   && < 1.4,
                    Cabal,
-                   hpc
+                   hpc,
+                   transformers
 
     if flag(stage1) && impl(ghc < 7.5)
         Build-Depends: old-time   >= 1   && < 1.2
@@ -101,9 +97,8 @@ Library
     c-sources:
         parser/cutils.c
 
-    if flag(dynlibs)
-        c-sources:
-            ghci/keepCAFsForGHCi.c
+    c-sources:
+        ghci/keepCAFsForGHCi.c
 
     hs-source-dirs:
         basicTypes
@@ -173,7 +168,6 @@ Library
         CmmCallConv
         CmmCommonBlockElim
         CmmContFlowOpt
-        CmmCvt
         CmmExpr
         CmmInfo
         CmmLex
@@ -190,35 +184,20 @@ Library
         CmmUtils
         CmmLayoutStack
         MkGraph
-        OldCmm
-        OldCmmLint
-        OldCmmUtils
-        OldPprCmm
         PprBase
         PprC
         PprCmm
         PprCmmDecl
         PprCmmExpr
         Bitmap
-        CgBindery
-        CgCallConv
-        CgCase
-        CgClosure
-        CgCon
-        CgExpr
-        CgExtCode
-        CgForeignCall
-        CgHeapery
-        CgHpc
-        CgInfoTbls
-        CgLetNoEscape
-        CgMonad
-        CgParallel
-        CgPrimOp
-        CgProf
-        CgStackery
-        CgTailCall
-        CgTicky
+        CodeGen.Platform
+        CodeGen.Platform.ARM
+        CodeGen.Platform.NoRegs
+        CodeGen.Platform.PPC
+        CodeGen.Platform.PPC_Darwin
+        CodeGen.Platform.SPARC
+        CodeGen.Platform.X86
+        CodeGen.Platform.X86_64
         CgUtils
         StgCmm
         StgCmmBind
@@ -236,8 +215,7 @@ Library
         StgCmmProf
         StgCmmTicky
         StgCmmUtils
-        ClosureInfo
-        CodeGen
+        StgCmmExtCode
         SMRep
         CoreArity
         CoreFVs
@@ -311,9 +289,9 @@ Library
         InteractiveEval
         PackageConfig
         Packages
+        PlatformConstants
         PprTyThing
         StaticFlags
-        StaticFlagParser
         SysTools
         TidyPgm
         Ctype
@@ -356,7 +334,6 @@ Library
         SimplMonad
         SimplUtils
         Simplify
-        SRT
         SimplStg
         StgStats
         UnariseStg
@@ -386,6 +363,7 @@ Library
         TcHsType
         TcInstDcls
         TcMType
+        TcValidity
         TcMatches
         TcPat
         TcRnDriver
@@ -408,6 +386,7 @@ Library
         FunDeps
         InstEnv
         TyCon
+        CoAxiom
         Kind
         Type
         TypeRep
@@ -476,6 +455,9 @@ Library
         Hoopl.Dataflow
         Hoopl
 
+--        CgInfoTbls used in ghci/DebuggerUtils
+--        CgHeapery  mkVirtHeapOffsets used in ghci
+
     Exposed-Modules:
             AsmCodeGen
             TargetReg
@@ -501,7 +483,6 @@ Library
             PPC.CodeGen
             SPARC.Base
             SPARC.Regs
-            SPARC.RegPlate
             SPARC.Imm
             SPARC.AddrMode
             SPARC.Cond
@@ -535,6 +516,7 @@ Library
             RegAlloc.Linear.StackMap
             RegAlloc.Linear.Base
             RegAlloc.Linear.X86.FreeRegs
+            RegAlloc.Linear.X86_64.FreeRegs
             RegAlloc.Linear.PPC.FreeRegs
             RegAlloc.Linear.SPARC.FreeRegs
 

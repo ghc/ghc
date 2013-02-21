@@ -52,9 +52,11 @@ import FastString
 import BasicTypes
 import Binary
 import Constants
+import DynFlags
 import UniqFM
 import Util
 
+import Data.ByteString (ByteString)
 import Data.Int
 import Data.Ratio
 import Data.Word
@@ -84,7 +86,7 @@ data Literal
         -- First the primitive guys
     MachChar    Char            -- ^ @Char#@ - at least 31 bits. Create with 'mkMachChar'
 
-  | MachStr     FastBytes       -- ^ A string-literal: stored and emitted
+  | MachStr     ByteString      -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @'\0'@
                                 -- terminator. Create with 'mkMachString'
@@ -216,14 +218,14 @@ instance Ord Literal where
         ~~~~~~~~~~~~
 \begin{code}
 -- | Creates a 'Literal' of type @Int#@
-mkMachInt :: Integer -> Literal
-mkMachInt  x   = ASSERT2( inIntRange x,  integer x )
-                 MachInt x
+mkMachInt :: DynFlags -> Integer -> Literal
+mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
+                       MachInt x
 
 -- | Creates a 'Literal' of type @Word#@
-mkMachWord :: Integer -> Literal
-mkMachWord x   = ASSERT2( inWordRange x, integer x )
-                 MachWord x
+mkMachWord :: DynFlags -> Integer -> Literal
+mkMachWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
+                        MachWord x
 
 -- | Creates a 'Literal' of type @Int64#@
 mkMachInt64 :: Integer -> Literal
@@ -249,14 +251,14 @@ mkMachChar = MachChar
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
 mkMachString :: String -> Literal
 -- stored UTF-8 encoded
-mkMachString s = MachStr (fastStringToFastBytes $ mkFastString s)
+mkMachString s = MachStr (fastStringToByteString $ mkFastString s)
 
 mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger = LitInteger
 
-inIntRange, inWordRange :: Integer -> Bool
-inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT
-inWordRange x = x >= 0              && x <= tARGET_MAX_WORD
+inIntRange, inWordRange :: DynFlags -> Integer -> Bool
+inIntRange  dflags x = x >= tARGET_MIN_INT dflags && x <= tARGET_MAX_INT dflags
+inWordRange dflags x = x >= 0                     && x <= tARGET_MAX_WORD dflags
 
 inCharRange :: Char -> Bool
 inCharRange c =  c >= '\0' && c <= chr tARGET_MAX_CHAR
@@ -275,23 +277,23 @@ isZeroLit _              = False
         Coercions
         ~~~~~~~~~
 \begin{code}
-word2IntLit, int2WordLit,
-  narrow8IntLit, narrow16IntLit, narrow32IntLit,
+narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
   char2IntLit, int2CharLit,
   float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
   float2DoubleLit, double2FloatLit
   :: Literal -> Literal
 
-word2IntLit (MachWord w)
-  | w > tARGET_MAX_INT = MachInt (w - tARGET_MAX_WORD - 1)
-  | otherwise          = MachInt w
-word2IntLit l = pprPanic "word2IntLit" (ppr l)
+word2IntLit, int2WordLit :: DynFlags -> Literal -> Literal
+word2IntLit dflags (MachWord w)
+  | w > tARGET_MAX_INT dflags = MachInt (w - tARGET_MAX_WORD dflags - 1)
+  | otherwise                 = MachInt w
+word2IntLit _ l = pprPanic "word2IntLit" (ppr l)
 
-int2WordLit (MachInt i)
-  | i < 0     = MachWord (1 + tARGET_MAX_WORD + i)      -- (-1)  --->  tARGET_MAX_WORD
+int2WordLit dflags (MachInt i)
+  | i < 0     = MachWord (1 + tARGET_MAX_WORD dflags + i)      -- (-1)  --->  tARGET_MAX_WORD
   | otherwise = MachWord i
-int2WordLit l = pprPanic "int2WordLit" (ppr l)
+int2WordLit _ l = pprPanic "int2WordLit" (ppr l)
 
 narrow8IntLit    (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int8))
 narrow8IntLit    l            = pprPanic "narrow8IntLit" (ppr l)
@@ -343,17 +345,16 @@ litIsTrivial _                = True
 
 -- | True if code space does not go bad if we duplicate this literal
 -- Currently we treat it just like 'litIsTrivial'
-litIsDupable :: Literal -> Bool
+litIsDupable :: DynFlags -> Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable (MachStr _)      = False
-litIsDupable (LitInteger i _) = inIntRange i
-litIsDupable _                = True
+litIsDupable _      (MachStr _)      = False
+litIsDupable dflags (LitInteger i _) = inIntRange dflags i
+litIsDupable _      _                = True
 
 litFitsInChar :: Literal -> Bool
-litFitsInChar (MachInt i)
-                         = fromInteger i <= ord minBound
-                        && fromInteger i >= ord maxBound
-litFitsInChar _         = False
+litFitsInChar (MachInt i) = i >= toInteger (ord minBound)
+                         && i <= toInteger (ord maxBound)
+litFitsInChar _           = False
 
 litIsLifted :: Literal -> Bool
 litIsLifted (LitInteger {}) = True
@@ -470,7 +471,7 @@ Hash values should be zero or a positive integer.  No negatives please.
 \begin{code}
 hashLiteral :: Literal -> Int
 hashLiteral (MachChar c)        = ord c + 1000  -- Keep it out of range of common ints
-hashLiteral (MachStr s)         = hashFB s
+hashLiteral (MachStr s)         = hashByteString s
 hashLiteral (MachNullAddr)      = 0
 hashLiteral (MachInt i)         = hashInteger i
 hashLiteral (MachInt64 i)       = hashInteger i

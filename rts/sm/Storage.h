@@ -37,7 +37,7 @@ doYouWantToGC( Capability *cap )
 }
 
 /* for splitting blocks groups in two */
-bdescr * splitLargeBlock (bdescr *bd, nat blocks);
+bdescr * splitLargeBlock (bdescr *bd, W_ blocks);
 
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
@@ -69,10 +69,11 @@ extern Mutex sm_mutex;
 #endif
 
 /* -----------------------------------------------------------------------------
-   The write barrier for MVARs
+   The write barrier for MVARs and TVARs
    -------------------------------------------------------------------------- */
 
 void dirty_MVAR(StgRegTable *reg, StgClosure *p);
+void dirty_TVAR(Capability *cap, StgTVar *p);
 
 /* -----------------------------------------------------------------------------
    Nursery manipulation
@@ -81,28 +82,28 @@ void dirty_MVAR(StgRegTable *reg, StgClosure *p);
 extern nursery *nurseries;
 
 void     resetNurseries       ( void );
-lnat     clearNursery         ( Capability *cap );
-void     resizeNurseries      ( nat blocks );
-void     resizeNurseriesFixed ( nat blocks );
-lnat     countNurseryBlocks   ( void );
+void     clearNursery         ( Capability *cap );
+void     resizeNurseries      ( W_ blocks );
+void     resizeNurseriesFixed ( W_ blocks );
+W_       countNurseryBlocks   ( void );
 
 /* -----------------------------------------------------------------------------
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-lnat    updateNurseriesStats (void);
-lnat    countLargeAllocated  (void);
-lnat    countOccupied  (bdescr *bd);
-lnat    calcNeeded     (void);
+void  updateNurseriesStats (void);
+W_    countLargeAllocated  (void);
+W_    countOccupied        (bdescr *bd);
+W_    calcNeeded           (rtsBool force_major, W_ *blocks_needed);
 
-lnat    gcThreadLiveWords  (nat i, nat g);
-lnat    gcThreadLiveBlocks (nat i, nat g);
+W_    gcThreadLiveWords  (nat i, nat g);
+W_    gcThreadLiveBlocks (nat i, nat g);
 
-lnat    genLiveWords  (generation *gen);
-lnat    genLiveBlocks (generation *gen);
+W_    genLiveWords  (generation *gen);
+W_    genLiveBlocks (generation *gen);
 
-lnat    calcLiveBlocks (void);
-lnat    calcLiveWords  (void);
+W_    calcLiveBlocks (void);
+W_    calcLiveWords  (void);
 
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals

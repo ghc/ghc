@@ -19,6 +19,7 @@ module DsCCall
 	, unboxArg
 	, boxResult
 	, resultWrapper
+        , splitDataProductType_maybe
 	) where
 
 #include "HsVersions.h"
@@ -47,7 +48,6 @@ import BasicTypes
 import Literal
 import PrelNames
 import VarSet
-import Constants
 import DynFlags
 import Outputable
 import Util
@@ -150,11 +150,12 @@ unboxArg arg
   -- Booleans
   | Just tc <- tyConAppTyCon_maybe arg_ty, 
     tc `hasKey` boolTyConKey
-  = do prim_arg <- newSysLocalDs intPrimTy
+  = do dflags <- getDynFlags
+       prim_arg <- newSysLocalDs intPrimTy
        return (Var prim_arg,
               \ body -> Case (mkWildCase arg arg_ty intPrimTy
-                                       [(DataAlt falseDataCon,[],mkIntLit 0),
-                                        (DataAlt trueDataCon, [],mkIntLit 1)])
+                                       [(DataAlt falseDataCon,[],mkIntLit dflags 0),
+                                        (DataAlt trueDataCon, [],mkIntLit dflags 1)])
                                         -- In increasing tag order!
                              prim_arg
                              (exprType body) 
@@ -191,7 +192,7 @@ unboxArg arg
        pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
     arg_ty					= exprType arg
-    maybe_product_type 			   	= splitProductType_maybe arg_ty
+    maybe_product_type 			   	= splitDataProductType_maybe arg_ty
     is_product_type			   	= maybeToBool maybe_product_type
     Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
     data_con_arity				= dataConSourceArity data_con
@@ -336,11 +337,13 @@ resultWrapper result_ty
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
-  = return
+  = do
+    dflags <- getDynFlags
+    return
      (Just intPrimTy, \e -> mkWildCase e intPrimTy
                                    boolTy
-                                   [(DEFAULT             ,[],Var trueDataConId ),
-                                    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
+                                   [(DEFAULT                    ,[],Var trueDataConId ),
+                                    (LitAlt (mkMachInt dflags 0),[],Var falseDataConId)])
 
   -- Recursive newtypes
   | Just (rep_ty, co) <- splitNewTypeRepCo_maybe result_ty
@@ -355,11 +358,12 @@ resultWrapper result_ty
 
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
-  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
+  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitDataProductType_maybe result_ty,
     dataConSourceArity data_con == 1
-  = do let
+  = do dflags <- getDynFlags
+       let
            (unwrapped_res_ty : _) = data_con_arg_tys
-           narrow_wrapper         = maybeNarrow tycon
+           narrow_wrapper         = maybeNarrow dflags tycon
        (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        return
          (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
@@ -375,16 +379,56 @@ resultWrapper result_ty
 -- standard appears to say that this is the responsibility of the
 -- caller, not the callee.
 
-maybeNarrow :: TyCon -> (CoreExpr -> CoreExpr)
-maybeNarrow tycon
+maybeNarrow :: DynFlags -> TyCon -> (CoreExpr -> CoreExpr)
+maybeNarrow dflags tycon
   | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId Narrow8IntOp)) e
   | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId Narrow16IntOp)) e
   | tycon `hasKey` int32TyConKey
-	 && wORD_SIZE > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
+	 && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
 
   | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId Narrow8WordOp)) e
   | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId Narrow16WordOp)) e
   | tycon `hasKey` word32TyConKey
-	 && wORD_SIZE > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
+	 && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
   | otherwise			  = id
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Splitting products}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | Extract the type constructor, type argument, data constructor and it's
+-- /representation/ argument types from a type if it is a product type.
+--
+-- Precisely, we return @Just@ for any type that is all of:
+--
+--  * Concrete (i.e. constructors visible)
+--
+--  * Single-constructor
+--
+--  * Not existentially quantified
+--
+-- Whether the type is a @data@ type or a @newtype@
+splitDataProductType_maybe
+	:: Type 			-- ^ A product type, perhaps
+	-> Maybe (TyCon, 		-- The type constructor
+		  [Type],		-- Type args of the tycon
+		  DataCon,		-- The data constructor
+		  [Type])		-- Its /representation/ arg types
+
+	-- Rejecing existentials is conservative.  Maybe some things
+	-- could be made to work with them, but I'm not going to sweat
+	-- it through till someone finds it's important.
+
+splitDataProductType_maybe ty
+  | Just (tycon, ty_args) <- splitTyConApp_maybe ty
+  , Just con <- isDataProductTyCon_maybe tycon
+  = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
+  | otherwise
+  = Nothing
+\end{code}
+
+

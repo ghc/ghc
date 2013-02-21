@@ -10,7 +10,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module OptCoercion ( optCoercion ) where 
+module OptCoercion ( optCoercion, checkAxInstCo ) where 
 
 #include "HsVersions.h"
 
@@ -18,6 +18,7 @@ import Coercion
 import Type hiding( substTyVarBndr, substTy, extendTvSubst )
 import TcType       ( exactTyVarsOfType )
 import TyCon
+import CoAxiom
 import Var
 import VarSet
 import VarEnv
@@ -27,6 +28,8 @@ import Pair
 import Maybes( allMaybes )
 import FastString
 import Util
+import Unify
+import InstEnv
 \end{code}
 
 %************************************************************************
@@ -119,12 +122,12 @@ opt_co' env sym (CoVarCo cv)
                 ASSERT( isCoVar cv )
                 wrapSym sym (CoVarCo cv)
 
-opt_co' env sym (AxiomInstCo con cos)
+opt_co' env sym (AxiomInstCo con ind cos)
     -- Do *not* push sym inside top-level axioms
     -- e.g. if g is a top-level axiom
     --   g a : f a ~ a
     -- then (sym (g ty)) /= g (sym ty) !!
-  = wrapSym sym $ AxiomInstCo con (map (opt_co env False) cos)
+  = wrapSym sym $ AxiomInstCo con ind (map (opt_co env False) cos)
       -- Note that the_co does *not* have sym pushed into it
 
 opt_co' env sym (UnsafeCo ty1 ty2)
@@ -145,11 +148,19 @@ opt_co' env sym (TransCo co1 co2)
 
 opt_co' env sym (NthCo n co)
   | TyConAppCo tc cos <- co'
-  , isDecomposableTyCon tc		-- Not synonym families
+  , isDecomposableTyCon tc   -- Not synonym families
   = ASSERT( n < length cos )
     cos !! n
   | otherwise
   = NthCo n co'
+  where
+    co' = opt_co env sym co
+
+opt_co' env sym (LRCo lr co)
+  | Just pr_co <- splitAppCo_maybe co'
+  = pickLR lr pr_co
+  | otherwise
+  = LRCo lr co'
   where
     co' = opt_co env sym co
 
@@ -165,7 +176,6 @@ opt_co' env sym (InstCo co ty)
   = substCoWithTy (getCvInScope env) tv ty' co'_body   
 
   | otherwise = InstCo co' ty'
-
   where
     co' = opt_co env sym co
     ty' = substTy env ty
@@ -208,17 +218,18 @@ opt_trans2 _ co1 co2
 -- Optimize coercions with a top-level use of transitivity.
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
--- push transitivity down through matching top-level constructors.
-opt_trans_rule is in_co1@(TyConAppCo tc1 cos1) in_co2@(TyConAppCo tc2 cos2)
-  | tc1 == tc2 = fireTransRule "PushTyConApp" in_co1 in_co2 $
-                 TyConAppCo tc1 (opt_transList is cos1 cos2)
-
--- push transitivity through matching destructors
+-- Push transitivity through matching destructors
 opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
   | d1 == d2
   , co1 `compatible_co` co2
   = fireTransRule "PushNth" in_co1 in_co2 $
     mkNthCo d1 (opt_trans is co1 co2)
+
+opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
+  | d1 == d2
+  , co1 `compatible_co` co2
+  = fireTransRule "PushLR" in_co1 in_co2 $
+    mkLRCo d1 (opt_trans is co1 co2)
 
 -- Push transitivity inside instantiation
 opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
@@ -227,11 +238,17 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   = fireTransRule "TrPushInst" in_co1 in_co2 $
     mkInstCo (opt_trans is co1 co2) ty1
  
--- Push transitivity inside apply
+-- Push transitivity down through matching top-level constructors.
+opt_trans_rule is in_co1@(TyConAppCo tc1 cos1) in_co2@(TyConAppCo tc2 cos2)
+  | tc1 == tc2 
+  = fireTransRule "PushTyConApp" in_co1 in_co2 $
+    TyConAppCo tc1 (opt_transList is cos1 cos2)
+
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   = fireTransRule "TrPushApp" in_co1 in_co2 $
     mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
+-- Eta rules
 opt_trans_rule is co1@(TyConAppCo tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
   = ASSERT( length cos1 == length cos2 )
@@ -243,6 +260,16 @@ opt_trans_rule is co1 co2@(TyConAppCo tc cos2)
   = ASSERT( length cos1 == length cos2 )
     fireTransRule "EtaCompR" co1 co2 $
     TyConAppCo tc (opt_transList is cos1 cos2)
+
+opt_trans_rule is co1@(AppCo co1a co1b) co2
+  | Just (co2a,co2b) <- etaAppCo_maybe co2
+  = fireTransRule "EtaAppL" co1 co2 $
+    mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+
+opt_trans_rule is co1 co2@(AppCo co2a co2b)
+  | Just (co1a,co1b) <- etaAppCo_maybe co1
+  = fireTransRule "EtaAppR" co1 co2 $
+    mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 -- Push transitivity inside forall
 opt_trans_rule is co1 co2
@@ -263,30 +290,48 @@ opt_trans_rule is co1 co2
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
 
-  -- TrPushAxR/TrPushSymAxR
-  | Just (sym, con, cos1) <- co1_is_axiom_maybe
-  , Just cos2 <- matchAxiom sym con co2
-  = fireTransRule "TrPushAxR" co1 co2 $
-    if sym 
-    then SymCo $ AxiomInstCo con (opt_transList is (map mkSymCo cos2) cos1)
-    else         AxiomInstCo con (opt_transList is cos1 cos2)
+  -- TrPushSymAxR
+  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
+  , Just cos2 <- matchAxiom sym con ind co2
+  , True <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushSymAxR" co1 co2 $ SymCo newAxInst
 
-  -- TrPushAxL/TrPushSymAxL
-  | Just (sym, con, cos2) <- co2_is_axiom_maybe
-  , Just cos1 <- matchAxiom (not sym) con co1
-  = fireTransRule "TrPushAxL" co1 co2 $
-    if sym 
-    then SymCo $ AxiomInstCo con (opt_transList is cos2 (map mkSymCo cos1))
-    else         AxiomInstCo con (opt_transList is cos1 cos2)
+  -- TrPushAxR
+  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
+  , Just cos2 <- matchAxiom sym con ind co2
+  , False <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushAxR" co1 co2 newAxInst
+
+  -- TrPushSymAxL
+  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
+  , Just cos1 <- matchAxiom (not sym) con ind co1
+  , True <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushSymAxL" co1 co2 $ SymCo newAxInst
+
+  -- TrPushAxL  
+  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
+  , Just cos1 <- matchAxiom (not sym) con ind co1
+  , False <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushAxL" co1 co2 newAxInst
 
   -- TrPushAxSym/TrPushSymAx
-  | Just (sym1, con1, cos1) <- co1_is_axiom_maybe
-  , Just (sym2, con2, cos2) <- co2_is_axiom_maybe
+  | Just (sym1, con1, ind1, cos1) <- co1_is_axiom_maybe
+  , Just (sym2, con2, ind2, cos2) <- co2_is_axiom_maybe
   , con1 == con2
+  , ind1 == ind2
   , sym1 == not sym2
-  , let qtvs = co_ax_tvs con1
-        lhs  = co_ax_lhs con1 
-        rhs  = co_ax_rhs con1 
+  , let branch = coAxiomNthBranch con1 ind1
+        qtvs = coAxBranchTyVars branch
+        lhs  = coAxNthLHS con1 ind1
+        rhs  = coAxBranchRHS branch
         pivot_tvs = exactTyVarsOfType (if sym2 then rhs else lhs)
   , all (`elemVarSet` pivot_tvs) qtvs
   = fireTransRule "TrPushAxSym" co1 co2 $
@@ -311,26 +356,77 @@ fireTransRule _rule _co1 _co2 res
   = -- pprTrace ("Trans rule fired: " ++ _rule) (vcat [ppr _co1, ppr _co2, ppr res]) $
     Just res
 
+\end{code}
+
+Note [Conflict checking with AxiomInstCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following type family and axiom:
+
+type family Equal (a :: k) (b :: k) :: Bool
+type instance where
+  Equal a a = True
+  Equal a b = False
+--
+Equal :: forall k::BOX. k -> k -> Bool
+axEqual :: { forall k::BOX. forall a::k. Equal k a a ~ True
+           ; forall k::BOX. forall a::k. forall b::k. Equal k a b ~ False }
+
+We wish to disallow (axEqual[1] <*> <Int> <Int). (Recall that the index is 0-based,
+so this is the second branch of the axiom.) The problem is that, on the surface, it
+seems that (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~ False) and that all is
+OK. But, all is not OK: we want to use the first branch of the axiom in this case,
+not the second. The problem is that the parameters of the first branch can unify with
+the supplied coercions, thus meaning that the first branch should be taken. See also
+Note [Instance checking within groups] in types/FamInstEnv.lhs.
+
+\begin{code}
+-- | Check to make sure that an AxInstCo is internally consistent.
+-- Returns the number of the conflicting branch, if it exists
+-- See Note [Conflict checking with AxiomInstCo]
+checkAxInstCo :: Coercion -> Maybe Int
+-- defined here to avoid dependencies in Coercion
+checkAxInstCo (AxiomInstCo ax ind cos)
+  = let branch = coAxiomNthBranch ax ind
+        tvs = coAxBranchTyVars branch
+        tys = map (pFst . coercionKind) cos 
+        subst = zipOpenTvSubst tvs tys
+        lhs' = Type.substTys subst (coAxBranchLHS branch) in
+    check_no_conflict lhs' (ind-1)
+  where
+    check_no_conflict :: [Type] -> Int -> Maybe Int
+    check_no_conflict _ (-1) = Nothing
+    check_no_conflict lhs' j
+      | SurelyApart <- tcApartTys instanceBindFun lhs' lhsj
+      = check_no_conflict lhs' (j-1)
+      | otherwise
+      = Just j
+      where
+        (CoAxBranch { cab_lhs = lhsj }) = coAxiomNthBranch ax j
+checkAxInstCo _ = Nothing
+
 -----------
 wrapSym :: Bool -> Coercion -> Coercion
 wrapSym sym co | sym       = SymCo co
                | otherwise = co
 
 -----------
-isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom, [Coercion])
+isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom Branched, Int, [Coercion])
 isAxiom_maybe (SymCo co) 
-  | Just (sym, con, cos) <- isAxiom_maybe co
-  = Just (not sym, con, cos)
-isAxiom_maybe (AxiomInstCo con cos)
-  = Just (False, con, cos)
+  | Just (sym, con, ind, cos) <- isAxiom_maybe co
+  = Just (not sym, con, ind, cos)
+isAxiom_maybe (AxiomInstCo con ind cos)
+  = Just (False, con, ind, cos)
 isAxiom_maybe _ = Nothing
 
 matchAxiom :: Bool -- True = match LHS, False = match RHS
-           -> CoAxiom -> Coercion -> Maybe [Coercion]
+           -> CoAxiom br -> Int -> Coercion -> Maybe [Coercion]
 -- If we succeed in matching, then *all the quantified type variables are bound*
 -- E.g.   if tvs = [a,b], lhs/rhs = [b], we'll fail
-matchAxiom sym (CoAxiom { co_ax_tvs = qtvs, co_ax_lhs = lhs, co_ax_rhs = rhs }) co
-  = case liftCoMatch (mkVarSet qtvs) (if sym then lhs else rhs) co of
+matchAxiom sym ax@(CoAxiom { co_ax_tc = tc }) ind co
+  = let (CoAxBranch { cab_tvs = qtvs
+                    , cab_lhs = lhs
+                    , cab_rhs = rhs }) = coAxiomNthBranch ax ind in
+    case liftCoMatch (mkVarSet qtvs) (if sym then (mkTyConApp tc lhs) else rhs) co of
       Nothing    -> Nothing
       Just subst -> allMaybes (map (liftCoSubstTyVar subst) qtvs)
 
@@ -359,6 +455,21 @@ etaForAllCo_maybe co
   | otherwise
   = Nothing
 
+etaAppCo_maybe :: Coercion -> Maybe (Coercion,Coercion)
+-- If possible, split a coercion
+--   g :: t1a t1b ~ t2a t2b
+-- into a pair of coercions (left g, right g)
+etaAppCo_maybe co
+  | Just (co1,co2) <- splitAppCo_maybe co
+  = Just (co1,co2)
+  | Pair ty1 ty2 <- coercionKind co
+  , Just (_,t1) <- splitAppTy_maybe ty1
+  , Just (_,t2) <- splitAppTy_maybe ty2
+  , typeKind t1 `eqType` typeKind t2      -- Note [Eta for AppCo]
+  = Just (LRCo CLeft co, LRCo CRight co)
+  | otherwise
+  = Nothing
+
 etaTyConAppCo_maybe :: TyCon -> Coercion -> Maybe [Coercion]
 -- If possible, split a coercion 
 --       g :: T s1 .. sn ~ T t1 .. tn
@@ -383,3 +494,25 @@ etaTyConAppCo_maybe tc co
   | otherwise
   = Nothing
 \end{code}  
+
+Note [Eta for AppCo]
+~~~~~~~~~~~~~~~~~~~~
+Suppose we have 
+   g :: s1 t1 ~ s2 t2
+
+Then we can't necessarily make
+   left  g :: s1 ~ s2
+   right g :: t1 ~ t2
+because it's possible that
+   s1 :: * -> *         t1 :: *
+   s2 :: (*->*) -> *    t2 :: * -> *
+and in that case (left g) does not have the same
+kind on either side.
+
+It's enough to check that 
+  kind t1 = kind t2
+because if g is well-kinded then
+  kind (s1 t2) = kind (s2 t2)
+and these two imply
+  kind s1 = kind s2
+

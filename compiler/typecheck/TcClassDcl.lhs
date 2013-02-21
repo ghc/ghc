@@ -16,7 +16,7 @@ Typechecking class declarations
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
-		    tcAddDeclCtxt, badMethodErr
+		    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
@@ -197,10 +197,10 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
       DefMeth dm_name    -> tc_dm dm_name 
       GenDefMeth dm_name -> tc_dm dm_name 
   where
-    sel_name      = idName sel_id
-    prags         = prag_fn sel_name
-    dm_bind       = findMethodBind sel_name binds_in
-	            `orElse` pprPanic "tcDefMeth" (ppr sel_id)
+    sel_name           = idName sel_id
+    prags              = prag_fn sel_name
+    (dm_bind,bndr_loc) = findMethodBind sel_name binds_in
+	                 `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 
     -- Eg.   class C a where
     --          op :: forall b. Eq b => a -> [b] -> a
@@ -211,10 +211,9 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
 
     tc_dm dm_name 
       = do { dm_id <- tcLookupId dm_name
-	   ; local_dm_name <- newLocalName sel_name
+	   ; local_dm_name <- setSrcSpan bndr_loc (newLocalName sel_name)
  	     -- Base the local_dm_name on the selector name, because
  	     -- type errors from tcInstanceMethodBody come from here
-
 
            ; dm_id_w_inline <- addInlinePrags dm_id prags
            ; spec_prags     <- tcSpecPrags dm_id prags
@@ -242,17 +241,13 @@ tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
 tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                      meth_id local_meth_sig
 		     specs (L loc bind)
-  = do	{       -- Typecheck the binding, first extending the envt
-		-- so that when tcInstSig looks up the local_meth_id to find
-		-- its signature, we'll find it in the environment
-          let local_meth_id = sig_id local_meth_sig
+  = do	{ let local_meth_id = sig_id local_meth_sig
               lm_bind = L loc (bind { fun_id = L loc (idName local_meth_id) })
                              -- Substitute the local_meth_name for the binder
 			     -- NB: the binding is always a FunBind
 	; (ev_binds, (tc_bind, _, _)) 
                <- checkConstraints skol_info tyvars dfun_ev_vars $
-		  tcExtendIdEnv [local_meth_id] $
-	          tcPolyCheck local_meth_sig no_prag_fn NonRecursive [lm_bind]
+	          tcPolyCheck NotTopLevel NonRecursive no_prag_fn local_meth_sig [lm_bind]
 
         ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
                            , abe_mono = local_meth_id, abe_prags = specs }
@@ -308,13 +303,15 @@ lookupHsSig = lookupNameEnv
 ---------------------------
 findMethodBind	:: Name  	        -- Selector name
           	-> LHsBinds Name 	-- A group of bindings
-		-> Maybe (LHsBind Name)	-- The binding
+		-> Maybe (LHsBind Name, SrcSpan)
+          	-- Returns the binding, and the binding 
+                -- site of the method binder
 findMethodBind sel_name binds
   = foldlBag mplus Nothing (mapBag f binds)
   where 
-    f bind@(L _ (FunBind { fun_id = L _ op_name }))
+    f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
              | op_name == sel_name
-    	     = Just bind
+    	     = Just (bind, bndr_loc)
     f _other = Nothing
 \end{code}
 
@@ -352,12 +349,13 @@ This makes the error messages right.
 %************************************************************************
 
 \begin{code}
+tcMkDeclCtxt :: TyClDecl Name -> SDoc
+tcMkDeclCtxt decl = hsep [ptext (sLit "In the"), pprTyClDeclFlavour decl, 
+                      ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
+
 tcAddDeclCtxt :: TyClDecl Name -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
-  = addErrCtxt ctxt thing_inside
-  where
-     ctxt = hsep [ptext (sLit "In the"), pprTyClDeclFlavour decl, 
-		  ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
+  = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
 badMethodErr :: Outputable a => a -> Name -> SDoc
 badMethodErr clas op

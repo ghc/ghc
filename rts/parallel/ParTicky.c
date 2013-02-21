@@ -30,8 +30,8 @@ extern double ElapsedTimeStart;
 extern StgWord64 GC_tot_alloc;
 extern StgWord64 GC_tot_copied;
 
-extern lnat MaxResidency;     /* in words; for stats only */
-extern lnat ResidencySamples; /* for stats only */
+extern W_ MaxResidency;     /* in words; for stats only */
+extern W_ ResidencySamples; /* for stats only */
 
 /* ngIplu' {Stats.c}vo' */
 #define BIG_STRING_LEN              512

@@ -16,7 +16,6 @@ The Desugarer: turning HsSyn into Core.
 module Desugar ( deSugar, deSugarExpr ) where
 
 import DynFlags
-import StaticFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
@@ -96,7 +95,6 @@ deSugar hsc_env
                             tcg_hpc          = other_hpc_info })
 
   = do { let dflags = hsc_dflags hsc_env
-             platform = targetPlatform dflags
         ; showPass dflags "Desugar"
 
 	-- Desugar the program
@@ -110,9 +108,9 @@ deSugar hsc_env
                                Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
                    _        -> do
 
-                     let want_ticks = opt_Hpc
+                     let want_ticks = gopt Opt_Hpc dflags
                                    || target == HscInterpreted
-                                   || (opt_SccProfilingOn
+                                   || (gopt Opt_SccProfilingOn dflags
                                        && case profAuto dflags of
                                             NoProfAuto -> False
                                             _          -> True)
@@ -131,7 +129,7 @@ deSugar hsc_env
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; ds_vects <- mapM dsVect vects
                           ; let hpc_init
-                                  | opt_Hpc   = hpcInitCode platform mod ds_hpc_info
+                                  | gopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
@@ -359,11 +357,12 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
 
-        ; lhs' <- unsetDOptM Opt_EnableRewriteRules $
+        ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
                   dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 
 	; rhs' <- dsLExpr rhs
+        ; dflags <- getDynFlags
 
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
@@ -372,7 +371,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 		Right (final_bndrs, fn_id, args) -> do
 	
 	{ let is_local = isLocalId fn_id
-		-- NB: isLocalId is False of implicit Ids.  This is good becuase
+		-- NB: isLocalId is False of implicit Ids.  This is good because
 		-- we don't want to attach rules to the bindings of implicit Ids, 
 		-- because they don't show up in the bindings until just before code gen
 	      fn_name   = idName fn_id
@@ -381,6 +380,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                                  name act fn_name final_bndrs args final_rhs
 
               inline_shadows_rule   -- Function can be inlined before rule fires
+                | wopt Opt_WarnInlineRuleShadowing dflags
                 = case (idInlineActivation fn_id, act) of
                     (NeverActive, _)    -> False
                     (AlwaysActive, _)   -> True
@@ -389,12 +389,12 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                     (ActiveAfter n, ActiveAfter r)    -> r < n  -- Rule active strictly first
                     (ActiveAfter {}, AlwaysActive)    -> False
                     (ActiveAfter {}, ActiveBefore {}) -> False
-                                       
+                | otherwise = False
 
         ; when inline_shadows_rule $
           warnDs (vcat [ hang (ptext (sLit "Rule") <+> doubleQuotes (ftext name)
                                <+> ptext (sLit "may never fire"))
-                            2 (ptext (sLit "becuase") <+> quotes (ppr fn_id)
+                            2 (ptext (sLit "because") <+> quotes (ppr fn_id)
                                <+> ptext (sLit "might inline first"))
                        , ptext (sLit "Probable fix: add an INLINE[n] or NOINLINE[n] pragma on")
                          <+> quotes (ppr fn_id) ])
@@ -430,7 +430,7 @@ the rule is precisly to optimise them:
 dsVect :: LVectDecl Id -> DsM CoreVect
 dsVect (L loc (HsVect (L _ v) rhs))
   = putSrcSpanDs loc $ 
-    do { rhs' <- fmapMaybeM dsLExpr rhs
+    do { rhs' <- dsLExpr rhs
        ; return $ Vect v rhs'
        }
 dsVect (L _loc (HsNoVect (L _ v)))

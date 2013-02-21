@@ -1,6 +1,7 @@
 The @FamInst@ type: family instance heads
 
 \begin{code}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
@@ -11,30 +12,75 @@ The @FamInst@ type: family instance heads
 module FamInst ( 
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
 	tcLookupFamInst, tcLookupDataFamInst,
-        tcGetFamInstEnvs
+        tcGetFamInstEnvs,
+        newFamInst
     ) where
 
 import HscTypes
 import FamInstEnv
+import InstEnv( roughMatchTcs )
+import Coercion( pprCoAxBranchHdr )
 import LoadIface
 import TypeRep
-import TcMType
 import TcRnMonad
 import TyCon
+import CoAxiom
 import DynFlags
-import Name
 import Module
 import Outputable
 import UniqFM
-import VarSet
 import FastString
 import Util
 import Maybes
+import TcMType
+import TcType
+import Name
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 
 #include "HsVersions.h"
+\end{code}
+
+%************************************************************************
+%*									*
+                 Making a FamInst
+%*									*
+%************************************************************************
+
+\begin{code}
+-- All type variables in a FamInst must be fresh. This function
+-- creates the fresh variables and applies the necessary substitution
+-- It is defined here to avoid a dependency from FamInstEnv on the monad
+-- code.
+newFamInst :: FamFlavor -> Bool -> CoAxiom br -> TcRnIf gbl lcl(FamInst br)
+-- Freshen the type variables of the FamInst branches
+-- Called from the vectoriser monad too, hence the rather general type
+newFamInst flavor is_group axiom@(CoAxiom { co_ax_tc       = fam_tc
+                                          , co_ax_branches = ax_branches })
+  = do { fam_branches <- go ax_branches
+       ; return (FamInst { fi_fam      = tyConName fam_tc
+                         , fi_flavor   = flavor
+                         , fi_branches = fam_branches
+                         , fi_group    = is_group
+                         , fi_axiom    = axiom }) }
+  where
+    go :: BranchList CoAxBranch br -> TcRnIf gbl lcl (BranchList FamInstBranch br)
+    go (FirstBranch br) = do { br' <- go_branch br
+                             ; return (FirstBranch br') }
+    go (NextBranch br brs) = do { br' <- go_branch br
+                                ; brs' <- go brs
+                                ;return (NextBranch br' brs') }
+    go_branch :: CoAxBranch -> TcRnIf gbl lcl FamInstBranch 
+    go_branch (CoAxBranch { cab_tvs = tvs1
+                          , cab_lhs = lhs
+                          , cab_loc = loc
+                          , cab_rhs = rhs })
+       = do { (subst, tvs2) <- tcInstSkolTyVarsLoc loc tvs1
+            ; return (FamInstBranch { fib_tvs   = tvs2
+                                    , fib_lhs   = substTys subst lhs
+                                    , fib_rhs   = substTy  subst rhs
+                                    , fib_tcs   = roughMatchTcs lhs }) }
 \end{code}
 
 
@@ -170,18 +216,20 @@ then we have a coercion (ie, type instance of family instance coercion)
 which implies that :R42T was declared as 'data instance T [a]'.
 
 \begin{code}
-tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (FamInst, [Type]))
+tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe FamInstMatch)
 tcLookupFamInst tycon tys
   | not (isFamilyTyCon tycon)
   = return Nothing
   | otherwise
   = do { instEnv <- tcGetFamInstEnvs
        ; let mb_match = lookupFamInstEnv instEnv tycon tys 
-       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ ppr mb_match $$ ppr instEnv)
+--       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ 
+--                                  pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ 
+--                                  ppr mb_match $$ ppr instEnv)
        ; case mb_match of
 	   [] -> return Nothing
-	   ((fam_inst, rep_tys):_) 
-              -> return $ Just (fam_inst, rep_tys)
+	   (match:_) 
+              -> return $ Just match
        }
 
 tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
@@ -195,8 +243,12 @@ tcLookupDataFamInst tycon tys
     do { maybeFamInst <- tcLookupFamInst tycon tys
        ; case maybeFamInst of
            Nothing             -> famInstNotFound tycon tys
-           Just (famInst, tys) -> let tycon' = dataFamInstRepTyCon famInst
-                                  in return (tycon', tys) }
+           Just (FamInstMatch { fim_instance = famInst
+                              , fim_index    = index
+                              , fim_tys      = tys })
+             -> ASSERT( index == 0 )
+                let tycon' = dataFamInstRepTyCon famInst
+                in return (tycon', tys) }
 
 famInstNotFound :: TyCon -> [Type] -> TcM a
 famInstNotFound tycon tys 
@@ -237,7 +289,7 @@ with standalone deriving declrations.
 
 \begin{code}
 -- Add new locally-defined family instances
-tcExtendLocalFamInstEnv :: [FamInst] -> TcM a -> TcM a
+tcExtendLocalFamInstEnv :: [FamInst br] -> TcM a -> TcM a
 tcExtendLocalFamInstEnv fam_insts thing_inside
  = do { env <- getGblEnv
       ; (inst_env', fam_insts') <- foldlM addLocalFamInst  
@@ -250,17 +302,20 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
 
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
-addLocalFamInst :: (FamInstEnv,[FamInst]) -> FamInst -> TcM (FamInstEnv, [FamInst])
-addLocalFamInst (home_fie, my_fis) fam_inst 
+-- This must be lazy in the fam_inst arguments, see Note [Lazy axiom match]
+-- in FamInstEnv.lhs
+addLocalFamInst :: (FamInstEnv,[FamInst Branched]) -> FamInst br -> TcM (FamInstEnv, [FamInst Branched])
+addLocalFamInst (home_fie, my_fis) fam_inst
         -- home_fie includes home package and this module
         -- my_fies is just the ones from this module
   = do { traceTc "addLocalFamInst" (ppr fam_inst)
+
        ; isGHCi <- getIsGHCi
  
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
        ; let (home_fie', my_fis') 
-               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst 
+               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst
                              , filterOut (identicalFamInst fam_inst) my_fis)
                | otherwise = (home_fie, my_fis)
 
@@ -268,14 +323,16 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- overlaps correctly
        ; eps <- getEps
        ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
-             home_fie'' = extendFamInstEnv home_fie fam_inst
+             fam_inst'  = toBranchedFamInst fam_inst
+             home_fie'' = extendFamInstEnv home_fie fam_inst'
 
            -- Check for conflicting instance decls
-       ; no_conflict <- checkForConflicts inst_envs fam_inst
+       ; no_conflict <- checkForConflicts inst_envs fam_inst'
        ; if no_conflict then
-            return (home_fie'', fam_inst : my_fis')
+            return (home_fie'', fam_inst' : my_fis')
          else 
             return (home_fie,   my_fis) }
+
 \end{code}
 
 %************************************************************************
@@ -288,35 +345,39 @@ Check whether a single family instance conflicts with those in two instance
 environments (one for the EPS and one for the HPT).
 
 \begin{code}
-checkForConflicts :: FamInstEnvs -> FamInst -> TcM Bool
-checkForConflicts inst_envs fam_inst
-  = do { 	-- To instantiate the family instance type, extend the instance
-		-- envt with completely fresh template variables
-		-- This is important because the template variables must
-		-- not overlap with anything in the things being looked up
-		-- (since we do unification).  
-		-- We use tcInstSkolType because we don't want to allocate
-		-- fresh *meta* type variables.  
-
-       ; (_, skol_tvs) <- tcInstSkolTyVars (coAxiomTyVars (famInstAxiom fam_inst))
-       ; let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst skol_tvs
-             no_conflicts = null conflicts
+checkForConflicts :: FamInstEnvs -> FamInst Branched -> TcM Bool
+checkForConflicts inst_envs fam_inst@(FamInst { fi_branches = branches
+                                              , fi_group = group })
+  = do { let conflicts = brListMap (lookupFamInstEnvConflicts inst_envs group fam_tc) branches
+             no_conflicts = all null conflicts
        ; traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
        ; unless no_conflicts $
-	   conflictInstErr fam_inst (fst (head conflicts))
+	   zipWithM_ (conflictInstErr fam_inst) (brListIndices branches) conflicts
        ; return no_conflicts }
+    where fam_tc = famInstTyCon fam_inst
 
-conflictInstErr :: FamInst -> FamInst -> TcRn ()
-conflictInstErr famInst conflictingFamInst
+conflictInstErr :: FamInst Branched -> BranchIndex -> [FamInstMatch] -> TcRn ()
+conflictInstErr fam_inst branch conflictingMatch
+  | (FamInstMatch { fim_instance = confInst
+                  , fim_index = confIndex }) : _ <- conflictingMatch
   = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))
-                   [famInst, conflictingFamInst]
+                   [(fam_inst, branch),
+                    (confInst, confIndex) ]
+  | otherwise -- no conflict on this branch; see Trac #7560
+  = return ()
 
-addFamInstsErr :: SDoc -> [FamInst] -> TcRn ()
+addFamInstsErr :: SDoc -> [(FamInst Branched, Int)] -> TcRn ()
 addFamInstsErr herald insts
-  = setSrcSpan (getSrcSpan (head sorted)) $
-    addErr (hang herald 2 (pprFamInsts sorted))
+  = ASSERT( not (null insts) )
+    setSrcSpan srcSpan $ addErr $
+    hang herald
+       2 (vcat [ pprCoAxBranchHdr (famInstAxiom fi) index 
+               | (fi,index) <- sorted ])
  where
-   sorted = sortWith getSrcLoc insts
+   getSpan   = getSrcLoc . famInstAxiom . fst
+   sorted    = sortWith getSpan insts
+   (fi1,ix1) = head sorted
+   srcSpan   = coAxBranchSpan (coAxiomNthBranch (famInstAxiom fi1) ix1)
    -- The sortWith just arranges that instances are dislayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users

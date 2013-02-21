@@ -1,5 +1,7 @@
 -- CmmNode type for representation using Hoopl graphs.
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
@@ -9,13 +11,17 @@
 -- for details
 
 module CmmNode (
-     CmmNode(..), ForeignHint(..), CmmFormal, CmmActual,
-     UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),
+     CmmNode(..), CmmFormal, CmmActual,
+     UpdFrameOffset, Convention(..),
+     ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
+     CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors
   ) where
 
+import CodeGen.Platform
 import CmmExpr
+import DynFlags
 import FastString
 import ForeignCall
 import SMRep
@@ -51,10 +57,11 @@ data CmmNode e x where
       [CmmFormal] ->               -- zero or more results
       [CmmActual] ->               -- zero or more arguments
       CmmNode O O
-      -- Semantics: kills only result regs; all other regs (both GlobalReg
-      --            and LocalReg) are preserved.  But there is a current
-      --            bug for what can be put in arguments, see
-      --            Note [Register Parameter Passing]
+      -- Semantics: clobbers any GlobalRegs for which callerSaves r == True
+      -- See Note [foreign calls clobber GlobalRegs]
+      --
+      -- Also, there is a current bug for what can be put in
+      -- arguments, see Note [Register Parameter Passing]
 
   CmmBranch :: ULabel -> CmmNode O C
                                    -- Goto another block in the same procedure
@@ -147,12 +154,31 @@ ultimately expands to
      pop "return address"
 We cannot "lower" a safe foreign call to this sequence of Cmms, because
 after we've saved Sp all the Cmm optimiser's assumptions are broken.
-Furthermore, currently the smart Cmm constructors know the calling
-conventions for Haskell, the garbage collector, etc, and "lower" them
-so that a LastCall passes no parameters or results.  But the smart 
-constructors do *not* (currently) know the foreign call conventions.
 
 Note that a safe foreign call needs an info table.
+
+So Safe Foreign Calls must remain as last nodes until the stack is
+made manifest in CmmLayoutStack, where they are lowered into the above
+sequence.
+-}
+
+{- Note [foreign calls clobber GlobalRegs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A foreign call is defined to clobber any GlobalRegs that are mapped to
+caller-saves machine registers (according to the prevailing C ABI).
+StgCmmUtils.callerSaves tells you which GlobalRegs are caller-saves.
+
+This is a design choice that makes it easier to generate code later.
+We could instead choose to say that foreign calls do *not* clobber
+caller-saves regs, but then we would have to figure out which regs
+were live across the call later and insert some saves/restores.
+
+Furthermore when we generate code we never have any GlobalRegs live
+across a call, because they are always copied-in to LocalRegs and
+copied-out again before making a call/jump.  So all we have to do is
+avoid any code motion that would make a caller-saves GlobalReg live
+across a foreign call during subsequent optimisations.
 -}
 
 {- Note [Register parameter passing]
@@ -208,14 +234,31 @@ type CmmFormal = LocalReg
 
 type UpdFrameOffset = ByteOff
 
+-- | A convention maps a list of values (function arguments or return
+-- values) to registers or stack locations.
 data Convention
-  = NativeDirectCall -- Native C-- call skipping the node (closure) argument
-  | NativeNodeCall   -- Native C-- call including the node argument
-  | NativeReturn     -- Native C-- return
-  | Slow             -- Slow entry points: all args pushed on the stack
-  | GC               -- Entry to the garbage collector: uses the node reg!
-  | PrimOpCall       -- Calling prim ops
-  | PrimOpReturn     -- Returning from prim ops
+  = NativeDirectCall
+       -- ^ top-level Haskell functions use @NativeDirectCall@, which
+       -- maps arguments to registers starting with R2, according to
+       -- how many registers are available on the platform.  This
+       -- convention ignores R1, because for a top-level function call
+       -- the function closure is implicit, and doesn't need to be passed.
+  | NativeNodeCall
+       -- ^ non-top-level Haskell functions, which pass the address of
+       -- the function closure in R1 (regardless of whether R1 is a
+       -- real register or not), and the rest of the arguments in
+       -- registers or on the stack.
+  | NativeReturn
+       -- ^ a native return.  The convention for returns depends on
+       -- how many values are returned: for just one value returned,
+       -- the appropriate register is used (R1, F1, etc.). regardless
+       -- of whether it is a real register or not.  For multiple
+       -- values returned, they are mapped to registers or the stack.
+  | Slow
+       -- ^ Slow entry points: all args pushed on the stack
+  | GC
+       -- ^ Entry to the garbage collector: uses the node reg!
+       -- (TODO: I don't think we need this --SDM)
   deriving( Eq )
 
 data ForeignConvention
@@ -223,7 +266,13 @@ data ForeignConvention
         CCallConv               -- Which foreign-call convention
         [ForeignHint]           -- Extra info about the args
         [ForeignHint]           -- Extra info about the result
+        CmmReturnInfo
   deriving Eq
+
+data CmmReturnInfo
+  = CmmMayReturn
+  | CmmNeverReturns
+  deriving ( Eq )
 
 data ForeignTarget        -- The target of a foreign call
   = ForeignTarget                -- A foreign procedure
@@ -233,17 +282,22 @@ data ForeignTarget        -- The target of a foreign call
         CallishMachOp            -- Which one
   deriving Eq
 
-data ForeignHint
-  = NoHint | AddrHint | SignedHint
-  deriving( Eq )
-        -- Used to give extra per-argument or per-result
-        -- information needed by foreign calling conventions
+foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
+foreignTargetHints target
+  = ( res_hints ++ repeat NoHint
+    , arg_hints ++ repeat NoHint )
+  where
+    (res_hints, arg_hints) =
+       case target of
+          PrimTarget op -> callishMachOpHints op
+          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _) ->
+             (res_hints, arg_hints)
 
 --------------------------------------------------
 -- Instances of register and slot users / definers
 
-instance UserOfLocalRegs (CmmNode e x) where
-  foldRegsUsed f z n = case n of
+instance UserOfRegs LocalReg (CmmNode e x) where
+  foldRegsUsed dflags f z n = case n of
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
     CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
@@ -253,24 +307,58 @@ instance UserOfLocalRegs (CmmNode e x) where
     CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
     _ -> z
     where fold :: forall a b.
-                       UserOfLocalRegs a =>
+                       UserOfRegs LocalReg a =>
                        (b -> LocalReg -> b) -> b -> a -> b
-          fold f z n = foldRegsUsed f z n
+          fold f z n = foldRegsUsed dflags f z n
 
-instance UserOfLocalRegs ForeignTarget where
-  foldRegsUsed _f z (PrimTarget _)      = z
-  foldRegsUsed f  z (ForeignTarget e _) = foldRegsUsed f z e
+instance UserOfRegs GlobalReg (CmmNode e x) where
+  foldRegsUsed dflags f z n = case n of
+    CmmAssign _ expr -> fold f z expr
+    CmmStore addr rval -> fold f (fold f z addr) rval
+    CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
+    CmmCondBranch expr _ _ -> fold f z expr
+    CmmSwitch expr _ -> fold f z expr
+    CmmCall {cml_target=tgt, cml_args_regs=args} -> fold f (fold f z args) tgt
+    CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
+    _ -> z
+    where fold :: forall a b.
+                       UserOfRegs GlobalReg a =>
+                       (b -> GlobalReg -> b) -> b -> a -> b
+          fold f z n = foldRegsUsed dflags f z n
 
-instance DefinerOfLocalRegs (CmmNode e x) where
-  foldRegsDefd f z n = case n of
+instance UserOfRegs r CmmExpr => UserOfRegs r ForeignTarget where
+  foldRegsUsed _      _ z (PrimTarget _)      = z
+  foldRegsUsed dflags f z (ForeignTarget e _) = foldRegsUsed dflags f z e
+
+instance DefinerOfRegs LocalReg (CmmNode e x) where
+  foldRegsDefd dflags f z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall _ fs _ -> fold f z fs
     CmmForeignCall {res=res} -> fold f z res
     _ -> z
     where fold :: forall a b.
-                   DefinerOfLocalRegs a =>
+                   DefinerOfRegs LocalReg a =>
                    (b -> LocalReg -> b) -> b -> a -> b
-          fold f z n = foldRegsDefd f z n
+          fold f z n = foldRegsDefd dflags f z n
+
+instance DefinerOfRegs GlobalReg (CmmNode e x) where
+  foldRegsDefd dflags f z n = case n of
+    CmmAssign lhs _ -> fold f z lhs
+    CmmUnsafeForeignCall tgt _ _  -> fold f z (foreignTargetRegs tgt)
+    CmmCall {} -> fold f z activeRegs
+    CmmForeignCall {tgt=tgt} -> fold f z (foreignTargetRegs tgt)
+    _ -> z
+    where fold :: forall a b.
+                   DefinerOfRegs GlobalReg a =>
+                   (b -> GlobalReg -> b) -> b -> a -> b
+          fold f z n = foldRegsDefd dflags f z n
+
+          platform = targetPlatform dflags
+          activeRegs = activeStgRegs platform
+          activeCallerSavesRegs = filter (callerSaves platform) activeRegs
+
+          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
+          foreignTargetRegs _ = activeCallerSavesRegs
 
 
 -----------------------------------
@@ -375,14 +463,7 @@ foldExp f (CmmCall {cml_target=tgt}) z            = f tgt z
 foldExp f (CmmForeignCall {tgt=tgt, args=args}) z = foldr f (foldExpForeignTarget f tgt z) args
 
 foldExpDeep :: (CmmExpr -> z -> z) -> CmmNode e x -> z -> z
-foldExpDeep f = foldExp go
-  where -- go :: CmmExpr -> z -> z
-        go e@(CmmMachOp _ es) z = gos es $! f e z
-        go e@(CmmLoad addr _) z = go addr $! f e z
-        go e                  z = f e z
-
-        gos [] z = z
-        gos (e:es) z = gos es $! f e z
+foldExpDeep f = foldExp (wrapRecExpf f)
 
 -- -----------------------------------------------------------------------------
 

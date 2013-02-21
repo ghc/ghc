@@ -154,6 +154,10 @@ extern void hs_add_root (void (*init_root)(void));
 
 extern void hs_perform_gc (void);
 
+extern void hs_lock_stable_tables (void);
+extern void hs_unlock_stable_tables (void);
+extern void hs_free_stable_ptr_unsafe (HsStablePtr sp);
+
 extern void hs_free_stable_ptr (HsStablePtr sp);
 extern void hs_free_fun_ptr    (HsFunPtr fp);
 

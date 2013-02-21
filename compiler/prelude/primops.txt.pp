@@ -45,8 +45,9 @@ defaults
    can_fail         = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
-   strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity lazyDmd) TopRes) }
-
+   strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity topDmd) topRes) }
+   fixity           = Nothing
+   llvm_only        = False
 
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
@@ -54,10 +55,8 @@ defaults
 
 #include "MachDeps.h"
 
--- We need platform defines (tests for mingw32 below).  However, we only
--- test the TARGET platform, which doesn't vary between stages, so the
--- stage1 platform defines are fine:
-#include "../stage1/ghc_boot_platform.h"
+-- We need platform defines (tests for mingw32 below).
+#include "ghc_boot_platform.h"
 
 section "The word size story."
 	{Haskell98 specifies that signed integers (type {\tt Int})
@@ -168,13 +167,16 @@ primtype Int#
 primop   IntAddOp    "+#"    Dyadic
    Int# -> Int# -> Int#
    with commutable = True
+        fixity = infixl 6
 
 primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
+   with fixity = infixl 6
 
 primop   IntMulOp    "*#"
    Dyadic   Int# -> Int# -> Int#
    {Low word of signed integer multiply.}
    with commutable = True
+        fixity = infixl 7
 
 primop   IntMulMayOfloOp  "mulIntMayOflo#"
    Dyadic   Int# -> Int# -> Int#
@@ -215,6 +217,17 @@ primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    {Rounds towards zero.}
    with can_fail = True
 
+primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
+   with commutable = True
+
+primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
+   with commutable = True
+
+primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
+   with commutable = True
+
+primop   NotIOp   "notI#"   Monadic   Int# -> Int#
+
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
 	 {Add with carry.  First member of result is (wrapped) sum;
@@ -227,18 +240,26 @@ primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
    with code_size = 2
 
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
+
 primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
 
 primop   IntEqOp  "==#"   Compare
    Int# -> Int# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop   IntNeOp  "/=#"   Compare
    Int# -> Int# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
+
 primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
 
 primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
    with code_size = 0
@@ -248,6 +269,9 @@ primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
 
 primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
 primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
+
+primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
+primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
 	 {Shift left.  Result undefined if shift amount is not
@@ -403,32 +427,44 @@ section "Double#"
 primtype Double#
 
 primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
+
 primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
 
 primop DoubleEqOp "==##"   Compare
    Double# -> Double# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop DoubleNeOp "/=##"   Compare
    Double# -> Double# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
+
 primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   Dyadic
    Double# -> Double# -> Double#
    with commutable = True
+        fixity = infixl 6
 
 primop   DoubleSubOp   "-##"   Dyadic   Double# -> Double# -> Double#
+   with fixity = infixl 6
 
 primop   DoubleMulOp   "*##"   Dyadic
    Double# -> Double# -> Double#
    with commutable = True
+        fixity = infixl 7
 
 primop   DoubleDivOp   "/##"   Dyadic
    Double# -> Double# -> Double#
    with can_fail = True
+        fixity = infixl 7
 
 primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
 
@@ -1505,7 +1541,7 @@ primop  CatchOp "catch#" GenPrimOp
 primop  RaiseOp "raise#" GenPrimOp
    a -> b
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [lazyDmd] BotRes) }
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd] botRes) }
       -- NB: result is bottom
    out_of_line = True
 
@@ -1522,7 +1558,7 @@ primop  RaiseOp "raise#" GenPrimOp
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [lazyDmd,lazyDmd] BotRes) }
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd, topDmd] botRes) }
    out_of_line = True
    has_side_effects = True
 
@@ -2010,7 +2046,7 @@ primop  MakeStableNameOp "makeStableName#" GenPrimOp
    out_of_line      = True
 
 primop  EqStableNameOp "eqStableName#" GenPrimOp
-   StableName# a -> StableName# a -> Int#
+   StableName# a -> StableName# b -> Int#
 
 primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
    StableName# a -> Int#
@@ -2121,7 +2157,8 @@ section "Tag to enum stuff"
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [seqDmd] TopRes) }
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [evalDmd] topRes) }
+
 	-- dataToTag# must have an evaluated argument
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
@@ -2187,46 +2224,6 @@ pseudoop   "seq"
    a -> b -> b
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
-
-pseudoop   "inline"
-   a -> a
-   { The call {\tt (inline f)} arranges that f is inlined, regardless of its size.
-	More precisely, the call {\tt (inline f)} rewrites to the right-hand side of
-	{\tt f}'s definition. This allows the programmer to control inlining from a
-	particular call site rather than the definition site of the function (c.f.
-	{\tt INLINE} pragmas in User's Guide, Section 7.10.3, "INLINE and NOINLINE
-	pragmas").
-
-	This inlining occurs regardless of the argument to the call or the size of
-	{\tt f}'s definition; it is unconditional. The main caveat is that {\tt f}'s
-	definition must be visible to the compiler. That is, {\tt f} must be
-	{\tt let}-bound in the current scope. If no inlining takes place, the
-	{\tt inline} function expands to the identity function in Phase zero; so its
-	use imposes no overhead.
-
-	It is good practice to mark the function with an INLINABLE pragma at
-        its definition, (a) so that GHC guarantees to expose its unfolding regardless
-        of size, and (b) so that you have control over exactly what is inlined. }
-
-pseudoop   "lazy"
-   a -> a
-   { The {\tt lazy} function restrains strictness analysis a little. The call
-	{\tt (lazy e)} means the same as {\tt e}, but {\tt lazy} has a magical
-	property so far as strictness analysis is concerned: it is lazy in its first
-	argument, even though its semantics is strict. After strictness analysis has
-	run, calls to {\tt lazy} are inlined to be the identity function.
-
-	This behaviour is occasionally useful when controlling evaluation order.
-	Notably, {\tt lazy} is used in the library definition of {\tt Control.Parallel.par}:
-
-	{\tt par :: a -> b -> b}
-
-	{\tt par x y = case (par\# x) of \_ -> lazy y}
-
-	If {\tt lazy} were not lazy, {\tt par} would look strict in {\tt y} which
-	would defeat the whole purpose of {\tt par}.
-
-	Like {\tt seq}, the argument of {\tt lazy} can have an unboxed type. }
 
 primtype Any k
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
@@ -2322,6 +2319,510 @@ primop  TraceEventOp "traceEvent#" GenPrimOp
    with
    has_side_effects = True
    out_of_line      = True
+
+primop  TraceMarkerOp "traceMarker#" GenPrimOp
+   Addr# -> State# s -> State# s
+   { Emits a marker event via the RTS tracing framework.  The contents
+     of the event is the zero-terminated byte string passed as the first
+     argument.  The event will be emitted either to the .eventlog file,
+     or to stderr, depending on the runtime RTS flags. }
+   with
+   has_side_effects = True
+   out_of_line      = True
+
+
+------------------------------------------------------------------------
+section "Float SIMD Vectors" 
+	{Operations on SIMD vectors of 4 single-precision (32-bit)
+         floating-point numbers.}
+------------------------------------------------------------------------
+
+primtype FloatX4#
+   with llvm_only = True
+
+primop FloatToFloatX4Op "floatToFloatX4#" GenPrimOp     
+   Float# -> FloatX4#
+   with llvm_only = True
+
+primop FloatX4PackOp "packFloatX4#" GenPrimOp         
+   Float# -> Float# -> Float# -> Float# -> FloatX4#
+   with llvm_only = True
+
+primop FloatX4UnpackOp "unpackFloatX4#" GenPrimOp         
+   FloatX4# -> (# Float#, Float#, Float#, Float# #)
+   with llvm_only = True
+
+primop FloatX4InsertOp "insertFloatX4#" GenPrimOp     
+   FloatX4# -> Float# -> Int# -> FloatX4#
+   with can_fail = True
+        llvm_only = True
+
+primop FloatX4AddOp "plusFloatX4#" Dyadic            
+   FloatX4# -> FloatX4# -> FloatX4#
+   with commutable = True
+        llvm_only = True
+
+primop FloatX4SubOp "minusFloatX4#" Dyadic
+  FloatX4# -> FloatX4# -> FloatX4#
+   with llvm_only = True
+
+primop FloatX4MulOp "timesFloatX4#" Dyadic    
+   FloatX4# -> FloatX4# -> FloatX4#
+   with commutable = True
+        llvm_only = True
+
+primop FloatX4DivOp "divideFloatX4#" Dyadic  
+   FloatX4# -> FloatX4# -> FloatX4#
+   with can_fail = True
+        llvm_only = True
+
+primop FloatX4NegOp "negateFloatX4#" Monadic
+   FloatX4# -> FloatX4#
+   with llvm_only = True
+
+primop IndexByteArrayOp_FloatX4 "indexFloatX4Array#" GenPrimOp
+   ByteArray# -> Int# -> FloatX4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_FloatX4 "readFloatX4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_FloatX4 "writeFloatX4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_FloatX4 "indexFloatX4OffAddr#" GenPrimOp
+   Addr# -> Int# -> FloatX4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_FloatX4 "readFloatX4OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_FloatX4 "writeFloatX4OffAddr#" GenPrimOp
+   Addr# -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexByteArrayOp_FloatAsFloatX4 "indexFloatArrayAsFloatX4#" GenPrimOp
+   ByteArray# -> Int# -> FloatX4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_FloatAsFloatX4 "readFloatArrayAsFloatX4#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_FloatAsFloatX4 "writeFloatArrayAsFloatX4#" GenPrimOp
+   MutableByteArray# s -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_FloatAsFloatX4 "indexFloatOffAddrAsFloatX4#" GenPrimOp
+   Addr# -> Int# -> FloatX4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_FloatAsFloatX4 "readFloatOffAddrAsFloatX4#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_FloatAsFloatX4 "writeFloatOffAddrAsFloatX4#" GenPrimOp
+   Addr# -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+------------------------------------------------------------------------
+section "Double SIMD Vectors" 
+	{Operations on SIMD vectors of 2 double-precision (64-bit)
+         floating-point numbers.}
+------------------------------------------------------------------------
+
+primtype DoubleX2#
+   with llvm_only = True
+
+primop DoubleToDoubleX2Op "doubleToDoubleX2#" GenPrimOp     
+   Double# -> DoubleX2#
+   with llvm_only = True
+
+primop DoubleX2InsertOp "insertDoubleX2#" GenPrimOp     
+   DoubleX2# -> Double# -> Int# -> DoubleX2#
+   with can_fail = True
+        llvm_only = True
+
+primop DoubleX2PackOp "packDoubleX2#" GenPrimOp         
+   Double# -> Double# -> DoubleX2#
+   with llvm_only = True
+
+primop DoubleX2UnpackOp "unpackDoubleX2#" GenPrimOp         
+   DoubleX2# -> (# Double#, Double# #)
+   with llvm_only = True
+
+primop DoubleX2AddOp "plusDoubleX2#" Dyadic            
+   DoubleX2# -> DoubleX2# -> DoubleX2#
+   with commutable = True
+        llvm_only = True
+
+primop DoubleX2SubOp "minusDoubleX2#" Dyadic
+  DoubleX2# -> DoubleX2# -> DoubleX2#
+   with llvm_only = True
+
+primop DoubleX2MulOp "timesDoubleX2#" Dyadic    
+   DoubleX2# -> DoubleX2# -> DoubleX2#
+   with commutable = True
+        llvm_only = True
+
+primop DoubleX2DivOp "divideDoubleX2#" Dyadic  
+   DoubleX2# -> DoubleX2# -> DoubleX2#
+   with can_fail = True
+        llvm_only = True
+
+primop DoubleX2NegOp "negateDoubleX2#" Monadic
+   DoubleX2# -> DoubleX2#
+   with llvm_only = True
+
+primop IndexByteArrayOp_DoubleX2 "indexDoubleX2Array#" GenPrimOp
+   ByteArray# -> Int# -> DoubleX2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_DoubleX2 "readDoubleX2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_DoubleX2 "writeDoubleX2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_DoubleX2 "indexDoubleX2OffAddr#" GenPrimOp
+   Addr# -> Int# -> DoubleX2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_DoubleX2 "readDoubleX2OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_DoubleX2 "writeDoubleX2OffAddr#" GenPrimOp
+   Addr# -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexByteArrayOp_DoubleAsDoubleX2 "indexDoubleArrayAsDoubleX2#" GenPrimOp
+   ByteArray# -> Int# -> DoubleX2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_DoubleAsDoubleX2 "readDoubleArrayAsDoubleX2#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_DoubleAsDoubleX2 "writeDoubleArrayAsDoubleX2#" GenPrimOp
+   MutableByteArray# s -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_DoubleAsDoubleX2 "indexDoubleOffAddrAsDoubleX2#" GenPrimOp
+   Addr# -> Int# -> DoubleX2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_DoubleAsDoubleX2 "readDoubleOffAddrAsDoubleX2#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_DoubleAsDoubleX2 "writeDoubleOffAddrAsDoubleX2#" GenPrimOp
+   Addr# -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+------------------------------------------------------------------------
+section "Int32 SIMD Vectors" 
+	{Operations on SIMD vectors of 4 32-bit signed integers.}
+------------------------------------------------------------------------
+
+primtype Int32X4#
+   with llvm_only = True
+
+primop Int32ToInt32X4Op "int32ToInt32X4#" GenPrimOp     
+   INT32 -> Int32X4#
+   with llvm_only = True
+
+primop Int32X4InsertOp "insertInt32X4#" GenPrimOp     
+   Int32X4# -> INT32 -> Int# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+
+primop Int32X4PackOp "packInt32X4#" GenPrimOp         
+   INT32 -> INT32 -> INT32 -> INT32 -> Int32X4#
+   with llvm_only = True
+
+primop Int32X4UnpackOp "unpackInt32X4#" GenPrimOp         
+   Int32X4# -> (# INT32, INT32, INT32, INT32 #)
+   with llvm_only = True
+
+primop Int32X4AddOp "plusInt32X4#" Dyadic            
+   Int32X4# -> Int32X4# -> Int32X4#
+   with commutable = True
+        llvm_only = True
+
+primop Int32X4SubOp "minusInt32X4#" Dyadic
+  Int32X4# -> Int32X4# -> Int32X4#
+   with llvm_only = True
+
+primop Int32X4MulOp "timesInt32X4#" Dyadic    
+   Int32X4# -> Int32X4# -> Int32X4#
+   with commutable = True
+        llvm_only = True
+
+primop Int32X4QuotOp "quotInt32X4#" Dyadic  
+   Int32X4# -> Int32X4# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+   
+primop Int32X4RemOp "remInt32X4#" Dyadic  
+   Int32X4# -> Int32X4# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+
+primop Int32X4NegOp "negateInt32X4#" Monadic
+   Int32X4# -> Int32X4#
+   with llvm_only = True
+
+primop IndexByteArrayOp_Int32X4 "indexInt32X4Array#" GenPrimOp
+   ByteArray# -> Int# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_Int32X4 "readInt32X4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_Int32X4 "writeInt32X4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_Int32X4 "indexInt32X4OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_Int32X4 "readInt32X4OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_Int32X4 "writeInt32X4OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexByteArrayOp_Int32AsInt32X4 "indexInt32ArrayAsInt32X4#" GenPrimOp
+   ByteArray# -> Int# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_Int32AsInt32X4 "readInt32ArrayAsInt32X4#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_Int32AsInt32X4 "writeInt32ArrayAsInt32X4#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_Int32AsInt32X4 "indexInt32OffAddrAsInt32X4#" GenPrimOp
+   Addr# -> Int# -> Int32X4#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_Int32AsInt32X4 "readInt32OffAddrAsInt32X4#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_Int32AsInt32X4 "writeInt32OffAddrAsInt32X4#" GenPrimOp
+   Addr# -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+------------------------------------------------------------------------
+section "Int64 SIMD Vectors" 
+	{Operations on SIMD vectors of 2 64-bit signed integers.}
+------------------------------------------------------------------------
+
+primtype Int64X2#
+   with llvm_only = True
+
+primop Int64ToInt64X2Op "int64ToInt64X2#" GenPrimOp     
+   INT64 -> Int64X2#
+   with llvm_only = True
+
+primop Int64X2InsertOp "insertInt64X2#" GenPrimOp     
+   Int64X2# -> INT64 -> Int# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+
+primop Int64X2PackOp "packInt64X2#" GenPrimOp         
+   INT64 -> INT64 -> Int64X2#
+   with llvm_only = True
+
+primop Int64X2UnpackOp "unpackInt64X2#" GenPrimOp         
+   Int64X2# -> (# INT64, INT64 #)
+   with llvm_only = True
+
+primop Int64X2AddOp "plusInt64X2#" Dyadic            
+   Int64X2# -> Int64X2# -> Int64X2#
+   with commutable = True
+        llvm_only = True
+
+primop Int64X2SubOp "minusInt64X2#" Dyadic
+  Int64X2# -> Int64X2# -> Int64X2#
+   with llvm_only = True
+
+primop Int64X2MulOp "timesInt64X2#" Dyadic    
+   Int64X2# -> Int64X2# -> Int64X2#
+   with commutable = True
+        llvm_only = True
+
+primop Int64X2QuotOp "quotInt64X2#" Dyadic  
+   Int64X2# -> Int64X2# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+   
+primop Int64X2RemOp "remInt64X2#" Dyadic  
+   Int64X2# -> Int64X2# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+
+primop Int64X2NegOp "negateInt64X2#" Monadic
+   Int64X2# -> Int64X2#
+   with llvm_only = True
+
+primop IndexByteArrayOp_Int64X2 "indexInt64X2Array#" GenPrimOp
+   ByteArray# -> Int# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_Int64X2 "readInt64X2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_Int64X2 "writeInt64X2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_Int64X2 "indexInt64X2OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_Int64X2 "readInt64X2OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_Int64X2 "writeInt64X2OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexByteArrayOp_Int64AsInt64X2 "indexInt64ArrayAsInt64X2#" GenPrimOp
+   ByteArray# -> Int# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadByteArrayOp_Int64AsInt64X2 "readInt64ArrayAsInt64X2#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop WriteByteArrayOp_Int64AsInt64X2 "writeInt64ArrayAsInt64X2#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop IndexOffAddrOp_Int64AsInt64X2 "indexInt64OffAddrAsInt64X2#" GenPrimOp
+   Addr# -> Int# -> Int64X2#
+   with can_fail = True
+        llvm_only = True
+
+primop ReadOffAddrOp_Int64AsInt64X2 "readInt64OffAddrAsInt64X2#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+
+primop  WriteOffAddrOp_Int64AsInt64X2 "writeInt64OffAddrAsInt64X2#" GenPrimOp
+   Addr# -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+        llvm_only = True
+   
+------------------------------------------------------------------------
+section "Prefetch" 
+	{Prefetch operations}
+------------------------------------------------------------------------
+
+primop PrefetchByteArrayOp "prefetchByteArray#" GenPrimOp
+   ByteArray# -> Int# -> ByteArray#
+   with llvm_only = True
+
+primop PrefetchMutableByteArrayOp "prefetchMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> State# s
+   with has_side_effects = True
+        llvm_only = True
+
+primop PrefetchAddrOp "prefetchAddr#" GenPrimOp
+   Addr# -> Int# -> Addr#
+   with llvm_only = True
 
 ------------------------------------------------------------------------
 ---                                                                  ---

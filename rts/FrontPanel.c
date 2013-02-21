@@ -287,7 +287,7 @@ updateFrontPanelBeforeGC( nat N )
   }
 }
 
-  static void
+static void
 numLabel( GtkWidget *lbl, nat n )
 {
   char buf[64];
@@ -295,8 +295,8 @@ numLabel( GtkWidget *lbl, nat n )
   gtk_label_set_text( GTK_LABEL(lbl), buf );
 }
 
-  void
-updateFrontPanelAfterGC( nat N, lnat live )
+void
+updateFrontPanelAfterGC( nat N, W_ live )
 {
   char buf[1000];
 

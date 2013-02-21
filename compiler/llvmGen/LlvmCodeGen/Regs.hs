@@ -12,23 +12,24 @@ module LlvmCodeGen.Regs (
 import Llvm
 
 import CmmExpr
+import DynFlags
 import FastString
 import Outputable ( panic )
 
 -- | Get the LlvmVar function variable storing the real register
-lmGlobalRegVar :: GlobalReg -> LlvmVar
-lmGlobalRegVar = (pVarLift . lmGlobalReg "_Var")
+lmGlobalRegVar :: DynFlags -> GlobalReg -> LlvmVar
+lmGlobalRegVar dflags = pVarLift . lmGlobalReg dflags "_Var"
 
 -- | Get the LlvmVar function argument storing the real register
-lmGlobalRegArg :: GlobalReg -> LlvmVar
-lmGlobalRegArg = lmGlobalReg "_Arg"
+lmGlobalRegArg :: DynFlags -> GlobalReg -> LlvmVar
+lmGlobalRegArg dflags = lmGlobalReg dflags "_Arg"
 
 {- Need to make sure the names here can't conflict with the unique generated
    names. Uniques generated names containing only base62 chars. So using say
    the '_' char guarantees this.
 -}
-lmGlobalReg :: String -> GlobalReg -> LlvmVar
-lmGlobalReg suf reg
+lmGlobalReg :: DynFlags -> String -> GlobalReg -> LlvmVar
+lmGlobalReg dflags suf reg
   = case reg of
         BaseReg        -> ptrGlobal $ "Base" ++ suf
         Sp             -> ptrGlobal $ "Sp" ++ suf
@@ -46,17 +47,30 @@ lmGlobalReg suf reg
         FloatReg 2     -> floatGlobal $"F2" ++ suf
         FloatReg 3     -> floatGlobal $"F3" ++ suf
         FloatReg 4     -> floatGlobal $"F4" ++ suf
+        FloatReg 5     -> floatGlobal $"F5" ++ suf
+        FloatReg 6     -> floatGlobal $"F6" ++ suf
         DoubleReg 1    -> doubleGlobal $ "D1" ++ suf
         DoubleReg 2    -> doubleGlobal $ "D2" ++ suf
+        DoubleReg 3    -> doubleGlobal $ "D3" ++ suf
+        DoubleReg 4    -> doubleGlobal $ "D4" ++ suf
+        DoubleReg 5    -> doubleGlobal $ "D5" ++ suf
+        DoubleReg 6    -> doubleGlobal $ "D6" ++ suf
+        XmmReg 1       -> xmmGlobal $ "XMM1" ++ suf
+        XmmReg 2       -> xmmGlobal $ "XMM2" ++ suf
+        XmmReg 3       -> xmmGlobal $ "XMM3" ++ suf
+        XmmReg 4       -> xmmGlobal $ "XMM4" ++ suf
+        XmmReg 5       -> xmmGlobal $ "XMM5" ++ suf
+        XmmReg 6       -> xmmGlobal $ "XMM6" ++ suf
         _other         -> panic $ "LlvmCodeGen.Reg: GlobalReg (" ++ (show reg)
                                 ++ ") not supported!"
         -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
         -- EagerBlackholeInfo, GCEnter1, GCFun, BaseReg, PicBaseReg
     where
-        wordGlobal   name = LMNLocalVar (fsLit name) llvmWord
-        ptrGlobal    name = LMNLocalVar (fsLit name) llvmWordPtr
+        wordGlobal   name = LMNLocalVar (fsLit name) (llvmWord dflags)
+        ptrGlobal    name = LMNLocalVar (fsLit name) (llvmWordPtr dflags)
         floatGlobal  name = LMNLocalVar (fsLit name) LMFloat
         doubleGlobal name = LMNLocalVar (fsLit name) LMDouble
+        xmmGlobal    name = LMNLocalVar (fsLit name) (LMVector 4 (LMInt 32))
 
 -- | A list of STG Registers that should always be considered alive
 alwaysLive :: [GlobalReg]

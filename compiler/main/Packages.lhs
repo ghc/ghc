@@ -37,7 +37,6 @@ where
 
 import PackageConfig
 import DynFlags
-import StaticFlags
 import Config           ( cProjectVersion )
 import Name             ( Name, nameModule_maybe )
 import UniqFM
@@ -69,7 +68,7 @@ import qualified Data.Set as Set
 -- ---------------------------------------------------------------------------
 -- The Package state
 
--- | Package state is all stored in 'DynFlag's, including the details of
+-- | Package state is all stored in 'DynFlags', including the details of
 -- all packages, which packages are exposed, and which modules they
 -- provide.
 --
@@ -231,14 +230,14 @@ readPackageConfig dflags conf_file = do
        else do
             isfile <- doesFileExist conf_file
             when (not isfile) $
-              ghcError $ InstallationError $
+              throwGhcExceptionIO $ InstallationError $
                 "can't find a package database at " ++ conf_file
             debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
             str <- readFile conf_file
             case reads str of
                 [(configs, rest)]
                     | all isSpace rest -> return (map installedPackageInfoToPackageConfig configs)
-                _ -> ghcError $ InstallationError $
+                _ -> throwGhcExceptionIO $ InstallationError $
                         "invalid package database file " ++ conf_file
 
   let
@@ -253,11 +252,11 @@ setBatchPackageFlags :: DynFlags -> [PackageConfig] -> [PackageConfig]
 setBatchPackageFlags dflags pkgs = (maybeDistrustAll . maybeHideAll) pkgs
   where
     maybeHideAll pkgs'
-      | dopt Opt_HideAllPackages dflags = map hide pkgs'
+      | gopt Opt_HideAllPackages dflags = map hide pkgs'
       | otherwise                       = pkgs'
 
     maybeDistrustAll pkgs'
-      | dopt Opt_DistrustAllPackages dflags = map distrust pkgs'
+      | gopt Opt_DistrustAllPackages dflags = map distrust pkgs'
       | otherwise                           = pkgs'
 
     hide pkg = pkg{ exposed = False }
@@ -411,12 +410,13 @@ packageFlagErr :: DynFlags
 -- for missing DPH package we emit a more helpful error message, because
 -- this may be the result of using -fdph-par or -fdph-seq.
 packageFlagErr dflags (ExposePackage pkg) [] | is_dph_package pkg
-  = ghcError (CmdLineError (showSDoc dflags $ dph_err))
+  = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ dph_err))
   where dph_err = text "the " <> text pkg <> text " package is not installed."
                   $$ text "To install it: \"cabal install dph\"."
         is_dph_package pkg = "dph" `isPrefixOf` pkg
 
-packageFlagErr dflags flag reasons = ghcError (CmdLineError (showSDoc dflags $ err))
+packageFlagErr dflags flag reasons
+  = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ err))
   where err = text "cannot satisfy " <> ppr_flag <>
                 (if null reasons then empty else text ": ") $$
               nest 4 (ppr_reasons $$
@@ -793,7 +793,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   let
       -- add base & rts to the preload packages
       basicLinkedPackages
-       | dopt Opt_AutoLinkPackages dflags
+       | gopt Opt_AutoLinkPackages dflags
           = filter (flip elemUFM pkg_db) [basePackageId, rtsPackageId]
        | otherwise = []
       -- but in any case remove the current package from the set of
@@ -883,20 +883,20 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
         ways0 = ways dflags
 
-        ways1 = filter ((/= WayDyn) . wayName) ways0
+        ways1 = filter (/= WayDyn) ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
         -- debug RTS includes support for -eventlog
-        ways2 | WayDebug `elem` map wayName ways1
-              = filter ((/= WayEventLog) . wayName) ways1
+        ways2 | WayDebug `elem` ways1
+              = filter (/= WayEventLog) ways1
               | otherwise
               = ways1
 
         tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
         rts_tag = mkBuildTag ways2
 
-        mkDynName | opt_Static = id
+        mkDynName | gopt Opt_Static dflags = id
                   | otherwise = (++ ("-ghc" ++ cProjectVersion))
 
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
@@ -948,7 +948,7 @@ lookupModuleWithSuggestions dflags m
   where
     pkg_state = pkgState dflags
     suggestions
-      | dopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
+      | gopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
       | otherwise                     = []
 
     all_mods :: [(String, Module)]     -- All modules
@@ -984,7 +984,7 @@ closeDeps dflags pkg_map ipid_map ps
 throwErr :: DynFlags -> MaybeErr MsgDoc a -> IO a
 throwErr dflags m
               = case m of
-                Failed e    -> ghcError (CmdLineError (showSDoc dflags e))
+                Failed e    -> throwGhcExceptionIO (CmdLineError (showSDoc dflags e))
                 Succeeded r -> return r
 
 closeDepsErr :: PackageConfigMap
@@ -1018,7 +1018,7 @@ add_package pkg_db ipid_map ps (p, mb_parent)
 
 missingPackageErr :: DynFlags -> String -> IO a
 missingPackageErr dflags p
-    = ghcError (CmdLineError (showSDoc dflags (missingPackageMsg p)))
+    = throwGhcExceptionIO (CmdLineError (showSDoc dflags (missingPackageMsg p)))
 
 missingPackageMsg :: String -> SDoc
 missingPackageMsg p = ptext (sLit "unknown package:") <+> text p
@@ -1031,12 +1031,12 @@ missingDependencyMsg (Just parent)
 -- -----------------------------------------------------------------------------
 
 -- | Will the 'Name' come from a dynamically linked library?
-isDllName :: PackageId -> Name -> Bool
+isDllName :: DynFlags -> PackageId -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the synbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName this_pkg name
-  | opt_Static = False
+isDllName dflags this_pkg name
+  | gopt Opt_Static dflags = False
   | Just mod <- nameModule_maybe name = modulePackageId mod /= this_pkg
   | otherwise = False  -- no, it is not even an external name
 

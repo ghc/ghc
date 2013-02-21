@@ -218,7 +218,7 @@ void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 #endif
 }
 
-nat
+W_
 getPageFaults(void)
 {
 #if !defined(HAVE_GETRUSAGE) || irix_HOST_OS || haiku_HOST_OS

@@ -20,12 +20,12 @@ module Main (main) where
 
 import Control.Exception
 import Data.Monoid
-import System.Cmd
 import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
 import System.IO
+import System.Process
 
 #if defined(mingw32_HOST_OS)
 import Foreign

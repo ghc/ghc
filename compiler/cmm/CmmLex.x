@@ -23,9 +23,9 @@ module CmmLex (
    CmmToken(..), cmmlex,
   ) where
 
-import OldCmm
-import Lexer
+import CmmExpr
 
+import Lexer
 import SrcLoc
 import UniqFM
 import StringBuffer
@@ -147,6 +147,7 @@ data CmmToken
   | CmmT_align
   | CmmT_goto
   | CmmT_if
+  | CmmT_call
   | CmmT_jump
   | CmmT_foreign
   | CmmT_never
@@ -157,10 +158,12 @@ data CmmToken
   | CmmT_switch
   | CmmT_case
   | CmmT_default
+  | CmmT_push
   | CmmT_bits8
   | CmmT_bits16
   | CmmT_bits32
   | CmmT_bits64
+  | CmmT_bits128
   | CmmT_float32
   | CmmT_float64
   | CmmT_gcptr
@@ -224,8 +227,9 @@ reservedWordsFM = listToUFM $
 	( "align",		CmmT_align ),
 	( "goto",		CmmT_goto ),
 	( "if",			CmmT_if ),
-	( "jump",		CmmT_jump ),
-	( "foreign",		CmmT_foreign ),
+        ( "call",               CmmT_call ),
+        ( "jump",               CmmT_jump ),
+        ( "foreign",            CmmT_foreign ),
 	( "never",		CmmT_never ),
 	( "prim",		CmmT_prim ),
 	( "return",		CmmT_return ),
@@ -233,11 +237,13 @@ reservedWordsFM = listToUFM $
 	( "import",		CmmT_import ),
 	( "switch",		CmmT_switch ),
 	( "case",		CmmT_case ),
-	( "default",		CmmT_default ),
-	( "bits8",		CmmT_bits8 ),
+        ( "default",            CmmT_default ),
+        ( "push",               CmmT_push ),
+        ( "bits8",              CmmT_bits8 ),
 	( "bits16",		CmmT_bits16 ),
 	( "bits32",		CmmT_bits32 ),
 	( "bits64",		CmmT_bits64 ),
+	( "bits128",		CmmT_bits128 ),
 	( "float32",		CmmT_float32 ),
 	( "float64",		CmmT_float64 ),
 -- New forms
@@ -245,6 +251,7 @@ reservedWordsFM = listToUFM $
 	( "b16",		CmmT_bits16 ),
 	( "b32",		CmmT_bits32 ),
 	( "b64",		CmmT_bits64 ),
+	( "b128",		CmmT_bits128 ),
 	( "f32",		CmmT_float32 ),
 	( "f64",		CmmT_float64 ),
 	( "gcptr",		CmmT_gcptr )

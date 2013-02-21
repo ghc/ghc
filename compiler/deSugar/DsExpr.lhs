@@ -40,9 +40,9 @@ import CoreFVs
 import MkCore
 
 import DynFlags
-import StaticFlags
 import CostCentre
 import Id
+import Module
 import VarSet
 import VarEnv
 import DataCon
@@ -205,17 +205,15 @@ dsExpr (NegApp expr neg_expr)
 dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr a_Match
 
-dsExpr (HsLamCase arg matches@(MatchGroup _ rhs_ty))
-  | isEmptyMatchGroup matches   -- A Core 'case' is always non-empty
-  =                             -- So desugar empty HsLamCase to error call
-    mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) (ptext (sLit "\\case"))
-  | otherwise
+dsExpr (HsLamCase arg matches)
   = do { arg_var <- newSysLocalDs arg
        ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
        ; return $ Lam arg_var $ bindNonRec discrim_var (Var arg_var) matching_code }
 
 dsExpr (HsApp fun arg)
   = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
+
+dsExpr (HsUnboundVar _) = panic "dsExpr: HsUnboundVar"
 \end{code}
 
 Note [Desugaring vars]
@@ -295,20 +293,15 @@ dsExpr (ExplicitTuple tup_args boxity)
                            (map (Type . exprType) args ++ args) }
 
 dsExpr (HsSCC cc expr@(L loc _)) = do
-    mod_name <- getModuleDs
-    count <- doptM Opt_ProfCountEntries
+    mod_name <- getModule
+    count <- goptM Opt_ProfCountEntries
     uniq <- newUnique
     Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr
 
 dsExpr (HsCoreAnn _ expr)
   = dsLExpr expr
 
-dsExpr (HsCase discrim matches@(MatchGroup _ rhs_ty)) 
-  | isEmptyMatchGroup matches   -- A Core 'case' is always non-empty
-  =                             -- So desugar empty HsCase to error call
-    mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) (ptext (sLit "case"))
-
-  | otherwise
+dsExpr (HsCase discrim matches)
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
        ; return (bindNonRec discrim_var core_discrim matching_code) }
@@ -322,12 +315,12 @@ dsExpr (HsLet binds body) = do
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-dsExpr (HsDo ListComp  stmts res_ty) = dsListComp stmts res_ty
-dsExpr (HsDo PArrComp  stmts _)      = dsPArrComp (map unLoc stmts)
-dsExpr (HsDo DoExpr    stmts _)      = dsDo stmts 
-dsExpr (HsDo GhciStmt  stmts _)      = dsDo stmts 
-dsExpr (HsDo MDoExpr   stmts _)      = dsDo stmts 
-dsExpr (HsDo MonadComp stmts _)      = dsMonadComp stmts
+dsExpr (HsDo ListComp     stmts res_ty) = dsListComp stmts res_ty
+dsExpr (HsDo PArrComp     stmts _)      = dsPArrComp (map unLoc stmts)
+dsExpr (HsDo DoExpr       stmts _)      = dsDo stmts 
+dsExpr (HsDo GhciStmtCtxt stmts _)      = dsDo stmts 
+dsExpr (HsDo MDoExpr      stmts _)      = dsDo stmts 
+dsExpr (HsDo MonadComp    stmts _)      = dsMonadComp stmts
 
 dsExpr (HsIf mb_fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -357,8 +350,8 @@ dsExpr (HsMultiIf res_ty alts)
 \underline{\bf Various data construction things}
 %              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-dsExpr (ExplicitList elt_ty xs) 
-  = dsExplicitList elt_ty xs
+dsExpr (ExplicitList elt_ty wit xs) 
+  = dsExplicitList elt_ty wit xs
 
 -- We desugar [:x1, ..., xn:] as
 --   singletonP x1 +:+ ... +:+ singletonP xn
@@ -375,17 +368,13 @@ dsExpr (ExplicitPArr ty xs) = do
     unary  fn x   = mkApps (Var fn) [Type ty, x]
     binary fn x y = mkApps (Var fn) [Type ty, x, y]
 
-dsExpr (ArithSeq expr (From from))
-  = App <$> dsExpr expr <*> dsLExpr from
-
-dsExpr (ArithSeq expr (FromTo from to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
-
-dsExpr (ArithSeq expr (FromThen from thn))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
-
-dsExpr (ArithSeq expr (FromThenTo from thn to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
+dsExpr (ArithSeq expr witness seq)
+  = case witness of
+     Nothing -> dsArithSeq expr seq
+     Just fl -> do { 
+       ; fl' <- dsExpr fl
+       ; newArithSeq <- dsArithSeq expr seq
+       ; return (App fl' newArithSeq)}
 
 dsExpr (PArrSeq expr (FromTo from to))
   = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
@@ -497,7 +486,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code) 
-                <- matchWrapper RecUpd (MatchGroup alts in_out_ty)
+                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty], mg_res_ty = out_ty })
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
@@ -519,7 +508,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- from instance type to family type
     tycon     = dataConTyCon (head cons_to_upd)
     in_ty     = mkTyConApp tycon in_inst_tys
-    in_out_ty = mkFunTy in_ty (mkFamilyTyConApp tycon out_inst_tys)
+    out_ty    = mkFamilyTyConApp tycon out_inst_tys
 
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec, 
@@ -680,14 +669,14 @@ makes all list literals be generated via the simple route.
 
 
 \begin{code}
-dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
+dsExplicitList :: PostTcType -> Maybe (SyntaxExpr Id) -> [LHsExpr Id] -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
-dsExplicitList elt_ty xs
+dsExplicitList elt_ty Nothing xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
-       ; if opt_SimpleListLiterals                      -- -fsimple-list-literals
-         || not (dopt Opt_EnableRewriteRules dflags)    -- Rewrite rules off
+       ; if gopt Opt_SimpleListLiterals dflags        -- -fsimple-list-literals
+         || not (gopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
                 -- See Note [Desugaring RULE left hand sides] in Desugar
          || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!
@@ -707,9 +696,25 @@ dsExplicitList elt_ty xs
            ; folded_suffix <- mkFoldrExpr elt_ty n_ty (Var c) (Var n) suffix'
            ; return (foldr (App . App (Var c)) folded_suffix prefix) }
 
+dsExplicitList elt_ty (Just fln) xs
+  = do { fln' <- dsExpr fln
+       ; list <- dsExplicitList elt_ty Nothing xs
+       ; dflags <- getDynFlags
+       ; return (App (App fln' (mkIntExprInt dflags (length xs))) list) }
+       
 spanTail :: (a -> Bool) -> [a] -> ([a], [a])
 spanTail f xs = (reverse rejected, reverse satisfying)
     where (satisfying, rejected) = span f $ reverse xs
+    
+dsArithSeq :: PostTcExpr -> (ArithSeqInfo Id) -> DsM CoreExpr
+dsArithSeq expr (From from)
+  = App <$> dsExpr expr <*> dsLExpr from
+dsArithSeq expr (FromTo from to)
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
+dsArithSeq expr (FromThen from thn)
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
+dsArithSeq expr (FromThenTo from thn to)
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
 \end{code}
 
 Desugar 'do' and 'mdo' expressions (NOT list comprehensions, they're
@@ -717,7 +722,7 @@ handled in DsListComp).  Basically does the translation given in the
 Haskell 98 report:
 
 \begin{code}
-dsDo :: [LStmt Id] -> DsM CoreExpr
+dsDo :: [ExprLStmt Id] -> DsM CoreExpr
 dsDo stmts
   = goL stmts
   where
@@ -728,7 +733,7 @@ dsDo stmts
       = ASSERT( null stmts ) dsLExpr body
         -- The 'return' op isn't used for 'do' expressions
 
-    go _ (ExprStmt rhs then_expr _ _) stmts
+    go _ (BodyStmt rhs then_expr _ _) stmts
       = do { rhs2 <- dsLExpr rhs
            ; warnDiscardedDoBindings rhs (exprType rhs2) 
            ; then_expr2 <- dsExpr then_expr
@@ -768,8 +773,8 @@ dsDo stmts
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
         mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
-        mfix_arg     = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
-                                                 (mkFunTy tup_ty body_ty))
+        mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
+                                         , mg_arg_tys = [tup_ty], mg_res_ty = body_ty })
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
         ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)
@@ -827,7 +832,7 @@ conversionNames
   = [ toIntegerName, toRationalName
     , fromIntegralName, realToFracName ]
  -- We can't easily add fromIntegerName, fromRationalName,
- -- becuase they are generated by literals
+ -- because they are generated by literals
 \end{code}
 
 %************************************************************************

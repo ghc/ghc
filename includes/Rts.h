@@ -156,6 +156,8 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define TIME_RESOLUTION 1000000000
 typedef StgInt64 Time;
 
+#define TIME_MAX HS_INT64_MAX
+
 #if TIME_RESOLUTION == 1000000000
 // I'm being lazy, but it's awkward to define fully general versions of these
 #define TimeToUS(t)      ((t) / 1000)
@@ -180,7 +182,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
    Include everything STG-ish
    -------------------------------------------------------------------------- */
 
-/* System headers: stdlib.h is eeded so that we can use NULL.  It must
+/* System headers: stdlib.h is needed so that we can use NULL.  It must
  * come after MachRegs.h, because stdlib.h might define some inline
  * functions which may only be defined after register variables have
  * been declared.
@@ -206,7 +208,6 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/storage/FunTypes.h"
 #include "rts/storage/InfoTables.h"
 #include "rts/storage/Closures.h"
-#include "rts/storage/Liveness.h"
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/TSO.h"
 #include "stg/MiscClosures.h" /* InfoTables, closures etc. defined in the RTS */
@@ -225,6 +226,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/Flags.h"
 #include "rts/Adjustor.h"
 #include "rts/FileLock.h"
+#include "rts/GetTime.h"
 #include "rts/Globals.h"
 #include "rts/IOManager.h"
 #include "rts/Linker.h"
@@ -303,6 +305,12 @@ TICK_VAR(2)
 #define DEBUG_ONLY(s) s
 #else
 #define DEBUG_ONLY(s) doNothing()
+#endif
+
+#ifdef DEBUG
+#define DEBUG_IS_ON   1
+#else
+#define DEBUG_IS_ON   0
 #endif
 
 /* -----------------------------------------------------------------------------

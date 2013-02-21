@@ -9,36 +9,6 @@
  *
  * For the syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
  *
- * If you're used to the old HC file syntax, here's a quick cheat sheet
- * for converting HC code:
- *
- *       - Remove FB_/FE_
- *       - Remove all type casts
- *       - Remove '&'
- *       - STGFUN(foo) { ... }  ==>  foo { ... }
- *       - FN_(foo) { ... }  ==>  foo { ... }
- *       - JMP_(e)  ==> jump e;
- *       - Remove EXTFUN(foo)
- *       - Sp[n]  ==>  Sp(n)
- *       - Hp[n]  ==>  Hp(n)
- *       - Sp += n  ==> Sp_adj(n)
- *       - Hp += n  ==> Hp_adj(n)
- *       - R1.i   ==>  R1   (similarly for R1.w, R1.cl etc.)
- *       - You need to explicitly dereference variables; eg. 
- *             alloc_blocks   ==>  CInt[alloc_blocks]
- *       - convert all word offsets into byte offsets:
- *         	- e ==> WDS(e)
- *       - sizeofW(StgFoo)  ==>  SIZEOF_StgFoo
- *       - ENTRY_CODE(e)  ==>  %ENTRY_CODE(e)
- *       - get_itbl(c)  ==>  %GET_STD_INFO(c)
- *       - Change liveness masks in STK_CHK_GEN, HP_CHK_GEN:
- *        	R1_PTR | R2_PTR  ==>  R1_PTR & R2_PTR
- *         	(NOTE: | becomes &)
- *       - Declarations like 'StgPtr p;' become just 'W_ p;'
- *       - e->payload[n] ==> PAYLOAD(e,n)
- *       - Be very careful with comparisons: the infix versions (>, >=, etc.)
- *         are unsigned, so use %lt(a,b) to get signed less-than for example.
- *
  * Accessing fields of structures defined in the RTS header files is
  * done via automatically-generated macros in DerivedConstants.h.  For
  * example, where previously we used
@@ -125,9 +95,10 @@
 #error Unknown long size
 #endif
 
-#define F_ float32
-#define D_ float64
-#define L_ bits64
+#define F_   float32
+#define D_   float64
+#define L_   bits64
+#define V16_ bits128
 
 #define SIZEOF_StgDouble 8
 #define SIZEOF_StgWord64 8
@@ -135,6 +106,8 @@
 /* -----------------------------------------------------------------------------
    Misc useful stuff
    -------------------------------------------------------------------------- */
+
+#define ccall foreign "C"
 
 #define NULL (0::W_)
 
@@ -210,7 +183,7 @@
 #define Sp(n)  W_[Sp + WDS(n)]
 #define Hp(n)  W_[Hp + WDS(n)]
 
-#define Sp_adj(n) Sp = Sp + WDS(n)
+#define Sp_adj(n) Sp = Sp + WDS(n)  /* pronounced "spadge" */
 #define Hp_adj(n) Hp = Hp + WDS(n)
 
 /* -----------------------------------------------------------------------------
@@ -222,7 +195,7 @@
 	if (predicate) {			\
 	    /*null*/;				\
 	} else {				\
-	    foreign "C" _assertFail(NULL, __LINE__); \
+	    foreign "C" _assertFail(NULL, __LINE__) never returns; \
         }
 #else
 #define ASSERT(p) /* nothing */
@@ -275,28 +248,40 @@
 // because LDV profiling relies on entering closures to mark them as
 // "used".
 
-#define LOAD_INFO \
-    info = %INFO_PTR(UNTAG(P1));
+#define LOAD_INFO(ret,x)                        \
+    info = %INFO_PTR(UNTAG(x));
 
-#define UNTAG_R1 \
-    P1 = UNTAG(P1);
+#define UNTAG_IF_PROF(x) UNTAG(x)
 
 #else
 
-#define LOAD_INFO                               \
-  if (GETTAG(P1) != 0) {                        \
-      jump %ENTRY_CODE(Sp(0));                  \
+#define LOAD_INFO(ret,x)                        \
+  if (GETTAG(x) != 0) {                         \
+      ret(x);                                   \
   }                                             \
-  info = %INFO_PTR(P1);
+  info = %INFO_PTR(x);
 
-#define UNTAG_R1 /* nothing */
+#define UNTAG_IF_PROF(x) (x) /* already untagged */
 
 #endif
 
-#define ENTER()						\
+// We need two versions of ENTER():
+//  - ENTER(x) takes the closure as an argument and uses return(),
+//    for use in civilized code where the stack is handled by GHC
+//
+//  - ENTER_NOSTACK() where the closure is in R1, and returns are
+//    explicit jumps, for use when we are doing the stack management
+//    ourselves.
+
+#define ENTER(x) ENTER_(return,x)
+#define ENTER_R1() ENTER_(RET_R1,R1)
+
+#define RET_R1(x) jump %ENTRY_CODE(Sp(0)) [R1]
+
+#define ENTER_(ret,x)                                   \
  again:							\
   W_ info;						\
-  LOAD_INFO                                             \
+  LOAD_INFO(ret,x)                                       \
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]		\
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {	\
   case							\
@@ -304,7 +289,7 @@
     IND_PERM,						\
     IND_STATIC:						\
    {							\
-      P1 = StgInd_indirectee(P1);			\
+      x = StgInd_indirectee(x);                         \
       goto again;					\
    }							\
   case							\
@@ -318,12 +303,12 @@
     BCO,						\
     PAP:						\
    {							\
-      jump %ENTRY_CODE(Sp(0));				\
+       ret(x);                                          \
    }							\
   default:						\
    {							\
-      UNTAG_R1                                          \
-      jump %ENTRY_CODE(info);				\
+       x = UNTAG_IF_PROF(x);                            \
+       jump %ENTRY_CODE(info) (x);                      \
    }							\
   }
 
@@ -346,10 +331,8 @@
  * Need MachRegs, because some of the RTS code is conditionally
  * compiled based on REG_R1, REG_R2, etc.
  */
-#define STOLEN_X86_REGS 4
-#include "stg/MachRegs.h"
+#include "stg/RtsMachRegs.h"
 
-#include "rts/storage/Liveness.h"
 #include "rts/prof/LDV.h"
 
 #undef BLOCK_SIZE
@@ -358,6 +341,18 @@
 
 
 #define MyCapability()  (BaseReg - OFFSET_Capability_r)
+
+/* -------------------------------------------------------------------------
+   Info tables
+   ------------------------------------------------------------------------- */
+
+#if defined(PROFILING)
+#define PROF_HDR_FIELDS(w_,hdr1,hdr2)          \
+  w_ hdr1,                                     \
+  w_ hdr2,
+#else
+#define PROF_HDR_FIELDS(w_,hdr1,hdr2) /* nothing */
+#endif
 
 /* -------------------------------------------------------------------------
    Allocation and garbage collection
@@ -372,29 +367,136 @@
  * ticky-ticky.  It's not clear whether eg. the size field of an array
  * should be counted as "admin", or the various fields of a BCO.
  */
-#define ALLOC_PRIM(bytes,liveness,reentry)			\
-   HP_CHK_GEN_TICKY(bytes,liveness,reentry);			\
+#define ALLOC_PRIM(bytes)                                       \
+   HP_CHK_GEN_TICKY(bytes);                                     \
    TICK_ALLOC_PRIM(SIZEOF_StgHeader,bytes-SIZEOF_StgHeader,0);	\
    CCCS_ALLOC(bytes);
+
+#define HEAP_CHECK(bytes,failure)                       \
+    Hp = Hp + (bytes);                                  \
+    if (Hp > HpLim) { HpAlloc = (bytes); failure; }     \
+    TICK_ALLOC_HEAP_NOCTR(bytes);
+
+#define ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,failure)           \
+    HEAP_CHECK(bytes,failure)                                   \
+    TICK_ALLOC_PRIM(SIZEOF_StgHeader,bytes-SIZEOF_StgHeader,0); \
+    CCCS_ALLOC(bytes);
+
+#define ALLOC_PRIM_(bytes,fun)                                  \
+    ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,GC_PRIM(fun));
+
+#define ALLOC_PRIM_P(bytes,fun,arg)                             \
+    ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,GC_PRIM_P(fun,arg));
+
+#define ALLOC_PRIM_N(bytes,fun,arg)                             \
+    ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,GC_PRIM_N(fun,arg));
 
 /* CCS_ALLOC wants the size in words, because ccs->mem_alloc is in words */
 #define CCCS_ALLOC(__alloc) CCS_ALLOC(BYTES_TO_WDS(__alloc), CCCS)
 
-#define HP_CHK_GEN_TICKY(alloc,liveness,reentry)	\
-   HP_CHK_GEN(alloc,liveness,reentry);			\
+#define HP_CHK_GEN_TICKY(alloc)                 \
+   HP_CHK_GEN(alloc);                           \
    TICK_ALLOC_HEAP_NOCTR(alloc);
+
+#define HP_CHK_P(bytes, fun, arg)               \
+   HEAP_CHECK(bytes, GC_PRIM_P(fun,arg))
+
+#define ALLOC_P_TICKY(alloc, fun, arg)          \
+   HP_CHK_P(alloc);                             \
+   TICK_ALLOC_HEAP_NOCTR(alloc);
+
+#define CHECK_GC()                                                      \
+  (bdescr_link(CurrentNursery) == NULL ||                               \
+   generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
 
 // allocate() allocates from the nursery, so we check to see
 // whether the nursery is nearly empty in any function that uses
 // allocate() - this includes many of the primops.
-#define MAYBE_GC(liveness,reentry)			\
-    if (bdescr_link(CurrentNursery) == NULL || \
-        generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim])) {   \
-	R9  = liveness;					\
-        R10 = reentry;					\
-        HpAlloc = 0;					\
-        jump stg_gc_gen_hp;				\
+//
+// HACK alert: the __L__ stuff is here to coax the common-block
+// eliminator into commoning up the call stg_gc_noregs() with the same
+// code that gets generated by a STK_CHK_GEN() in the same proc.  We
+// also need an if (0) { goto __L__; } so that the __L__ label isn't
+// optimised away by the control-flow optimiser prior to common-block
+// elimination (it will be optimised away later).
+//
+// This saves some code in gmp-wrappers.cmm where we have lots of
+// MAYBE_GC() in the same proc as STK_CHK_GEN().
+//
+#define MAYBE_GC(retry)                         \
+    if (CHECK_GC()) {                           \
+        HpAlloc = 0;                            \
+        goto __L__;                             \
+  __L__:                                        \
+        call stg_gc_noregs();                   \
+        goto retry;                             \
+   }                                            \
+   if (0) { goto __L__; }
+
+#define GC_PRIM(fun)                            \
+        R9 = fun;                               \
+        jump stg_gc_prim();
+
+#define GC_PRIM_N(fun,arg)                      \
+        R9 = fun;                               \
+        jump stg_gc_prim_n(arg);
+
+#define GC_PRIM_P(fun,arg)                      \
+        R9 = fun;                               \
+        jump stg_gc_prim_p(arg);
+
+#define GC_PRIM_PP(fun,arg1,arg2)               \
+        R9 = fun;                               \
+        jump stg_gc_prim_pp(arg1,arg2);
+
+#define MAYBE_GC_(fun)                          \
+    if (CHECK_GC()) {                           \
+        HpAlloc = 0;                            \
+        GC_PRIM(fun)                            \
    }
+
+#define MAYBE_GC_N(fun,arg)                     \
+    if (CHECK_GC()) {                           \
+        HpAlloc = 0;                            \
+        GC_PRIM_N(fun,arg)                      \
+   }
+
+#define MAYBE_GC_P(fun,arg)                     \
+    if (CHECK_GC()) {                           \
+        HpAlloc = 0;                            \
+        GC_PRIM_P(fun,arg)                      \
+   }
+
+#define MAYBE_GC_PP(fun,arg1,arg2)              \
+    if (CHECK_GC()) {                           \
+        HpAlloc = 0;                            \
+        GC_PRIM_PP(fun,arg1,arg2)               \
+   }
+
+#define STK_CHK(n, fun)                         \
+    if (Sp - (n) < SpLim) {                     \
+        GC_PRIM(fun)                            \
+    }
+
+#define STK_CHK_P(n, fun, arg)                  \
+    if (Sp - (n) < SpLim) {                     \
+        GC_PRIM_P(fun,arg)                      \
+    }
+
+#define STK_CHK_PP(n, fun, arg1, arg2)          \
+    if (Sp - (n) < SpLim) {                     \
+        GC_PRIM_PP(fun,arg1,arg2)               \
+    }
+
+#define STK_CHK_ENTER(n, closure)               \
+    if (Sp - (n) < SpLim) {                     \
+        jump __stg_gc_enter_1(closure);         \
+    }
+
+// A funky heap check used by AutoApply.cmm
+
+#define HP_CHK_NP_ASSIGN_SP0(size,f)                    \
+    HEAP_CHECK(size, Sp(0) = f; jump __stg_gc_enter_1 [R1];)
 
 /* -----------------------------------------------------------------------------
    Closure headers
@@ -480,23 +582,6 @@
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
 #endif
-
-/* -----------------------------------------------------------------------------
-   Voluntary Yields/Blocks
-
-   We only have a generic version of this at the moment - if it turns
-   out to be slowing us down we can make specialised ones.
-   -------------------------------------------------------------------------- */
-
-#define YIELD(liveness,reentry)			\
-   R9  = liveness;				\
-   R10 = reentry;				\
-   jump stg_gen_yield;
-
-#define BLOCK(liveness,reentry)			\
-   R9  = liveness;				\
-   R10 = reentry;				\
-   jump stg_gen_block;
 
 /* -----------------------------------------------------------------------------
    Ticky macros 
@@ -586,21 +671,91 @@
     TICK_BUMP_BY(ALLOC_HEAP_tot,n)
 
 /* -----------------------------------------------------------------------------
+   Saving and restoring STG registers
+
+   STG registers must be saved around a C call, just in case the STG
+   register is mapped to a caller-saves machine register.  Normally we
+   don't need to worry about this the code generator has already
+   loaded any live STG registers into variables for us, but in
+   hand-written low-level Cmm code where we don't know which registers
+   are live, we might have to save them all.
+   -------------------------------------------------------------------------- */
+
+#define SAVE_STGREGS                            \
+    W_ r1, r2, r3,  r4,  r5,  r6,  r7,  r8;     \
+    F_ f1, f2, f3, f4, f5, f6;                  \
+    D_ d1, d2, d3, d4, d5, d6;                  \
+    L_ l1;                                      \
+                                                \
+    r1 = R1;                                    \
+    r2 = R2;                                    \
+    r3 = R3;                                    \
+    r4 = R4;                                    \
+    r5 = R5;                                    \
+    r6 = R6;                                    \
+    r7 = R7;                                    \
+    r8 = R8;                                    \
+                                                \
+    f1 = F1;                                    \
+    f2 = F2;                                    \
+    f3 = F3;                                    \
+    f4 = F4;                                    \
+    f5 = F5;                                    \
+    f6 = F6;                                    \
+                                                \
+    d1 = D1;                                    \
+    d2 = D2;                                    \
+    d3 = D3;                                    \
+    d4 = D4;                                    \
+    d5 = D5;                                    \
+    d6 = D6;                                    \
+                                                \
+    l1 = L1;
+
+
+#define RESTORE_STGREGS                         \
+    R1 = r1;                                    \
+    R2 = r2;                                    \
+    R3 = r3;                                    \
+    R4 = r4;                                    \
+    R5 = r5;                                    \
+    R6 = r6;                                    \
+    R7 = r7;                                    \
+    R8 = r8;                                    \
+                                                \
+    F1 = f1;                                    \
+    F2 = f2;                                    \
+    F3 = f3;                                    \
+    F4 = f4;                                    \
+    F5 = f5;                                    \
+    F6 = f6;                                    \
+                                                \
+    D1 = d1;                                    \
+    D2 = d2;                                    \
+    D3 = d3;                                    \
+    D4 = d4;                                    \
+    D5 = d5;                                    \
+    D6 = d6;                                    \
+                                                \
+    L1 = l1;
+
+/* -----------------------------------------------------------------------------
    Misc junk
    -------------------------------------------------------------------------- */
 
 #define NO_TREC                   stg_NO_TREC_closure
 #define END_TSO_QUEUE             stg_END_TSO_QUEUE_closure
+#define STM_AWOKEN                stg_STM_AWOKEN_closure
 #define END_INVARIANT_CHECK_QUEUE stg_END_INVARIANT_CHECK_QUEUE_closure
 
-#define recordMutableCap(p, gen, regs)					\
+#define recordMutableCap(p, gen)                                        \
   W_ __bd;								\
   W_ mut_list;								\
   mut_list = Capability_mut_lists(MyCapability()) + WDS(gen);		\
  __bd = W_[mut_list];							\
   if (bdescr_free(__bd) >= bdescr_start(__bd) + BLOCK_SIZE) {		\
       W_ __new_bd;							\
-      ("ptr" __new_bd) = foreign "C" allocBlock_lock() [regs];		\
+      ("ptr" __new_bd) = foreign "C" allocBlock_lock();			\
       bdescr_link(__new_bd) = __bd;					\
       __bd = __new_bd;							\
       W_[mut_list] = __bd;						\
@@ -610,13 +765,13 @@
   W_[free] = p;								\
   bdescr_free(__bd) = free + WDS(1);
 
-#define recordMutable(p, regs)                                  \
+#define recordMutable(p)                                        \
       P_ __p;                                                   \
       W_ __bd;                                                  \
       W_ __gen;                                                 \
       __p = p;                                                  \
       __bd = Bdescr(__p);                                       \
       __gen = TO_W_(bdescr_gen_no(__bd));                       \
-      if (__gen > 0) { recordMutableCap(__p, __gen, regs); }
+      if (__gen > 0) { recordMutableCap(__p, __gen); }
 
 #endif /* CMM_H */

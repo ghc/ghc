@@ -1,0 +1,321 @@
+\documentclass{article}
+
+\usepackage{supertabular}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{xcolor}
+\usepackage{fullpage}
+\usepackage{multirow}
+
+\newcommand{\ghcfile}[1]{\textsl{#1}}
+\newcommand{\arraylabel}[1]{\multicolumn{2}{l}{\!\!\!\!\!\!\!\!\!\text{\underline{#1}:}}}
+
+\input{CoreOtt}
+
+% increase spacing between rules for ease of reading:
+\renewcommand{\ottusedrule}[1]{\[#1\]\\[1ex]}
+
+\setlength{\parindent}{0in}
+\setlength{\parskip}{1ex}
+
+\newcommand{\gram}[1]{\ottgrammartabular{#1\ottinterrule}}
+
+\begin{document}
+
+\begin{center}
+\LARGE
+System FC, as implemented in GHC\footnote{This
+document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
+but it should be maintained by anyone who edits the functions or data structures
+mentioned in this file. Please feel free to contact Richard for more information.}\\
+\Large\today
+\end{center}
+
+\section{Introduction}
+
+There are a number of details elided from this presentation. The goal of the
+formalism is to aid in reasoning about type safety, and checks that do not
+work toward this goal were omitted. For example, various scoping checks (other
+than basic context inclusion) appear in the GHC code but not here.
+
+\section{Grammar}
+
+\subsection{Metavariables}
+
+We will use the following metavariables:
+
+\ottmetavars{}\\
+
+\subsection{Literals}
+
+Literals do not play a major role, so we leave them abstract:
+
+\gram{\ottlit}
+
+We also leave abstract the function \coderef{basicTypes/Literal.lhs}{literalType}
+and the judgment \coderef{coreSyn/CoreLint.lhs}{lintTyLit} (written $[[G |-tylit lit : k]]$).
+
+\subsection{Variables}
+
+GHC uses the same datatype to represent term-level variables and type-level
+variables:
+
+\gram{
+\ottz
+}
+foo
+
+\gram{
+\ottn
+}
+
+\subsection{Expressions}
+
+The datatype that represents expressions:
+
+\gram{\otte}
+
+There are a few key invariants about expressions:
+\begin{itemize}
+\item The right-hand sides of all top-level and recursive $[[let]]$s
+must be of lifted type.
+\item The right-hand side of a non-recursive $[[let]]$ and the argument
+of an application may be of unlifted type, but only if the expression
+is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{coreSyn/CoreSyn.lhs}.
+\item We allow a non-recursive $[[let]]$ for bind a type variable.
+\item The $[[_]]$ case for a $[[case]]$ must come first.
+\item The list of case alternatives must be exhaustive.
+\item Types and coercions can only appear on the right-hand-side of an application.
+\end{itemize}
+
+Bindings for $[[let]]$ statements:
+
+\gram{\ottbinding}
+
+Case alternatives:
+
+\gram{\ottalt}
+
+Constructors as used in patterns:
+
+\gram{\ottKp}
+
+Notes that can be inserted into the AST. We leave these abstract:
+
+\gram{\otttick}
+
+A program is just a list of bindings:
+
+\gram{\ottprogram}
+
+\subsection{Types}
+
+\gram{\ottt}
+
+There are some invariants on types:
+\begin{itemize}
+\item The type $[[t1]]$ in the form $[[t1 t2]]$ must not be a type constructor
+$[[T]]$. It should be another application or a type variable.
+\item The form $[[T </ ti // i /> ]]$ (\texttt{TyConApp}) 
+does \emph{not} need to be saturated.
+\item A saturated application of $[[(->) t1 t2]]$ should be represented as 
+$[[t1 -> t2]]$. This is a different point in the grammar, not just pretty-printing.
+The constructor for a saturated $[[(->)]]$ is \texttt{FunTy}.
+\item A type-level literal is represented in GHC with a different datatype than
+a term-level literal, but we are ignoring this distinction here.
+\end{itemize}
+
+\subsection{Coercions}
+
+\gram{\ottg}
+
+Invariants on coercions:
+\begin{itemize}
+\item $[[<t1 t2>]]$ is used; never $[[<t1> <t2>]]$.
+\item If $[[<T>]]$ is applied to some coercions, at least one of which is not
+reflexive, use $[[T </ gi // i />]]$, never $[[<T> g1 g2]] \ldots$.
+\item The $[[T]]$ in $[[T </gi//i/>]]$ is never a type synonym, though it could
+be a type function.
+\end{itemize}
+
+Is it a left projection or a right projection?
+
+\gram{\ottLorR}
+
+Axioms:
+
+\gram{
+\ottC\ottinterrule
+\ottaxBranch
+}
+
+\subsection{Type constructors}
+
+Type constructors in GHC contain \emph{lots} of information. We leave most of it out
+for this formalism:
+
+\gram{\ottT}
+
+We include some representative primitive type constructors. There are many more in \ghcfile{prelude/TysPrim.lhs}.
+
+\gram{\ottH}
+
+\section{Contexts}
+
+The functions in \ghcfile{coreSyn/CoreLint.lhs} use the \texttt{LintM} monad.
+This monad contains a context with a set of bound variables $[[G]]$. The
+formalism treats $[[G]]$ as an ordered list, but GHC uses a set as its
+representation.
+
+\gram{
+\ottG
+}
+
+We assume the Barendregt variable convention that all new variables are
+fresh in the context. In the implementation, of course, some work is done
+to guarantee this freshness. In particular, adding a new type variable to
+the context sometimes requires creating a new, fresh variable name and then
+applying a substitution. We elide these details in this formalism, but
+see \coderef{types/Type.lhs}{substTyVarBndr} for details.
+
+\section{Judgments}
+
+The following functions are used from GHC. Their names are descriptive, and they
+are not formalized here: \coderef{types/TyCon.lhs}{tyConKind},
+\coderef{types/TyCon.lhs}{tyConArity}, \coderef{basicTypes/DataCon.lhs}{dataConTyCon}, \coderef{types/TyCon.lhs}{isNewTyCon}, \coderef{basicTypes/DataCon.lhs}{dataConRepType}.
+
+\subsection{Program consistency}
+
+Check the entire bindings list in a context including the whole list. We extract
+the actual variables (with their types/kinds) from the bindings, check for duplicates,
+and then check each binding.
+
+\ottdefnlintCoreBindings{}
+
+Here is the definition of $[[vars_of]]$, taken from \coderef{coreSyn/CoreSyn.lhs}{bindersOf}:
+
+\[
+\begin{array}{ll}
+[[vars_of n = e]] &= [[n]] \\
+[[vars_of rec </ ni = ei // i />]] &= [[</ ni // i />]]
+\end{array}
+\]
+
+\subsection{Binding consistency}
+
+\ottdefnlintXXbind{}
+
+\ottdefnlintSingleBinding{}
+
+In the GHC source, this function contains a number of other checks, such
+as for strictness and exportability. See the source code for further information.
+
+\subsection{Expression typing}
+
+\ottdefnlintCoreExpr{}
+
+%\arraylabel{\coderef{coreSyn/CoreLint.lhs}{checkCaseAlts}} \\
+%\multicolumn{2}{l}{[[checkCaseAlts]] \text{ checks ordering and exhaustivity constr%aints}} \\
+
+%\end{array}
+%\]
+
+\begin{itemize}
+\item Some explication of \ottdrulename{Tm\_LetRec} is helpful: The idea behind the
+second premise ($[[</ G, G'i |-ty s'i : ki // i />]]$) is that we wish
+to check each substituted type $[[s'i]]$ in a context containing all the types
+that come before it in the list of bindings. The $[[G'i]]$ are contexts
+containing the names and kinds of all type variables (and term variables,
+for that matter) up to the $i$th binding. This logic is extracted from
+\coderef{coreSyn/CoreLint.lhs}{lintAndScopeIds}.
+
+\item There is one more case for $[[G |-tm e : t]]$, for type expressions.
+This is included in the GHC code but is elided
+here because the case is never used in practice. Type expressions
+can only appear in arguments to functions, and these are handled
+in \ottdrulename{Tm\_AppType}.
+
+\item The GHC source code checks all arguments in an application expression
+all at once using \coderef{coreSyn/CoreSyn.lhs}{collectArgs}
+and \coderef{coreSyn/CoreLint.lhs}{lintCoreArgs}. The operation
+has been unfolded for presentation here.
+
+\item If a $[[tick]]$ contains breakpoints, the GHC source performs additional
+(scoping) checks.
+
+\item The rule for $[[case]]$ statements also checks to make sure that
+the alternatives in the $[[case]]$ are well-formed with respect to the
+invariants listed above. These invariants do not affect the type or
+evaluation of the expression, so the check is omitted here.
+
+\item The GHC source code for \ottdrulename{Tm\_Var} contains checks for
+a dead id and for one-tuples. These checks are omitted here.
+\end{itemize}
+
+\subsection{Kinding}
+
+\ottdefnlintType{}
+
+\subsection{Kind validity}
+
+\ottdefnlintKind{}
+
+\subsection{Coercion typing}
+
+\ottdefnlintCoercion{}
+
+In \ottdrulename{Co\_AxiomInstCo}, the use of $[[inits]]$ creates substitutions from
+the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of 
+folding the substitution over the kinds for kind-checking.
+
+\subsection{Name consistency}
+
+There are two very similar checks for names, one declared as a local function:
+
+\ottdefnlintSingleBindingXXlintBinder{}
+
+\ottdefnlintBinder{}
+
+\subsection{Substitution consistency}
+
+\ottdefncheckTyKind{}
+
+\subsection{Case alternative consistency}
+
+\ottdefnlintCoreAlt{}
+
+\subsection{Telescope substitution}
+
+\ottdefnapplyTys{}
+
+\subsection{Case alternative binding consistency}
+
+\ottdefnlintAltBinders{}
+
+\subsection{Arrow kinding}
+
+\ottdefnlintArrow{}
+
+\subsection{Type application kinding}
+
+\ottdefnlintXXapp{}
+
+\subsection{Sub-kinding}
+
+\ottdefnisSubKind{}
+
+\subsection{Branched axiom conflict checking}
+
+The following judgment is used within \ottdrulename{Co\_AxiomInstCo} to make
+sure that a type family application cannot unify with any previous branch
+in the axiom.
+
+\ottdefncheckXXnoXXconflict{}
+
+The judgment $[[apart]]$ checks to see whether two lists of types are surely apart.
+It checks to see if \coderef{types/Unify.lhs}{tcApartTys} returns \texttt{SurelyApart}.
+Two types are apart if neither type is a type family application and if they do not
+unify.
+
+\end{document}

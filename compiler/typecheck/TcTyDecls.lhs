@@ -17,7 +17,7 @@ files for imported data types.
 -- for details
 
 module TcTyDecls(
-        calcRecFlags,
+        calcRecFlags, RecTyInfo(..), 
         calcSynCycles, calcClassCycles
     ) where
 
@@ -27,9 +27,11 @@ import TypeRep
 import HsSyn
 import Class
 import Type
+import Kind
 import HscTypes
 import TyCon
 import DataCon
+import Var
 import Name
 import NameEnv
 import NameSet
@@ -38,8 +40,8 @@ import Digraph
 import BasicTypes
 import SrcLoc
 import UniqSet
-import Maybes( mapCatMaybes )
-import Util ( isSingleton )
+import Maybes( mapCatMaybes, isJust )
+import Util ( lengthIs, isSingleton )
 import Data.List
 \end{code}
 
@@ -110,7 +112,7 @@ synTyConsOfType ty
 \begin{code}
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
 mkSynEdges syn_decls = [ (ldecl, name, nameSetToList fvs)
-                       | ldecl@(L _ (TyDecl { tcdLName = L _ name
+                       | ldecl@(L _ (SynDecl { tcdLName = L _ name
                                             , tcdFVs = fvs })) <- syn_decls ]
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
@@ -195,17 +197,6 @@ calcClassCycles cls
     expandTheta _    _    []           = id
     expandTheta seen path (pred:theta) = expandType seen path pred . expandTheta seen path theta
 
-    {-
-    expandTree seen path (ClassPred cls tys)
-      | cls `elemUniqSet` seen = 
-      | otherwise              = expandTheta (addOneToUniqSet cls seen) (classTyCon cls:path) 
-                                             (substTysWith (classTyVars cls) tys (classSCTheta cls))
-    expandTree seen path (TuplePred ts)      = flip (foldr (expandTree seen path)) ts
-    expandTree _    _    (EqPred _ _)        = id
-    expandTree _    _    (IPPred _ _)        = id
-    expandTree seen path (IrredPred pred)    = expandType seen path pred
-    -}
-
     expandType seen path (TyConApp tc tys)
       -- Expand unsaturated classes to their superclass theta if they are yet unseen.
       -- If they have already been seen then we have detected an error!
@@ -222,9 +213,8 @@ calcClassCycles cls
       -- For synonyms, try to expand them: some arguments might be
       -- phantoms, after all. We can expand with impunity because at
       -- this point the type synonym cycle check has already happened.
-      | isSynTyCon tc
-      , SynonymTyCon rhs <- synTyConRhs tc
-      , let (env, remainder) = papp (tyConTyVars tc) tys
+      | Just (tvs, rhs) <- synTyConDefn_maybe tc
+      , let (env, remainder) = papp tvs tys
             rest_tys = either (const []) id remainder
       = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) 
         . flip (foldr (expandType seen path)) rest_tys
@@ -360,12 +350,24 @@ recursiveness, because we need only look at the type decls in the module being
 compiled, plus the outer structure of directly-mentioned types.
 
 \begin{code}
-calcRecFlags :: ModDetails -> [TyThing] -> (Name -> RecFlag)
+data RecTyInfo = RTI { rti_promotable :: Bool
+                     , rti_is_rec     :: Name -> RecFlag }
+
+calcRecFlags :: ModDetails -> [TyThing] -> RecTyInfo
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
 calcRecFlags boot_details tyclss
-  = is_rec
+  = RTI { rti_promotable = is_promotable
+        , rti_is_rec     = is_rec }
   where
+    rec_tycon_names = mkNameSet (map tyConName all_tycons)
+    all_tycons = mapCatMaybes getTyCon tyclss
+                   -- Recursion of newtypes/data types can happen via
+                   -- the class TyCon, so tyclss includes the class tycons
+
+    is_promotable = all (isPromotableTyCon rec_tycon_names) all_tycons
+
+    ----------------- Recursion calculation ----------------
     is_rec n | n `elemNameSet` rec_names = Recursive
              | otherwise                 = NonRecursive
 
@@ -374,12 +376,6 @@ calcRecFlags boot_details tyclss
                 nt_loop_breakers  `unionNameSets`
                 prod_loop_breakers
 
-    all_tycons = [ tc | tc <- mapCatMaybes getTyCon tyclss
-                           -- Recursion of newtypes/data types can happen via
-                           -- the class TyCon, so tyclss includes the class tycons
-                      , not (tyConName tc `elemNameSet` boot_name_set) ]
-                           -- Remove the boot_name_set because they are going
-                           -- to be loop breakers regardless.
 
         -------------------------------------------------
         --                      NOTE
@@ -391,8 +387,13 @@ calcRecFlags boot_details tyclss
         -- loop.  We could program round this, but it'd make the code
         -- rather less nice, so I'm not going to do that yet.
 
-    single_con_tycons = filter (isSingleton . tyConDataCons) all_tycons
+    single_con_tycons = [ tc | tc <- all_tycons
+                             , not (tyConName tc `elemNameSet` boot_name_set)
+                                 -- Remove the boot_name_set because they are 
+                                 -- going to be loop breakers regardless.
+                             , isSingleton (tyConDataCons tc) ]
         -- Both newtypes and data types, with exactly one data constructor
+
     (new_tycons, prod_tycons) = partition isNewTyCon single_con_tycons
         -- NB: we do *not* call isProductTyCon because that checks
 	--     for vanilla-ness of data constructors; and that depends
@@ -454,6 +455,80 @@ findLoopBreakers deps
                | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompFromEdgedVerticesR edges,
                  name <- tyConName tc : go edges']
 \end{code}
+
+
+%************************************************************************
+%*                                                                      *
+                  Promotion calculation
+%*                                                                      *
+%************************************************************************
+
+See Note [Checking whether a group is promotable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We only want to promote a TyCon if all its data constructors
+are promotable; it'd be very odd to promote some but not others.
+
+But the data constructors may mention this or other TyCons.
+
+So we treat the recursive uses as all OK (ie promotable) and
+do one pass to check that each TyCon is promotable.
+
+Currently type synonyms are not promotable, though that
+could change.
+
+\begin{code}
+isPromotableTyCon :: NameSet -> TyCon -> Bool
+isPromotableTyCon rec_tycons tc
+  =  isAlgTyCon tc    -- Only algebraic; not even synonyms
+                     -- (we could reconsider the latter)
+  && ok_kind (tyConKind tc)
+  && case algTyConRhs tc of 
+       DataTyCon { data_cons = cs } -> all ok_con cs 
+       NewTyCon { data_con = c }    -> ok_con c
+       AbstractTyCon {}             -> False
+       DataFamilyTyCon {}           -> False
+
+  where
+    ok_kind kind = all isLiftedTypeKind args && isLiftedTypeKind res
+            where  -- Checks for * -> ... -> * -> *
+              (args, res) = splitKindFunTys kind
+
+    -- See Note [Promoted data constructors] in TyCon
+    ok_con con = all (isLiftedTypeKind . tyVarKind) ex_tvs
+              && null eq_spec   -- No constraints
+              && null theta
+              && all (isPromotableType rec_tycons) orig_arg_tys
+       where
+         (_, ex_tvs, eq_spec, theta, orig_arg_tys, _) = dataConFullSig con
+
+
+isPromotableType :: NameSet -> Type -> Bool
+-- Must line up with DataCon.promoteType
+-- But the function lives here because we must treat the
+-- *recursive* tycons as promotable
+isPromotableType rec_tcs ty
+  = case splitForAllTys ty of
+      (_, rho) -> go rho
+  where
+    go (TyConApp tc tys) 
+      | tys `lengthIs` tyConArity tc 
+      ,  tyConName tc `elemNameSet` rec_tcs 
+      || isJust (promotableTyCon_maybe tc) 
+                       = all go tys
+      | otherwise      = False
+    go (FunTy arg res) = go arg && go res
+    go (AppTy arg res) = go arg && go res
+    go (ForAllTy _ ty) = go ty
+    go (TyVarTy {})    = True
+    go (LitTy {})      = False
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+        Miscellaneous funcions
+%*                                                                      *
+%************************************************************************
 
 These two functions know about type representations, so they could be
 in Type or TcType -- but they are very specialised to this module, so

@@ -39,8 +39,6 @@ module DsUtils (
 
         mkSelectorBinds,
 
-        dsSyntaxTable, lookupEvidence,
-
 	selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
         mkOptTickBox, mkBinaryTickBox
     ) where
@@ -48,7 +46,6 @@ module DsUtils (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	Match ( matchSimply )
-import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn
 import TcHsSyn
@@ -60,7 +57,6 @@ import CoreUtils
 import MkCore
 import MkId
 import Id
-import Name
 import Literal
 import TyCon
 import DataCon
@@ -71,47 +67,17 @@ import TysWiredIn
 import BasicTypes
 import UniqSet
 import UniqSupply
+import Module
 import PrelNames
 import Outputable
 import SrcLoc
 import Util
-import ListSetOps
 import DynFlags
 import FastString
 
 import Control.Monad    ( zipWithM )
 \end{code}
 
-
-%************************************************************************
-%*									*
-		Rebindable syntax
-%*									*
-%************************************************************************
-
-\begin{code}
-dsSyntaxTable :: SyntaxTable Id 
-	       -> DsM ([CoreBind], 	-- Auxiliary bindings
-		       [(Name,Id)])	-- Maps the standard name to its value
-
-dsSyntaxTable rebound_ids = do
-    (binds_s, prs) <- mapAndUnzipM mk_bind rebound_ids
-    return (concat binds_s, prs)
-  where
-        -- The cheapo special case can happen when we 
-        -- make an intermediate HsDo when desugaring a RecStmt
-    mk_bind (std_name, HsVar id) = return ([], (std_name, id))
-    mk_bind (std_name, expr) = do
-           rhs <- dsExpr expr
-           id <- newSysLocalDs (exprType rhs)
-           return ([NonRec id rhs], (std_name, id))
-
-lookupEvidence :: [(Name, Id)] -> Name -> Id
-lookupEvidence prs std_name
-  = assocDefault (mk_panic std_name) prs std_name
-  where
-    mk_panic std_name = pprPanic "dsSyntaxTable" (ptext (sLit "Not found:") <+> ppr std_name)
-\end{code}
 
 %************************************************************************
 %*									*
@@ -308,11 +274,12 @@ mkCoPrimCaseMatchResult var ty match_alts
 
 
 mkCoAlgCaseMatchResult 
-  :: Id					   -- Scrutinee
+  :: DynFlags
+  -> Id					   -- Scrutinee
   -> Type                                  -- Type of exp
   -> [(DataCon, [CoreBndr], MatchResult)]  -- Alternatives (bndrs *include* tyvars, dicts)
   -> MatchResult
-mkCoAlgCaseMatchResult var ty match_alts 
+mkCoAlgCaseMatchResult dflags var ty match_alts 
   | isNewTyCon tycon		-- Newtype case; use a let
   = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
@@ -324,7 +291,7 @@ mkCoAlgCaseMatchResult var ty match_alts
   = MatchResult fail_flag mk_case
   where
     tycon = dataConTyCon con1
-	-- [Interesting: becuase of GADTs, we can't rely on the type of 
+	-- [Interesting: because of GADTs, we can't rely on the type of 
 	--  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
 	-- Stuff for newtype
@@ -340,7 +307,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     match_results  = [match_result | (_,_,match_result) <- match_alts]
 
     fail_flag | exhaustive_case
-	      = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
+	      = foldr orFail CantFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
 	      | otherwise
 	      = CanFail
 
@@ -349,10 +316,14 @@ mkCoAlgCaseMatchResult var ty match_alts
     mk_case fail = do alts <- mapM (mk_alt fail) sorted_alts
                       return (mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts))
 
-    mk_alt fail (con, args, MatchResult _ body_fn) = do
-          body <- body_fn fail
-          us <- newUniqueSupply
-          return (mkReboxingAlt (uniqsFromSupply us) con args body)
+    mk_alt fail (con, args, MatchResult _ body_fn)
+      = do { body <- body_fn fail
+           ; case dataConBoxer con of {
+                Nothing -> return (DataAlt con, args, body) ;
+                Just (DCB boxer) -> 
+        do { us <- newUniqueSupply
+           ; let (rep_ids, binds) = initUs_ us (boxer ty_args args)
+           ; return (DataAlt con, rep_ids, mkLets binds body) } } }
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -423,7 +394,7 @@ mkCoAlgCaseMatchResult var ty match_alts
 	    lit   = MachInt $ toInteger (dataConSourceArity con)
 	    binds = [NonRec arg (indexExpr i) | (i, arg) <- zip [1..] args]
 	    --
-	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, mkIntExpr i]
+	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, mkIntExpr dflags i]
 \end{code}
 
 %************************************************************************
@@ -793,7 +764,7 @@ mkOptTickBox (Just tickish) e = Tick tickish e
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique 	
-       this_mod <- getModuleDs
+       this_mod <- getModule
        let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
        let
            falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)

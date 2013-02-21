@@ -13,8 +13,9 @@ import BasicTypes
 import CoreSyn
 import CoreUtils
 import CoreUnfold
-import DsMonad
+import Module
 import TyCon
+import CoAxiom
 import Type
 import Id
 import Var
@@ -24,7 +25,7 @@ import FastString
 
 -- |Build the PA dictionary function for some type and hoist it to top level.
 --
---  The PA dictionary holds fns that convert values to and from their vectorised representations.
+-- The PA dictionary holds fns that convert values to and from their vectorised representations.
 --
 -- @Recall the definition:
 --    class PR (PRepr a) => PA a where
@@ -32,6 +33,8 @@ import FastString
 --      fromPRepr    :: PRepr a -> a
 --      toArrPRepr   :: PData a -> PData (PRepr a)
 --      fromArrPRepr :: PData (PRepr a) -> PData a
+--      toArrPReprs   :: PDatas a         -> PDatas (PRepr a)
+--      fromArrPReprs :: PDatas (PRepr a) -> PDatas a
 --
 -- Example:
 --    df :: forall a. PR (PRepr a) -> PA a -> PA (T a)
@@ -45,7 +48,8 @@ import FastString
 --
 buildPADict
         :: TyCon        -- ^ tycon of the type being vectorised.
-        -> CoAxiom      -- ^ Coercion between the type and 
+        -> CoAxiom Unbranched
+                        -- ^ Coercion between the type and 
                         --     its vectorised representation.
         -> TyCon        -- ^ PData  instance tycon
         -> TyCon        -- ^ PDatas instance tycon
@@ -56,7 +60,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
  = polyAbstract tvs $ \args ->    -- The args are the dictionaries we lambda abstract over; and they
                                   -- are put in the envt, so when we need a (PA a) we can find it in
                                   -- the envt; they don't include the silent superclass args yet
-   do { mod <- liftDs getModuleDs
+   do { mod <- liftDs getModule
       ; let dfun_name = mkLocalisedOccName mod mkPADFunOcc vect_tc_name
    
           -- The superclass dictionary is a (silent) argument if the tycon is polymorphic...
@@ -93,7 +97,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
       ; raw_dfun <- newExportedVar dfun_name dfun_ty
       ; let dfun_unf = mkDFunUnfolding dfun_ty $
                        map (const $ DFunLamArg 0) super_args
-                       -- ++ map DFunConstArg super_consts
+                       ++ map DFunPolyArg super_consts
                        ++ map (DFunPolyArg . Var) method_ids
             dfun = raw_dfun `setIdUnfolding`  dfun_unf
                             `setInlinePragma` dfunInlinePragma

@@ -39,6 +39,7 @@ import RnTypes        ( bindSigTyVarsFV, rnHsSigType, rnLHsType, checkPrecMatch 
 import RnPat
 import RnEnv
 import DynFlags
+import Module
 import Name
 import NameEnv
 import NameSet
@@ -50,7 +51,7 @@ import Digraph		( SCC(..) )
 import Bag
 import Outputable
 import FastString
-import Data.List	( partition )
+import Data.List	( partition, sort )
 import Maybes		( orElse )
 import Control.Monad
 \end{code}
@@ -444,7 +445,7 @@ rnBind _ (L loc bind@(PatBind { pat_lhs = pat
                               , bind_fvs = pat_fvs }))
   = setSrcSpan loc $ 
     do	{ mod <- getModule
-        ; (grhss', rhs_fvs) <- rnGRHSs PatBindRhs grhss
+        ; (grhss', rhs_fvs) <- rnGRHSs PatBindRhs rnLExpr grhss
 
 		-- No scoped type variables for pattern bindings
 	; let all_fvs = pat_fvs `plusFV` rhs_fvs
@@ -463,7 +464,7 @@ rnBind _ (L loc bind@(PatBind { pat_lhs = pat
         -- which (a) is not that different from  _v = rhs
         --       (b) is sometimes used to give a type sig for,
         --           or an occurrence of, a variable on the RHS
-        ; ifWOptM Opt_WarnUnusedBinds $
+        ; whenWOptM Opt_WarnUnusedBinds $
           when (null bndrs && not is_wild_pat) $
           addWarn $ unusedPatBindWarn bind'
 
@@ -479,7 +480,7 @@ rnBind sig_fn (L loc bind@(FunBind { fun_id = name
 
 	; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 				-- bindSigTyVars tests for Opt_ScopedTyVars
-			         rnMatchGroup (FunRhs plain_name is_infix) matches
+			         rnMatchGroup (FunRhs plain_name is_infix) rnLExpr matches
 	; when is_infix $ checkPrecMatch plain_name matches'
 
         ; mod <- getModule
@@ -605,15 +606,15 @@ rnMethodBind :: Name
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
 rnMethodBind cls sig_fn 
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
-				  , fun_matches = MatchGroup matches _ }))
+				  , fun_matches = MG { mg_alts = matches } }))
   = setSrcSpan loc $ do
     sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
     let plain_name = unLoc sel_name
         -- We use the selector name as the binder
 
     (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
-                          mapFvRn (rnMatch (FunRhs plain_name is_infix)) matches
-    let new_group = MatchGroup new_matches placeHolderType
+                          mapFvRn (rnMatch (FunRhs plain_name is_infix) rnLExpr) matches
+    let new_group = mkMatchGroup new_matches
 
     when is_infix $ checkPrecMatch plain_name new_group
     return (unitBag (L loc (bind { fun_id      = sel_name 
@@ -653,15 +654,7 @@ renameSigs :: HsSigCtxt
 	   -> RnM ([LSig Name], FreeVars)
 -- Renames the signatures and performs error checks
 renameSigs ctxt sigs 
-  = do	{ mapM_ dupSigDeclErr (findDupsEq overlapHsSig sigs)  -- Duplicate
-	  	-- Check for duplicates on RdrName version, 
-		-- because renamed version has unboundName for
-		-- not-in-scope binders, which gives bogus dup-sig errors
-		-- NB: in a class decl, a 'generic' sig is not considered 
-		--     equal to an ordinary sig, so we allow, say
-		--     	     class C a where
-		--	       op :: a -> a
- 		--             default op :: Eq a => a -> a
+  = do	{ mapM_ dupSigDeclErr (findDupSigs sigs)
 		
 	; (sigs', sig_fvs) <- mapFvRn (wrapLocFstM (renameSig ctxt)) sigs
 
@@ -748,6 +741,32 @@ okHsSig ctxt (L _ sig)
 
      (SpecInstSig {}, InstDeclCtxt {}) -> True
      (SpecInstSig {}, _)               -> False
+
+-------------------
+findDupSigs :: [LSig RdrName] -> [[(Located RdrName, Sig RdrName)]]
+-- Check for duplicates on RdrName version, 
+-- because renamed version has unboundName for
+-- not-in-scope binders, which gives bogus dup-sig errors
+-- NB: in a class decl, a 'generic' sig is not considered 
+--     equal to an ordinary sig, so we allow, say
+--     	     class C a where
+--	       op :: a -> a
+--             default op :: Eq a => a -> a
+findDupSigs sigs
+  = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
+  where
+    expand_sig sig@(FixSig (FixitySig n _)) = [(n,sig)]
+    expand_sig sig@(InlineSig n _)          = [(n,sig)]
+    expand_sig sig@(TypeSig  ns _)   = [(n,sig) | n <- ns]
+    expand_sig sig@(GenericSig ns _) = [(n,sig) | n <- ns]
+    expand_sig _ = []
+
+    matching_sig (L _ n1,sig1) (L _ n2,sig2) = n1 == n2 && mtch sig1 sig2
+    mtch (FixSig {})     (FixSig {})     = True
+    mtch (InlineSig {})  (InlineSig {})  = True
+    mtch (TypeSig {})    (TypeSig {})    = True
+    mtch (GenericSig {}) (GenericSig {}) = True
+    mtch _ _ = False
 \end{code}
 
 
@@ -758,16 +777,27 @@ okHsSig ctxt (L _ sig)
 %************************************************************************
 
 \begin{code}
-rnMatchGroup :: HsMatchContext Name -> MatchGroup RdrName -> RnM (MatchGroup Name, FreeVars)
-rnMatchGroup ctxt (MatchGroup ms _) 
-  = do { (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt) ms
-       ; return (MatchGroup new_ms placeHolderType, ms_fvs) }
+rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
+             -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
+             -> MatchGroup RdrName (Located (body RdrName))
+             -> RnM (MatchGroup Name (Located (body Name)), FreeVars)
+rnMatchGroup ctxt rnBody (MG { mg_alts = ms }) 
+  = do { empty_case_ok <- xoptM Opt_EmptyCase
+       ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
+       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
+       ; return (mkMatchGroup new_ms, ms_fvs) }
 
-rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
-rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
+rnMatch :: Outputable (body RdrName) => HsMatchContext Name
+        -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
+        -> LMatch RdrName (Located (body RdrName))
+        -> RnM (LMatch Name (Located (body Name)), FreeVars)
+rnMatch ctxt rnBody = wrapLocFstM (rnMatch' ctxt rnBody)
 
-rnMatch' :: HsMatchContext Name -> Match RdrName -> RnM (Match Name, FreeVars)
-rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
+rnMatch' :: Outputable (body RdrName) => HsMatchContext Name 
+         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
+         -> Match RdrName (Located (body RdrName))
+         -> RnM (Match Name (Located (body Name)), FreeVars)
+rnMatch' ctxt rnBody match@(Match pats maybe_rhs_sig grhss)
   = do 	{ 	-- Result type signatures are no longer supported
 	  case maybe_rhs_sig of	
 	        Nothing -> return ()
@@ -776,11 +806,21 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 	       -- Now the main event
 	       -- note that there are no local ficity decls for matches
 	; rnPats ctxt pats	$ \ pats' -> do
-	{ (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
+	{ (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
 
 	; return (Match pats' Nothing grhss', grhss_fvs) }}
 
-resSigErr :: HsMatchContext Name -> Match RdrName -> HsType RdrName -> SDoc 
+emptyCaseErr :: HsMatchContext Name -> SDoc
+emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alterantives in") <+> pp_ctxt)
+                       2 (ptext (sLit "Use -XEmptyCase to allow this"))
+  where
+    pp_ctxt = case ctxt of
+                CaseAlt    -> ptext (sLit "case expression")
+                LambdaExpr -> ptext (sLit "\\case expression")
+                _ -> ptext (sLit "(unexpected)") <+> pprMatchContextNoun ctxt
+ 
+
+resSigErr :: Outputable body => HsMatchContext Name -> Match RdrName body -> HsType RdrName -> SDoc 
 resSigErr ctxt match ty
    = vcat [ ptext (sLit "Illegal result type signature") <+> quotes (ppr ty)
 	  , nest 2 $ ptext (sLit "Result signatures are no longer supported in pattern matches")
@@ -795,21 +835,29 @@ resSigErr ctxt match ty
 %************************************************************************
 
 \begin{code}
-rnGRHSs :: HsMatchContext Name -> GRHSs RdrName -> RnM (GRHSs Name, FreeVars)
-
-rnGRHSs ctxt (GRHSs grhss binds)
+rnGRHSs :: HsMatchContext Name 
+        -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
+        -> GRHSs RdrName (Located (body RdrName))
+        -> RnM (GRHSs Name (Located (body Name)), FreeVars)
+rnGRHSs ctxt rnBody (GRHSs grhss binds)
   = rnLocalBindsAndThen binds	$ \ binds' -> do
-    (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt) grhss
+    (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
     return (GRHSs grhss' binds', fvGRHSs)
 
-rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
-rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
+rnGRHS :: HsMatchContext Name 
+       -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
+       -> LGRHS RdrName (Located (body RdrName))
+       -> RnM (LGRHS Name (Located (body Name)), FreeVars)
+rnGRHS ctxt rnBody = wrapLocFstM (rnGRHS' ctxt rnBody)
 
-rnGRHS' :: HsMatchContext Name -> GRHS RdrName -> RnM (GRHS Name, FreeVars)
-rnGRHS' ctxt (GRHS guards rhs)
+rnGRHS' :: HsMatchContext Name 
+        -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
+        -> GRHS RdrName (Located (body RdrName))
+        -> RnM (GRHS Name (Located (body Name)), FreeVars)
+rnGRHS' ctxt rnBody (GRHS guards rhs)
   = do	{ pattern_guards_allowed <- xoptM Opt_PatternGuards
-        ; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $ \ _ ->
-				    rnLExpr rhs
+        ; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) rnLExpr guards $ \ _ ->
+				    rnBody rhs
 
 	; unless (pattern_guards_allowed || is_standard_guard guards')
 	  	 (addWarn (nonStdGuardErr guards'))
@@ -820,7 +868,7 @@ rnGRHS' ctxt (GRHS guards rhs)
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
     is_standard_guard []                       = True
-    is_standard_guard [L _ (ExprStmt _ _ _ _)] = True
+    is_standard_guard [L _ (BodyStmt _ _ _ _)] = True
     is_standard_guard _                        = False
 \end{code}
 
@@ -831,14 +879,15 @@ rnGRHS' ctxt (GRHS guards rhs)
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr :: [LSig RdrName] -> RnM ()
-dupSigDeclErr sigs@(L loc sig : _)
+dupSigDeclErr :: [(Located RdrName, Sig RdrName)] -> RnM ()
+dupSigDeclErr pairs@((L loc name, sig) : _)
   = addErrAt loc $
-	vcat [ptext (sLit "Duplicate") <+> what_it_is <> colon,
-	      nest 2 (vcat (map ppr_sig sigs))]
+    vcat [ ptext (sLit "Duplicate") <+> what_it_is 
+           <> ptext (sLit "s for") <+> quotes (ppr name)
+         , ptext (sLit "at") <+> vcat (map ppr $ sort $ map (getLoc . fst) pairs) ]
   where
     what_it_is = hsSigDoc sig
-    ppr_sig (L loc sig) = ppr loc <> colon <+> ppr sig
+
 dupSigDeclErr [] = panic "dupSigDeclErr"
 
 misplacedSigErr :: LSig Name -> RnM ()
@@ -861,7 +910,7 @@ bindsInHsBootFile mbinds
   = hang (ptext (sLit "Bindings in hs-boot files are not allowed"))
        2 (ppr mbinds)
 
-nonStdGuardErr :: [LStmtLR Name Name] -> SDoc
+nonStdGuardErr :: Outputable body => [LStmtLR Name Name body] -> SDoc
 nonStdGuardErr guards
   = hang (ptext (sLit "accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
        4 (interpp'SP guards)

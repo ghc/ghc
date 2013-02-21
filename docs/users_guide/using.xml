@@ -120,7 +120,7 @@ ghc [argument...]
       <para>Sometimes it is useful to make the connection between a
       source file and the command-line options it requires quite
       tight. For instance, if a Haskell source file deliberately
-	uses name shadowing, it should be compiled with  the
+        uses name shadowing, it should be compiled with  the
       <option>-fno-warn-name-shadowing</option> option.  Rather than maintaining
       the list of per-file options in a <filename>Makefile</filename>,
       it is possible to do this directly in the source file using the
@@ -181,29 +181,29 @@ module X where
 
     <variablelist>
       <varlistentry>
-	<term>Mode flags</term>
-	<listitem>
-	  <para>For example, <option>&ndash;&ndash;make</option> or <option>-E</option>.
-	    There may only be a single mode flag on the command line.  The
-	    available modes are listed in <xref linkend="modes"/>.</para>
-	</listitem>
+        <term>Mode flags</term>
+        <listitem>
+          <para>For example, <option>&ndash;&ndash;make</option> or <option>-E</option>.
+            There may only be a single mode flag on the command line.  The
+            available modes are listed in <xref linkend="modes"/>.</para>
+        </listitem>
       </varlistentry>
       <varlistentry>
-	<term>Dynamic Flags</term>
-	<listitem>
-	  <para>Most non-mode flags fall into this category.  A dynamic flag
-	    may be used on the command line, in a
-	    <literal>OPTIONS_GHC</literal> pragma in a source file, or set
-	    using <literal>:set</literal> in GHCi.</para>
-	</listitem>
+        <term>Dynamic Flags</term>
+        <listitem>
+          <para>Most non-mode flags fall into this category.  A dynamic flag
+            may be used on the command line, in a
+            <literal>OPTIONS_GHC</literal> pragma in a source file, or set
+            using <literal>:set</literal> in GHCi.</para>
+        </listitem>
       </varlistentry>
       <varlistentry>
-	<term>Static Flags</term>
-	<listitem>
-	  <para>A few flags are "static", which means they can only be used on
-	    the command-line, and remain in force over the entire GHC/GHCi
-	    run.</para>
-	</listitem>
+        <term>Static Flags</term>
+        <listitem>
+          <para>A few flags are "static", which means they can only be used on
+            the command-line, and remain in force over the entire GHC/GHCi
+            run.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
 
@@ -229,75 +229,75 @@ module X where
     <variablelist>
 
       <varlistentry>
-	<term><filename>.hs</filename></term>
-	<listitem>
-	  <para>A Haskell module.</para>
-	</listitem>
+        <term><filename>.hs</filename></term>
+        <listitem>
+          <para>A Haskell module.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <filename>.lhs</filename>
           <indexterm><primary><literal>lhs</literal> suffix</primary></indexterm>
-	</term>
-	<listitem>
-	  <para>A &ldquo;literate Haskell&rdquo; module.</para>
-	</listitem>
+        </term>
+        <listitem>
+          <para>A &ldquo;literate Haskell&rdquo; module.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.hi</filename></term>
-	<listitem>
-	  <para>A Haskell interface file, probably
-	  compiler-generated.</para>
-	</listitem>
+        <term><filename>.hi</filename></term>
+        <listitem>
+          <para>A Haskell interface file, probably
+          compiler-generated.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.hc</filename></term>
-	<listitem>
-	  <para>Intermediate C file produced by the Haskell
-	  compiler.</para>
-	</listitem>
+        <term><filename>.hc</filename></term>
+        <listitem>
+          <para>Intermediate C file produced by the Haskell
+          compiler.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.c</filename></term>
-	<listitem>
-	  <para>A C&nbsp;file not produced by the Haskell
-	  compiler.</para>
-	</listitem>
+        <term><filename>.c</filename></term>
+        <listitem>
+          <para>A C&nbsp;file not produced by the Haskell
+          compiler.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.ll</filename></term>
-	<listitem>
-	  <para>An llvm-intermediate-language source file, usually
+        <term><filename>.ll</filename></term>
+        <listitem>
+          <para>An llvm-intermediate-language source file, usually
           produced by the compiler.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.bc</filename></term>
-	<listitem>
-	  <para>An llvm-intermediate-language bitcode file, usually
+        <term><filename>.bc</filename></term>
+        <listitem>
+          <para>An llvm-intermediate-language bitcode file, usually
           produced by the compiler.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.s</filename></term>
-	<listitem>
-	  <para>An assembly-language source file, usually produced by
+        <term><filename>.s</filename></term>
+        <listitem>
+          <para>An assembly-language source file, usually produced by
           the compiler.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><filename>.o</filename></term>
-	<listitem>
-	  <para>An object file, produced by an assembler.</para>
-	</listitem>
+        <term><filename>.o</filename></term>
+        <listitem>
+          <para>An object file, produced by an assembler.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
 
@@ -326,164 +326,164 @@ module X where
 
     <variablelist>
       <varlistentry>
-	<term>
-	  <cmdsynopsis><command>ghc --interactive</command>
-	  </cmdsynopsis>
+        <term>
+          <cmdsynopsis><command>ghc --interactive</command>
+          </cmdsynopsis>
           <indexterm><primary>interactive mode</primary></indexterm>
           <indexterm><primary>ghci</primary></indexterm>
-	</term>
-	<listitem>
-	  <para>Interactive mode, which is also available as
-	  <command>ghci</command>.  Interactive mode is described in
-	  more detail in <xref linkend="ghci"/>.</para>
-	</listitem>
+        </term>
+        <listitem>
+          <para>Interactive mode, which is also available as
+          <command>ghci</command>.  Interactive mode is described in
+          more detail in <xref linkend="ghci"/>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <cmdsynopsis><command>ghc &ndash;&ndash;make</command>
-	  </cmdsynopsis>
+        <term>
+          <cmdsynopsis><command>ghc &ndash;&ndash;make</command>
+          </cmdsynopsis>
           <indexterm><primary>make mode</primary></indexterm>
           <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
-	</term>
-	<listitem>
-	  <para>In this mode, GHC will build a multi-module Haskell
-	  program automatically, figuring out dependencies for itself.
-	  If you have a straightforward Haskell program, this is
-	  likely to be much easier, and faster, than using
-	  <command>make</command>.  Make mode is described in <xref
-	  linkend="make-mode"/>.</para>
+        </term>
+        <listitem>
+          <para>In this mode, GHC will build a multi-module Haskell
+          program automatically, figuring out dependencies for itself.
+          If you have a straightforward Haskell program, this is
+          likely to be much easier, and faster, than using
+          <command>make</command>.  Make mode is described in <xref
+          linkend="make-mode"/>.</para>
 
           <para>
             This mode is the default if there are any Haskell
             source files mentioned on the command line, and in this case
             the <option>&ndash;&ndash;make</option> option can be omitted.
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <cmdsynopsis><command>ghc -e</command>
-	     <arg choice='plain'><replaceable>expr</replaceable></arg>
+        <term>
+          <cmdsynopsis><command>ghc -e</command>
+             <arg choice='plain'><replaceable>expr</replaceable></arg>
           </cmdsynopsis>
           <indexterm><primary>eval mode</primary></indexterm>
-	</term>
-	<listitem>
-	  <para>Expression-evaluation mode.  This is very similar to
-	  interactive mode, except that there is a single expression
-	  to evaluate (<replaceable>expr</replaceable>) which is given
-	  on the command line.  See <xref linkend="eval-mode"/> for
-	  more details.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <cmdsynopsis>
-	    <command>ghc -E</command>
-	    <command>ghc -c</command>
-	    <command>ghc -S</command>
-	    <command>ghc -c</command>
-	  </cmdsynopsis>
-	  <indexterm><primary><option>-E</option></primary></indexterm>
-	  <indexterm><primary><option>-C</option></primary></indexterm>
-	  <indexterm><primary><option>-S</option></primary></indexterm>
-	  <indexterm><primary><option>-c</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>This is the traditional batch-compiler mode, in which
-	  GHC can compile source files one at a time, or link objects
-	  together into an executable.  This mode also applies if
-	  there is no other mode flag specified on the command line,
-	  in which case it means that the specified files should be
-	  compiled and then linked to form a program. See <xref
-	  linkend="options-order"/>.</para>
-	</listitem>
+        <listitem>
+          <para>Expression-evaluation mode.  This is very similar to
+          interactive mode, except that there is a single expression
+          to evaluate (<replaceable>expr</replaceable>) which is given
+          on the command line.  See <xref linkend="eval-mode"/> for
+          more details.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
+          <cmdsynopsis>
+            <command>ghc -E</command>
+            <command>ghc -c</command>
+            <command>ghc -S</command>
+            <command>ghc -c</command>
+          </cmdsynopsis>
+          <indexterm><primary><option>-E</option></primary></indexterm>
+          <indexterm><primary><option>-C</option></primary></indexterm>
+          <indexterm><primary><option>-S</option></primary></indexterm>
+          <indexterm><primary><option>-c</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>This is the traditional batch-compiler mode, in which
+          GHC can compile source files one at a time, or link objects
+          together into an executable.  This mode also applies if
+          there is no other mode flag specified on the command line,
+          in which case it means that the specified files should be
+          compiled and then linked to form a program. See <xref
+          linkend="options-order"/>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <cmdsynopsis>
             <command>ghc -M</command>
           </cmdsynopsis>
           <indexterm><primary>dependency-generation mode</primary></indexterm>
         </term>
-	<listitem>
-	  <para>Dependency-generation mode.  In this mode, GHC can be
-	  used to generate dependency information suitable for use in
-	  a <literal>Makefile</literal>.  See <xref
-	  linkend="makefile-dependencies"/>.</para>
-	</listitem>
+        <listitem>
+          <para>Dependency-generation mode.  In this mode, GHC can be
+          used to generate dependency information suitable for use in
+          a <literal>Makefile</literal>.  See <xref
+          linkend="makefile-dependencies"/>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <cmdsynopsis>
             <command>ghc --mk-dll</command>
           </cmdsynopsis>
-	  <indexterm><primary>DLL-creation mode</primary></indexterm>
+          <indexterm><primary>DLL-creation mode</primary></indexterm>
         </term>
-	<listitem>
-	  <para>DLL-creation mode (Windows only).  See <xref
-	  linkend="win32-dlls-create"/>.</para>
-	</listitem>
+        <listitem>
+          <para>DLL-creation mode (Windows only).  See <xref
+          linkend="win32-dlls-create"/>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <cmdsynopsis>
+        <term>
+          <cmdsynopsis>
           <command>ghc --help</command> <command>ghc -?</command>
-	    </cmdsynopsis>
+            </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Cause GHC to spew a long usage message to standard
+        <listitem>
+          <para>Cause GHC to spew a long usage message to standard
           output and then exit.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <cmdsynopsis>
             <command>ghc --show-iface <replaceable>file</replaceable></command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;--show-iface</option></primary></indexterm>
         </term>
-	<listitem>
-	      <para>Read the interface in
-	      <replaceable>file</replaceable> and dump it as text to
-	      <literal>stdout</literal>. For example <literal>ghc --show-iface M.hi</literal>.</para>
-	</listitem>
+        <listitem>
+              <para>Read the interface in
+              <replaceable>file</replaceable> and dump it as text to
+              <literal>stdout</literal>. For example <literal>ghc --show-iface M.hi</literal>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <cmdsynopsis>
             <command>ghc --supported-extensions</command>
             <command>ghc --supported-languages</command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;supported-extensions</option></primary><primary><option>&ndash;&ndash;supported-languages</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Print the supported language extensions.</para>
-	</listitem>
+        <listitem>
+          <para>Print the supported language extensions.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <cmdsynopsis>
             <command>ghc --info</command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;info</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Print information about the compiler.</para>
-	</listitem>
+        <listitem>
+          <para>Print information about the compiler.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <cmdsynopsis>
             <command>ghc --version</command>
             <command>ghc -V</command>
@@ -491,40 +491,40 @@ module X where
           <indexterm><primary><option>-V</option></primary></indexterm>
           <indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Print a one-line string including GHC's version number.</para>
-	</listitem>
+        <listitem>
+          <para>Print a one-line string including GHC's version number.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <cmdsynopsis>
             <command>ghc --numeric-version</command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Print GHC's numeric version number only.</para>
-	</listitem>
+        <listitem>
+          <para>Print GHC's numeric version number only.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <cmdsynopsis>
+        <term>
+          <cmdsynopsis>
             <command>ghc --print-libdir</command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Print the path to GHC's library directory.  This is
-	  the top of the directory tree containing GHC's libraries,
-	  interfaces, and include files (usually something like
-	  <literal>/usr/local/lib/ghc-5.04</literal> on Unix).  This
-	  is the value of
-	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary></indexterm>
+        <listitem>
+          <para>Print the path to GHC's library directory.  This is
+          the top of the directory tree containing GHC's libraries,
+          interfaces, and include files (usually something like
+          <literal>/usr/local/lib/ghc-5.04</literal> on Unix).  This
+          is the value of
+          <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary></indexterm>
       in the package configuration file
       (see <xref linkend="packages"/>).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
     </variablelist>
@@ -567,23 +567,23 @@ ghc Main.hs
       <literal>Makefile</literal>s are:</para>
 
       <itemizedlist>
-	<listitem>
-	  <para>GHC doesn't have to be restarted for each compilation,
-	  which means it can cache information between compilations.
-	  Compiling a multi-module program with <literal>ghc
-	  &ndash;&ndash;make</literal> can be up to twice as fast as
-	  running <literal>ghc</literal> individually on each source
-	  file.</para>
-	</listitem>
-	<listitem>
-	  <para>You don't have to write a <literal>Makefile</literal>.</para>
+        <listitem>
+          <para>GHC doesn't have to be restarted for each compilation,
+          which means it can cache information between compilations.
+          Compiling a multi-module program with <literal>ghc
+          &ndash;&ndash;make</literal> can be up to twice as fast as
+          running <literal>ghc</literal> individually on each source
+          file.</para>
+        </listitem>
+        <listitem>
+          <para>You don't have to write a <literal>Makefile</literal>.</para>
           <indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary></indexterm>
-	</listitem>
-	<listitem>
-	  <para>GHC re-calculates the dependencies each time it is
-	  invoked, so the dependencies never get out of sync with the
-	  source.</para>
-	</listitem>
+        </listitem>
+        <listitem>
+          <para>GHC re-calculates the dependencies each time it is
+          invoked, so the dependencies never get out of sync with the
+          source.</para>
+        </listitem>
       </itemizedlist>
 
       <para>Any of the command-line options described in the rest of
@@ -658,65 +658,65 @@ olleh
       This table summarises:</para>
 
       <informaltable>
-	<tgroup cols="4">
-	  <colspec align="left"/>
-	  <colspec align="left"/>
-	  <colspec align="left"/>
-	  <colspec align="left"/>
+        <tgroup cols="4">
+          <colspec align="left"/>
+          <colspec align="left"/>
+          <colspec align="left"/>
+          <colspec align="left"/>
 
-	  <thead>
-	    <row>
-	      <entry>Phase of the compilation system</entry>
-	      <entry>Suffix saying &ldquo;start here&rdquo;</entry>
-	      <entry>Flag saying &ldquo;stop after&rdquo;</entry>
-	      <entry>(suffix of) output file</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry>literate pre-processor</entry>
-	      <entry><literal>.lhs</literal></entry>
-	      <entry>-</entry>
-	      <entry><literal>.hs</literal></entry>
-	    </row>
+          <thead>
+            <row>
+              <entry>Phase of the compilation system</entry>
+              <entry>Suffix saying &ldquo;start here&rdquo;</entry>
+              <entry>Flag saying &ldquo;stop after&rdquo;</entry>
+              <entry>(suffix of) output file</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>literate pre-processor</entry>
+              <entry><literal>.lhs</literal></entry>
+              <entry>-</entry>
+              <entry><literal>.hs</literal></entry>
+            </row>
 
-	    <row>
-	      <entry>C pre-processor (opt.) </entry>
-	      <entry><literal>.hs</literal> (with
-	      <option>-cpp</option>)</entry>
-	      <entry><option>-E</option></entry>
-	      <entry><literal>.hspp</literal></entry>
-	    </row>
+            <row>
+              <entry>C pre-processor (opt.) </entry>
+              <entry><literal>.hs</literal> (with
+              <option>-cpp</option>)</entry>
+              <entry><option>-E</option></entry>
+              <entry><literal>.hspp</literal></entry>
+            </row>
 
-	    <row>
-	      <entry>Haskell compiler</entry>
-	      <entry><literal>.hs</literal></entry>
-	      <entry><option>-C</option>, <option>-S</option></entry>
-	      <entry><literal>.hc</literal>, <literal>.s</literal></entry>
-	    </row>
+            <row>
+              <entry>Haskell compiler</entry>
+              <entry><literal>.hs</literal></entry>
+              <entry><option>-C</option>, <option>-S</option></entry>
+              <entry><literal>.hc</literal>, <literal>.s</literal></entry>
+            </row>
 
-	    <row>
-	      <entry>C compiler (opt.)</entry>
-	      <entry><literal>.hc</literal> or <literal>.c</literal></entry>
-	      <entry><option>-S</option></entry>
-	      <entry><literal>.s</literal></entry>
-	    </row>
+            <row>
+              <entry>C compiler (opt.)</entry>
+              <entry><literal>.hc</literal> or <literal>.c</literal></entry>
+              <entry><option>-S</option></entry>
+              <entry><literal>.s</literal></entry>
+            </row>
 
-	    <row>
-	      <entry>assembler</entry>
-	      <entry><literal>.s</literal></entry>
-	      <entry><option>-c</option></entry>
-	      <entry><literal>.o</literal></entry>
-	    </row>
+            <row>
+              <entry>assembler</entry>
+              <entry><literal>.s</literal></entry>
+              <entry><option>-c</option></entry>
+              <entry><literal>.o</literal></entry>
+            </row>
 
-	    <row>
-	      <entry>linker</entry>
-	      <entry><replaceable>other</replaceable></entry>
-	      <entry>-</entry>
-	      <entry><filename>a.out</filename></entry>
-	    </row>
-	  </tbody>
-	</tgroup>
+            <row>
+              <entry>linker</entry>
+              <entry><replaceable>other</replaceable></entry>
+              <entry>-</entry>
+              <entry><filename>a.out</filename></entry>
+            </row>
+          </tbody>
+        </tgroup>
       </informaltable>
 
       <indexterm><primary><option>-C</option></primary></indexterm>
@@ -748,26 +748,26 @@ ghc -c Foo.hs
       of the compiler, dumping the result in a file.</para>
 
       <sect3 id="overriding-suffixes">
-	<title>Overriding the default behaviour for a file</title>
+        <title>Overriding the default behaviour for a file</title>
 
-	<para>As described above, the way in which a file is processed by GHC
-	  depends on its suffix.  This behaviour can be overridden using the
-	  <option>-x</option> option:</para>
+        <para>As described above, the way in which a file is processed by GHC
+          depends on its suffix.  This behaviour can be overridden using the
+          <option>-x</option> option:</para>
 
-	<variablelist>
-	  <varlistentry>
-	    <term><option>-x</option> <replaceable>suffix</replaceable>
-	    	      <indexterm><primary><option>-x</option></primary>
-	      </indexterm></term>
-	      <listitem>
-		<para>Causes all files following this option on the command
-		  line to be processed as if they had the suffix
-		  <replaceable>suffix</replaceable>.  For example, to compile a
-		  Haskell module in the file <literal>M.my-hs</literal>,
-		  use <literal>ghc -c -x hs M.my-hs</literal>.</para>
-	      </listitem>
-	  </varlistentry>
-	</variablelist>
+        <variablelist>
+          <varlistentry>
+            <term><option>-x</option> <replaceable>suffix</replaceable>
+                      <indexterm><primary><option>-x</option></primary>
+              </indexterm></term>
+              <listitem>
+                <para>Causes all files following this option on the command
+                  line to be processed as if they had the suffix
+                  <replaceable>suffix</replaceable>.  For example, to compile a
+                  Haskell module in the file <literal>M.my-hs</literal>,
+                  use <literal>ghc -c -x hs M.my-hs</literal>.</para>
+              </listitem>
+          </varlistentry>
+        </variablelist>
       </sect3>
 
     </sect2>
@@ -783,111 +783,111 @@ ghc -c Foo.hs
     and <option>--print-libdir</option> modes in <xref linkend="modes"/>.</para>
     <variablelist>
       <varlistentry>
-	<term>
+        <term>
           <option>-v</option>
           <indexterm><primary><option>-v</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>The <option>-v</option> option makes GHC
+        <listitem>
+          <para>The <option>-v</option> option makes GHC
           <emphasis>verbose</emphasis>: it reports its version number
           and shows (on stderr) exactly how it invokes each phase of
           the compilation system.  Moreover, it passes the
           <option>-v</option> flag to most phases; each reports its
           version number (and possibly some other information).</para>
 
-	  <para>Please, oh please, use the <option>-v</option> option
+          <para>Please, oh please, use the <option>-v</option> option
           when reporting bugs!  Knowing that you ran the right bits in
           the right order is always the first thing we want to
           verify.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <option>-v</option><replaceable>n</replaceable>
           <indexterm><primary><option>-v</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>To provide more control over the compiler's verbosity,
-	  the <option>-v</option> flag takes an optional numeric
-	  argument.  Specifying <option>-v</option> on its own is
-	  equivalent to <option>-v3</option>, and the other levels
-	  have the following meanings:</para>
+        <listitem>
+          <para>To provide more control over the compiler's verbosity,
+          the <option>-v</option> flag takes an optional numeric
+          argument.  Specifying <option>-v</option> on its own is
+          equivalent to <option>-v3</option>, and the other levels
+          have the following meanings:</para>
 
-	  <variablelist>
-	    <varlistentry>
-	      <term><option>-v0</option></term>
-	      <listitem>
-		<para>Disable all non-essential messages (this is the
-		default).</para>
-	      </listitem>
-	    </varlistentry>
+          <variablelist>
+            <varlistentry>
+              <term><option>-v0</option></term>
+              <listitem>
+                <para>Disable all non-essential messages (this is the
+                default).</para>
+              </listitem>
+            </varlistentry>
 
-	    <varlistentry>
-	      <term><option>-v1</option></term>
-	      <listitem>
-		<para>Minimal verbosity: print one line per
-		compilation (this is the default when
-		<option>&ndash;&ndash;make</option> or
-		<option>&ndash;&ndash;interactive</option> is on).</para>
-	      </listitem>
-	    </varlistentry>
+            <varlistentry>
+              <term><option>-v1</option></term>
+              <listitem>
+                <para>Minimal verbosity: print one line per
+                compilation (this is the default when
+                <option>&ndash;&ndash;make</option> or
+                <option>&ndash;&ndash;interactive</option> is on).</para>
+              </listitem>
+            </varlistentry>
 
-	    <varlistentry>
-	      <term><option>-v2</option></term>
-	      <listitem>
-		<para>Print the name of each compilation phase as it
-		is executed. (equivalent to
-		<option>-dshow-passes</option>).</para>
-	      </listitem>
-	    </varlistentry>
+            <varlistentry>
+              <term><option>-v2</option></term>
+              <listitem>
+                <para>Print the name of each compilation phase as it
+                is executed. (equivalent to
+                <option>-dshow-passes</option>).</para>
+              </listitem>
+            </varlistentry>
 
-	    <varlistentry>
-	      <term><option>-v3</option></term>
-	      <listitem>
-		<para>The same as <option>-v2</option>, except that in
+            <varlistentry>
+              <term><option>-v3</option></term>
+              <listitem>
+                <para>The same as <option>-v2</option>, except that in
                 addition the full command line (if appropriate) for
                 each compilation phase is also printed.</para>
-	      </listitem>
-	    </varlistentry>
+              </listitem>
+            </varlistentry>
 
-	    <varlistentry>
-	      <term><option>-v4</option></term>
-	      <listitem>
-		<para>The same as <option>-v3</option> except that the
-		intermediate program representation after each
-		compilation phase is also printed (excluding
-		preprocessed and C/assembly files).</para>
-	      </listitem>
-	    </varlistentry>
-	  </variablelist>
-	</listitem>
+            <varlistentry>
+              <term><option>-v4</option></term>
+              <listitem>
+                <para>The same as <option>-v3</option> except that the
+                intermediate program representation after each
+                compilation phase is also printed (excluding
+                preprocessed and C/assembly files).</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-ferror-spans</option>
+        <term><option>-ferror-spans</option>
           <indexterm><primary><option>-ferror-spans</option></primary>
-	  </indexterm>
+          </indexterm>
         </term>
-	<listitem>
-	  <para>Causes GHC to emit the full source span of the
-	  syntactic entity relating to an error message.  Normally, GHC
-	  emits the source location of the start of the syntactic
-	  entity only.</para>
+        <listitem>
+          <para>Causes GHC to emit the full source span of the
+          syntactic entity relating to an error message.  Normally, GHC
+          emits the source location of the start of the syntactic
+          entity only.</para>
 
-	  <para>For example:</para>
+          <para>For example:</para>
 
 <screen>
 test.hs:3:6: parse error on input `where'
 </screen>
 
-	  <para>becomes:</para>
+          <para>becomes:</para>
 
 <screen>
 test296.hs:3:6-10: parse error on input `where'
 </screen>
 
-	  <para>And multi-line spans are possible too:</para>
+          <para>And multi-line spans are possible too:</para>
 
 <screen>
 test.hs:(5,4)-(6,7):
@@ -897,11 +897,11 @@ test.hs:(5,4)-(6,7):
     In the binding group for: a, b, a
 </screen>
 
-	  <para>Note that line numbers start counting at one, but
-	  column numbers start at zero.  This choice was made to
-	  follow existing convention (i.e. this is how Emacs does
-	  it).</para>
-	</listitem>
+          <para>Note that line numbers start counting at one, but
+          column numbers start at zero.  This choice was made to
+          follow existing convention (i.e. this is how Emacs does
+          it).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -950,13 +950,15 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-warnings-deprecations</option>,
     <option>-fwarn-deprecated-flags</option>,
+    <option>-fwarn-duplicate-constraints</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>,
     <option>-fwarn-missing-methods</option>,
     <option>-fwarn-lazy-unlifted-bindings</option>,
     <option>-fwarn-wrong-do-bind</option>,
-    <option>-fwarn-unsupported-calling-conventions</option>, and
-    <option>-fwarn-dodgy-foreign-imports</option>.  The following
+    <option>-fwarn-unsupported-calling-conventions</option>,
+    <option>-fwarn-dodgy-foreign-imports</option>, and
+    <option>-fwarn-typeable-instances</option>.  The following
     flags are
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
     </para>
@@ -964,27 +966,27 @@ test.hs:(5,4)-(6,7):
     <variablelist>
 
       <varlistentry>
-	<term><option>-W</option>:</term>
-	<listitem>
-	  <indexterm><primary>-W option</primary></indexterm>
-	  <para>Provides the standard warnings plus
-	  <option>-fwarn-incomplete-patterns</option>,
-	  <option>-fwarn-dodgy-exports</option>,
-	  <option>-fwarn-dodgy-imports</option>,
-	  <option>-fwarn-unused-matches</option>,
-	  <option>-fwarn-unused-imports</option>, and
-	  <option>-fwarn-unused-binds</option>.</para>
-	</listitem>
+        <term><option>-W</option>:</term>
+        <listitem>
+          <indexterm><primary>-W option</primary></indexterm>
+          <para>Provides the standard warnings plus
+          <option>-fwarn-incomplete-patterns</option>,
+          <option>-fwarn-dodgy-exports</option>,
+          <option>-fwarn-dodgy-imports</option>,
+          <option>-fwarn-unused-matches</option>,
+          <option>-fwarn-unused-imports</option>, and
+          <option>-fwarn-unused-binds</option>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-Wall</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-Wall</option></primary></indexterm>
-	  <para>Turns on all warning options that indicate potentially
-	  suspicious code.  The warnings that are
-	  <emphasis>not</emphasis> enabled by <option>-Wall</option>
-	  are
+        <term><option>-Wall</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-Wall</option></primary></indexterm>
+          <para>Turns on all warning options that indicate potentially
+          suspicious code.  The warnings that are
+          <emphasis>not</emphasis> enabled by <option>-Wall</option>
+          are
             <option>-fwarn-tabs</option>,
             <option>-fwarn-incomplete-uni-patterns</option>,
             <option>-fwarn-incomplete-record-updates</option>,
@@ -997,31 +999,31 @@ test.hs:(5,4)-(6,7):
       </varlistentry>
 
       <varlistentry>
-	<term><option>-w</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-w</option></primary></indexterm>
-	  <para>Turns off all warnings, including the standard ones and
+        <term><option>-w</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-w</option></primary></indexterm>
+          <para>Turns off all warnings, including the standard ones and
       those that <literal>-Wall</literal> doesn't enable.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-Werror</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-Werror</option></primary></indexterm>
-	  <para>Makes any warning into a fatal error. Useful so that you don't
-	    miss warnings when doing batch compilation. </para>
-	</listitem>
+        <term><option>-Werror</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-Werror</option></primary></indexterm>
+          <para>Makes any warning into a fatal error. Useful so that you don't
+            miss warnings when doing batch compilation. </para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-Wwarn</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-Wwarn</option></primary></indexterm>
-	  <para>Warnings are treated only as warnings, not as errors. This is
-	    the default, but can be useful to negate a
+        <term><option>-Wwarn</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-Wwarn</option></primary></indexterm>
+          <para>Warnings are treated only as warnings, not as errors. This is
+            the default, but can be useful to negate a
         <option>-Werror</option> flag.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
     </variablelist>
@@ -1042,7 +1044,7 @@ test.hs:(5,4)-(6,7):
             At compile time you get a warning (instead of an error).  At 
             runtime, if you use a value that depends on a type error, you 
             get a runtime error; but you can run any type-correct parts of your code 
-            just fine.</para>
+            just fine.  See <xref linkend="defer-type-errors"/></para>
         </listitem>
       </varlistentry>
 
@@ -1059,49 +1061,49 @@ test.hs:(5,4)-(6,7):
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-unrecognised-pragmas</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-unrecognised-pragmas</option></primary>
-	  </indexterm>
-	  <indexterm><primary>warnings</primary></indexterm>
-	  <indexterm><primary>pragmas</primary></indexterm>
-	  <para>Causes a warning to be emitted when a
-	  pragma that GHC doesn't recognise is used. As well as pragmas
+        <term><option>-fwarn-unrecognised-pragmas</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unrecognised-pragmas</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+          <indexterm><primary>pragmas</primary></indexterm>
+          <para>Causes a warning to be emitted when a
+          pragma that GHC doesn't recognise is used. As well as pragmas
       that GHC itself uses, GHC also recognises pragmas known to be used
       by other tools, e.g. <literal>OPTIONS_HUGS</literal> and
       <literal>DERIVE</literal>.</para>
 
-	  <para>This option is on by default.</para>
-	</listitem>
+          <para>This option is on by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-warnings-deprecations</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-warnings-deprecations</option></primary>
-	  </indexterm>
-	  <indexterm><primary>warnings</primary></indexterm>
-	  <indexterm><primary>deprecations</primary></indexterm>
-	  <para>Causes a warning to be emitted when a
-	  module, function or type with a WARNING or DEPRECATED pragma
+        <term><option>-fwarn-warnings-deprecations</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-warnings-deprecations</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+          <indexterm><primary>deprecations</primary></indexterm>
+          <para>Causes a warning to be emitted when a
+          module, function or type with a WARNING or DEPRECATED pragma
       is used. See <xref linkend="warning-deprecated-pragma"/> for more
       details on the pragmas.</para>
 
-	  <para>This option is on by default.</para>
-	</listitem>
+          <para>This option is on by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-deprecated-flags</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-deprecated-flags</option></primary>
-	  </indexterm>
-	  <indexterm><primary>deprecated-flags</primary></indexterm>
-	  <para>Causes a warning to be emitted when a deprecated
-	  commandline flag is used.</para>
+        <term><option>-fwarn-deprecated-flags</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-deprecated-flags</option></primary>
+          </indexterm>
+          <indexterm><primary>deprecated-flags</primary></indexterm>
+          <para>Causes a warning to be emitted when a deprecated
+          commandline flag is used.</para>
 
-	  <para>This option is on by default.</para>
-	</listitem>
+          <para>This option is on by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -1118,12 +1120,12 @@ test.hs:(5,4)-(6,7):
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-dodgy-foreign-imports</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-dodgy-foreign-imports</option></primary>
-	  </indexterm>
-	  <para>Causes a warning to be emitted for foreign imports of
-	  the following form:</para>
+        <term><option>-fwarn-dodgy-foreign-imports</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-dodgy-foreign-imports</option></primary>
+          </indexterm>
+          <para>Causes a warning to be emitted for foreign imports of
+          the following form:</para>
 
 <programlisting>
 foreign import "f" f :: FunPtr t
@@ -1142,83 +1144,110 @@ foreign import "&amp;f" f :: FunPtr t
           declaration is usually a mistake, and one that is hard to
           debug because it results in a crash, hence this
           warning.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-dodgy-exports</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-dodgy-exports</option></primary>
-	  </indexterm>
-	  <para>Causes a warning to be emitted when a datatype
+        <term><option>-fwarn-dodgy-exports</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-dodgy-exports</option></primary>
+          </indexterm>
+          <para>Causes a warning to be emitted when a datatype
       <literal>T</literal> is exported
       with all constructors, i.e. <literal>T(..)</literal>, but is it
       just a type synonym.</para>
-	  <para>Also causes a warning to be emitted when a module is
+          <para>Also causes a warning to be emitted when a module is
       re-exported, but that module exports nothing.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-dodgy-imports</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-dodgy-imports</option></primary>
-	  </indexterm>
-	  <para>Causes a warning to be emitted when a datatype
-      <literal>T</literal> is imported
-      with all constructors, i.e. <literal>T(..)</literal>, but has been
-      exported abstractly, i.e. <literal>T</literal>.</para>
-	</listitem>
+        <term><option>-fwarn-dodgy-imports</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-dodgy-imports</option></primary>
+          </indexterm>
+          <para>Causes a warning to be emitted in the following cases:</para>
+          <itemizedlist>
+            <listitem>
+              <para>When a datatype <literal>T</literal> is imported with all
+                constructors, i.e. <literal>T(..)</literal>, but has been
+                exported abstractly, i.e. <literal>T</literal>.
+              </para>
+            </listitem>
+            <listitem>
+              <para>When an <literal>import</literal> statement hides an
+                entity that is not exported.</para>
+            </listitem>
+          </itemizedlist>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-lazy-unlifted-bindings</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-lazy-unlifted-bindings</option></primary>
-	  </indexterm>
-	  <para>Causes a warning to be emitted when an unlifted type
+        <term><option>-fwarn-lazy-unlifted-bindings</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-lazy-unlifted-bindings</option></primary>
+          </indexterm>
+          <para>Causes a warning to be emitted when an unlifted type
       is bound in a way that looks lazy, e.g.
       <literal>where (I# x) = ...</literal>. Use
       <literal>where !(I# x) = ...</literal> instead. This will be an
       error, rather than a warning, in GHC 7.2.
       </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-duplicate-exports</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-duplicate-exports</option></primary></indexterm>
-	  <indexterm><primary>duplicate exports, warning</primary></indexterm>
-	  <indexterm><primary>export lists, duplicates</primary></indexterm>
+        <term><option>-fwarn-duplicate-constraints</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-duplicate-constraints</option></primary></indexterm>
+          <indexterm><primary>duplicate constraints, warning</primary></indexterm>
 
-	  <para>Have the compiler warn about duplicate entries in
+          <para>Have the compiler warn about duplicate constraints in a type signature. For
+          example
+          <programlisting>
+             f :: (Eq a, Show a, Eq a) => a -> a
+          </programlisting>
+          The warning will indicate the duplicated <literal>Eq a</literal> constraint.
+          </para>
+
+          <para>This option is on by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-duplicate-exports</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-duplicate-exports</option></primary></indexterm>
+          <indexterm><primary>duplicate exports, warning</primary></indexterm>
+          <indexterm><primary>export lists, duplicates</primary></indexterm>
+
+          <para>Have the compiler warn about duplicate entries in
           export lists. This is useful information if you maintain
           large export lists, and want to avoid the continued export
           of a definition after you've deleted (one) mention of it in
           the export list.</para>
 
-	  <para>This option is on by default.</para>
-	</listitem>
+          <para>This option is on by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-hi-shadowing</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-hi-shadowing</option></primary></indexterm>
-	  <indexterm><primary>shadowing</primary>
-	    <secondary>interface files</secondary></indexterm>
+        <term><option>-fwarn-hi-shadowing</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-hi-shadowing</option></primary></indexterm>
+          <indexterm><primary>shadowing</primary>
+            <secondary>interface files</secondary></indexterm>
 
-	  <para>Causes the compiler to emit a warning when a module or
-	  interface file in the current directory is shadowing one
-	  with the same module name in a library or other
-	  directory.</para>
-	</listitem>
+          <para>Causes the compiler to emit a warning when a module or
+          interface file in the current directory is shadowing one
+          with the same module name in a library or other
+          directory.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
         <term><option>-fwarn-identities</option>:</term>
-	<listitem>
+        <listitem>
           <indexterm><primary><option>-fwarn-identities</option></primary></indexterm>
           <para>Causes the compiler to emit a warning when a Prelude numeric
             conversion converts a type T to the same type T; such calls
@@ -1228,7 +1257,7 @@ foreign import "&amp;f" f :: FunPtr t
             <literal>fromIntegral</literal>,
             and <literal>realToFrac</literal>.
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -1257,18 +1286,18 @@ foreign import "&amp;f" f :: FunPtr t
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-incomplete-patterns</option>,
+        <term><option>-fwarn-incomplete-patterns</option>,
               <option>-fwarn-incomplete-uni-patterns</option>:
         </term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-incomplete-patterns</option></primary></indexterm>
-	  <indexterm><primary><option>-fwarn-incomplete-uni-patterns</option></primary></indexterm>
-	  <indexterm><primary>incomplete patterns, warning</primary></indexterm>
-	  <indexterm><primary>patterns, incomplete</primary></indexterm>
+        <listitem>
+          <indexterm><primary><option>-fwarn-incomplete-patterns</option></primary></indexterm>
+          <indexterm><primary><option>-fwarn-incomplete-uni-patterns</option></primary></indexterm>
+          <indexterm><primary>incomplete patterns, warning</primary></indexterm>
+          <indexterm><primary>patterns, incomplete</primary></indexterm>
 
           <para>The option <option>-fwarn-incomplete-patterns</option> warns
             about places where
-	    a pattern-match might fail at runtime.
+            a pattern-match might fail at runtime.
           The function
           <function>g</function> below will fail when applied to
           non-empty lists, so the compiler will emit a warning about
@@ -1279,7 +1308,7 @@ foreign import "&amp;f" f :: FunPtr t
 g [] = 2
 </programlisting>
 
-	  This option isn't enabled by default because it can be
+          This option isn't enabled by default because it can be
           a bit noisy, and it doesn't always indicate a bug in the
           program.  However, it's generally considered good practice
           to cover all the cases in your functions, and it is switched
@@ -1288,7 +1317,7 @@ g [] = 2
           <para>The flag <option>-fwarn-incomplete-uni-patterns</option> is
           similar, except that it
           applies only to lambda-expressions and pattern bindings, constructs
-	  that only allow a single pattern:
+          that only allow a single pattern:
 
 <programlisting>
 h = \[] -> 2
@@ -1296,17 +1325,17 @@ Just k = f y
 </programlisting>
 
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-incomplete-record-updates</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-incomplete-record-updates</option></primary></indexterm>
-	  <indexterm><primary>incomplete record updates, warning</primary></indexterm>
-	  <indexterm><primary>record updates, incomplete</primary></indexterm>
+        <term><option>-fwarn-incomplete-record-updates</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-incomplete-record-updates</option></primary></indexterm>
+          <indexterm><primary>incomplete record updates, warning</primary></indexterm>
+          <indexterm><primary>record updates, incomplete</primary></indexterm>
 
-	  <para>The function
+          <para>The function
           <function>f</function> below will fail when applied to
           <literal>Bar</literal>, so the compiler will emit a warning about
           this when <option>-fwarn-incomplete-record-updates</option> is
@@ -1320,42 +1349,42 @@ f :: Foo -> Foo
 f foo = foo { x = 6 }
 </programlisting>
 
-	  <para>This option isn't enabled by default because it can be
+          <para>This option isn't enabled by default because it can be
           very noisy, and it often doesn't indicate a bug in the
           program.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <option>-fwarn-missing-fields</option>:
-	  <indexterm><primary><option>-fwarn-missing-fields</option></primary></indexterm>
-	  <indexterm><primary>missing fields, warning</primary></indexterm>
-	  <indexterm><primary>fields, missing</primary></indexterm>
+          <indexterm><primary><option>-fwarn-missing-fields</option></primary></indexterm>
+          <indexterm><primary>missing fields, warning</primary></indexterm>
+          <indexterm><primary>fields, missing</primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
 
-	  <para>This option is on by default, and warns you whenever
+          <para>This option is on by default, and warns you whenever
           the construction of a labelled field constructor isn't
           complete, missing initializers for one or more fields. While
           not an error (the missing fields are initialised with
           bottoms), it is often an indication of a programmer error.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <option>-fwarn-missing-import-lists</option>:
-	  <indexterm><primary><option>-fwarn-import-lists</option></primary></indexterm>
-	  <indexterm><primary>missing import lists, warning</primary></indexterm>
-	  <indexterm><primary>import lists, missing</primary></indexterm>
+          <indexterm><primary><option>-fwarn-import-lists</option></primary></indexterm>
+          <indexterm><primary>missing import lists, warning</primary></indexterm>
+          <indexterm><primary>import lists, missing</primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
 
-	  <para>This flag warns if you use an unqualified
+          <para>This flag warns if you use an unqualified
             <literal>import</literal> declaration
-	    that does not explicitly list the entities brought into scope. For
-	    example
+            that does not explicitly list the entities brought into scope. For
+            example
       </para>
 
 <programlisting>
@@ -1368,77 +1397,77 @@ module M where
 
         <para>
           The <option>-fwarn-import-lists</option> flag will warn about the import
-	  of <literal>Y</literal> but not <literal>X</literal>
-	  If module <literal>Y</literal> is later changed to export (say) <literal>f</literal>,
+          of <literal>Y</literal> but not <literal>X</literal>
+          If module <literal>Y</literal> is later changed to export (say) <literal>f</literal>,
           then the reference to <literal>f</literal> in <literal>M</literal> will become
-	  ambiguous.  No warning is produced for the import of <literal>Z</literal>
-	  because extending <literal>Z</literal>'s exports would be unlikely to produce
-	  ambiguity in <literal>M</literal>.
+          ambiguous.  No warning is produced for the import of <literal>Z</literal>
+          because extending <literal>Z</literal>'s exports would be unlikely to produce
+          ambiguity in <literal>M</literal>.
         </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-missing-methods</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-missing-methods</option></primary></indexterm>
-	  <indexterm><primary>missing methods, warning</primary></indexterm>
-	  <indexterm><primary>methods, missing</primary></indexterm>
+        <term><option>-fwarn-missing-methods</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-missing-methods</option></primary></indexterm>
+          <indexterm><primary>missing methods, warning</primary></indexterm>
+          <indexterm><primary>methods, missing</primary></indexterm>
 
-	  <para>This option is on by default, and warns you whenever
+          <para>This option is on by default, and warns you whenever
           an instance declaration is missing one or more methods, and
           the corresponding class declaration has no default
           declaration for them.</para>
-	  <para>The warning is suppressed if the method name
-	  begins with an underscore.  Here's an example where this is useful:
-	    <programlisting>
-	      class C a where
-	        _simpleFn :: a -> String
-	        complexFn :: a -> a -> String
-	        complexFn x y = ... _simpleFn ...
-	      </programlisting>
-	    The idea is that: (a) users of the class will only call <literal>complexFn</literal>;
-	    never <literal>_simpleFn</literal>; and (b)
-	    instance declarations can define either <literal>complexFn</literal> or <literal>_simpleFn</literal>.
-	    </para>
-	</listitem>
+          <para>The warning is suppressed if the method name
+          begins with an underscore.  Here's an example where this is useful:
+            <programlisting>
+              class C a where
+                _simpleFn :: a -> String
+                complexFn :: a -> a -> String
+                complexFn x y = ... _simpleFn ...
+              </programlisting>
+            The idea is that: (a) users of the class will only call <literal>complexFn</literal>;
+            never <literal>_simpleFn</literal>; and (b)
+            instance declarations can define either <literal>complexFn</literal> or <literal>_simpleFn</literal>.
+            </para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-missing-signatures</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-missing-signatures</option></primary></indexterm>
-	  <indexterm><primary>type signatures, missing</primary></indexterm>
+        <term><option>-fwarn-missing-signatures</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-missing-signatures</option></primary></indexterm>
+          <indexterm><primary>type signatures, missing</primary></indexterm>
 
-	  <para>If you would like GHC to check that every top-level
+          <para>If you would like GHC to check that every top-level
           function/value has a type signature, use the
           <option>-fwarn-missing-signatures</option> option.  As part of
-	    the warning GHC also reports the inferred type.  The
+            the warning GHC also reports the inferred type.  The
           option is off by default.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-missing-local-sigs</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-missing-local-sigs</option></primary></indexterm>
-	  <indexterm><primary>type signatures, missing</primary></indexterm>
+        <term><option>-fwarn-missing-local-sigs</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-missing-local-sigs</option></primary></indexterm>
+          <indexterm><primary>type signatures, missing</primary></indexterm>
 
-	  <para>If you use the
+          <para>If you use the
           <option>-fwarn-missing-local-sigs</option> flag GHC will warn
           you about any polymorphic local bindings. As part of
-	    the warning GHC also reports the inferred type. The
+            the warning GHC also reports the inferred type. The
           option is off by default.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-name-shadowing</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-name-shadowing</option></primary></indexterm>
-	  <indexterm><primary>shadowing, warning</primary></indexterm>
+        <term><option>-fwarn-name-shadowing</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-name-shadowing</option></primary></indexterm>
+          <indexterm><primary>shadowing, warning</primary></indexterm>
 
-	  <para>This option causes a warning to be emitted whenever an
+          <para>This option causes a warning to be emitted whenever an
           inner-scope value has the same name as an outer-scope value,
           i.e. the inner value shadows the outer one.  This can catch
           typographical errors that turn into hard-to-find bugs, e.g.,
@@ -1449,46 +1478,46 @@ module M where
              f x = do { _ignore &lt;- this; _ignore &lt;- that; return (the other) }
           </programlisting>
          </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
         <term><option>-fwarn-orphans, -fwarn-auto-orphans</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-orphans</option></primary></indexterm>
+        <listitem>
+          <indexterm><primary><option>-fwarn-orphans</option></primary></indexterm>
           <indexterm><primary><option>-fwarn-auto-orphans</option></primary></indexterm>
-	  <indexterm><primary>orphan instances, warning</primary></indexterm>
-	  <indexterm><primary>orphan rules, warning</primary></indexterm>
+          <indexterm><primary>orphan instances, warning</primary></indexterm>
+          <indexterm><primary>orphan rules, warning</primary></indexterm>
 
           <para>These flags cause a warning to be emitted whenever the
-	    module contains an "orphan" instance declaration or rewrite rule.
-	    An instance declaration is an orphan if it appears in a module in
-	    which neither the class nor the type being instanced are declared
-	    in the same module.  A rule is an orphan if it is a rule for a
-	    function declared in another module.  A module containing any
-	  orphans is called an orphan module.</para>
-	  <para>The trouble with orphans is that GHC must pro-actively read the interface
-	    files for all orphan modules, just in case their instances or rules
-	    play a role, whether or not the module's interface would otherwise
-	    be of any use.  See <xref linkend="orphan-modules"/> for details.
+            module contains an "orphan" instance declaration or rewrite rule.
+            An instance declaration is an orphan if it appears in a module in
+            which neither the class nor the type being instanced are declared
+            in the same module.  A rule is an orphan if it is a rule for a
+            function declared in another module.  A module containing any
+          orphans is called an orphan module.</para>
+          <para>The trouble with orphans is that GHC must pro-actively read the interface
+            files for all orphan modules, just in case their instances or rules
+            play a role, whether or not the module's interface would otherwise
+            be of any use.  See <xref linkend="orphan-modules"/> for details.
             </para>
            <para>The flag <option>-fwarn-orphans</option> warns about user-written
             orphan rules or instances.  The flag <option>-fwarn-auto-orphans</option>
             warns about automatically-generated orphan rules, notably as a result of
             specialising functions, for type classes (<literal>Specialise</literal>)
             or argument values (<literal>SpecConstr</literal>).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <option>-fwarn-overlapping-patterns</option>:
           <indexterm><primary><option>-fwarn-overlapping-patterns</option></primary></indexterm>
           <indexterm><primary>overlapping patterns, warning</primary></indexterm>
           <indexterm><primary>patterns, overlapping</primary></indexterm>
         </term>
-	<listitem>
-	  <para>By default, the compiler will warn you if a set of
+        <listitem>
+          <para>By default, the compiler will warn you if a set of
           patterns are overlapping, e.g.,</para>
 
 <programlisting>
@@ -1498,31 +1527,31 @@ f (_:xs) = 1
 f "2"    = 2
 </programlisting>
 
-	  <para>where the last pattern match in <function>f</function>
+          <para>where the last pattern match in <function>f</function>
           won't ever be reached, as the second pattern overlaps
           it. More often than not, redundant patterns is a programmer
           mistake/error, so this option is enabled by default.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-tabs</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-tabs</option></primary></indexterm>
-	  <indexterm><primary>tabs, warning</primary></indexterm>
-	  <para>Have the compiler warn if there are tabs in your source
+        <term><option>-fwarn-tabs</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-tabs</option></primary></indexterm>
+          <indexterm><primary>tabs, warning</primary></indexterm>
+          <para>Have the compiler warn if there are tabs in your source
           file.</para>
 
-	  <para>This warning is off by default.</para>
-	</listitem>
+          <para>This warning is off by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-type-defaults</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-type-defaults</option></primary></indexterm>
-	  <indexterm><primary>defaulting mechanism, warning</primary></indexterm>
-	  <para>Have the compiler warn/inform you where in your source
+        <term><option>-fwarn-type-defaults</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-type-defaults</option></primary></indexterm>
+          <indexterm><primary>defaulting mechanism, warning</primary></indexterm>
+          <para>Have the compiler warn/inform you where in your source
           the Haskell defaulting mechanism for numeric types kicks
           in. This is useful information when converting code from a
           context that assumed one default into one with another,
@@ -1534,124 +1563,137 @@ f "2"    = 2
           differences in performance and behaviour, hence the
           usefulness of being non-silent about this.</para>
 
-	  <para>This warning is off by default.</para>
-	</listitem>
+          <para>This warning is off by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-monomorphism-restriction</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-monomorphism-restriction</option></primary></indexterm>
-	  <indexterm><primary>monomorphism restriction, warning</primary></indexterm>
-	  <para>Have the compiler warn/inform you where in your source
+        <term><option>-fwarn-monomorphism-restriction</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-monomorphism-restriction</option></primary></indexterm>
+          <indexterm><primary>monomorphism restriction, warning</primary></indexterm>
+          <para>Have the compiler warn/inform you where in your source
           the Haskell Monomorphism Restriction is applied.  If applied silently
-	  the MR can give rise to unexpected behaviour, so it can be helpful
-	  to have an explicit warning that it is being applied.</para>
+          the MR can give rise to unexpected behaviour, so it can be helpful
+          to have an explicit warning that it is being applied.</para>
 
-	  <para>This warning is off by default.</para>
-	</listitem>
+          <para>This warning is off by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-unused-binds</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-unused-binds</option></primary></indexterm>
-	  <indexterm><primary>unused binds, warning</primary></indexterm>
-	  <indexterm><primary>binds, unused</primary></indexterm>
-	  <para>Report any function definitions (and local bindings)
+        <term><option>-fwarn-unused-binds</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-binds</option></primary></indexterm>
+          <indexterm><primary>unused binds, warning</primary></indexterm>
+          <indexterm><primary>binds, unused</primary></indexterm>
+          <para>Report any function definitions (and local bindings)
           which are unused.  For top-level functions, the warning is
           only given if the binding is not exported.</para>
-	  <para>A definition is regarded as "used" if (a) it is exported, or (b) it is
-	    mentioned in the right hand side of another definition that is used, or (c) the
-	    function it defines begins with an underscore.  The last case provides a
-	    way to suppress unused-binding warnings selectively.  </para>
-	  <para> Notice that a variable
-	    is reported as unused even if it appears in the right-hand side of another
-	    unused binding. </para>
-	</listitem>
+          <para>A definition is regarded as "used" if (a) it is exported, or (b) it is
+            mentioned in the right hand side of another definition that is used, or (c) the
+            function it defines begins with an underscore.  The last case provides a
+            way to suppress unused-binding warnings selectively.  </para>
+          <para> Notice that a variable
+            is reported as unused even if it appears in the right-hand side of another
+            unused binding. </para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-unused-imports</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-unused-imports</option></primary></indexterm>
-	  <indexterm><primary>unused imports, warning</primary></indexterm>
-	  <indexterm><primary>imports, unused</primary></indexterm>
+        <term><option>-fwarn-unused-imports</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-imports</option></primary></indexterm>
+          <indexterm><primary>unused imports, warning</primary></indexterm>
+          <indexterm><primary>imports, unused</primary></indexterm>
 
-	  <para>Report any modules that are explicitly imported but
-	  never used.  However, the form <literal>import M()</literal> is
-	  never reported as an unused import, because it is a useful idiom
-	  for importing instance declarations, which are anonymous in Haskell.</para>
-	</listitem>
+          <para>Report any modules that are explicitly imported but
+          never used.  However, the form <literal>import M()</literal> is
+          never reported as an unused import, because it is a useful idiom
+          for importing instance declarations, which are anonymous in Haskell.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-unused-matches</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-unused-matches</option></primary></indexterm>
-	  <indexterm><primary>unused matches, warning</primary></indexterm>
-	  <indexterm><primary>matches, unused</primary></indexterm>
+        <term><option>-fwarn-unused-matches</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-matches</option></primary></indexterm>
+          <indexterm><primary>unused matches, warning</primary></indexterm>
+          <indexterm><primary>matches, unused</primary></indexterm>
 
-	  <para>Report all unused variables which arise from pattern
+          <para>Report all unused variables which arise from pattern
           matches, including patterns consisting of a single variable.
           For instance <literal>f x y = []</literal> would report
           <varname>x</varname> and <varname>y</varname> as unused.  The
           warning is suppressed if the variable name begins with an underscore, thus:
-	    <programlisting>
-	       f _x = True
-	    </programlisting>
+            <programlisting>
+               f _x = True
+            </programlisting>
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-unused-do-bind</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-unused-do-bind</option></primary></indexterm>
-	  <indexterm><primary>unused do binding, warning</primary></indexterm>
-	  <indexterm><primary>do binding, unused</primary></indexterm>
+        <term><option>-fwarn-unused-do-bind</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unused-do-bind</option></primary></indexterm>
+          <indexterm><primary>unused do binding, warning</primary></indexterm>
+          <indexterm><primary>do binding, unused</primary></indexterm>
 
-	  <para>Report expressions occurring in <literal>do</literal> and <literal>mdo</literal> blocks
-	  that appear to silently throw information away.
+          <para>Report expressions occurring in <literal>do</literal> and <literal>mdo</literal> blocks
+          that appear to silently throw information away.
           For instance <literal>do { mapM popInt xs ; return 10 }</literal> would report
           the first statement in the <literal>do</literal> block as suspicious,
           as it has the type <literal>StackM [Int]</literal> and not <literal>StackM ()</literal>, but that
           <literal>[Int]</literal> value is not bound to anything.  The warning is suppressed by
           explicitly mentioning in the source code that your program is throwing something away:
-	    <programlisting>
-	       do { _ &lt;- mapM popInt xs ; return 10 }
-	    </programlisting>
-	  Of course, in this particular situation you can do even better:
-	    <programlisting>
-	       do { mapM_ popInt xs ; return 10 }
-	    </programlisting>
+            <programlisting>
+               do { _ &lt;- mapM popInt xs ; return 10 }
+            </programlisting>
+          Of course, in this particular situation you can do even better:
+            <programlisting>
+               do { mapM_ popInt xs ; return 10 }
+            </programlisting>
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-wrong-do-bind</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-wrong-do-bind</option></primary></indexterm>
-	  <indexterm><primary>apparently erroneous do binding, warning</primary></indexterm>
-	  <indexterm><primary>do binding, apparently erroneous</primary></indexterm>
+        <term><option>-fwarn-wrong-do-bind</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-wrong-do-bind</option></primary></indexterm>
+          <indexterm><primary>apparently erroneous do binding, warning</primary></indexterm>
+          <indexterm><primary>do binding, apparently erroneous</primary></indexterm>
 
-	  <para>Report expressions occurring in <literal>do</literal> and <literal>mdo</literal> blocks
-	  that appear to lack a binding.
+          <para>Report expressions occurring in <literal>do</literal> and <literal>mdo</literal> blocks
+          that appear to lack a binding.
           For instance <literal>do { return (popInt 10) ; return 10 }</literal> would report
           the first statement in the <literal>do</literal> block as suspicious,
           as it has the type <literal>StackM (StackM Int)</literal> (which consists of two nested applications
           of the same monad constructor), but which is not then &quot;unpacked&quot; by binding the result.
           The warning is suppressed by explicitly mentioning in the source code that your program is throwing something away:
-	    <programlisting>
-	       do { _ &lt;- return (popInt 10) ; return 10 }
-	    </programlisting>
-	  For almost all sensible programs this will indicate a bug, and you probably intended to write:
-	    <programlisting>
-	       do { popInt 10 ; return 10 }
-	    </programlisting>
+            <programlisting>
+               do { _ &lt;- return (popInt 10) ; return 10 }
+            </programlisting>
+          For almost all sensible programs this will indicate a bug, and you probably intended to write:
+            <programlisting>
+               do { popInt 10 ; return 10 }
+            </programlisting>
           </para>
-	</listitem>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-typeable-instances</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-typeable-instances</option></primary></indexterm>
+          <indexterm><primary>typeable instances, warning</primary></indexterm>
+
+          <para>Report handwritten (ie. not derived) instances of the
+          <literal>Typeable</literal> class. These are ignore by the compiler;
+          only derived instances of <literal>Typeable</literal> are allowed.
+          </para>
+        </listitem>
       </varlistentry>
 
     </variablelist>
@@ -1699,69 +1741,69 @@ f "2"    = 2
 
       <variablelist>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             No <option>-O*</option>-type option specified:
             <indexterm><primary>-O* not specified</primary></indexterm>
           </term>
-	  <listitem>
-	    <para>This is taken to mean: &ldquo;Please compile
+          <listitem>
+            <para>This is taken to mean: &ldquo;Please compile
             quickly; I'm not over-bothered about compiled-code
             quality.&rdquo; So, for example: <command>ghc -c
             Foo.hs</command></para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-O0</option>:
             <indexterm><primary><option>-O0</option></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Means &ldquo;turn off all optimisation&rdquo;,
-	    reverting to the same settings as if no
-	    <option>-O</option> options had been specified.  Saying
-	    <option>-O0</option> can be useful if
-	    eg. <command>make</command> has inserted a
-	    <option>-O</option> on the command line already.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Means &ldquo;turn off all optimisation&rdquo;,
+            reverting to the same settings as if no
+            <option>-O</option> options had been specified.  Saying
+            <option>-O0</option> can be useful if
+            eg. <command>make</command> has inserted a
+            <option>-O</option> on the command line already.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-O</option> or <option>-O1</option>:
             <indexterm><primary>-O option</primary></indexterm>
             <indexterm><primary>-O1 option</primary></indexterm>
             <indexterm><primary>optimise</primary><secondary>normally</secondary></indexterm>
           </term>
-	  <listitem>
-	    <para>Means: &ldquo;Generate good-quality code without
+          <listitem>
+            <para>Means: &ldquo;Generate good-quality code without
             taking too long about it.&rdquo; Thus, for example:
             <command>ghc -c -O Main.lhs</command></para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-O2</option>:
             <indexterm><primary>-O2 option</primary></indexterm>
             <indexterm><primary>optimise</primary><secondary>aggressively</secondary></indexterm>
           </term>
-	  <listitem>
-	    <para>Means: &ldquo;Apply every non-dangerous
+          <listitem>
+            <para>Means: &ldquo;Apply every non-dangerous
             optimisation, even if it means significantly longer
             compile times.&rdquo;</para>
 
-	    <para>The avoided &ldquo;dangerous&rdquo; optimisations
+            <para>The avoided &ldquo;dangerous&rdquo; optimisations
             are those that can make runtime or space
             <emphasis>worse</emphasis> if you're unlucky.  They are
             normally turned on or off individually.</para>
 
-	    <para>At the moment, <option>-O2</option> is
+            <para>At the moment, <option>-O2</option> is
             <emphasis>unlikely</emphasis> to produce better code than
             <option>-O</option>.</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
       </variablelist>
 
       <para>We don't use a <option>-O*</option> flag for day-to-day
@@ -1791,25 +1833,25 @@ f "2"    = 2
      </para>
 
       <variablelist>
-	<varlistentry>
+        <varlistentry>
           <term>
             <option>-fcse</option>
             <indexterm><primary><option>-fcse</option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para><emphasis>On by default.</emphasis>.  Enables the common-sub-expression 
             elimination optimisation.
             Switching this off can be useful if you have some <literal>unsafePerformIO</literal>
             expressions that you don't want commoned-up.</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
+        <varlistentry>
           <term>
             <option>-fstrictness</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para> <emphasis>On by default.</emphasis>.  
             Switch on the strictness analyser. There is a very old paper about GHC's 
             strictness analyser, <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/simple-strictnes-analyser.ps.gz">
@@ -1823,18 +1865,18 @@ f "2"    = 2
             GHC to apply certain optimisations such as unboxing that
             otherwise don't apply as they change the semantics of the program
             when applied to lazy arguments.
-	    </para>
-	  </listitem>
-	</varlistentry>
+            </para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-funbox-strict-fields</option>:
             <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
             <indexterm><primary>strict constructor fields</primary></indexterm>
             <indexterm><primary>constructor fields, strict</primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>This option causes all constructor fields which are marked
             strict (i.e. &ldquo;!&rdquo;) to be unpacked if possible. It is
             equivalent to adding an <literal>UNPACK</literal> pragma to every
@@ -1848,15 +1890,62 @@ f "2"    = 2
             unboxing by default but disable it for certain constructor
             fields using the <literal>NOUNPACK</literal> pragma (see
             <xref linkend="nounpack-pragma"/>).</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
+            <option>-funbox-small-strict-fields</option>:
+            <indexterm><primary><option>-funbox-small-strict-fields</option></primary></indexterm>
+            <indexterm><primary>strict constructor fields</primary></indexterm>
+            <indexterm><primary>constructor fields, strict</primary></indexterm>
+          </term>
+          <listitem>
+            <para>This option causes all constructor fields which are
+            marked strict (i.e. &ldquo;!&rdquo;) and which
+            representation is smaller or equal to the size of a
+            pointer to be unpacked, if possible. It is equivalent to
+            adding an <literal>UNPACK</literal> pragma (see <xref
+            linkend="unpack-pragma"/>) to every strict constructor
+            field that fulfils the size restriction.
+            </para>
+
+            <para>For example, the constructor fields in the following
+            data types
+<programlisting>
+data A = A !Int
+data B = B !A
+newtype C = C B
+data D = D !C
+</programlisting>
+            would all be represented by a single
+            <literal>Int#</literal> (see <xref linkend="primitives"/>)
+            value with
+            <option>-funbox-small-strict-fields</option> enabled.
+            </para>
+
+            <para>This option is less of a sledgehammer than
+            <option>-funbox-strict-fields</option>: it should rarely make things
+            worse. If you use <option>-funbox-small-strict-fields</option>
+            to turn on unboxing by default you can disable it for certain
+            constructor fields using the <literal>NOUNPACK</literal> pragma (see
+            <xref linkend="nounpack-pragma"/>).</para>
+
+            <para>
+            Note that for consistency <literal>Double</literal>,
+            <literal>Word64</literal>, and <literal>Int64</literal> constructor
+            fields are unpacked on 32-bit platforms, even though they are
+            technically larger than a pointer on those platforms.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <option>-fspec-constr</option>
             <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para><emphasis>Off by default, but enabled by -O2.</emphasis>
             Turn on call-pattern specialisation; see
             <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm">
@@ -1892,15 +1981,15 @@ last (x : xs) = last' x xs
             strict recursive branch of the function is created similar to the
             above example.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fspecialise</option>
             <indexterm><primary><option>-fspecialise</option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para><emphasis>On by default.</emphasis>
             Specialise each type-class-overloaded function defined in this
             module for the types at which it is called in this module.  Also
@@ -1923,15 +2012,15 @@ last (x : xs) = last' x xs
             <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz">
               Andre Santos's PhD thesis</ulink>
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-ffloat-in</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para><emphasis>On by default.</emphasis>
             Float let-bindings inwards, nearer their binding site.  See
             <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">
@@ -1952,15 +2041,15 @@ last (x : xs) = last' x xs
             grouped into a larger single let binding, effectively batching
             their allocation and helping the garbage collector and allocator.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-ffull-laziness</option>
             <indexterm><primary><option>-ffull-laziness</option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para><emphasis>On by default.</emphasis>
             Run the full laziness optimisation (also known as let-floating),
             which floats let-bindings outside enclosing lambdas, in the hope
@@ -2044,71 +2133,71 @@ last (x : xs) = last' x xs
             (<option>-fspec-constr</option>) but for free variables rather than
             arguments.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fdicts-cheap</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>A very experimental flag that makes dictionary-valued
             expressions seem cheap to the optimiser.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-feager-blackholing</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>Usually GHC black-holes a thunk only when it switches
             threads. This flag makes it do so as soon as the thunk is
             entered. See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/">
               Haskell on a shared-memory multiprocessor</ulink>.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fno-state-hack</option>
             <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Turn off the "state hack" whereby any lambda with a
-	      <literal>State#</literal> token as argument is considered to be
-	      single-entry, hence it is considered OK to inline things inside
-	      it.  This can improve performance of IO and ST monad code, but it
+          <listitem>
+            <para>Turn off the "state hack" whereby any lambda with a
+            <literal>State#</literal> token as argument is considered to be
+            single-entry, hence it is considered OK to inline things inside
+            it. This can improve performance of IO and ST monad code, but it
             runs the risk of reducing sharing.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fpedantic-bottoms</option>
             <indexterm><primary><option>-fpedantic-bottoms</option></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Make GHC be more precise about its treatment of bottom (but see also
-                     <option>-fno-state-hack</option>). In particular, stop GHC 
-                     eta-expanding through a case expression, which is good for
-		     performance, but bad if you are using <literal>seq</literal> on
+          <listitem>
+            <para>Make GHC be more precise about its treatment of bottom (but see also
+            <option>-fno-state-hack</option>). In particular, stop GHC
+            eta-expanding through a case expression, which is good for
+            performance, but bad if you are using <literal>seq</literal> on
             partial applications.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fsimpl-tick-factor=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-fsimpl-tick-factor</option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>GHC's optimiser can diverge if you write rewrite rules (
               <xref linkend="rewrite-rules"/>) that don't terminate, or (less
             satisfactorily) if you code up recursion through data types
@@ -2127,18 +2216,18 @@ last (x : xs) = last' x xs
             <option>-fddump-simpl-stats</option> to generate a much more
             detailed list.  Usually that identifies the loop quite
             accurately, because some numbers are very large.
-	      </para>
-	  </listitem>
-	</varlistentry>
+            </para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
             <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
             <indexterm><primary>inlining, controlling</primary></indexterm>
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>(Default: 45) Governs the maximum size that GHC will allow a
             function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
             that reflects the cost in terms of &ldquo;code bloat&rdquo; of
@@ -2154,18 +2243,18 @@ last (x : xs) = last' x xs
             <para>Increasing this figure is more likely to result in longer
             compile times than faster code. The
             <option>-funfolding-use-threshold</option> is more useful.
-	      </para>
-	  </listitem>
-	</varlistentry>
+            </para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-funfolding-use-threshold=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
             <indexterm><primary>inlining, controlling</primary></indexterm>
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>(Default: 8) This is the magic cut-off figure for unfolding
             (aka inlining): below this size, a function definition will be
             unfolded at the call-site, any bigger and it won't. The size
@@ -2181,31 +2270,37 @@ last (x : xs) = last' x xs
             function definition will be kept around at all for potential
             inlining.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fexpose-all-unfoldings</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>An experimental flag to expose all unfoldings, even for very
             large or recursive functions. This allows for all functions to be
             inlined while usually GHC would avoid inlining larger functions.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fvectorise</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
-            <para>Data Parallel Haskell.
-            </para>
-            TODO: Document optimisation
+          <listitem>
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> optimisation transformation. This
+            optimisation transforms the nested data parallelism code of programs
+            using DPH into flat data parallelism. Flat data parallel programs
+            should have better load balancing, enable SIMD parallelism and
+            friendlier cache behaviour.</para>
           </listitem>
         </varlistentry>
 
@@ -2215,18 +2310,28 @@ last (x : xs) = last' x xs
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>Data Parallel Haskell.
-        </para>
-            TODO: Document optimisation
-	  </listitem>
-	</varlistentry>
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
 
-	<varlistentry>
-	  <term>
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> avoidance optimisation. This
+            optimisation only works when used in combination with the
+            <option>-fvectorise</option> transformation.</para>
+
+            <para>While vectorisation of code using DPH is often a big win, it
+            can also produce worse results for some kinds of code. This
+            optimisation modifies the vectorisation transformation to try to
+            determine if a function would be better of unvectorised and if
+            so, do just that.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <option>-fregs-graph</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para><emphasis>Off by default, but enabled by -O2. Only applies in
               combination with the native code generator.</emphasis>
             Use the graph colouring register allocator for register allocation
@@ -2290,15 +2395,15 @@ last (x : xs) = last' x xs
             linkend="assertions"/>).  This flag is turned on by
             <option>-O</option>.
             </para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
+        <varlistentry>
           <term>
             <option>-fignore-interface-pragmas</option>
             <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
           </term>
-	  <listitem>
+          <listitem>
             <para>Tells GHC to ignore all inessential information when reading interface files.
             That is, even if <filename>M.hi</filename> contains unfolding or strictness information
             for a function, GHC will ignore that information.</para>
@@ -2320,8 +2425,26 @@ last (x : xs) = last' x xs
             The benefit is that modules that import M will need to be
             recompiled less often (only when M's exports change their type, not
             when they change their implementation).</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fomit-yields</option>
+            <indexterm><primary><option>-fomit-yields</option></primary></indexterm>
+          </term>
+          <listitem>
+              <para><emphasis>On by default.</emphasis>  Tells GHC to omit
+            heap checks when no allocation is being performed.  While this improves
+            binary sizes by about 5%, it also means that threads run in
+            tight non-allocating loops will not get preempted in a timely
+            fashion.  If it is important to always be able to interrupt such
+            threads, you should turn this optimization off.  Consider also
+            recompiling all libraries with this optimization turned off, if you
+            need to guarantee interruptibility.
+            </para>
+          </listitem>
+        </varlistentry>
 
       </variablelist>
 
@@ -2343,7 +2466,7 @@ last (x : xs) = last' x xs
       special option or libraries compiled in a certain way.  To get access to
       the support libraries for Concurrent Haskell, just import
       <ulink
-	url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>.  More information on Concurrent Haskell is provided in the documentation for that module.</para>
+        url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>.  More information on Concurrent Haskell is provided in the documentation for that module.</para>
 
     <para>
       Optionally, the program may be linked with
@@ -2379,17 +2502,17 @@ last (x : xs) = last' x xs
 
     <variablelist>
       <varlistentry>
-	<term><option>-C<replaceable>s</replaceable></option></term>
-	<listitem>
-	  <para><indexterm><primary><option>-C<replaceable>s</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
-	    Sets the context switch interval to <replaceable>s</replaceable>
-	    seconds.  A context switch will occur at the next heap block
-	    allocation after the timer expires (a heap block allocation occurs
-	    every 4k of allocation).  With <option>-C0</option> or
-	    <option>-C</option>, context switches will occur as often as
-	    possible (at every heap block allocation).  By default, context
-	    switches occur every 20ms.</para>
-	</listitem>
+        <term><option>-C<replaceable>s</replaceable></option></term>
+        <listitem>
+          <para><indexterm><primary><option>-C<replaceable>s</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
+            Sets the context switch interval to <replaceable>s</replaceable>
+            seconds.  A context switch will occur at the next heap block
+            allocation after the timer expires (a heap block allocation occurs
+            every 4k of allocation).  With <option>-C0</option> or
+            <option>-C</option>, context switches will occur as often as
+            possible (at every heap block allocation).  By default, context
+            switches occur every 20ms.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
   </sect1>
@@ -2418,16 +2541,16 @@ last (x : xs) = last' x xs
       is also possible to obtain performance improvements with parallelism
       on programs that do not use concurrency.  This section describes how to
       use GHC to compile and run parallel programs, in <xref
-	linkend="lang-parallel" /> we describe the language features that affect
+        linkend="lang-parallel" /> we describe the language features that affect
     parallelism.</para>
 
     <sect2 id="parallel-compile-options">
       <title>Compile-time options for SMP parallelism</title>
 
       <para>In order to make use of multiple CPUs, your program must be
-	linked with the <option>-threaded</option> option (see <xref
-	  linkend="options-linker" />).  Additionally, the following
-	compiler options affect parallelism:</para>
+        linked with the <option>-threaded</option> option (see <xref
+          linkend="options-linker" />).  Additionally, the following
+        compiler options affect parallelism:</para>
 
       <variablelist>
         <varlistentry>
@@ -2475,18 +2598,18 @@ last (x : xs) = last' x xs
         program, or use the RTS <option>-N</option> option.</para>
 
       <variablelist>
-	<varlistentry>
-	  <term><option>-N<optional><replaceable>x</replaceable></optional></option></term>
-	  <listitem>
-	    <para><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
-	      Use <replaceable>x</replaceable> simultaneous threads when
-	      running the program.  Normally <replaceable>x</replaceable>
-	      should be chosen to match the number of CPU cores on the
-	      machine<footnote><para>Whether hyperthreading cores should be counted or not is an
-	      open question; please feel free to experiment and let us know what
-	          results you find.</para></footnote>.  For example,
-	      on a dual-core machine we would probably use
-	      <literal>+RTS -N2 -RTS</literal>.</para>
+        <varlistentry>
+          <term><option>-N<optional><replaceable>x</replaceable></optional></option></term>
+          <listitem>
+            <para><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
+              Use <replaceable>x</replaceable> simultaneous threads when
+              running the program.  Normally <replaceable>x</replaceable>
+              should be chosen to match the number of CPU cores on the
+              machine<footnote><para>Whether hyperthreading cores should be counted or not is an
+              open question; please feel free to experiment and let us know what
+                  results you find.</para></footnote>.  For example,
+              on a dual-core machine we would probably use
+              <literal>+RTS -N2 -RTS</literal>.</para>
 
             <para>Omitting <replaceable>x</replaceable>,
               i.e. <literal>+RTS -N -RTS</literal>, lets the runtime
@@ -2507,30 +2630,30 @@ last (x : xs) = last' x xs
               via <literal>Control.Concurrent.getNumCapabilities</literal>, and
               it may be changed while the program is running by
               calling <literal>Control.Concurrent.setNumCapabilities</literal>.</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
       </variablelist>
 
       <para>The following options affect the way the runtime schedules
       threads on CPUs:</para>
 
       <variablelist>
-	<varlistentry>
-	  <term><option>-qa</option></term>
+        <varlistentry>
+          <term><option>-qa</option></term>
           <indexterm><primary><option>-qa</option></primary><secondary>RTS
           option</secondary></indexterm>
-	  <listitem>
+          <listitem>
             <para>Use the OS's affinity facilities to try to pin OS
               threads to CPU cores.  This is an experimental feature,
               and may or may not be useful.  Please let us know
               whether it helps for you!</para>
           </listitem>
         </varlistentry>
-	<varlistentry>
-	  <term><option>-qm</option></term>
+        <varlistentry>
+          <term><option>-qm</option></term>
           <indexterm><primary><option>-qm</option></primary><secondary>RTS
           option</secondary></indexterm>
-	  <listitem>
+          <listitem>
             <para>Disable automatic migration for load balancing.
             Normally the runtime will automatically try to schedule
             threads across the available CPUs to make use of idle
@@ -2553,12 +2676,12 @@ last (x : xs) = last' x xs
       <title>Hints for using SMP parallelism</title>
 
       <para>Add the <literal>-s</literal> RTS option when
-	running the program to see timing stats, which will help to tell you
-	whether your program got faster by using more CPUs or not.  If the user
-	time is greater than
-	the elapsed time, then the program used more than one CPU.  You should
-	also run the program without <literal>-N</literal> for
-	comparison.</para>
+        running the program to see timing stats, which will help to tell you
+        whether your program got faster by using more CPUs or not.  If the user
+        time is greater than
+        the elapsed time, then the program used more than one CPU.  You should
+        also run the program without <literal>-N</literal> for
+        comparison.</para>
 
       <para>The output of <literal>+RTS -s</literal> tells you how
         many &ldquo;sparks&rdquo; were created and executed during the
@@ -2587,19 +2710,19 @@ last (x : xs) = last' x xs
     <variablelist>
 
       <varlistentry>
-	<term><option>-msse2</option>:</term>
-	<listitem>
+        <term><option>-msse2</option>:</term>
+        <listitem>
           <para>
-				(x86 only, added in GHC 7.0.1) Use the SSE2 registers and
-				instruction set to implement floating point operations when using
-				the <link linkend="native-code-gen">native code generator</link>.
-				This gives a substantial performance improvement for floating
-				point, but the resulting compiled code
-				will only run on processors that support SSE2 (Intel Pentium 4 and
-				later, or AMD Athlon 64 and later). The
-				<link linkend="llvm-code-gen">LLVM backend</link> will also use SSE2
-				if your processor supports it but detects this automatically so no
-				flag is required.
+                                (x86 only, added in GHC 7.0.1) Use the SSE2 registers and
+                                instruction set to implement floating point operations when using
+                                the <link linkend="native-code-gen">native code generator</link>.
+                                This gives a substantial performance improvement for floating
+                                point, but the resulting compiled code
+                                will only run on processors that support SSE2 (Intel Pentium 4 and
+                                later, or AMD Athlon 64 and later). The
+                                <link linkend="llvm-code-gen">LLVM backend</link> will also use SSE2
+                                if your processor supports it but detects this automatically so no
+                                flag is required.
           </para>
           <para>
             SSE2 is unconditionally used on x86-64 platforms.
@@ -2608,17 +2731,17 @@ last (x : xs) = last' x xs
       </varlistentry>
 
       <varlistentry>
-	<term><option>-msse4.2</option>:</term>
-	<listitem>
+        <term><option>-msse4.2</option>:</term>
+        <listitem>
           <para>
-				(x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
-				implement some floating point and bit operations when using the
-				<link linkend="native-code-gen">native code generator</link>. The
-				resulting compiled code will only run on processors that
-				support SSE4.2 (Intel Core i7 and later). The
-				<link linkend="llvm-code-gen">LLVM backend</link> will also use
-				SSE4.2 if your processor supports it but detects this automatically
-				so no flag is required.
+                                (x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
+                                implement some floating point and bit operations when using the
+                                <link linkend="native-code-gen">native code generator</link>. The
+                                resulting compiled code will only run on processors that
+                                support SSE4.2 (Intel Core i7 and later). The
+                                <link linkend="llvm-code-gen">LLVM backend</link> will also use
+                                SSE4.2 if your processor supports it but detects this automatically
+                                so no flag is required.
           </para>
         </listitem>
       </varlistentry>
@@ -2650,15 +2773,15 @@ last (x : xs) = last' x xs
 
     <variablelist>
 
-  	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-fext-core</option>
             <indexterm><primary><option>-fext-core</option></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Generate <literal>.hcr</literal> files.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Generate <literal>.hcr</literal> files.</para>
+          </listitem>
+        </varlistentry>
 
     </variablelist>
 

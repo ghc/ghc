@@ -29,6 +29,7 @@ markup_options
         . includeOpt
         . srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . funTotalsOpt
         . altHighlightOpt
         . destDirOpt

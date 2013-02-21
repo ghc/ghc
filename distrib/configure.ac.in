@@ -9,29 +9,26 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [
 FP_BINDIST_GHC_PWD
 FP_FIND_ROOT
 
-BootingFromHc=NO
-AC_SUBST(BootingFromHc)
-
 dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
 
 FP_GMP
 
-bootstrap_target=`ghc/stage2/build/tmp/ghc-stage2 +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+bootstrap_target=@TargetPlatform@
 FPTOOLS_SET_PLATFORM_VARS
 
-BuildingCrossCompiler=NO
-PortingCompiler=NO
+# ToDo: if Stage1Only=YES, should be YES
 CrossCompiling=NO
 CrossCompilePrefix=""
 TargetPlatformFull="${target}"
 
-AC_SUBST(BuildingCrossCompiler)  # 'toolchain' case
-AC_SUBST(PortingCompiler)        # 'port' case
-AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
+AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
+
+Unregisterised="@Unregisterised@"
+AC_SUBST(Unregisterised)
 
 #
 dnl ** Check Perl installation **
@@ -42,7 +39,6 @@ if test -z "$PerlCmd"; then
    echo "Perhaps it is already installed, but not in your PATH?"
    exit 1
 fi
-FPTOOLS_SHEBANG_PERL
 
 #
 dnl ** figure out how to do a BSD-ish install **
@@ -67,11 +63,20 @@ FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
 CC="$WhatGccIsCalled"
 export CC
 
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
+LdCmd="$LD"
+AC_SUBST([LdCmd])
+
 FP_GCC_VERSION
 AC_PROG_CPP
 
 FP_PROG_LD_HashSize31
 FP_PROG_LD_ReduceMemoryOverheads
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
 
 #
 dnl ** Check gcc version and flags we need to pass it **

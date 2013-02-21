@@ -339,7 +339,7 @@ eval_obj:
 	{
 	    StgUpdateFrame *__frame;
 	    __frame = (StgUpdateFrame *)Sp;
-	    SET_INFO(__frame, (StgInfoTable *)&stg_upd_frame_info);
+	    SET_INFO((StgClosure *)__frame, (StgInfoTable *)&stg_upd_frame_info);
 	    __frame->updatee = (StgClosure *)(ap);
 	}
 	
@@ -503,7 +503,7 @@ do_return:
     // 	  |   XXXX_info   |
     // 	  +---------------+
     //
-    // where XXXX_info is one of the stg_gc_unbx_r1_info family.
+    // where XXXX_info is one of the stg_ret_*_info family.
     //
     // We're only interested in the case when the real return address
     // is a BCO; otherwise we'll return to the scheduler.
@@ -512,12 +512,12 @@ do_return_unboxed:
     { 
 	int offset;
 	
-	ASSERT( Sp[0] == (W_)&stg_gc_unbx_r1_info
-		|| Sp[0] == (W_)&stg_gc_unpt_r1_info
-		|| Sp[0] == (W_)&stg_gc_f1_info
-		|| Sp[0] == (W_)&stg_gc_d1_info
-		|| Sp[0] == (W_)&stg_gc_l1_info
-		|| Sp[0] == (W_)&stg_gc_void_info // VoidRep
+        ASSERT(    Sp[0] == (W_)&stg_ret_v_info
+                || Sp[0] == (W_)&stg_ret_p_info
+                || Sp[0] == (W_)&stg_ret_n_info
+                || Sp[0] == (W_)&stg_ret_f_info
+                || Sp[0] == (W_)&stg_ret_d_info
+                || Sp[0] == (W_)&stg_ret_l_info
 	    );
 
 	// get the offset of the stg_ctoi_ret_XXX itbl
@@ -788,9 +788,7 @@ run_BCO:
 	register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
 #ifdef DEBUG
 	int bcoSize;
-    bcoSize = BCO_READ_NEXT_WORD;
-#else
-    BCO_NEXT_WORD;
+        bcoSize = bco->instrs->bytes / sizeof(StgWord16);
 #endif
 	IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
 
@@ -1183,7 +1181,7 @@ run_BCO:
 	    int i;
 	    int o_itbl         = BCO_GET_LARGE_ARG;
 	    int n_words        = BCO_NEXT;
-	    StgInfoTable* itbl = INFO_PTR_TO_STRUCT(BCO_LIT(o_itbl));
+	    StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
 	    int request        = CONSTR_sizeW( itbl->layout.payload.ptrs, 
 					       itbl->layout.payload.nptrs );
 	    StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
@@ -1336,27 +1334,27 @@ run_BCO:
 
 	case bci_RETURN_P:
 	    Sp--;
-	    Sp[0] = (W_)&stg_gc_unpt_r1_info;
+            Sp[0] = (W_)&stg_ret_p_info;
 	    goto do_return_unboxed;
 	case bci_RETURN_N:
 	    Sp--;
-	    Sp[0] = (W_)&stg_gc_unbx_r1_info;
+            Sp[0] = (W_)&stg_ret_n_info;
 	    goto do_return_unboxed;
 	case bci_RETURN_F:
 	    Sp--;
-	    Sp[0] = (W_)&stg_gc_f1_info;
+            Sp[0] = (W_)&stg_ret_f_info;
 	    goto do_return_unboxed;
 	case bci_RETURN_D:
 	    Sp--;
-	    Sp[0] = (W_)&stg_gc_d1_info;
+            Sp[0] = (W_)&stg_ret_d_info;
 	    goto do_return_unboxed;
 	case bci_RETURN_L:
 	    Sp--;
-	    Sp[0] = (W_)&stg_gc_l1_info;
+            Sp[0] = (W_)&stg_ret_l_info;
 	    goto do_return_unboxed;
 	case bci_RETURN_V:
 	    Sp--;
-	    Sp[0] = (W_)&stg_gc_void_info;
+            Sp[0] = (W_)&stg_ret_v_info;
 	    goto do_return_unboxed;
 
 	case bci_SWIZZLE: {
@@ -1372,9 +1370,6 @@ run_BCO:
 	    int o_itbl                = BCO_GET_LARGE_ARG;
 	    int interruptible         = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
-	    int ret_dyn_size = 
-		RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE
-		+ sizeofW(StgRetDyn);
 
             /* the stack looks like this:
                
@@ -1405,6 +1400,7 @@ run_BCO:
             nat nargs = cif->nargs;
             nat ret_size;
             nat i;
+            int j;
             StgPtr p;
             W_ ret[2];                  // max needed
 	    W_ *arguments[stk_offset];  // max needed
@@ -1446,17 +1442,19 @@ run_BCO:
 	    //
 	    // We know how many (non-ptr) words there are before the
 	    // next valid stack frame: it is the stk_offset arg to the
-	    // CCALL instruction.   So we build a RET_DYN stack frame
-	    // on the stack frame to describe this chunk of stack.
-	    //
-	    Sp -= ret_dyn_size;
-	    ((StgRetDyn *)Sp)->liveness = R1_PTR | N_NONPTRS(stk_offset);
-	    ((StgRetDyn *)Sp)->info = (StgInfoTable *)&stg_gc_gen_info;
+	    // CCALL instruction.   So we overwrite this area of the
+            // stack with empty stack frames (stg_ret_v_info);
+            //
+            for (j = 0; j < stk_offset; j++) {
+                Sp[j] = (W_)&stg_ret_v_info; /* an empty stack frame */
+            }
 
             // save obj (pointer to the current BCO), since this
-            // might move during the call.  We use the R1 slot in the
-            // RET_DYN frame for this, hence R1_PTR above.
-            ((StgRetDyn *)Sp)->payload[0] = (StgClosure *)obj;
+            // might move during the call.  We push an stg_ret_p frame
+            // for this.
+            Sp -= 2;
+            Sp[1] = (W_)obj;
+            Sp[0] = (W_)&stg_ret_p_info;
 
 	    SAVE_STACK_POINTERS;
 	    tok = suspendThread(&cap->r, interruptible ? rtsTrue : rtsFalse);
@@ -1464,11 +1462,11 @@ run_BCO:
 	    // We already made a copy of the arguments above.
             ffi_call(cif, fn, ret, argptrs);
 
-	    // And restart the thread again, popping the RET_DYN frame.
+            // And restart the thread again, popping the stg_ret_p frame.
 	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
 	    LOAD_STACK_POINTERS;
 
-            if (Sp[0] != (W_)&stg_gc_gen_info) {
+            if (Sp[0] != (W_)&stg_ret_p_info) {
                 // the stack is not how we left it.  This probably
                 // means that an exception got raised on exit from the
                 // foreign call, so we should just continue with
@@ -1476,16 +1474,16 @@ run_BCO:
                 RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
             }
 
-            // Re-load the pointer to the BCO from the RET_DYN frame,
+            // Re-load the pointer to the BCO from the stg_ret_p frame,
             // it might have moved during the call.  Also reload the
             // pointers to the components of the BCO.
-            obj        = ((StgRetDyn *)Sp)->payload[0];
+            obj        = (StgClosure*)Sp[1];
             bco        = (StgBCO*)obj;
             instrs     = (StgWord16*)(bco->instrs->payload);
             literals   = (StgWord*)(&bco->literals->payload[0]);
             ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
 
-	    Sp += ret_dyn_size;
+            Sp += 2; // pop the stg_ret_p frame
 	    
 	    // Save the Haskell thread's current value of errno
 	    cap->r.rCurrentTSO->saved_errno = errno;

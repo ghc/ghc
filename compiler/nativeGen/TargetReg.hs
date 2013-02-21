@@ -21,7 +21,6 @@ module TargetReg (
 	targetRealRegSqueeze,
 	targetClassOfRealReg,
 	targetMkVirtualReg,
-	targetWordSize,
 	targetRegDotColor,
 	targetClassOfReg
 )
@@ -34,7 +33,6 @@ import Reg
 import RegClass
 import Size
 
-import CmmType	(wordWidth)
 import Outputable
 import Unique
 import FastTypes
@@ -56,6 +54,9 @@ targetVirtualRegSqueeze platform
       ArchSPARC     -> SPARC.virtualRegSqueeze
       ArchPPC_64    -> panic "targetVirtualRegSqueeze ArchPPC_64"
       ArchARM _ _ _ -> panic "targetVirtualRegSqueeze ArchARM"
+      ArchAlpha     -> panic "targetVirtualRegSqueeze ArchAlpha"
+      ArchMipseb    -> panic "targetVirtualRegSqueeze ArchMipseb"
+      ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
       ArchUnknown   -> panic "targetVirtualRegSqueeze ArchUnknown"
 
 targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> FastInt
@@ -67,22 +68,24 @@ targetRealRegSqueeze platform
       ArchSPARC     -> SPARC.realRegSqueeze
       ArchPPC_64    -> panic "targetRealRegSqueeze ArchPPC_64"
       ArchARM _ _ _ -> panic "targetRealRegSqueeze ArchARM"
+      ArchAlpha     -> panic "targetRealRegSqueeze ArchAlpha"
+      ArchMipseb    -> panic "targetRealRegSqueeze ArchMipseb"
+      ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
       ArchUnknown   -> panic "targetRealRegSqueeze ArchUnknown"
 
 targetClassOfRealReg :: Platform -> RealReg -> RegClass
 targetClassOfRealReg platform
     = case platformArch platform of
-      ArchX86       -> X86.classOfRealReg
-      ArchX86_64    -> X86.classOfRealReg
+      ArchX86       -> X86.classOfRealReg platform
+      ArchX86_64    -> X86.classOfRealReg platform
       ArchPPC       -> PPC.classOfRealReg
       ArchSPARC     -> SPARC.classOfRealReg
       ArchPPC_64    -> panic "targetClassOfRealReg ArchPPC_64"
       ArchARM _ _ _ -> panic "targetClassOfRealReg ArchARM"
+      ArchAlpha     -> panic "targetClassOfRealReg ArchAlpha"
+      ArchMipseb    -> panic "targetClassOfRealReg ArchMipseb"
+      ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
-
--- TODO: This should look at targetPlatform too
-targetWordSize :: Size
-targetWordSize = intSize wordWidth
 
 targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
 targetMkVirtualReg platform
@@ -93,6 +96,9 @@ targetMkVirtualReg platform
       ArchSPARC     -> SPARC.mkVirtualReg
       ArchPPC_64    -> panic "targetMkVirtualReg ArchPPC_64"
       ArchARM _ _ _ -> panic "targetMkVirtualReg ArchARM"
+      ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
+      ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
+      ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
       ArchUnknown   -> panic "targetMkVirtualReg ArchUnknown"
 
 targetRegDotColor :: Platform -> RealReg -> SDoc
@@ -104,6 +110,9 @@ targetRegDotColor platform
       ArchSPARC     -> SPARC.regDotColor
       ArchPPC_64    -> panic "targetRegDotColor ArchPPC_64"
       ArchARM _ _ _ -> panic "targetRegDotColor ArchARM"
+      ArchAlpha     -> panic "targetRegDotColor ArchAlpha"
+      ArchMipseb    -> panic "targetRegDotColor ArchMipseb"
+      ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
       ArchUnknown   -> panic "targetRegDotColor ArchUnknown"
 
 

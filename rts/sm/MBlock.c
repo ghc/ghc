@@ -18,9 +18,9 @@
 
 #include <string.h>
 
-lnat peak_mblocks_allocated = 0;
-lnat mblocks_allocated = 0;
-lnat mpc_misses = 0;
+W_ peak_mblocks_allocated = 0;
+W_ mblocks_allocated = 0;
+W_ mpc_misses = 0;
 
 /* -----------------------------------------------------------------------------
    The MBlock Map: provides our implementation of HEAP_ALLOCED()

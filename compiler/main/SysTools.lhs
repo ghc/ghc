@@ -24,6 +24,8 @@ module SysTools (
         figureLlvmVersion,
         readElfSection,
 
+        linkDynLib,
+
         askCc,
 
         touch,                  -- String -> String -> IO ()
@@ -43,6 +45,8 @@ module SysTools (
 #include "HsVersions.h"
 
 import DriverPhases
+import Module
+import Packages
 import Config
 import Outputable
 import ErrUtils
@@ -166,144 +170,177 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
                                 --      (b) the package-config file
                                 --      (c) the GHC usage message
 initSysTools mbMinusB
-  = do  { top_dir <- findTopDir mbMinusB
-                -- see [Note topdir]
-                -- NB: top_dir is assumed to be in standard Unix
-                -- format, '/' separated
+  = do top_dir <- findTopDir mbMinusB
+             -- see [Note topdir]
+             -- NB: top_dir is assumed to be in standard Unix
+             -- format, '/' separated
 
-        ; let settingsFile = top_dir </> "settings"
-              installed :: FilePath -> FilePath
-              installed file = top_dir </> file
+       let settingsFile = top_dir </> "settings"
+           platformConstantsFile = top_dir </> "platformConstants"
+           installed :: FilePath -> FilePath
+           installed file = top_dir </> file
 
-        ; settingsStr <- readFile settingsFile
-        ; mySettings <- case maybeReadFuzzy settingsStr of
-                        Just s ->
-                            return s
-                        Nothing ->
-                            pgmError ("Can't parse " ++ show settingsFile)
-        ; let getSetting key = case lookup key mySettings of
-                               Just xs ->
-                                   return $ case stripPrefix "$topdir" xs of
-                                            Just [] ->
-                                                top_dir
-                                            Just xs'@(c:_)
-                                             | isPathSeparator c ->
-                                                top_dir ++ xs'
-                                            _ ->
-                                                xs
-                               Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-              readSetting key = case lookup key mySettings of
-                                Just xs ->
-                                    case maybeRead xs of
-                                    Just v -> return v
-                                    Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
-                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-        ; targetArch <- readSetting "target arch"
-        ; targetOS <- readSetting "target os"
-        ; targetWordSize <- readSetting "target word size"
-        ; targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
-        ; targetHasIdentDirective <- readSetting "target has .ident directive"
-        ; targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
-        ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
-        -- On Windows, mingw is distributed with GHC,
-        -- so we look in TopDir/../mingw/bin
-        -- It would perhaps be nice to be able to override this
-        -- with the settings file, but it would be a little fiddly
-        -- to make that possible, so for now you can't.
-        ; gcc_prog <- getSetting "C compiler command"
-        ; gcc_args_str <- getSetting "C compiler flags"
-        ; let gcc_args = map Option (words gcc_args_str)
-        ; perl_path <- getSetting "perl command"
+       settingsStr <- readFile settingsFile
+       platformConstantsStr <- readFile platformConstantsFile
+       mySettings <- case maybeReadFuzzy settingsStr of
+                     Just s ->
+                         return s
+                     Nothing ->
+                         pgmError ("Can't parse " ++ show settingsFile)
+       platformConstants <- case maybeReadFuzzy platformConstantsStr of
+                            Just s ->
+                                return s
+                            Nothing ->
+                                pgmError ("Can't parse " ++
+                                          show platformConstantsFile)
+       let getSetting key = case lookup key mySettings of
+                            Just xs ->
+                                return $ case stripPrefix "$topdir" xs of
+                                         Just [] ->
+                                             top_dir
+                                         Just xs'@(c:_)
+                                          | isPathSeparator c ->
+                                             top_dir ++ xs'
+                                         _ ->
+                                             xs
+                            Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+           getBooleanSetting key = case lookup key mySettings of
+                                   Just "YES" -> return True
+                                   Just "NO" -> return False
+                                   Just xs -> pgmError ("Bad value for " ++ show key ++ ": " ++ show xs)
+                                   Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+           readSetting key = case lookup key mySettings of
+                             Just xs ->
+                                 case maybeRead xs of
+                                 Just v -> return v
+                                 Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
+                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+       targetArch <- readSetting "target arch"
+       targetOS <- readSetting "target os"
+       targetWordSize <- readSetting "target word size"
+       targetUnregisterised <- getBooleanSetting "Unregisterised"
+       targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
+       targetHasIdentDirective <- readSetting "target has .ident directive"
+       targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
+       myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
+       -- On Windows, mingw is distributed with GHC,
+       -- so we look in TopDir/../mingw/bin
+       -- It would perhaps be nice to be able to override this
+       -- with the settings file, but it would be a little fiddly
+       -- to make that possible, so for now you can't.
+       gcc_prog <- getSetting "C compiler command"
+       gcc_args_str <- getSetting "C compiler flags"
+       let unreg_gcc_args = if targetUnregisterised
+                            then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
+                            else []
+           -- TABLES_NEXT_TO_CODE affects the info table layout.
+           tntc_gcc_args
+            | mkTablesNextToCode targetUnregisterised
+               = ["-DTABLES_NEXT_TO_CODE"]
+            | otherwise = []
+           gcc_args = map Option (words gcc_args_str
+                               ++ unreg_gcc_args
+                               ++ tntc_gcc_args)
+       ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
+       ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
+       ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
+       perl_path <- getSetting "perl command"
 
-        ; let pkgconfig_path = installed "package.conf.d"
-              ghc_usage_msg_path  = installed "ghc-usage.txt"
-              ghci_usage_msg_path = installed "ghci-usage.txt"
+       let pkgconfig_path = installed "package.conf.d"
+           ghc_usage_msg_path  = installed "ghc-usage.txt"
+           ghci_usage_msg_path = installed "ghci-usage.txt"
 
-                -- For all systems, unlit, split, mangle are GHC utilities
-                -- architecture-specific stuff is done when building Config.hs
-              unlit_path = installed cGHC_UNLIT_PGM
+             -- For all systems, unlit, split, mangle are GHC utilities
+             -- architecture-specific stuff is done when building Config.hs
+           unlit_path = installed cGHC_UNLIT_PGM
 
-                -- split is a Perl script
-              split_script  = installed cGHC_SPLIT_PGM
+             -- split is a Perl script
+           split_script  = installed cGHC_SPLIT_PGM
 
-        ; windres_path <- getSetting "windres command"
+       windres_path <- getSetting "windres command"
 
-        ; tmpdir <- getTemporaryDirectory
+       tmpdir <- getTemporaryDirectory
 
-        ; touch_path <- getSetting "touch command"
+       touch_path <- getSetting "touch command"
 
-        ; let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-              -- a call to Perl to get the invocation of split.
-              -- On Unix, scripts are invoked using the '#!' method.  Binary
-              -- installations of GHC on Unix place the correct line on the
-              -- front of the script at installation time, so we don't want
-              -- to wire-in our knowledge of $(PERL) on the host system here.
-              (split_prog,  split_args)
-                | isWindowsHost = (perl_path,    [Option split_script])
-                | otherwise     = (split_script, [])
-        ; mkdll_prog <- getSetting "dllwrap command"
-        ; let mkdll_args = []
+       let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
+           -- a call to Perl to get the invocation of split.
+           -- On Unix, scripts are invoked using the '#!' method.  Binary
+           -- installations of GHC on Unix place the correct line on the
+           -- front of the script at installation time, so we don't want
+           -- to wire-in our knowledge of $(PERL) on the host system here.
+           (split_prog,  split_args)
+             | isWindowsHost = (perl_path,    [Option split_script])
+             | otherwise     = (split_script, [])
+       mkdll_prog <- getSetting "dllwrap command"
+       let mkdll_args = []
 
-        -- cpp is derived from gcc on all platforms
-        -- HACK, see setPgmP below. We keep 'words' here to remember to fix
-        -- Config.hs one day.
-        ; let cpp_prog  = gcc_prog
-              cpp_args  = Option "-E"
-                        : map Option (words cRAWCPP_FLAGS)
-                       ++ gcc_args
+       -- cpp is derived from gcc on all platforms
+       -- HACK, see setPgmP below. We keep 'words' here to remember to fix
+       -- Config.hs one day.
+       let cpp_prog  = gcc_prog
+           cpp_args  = Option "-E"
+                     : map Option (words cRAWCPP_FLAGS)
+                    ++ gcc_args
 
-        -- Other things being equal, as and ld are simply gcc
-        ; let   as_prog  = gcc_prog
-                as_args  = gcc_args
-                ld_prog  = gcc_prog
-                ld_args  = gcc_args
+       -- Other things being equal, as and ld are simply gcc
+       let   as_prog  = gcc_prog
+             as_args  = gcc_args
+             ld_prog  = gcc_prog
+             ld_args  = gcc_args
 
-        -- We just assume on command line
-        ; lc_prog <- getSetting "LLVM llc command"
-        ; lo_prog <- getSetting "LLVM opt command"
+       -- We just assume on command line
+       lc_prog <- getSetting "LLVM llc command"
+       lo_prog <- getSetting "LLVM opt command"
 
-        ; return $ Settings {
-                        sTargetPlatform = Platform {
-                                              platformArch = targetArch,
-                                              platformOS   = targetOS,
-                                              platformWordSize = targetWordSize,
-                                              platformHasGnuNonexecStack = targetHasGnuNonexecStack,
-                                              platformHasIdentDirective = targetHasIdentDirective,
-                                              platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
-                                          },
-                        sTmpDir = normalise tmpdir,
-                        sGhcUsagePath = ghc_usage_msg_path,
-                        sGhciUsagePath = ghci_usage_msg_path,
-                        sTopDir  = top_dir,
-                        sRawSettings = mySettings,
-                        sExtraGccViaCFlags = words myExtraGccViaCFlags,
-                        sSystemPackageConfig = pkgconfig_path,
-                        sPgm_L   = unlit_path,
-                        sPgm_P   = (cpp_prog, cpp_args),
-                        sPgm_F   = "",
-                        sPgm_c   = (gcc_prog, gcc_args),
-                        sPgm_s   = (split_prog,split_args),
-                        sPgm_a   = (as_prog, as_args),
-                        sPgm_l   = (ld_prog, ld_args),
-                        sPgm_dll = (mkdll_prog,mkdll_args),
-                        sPgm_T   = touch_path,
-                        sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
-                        sPgm_windres = windres_path,
-                        sPgm_lo  = (lo_prog,[]),
-                        sPgm_lc  = (lc_prog,[]),
-                        -- Hans: this isn't right in general, but you can
-                        -- elaborate it in the same way as the others
-                        sOpt_L       = [],
-                        sOpt_P       = [],
-                        sOpt_F       = [],
-                        sOpt_c       = [],
-                        sOpt_a       = [],
-                        sOpt_l       = [],
-                        sOpt_windres = [],
-                        sOpt_lo      = [],
-                        sOpt_lc      = []
-                }
-        }
+       let platform = Platform {
+                          platformArch = targetArch,
+                          platformOS   = targetOS,
+                          platformWordSize = targetWordSize,
+                          platformUnregisterised = targetUnregisterised,
+                          platformHasGnuNonexecStack = targetHasGnuNonexecStack,
+                          platformHasIdentDirective = targetHasIdentDirective,
+                          platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
+                      }
+
+       return $ Settings {
+                    sTargetPlatform = platform,
+                    sTmpDir         = normalise tmpdir,
+                    sGhcUsagePath   = ghc_usage_msg_path,
+                    sGhciUsagePath  = ghci_usage_msg_path,
+                    sTopDir         = top_dir,
+                    sRawSettings    = mySettings,
+                    sExtraGccViaCFlags = words myExtraGccViaCFlags,
+                    sSystemPackageConfig = pkgconfig_path,
+                    sLdSupportsCompactUnwind = ldSupportsCompactUnwind,
+                    sLdSupportsBuildId       = ldSupportsBuildId,
+                    sLdIsGnuLd               = ldIsGnuLd,
+                    sPgm_L   = unlit_path,
+                    sPgm_P   = (cpp_prog, cpp_args),
+                    sPgm_F   = "",
+                    sPgm_c   = (gcc_prog, gcc_args),
+                    sPgm_s   = (split_prog,split_args),
+                    sPgm_a   = (as_prog, as_args),
+                    sPgm_l   = (ld_prog, ld_args),
+                    sPgm_dll = (mkdll_prog,mkdll_args),
+                    sPgm_T   = touch_path,
+                    sPgm_sysman  = top_dir ++ "/ghc/rts/parallel/SysMan",
+                    sPgm_windres = windres_path,
+                    sPgm_lo  = (lo_prog,[]),
+                    sPgm_lc  = (lc_prog,[]),
+                    -- Hans: this isn't right in general, but you can
+                    -- elaborate it in the same way as the others
+                    sOpt_L       = [],
+                    sOpt_P       = [],
+                    sOpt_F       = [],
+                    sOpt_c       = [],
+                    sOpt_a       = [],
+                    sOpt_l       = [],
+                    sOpt_windres = [],
+                    sOpt_lo      = [],
+                    sOpt_lc      = [],
+                    sPlatformConstants = platformConstants
+             }
 \end{code}
 
 \begin{code}
@@ -316,7 +353,7 @@ findTopDir Nothing
          maybe_exec_dir <- getBaseDir
          case maybe_exec_dir of
              -- "Just" on Windows, "Nothing" on unix
-             Nothing  -> ghcError (InstallationError "missing -B<dir> option")
+             Nothing  -> throwGhcExceptionIO (InstallationError "missing -B<dir> option")
              Just dir -> return dir
 \end{code}
 
@@ -338,7 +375,7 @@ runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do
   let (p,args0) = pgm_P dflags
       args1 = args0 ++ args
-      args2 = if dopt Opt_WarnIsError dflags
+      args2 = if gopt Opt_WarnIsError dflags
               then Option "-Werror" : args1
               else                    args1
   mb_env <- getGccEnv args2
@@ -490,13 +527,20 @@ runClang :: DynFlags -> [Option] -> IO ()
 runClang dflags args = do
   -- we simply assume its available on the PATH
   let clang = "clang"
+      -- be careful what options we call clang with
+      -- see #5903 and #7617 for bugs caused by this.
+      (_,args0) = pgm_a dflags
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
   Exception.catch (do
-        runSomething dflags "Clang (Assembler)" clang args
+        runSomethingFiltered dflags id "Clang (Assembler)" clang args1 mb_env
     )
     (\(err :: SomeException) -> do
-        errorMsg dflags $ text $ "Error running clang! you need clang installed"
-                              ++ " to use the LLVM backend"
-        throw err
+        errorMsg dflags $
+            text ("Error running clang! you need clang installed to use the" ++
+                "LLVM backend") $+$
+            text "(or GHC tried to execute clang incorrectly)"
+        throwIO err
     )
 
 -- | Figure out which version of LLVM we are running this session
@@ -639,7 +683,7 @@ readElfSection _dflags section exe = do
 \begin{code}
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = dirsToClean dflags
         ds <- readIORef ref
         removeTmpDirs dflags (Map.elems ds)
@@ -647,7 +691,7 @@ cleanTempDirs dflags
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = filesToClean dflags
         fs <- readIORef ref
         removeTmpFiles dflags fs
@@ -655,7 +699,7 @@ cleanTempFiles dflags
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
 cleanTempFilesExcept dflags dont_delete
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = filesToClean dflags
         files <- readIORef ref
         let (to_keep, to_delete) = partition (`elem` dont_delete) files
@@ -793,14 +837,14 @@ handleProc pgm phase_name proc = do
         -- the case of a missing program there will otherwise be no output
         -- at all.
        | n == 127  -> does_not_exist
-       | otherwise -> ghcError (PhaseFailed phase_name rc)
+       | otherwise -> throwGhcExceptionIO (PhaseFailed phase_name rc)
   where
     handler err =
        if IO.isDoesNotExistError err
           then does_not_exist
           else IO.ioError err
 
-    does_not_exist = ghcError (InstallationError ("could not execute: " ++ pgm))
+    does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
 
 builderMainLoop :: DynFlags -> (String -> String) -> FilePath
@@ -932,7 +976,7 @@ traceCmd dflags phase_name cmd_line action
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                              ; ghcError (PhaseFailed phase_name (ExitFailure 1)) }
+                              ; throwGhcExceptionIO (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
 %************************************************************************
@@ -1002,5 +1046,171 @@ linesPlatform xs =
    lineBreak (x:xs) = let (as,bs) = lineBreak xs in (x:as,bs)
 
 #endif
+
+linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkDynLib dflags o_files dep_packages
+ = do
+    let verbFlags = getVerbFlags dflags
+    let o_file = outputFile dflags
+
+    pkgs <- getPreloadPackagesAnd dflags dep_packages
+
+    let pkg_lib_paths = collectLibraryPaths pkgs
+    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
+        get_pkg_lib_path_opts l
+         | osElfTarget (platformOS (targetPlatform dflags)) &&
+           dynLibLoader dflags == SystemDependent &&
+           not (gopt Opt_Static dflags)
+            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+         | otherwise = ["-L" ++ l]
+
+    let lib_paths = libraryPaths dflags
+    let lib_path_opts = map ("-L"++) lib_paths
+
+    -- We don't want to link our dynamic libs against the RTS package,
+    -- because the RTS lib comes in several flavours and we want to be
+    -- able to pick the flavour when a binary is linked.
+    -- On Windows we need to link the RTS import lib as Windows does
+    -- not allow undefined symbols.
+    -- The RTS library path is still added to the library search path
+    -- above in case the RTS is being explicitly linked in (see #3807).
+    let platform = targetPlatform dflags
+        os = platformOS platform
+        pkgs_no_rts = case os of
+                      OSMinGW32 ->
+                          pkgs
+                      _ ->
+                          filter ((/= rtsPackageId) . packageConfigId) pkgs
+    let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
+
+        -- probably _stub.o files
+    let extra_ld_inputs = ldInputs dflags
+
+    let extra_ld_opts = getOpts dflags opt_l
+
+    case os of
+        OSMinGW32 -> do
+            -------------------------------------------------------------
+            -- Making a DLL
+            -------------------------------------------------------------
+            let output_fn = case o_file of
+                            Just s -> s
+                            Nothing -> "HSdll.dll"
+
+            runLink dflags (
+                    map Option verbFlags
+                 ++ [ Option "-o"
+                    , FileOption "" output_fn
+                    , Option "-shared"
+                    ] ++
+                    [ FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
+                    | gopt Opt_SharedImplib dflags
+                    ]
+                 ++ map (FileOption "") o_files
+                 ++ map Option (
+
+                 -- Permit the linker to auto link _symbol to _imp_symbol
+                 -- This lets us link against DLLs without needing an "import library"
+                    ["-Wl,--enable-auto-import"]
+
+                 ++ extra_ld_inputs
+                 ++ lib_path_opts
+                 ++ extra_ld_opts
+                 ++ pkg_lib_path_opts
+                 ++ pkg_link_opts
+                ))
+        OSDarwin -> do
+            -------------------------------------------------------------------
+            -- Making a darwin dylib
+            -------------------------------------------------------------------
+            -- About the options used for Darwin:
+            -- -dynamiclib
+            --   Apple's way of saying -shared
+            -- -undefined dynamic_lookup:
+            --   Without these options, we'd have to specify the correct
+            --   dependencies for each of the dylibs. Note that we could
+            --   (and should) do without this for all libraries except
+            --   the RTS; all we need to do is to pass the correct
+            --   HSfoo_dyn.dylib files to the link command.
+            --   This feature requires Mac OS X 10.3 or later; there is
+            --   a similar feature, -flat_namespace -undefined suppress,
+            --   which works on earlier versions, but it has other
+            --   disadvantages.
+            -- -single_module
+            --   Build the dynamic library as a single "module", i.e. no
+            --   dynamic binding nonsense when referring to symbols from
+            --   within the library. The NCG assumes that this option is
+            --   specified (on i386, at least).
+            -- -install_name
+            --   Mac OS/X stores the path where a dynamic library is (to
+            --   be) installed in the library itself.  It's called the
+            --   "install name" of the library. Then any library or
+            --   executable that links against it before it's installed
+            --   will search for it in its ultimate install location.
+            --   By default we set the install name to the absolute path
+            --   at build time, but it can be overridden by the
+            --   -dylib-install-name option passed to ghc. Cabal does
+            --   this.
+            -------------------------------------------------------------------
+
+            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+
+            instName <- case dylibInstallName dflags of
+                Just n -> return n
+                Nothing -> do
+                    pwd <- getCurrentDirectory
+                    return $ pwd `combine` output_fn
+            runLink dflags (
+                    map Option verbFlags
+                 ++ [ Option "-dynamiclib"
+                    , Option "-o"
+                    , FileOption "" output_fn
+                    ]
+                 ++ map Option (
+                    o_files
+                 ++ [ "-undefined", "dynamic_lookup", "-single_module" ]
+                 ++ (if platformArch platform == ArchX86_64
+                     then [ ]
+                     else [ "-Wl,-read_only_relocs,suppress" ])
+                 ++ [ "-install_name", instName ]
+                 ++ extra_ld_inputs
+                 ++ lib_path_opts
+                 ++ extra_ld_opts
+                 ++ pkg_lib_path_opts
+                 ++ pkg_link_opts
+                ))
+        _ -> do
+            -------------------------------------------------------------------
+            -- Making a DSO
+            -------------------------------------------------------------------
+
+            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+            let buildingRts = thisPackage dflags == rtsPackageId
+            let bsymbolicFlag = if buildingRts
+                                then -- -Bsymbolic breaks the way we implement
+                                     -- hooks in the RTS
+                                     []
+                                else -- we need symbolic linking to resolve
+                                     -- non-PIC intra-package-relocations
+                                     ["-Wl,-Bsymbolic"]
+
+            runLink dflags (
+                    map Option verbFlags
+                 ++ [ Option "-o"
+                    , FileOption "" output_fn
+                    ]
+                 ++ map Option (
+                    o_files
+                 ++ [ "-shared" ]
+                 ++ bsymbolicFlag
+                    -- Set the library soname. We use -h rather than -soname as
+                    -- Solaris 10 doesn't support the latter:
+                 ++ [ "-Wl,-h," ++ takeFileName output_fn ]
+                 ++ extra_ld_inputs
+                 ++ lib_path_opts
+                 ++ extra_ld_opts
+                 ++ pkg_lib_path_opts
+                 ++ pkg_link_opts
+                ))
 
 \end{code}

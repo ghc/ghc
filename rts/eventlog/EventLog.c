@@ -80,6 +80,7 @@ char *EventDesc[] = {
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_MSG]             = "Log message",
   [EVENT_USER_MSG]            = "User message",
+  [EVENT_USER_MARKER]         = "User marker",
   [EVENT_GC_IDLE]             = "GC idle",
   [EVENT_GC_WORK]             = "GC working",
   [EVENT_GC_DONE]             = "GC done",
@@ -369,6 +370,7 @@ initEventLogging(void)
 
         case EVENT_LOG_MSG:          // (msg)
         case EVENT_USER_MSG:         // (msg)
+        case EVENT_USER_MARKER:      // (markername)
         case EVENT_RTS_IDENTIFIER:   // (capset, str)
         case EVENT_PROGRAM_ARGS:     // (capset, strvec)
         case EVENT_PROGRAM_ENV:      // (capset, strvec)
@@ -851,7 +853,7 @@ void postWallClockTime (EventCapsetID capset)
 void postHeapEvent (Capability    *cap,
                     EventTypeNum   tag,
                     EventCapsetID  heap_capset,
-                    lnat           info1)
+                    W_           info1)
 {
     EventsBuf *eb;
 
@@ -881,10 +883,10 @@ void postHeapEvent (Capability    *cap,
 
 void postEventHeapInfo (EventCapsetID heap_capset,
                         nat           gens,
-                        lnat          maxHeapSize,
-                        lnat          allocAreaSize,
-                        lnat          mblockSize,
-                        lnat          blockSize)
+                        W_          maxHeapSize,
+                        W_          allocAreaSize,
+                        W_          mblockSize,
+                        W_          blockSize)
 {
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -910,12 +912,12 @@ void postEventHeapInfo (EventCapsetID heap_capset,
 void postEventGcStats  (Capability    *cap,
                         EventCapsetID  heap_capset,
                         nat            gen,
-                        lnat           copied,
-                        lnat           slop,
-                        lnat           fragmentation,
+                        W_           copied,
+                        W_           slop,
+                        W_           fragmentation,
                         nat            par_n_threads,
-                        lnat           par_max_copied,
-                        lnat           par_tot_copied)
+                        W_           par_max_copied,
+                        W_           par_tot_copied)
 {
     EventsBuf *eb;
 
@@ -1084,6 +1086,27 @@ void postEventStartup(EventCapNo n_caps)
     postCapNo(&eventBuf, n_caps);
 
     RELEASE_LOCK(&eventBufMutex);
+}
+
+void postUserMarker(Capability *cap, char *markername)
+{
+    EventsBuf *eb;
+    int size = strlen(markername);
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForVariableEvent(eb, size)){
+        printAndClearEventBuf(eb);
+
+        if (!hasRoomForVariableEvent(eb, size)){
+            // Event size exceeds buffer size, bail out:
+            return;
+        }
+    }
+
+    postEventHeader(eb, EVENT_USER_MARKER);
+    postPayloadSize(eb, size);
+    postBuf(eb, (StgWord8*) markername, size);
 }
 
 void postThreadLabel(Capability    *cap,

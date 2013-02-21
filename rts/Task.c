@@ -54,9 +54,6 @@ __thread Task *my_task;
 # else
 ThreadLocalKey currentTaskKey;
 # endif
-#ifdef llvm_CC_FLAVOR
-ThreadLocalKey gctKey;
-#endif
 #else
 Task *my_task;
 #endif
@@ -77,9 +74,6 @@ initTaskManager (void)
 #if defined(THREADED_RTS)
 #if !defined(MYTASK_USE_TLV)
 	newThreadLocalKey(&currentTaskKey);
-#endif
-#if defined(llvm_CC_FLAVOR)
-	newThreadLocalKey(&gctKey);
 #endif
         initMutex(&all_tasks_mutex);
 #endif
@@ -114,9 +108,6 @@ freeTaskManager (void)
     closeMutex(&all_tasks_mutex);
 #if !defined(MYTASK_USE_TLV)
     freeThreadLocalKey(&currentTaskKey);
-#endif
-#if defined(llvm_CC_FLAVOR)
-    freeThreadLocalKey(&gctKey);
 #endif
 #endif
 
@@ -395,22 +386,6 @@ workerTaskStop (Task *task)
 
 #endif
 
-#ifdef DEBUG
-// We don't replace this function with serialisableTaskId,
-// because debug prints as pointers are more readable than random
-// 64-bit intergers (especially on 32-bit architectures)
-// and because we want to use this function also for non-threaded RTS.
-static void *taskId(Task *task)
-{
-#ifdef THREADED_RTS
-    return (void *)(size_t)task->id;
-#else
-    return (void *)task;
-#endif
-}
-
-#endif
-
 #if defined(THREADED_RTS)
 
 static void OSThreadProcAttr
@@ -483,7 +458,8 @@ interruptWorkerTask (Task *task)
   ASSERT(osThreadId() != task->id);    // seppuku not allowed
   ASSERT(task->incall->suspended_tso); // use this only for FFI calls
   interruptOSThread(task->id);
-  debugTrace(DEBUG_sched, "interrupted worker task %p", taskId(task));
+  debugTrace(DEBUG_sched, "interrupted worker task %#" FMT_HexWord64,
+             serialisableTaskId(task));
 }
 
 #endif /* THREADED_RTS */
@@ -497,7 +473,8 @@ printAllTasks(void)
 {
     Task *task;
     for (task = all_tasks; task != NULL; task = task->all_next) {
-	debugBelch("task %p is %s, ", taskId(task), task->stopped ? "stopped" : "alive");
+	debugBelch("task %#" FMT_HexWord64 " is %s, ", serialisableTaskId(task),
+                   task->stopped ? "stopped" : "alive");
 	if (!task->stopped) {
 	    if (task->cap) {
 		debugBelch("on capability %d, ", task->cap->no);

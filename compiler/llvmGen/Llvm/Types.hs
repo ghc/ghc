@@ -11,12 +11,15 @@ import Data.Int
 import Data.List (intercalate)
 import Numeric
 
-import Constants
+import DynFlags
 import FastString
+import Outputable (panic)
 import Unique
 
 -- from NCG
 import PprBase
+
+import GHC.Float
 
 -- -----------------------------------------------------------------------------
 -- * LLVM Basic Types and Variables
@@ -32,33 +35,35 @@ type LlvmAlias = (LMString, LlvmType)
 
 -- | Llvm Types
 data LlvmType
-  = LMInt Int            -- ^ An integer with a given width in bits.
-  | LMFloat              -- ^ 32 bit floating point
-  | LMDouble             -- ^ 64 bit floating point
-  | LMFloat80            -- ^ 80 bit (x86 only) floating point
-  | LMFloat128           -- ^ 128 bit floating point
-  | LMPointer LlvmType   -- ^ A pointer to a 'LlvmType'
-  | LMArray Int LlvmType -- ^ An array of 'LlvmType'
-  | LMLabel              -- ^ A 'LlvmVar' can represent a label (address)
-  | LMVoid               -- ^ Void type
-  | LMStruct [LlvmType]  -- ^ Structure type
-  | LMAlias LlvmAlias    -- ^ A type alias
+  = LMInt Int             -- ^ An integer with a given width in bits.
+  | LMFloat               -- ^ 32 bit floating point
+  | LMDouble              -- ^ 64 bit floating point
+  | LMFloat80             -- ^ 80 bit (x86 only) floating point
+  | LMFloat128            -- ^ 128 bit floating point
+  | LMPointer LlvmType    -- ^ A pointer to a 'LlvmType'
+  | LMArray Int LlvmType  -- ^ An array of 'LlvmType'
+  | LMVector Int LlvmType -- ^ A vector of 'LlvmType'
+  | LMLabel               -- ^ A 'LlvmVar' can represent a label (address)
+  | LMVoid                -- ^ Void type
+  | LMStruct [LlvmType]   -- ^ Structure type
+  | LMAlias LlvmAlias     -- ^ A type alias
 
   -- | Function type, used to create pointers to functions
   | LMFunction LlvmFunctionDecl
   deriving (Eq)
 
 instance Show LlvmType where
-  show (LMInt size    ) = "i" ++ show size
-  show (LMFloat       ) = "float"
-  show (LMDouble      ) = "double"
-  show (LMFloat80     ) = "x86_fp80"
-  show (LMFloat128    ) = "fp128"
-  show (LMPointer x   ) = show x ++ "*"
-  show (LMArray nr tp ) = "[" ++ show nr ++ " x " ++ show tp ++ "]"
-  show (LMLabel       ) = "label"
-  show (LMVoid        ) = "void"
-  show (LMStruct tys  ) = "<{" ++ (commaCat tys) ++ "}>"
+  show (LMInt size     ) = "i" ++ show size
+  show (LMFloat        ) = "float"
+  show (LMDouble       ) = "double"
+  show (LMFloat80      ) = "x86_fp80"
+  show (LMFloat128     ) = "fp128"
+  show (LMPointer x    ) = show x ++ "*"
+  show (LMArray nr tp  ) = "[" ++ show nr ++ " x " ++ show tp ++ "]"
+  show (LMVector nr tp ) = "<" ++ show nr ++ " x " ++ show tp ++ ">"
+  show (LMLabel        ) = "label"
+  show (LMVoid         ) = "void"
+  show (LMStruct tys   ) = "<{" ++ (commaCat tys) ++ "}>"
 
   show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
     = let varg' = case varg of
@@ -141,12 +146,15 @@ data LlvmLit
   | LMFloatLit Double LlvmType
   -- | Literal NULL, only applicable to pointer types
   | LMNullLit LlvmType
+  -- | Vector literal
+  | LMVectorLit [LlvmLit]
   -- | Undefined value, random bit pattern. Useful for optimisations.
   | LMUndefLit LlvmType
   deriving (Eq)
 
 instance Show LlvmLit where
-  show l = show (getLitType l) ++ " " ++ getLit l
+  show l@(LMVectorLit {}) = getLit l
+  show l                  = show (getLitType l) ++ " " ++ getLit l
 
 
 -- | Llvm Static Data.
@@ -227,9 +235,11 @@ getLit :: LlvmLit -> String
 getLit (LMIntLit i (LMInt 32)) = show (fromInteger i :: Int32)
 getLit (LMIntLit i (LMInt 64)) = show (fromInteger i :: Int64)
 getLit (LMIntLit i _         ) = show (fromInteger i :: Int)
-getLit (LMFloatLit r LMFloat ) = fToStr $ realToFrac r
+-- See Note [LLVM Float Types].
+getLit (LMFloatLit r LMFloat ) = (dToStr . widenFp . narrowFp) r
 getLit (LMFloatLit r LMDouble) = dToStr r
 getLit f@(LMFloatLit _ _) = error $ "Can't print this float literal!" ++ show f
+getLit (LMVectorLit ls  ) = "< " ++ commaCat ls ++ " >"
 getLit (LMNullLit _     ) = "null"
 getLit (LMUndefLit _    ) = "undef"
 
@@ -242,10 +252,12 @@ getVarType (LMLitVar    l          ) = getLitType l
 
 -- | Return the 'LlvmType' of a 'LlvmLit'
 getLitType :: LlvmLit -> LlvmType
-getLitType (LMIntLit   _ t) = t
-getLitType (LMFloatLit _ t) = t
-getLitType (LMNullLit    t) = t
-getLitType (LMUndefLit   t) = t
+getLitType (LMIntLit    _ t) = t
+getLitType (LMFloatLit  _ t) = t
+getLitType (LMVectorLit [])  = panic "getLitType"
+getLitType (LMVectorLit ls)  = LMVector (length ls) (getLitType (head ls))
+getLitType (LMNullLit     t) = t
+getLitType (LMUndefLit    t) = t
 
 -- | Return the 'LlvmType' of the 'LlvmStatic'
 getStatType :: LlvmStatic -> LlvmType
@@ -319,27 +331,33 @@ isPointer :: LlvmType -> Bool
 isPointer (LMPointer _) = True
 isPointer _             = False
 
+-- | Test if the given 'LlvmType' is an 'LMVector' construct
+isVector :: LlvmType -> Bool
+isVector (LMVector {}) = True
+isVector _             = False
+
 -- | Test if a 'LlvmVar' is global.
 isGlobal :: LlvmVar -> Bool
 isGlobal (LMGlobalVar _ _ _ _ _ _) = True
 isGlobal _                         = False
 
 -- | Width in bits of an 'LlvmType', returns 0 if not applicable
-llvmWidthInBits :: LlvmType -> Int
-llvmWidthInBits (LMInt n)       = n
-llvmWidthInBits (LMFloat)       = 32
-llvmWidthInBits (LMDouble)      = 64
-llvmWidthInBits (LMFloat80)     = 80
-llvmWidthInBits (LMFloat128)    = 128
+llvmWidthInBits :: DynFlags -> LlvmType -> Int
+llvmWidthInBits _      (LMInt n)       = n
+llvmWidthInBits _      (LMFloat)       = 32
+llvmWidthInBits _      (LMDouble)      = 64
+llvmWidthInBits _      (LMFloat80)     = 80
+llvmWidthInBits _      (LMFloat128)    = 128
 -- Could return either a pointer width here or the width of what
 -- it points to. We will go with the former for now.
-llvmWidthInBits (LMPointer _)   = llvmWidthInBits llvmWord
-llvmWidthInBits (LMArray _ _)   = llvmWidthInBits llvmWord
-llvmWidthInBits LMLabel         = 0
-llvmWidthInBits LMVoid          = 0
-llvmWidthInBits (LMStruct tys)  = sum $ map llvmWidthInBits tys
-llvmWidthInBits (LMFunction  _) = 0
-llvmWidthInBits (LMAlias (_,t)) = llvmWidthInBits t
+llvmWidthInBits dflags (LMPointer _)   = llvmWidthInBits dflags (llvmWord dflags)
+llvmWidthInBits dflags (LMArray _ _)   = llvmWidthInBits dflags (llvmWord dflags)
+llvmWidthInBits dflags (LMVector n ty) = n * llvmWidthInBits dflags ty
+llvmWidthInBits _      LMLabel         = 0
+llvmWidthInBits _      LMVoid          = 0
+llvmWidthInBits dflags (LMStruct tys)  = sum $ map (llvmWidthInBits dflags) tys
+llvmWidthInBits _      (LMFunction  _) = 0
+llvmWidthInBits dflags (LMAlias (_,t)) = llvmWidthInBits dflags t
 
 
 -- -----------------------------------------------------------------------------
@@ -356,9 +374,9 @@ i1    = LMInt   1
 i8Ptr = pLift i8
 
 -- | The target architectures word size
-llvmWord, llvmWordPtr :: LlvmType
-llvmWord    = LMInt (wORD_SIZE * 8)
-llvmWordPtr = pLift llvmWord
+llvmWord, llvmWordPtr :: DynFlags -> LlvmType
+llvmWord    dflags = LMInt (wORD_SIZE dflags * 8)
+llvmWordPtr dflags = pLift (llvmWord dflags)
 
 -- -----------------------------------------------------------------------------
 -- * LLVM Function Types
@@ -792,6 +810,8 @@ instance Show LlvmCastOp where
 -- | Convert a Haskell Double to an LLVM hex encoded floating point form. In
 -- Llvm float literals can be printed in a big-endian hexadecimal format,
 -- regardless of underlying architecture.
+--
+-- See Note [LLVM Float Types].
 dToStr :: Double -> String
 dToStr d
   = let bs     = doubleToBytes d
@@ -804,13 +824,30 @@ dToStr d
         str  = map toUpper $ concat . fixEndian . (map hex) $ bs
     in  "0x" ++ str
 
--- | Convert a Haskell Float to an LLVM hex encoded floating point form.
--- LLVM uses the same encoding for both floats and doubles (16 digit hex
--- string) but floats must have the last half all zeroes so it can fit into
--- a float size type.
-{-# NOINLINE fToStr #-}
-fToStr :: Float -> String
-fToStr = (dToStr . realToFrac)
+-- Note [LLVM Float Types]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+-- We use 'dToStr' for both printing Float and Double floating point types. This is
+-- as LLVM expects all floating point constants (single & double) to be in IEEE
+-- 754 Double precision format. However, for single precision numbers (Float)
+-- they should be *representable* in IEEE 754 Single precision format. So the
+-- easiest way to do this is to narrow and widen again.
+-- (i.e., Double -> Float -> Double). We must be careful doing this that GHC
+-- doesn't optimize that away.
+
+-- Note [narrowFp & widenFp]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- NOTE: we use float2Double & co directly as GHC likes to optimize away
+-- successive calls of 'realToFrac', defeating the narrowing. (Bug #7600).
+-- 'realToFrac' has inconsistent behaviour with optimisation as well that can
+-- also cause issues, these methods don't.
+
+narrowFp :: Double -> Float
+{-# NOINLINE narrowFp #-}
+narrowFp = double2Float
+
+widenFp :: Float -> Double
+{-# NOINLINE widenFp #-}
+widenFp = float2Double
 
 -- | Reverse or leave byte data alone to fix endianness on this target.
 fixEndian :: [a] -> [a]

@@ -106,37 +106,13 @@ if [ $speed != "FAST" ]; then
     $make test_bindist TEST_PREP=YES
 
     #
-    # Install the transformers package into the bindist, because it is
-    # used by some tests.
-    # It isn't essential that we do this (the failing tests will
-    # be treated as expected failures), but we get a bit more test
-    # coverage, and also verify that we can install a package into the
+    # Install the xhtml package into the bindist.
+    # This verifies that we can install a package into the
     # bindist with Cabal.
     #
     bindistdir="bindisttest/install dir"
 
-    # This is a hack to make
-    #     HADDOCK_DOCS = NO
-    # work when validating.
-    if grep -q "^HADDOCK_DOCS.*=.*NO" mk/validate.mk
-    then
-        unset WITH_HADDOCK
-        DO_HADDOCK=NO
-    else
-        WITH_HADDOCK=--with-haddock="$thisdir/$bindistdir/bin/haddock"
-        DO_HADDOCK=YES
-    fi
-
-    cd libraries/transformers
-    "$thisdir/$bindistdir/bin/ghc" --make Setup
-
-    ./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" ${WITH_HADDOCK+"$WITH_HADDOCK"} --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
-    ./Setup build   --builddir=dist-bindist
-    [ "$DO_HADDOCK" = "YES" ] && ./Setup haddock --builddir=dist-bindist
-    ./Setup install --builddir=dist-bindist
-    ./Setup clean   --builddir=dist-bindist
-    rm -f Setup Setup.exe Setup.hi Setup.o
-    cd $thisdir
+    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
 fi
 
 fi # testsuite-only

@@ -358,10 +358,10 @@ Prelude> 5+5
 </screen>
 </para>
 
-<sect2><title>I/O actions at the prompt</title>
+<sect2 id="actions-at-prompt"><title>I/O actions at the prompt</title>
 
 <para>GHCi does more than simple expression evaluation at the prompt.
-If you type something of type <literal>IO a</literal> for some
+If you enter an expression of type <literal>IO a</literal> for some
     <literal>a</literal>, then GHCi <emphasis>executes</emphasis> it
     as an IO-computation.
 <screen>
@@ -369,6 +369,12 @@ Prelude> "hello"
 "hello"
 Prelude> putStrLn "hello"
 hello
+</screen>
+This works even if the type of the expression is more general,
+provided it can be <emphasis>instantiated</emphasis> to <literal>IO a</literal>.  For example
+<screen>
+Prelude> return True
+True
 </screen>
 Furthermore, GHCi will print the result of the I/O action if (and only
 if):
@@ -608,7 +614,7 @@ Prelude>
     <sect2 id="ghci-decls">
       <title>Type, class and other declarations</title>
 
-      <para>[<emphasis role="bold">New in version 7.4.1</emphasis>] At the GHCi
+      <para>At the GHCi
       prompt you can also enter any top-level Haskell declaration,
       including <literal>data</literal>, <literal>type</literal>, <literal>newtype</literal>, <literal>class</literal>, <literal>instance</literal>, <literal>deriving</literal>,
       and <literal>foreign</literal> declarations.  For
@@ -656,6 +662,10 @@ Prelude>
       an attempt to distinguish it from the new <literal>T</literal>,
       which is displayed as simply <literal>T</literal>.</para>
 
+    <para>Class and type-family instance declarations are simply added to the list of available instances, with one
+    exception. Since type-family instances are not permitted to overlap, but you might want to re-define one,
+    a type-family instance <emphasis>replaces</emphasis> any earlier type instance with an identical left hand side.
+    (See <xref linkend="type-families"/>.)</para>
     </sect2>
 
     <sect2 id="ghci-scope">
@@ -1089,7 +1099,11 @@ def = toEnum 0
     <literal>Integer</literal> then ghci gives an error when running a
     printf.
    </para>
+   <para>See also <xref linkend="actions-at-prompt"/> for how the monad of a computational
+   expression defaults to <literal>IO</literal> if possible.
+   </para>
     </sect2>
+
    <sect2 id="ghci-interactive-print">
      <title>Using a custom interactive printing function</title>
      <para>[<emphasis role="bold">New in version 7.6.1</emphasis>]
@@ -1701,8 +1715,7 @@ a :: a
       <para>The history is only available when
         using <literal>:trace</literal>; the reason for this is we found that
         logging each breakpoint in the history cuts performance by a factor of
-        2 or more.  GHCi remembers the last 50 steps in the history (perhaps in
-        the future we'll make this configurable).</para>
+        2 or more.  By default, GHCi remembers the last 50 steps in the history, but this can be changed with the <option>-fghci-hist-size=<replaceable>n</replaceable></option><indexterm><primary><option>&ndash;fghci-hist-size</option></primary></indexterm> option).</para>
     </sect2>
 
     <sect2 id="ghci-debugger-exceptions">
@@ -2367,16 +2380,18 @@ Prelude> :. cmds.ghci
           <indexterm><primary><literal>:history</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Display the history of evaluation steps.  With a number,
-            displays that many steps (default: 20).  For use with
-            <literal>:trace</literal>; see <xref
-              linkend="tracing" />.</para>
+	  <para>Display the history of evaluation steps.  With a
+	  number, displays that many steps (default: 20).  For use
+	  with <literal>:trace</literal>; see <xref linkend="tracing"
+	  />.  To set the number of history entries stored by GHCi,
+	  use
+	  <option>-fghci-hist-size=<replaceable>n</replaceable></option>.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term>
-          <literal>:info</literal> <replaceable>name</replaceable> ...
+          <literal>:info</literal><optional><literal>!</literal></optional><replaceable>name</replaceable> ...
           <indexterm><primary><literal>:info</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -2395,6 +2410,9 @@ Prelude> :. cmds.ghci
 	  and (b) all the other things mentioned in the instance
 	  are in scope (either qualified or otherwise) as a result of
 	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
+          The command <literal>:info!</literal> works in a similar fashion
+          but it removes restriction (b), showing all instances that are in
+          scope and mention <replaceable>name</replaceable> in their head.
 	</listitem>
       </varlistentry>
 
@@ -2790,11 +2808,22 @@ bar
 
       <varlistentry>
 	<term>
-          <literal>:show languages</literal>
-          <indexterm><primary><literal>:show languages</literal></primary></indexterm>
+          <literal>:show language</literal>
+          <indexterm><primary><literal>:show language</literal></primary></indexterm>
         </term>
 	<listitem>
-    <para>Show the currently active language flags.</para>
+    <para>Show the currently active language flags for source files.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:showi language</literal>
+          <indexterm><primary><literal>:showi language</literal></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Show the currently active language flags for
+          expressions typed at the prompt (see also <literal>:seti</literal>).</para>
 	</listitem>
       </varlistentry>
 
@@ -3047,6 +3076,7 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
 Prelude> :seti
 base language is: Haskell2010
 with the following modifiers:
+  -XNoMonomorphismRestriction
   -XNoDatatypeContexts
   -XNondecreasingIndentation
   -XExtendedDefaultRules
@@ -3055,7 +3085,6 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
 warning settings:
 </screen>
-
       <para>
         Note that the option <option>-XExtendedDefaultRules</option>
         is on, because we apply special defaulting rules to
@@ -3064,18 +3093,21 @@ warning settings:
       </para>
 
       <para>
-        It is often useful to change the language options for
-        expressions typed at the prompt only, without having that
-        option apply to loaded modules too.  A good example is
+        Furthermore, the Monomorphism Restriction is disabled by default in
+        GHCi (see <xref linkend="monomorphism" />).
+      </para>
+
+      <para>
+        It is often useful to change the language options for expressions typed
+        at the prompt only, without having that option apply to loaded modules
+        too.  For example
 <screen>
-:seti -XNoMonomorphismRestriction
+:seti -XMonoLocalBinds
 </screen>
-        It would be undesirable if
-        <option>-XNoMonomorphismRestriction</option> were to apply to
-        loaded modules too: that might cause a compilation error, but
-        more commonly it will cause extra recompilation, because GHC
-        will think that it needs to recompile the module because the
-        flags have changed.
+        It would be undesirable if <option>-XMonoLocalBinds</option> were to
+        apply to loaded modules too: that might cause a compilation error, but
+        more commonly it will cause extra recompilation, because GHC will think
+        that it needs to recompile the module because the flags have changed.
       </para>
 
       <para>

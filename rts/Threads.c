@@ -57,7 +57,7 @@ static StgThreadID next_thread_id = 1;
    currently pri (priority) is only used in a GRAN setup -- HWL
    ------------------------------------------------------------------------ */
 StgTSO *
-createThread(Capability *cap, nat size)
+createThread(Capability *cap, W_ size)
 {
   StgTSO *tso;
   StgStack *stack;
@@ -274,7 +274,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     msg->tso = tso;
     sendMessage(cap, tso->cap, (Message*)msg);
     debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
-                  (lnat)tso->id, tso->cap->no);
+                  (W_)tso->id, tso->cap->no);
     return;
   }
 #endif
@@ -302,7 +302,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         unlockClosure(tso->block_info.closure, i);
         if (i != &stg_MSG_NULL_info) {
           debugTraceCap(DEBUG_sched, cap, "thread %ld still blocked on throwto (%p)",
-                        (lnat)tso->id, tso->block_info.throwto->header.info);
+                        (W_)tso->id, tso->block_info.throwto->header.info);
           return;
         }
 
@@ -452,7 +452,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
 
   debugTraceCap(DEBUG_sched, cap,
                 "collision occurred; checking blocking queues for thread %ld",
-                (lnat)tso->id);
+                (W_)tso->id);
 
   for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
     next = bq->link;
@@ -592,23 +592,46 @@ isThreadSleeping (StgTSO* tso) {
   void
 threadStackOverflow (Capability *cap, StgTSO *tso)
 {
-  StgStack *new_stack, *old_stack;
-  StgUnderflowFrame *frame;
-  lnat chunk_size;
+    StgStack *new_stack, *old_stack;
+    StgUnderflowFrame *frame;
+    W_ chunk_size;
 
-  IF_DEBUG(sanity,checkTSO(tso));
+    IF_DEBUG(sanity,checkTSO(tso));
 
-  if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
-      && !(tso->flags & TSO_BLOCKEX)) {
-    // NB. never raise a StackOverflow exception if the thread is
-    // inside Control.Exceptino.block.  It is impractical to protect
-    // against stack overflow exceptions, since virtually anything
-    // can raise one (even 'catch'), so this is the only sensible
-    // thing to do here.  See bug #767.
-    //
+    if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
+        && !(tso->flags & TSO_BLOCKEX)) {
+        // NB. never raise a StackOverflow exception if the thread is
+        // inside Control.Exceptino.block.  It is impractical to protect
+        // against stack overflow exceptions, since virtually anything
+        // can raise one (even 'catch'), so this is the only sensible
+        // thing to do here.  See bug #767.
+        //
 
-    if (tso->flags & TSO_SQUEEZED) {
-      return;
+        if (tso->flags & TSO_SQUEEZED) {
+            return;
+        }
+        // #3677: In a stack overflow situation, stack squeezing may
+        // reduce the stack size, but we don't know whether it has been
+        // reduced enough for the stack check to succeed if we try
+        // again.  Fortunately stack squeezing is idempotent, so all we
+        // need to do is record whether *any* squeezing happened.  If we
+        // are at the stack's absolute -K limit, and stack squeezing
+        // happened, then we try running the thread again.  The
+        // TSO_SQUEEZED flag is set by threadPaused() to tell us whether
+        // squeezing happened or not.
+
+        debugTrace(DEBUG_gc,
+                   "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
+                   (long)tso->id, tso, (long)tso->stackobj->stack_size,
+                   RtsFlags.GcFlags.maxStkSize);
+        IF_DEBUG(gc,
+                 /* If we're debugging, just print out the top of the stack */
+                 printStackChunk(tso->stackobj->sp,
+                                 stg_min(tso->stackobj->stack + tso->stackobj->stack_size,
+                                         tso->stackobj->sp+64)));
+
+        // Send this thread the StackOverflow exception
+        throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
     }
     // #3677: In a stack overflow situation, stack squeezing may
     // reduce the stack size, but we don't know whether it has been
@@ -699,17 +722,31 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
          sp < stg_min(old_stack->sp + RtsFlags.GcFlags.stkChunkBufferSize,
                       old_stack->stack + old_stack->stack_size); )
     {
-      size = stack_frame_sizeW((StgClosure*)sp);
+        StgWord *sp;
+        W_ chunk_words, size;
 
-      // if including this frame would exceed the size of the
-      // new stack (taking into account the underflow frame),
-      // then stop at the previous frame.
-      if (sp + size > old_stack->stack + (new_stack->stack_size -
-                                          sizeofW(StgUnderflowFrame))) {
-        break;
-      }
-      sp += size;
-    }
+        // find the boundary of the chunk of old stack we're going to
+        // copy to the new stack.  We skip over stack frames until we
+        // reach the smaller of
+        //
+        //   * the chunk buffer size (+RTS -kb)
+        //   * the end of the old stack
+        //
+        for (sp = old_stack->sp;
+             sp < stg_min(old_stack->sp + RtsFlags.GcFlags.stkChunkBufferSize,
+                          old_stack->stack + old_stack->stack_size); )
+        {
+            size = stack_frame_sizeW((StgClosure*)sp);
+
+            // if including this frame would exceed the size of the
+            // new stack (taking into account the underflow frame),
+            // then stop at the previous frame.
+            if (sp + size > old_stack->stack + (new_stack->stack_size -
+                                                sizeofW(StgUnderflowFrame))) {
+                break;
+            }
+            sp += size;
+        }
 
     if (sp == old_stack->stack + old_stack->stack_size) {
       //
@@ -759,7 +796,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
    Stack underflow - called from the stg_stack_underflow_info frame
    ------------------------------------------------------------------------ */
 
-  nat // returns offset to the return address
+W_ // returns offset to the return address
 threadStackUnderflow (Capability *cap, StgTSO *tso)
 {
   StgStack *new_stack, *old_stack;
@@ -781,7 +818,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
   if (retvals != 0)
   {
     // we have some return values to copy to the old stack
-    if ((nat)(new_stack->sp - new_stack->stack) < retvals)
+    if ((W_)(new_stack->sp - new_stack->stack) < retvals)
     {
       barf("threadStackUnderflow: not enough space for return values");
     }

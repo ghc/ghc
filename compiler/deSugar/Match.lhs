@@ -17,12 +17,13 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 #include "HsVersions.h"
 
-import {-#SOURCE#-} DsExpr (dsLExpr)
+import {-#SOURCE#-} DsExpr (dsLExpr, dsExpr)
 
 import DynFlags
 import HsSyn		
 import TcHsSyn
 import TcEvidence
+import TcRnMonad
 import Check
 import CoreSyn
 import Literal
@@ -52,7 +53,7 @@ import qualified Data.Map as Map
 \end{code}
 
 This function is a wrapper of @match@, it must be called from all the parts where 
-it was called match, but only substitutes the firs call, ....
+it was called match, but only substitutes the first call, ....
 if the associated flags are declared, warnings will be issued.
 It can not be called matchWrapper because this name already exists :-(
 
@@ -290,24 +291,29 @@ match [] ty eqns
 		      eqn_rhs eqn
 		    | eqn <- eqns ]
 
-match vars@(v:_) ty eqns
-  = ASSERT( not (null eqns ) )
-    do	{ 	-- Tidy the first pattern, generating
+match vars@(v:_) ty eqns    -- Eqns *can* be empty
+  = do	{ dflags <- getDynFlags
+      	; 	-- Tidy the first pattern, generating
 		-- auxiliary bindings if necessary
           (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
 
 		-- Group the equations and match each group in turn
-        ; let grouped = groupEquations tidy_eqns
+        ; let grouped = groupEquations dflags tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
-        ; ifDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
+        ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
-	; match_results <- mapM match_group grouped
-	; return (adjustMatchResult (foldr1 (.) aux_binds) $
+	; match_results <- match_groups grouped
+	; return (adjustMatchResult (foldr (.) id aux_binds) $
 		  foldr1 combineMatchResults match_results) }
   where
     dropGroup :: [(PatGroup,EquationInfo)] -> [EquationInfo]
     dropGroup = map snd
+
+    match_groups :: [[(PatGroup,EquationInfo)]] -> DsM [MatchResult]
+    -- Result list of [MatchResult] is always non-empty
+    match_groups [] = matchEmpty v ty
+    match_groups gs = mapM match_group gs
 
     match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
     match_group [] = panic "match_group"
@@ -321,12 +327,13 @@ match vars@(v:_) ty eqns
             PgBang     -> matchBangs      vars ty (dropGroup eqns)
             PgCo _     -> matchCoercion   vars ty (dropGroup eqns)
             PgView _ _ -> matchView       vars ty (dropGroup eqns)
-
+            PgOverloadedList -> matchOverloadedList vars ty (dropGroup eqns)
+            
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
 
     -- print some stuff to see what's getting grouped
-    -- use -dppr-debug to see the resolution of overloaded lits
+    -- use -dppr-debug to see the resolution of overloaded literals
     debug eqns = 
         let gs = map (\group -> foldr (\ (p,_) -> \acc -> 
                                            case p of PgView e _ -> e:acc 
@@ -336,6 +343,14 @@ match vars@(v:_) ty eqns
         in 
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))
+
+matchEmpty :: Id -> Type -> DsM [MatchResult]
+-- See Note [Empty case expressions]
+matchEmpty var res_ty
+  = return [MatchResult CanFail mk_seq]
+  where
+    mk_seq fail = return $ mkWildCase (Var var) (idType var) res_ty 
+                                      [(DEFAULT, [], fail)]
 
 matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
@@ -377,20 +392,52 @@ matchView (var:vars) ty (eqns@(eqn1:_))
 	; return (mkViewMatchResult var' viewExpr' var match_result) }
 matchView _ _ _ = panic "matchView"
 
+matchOverloadedList :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
+-- Since overloaded list patterns are treated as view patterns, 
+-- the code is roughly the same as for matchView
+  = do { let ListPat _ elt_ty (Just (_,e)) = firstPat eqn1 
+       ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
+       ; match_result <- match (var':vars) ty $ 
+                            map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
+       ; e' <- dsExpr e
+       ; return (mkViewMatchResult var' e' var match_result) }
+matchOverloadedList _ _ _ = panic "matchOverloadedList"
+
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat Id -> Pat Id) -> EquationInfo -> EquationInfo
 decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 	= eqn { eqn_pats = extractpat pat : pats}
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
-getCoPat, getBangPat, getViewPat :: Pat Id -> Pat Id
+getCoPat, getBangPat, getViewPat, getOLPat :: Pat Id -> Pat Id
 getCoPat (CoPat _ pat _)     = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat pat  )   = unLoc pat
 getBangPat _                 = panic "getBangPat"
 getViewPat (ViewPat _ pat _) = unLoc pat
-getViewPat _                 = panic "getBangPat"
+getViewPat _                 = panic "getViewPat"
+getOLPat (ListPat pats ty (Just _)) = ListPat pats ty Nothing
+getOLPat _                   = panic "getOLPat"
 \end{code}
+
+Note [Empty case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The list of EquationInfo can be empty, arising from
+    case x of {}   or    \case {}
+In that situation we desugar to
+    case x of { _ -> error "pattern match failure" }
+The *desugarer* isn't certain whether there really should be no
+alternatives, so it adds a default case, as it always does.  A later
+pass may remove it if it's inaccessible.  (See also Note [Empty case
+alternatives] in CoreSyn.)
+
+We do *not* deugar simply to
+   error "empty case" 
+or some such, because 'x' might be bound to (error "hello"), in which
+case we want to see that "hello" exception, not (error "empty case").
+See also Note [Case elimination: lifted case] in Simplify.
+
 
 %************************************************************************
 %*									*
@@ -475,6 +522,7 @@ tidy1 :: Id 			-- The Id being scrutinised
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat) 
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat) 
 tidy1 _ (WildPat ty)      = return (idDsWrapper, WildPat ty)
+tidy1 v (BangPat (L l p)) = tidy_bang_pat v l p
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
@@ -503,7 +551,7 @@ tidy1 v (LazyPat pat)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
 	; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
-tidy1 _ (ListPat pats ty)
+tidy1 _ (ListPat pats ty Nothing)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
@@ -533,24 +581,37 @@ tidy1 _ (LitPat lit)
 tidy1 _ (NPat lit mb_neg eq)
   = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq)
 
--- BangPatterns: Pattern matching is already strict in constructors,
--- tuples etc, so the last case strips off the bang for thoses patterns.
-tidy1 v (BangPat (L _ (LazyPat p)))       = tidy1 v (BangPat p)
-tidy1 v (BangPat (L _ (ParPat p)))        = tidy1 v (BangPat p)
-tidy1 _ p@(BangPat (L _(VarPat _)))       = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (WildPat _)))     = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (CoPat _ _ _)))   = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (SigPatIn _ _)))  = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (SigPatOut _ _))) = return (idDsWrapper, p)
-tidy1 v (BangPat (L _ (AsPat (L _ var) pat)))
-  = do	{ (wrap, pat') <- tidy1 v (BangPat pat)
-        ; return (wrapBind var v . wrap, pat') }
-tidy1 v (BangPat (L _ p))                   = tidy1 v p
-
 -- Everything else goes through unchanged...
 
 tidy1 _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
+
+--------------------
+tidy_bang_pat :: Id -> SrcSpan -> Pat Id -> DsM (DsWrapper, Pat Id)
+-- BangPatterns: Pattern matching is already strict in constructors,
+-- tuples etc, so the last case strips off the bang for those patterns.
+
+-- Discard bang around strict pattern
+tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
+tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
+tidy_bang_pat v _ p@(PArrPat {})   = tidy1 v p
+tidy_bang_pat v _ p@(ConPatOut {}) = tidy1 v p
+tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
+
+-- Discard lazy/par/sig under a bang
+tidy_bang_pat v _ (LazyPat (L l p))     = tidy_bang_pat v l p
+tidy_bang_pat v _ (ParPat (L l p))      = tidy_bang_pat v l p
+tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
+
+-- Push the bang-pattern inwards, in the hope that
+-- it may disappear next time 
+tidy_bang_pat v l (AsPat v' p)  = tidy1 v (AsPat v' (L l (BangPat p)))
+tidy_bang_pat v l (CoPat w p t) = tidy1 v (CoPat w (BangPat (L l p)) t)
+
+-- Default case, leave the bang there:
+-- VarPat, WildPat, ViewPat, NPat, NPlusKPat
+tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
+  -- NB: SigPatIn, ConPatIn should not happen
 \end{code}
 
 \noindent
@@ -663,9 +724,9 @@ Call @match@ with all of this information!
 \end{enumerate}
 
 \begin{code}
-matchWrapper :: HsMatchContext Name	-- For shadowing warning messages
-	     -> MatchGroup Id		-- Matches being desugared
-	     -> DsM ([Id], CoreExpr) 	-- Results
+matchWrapper :: HsMatchContext Name             -- For shadowing warning messages
+	     -> MatchGroup Id (LHsExpr Id)      -- Matches being desugared
+	     -> DsM ([Id], CoreExpr)            -- Results
 \end{code}
 
  There is one small problem with the Lambda Patterns, when somebody
@@ -691,17 +752,16 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 
 \begin{code}
-matchWrapper ctxt (MatchGroup matches match_ty)
-  = ASSERT( notNull matches )
-    do	{ eqns_info   <- mapM mk_eqn_info matches
-	; new_vars    <- selectMatchVars arg_pats
+matchWrapper ctxt (MG { mg_alts = matches
+                      , mg_arg_tys = arg_tys
+                      , mg_res_ty = rhs_ty })
+  = do	{ eqns_info   <- mapM mk_eqn_info matches
+	; new_vars    <- case matches of
+                           []    -> mapM newSysLocalDs arg_tys
+                           (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 	; result_expr <- matchEquations ctxt new_vars eqns_info rhs_ty
 	; return (new_vars, result_expr) }
   where
-    arg_pats    = map unLoc (hsLMatchPats (head matches))
-    n_pats	= length arg_pats
-    (_, rhs_ty) = splitFunTysN n_pats match_ty
-
     mk_eqn_info (L _ (Match pats _ grhss))
       = do { let upats = map unLoc pats
 	   ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
@@ -786,14 +846,15 @@ data PatGroup
   | PgView (LHsExpr Id) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
-
-groupEquations :: [EquationInfo] -> [[(PatGroup, EquationInfo)]]
+  | PgOverloadedList
+  
+groupEquations :: DynFlags -> [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- If the result is of form [g1, g2, g3], 
 -- (a) all the (pg,eq) pairs in g1 have the same pg
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
-groupEquations eqns
-  = runs same_gp [(patGroup (firstPat eqn), eqn) | eqn <- eqns]
+groupEquations dflags eqns
+  = runs same_gp [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
     (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
@@ -840,7 +901,7 @@ sameGroup (PgCo	t1)  (PgCo t2)  = t1 `eqType` t2
 	-- always have the same type, so this boils down to saying that
 	-- the two coercions are identical.
 sameGroup (PgView e1 t1) (PgView e2 t2) = viewLExprEq (e1,t1) (e2,t2) 
-       -- ViewPats are in the same gorup iff the expressions
+       -- ViewPats are in the same group iff the expressions
        -- are "equal"---conservatively, we use syntactic equality
 sameGroup _          _          = False
 
@@ -948,16 +1009,17 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_co (TcTyConAppCo tc1 cos1) (TcTyConAppCo tc2 cos2) = tc1==tc2 && eq_list eq_co cos1 cos2
     eq_co _ _ = False
 
-patGroup :: Pat Id -> PatGroup
-patGroup (WildPat {})       	      = PgAny
-patGroup (BangPat {})       	      = PgBang  
-patGroup (ConPatOut { pat_con = dc }) = PgCon (unLoc dc)
-patGroup (LitPat lit)		      = PgLit (hsLitKey lit)
-patGroup (NPat olit mb_neg _)	      = PgN   (hsOverLitKey olit (isJust mb_neg))
-patGroup (NPlusKPat _ olit _ _)	      = PgNpK (hsOverLitKey olit False)
-patGroup (CoPat _ p _)		      = PgCo  (hsPatType p)	-- Type of innelexp pattern
-patGroup (ViewPat expr p _)               = PgView expr (hsPatType (unLoc p))
-patGroup pat = pprPanic "patGroup" (ppr pat)
+patGroup :: DynFlags -> Pat Id -> PatGroup
+patGroup _      (WildPat {})                 = PgAny
+patGroup _      (BangPat {})                 = PgBang
+patGroup _      (ConPatOut { pat_con = dc }) = PgCon (unLoc dc)
+patGroup dflags (LitPat lit)                 = PgLit (hsLitKey dflags lit)
+patGroup _      (NPat olit mb_neg _)         = PgN   (hsOverLitKey olit (isJust mb_neg))
+patGroup _      (NPlusKPat _ olit _ _)       = PgNpK (hsOverLitKey olit False)
+patGroup _      (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
+patGroup _      (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
+patGroup _      (ListPat _ _ (Just _))       = PgOverloadedList
+patGroup _      pat = pprPanic "patGroup" (ppr pat)
 \end{code}
 
 Note [Grouping overloaded literal patterns]

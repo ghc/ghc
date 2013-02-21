@@ -29,9 +29,10 @@ import NCGMonad
 import Size
 import Reg
 
-import OldCmm
+import Cmm
 
 import Control.Monad (liftM)
+import DynFlags
 import OrdList
 import Outputable
 
@@ -54,11 +55,14 @@ getSomeReg expr = do
 getRegister :: CmmExpr -> NatM Register
 
 getRegister (CmmReg reg) 
-  = return (Fixed (cmmTypeSize (cmmRegType reg)) 
-		  (getRegisterReg reg) nilOL)
+  = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       return (Fixed (cmmTypeSize (cmmRegType dflags reg))
+                     (getRegisterReg platform reg) nilOL)
 
 getRegister tree@(CmmRegOff _ _) 
-  = getRegister (mangleIndexTree tree)
+  = do dflags <- getDynFlags
+       getRegister (mangleIndexTree dflags tree)
 
 getRegister (CmmMachOp (MO_UU_Conv W64 W32)
              [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
@@ -487,14 +491,15 @@ trivialFCode
 	-> NatM Register
 
 trivialFCode pk instr x y = do
+    dflags <- getDynFlags
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     tmp <- getNewRegNat FF64
     let
     	promote x = FxTOy FF32 FF64 x tmp
 
-    	pk1   = cmmExprType x
-    	pk2   = cmmExprType y
+    	pk1   = cmmExprType dflags x
+    	pk2   = cmmExprType dflags y
 
     	code__2 dst =
     	    	if pk1 `cmmEqType` pk2 then

@@ -27,42 +27,20 @@ TOP		= @hardtop@
 
 include $(TOP)/mk/project.mk
 
+# By default, be verbose
+V = 1
+
 ################################################################################
 #
 #		Global configuration options
 #
 ################################################################################
 
-# BootingFromHc - build GHC and the libraries from .hc files?
-# (unregisterised only)
-BootingFromHc = @BootingFromHc@
-
 NO_INCLUDE_DEPS = NO
 NO_INCLUDE_PKGDATA = NO
 
 # Should we build latex docs?
 LATEX_DOCS = NO
-
-# Mac OS X deployment target (to cross-compile for older OS versions)
-#
-MACOSX_DEPLOYMENT_VERSION = @MACOSX_DEPLOYMENT_VERSION@
-MACOSX_DEPLOYMENT_SDK = @MACOSX_DEPLOYMENT_SDK@
-
-ifneq "$(MACOSX_DEPLOYMENT_VERSION)" ""
-MACOSX_DEPLOYMENT_CC_OPTS = -mmacosx-version-min=$(MACOSX_DEPLOYMENT_VERSION) \
-			    -isysroot $(MACOSX_DEPLOYMENT_SDK) \
-			    --no-builtin-fprintf
-MACOSX_DEPLOYMENT_LD_OPTS = -mmacosx-version-min=$(MACOSX_DEPLOYMENT_VERSION) \
-			    -Wl,-syslibroot,$(MACOSX_DEPLOYMENT_SDK)
-# We don't extend SRC_CC_OPTS and friends here directly, as (a) they may get
-# overwritten in build.mk and (b) we must not use the deployment options in
-# stage 1 or we get a linker error if the bootstrap compiler is for a more
-# recent OS version.
-#
-# We need --no-builtin-fprintf, as the use of the builtin function optimisation
-# for fprintf together with #include "PosixSource" in the RTS leads to the
-# use of fwrite$UNIX2003 (with GCC 4.0.1 on Mac OS X 10.5.2).
-endif
 
 ################################################################################
 #
@@ -129,6 +107,26 @@ endif
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 	$(SharedLibsPlatformList)),YES,NO)
 
+# DYNAMIC_BY_DEFAULT says whether this compiler will default to
+# building dynamic executables, i.e. -dynamic is on.  We do this for
+# most platforms because it lets us use the system dynamic linker
+# instead of our own linker for GHCi.
+#
+# Currently this isn't possible on Windows, and we have not yet enabled
+# it on i386 while we consider the performance implications.
+#
+ifeq "$(TargetOS_CPP)" "mingw32"
+DYNAMIC_BY_DEFAULT = NO
+else ifeq "$(TargetArch_CPP)" "i386"
+DYNAMIC_BY_DEFAULT = NO
+else
+DYNAMIC_BY_DEFAULT = YES
+endif
+
+# For now, we unconditionally disable dynamic-by-default, as the
+# cabal-install's that are in the wild don't handle it properly.
+DYNAMIC_BY_DEFAULT = NO
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
@@ -139,23 +137,18 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 # the compiler you build with is generating registerised binaries), but
 # the stage2 compiler will be an unregisterised binary.
 #
-ifneq "$(findstring $(TargetArch_CPP), i386 x86_64 powerpc arm)" ""
-GhcUnregisterised=NO
-else
-GhcUnregisterised=YES
-endif
+GhcUnregisterised=@Unregisterised@
 
 # Build a compiler with a native code generator backend
 # (as well as a C backend)
 #
 # Target platforms supported:
 #   i386, powerpc
-#   AIX is not supported
+#   AIX is not supported 
 ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
 OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst aix,,$(TargetOS_CPP))))
 
-# lazy test, because $(GhcUnregisterised) might be set in build.mk later.
-GhcWithNativeCodeGen=$(strip\
+GhcWithNativeCodeGen := $(strip\
     $(if $(filter YESYESNO,\
 		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
 
@@ -165,8 +158,7 @@ HaveLibDL = @HaveLibDL@
 # includes/stg/SMP.h
 ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc arm)))
 
-# lazy test, because $(GhcUnregisterised) might be set in build.mk later.
-GhcWithSMP=$(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
+GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
@@ -176,8 +168,8 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
-else
-GhcWithInterpreter=NO
+else 
+GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_BY_DEFAULT)),YES,NO)
 endif
 
 # GhcEnableTablesNextToCode tells us whether the target architecture
@@ -216,6 +208,8 @@ include $(TOP)/mk/install.mk
 # portable as possible.
 BeConservative = NO
 
+ExtraMakefileSanityChecks = NO
+
 #
 # Building various ways?
 # (right now, empty if not).
@@ -246,7 +240,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 
 # In addition, the RTS is built in some further variations.  Ways that
 # make sense here:
-#
+# 
 #   thr         : threaded
 #   thr_p       : threaded profiled
 #   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
@@ -260,14 +254,14 @@ GhcRTSWays=l
 
 # Usually want the debug version
 ifeq "$(BootingFromHc)" "NO"
-GhcRTSWays += debug
+GhcRTSWays += debug 
 endif
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
 GhcRTSWays += thr thr_debug thr_l
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
-GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn,)
+GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn l_dyn thr_l_dyn,)
 
 # We can only build GHCi threaded if we have a threaded RTS:
 GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
@@ -304,8 +298,7 @@ ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerp
 OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
 SplitObjsBroken = @SplitObjsBroken@
 
-# lazy test, so that $(GhcUnregisterised) can be set in build.mk
-SupportsSplitObjs=$(strip \
+SupportsSplitObjs := $(strip \
                     $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
                                $(filter YES,$(OsSupportsSplitObjs)),\
                                $(filter NO,$(SplitObjsBroken)),\
@@ -348,10 +341,12 @@ LAX_DEPENDENCIES = NO
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
 
-# For an optimised RTS (you probably don't want to change these; we build
-# a debugging RTS by default now.  Use -debug to get it).
-GhcRtsHcOpts=-optc-O2
-GhcRtsCcOpts=-fomit-frame-pointer
+# Build an optimised RTS.  Remember that we need to turn on
+# optimisation both for C code (-optc-O2) and .cmm code (-O2).  For
+# the debugging RTS flavour, rts/ghc.mk overrides these to turn off
+# optimisation.
+GhcRtsHcOpts=-O2
+GhcRtsCcOpts=-O2 -fomit-frame-pointer
 
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
@@ -361,6 +356,13 @@ GhcRtsWithFrontPanel = NO
 GhcRtsWithPapi = NO
 PapiLibDir=
 PapiIncludeDir=
+
+# Configuration for libffi
+UseSystemLibFFI=@UseSystemLibFFI@
+# Flags to go into package.conf for rts
+FFILibDir=@FFILibDir@
+FFIIncludeDir=@FFIIncludeDir@
+
 
 ################################################################################
 #
@@ -393,11 +395,11 @@ BIN_DIST_PREP_TAR_BZ2 = $(BIN_DIST_PREP_TAR).bz2
 BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 BIN_DIST_LIST         = bindist-list
 
-WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-i386-windows
+WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-$(TargetArch_CPP)-windows
 WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 
 # -----------------------------------------------------------------------------
-# Utilities programs: flags
+# Utilities programs: flags 
 
 # If you want to give any standard flags to pretty much any utility
 # (see utils.mk for a complete list), by adding a line here
@@ -405,7 +407,7 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 # 	SRC_P_OPTS += ...
 #
 # where P is the utility. For example, to add -O to all Haskell
-# compilations,
+# compilations, 
 #
 #	SRC_HC_OPTS += -O
 
@@ -413,7 +415,7 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 # SRC_HC_OPTS includes flags to be added to *every* Haskell
 # compilation.  Setting SRC_HC_OPTS is a good way to set the default
 # optimisation level (-O) and heap size (-H<size>).
-#
+# 
 # SRC_HC_OPTS is *not* for adding flags that are required to make your
 # build work.  Examples:
 #
@@ -533,16 +535,6 @@ else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
-# Work around #5453, which causes the stage1 compiler to segfault when
-# built with 7.2.1.
-ifeq "$(GhcVersion)" "7.2.1"
-CONF_HC_OPTS_STAGE0 += -fno-full-laziness
-compiler/cmm/Bitmap_HC_OPTS += -ffull-laziness
-# urgh.  Compiling cmm/Bitmap.hs with -fno-full-laziness results in
-#   "gmp: overflow in mpz type"
-# for some unknown reason, so turn full-laziness back on for this module.
-endif
-
 GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
 #-----------------------------------------------------------------------------
@@ -552,9 +544,8 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 # the flag --with-gcc=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-WhatGccIsCalled = @WhatGccIsCalled@
-GccVersion      = @GccVersion@
-AlienScript           = @AlienScript@
+WhatGccIsCalled       = @WhatGccIsCalled@
+GccVersion            = @GccVersion@
 ifeq "$(phase)" "0"
 CrossCompilePrefix    =
 else
@@ -565,32 +556,37 @@ endif
 TargetPlatformFull    = @TargetPlatformFull@
 GccLT34         = @GccLT34@
 GccLT46         = @GccLT46@
+
 CC              = $(WhatGccIsCalled)
 CC_STAGE0       = @CC_STAGE0@
 CC_STAGE1       = $(CC)
 CC_STAGE2       = $(CC)
 CC_STAGE3       = $(CC)
+
 AS              = $(WhatGccIsCalled)
 AS_STAGE0       = @CC_STAGE0@
 AS_STAGE1       = $(AS)
 AS_STAGE2       = $(AS)
 AS_STAGE3       = $(AS)
 
+# We don't have an LD_STAGE0.  CC_STAGE0 is determined by asking "ghc
+# --info", and it doesn't report an LD.
+LD_STAGE0       = error-no-ld-stage0
+LD_STAGE1       = $(LD)
+LD_STAGE2       = $(LD)
+LD_STAGE3       = $(LD)
+
 # Cross-compiling options
 #
-# The 'toolchain' case: Cross-compiler to run locally:
-BuildingCrossCompiler = @BuildingCrossCompiler@
-# The 'port' case: Porting to a foreign architecture:
-PortingCompiler       = @PortingCompiler@
-# BuildingCrossCompiler OR PortingCompiler
 CrossCompiling        = @CrossCompiling@
 
-# Install stage 2 by default, or stage 1 in the cross compiler case. Can be changed to 3
-ifeq "$(BuildingCrossCompiler)" "YES"
-INSTALL_GHC_STAGE=1
-else
-INSTALL_GHC_STAGE=2
-endif
+# Change this to YES if you're building a cross-compiler and don't
+# want to build stage 2.
+Stage1Only = NO
+
+# Install stage 2 by default, or stage 1 in the cross compiler
+# case. Can be changed to 3
+INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC
@@ -645,7 +641,7 @@ endif
 
 # FLEX			= @LEX@
 # Don't bother with -lfl, we define our own yywrap()s anyway.
-# FLEX_LIB		=
+# FLEX_LIB		= 
 #WAS:FLEX_LIB		= @LEXLIB@
 
 #-----------------------------------------------------------------------------
@@ -684,13 +680,12 @@ CTAGS 			= $(ETAGS)
 #
 RAWCPP_FLAGS            = -undef -traditional
 FIND			= @FindCmd@
-SORT		        = @SortCmd@
 
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
 # install-sh script (if chosen). This not terribly useful to us, so we convert
 # it into an abs. path.
-#
+# 
 INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 
@@ -701,7 +696,6 @@ LN_S			= @LN_S@
 MV			= mv
 NROFF			= nroff
 PERL 			= @PerlCmd@
-PYTHON			= @PythonCmd@
 PIC			= pic
 RANLIB			= @RANLIB@
 SED			= @SedCmd@
@@ -719,11 +713,6 @@ OBJDUMP = @ObjdumpCmd@
 LLC = @LlcCmd@
 OPT = @OptCmd@
 
-# Some ld's support the -x flag and some don't, so the configure
-# script detects which we have and sets LdXFlag to "-x" or ""
-# respectively.
-LD_X			= @LdXFlag@
-
 # GNU ld supports input via a linker script, which is useful to avoid
 # overflowing command-line length limits.
 LdIsGNULd		= @LdIsGNULd@
@@ -736,7 +725,7 @@ LdHasBuildId	        = @LdHasBuildId@
 # and compiler/main/DriverPipeline.hs.
 LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@
 
-# On MSYS, building with SplitObjs=YES fails with
+# On MSYS, building with SplitObjs=YES fails with 
 #   ar: Bad file number
 # see #3201.  We need to specify a smaller max command-line size
 # to work around it.  32767 doesn't work; 30000 does, but says
@@ -750,16 +739,16 @@ endif
 #
 # In emergency situations, REAL_SHELL is used to perform shell commands
 # from within the ghc driver script, by scribbling the command line to
-# a temp file and then having $(REAL_SHELL) execute it.
+# a temp file and then having $(REAL_SHELL) execute it. 
 #
 # The reason for having to do this is that overly long command lines
 # cause unnecessary trouble with some shells (e.g., /bin/sh on Solaris
 # 2.5.1), which is why this backdoor is provided. The situation of overly
-# long command lines is either encountered while doing `make boot' in compiler/,
-# or when linking the compiler binary (`hsc').
+# long command lines is either encountered while doing `make boot' in compiler/, 
+# or when linking the compiler binary (`hsc'). 
 #
 # We do not use SHELL to execute long commands, as `make' will more than likely
-# override whatever setting you have in your environment while executing.
+# override whatever setting you have in your environment while executing. 
 
 # By default, REAL_SHELL is set equal to SHELL, which is not really a smart move
 # as it is SHELL that will show up the bogosity in the first place, but setting
@@ -807,6 +796,8 @@ BUILD_DOCBOOK_HTML       = @BUILD_DOCBOOK_HTML@
 BUILD_DOCBOOK_PS         = @BUILD_DOCBOOK_PS@
 BUILD_DOCBOOK_PDF        = @BUILD_DOCBOOK_PDF@
 DBLATEX                  = @DblatexCmd@
+# filename.as.url=0 is needed with dblatex 0.3.4 (#7486)
+DBLATEX_OPTS             = -P 'filename.as.url=0'
 XSLTPROC                 = @XsltprocCmd@
 XMLLINT                  = @XmllintCmd@
 HAVE_DOCBOOK_XSL	 = @HAVE_DOCBOOK_XSL@
@@ -827,7 +818,7 @@ GHC_PKG		        = @GhcPkgCmd@
 # Happy
 #
 HAPPY			= @HappyCmd@
-HAPPY_VERSION		= @HappyVersion@
+HAPPY_VERSION		= @HappyVersion@		
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
@@ -837,7 +828,7 @@ SRC_HAPPY_OPTS		= -agc --strict
 # Alex
 #
 ALEX			= @AlexCmd@
-ALEX_VERSION		= @AlexVersion@
+ALEX_VERSION		= @AlexVersion@		
 Alex3			= @Alex3@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
@@ -865,7 +856,7 @@ endif
 #
 ################################################################################
 
-#
+# 
 # It is possible to configure the compiler and prelude to support 31-bit
 # integers, suitable for a back-end and RTS using a tag bit on a 32-bit
 # architecture.  Currently the only useful output from this option is external Core

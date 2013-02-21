@@ -35,9 +35,10 @@ import Reg
 import Size
 import PprBase
 
-import OldCmm
-import OldPprCmm()
+import Cmm hiding (topInfoTable)
+import PprCmm()
 import CLabel
+import BlockId
 
 import Unique           ( Uniquable(..), pprUnique )
 import Outputable
@@ -48,50 +49,57 @@ import Data.Word
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> SDoc
-pprNatCmmDecl _ (CmmData section dats) =
+pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
- -- special case for split markers:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+  case topInfoTable proc of
+    Nothing ->
+       case blocks of
+         []     -> -- special case for split markers:
+           pprLabel lbl
+         blocks -> -- special case for code without info table:
+           pprSectionHeader Text $$
+           pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+           vcat (map (pprBasicBlock top_info) blocks)
 
- -- special case for code without info table:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
-  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-  vcat (map pprBasicBlock blocks)
-
-pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
-  (
-       (if platformHasSubsectionsViaSymbols platform
-        then ppr (mkDeadStripPreventer info_lbl) <> char ':'
-        else empty) $$
-       vcat (map pprData info) $$
-       pprLabel info_lbl
-  ) $$
-  vcat (map pprBasicBlock blocks) $$
-     -- above: Even the first block gets a label, because with branch-chain
-     -- elimination, it might be the target of a goto.
-        (if platformHasSubsectionsViaSymbols platform
-         then
-         -- If we are using the .subsections_via_symbols directive
-         -- (available on recent versions of Darwin),
-         -- we have to make sure that there is some kind of reference
-         -- from the entry code to a label on the _top_ of of the info table,
-         -- so that the linker will not think it is unreferenced and dead-strip
-         -- it. That's why the label is called a DeadStripPreventer (_dsp).
-                  text "\t.long "
-              <+> ppr info_lbl
-              <+> char '-'
-              <+> ppr (mkDeadStripPreventer info_lbl)
-         else empty)
+    Just (Statics info_lbl _) ->
+      sdocWithPlatform $ \platform ->
+      (if platformHasSubsectionsViaSymbols platform
+          then pprSectionHeader Text $$
+               ppr (mkDeadStripPreventer info_lbl) <> char ':'
+          else empty) $$
+      vcat (map (pprBasicBlock top_info) blocks) $$
+         -- above: Even the first block gets a label, because with branch-chain
+         -- elimination, it might be the target of a goto.
+            (if platformHasSubsectionsViaSymbols platform
+             then
+             -- If we are using the .subsections_via_symbols directive
+             -- (available on recent versions of Darwin),
+             -- we have to make sure that there is some kind of reference
+             -- from the entry code to a label on the _top_ of of the info table,
+             -- so that the linker will not think it is unreferenced and dead-strip
+             -- it. That's why the label is called a DeadStripPreventer (_dsp).
+                      text "\t.long "
+                  <+> ppr info_lbl
+                  <+> char '-'
+                  <+> ppr (mkDeadStripPreventer info_lbl)
+             else empty)
 
 
-pprBasicBlock :: NatBasicBlock Instr -> SDoc
-pprBasicBlock (BasicBlock blockid instrs) =
-  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
-  vcat (map pprInstr instrs)
+pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock info_env (BasicBlock blockid instrs)
+  = maybe_infotable $$
+    pprLabel (mkAsmTempLabel (getUnique blockid)) $$
+    vcat (map pprInstr instrs)
+  where
+    maybe_infotable = case mapLookup blockid info_env of
+       Nothing   -> empty
+       Just (Statics info_lbl info) ->
+           pprSectionHeader Text $$
+           vcat (map pprData info) $$
+           pprLabel info_lbl
 
 
 pprDatas :: CmmStatics -> SDoc
@@ -330,7 +338,8 @@ pprSectionHeader seg
 -- | Pretty print a data item.
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
-  = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
+  = sdocWithDynFlags $ \dflags ->
+    vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit)
     where
         imm = litToImm lit
 
@@ -532,7 +541,7 @@ pprInstr (BF cond b blockid)
         ppr (mkAsmTempLabel (getUnique blockid))
     ]
 
-pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
+pprInstr (JMP addr) = ptext (sLit "\tjmp\t") <> pprAddr addr
 pprInstr (JMP_TBL op _ _)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)

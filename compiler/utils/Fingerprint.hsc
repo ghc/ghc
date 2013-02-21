@@ -8,7 +8,6 @@
 --
 -- ----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Fingerprint (
         Fingerprint(..), fingerprint0,
         readHexFingerprint,
@@ -19,15 +18,9 @@ module Fingerprint (
 #include "md5.h"
 ##include "HsVersions.h"
 
-import Outputable
-
-import Text.Printf
 import Numeric          ( readHex )
 
 import GHC.Fingerprint
-
-instance Outputable Fingerprint where
-  ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
 
 -- useful for parsing the output of 'md5sum', should we want to do that.
 readHexFingerprint :: String -> Fingerprint

@@ -11,7 +11,7 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.4
 
 Executable ghc-pkg
     Main-Is: Main.hs
@@ -19,8 +19,8 @@ Executable ghc-pkg
     Extensions: CPP, ForeignFunctionInterface, NondecreasingIndentation
 
     Build-Depends: base       >= 4   && < 5,
-                   directory  >= 1   && < 1.2,
-                   process    >= 1   && < 1.2,
+                   directory  >= 1   && < 1.3,
+                   process    >= 1   && < 1.3,
                    filepath,
                    Cabal,
                    binary,

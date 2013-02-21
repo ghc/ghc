@@ -21,7 +21,7 @@ import SPARC.Imm
 
 import CLabel
 import BlockId
-import OldCmm
+import Cmm
 
 import Panic
 import Unique

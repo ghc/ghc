@@ -23,7 +23,7 @@ sweep(generation *gen)
 {
     bdescr *bd, *prev, *next;
     nat i;
-    nat freed, resid, fragd, blocks, live;
+    W_ freed, resid, fragd, blocks, live;
     
     ASSERT(countBlocks(gen->old_blocks) == gen->n_old_blocks);
 

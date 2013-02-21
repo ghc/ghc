@@ -10,23 +10,24 @@ import qualified Data.Map as Map
 import Data.Tree
 
 overlay_options :: FlagOptSeq
-overlay_options 
+overlay_options
         = srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . outputOpt
 
 overlay_plugin :: Plugin
 overlay_plugin = Plugin { name = "overlay"
-	      	       , usage = "[OPTION] .. <OVERLAY_FILE> [<OVERLAY_FILE> [...]]" 
-		       , options = overlay_options 
-		       , summary = "Generate a .tix file from an overlay file"
-		       , implementation = overlay_main
-		       , init_flags = default_flags
-		       , final_flags = default_final_flags
-		       }
+                       , usage = "[OPTION] .. <OVERLAY_FILE> [<OVERLAY_FILE> [...]]"
+                       , options = overlay_options
+                       , summary = "Generate a .tix file from an overlay file"
+                       , implementation = overlay_main
+                       , init_flags = default_flags
+                       , final_flags = default_final_flags
+                       }
 
 overlay_main :: Flags -> [String] -> IO ()
-overlay_main _     [] = hpcError overlay_plugin $ "no overlay file specified" 
+overlay_main _     [] = hpcError overlay_plugin $ "no overlay file specified"
 overlay_main flags files = do
   specs <- mapM hpcParser files
   let (Spec globals modules) = concatSpec specs
@@ -35,8 +36,8 @@ overlay_main flags files = do
 
   mod_info <-
      sequence [ do mix@(Mix origFile _ _ _ _) <- readMixWithFlags flags (Left modu)
-	           content <- readFileFromPath (hpcError overlay_plugin) origFile (srcDirs flags)
-	           processModule modu content mix mod_spec globals
+                   content <- readFileFromPath (hpcError overlay_plugin) origFile (srcDirs flags)
+                   processModule modu content mix mod_spec globals
               | (modu, mod_spec) <- Map.toList modules1
               ]
 
@@ -48,12 +49,12 @@ overlay_main flags files = do
     out -> writeFile out (show tix)
 
 
-processModule :: String		-- ^ module name
-	      -> String		-- ^ module contents
-	      -> Mix		-- ^ mix entry for this module
-              -> [Tick] 	-- ^ local ticks
-              -> [ExprTick]	-- ^ global ticks
-              -> IO TixModule 
+processModule :: String         -- ^ module name
+              -> String         -- ^ module contents
+              -> Mix            -- ^ mix entry for this module
+              -> [Tick]         -- ^ local ticks
+              -> [ExprTick]     -- ^ global ticks
+              -> IO TixModule
 processModule modName modContents (Mix _ _ hash _ entries) locals globals = do
 
    let hsMap :: Map.Map Int String
@@ -76,8 +77,8 @@ processModule modName modContents (Mix _ _ hash _ entries) locals globals = do
        plzTick pos (ExpBox _) (TickExpression _ match q _)  =
                      qualifier pos q
                   && case match of
-			Nothing -> True
-			Just str -> str == grabHpcPos hsMap pos
+                        Nothing -> True
+                        Just str -> str == grabHpcPos hsMap pos
        plzTick _   _       _ = False
 
 
@@ -105,7 +106,7 @@ processModule modName modContents (Mix _ _ hash _ entries) locals globals = do
               ]
 
 
-   --    
+   --
    let forest2 = addParentToList [] $ forest
 --   putStrLn $ drawForest $ map (fmap show') $ forest2
 
@@ -136,14 +137,14 @@ qualifier :: HpcPos -> Maybe Qualifier -> Bool
 qualifier _   Nothing = True
 qualifier pos (Just (OnLine n)) = n == l1 && n == l2
   where (l1,_,l2,_) = fromHpcPos pos
-qualifier pos (Just (AtPosition l1' c1' l2' c2')) 
-	  = (l1', c1', l2', c2') == fromHpcPos pos
+qualifier pos (Just (AtPosition l1' c1' l2' c2'))
+          = (l1', c1', l2', c2') == fromHpcPos pos
 
 concatSpec :: [Spec] -> Spec
-concatSpec = foldr 
-	       (\ (Spec pre1 body1) (Spec pre2 body2) 
-		     -> Spec (pre1 ++ pre2) (body1 ++ body2))
-		(Spec [] [])
+concatSpec = foldr
+               (\ (Spec pre1 body1) (Spec pre2 body2)
+                     -> Spec (pre1 ++ pre2) (body1 ++ body2))
+                (Spec [] [])
 
 
 

@@ -36,7 +36,6 @@ import SPARC.Imm
 import SPARC.AddrMode
 import SPARC.Cond
 import SPARC.Regs
-import SPARC.RegPlate
 import SPARC.Base
 import TargetReg
 import Instruction
@@ -45,8 +44,10 @@ import Reg
 import Size
 
 import CLabel
+import CodeGen.Platform
 import BlockId
-import OldCmm
+import DynFlags
+import Cmm
 import FastString
 import FastBool
 import Outputable
@@ -107,6 +108,8 @@ instance Instruction Instr where
 	mkRegRegMoveInstr	= sparc_mkRegRegMoveInstr
 	takeRegRegMoveInstr	= sparc_takeRegRegMoveInstr
 	mkJumpInstr		= sparc_mkJumpInstr
+        mkStackAllocInstr       = panic "no sparc_mkStackAllocInstr"
+        mkStackDeallocInstr     = panic "no sparc_mkStackDeallocInstr"
 
 
 -- | SPARC instruction set.
@@ -221,8 +224,8 @@ data Instr
 -- 	consequences of control flow transfers, as far as register
 -- 	allocation goes, are taken care of by the register allocator.
 --
-sparc_regUsageOfInstr :: Instr -> RegUsage
-sparc_regUsageOfInstr instr 
+sparc_regUsageOfInstr :: Platform -> Instr -> RegUsage
+sparc_regUsageOfInstr platform instr
  = case instr of
     LD    _ addr reg  		-> usage (regAddr addr, 	[reg])
     ST    _ reg addr  		-> usage (reg : regAddr addr, 	[])
@@ -266,7 +269,8 @@ sparc_regUsageOfInstr instr
 
   where
     usage (src, dst) 
-     = RU (filter interesting src) (filter interesting dst)
+     = RU (filter (interesting platform) src)
+          (filter (interesting platform) dst)
 
     regAddr (AddrRegReg r1 r2)	= [r1, r2]
     regAddr (AddrRegImm r1 _)	= [r1]
@@ -277,12 +281,12 @@ sparc_regUsageOfInstr instr
 
 -- | Interesting regs are virtuals, or ones that are allocatable 
 --	by the register allocator.
-interesting :: Reg -> Bool
-interesting reg
+interesting :: Platform -> Reg -> Bool
+interesting platform reg
  = case reg of
 	RegVirtual _			-> True
-	RegReal (RealRegSingle r1)	-> isFastTrue (freeReg r1)
-	RegReal (RealRegPair r1 _)	-> isFastTrue (freeReg r1)
+	RegReal (RealRegSingle r1)	-> isFastTrue (freeReg platform r1)
+	RegReal (RealRegPair r1 _)	-> isFastTrue (freeReg platform r1)
 
 
 
@@ -371,15 +375,16 @@ sparc_patchJumpInstr insn patchF
 -- | Make a spill instruction.
 -- 	On SPARC we spill below frame pointer leaving 2 words/spill
 sparc_mkSpillInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- ^ register to spill
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkSpillInstr platform reg _ slot
- = let	off     = spillSlotToOffset slot
-        off_w	= 1 + (off `div` 4)
+sparc_mkSpillInstr dflags reg _ slot
+ = let  platform = targetPlatform dflags
+        off      = spillSlotToOffset dflags slot
+        off_w    = 1 + (off `div` 4)
         sz 	= case targetClassOfReg platform reg of
 			RcInteger -> II32
 			RcFloat   -> FF32
@@ -391,14 +396,15 @@ sparc_mkSpillInstr platform reg _ slot
 
 -- | Make a spill reload instruction.
 sparc_mkLoadInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- ^ register to load into
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkLoadInstr platform reg _ slot
-  = let off     = spillSlotToOffset slot
+sparc_mkLoadInstr dflags reg _ slot
+  = let platform = targetPlatform dflags
+        off      = spillSlotToOffset dflags slot
 	off_w	= 1 + (off `div` 4)
         sz	= case targetClassOfReg platform reg of
 			RcInteger -> II32

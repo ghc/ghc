@@ -75,8 +75,9 @@ typedef struct generation_ {
 
     bdescr *       large_objects;	// large objects (doubly linked)
     memcount       n_large_blocks;      // no. of blocks used by large objs
+    memcount       n_large_words;       // no. of words used by large objs
     memcount       n_new_large_words;   // words of new large objects
-                                        // (for allocation stats)
+                                        // (for doYouWantToGC())
 
     memcount       max_blocks;          // max blocks
 
@@ -124,13 +125,13 @@ extern generation * oldest_gen;
 /* -----------------------------------------------------------------------------
    Generic allocation
 
-   StgPtr allocate(Capability *cap, nat n)
+   StgPtr allocate(Capability *cap, W_ n)
                                 Allocates memory from the nursery in
 				the current Capability.  This can be
 				done without taking a global lock,
                                 unlike allocate().
 
-   StgPtr allocatePinned(Capability *cap, nat n) 
+   StgPtr allocatePinned(Capability *cap, W_ n)
                                 Allocates a chunk of contiguous store
    				n words long, which is at a fixed
 				address (won't be moved by GC).  
@@ -149,15 +150,15 @@ extern generation * oldest_gen;
 
    -------------------------------------------------------------------------- */
 
-StgPtr  allocate        ( Capability *cap, lnat n );
-StgPtr  allocatePinned  ( Capability *cap, lnat n );
+StgPtr  allocate        ( Capability *cap, W_ n );
+StgPtr  allocatePinned  ( Capability *cap, W_ n );
 
 /* memory allocator for executable memory */
-void * allocateExec(unsigned int len, void **exec_addr);
+void * allocateExec(W_ len, void **exec_addr);
 void   freeExec (void *p);
 
 // Used by GC checks in external .cmm code:
-extern nat large_alloc_lim;
+extern W_ large_alloc_lim;
 
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection

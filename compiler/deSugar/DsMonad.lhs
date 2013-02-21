@@ -9,14 +9,13 @@
 module DsMonad (
         DsM, mapM, mapAndUnzipM,
         initDs, initDsTc, fixDs,
-        foldlM, foldrM, ifDOptM, unsetDOptM, unsetWOptM,
+        foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM,
         Applicative(..),(<$>),
 
         newLocalName,
         duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
         newFailLocalDs, newPredVarDs,
         getSrcSpanDs, putSrcSpanDs,
-        getModuleDs,
         mkPrintUnqualifiedDs,
         newUnique, 
         UniqSupply, newUniqueSupply,
@@ -167,6 +166,9 @@ data DsGblEnv
         , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
         }
 
+instance ContainsModule DsGblEnv where
+    extractModule = ds_mod
+
 data DsLclEnv = DsLclEnv {
         ds_meta    :: DsMetaEnv,        -- Template Haskell bindings
         ds_loc     :: SrcSpan           -- to put in pattern-matching error msgs
@@ -220,7 +222,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
     --   * 'Data.Array.Parallel.Prim' iff '-fvectorise' specified.
     loadDAP thing_inside
       = do { dapEnv  <- loadOneModule dATA_ARRAY_PARALLEL_NAME      checkLoadDAP          paErr
-           ; dappEnv <- loadOneModule dATA_ARRAY_PARALLEL_PRIM_NAME (doptM Opt_Vectorise) veErr
+           ; dappEnv <- loadOneModule dATA_ARRAY_PARALLEL_PRIM_NAME (goptM Opt_Vectorise) veErr
            ; updGblEnv (\env -> env {ds_dph_env = dapEnv `plusOccEnv` dappEnv }) thing_inside
            }
       where
@@ -348,9 +350,6 @@ the @SrcSpan@ being carried around.
 \begin{code}
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
-
-getModuleDs :: DsM Module
-getModuleDs = do { env <- getGblEnv; return (ds_mod env) }
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv; return (ds_loc env) }

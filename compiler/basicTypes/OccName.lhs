@@ -109,12 +109,12 @@ module OccName (
 import Util
 import Unique
 import BasicTypes
+import DynFlags
 import UniqFM
 import UniqSet
 import FastString
 import Outputable
 import Binary
-import StaticFlags( opt_SuppressUniques )
 import Data.Char
 import Data.Data
 \end{code}
@@ -271,8 +271,10 @@ pprOccName (OccName sp occ)
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
 	         | otherwise      = empty
 
-    pp_occ | opt_SuppressUniques = text (strip_th_unique (unpackFS occ))
-           | otherwise           = ftext occ
+    pp_occ = sdocWithDynFlags $ \dflags ->
+             if gopt Opt_SuppressUniques dflags
+             then text (strip_th_unique (unpackFS occ))
+             else ftext occ
 
 	-- See Note [Suppressing uniques in OccNames]
     strip_th_unique ('[' : c : _) | isAlphaNum c = []
@@ -756,29 +758,54 @@ There's a wrinkle for operators.  Consider '>>='.  We can't use '>>=1'
 because that isn't a single lexeme.  So we encode it to 'lle' and *then*
 tack on the '1', if necessary.
 
+Note [TidyOccEnv]
+~~~~~~~~~~~~~~~~~
+type TidyOccEnv = UniqFM Int
+
+* Domain = The OccName's FastString. These FastStrings are "taken";
+           make sure that we don't re-use
+
+* Int, n = A plausible starting point for new guesses
+           There is no guarantee that "FSn" is available; 
+           you must look that up in the TidyOccEnv.  But
+           it's a good place to start looking.
+
+* When looking for a renaming for "foo2" we strip off the "2" and start
+  with "foo".  Otherwise if we tidy twice we get silly names like foo23.
+
 \begin{code}
-type TidyOccEnv = OccEnv Int	-- The in-scope OccNames
-	-- Range gives a plausible starting point for new guesses
+type TidyOccEnv = UniqFM Int	-- The in-scope OccNames
+  -- See Note [TidyOccEnv]
 
 emptyTidyOccEnv :: TidyOccEnv
-emptyTidyOccEnv = emptyOccEnv
+emptyTidyOccEnv = emptyUFM
 
 initTidyOccEnv :: [OccName] -> TidyOccEnv	-- Initialise with names to avoid!
-initTidyOccEnv = foldl (\env occ -> extendOccEnv env occ 1) emptyTidyOccEnv
+initTidyOccEnv = foldl add emptyUFM
+  where
+    add env (OccName _ fs) = addToUFM env fs 1
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
-
-tidyOccName in_scope occ@(OccName occ_sp fs)
-  = case lookupOccEnv in_scope occ of
-	Nothing -> 	-- Not already used: make it used
-		   (extendOccEnv in_scope occ 1, occ)
-
-	Just n  -> 	-- Already used: make a new guess, 
-			-- change the guess base, and try again
-		   tidyOccName  (extendOccEnv in_scope occ (n+1))
-                                (mkOccName occ_sp (base_occ ++ show n))
+tidyOccName env occ@(OccName occ_sp fs)
+  = case lookupUFM env fs of
+	Just n  -> find n
+	Nothing -> (addToUFM env fs 1, occ)
   where
-    base_occ = reverse (dropWhile isDigit (reverse (unpackFS fs)))
+    base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
+    base = reverse (dropWhile isDigit (reverse (unpackFS fs)))
+ 
+    find n 
+      = case lookupUFM env new_fs of
+          Just n' -> find (n1 `max` n')
+                     -- The max ensures that n increases, avoiding loops
+          Nothing -> (addToUFM (addToUFM env fs n1) new_fs n1,
+                      OccName occ_sp new_fs)
+                     -- We update only the beginning and end of the
+                     -- chain that find explores; it's a little harder to
+                     -- update the middle and there's no real need.
+       where
+         n1 = n+1
+         new_fs = mkFastString (base ++ show n)
 \end{code}
 
 %************************************************************************

@@ -86,7 +86,7 @@
           <row>
             <entry><option>-ferror-spans</option></entry>
             <entry>output full span in error messages</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -460,8 +460,9 @@
         <tbody>
           <row>
             <entry><option>-fforce-recomp</option></entry>
-            <entry>Turn off recompilation checking; implied by any
-              <option>-ddump-X</option> option</entry>
+            <entry>Turn off recompilation checking. This is implied by any
+              <option>-ddump-X</option> option when compiling a single
+              file (i.e. when using <literal>-c</literal>).</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-force-recomp</option></entry>
           </row>
@@ -509,6 +510,12 @@
             <entry><link linkend="ghci-debugger-exceptions">Break on uncaught exceptions and errors</link></entry>
             <entry>dynamic</entry>
             <entry><option>-fno-break-on-error</option></entry>
+          </row>
+          <row>
+            <entry><option>-fghci-hist-size=<replaceable>n</replaceable></option></entry>
+            <entry><link linkend="ghci-debugger">Set the number of entries GHCi keeps for <literal>:history</literal></link></entry>
+            <entry>dynamic</entry>
+            <entry><option>(default is 50)</option></entry>
           </row>
           <row>
             <entry><option>-fprint-evld-with-show</option></entry>
@@ -632,7 +639,7 @@
           </row>
           <row>
             <entry><option>-no-auto-link-packages</option></entry>
-            <entry>Don't automatically link in the haskell98 package.</entry>
+            <entry>Don't automatically link in the base and rts packages.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
@@ -783,12 +790,6 @@
             <entry><option>-XTraditionalRecordSyntax</option></entry>
           </row>
           <row>
-            <entry><option>-XNoMonoPatBinds</option></entry>
-            <entry>Make <link linkend="monomorphism">pattern bindings polymorphic</link></entry>
-            <entry>dynamic</entry>
-            <entry><option>-XMonoPatBinds</option></entry>
-          </row>
-          <row>
             <entry><option>-XRelaxedPolyRec</option></entry>
             <entry>Relaxed checking for <link linkend="typing-binds">mutually-recursive polymorphic functions</link></entry>
             <entry>dynamic</entry>
@@ -806,6 +807,13 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoOverloadedStrings</option></entry>
+          </row>
+          <row>
+            <entry><option>-XOverloadedLists</option></entry>
+            <entry>Enable <link linkend="overloaded-lists">overloaded lists</link>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoOverloadedLists</option></entry>
           </row>
           <row>
             <entry><option>-XGADTs</option></entry>
@@ -856,6 +864,7 @@
           <row>
             <entry><option>-XMonoLocalBinds</option></entry>
             <entry>Enable <link linkend="mono-local-binds">do not generalise local bindings</link>.
+              Implied by <option>-XTypeFamilies</option> and <option>-XGADTs</option>.
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMonoLocalBinds</option></entry>
@@ -914,9 +923,7 @@
             <entry>Enable <link linkend="explicit-foralls">explicit universal quantification</link>.
               Implied by <option>-XScopedTypeVariables</option>,
               <option>-XLiberalTypeSynonyms</option>,
-              <option>-XRank2Types</option>,
               <option>-XRankNTypes</option>,
-              <option>-XPolymorphicComponents</option>,
               <option>-XExistentialQuantification</option>
             </entry>
             <entry>dynamic</entry>
@@ -925,13 +932,13 @@
           <row>
             <entry><option>-XPolymorphicComponents</option></entry>
             <entry>Enable <link linkend="universal-quantification">polymorphic components for data constructors</link>.</entry>
-            <entry>dynamic</entry>
+            <entry>dynamic, synonym for <option>-XRankNTypes</option></entry>
             <entry><option>-XNoPolymorphicComponents</option></entry>
           </row>
           <row>
             <entry><option>-XRank2Types</option></entry>
             <entry>Enable <link linkend="universal-quantification">rank-2 types</link>.</entry>
-            <entry>dynamic</entry>
+            <entry>dynamic, synonym for <option>-XRankNTypes</option></entry>
             <entry><option>-XNoRank2Types</option></entry>
           </row>
           <row>
@@ -1061,6 +1068,12 @@
             <entry><option>-XNoDeriveDataTypeable</option></entry>
           </row>
           <row>
+            <entry><option>-XAutoDeriveTypeable</option></entry>
+            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoAutoDeriveTypeable</option></entry>
+          </row>
+          <row>
             <entry><option>-XDeriveGeneric</option></entry>
             <entry>Enable <link linkend="deriving-typeable">deriving for the Generic class</link>.</entry>
             <entry>dynamic</entry>
@@ -1157,6 +1170,12 @@
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
+          <row>
+            <entry><option>-XTypeHoles</option></entry>
+            <entry>Enable <link linkend="type-holes">holes</link> in expressions.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-</option></entry>
+          </row>
         </tbody>
       </tgroup>
     </informaltable>
@@ -1228,6 +1247,13 @@
             <entry>warn about uses of commandline flags that are deprecated</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-deprecated-flags</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-duplicate-constraints</option></entry>
+            <entry>warn when a constraint appears duplicated in a type signature</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-duplicate-constraints</option></entry>
           </row>
 
           <row>
@@ -1434,6 +1460,14 @@
             <entry><option>-fno-warn-warnings-deprecations</option></entry>
           </row>
 
+          <row>
+            <entry><option>-fwarn-typeable-instances</option></entry>
+            <entry>warn if there are any handwritten <literal>Typeable</literal>
+                   instances (see <xref linkend="deriving-typeable"/>)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-typeable-instances</option></entry>
+          </row>
+
         </tbody>
       </tgroup>
     </informaltable>
@@ -1613,7 +1647,7 @@
             <entry><option>-fmax-worker-args</option></entry>
             <entry>If a worker has that many arguments, none will be
               unpacked anymore (default: 10)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
 
@@ -1627,7 +1661,7 @@
           <row>
             <entry><option>-fno-pre-inlining</option></entry>
             <entry>Turn off pre-inlining</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
 
@@ -1730,30 +1764,38 @@
           </row>
 
           <row>
+            <entry><option>-funbox-small-strict-fields</option></entry>
+            <entry>Flatten strict constructor fields with a
+              pointer-sized representation</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-unbox-small-strict-fields</option></entry>
+          </row>
+
+          <row>
             <entry><option>-funfolding-creation-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-creation-threshold</option></entry>
           </row>
 
           <row>
             <entry><option>-funfolding-fun-discount</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-fun-discount</option></entry>
           </row>
 
           <row>
             <entry><option>-funfolding-keeness-factor</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-keeness-factor</option></entry>
           </row>
 
           <row>
             <entry><option>-funfolding-use-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-use-threshold</option></entry>
           </row>
 
@@ -1847,7 +1889,7 @@
           <row>
             <entry><option>-fhpc</option></entry>
             <entry>Turn on Haskell program coverage instrumentation</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
           <row>
@@ -2742,44 +2784,44 @@
           </row>
           <row>
             <entry><option>-dsuppress-all</option></entry>
-            <entry>In core dumps, suppress everything that is suppressable.</entry>
-            <entry>static</entry>
+            <entry>In core dumps, suppress everything (except for uniques) that is suppressable.</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dsuppress-uniques</option></entry>
             <entry>Suppress the printing of uniques in debug output (easier to use <command>diff</command>)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dsuppress-idinfo</option></entry>
             <entry>Suppress extended information about identifiers where they are bound</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dsuppress-module-prefixes</option></entry>
             <entry>Suppress the printing of module qualification prefixes</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dsuppress-type-signatures</option></entry>
             <entry>Suppress type signatures</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dsuppress-type-applications</option></entry>
             <entry>Suppress type applications</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dsuppress-coercions</option></entry>
             <entry>Suppress the printing of coercions in Core dumps to make them shorter</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -2864,7 +2906,7 @@
           <row>
             <entry><option>-fhistory-size</option></entry>
             <entry>Set simplification history size</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

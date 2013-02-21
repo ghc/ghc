@@ -21,12 +21,11 @@ import Var
 import Id
 import Type		( Type )
 import IdInfo
-import Demand
 import UniqSupply
 import BasicTypes
 import DynFlags
 import VarEnv		( isEmptyVarEnv )
-import Maybes		( orElse )
+import Demand
 import WwLib
 import Util
 import Outputable
@@ -258,14 +257,14 @@ tryWW dflags is_rec fn_id rhs
 	-- Furthermore, don't even expose strictness info
   = return [ (fn_id, rhs) ]
 
-  | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
+  | is_thunk && worthSplittingThunk fn_dmd res_info
   	-- See Note [Thunk splitting]
   = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
-    checkSize new_fn_id rhs $ 
+    checkSize dflags new_fn_id rhs $ 
     splitThunk dflags new_fn_id rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
-  = checkSize new_fn_id rhs $
+  = checkSize dflags new_fn_id rhs $
     splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
 
   | otherwise
@@ -273,12 +272,12 @@ tryWW dflags is_rec fn_id rhs
 
   where
     fn_info   	 = idInfo fn_id
-    maybe_fn_dmd = demandInfo fn_info
+    fn_dmd       = demandInfo fn_info
     inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
 
 	-- In practice it always will have a strictness 
 	-- signature, even if it's a uninformative one
-    strict_sig  = strictnessInfo fn_info `orElse` topSig
+    strict_sig  = strictnessInfo fn_info
     StrictSig (DmdType env wrap_dmds res_info) = strict_sig
 
 	-- new_fn_id has the DmdEnv zapped.  
@@ -294,9 +293,9 @@ tryWW dflags is_rec fn_id rhs
     is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
-checkSize :: Id -> CoreExpr
+checkSize :: DynFlags -> Id -> CoreExpr
 	  -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
-checkSize fn_id rhs thing_inside
+checkSize dflags fn_id rhs thing_inside
   | isStableUnfolding (realIdUnfolding fn_id)
   = return [ (fn_id, rhs) ]
       -- See Note [Don't w/w INLINE things]
@@ -304,7 +303,7 @@ checkSize fn_id rhs thing_inside
       -- NB: use realIdUnfolding because we want to see the unfolding
       --     even if it's a loop breaker!
 
-  | certainlyWillInline (idUnfolding fn_id)
+  | certainlyWillInline dflags (idUnfolding fn_id)
   = return [ (fn_id `setIdUnfolding` inline_rule, rhs) ]
 	-- Note [Don't w/w inline small non-loop-breaker things]
 	-- NB: use idUnfolding because we don't want to apply
@@ -376,8 +375,8 @@ splitFun dflags fn_id fn_info wrap_dmds res_info rhs
     		    -- The arity is set by the simplifier using exprEtaExpandArity
 		    -- So it may be more than the number of top-level-visible lambdas
 
-    work_res_info | isBotRes res_info = BotRes	-- Cpr stuff done by wrapper
-		  | otherwise	      = TopRes
+    work_res_info | isBotRes res_info = botRes	-- Cpr stuff done by wrapper
+		  | otherwise	      = topRes
 
     one_shots = get_one_shots rhs
 
@@ -447,51 +446,6 @@ splitThunk dflags fn_id rhs = do
     (_, wrap_fn, work_fn) <- mkWWstr dflags [fn_id]
     return [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Functions over Demands}
-%*									*
-%************************************************************************
-
-\begin{code}
-worthSplittingFun :: [Demand] -> DmdResult -> Bool
-		-- True <=> the wrapper would not be an identity function
-worthSplittingFun ds res
-  = any worth_it ds || returnsCPR res
-	-- worthSplitting returns False for an empty list of demands,
-	-- and hence do_strict_ww is False if arity is zero and there is no CPR
-  -- See Note [Worker-wrapper for bottoming functions]
-  where
-    worth_it Abs	      = True	-- Absent arg
-    worth_it (Eval (Prod _)) = True	-- Product arg to evaluate
-    worth_it _    	      = False
-
-worthSplittingThunk :: Maybe Demand	-- Demand on the thunk
-		    -> DmdResult	-- CPR info for the thunk
-		    -> Bool
-worthSplittingThunk maybe_dmd res
-  = worth_it maybe_dmd || returnsCPR res
-  where
-	-- Split if the thing is unpacked
-    worth_it (Just (Eval (Prod ds))) = not (all isAbsent ds)
-    worth_it _    	   	     = False
-\end{code}
-
-Note [Worker-wrapper for bottoming functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used not to split if the result is bottom.
-[Justification:  there's no efficiency to be gained.]
-
-But it's sometimes bad not to make a wrapper.  Consider
-	fw = \x# -> let x = I# x# in case e of
-					p1 -> error_fn x
-					p2 -> error_fn x
-					p3 -> the real stuff
-The re-boxing code won't go away unless error_fn gets a wrapper too.
-[We don't do reboxing now, but in general it's better to pass an
-unboxed thing to f, and have it reboxed in the error cases....]
 
 
 %************************************************************************

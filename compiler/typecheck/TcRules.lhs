@@ -26,7 +26,6 @@ import TcEnv
 import TcEvidence( TcEvBinds(..) )
 import Type
 import Id
-import NameEnv( emptyNameEnv )
 import Name
 import Var
 import VarSet
@@ -139,10 +138,10 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 
     	-- Note [Typechecking rules]
        ; vars <- tcRuleBndrs hs_bndrs
-       ; let (id_bndrs, tv_bndrs) = partition (isId . snd) vars
+       ; let (id_bndrs, tv_bndrs) = partition isId vars
        ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
-            <- tcExtendTyVarEnv2 tv_bndrs $
-               tcExtendIdEnv2    id_bndrs $
+            <- tcExtendTyVarEnv tv_bndrs $
+               tcExtendIdEnv    id_bndrs $
                do { ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
                   ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
@@ -161,7 +160,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 	-- the LHS, lest they otherwise get defaulted to Any; but we do that
 	-- during zonking (see TcHsSyn.zonkRule)
 
-       ; let tpl_ids    = lhs_evs ++ map snd id_bndrs
+       ; let tpl_ids    = lhs_evs ++ id_bndrs
              forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
        ; zonked_forall_tvs <- zonkTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
@@ -178,54 +177,61 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                   ])
 
            -- Simplify the RHS constraints
-       ; loc           <- getCtLoc (RuleSkol name)
+       ; lcl_env <- getLclEnv
        ; rhs_binds_var <- newTcEvBinds
-       ; emitImplication $ Implic { ic_untch  = NoUntouchables
-                                  , ic_env    = emptyNameEnv
+       ; emitImplication $ Implic { ic_untch  = noUntouchables
                                   , ic_skols  = qtkvs
+                                  , ic_fsks   = []
                                   , ic_given  = lhs_evs
                                   , ic_wanted = rhs_wanted
                                   , ic_insol  = insolubleWC rhs_wanted
                                   , ic_binds  = rhs_binds_var
-                                  , ic_loc    = loc } 
+                                  , ic_info   = RuleSkol name
+                                  , ic_env    = lcl_env } 
 
            -- For the LHS constraints we must solve the remaining constraints
            -- (a) so that we report insoluble ones
            -- (b) so that we bind any soluble ones
        ; lhs_binds_var <- newTcEvBinds
-       ; emitImplication $ Implic { ic_untch  = NoUntouchables
-                                  , ic_env    = emptyNameEnv
+       ; emitImplication $ Implic { ic_untch  = noUntouchables
                                   , ic_skols  = qtkvs
+                                  , ic_fsks   = []
                                   , ic_given  = lhs_evs
                                   , ic_wanted = other_lhs_wanted
                                   , ic_insol  = insolubleWC other_lhs_wanted
                                   , ic_binds  = lhs_binds_var
-                                  , ic_loc    = loc } 
+                                  , ic_info   = RuleSkol name
+                                  , ic_env    = lcl_env } 
 
        ; return (HsRule name act
 		    (map (RuleBndr . noLoc) (qtkvs ++ tpl_ids))
 		    (mkHsDictLet (TcEvBinds lhs_binds_var) lhs') fv_lhs
 		    (mkHsDictLet (TcEvBinds rhs_binds_var) rhs') fv_rhs) }
 
-tcRuleBndrs :: [RuleBndr Name] -> TcM [(Name, Var)]
+tcRuleBndrs :: [RuleBndr Name] -> TcM [Var]
 tcRuleBndrs [] 
   = return []
 tcRuleBndrs (RuleBndr (L _ name) : rule_bndrs)
   = do 	{ ty <- newFlexiTyVarTy openTypeKind
         ; vars <- tcRuleBndrs rule_bndrs
-	; return ((name, mkLocalId name ty) : vars) }
+	; return (mkLocalId name ty : vars) }
 tcRuleBndrs (RuleBndrSig (L _ name) rn_ty : rule_bndrs)
 --  e.g 	x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --		a::*, x :: a->a
   = do	{ let ctxt = RuleSigCtxt name
-	; (id_ty, skol_tvs) <- tcHsPatSigType ctxt rn_ty
-        ; let id = mkLocalId name id_ty
+	; (id_ty, tv_prs) <- tcHsPatSigType ctxt rn_ty
+        ; let id  = mkLocalId name id_ty
+              tvs = map snd tv_prs   
+                    -- tcHsPatSigType returns (Name,TyVar) pairs
+                    -- for for RuleSigCtxt their Names are not
+                    -- cloned, so we get (n, tv-with-name-n) pairs
+                    -- See Note [Pattern signature binders] in TcHsType
 
 	      -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendTyVarEnv2 skol_tvs $ 
+        ; vars <- tcExtendTyVarEnv tvs $ 
                   tcRuleBndrs rule_bndrs 
-	; return (skol_tvs ++ (name, id) : vars) }
+	; return (tvs ++ id : vars) }
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 

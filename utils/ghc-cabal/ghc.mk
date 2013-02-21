@@ -28,8 +28,9 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/C
 $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) --make $(GHC_CABAL_DIR)/Main.hs -o $@ \
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
-	       -Wall \
+	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
+	       -DBOOTSTRAPPING \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
 	       -ilibraries/Cabal/Cabal \
@@ -54,6 +55,7 @@ $(GHC_CABAL_DIR)_USES_CABAL                   = YES
 $(GHC_CABAL_DIR)_PACKAGE                      = ghc-cabal
 $(GHC_CABAL_DIR)_dist-install_PROG            = ghc-cabal$(exeext)
 $(GHC_CABAL_DIR)_dist-install_INSTALL_INPLACE = NO
+$(GHC_CABAL_DIR)_dist-install_WANT_BINDIST_WRAPPER = YES
 $(GHC_CABAL_DIR)_dist-install_MODULES         = Main
 
 $(eval $(call build-prog,utils/ghc-cabal,dist-install,1))

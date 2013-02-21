@@ -514,17 +514,6 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
       </listitem>
 
       <listitem>
-	<para>GHC does not keep careful track of
-	    what instance declarations are 'in scope' if they come from other packages.
-        Instead, all instance declarations that GHC has seen in other
-        packages are all in scope everywhere, whether or not the
-        module from that package is used by the command-line
-        expression.  This bug affects only the <option>--make</option> mode and
-	  GHCi.</para>
-      </listitem>
-
-
-      <listitem>
         <para>On 32-bit x86 platforms when using the native code
         generator, the
         <option>-fexcess-precision</option><indexterm><primary><option>-fexcess-precision</option></primary></indexterm> option
@@ -587,6 +576,17 @@ Loading package javavm ... linking ... WARNING: Overflown relocation field (# re
       <para>The workaround is to split up the .o files that make up
       your package into two or more .o's, along the lines of
       how the "base" package does it.</para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHCi does not keep careful track of what instance
+          declarations are 'in scope' if they come from other
+          packages.  Instead, all instance declarations that GHC has
+          seen in other packages are all available at the prompt,
+          whether or not the instance really ought to be in visible
+          given the current set of modules in scope.
+        </para>
       </listitem>
     </itemizedlist>
   </sect2>

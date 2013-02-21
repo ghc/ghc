@@ -22,8 +22,7 @@
 //
 // Creating threads
 //
-
-StgTSO *createThread (Capability *cap, nat stack_size);
+StgTSO *createThread (Capability *cap, W_ stack_size);
 
 void scheduleWaitThread (/* in    */ StgTSO *tso,
                          /* out   */ HaskellObj* ret,
@@ -32,11 +31,11 @@ void scheduleWaitThread (/* in    */ StgTSO *tso,
 
 void pushClosure (StgTSO *tso, StgWord c);
 
-StgTSO *createGenThread       (Capability *cap, nat stack_size,
+StgTSO *createGenThread       (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
-StgTSO *createIOThread        (Capability *cap, nat stack_size,
+StgTSO *createIOThread        (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
-StgTSO *createUserLevelThread (Capability *cap, nat stack_size,
+StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
 StgTSO *createStrictIOThread  (Capability *cap, nat stack_size,
 			       StgClosure *closure);
@@ -68,6 +67,9 @@ HsBool rtsSupportsBoundThreads (void);
 
 // The number of Capabilities
 extern unsigned int n_capabilities;
+
+// The number of Capabilities that are not disabled
+extern nat enabled_capabilities;
 
 #if !IN_STG_CODE
 extern Capability MainCapability;

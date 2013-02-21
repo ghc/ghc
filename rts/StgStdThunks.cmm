@@ -11,6 +11,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Cmm.h"
+#include "Updates.h"
 
 /* -----------------------------------------------------------------------------
    The code for a thunk that simply extracts a field from a
@@ -26,17 +27,12 @@
    matching.
    -------------------------------------------------------------------------- */
 
-#define WITHUPD_FRAME_SIZE  (SIZEOF_StgUpdateFrame + SIZEOF_StgHeader)
-#define NOUPD_FRAME_SIZE    (SIZEOF_StgHeader)
-
 #ifdef PROFILING
-#define SAVE_CCCS(fs)   StgHeader_ccs(Sp-fs) = CCCS
-#define GET_SAVED_CCCS  CCCS = StgHeader_ccs(Sp)
-#define RET_PARAMS      W_ unused1, W_ unused2
+#define SAVE_CCS        W_ saved_ccs; saved_ccs = CCCS;
+#define RESTORE_CCS     CCCS = saved_ccs;
 #else
-#define SAVE_CCCS(fs)   /* empty */
-#define GET_SAVED_CCCS  /* empty */
-#define RET_PARAMS
+#define SAVE_CCS        /* nothing */
+#define RESTORE_CCS     /* nothing */
 #endif
 
 /*
@@ -56,42 +52,36 @@
 // When profiling, we cannot shortcut by checking the tag,
 // because LDV profiling relies on entering closures to mark them as
 // "used".
-#define SEL_ENTER(offset)                       \
-      R1 = UNTAG(R1);                           \
-      jump %GET_ENTRY(R1);
+#define NEED_EVAL(__x__) 1
 #else
-#define SEL_ENTER(offset)                               \
-      if (GETTAG(R1) != 0) {                            \
-          jump RET_LBL(stg_sel_ret_##offset##_upd);     \
-      }                                                 \
-      jump %GET_ENTRY(R1);
+#define NEED_EVAL(__x__) GETTAG(__x__) == 0
 #endif
 
 #define SELECTOR_CODE_UPD(offset)                                       \
-  INFO_TABLE_RET(stg_sel_ret_##offset##_upd, RET_SMALL, RET_PARAMS)	\
-  {									\
-      R1 = StgClosure_payload(UNTAG(R1),offset);			\
-      GET_SAVED_CCCS;							\
-      Sp = Sp + SIZEOF_StgHeader;					\
-      ENTER();								\
-  }									\
-									\
   INFO_TABLE_SELECTOR(stg_sel_##offset##_upd, offset, THUNK_SELECTOR, "stg_sel_upd", "stg_sel_upd") \
-  {									\
-      TICK_ENT_DYN_THK();						\
-      STK_CHK_NP(WITHUPD_FRAME_SIZE);					\
-      UPD_BH_UPDATABLE();						\
-      LDV_ENTER(R1);							\
-      PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);			\
-      ENTER_CCS_THUNK(R1);						\
-      SAVE_CCCS(WITHUPD_FRAME_SIZE);					\
-      W_[Sp-WITHUPD_FRAME_SIZE] = stg_sel_ret_##offset##_upd_info;	\
-      Sp = Sp - WITHUPD_FRAME_SIZE;					\
-      R1 = StgThunk_payload(R1,0);				        \
-      SEL_ENTER(offset);                                                \
+      (P_ node)                                                         \
+  {                                                                     \
+      P_ selectee, field;                                               \
+      TICK_ENT_DYN_THK();                                               \
+      STK_CHK_NP(node);                                                 \
+      UPD_BH_UPDATABLE(node);                                           \
+      LDV_ENTER(node);                                                  \
+      selectee = StgThunk_payload(node,0);                              \
+      push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info,CCCS,0,node)) {    \
+        ENTER_CCS_THUNK(node);                                          \
+        if (NEED_EVAL(selectee)) {                                      \
+          SAVE_CCS;                                                     \
+          (P_ constr) = call %GET_ENTRY(UNTAG_IF_PROF(selectee)) (selectee); \
+          RESTORE_CCS;                                                  \
+          selectee = constr;                                            \
+        }                                                               \
+        field = StgClosure_payload(UNTAG(selectee),offset);             \
+        jump stg_ap_0_fast(field);                                      \
+     }                                                                  \
   }
-  /* NOTE: no need to ENTER() here, we know the closure cannot evaluate to a function,
-     because we're going to do a field selection on the result. */
+  /* NOTE: no need to ENTER() here, we know the closure cannot
+     evaluate to a function, because we're going to do a field
+     selection on the result. */
 
 SELECTOR_CODE_UPD(0)
 SELECTOR_CODE_UPD(1)
@@ -110,32 +100,28 @@ SELECTOR_CODE_UPD(13)
 SELECTOR_CODE_UPD(14)
 SELECTOR_CODE_UPD(15)
 
-#define SELECTOR_CODE_NOUPD(offset) \
-  INFO_TABLE_RET(stg_sel_ret_##offset##_noupd, RET_SMALL, RET_PARAMS)	\
-  {									\
-      R1 = StgClosure_payload(UNTAG(R1),offset);			\
-      GET_SAVED_CCCS;							\
-      Sp = Sp + SIZEOF_StgHeader;					\
-      ENTER();								\
-  }									\
-									\
-  INFO_TABLE_SELECTOR(stg_sel_##offset##_noupd, offset, THUNK_SELECTOR, "stg_sel_noupd", "stg_sel_noupd")\
-  {									\
-      TICK_ENT_DYN_THK();						\
-      STK_CHK_NP(NOUPD_FRAME_SIZE);					\
-      UPD_BH_SINGLE_ENTRY();						\
-      LDV_ENTER(R1);							\
-      TICK_UPDF_OMITTED();						\
-      ENTER_CCS_THUNK(R1);						\
-      SAVE_CCCS(NOUPD_FRAME_SIZE);					\
-      W_[Sp-NOUPD_FRAME_SIZE] = stg_sel_ret_##offset##_noupd_info;	\
-      Sp = Sp - NOUPD_FRAME_SIZE;					\
-      R1 = StgThunk_payload(R1,0);					\
-      if (GETTAG(R1) != 0) {                                            \
-          jump RET_LBL(stg_sel_ret_##offset##_noupd);		        \
+
+#define SELECTOR_CODE_NOUPD(offset)                                     \
+  INFO_TABLE_SELECTOR(stg_sel_##offset##_noupd, offset, THUNK_SELECTOR, "stg_sel_noupd", "stg_sel_noupd") \
+      (P_ node)                                                         \
+  {                                                                     \
+      P_ selectee, field;                                               \
+      TICK_ENT_DYN_THK();                                               \
+      STK_CHK_NP(node);                                                 \
+      UPD_BH_UPDATABLE(node);                                           \
+      LDV_ENTER(node);                                                  \
+      selectee = StgThunk_payload(node,0);                              \
+      if (NEED_EVAL(selectee)) {                                        \
+          ENTER_CCS_THUNK(node);                                        \
+          SAVE_CCS;                                                     \
+          (P_ constr) = call %GET_ENTRY(selectee) (selectee);           \
+          RESTORE_CCS;                                                  \
+          selectee = constr;                                            \
       }                                                                 \
-      jump %GET_ENTRY(R1);						\
+      field = StgClosure_payload(UNTAG(selectee),offset);               \
+      jump stg_ap_0_fast(field);                                        \
   }
+
 
 SELECTOR_CODE_NOUPD(0)
 SELECTOR_CODE_NOUPD(1)
@@ -173,131 +159,120 @@ SELECTOR_CODE_NOUPD(15)
  */
 
 INFO_TABLE(stg_ap_1_upd,1,0,THUNK_1_0,"stg_ap_1_upd_info","stg_ap_1_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(1));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame;
-  jump stg_ap_0_fast;
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+        ENTER_CCS_THUNK(node);
+        jump stg_ap_0_fast
+            (StgThunk_payload(node,0));
+    }
 }
 
 INFO_TABLE(stg_ap_2_upd,2,0,THUNK_2_0,"stg_ap_2_upd_info","stg_ap_2_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(2));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(1);
-  Sp_adj(-1); // for stg_ap_*_ret
-  TICK_UNKNOWN_CALL();
-  TICK_SLOW_CALL_p();
-  jump RET_LBL(stg_ap_p);
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+        ENTER_CCS_THUNK(node);
+        jump stg_ap_p_fast
+            (StgThunk_payload(node,0),
+             StgThunk_payload(node,1));
+    }
 }
 
 INFO_TABLE(stg_ap_3_upd,3,0,THUNK,"stg_ap_3_upd_info","stg_ap_3_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(3));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(2);
-  Sp_adj(-1); // for stg_ap_*_ret
-  TICK_UNKNOWN_CALL();
-  TICK_SLOW_CALL_pp();
-  jump RET_LBL(stg_ap_pp);
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+        ENTER_CCS_THUNK(node);
+        jump stg_ap_pp_fast
+            (StgThunk_payload(node,0),
+             StgThunk_payload(node,1),
+             StgThunk_payload(node,2));
+    }
 }
 
 INFO_TABLE(stg_ap_4_upd,4,0,THUNK,"stg_ap_4_upd_info","stg_ap_4_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(4));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(3);
-  Sp_adj(-1); // for stg_ap_*_ret
-  TICK_UNKNOWN_CALL();
-  TICK_SLOW_CALL_ppp();
-  jump RET_LBL(stg_ap_ppp);
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+        ENTER_CCS_THUNK(node);
+        jump stg_ap_ppp_fast
+            (StgThunk_payload(node,0),
+             StgThunk_payload(node,1),
+             StgThunk_payload(node,2),
+             StgThunk_payload(node,3));
+    }
 }
 
 INFO_TABLE(stg_ap_5_upd,5,0,THUNK,"stg_ap_5_upd_info","stg_ap_5_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(5));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,4);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgThunk_payload(R1,1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(4);
-  Sp_adj(-1); // for stg_ap_*_ret
-  TICK_UNKNOWN_CALL();
-  TICK_SLOW_CALL_pppp();
-  jump RET_LBL(stg_ap_pppp);
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+        ENTER_CCS_THUNK(node);
+        jump stg_ap_pppp_fast
+            (StgThunk_payload(node,0),
+             StgThunk_payload(node,1),
+             StgThunk_payload(node,2),
+             StgThunk_payload(node,3),
+             StgThunk_payload(node,4));
+    }
 }
 
 INFO_TABLE(stg_ap_6_upd,6,0,THUNK,"stg_ap_6_upd_info","stg_ap_6_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(6));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,5);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,4);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgThunk_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(5)] = StgThunk_payload(R1,1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(5);
-  Sp_adj(-1); // for stg_ap_*_ret
-  TICK_UNKNOWN_CALL();
-  TICK_SLOW_CALL_ppppp();
-  jump RET_LBL(stg_ap_ppppp);
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+        ENTER_CCS_THUNK(node);
+        jump stg_ap_ppppp_fast
+            (StgThunk_payload(node,0),
+             StgThunk_payload(node,1),
+             StgThunk_payload(node,2),
+             StgThunk_payload(node,3),
+             StgThunk_payload(node,4),
+             StgThunk_payload(node,5));
+    }
 }
 
 INFO_TABLE(stg_ap_7_upd,7,0,THUNK,"stg_ap_7_upd_info","stg_ap_7_upd_info")
+    (P_ node)
 {
-  TICK_ENT_DYN_THK();
-  STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(7));
-  UPD_BH_UPDATABLE();
-  LDV_ENTER(R1);
-  ENTER_CCS_THUNK(R1);
-  PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,6);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,5);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,4);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgThunk_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(5)] = StgThunk_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(6)] = StgThunk_payload(R1,1);
-  R1 = StgThunk_payload(R1,0);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(6);
-  Sp_adj(-1); // for stg_ap_*_ret
-  TICK_UNKNOWN_CALL();
-  TICK_SLOW_CALL_pppppp();
-  jump RET_LBL(stg_ap_pppppp);
+    TICK_ENT_DYN_THK();
+    STK_CHK_NP(node);
+    UPD_BH_UPDATABLE(node);
+    LDV_ENTER(node);
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, 0, node)) {
+      ENTER_CCS_THUNK(node);
+      jump stg_ap_pppppp_fast
+          (StgThunk_payload(node,0),
+           StgThunk_payload(node,1),
+           StgThunk_payload(node,2),
+           StgThunk_payload(node,3),
+           StgThunk_payload(node,4),
+           StgThunk_payload(node,5),
+           StgThunk_payload(node,6));
+    }
 }

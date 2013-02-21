@@ -20,6 +20,7 @@ import SPARC.Regs
 import SPARC.Base
 import SPARC.Imm
 
+import DynFlags
 import Outputable
 
 -- | Get an AddrMode relative to the address in sp.
@@ -42,15 +43,15 @@ fpRel n
 
 -- | Convert a spill slot number to a *byte* offset, with no sign.
 --
-spillSlotToOffset :: Int -> Int
-spillSlotToOffset slot
-	| slot >= 0 && slot < maxSpillSlots
+spillSlotToOffset :: DynFlags -> Int -> Int
+spillSlotToOffset dflags slot
+	| slot >= 0 && slot < maxSpillSlots dflags
 	= 64 + spillSlotSize * slot
 
 	| otherwise
 	= pprPanic "spillSlotToOffset:" 
 	              (   text "invalid spill location: " <> int slot
-		      $$  text "maxSpillSlots:          " <> int maxSpillSlots)
+		      $$  text "maxSpillSlots:          " <> int (maxSpillSlots dflags))
 
 
 -- | The maximum number of spill slots available on the C stack.
@@ -59,7 +60,7 @@ spillSlotToOffset slot
 --	Why do we reserve 64 bytes, instead of using the whole thing??
 --		-- BL 2009/02/15
 --
-maxSpillSlots :: Int
-maxSpillSlots 
-	= ((spillAreaLength - 64) `div` spillSlotSize) - 1
+maxSpillSlots :: DynFlags -> Int
+maxSpillSlots dflags
+	= ((spillAreaLength dflags - 64) `div` spillSlotSize) - 1
 

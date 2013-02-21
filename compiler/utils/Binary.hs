@@ -74,6 +74,9 @@ import BasicTypes
 
 import Foreign
 import Data.Array
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Internal as BS
+import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
@@ -713,39 +716,38 @@ type SymbolTable = Array Int Name
 ---------------------------------------------------------
 
 putFS :: BinHandle -> FastString -> IO ()
-putFS bh fs = putFB bh $ fastStringToFastBytes fs
+putFS bh fs = putBS bh $ fastStringToByteString fs
 
 getFS :: BinHandle -> IO FastString
-getFS bh = do fb <- getFB bh
-              mkFastStringFastBytes fb
+getFS bh = do bs <- getBS bh
+              mkFastStringByteString bs
 
-putFB :: BinHandle -> FastBytes -> IO ()
-putFB bh (FastBytes l buf) = do
+putBS :: BinHandle -> ByteString -> IO ()
+putBS bh bs =
+  BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
   put_ bh l
-  withForeignPtr buf $ \ptr ->
-    let
+  let
         go n | n == l    = return ()
              | otherwise = do
-                b <- peekElemOff ptr n
+                b <- peekElemOff (castPtr ptr) n
                 putByte bh b
                 go (n+1)
-   in
-   go 0
+  go 0
 
 {- -- possible faster version, not quite there yet:
-getFB bh@BinMem{} = do
+getBS bh@BinMem{} = do
   (I# l) <- get bh
   arr <- readIORef (arr_r bh)
   off <- readFastMutInt (off_r bh)
   return $! (mkFastSubBytesBA# arr off l)
 -}
-getFB :: BinHandle -> IO FastBytes
-getFB bh = do
+getBS :: BinHandle -> IO ByteString
+getBS bh = do
   l <- get bh
   fp <- mallocForeignPtrBytes l
   withForeignPtr fp $ \ptr -> do
   let
-        go n | n == l = return $ foreignPtrToFastBytes fp l
+        go n | n == l = return $ BS.fromForeignPtr fp 0 l
              | otherwise = do
                 b <- getByte bh
                 pokeElemOff ptr n b
@@ -753,9 +755,9 @@ getFB bh = do
   --
   go 0
 
-instance Binary FastBytes where
-  put_ bh f = putFB bh f
-  get bh = getFB bh
+instance Binary ByteString where
+  put_ bh f = putBS bh f
+  get bh = getBS bh
 
 instance Binary FastString where
   put_ bh f =

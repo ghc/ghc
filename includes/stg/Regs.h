@@ -73,8 +73,20 @@ typedef struct {
   StgFloat 	  rF2;
   StgFloat 	  rF3;
   StgFloat 	  rF4;
+  StgFloat 	  rF5;
+  StgFloat 	  rF6;
   StgDouble 	  rD1;
   StgDouble 	  rD2;
+  StgDouble 	  rD3;
+  StgDouble 	  rD4;
+  StgDouble 	  rD5;
+  StgDouble 	  rD6;
+  StgWord128 	  rXMM1;
+  StgWord128 	  rXMM2;
+  StgWord128 	  rXMM3;
+  StgWord128 	  rXMM4;
+  StgWord128 	  rXMM5;
+  StgWord128 	  rXMM6;
   StgWord64       rL1;
   StgPtr 	  rSp;
   StgPtr 	  rSpLim;
@@ -93,10 +105,10 @@ typedef struct {
 
 /*
  * Registers Hp and HpLim are global across the entire system, and are
- * copied into the RegTable before executing a thread.
+ * copied into the RegTable or registers before executing a thread.
  *
- * Registers Sp and SpLim are saved in the TSO for the
- * thread, but are copied into the RegTable before executing a thread.
+ * Registers Sp and SpLim are saved in the TSO for the thread, but are
+ * copied into the RegTable or registers before executing a thread.
  *
  * All other registers are "general purpose", and are used for passing
  * arguments to functions, and returning values.  The code generator
@@ -116,45 +128,6 @@ typedef struct {
  * (pseudo-)registers in those cases.
  */
 
-/* 
- * Locations for saving per-thread registers.
- */
-
-#define SAVE_Sp    	    (CurrentTSO->sp)
-#define SAVE_SpLim    	    (CurrentTSO->splim)
-
-#define SAVE_Hp	    	    (BaseReg->rHp)
-
-#define SAVE_CurrentTSO     (BaseReg->rCurrentTSO)
-#define SAVE_CurrentNursery (BaseReg->rCurrentNursery)
-#define SAVE_HpAlloc        (BaseReg->rHpAlloc)
-
-/* We sometimes need to save registers across a C-call, eg. if they
- * are clobbered in the standard calling convention.  We define the
- * save locations for all registers in the register table.
- */
-
-#define SAVE_R1             (BaseReg->rR1)
-#define SAVE_R2             (BaseReg->rR2)
-#define SAVE_R3             (BaseReg->rR3)
-#define SAVE_R4             (BaseReg->rR4)
-#define SAVE_R5             (BaseReg->rR5)
-#define SAVE_R6             (BaseReg->rR6)
-#define SAVE_R7             (BaseReg->rR7)
-#define SAVE_R8             (BaseReg->rR8)
-#define SAVE_R9             (BaseReg->rR9)
-#define SAVE_R10            (BaseReg->rR10)
- 
-#define SAVE_F1             (BaseReg->rF1)
-#define SAVE_F2             (BaseReg->rF2)
-#define SAVE_F3             (BaseReg->rF3)
-#define SAVE_F4             (BaseReg->rF4)
-
-#define SAVE_D1             (BaseReg->rD1)
-#define SAVE_D2             (BaseReg->rD2)
-
-#define SAVE_L1             (BaseReg->rL1)
-
 /* -----------------------------------------------------------------------------
  * Emit the GCC-specific register declarations for each machine
  * register being used.  If any STG register isn't mapped to a machine
@@ -163,11 +136,6 @@ typedef struct {
  * First, the general purpose registers.  The idea is, if a particular
  * general-purpose STG register can't be mapped to a real machine
  * register, it won't be used at all.  Instead, we'll use the stack.
- *
- * This is an improvement on the way things used to be done, when all
- * registers were mapped to locations in the register table, and stuff
- * was being shifted from the stack to the register table and back
- * again for no good reason (on register-poor architectures).
  */
 
 /* define NO_REGS to omit register declarations - used in RTS C code
@@ -260,6 +228,18 @@ GLOBAL_REG_DECL(StgFloat,F4,REG_F4)
 #define F4 (BaseReg->rF4)
 #endif
 
+#if defined(REG_F5) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgFloat,F5,REG_F5)
+#else
+#define F5 (BaseReg->rF5)
+#endif
+
+#if defined(REG_F6) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgFloat,F6,REG_F6)
+#else
+#define F6 (BaseReg->rF6)
+#endif
+
 #if defined(REG_D1) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgDouble,D1,REG_D1)
 #else
@@ -270,6 +250,66 @@ GLOBAL_REG_DECL(StgDouble,D1,REG_D1)
 GLOBAL_REG_DECL(StgDouble,D2,REG_D2)
 #else
 #define D2 (BaseReg->rD2)
+#endif
+
+#if defined(REG_D3) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D3,REG_D3)
+#else
+#define D3 (BaseReg->rD3)
+#endif
+
+#if defined(REG_D4) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D4,REG_D4)
+#else
+#define D4 (BaseReg->rD4)
+#endif
+
+#if defined(REG_D5) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D5,REG_D5)
+#else
+#define D5 (BaseReg->rD5)
+#endif
+
+#if defined(REG_D6) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D6,REG_D6)
+#else
+#define D6 (BaseReg->rD6)
+#endif
+
+#if defined(REG_XMM1) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM1,REG_XMM1)
+#else
+#define XMM1 (BaseReg->rXMM1)
+#endif
+
+#if defined(REG_XMM2) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM2,REG_XMM2)
+#else
+#define XMM2 (BaseReg->rXMM2)
+#endif
+
+#if defined(REG_XMM3) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM3,REG_XMM3)
+#else
+#define XMM3 (BaseReg->rXMM3)
+#endif
+
+#if defined(REG_XMM4) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM4,REG_XMM4)
+#else
+#define XMM4 (BaseReg->rXMM4)
+#endif
+
+#if defined(REG_XMM5) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM5,REG_XMM5)
+#else
+#define XMM5 (BaseReg->rXMM5)
+#endif
+
+#if defined(REG_XMM6) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM6,REG_XMM6)
+#else
+#define XMM6 (BaseReg->rXMM6)
 #endif
 
 #if defined(REG_L1) && !defined(NO_GLOBAL_REG_DECLS)
@@ -402,287 +442,6 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
 #define stg_gc_enter_1            (FunReg->stgGCEnter1)
 #define stg_gc_fun                (FunReg->stgGCFun)
 
-/* -----------------------------------------------------------------------------
-   For any registers which are denoted "caller-saves" by the C calling
-   convention, we have to emit code to save and restore them across C
-   calls.
-   -------------------------------------------------------------------------- */
-
-#ifdef CALLER_SAVES_R1
-#define CALLER_SAVE_R1    	SAVE_R1 = R1;
-#define CALLER_RESTORE_R1 	R1 = SAVE_R1;
-#else
-#define CALLER_SAVE_R1      	/* nothing */
-#define CALLER_RESTORE_R1    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R2
-#define CALLER_SAVE_R2    	SAVE_R2 = R2;
-#define CALLER_RESTORE_R2 	R2 = SAVE_R2;
-#else
-#define CALLER_SAVE_R2      	/* nothing */
-#define CALLER_RESTORE_R2    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R3
-#define CALLER_SAVE_R3    	SAVE_R3 = R3;
-#define CALLER_RESTORE_R3 	R3 = SAVE_R3;
-#else
-#define CALLER_SAVE_R3      	/* nothing */
-#define CALLER_RESTORE_R3    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R4
-#define CALLER_SAVE_R4    	SAVE_R4 = R4;
-#define CALLER_RESTORE_R4 	R4 = SAVE_R4;
-#else
-#define CALLER_SAVE_R4      	/* nothing */
-#define CALLER_RESTORE_R4    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R5
-#define CALLER_SAVE_R5    	SAVE_R5 = R5;
-#define CALLER_RESTORE_R5 	R5 = SAVE_R5;
-#else
-#define CALLER_SAVE_R5      	/* nothing */
-#define CALLER_RESTORE_R5    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R6
-#define CALLER_SAVE_R6    	SAVE_R6 = R6;
-#define CALLER_RESTORE_R6 	R6 = SAVE_R6;
-#else
-#define CALLER_SAVE_R6      	/* nothing */
-#define CALLER_RESTORE_R6    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R7
-#define CALLER_SAVE_R7    	SAVE_R7 = R7;
-#define CALLER_RESTORE_R7 	R7 = SAVE_R7;
-#else
-#define CALLER_SAVE_R7      	/* nothing */
-#define CALLER_RESTORE_R7    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R8
-#define CALLER_SAVE_R8    	SAVE_R8 = R8;
-#define CALLER_RESTORE_R8 	R8 = SAVE_R8;
-#else
-#define CALLER_SAVE_R8      	/* nothing */
-#define CALLER_RESTORE_R8    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R9
-#define CALLER_SAVE_R9    	SAVE_R9 = R9;
-#define CALLER_RESTORE_R9 	R9 = SAVE_R9;
-#else
-#define CALLER_SAVE_R9      	/* nothing */
-#define CALLER_RESTORE_R9    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_R10
-#define CALLER_SAVE_R10    	SAVE_R10 = R10;
-#define CALLER_RESTORE_R10 	R10 = SAVE_R10;
-#else
-#define CALLER_SAVE_R10      	/* nothing */
-#define CALLER_RESTORE_R10    	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_F1
-#define CALLER_SAVE_F1    	SAVE_F1 = F1;
-#define CALLER_RESTORE_F1 	F1 = SAVE_F1;
-#else
-#define CALLER_SAVE_F1    	/* nothing */
-#define CALLER_RESTORE_F1 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_F2
-#define CALLER_SAVE_F2    	SAVE_F2 = F2;
-#define CALLER_RESTORE_F2 	F2 = SAVE_F2;
-#else
-#define CALLER_SAVE_F2    	/* nothing */
-#define CALLER_RESTORE_F2 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_F3
-#define CALLER_SAVE_F3    	SAVE_F3 = F3;
-#define CALLER_RESTORE_F3 	F3 = SAVE_F3;
-#else
-#define CALLER_SAVE_F3    	/* nothing */
-#define CALLER_RESTORE_F3 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_F4
-#define CALLER_SAVE_F4    	SAVE_F4 = F4;
-#define CALLER_RESTORE_F4 	F4 = SAVE_F4;
-#else
-#define CALLER_SAVE_F4    	/* nothing */
-#define CALLER_RESTORE_F4 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_D1
-#define CALLER_SAVE_D1    	SAVE_D1 = D1;
-#define CALLER_RESTORE_D1 	D1 = SAVE_D1;
-#else
-#define CALLER_SAVE_D1    	/* nothing */
-#define CALLER_RESTORE_D1 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_D2
-#define CALLER_SAVE_D2    	SAVE_D2 = D2;
-#define CALLER_RESTORE_D2 	D2 = SAVE_D2;
-#else
-#define CALLER_SAVE_D2    	/* nothing */
-#define CALLER_RESTORE_D2 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_L1
-#define CALLER_SAVE_L1    	SAVE_L1 = L1;
-#define CALLER_RESTORE_L1 	L1 = SAVE_L1;
-#else
-#define CALLER_SAVE_L1    	/* nothing */
-#define CALLER_RESTORE_L1 	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_Sp
-#define CALLER_SAVE_Sp	    	SAVE_Sp = Sp;
-#define CALLER_RESTORE_Sp  	Sp = SAVE_Sp;
-#else
-#define CALLER_SAVE_Sp	    	/* nothing */
-#define CALLER_RESTORE_Sp	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_SpLim
-#define CALLER_SAVE_SpLim    	SAVE_SpLim = SpLim;
-#define CALLER_RESTORE_SpLim  	SpLim = SAVE_SpLim;
-#else
-#define CALLER_SAVE_SpLim    	/* nothing */
-#define CALLER_RESTORE_SpLim	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_Hp
-#define CALLER_SAVE_Hp	    	SAVE_Hp = Hp;
-#define CALLER_RESTORE_Hp   	Hp = SAVE_Hp;
-#else
-#define CALLER_SAVE_Hp	    	/* nothing */
-#define CALLER_RESTORE_Hp	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_Base
-#ifdef THREADED_RTS
-#error "Can't have caller-saved BaseReg with THREADED_RTS"
-#endif
-#define CALLER_SAVE_Base	/* nothing */
-#define CALLER_RESTORE_Base	BaseReg = &MainRegTable;
-#else
-#define CALLER_SAVE_Base	/* nothing */
-#define CALLER_RESTORE_Base	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_CurrentTSO
-#define CALLER_SAVE_CurrentTSO   	SAVE_CurrentTSO = CurrentTSO;
-#define CALLER_RESTORE_CurrentTSO	CurrentTSO = SAVE_CurrentTSO;
-#else
-#define CALLER_SAVE_CurrentTSO   	/* nothing */
-#define CALLER_RESTORE_CurrentTSO   	/* nothing */
-#endif
-
-#ifdef CALLER_SAVES_CurrentNursery
-#define CALLER_SAVE_CurrentNursery   	SAVE_CurrentNursery = CurrentNursery;
-#define CALLER_RESTORE_CurrentNursery	CurrentNursery = SAVE_CurrentNursery;
-#else
-#define CALLER_SAVE_CurrentNursery   	/* nothing */
-#define CALLER_RESTORE_CurrentNursery   /* nothing */
-#endif
-
-#ifdef CALLER_SAVES_HpAlloc
-#define CALLER_SAVE_HpAlloc   		SAVE_HpAlloc = HpAlloc;
-#define CALLER_RESTORE_HpAlloc		HpAlloc = SAVE_HpAlloc;
-#else
-#define CALLER_SAVE_HpAlloc   		/* nothing */
-#define CALLER_RESTORE_HpAlloc   	/* nothing */
-#endif
-
 #endif /* IN_STG_CODE */
-
-/* ----------------------------------------------------------------------------
-   Handy bunches of saves/restores 
-   ------------------------------------------------------------------------  */
-
-#if IN_STG_CODE
-
-#define CALLER_SAVE_USER			\
-  CALLER_SAVE_R1				\
-  CALLER_SAVE_R2				\
-  CALLER_SAVE_R3				\
-  CALLER_SAVE_R4				\
-  CALLER_SAVE_R5				\
-  CALLER_SAVE_R6				\
-  CALLER_SAVE_R7				\
-  CALLER_SAVE_R8				\
-  CALLER_SAVE_R9				\
-  CALLER_SAVE_R10				\
-  CALLER_SAVE_F1				\
-  CALLER_SAVE_F2				\
-  CALLER_SAVE_F3				\
-  CALLER_SAVE_F4				\
-  CALLER_SAVE_D1				\
-  CALLER_SAVE_D2				\
-  CALLER_SAVE_L1
-
-     /* Save Base last, since the others may
-	be addressed relative to it */
-#define CALLER_SAVE_SYSTEM			\
-  CALLER_SAVE_Sp				\
-  CALLER_SAVE_SpLim				\
-  CALLER_SAVE_Hp				\
-  CALLER_SAVE_CurrentTSO			\
-  CALLER_SAVE_CurrentNursery			\
-  CALLER_SAVE_Base
-
-#define CALLER_RESTORE_USER			\
-  CALLER_RESTORE_R1				\
-  CALLER_RESTORE_R2				\
-  CALLER_RESTORE_R3				\
-  CALLER_RESTORE_R4				\
-  CALLER_RESTORE_R5				\
-  CALLER_RESTORE_R6				\
-  CALLER_RESTORE_R7				\
-  CALLER_RESTORE_R8				\
-  CALLER_RESTORE_R9				\
-  CALLER_RESTORE_R10			\
-  CALLER_RESTORE_F1				\
-  CALLER_RESTORE_F2				\
-  CALLER_RESTORE_F3				\
-  CALLER_RESTORE_F4				\
-  CALLER_RESTORE_D1				\
-  CALLER_RESTORE_D2				\
-  CALLER_RESTORE_L1
-
-     /* Restore Base first, since the others may
-	be addressed relative to it */
-#define CALLER_RESTORE_SYSTEM			\
-  CALLER_RESTORE_Base				\
-  CALLER_RESTORE_Sp				\
-  CALLER_RESTORE_SpLim				\
-  CALLER_RESTORE_Hp				\
-  CALLER_RESTORE_CurrentTSO			\
-  CALLER_RESTORE_CurrentNursery
-
-#else /* not IN_STG_CODE */
-
-#define CALLER_SAVE_USER       /* nothing */
-#define CALLER_SAVE_SYSTEM     /* nothing */
-#define CALLER_RESTORE_USER    /* nothing */
-#define CALLER_RESTORE_SYSTEM  /* nothing */
-
-#endif /* IN_STG_CODE */
-#define CALLER_SAVE_ALL				\
-  CALLER_SAVE_SYSTEM				\
-  CALLER_SAVE_USER
-
-#define CALLER_RESTORE_ALL			\
-  CALLER_RESTORE_SYSTEM				\
-  CALLER_RESTORE_USER
 
 #endif /* REGS_H */

@@ -36,6 +36,7 @@ import Maybes           ( maybeToBool )
 import Name             ( getOccName, isExternalName, nameOccName )
 import OccName          ( occNameString, occNameFS )
 import BasicTypes       ( Arity )
+import TysWiredIn       ( unboxedUnitDataCon )
 import Literal
 import Outputable
 import MonadUtils
@@ -420,6 +421,14 @@ coreToStgExpr (Case scrut bndr _ alts) = do
       )
   where
     vars_alt (con, binders, rhs)
+      | DataAlt c <- con, c == unboxedUnitDataCon
+      = -- This case is a bit smelly. 
+        -- See Note [Nullary unboxed tuple] in Type.lhs
+        -- where a nullary tuple is mapped to (State# World#)
+        ASSERT( null binders )
+        do { (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
+           ; return ((DEFAULT, [], [], rhs2), rhs_fvs, rhs_escs) }
+      | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
@@ -463,12 +472,12 @@ mkStgAltType bndr alts = case repType (idType bndr) of
                                         PolyAlt
         Nothing                      -> PolyAlt
     UbxTupleRep rep_tys -> UbxTupAlt (length rep_tys)
-
+    -- NB Nullary unboxed tuples have UnaryRep, and generate a PrimAlt
   where
    _is_poly_alt_tycon tc
         =  isFunTyCon tc
         || isPrimTyCon tc   -- "Any" is lifted but primitive
-        || isFamilyTyCon tc   -- Type family; e.g. arising from strict
+        || isFamilyTyCon tc -- Type family; e.g. Any, or arising from strict
                             -- function application where argument has a
                             -- type-family type
 

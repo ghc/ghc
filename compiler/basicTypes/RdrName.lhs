@@ -277,7 +277,11 @@ instance OutputableBndr RdrName where
 	| otherwise		 = ppr n
 
     pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
-    pprPrefixOcc rdr = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
+    pprPrefixOcc rdr 
+      | Just name <- isExact_maybe rdr = pprPrefixName name
+             -- pprPrefixName has some special cases, so
+             -- we delegate to them rather than reproduce them
+      | otherwise = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
 
 instance Eq RdrName where
     (Exact n1) 	  == (Exact n2)    = n1==n2
@@ -585,26 +589,25 @@ mkGlobalRdrEnv gres
 				   (nameOccName (gre_name gre)) 
 				   gre
 
-findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> (GlobalRdrEnv, [[Name]])
+findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> [[Name]]
 -- ^ For each 'OccName', see if there are multiple local definitions
--- for it.  If so, remove all but one (to suppress subsequent error messages)
+-- for it; return a list of all such
 -- and return a list of the duplicate bindings
 findLocalDupsRdrEnv rdr_env occs 
   = go rdr_env [] occs
   where
-    go rdr_env dups [] = (rdr_env, dups)
+    go _       dups [] = dups
     go rdr_env dups (occ:occs)
       = case filter isLocalGRE gres of
-	  []       -> WARN( True, ppr occ <+> ppr rdr_env ) 
-		      go rdr_env dups occs	-- Weird!  No binding for occ
-	  [_]      -> go rdr_env dups occs	-- The common case
-	  dup_gres -> go (extendOccEnv rdr_env occ (head dup_gres : nonlocal_gres))
-   		         (map gre_name dup_gres : dups)
-			 occs
+	  []       -> go rdr_env  dups  			 occs
+	  [_]      -> go rdr_env  dups  			 occs	-- The common case
+	  dup_gres -> go rdr_env' (map gre_name dup_gres : dups) occs
       where
         gres = lookupOccEnv rdr_env occ `orElse` []
-	nonlocal_gres = filterOut isLocalGRE gres
-
+        rdr_env' = delFromOccEnv rdr_env occ    
+            -- The delFromOccEnv avoids repeating the same
+            -- complaint twice, when occs itself has a duplicate
+            -- which is a common case
 
 insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
 insertGRE new_g [] = [new_g]

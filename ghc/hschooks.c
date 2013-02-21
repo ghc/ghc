@@ -18,7 +18,15 @@ in instead of the defaults.
 void
 defaultsHook (void)
 {
+#if __GLASGOW_HASKELL__ >= 707
+    // This helps particularly with large compiles, but didn't work
+    // very well with earlier GHCs because it caused large amounts of
+    // fragmentation.  See rts/sm/BlockAlloc.c:allocLargeChunk().
+    RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsTrue;
+#else
     RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
+#endif
+
     RtsFlags.GcFlags.maxStkSize         = 512*1024*1024 / sizeof(W_);
     RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
 
@@ -32,7 +40,7 @@ defaultsHook (void)
 }
 
 void
-StackOverflowHook (lnat stack_size)    /* in bytes */
+StackOverflowHook (StgWord stack_size)    /* in bytes */
 {
     fprintf(stderr, "GHC stack-space overflow: current limit is %zu bytes.\nUse the `-K<size>' option to increase it.\n", (size_t)stack_size);
 }

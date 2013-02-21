@@ -21,7 +21,7 @@ import SPARC.Ppr	()
 import Instruction
 import Reg
 import Size
-import OldCmm
+import Cmm
 
 
 import Outputable
@@ -32,8 +32,8 @@ expandTop :: NatCmmDecl CmmStatics Instr -> NatCmmDecl CmmStatics Instr
 expandTop top@(CmmData{})
 	= top
 
-expandTop (CmmProc info lbl (ListGraph blocks))
-	= CmmProc info lbl (ListGraph $ map expandBlock blocks)
+expandTop (CmmProc info lbl live (ListGraph blocks))
+	= CmmProc info lbl live (ListGraph $ map expandBlock blocks)
 
 
 -- | Expand out synthetic instructions in this block

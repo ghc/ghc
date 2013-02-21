@@ -20,14 +20,13 @@ module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
 
 #include "HsVersions.h"
 
+import DynFlags
 import Name             ( Name, getName )
 import NameEnv
-import ClosureInfo
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import Type             ( flattenRepType, repType )
-import Constants        ( mIN_PAYLOAD_SIZE, wORD_SIZE )
-import CgHeapery        ( mkVirtHeapOffsets )
+import Type             ( flattenRepType, repType, typePrimRep )
+import StgCmmLayout     ( mkVirtHeapOffsets )
 import Util
 
 import Foreign
@@ -48,14 +47,14 @@ import GHC.Ptr          ( Ptr(..) )
 \begin{code}
 newtype ItblPtr = ItblPtr (Ptr ()) deriving Show
 
-itblCode :: ItblPtr -> Ptr ()
-itblCode (ItblPtr ptr)
- | ghciTablesNextToCode = castPtr ptr `plusPtr` conInfoTableSizeB
+itblCode :: DynFlags -> ItblPtr -> Ptr ()
+itblCode dflags (ItblPtr ptr)
+ | ghciTablesNextToCode = castPtr ptr `plusPtr` conInfoTableSizeB dflags
  | otherwise            = castPtr ptr
 
 -- XXX bogus
-conInfoTableSizeB :: Int
-conInfoTableSizeB = 3 * wORD_SIZE
+conInfoTableSizeB :: DynFlags -> Int
+conInfoTableSizeB dflags = 3 * wORD_SIZE dflags
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
@@ -66,31 +65,31 @@ mkItblEnv pairs = mkNameEnv [(n, (n,p)) | (n,p) <- pairs]
 
 
 -- Make info tables for the data decls in this module
-mkITbls :: [TyCon] -> IO ItblEnv
-mkITbls [] = return emptyNameEnv
-mkITbls (tc:tcs) = do itbls  <- mkITbl tc
-                      itbls2 <- mkITbls tcs
-                      return (itbls `plusNameEnv` itbls2)
+mkITbls :: DynFlags -> [TyCon] -> IO ItblEnv
+mkITbls _ [] = return emptyNameEnv
+mkITbls dflags (tc:tcs) = do itbls  <- mkITbl dflags tc
+                             itbls2 <- mkITbls dflags tcs
+                             return (itbls `plusNameEnv` itbls2)
 
-mkITbl :: TyCon -> IO ItblEnv
-mkITbl tc
+mkITbl :: DynFlags -> TyCon -> IO ItblEnv
+mkITbl dflags tc
    | not (isDataTyCon tc) 
    = return emptyNameEnv
    | dcs `lengthIs` n -- paranoia; this is an assertion.
-   = make_constr_itbls dcs
+   = make_constr_itbls dflags dcs
      where
         dcs = tyConDataCons tc
         n   = tyConFamilySize tc
 
-mkITbl _ = error "Unmatched patter in mkITbl: assertion failed!"
+mkITbl _ _ = error "Unmatched patter in mkITbl: assertion failed!"
 
 #include "../includes/rts/storage/ClosureTypes.h"
 cONSTR :: Int   -- Defined in ClosureTypes.h
 cONSTR = CONSTR 
 
 -- Assumes constructors are numbered from zero, not one
-make_constr_itbls :: [DataCon] -> IO ItblEnv
-make_constr_itbls cons
+make_constr_itbls :: DynFlags -> [DataCon] -> IO ItblEnv
+make_constr_itbls dflags cons
    = do is <- mapM mk_dirret_itbl (zip cons [0..])
         return (mkItblEnv is)
      where
@@ -99,14 +98,14 @@ make_constr_itbls cons
 
         mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr = do
-           let rep_args = [ (typeCgRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
-               (tot_wds, ptr_wds, _) = mkVirtHeapOffsets False{-not a THUNK-} rep_args
+           let rep_args = [ (typePrimRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
+               (tot_wds, ptr_wds, _) = mkVirtHeapOffsets dflags False{-not a THUNK-} rep_args
 
                ptrs'  = ptr_wds
                nptrs' = tot_wds - ptr_wds
                nptrs_really
-                  | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE = nptrs'
-                  | otherwise = mIN_PAYLOAD_SIZE - ptrs'
+                  | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
+                  | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
                code' = mkJumpToAddr entry_addr
                itbl  = StgInfoTable {
 #ifndef GHCI_TABLES_NEXT_TO_CODE
@@ -127,7 +126,7 @@ make_constr_itbls cons
                             }
                -- Make a piece of code to jump to "entry_label".
                -- This is the only arch-dependent bit.
-           addrCon <- newExec pokeConItbl conInfoTbl
+           addrCon <- newExecConItbl dflags conInfoTbl
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
@@ -175,7 +174,7 @@ mkJumpToAddr a
 
 #elif powerpc_TARGET_ARCH
 -- We'll use r12, for no particular reason.
--- 0xDEADBEEF stands for the adress:
+-- 0xDEADBEEF stands for the address:
 -- 3D80DEAD lis r12,0xDEAD
 -- 618CBEEF ori r12,r12,0xBEEF
 -- 7D8903A6 mtctr r12
@@ -284,39 +283,17 @@ data StgConInfoTable = StgConInfoTable {
    infoTable :: StgInfoTable
 }
 
-instance Storable StgConInfoTable where
-   sizeOf conInfoTable    
+sizeOfConItbl :: StgConInfoTable -> Int
+sizeOfConItbl conInfoTable
       = sum [ sizeOf (conDesc conInfoTable)
             , sizeOf (infoTable conInfoTable) ]
-   alignment _ = SIZEOF_VOID_P
-   peek ptr 
-      = evalState (castPtr ptr) $ do
-#ifdef GHCI_TABLES_NEXT_TO_CODE
-           desc <- load
-#endif
-           itbl <- load
-#ifndef GHCI_TABLES_NEXT_TO_CODE
-           desc <- load
-#endif
-           return  
-              StgConInfoTable 
-              { 
-#ifdef GHCI_TABLES_NEXT_TO_CODE
-                conDesc   = castPtr $ ptr `plusPtr` conInfoTableSizeB `plusPtr` desc
-#else
-                conDesc   = desc
-#endif
-              , infoTable = itbl
-              }
-   poke = error "poke(StgConInfoTable): use pokeConItbl instead"
 
-
-pokeConItbl :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
+pokeConItbl :: DynFlags -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
             -> IO ()
-pokeConItbl wr_ptr ex_ptr itbl 
+pokeConItbl dflags wr_ptr ex_ptr itbl
       = evalState (castPtr wr_ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-           store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB))
+           store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB dflags))
 #endif
            store (infoTable itbl)
 #ifndef GHCI_TABLES_NEXT_TO_CODE
@@ -442,12 +419,12 @@ load = do addr <- advance
           lift (peek addr)
 
 
-newExec :: Storable a => (Ptr a -> Ptr a -> a -> IO ()) -> a -> IO (FunPtr ())
-newExec poke_fn obj
+newExecConItbl :: DynFlags -> StgConInfoTable -> IO (FunPtr ())
+newExecConItbl dflags obj
    = alloca $ \pcode -> do
-        wr_ptr <- _allocateExec (fromIntegral (sizeOf obj)) pcode
+        wr_ptr <- _allocateExec (fromIntegral (sizeOfConItbl obj)) pcode
         ex_ptr <- peek pcode
-        poke_fn wr_ptr ex_ptr obj
+        pokeConItbl dflags wr_ptr ex_ptr obj
         return (castPtrToFunPtr ex_ptr)
 
 foreign import ccall unsafe "allocateExec"

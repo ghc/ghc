@@ -4,21 +4,26 @@
 \section[Constants]{Info about this compilation}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Constants (module Constants) where
 
 import Config
 
-#include "ghc_boot_platform.h"
-
-#include "../includes/HaskellConstants.hs"
-
 hiVersion :: Integer
 hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
+
+-- All pretty arbitrary:
+
+mAX_TUPLE_SIZE :: Int
+mAX_TUPLE_SIZE = 62 -- Should really match the number
+                    -- of decls in Data.Tuple
+
+mAX_CONTEXT_REDUCTION_DEPTH :: Int
+mAX_CONTEXT_REDUCTION_DEPTH = 200
+  -- Increase to 200; see Trac #5395
+
+wORD64_SIZE :: Int
+wORD64_SIZE = 8
+
+tARGET_MAX_CHAR :: Int
+tARGET_MAX_CHAR = 0x10ffff
 \end{code}

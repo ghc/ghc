@@ -14,11 +14,6 @@
 void initProfTimer      ( void );
 void handleProfTick     ( void );
 
-#ifdef PROFILING
-void stopProfTimer      ( void );
-void startProfTimer     ( void );
-#endif
-
 void stopHeapProfTimer  ( void );
 void startHeapProfTimer ( void );
 

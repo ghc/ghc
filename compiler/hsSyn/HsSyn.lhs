@@ -9,49 +9,41 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 
 \begin{code}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module HsSyn (
-	module HsBinds,
-	module HsDecls,
-	module HsExpr,
-	module HsImpExp,
-	module HsLit,
-	module HsPat,
-	module HsTypes,
- 	module HsUtils,
-	module HsDoc,
-	Fixity,
+        module HsBinds,
+        module HsDecls,
+        module HsExpr,
+        module HsImpExp,
+        module HsLit,
+        module HsPat,
+        module HsTypes,
+        module HsUtils,
+        module HsDoc,
+        Fixity,
 
-	HsModule(..), HsExtCore(..),
+        HsModule(..), HsExtCore(..),
 ) where
 
 -- friends:
-import HsDecls		
+import HsDecls
 import HsBinds
 import HsExpr
 import HsImpExp
 import HsLit
 import HsPat
 import HsTypes
-import BasicTypes	( Fixity, WarningTxt )
+import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
 
 -- others:
 import OccName          ( HasOccName )
-import IfaceSyn		( IfaceBinding )
+import IfaceSyn         ( IfaceBinding )
 import Outputable
 import SrcLoc
-import Module		( Module, ModuleName )
+import Module           ( Module, ModuleName )
 import FastString
 
 -- libraries:
@@ -86,47 +78,44 @@ data HsModule name
         -- ^ Haddock module info and description, unparsed
    } deriving (Data, Typeable)
 
-data HsExtCore name	-- Read from Foo.hcr
+data HsExtCore name     -- Read from Foo.hcr
   = HsExtCore
-	Module
-	[TyClDecl name]	-- Type declarations only; just as in Haskell source,
-			-- so that we can infer kinds etc
-	[IfaceBinding]	-- And the bindings
+        Module
+        [TyClDecl name] -- Type declarations only; just as in Haskell source,
+                        -- so that we can infer kinds etc
+        [IfaceBinding]  -- And the bindings
 \end{code}
 
 
 \begin{code}
-instance Outputable Char where
-  ppr c = text [c]
-
 instance (OutputableBndr name, HasOccName name)
-	=> Outputable (HsModule name) where
+        => Outputable (HsModule name) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports $$ pp_nonnull decls
 
     ppr (HsModule (Just name) exports imports decls deprec mbDoc)
       = vcat [
-	    pp_mb mbDoc,
-	    case exports of
-	      Nothing -> pp_header (ptext (sLit "where"))
-	      Just es -> vcat [
-			   pp_header lparen,
-			   nest 8 (fsep (punctuate comma (map ppr es))),
-			   nest 4 (ptext (sLit ") where"))
-			  ],
-	    pp_nonnull imports,
-	    pp_nonnull decls
+            pp_mb mbDoc,
+            case exports of
+              Nothing -> pp_header (ptext (sLit "where"))
+              Just es -> vcat [
+                           pp_header lparen,
+                           nest 8 (fsep (punctuate comma (map ppr es))),
+                           nest 4 (ptext (sLit ") where"))
+                          ],
+            pp_nonnull imports,
+            pp_nonnull decls
           ]
       where
-	pp_header rest = case deprec of
+        pp_header rest = case deprec of
            Nothing -> pp_modname <+> rest
            Just d -> vcat [ pp_modname, ppr d, rest ]
 
-	pp_modname = ptext (sLit "module") <+> ppr name
+        pp_modname = ptext (sLit "module") <+> ppr name
 
 pp_mb :: Outputable t => Maybe t -> SDoc
-pp_mb (Just x) = ppr x 
+pp_mb (Just x) = ppr x
 pp_mb Nothing  = empty
 
 pp_nonnull :: Outputable t => [t] -> SDoc

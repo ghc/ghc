@@ -12,7 +12,6 @@
 #include "BeginPrivate.h"
 
 void initializeTimer       (void);
-StgWord64 getMonotonicNSec (void);
 
 Time getProcessCPUTime     (void);
 Time getThreadCPUTime      (void);
@@ -25,7 +24,7 @@ void getProcessTimes       (Time *user, Time *elapsed);
 void  getUnixEpochTime      (StgWord64 *sec, StgWord32 *nsec);
 
 // Not strictly timing, but related
-nat   getPageFaults         (void);
+W_    getPageFaults         (void);
 
 #include "EndPrivate.h"
 

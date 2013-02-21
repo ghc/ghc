@@ -884,8 +884,8 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
       by defining what we mean by a retainer:</para>
 
       <blockquote>
-	<para>A retainer is either the system stack, or an unevaluated
-	closure (thunk).</para>
+        <para>A retainer is either the system stack, an unevaluated
+        closure (thunk), or an explicitly mutable object.</para>
       </blockquote>
 
       <para>In particular, constructors are <emphasis>not</emphasis>
@@ -1626,8 +1626,10 @@ Options:
     --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
     --srcdir=DIR                  path to source directory of .hs files
                                   multi-use of srcdir possible
-    --hpcdir=DIR                  sub-directory that contains .mix files
+    --hpcdir=DIR                  append sub-directory that contains .mix files
                                   default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
     --xml-output                  show output in XML
 </screen>
        </sect3>
@@ -1644,8 +1646,10 @@ Options:
     --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
     --srcdir=DIR                  path to source directory of .hs files
                                   multi-use of srcdir possible
-    --hpcdir=DIR                  sub-directory that contains .mix files
+    --hpcdir=DIR                  append sub-directory that contains .mix files
                                   default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
     --fun-entry-count             show top-level function entry counts
     --highlight-covered           highlight covered code, rather that code gaps
     --destdir=DIR                 path to write output to
@@ -1723,8 +1727,10 @@ Options:
 
     --srcdir=DIR   path to source directory of .hs files
                    multi-use of srcdir possible
-    --hpcdir=DIR   sub-directory that contains .mix files
-                   default .hpc [rarely used]
+    --hpcdir=DIR                  append sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
     --output=FILE  output FILE
 % hpc help draft
 Usage: hpc draft [OPTION] .. &lt;TIX_FILE&gt;
@@ -1735,8 +1741,10 @@ Options:
     --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
     --srcdir=DIR                  path to source directory of .hs files
                                   multi-use of srcdir possible
-    --hpcdir=DIR                  sub-directory that contains .mix files
+    --hpcdir=DIR                  append sub-directory that contains .mix files
                                   default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
     --output=FILE                 output FILE
 </screen>
       </sect3>

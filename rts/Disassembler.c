@@ -80,7 +80,7 @@ disInstr ( StgBCO *bco, int pc )
          pc += 1; break;
      case bci_STKCHECK:  {
          StgWord stk_words_reqd = BCO_GET_LARGE_ARG + 1;
-         debugBelch("STKCHECK %" FMT_SizeT "\n", (lnat)stk_words_reqd );
+         debugBelch("STKCHECK %" FMT_Word "\n", (W_)stk_words_reqd );
          break;
      }
       case bci_PUSH_L: 
@@ -283,11 +283,11 @@ void disassemble( StgBCO *bco )
    nat i, j;
    StgWord16*     instrs    = (StgWord16*)(bco->instrs->payload);
    StgMutArrPtrs* ptrs      = bco->ptrs;
-   nat            nbcs      = (int)instrs[0];
+   nat            nbcs      = (int)(bco->instrs->bytes / sizeof(StgWord16));
    nat            pc        = 1;
 
    debugBelch("BCO\n" );
-   pc = 1;
+   pc = 0;
    while (pc <= nbcs) {
       debugBelch("\t%2d:  ", pc );
       pc = disInstr ( bco, pc );

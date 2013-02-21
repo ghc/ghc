@@ -19,7 +19,7 @@
 #define BLOCK_SIZE_W (BLOCK_SIZE/sizeof(W_))
 #define BLOCK_MASK   (BLOCK_SIZE-1)
 
-#define BLOCK_ROUND_UP(p)   ((void *) (((W_)(p)+BLOCK_SIZE-1) & ~BLOCK_MASK))
+#define BLOCK_ROUND_UP(p)   (((W_)(p)+BLOCK_SIZE-1) & ~BLOCK_MASK)
 #define BLOCK_ROUND_DOWN(p) ((void *) ((W_)(p) & ~BLOCK_MASK))
 
 /* Megablock related constants (MBLOCK_SHIFT is defined in Constants.h) */
@@ -244,11 +244,11 @@ extern void initBlockAllocator(void);
 
 /* Allocation -------------------------------------------------------------- */
 
-bdescr *allocGroup(nat n);
+bdescr *allocGroup(W_ n);
 bdescr *allocBlock(void);
 
 // versions that take the storage manager lock for you:
-bdescr *allocGroup_lock(nat n);
+bdescr *allocGroup_lock(W_ n);
 bdescr *allocBlock_lock(void);
 
 /* De-Allocation ----------------------------------------------------------- */

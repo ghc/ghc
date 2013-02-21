@@ -22,7 +22,7 @@ import SPARC.Base
 import NCGMonad
 import Size
 
-import OldCmm
+import Cmm
 
 import OrdList
 
@@ -33,7 +33,8 @@ getAmode
 	-> NatM Amode
 
 getAmode tree@(CmmRegOff _ _) 
-	= getAmode (mangleIndexTree tree)
+    = do dflags <- getDynFlags
+         getAmode (mangleIndexTree dflags tree)
 
 getAmode (CmmMachOp (MO_Sub _) [x, CmmLit (CmmInt i _)])
   | fits13Bits (-i)

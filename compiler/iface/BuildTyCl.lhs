@@ -24,12 +24,11 @@ module BuildTyCl (
 #include "HsVersions.h"
 
 import IfaceEnv
-
+import FamInstEnv( FamInstEnvs )
 import DataCon
 import Var
 import VarSet
 import BasicTypes
-import ForeignCall
 import Name
 import MkId
 import Class
@@ -37,7 +36,9 @@ import TyCon
 import Type
 import Coercion
 
+import DynFlags
 import TcRnMonad
+import UniqSupply
 import Util
 import Outputable
 \end{code}
@@ -46,7 +47,7 @@ import Outputable
 \begin{code}
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
-              -> SynTyConRhs
+              -> SynTyConRhs Type
               -> Kind                   -- ^ Kind of the RHS
               -> TyConParent
               -> TcRnIf m n TyCon
@@ -54,21 +55,6 @@ buildSynTyCon tc_name tvs rhs rhs_kind parent
   = return (mkSynTyCon tc_name kind tvs rhs parent)
   where kind = mkPiKinds tvs rhs_kind
 
-------------------------------------------------------
-buildAlgTyCon :: Name 
-              -> [TyVar]               -- ^ Kind variables and type variables
-	      -> Maybe CType
-	      -> ThetaType	       -- ^ Stupid theta
-	      -> AlgTyConRhs
-	      -> RecFlag
-	      -> Bool		       -- ^ True <=> was declared in GADT syntax
-              -> TyConParent
-	      -> TyCon
-
-buildAlgTyCon tc_name ktvs cType stupid_theta rhs is_rec gadt_syn parent
-  = mkAlgTyCon tc_name kind ktvs cType stupid_theta rhs parent is_rec gadt_syn
-  where 
-    kind = mkPiKinds ktvs liftedTypeKind
 
 ------------------------------------------------------
 distinctAbstractTyConRhs, totallyAbstractTyConRhs :: AlgTyConRhs
@@ -132,7 +118,8 @@ mkNewTyConRhs tycon_name tycon con
 				
 
 ------------------------------------------------------
-buildDataCon :: Name -> Bool
+buildDataCon :: FamInstEnvs 
+            -> Name -> Bool
 	    -> [HsBang] 
 	    -> [Name]			-- Field labels
 	    -> [TyVar] -> [TyVar]	-- Univ and ext 
@@ -146,7 +133,7 @@ buildDataCon :: Name -> Bool
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
-buildDataCon src_name declared_infix arg_stricts field_lbls
+buildDataCon fam_envs src_name declared_infix arg_stricts field_lbls
 	     univ_tvs ex_tvs eq_spec ctxt arg_tys res_ty rep_tycon
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
@@ -154,14 +141,17 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 	-- code, which (for Haskell source anyway) will be in the DataName name
 	-- space, and puts it into the VarName name space
 
+        ; us <- newUniqueSupply
+        ; dflags <- getDynFlags
 	; let
 		stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
 		data_con = mkDataCon src_name declared_infix
 				     arg_stricts field_lbls
 				     univ_tvs ex_tvs eq_spec ctxt
 				     arg_tys res_ty rep_tycon
-				     stupid_ctxt dc_ids
-		dc_ids = mkDataConIds wrap_name work_name data_con
+				     stupid_ctxt dc_wrk dc_rep
+                dc_wrk = mkDataConWorkId work_name data_con
+                dc_rep = initUs_ us (mkDataConRep dflags fam_envs wrap_name data_con)
 
 	; return data_con }
 
@@ -205,6 +195,8 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
   = fixM  $ \ rec_clas -> 	-- Only name generation inside loop
     do	{ traceIf (text "buildClass")
+        ; dflags <- getDynFlags
+
 	; datacon_name <- newImplicitBinder tycon_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
 		-- because one should import the class to get the binding for 
@@ -217,7 +209,7 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
 	      -- Make selectors for the superclasses 
 	; sc_sel_names <- mapM  (newImplicitBinder tycon_name . mkSuperDictSelOcc) 
 				[1..length sc_theta]
-        ; let sc_sel_ids = [ mkDictSelId no_unf sc_name rec_clas 
+        ; let sc_sel_ids = [ mkDictSelId dflags no_unf sc_name rec_clas 
                            | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
 	      -- can construct names for the selectors. Thus
@@ -245,7 +237,8 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
 	      arg_tys   = sc_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
                
-	; dict_con <- buildDataCon datacon_name
+	; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
+                                   datacon_name
 				   False 	-- Not declared infix
 				   (map (const HsNoBang) args)
 				   [{- No fields -}]
@@ -282,13 +275,14 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
   where
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, dm_spec, _) 
-      = do { dm_info <- case dm_spec of
+      = do { dflags <- getDynFlags
+           ; dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
                           GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
 			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
-           ; return (mkDictSelId no_unf op_name rec_clas, dm_info) }
+           ; return (mkDictSelId dflags no_unf op_name rec_clas, dm_info) }
 \end{code}
 
 Note [Class newtypes and equality predicates]

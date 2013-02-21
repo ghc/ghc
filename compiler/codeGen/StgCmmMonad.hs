@@ -17,30 +17,30 @@
 module StgCmmMonad (
 	FCode,	-- type
 
-        initC, runC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
-	returnFC, fixC, fixC_, nopC, whenC, 
+        initC, runC, thenC, thenFC, listCs,
+        returnFC, fixC,
 	newUnique, newUniqSupply, 
 
         newLabelC, emitLabel,
 
-	emit, emitDecl, emitProc, emitProcWithConvention, emitSimpleProc,
+        emit, emitDecl, emitProc,
+        emitProcWithConvention, emitProcWithStackFrame,
         emitOutOfLine, emitAssign, emitStore, emitComment,
 
-	getCmm, cgStmtsToBlocks,
+        getCmm, aGraphToGraph,
 	getCodeR, getCode, getHeapUsage,
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
-        mkCall, mkCmmCall, mkSafeCall,
+        mkCall, mkCmmCall,
 
         forkClosureBody, forkStatics, forkAlts, forkProc, codeOnly,
 
 	ConTagZ,
 
-	Sequel(..),
+        Sequel(..), ReturnKind(..),
 	withSequel, getSequel,
 
-	setSRTLabel, getSRTLabel, 
-	setTickyCtrLabel, getTickyCtrLabel,
+        setTickyCtrLabel, getTickyCtrLabel,
 
 	withUpdFrameOff, getUpdFrameOff, initUpdFrameOff,
 
@@ -66,6 +66,7 @@ module StgCmmMonad (
 import Cmm
 import StgCmmClosure
 import DynFlags
+import Hoopl
 import MkGraph
 import BlockId
 import CLabel
@@ -89,10 +90,36 @@ infixr 9 `thenFC`
 
 
 --------------------------------------------------------
---	The FCode monad and its types
+-- The FCode monad and its types
+--
+-- FCode is the monad plumbed through the Stg->Cmm code generator, and
+-- the Cmm parser.  It contains the following things:
+--
+--  - A writer monad, collecting:
+--    - code for the current function, in the form of a CmmAGraph.
+--      The function "emit" appends more code to this.
+--    - the top-level CmmDecls accumulated so far
+--
+--  - A state monad with:
+--    - the local bindings in scope
+--    - the current heap usage
+--    - a UniqSupply
+--
+--  - A reader monad, for CgInfoDownwards, containing
+--    - DynFlags,
+--    - the current Module
+--    - the static top-level environmnet
+--    - the update-frame offset
+--    - the ticky counter label
+--    - the Sequel (the continuation to return to)
+
+
 --------------------------------------------------------
 
-newtype FCode a = FCode (CgInfoDownwards -> CgState -> (a, CgState))
+newtype FCode a = FCode (CgInfoDownwards -> CgState -> (# a, CgState #))
+
+instance Functor FCode where
+  fmap f (FCode g) = FCode $ \i s -> case g i s of (# a, s' #) -> (# f a, s' #)
 
 instance Monad FCode where
 	(>>=) = thenFC
@@ -107,22 +134,15 @@ initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
 runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
-runC dflags mod st (FCode code) = code (initCgInfoDown dflags mod) st
+runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
 
 returnFC :: a -> FCode a
-returnFC val = FCode (\_info_down state -> (val, state))
+returnFC val = FCode (\_info_down state -> (# val, state #))
 
 thenC :: FCode () -> FCode a -> FCode a
 thenC (FCode m) (FCode k) = 
-  	FCode (\info_down state -> let (_,new_state) = m info_down state in 
-  		k info_down new_state)
-
-nopC :: FCode ()
-nopC = return ()
-
-whenC :: Bool -> FCode () -> FCode ()
-whenC True  code  = code
-whenC False _code = nopC
+        FCode $ \info_down state -> case m info_down state of
+                                     (# _,new_state #) -> k info_down new_state
 
 listCs :: [FCode ()] -> FCode ()
 listCs [] = return ()
@@ -130,38 +150,22 @@ listCs (fc:fcs) = do
 	fc
 	listCs fcs
    	
-mapCs :: (a -> FCode ()) -> [a] -> FCode ()
-mapCs = mapM_
-
-thenFC	:: FCode a -> (a -> FCode c) -> FCode c
-thenFC (FCode m) k = FCode (
+thenFC  :: FCode a -> (a -> FCode c) -> FCode c
+thenFC (FCode m) k = FCode $
 	\info_down state ->
-		let 
-			(m_result, new_state) = m info_down state
-			(FCode kcode) = k m_result
-		in 
-			kcode info_down new_state
-	)
-
-listFCs :: [FCode a] -> FCode [a]
-listFCs = Prelude.sequence
-
-mapFCs :: (a -> FCode b) -> [a] -> FCode [b]
-mapFCs = mapM
+            case m info_down state of
+              (# m_result, new_state #) ->
+                 case k m_result of
+                   FCode kcode -> kcode info_down new_state
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode (
 	\info_down state -> 
 		let
-			FCode fc = fcode v
-			result@(v,_) = fc info_down state
-			--	    ^--------^
-		in
-			result
+                        (v,s) = doFCode (fcode v) info_down state
+                in
+                        (# v, s #)
 	)
-
-fixC_ :: (a -> FCode a) -> FCode ()
-fixC_ fcode = fixC fcode >> return ()
 
 --------------------------------------------------------
 --	The code generator environment
@@ -176,8 +180,7 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 	cgd_dflags     :: DynFlags,
 	cgd_mod        :: Module,	  -- Module being compiled
 	cgd_statics    :: CgBindings,	  -- [Id -> info] : static environment
-	cgd_srt_lbl    :: CLabel,	  -- Label of the current top-level SRT
-	cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
+        cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
 	cgd_ticky      :: CLabel,	  -- Current destination for ticky counts
 	cgd_sequel     :: Sequel	  -- What to do at end of basic block
   }
@@ -221,29 +224,100 @@ data Sequel
   | AssignTo 
 	[LocalReg]	-- Put result(s) in these regs and fall through
 			-- 	NB: no void arguments here
-        Bool            -- Should we adjust the heap pointer back to recover
-                        -- space that's unused on this path?
-                        -- We need to do this only if the expression may
-                        -- allocate (e.g. it's a foreign call or allocating primOp)
-instance Show Sequel where
-  show (Return _) = "Sequel: Return"
-  show (AssignTo _ _) = "Sequel: Assign"
+                        --
+        Bool            -- Should we adjust the heap pointer back to
+                        -- recover space that's unused on this path?
+                        -- We need to do this only if the expression
+                        -- may allocate (e.g. it's a foreign call or
+                        -- allocating primOp)
+
+-- See Note [sharing continuations] below
+data ReturnKind
+  = AssignedDirectly
+  | ReturnedTo BlockId ByteOff
+
+-- Note [sharing continuations]
+--
+-- ReturnKind says how the expression being compiled returned its
+-- results: either by assigning directly to the registers specified
+-- by the Sequel, or by returning to a continuation that does the
+-- assignments.  The point of this is we might be able to re-use the
+-- continuation in a subsequent heap-check.  Consider:
+--
+--    case f x of z
+--      True  -> <True code>
+--      False -> <False code>
+--
+-- Naively we would generate
+--
+--    R2 = x   -- argument to f
+--    Sp[young(L1)] = L1
+--    call f returns to L1
+--  L1:
+--    z = R1
+--    if (z & 1) then Ltrue else Lfalse
+--  Ltrue:
+--    Hp = Hp + 24
+--    if (Hp > HpLim) then L4 else L7
+--  L4:
+--    HpAlloc = 24
+--    goto L5
+--  L5:
+--    R1 = z
+--    Sp[young(L6)] = L6
+--    call stg_gc_unpt_r1 returns to L6
+--  L6:
+--    z = R1
+--    goto L1
+--  L7:
+--    <True code>
+--  Lfalse:
+--    <False code>
+--
+-- We want the gc call in L4 to return to L1, and discard L6.  Note
+-- that not only can we share L1 and L6, but the assignment of the
+-- return address in L4 is unnecessary because the return address for
+-- L1 is already on the stack.  We used to catch the sharing of L1 and
+-- L6 in the common-block-eliminator, but not the unnecessary return
+-- address assignment.
+--
+-- Since this case is so common I decided to make it more explicit and
+-- robust by programming the sharing directly, rather than relying on
+-- the common-block elimiantor to catch it.  This makes
+-- common-block-elimianteion an optional optimisation, and furthermore
+-- generates less code in the first place that we have to subsequently
+-- clean up.
+--
+-- There are some rarer cases of common blocks that we don't catch
+-- this way, but that's ok.  Common-block-elimation is still available
+-- to catch them when optimisation is enabled.  Some examples are:
+--
+--   - when both the True and False branches do a heap check, we
+--     can share the heap-check failure code L4a and maybe L4
+--
+--   - in a case-of-case, there might be multiple continuations that
+--     we can common up.
+--
+-- It is always safe to use AssignedDirectly.  Expressions that jump
+-- to the continuation from multiple places (e.g. case expressions)
+-- fall back to AssignedDirectly.
+--
+
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
   = MkCgInfoDown {	cgd_dflags    = dflags,
 			cgd_mod       = mod,
 			cgd_statics   = emptyVarEnv,
-			cgd_srt_lbl   = error "initC: srt_lbl",
-			cgd_updfr_off = initUpdFrameOff,
+                        cgd_updfr_off = initUpdFrameOff dflags,
 			cgd_ticky     = mkTopTickyCtrLabel,
 			cgd_sequel    = initSequel }
 
 initSequel :: Sequel
 initSequel = Return False
 
-initUpdFrameOff :: UpdFrameOffset
-initUpdFrameOff = widthInBytes wordWidth -- space for the RA
+initUpdFrameOff :: DynFlags -> UpdFrameOffset
+initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA
 
 
 --------------------------------------------------------
@@ -322,10 +396,10 @@ hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
 --------------------------------------------------------
 
 getState :: FCode CgState
-getState = FCode $ \_info_down state -> (state,state)
+getState = FCode $ \_info_down state -> (# state, state #)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_info_down _ -> ((),state)
+setState state = FCode $ \_info_down _ -> (# (), state #)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -369,7 +443,8 @@ getStaticBinds = do
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state -> 
-	let (retval, state2) = fcode info_down newstate in ((retval,state2), state)
+  case fcode info_down newstate of
+    (# retval, state2 #) -> (# (retval,state2), state #)
 
 newUniqSupply :: FCode UniqSupply
 newUniqSupply = do
@@ -385,7 +460,7 @@ newUnique = do
 
 ------------------
 getInfoDown :: FCode CgInfoDownwards
-getInfoDown = FCode $ \info_down state -> (info_down,state)
+getInfoDown = FCode $ \info_down state -> (# info_down,state #)
 
 instance HasDynFlags FCode where
     getDynFlags = liftM cgd_dflags getInfoDown
@@ -397,8 +472,9 @@ withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state 
 
 doFCode :: FCode a -> CgInfoDownwards -> CgState -> (a,CgState)
-doFCode (FCode fcode) info_down state = fcode info_down state
-
+doFCode (FCode fcode) info_down state =
+  case fcode info_down state of
+    (# a, s #) -> ( a, s )
 
 -- ----------------------------------------------------------------------------
 -- Get the current module name
@@ -409,7 +485,7 @@ getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info
 
-withSequel :: Sequel -> FCode () -> FCode ()
+withSequel :: Sequel -> FCode a -> FCode a
 withSequel sequel code
   = do	{ info  <- getInfoDown
 	; withInfoDown code (info {cgd_sequel = sequel }) }
@@ -417,22 +493,6 @@ withSequel sequel code
 getSequel :: FCode Sequel
 getSequel = do  { info <- getInfoDown
 		; return (cgd_sequel info) }
-
--- ----------------------------------------------------------------------------
--- Get/set the current SRT label
-
--- There is just one SRT for each top level binding; all the nested
--- bindings use sub-sections of this SRT.  The label is passed down to
--- the nested bindings via the monad.
-
-getSRTLabel :: FCode CLabel	-- Used only by cgPanic
-getSRTLabel = do info  <- getInfoDown
-		 return (cgd_srt_lbl info)
-
-setSRTLabel :: CLabel -> FCode a -> FCode a
-setSRTLabel srt_lbl code
-  = do  info <- getInfoDown
-	withInfoDown code (info { cgd_srt_lbl = srt_lbl})
 
 -- ----------------------------------------------------------------------------
 -- Get/set the size of the update frame
@@ -444,7 +504,7 @@ setSRTLabel srt_lbl code
 -- Note: I'm including the size of the original return address
 -- in the size of the update frame -- hence the default case on `get'.
 
-withUpdFrameOff :: UpdFrameOffset -> FCode () -> FCode ()
+withUpdFrameOff :: UpdFrameOffset -> FCode a -> FCode a
 withUpdFrameOff size code
   = do	{ info  <- getInfoDown
 	; withInfoDown code (info {cgd_updfr_off = size }) }
@@ -484,11 +544,12 @@ forkClosureBody :: FCode () -> FCode ()
 -- C-- from the fork is incorporated.
 
 forkClosureBody body_code
-  = do	{ info <- getInfoDown
+  = do	{ dflags <- getDynFlags
+      	; info <- getInfoDown
 	; us   <- newUniqSupply
 	; state <- getState
    	; let	body_info_down = info { cgd_sequel    = initSequel
-                                      , cgd_updfr_off = initUpdFrameOff }
+                                      , cgd_updfr_off = initUpdFrameOff dflags }
 		fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
 		((),fork_state_out)
 		    = doFCode body_code body_info_down fork_state_in
@@ -500,12 +561,13 @@ forkStatics :: FCode a -> FCode a
 -- The Abstract~C returned is attached to the current state, but the
 -- bindings and usage information is otherwise unchanged.
 forkStatics body_code
-  = do	{ info  <- getInfoDown
+  = do	{ dflags <- getDynFlags
+      	; info  <- getInfoDown
 	; us    <- newUniqSupply
 	; state <- getState
 	; let	rhs_info_down = info { cgd_statics = cgs_binds state
 				     , cgd_sequel  = initSequel 
-			             , cgd_updfr_off = initUpdFrameOff }
+			             , cgd_updfr_off = initUpdFrameOff dflags }
 		(result, fork_state_out) = doFCode body_code rhs_info_down 
 						   (initCgState us)
 	; setState (state `addCodeBlocksFrom` fork_state_out)
@@ -639,23 +701,60 @@ emitDecl decl
 emitOutOfLine :: BlockId -> CmmAGraph -> FCode ()
 emitOutOfLine l stmts = emitCgStmt (CgFork l stmts)
 
-emitProcWithConvention :: Convention -> CmmInfoTable -> CLabel -> [CmmFormal] ->
-                          CmmAGraph -> FCode ()
-emitProcWithConvention conv info lbl args blocks
-  = do  { us <- newUniqSupply
-        ; let (offset, entry) = mkCallEntry conv args
-              blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
-        ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just initUpdFrameOff}
-              proc_block = CmmProc (TopInfo {info_tbl=info, stack_info=sinfo}) lbl blks
+emitProcWithStackFrame
+   :: Convention                        -- entry convention
+   -> Maybe CmmInfoTable                -- info table?
+   -> CLabel                            -- label for the proc
+   -> [CmmFormal]                       -- stack frame
+   -> [CmmFormal]                       -- arguments
+   -> CmmAGraph                         -- code
+   -> Bool                              -- do stack layout?
+   -> FCode ()
+
+emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
+  = do  { dflags <- getDynFlags
+        ; emitProc_ mb_info lbl [] blocks (widthInBytes (wordWidth dflags)) False
+        }
+emitProcWithStackFrame conv mb_info lbl stk_args args blocks True -- do layout
+  = do  { dflags <- getDynFlags
+        ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
+        ; emitProc_ mb_info lbl live (entry <*> blocks) offset True
+        }
+emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
+
+emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
+                       -> [CmmFormal]
+                       -> CmmAGraph
+                       -> FCode ()
+emitProcWithConvention conv mb_info lbl args blocks
+  = emitProcWithStackFrame conv mb_info lbl [] args blocks True
+
+emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraph -> Int -> FCode ()
+emitProc  mb_info lbl live blocks offset
+ = emitProc_ mb_info lbl live blocks offset True
+
+emitProc_ :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraph -> Int -> Bool
+          -> FCode ()
+emitProc_ mb_info lbl live blocks offset do_layout
+  = do  { dflags <- getDynFlags
+        ; l <- newLabelC
+        ; let
+              blks = labelAGraph l blocks
+
+              infos | Just info <- mb_info = mapSingleton (g_entry blks) info
+                    | otherwise            = mapEmpty
+
+              sinfo = StackInfo { arg_space = offset
+                                , updfr_space = Just (initUpdFrameOff dflags)
+                                , do_layout = do_layout }
+
+              tinfo = TopInfo { info_tbls = infos
+                              , stack_info=sinfo}
+
+              proc_block = CmmProc tinfo lbl live blks
+
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
-
-emitProc :: CmmInfoTable -> CLabel -> [CmmFormal] -> CmmAGraph -> FCode ()
-emitProc = emitProcWithConvention NativeNodeCall
-
-emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()
-emitSimpleProc lbl code = 
-  emitProc CmmNonInfoTable lbl [] code
 
 getCmm :: FCode () -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)
@@ -691,44 +790,25 @@ mkCmmIfThen e tbranch = do
 
 
 mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual]
-       -> UpdFrameOffset -> (ByteOff,[(CmmExpr,ByteOff)]) -> FCode CmmAGraph
+       -> UpdFrameOffset -> [CmmActual] -> FCode CmmAGraph
 mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
+  dflags <- getDynFlags
   k <- newLabelC
   let area = Young k
-      (off, copyin) = copyInOflow retConv area results
-      copyout = mkCallReturnsTo f callConv actuals k off updfr_off extra_stack
+      (off, _, copyin) = copyInOflow dflags retConv area results []
+      copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack
   return (copyout <*> mkLabel k <*> copyin)
 
 mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset
           -> FCode CmmAGraph
 mkCmmCall f results actuals updfr_off
-   = mkCall f (NativeDirectCall, NativeReturn) results actuals updfr_off (0,[])
+   = mkCall f (NativeDirectCall, NativeReturn) results actuals updfr_off []
 
-
-mkSafeCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
-           -> UpdFrameOffset -> Bool
-           -> FCode CmmAGraph
-mkSafeCall   t fs as upd i = do
-  k <- newLabelC
-  let (_off, copyout) = copyInOflow NativeReturn (Young k) fs
-    -- see Note [safe foreign call convention]
-  return
-     (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
-                  (CmmLit (CmmBlock k))
-      <*> mkLast (CmmForeignCall { tgt=t, res=fs, args=as, succ=k
-                                 , updfr=upd, intrbl=i })
-      <*> mkLabel k
-      <*> copyout
-     )
 
 -- ----------------------------------------------------------------------------
--- CgStmts
+-- turn CmmAGraph into CmmGraph, for making a new proc.
 
--- These functions deal in terms of CgStmts, which is an abstract type
--- representing the code in the current proc.
-
--- turn CgStmts into [CmmBasicBlock], for making a new proc.
-cgStmtsToBlocks :: CmmAGraph -> FCode CmmGraph
-cgStmtsToBlocks stmts
-  = do  { us <- newUniqSupply
-	; return (initUs_ us (lgraphOfAGraph stmts)) }	
+aGraphToGraph :: CmmAGraph -> FCode CmmGraph
+aGraphToGraph stmts
+  = do  { l <- newLabelC
+        ; return (labelAGraph l stmts) }

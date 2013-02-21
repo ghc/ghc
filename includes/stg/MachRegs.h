@@ -20,38 +20,36 @@
  */
 
 /*
- * Defining NO_REGS causes no global registers to be used.  NO_REGS is
+ * Undefine these as a precaution: some of them were found to be
+ * defined by system headers on ARM/Linux.
+ */
+#undef REG_R1
+#undef REG_R2
+#undef REG_R3
+#undef REG_R4
+#undef REG_R5
+#undef REG_R6
+#undef REG_R7
+#undef REG_R8
+#undef REG_R9
+#undef REG_R10
+
+/*
+ * Defining MACHREGS_NO_REGS to 1 causes no global registers to be used.
+ * MACHREGS_NO_REGS is typically controlled by NO_REGS, which is
  * typically defined by GHC, via a command-line option passed to gcc,
  * when the -funregisterised flag is given.
  *
- * NB. When NO_REGS is on, calling & return conventions may be
+ * NB. When MACHREGS_NO_REGS to 1, calling & return conventions may be
  * different.  For example, all function arguments will be passed on
  * the stack, and components of an unboxed tuple will be returned on
  * the stack rather than in registers.
  */
-#ifndef NO_REGS
+#if MACHREGS_NO_REGS == 1
 
-/* NOTE: when testing the platform in this file we must test either
- * *_HOST_ARCH and *_TARGET_ARCH, depending on whether COMPILING_GHC
- * is set.  This is because when we're compiling the RTS and HC code,
- * the platform we're running on is the HOST, but when compiling GHC
- * we want to know about the register mapping on the TARGET platform.
- */
-#ifdef COMPILING_GHC
-#define i386_REGS     i386_TARGET_ARCH
-#define x86_64_REGS   x86_64_TARGET_ARCH
-#define powerpc_REGS  (powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH)
-#define sparc_REGS    sparc_TARGET_ARCH
-#define arm_REGS      arm_TARGET_ARCH
-#define darwin_REGS   darwin_TARGET_OS
-#else
-#define i386_REGS     i386_HOST_ARCH
-#define x86_64_REGS   x86_64_HOST_ARCH
-#define powerpc_REGS  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH || rs6000_HOST_ARCH)
-#define sparc_REGS    sparc_HOST_ARCH
-#define arm_REGS      arm_HOST_ARCH
-#define darwin_REGS   darwin_HOST_OS
-#endif
+/* Nothing */
+
+#elif MACHREGS_NO_REGS == 0
 
 /* ----------------------------------------------------------------------------
    Caller saves and callee-saves regs.
@@ -84,7 +82,7 @@
    Leaving SpLim out of the picture.
    -------------------------------------------------------------------------- */
 
-#if i386_REGS
+#if MACHREGS_i386
 
 #define REG(x) __asm__("%" #x)
 
@@ -109,8 +107,7 @@
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
 #define MAX_REAL_LONG_REG    0
-
-#endif /* iX86 */
+#define MAX_REAL_SSE_REG     0
 
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
@@ -141,7 +138,7 @@
 
   --------------------------------------------------------------------------- */
 
-#if x86_64_REGS
+#elif MACHREGS_x86_64
 
 #define REG(x) __asm__("%" #x)
 
@@ -160,9 +157,22 @@
 #define REG_F2    xmm2
 #define REG_F3    xmm3
 #define REG_F4    xmm4
+#define REG_F5    xmm5
+#define REG_F6    xmm6
 
-#define REG_D1    xmm5
-#define REG_D2    xmm6
+#define REG_D1    xmm1
+#define REG_D2    xmm2
+#define REG_D3    xmm3
+#define REG_D4    xmm4
+#define REG_D5    xmm5
+#define REG_D6    xmm6
+
+#define REG_XMM1    xmm1
+#define REG_XMM2    xmm2
+#define REG_XMM3    xmm3
+#define REG_XMM4    xmm4
+#define REG_XMM5    xmm5
+#define REG_XMM6    xmm6
 
 #if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_R3
@@ -175,18 +185,34 @@
 #define CALLER_SAVES_F2
 #define CALLER_SAVES_F3
 #define CALLER_SAVES_F4
+#define CALLER_SAVES_F5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_F6
+#endif
 
 #define CALLER_SAVES_D1
-#if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_D2
+#define CALLER_SAVES_D3
+#define CALLER_SAVES_D4
+#define CALLER_SAVES_D5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_D6
+#endif
+
+#define CALLER_SAVES_XMM1
+#define CALLER_SAVES_XMM2
+#define CALLER_SAVES_XMM3
+#define CALLER_SAVES_XMM4
+#define CALLER_SAVES_XMM5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_XMM6
 #endif
 
 #define MAX_REAL_VANILLA_REG 6
-#define MAX_REAL_FLOAT_REG   4
-#define MAX_REAL_DOUBLE_REG  2
+#define MAX_REAL_FLOAT_REG   6
+#define MAX_REAL_DOUBLE_REG  6
 #define MAX_REAL_LONG_REG    0
-
-#endif /* x86_64 */
+#define MAX_REAL_SSE_REG     6
 
 /* -----------------------------------------------------------------------------
    The PowerPC register mapping
@@ -218,7 +244,7 @@
    We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
-#if powerpc_REGS
+#elif MACHREGS_powerpc
 
 #define REG(x) __asm__(#x)
 
@@ -231,7 +257,7 @@
 #define REG_R7          r20
 #define REG_R8          r21
 
-#if darwin_REGS
+#if MACHREGS_darwin
 
 #define REG_F1          f14
 #define REG_F2          f15
@@ -259,8 +285,6 @@
 #define REG_Hp          r25
 
 #define REG_Base        r27
-
-#endif /* powerpc */
 
 /* -----------------------------------------------------------------------------
    The Sun SPARC register mapping
@@ -353,7 +377,7 @@
 
    -------------------------------------------------------------------------- */
 
-#if sparc_REGS
+#elif MACHREGS_sparc
 
 #define REG(x) __asm__("%" #x)
 
@@ -396,8 +420,6 @@
 
 #define NCG_FirstFloatReg f22
 
-#endif /* sparc */
-
 /* -----------------------------------------------------------------------------
    The ARM EABI register mapping
 
@@ -433,8 +455,7 @@
    d16-d31/q8-q15        Argument / result/ scratch registers
    ----------------------------------------------------------------------------- */
 
-
-#if arm_REGS
+#elif MACHREGS_arm
 
 #define REG(x) __asm__(#x)
 
@@ -459,9 +480,17 @@
 #define REG_D2    d11
 #endif
 
-#endif /* arm */
+#else
 
-#endif /* NO_REGS */
+#error Cannot find platform to give register info for
+
+#endif
+
+#else
+
+#error Bad MACHREGS_NO_REGS value
+
+#endif
 
 /* -----------------------------------------------------------------------------
  * These constants define how many stg registers will be used for
@@ -533,6 +562,24 @@
 #  define MAX_REAL_LONG_REG 1
 #  else
 #  define MAX_REAL_LONG_REG 0
+#  endif
+#endif
+
+#ifndef MAX_REAL_SSE_REG
+#  if   defined(REG_SSE6)
+#  define MAX_REAL_SSE_REG 6
+#  elif defined(REG_SSE5)
+#  define MAX_REAL_SSE_REG 5
+#  elif defined(REG_SSE4)
+#  define MAX_REAL_SSE_REG 4
+#  elif defined(REG_SSE3)
+#  define MAX_REAL_SSE_REG 3
+#  elif defined(REG_SSE2)
+#  define MAX_REAL_SSE_REG 2
+#  elif defined(REG_SSE1)
+#  define MAX_REAL_SSE_REG 1
+#  else
+#  define MAX_REAL_SSE_REG 0
 #  endif
 #endif
 

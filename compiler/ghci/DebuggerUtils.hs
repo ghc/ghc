@@ -2,20 +2,18 @@ module DebuggerUtils (
        dataConInfoPtrToName,
   ) where
 
+import CmmInfo ( stdInfoTableSizeB )
 import ByteCodeItbls
 import DynFlags
 import FastString
 import TcRnTypes
 import TcRnMonad
 import IfaceEnv
-import CgInfoTbls
-import SMRep
 import Module
 import OccName
 import Name
 import Outputable
-import Constants
-import MonadUtils ()
+import Platform
 import Util
 
 import Data.Char
@@ -36,9 +34,10 @@ import Data.List
 --
 dataConInfoPtrToName :: Ptr () -> TcM (Either String Name)
 dataConInfoPtrToName x = do 
+   dflags <- getDynFlags
    theString <- liftIO $ do
       let ptr = castPtr x :: Ptr StgInfoTable
-      conDescAddress <- getConDescAddress ptr 
+      conDescAddress <- getConDescAddress dflags ptr
       peekArray0 0 conDescAddress  
    let (pkg, mod, occ) = parse theString 
        pkgFS = mkFastStringByteList pkg
@@ -46,7 +45,6 @@ dataConInfoPtrToName x = do
        occFS = mkFastStringByteList occ
        occName = mkOccNameFS OccName.dataName occFS
        modName = mkModule (fsToPackageId pkgFS) (mkModuleNameFS modFS) 
-   dflags <- getDynFlags
    return (Left $ showSDoc dflags $ ppr modName <> dot <> ppr occName)
     `recoverM` (Right `fmap` lookupOrig modName occName)
 
@@ -92,14 +90,22 @@ dataConInfoPtrToName x = do
          in the memory location: info_table_ptr + info_table_size
    -}
 
-   getConDescAddress :: Ptr StgInfoTable -> IO (Ptr Word8)
-   getConDescAddress ptr
+   getConDescAddress :: DynFlags -> Ptr StgInfoTable -> IO (Ptr Word8)
+   getConDescAddress dflags ptr
     | ghciTablesNextToCode = do
-       offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
-       return $ (ptr `plusPtr` stdInfoTableSizeB) `plusPtr` (fromIntegral (offsetToString :: StgWord))
+       let ptr' = ptr `plusPtr` (- wORD_SIZE dflags)
+       -- offsetToString is really an StgWord, but we have to jump
+       -- through some hoops due to the way that our StgWord Haskell
+       -- type is the same on 32 and 64bit platforms
+       offsetToString <- case platformWordSize (targetPlatform dflags) of
+                         4 -> do w <- peek ptr'
+                                 return (fromIntegral (w :: Word32))
+                         8 -> do w <- peek ptr'
+                                 return (fromIntegral (w :: Word64))
+                         w -> panic ("getConDescAddress: Unknown platformWordSize: " ++ show w)
+       return $ (ptr `plusPtr` stdInfoTableSizeB dflags) `plusPtr` offsetToString
     | otherwise =
-       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + fromIntegral stdInfoTableSizeB
-
+       peek $ intPtrToPtr $ ptrToIntPtr ptr + fromIntegral (stdInfoTableSizeB dflags)
    -- parsing names is a little bit fiddly because we have a string in the form: 
    -- pkg:A.B.C.foo, and we want to split it into three parts: ("pkg", "A.B.C", "foo").
    -- Thus we split at the leftmost colon and the rightmost occurrence of the dot.

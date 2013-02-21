@@ -19,7 +19,7 @@
    -------------------------------------------------------------------------- */
 
 typedef struct _StgEntCounter {
-  /* Using StgWord for everything, becuase both the C and asm code
+  /* Using StgWord for everything, because both the C and asm code
      generators make trouble if you try to pack things tighter */
     StgWord	registeredp;	/* 0 == no, 1 == yes */
     StgInt	arity;		/* arity (static info) */

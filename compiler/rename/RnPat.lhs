@@ -61,6 +61,8 @@ import SrcLoc
 import FastString
 import Literal		( inCharRange )
 import Control.Monad	( when )
+import TysWiredIn       ( nilDataCon )
+import DataCon          ( dataConName )
 \end{code}
 
 
@@ -121,9 +123,25 @@ wrapSrcSpanCps fn (L loc a)
 lookupConCps :: Located RdrName -> CpsRn (Located Name)
 lookupConCps con_rdr 
   = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
-                    ; (r, fvs) <- k con_name
-                    ; return (r, fvs `plusFV` unitFV (unLoc con_name)) })
+                    ; k con_name })
+    -- We do not add the constructor name to the free vars
+    -- See Note [Patterns are not uses]
 \end{code}
+
+Note [Patterns are not uses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  module Foo( f, g ) where
+  data T = T1 | T2
+
+  f T1 = True
+  f T2 = False
+
+  g _ = T1
+
+Arguaby we should report T2 as unused, even though it appears in a
+pattern, because it never occurs in a constructed position.  See
+Trac #7336.
 
 %*********************************************************
 %*							*
@@ -158,8 +176,8 @@ matchNameMaker ctxt = LamMk report_unused
     -- Do not report unused names in interactive contexts
     -- i.e. when you type 'x <- e' at the GHCi prompt
     report_unused = case ctxt of
-                      StmtCtxt GhciStmt -> False
-                      _                 -> True
+                      StmtCtxt GhciStmtCtxt -> False
+                      _                     -> True
 
 rnHsSigCps :: HsWithBndrs (LHsType RdrName) -> CpsRn (HsWithBndrs (LHsType Name))
 rnHsSigCps sig 
@@ -359,11 +377,20 @@ rnPatAndThen mk p@(ViewPat expr pat ty)
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
-  = rnConPatAndThen mk con stuff
+   -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
+  = case unLoc con == nameRdrName (dataConName nilDataCon) of
+      True    -> do { ol_flag <- liftCps $ xoptM Opt_OverloadedLists
+                    ; if ol_flag then rnPatAndThen mk (ListPat [] placeHolderType Nothing)
+                                 else rnConPatAndThen mk con stuff} 
+      False   -> rnConPatAndThen mk con stuff
 
-rnPatAndThen mk (ListPat pats _)
-  = do { pats' <- rnLPatsAndThen mk pats
-       ; return (ListPat pats' placeHolderType) }
+rnPatAndThen mk (ListPat pats _ _)
+  = do { opt_OverloadedLists <- liftCps $ xoptM Opt_OverloadedLists
+       ; pats' <- rnLPatsAndThen mk pats
+       ; case opt_OverloadedLists of
+          True -> do   { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
+                       ; return (ListPat pats' placeHolderType (Just (placeHolderType, to_list_name)))}
+          False -> return (ListPat pats' placeHolderType Nothing) }
 
 rnPatAndThen mk (PArrPat pats _)
   = do { pats' <- rnLPatsAndThen mk pats
@@ -483,7 +510,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
     rn_fld pun_ok parent (HsRecField { hsRecFieldId = fld
                        	      	     , hsRecFieldArg = arg
                        	      	     , hsRecPun = pun })
-      = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndrOcc parent doc) fld
+      = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndrOcc True parent doc) fld
            ; arg' <- if pun 
                      then do { checkErr pun_ok (badPun fld)
                              ; return (L loc (mk_arg (mkRdrUnqual (nameOccName fld_nm)))) }

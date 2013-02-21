@@ -38,13 +38,11 @@ module PprCmmDecl
     )
 where
 
-import CLabel
 import PprCmmExpr
 import Cmm
 
 import DynFlags
 import Outputable
-import Platform
 import FastString
 
 import Data.List
@@ -72,7 +70,7 @@ instance (Outputable d, Outputable info, Outputable i)
     ppr t = pprTop t
 
 instance Outputable CmmStatics where
-    ppr x = sdocWithPlatform $ \platform -> pprStatics platform x
+    ppr = pprStatics
 
 instance Outputable CmmStatic where
     ppr = pprStatic
@@ -94,9 +92,9 @@ pprCmmGroup tops
 pprTop :: (Outputable d, Outputable info, Outputable i)
        => GenCmmDecl d info i -> SDoc
 
-pprTop (CmmProc info lbl graph)
+pprTop (CmmProc info lbl live graph)
 
-  = vcat [ ppr lbl <> lparen <> rparen
+  = vcat [ ppr lbl <> lparen <> rparen <+> ptext (sLit "// ") <+> ppr live
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]
@@ -114,8 +112,6 @@ pprTop (CmmData section ds) =
 -- Info tables.
 
 pprInfoTable :: CmmInfoTable -> SDoc
-pprInfoTable CmmNonInfoTable
-  = empty
 pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
                            , cit_srt = _srt })
@@ -129,7 +125,7 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
 instance Outputable C_SRT where
   ppr NoC_SRT = ptext (sLit "_no_srt_")
   ppr (C_SRT label off bitmap)
-      = parens (ppr label <> comma <> ppr off <> comma <> text (show bitmap))
+      = parens (ppr label <> comma <> ppr off <> comma <> ppr bitmap)
 
 instance Outputable ForeignHint where
   ppr NoHint     = empty
@@ -143,9 +139,8 @@ instance Outputable ForeignHint where
 --      Strings are printed as C strings, and we print them as I8[],
 --      following C--
 --
-pprStatics :: Platform -> CmmStatics -> SDoc
-pprStatics platform (Statics lbl ds)
-    = vcat ((pprCLabel platform lbl <> colon) : map ppr ds)
+pprStatics :: CmmStatics -> SDoc
+pprStatics (Statics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of

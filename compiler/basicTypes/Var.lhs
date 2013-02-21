@@ -86,8 +86,6 @@ import FastTypes
 import FastString
 import Outputable
 
--- import StaticFlags ( opt_SuppressVarKinds )
-
 import Data.Data
 \end{code}
 
@@ -217,7 +215,7 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 instance Outputable Var where
   ppr var = ppr (varName var) <+> ifPprDebug (brackets (ppr_debug var))
 -- Printing the type on every occurrence is too much!
---            <+> if (not opt_SuppressVarKinds)
+--            <+> if (not (gopt Opt_SuppressVarKinds dflags))
 --                then ifPprDebug (text "::" <+> ppr (tyVarKind var) <+> text ")")
 --                else empty
 
@@ -354,7 +352,7 @@ idDetails (Id { id_details = details }) = details
 idDetails other 	       	        = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
--- Ids, becuase Id.lhs uses 'mkGlobalId' etc with different types
+-- Ids, because Id.lhs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
   = mk_id name ty GlobalId details info

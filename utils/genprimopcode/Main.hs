@@ -61,6 +61,11 @@ main = getArgs >>= \args ->
                                        "strictness"
                                        "primOpStrictness" p_o_specs)
 
+                      "--fixity"
+                         -> putStr (gen_switch_from_attribs
+                                       "fixity"
+                                       "primOpFixity" p_o_specs)
+
                       "--primop-primop-info"
                          -> putStr (gen_primop_info p_o_specs)
 
@@ -94,6 +99,7 @@ known_args
        "--code-size",
        "--can-fail",
        "--strictness",
+       "--fixity",
        "--primop-primop-info",
        "--primop-tag",
        "--primop-list",
@@ -142,6 +148,7 @@ gen_hs_source (Info defaults entries) =
            opt (OptionTrue n)	  = n ++ " = True"
 	   opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
            opt (OptionInteger n v) = n ++ " = " ++ show v
+           opt (OptionFixity mf) = "fixity" ++ " = " ++ show mf
 
 	   hdr s@(Section {})			 = sec s
 	   hdr (PrimOpSpec { name = n })	 = wrapOp n ++ ","
@@ -157,9 +164,11 @@ gen_hs_source (Info defaults entries) =
 	   sec s = "\n-- * " ++ escape (title s) ++ "\n"
 			++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
 
-	   spec o = comm : decls
-	     where decls = case o of
-			PrimOpSpec { name = n, ty = t }	  ->
+           spec o = comm : decls
+             where decls = case o of
+                        PrimOpSpec { name = n, ty = t, opts = options } ->
+                            [ pprFixity fixity n | OptionFixity (Just fixity) <- options ]
+                            ++
                             [ wrapOp n ++ " :: " ++ pprTy t,
                               wrapOp n ++ " = let x = x in x" ]
 			PseudoOpSpec { name = n, ty = t } ->
@@ -190,6 +199,8 @@ gen_hs_source (Info defaults entries) =
 	              mk (c:cs)	   = c : mk cs
 	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
 	   	where special = "/'`\"@<"
+
+           pprFixity (Fixity i d) n = pprFixityDir d ++ " " ++ show i ++ " " ++ n
 
 pprTy :: Ty -> String
 pprTy = pty
@@ -390,114 +401,128 @@ gen_latex_doc (Info defaults entries)
 	   tvars_of (TyVar tv) = [tv]
 
            mk_options o =
-	     "\\primoptions{"
-	      ++ mk_has_side_effects o ++ "}{"
-	      ++ mk_out_of_line o ++ "}{"
-	      ++ mk_commutable o ++ "}{"
- 	      ++ mk_needs_wrapper o ++ "}{"
-	      ++ mk_can_fail o ++ "}{"
-	      ++ latex_encode (mk_strictness o) ++ "}{"
-	      ++ "}"
+             "\\primoptions{"
+              ++ mk_has_side_effects o ++ "}{"
+              ++ mk_out_of_line o ++ "}{"
+              ++ mk_commutable o ++ "}{"
+              ++ mk_needs_wrapper o ++ "}{"
+              ++ mk_can_fail o ++ "}{"
+              ++ mk_fixity o ++ "}{"
+              ++ latex_encode (mk_strictness o) ++ "}{"
+              ++ "}"
 
-  	   mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
-	   mk_out_of_line o = mk_bool_opt o "out_of_line" "Implemented out of line." "Implemented in line."
-  	   mk_commutable o = mk_bool_opt o "commutable" "Commutable." "Not commutable."
-  	   mk_needs_wrapper o = mk_bool_opt o "needs_wrapper" "Needs wrapper." "Needs no wrapper."
-	   mk_can_fail o = mk_bool_opt o "can_fail" "Can fail." "Cannot fail."
+           mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
+           mk_out_of_line o = mk_bool_opt o "out_of_line" "Implemented out of line." "Implemented in line."
+           mk_commutable o = mk_bool_opt o "commutable" "Commutable." "Not commutable."
+           mk_needs_wrapper o = mk_bool_opt o "needs_wrapper" "Needs wrapper." "Needs no wrapper."
+           mk_can_fail o = mk_bool_opt o "can_fail" "Can fail." "Cannot fail."
 
-	   mk_bool_opt o opt_name if_true if_false =
-	     case lookup_attrib opt_name o of
-	       Just (OptionTrue _) -> if_true
-	       Just (OptionFalse _) -> if_false
-	       Just (OptionString _ _) -> error "String value for boolean option"
+           mk_bool_opt o opt_name if_true if_false =
+             case lookup_attrib opt_name o of
+               Just (OptionTrue _) -> if_true
+               Just (OptionFalse _) -> if_false
+               Just (OptionString _ _) -> error "String value for boolean option"
                Just (OptionInteger _ _) -> error "Integer value for boolean option"
+               Just (OptionFixity _) -> error "Fixity value for boolean option"
                Nothing -> ""
 
-	   mk_strictness o =
-	     case lookup_attrib "strictness" o of
-	       Just (OptionString _ s) -> s  -- for now
-	       Just _ -> error "Boolean value for strictness"
-	       Nothing -> ""
+           mk_strictness o =
+             case lookup_attrib "strictness" o of
+               Just (OptionString _ s) -> s  -- for now
+               Just _ -> error "Wrong value for strictness"
+               Nothing -> ""
 
-	   zencode xs =
-	     case maybe_tuple xs of
-		Just n  -> n		-- Tuples go to Z2T etc
-		Nothing -> concat (map encode_ch xs)
-	     where
-	       maybe_tuple "(# #)" = Just("Z1H")
-	       maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-						(n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
-						_		   -> Nothing
-	       maybe_tuple "()" = Just("Z0T")
-	       maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-						(n, ')' : _) -> Just ('Z' : shows (n+1) "T")
-						_	     -> Nothing
-	       maybe_tuple _    	     = Nothing
+           mk_fixity o = case lookup_attrib "fixity" o of
+             Just (OptionFixity (Just (Fixity i d)))
+               -> pprFixityDir d ++ " " ++ show i
+             _ -> ""
 
-	       count_commas :: Int -> String -> (Int, String)
-	       count_commas n (',' : cs) = count_commas (n+1) cs
-	       count_commas n cs	  = (n,cs)
+           zencode xs =
+             case maybe_tuple xs of
+                Just n  -> n            -- Tuples go to Z2T etc
+                Nothing -> concat (map encode_ch xs)
+             where
+               maybe_tuple "(# #)" = Just("Z1H")
+               maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
+                                                (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
+                                                _                  -> Nothing
+               maybe_tuple "()" = Just("Z0T")
+               maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
+                                                (n, ')' : _) -> Just ('Z' : shows (n+1) "T")
+                                                _            -> Nothing
+               maybe_tuple _                 = Nothing
 
-	       unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
-	       unencodedChar 'Z' = False
-	       unencodedChar 'z' = False
-	       unencodedChar c   = isAlphaNum c
+               count_commas :: Int -> String -> (Int, String)
+               count_commas n (',' : cs) = count_commas (n+1) cs
+               count_commas n cs          = (n,cs)
 
-	       encode_ch :: Char -> String
-	       encode_ch c | unencodedChar c = [c]	-- Common case first
+               unencodedChar :: Char -> Bool    -- True for chars that don't need encoding
+               unencodedChar 'Z' = False
+               unencodedChar 'z' = False
+               unencodedChar c   = isAlphaNum c
 
-	       -- Constructors
-	       encode_ch '('  = "ZL"	-- Needed for things like (,), and (->)
-	       encode_ch ')'  = "ZR"	-- For symmetry with (
-	       encode_ch '['  = "ZM"
-	       encode_ch ']'  = "ZN"
-	       encode_ch ':'  = "ZC"
-	       encode_ch 'Z'  = "ZZ"
+               encode_ch :: Char -> String
+               encode_ch c | unencodedChar c = [c]      -- Common case first
 
-	       -- Variables
-	       encode_ch 'z'  = "zz"
-	       encode_ch '&'  = "za"
-	       encode_ch '|'  = "zb"
-	       encode_ch '^'  = "zc"
-	       encode_ch '$'  = "zd"
-	       encode_ch '='  = "ze"
-	       encode_ch '>'  = "zg"
-	       encode_ch '#'  = "zh"
-	       encode_ch '.'  = "zi"
-	       encode_ch '<'  = "zl"
-	       encode_ch '-'  = "zm"
-	       encode_ch '!'  = "zn"
-	       encode_ch '+'  = "zp"
-	       encode_ch '\'' = "zq"
-	       encode_ch '\\' = "zr"
-	       encode_ch '/'  = "zs"
-	       encode_ch '*'  = "zt"
-	       encode_ch '_'  = "zu"
-	       encode_ch '%'  = "zv"
-	       encode_ch c    = 'z' : shows (ord c) "U"
+               -- Constructors
+               encode_ch '('  = "ZL"    -- Needed for things like (,), and (->)
+               encode_ch ')'  = "ZR"    -- For symmetry with (
+               encode_ch '['  = "ZM"
+               encode_ch ']'  = "ZN"
+               encode_ch ':'  = "ZC"
+               encode_ch 'Z'  = "ZZ"
 
-	   latex_encode [] = []
-	   latex_encode (c:cs) | c `elem` "#$%&_^{}" = "\\" ++ c:(latex_encode cs)
-	   latex_encode ('~':cs) = "\\verb!~!" ++ (latex_encode cs)
-	   latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
-	   latex_encode (c:cs) = c:(latex_encode cs)
+               -- Variables
+               encode_ch 'z'  = "zz"
+               encode_ch '&'  = "za"
+               encode_ch '|'  = "zb"
+               encode_ch '^'  = "zc"
+               encode_ch '$'  = "zd"
+               encode_ch '='  = "ze"
+               encode_ch '>'  = "zg"
+               encode_ch '#'  = "zh"
+               encode_ch '.'  = "zi"
+               encode_ch '<'  = "zl"
+               encode_ch '-'  = "zm"
+               encode_ch '!'  = "zn"
+               encode_ch '+'  = "zp"
+               encode_ch '\'' = "zq"
+               encode_ch '\\' = "zr"
+               encode_ch '/'  = "zs"
+               encode_ch '*'  = "zt"
+               encode_ch '_'  = "zu"
+               encode_ch '%'  = "zv"
+               encode_ch c    = 'z' : shows (ord c) "U"
+
+           latex_encode [] = []
+           latex_encode (c:cs) | c `elem` "#$%&_^{}" = "\\" ++ c:(latex_encode cs)
+           latex_encode ('~':cs) = "\\verb!~!" ++ (latex_encode cs)
+           latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
+           latex_encode (c:cs) = c:(latex_encode cs)
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
-   = "{-# LANGUAGE NoImplicitPrelude, UnboxedTuples #-}\n"
-	-- Dependencies on Prelude must be explicit in libraries/base, but we
-	-- don't need the Prelude here so we add NoImplicitPrelude.
+   = "{-# LANGUAGE CPP, NoImplicitPrelude, UnboxedTuples #-}\n"
+        -- Dependencies on Prelude must be explicit in libraries/base, but we
+        -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n"
      ++ "import qualified GHC.Prim\n"
      ++ "import GHC.Types (Bool)\n"
      ++ "import GHC.Tuple ()\n"
-     ++ "import GHC.Prim (" ++ types ++ ")\n"
-     ++ unlines (concatMap f specs)
+     ++ "import GHC.Prim (" ++ concat (intersperse ", " othertycons) ++ ")\n"
+     ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"
+     ++ "import GHC.Prim (" ++ concat (intersperse ", " vectycons) ++ ")\n"
+     ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
+     ++ unlines (concatMap f otherspecs)
+     ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"
+     ++ unlines (concatMap f vecspecs)
+     ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
      where
         specs = filter (not.dodgy) (filter is_primop entries)
+        (vecspecs, otherspecs) = partition is_llvm_only specs
         tycons = foldr union [] $ map (tyconsIn . ty) specs
-        tycons' = filter (`notElem` ["()", "Bool"]) tycons
-        types = concat $ intersperse ", " tycons'
+        (vectycons, othertycons) =
+            (partition llvmOnlyTyCon . filter (`notElem` ["()", "Bool"])) tycons
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
                      lhs = src_name ++ " " ++ unwords args
@@ -517,6 +542,20 @@ gen_wrappers (Info _ entries)
               "par#", "parGlobal#", "parLocal#", "parAt#",
               "parAtAbs#", "parAtRel#", "parAtForNow#"
              ]
+
+        is_llvm_only :: Entry -> Bool
+        is_llvm_only entry =
+            case lookup_attrib "llvm_only" (opts entry) of
+              Just (OptionTrue _) -> True
+              _                   -> False
+
+        llvmOnlyTyCon :: TyCon -> Bool
+        llvmOnlyTyCon "Int32#"    = True
+        llvmOnlyTyCon "FloatX4#"  = True
+        llvmOnlyTyCon "DoubleX2#" = True
+        llvmOnlyTyCon "Int32X4#"  = True
+        llvmOnlyTyCon "Int64X2#"  = True
+        llvmOnlyTyCon _           = False
 
 gen_primop_list :: Info -> String
 gen_primop_list (Info _ entries)
@@ -554,6 +593,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          getAltRhs (OptionTrue _)     = "True"
          getAltRhs (OptionInteger _ i) = show i
          getAltRhs (OptionString _ s) = s
+         getAltRhs (OptionFixity mf) = show mf
 
          mkAlt po
             = case lookup_attrib attrib_name (opts po) of
@@ -634,6 +674,10 @@ ppType (TyApp "Word64#"     []) = "word64PrimTy"
 ppType (TyApp "Addr#"       []) = "addrPrimTy"
 ppType (TyApp "Float#"      []) = "floatPrimTy"
 ppType (TyApp "Double#"     []) = "doublePrimTy"
+ppType (TyApp "FloatX4#"    []) = "floatX4PrimTy"
+ppType (TyApp "DoubleX2#"   []) = "doubleX2PrimTy"
+ppType (TyApp "Int32X4#"    []) = "int32X4PrimTy"
+ppType (TyApp "Int64X2#"    []) = "int64X2PrimTy"
 ppType (TyApp "ByteArray#"  []) = "byteArrayPrimTy"
 ppType (TyApp "RealWorld"   []) = "realWorldTy"
 ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"
@@ -675,6 +719,11 @@ ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 ppType other
    = error ("ppType: can't handle: " ++ show other ++ "\n")
 
+pprFixityDir :: FixityDirection -> String
+pprFixityDir InfixN = "infix"
+pprFixityDir InfixL = "infixl"
+pprFixityDir InfixR = "infixr"
+
 listify :: [String] -> String
 listify ss = "[" ++ concat (intersperse ", " ss) ++ "]"
 
@@ -696,4 +745,3 @@ tyconsIn (TyUTup tys)   = foldr union [] $ map tyconsIn tys
 
 arity :: Ty -> Int
 arity = length . fst . flatTys
-

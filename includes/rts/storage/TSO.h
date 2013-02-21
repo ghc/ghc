@@ -247,7 +247,8 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
         BlockedOnMVar          the MVAR             the MVAR's queue
 
-	BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
+        BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
+        BlockedOnSTM           STM_AWOKEN           run queue
 
         BlockedOnMsgThrowTo    MessageThrowTo *     TSO->blocked_exception
 

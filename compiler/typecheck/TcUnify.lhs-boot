@@ -1,6 +1,6 @@
 \begin{code}
 module TcUnify where
-import TcType     ( TcTauType, TcKind, Type, Kind )
+import TcType     ( TcTauType, Type, Kind )
 import VarEnv     ( TidyEnv )
 import TcRnTypes  ( TcM )
 import TcEvidence ( TcCoercion )
@@ -10,6 +10,5 @@ import Outputable ( SDoc )
 --              TcUnify and Inst
 
 unifyType :: TcTauType -> TcTauType -> TcM TcCoercion
-unifyKindEq :: TcKind -> TcKind -> TcM ()
 mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
 \end{code}

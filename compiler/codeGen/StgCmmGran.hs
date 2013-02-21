@@ -53,7 +53,7 @@ staticGranHdr = []
 doGranAllocate :: CmmExpr -> Code
 -- macro DO_GRAN_ALLOCATE
 doGranAllocate hp
-  | not opt_GranMacros = nopC
+  | not opt_GranMacros = return ()
   | otherwise          = panic "doGranAllocate"
 
 
@@ -75,7 +75,7 @@ granFetchAndReschedule regs node_reqd
   = do { fetch
        ; reschedule liveness node_reqd }
   | otherwise
-  = nopC
+  = return ()
   where
     liveness = mkRegLiveness regs 0 0
 
@@ -96,7 +96,7 @@ reschedule liveness node_reqd = panic "granReschedule"
 -- @Continue@ rather  than the @EnterNodeCode@  function in the  RTS). We emit
 -- this kind of macro at the beginning of the following kinds of basic bocks:
 -- \begin{itemize}
---  \item Slow entry code where node is not alive (see @CgClosure.lhs@). Normally
+--  \item Slow entry code where node is not alive (see @StgCmmClosure.lhs@). Normally
 --        we use @fetchAndReschedule@ at a slow entry code.
 --  \item Fast entry code (see @CgClosure.lhs@).
 --  \item Alternatives in case expressions (@CLabelledCode@ structures), provided
@@ -109,7 +109,7 @@ granYield :: [(Id,GlobalReg)]   -- Live registers
 
 granYield regs node_reqd
   | opt_GranMacros && node_reqd = yield liveness
-  | otherwise                   = nopC
+  | otherwise                   = return ()
   where
      liveness = mkRegLiveness regs 0 0
 

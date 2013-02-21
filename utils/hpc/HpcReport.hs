@@ -55,9 +55,9 @@ bbtPlus (BBT b1 tt1 ft1 bt1) (BBT b2 tt2 ft2 bt2) =
   BBT (b1+b2) (tt1+tt2) (ft1+ft2) (bt1+bt2)
 
 bbtPercentage :: String -> Bool -> BinBoxTixCounts -> String
-bbtPercentage s withdetail (BBT b tt ft bt) = 
-  showPercentage s bt b ++ 
-  if withdetail && bt/=b then  
+bbtPercentage s withdetail (BBT b tt ft bt) =
+  showPercentage s bt b ++
+  if withdetail && bt/=b then
     detailFor tt "always True"++
     detailFor ft "always False"++
     detailFor (b-(tt+ft+bt)) "unevaluated"
@@ -160,11 +160,11 @@ modInfo hpcflags qualDecList tix@(TixModule moduleName _ _ tickCounts) = do
 modReport :: Flags -> TixModule -> IO ()
 modReport hpcflags tix@(TixModule moduleName _ _ _) = do
   mi <- modInfo hpcflags False tix
-  if xmlOutput hpcflags 
+  if xmlOutput hpcflags
     then putStrLn $ "  <module name = " ++ show moduleName  ++ ">"
     else putStrLn ("-----<module "++moduleName++">-----")
   printModInfo hpcflags mi
-  if xmlOutput hpcflags 
+  if xmlOutput hpcflags
     then putStrLn $ "  </module>"
     else return ()
 
@@ -193,7 +193,7 @@ modDecList :: Flags -> ModInfo -> IO ()
 modDecList hpcflags mi0 =
   when (decList hpcflags && someDecsUnused mi0) $ do
     putStrLn "unused declarations:"
-    mapM_ showDecPath (sort (decPaths mi0))   
+    mapM_ showDecPath (sort (decPaths mi0))
   where
   someDecsUnused mi = tixCount (top mi) < boxCount (top mi) ||
                       tixCount (loc mi) < boxCount (loc mi)
@@ -202,39 +202,39 @@ modDecList hpcflags mi0 =
 
 report_plugin :: Plugin
 report_plugin = Plugin { name = "report"
-	      	       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]" 
-		       , options = report_options 
-		       , summary = "Output textual report about program coverage"
-		       , implementation = report_main
-		       , init_flags = default_flags
-		       , final_flags = default_final_flags
-		       }
+                       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]"
+                       , options = report_options
+                       , summary = "Output textual report about program coverage"
+                       , implementation = report_main
+                       , init_flags = default_flags
+                       , final_flags = default_final_flags
+                       }
 
 report_main :: Flags -> [String] -> IO ()
 report_main hpcflags (progName:mods) = do
-  let hpcflags1 = hpcflags 
-      		{ includeMods = Set.fromList mods 
-  	      	     	 	   `Set.union` 
-				includeMods hpcflags }
-  let prog = getTixFileName $ progName 
-  tix <- readTix prog  
+  let hpcflags1 = hpcflags
+                { includeMods = Set.fromList mods
+                                   `Set.union`
+                                includeMods hpcflags }
+  let prog = getTixFileName $ progName
+  tix <- readTix prog
   case tix of
     Just (Tix tickCounts) ->
-    	   makeReport hpcflags1 progName 
-		    $ sortBy (\ mod1 mod2 -> tixModuleName mod1 `compare` tixModuleName mod2)
-	   	    $ [ tix'
-	   	      | tix'@(TixModule m _ _ _) <- tickCounts
-		      , allowModule hpcflags1 m 
-		      ]
+           makeReport hpcflags1 progName
+                    $ sortBy (\ mod1 mod2 -> tixModuleName mod1 `compare` tixModuleName mod2)
+                    $ [ tix'
+                      | tix'@(TixModule m _ _ _) <- tickCounts
+                      , allowModule hpcflags1 m
+                      ]
     Nothing -> hpcError report_plugin  $ "unable to find tix file for:" ++ progName
-report_main _ [] = 
-        hpcError report_plugin $ "no .tix file or executable name specified" 
+report_main _ [] =
+        hpcError report_plugin $ "no .tix file or executable name specified"
 
 makeReport :: Flags -> String -> [TixModule] -> IO ()
 makeReport hpcflags progName modTcs | xmlOutput hpcflags = do
   putStrLn $ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
   putStrLn $ "<coverage name=" ++ show progName ++ ">"
-  if perModule hpcflags 
+  if perModule hpcflags
     then mapM_ (modReport hpcflags) modTcs
     else return ()
   mis <- mapM (modInfo hpcflags True) modTcs
@@ -250,11 +250,11 @@ makeReport hpcflags _ modTcs =
     printModInfo hpcflags (foldr miPlus miZero mis)
 
 element :: String -> [(String,String)] -> IO ()
-element tag attrs = putStrLn $ 
-	    	    "    <" ++ tag ++ " " 
-	    	        ++ unwords [ x ++ "=" ++ show y 
-			   	   | (x,y) <- attrs
-				   ] ++ "/>"
+element tag attrs = putStrLn $
+                    "    <" ++ tag ++ " "
+                        ++ unwords [ x ++ "=" ++ show y
+                                   | (x,y) <- attrs
+                                   ] ++ "/>"
 
 xmlBT :: BoxTixCounts -> [(String, String)]
 xmlBT (BT b t) = [("boxes",show b),("count",show t)]
@@ -265,13 +265,14 @@ xmlBBT (BBT b tt tf bt) = [("boxes",show b),("true",show tt),("false",show tf),(
 ------------------------------------------------------------------------------
 
 report_options :: FlagOptSeq
-report_options 
+report_options
         = perModuleOpt
         . decListOpt
         . excludeOpt
         . includeOpt
         . srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . xmlOutputOpt
-        
+
 

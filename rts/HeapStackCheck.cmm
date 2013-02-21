@@ -11,6 +11,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Cmm.h"
+#include "Updates.h"
 
 #ifdef __PIC__
 import pthread_mutex_unlock;
@@ -81,49 +82,57 @@ import LeaveCriticalSection;
  * ThreadRunGHC thread.
  */
 
-#define GC_GENERIC                                                      \
-    DEBUG_ONLY(foreign "C" heapCheckFail());                            \
-    if (Hp > HpLim) {                                                   \
-        Hp = Hp - HpAlloc/*in bytes*/;                                  \
-        if (HpLim == 0) {                                               \
-                R1 = ThreadYielding;                                    \
-                goto sched;                                             \
-        }                                                               \
-        if (HpAlloc <= BLOCK_SIZE                                       \
-            && bdescr_link(CurrentNursery) != NULL) {                   \
-            HpAlloc = 0;                                                \
-            CLOSE_NURSERY();                                            \
-            CurrentNursery = bdescr_link(CurrentNursery);               \
-            OPEN_NURSERY();                                             \
-            if (Capability_context_switch(MyCapability()) != 0 :: CInt ||  \
-                Capability_interrupt(MyCapability())      != 0 :: CInt) { \
-                R1 = ThreadYielding;                                    \
-                goto sched;                                             \
-            } else {                                                    \
-                jump %ENTRY_CODE(Sp(0));                                \
-            }                                                           \
-	} else {                                                        \
-            R1 = HeapOverflow;                                          \
-            goto sched;                                                 \
-        }                                                               \
-    } else {                                                            \
-        R1 = StackOverflow;                                             \
-    }                                                                   \
-  sched:                                                                \
-    PRE_RETURN(R1,ThreadRunGHC);                                        \
-    jump stg_returnToSched;
+stg_gc_noregs
+{
+    W_ ret;
+
+    DEBUG_ONLY(foreign "C" heapCheckFail());
+    if (Hp > HpLim) {
+        Hp = Hp - HpAlloc/*in bytes*/;
+        if (HpLim == 0) {
+                ret = ThreadYielding;
+                goto sched;
+        }
+        if (HpAlloc <= BLOCK_SIZE
+            && bdescr_link(CurrentNursery) != NULL) {
+            HpAlloc = 0;
+            CLOSE_NURSERY();
+            CurrentNursery = bdescr_link(CurrentNursery);
+            OPEN_NURSERY();
+            if (Capability_context_switch(MyCapability()) != 0 :: CInt ||
+                Capability_interrupt(MyCapability())      != 0 :: CInt) {
+                ret = ThreadYielding;
+                goto sched;
+            } else {
+                jump %ENTRY_CODE(Sp(0)) [];
+            }
+        } else {
+            ret = HeapOverflow;
+            goto sched;
+        }
+    } else {
+        if (CHECK_GC()) {
+            ret = HeapOverflow;
+        } else {
+            ret = StackOverflow;
+        }
+    }
+  sched:
+    PRE_RETURN(ret,ThreadRunGHC);
+    jump stg_returnToSched [R1];
+}
 
 #define HP_GENERIC				\
-   PRE_RETURN(HeapOverflow, ThreadRunGHC)	\
-  jump stg_returnToSched;
+    PRE_RETURN(HeapOverflow, ThreadRunGHC)      \
+    jump stg_returnToSched [R1];
 
 #define BLOCK_GENERIC				\
-   PRE_RETURN(ThreadBlocked,  ThreadRunGHC)	\
-  jump stg_returnToSched;
+    PRE_RETURN(ThreadBlocked,  ThreadRunGHC)    \
+    jump stg_returnToSched [R1];
 
 #define YIELD_GENERIC				\
-  PRE_RETURN(ThreadYielding, ThreadRunGHC)	\
-  jump stg_returnToSched;
+    PRE_RETURN(ThreadYielding, ThreadRunGHC)    \
+    jump stg_returnToSched [R1];
 
 #define SWITCH              \
   StgRegTable_rRet(BaseReg) = ThreadSwitch; \
@@ -131,13 +140,13 @@ import LeaveCriticalSection;
   jump stg_returnToSched;
 
 #define BLOCK_BUT_FIRST(c)			\
-  PRE_RETURN(ThreadBlocked, ThreadRunGHC)	\
-  R2 = c;					\
-  jump stg_returnToSchedButFirst;
+    PRE_RETURN(ThreadBlocked, ThreadRunGHC)     \
+    R2 = c;                                     \
+    jump stg_returnToSchedButFirst [R1,R2,R3];
 
 #define YIELD_TO_INTERPRETER			\
-  PRE_RETURN(ThreadYielding, ThreadInterpret)	\
-  jump stg_returnToSchedNotPaused;
+    PRE_RETURN(ThreadYielding, ThreadInterpret) \
+    jump stg_returnToSchedNotPaused [R1];
 
 /* -----------------------------------------------------------------------------
    Heap checks in thunks/functions.
@@ -149,19 +158,55 @@ import LeaveCriticalSection;
    There are canned sequences for 'n' pointer values in registers.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_enter, RET_SMALL, P_ unused)
+INFO_TABLE_RET ( stg_enter, RET_SMALL, W_ info_ptr, P_ closure )
+    return (/* no return values */)
 {
-    R1 = Sp(1);
-    Sp_adj(2);
-    ENTER();
+    ENTER(closure);
 }
 
-__stg_gc_enter_1
+__stg_gc_enter_1 (P_ node)
 {
-    Sp_adj(-2);
-    Sp(1) = R1;
-    Sp(0) = stg_enter_info;
-    GC_GENERIC
+    jump stg_gc_noregs (stg_enter_info, node) ();
+}
+
+/* -----------------------------------------------------------------------------
+   Canned heap checks for primitives.
+
+   We can't use stg_gc_fun because primitives are not functions, so
+   these fragments let us save some boilerplate heap-check-failure
+   code in a few common cases.
+   -------------------------------------------------------------------------- */
+
+stg_gc_prim ()
+{
+    W_ fun;
+    fun = R9;
+    call stg_gc_noregs ();
+    jump fun();
+}
+
+stg_gc_prim_p (P_ arg)
+{
+    W_ fun;
+    fun = R9;
+    call stg_gc_noregs ();
+    jump fun(arg);
+}
+
+stg_gc_prim_pp (P_ arg1, P_ arg2)
+{
+    W_ fun;
+    fun = R9;
+    call stg_gc_noregs ();
+    jump fun(arg1,arg2);
+}
+
+stg_gc_prim_n (W_ arg)
+{
+    W_ fun;
+    fun = R9;
+    call stg_gc_noregs ();
+    jump fun(arg);
 }
 
 /* -----------------------------------------------------------------------------
@@ -174,138 +219,125 @@ __stg_gc_enter_1
    -------------------------------------------------------------------------- */
 
 /* The stg_enter_checkbh frame has the same shape as an update frame: */
-#if defined(PROFILING)
-#define UPD_FRAME_PARAMS W_ unused1, W_ unused2, P_ unused3
-#else
-#define UPD_FRAME_PARAMS P_ unused1
-#endif
 
-INFO_TABLE_RET( stg_enter_checkbh, RET_SMALL, UPD_FRAME_PARAMS)
+INFO_TABLE_RET ( stg_enter_checkbh, RET_SMALL,
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,ccs,p2,updatee))
+    return (P_ ret)
 {
-    R1 = StgUpdateFrame_updatee(Sp);
-    Sp = Sp + SIZEOF_StgUpdateFrame;
     foreign "C" checkBlockingQueues(MyCapability() "ptr",
-                                    CurrentTSO) [R1];
-    ENTER();
+                                    CurrentTSO);
+
+    // we need to return updatee now.  Note that it might be a pointer
+    // to an indirection or a tagged value, we don't know which, so we
+    // need to ENTER() rather than return().
+    ENTER(updatee);
 }
 
 /* -----------------------------------------------------------------------------
-   Heap checks in Primitive case alternatives
-
-   A primitive case alternative is entered with a value either in
-   R1, FloatReg1 or D1 depending on the return convention.  All the
-   cases are covered below.
+   Info tables for returning values of various types.  These are used
+   when we want to push a frame on the stack that will return a value
+   to the frame underneath it.
    -------------------------------------------------------------------------- */
 
-/*-- No Registers live ------------------------------------------------------ */
-
-stg_gc_noregs
+INFO_TABLE_RET ( stg_ret_v, RET_SMALL, W_ info_ptr )
+    return (/* no return values */)
 {
-    GC_GENERIC
+    return ();
 }
+
+INFO_TABLE_RET ( stg_ret_p, RET_SMALL, W_ info_ptr, P_ ptr )
+    return (/* no return values */)
+{
+    return (ptr);
+}
+
+INFO_TABLE_RET ( stg_ret_n, RET_SMALL, W_ info_ptr, W_ nptr )
+    return (/* no return values */)
+{
+    return (nptr);
+}
+
+INFO_TABLE_RET ( stg_ret_f, RET_SMALL, W_ info_ptr, F_ f )
+    return (/* no return values */)
+{
+    return (f);
+}
+
+INFO_TABLE_RET ( stg_ret_d, RET_SMALL, W_ info_ptr, D_ d )
+    return (/* no return values */)
+{
+    return (d);
+}
+
+INFO_TABLE_RET ( stg_ret_l, RET_SMALL, W_ info_ptr, L_ l )
+    return (/* no return values */)
+{
+    return (l);
+}
+
+/* -----------------------------------------------------------------------------
+   Canned heap-check failures for case alts, where we have some values
+   in registers or on the stack according to the NativeReturn
+   convention.
+   -------------------------------------------------------------------------- */
+
 
 /*-- void return ------------------------------------------------------------ */
 
-INFO_TABLE_RET( stg_gc_void, RET_SMALL)
-{
-    Sp_adj(1);
-    jump %ENTRY_CODE(Sp(0));
-}
+/*-- R1 is a GC pointer, but we don't enter it ----------------------- */
 
-/*-- R1 is boxed/unpointed -------------------------------------------------- */
-
-INFO_TABLE_RET( stg_gc_unpt_r1, RET_SMALL, P_ unused)
+stg_gc_unpt_r1 return (P_ ptr) /* NB. return convention */
 {
-    R1 = Sp(1);
-    Sp_adj(2);
-    jump %ENTRY_CODE(Sp(0));
-}
-
-stg_gc_unpt_r1
-{
-    Sp_adj(-2);
-    Sp(1) = R1;
-    Sp(0) = stg_gc_unpt_r1_info;
-    GC_GENERIC
+    jump stg_gc_noregs (stg_ret_p_info, ptr) ();
 }
 
 /*-- R1 is unboxed -------------------------------------------------- */
 
-/* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
-INFO_TABLE_RET(	stg_gc_unbx_r1, RET_SMALL, W_ unused )
+stg_gc_unbx_r1 return (W_ nptr) /* NB. return convention */
 {
-    R1 = Sp(1);
-    Sp_adj(2);
-    jump %ENTRY_CODE(Sp(0));
-}
-
-stg_gc_unbx_r1
-{
-    Sp_adj(-2);
-    Sp(1) = R1;
-    Sp(0) = stg_gc_unbx_r1_info;
-    GC_GENERIC
+    jump stg_gc_noregs (stg_ret_n_info, nptr) ();
 }
 
 /*-- F1 contains a float ------------------------------------------------- */
 
-INFO_TABLE_RET(	stg_gc_f1, RET_SMALL, F_ unused )
+stg_gc_f1 return (F_ f)
 {
-    F1 = F_[Sp+WDS(1)];
-    Sp_adj(2);
-    jump %ENTRY_CODE(Sp(0));
-}
-
-stg_gc_f1
-{
-    Sp_adj(-2);
-    F_[Sp + WDS(1)] = F1;
-    Sp(0) = stg_gc_f1_info;
-    GC_GENERIC
+    jump stg_gc_noregs (stg_ret_f_info, f) ();
 }
 
 /*-- D1 contains a double ------------------------------------------------- */
 
-INFO_TABLE_RET(	stg_gc_d1, RET_SMALL, D_ unused )
+stg_gc_d1 return (D_ d)
 {
-    D1 = D_[Sp + WDS(1)];
-    Sp = Sp + WDS(1) + SIZEOF_StgDouble;
-    jump %ENTRY_CODE(Sp(0));
-}
-
-stg_gc_d1
-{
-    Sp = Sp - WDS(1) - SIZEOF_StgDouble;
-    D_[Sp + WDS(1)] = D1;
-    Sp(0) = stg_gc_d1_info;
-    GC_GENERIC
+    jump stg_gc_noregs (stg_ret_d_info, d) ();
 }
 
 
 /*-- L1 contains an int64 ------------------------------------------------- */
 
-INFO_TABLE_RET( stg_gc_l1, RET_SMALL, L_ unused )
+stg_gc_l1 return (L_ l)
 {
-    L1 = L_[Sp + WDS(1)];
-    Sp_adj(1) + SIZEOF_StgWord64;
-    jump %ENTRY_CODE(Sp(0));
+    jump stg_gc_noregs (stg_ret_l_info, l) ();
 }
 
-stg_gc_l1
+/*-- Unboxed tuples with multiple pointers -------------------------------- */
+
+stg_gc_pp return (P_ arg1, P_ arg2)
 {
-    Sp_adj(-1) - SIZEOF_StgWord64;
-    L_[Sp + WDS(1)] = L1;
-    Sp(0) = stg_gc_l1_info;
-    GC_GENERIC
+    call stg_gc_noregs();
+    return (arg1,arg2);
 }
 
-/*-- Unboxed tuple return, one pointer (unregisterised build only) ---------- */
-
-INFO_TABLE_RET( stg_ut_1_0_unreg, RET_SMALL, P_ unused )
+stg_gc_ppp return (P_ arg1, P_ arg2, P_ arg3)
 {
-    Sp_adj(1);
-    // one ptr is on the stack (Sp(0))
-    jump %ENTRY_CODE(Sp(1));
+    call stg_gc_noregs();
+    return (arg1,arg2,arg3);
+}
+
+stg_gc_pppp return (P_ arg1, P_ arg2, P_ arg3, P_ arg4)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2,arg3,arg4);
 }
 
 /* -----------------------------------------------------------------------------
@@ -338,7 +370,7 @@ INFO_TABLE_RET( stg_ut_1_0_unreg, RET_SMALL, P_ unused )
 
    -------------------------------------------------------------------------- */
 
-__stg_gc_fun
+__stg_gc_fun /* explicit stack */
 {
     W_ size;
     W_ info;
@@ -370,7 +402,7 @@ __stg_gc_fun
     Sp(2) = R1;
     Sp(1) = size;
     Sp(0) = stg_gc_fun_info;
-    GC_GENERIC
+    jump stg_gc_noregs [];
 #else
     W_ type;
     type = TO_W_(StgFunInfoExtra_fun_type(info));
@@ -382,13 +414,14 @@ __stg_gc_fun
         Sp(1) = size;
         Sp(0) = stg_gc_fun_info;
         // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
-        GC_GENERIC
+        jump stg_gc_noregs [];
     } else {
-	jump W_[stg_stack_save_entries + WDS(type)];
+        jump W_[stg_stack_save_entries + WDS(type)] [*]; // all regs live
 	    // jumps to stg_gc_noregs after saving stuff
     }
 #endif /* !NO_ARG_REGS */
 }
+
 
 /* -----------------------------------------------------------------------------
    Generic Apply (return point)
@@ -398,14 +431,15 @@ __stg_gc_fun
    appropriately.  The stack layout is given above.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_gc_fun, RET_FUN )
+INFO_TABLE_RET ( stg_gc_fun, RET_FUN )
+    /* explicit stack */
 {
     R1 = Sp(2);
     Sp_adj(3);
 #ifdef NO_ARG_REGS
     // Minor optimisation: there are no argument registers to load up,
     // so we can just jump straight to the function's entry point.
-    jump %GET_ENTRY(UNTAG(R1));
+    jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
     W_ info;
     W_ type;
@@ -413,125 +447,24 @@ INFO_TABLE_RET( stg_gc_fun, RET_FUN )
     info = %GET_FUN_INFO(UNTAG(R1));
     type = TO_W_(StgFunInfoExtra_fun_type(info));
     if (type == ARG_GEN || type == ARG_GEN_BIG) {
-	jump StgFunInfoExtra_slow_apply(info);
+        jump StgFunInfoExtra_slow_apply(info) [R1];
     } else {
 	if (type == ARG_BCO) {
 	    // cover this case just to be on the safe side
 	    Sp_adj(-2);
 	    Sp(1) = R1;
 	    Sp(0) = stg_apply_interp_info;
-	    jump stg_yield_to_interpreter;
+            jump stg_yield_to_interpreter [];
 	} else {
-	    jump W_[stg_ap_stack_entries + WDS(type)];
+            jump W_[stg_ap_stack_entries + WDS(type)] [R1];
 	}
     }
 #endif
 }
 
 /* -----------------------------------------------------------------------------
-   Generic Heap Check Code.
-
-   Called with Liveness mask in R9,  Return address in R10.
-   Stack must be consistent (containing all necessary info pointers
-   to relevant SRTs).
-
-   See StgMacros.h for a description of the RET_DYN stack frame.
-
-   We also define an stg_gen_yield here, because it's very similar.
-   -------------------------------------------------------------------------- */
-
-// For simplicity, we assume that SIZEOF_DOUBLE == 2*SIZEOF_VOID_P
-// on a 64-bit machine, we'll end up wasting a couple of words, but
-// it's not a big deal.
-
-#define RESTORE_EVERYTHING			\
-    L1   = L_[Sp + WDS(19)];			\
-    D2   = D_[Sp + WDS(17)];			\
-    D1   = D_[Sp + WDS(15)];			\
-    F4   = F_[Sp + WDS(14)];			\
-    F3   = F_[Sp + WDS(13)];			\
-    F2   = F_[Sp + WDS(12)];			\
-    F1   = F_[Sp + WDS(11)];			\
-    R8 = Sp(10);				\
-    R7 = Sp(9);					\
-    R6 = Sp(8);					\
-    R5 = Sp(7);					\
-    R4 = Sp(6);					\
-    R3 = Sp(5);					\
-    R2 = Sp(4);					\
-    R1 = Sp(3);					\
-    Sp_adj(21);
-
-#define RET_OFFSET (-19)
-
-#define SAVE_EVERYTHING				\
-    Sp_adj(-21);				\
-    L_[Sp + WDS(19)] = L1;			\
-    D_[Sp + WDS(17)] = D2;			\
-    D_[Sp + WDS(15)] = D1;			\
-    F_[Sp + WDS(14)] = F4;			\
-    F_[Sp + WDS(13)] = F3;			\
-    F_[Sp + WDS(12)] = F2;			\
-    F_[Sp + WDS(11)] = F1;			\
-    Sp(10) = R8;				\
-    Sp(9) = R7;					\
-    Sp(8) = R6;					\
-    Sp(7) = R5;					\
-    Sp(6) = R4;					\
-    Sp(5) = R3;					\
-    Sp(4) = R2;					\
-    Sp(3) = R1;					\
-    Sp(2) = R10;    /* return address */	\
-    Sp(1) = R9;     /* liveness mask  */	\
-    Sp(0) = stg_gc_gen_info;
-
-INFO_TABLE_RET( stg_gc_gen, RET_DYN )
-/* bitmap in the above info table is unused, the real one is on the stack. */
-{
-    RESTORE_EVERYTHING;
-    jump Sp(RET_OFFSET); /* No %ENTRY_CODE( - this is an actual code ptr */
-}
-
-stg_gc_gen
-{
-    // Hack; see Note [mvar-heap-check] in PrimOps.cmm
-    if (R10 == stg_putMVarzh || R10 == stg_takeMVarzh) {
-       unlockClosure(R1, stg_MVAR_DIRTY_info)
-    }
-    SAVE_EVERYTHING;
-    GC_GENERIC
-}
-
-// A heap check at an unboxed tuple return point.  The return address
-// is on the stack, and we can find it by using the offsets given
-// to us in the liveness mask.
-stg_gc_ut
-{
-    R10 = %ENTRY_CODE(Sp(RET_DYN_NONPTRS(R9) + RET_DYN_PTRS(R9)));
-    SAVE_EVERYTHING;
-    GC_GENERIC
-}
-
-/*
- * stg_gen_hp is used by MAYBE_GC, where we can't use GC_GENERIC
- * because we've just failed doYouWantToGC(), not a standard heap
- * check.  GC_GENERIC would end up returning StackOverflow.
- */
-stg_gc_gen_hp
-{
-    SAVE_EVERYTHING;
-    HP_GENERIC
-}
-
-/* -----------------------------------------------------------------------------
    Yields
    -------------------------------------------------------------------------- */
-
-stg_gen_yield
-{
-    SAVE_EVERYTHING;
-    YIELD_GENERIC
-}
 
 stg_yield_noregs
 {
@@ -556,22 +489,8 @@ stg_yield_to_interpreter
    Blocks
    -------------------------------------------------------------------------- */
 
-stg_gen_block
-{
-    SAVE_EVERYTHING;
-    BLOCK_GENERIC;
-}
-
 stg_block_noregs
 {
-    BLOCK_GENERIC;
-}
-
-stg_block_1
-{
-    Sp_adj(-2);
-    Sp(1) = R1;
-    Sp(0) = stg_enter_info;
     BLOCK_GENERIC;
 }
 
@@ -595,52 +514,58 @@ stg_block_1
  *
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, P_ unused )
+INFO_TABLE_RET ( stg_block_takemvar, RET_SMALL, W_ info_ptr, P_ mvar )
+    return ()
 {
-    R1 = Sp(1);
-    Sp_adj(2);
-    jump stg_takeMVarzh;
+    jump stg_takeMVarzh(mvar);
 }
 
 // code fragment executed just before we return to the scheduler
 stg_block_takemvar_finally
 {
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
     unlockClosure(R3, stg_MVAR_DIRTY_info);
-    jump StgReturn;
+    R1 = r1;
+    R3 = r3;
+    jump StgReturn [R1];
 }
 
-stg_block_takemvar
+stg_block_takemvar /* mvar passed in R1 */
 {
     Sp_adj(-2);
     Sp(1) = R1;
     Sp(0) = stg_block_takemvar_info;
-    R3 = R1;
+    R3 = R1; // mvar communicated to stg_block_takemvar_finally in R3
     BLOCK_BUT_FIRST(stg_block_takemvar_finally);
 }
 
-INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, P_ unused1, P_ unused2 )
+INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, W_ info_ptr,
+                P_ mvar, P_ val )
+    return ()
 {
-    R2 = Sp(2);
-    R1 = Sp(1);
-    Sp_adj(3);
-    jump stg_putMVarzh;
+    jump stg_putMVarzh(mvar, val);
 }
 
 // code fragment executed just before we return to the scheduler
 stg_block_putmvar_finally
 {
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
     unlockClosure(R3, stg_MVAR_DIRTY_info);
-    jump StgReturn;
+    R1 = r1;
+    R3 = r3;
+    jump StgReturn [R1];
 }
 
-stg_block_putmvar
+stg_block_putmvar (P_ mvar, P_ val)
 {
-    Sp_adj(-3);
-    Sp(2) = R2;
-    Sp(1) = R1;
-    Sp(0) = stg_block_putmvar_info;
-    R3 = R1;
-    BLOCK_BUT_FIRST(stg_block_putmvar_finally);
+    push (stg_block_putmvar_info, mvar, val) {
+      R3 = R1; // mvar communicated to stg_block_putmvar_finally in R3
+      BLOCK_BUT_FIRST(stg_block_putmvar_finally);
+   }
 }
 
 stg_block_blackhole
@@ -651,12 +576,11 @@ stg_block_blackhole
     BLOCK_GENERIC;
 }
 
-INFO_TABLE_RET( stg_block_throwto, RET_SMALL, P_ unused, P_ unused )
+INFO_TABLE_RET ( stg_block_throwto, RET_SMALL, W_ info_ptr,
+                 P_ tso, P_ exception )
+    return ()
 {
-    R2 = Sp(2);
-    R1 = Sp(1);
-    Sp_adj(3);
-    jump stg_killThreadzh;
+    jump stg_killThreadzh(tso, exception);
 }
 
 stg_block_throwto_finally
@@ -665,32 +589,31 @@ stg_block_throwto_finally
     // unlocked.  It may have been unlocked if we revoked the message
     // due to an exception being raised during threadPaused().
     if (StgHeader_info(StgTSO_block_info(CurrentTSO)) == stg_WHITEHOLE_info) {
+        W_ r1;
+        r1 = R1;
         unlockClosure(StgTSO_block_info(CurrentTSO), stg_MSG_THROWTO_info);
+        R1 = r1;
     }
-    jump StgReturn;
+    jump StgReturn [R1];
 }
 
-stg_block_throwto
+stg_block_throwto (P_ tso, P_ exception)
 {
-    Sp_adj(-3);
-    Sp(2) = R2;
-    Sp(1) = R1;
-    Sp(0) = stg_block_throwto_info;
-    BLOCK_BUT_FIRST(stg_block_throwto_finally);
+    push (stg_block_throwto_info, tso, exception) {
+       BLOCK_BUT_FIRST(stg_block_throwto_finally);
+    }
 }
 
 #ifdef mingw32_HOST_OS
-INFO_TABLE_RET( stg_block_async, RET_SMALL, W_ unused )
+INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ ares )
+    return ()
 {
-    W_ ares;
     W_ len, errC;
 
-    ares = Sp(1);
     len = TO_W_(StgAsyncIOResult_len(ares));
     errC = TO_W_(StgAsyncIOResult_errCode(ares));
-    foreign "C" free(ares "ptr");
-    Sp_adj(2);
-    RET_NN(len, errC);
+    ccall free(ares "ptr");
+    return (len, errC);
 }
 
 stg_block_async
@@ -703,14 +626,11 @@ stg_block_async
 /* Used by threadDelay implementation; it would be desirable to get rid of
  * this free()'ing void return continuation.
  */
-INFO_TABLE_RET( stg_block_async_void, RET_SMALL, W_ ares )
+INFO_TABLE_RET ( stg_block_async_void, RET_SMALL, W_ info_ptr, W_ ares )
+    return ()
 {
-    W_ ares;
-
-    ares = Sp(1);
-    foreign "C" free(ares "ptr");
-    Sp_adj(2);
-    jump %ENTRY_CODE(Sp(0));
+    ccall free(ares "ptr");
+    return ();
 }
 
 stg_block_async_void
@@ -722,14 +642,15 @@ stg_block_async_void
 
 #endif
 
+
 /* -----------------------------------------------------------------------------
    STM-specific waiting
    -------------------------------------------------------------------------- */
 
 stg_block_stmwait_finally
 {
-    foreign "C" stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
-    jump StgReturn;
+    ccall stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
+    jump StgReturn [R1];
 }
 
 stg_block_stmwait

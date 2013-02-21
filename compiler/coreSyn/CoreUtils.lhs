@@ -10,7 +10,7 @@ Utility functions on @Core@ syntax
 module CoreUtils (
         -- * Constructing expressions
         mkCast,
-        mkTick, mkTickNoHNF,
+        mkTick, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
         mkAltExpr,
 
@@ -64,8 +64,10 @@ import TyCon
 import Unique
 import Outputable
 import TysPrim
+import DynFlags
 import FastString
 import Maybes
+import Platform
 import Util
 import Pair
 import Data.Word
@@ -413,62 +415,65 @@ filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have t
              -- If callers need to preserve the invariant that there is always at least one branch
              -- in a "case" statement then they will need to manually add a dummy case branch that just
              -- calls "error" or similar.
-filterAlts us ty imposs_cons alts = (imposs_deflt_cons, refined_deflt, merged_alts)
+filterAlts us ty imposs_cons alts 
+  | Just (tycon, inst_tys) <- splitTyConApp_maybe ty
+  = filter_alts tycon inst_tys
+  | otherwise
+  = (imposs_cons, False, alts)
   where
     (alts_wo_default, maybe_deflt) = findDefault alts
     alt_cons = [con | (con,_,_) <- alts_wo_default]
-    imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
-      -- "imposs_deflt_cons" are handled 
-      --   EITHER by the context, 
-      --   OR by a non-DEFAULT branch in this case expression.
 
-    trimmed_alts = filterOut impossible_alt alts_wo_default
-    merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
-      -- We need the mergeAlts in case the new default_alt 
-      -- has turned into a constructor alternative.
-      -- The merge keeps the inner DEFAULT at the front, if there is one
-      -- and interleaves the alternatives in the right order
+    filter_alts tycon inst_tys 
+      = (imposs_deflt_cons, refined_deflt, merged_alts)
+     where
+       trimmed_alts = filterOut (impossible_alt inst_tys) alts_wo_default
 
-    (refined_deflt, maybe_deflt') = case maybe_deflt of
-      Just deflt_rhs -> case mb_tc_app of
-        Just (tycon, inst_tys)
-          |     -- This branch handles the case where we are 
-                -- scrutinisng an algebraic data type
-            isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.  
-          , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
-                                        --      case x of { DEFAULT -> e }
-                                        -- and we don't want to fill in a default for them!
-          , Just all_cons <- tyConDataCons_maybe tycon
-          , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type 
-                impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
-          -> case filterOut impossible all_cons of
-               -- Eliminate the default alternative
-               -- altogether if it can't match:
-               []    -> (False, Nothing)
-               -- It matches exactly one constructor, so fill it in:
-               [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
-                 where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
-               _     -> (False, Just (DEFAULT, [], deflt_rhs))
+       imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
+         -- "imposs_deflt_cons" are handled 
+         --   EITHER by the context, 
+         --   OR by a non-DEFAULT branch in this case expression.
 
-          | debugIsOn, isAlgTyCon tycon
-          , null (tyConDataCons tycon)
-          , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
-                -- Check for no data constructors
-                -- This can legitimately happen for abstract types and type families,
-                -- so don't report that
-          -> pprTrace "prepareDefault" (ppr tycon)
-             (False, Just (DEFAULT, [], deflt_rhs))
+       merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
+         -- We need the mergeAlts in case the new default_alt 
+         -- has turned into a constructor alternative.
+         -- The merge keeps the inner DEFAULT at the front, if there is one
+         -- and interleaves the alternatives in the right order
 
-        _ -> (False, Just (DEFAULT, [], deflt_rhs))
-      Nothing -> (False, Nothing)
-  
-    mb_tc_app = splitTyConApp_maybe ty
-    Just (_, inst_tys) = mb_tc_app
+       (refined_deflt, maybe_deflt') = case maybe_deflt of
+          Nothing -> (False, Nothing)
+          Just deflt_rhs 
+             | isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.  
+             , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
+                                           --      case x of { DEFAULT -> e }
+                                           -- and we don't want to fill in a default for them!
+             , Just all_cons <- tyConDataCons_maybe tycon
+             , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type 
+                   impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
+             -> case filterOut impossible all_cons of
+                  -- Eliminate the default alternative
+                  -- altogether if it can't match:
+                  []    -> (False, Nothing)
+                  -- It matches exactly one constructor, so fill it in:
+                  [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
+                    where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
+                  _     -> (False, Just (DEFAULT, [], deflt_rhs))
 
-    impossible_alt :: (AltCon, a, b) -> Bool
-    impossible_alt (con, _, _) | con `elem` imposs_cons = True
-    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
-    impossible_alt _                   = False
+             | debugIsOn, isAlgTyCon tycon
+             , null (tyConDataCons tycon)
+             , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
+                   -- Check for no data constructors
+                   -- This can legitimately happen for abstract types and type families,
+                   -- so don't report that
+             -> pprTrace "prepareDefault" (ppr tycon)
+                (False, Just (DEFAULT, [], deflt_rhs))
+
+             | otherwise -> (False, Just (DEFAULT, [], deflt_rhs))
+
+    impossible_alt :: [Type] -> (AltCon, a, b) -> Bool
+    impossible_alt _ (con, _, _) | con `elem` imposs_cons = True
+    impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
+    impossible_alt _  _                         = False
 \end{code}
 
 Note [Unreachable code]
@@ -520,7 +525,7 @@ There used to be a gruesome test for (hasNoBinding v) in the
 Var case:
         exprIsTrivial (Var v) | hasNoBinding v = idArity v == 0
 The idea here is that a constructor worker, like \$wJust, is
-really short for (\x -> \$wJust x), becuase \$wJust has no binding.
+really short for (\x -> \$wJust x), because \$wJust has no binding.
 So it should be treated like a lambda.  Ditto unsaturated primops.
 But now constructor workers are not "have-no-binding" Ids.  And
 completely un-applied primops and foreign-call Ids are sufficiently
@@ -601,8 +606,8 @@ Note [exprIsDupable]
 
 
 \begin{code}
-exprIsDupable :: CoreExpr -> Bool
-exprIsDupable e
+exprIsDupable :: DynFlags -> CoreExpr -> Bool
+exprIsDupable dflags e
   = isJust (go dupAppSize e)
   where
     go :: Int -> CoreExpr -> Maybe Int
@@ -612,7 +617,7 @@ exprIsDupable e
     go n (Tick _ e)    = go n e
     go n (Cast e _)    = go n e
     go n (App f a) | Just n' <- go n a = go n' f
-    go n (Lit lit) | litIsDupable lit = decrement n
+    go n (Lit lit) | litIsDupable dflags lit = decrement n
     go _ _ = Nothing
 
     decrement :: Int -> Maybe Int
@@ -673,7 +678,7 @@ exprIsWorkFree e = go 0 e
                                               [ go n rhs | (_,_,rhs) <- alts ]
          -- See Note [Case expressions are work-free]
     go _ (Let {})                     = False
-    go n (Var v)                      = n==0 || n < idArity v
+    go n (Var v)                      = isCheapApp v n
     go n (Tick t e) | tickishCounts t = False
                     | otherwise       = go n e
     go n (Lam x e)  | isRuntimeVar x = n==0 || go (n-1) e
@@ -738,7 +743,6 @@ exprIsCheap = exprIsCheap' isCheapApp
 exprIsExpandable :: CoreExpr -> Bool
 exprIsExpandable = exprIsCheap' isExpandableApp -- See Note [CONLIKE pragma] in BasicTypes
 
-type CheapAppFun = Id -> Int -> Bool
 exprIsCheap' :: CheapAppFun -> CoreExpr -> Bool
 exprIsCheap' _        (Lit _)      = True
 exprIsCheap' _        (Type _)    = True
@@ -777,16 +781,26 @@ exprIsCheap' good_app other_expr        -- Applications and variables
     go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
                           | otherwise      = go f val_args
 
-    go (Var _) [] = True        -- Just a type application of a variable
-                                -- (f t1 t2 t3) counts as WHNF
+    go (Var _) [] = True        
+         -- Just a type application of a variable
+         -- (f t1 t2 t3) counts as WHNF
+         -- This case is probably handeld by the good_app case
+         -- below, which should have a case for n=0, but putting
+         -- it here too is belt and braces; and it's such a common
+         -- case that checking for null directly seems like a 
+         -- good plan
+
     go (Var f) args
+       | good_app f (length args) 
+       = go_pap args
+
+       | otherwise
         = case idDetails f of
-                RecSelId {}                  -> go_sel args
-                ClassOpId {}                 -> go_sel args
-                PrimOpId op                  -> go_primop op args
-                _ | good_app f (length args) -> go_pap args
-                  | isBottomingId f          -> True
-                  | otherwise                -> False
+                RecSelId {}         -> go_sel args
+                ClassOpId {}        -> go_sel args
+                PrimOpId op         -> go_primop op args
+                _ | isBottomingId f -> True
+                  | otherwise       -> False
                         -- Application of a function which
                         -- always gives bottom; we treat this as cheap
                         -- because it certainly doesn't need to be shared!
@@ -818,9 +832,17 @@ exprIsCheap' good_app other_expr        -- Applications and variables
                 -- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
                 --      there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
 
+-------------------------------------
+type CheapAppFun = Id -> Int -> Bool  
+  -- Is an application of this function to n *value* args 
+  -- always cheap, assuming the arguments are cheap?  
+  -- Mainly true of partial applications, data constructors,
+  -- and of course true if the number of args is zero
+
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
-  = isDataConWorkId fn
+  =  isDataConWorkId fn 
+  || n_val_args == 0 
   || n_val_args < idArity fn
 
 isExpandableApp :: CheapAppFun
@@ -831,6 +853,7 @@ isExpandableApp fn n_val_args
   where
   -- See if all the arguments are PredTys (implicit params or classes)
   -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+  -- This incidentally picks up the (n_val_args = 0) case
      go 0 _ = True
      go n_val_args ty
        | Just (_, ty) <- splitForAllTy_maybe ty   = go n_val_args ty
@@ -1433,7 +1456,11 @@ exprStats (Cast e co)     = coStats co `plusCS` exprStats e
 exprStats (Tick _ e)      = exprStats e
 
 altStats :: CoreAlt -> CoreStats
-altStats (_, bs, r) = sumCS bndrStats bs `plusCS` exprStats r
+altStats (_, bs, r) = altBndrStats bs `plusCS` exprStats r
+
+altBndrStats :: [Var] -> CoreStats
+-- Charge one for the alternative, not for each binder
+altBndrStats vs = oneTM `plusCS` sumCS (tyStats . varType) vs
 
 tyStats :: Type -> CoreStats
 tyStats ty = zeroCS { cs_ty = typeSize ty }
@@ -1605,7 +1632,7 @@ There are some particularly delicate points here:
       f = \x. f x
   to
       f = f
-  Which might change a terminiating program (think (f `seq` e)) to a
+  Which might change a terminating program (think (f `seq` e)) to a
   non-terminating one.  So we check for being a loop breaker first.
 
   However for GlobalIds we can look at the arity; and for primops we
@@ -1689,8 +1716,14 @@ tryEtaReduce bndrs body
 
     ---------------
     fun_arity fun             -- See Note [Arity care]
-       | isLocalId fun && isStrongLoopBreaker (idOccInfo fun) = 0
-       | otherwise = idArity fun
+       | isLocalId fun
+       , isStrongLoopBreaker (idOccInfo fun) = 0
+       | arity > 0                           = arity
+       | isEvaldUnfolding (idUnfolding fun)  = 1  
+            -- See Note [Eta reduction of an eval'd function]
+       | otherwise                           = 0
+       where
+         arity = idArity fun
 
     ---------------
     ok_lam v = isTyVar v || isEvVar v
@@ -1714,6 +1747,20 @@ tryEtaReduce bndrs body
     ok_arg _ _ _ = Nothing
 \end{code}
 
+Note [Eta reduction of an eval'd function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell is is not true that    f = \x. f x
+because f might be bottom, and 'seq' can distinguish them.
+
+But it *is* true that   f = f `seq` \x. f x 
+and we'd like to simplify the latter to the former.  This amounts
+to the rule that 
+  * when there is just *one* value argument,
+  * f is not bottom
+we can eta-reduce    \x. f x  ===>  f
+
+This turned up in Trac #7542.  
+
 
 %************************************************************************
 %*                                                                      *
@@ -1733,7 +1780,7 @@ and 'execute' it rather than allocating it statically.
 -- | This function is called only on *top-level* right-hand sides.
 -- Returns @True@ if the RHS can be allocated statically in the output,
 -- with no thunks involved at all.
-rhsIsStatic :: (Name -> Bool) -> CoreExpr -> Bool
+rhsIsStatic :: Platform -> (Name -> Bool) -> CoreExpr -> Bool
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
@@ -1788,7 +1835,7 @@ rhsIsStatic :: (Name -> Bool) -> CoreExpr -> Bool
 --
 --    c) don't look through unfolding of f in (f x).
 
-rhsIsStatic _is_dynamic_name rhs = is_static False rhs
+rhsIsStatic platform is_dynamic_name rhs = is_static False rhs
   where
   is_static :: Bool     -- True <=> in a constructor argument; must be atomic
             -> CoreExpr -> Bool
@@ -1813,9 +1860,8 @@ rhsIsStatic _is_dynamic_name rhs = is_static False rhs
   is_static in_arg other_expr = go other_expr 0
    where
     go (Var f) n_val_args
-#if mingw32_TARGET_OS
-        | not (_is_dynamic_name (idName f))
-#endif
+        | (platformOS platform /= OSMinGW32) ||
+          not (is_dynamic_name (idName f))
         =  saturated_data_con f n_val_args
         || (in_arg && n_val_args == 0)
                 -- A naked un-applied variable is *not* deemed a static RHS

@@ -444,10 +444,10 @@ static void
 giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
   ASSERT_LOCK_HELD(&cap->lock);
-  debugTrace(DEBUG_sched, "passing capability %d to %s %p",
-             cap->no, task->incall->tso ? "bound task" : "worker",
-             (void *)(size_t)task->id);
   ASSERT(task->cap == cap);
+  debugTrace(DEBUG_sched, "passing capability %d to %s %#" FMT_HexWord64,
+             cap->no, task->incall->tso ? "bound task" : "worker",
+             serialisableTaskId(task));
   ACQUIRE_LOCK(&task->lock);
   if (task->wakeup == rtsFalse) {
     task->wakeup = rtsTrue;
@@ -500,13 +500,13 @@ releaseCapability_ (Capability* cap,
 
   // If the next thread on the run queue is a bound thread,
   // give this Capability to the appropriate Task.
-  if (!emptyRunQueue(cap) && cap->run_queue_hd->bound) {
+  if (!emptyRunQueue(cap) && peekRunQueue(cap)->bound) {
     // Make sure we're not about to try to wake ourselves up
     // ASSERT(task != cap->run_queue_hd->bound);
     // assertion is false: in schedule() we force a yield after
     // ThreadBlocked, but the thread may be back on the run queue
     // by now.
-    task = cap->run_queue_hd->bound->task;
+    task = peekRunQueue(cap)->bound->task;
     giveCapabilityToTask(cap, task);
     return;
   }
@@ -872,7 +872,7 @@ tryGrabCapability (Capability *cap, Task *task)
  * allow the workers to stop.
  *
  * This function should be called when interrupted and
- * shutting_down_scheduler = rtsTrue, thus any worker that wakes up
+ * sched_state = SCHED_SHUTTING_DOWN, thus any worker that wakes up
  * will exit the scheduler and call taskStop(), and any bound thread
  * that wakes up will return to its caller.  Runnable threads are
  * killed.

@@ -8,7 +8,7 @@
 module Main(main) where
 
 #include "../../includes/ghcconfig.h"
-#include "../../includes/stg/MachRegs.h"
+#include "../../includes/stg/HaskellMachRegs.h"
 #include "../../includes/rts/Constants.h"
 
 -- Needed for TAG_BITS
@@ -17,7 +17,7 @@ module Main(main) where
 import Text.PrettyPrint
 import Data.Word
 import Data.Bits
-import Data.List        ( intersperse )
+import Data.List        ( intersperse, nub, sort )
 import System.Exit
 import System.Environment
 import System.IO
@@ -26,29 +26,32 @@ import System.IO
 -- Argument kinds (rougly equivalent to PrimRep)
 
 data ArgRep 
-  = N           -- non-ptr
-  | P           -- ptr
-  | V           -- void
-  | F           -- float
-  | D           -- double
-  | L           -- long (64-bit)
+  = N   -- non-ptr
+  | P   -- ptr
+  | V   -- void
+  | F   -- float
+  | D   -- double
+  | L   -- long (64-bit)
+  | V16 -- 16-byte (128-bit) vectors
 
 -- size of a value in *words*
 argSize :: ArgRep -> Int
-argSize N = 1
-argSize P = 1
-argSize V = 0
-argSize F = 1
-argSize D = (SIZEOF_DOUBLE `quot` SIZEOF_VOID_P :: Int)
-argSize L = (8 `quot` SIZEOF_VOID_P :: Int)
+argSize N   = 1
+argSize P   = 1
+argSize V   = 0
+argSize F   = 1
+argSize D   = (SIZEOF_DOUBLE `quot` SIZEOF_VOID_P :: Int)
+argSize L   = (8 `quot` SIZEOF_VOID_P :: Int)
+argSize V16 = (16 `quot` SIZEOF_VOID_P :: Int)
 
-showArg :: ArgRep -> Char
-showArg N = 'n'
-showArg P = 'p'
-showArg V = 'v'
-showArg F = 'f'
-showArg D = 'd'
-showArg L = 'l'
+showArg :: ArgRep -> String
+showArg N   = "n"
+showArg P   = "p"
+showArg V   = "v"
+showArg F   = "f"
+showArg D   = "d"
+showArg L   = "l"
+showArg V16 = "v16"
 
 -- is a value a pointer?
 isPtr :: ArgRep -> Bool
@@ -135,6 +138,18 @@ regRep _       = "W_"
 loadSpWordOff :: String -> Int -> Doc
 loadSpWordOff rep off = text rep <> text "[Sp+WDS(" <> int off <> text ")]"
 
+-- Make a jump
+mkJump :: RegStatus -- Registerised status
+       -> Doc       -- Jump target
+       -> [Reg]     -- Registers that are definitely live
+       -> [ArgRep]  -- Jump arguments
+       -> Doc
+mkJump regstatus jump live args =
+    text "jump " <> jump <+> brackets (hcat (punctuate comma (map text regs)))
+  where
+   (reg_locs, _, _) = assignRegs regstatus 0 args
+   regs             = (nub . sort) (live ++ map fst reg_locs)
+
 -- make a ptr/non-ptr bitmap from a list of argument types
 mkBitmap :: [ArgRep] -> Word32
 mkBitmap args = foldr f 0 args
@@ -162,7 +177,7 @@ mkBitmap args = foldr f 0 args
 -- when we start passing args to stg_ap_* in regs).
 
 mkApplyName args
-  = text "stg_ap_" <> text (map showArg args)
+  = text "stg_ap_" <> text (concatMap showArg args)
 
 mkApplyRetName args
   = mkApplyName args <> text "_ret"
@@ -178,7 +193,21 @@ mb_tag_node arity | Just tag <- tagForArity arity = mkTagStmt tag <> semi
 
 mkTagStmt tag = text ("R1 = R1 + "++ show tag)
 
-genMkPAP regstatus macro jump ticker disamb
+genMkPAP :: RegStatus -- Register status
+         -> String    -- Macro
+         -> String    -- Jump target
+         -> [Reg]     -- Registers that are definitely live
+         -> String    -- Ticker
+         -> String    -- Disamb
+         -> Bool      -- Don't load argument registers before jump if True
+         -> Bool      -- Arguments already in registers if True
+         -> Bool      -- Is a PAP if True
+         -> [ArgRep]  -- Arguments
+         -> Int       -- Size of all arguments
+         -> Doc       -- info label
+         -> Bool      -- Is a function
+         -> Doc
+genMkPAP regstatus macro jump live ticker disamb
         no_load_regs    -- don't load argument regs before jumping
         args_in_regs    -- arguments are already in regs
         is_pap args all_args_size fun_info_label
@@ -232,7 +261,7 @@ genMkPAP regstatus macro jump ticker disamb
             if is_fun_case then mb_tag_node arity else empty,
             if overflow_regs
                 then text "jump_SAVE_CCCS" <> parens (text jump) <> semi
-                else text "jump " <> text jump <> semi
+                else mkJump regstatus (text jump) live (if no_load_regs then [] else args) <> semi
             ]) $$
            text "}"
 
@@ -334,7 +363,7 @@ genMkPAP regstatus macro jump ticker disamb
                 then text "R2 = " <> fun_info_label <> semi
                 else empty,
             if is_fun_case then mb_tag_node n_args else empty,
-            text "jump " <> text jump <> semi
+            mkJump regstatus (text jump) live (if no_load_regs then [] else args) <> semi
           ])
 
 -- The LARGER ARITY cases:
@@ -411,12 +440,18 @@ tagForArity :: Int -> Maybe Int
 tagForArity i | i < tAG_BITS_MAX = Just i
               | otherwise        = Nothing
 
+enterFastPathHelper :: Int
+                    -> RegStatus
+                    -> Bool
+                    -> Bool
+                    -> [ArgRep]
+                    -> Doc
 enterFastPathHelper tag regstatus no_load_regs args_in_regs args =
   vcat [text "if (GETTAG(R1)==" <> int tag <> text ") {",
         reg_doc,
         text "  Sp_adj(" <> int sp' <> text ");",
         -- enter, but adjust offset with tag
-        text "  jump " <> text "%GET_ENTRY(R1-" <> int tag <> text ");",
+        text "  " <> mkJump regstatus (text "%GET_ENTRY(R1-" <> int tag <> text ")") ["R1"] args <> semi,
         text "}"
        ]
   -- I don't totally understand this code, I copied it from
@@ -464,11 +499,12 @@ formalParam arg n =
     text "arg" <> int n <> text ", "
 formalParamType arg = argRep arg
 
-argRep F = text "F_"
-argRep D = text "D_"
-argRep L = text "L_"
-argRep P = text "gcptr"
-argRep _ = text "W_"
+argRep F   = text "F_"
+argRep D   = text "D_"
+argRep L   = text "L_"
+argRep P   = text "gcptr"
+argRep V16 = text "V16_"
+argRep _   = text "W_"
 
 genApply regstatus args =
    let
@@ -478,7 +514,7 @@ genApply regstatus args =
    in
     vcat [
       text "INFO_TABLE_RET(" <> mkApplyName args <> text ", " <>
-        text "RET_SMALL, " <> (cat $ zipWith formalParam args [1..]) <>
+        text "RET_SMALL, W_ info_ptr, " <> (cat $ zipWith formalParam args [1..]) <>
         text ")\n{",
       nest 4 (vcat [
        text "W_ info;",
@@ -552,7 +588,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgBCO_arity(R1));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" "FUN" "BCO"
+          genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" ["R1"] "FUN" "BCO"
                 True{-stack apply-} False{-args on stack-} False{-not a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}False
          ]),
@@ -571,7 +607,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" "FUN" "FUN"
+          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
                 False{-reg apply-} False{-args on stack-} False{-not a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}True
          ]),
@@ -585,7 +621,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgPAP_arity(R1));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" "PAP" "PAP"
+          genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" ["R1", "R2"] "PAP" "PAP"
                 True{-stack apply-} False{-args on stack-} True{-is a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}False
          ]),
@@ -686,7 +722,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
             text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
             text "ASSERT(arity > 0);",
-            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" "FUN" "FUN"
+            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
                 False{-reg apply-} True{-args in regs-} False{-not a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}True
            ]),
@@ -701,7 +737,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
-             text "jump" <+> fun_ret_label <> semi
+             mkJump regstatus fun_ret_label [] [] <> semi
           ]),
           char '}'
         ]),
@@ -726,7 +762,7 @@ genApplyFast regstatus args =
 -- void arguments.
 
 mkStackApplyEntryLabel:: [ArgRep] -> Doc
-mkStackApplyEntryLabel args = text "stg_ap_stk_" <> text (map showArg args)
+mkStackApplyEntryLabel args = text "stg_ap_stk_" <> text (concatMap showArg args)
 
 genStackApply :: RegStatus -> [ArgRep] -> Doc
 genStackApply regstatus args = 
@@ -739,7 +775,7 @@ genStackApply regstatus args =
    (assign_regs, sp') = loadRegArgs regstatus 0 args
    body = vcat [assign_regs,
                 text "Sp_adj" <> parens (int sp') <> semi,
-                text "jump %GET_ENTRY(UNTAG(R1));"
+                mkJump regstatus (text "%GET_ENTRY(UNTAG(R1))") ["R1"] args <> semi
                 ]
 
 -- -----------------------------------------------------------------------------
@@ -751,7 +787,7 @@ genStackApply regstatus args =
 -- in HeapStackCheck.hc for more details.
 
 mkStackSaveEntryLabel :: [ArgRep] -> Doc
-mkStackSaveEntryLabel args = text "stg_stk_save_" <> text (map showArg args)
+mkStackSaveEntryLabel args = text "stg_stk_save_" <> text (concatMap showArg args)
 
 genStackSave :: RegStatus -> [ArgRep] -> Doc
 genStackSave regstatus args =
@@ -766,7 +802,7 @@ genStackSave regstatus args =
                 text "Sp(2) = R1;",
                 text "Sp(1) =" <+> int stk_args <> semi,
                 text "Sp(0) = stg_gc_fun_info;",
-                text "jump stg_gc_noregs;"
+                text "jump stg_gc_noregs [];"
                 ]
 
    std_frame_size = 3 -- the std bits of the frame. See StgRetFun in Closures.h,
@@ -817,6 +853,7 @@ applyTypes = [
         [F],
         [D],
         [L],
+        [V16],
         [N],
         [P],
         [P,V],
@@ -833,6 +870,10 @@ applyTypes = [
 -- ToDo: the stack apply and stack save code doesn't make a distinction
 -- between N and P (they both live in the same register), only the bitmap
 -- changes, so we could share the apply/save code between lots of cases.
+--
+--  NOTE: other places to change if you change stackApplyTypes:
+--       - includes/rts/storage/FunTypes.h
+--       - compiler/codeGen/CgCallConv.lhs: stdPattern
 stackApplyTypes = [
         [],
         [N],
@@ -840,6 +881,7 @@ stackApplyTypes = [
         [F],
         [D],
         [L],
+        [V16],
         [N,N],
         [N,P],
         [P,N],

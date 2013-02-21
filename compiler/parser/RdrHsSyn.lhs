@@ -10,8 +10,9 @@ module RdrHsSyn (
         mkHsDo, mkHsSplice, mkTopSpliceDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
-        mkTySynonym, mkFamInstSynonym,
-        mkTyFamily, 
+        mkTySynonym, mkTyFamInstEqn, mkTyFamInstGroup,
+        mkTyFamInst, 
+        mkFamDecl, 
         splitCon, mkInlinePragma,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyLit,
@@ -39,6 +40,7 @@ module RdrHsSyn (
         bang_RDR,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
+        checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkDoAndIfThenElse,
@@ -111,7 +113,7 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl RdrName)
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { let (binds, sigs, ats, at_defs, docs) = cvBindsAndSigs (unLoc where_cls)
+  = do { let (binds, sigs, ats, at_defs, _, docs) = cvBindsAndSigs (unLoc where_cls)
              cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
@@ -132,9 +134,9 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tycl_hdr tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = defn,
-                                 tcdFVs = placeHolderNames })) }
+       ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
+                                   tcdDataDefn = defn,
+                                   tcdFVs = placeHolderNames })) }
 
 mkFamInstData :: SrcSpan
          -> NewOrData
@@ -143,12 +145,12 @@ mkFamInstData :: SrcSpan
          -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
-         -> P (LFamInstDecl RdrName)
+         -> P (LDataFamInstDecl RdrName)
 mkFamInstData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsWithBndrs tparams
-                                    , fid_defn = defn, fid_fvs = placeHolderNames })) }
+       ; return (L loc (DataFamInstDecl { dfid_tycon = tc, dfid_pats = mkHsWithBndrs tparams
+                                        , dfid_defn = defn, dfid_fvs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
            -> Maybe CType
@@ -156,15 +158,15 @@ mkDataDefn :: NewOrData
            -> Maybe (LHsKind RdrName)
            -> [LConDecl RdrName]
            -> Maybe [LHsType RdrName]
-           -> P (HsTyDefn RdrName)
+           -> P (HsDataDefn RdrName)
 mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
-       ; return (TyData { td_ND = new_or_data, td_cType = cType
-                        , td_ctxt = cxt 
-                        , td_cons = data_cons
-                        , td_kindSig = ksig
-                        , td_derivs = maybe_deriv }) }
+       ; return (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                            , dd_ctxt = cxt 
+                            , dd_cons = data_cons
+                            , dd_kindSig = ksig
+                            , dd_derivs = maybe_deriv }) }
 
 mkTySynonym :: SrcSpan
             -> LHsType RdrName  -- LHS
@@ -173,29 +175,42 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
-       ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = TySynonym { td_synRhs = rhs },
-                                 tcdFVs = placeHolderNames })) }
+       ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars,
+                                 tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
-mkFamInstSynonym :: SrcSpan
-            -> LHsType RdrName  -- LHS
-            -> LHsType RdrName  -- RHS
-            -> P (LFamInstDecl RdrName)
-mkFamInstSynonym loc lhs rhs
+mkTyFamInstEqn :: SrcSpan
+               -> LHsType RdrName
+               -> LHsType RdrName
+               -> P (LTyFamInstEqn RdrName)
+mkTyFamInstEqn loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsWithBndrs tparams
-                                    , fid_defn = TySynonym { td_synRhs = rhs }
-                                    , fid_fvs = placeHolderNames })) }
+       ; return (L loc (TyFamInstEqn { tfie_tycon = tc
+                                     , tfie_pats  = mkHsWithBndrs tparams
+                                     , tfie_rhs   = rhs })) }
 
-mkTyFamily :: SrcSpan
-           -> FamilyFlavour
-           -> LHsType RdrName   -- LHS
-           -> Maybe (LHsKind RdrName) -- Optional kind signature
-           -> P (LTyClDecl RdrName)
-mkTyFamily loc flavour lhs ksig
+mkTyFamInst :: SrcSpan
+            -> LTyFamInstEqn RdrName
+            -> P (LTyFamInstDecl RdrName)
+mkTyFamInst loc eqn
+  = return (L loc (TyFamInstDecl { tfid_eqns  = [eqn]
+                                 , tfid_group = False
+                                 , tfid_fvs   = placeHolderNames }))
+
+mkTyFamInstGroup :: [LTyFamInstEqn RdrName]
+                 -> TyFamInstDecl RdrName
+mkTyFamInstGroup eqns = TyFamInstDecl { tfid_eqns  = eqns
+                                      , tfid_group = True
+                                      , tfid_fvs   = placeHolderNames }
+
+mkFamDecl :: SrcSpan
+          -> FamilyFlavour
+          -> LHsType RdrName   -- LHS
+          -> Maybe (LHsKind RdrName) -- Optional kind signature
+          -> P (LFamilyDecl RdrName)
+mkFamDecl loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
-       ; return (L loc (TyFamily flavour tc tyvars ksig)) }
+       ; return (L loc (FamilyDecl flavour tc tyvars ksig)) }
 
 mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- If the user wrote
@@ -248,30 +263,32 @@ cvTopDecls decls = go (fromOL decls)
 cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
 cvBindGroup binding
   = case cvBindsAndSigs binding of
-      (mbs, sigs, fam_ds, fam_insts, _) 
-         -> ASSERT( null fam_ds && null fam_insts )
+      (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _) 
+         -> ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
             ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (Bag ( LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName]
-          , [LFamInstDecl RdrName], [LDocDecl])
+  -> (Bag ( LHsBind RdrName), [LSig RdrName], [LFamilyDecl RdrName]
+          , [LTyFamInstDecl RdrName], [LDataFamInstDecl RdrName], [LDocDecl])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigs  fb = go (fromOL fb)
   where
-    go []                  = (emptyBag, [], [], [], [])
-    go (L l (SigD s) : ds) = (bs, L l s : ss, ts, fis, docs)
-                           where (bs, ss, ts, fis, docs) = go ds
-    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, fis, docs)
+    go []                  = (emptyBag, [], [], [], [], [])
+    go (L l (SigD s) : ds) = (bs, L l s : ss, ts, tfis, dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, tfis, dfis, docs)
                            where (b', ds')    = getMonoBind (L l b) ds
-                                 (bs, ss, ts, fis, docs) = go ds'
-    go (L l (TyClD t@(TyFamily {})) : ds) = (bs, ss, L l t : ts, fis, docs)
-                           where (bs, ss, ts, fis, docs) = go ds
-    go (L l (InstD (FamInstD { lid_inst = fi })) : ds) = (bs, ss, ts, L l fi : fis, docs)
-                           where (bs, ss, ts, fis, docs) = go ds
-    go (L l (DocD d) : ds) =  (bs, ss, ts, fis, (L l d) : docs)
-                           where (bs, ss, ts, fis, docs) = go ds
+                                 (bs, ss, ts, tfis, dfis, docs) = go ds'
+    go (L l (TyClD (FamDecl t)) : ds) = (bs, ss, L l t : ts, tfis, dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (InstD (TyFamInstD { tfid_inst = tfi })) : ds) = (bs, ss, ts, L l tfi : tfis, dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (InstD (DataFamInstD { dfid_inst = dfi })) : ds) = (bs, ss, ts, tfis, L l dfi : dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (DocD d) : ds) =  (bs, ss, ts, tfis, dfis, (L l d) : docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
     go (L _ d : _) = pprPanic "cvBindsAndSigs" (ppr d)
 
 -----------------------------------------------------------------------------
@@ -293,13 +310,13 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
-                               fun_matches = MatchGroup mtchs1 _ })) binds
+                               fun_matches = MG { mg_alts = mtchs1 } })) binds
   | has_args mtchs1
   = go is_infix1 mtchs1 loc1 binds []
   where
     go is_infix mtchs loc
        (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_infix = is_infix2,
-                                fun_matches = MatchGroup mtchs2 _ })) : binds) _
+                                fun_matches = MG { mg_alts = mtchs2 } })) : binds) _
         | f1 == f2 = go (is_infix || is_infix2) (mtchs2 ++ mtchs)
                         (combineSrcSpans loc loc2) binds []
     go is_infix mtchs loc (doc_decl@(L loc2 (DocD _)) : binds) doc_decls
@@ -312,7 +329,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
 
 getMonoBind bind binds = (bind, binds)
 
-has_args :: [LMatch RdrName] -> Bool
+has_args :: [LMatch RdrName (LHsExpr RdrName)] -> Bool
 has_args []                           = panic "RdrHsSyn:has_args"
 has_args ((L _ (Match args _ _)) : _) = not (null args)
         -- Don't group together FunBinds if they have
@@ -525,35 +542,39 @@ checkContext (L l orig_t)
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
-checkPattern :: LHsExpr RdrName -> P (LPat RdrName)
-checkPattern e = checkLPat e
+checkPattern :: SDoc -> LHsExpr RdrName -> P (LPat RdrName)
+checkPattern msg e = checkLPat msg e
 
-checkPatterns :: [LHsExpr RdrName] -> P [LPat RdrName]
-checkPatterns es = mapM checkPattern es
+checkPatterns :: SDoc -> [LHsExpr RdrName] -> P [LPat RdrName]
+checkPatterns msg es = mapM (checkPattern msg) es
 
-checkLPat :: LHsExpr RdrName -> P (LPat RdrName)
-checkLPat e@(L l _) = checkPat l e []
+checkLPat :: SDoc -> LHsExpr RdrName -> P (LPat RdrName)
+checkLPat msg e@(L l _) = checkPat msg l e []
 
-checkPat :: SrcSpan -> LHsExpr RdrName -> [LPat RdrName] -> P (LPat RdrName)
-checkPat loc (L l (HsVar c)) args
+checkPat :: SDoc -> SrcSpan -> LHsExpr RdrName -> [LPat RdrName]
+         -> P (LPat RdrName)
+checkPat _ loc (L l (HsVar c)) args
   | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
-checkPat loc e args     -- OK to let this happen even if bang-patterns
+checkPat msg loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
                         -- non-bang-pattern parse of (C ! e)
   | Just (e', args') <- splitBang e
-  = do  { args'' <- checkPatterns args'
-        ; checkPat loc e' (args'' ++ args) }
-checkPat loc (L _ (HsApp f x)) args
-  = do { x <- checkLPat x; checkPat loc f (x:args) }
-checkPat loc (L _ e) []
-  = do { pState <- getPState
-       ; p <- checkAPat (dflags pState) loc e
-       ; return (L loc p) }
-checkPat loc e _
-  = patFail loc (unLoc e)
+  = do  { args'' <- checkPatterns msg args'
+        ; checkPat msg loc e' (args'' ++ args) }
+checkPat msg loc (L _ (HsApp f e)) args
+  = do p <- checkLPat msg e
+       checkPat msg loc f (p : args)
+checkPat msg loc (L _ e) []
+  = do p <- checkAPat msg loc e
+       return (L loc p)
+checkPat msg loc e _
+  = patFail msg loc (unLoc e)
 
-checkAPat :: DynFlags -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
-checkAPat dynflags loc e0 = case e0 of
+checkAPat :: SDoc -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
+checkAPat msg loc e0 = do
+ pState <- getPState
+ let dynflags = dflags pState
+ case e0 of
    EWildPat -> return (WildPat placeHolderType)
    HsVar x  -> return (VarPat x)
    HsLit l  -> return (LitPat l)
@@ -568,14 +589,14 @@ checkAPat dynflags loc e0 = case e0 of
    SectionR (L _ (HsVar bang)) e        -- (! x)
         | bang == bang_RDR
         -> do { bang_on <- extension bangPatEnabled
-              ; if bang_on then checkLPat e >>= (return . BangPat)
+              ; if bang_on then checkLPat msg e >>= (return . BangPat)
                 else parseErrorSDoc loc (text "Illegal bang-pattern (use -XBangPatterns):" $$ ppr e0) }
 
-   ELazyPat e         -> checkLPat e >>= (return . LazyPat)
-   EAsPat n e         -> checkLPat e >>= (return . AsPat n)
+   ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
+   EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
    -- view pattern is well-formed if the pattern is
-   EViewPat expr patE -> checkLPat patE >>= (return . (\p -> ViewPat expr p placeHolderType))
-   ExprWithTySig e t  -> do e <- checkLPat e
+   EViewPat expr patE -> checkLPat msg patE >>= (return . (\p -> ViewPat expr p placeHolderType))
+   ExprWithTySig e t  -> do e <- checkLPat msg e
                             -- Pattern signatures are parsed as sigtypes,
                             -- but they aren't explicit forall points.  Hence
                             -- we have to remove the implicit forall here.
@@ -590,29 +611,29 @@ checkAPat dynflags loc e0 = case e0 of
                       | xopt Opt_NPlusKPatterns dynflags && (plus == plus_RDR)
                       -> return (mkNPlusKPat (L nloc n) lit)
 
-   OpApp l op _fix r  -> do l <- checkLPat l
-                            r <- checkLPat r
+   OpApp l op _fix r  -> do l <- checkLPat msg l
+                            r <- checkLPat msg r
                             case op of
                                L cl (HsVar c) | isDataOcc (rdrNameOcc c)
                                       -> return (ConPatIn (L cl c) (InfixCon l r))
-                               _ -> patFail loc e0
+                               _ -> patFail msg loc e0
 
-   HsPar e            -> checkLPat e >>= (return . ParPat)
-   ExplicitList _ es  -> do ps <- mapM checkLPat es
-                            return (ListPat ps placeHolderType)
-   ExplicitPArr _ es  -> do ps <- mapM checkLPat es
+   HsPar e            -> checkLPat msg e >>= (return . ParPat)
+   ExplicitList _ _ es  -> do ps <- mapM (checkLPat msg) es
+                              return (ListPat ps placeHolderType Nothing)
+   ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
                             return (PArrPat ps placeHolderType)
 
    ExplicitTuple es b
-     | all tupArgPresent es  -> do ps <- mapM checkLPat [e | Present e <- es]
+     | all tupArgPresent es  -> do ps <- mapM (checkLPat msg) [e | Present e <- es]
                                    return (TuplePat ps b placeHolderType)
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    RecordCon c _ (HsRecFields fs dd)
-                      -> do fs <- mapM checkPatField fs
+                      -> do fs <- mapM (checkPatField msg) fs
                             return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
-   _                  -> patFail loc e0
+   _                  -> patFail msg loc e0
 
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer
@@ -624,58 +645,63 @@ plus_RDR = mkUnqual varName (fsLit "+") -- Hack
 bang_RDR = mkUnqual varName (fsLit "!") -- Hack
 pun_RDR  = mkUnqual varName (fsLit "pun-right-hand-side")
 
-checkPatField :: HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
-checkPatField fld = do  { p <- checkLPat (hsRecFieldArg fld)
-                        ; return (fld { hsRecFieldArg = p }) }
+checkPatField :: SDoc -> HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
+checkPatField msg fld = do p <- checkLPat msg (hsRecFieldArg fld)
+                           return (fld { hsRecFieldArg = p })
 
-patFail :: SrcSpan -> HsExpr RdrName -> P a
-patFail loc e = parseErrorSDoc loc (text "Parse error in pattern:" <+> ppr e)
+patFail :: SDoc -> SrcSpan -> HsExpr RdrName -> P a
+patFail msg loc e = parseErrorSDoc loc err
+    where err = text "Parse error in pattern:" <+> ppr e
+             $$ msg
 
 
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
-checkValDef :: LHsExpr RdrName
+checkValDef :: SDoc
+            -> LHsExpr RdrName
             -> Maybe (LHsType RdrName)
-            -> Located (GRHSs RdrName)
+            -> Located (GRHSs RdrName (LHsExpr RdrName))
             -> P (HsBind RdrName)
 
-checkValDef lhs (Just sig) grhss
+checkValDef msg lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = checkPatBind (L (combineLocs lhs sig) (ExprWithTySig lhs sig)) grhss
+  = checkPatBind msg (L (combineLocs lhs sig) (ExprWithTySig lhs sig)) grhss
 
-checkValDef lhs opt_sig grhss
+checkValDef msg lhs opt_sig grhss
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
-            Just (fun, is_infix, pats) -> checkFunBind (getLoc lhs)
+            Just (fun, is_infix, pats) -> checkFunBind msg (getLoc lhs)
                                                 fun is_infix pats opt_sig grhss
-            Nothing -> checkPatBind lhs grhss }
+            Nothing -> checkPatBind msg lhs grhss }
 
-checkFunBind :: SrcSpan
+checkFunBind :: SDoc
+             -> SrcSpan
              -> Located RdrName
              -> Bool
              -> [LHsExpr RdrName]
              -> Maybe (LHsType RdrName)
-             -> Located (GRHSs RdrName)
+             -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P (HsBind RdrName)
-checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
-  = do  ps <- checkPatterns pats
+checkFunBind msg lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
+  = do  ps <- checkPatterns msg pats
         let match_span = combineSrcSpans lhs_loc rhs_span
         return (makeFunBind fun is_infix [L match_span (Match ps opt_sig grhss)])
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
 
-makeFunBind :: Located id -> Bool -> [LMatch id] -> HsBind id
+makeFunBind :: Located id -> Bool -> [LMatch id (LHsExpr id)] -> HsBind id
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn is_infix ms
   = FunBind { fun_id = fn, fun_infix = is_infix, fun_matches = mkMatchGroup ms,
               fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames, fun_tick = Nothing }
 
-checkPatBind :: LHsExpr RdrName
-             -> Located (GRHSs RdrName)
+checkPatBind :: SDoc
+             -> LHsExpr RdrName
+             -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P (HsBind RdrName)
-checkPatBind lhs (L _ grhss)
-  = do  { lhs <- checkPattern lhs
+checkPatBind msg lhs (L _ grhss)
+  = do  { lhs <- checkPattern msg lhs
         ; return (PatBind lhs grhss placeHolderType placeHolderNames
                     (Nothing,[])) }
 
@@ -807,6 +833,94 @@ checkMonadComp = do
     return $ if xopt Opt_MonadComprehensions (dflags pState)
                 then MonadComp
                 else ListComp
+
+-- -------------------------------------------------------------------------
+-- Checking arrow syntax.
+
+-- We parse arrow syntax as expressions and check for valid syntax below,
+-- converting the expression into a pattern at the same time.
+
+checkCommand :: LHsExpr RdrName -> P (LHsCmd RdrName)
+checkCommand lc = locMap checkCmd lc
+
+locMap :: (SrcSpan -> a -> P b) -> Located a -> P (Located b)
+locMap f (L l a) = f l a >>= (\b -> return $ L l b)
+
+checkCmd :: SrcSpan -> HsExpr RdrName -> P (HsCmd RdrName)
+checkCmd _ (HsArrApp e1 e2 ptt haat b) = 
+    return $ HsCmdArrApp e1 e2 ptt haat b
+checkCmd _ (HsArrForm e mf args) = 
+    return $ HsCmdArrForm e mf args
+checkCmd _ (HsApp e1 e2) = 
+    checkCommand e1 >>= (\c -> return $ HsCmdApp c e2)
+checkCmd _ (HsLam mg) = 
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdLam mg')
+checkCmd _ (HsPar e) = 
+    checkCommand e >>= (\c -> return $ HsCmdPar c)
+checkCmd _ (HsCase e mg) = 
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase e mg')
+checkCmd _ (HsIf cf ep et ee) = do
+    pt <- checkCommand et
+    pe <- checkCommand ee
+    return $ HsCmdIf cf ep pt pe
+checkCmd _ (HsLet lb e) = 
+    checkCommand e >>= (\c -> return $ HsCmdLet lb c)
+checkCmd _ (HsDo DoExpr stmts ty) = 
+    mapM checkCmdLStmt stmts >>= (\ss -> return $ HsCmdDo ss ty)
+
+checkCmd _ (OpApp eLeft op fixity eRight) = do
+    -- OpApp becomes a HsCmdArrForm with a (Just fixity) in it
+    c1 <- checkCommand eLeft
+    c2 <- checkCommand eRight
+    let arg1 = L (getLoc c1) $ HsCmdTop c1 [] placeHolderType []
+        arg2 = L (getLoc c2) $ HsCmdTop c2 [] placeHolderType []
+    return $ HsCmdArrForm op (Just fixity) [arg1, arg2]
+
+checkCmd l e = cmdFail l e
+
+checkCmdLStmt :: ExprLStmt RdrName -> P (CmdLStmt RdrName)
+checkCmdLStmt = locMap checkCmdStmt
+
+checkCmdStmt :: SrcSpan -> ExprStmt RdrName -> P (CmdStmt RdrName)
+checkCmdStmt _ (LastStmt e r) = 
+    checkCommand e >>= (\c -> return $ LastStmt c r)
+checkCmdStmt _ (BindStmt pat e b f) = 
+    checkCommand e >>= (\c -> return $ BindStmt pat c b f)
+checkCmdStmt _ (BodyStmt e t g ty) = 
+    checkCommand e >>= (\c -> return $ BodyStmt c t g ty)
+checkCmdStmt _ (LetStmt bnds) = return $ LetStmt bnds
+checkCmdStmt _ stmt@(RecStmt { recS_stmts = stmts }) = do
+    ss <- mapM checkCmdLStmt stmts
+    return $ stmt { recS_stmts = ss }
+checkCmdStmt l stmt = cmdStmtFail l stmt
+
+checkCmdMatchGroup :: MatchGroup RdrName (LHsExpr RdrName) -> P (MatchGroup RdrName (LHsCmd RdrName))
+checkCmdMatchGroup mg@(MG { mg_alts = ms }) = do
+    ms' <- mapM (locMap $ const convert) ms
+    return $ mg { mg_alts = ms' }
+    where convert (Match pat mty grhss) = do
+            grhss' <- checkCmdGRHSs grhss
+            return $ Match pat mty grhss'
+
+checkCmdGRHSs :: GRHSs RdrName (LHsExpr RdrName) -> P (GRHSs RdrName (LHsCmd RdrName))
+checkCmdGRHSs (GRHSs grhss binds) = do
+    grhss' <- mapM checkCmdGRHS grhss
+    return $ GRHSs grhss' binds
+
+checkCmdGRHS :: LGRHS RdrName (LHsExpr RdrName) -> P (LGRHS RdrName (LHsCmd RdrName))
+checkCmdGRHS = locMap $ const convert
+  where 
+    convert (GRHS stmts e) = do
+        c <- checkCommand e
+--        cmdStmts <- mapM checkCmdLStmt stmts
+        return $ GRHS {- cmdStmts -} stmts c
+
+
+cmdFail :: SrcSpan -> HsExpr RdrName -> P a
+cmdFail loc e = parseErrorSDoc loc (text "Parse error in command:" <+> ppr e)
+cmdStmtFail :: SrcSpan -> Stmt RdrName (LHsExpr RdrName) -> P a
+cmdStmtFail loc e = parseErrorSDoc loc 
+                    (text "Parse error in command statement:" <+> ppr e)
 
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities

@@ -21,7 +21,7 @@ import Distribution.Text
 import Distribution.Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
-import System.Cmd       ( rawSystem )
+import System.Process
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
@@ -49,7 +49,7 @@ import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
 #if defined(mingw32_HOST_OS)
--- mingw32 needs these for getExecDir, GHC <6.12 needs them for openNewFile
+-- mingw32 needs these for getExecDir
 import Foreign
 import Foreign.C
 #endif
@@ -61,7 +61,6 @@ import System.Posix hiding (fdToHandle)
 #endif
 
 #if defined(GLOB)
-import System.Process(runInteractiveCommand)
 import qualified System.Info(os)
 #endif
 
@@ -98,7 +97,7 @@ main = do
            Left err -> die err
         (_,_,errors) -> do
            prog <- getProgramName
-           die (concat errors ++ usageInfo (usageHeader prog) flags)
+           die (concat errors ++ shortUsage prog)
 
 -- -----------------------------------------------------------------------------
 -- Command-line syntax
@@ -185,6 +184,9 @@ deprecFlags = [
 ourCopyright :: String
 ourCopyright = "GHC package manager version " ++ Version.version ++ "\n"
 
+shortUsage :: String -> String
+shortUsage prog = "For usage information see '" ++ prog ++ " --help'."
+
 usageHeader :: String -> String
 usageHeader prog = substProg prog $
   "Usage:\n" ++
@@ -239,7 +241,7 @@ usageHeader prog = substProg prog $
   "    Prints the highest registered version of a package.\n" ++
   "\n" ++
   "  $p check\n" ++
-  "    Check the consistency of package depenencies and list broken packages.\n" ++
+  "    Check the consistency of package dependencies and list broken packages.\n" ++
   "    Accepts the --simple-output flag.\n" ++
   "\n" ++
   "  $p describe {pkg}\n" ++
@@ -408,11 +410,9 @@ runit verbosity cli nonopts = do
         recache verbosity cli
 
     [] -> do
-        die ("missing command\n" ++
-                usageInfo (usageHeader prog) flags)
+        die ("missing command\n" ++ shortUsage prog)
     (_cmd:_) -> do
-        die ("command-line syntax error\n" ++
-                usageInfo (usageHeader prog) flags)
+        die ("command-line syntax error\n" ++ shortUsage prog)
 
 parseCheck :: ReadP a a -> String -> String -> IO a
 parseCheck parser str what =
@@ -985,7 +985,10 @@ listPackages verbosity my_flags mPackageName mModuleName = do
       broken = map sourcePackageId (brokenPackages pkg_map)
 
       show_normal PackageDB{ location = db_name, packages = pkg_confs } =
-          hPutStrLn stdout $ unlines ((db_name ++ ":") : map ("    " ++) pp_pkgs)
+          do hPutStrLn stdout (db_name ++ ":")
+             if null pp_pkgs
+                 then hPutStrLn stdout "    (no packages)"
+                 else hPutStrLn stdout $ unlines (map ("    " ++) pp_pkgs)
            where
                  pp_pkgs = map pp_pkg pkg_confs
                  pp_pkg p
@@ -1468,32 +1471,38 @@ checkDuplicateDepends deps
 checkHSLib :: Verbosity -> [String] -> Bool -> String -> Validate ()
 checkHSLib verbosity dirs auto_ghci_libs lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
-  m <- liftIO $ doesFileExistOnPath batch_lib_file dirs
+      filenames = ["lib" ++ lib ++ ".a",
+                   "lib" ++ lib ++ ".p_a",
+                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".so",
+                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".dylib",
+                            lib ++ "-ghc" ++ Version.version ++ ".dll"]
+  m <- liftIO $ doesFileExistOnPath filenames dirs
   case m of
-    Nothing -> verror ForceFiles ("cannot find " ++ batch_lib_file ++
-                                   " on library path")
+    Nothing -> verror ForceFiles ("cannot find any of " ++ show filenames ++
+                                  " on library path")
     Just dir -> liftIO $ checkGHCiLib verbosity dir batch_lib_file lib auto_ghci_libs
 
-doesFileExistOnPath :: String -> [FilePath] -> IO (Maybe FilePath)
-doesFileExistOnPath file path = go path
-  where go []     = return Nothing
-        go (p:ps) = do b <- doesFileExistIn file p
-                       if b then return (Just p) else go ps
-
-doesFileExistIn :: String -> String -> IO Bool
-doesFileExistIn lib d = doesFileExist (d </> lib)
+doesFileExistOnPath :: [FilePath] -> [FilePath] -> IO (Maybe FilePath)
+doesFileExistOnPath filenames paths = go fullFilenames
+  where fullFilenames = [ (path, path </> filename)
+                        | filename <- filenames
+                        , path <- paths ]
+        go []             = return Nothing
+        go ((p, fp) : xs) = do b <- doesFileExist fp
+                               if b then return (Just p) else go xs
 
 checkModules :: InstalledPackageInfo -> Validate ()
 checkModules pkg = do
   mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)
   where
-    findModule modl = do
-      -- there's no .hi file for GHC.Prim
-      if modl == fromString "GHC.Prim" then return () else do
-      let file = toFilePath modl <.> "hi"
-      m <- liftIO $ doesFileExistOnPath file (importDirs pkg)
+    findModule modl =
+      -- there's no interface file for GHC.Prim
+      unless (modl == fromString "GHC.Prim") $ do
+      let files = [ toFilePath modl <.> extension
+                  | extension <- ["hi", "p_hi", "dyn_hi" ] ]
+      m <- liftIO $ doesFileExistOnPath files (importDirs pkg)
       when (isNothing m) $
-         verror ForceFiles ("file " ++ file ++ " is missing")
+         verror ForceFiles ("cannot find any of " ++ show files)
 
 checkGHCiLib :: Verbosity -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib verbosity batch_lib_dir batch_lib_file lib auto_build

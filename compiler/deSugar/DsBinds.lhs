@@ -68,6 +68,7 @@ import BasicTypes hiding ( TopLevel )
 import DynFlags
 import FastString
 import ErrUtils( MsgDoc )
+import ListSetOps( getNth )
 import Util
 import Control.Monad( when )
 import MonadUtils
@@ -101,23 +102,25 @@ dsLHsBind (L loc bind)
 dsHsBind :: HsBind Id -> DsM (OrdList (Id,CoreExpr))
 
 dsHsBind (VarBind { var_id = var, var_rhs = expr, var_inline = inline_regardless })
-  = do  { core_expr <- dsLExpr expr
+  = do  { dflags <- getDynFlags
+        ; core_expr <- dsLExpr expr
 
 	        -- Dictionary bindings are always VarBinds,
 	        -- so we only need do this here
         ; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
 	      	   | otherwise         = var
 
-        ; return (unitOL (makeCorePair var' False 0 core_expr)) }
+        ; return (unitOL (makeCorePair dflags var' False 0 core_expr)) }
 
 dsHsBind (FunBind { fun_id = L _ fun, fun_matches = matches
                   , fun_co_fn = co_fn, fun_tick = tick
                   , fun_infix = inf })
- = do	{ (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
+ = do	{ dflags <- getDynFlags
+        ; (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
         ; let body' = mkOptTickBox tick body
         ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; {- pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun)) $ -}
-           return (unitOL (makeCorePair fun False 0 rhs)) }
+           return (unitOL (makeCorePair dflags fun False 0 rhs)) }
 
 dsHsBind (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty
                   , pat_ticks = (rhs_tick, var_ticks) })
@@ -137,7 +140,8 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_ev_binds = ev_binds, abs_binds = binds })
   | ABE { abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
-  = do  { bind_prs    <- ds_lhs_binds binds
+  = do  { dflags <- getDynFlags
+        ; bind_prs    <- ds_lhs_binds binds
 	; let	core_bind = Rec (fromOL bind_prs)
         ; ds_binds <- dsTcEvBinds ev_binds
         ; rhs <- dsHsWrapper wrap $  -- Usually the identity
@@ -149,7 +153,7 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 	; (spec_binds, rules) <- dsSpecs rhs prags
 
 	; let   global'   = addIdSpecialisations global rules
-		main_bind = makeCorePair global' (isDefaultMethod prags)
+		main_bind = makeCorePair dflags global' (isDefaultMethod prags)
                                          (dictArity dicts) rhs 
     
 	; return (main_bind `consOL` spec_binds) }
@@ -158,8 +162,9 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
          -- See Note [Desugaring AbsBinds]
-  = do  { bind_prs    <- ds_lhs_binds binds
-        ; let core_bind = Rec [ makeCorePair (add_inline lcl_id) False 0 rhs
+  = do  { dflags <- getDynFlags
+        ; bind_prs    <- ds_lhs_binds binds
+        ; let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
                               | (lcl_id, rhs) <- fromOL bind_prs ]
 	      	-- Monomorphic recursion possible, hence Rec
 
@@ -207,8 +212,8 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
     add_inline lcl_id = lookupVarEnv inline_env lcl_id `orElse` lcl_id
 
 ------------------------
-makeCorePair :: Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
-makeCorePair gbl_id is_default_method dict_arity rhs
+makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
+makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method		      -- Default methods are *always* inlined
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
@@ -221,7 +226,7 @@ makeCorePair gbl_id is_default_method dict_arity rhs
 
   where
     inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding rhs
+    inlinable_unf = mkInlinableUnfolding dflags rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
       	-- Add an Unfolding for an INLINE (but not for NOINLINE)
@@ -440,8 +445,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
   | otherwise
   = putSrcSpanDs loc $ 
-    do { let poly_name = idName poly_id
-       ; spec_name <- newLocalName poly_name
+    do { uniq <- newUnique
+       ; let poly_name = idName poly_id
+             spec_name = mkClonedInternalName uniq poly_name
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
        ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
@@ -462,7 +468,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        			(mkVarApps (Var spec_id) bndrs)
 
        ; spec_rhs <- dsHsWrapper spec_co poly_rhs
-       ; let spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
+       ; let spec_pair = makeCorePair dflags spec_id False (dictArity bndrs) spec_rhs
 
        ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
               (warnDs (specOnInline poly_name))
@@ -656,8 +662,8 @@ It's true that this *is* a more specialised type, but the rule
 we get is something like this:
 	f_spec d = f
 	RULE: f = f_spec d
-Note that the rule is bogus, becuase it mentions a 'd' that is
-not bound on the LHS!  But it's a silly specialisation anyway, becuase
+Note that the rule is bogus, because it mentions a 'd' that is
+not bound on the LHS!  But it's a silly specialisation anyway, because
 the constraint is unused.  We could bind 'd' to (error "unused")
 but it seems better to reject the program because it's almost certainly
 a mistake.  That's what the isDeadBinder call detects.
@@ -740,10 +746,6 @@ dsEvTerm (EvCast tm co)
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
-dsEvTerm (EvKindCast v co)
-  = do { v' <- dsEvTerm v
-       ; dsTcCoercion co $ (\_ -> v') }
-
 dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
                                      ; return (Var df `mkTyApps` tys `mkApps` tms') }
 dsEvTerm (EvCoercion co)         = dsTcCoercion co mkEqBox
@@ -753,7 +755,7 @@ dsEvTerm (EvTupleSel v n)
               (tc, tys) = splitTyConApp scrut_ty
     	      Just [dc] = tyConDataCons_maybe tc
     	      xs = mkTemplateLocals tys
-              the_x = xs !! n
+              the_x = getNth xs n
         ; ASSERT( isTupleTyCon tc )
           return $
           Case tm' (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
@@ -775,7 +777,7 @@ dsEvTerm (EvSuperClass d n)
 dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
   where 
     errorId = rUNTIME_ERROR_ID
-    litMsg  = Lit (MachStr (fastStringToFastBytes msg))
+    litMsg  = Lit (MachStr (fastStringToByteString msg))
 
 dsEvTerm (EvLit l) =
   case l of
@@ -829,10 +831,12 @@ ds_tc_coercion subst tc_co
     go (TcForAllCo tv co)     = mkForAllCo tv' (ds_tc_coercion subst' co)
                               where
                                 (subst', tv') = Coercion.substTyVarBndr subst tv
-    go (TcAxiomInstCo ax tys) = mkAxInstCo ax (map (Coercion.substTy subst) tys)
+    go (TcAxiomInstCo ax ind tys)
+                              = mkAxInstCo ax ind (map (Coercion.substTy subst) tys)
     go (TcSymCo co)           = mkSymCo (go co)
     go (TcTransCo co1 co2)    = mkTransCo (go co1) (go co2)
     go (TcNthCo n co)         = mkNthCo n (go co)
+    go (TcLRCo lr co)         = mkLRCo lr (go co)
     go (TcInstCo co ty)       = mkInstCo (go co) ty
     go (TcLetCo bs co)        = ds_tc_coercion (ds_co_binds bs) co
     go (TcCastCo co1 co2)     = mkCoCast (go co1) (go co2)
@@ -844,13 +848,14 @@ ds_tc_coercion subst tc_co
 
     ds_scc :: CvSubst -> SCC EvBind -> CvSubst
     ds_scc subst (AcyclicSCC (EvBind v ev_term))
-      = extendCvSubstAndInScope subst v (ds_ev_term subst ev_term)
+      = extendCvSubstAndInScope subst v (ds_co_term subst ev_term)
     ds_scc _ (CyclicSCC other) = pprPanic "ds_scc:cyclic" (ppr other $$ ppr tc_co)
 
-    ds_ev_term :: CvSubst -> EvTerm -> Coercion
-    ds_ev_term subst (EvCoercion tc_co) = ds_tc_coercion subst tc_co
-    ds_ev_term subst (EvId v)           = ds_ev_id subst v
-    ds_ev_term _ other = pprPanic "ds_ev_term" (ppr other $$ ppr tc_co)
+    ds_co_term :: CvSubst -> EvTerm -> Coercion
+    ds_co_term subst (EvCoercion tc_co) = ds_tc_coercion subst tc_co
+    ds_co_term subst (EvId v)           = ds_ev_id subst v
+    ds_co_term subst (EvCast tm co)     = mkCoCast (ds_co_term subst tm) (ds_tc_coercion subst co)
+    ds_co_term _ other = pprPanic "ds_co_term" (ppr other $$ ppr tc_co)
 
     ds_ev_id :: CvSubst -> EqVar -> Coercion
     ds_ev_id subst v

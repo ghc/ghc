@@ -26,21 +26,18 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
-import PPC.Regs
 import PPC.Instr
 
 import BlockId
-import OldCmm
+import Cmm
 import CLabel
 
-import Outputable
 import Unique
 
-data JumpDest = DestBlockId BlockId | DestImm Imm
+data JumpDest = DestBlockId BlockId
 
 getJumpDestBlockId :: JumpDest -> Maybe BlockId
 getJumpDestBlockId (DestBlockId bid) = Just bid
-getJumpDestBlockId _                 = Nothing
 
 canShortcut :: Instr -> Maybe JumpDest
 canShortcut _ = Nothing
@@ -80,7 +77,5 @@ shortBlockId fn blockid =
    case fn blockid of
       Nothing -> mkAsmTempLabel uq
       Just (DestBlockId blockid')  -> shortBlockId fn blockid'
-      Just (DestImm (ImmCLbl lbl)) -> lbl
-      _other -> panic "shortBlockId"
    where uq = getUnique blockid
 

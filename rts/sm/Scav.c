@@ -105,7 +105,7 @@ scavengeTSO (StgTSO *tso)
 
 static StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
 {
-    lnat m;
+    W_ m;
     rtsBool any_failed;
     StgPtr p, q;
 
@@ -147,7 +147,7 @@ static StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
 // scavenge only the marked areas of a MUT_ARR_PTRS
 static StgPtr scavenge_mut_arr_ptrs_marked (StgMutArrPtrs *a)
 {
-    lnat m;
+    W_ m;
     StgPtr p, q;
     rtsBool any_failed;
 
@@ -329,8 +329,8 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 	  //
 	  // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
 	  // closure that's fixed at link-time, and no extra magic is required.
-	  if ( (lnat)(*srt) & 0x1 ) {
-	      evacuate( (StgClosure**) ((lnat) (*srt) & ~0x1));
+	  if ( (W_)(*srt) & 0x1 ) {
+	      evacuate( (StgClosure**) ((W_) (*srt) & ~0x1));
 	  } else {
 	      evacuate(p);
 	  }
@@ -428,6 +428,23 @@ scavenge_block (bdescr *bd)
 	    mvar->header.info = &stg_MVAR_CLEAN_info;
 	}
 	p += sizeofW(StgMVar);
+	break;
+    }
+
+    case TVAR:
+    {
+	StgTVar *tvar = ((StgTVar *)p);
+	gct->eager_promotion = rtsFalse;
+        evacuate((StgClosure **)&tvar->current_value);
+        evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    tvar->header.info = &stg_TVAR_DIRTY_info;
+	} else {
+	    tvar->header.info = &stg_TVAR_CLEAN_info;
+	}
+	p += sizeofW(StgTVar);
 	break;
     }
 
@@ -790,6 +807,22 @@ scavenge_mark_stack(void)
             break;
         }
 
+        case TVAR:
+        {
+            StgTVar *tvar = ((StgTVar *)p);
+            gct->eager_promotion = rtsFalse;
+            evacuate((StgClosure **)&tvar->current_value);
+            evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+            gct->eager_promotion = saved_eager_promotion;
+
+            if (gct->failed_to_evac) {
+                tvar->header.info = &stg_TVAR_DIRTY_info;
+            } else {
+                tvar->header.info = &stg_TVAR_CLEAN_info;
+            }
+            break;
+        }
+
 	case FUN_2_0:
 	    scavenge_fun_srt(info);
 	    evacuate(&((StgClosure *)p)->payload[1]);
@@ -1095,6 +1128,22 @@ scavenge_one(StgPtr p)
 	break;
     }
 
+    case TVAR:
+    {
+	StgTVar *tvar = ((StgTVar *)p);
+	gct->eager_promotion = rtsFalse;
+        evacuate((StgClosure **)&tvar->current_value);
+        evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    tvar->header.info = &stg_TVAR_DIRTY_info;
+	} else {
+	    tvar->header.info = &stg_TVAR_CLEAN_info;
+	}
+        break;
+    }
+
     case THUNK:
     case THUNK_1_0:
     case THUNK_0_1:
@@ -1370,17 +1419,33 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    case MVAR_CLEAN:
 		barf("MVAR_CLEAN on mutable list");
 	    case MVAR_DIRTY:
-		mutlist_MVARS++; break;
-	    default:
-		mutlist_OTHERS++; break;
-	    }
+                mutlist_MVARS++; break;
+            case TVAR:
+                mutlist_TVAR++; break;
+            case TREC_CHUNK:
+                mutlist_TREC_CHUNK++; break;
+            case MUT_PRIM:
+                if (((StgClosure*)p)->header.info == &stg_TVAR_WATCH_QUEUE_info)
+                    mutlist_TVAR_WATCH_QUEUE++;
+                else if (((StgClosure*)p)->header.info == &stg_TREC_HEADER_info)
+                    mutlist_TREC_HEADER++;
+                else if (((StgClosure*)p)->header.info == &stg_ATOMIC_INVARIANT_info)
+                    mutlist_ATOMIC_INVARIANT++;
+                else if (((StgClosure*)p)->header.info == &stg_INVARIANT_CHECK_QUEUE_info)
+                    mutlist_INVARIANT_CHECK_QUEUE++;
+                else
+                    mutlist_OTHERS++;
+                break;
+            default:
+                mutlist_OTHERS++; break;
+            }
 #endif
 
 	    // Check whether this object is "clean", that is it
 	    // definitely doesn't point into a young generation.
 	    // Clean objects don't need to be scavenged.  Some clean
 	    // objects (MUT_VAR_CLEAN) are not kept on the mutable
-	    // list at all; others, such as TSO
+	    // list at all; others, such as MUT_ARR_PTRS
 	    // are always on the mutable list.
 	    //
 	    switch (get_itbl((StgClosure *)p)->type) {
@@ -1595,29 +1660,29 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
     switch (info->i.type) {
 
-    case UPDATE_FRAME:
-	// In SMP, we can get update frames that point to indirections
-	// when two threads evaluate the same thunk.  We do attempt to
-	// discover this situation in threadPaused(), but it's
-	// possible that the following sequence occurs:
-	//
-	//        A             B
-	//                  enter T
-	//     enter T
-	//     blackhole T
-	//                  update T
-	//     GC
-	//
-	// Now T is an indirection, and the update frame is already
-	// marked on A's stack, so we won't traverse it again in
-	// threadPaused().  We could traverse the whole stack again
-	// before GC, but that seems like overkill.
-	//
-	// Scavenging this update frame as normal would be disastrous;
-	// the updatee would end up pointing to the value.  So we
-	// check whether the value after evacuation is a BLACKHOLE,
-	// and if not, we change the update frame to an stg_enter
-	// frame that simply returns the value.  Hence, blackholing is
+      case UPDATE_FRAME:
+        // In SMP, we can get update frames that point to indirections
+        // when two threads evaluate the same thunk.  We do attempt to
+        // discover this situation in threadPaused(), but it's
+        // possible that the following sequence occurs:
+        //
+        //        A             B
+        //                  enter T
+        //     enter T
+        //     blackhole T
+        //                  update T
+        //     GC
+        //
+        // Now T is an indirection, and the update frame is already
+        // marked on A's stack, so we won't traverse it again in
+        // threadPaused().  We could traverse the whole stack again
+        // before GC, but that seems like overkill.
+        //
+        // Scavenging this update frame as normal would be disastrous;
+        // the updatee would end up pointing to the value.  So we
+        // check whether the value after evacuation is a BLACKHOLE,
+        // and if not, we change the update frame to an stg_enter
+        // frame that simply returns the value.  Hence, blackholing is
         // compulsory (otherwise we would have to check for thunks
         // too).
         //
@@ -1629,108 +1694,80 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         // happening (either lazy or eager), then we can be sure that
         // the updatee is never a THUNK_SELECTOR and we're ok.
         // NB. this is a new invariant: blackholing is not optional.
-    {
-        StgUpdateFrame *frame = (StgUpdateFrame *)p;
-        StgClosure *v;
+        {
+          StgUpdateFrame *frame = (StgUpdateFrame *)p;
+          StgClosure *v;
 
-        evacuate(&frame->updatee);
-        v = frame->updatee;
-        if (GET_CLOSURE_TAG(v) != 0 ||
-            (get_itbl(v)->type != BLACKHOLE)) {
+          evacuate(&frame->updatee);
+          v = frame->updatee;
+          if (GET_CLOSURE_TAG(v) != 0 ||
+              (get_itbl(v)->type != BLACKHOLE)) {
             // blackholing is compulsory, see above.
             frame->header.info = (const StgInfoTable*)&stg_enter_checkbh_info;
+          }
+          ASSERT(v->header.info != &stg_TSO_info);
+          p += sizeofW(StgUpdateFrame);
+          continue;
         }
-        ASSERT(v->header.info != &stg_TSO_info);
-        p += sizeofW(StgUpdateFrame);
+
+        // small bitmap (< 32 entries, or 64 on a 64-bit machine)
+      case CATCH_STM_FRAME:
+      case CATCH_RETRY_FRAME:
+      case ATOMICALLY_FRAME:
+      case UNDERFLOW_FRAME:
+      case STOP_FRAME:
+      case CATCH_FRAME:
+      case RET_SMALL:
+        bitmap = BITMAP_BITS(info->i.layout.bitmap);
+        size   = BITMAP_SIZE(info->i.layout.bitmap);
+        // NOTE: the payload starts immediately after the info-ptr, we
+        // don't have an StgHeader in the same sense as a heap closure.
+        p++;
+        p = scavenge_small_bitmap(p, size, bitmap);
+
+follow_srt:
+        if (major_gc)
+          scavenge_srt((StgClosure **)GET_SRT(info), info->i.srt_bitmap);
         continue;
-    }
 
-      // small bitmap (< 32 entries, or 64 on a 64-bit machine)
-    case CATCH_STM_FRAME:
-    case CATCH_RETRY_FRAME:
-    case ATOMICALLY_FRAME:
-    case UNDERFLOW_FRAME:
-    case STOP_FRAME:
-    case CATCH_FRAME:
-    case RET_SMALL:
-	bitmap = BITMAP_BITS(info->i.layout.bitmap);
-	size   = BITMAP_SIZE(info->i.layout.bitmap);
-	// NOTE: the payload starts immediately after the info-ptr, we
-	// don't have an StgHeader in the same sense as a heap closure.
-	p++;
-	p = scavenge_small_bitmap(p, size, bitmap);
+      case RET_BCO: {
+                      StgBCO *bco;
+                      nat size;
 
-    follow_srt:
-	if (major_gc)
-	    scavenge_srt((StgClosure **)GET_SRT(info), info->i.srt_bitmap);
-	continue;
+                      p++;
+                      evacuate((StgClosure **)p);
+                      bco = (StgBCO *)*p;
+                      p++;
+                      size = BCO_BITMAP_SIZE(bco);
+                      scavenge_large_bitmap(p, BCO_BITMAP(bco), size);
+                      p += size;
+                      continue;
+                    }
 
-    case RET_BCO: {
-	StgBCO *bco;
-	nat size;
+                    // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
+      case RET_BIG:
+                    {
+                      nat size;
 
-	p++;
-	evacuate((StgClosure **)p);
-	bco = (StgBCO *)*p;
-	p++;
-	size = BCO_BITMAP_SIZE(bco);
-	scavenge_large_bitmap(p, BCO_BITMAP(bco), size);
-	p += size;
-	continue;
-    }
+                      size = GET_LARGE_BITMAP(&info->i)->size;
+                      p++;
+                      scavenge_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
+                      p += size;
+                      // and don't forget to follow the SRT
+                      goto follow_srt;
+                    }
 
-      // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
-    case RET_BIG:
-    {
-	nat size;
+      case RET_FUN:
+                    StgRetFun *ret_fun = (StgRetFun *)p;
+                    StgFunInfoTable *fun_info;
 
-	size = GET_LARGE_BITMAP(&info->i)->size;
-	p++;
-	scavenge_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
-	p += size;
-	// and don't forget to follow the SRT
-	goto follow_srt;
-    }
+                    evacuate(&ret_fun->fun);
+                    fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+                    p = scavenge_arg_block(fun_info, ret_fun->payload);
+                    goto follow_srt;
 
-      // Dynamic bitmap: the mask is stored on the stack, and
-      // there are a number of non-pointers followed by a number
-      // of pointers above the bitmapped area.  (see StgMacros.h,
-      // HEAP_CHK_GEN).
-    case RET_DYN:
-    {
-	StgWord dyn;
-	dyn = ((StgRetDyn *)p)->liveness;
-
-	// traverse the bitmap first
-	bitmap = RET_DYN_LIVENESS(dyn);
-	p      = (P_)&((StgRetDyn *)p)->payload[0];
-	size   = RET_DYN_BITMAP_SIZE;
-	p = scavenge_small_bitmap(p, size, bitmap);
-
-	// skip over the non-ptr words
-	p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
-
-	// follow the ptr words
-	for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-	    evacuate((StgClosure **)p);
-	    p++;
-	}
-	continue;
-    }
-
-    case RET_FUN:
-    {
-	StgRetFun *ret_fun = (StgRetFun *)p;
-	StgFunInfoTable *fun_info;
-
-	evacuate(&ret_fun->fun);
- 	fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-	p = scavenge_arg_block(fun_info, ret_fun->payload);
-	goto follow_srt;
-    }
-
-    default:
-	barf("scavenge_stack: weird activation record found on stack: %d", (int)(info->i.type));
+      default:
+                    barf("scavenge_stack: weird activation record found on stack: %d", (int)(info->i.type));
     }
   }
 }

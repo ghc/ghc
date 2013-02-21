@@ -1,39 +1,31 @@
 -- | State monad for the linear register allocator.
 
--- 	Here we keep all the state that the register allocator keeps track
--- 	of as it walks the instructions in a basic block.
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
+--      Here we keep all the state that the register allocator keeps track
+--      of as it walks the instructions in a basic block.
 
 module RegAlloc.Linear.State (
-	RA_State(..),
-	RegM,
-	runR,
+        RA_State(..),
+        RegM,
+        runR,
 
-	spillR,
-	loadR,
+        spillR,
+        loadR,
 
-	getFreeRegsR,
-	setFreeRegsR,
+        getFreeRegsR,
+        setFreeRegsR,
 
-	getAssigR,
-	setAssigR,
-	
-	getBlockAssigR,
-	setBlockAssigR,
-	
-	setDeltaR,
-	getDeltaR,
-	
-	getUniqueR,
-	
-	recordSpill
+        getAssigR,
+        setAssigR,
+
+        getBlockAssigR,
+        setBlockAssigR,
+
+        setDeltaR,
+        getDeltaR,
+
+        getUniqueR,
+
+        recordSpill
 )
 where
 
@@ -44,9 +36,14 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import Platform
+import DynFlags
 import Unique
 import UniqSupply
+
+
+-- | The register allocator monad type.
+newtype RegM freeRegs a
+        = RegM { unReg :: RA_State freeRegs -> (# RA_State freeRegs, a #) }
 
 
 -- | The RegM Monad
@@ -54,57 +51,64 @@ instance Monad (RegM freeRegs) where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
   return a  =  RegM $ \s -> (# s, a #)
 
+instance HasDynFlags (RegM a) where
+    getDynFlags = RegM $ \s -> (# s, ra_DynFlags s #)
+
 
 -- | Run a computation in the RegM register allocator monad.
-runR 	:: BlockAssignment freeRegs
-	-> freeRegs 
-	-> RegMap Loc
-	-> StackMap 
-	-> UniqSupply
-  	-> RegM freeRegs a 
-	-> (BlockAssignment freeRegs, StackMap, RegAllocStats, a)
+runR    :: DynFlags
+        -> BlockAssignment freeRegs
+        -> freeRegs
+        -> RegMap Loc
+        -> StackMap
+        -> UniqSupply
+        -> RegM freeRegs a
+        -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a)
 
-runR block_assig freeregs assig stack us thing =
-  case unReg thing 
-  	(RA_State
-		{ ra_blockassig = block_assig
-		, ra_freeregs	= freeregs
-		, ra_assig	= assig
-		, ra_delta	= 0{-???-}
-		, ra_stack	= stack
-		, ra_us 	= us
-		, ra_spills 	= [] }) 
+runR dflags block_assig freeregs assig stack us thing =
+  case unReg thing
+        (RA_State
+                { ra_blockassig = block_assig
+                , ra_freeregs   = freeregs
+                , ra_assig      = assig
+                , ra_delta      = 0{-???-}
+                , ra_stack      = stack
+                , ra_us         = us
+                , ra_spills     = []
+                , ra_DynFlags   = dflags })
    of
-	(# state'@RA_State
-		{ ra_blockassig = block_assig
-		, ra_stack	= stack' }
-		, returned_thing #)
-		
-	 -> 	(block_assig, stack', makeRAStats state', returned_thing)
+        (# state'@RA_State
+                { ra_blockassig = block_assig
+                , ra_stack      = stack' }
+                , returned_thing #)
+
+         ->     (block_assig, stack', makeRAStats state', returned_thing)
 
 
 -- | Make register allocator stats from its final state.
 makeRAStats :: RA_State freeRegs -> RegAllocStats
 makeRAStats state
-	= RegAllocStats
-	{ ra_spillInstrs	= binSpillReasons (ra_spills state) }
+        = RegAllocStats
+        { ra_spillInstrs        = binSpillReasons (ra_spills state) }
 
 
 spillR :: Instruction instr
-       => Platform -> Reg -> Unique -> RegM freeRegs (instr, Int)
+       => Reg -> Unique -> RegM freeRegs (instr, Int)
 
-spillR platform reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
-  let (stack',slot) = getStackSlotFor stack temp
-      instr  = mkSpillInstr platform reg delta slot
+spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
+  let dflags = ra_DynFlags s
+      (stack',slot) = getStackSlotFor stack temp
+      instr  = mkSpillInstr dflags reg delta slot
   in
   (# s{ra_stack=stack'}, (instr,slot) #)
 
 
 loadR :: Instruction instr
-      => Platform -> Reg -> Int -> RegM freeRegs instr
+      => Reg -> Int -> RegM freeRegs instr
 
-loadR platform reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
-  (# s, mkLoadInstr platform reg delta slot #)
+loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
+  let dflags = ra_DynFlags s
+  in (# s, mkLoadInstr dflags reg delta slot #)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->
@@ -146,4 +150,5 @@ getUniqueR = RegM $ \s ->
 -- | Record that a spill instruction was inserted, for profiling.
 recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
- 	= RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
+    = RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
+

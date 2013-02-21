@@ -42,7 +42,7 @@ unsigned int CCS_ID = 1;
 /* figures for the profiling report.
  */
 static StgWord64 total_alloc;
-static lnat      total_prof_ticks;
+static W_      total_prof_ticks;
 
 /* Globals for opening the profiling log file(s)
  */
@@ -240,7 +240,8 @@ initProfilingLogFile(void)
 #endif
 
     if (RtsFlags.CcFlags.doCostCentres == 0 && 
-        RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_RETAINER)
+        RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_RETAINER &&
+        RtsFlags.ProfFlags.retainerSelector == NULL)
     {
         /* No need for the <prog>.prof file */
         prof_filename = NULL;
@@ -1066,7 +1067,7 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
     {
         char *desc;
         StgInfoTable *info;
-        info = get_itbl(exception);
+        info = get_itbl(UNTAG_CLOSURE(exception));
         switch (info->type) {
         case CONSTR:
         case CONSTR_1_0:
@@ -1077,8 +1078,10 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
         case CONSTR_STATIC:
         case CONSTR_NOCAF_STATIC:
             desc = GET_CON_DESC(itbl_to_con_itbl(info));
-        default:
+            break;
+       default:
             desc = closure_type_names[info->type];
+            break;
         }
         fprintf(stderr, "*** Exception (reporting due to +RTS -xc): (%s), stack trace: \n  ", desc);
     }

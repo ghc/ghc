@@ -34,7 +34,6 @@ module TysPrim(
         -- Kinds
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind, constraintKind,
         mkArrowKind, mkArrowKinds,
-        typeNatKind, typeStringKind,
 
         funTyCon, funTyConName,
         primTyCons,
@@ -75,7 +74,13 @@ module TysPrim(
         eqPrimTyCon,            -- ty1 ~# ty2
 
 	-- * Any
-	anyTy, anyTyCon, anyTypeOfKind
+	anyTy, anyTyCon, anyTypeOfKind,
+
+        -- * SIMD
+	floatX4PrimTyCon,		floatX4PrimTy,
+	doubleX2PrimTyCon,		doubleX2PrimTy,
+	int32X4PrimTyCon,		int32X4PrimTy,
+	int64X2PrimTyCon,		int64X2PrimTy
   ) where
 
 #include "HsVersions.h"
@@ -138,6 +143,11 @@ primTyCons
     , constraintKindTyCon
     , superKindTyCon
     , anyKindTyCon
+
+    , floatX4PrimTyCon
+    , doubleX2PrimTyCon
+    , int32X4PrimTyCon
+    , int64X2PrimTyCon
     ]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
@@ -147,7 +157,7 @@ mkPrimTc fs unique tycon
 		  (ATyCon tycon)	-- Relevant TyCon
 		  UserSyntax		-- None are built-in syntax
 
-charPrimTyConName, intPrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, sContPrimTyConName, eqPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, sContPrimTyConName, eqPrimTyConName, floatX4PrimTyConName, doubleX2PrimTyConName, int32X4PrimTyConName, int64X2PrimTyConName :: Name
 charPrimTyConName    	      = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName     	      = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int32PrimTyConName	      = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
@@ -176,6 +186,10 @@ bcoPrimTyConName 	      = mkPrimTc (fsLit "BCO#") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName  	      = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName  	      = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 sContPrimTyConName            = mkPrimTc (fsLit "SCont#") sContPrimTyConKey sContPrimTyCon
+floatX4PrimTyConName          = mkPrimTc (fsLit "FloatX4#") floatX4PrimTyConKey floatX4PrimTyCon
+doubleX2PrimTyConName         = mkPrimTc (fsLit "DoubleX2#") doubleX2PrimTyConKey doubleX2PrimTyCon
+int32X4PrimTyConName          = mkPrimTc (fsLit "Int32X4#") int32X4PrimTyConKey int32X4PrimTyCon
+int64X2PrimTyConName          = mkPrimTc (fsLit "Int64X2#") int64X2PrimTyConKey int64X2PrimTyCon
 \end{code}
 
 %************************************************************************
@@ -245,7 +259,7 @@ funTyCon = mkFunTyCon funTyConName $
         -- You might think that (->) should have type (?? -> ? -> *), and you'd be right
 	-- But if we do that we get kind errors when saying
 	--	instance Control.Arrow (->)
-	-- becuase the expected kind is (*->*->*).  The trouble is that the
+	-- because the expected kind is (*->*->*).  The trouble is that the
 	-- expected/actual stuff in the unifier does not go contra-variant, whereas
 	-- the kind sub-typing does.  Sigh.  It really only matters if you use (->) in
 	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
@@ -314,6 +328,8 @@ constraintKindTyCon   = mkKindTyCon constraintKindTyConName   superKind
 --------------------------
 -- ... and now their names
 
+-- If you edit these, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 superKindTyConName      = mkPrimTyConName (fsLit "BOX") superKindTyConKey superKindTyCon
 anyKindTyConName      = mkPrimTyConName (fsLit "AnyK") anyKindTyConKey anyKindTyCon
 liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon
@@ -338,18 +354,12 @@ kindTyConType kind = TyConApp kind []
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
 anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind, constraintKind, superKind :: Kind
 
-superKind        = kindTyConType superKindTyCon 
+superKind        = kindTyConType superKindTyCon
 anyKind          = kindTyConType anyKindTyCon  -- See Note [Any kinds]
 liftedTypeKind   = kindTyConType liftedTypeKindTyCon
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
 openTypeKind     = kindTyConType openTypeKindTyCon
 constraintKind   = kindTyConType constraintKindTyCon
-
-typeNatKind :: Kind
-typeNatKind = kindTyConType (mkKindTyCon typeNatKindConName superKind)
-
-typeStringKind :: Kind
-typeStringKind = kindTyConType (mkKindTyCon typeStringKindConName superKind)
 
 -- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
 mkArrowKind :: Kind -> Kind -> Kind
@@ -671,7 +681,13 @@ The type constructor Any of kind forall k. k -> k has these properties:
     primitive type:
       - has a fixed unique, anyTyConKey,
       - lives in the global name cache
-      - built with TyCon.PrimTyCon
+
+  * It is a *closed* type family, with no instances.  This means that
+    if   ty :: '(k1, k2)  we add a given coercion
+             g :: ty ~ (Fst ty, Snd ty)
+    If Any was a *data* type, then we'd get inconsistency because 'ty'
+    could be (Any '(k1,k2)) and then we'd have an equality with Any on
+    one side and '(,) on the other
 
   * It is lifted, and hence represented by a pointer
 
@@ -731,6 +747,45 @@ anyTyCon :: TyCon
 anyTyCon = mkLiftedPrimTyCon anyTyConName kind 1 PtrRep
   where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
 
+{-   Can't do this yet without messing up kind proxies
+anyTyCon :: TyCon
+anyTyCon = mkSynTyCon anyTyConName kind [kKiVar]
+                      syn_rhs
+                      NoParentTyCon
+  where
+    kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
+    syn_rhs = SynFamilyTyCon { synf_open = False, synf_injective = True }
+                  -- NB Closed, injective
+-}
+
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = mkNakedTyConApp anyTyCon [kind]
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{SIMD vector type}
+%*									*
+%************************************************************************
+
+\begin{code}
+floatX4PrimTy :: Type
+floatX4PrimTy = mkTyConTy floatX4PrimTyCon
+floatX4PrimTyCon :: TyCon
+floatX4PrimTyCon = pcPrimTyCon0 floatX4PrimTyConName (VecRep 4 FloatElemRep)
+
+doubleX2PrimTy :: Type
+doubleX2PrimTy = mkTyConTy doubleX2PrimTyCon
+doubleX2PrimTyCon :: TyCon
+doubleX2PrimTyCon = pcPrimTyCon0 doubleX2PrimTyConName (VecRep 2 DoubleElemRep)
+
+int32X4PrimTy :: Type
+int32X4PrimTy = mkTyConTy int32X4PrimTyCon
+int32X4PrimTyCon :: TyCon
+int32X4PrimTyCon = pcPrimTyCon0 int32X4PrimTyConName (VecRep 4 Int32ElemRep)
+
+int64X2PrimTy :: Type
+int64X2PrimTy = mkTyConTy int64X2PrimTyCon
+int64X2PrimTyCon :: TyCon
+int64X2PrimTyCon = pcPrimTyCon0 int64X2PrimTyConName (VecRep 2 Int64ElemRep)
 \end{code}

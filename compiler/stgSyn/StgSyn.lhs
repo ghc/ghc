@@ -38,7 +38,7 @@ module StgSyn (
         isDllConApp,
         stgArgType,
 
-        pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
+        pprStgBinding, pprStgBindings,
         pprStgLVs
     ) where
 
@@ -60,7 +60,6 @@ import Packages    ( isDllName )
 import Platform
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
-import StaticFlags ( opt_SccProfilingOn )
 import TyCon       ( PrimRep(..) )
 import TyCon       ( TyCon )
 import Type        ( Type )
@@ -107,21 +106,21 @@ data GenStgArg occ
 isDllConApp :: DynFlags -> DataCon -> [StgArg] -> Bool
 isDllConApp dflags con args
  | platformOS (targetPlatform dflags) == OSMinGW32
-    = isDllName this_pkg (dataConName con) || any is_dll_arg args
+    = isDllName dflags this_pkg (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
     -- NB: typePrimRep is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool
     is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep (idType v))
-                             && isDllName this_pkg (idName v)
+                             && isDllName dflags this_pkg (idName v)
     is_dll_arg _             = False
 
     this_pkg = thisPackage dflags
 
--- True of machine adddresses; these are the things that don't
+-- True of machine addresses; these are the things that don't
 -- work across DLLs. The key point here is that VoidRep comes
--- out False, so that a top level nullary GADT construtor is
+-- out False, so that a top level nullary GADT constructor is
 -- False for isDllConApp
 --    data T a where
 --      T1 :: T Int
@@ -636,7 +635,7 @@ pprGenStgBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
 
 pprGenStgBinding (StgNonRec bndr rhs)
   = hang (hsep [pprBndr LetBind bndr, equals])
-        4 ((<>) (ppr rhs) semi)
+        4 (ppr rhs <> semi)
 
 pprGenStgBinding (StgRec pairs)
   = vcat $ ifPprDebug (ptext $ sLit "{- StgRec (begin) -}") :
@@ -644,23 +643,13 @@ pprGenStgBinding (StgRec pairs)
   where
     ppr_bind (bndr, expr)
       = hang (hsep [pprBndr LetBind bndr, equals])
-             4 ((<>) (ppr expr) semi)
+             4 (ppr expr <> semi)
 
 pprStgBinding :: StgBinding -> SDoc
 pprStgBinding  bind  = pprGenStgBinding bind
 
 pprStgBindings :: [StgBinding] -> SDoc
 pprStgBindings binds = vcat (map pprGenStgBinding binds)
-
-pprGenStgBindingWithSRT :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                        => (GenStgBinding bndr bdee,[(Id,[Id])]) -> SDoc
-pprGenStgBindingWithSRT (bind,srts)
-  = vcat $ pprGenStgBinding bind : map pprSRT srts
-  where pprSRT (id,srt) =
-           ptext (sLit "SRT") <> parens (ppr id) <> ptext (sLit ": ") <> ppr srt
-
-pprStgBindingsWithSRTs :: [(StgBinding,[(Id,[Id])])] -> SDoc
-pprStgBindingsWithSRTs binds = vcat (map pprGenStgBindingWithSRT binds)
 
 instance (Outputable bdee) => Outputable (GenStgArg bdee) where
     ppr = pprStgArg
@@ -740,12 +729,12 @@ pprStgExpr (StgLet bind expr)
 pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
   = sep [hang (ptext (sLit "let-no-escape {"))
                 2 (pprGenStgBinding bind),
-           hang ((<>) (ptext (sLit "} in "))
-                   (ifPprDebug (
+           hang (ptext (sLit "} in ") <>
+                   ifPprDebug (
                     nest 4 (
                       hcat [ptext  (sLit "-- lvs: ["), interppSP (uniqSetToList lvs_whole),
                              ptext (sLit "]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
-                             char ']']))))
+                             char ']'])))
                 2 (ppr expr)]
 
 pprStgExpr (StgSCC cc tick push expr)
@@ -810,7 +799,8 @@ pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag srt [{-no args-}] (StgApp fun
 
 -- general case
 pprStgRhs (StgRhsClosure cc bi free_vars upd_flag srt args body)
-  = hang (hsep [if opt_SccProfilingOn then ppr cc else empty,
+  = sdocWithDynFlags $ \dflags ->
+    hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
                 pp_binder_info bi,
                 ifPprDebug (brackets (interppSP free_vars)),
                 char '\\' <> ppr upd_flag, pprMaybeSRT srt, brackets (interppSP args)])

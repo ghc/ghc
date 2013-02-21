@@ -1,7 +1,6 @@
-
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2009-2013 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -52,7 +51,7 @@
 #     * For each package:
 #	    o configure, generate package-data.mk and inplace-pkg-info
 #           o register each package into inplace/lib/package.conf
-#     * build libffi
+#     * build libffi (if not disabled by --with-system-libffi)
 #     * With bootstrapping compiler:
 #	    o Build libraries/{filepath,hpc,Cabal}
 #           o Build compiler (stage 1)
@@ -129,8 +128,19 @@ include mk/ways.mk
 include mk/custom-settings.mk
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$(GhcLibWays)" ""
-$(error $$(GhcLibWays) is empty, it must contain at least one way)
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(findstring dyn,$(GhcLibWays))" ""
+$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_BY_DEFAULT) is YES)
+endif
+else
+ifeq "$(findstring v,$(GhcLibWays))" ""
+$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
+endif
+endif
+ifeq "$(GhcProfiled)" "YES"
+ifeq "$(findstring p,$(GhcLibWays))" ""
+$(error p is not in $$(GhcLibWays), and $$(GhcProfiled) is YES)
+endif
 endif
 endif
 
@@ -143,6 +153,8 @@ endif
 
 include rules/prof.mk
 include rules/trace.mk
+include rules/library-path.mk
+include rules/add-dependency.mk
 include rules/make-command.mk
 include rules/pretty_commands.mk
 
@@ -184,9 +196,18 @@ include rules/way-prelims.mk
 $(foreach way,$(ALL_WAYS),\
   $(eval $(call way-prelims,$(way))))
 
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+GHCI_WAY = dyn
+HADDOCK_WAY = dyn
+else
+GHCI_WAY = v
+HADDOCK_WAY = v
+endif
+
 # -----------------------------------------------------------------------------
 # Compilation Flags
 
+include rules/distdir-opts.mk
 include rules/distdir-way-opts.mk
 
 # -----------------------------------------------------------------------------
@@ -207,12 +228,9 @@ include rules/cmm-objs.mk
 ifneq "$(CLEANING)" "YES"
 
 include rules/hs-suffix-rules-srcdir.mk
-include rules/hs-suffix-rules.mk
+include rules/hs-suffix-way-rules-srcdir.mk
+include rules/hs-suffix-way-rules.mk
 include rules/hi-rule.mk
-
-$(foreach way,$(ALL_WAYS),\
-  $(eval $(call hi-rule,$(way))))
-
 include rules/c-suffix-rules.mk
 include rules/cmm-suffix-rules.mk
 
@@ -310,7 +328,7 @@ endif
 # They do not say "this package will be built"; see $(PACKAGES_xx) for that
 
 # Packages that are built but not installed
-PKGS_THAT_ARE_INTREE_ONLY := haskeline transformers terminfo utf8-string xhtml
+PKGS_THAT_ARE_INTREE_ONLY := haskeline terminfo xhtml
 
 PKGS_THAT_ARE_DPH := \
     dph/dph-base \
@@ -322,7 +340,11 @@ PKGS_THAT_ARE_DPH := \
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
 # packages:
-PKGS_THAT_BUILD_WITH_STAGE2 := $(PKGS_THAT_ARE_DPH) haskell98 haskell2010
+PKGS_THAT_BUILD_WITH_STAGE2 := $(PKGS_THAT_ARE_DPH)
+ifeq "$(CrossCompiling)" "NO"
+# We cannot use the stage 2 compiler, it runs on $(TARGETPLATFORM)
+PKGS_THAT_BUILD_WITH_STAGE2 +=  old-time haskell98 haskell2010
+endif
 
 # Packages that we shouldn't build if we don't have TH (e.g. because
 # we're building a profiled compiler):
@@ -334,7 +356,10 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
+ifeq "$(Windows)" "NO"
+PKGS_THAT_BUILD_WITH_STAGE0 += terminfo
+endif
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
@@ -380,7 +405,7 @@ endef
 define addPackage # args: $1 = package, $2 = condition
 ifneq "$(filter $1,$(PKGS_THAT_USE_TH)) $(GhcProfiled)" "$1 YES"
 ifeq "$(filter $1,$(PKGS_THAT_BUILD_WITH_STAGE2))" "$1"
-ifneq "$(BuildingCrossCompiler)" "YES"
+ifneq "$(CrossCompiling)" "YES"
 $(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
 endif
 else
@@ -388,6 +413,9 @@ $(call addPackageGeneral,PACKAGES_STAGE1,$1,$2)
 endif
 endif
 endef
+
+# Add all the packages. Note that we need to add them in dependency
+# order, as this is the order that they get configured in.
 
 $(eval $(call addPackage,ghc-prim))
 ifeq "$(CLEANING)" "YES"
@@ -405,9 +433,9 @@ $(eval $(call addPackage,containers))
 $(eval $(call addPackage,lwconc))
 $(eval $(call addPackage,old-locale))
 $(eval $(call addPackage,old-time))
-$(eval $(call addPackage,time))
 
 $(eval $(call addPackage,Win32,($$(Windows),YES)))
+$(eval $(call addPackage,time))
 $(eval $(call addPackage,unix,($$(Windows),NO)))
 
 $(eval $(call addPackage,directory))
@@ -422,7 +450,6 @@ $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,hoopl))
 $(eval $(call addPackage,transformers))
-$(eval $(call addPackage,utf8-string))
 $(eval $(call addPackage,xhtml))
 $(eval $(call addPackage,terminfo,($$(Windows),NO)))
 $(eval $(call addPackage,haskeline))
@@ -442,7 +469,7 @@ $(eval $(call extra-packages))
 # parallelism, but we don't know the dependencies until we've
 # generated the package-data.mk files.
 define fixed_pkg_dep
-libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(fixed_pkg_prev)
+libraries/$1/$2/package-data.mk : $$(fixed_pkg_prev)
 fixed_pkg_prev:=libraries/$1/$2/package-data.mk
 endef
 
@@ -466,10 +493,13 @@ utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
+utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/hpc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/runghc/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/mkUserGuidePart/dist/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/package.conf.inplace
@@ -508,10 +538,10 @@ define libraries/ghc-prim_PACKAGE_MAGIC
 libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
 endef
 
-PRIMOPS_TXT = $(GHC_COMPILER_DIR)/prelude/primops.txt
+PRIMOPS_TXT_STAGE1 = compiler/stage1/build/primops.txt
 
-libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT) | $$(dir $$@)/.
-	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers <$(PRIMOPS_TXT) >$@
+libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
+	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
 
 # Required so that Haddock documents the primops.
 libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
@@ -540,23 +570,6 @@ libraries/dph/dph-lifted-boxed_dist-install_EXCLUDED_WAYS := dyn
 libraries/dph/dph-lifted-copy_dist-install_EXCLUDED_WAYS := dyn
 libraries/dph/dph-lifted-vseg_dist-install_EXCLUDED_WAYS := dyn
 endif
-
-# ----------------------------------------------
-# Checking packages with 'cabal check'
-
-ifeq "$(phase)" "final"
-ifeq "$(CHECK_PACKAGES)" "YES"
-all: check_packages
-endif
-endif
-
-# These packages don't pass the Cabal checks because hs-source-dirs
-# points outside the source directory. This isn't a real problem in
-# these cases, so we just skip checking them.
-# NB. these must come before we include the ghc.mk files below, because
-# they disable the relevant rules.
-# In compiler's case, include-dirs points outside of the source tree
-CHECKED_compiler = YES
 
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
@@ -587,7 +600,7 @@ BUILD_DIRS += \
    $(GHC_GENPRIMOP_DIR)
 endif
 
-ifeq "$(BuildingCrossCompiler)-$(phase)" "YES-final"
+ifeq "$(Stage1Only)-$(phase)" "YES-final"
 MAYBE_GHCI=
 else
 MAYBE_GHCI=driver/ghci
@@ -619,13 +632,11 @@ else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 BUILD_DIRS += libraries/integer-gmp/gmp
 endif
 
-ifeq "$(BuildingCrossCompiler)-$(phase)" "YES-final"
-MAYBE_COMPILER=
+ifeq "$(CrossCompiling)-$(phase)" "YES-final"
 MAYBE_GHCTAGS=
 MAYBE_HPC=
 MAYBE_RUNGHC=
 else
-MAYBE_COMPILER=compiler
 MAYBE_GHCTAGS=utils/ghctags
 MAYBE_HPC=utils/hpc
 MAYBE_RUNGHC=utils/runghc
@@ -634,9 +645,10 @@ endif
 BUILD_DIRS += \
    utils/haddock \
    utils/haddock/doc \
-   $(MAYBE_COMPILER) \
+   compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
+   utils/deriveConstants \
    utils/testremove \
    $(MAYBE_GHCTAGS) \
    utils/ghc-pwd \
@@ -646,7 +658,7 @@ BUILD_DIRS += \
    ghc
 
 ifneq "$(BINDIST)" "YES"
-ifneq "$(BuildingCrossCompiler)-$(phase)" "YES-final"
+ifneq "$(CrossCompiling)-$(phase)" "YES-final"
 BUILD_DIRS += \
    utils/mkUserGuidePart
 endif
@@ -667,6 +679,9 @@ endif
 # BUILD_DIRS_EXTRA needs to come after BUILD_DIRS, because stuff in
 # libraries/dph/ghc.mk refers to stuff defined earlier, in particular
 # things like $(libraries/dph/dph-base_dist-install_GHCI_LIB)
+ifeq "$(GhcProfiled)" "YES"
+BUILD_DIRS_EXTRA := $(filter-out libraries/dph,$(BUILD_DIRS_EXTRA))
+endif
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS) $(BUILD_DIRS_EXTRA))
 
 # A useful pseudo-target (must be after the include above, because it needs
@@ -700,7 +715,7 @@ $(foreach p,$(PACKAGES_STAGE0),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
 libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
-	cd libraries && sh gen_contents_index --inplace
+	cd libraries && sh gen_contents_index --intree
 ifeq "$(phase)" "final"
 $(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
 endif
@@ -728,8 +743,8 @@ $(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))
 # lost).
 fixed_pkg_prev=
 $(foreach pkg,$(PACKAGES_STAGE0),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
-
-compiler/stage1/package-data.mk : $(fixed_pkg_prev)
+utils/ghc-pkg/dist/package-data.mk: $(fixed_pkg_prev)
+compiler/stage1/package-data.mk:    $(fixed_pkg_prev)
 endif
 
 ifneq "$(BINDIST)" "YES"
@@ -780,7 +795,7 @@ $(ghc-prim-$(libraries/ghc-prim_dist-install_VERSION)_HADDOCK_FILE): \
 endif # BINDIST
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
-                            $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
+                            $(PRIMOPS_TXT_STAGE1) $(GENPRIMOP_INPLACE) \
                           | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-source < $< > $@
 
@@ -794,10 +809,32 @@ TAGS: TAGS_compiler
 # Installation
 
 install: install_libs install_packages install_libexecs \
-         install_libexec_scripts install_bins install_topdirs
+         install_bins install_topdirs
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_docs
 endif
+
+define installLibsTo
+# $1 = libraries to install
+# $2 = directory to install to
+	$(call INSTALL_DIR,$2)
+	for i in $1; do \
+		case $$i in \
+		  *.a) \
+		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
+		    $(RANLIB) $2/`basename $$i` ;; \
+		  *.dll) \
+		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
+		    $(STRIP_CMD) $2/`basename $$i` ;; \
+		  *.so) \
+		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2) ;; \
+		  *.dylib) \
+		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2);; \
+		  *) \
+		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
+		esac; \
+	done
+endef
 
 install_bins: $(INSTALL_BINS)
 	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
@@ -806,45 +843,19 @@ install_bins: $(INSTALL_BINS)
 	done
 
 install_libs: $(INSTALL_LIBS)
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibdir)")
-	for i in $(INSTALL_LIBS); do \
-		case $$i in \
-		  *.a) \
-		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
-		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
-		  *.dll) \
-		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ; \
-		    $(STRIP_CMD) "$(DESTDIR)$(ghclibdir)"/$$i ;; \
-		  *.so) \
-		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
-		  *.dylib) \
-		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)");; \
-		  *) \
-		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
-		esac; \
-	done
-
-install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
-ifeq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
-	@:
-else
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)")
-	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(call INSTALL_SCRIPT,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)"); \
-	done
-endif
+	$(call installLibsTo, $(INSTALL_LIBS), "$(DESTDIR)$(ghclibdir)")
 
 install_libexecs:  $(INSTALL_LIBEXECS)
 ifeq "$(INSTALL_LIBEXECS)" ""
 	@:
 else
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)")
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)/bin")
 	for i in $(INSTALL_LIBEXECS); do \
-		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)"); \
+		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)/bin"); \
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
-	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/ghc"
+	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
 endif
 
 install_topdirs: $(INSTALL_TOPDIRS)
@@ -882,15 +893,15 @@ INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
 ifeq "$(Windows)" "NO"
-INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/ghc
-INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-pkg
+INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/bin/ghc
+INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/bin/ghc-pkg
 else
 INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
 INSTALLED_PKG_DIRS := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifeq "$(BuildingCrossCompiler)" "NO"
+ifeq "$(Stage1Only)" "NO"
 INSTALLED_PKG_DIRS := $(INSTALLED_PKG_DIRS) compiler
 endif
 INSTALLED_PKG_DIRS := $(INSTALLED_PKG_DIRS) $(addprefix libraries/,$(PACKAGES_STAGE2))
@@ -912,14 +923,27 @@ install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
+	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts-1.0")
+	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+	$(foreach p, $(PKGS_THAT_ARE_INTREE_ONLY), \
+	    $(call installLibsTo, $(wildcard libraries/$p/dist-install/build/*.so libraries/$p/dist-install/build/*.dll libraries/$p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$p-$(libraries/$p_dist-install_VERSION)"))
+endif
+	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
+	    $(call make-command,                                      \
+	           "$(GHC_CABAL_INPLACE)" copy                        \
+	                                  "$(STRIP_CMD)"              \
+	                                  $p $(INSTALL_DISTDIR_$p)    \
+	                                  '$(DESTDIR)'                \
+	                                  '$(prefix)'                 \
+	                                  '$(ghclibdir)'              \
+	                                  '$(docdir)/html/libraries'))
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
-                   CROSS_COMPILE="$(CrossCompilePrefix)"              \
-	           "$(GHC_CABAL_INPLACE)" install                     \
+	           "$(GHC_CABAL_INPLACE)" register                    \
 	                                  "$(INSTALLED_GHC_REAL)"     \
 	                                  "$(INSTALLED_GHC_PKG_REAL)" \
-	                                  "$(STRIP_CMD)"              \
 	                                  "$(DESTDIR)$(topdir)"       \
 	                                  $p $(INSTALL_DISTDIR_$p)    \
 	                                  '$(DESTDIR)'                \
@@ -975,6 +999,7 @@ $(eval $(call bindist,.,\
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
     $(filter-out settings,$(INSTALL_LIBS)) \
+    $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
     mk/install.mk.in \
@@ -1002,7 +1027,8 @@ unix-binary-dist-prep:
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
-	echo "GHC_CABAL_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal" >> $(BIN_DIST_MK)
+	echo "GHC_CABAL_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist" >> $(BIN_DIST_MK)
+	echo "UseSystemLibFFI    = $(UseSystemLibFFI)"    >> $(BIN_DIST_MK)
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	$(call removeFiles,$(BIN_DIST_PREP_TAR))
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
@@ -1166,16 +1192,6 @@ publish-sdist :
 	$(call try10Times,$(PublishCp) $(SRC_DIST_TESTSUITE_TARBALL) $(PublishLocation)/dist)
 endif
 
-ifeq "$(BootingFromHc)" "YES"
-# In a normal build we use GHC to compile C files (see
-# rules/c-suffix-rules.mk), which passes a number of its own options
-# to the C compiler.  So when bootstrapping we have to provide these
-# flags explicitly to C compilations.
-SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
-SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-SRC_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-endif
-
 # -----------------------------------------------------------------------------
 # sdisting libraries
 
@@ -1192,14 +1208,17 @@ sdist_%:
 
 CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
-CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
-# These four are no longer generated, but we still clean them for a while
+# These are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:
 CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
 CLEAN_FILES += includes/ghcautoconf.h
 CLEAN_FILES += includes/ghcplatform.h
+CLEAN_FILES += utils/ghc-pkg/Version.hs
+CLEAN_FILES += compiler/parser/Parser.y
+CLEAN_FILES += compiler/prelude/primops.txt
+CLEAN_FILES += $(wildcard compiler/primop*incl)
 
 clean : clean_files clean_libraries
 
@@ -1250,6 +1269,7 @@ distclean : clean
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
 	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
 	$(call removeTrees,utils/ghc-pwd/dist-boot)
+	$(call removeTrees,includes/dist-derivedconstants)
 	$(call removeTrees,inplace)
 	$(call removeTrees,$(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 
@@ -1279,9 +1299,35 @@ bootstrapping-files: $(libffi_HEADERS)
 .DELETE_ON_ERROR:
 
 # -----------------------------------------------------------------------------
+
+ifeq "$(HADDOCK_DOCS)" "YES"
+BINDIST_HADDOCK_FLAG = --with-haddock="$(BINDIST_PREFIX)/bin/haddock"
+endif
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+BINDIST_LIBRARY_FLAGS = --enable-shared --disable-library-vanilla
+else
+BINDIST_LIBRARY_FLAGS = --enable-library-vanilla --disable-shared
+endif
+BINDIST_LIBRARY_FLAGS += --disable-library-prof
+
+.PHONY: validate_build_xhtml
+validate_build_xhtml:
+	cd libraries/xhtml && "$(BINDIST_PREFIX)/bin/ghc" --make Setup
+	cd libraries/xhtml && ./Setup configure --with-ghc="$(BINDIST_PREFIX)/bin/ghc" $(BINDIST_HADDOCK_FLAG) $(BINDIST_LIBRARY_FLAGS) --global --builddir=dist-bindist --prefix="$(BINDIST_PREFIX)"
+	cd libraries/xhtml && ./Setup build   --builddir=dist-bindist
+ifeq "$(HADDOCK_DOCS)" "YES"
+	cd libraries/xhtml && ./Setup haddock --builddir=dist-bindist
+endif
+	cd libraries/xhtml && ./Setup install --builddir=dist-bindist
+	cd libraries/xhtml && ./Setup clean   --builddir=dist-bindist
+	cd libraries/xhtml && rm -f Setup Setup.exe Setup.hi Setup.o
+
+# -----------------------------------------------------------------------------
 # Numbered phase targets
 
 .PHONY: phase_0_builds
+phase_0_builds: $(utils/ghc-pkg_dist_depfile_haskell)
+phase_0_builds: $(utils/ghc-pkg_dist_depfile_c_asm)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)

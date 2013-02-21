@@ -27,6 +27,7 @@ import Panic
 import Bag
 import SrcLoc
 
+import Data.Function
 import Data.List
 
 
@@ -47,10 +48,13 @@ data OptKind m                             -- Suppose the flag is -f
     | OptPrefix (String -> EwM m ())       -- -f or -farg (i.e. the arg is optional)
     | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -f=n; pass n to fn
     | IntSuffix (Int -> EwM m ())          -- -f or -f=n; pass n to fn
+    | FloatSuffix (Float -> EwM m ())      -- -f or -f=n; pass n to fn
     | PassFlag  (String -> EwM m ())       -- -f; pass "-f" fn
     | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
     | PrefixPred    (String -> Bool) (String -> EwM m ())
     | AnySuffixPred (String -> Bool) (String -> EwM m ())
+    | VersionSuffix (Int -> Int -> EwM m ())
+      -- -f or -f=maj.min; pass major and minor version to fn
 
 
 --------------------------------------------------------
@@ -187,18 +191,29 @@ processOneArg opt_kind rest arg args
         IntSuffix f | Just n <- parseInt rest_no_eq -> Right (f n, args)
                     | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
 
+        FloatSuffix f | Just n <- parseFloat rest_no_eq -> Right (f n, args)
+                      | otherwise -> Left ("malformed float argument in " ++ dash_arg)
+
         OptPrefix f       -> Right (f rest_no_eq, args)
         AnySuffix f       -> Right (f dash_arg, args)
         AnySuffixPred _ f -> Right (f dash_arg, args)
 
+        VersionSuffix f | [maj_s, min_s] <- split '.' rest_no_eq,
+                          Just maj <- parseInt maj_s,
+                          Just min <- parseInt min_s -> Right (f maj min, args)
+                        | [maj_s] <- split '.' rest_no_eq,
+                          Just maj <- parseInt maj_s -> Right (f maj 0, args)
+                        | otherwise -> Left ("malformed version argument in " ++ dash_arg)
+
 
 findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
 findArg spec arg =
-    case [ (removeSpaces rest, optKind)
-         | flag <- spec,
-           let optKind  = flagOptKind flag,
-           Just rest <- [stripPrefix (flagName flag) arg],
-           arg_ok optKind rest arg ]
+    case sortBy (compare `on` (length . fst)) -- prefer longest matching flag
+           [ (removeSpaces rest, optKind)
+           | flag <- spec,
+             let optKind  = flagOptKind flag,
+             Just rest <- [stripPrefix (flagName flag) arg],
+             arg_ok optKind rest arg ]
     of
         []      -> Nothing
         (one:_) -> Just one
@@ -211,10 +226,12 @@ arg_ok (Prefix          _)  rest _   = notNull rest
 arg_ok (PrefixPred p    _)  rest _   = notNull rest && p (dropEq rest)
 arg_ok (OptIntSuffix    _)  _    _   = True
 arg_ok (IntSuffix       _)  _    _   = True
+arg_ok (FloatSuffix     _)  _    _   = True
 arg_ok (OptPrefix       _)  _    _   = True
 arg_ok (PassFlag        _)  rest _   = null rest
 arg_ok (AnySuffix       _)  _    _   = True
 arg_ok (AnySuffixPred p _)  _    arg = p arg
+arg_ok (VersionSuffix   _)  _    _   = True
 
 -- | Parse an Int
 --
@@ -225,6 +242,11 @@ parseInt :: String -> Maybe Int
 parseInt s = case reads s of
                  ((n,""):_) -> Just n
                  _          -> Nothing
+
+parseFloat :: String -> Maybe Float
+parseFloat s = case reads s of
+                   ((n,""):_) -> Just n
+                   _          -> Nothing
 
 -- | Discards a leading equals sign
 dropEq :: String -> String

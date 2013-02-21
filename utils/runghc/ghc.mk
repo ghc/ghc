@@ -14,7 +14,8 @@ utils/runghc_PACKAGE = runghc
 utils/runghc_dist-install_USES_CABAL = YES
 utils/runghc_dist-install_PROG    = runghc$(exeext)
 utils/runghc_dist-install_SHELL_WRAPPER = YES
-utils/runghc_dist-install_INSTALL_SHELL_WRAPPER = YES
+utils/runghc_dist-install_INSTALL = YES
+utils/runghc_dist-install_INSTALL_INPLACE = YES
 utils/runghc_dist-install_INSTALL_SHELL_WRAPPER_NAME = runghc-$(ProjectVersion)
 utils/runghc_dist-install_EXTRA_HC_OPTS = -cpp -DVERSION="\"$(ProjectVersion)\""
 

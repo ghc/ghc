@@ -1,14 +1,7 @@
 -- | Graph coloring register allocator.
---
--- TODO: The colors in graphviz graphs for x86_64 and ppc could be nicer.
---
-
 module RegAlloc.Graph.Main (
         regAlloc
-)
-
-where
-
+) where
 import qualified GraphColor as Color
 import RegAlloc.Liveness
 import RegAlloc.Graph.Spill
@@ -20,7 +13,6 @@ import Instruction
 import TargetReg
 import RegClass
 import Reg
-
 
 import UniqSupply
 import UniqSet
@@ -34,10 +26,12 @@ import Data.List
 import Data.Maybe
 import Control.Monad
 
+
 -- | The maximum number of build\/spill cycles we'll allow.
---      We should only need 3 or 4 cycles tops.
---      If we run for any longer than this we're probably in an infinite loop,
---      It's probably better just to bail out and report a bug at this stage.
+--  
+--   It should only take 3 or 4 cycles for the allocator to converge.
+--   If it takes any longer than this it's probably in an infinite loop,
+--   so it's better just to bail out and report a bug.
 maxSpinCount    :: Int
 maxSpinCount    = 10
 
@@ -46,8 +40,8 @@ maxSpinCount    = 10
 regAlloc
         :: (Outputable statics, Outputable instr, Instruction instr)
         => DynFlags
-        -> UniqFM (UniqSet RealReg)     -- ^ the registers we can use for allocation
-        -> UniqSet Int                  -- ^ the set of available spill slots.
+        -> UniqFM (UniqSet RealReg)     -- ^ registers we can use for allocation
+        -> UniqSet Int                  -- ^ set of available spill slots.
         -> [LiveCmmDecl statics instr]  -- ^ code annotated with liveness information.
         -> UniqSM ( [NatCmmDecl statics instr], [RegAllocStats statics instr] )
            -- ^ code with registers allocated and stats for each stage of
@@ -55,8 +49,8 @@ regAlloc
 
 regAlloc dflags regsFree slotsFree code
  = do
-        -- TODO: the regClass function is currently hard coded to the default target
-        --       architecture. Would prefer to determine this from dflags.
+        -- TODO: the regClass function is currently hard coded to the default
+        --       target architecture. Would prefer to determine this from dflags.
         --       There are other uses of targetRegClass later in this module.
         let platform = targetPlatform dflags
             triv = trivColorable platform
@@ -71,77 +65,91 @@ regAlloc dflags regsFree slotsFree code
         return  ( code_final
                 , reverse debug_codeGraphs )
 
-regAlloc_spin :: (Instruction instr,
-                  Outputable instr,
-                  Outputable statics)
-              => DynFlags
-              -> Int
-              -> Color.Triv VirtualReg RegClass RealReg
-              -> UniqFM (UniqSet RealReg)
-              -> UniqSet Int
-              -> [RegAllocStats statics instr]
-              -> [LiveCmmDecl statics instr]
-              -> UniqSM ([NatCmmDecl statics instr],
-                         [RegAllocStats statics instr],
-                         Color.Graph VirtualReg RegClass RealReg)
+
+-- | Perform solver iterations for the graph coloring allocator.
+--
+--   We extract a register confict graph from the provided cmm code,
+--   and try to colour it. If that works then we use the solution rewrite 
+--   the code with real hregs. If coloring doesn't work we add spill code
+--   and try to colour it again. After `maxSpinCount` iterations we give up.
+--
+regAlloc_spin 
+        :: (Instruction instr,
+            Outputable instr,
+            Outputable statics)
+        => DynFlags
+        -> Int  -- ^ Number of solver iterations we've already performed.
+        -> Color.Triv VirtualReg RegClass RealReg
+                -- ^ Function for calculating whether a register is trivially
+                --   colourable.
+        -> UniqFM (UniqSet RealReg)      -- ^ Free registers that we can allocate.
+        -> UniqSet Int                   -- ^ Free stack slots that we can use.
+        -> [RegAllocStats statics instr] -- ^ Current regalloc stats to add to.
+        -> [LiveCmmDecl statics instr]   -- ^ Liveness annotated code to allocate.
+        -> UniqSM ( [NatCmmDecl statics instr]
+                  , [RegAllocStats statics instr]
+                  , Color.Graph VirtualReg RegClass RealReg)
+
 regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
  = do
         let platform = targetPlatform dflags
-        -- if any of these dump flags are turned on we want to hang on to
-        --      intermediate structures in the allocator - otherwise tell the
-        --      allocator to ditch them early so we don't end up creating space leaks.
+
+        -- If any of these dump flags are turned on we want to hang on to
+        -- intermediate structures in the allocator - otherwise tell the
+        -- allocator to ditch them early so we don't end up creating space leaks.
         let dump = or
                 [ dopt Opt_D_dump_asm_regalloc_stages dflags
                 , dopt Opt_D_dump_asm_stats dflags
                 , dopt Opt_D_dump_asm_conflicts dflags ]
 
-        -- check that we're not running off down the garden path.
+        -- Check that we're not running off down the garden path.
         when (spinCount > maxSpinCount)
          $ pprPanic "regAlloc_spin: max build/spill cycle count exceeded."
-                (  text "It looks like the register allocator is stuck in an infinite loop."
-                $$ text "max cycles  = " <> int maxSpinCount
-                $$ text "regsFree    = " <> (hcat       $ punctuate space $ map ppr
-                                                $ uniqSetToList $ unionManyUniqSets $ eltsUFM regsFree)
-                $$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
+           (  text "It looks like the register allocator is stuck in an infinite loop."
+           $$ text "max cycles  = " <> int maxSpinCount
+           $$ text "regsFree    = " <> (hcat $ punctuate space $ map ppr
+                                             $ uniqSetToList $ unionManyUniqSets 
+                                             $ eltsUFM regsFree)
+           $$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
-        -- build a conflict graph from the code.
+        -- Build the register conflict graph from the cmm code.
         (graph  :: Color.Graph VirtualReg RegClass RealReg)
                 <- {-# SCC "BuildGraph" #-} buildGraph code
 
         -- VERY IMPORTANT:
-        --      We really do want the graph to be fully evaluated _before_ we start coloring.
-        --      If we don't do this now then when the call to Color.colorGraph forces bits of it,
-        --      the heap will be filled with half evaluated pieces of graph and zillions of apply thunks.
-        --
+        --   We really do want the graph to be fully evaluated _before_ we
+        --   start coloring. If we don't do this now then when the call to
+        --   Color.colorGraph forces bits of it, the heap will be filled with
+        --   half evaluated pieces of graph and zillions of apply thunks.
         seqGraph graph `seq` return ()
 
-
-        -- build a map of the cost of spilling each instruction
-        --      this will only actually be computed if we have to spill something.
+        -- Build a map of the cost of spilling each instruction.
+        -- This is a lazy binding, so the map will only be computed if we 
+        -- actually have to spill to the stack.
         let spillCosts  = foldl' plusSpillCostInfo zeroSpillCostInfo
-                        $ map slurpSpillCostInfo code
+                        $ map (slurpSpillCostInfo platform) code
 
-        -- the function to choose regs to leave uncolored
+        -- The function to choose regs to leave uncolored.
         let spill       = chooseSpill spillCosts
 
-        -- record startup state
-        let stat1       =
-                if spinCount == 0
+        -- Record startup state in our log.
+        let stat1       
+             = if spinCount == 0
                  then   Just $ RegAllocStatsStart
                         { raLiveCmm     = code
                         , raGraph       = graph
                         , raSpillCosts  = spillCosts }
                  else   Nothing
 
-        -- try and color the graph
+        -- Try and color the graph.
         let (graph_colored, rsSpill, rmCoalesce)
-                        = {-# SCC "ColorGraph" #-}
-                           Color.colorGraph
-                                (dopt Opt_RegsIterative dflags)
-                                spinCount
-                                regsFree triv spill graph
+                = {-# SCC "ColorGraph" #-}
+                  Color.colorGraph
+                       (gopt Opt_RegsIterative dflags)
+                       spinCount
+                       regsFree triv spill graph
 
-        -- rewrite regs in the code that have been coalesced
+        -- Rewrite registers in the code that have been coalesced.
         let patchF reg
                 | RegVirtual vr <- reg
                 = case lookupUFM rmCoalesce vr of
@@ -152,33 +160,43 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                 = reg
 
         let code_coalesced
-                        = map (patchEraseLive patchF) code
+                = map (patchEraseLive patchF) code
 
-
-        -- see if we've found a coloring
+        -- Check whether we've found a coloring.
         if isEmptyUniqSet rsSpill
+
+         -- Coloring was successful because no registers needed to be spilled.
          then do
-                -- if -fasm-lint is turned on then validate the graph
+                -- if -fasm-lint is turned on then validate the graph.
+                -- This checks for bugs in the graph allocator itself.
                 let graph_colored_lint  =
-                        if dopt Opt_DoAsmLinting dflags
+                        if gopt Opt_DoAsmLinting dflags
                                 then Color.validateGraph (text "")
-                                        True    -- require all nodes to be colored
+                                        True    -- Require all nodes to be colored.
                                         graph_colored
                                 else graph_colored
 
-                -- patch the registers using the info in the graph
-                let code_patched        = map (patchRegsFromGraph platform graph_colored_lint) code_coalesced
+                -- Rewrite the code to use real hregs, using the colored graph.
+                let code_patched        
+                        = map (patchRegsFromGraph platform graph_colored_lint)
+                              code_coalesced
 
-                -- clean out unneeded SPILL/RELOADs
-                let code_spillclean     = map (cleanSpills platform) code_patched
+                -- Clean out unneeded SPILL/RELOAD meta instructions.
+                --   The spill code generator just spills the entire live range
+                --   of a vreg, but it might not need to be on the stack for
+                --   its entire lifetime.
+                let code_spillclean
+                        = map (cleanSpills platform) code_patched
 
-                -- strip off liveness information,
-                --      and rewrite SPILL/RELOAD pseudos into real instructions along the way
-                let code_final          = map (stripLive platform) code_spillclean
+                -- Strip off liveness information from the allocated code.
+                -- Also rewrite SPILL/RELOAD meta instructions into real machine
+                -- instructions along the way
+                let code_final
+                        = map (stripLive dflags) code_spillclean
 
-                -- record what happened in this stage for debugging
-                let stat                =
-                        RegAllocStatsColored
+                -- Record what happened in this stage for debugging
+                let stat                
+                     =  RegAllocStatsColored
                         { raCode                = code
                         , raGraph               = graph
                         , raGraphColored        = graph_colored_lint
@@ -187,41 +205,46 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                         , raPatched             = code_patched
                         , raSpillClean          = code_spillclean
                         , raFinal               = code_final
-                        , raSRMs                = foldl' addSRM (0, 0, 0) $ map countSRMs code_spillclean }
+                        , raSRMs                = foldl' addSRM (0, 0, 0) 
+                                                $ map countSRMs code_spillclean }
 
-
+                -- Bundle up all the register allocator statistics.
+                --   .. but make sure to drop them on the floor if they're not 
+                --      needed, otherwise we'll get a space leak.
                 let statList =
                         if dump then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
                                 else []
 
-                -- space leak avoidance
+                -- Ensure all the statistics are evaluated, to avoid space leaks.
                 seqList statList `seq` return ()
 
                 return  ( code_final
                         , statList
                         , graph_colored_lint)
 
-         -- we couldn't find a coloring, time to spill something
+         -- Coloring was unsuccessful. We need to spill some register to the
+         -- stack, make a new graph, and try to color it again.
          else do
                 -- if -fasm-lint is turned on then validate the graph
                 let graph_colored_lint  =
-                        if dopt Opt_DoAsmLinting dflags
+                        if gopt Opt_DoAsmLinting dflags
                                 then Color.validateGraph (text "")
                                         False   -- don't require nodes to be colored
                                         graph_colored
                                 else graph_colored
 
-                -- spill the uncolored regs
+                -- Spill uncolored regs to the stack.
                 (code_spilled, slotsFree', spillStats)
-                        <- regSpill code_coalesced slotsFree rsSpill
+                        <- regSpill platform code_coalesced slotsFree rsSpill
 
-                -- recalculate liveness
-                -- NOTE: we have to reverse the SCCs here to get them back into the reverse-dependency
-                --       order required by computeLiveness. If they're not in the correct order
-                --       that function will panic.
-                code_relive     <- mapM (regLiveness . reverseBlocksInTops) code_spilled
+                -- Recalculate liveness information.
+                -- NOTE: we have to reverse the SCCs here to get them back into
+                --       the reverse-dependency order required by computeLiveness.
+                --       If they're not in the correct order that function will panic.
+                code_relive     <- mapM (regLiveness platform . reverseBlocksInTops) 
+                                        code_spilled
 
-                -- record what happened in this stage for debugging
+                -- Record what happened in this stage for debugging.
                 let stat        =
                         RegAllocStatsSpill
                         { raCode        = code
@@ -231,12 +254,15 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                         , raSpillCosts  = spillCosts
                         , raSpilled     = code_spilled }
 
+                -- Bundle up all the register allocator statistics.
+                --   .. but make sure to drop them on the floor if they're not 
+                --      needed, otherwise we'll get a space leak.
                 let statList =
                         if dump
                                 then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
                                 else []
 
-                -- space leak avoidance
+                -- Ensure all the statistics are evaluated, to avoid space leaks.
                 seqList statList `seq` return ()
 
                 regAlloc_spin dflags (spinCount + 1) triv regsFree slotsFree'
@@ -252,26 +278,31 @@ buildGraph
 
 buildGraph code
  = do
-        -- Slurp out the conflicts and reg->reg moves from this code
+        -- Slurp out the conflicts and reg->reg moves from this code.
         let (conflictList, moveList) =
                 unzip $ map slurpConflicts code
 
-        -- Slurp out the spill/reload coalesces
+        -- Slurp out the spill/reload coalesces.
         let moveList2           = map slurpReloadCoalesce code
 
-        -- Add the reg-reg conflicts to the graph
+        -- Add the reg-reg conflicts to the graph.
         let conflictBag         = unionManyBags conflictList
-        let graph_conflict      = foldrBag graphAddConflictSet Color.initGraph conflictBag
+        let graph_conflict      
+                = foldrBag graphAddConflictSet Color.initGraph conflictBag
 
         -- Add the coalescences edges to the graph.
-        let moveBag             = unionBags (unionManyBags moveList2) (unionManyBags moveList)
-        let graph_coalesce      = foldrBag graphAddCoalesce graph_conflict moveBag
+        let moveBag
+                = unionBags (unionManyBags moveList2)
+                            (unionManyBags moveList)
+
+        let graph_coalesce
+                = foldrBag graphAddCoalesce graph_conflict moveBag
 
         return  graph_coalesce
 
 
 -- | Add some conflict edges to the graph.
---      Conflicts between virtual and real regs are recorded as exclusions.
+--   Conflicts between virtual and real regs are recorded as exclusions.
 graphAddConflictSet
         :: UniqSet Reg
         -> Color.Graph VirtualReg RegClass RealReg
@@ -293,7 +324,7 @@ graphAddConflictSet set graph
 
 
 -- | Add some coalesence edges to the graph
---      Coalesences between virtual and real regs are recorded as preferences.
+--   Coalesences between virtual and real regs are recorded as preferences.
 graphAddCoalesce
         :: (Reg, Reg)
         -> Color.Graph VirtualReg RegClass RealReg
@@ -333,8 +364,9 @@ patchRegsFromGraph
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
 patchRegsFromGraph platform graph code
- = let
-        -- a function to lookup the hardreg for a virtual reg from the graph.
+ = patchEraseLive patchF code
+ where
+        -- Function to lookup the hardreg for a virtual reg from the graph.
         patchF reg
                 -- leave real regs alone.
                 | RegReal{}     <- reg
@@ -350,7 +382,8 @@ patchRegsFromGraph platform graph code
                 -- no node in the graph for this virtual, bad news.
                 | otherwise
                 = pprPanic "patchRegsFromGraph: register mapping failed."
-                        (  text "There is no node in the graph for register " <> ppr reg
+                        (  text "There is no node in the graph for register " 
+                                <> ppr reg
                         $$ ppr code
                         $$ Color.dotGraph
                                 (\_ -> text "white")
@@ -359,12 +392,11 @@ patchRegsFromGraph platform graph code
                                         (targetRealRegSqueeze platform))
                                 graph)
 
-   in   patchEraseLive patchF code
-
 
 -----
 -- for when laziness just isn't what you wanted...
---
+--  We need to deepSeq the whole graph before trying to colour it to avoid
+--  space leaks.
 seqGraph :: Color.Graph VirtualReg RegClass RealReg -> ()
 seqGraph graph          = seqNodes (eltsUFM (Color.graphMap graph))
 

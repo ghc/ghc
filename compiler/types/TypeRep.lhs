@@ -8,7 +8,7 @@ Note [The Type-related module hierarchy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Class
   TyCon    imports Class
-  TypeRep
+  TypeRep 
   TysPrim  imports TypeRep ( including mkTyConTy )
   Kind     imports TysPrim ( mainly for primitive kinds )
   Type     imports Kind
@@ -35,17 +35,27 @@ module TypeRep (
         -- Functions over types
         mkNakedTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
         isLiftedTypeKind, isSuperKind, isTypeVar, isKindVar,
-
+        
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, pprSigmaType,
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-	Prec(..), maybeParen, pprTcApp, pprTypeNameApp,
+	Prec(..), maybeParen, pprTcApp, pprTypeNameApp, 
         pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
         tyVarsOfType, tyVarsOfTypes,
+
+        -- * Tidying type related things up for printing
+        tidyType,      tidyTypes,
+        tidyOpenType,  tidyOpenTypes,
+        tidyOpenKind,
+        tidyTyVarBndr, tidyTyVarBndrs, tidyFreeTyVars,
+        tidyOpenTyVar, tidyOpenTyVars,
+        tidyTyVarOcc,
+        tidyTopType,
+        tidyKind, 
 
         -- Substitutions
         TvSubst(..), TvSubstEnv
@@ -53,7 +63,7 @@ module TypeRep (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon( DataCon, dataConName )
+import {-# SOURCE #-} DataCon( DataCon, dataConTyCon, dataConName )
 import {-# SOURCE #-} Type( noParenPred, isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
@@ -64,6 +74,7 @@ import Name
 import BasicTypes
 import TyCon
 import Class
+import CoAxiom
 
 -- others
 import PrelNames
@@ -74,6 +85,7 @@ import StaticFlags( opt_PprStyle_Debug )
 import Util
 
 -- libraries
+import Data.List( mapAccumL )
 import qualified Data.Data        as Data hiding ( TyCon )
 \end{code}
 
@@ -87,6 +99,9 @@ import qualified Data.Data        as Data hiding ( TyCon )
 
 \begin{code}
 -- | The key representation of types within the compiler
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Type
   = TyVarTy Var	-- ^ Vanilla type or kind variable (*never* a coercion variable)
 
@@ -117,7 +132,7 @@ data Type
 	                --    can appear as the right hand side of a type synonym.
 
   | FunTy
-	Type
+	Type		
 	Type		-- ^ Special case of 'TyConApp': @TyConApp FunTyCon [t1, t2]@
 			-- See Note [Equality-constrained types]
 
@@ -170,7 +185,7 @@ has a UnliftedTypeKind or ArgTypeKind underneath an arrow.
 
 Nor can we abstract over a type variable with any of these kinds.
 
-    k :: = kk | # | ArgKind | (#) | OpenKind
+    k :: = kk | # | ArgKind | (#) | OpenKind 
     kk :: = * | kk -> kk | T kk1 ... kkn
 
 So a type variable can only be abstracted kk.
@@ -212,13 +227,13 @@ is encoded like this:
 
 \begin{code}
 -- | A type of the form @p@ of kind @Constraint@ represents a value whose type is
--- the Haskell predicate @p@, where a predicate is what occurs before
+-- the Haskell predicate @p@, where a predicate is what occurs before 
 -- the @=>@ in a Haskell type.
 --
 -- We use 'PredType' as documentation to mark those types that we guarantee to have
 -- this kind.
 --
--- It can be expanded into its representation, but:
+-- It can be expanded into its representation, but: 
 --
 -- * The type checker must treat it as opaque
 --
@@ -241,7 +256,7 @@ type ThetaType = [PredType]
 to expand to allow them.)
 
 A Haskell qualified type, such as that for f,g,h above, is
-represented using
+represented using 
 	* a FunTy for the double arrow
 	* with a type of kind Constraint as the function argument
 
@@ -266,9 +281,9 @@ mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 mkNakedTyConApp :: TyCon -> [Type] -> Type
--- Builds a TyConApp
+-- Builds a TyConApp 
 --   * without being strict in TyCon,
---   * the TyCon should never be a saturated FunTyCon
+--   * the TyCon should never be a saturated FunTyCon 
 -- Type.mkTyConApp is the usual one
 mkNakedTyConApp tc tys
   = TyConApp (ASSERT( not (isFunTyCon tc && length tys == 2) ) tc) tys
@@ -293,7 +308,7 @@ isSuperKind _                 = False
 isTypeVar :: Var -> Bool
 isTypeVar v = isTKVar v && not (isSuperKind (varType v))
 
-isKindVar :: Var -> Bool
+isKindVar :: Var -> Bool 
 isKindVar v = isTKVar v && isSuperKind (varType v)
 \end{code}
 
@@ -328,7 +343,7 @@ tyVarsOfTypes tys = foldr (unionVarSet . tyVarsOfType) emptyVarSet tys
 %*									*
 %************************************************************************
 
-Despite the fact that DataCon has to be imported via a hi-boot route,
+Despite the fact that DataCon has to be imported via a hi-boot route, 
 this module seems the right place for TyThing, because it's needed for
 funTyCon and all the types in TysPrim.
 
@@ -342,14 +357,14 @@ The Class and its associated TyCon have the same Name.
 
 \begin{code}
 -- | A typecheckable-thing, essentially anything that has a name
-data TyThing
+data TyThing 
   = AnId     Id
   | ADataCon DataCon
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
-  | ACoAxiom CoAxiom
+  | ACoAxiom (CoAxiom Branched)
   deriving (Eq, Ord)
 
-instance Outputable TyThing where
+instance Outputable TyThing where 
   ppr = pprTyThing
 
 pprTyThing :: TyThing -> SDoc
@@ -389,12 +404,12 @@ instance NamedThing TyThing where	-- Can't put this with the type
 -- 1. The in-scope set is needed /only/ to
 -- guide the generation of fresh uniques
 --
--- 2. In particular, the /kind/ of the type variables in
+-- 2. In particular, the /kind/ of the type variables in 
 -- the in-scope set is not relevant
 --
 -- 3. The substition is only applied ONCE! This is because
 -- in general such application will not reached a fixed point.
-data TvSubst
+data TvSubst 		
   = TvSubst InScopeSet 	-- The in-scope type and kind variables
 	    TvSubstEnv  -- Substitutes both type and kind variables
 	-- See Note [Apply Once]
@@ -420,7 +435,7 @@ So the substition might go [a->b, b->a].  A similar situation arises in Core
 when we find a beta redex like
 	(/\ a /\ b -> e) b a
 Then we also end up with a substition that permutes type variables. Other
-variations happen to; for example [a -> (a, b)].
+variations happen to; for example [a -> (a, b)].  
 
 	***************************************************
 	*** So a TvSubst must be applied precisely once ***
@@ -444,7 +459,7 @@ nevertheless we add 'b' to the TvSubstEnv, because b's kind does change
 
 This invariant has several crucial consequences:
 
-* In substTyVarBndr, we need extend the TvSubstEnv
+* In substTyVarBndr, we need extend the TvSubstEnv 
 	- if the unique has changed
 	- or if the kind has changed
 
@@ -494,8 +509,8 @@ pprParendKind = pprParendType
 
 ------------------
 pprEqPred :: Pair Type -> SDoc
--- NB: Maybe move to Coercion? It's only called after coercionKind anyway.
-pprEqPred (Pair ty1 ty2)
+-- NB: Maybe move to Coercion? It's only called after coercionKind anyway. 
+pprEqPred (Pair ty1 ty2) 
   = sep [ ppr_type FunPrec ty1
         , nest 2 (ptext (sLit "~#"))
         , ppr_type FunPrec ty2]
@@ -608,7 +623,7 @@ ppr_sigma_type show_foralls ty
 
     split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
     split1 tvs ty          = (reverse tvs, ty)
-
+ 
     split2 ps (ty1 `FunTy` ty2) | isPredTy ty1 = split2 (ty1:ps) ty2
     split2 ps ty                               = (reverse ps, ty)
 
@@ -624,7 +639,7 @@ pprTvBndrs :: [TyVar] -> SDoc
 pprTvBndrs tvs = sep (map pprTvBndr tvs)
 
 pprTvBndr :: TyVar -> SDoc
-pprTvBndr tv
+pprTvBndr tv 
   | isLiftedTypeKind kind = ppr_tvar tv
   | otherwise	          = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
 	     where
@@ -651,51 +666,62 @@ See Trac #2766.
 
 \begin{code}
 pprTcApp :: Prec -> (Prec -> a -> SDoc) -> TyCon -> [a] -> SDoc
-pprTcApp _ _ tc []      -- No brackets for SymOcc
-  = pp_nt_debug <> ppr tc
-  where
-   pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc
-				             then ptext (sLit "<recnt>")
-					     else ptext (sLit "<nt>"))
-	       | otherwise     = empty
-
 pprTcApp _ pp tc [ty]
-  | tc `hasKey` listTyConKey   = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
-  | tc `hasKey` parrTyConKey   = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+  | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
+  | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
 
 pprTcApp p pp tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
   = pprPromotionQuote tc <>
     tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
 
+  | Just dc <- isPromotedDataCon_maybe tc
+  , let dc_tc = dataConTyCon dc
+  , isTupleTyCon dc_tc 
+  , let arity = tyConArity dc_tc    -- E.g. 3 for (,,) k1 k2 k3 t1 t2 t3
+        ty_args = drop arity tys    -- Drop the kind args
+  , ty_args `lengthIs` arity        -- Result is saturated
+  = pprPromotionQuote tc <>
+    (tupleParens (tupleTyConSort dc_tc) $
+     sep (punctuate comma (map (pp TopPrec) ty_args)))
+
   | not opt_PprStyle_Debug
-  , tc `hasKey` eqTyConKey -- We need to special case the type equality TyCon because
+  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey] 
+                           -- We need to special case the type equality TyCons because
   , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
                            -- With -dppr-debug switch this off so we can see the kind
   = pprInfixApp p pp (ppr tc) ty1 ty2
 
   | otherwise
-  = ppr_type_name_app p pp (ppr tc) (isSymOcc (getOccName tc)) tys
+  = ppr_type_name_app p pp (getName tc) (ppr tc) tys
 
 ----------------
-pprTypeApp :: NamedThing a => a -> [Type] -> SDoc
--- The first arg is the tycon, or sometimes class
--- Print infix if the tycon/class looks like an operator
-pprTypeApp tc tys
-  = pprTypeNameApp TopPrec ppr_type (getName tc) tys
+pprTypeApp :: TyCon -> [Type] -> SDoc
+pprTypeApp tc tys 
+  = ppr_type_name_app TopPrec ppr_type (getName tc) (ppr tc) tys
+        -- We have to to use ppr on the TyCon (not its name)
+        -- so that we get promotion quotes in the right place
 
 pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc
 -- Used for classes and coercions as well as types; that's why it's separate from pprTcApp
 pprTypeNameApp p pp name tys
-  = ppr_type_name_app p pp (ppr name) (isSymOcc (getOccName name)) tys
+  = ppr_type_name_app p pp name (ppr name) tys
 
-ppr_type_name_app :: Prec -> (Prec -> a -> SDoc) -> SDoc -> Bool -> [a] -> SDoc
-ppr_type_name_app p pp pp_tc is_sym_occ tys
-  | is_sym_occ           -- Print infix if possible
-  , [ty1,ty2] <- tys  -- We know nothing of precedence though
+ppr_type_name_app :: Prec -> (Prec -> a -> SDoc) -> Name -> SDoc -> [a] -> SDoc
+ppr_type_name_app p pp nm_tc pp_tc tys
+  | not (isSymOcc (nameOccName nm_tc))
+  = pprPrefixApp p pp_tc (map (pp TyConPrec) tys)
+
+  | [ty1,ty2] <- tys  -- Infix, two arguments;
+                      -- we know nothing of precedence though
   = pprInfixApp p pp pp_tc ty1 ty2
+
+  |  nm_tc `hasKey` liftedTypeKindTyConKey 
+  || nm_tc `hasKey` unliftedTypeKindTyConKey 
+  = ASSERT( null tys ) pp_tc   -- Do not wrap *, # in parens
+
   | otherwise
-  = pprPrefixApp p (pprPrefixVar is_sym_occ pp_tc) (map (pp TyConPrec) tys)
+  = pprPrefixApp p (parens pp_tc) (map (pp TyConPrec) tys)
 
 ----------------
 pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> SDoc -> a -> a -> SDoc
@@ -704,8 +730,10 @@ pprInfixApp p pp pp_tc ty1 ty2
     sep [pp FunPrec ty1, pprInfixVar True pp_tc <+> pp FunPrec ty2]
 
 pprPrefixApp :: Prec -> SDoc -> [SDoc] -> SDoc
-pprPrefixApp p pp_fun pp_tys = maybeParen p TyConPrec $
-                               hang pp_fun 2 (sep pp_tys)
+pprPrefixApp p pp_fun pp_tys 
+  | null pp_tys = pp_fun
+  | otherwise   = maybeParen p TyConPrec $
+                  hang pp_fun 2 (sep pp_tys)
 
 ----------------
 pprArrowChain :: Prec -> [SDoc] -> SDoc
@@ -715,3 +743,111 @@ pprArrowChain p (arg:args) = maybeParen p FunPrec $
                              sep [arg, sep (map (arrow <+>) args)]
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{TidyType}
+%*									*
+%************************************************************************
+
+Tidying is here because it has a special case for FlatSkol
+
+\begin{code}
+-- | This tidies up a type for printing in an error message, or in
+-- an interface file.
+-- 
+-- It doesn't change the uniques at all, just the print names.
+tidyTyVarBndrs :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
+tidyTyVarBndrs env tvs = mapAccumL tidyTyVarBndr env tvs
+
+tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+tidyTyVarBndr tidy_env@(occ_env, subst) tyvar
+  = case tidyOccName occ_env occ1 of
+      (tidy', occ') -> ((tidy', subst'), tyvar')
+	where
+          subst' = extendVarEnv subst tyvar tyvar'
+          tyvar' = setTyVarKind (setTyVarName tyvar name') kind'
+          name'  = tidyNameOcc name occ'
+          kind'  = tidyKind tidy_env (tyVarKind tyvar)
+  where
+    name = tyVarName tyvar
+    occ  = getOccName name
+    -- System Names are for unification variables;
+    -- when we tidy them we give them a trailing "0" (or 1 etc)
+    -- so that they don't take precedence for the un-modified name
+    occ1 | isSystemName name = mkTyVarOcc (occNameString occ ++ "0")
+         | otherwise         = occ
+
+
+---------------
+tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
+-- ^ Add the free 'TyVar's to the env in tidy form,
+-- so that we can tidy the type they are free in
+tidyFreeTyVars (full_occ_env, var_env) tyvars 
+  = fst (tidyOpenTyVars (full_occ_env, var_env) (varSetElems tyvars))
+
+        ---------------
+tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
+tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
+
+---------------
+tidyOpenTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+-- ^ Treat a new 'TyVar' as a binder, and give it a fresh tidy name
+-- using the environment if one has not already been allocated. See
+-- also 'tidyTyVarBndr'
+tidyOpenTyVar env@(_, subst) tyvar
+  = case lookupVarEnv subst tyvar of
+	Just tyvar' -> (env, tyvar')		-- Already substituted
+	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
+
+---------------
+tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar
+tidyTyVarOcc (_, subst) tv
+  = case lookupVarEnv subst tv of
+	Nothing  -> tv
+	Just tv' -> tv'
+
+---------------
+tidyTypes :: TidyEnv -> [Type] -> [Type]
+tidyTypes env tys = map (tidyType env) tys
+
+---------------
+tidyType :: TidyEnv -> Type -> Type
+tidyType _   (LitTy n)            = LitTy n
+tidyType env (TyVarTy tv)	  = TyVarTy (tidyTyVarOcc env tv)
+tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
+ 		                    in args `seqList` TyConApp tycon args
+tidyType env (AppTy fun arg)	  = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (FunTy fun arg)	  = (FunTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (ForAllTy tv ty)	  = ForAllTy tvp $! (tidyType envp ty)
+			          where
+			            (envp, tvp) = tidyTyVarBndr env tv
+
+---------------
+-- | Grabs the free type variables, tidies them
+-- and then uses 'tidyType' to work over the type itself
+tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
+tidyOpenType env ty
+  = (env', tidyType (trimmed_occ_env, var_env) ty)
+  where
+    (env'@(_, var_env), tvs') = tidyOpenTyVars env (varSetElems (tyVarsOfType ty))
+    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
+      -- The idea here was that we restrict the new TidyEnv to the 
+      -- _free_ vars of the type, so that we don't gratuitously rename
+      -- the _bound_ variables of the type.
+
+---------------
+tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
+tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
+
+---------------
+-- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
+tidyTopType :: Type -> Type
+tidyTopType ty = tidyType emptyTidyEnv ty
+
+---------------
+tidyOpenKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
+tidyOpenKind = tidyOpenType
+
+tidyKind :: TidyEnv -> Kind -> Kind
+tidyKind = tidyType
+\end{code}

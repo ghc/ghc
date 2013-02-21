@@ -44,6 +44,16 @@
   </itemizedlist>
   </para>
 
+  <para>
+  Safe Haskell, however, <emphasis>does not offer</emphasis> compilation
+  safety. During compilation time it is possible for arbitrary processes to be
+  launched, using for example the <link linkend="pre-processor">custom
+    pre-processor</link> flag. This can be manipulated to either compromise a
+  users system at compilation time, or to modify the source code just before
+  compilation to try to alter set Safe Haskell flags. This is discussed further
+  in section <xref linkend="safe-compilation"/>.
+  </para>
+
   <sect2 id="safe-use-cases">
     <title>Uses of Safe Haskell</title>
     <indexterm><primary>safe haskell uses</primary></indexterm>
@@ -66,7 +76,7 @@
       being the <literal>unsafePerformIO :: IO a -> a</literal> function. The
       safe language dialect of Safe Haskell disallows the use of such
       functions. This can be useful for a variety of purposes as it makes
-      Haskell code easier to analyze and reason about. It also codifies an
+      Haskell code easier to analyse and reason about. It also codifies an
       existing culture in the Haskell community of trying to avoid using such
       unsafe functions unless absolutely necessary. As such using the safe
       language (through the <option>-XSafe</option> flag) can be thought of as
@@ -179,7 +189,7 @@
       The use of the <option>-XSafe</option> flag to compile the Danger module
       restricts the features of Haskell that can be used to a
       <link linkend="safe-language">safe subset</link>. This includes
-      disallowing <literal>unsafePerfromIO</literal>, Template Haskell, pure
+      disallowing <literal>unsafePerformIO</literal>, Template Haskell, pure
       FFI functions, Generalized Newtype Deriving, RULES and restricting the
       operation of Overlapping Instances. The <option>-XSafe</option> flag also
       restricts the modules can be imported by Danger to only those that are
@@ -720,6 +730,48 @@
         </listitem>
       </varlistentry>
     </variablelist>
+  </sect2>
+
+  <sect2 id="safe-compilation">
+    <title>Safe Compilation</title>
+    <indexterm><primary>safe compilation</primary></indexterm>
+
+    <para>
+    GHC includes a variety of flags that allow arbitrary processes to be run at
+    compilation time. One such example is the <link
+      linkend="pre-processor">custom pre-processor</link> flag. Another is the
+    ability of Template Haskell to execute Haskell code at compilation time,
+    including IO actions. Safe Haskell <emphasis>does not address this
+      danger</emphasis> (although, Template Haskell is a disallowed feature).
+    </para>
+
+    <para>
+    Due to this, it is suggested that when compiling untrusted source code that
+    has had no manual inspection done, the following precautions be taken:
+    <itemizedlist>
+      <listitem>Compile in a sandbox, such as a chroot or similar container
+        technology. Or simply as a user with very reduced system
+        access.</listitem>
+      <listitem>Compile untrusted code with the <option>-XSafe</option> flag
+        being specified on the command line. This will ensure that modifications
+        to the source being compiled can't disable the use of the Safe Language
+        as the command line flag takes precedence over a source level
+        pragma.</listitem>
+      <listitem>Ensure that all untrusted code is imported as a
+        <link linkend="safe-imports">safe import</link><emphasis> and</emphasis>
+        that the <link linkend="safe-package-trust"><option>-fpackage-trust</option></link>
+        flag is used with packages from untrusted sources being marked as
+        untrusted.</listitem>
+    </itemizedlist>
+    </para>
+
+    <para>
+    There is a more detailed discussion of the issues involved in compilation
+    safety and some potential solutions on the <ulink
+      url="http://hackage.haskell.org/trac/ghc/wiki/SafeHaskell/SafeCompilation">GHC
+      Wiki</ulink>.
+    </para>
+
   </sect2>
 
 </sect1>

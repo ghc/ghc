@@ -45,7 +45,7 @@
 
 #if SIZEOF_VOID_P == 4
 #define LowResTimeToTime(t)          (USToTime((t) * 1000))
-#define TimeToLowResTimeRoundDown(t) (TimeToUS(t) / 1000)
+#define TimeToLowResTimeRoundDown(t) ((LowResTime)(TimeToUS(t) / 1000))
 #define TimeToLowResTimeRoundUp(t)   ((TimeToUS(t) + 1000-1) / 1000)
 #else
 #define LowResTimeToTime(t) (t)
@@ -67,9 +67,18 @@ static LowResTime getLowResTimeOfDay(void)
  */
 LowResTime getDelayTarget (HsInt us)
 {
-    // round up the target time, because we never want to sleep *less*
-    // than the desired amount.
-    return TimeToLowResTimeRoundUp(getProcessElapsedTime() + USToTime(us));
+    Time elapsed;
+    elapsed = getProcessElapsedTime();
+
+    // If the desired target would be larger than the maximum Time,
+    // default to the maximum Time. (#7087)
+    if (us > TimeToUS(TIME_MAX - elapsed)) {
+        return TimeToLowResTimeRoundDown(TIME_MAX);
+    } else {
+        // round up the target time, because we never want to sleep *less*
+        // than the desired amount.
+        return TimeToLowResTimeRoundUp(elapsed + USToTime(us));
+    }
 }
 
 /* There's a clever trick here to avoid problems when the time wraps
@@ -212,19 +221,10 @@ awaitEvent(rtsBool wait)
           ptv = NULL;
       }
 
-      while (1) { // repeat the select on EINTR
-
-          // Disable the timer signal while blocked in
-          // select(), to conserve power. (#1623, #5991)
-          if (wait) stopTimer();
-
-          numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv);
-
-          if (wait) startTimer();
-
-          if (numFound >= 0) break;
-
-          if (errno != EINTR) {
+      /* Check for any interesting events */
+      
+      while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
+	  if (errno != EINTR) {
 	    /* Handle bad file descriptors by unblocking all the
 	       waiting threads. Why? Because a thread might have been
 	       a bit naughty and closed a file descriptor while another

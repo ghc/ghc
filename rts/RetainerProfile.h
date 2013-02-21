@@ -43,7 +43,7 @@ retainerSetOf( StgClosure *c )
 
 // Used by Storage.c:memInventory()
 #ifdef DEBUG
-extern lnat retainerStackBlocks ( void );
+extern W_ retainerStackBlocks ( void );
 #endif
 
 #include "EndPrivate.h"

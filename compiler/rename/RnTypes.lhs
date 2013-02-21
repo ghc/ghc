@@ -28,7 +28,7 @@ module RnTypes (
         -- Binding related stuff
         bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig,
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
-        extractRdrKindSigVars, extractTyDefnKindVars, filterInScope
+        extractRdrKindSigVars, extractDataDefnKindVars, filterInScope
   ) where
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
@@ -207,7 +207,7 @@ rnHsTyKi isType doc (HsFunTy ty1 ty2)
 
 rnHsTyKi isType doc listTy@(HsListTy ty)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr listTy))
+       ; unless (data_kinds || isType) (addErr (dataKindsErr isType listTy))
        ; (ty', fvs) <- rnLHsTyKi isType doc ty
        ; return (HsListTy ty', fvs) }
 
@@ -228,7 +228,7 @@ rnHsTyKi isType doc (HsPArrTy ty)
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr tupleTy))
+       ; unless (data_kinds || isType) (addErr (dataKindsErr isType tupleTy))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi isType doc) tys
        ; return (HsTupleTy tup_con tys', fvs) }
 
@@ -236,7 +236,7 @@ rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys)
 -- 2. Check that the integer is positive?
 rnHsTyKi isType _ tyLit@(HsTyLit t)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr tyLit))
+       ; unless (data_kinds || isType) (addErr (dataKindsErr isType tyLit))
        ; return (HsTyLit t, emptyFVs) }
 
 rnHsTyKi isType doc (HsAppTy ty1 ty2)
@@ -284,14 +284,18 @@ rnHsTyKi isType _ (HsCoreTy ty)
 rnHsTyKi _ _ (HsWrapTy {}) 
   = panic "rnHsTyKi"
 
-rnHsTyKi isType doc (HsExplicitListTy k tys)
+rnHsTyKi isType doc ty@(HsExplicitListTy k tys)
   = ASSERT( isType )
-    do { (tys', fvs) <- rnLHsTypes doc tys
+    do { data_kinds <- xoptM Opt_DataKinds
+       ; unless data_kinds (addErr (dataKindsErr isType ty))
+       ; (tys', fvs) <- rnLHsTypes doc tys
        ; return (HsExplicitListTy k tys', fvs) }
 
-rnHsTyKi isType doc (HsExplicitTupleTy kis tys) 
+rnHsTyKi isType doc ty@(HsExplicitTupleTy kis tys) 
   = ASSERT( isType )
-    do { (tys', fvs) <- rnLHsTypes doc tys
+    do { data_kinds <- xoptM Opt_DataKinds
+       ; unless data_kinds (addErr (dataKindsErr isType ty))
+       ; (tys', fvs) <- rnLHsTypes doc tys
        ; return (HsExplicitTupleTy kis tys', fvs) }
 
 --------------
@@ -356,7 +360,8 @@ bindHsTyVars :: HsDocContext
              -> (LHsTyVarBndrs Name -> RnM (b, FreeVars))
              -> RnM (b, FreeVars)
 -- (a) Bring kind variables into scope 
---     both (i) passed in (kv_bndrs) and (ii) mentioned in the kinds of tv_bndrs
+--     both (i)  passed in (kv_bndrs) 
+--     and  (ii) mentioned in the kinds of tv_bndrs
 -- (b) Bring type variables into scope
 bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { rdr_env <- getLocalRdrEnv
@@ -366,9 +371,17 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
                                  , kv <- kvs ]
              all_kvs = filterOut (`elemLocalRdrEnv` rdr_env) $
                        nub (kv_bndrs ++ kvs_from_tv_bndrs)
+             overlap_kvs = [ kv | kv <- all_kvs, any ((==) kv . hsLTyVarName) tvs ]
+                -- These variables appear both as kind and type variables
+                -- in the same declaration; eg  type family  T (x :: *) (y :: x)
+                -- We disallow this: too confusing!
+
        ; poly_kind <- xoptM Opt_PolyKinds
        ; unless (poly_kind || null all_kvs) 
                 (addErr (badKindBndrs doc all_kvs))
+       ; unless (null overlap_kvs) 
+                (addErr (overlappingKindVars doc overlap_kvs))
+
        ; loc <- getSrcSpanM
        ; kv_names <- mapM (newLocalBndrRn . L loc) all_kvs
        ; bindLocalNamesFV kv_names $ 
@@ -424,6 +437,13 @@ rnHsBndrSig doc (HsWB { hswb_cts = ty@(L loc _) }) thing_inside
        ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty', hswb_kvs = kv_names, hswb_tvs = tv_names })
        ; return (res, fvs1 `plusFV` fvs2) } }
 
+overlappingKindVars :: HsDocContext -> [RdrName] -> SDoc
+overlappingKindVars doc kvs
+  = vcat [ ptext (sLit "Kind variable") <> plural kvs <+> 
+           ptext (sLit "also used as type variable") <> plural kvs 
+           <> colon <+> pprQuotedList kvs
+         , docOfHsDocContext doc ]
+
 badKindBndrs :: HsDocContext -> [RdrName] -> SDoc
 badKindBndrs doc kvs
   = vcat [ hang (ptext (sLit "Unexpected kind variable") <> plural kvs
@@ -443,6 +463,14 @@ badSigErr is_type doc (L loc ty)
          | otherwise = ptext (sLit "kind")
     flag | is_type   = ptext (sLit "-XScopedTypeVariables")
          | otherwise = ptext (sLit "-XKindSignatures")
+
+dataKindsErr :: Bool -> HsType RdrName -> SDoc
+dataKindsErr is_type thing
+  = hang (ptext (sLit "Illegal") <+> what <> colon <+> quotes (ppr thing))
+       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
+  where
+    what | is_type   = ptext (sLit "type")
+         | otherwise = ptext (sLit "kind")
 \end{code}
 
 Note [Renaming associated types] 
@@ -642,15 +670,15 @@ mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
 	  -> RnM (HsCmd Name)
 
 -- (e11 `op1` e12) `op2` e2
-mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _))
+mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ _ _))
 	op2 fix2 a2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsArrForm op2 (Just fix2) [a1, a2])
+       return (HsCmdArrForm op2 (Just fix2) [a1, a2])
 
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
-       return (HsArrForm op1 (Just fix1)
+       return (HsCmdArrForm op1 (Just fix1)
 	          [a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
 	-- TODO: locs are wrong
   where
@@ -658,7 +686,7 @@ mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _
 
 --	Default case
 mkOpFormRn arg1 op fix arg2 			-- Default case, no rearrangment
-  = return (HsArrForm op (Just fix) [arg1, arg2])
+  = return (HsCmdArrForm op (Just fix) [arg1, arg2])
 
 
 --------------------------------------
@@ -687,12 +715,12 @@ not_op_pat (ConPatIn _ (InfixCon _ _)) = False
 not_op_pat _        	               = True
 
 --------------------------------------
-checkPrecMatch :: Name -> MatchGroup Name -> RnM ()
+checkPrecMatch :: Name -> MatchGroup Name body -> RnM ()
   -- Check precedence of a function binding written infix
   --   eg  a `op` b `C` c = ...
   -- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch op (MatchGroup ms _)	
+checkPrecMatch op (MG { mg_alts = ms })	
   = mapM_ check ms			 	
   where
     check (L _ (Match (L l1 p1 : L l2 p2 :_) _ _))
@@ -787,7 +815,7 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 \begin{code}
 warnUnusedForAlls :: SDoc -> LHsTyVarBndrs RdrName -> [RdrName] -> TcM ()
 warnUnusedForAlls in_doc bound mentioned_rdrs
-  = ifWOptM Opt_WarnUnusedMatches $
+  = whenWOptM Opt_WarnUnusedMatches $
     mapM_ add_warn bound_but_not_used
   where
     bound_names        = hsLTyVarLocNames bound
@@ -931,14 +959,12 @@ extractRdrKindSigVars :: Maybe (LHsKind RdrName) -> [RdrName]
 extractRdrKindSigVars Nothing = []
 extractRdrKindSigVars (Just k) = nub (fst (extract_lkind k ([],[])))
 
-extractTyDefnKindVars :: HsTyDefn RdrName -> [RdrName]
+extractDataDefnKindVars :: HsDataDefn RdrName -> [RdrName]
 -- Get the scoped kind variables mentioned free in the constructor decls
 -- Eg    data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
 -- Here k should scope over the whole definition
-extractTyDefnKindVars (TySynonym { td_synRhs = ty}) 
-  = fst (extractHsTyRdrTyVars ty)
-extractTyDefnKindVars (TyData { td_ctxt = ctxt, td_kindSig = ksig
-                              , td_cons = cons, td_derivs = derivs })
+extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
+                                    , dd_cons = cons, dd_derivs = derivs })
   = fst $ extract_lctxt ctxt $
           extract_mb extract_lkind ksig $
           extract_mb extract_ltys derivs $

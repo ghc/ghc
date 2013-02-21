@@ -45,6 +45,7 @@ import HsLit
 import NameSet( FreeVars )
 import Name( Name )
 import RdrName( RdrName )
+import DataCon( HsBang(..) )
 import Type
 import HsDoc
 import BasicTypes
@@ -613,7 +614,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
 ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty pREC_CON ty
 ppr_mono_ty _    (HsQuasiQuoteTy qq) = ppr qq
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
-ppr_mono_ty _    (HsTyVar name)      = ppr name
+ppr_mono_ty _    (HsTyVar name)      = pprPrefixOcc name
 ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
 ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (interpp'SP tys)
   where std_con = case con of
@@ -651,9 +652,12 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty, ppr_mono_lty pREC_CON arg_ty]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 (wrapper, op) ty2)
+ppr_mono_ty ctxt_prec (HsOpTy ty1 (_wrapper, L _ op) ty2)
   = maybeParen ctxt_prec pREC_OP $
-    ppr_mono_lty pREC_OP ty1 <+> ppr_mono_ty pREC_CON (HsWrapTy wrapper (HsTyVar (unLoc op))) <+> ppr_mono_lty pREC_OP ty2
+    sep [ ppr_mono_lty pREC_OP ty1
+        , sep [pprInfixOcc op, ppr_mono_lty pREC_OP ty2 ] ]
+    -- Don't print the wrapper (= kind applications)
+    -- c.f. HsWrapTy
 
 ppr_mono_ty _         (HsParTy ty)
   = parens (ppr_mono_lty pREC_TOP ty)

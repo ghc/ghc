@@ -45,7 +45,7 @@ StgBool isThreadBound (StgTSO* tso);
 
 // Overfow/underflow
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
-nat  threadStackUnderflow (Capability *cap, StgTSO *tso);
+W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
 #ifdef DEBUG
 void printThreadBlockage (StgTSO *tso);

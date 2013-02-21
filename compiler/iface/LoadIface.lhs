@@ -14,7 +14,7 @@ module LoadIface (
 
         -- IfM functions
         loadInterface, loadWiredInHomeIface, 
-        loadSysInterface, loadUserInterface, 
+        loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface,    -- Used when reading the module's old interface
         loadDecls,      -- Should move to TcIface and be renamed
         initExternalPackageState,
@@ -38,6 +38,7 @@ import TcRnMonad
 import Constants
 import PrelNames
 import PrelInfo
+import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
 import MkId     ( seqId )
 import Rules
 import Annotations
@@ -60,6 +61,8 @@ import FastString
 import Fingerprint
 
 import Control.Monad
+import Data.IORef
+import System.FilePath
 \end{code}
 
 
@@ -158,6 +161,10 @@ loadUserInterface :: Bool -> SDoc -> Module -> IfM lcl ModIface
 loadUserInterface is_boot doc mod_name 
   = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
 
+loadPluginInterface :: SDoc -> Module -> IfM lcl ModIface
+loadPluginInterface doc mod_name
+  = loadInterfaceWithException doc mod_name ImportByPlugin
+
 ------------------
 -- | A wrapper for 'loadInterface' that throws an exception if it fails
 loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
@@ -165,7 +172,7 @@ loadInterfaceWithException doc mod_name where_from
   = do  { mb_iface <- loadInterface doc mod_name where_from
         ; dflags <- getDynFlags
         ; case mb_iface of 
-            Failed err      -> ghcError (ProgramError (showSDoc dflags err))
+            Failed err      -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
             Succeeded iface -> return iface }
 
 ------------------
@@ -247,7 +254,7 @@ loadInterface doc_str mod from
         --     If we do loadExport first the wrong info gets into the cache (unless we
         --      explicitly tag each export which seems a bit of a bore)
 
-        ; ignore_prags      <- doptM Opt_IgnoreInterfacePragmas
+        ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
@@ -266,32 +273,36 @@ loadInterface doc_str mod from
 
         ; updateEps_  $ \ eps -> 
            if elemModuleEnv mod (eps_PIT eps) then eps else
-            eps { 
-              eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
-              eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-              eps_rule_base    = extendRuleBaseList (eps_rule_base eps) 
-                                                    new_eps_rules,
-              eps_inst_env     = extendInstEnvList (eps_inst_env eps)  
-                                                   new_eps_insts,
-              eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
-                                                      new_eps_fam_insts,
-              eps_vect_info    = plusVectInfo (eps_vect_info eps) 
-                                              new_eps_vect_info,
-              eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
-                                                  new_eps_anns,
-              eps_mod_fam_inst_env
-                               = let
-                                   fam_inst_env = 
-                                     extendFamInstEnvList emptyFamInstEnv
-                                                          new_eps_fam_insts
-                                 in
-                                 extendModuleEnv (eps_mod_fam_inst_env eps)
-                                                 mod
-                                                 fam_inst_env,
-              eps_stats        = addEpsInStats (eps_stats eps) 
-                                               (length new_eps_decls)
-                                               (length new_eps_insts)
-                                               (length new_eps_rules) }
+              case from of  -- See Note [Care with plugin imports]
+                ImportByPlugin -> eps {
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls}
+                _              -> eps {
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+                  eps_rule_base    = extendRuleBaseList (eps_rule_base eps) 
+                                                        new_eps_rules,
+                  eps_inst_env     = extendInstEnvList (eps_inst_env eps)  
+                                                       new_eps_insts,
+                  eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
+                                                          new_eps_fam_insts,
+                  eps_vect_info    = plusVectInfo (eps_vect_info eps) 
+                                                  new_eps_vect_info,
+                  eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
+                                                      new_eps_anns,
+                  eps_mod_fam_inst_env
+                                   = let
+                                       fam_inst_env = 
+                                         extendFamInstEnvList emptyFamInstEnv
+                                                              new_eps_fam_insts
+                                     in
+                                     extendModuleEnv (eps_mod_fam_inst_env eps)
+                                                     mod
+                                                     fam_inst_env,
+                  eps_stats        = addEpsInStats (eps_stats eps) 
+                                                   (length new_eps_decls)
+                                                   (length new_eps_insts)
+                                                   (length new_eps_rules) }
 
         ; return (Succeeded final_iface)
     }}}}
@@ -305,6 +316,9 @@ wantHiBootFile dflags eps mod from
           | usr_boot && not this_package
           -> Failed (badSourceImport mod)
           | otherwise -> Succeeded usr_boot
+
+       ImportByPlugin
+          -> Succeeded False
 
        ImportBySystem
           | not this_package   -- If the module to be imported is not from this package
@@ -328,16 +342,25 @@ badSourceImport mod
           <+> quotes (ppr (modulePackageId mod)))
 \end{code}
 
-{-
-Used to be used for the loadInterface sanity check on system imports. That has been removed, but I'm leaving this in pending
-review of this decision by SPJ - MCB 10/2008
+Note [Care with plugin imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When dynamically loading a plugin (via loadPluginInterface) we
+populate the same External Package State (EPS), even though plugin
+modules are to link with the compiler itself, and not with the 
+compiled program.  That's fine: mostly the EPS is just a cache for
+the interace files on disk.
 
-badDepMsg :: Module -> SDoc
-badDepMsg mod 
-  = hang (ptext (sLit "Interface file inconsistency:"))
-       2 (sep [ptext (sLit "home-package module") <+> quotes (ppr mod) <+> ptext (sLit "is needed,"), 
-               ptext (sLit "but is not listed in the dependencies of the interfaces directly imported by the module being compiled")])
--}
+But it's NOT ok for the RULES or instance environment.  We do not want
+to fire a RULE from the plugin on the code we are compiling, otherwise
+the code we are compiling will have a reference to a RHS of the rule
+that exists only in the compiler!  This actually happened to Daniel,
+via a RULE arising from a specialisation of (^) in the plugin.
+
+Solution: when loading plugins, do not extend the rule and instance
+environments.  We are only interested in the type environment, so that
+we can check that the plugin exports a function with the type that the
+compiler expects.
+
 
 \begin{code}
 -----------------------------------------------------
@@ -483,57 +506,73 @@ findAndReadIface :: SDoc -> Module
         -- sometimes it's ok to fail... see notes with loadInterface
 
 findAndReadIface doc_str mod hi_boot_file
-  = do  { traceIf (sep [hsep [ptext (sLit "Reading"), 
-                              if hi_boot_file 
-                                then ptext (sLit "[boot]") 
-                                else empty,
-                              ptext (sLit "interface for"), 
-                              ppr mod <> semi],
-                        nest 4 (ptext (sLit "reason:") <+> doc_str)])
+  = do traceIf (sep [hsep [ptext (sLit "Reading"), 
+                           if hi_boot_file 
+                             then ptext (sLit "[boot]") 
+                             else empty,
+                           ptext (sLit "interface for"), 
+                           ppr mod <> semi],
+                     nest 4 (ptext (sLit "reason:") <+> doc_str)])
 
-        -- Check for GHC.Prim, and return its static interface
-        ; dflags <- getDynFlags
-        ; if mod == gHC_PRIM
-          then return (Succeeded (ghcPrimIface,
+       -- Check for GHC.Prim, and return its static interface
+       if mod == gHC_PRIM
+           then return (Succeeded (ghcPrimIface,
                                    "<built in interface for GHC.Prim>"))
-          else do
+           else do
+               dflags <- getDynFlags
+               -- Look for the file
+               hsc_env <- getTopEnv
+               mb_found <- liftIO (findExactModule hsc_env mod)
+               case mb_found of
+                   Found loc mod -> do 
 
-        -- Look for the file
-        ; hsc_env <- getTopEnv
-        ; mb_found <- liftIO (findExactModule hsc_env mod)
-        ; case mb_found of {
-              
-              Found loc mod -> do 
+                       -- Found file, so read it
+                       let file_path = addBootSuffix_maybe hi_boot_file
+                                                           (ml_hi_file loc)
 
-        -- Found file, so read it
-        { let { file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc) }
-
-        -- If the interface is in the current package then if we could
-        -- load it would already be in the HPT and we assume that our
-        -- callers checked that.
-        ; if thisPackage dflags == modulePackageId mod
-                && not (isOneShot (ghcMode dflags))
-            then return (Failed (homeModError mod loc))
-            else do {
-
-        ; traceIf (ptext (sLit "readIFace") <+> text file_path)
-        ; read_result <- readIface mod file_path hi_boot_file
-        ; case read_result of
-            Failed err -> return (Failed (badIfaceFile file_path err))
-            Succeeded iface 
-                | mi_module iface /= mod ->
-                  return (Failed (wrongIfaceModErr iface mod file_path))
-                | otherwise ->
-                  return (Succeeded (iface, file_path))
-                        -- Don't forget to fill in the package name...
-        }}
-            ; err -> do
-                { traceIf (ptext (sLit "...not found"))
-                ; dflags <- getDynFlags
-                ; return (Failed (cannotFindInterface dflags 
-                                        (moduleName mod) err)) }
-        }
-        }
+                       -- If the interface is in the current package
+                       -- then if we could load it would already be in
+                       -- the HPT and we assume that our callers checked
+                       -- that.
+                       if thisPackage dflags == modulePackageId mod &&
+                          not (isOneShot (ghcMode dflags))
+                           then return (Failed (homeModError mod loc))
+                           else do r <- read_file file_path
+                                   checkBuildDynamicToo r
+                                   return r
+                   err -> do
+                       traceIf (ptext (sLit "...not found"))
+                       dflags <- getDynFlags
+                       return (Failed (cannotFindInterface dflags 
+                                           (moduleName mod) err))
+    where read_file file_path = do
+              traceIf (ptext (sLit "readIFace") <+> text file_path)
+              read_result <- readIface mod file_path hi_boot_file
+              case read_result of
+                Failed err -> return (Failed (badIfaceFile file_path err))
+                Succeeded iface 
+                    | mi_module iface /= mod ->
+                      return (Failed (wrongIfaceModErr iface mod file_path))
+                    | otherwise ->
+                      return (Succeeded (iface, file_path))
+                            -- Don't forget to fill in the package name...
+          checkBuildDynamicToo (Succeeded (iface, filePath)) = do
+              dflags <- getDynFlags
+              whenGeneratingDynamicToo dflags $ withDoDynamicToo $ do
+                  let ref = canGenerateDynamicToo dflags
+                      dynFilePath = replaceExtension filePath (dynHiSuf dflags)
+                  r <- read_file dynFilePath
+                  case r of
+                      Succeeded (dynIface, _)
+                       | mi_mod_hash iface == mi_mod_hash dynIface ->
+                          return ()
+                       | otherwise ->
+                          do traceIf (text "Dynamic hash doesn't match")
+                             liftIO $ writeIORef ref False
+                      Failed err ->
+                          do traceIf (text "Failed to load dynamic interface file:" $$ err)
+                             liftIO $ writeIORef ref False
+          checkBuildDynamicToo _ = return ()
 \end{code}
 
 @readIface@ tries just the one file.
@@ -604,8 +643,9 @@ ghcPrimIface
         mi_fix_fn  = mkIfaceFixCache fixities
     }           
   where
-    fixities = [(getOccName seqId, Fixity 0 InfixR)]
-                        -- seq is infixr 0
+    fixities = (getOccName seqId, Fixity 0 InfixR)  -- seq is infixr 0
+             : mapMaybe mkFixity allThePrimOps
+    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
 \end{code}
 
 %*********************************************************
@@ -750,18 +790,18 @@ pprFixities fixes = ptext (sLit "fixities") <+> pprWithCommas pprFix fixes
                     pprFix (occ,fix) = ppr fix <+> ppr occ 
 
 pprVectInfo :: IfaceVectInfo -> SDoc
-pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
-                           , ifaceVectInfoTyCon        = tycons
-                           , ifaceVectInfoTyConReuse   = tyconsReuse
-                           , ifaceVectInfoScalarVars   = scalarVars
-                           , ifaceVectInfoScalarTyCons = scalarTyCons
+pprVectInfo (IfaceVectInfo { ifaceVectInfoVar            = vars
+                           , ifaceVectInfoTyCon          = tycons
+                           , ifaceVectInfoTyConReuse     = tyconsReuse
+                           , ifaceVectInfoParallelVars   = parallelVars
+                           , ifaceVectInfoParallelTyCons = parallelTyCons
                            }) = 
   vcat 
   [ ptext (sLit "vectorised variables:") <+> hsep (map ppr vars)
   , ptext (sLit "vectorised tycons:") <+> hsep (map ppr tycons)
   , ptext (sLit "vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
-  , ptext (sLit "scalar variables:") <+> hsep (map ppr scalarVars)
-  , ptext (sLit "scalar tycons:") <+> hsep (map ppr scalarTyCons)
+  , ptext (sLit "parallel variables:") <+> hsep (map ppr parallelVars)
+  , ptext (sLit "parallel tycons:") <+> hsep (map ppr parallelTyCons)
   ]
 
 pprTrustInfo :: IfaceTrustInfo -> SDoc

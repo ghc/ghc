@@ -45,7 +45,6 @@ module CoreUnfold (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
@@ -69,6 +68,7 @@ import FastString
 import Outputable
 import ForeignCall
 
+import qualified Data.ByteString as BS
 import Data.Maybe
 \end{code}
 
@@ -80,12 +80,13 @@ import Data.Maybe
 %************************************************************************
 
 \begin{code}
-mkTopUnfolding :: Bool -> CoreExpr -> Unfolding
-mkTopUnfolding = mkUnfolding InlineRhs True {- Top level -}
+mkTopUnfolding :: DynFlags -> Bool -> CoreExpr -> Unfolding
+mkTopUnfolding dflags = mkUnfolding dflags InlineRhs True {- Top level -}
 
-mkImplicitUnfolding :: CoreExpr -> Unfolding
+mkImplicitUnfolding :: DynFlags -> CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
-mkImplicitUnfolding expr = mkTopUnfolding False (simpleOptExpr expr) 
+mkImplicitUnfolding dflags expr
+    = mkTopUnfolding dflags False (simpleOptExpr expr)
 
 -- Note [Top-level flag on inline rules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,15 +94,15 @@ mkImplicitUnfolding expr = mkTopUnfolding False (simpleOptExpr expr)
 -- top-level flag to True.  It gets set more accurately by the simplifier
 -- Simplify.simplUnfolding.
 
-mkSimpleUnfolding :: CoreExpr -> Unfolding
-mkSimpleUnfolding = mkUnfolding InlineRhs False False
+mkSimpleUnfolding :: DynFlags -> CoreExpr -> Unfolding
+mkSimpleUnfolding dflags = mkUnfolding dflags InlineRhs False False
 
 mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
 mkDFunUnfolding dfun_ty ops 
   = DFunUnfolding dfun_nargs data_con ops
   where
-    (tvs, n_theta, cls, _) = tcSplitDFunTy dfun_ty
-    dfun_nargs = length tvs + n_theta
+    (tvs, theta, cls, _) = tcSplitDFunTy dfun_ty
+    dfun_nargs = length tvs + length theta
     data_con   = classDataCon cls
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
@@ -130,9 +131,9 @@ mkInlineUnfolding mb_arity expr
               
     boring_ok = inlineBoringOk expr'
 
-mkInlinableUnfolding :: CoreExpr -> Unfolding
-mkInlinableUnfolding expr
-  = mkUnfolding InlineStable True is_bot expr'
+mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
+mkInlinableUnfolding dflags expr
+  = mkUnfolding dflags InlineStable True is_bot expr'
   where
     expr' = simpleOptExpr expr
     is_bot = isJust (exprBotStrictness_maybe expr')
@@ -155,10 +156,11 @@ mkCoreUnfolding src top_lvl expr arity guidance
 		    uf_expandable   = exprIsExpandable expr,
 		    uf_guidance     = guidance }
 
-mkUnfolding :: UnfoldingSource -> Bool -> Bool -> CoreExpr -> Unfolding
+mkUnfolding :: DynFlags -> UnfoldingSource -> Bool -> Bool -> CoreExpr
+            -> Unfolding
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
-mkUnfolding src top_lvl is_bottoming expr
+mkUnfolding dflags src top_lvl is_bottoming expr
   | top_lvl && is_bottoming
   , not (exprIsTrivial expr)
   = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
@@ -173,7 +175,7 @@ mkUnfolding src top_lvl is_bottoming expr
 		    uf_is_work_free = exprIsWorkFree   expr,
 		    uf_guidance     = guidance }
   where
-    (arity, guidance) = calcUnfoldingGuidance expr
+    (arity, guidance) = calcUnfoldingGuidance dflags expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
 	-- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 \end{code}
@@ -232,18 +234,19 @@ inlineBoringOk e
     go _      _                		   = boringCxtNotOk
 
 calcUnfoldingGuidance
-	:: CoreExpr    	-- Expression to look at
-	-> (Arity, UnfoldingGuidance)
-calcUnfoldingGuidance expr
+        :: DynFlags
+        -> CoreExpr    -- Expression to look at
+        -> (Arity, UnfoldingGuidance)
+calcUnfoldingGuidance dflags expr
   = case collectBinders expr of { (bndrs, body) ->
     let
-        bOMB_OUT_SIZE = opt_UF_CreationThreshold 
+        bOMB_OUT_SIZE = ufCreationThreshold dflags
                -- Bomb out if size gets bigger than this
         val_bndrs   = filter isId bndrs
 	n_val_bndrs = length val_bndrs
 
     	guidance 
-          = case (sizeExpr (iUnbox bOMB_OUT_SIZE) val_bndrs body) of
+          = case sizeExpr dflags (iUnbox bOMB_OUT_SIZE) val_bndrs body of
       	      TooBig -> UnfNever
       	      SizeIs size cased_bndrs scrut_discount
       	        | uncondInline expr n_val_bndrs (iBox size)
@@ -375,7 +378,8 @@ uncondInline rhs arity size
 
 
 \begin{code}
-sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
+sizeExpr :: DynFlags
+         -> FastInt 	    -- Bomb out if it gets bigger than this
 	 -> [Id]	    -- Arguments; we're interested in which of these
 			    -- get case'd
 	 -> CoreExpr
@@ -383,7 +387,7 @@ sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
 
 -- Note [Computing the size of an expression]
 
-sizeExpr bOMB_OUT_SIZE top_args expr
+sizeExpr dflags bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
     size_up (Cast e _) = size_up e
@@ -399,7 +403,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (App fun arg)      = size_up arg  `addSizeNSD`
                                  size_up_app fun [arg]
 
-    size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 10)
+    size_up (Lam b e) | isId b    = lamScrutDiscount dflags (size_up e `addSizeN` 10)
 		      | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
@@ -490,8 +494,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
            FCallId _        -> sizeN (10 * (1 + length val_args))
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op      -> primOpSize op (length val_args)
-	   ClassOpId _ 	    -> classOpSize top_args val_args
-	   _     	    -> funSize top_args fun (length val_args)
+	   ClassOpId _ 	    -> classOpSize dflags top_args val_args
+	   _     	    -> funSize dflags top_args fun (length val_args)
 
     ------------ 
     size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 10
@@ -532,7 +536,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
 litSize (LitInteger {}) = 100	-- Note [Size of literal integers]
-litSize (MachStr str)   = 10 + 10 * ((lengthFB str + 3) `div` 4)
+litSize (MachStr str)   = 10 + 10 * ((BS.length str + 3) `div` 4)
 	-- If size could be 0 then @f "x"@ might be too small
 	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
 	--  duplication of little strings]
@@ -540,11 +544,11 @@ litSize _other = 0    -- Must match size of nullary constructors
 	       	      -- Key point: if  x |-> 4, then x must inline unconditionally
 		      --     	    (eg via case binding)
 
-classOpSize :: [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: DynFlags -> [Id] -> [CoreExpr] -> ExprSize
 -- See Note [Conlike is interesting]
-classOpSize _ [] 
+classOpSize _ _ []
   = sizeZero
-classOpSize top_args (arg1 : other_args)
+classOpSize dflags top_args (arg1 : other_args)
   = SizeIs (iUnbox size) arg_discount (_ILIT(0))
   where
     size = 20 + (10 * length other_args)
@@ -553,13 +557,13 @@ classOpSize top_args (arg1 : other_args)
     -- The actual discount is rather arbitrarily chosen
     arg_discount = case arg1 of
     		     Var dict | dict `elem` top_args 
-		     	      -> unitBag (dict, opt_UF_DictDiscount)
+		     	      -> unitBag (dict, ufDictDiscount dflags)
 		     _other   -> emptyBag
     		     
-funSize :: [Id] -> Id -> Int -> ExprSize
+funSize :: DynFlags -> [Id] -> Id -> Int -> ExprSize
 -- Size for functions that are not constructors or primops
 -- Note [Function applications]
-funSize top_args fun n_val_args
+funSize dflags top_args fun n_val_args
   | fun `hasKey` buildIdKey   = buildSize
   | fun `hasKey` augmentIdKey = augmentSize
   | otherwise = SizeIs (iUnbox size) arg_discount (iUnbox res_discount)
@@ -575,12 +579,12 @@ funSize top_args fun n_val_args
         --                  DISCOUNTS
         --  See Note [Function and non-function discounts]
     arg_discount | some_val_args && fun `elem` top_args
-    		 = unitBag (fun, opt_UF_FunAppDiscount)
+    		 = unitBag (fun, ufFunAppDiscount dflags)
 		 | otherwise = emptyBag
 	-- If the function is an argument and is applied
 	-- to some values, give it an arg-discount
 
-    res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
+    res_discount | idArity fun > n_val_args = ufFunAppDiscount dflags
     		 | otherwise   	 	    = 0
         -- If the function is partially applied, show a result discount
 
@@ -691,9 +695,9 @@ augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
 	-- e plus ys. The -2 accounts for the \cn 
 
 -- When we return a lambda, give a discount if it's used (applied)
-lamScrutDiscount :: ExprSize -> ExprSize
-lamScrutDiscount (SizeIs n vs _) = SizeIs n vs (iUnbox opt_UF_FunAppDiscount)
-lamScrutDiscount TooBig          = TooBig
+lamScrutDiscount :: DynFlags -> ExprSize -> ExprSize
+lamScrutDiscount dflags (SizeIs n vs _) = SizeIs n vs (iUnbox (ufFunAppDiscount dflags))
+lamScrutDiscount _      TooBig          = TooBig
 \end{code}
 
 Note [addAltSize result discounts]
@@ -707,31 +711,31 @@ binary sizes shrink significantly either.
 
 Note [Discounts and thresholds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Constants for discounts and thesholds are defined in main/StaticFlags,
-all of form opt_UF_xxxx.   They are:
+Constants for discounts and thesholds are defined in main/DynFlags,
+all of form ufXxxx.   They are:
 
-opt_UF_CreationThreshold (45)
+ufCreationThreshold
      At a definition site, if the unfolding is bigger than this, we
      may discard it altogether
 
-opt_UF_UseThreshold (6)
+ufUseThreshold
      At a call site, if the unfolding, less discounts, is smaller than
      this, then it's small enough inline
 
-opt_UF_KeennessFactor (1.5)
+ufKeenessFactor
      Factor by which the discounts are multiplied before 
      subtracting from size
 
-opt_UF_DictDiscount (1)
+ufDictDiscount
      The discount for each occurrence of a dictionary argument
      as an argument of a class method.  Should be pretty small
      else big functions may get inlined
 
-opt_UF_FunAppDiscount (6)
+ufFunAppDiscount
      Discount for a function argument that is applied.  Quite
      large, because if we inline we avoid the higher-order call.
 
-opt_UF_DearOp (4)
+ufDearOp
      The size of a foreign call or not-dupable PrimOp
 
 
@@ -795,33 +799,33 @@ flaggery.  Just the same as smallEnoughToInline, except that it has no
 actual arguments.
 
 \begin{code}
-couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
-couldBeSmallEnoughToInline threshold rhs 
-  = case sizeExpr (iUnbox threshold) [] body of
+couldBeSmallEnoughToInline :: DynFlags -> Int -> CoreExpr -> Bool
+couldBeSmallEnoughToInline dflags threshold rhs 
+  = case sizeExpr dflags (iUnbox threshold) [] body of
        TooBig -> False
        _      -> True
   where
     (_, body) = collectBinders rhs
 
 ----------------
-smallEnoughToInline :: Unfolding -> Bool
-smallEnoughToInline (CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_size = size}})
-  = size <= opt_UF_UseThreshold
-smallEnoughToInline _
+smallEnoughToInline :: DynFlags -> Unfolding -> Bool
+smallEnoughToInline dflags (CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_size = size}})
+  = size <= ufUseThreshold dflags
+smallEnoughToInline _ _
   = False
 
 ----------------
-certainlyWillInline :: Unfolding -> Bool
+certainlyWillInline :: DynFlags -> Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
-certainlyWillInline (CoreUnfolding { uf_arity = n_vals, uf_guidance = guidance })
+certainlyWillInline dflags (CoreUnfolding { uf_arity = n_vals, uf_guidance = guidance })
   = case guidance of
       UnfNever      -> False
       UnfWhen {}    -> True
       UnfIfGoodArgs { ug_size = size} 
                     -> n_vals > 0     -- See Note [certainlyWillInline: be caseful of thunks]
-                    && size - (10 * (n_vals +1)) <= opt_UF_UseThreshold
+                    && size - (10 * (n_vals +1)) <= ufUseThreshold dflags
 
-certainlyWillInline _
+certainlyWillInline _ _
   = False
 \end{code}
 
@@ -979,8 +983,8 @@ tryUnfolding dflags id lone_variable
                 , (text "discounted size =" <+> int discounted_size) )
     	     where
     	       discounted_size = size - discount
-    	       small_enough = discounted_size <= opt_UF_UseThreshold
-    	       discount = computeDiscount uf_arity arg_discounts 
+    	       small_enough = discounted_size <= ufUseThreshold dflags
+    	       discount = computeDiscount dflags uf_arity arg_discounts 
     	         		          res_discount arg_infos cont_info
 \end{code}
 
@@ -1172,8 +1176,9 @@ This kind of thing can occur if you have
 which Roman did.
 
 \begin{code}
-computeDiscount :: Int -> [Int] -> Int -> [ArgSummary] -> CallCtxt -> Int
-computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
+computeDiscount :: DynFlags -> Int -> [Int] -> Int -> [ArgSummary] -> CallCtxt
+                -> Int
+computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_info
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
 	--  *size* whereas the discounts imply that there's some extra 
@@ -1187,7 +1192,7 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
       	       -- Discount of (un-scaled) 1 for each arg supplied, 
    	       -- because the result replaces the call
 
-    + round (opt_UF_KeenessFactor * 
+    + round (ufKeenessFactor dflags *
 	     fromIntegral (arg_discount + res_discount'))
   where
     arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)

@@ -1,0 +1,42 @@
+[submodule "libraries/binary"]
+	path = libraries/binary
+	url = http://darcs.haskell.org/libraries/binary.git/
+[submodule "libraries/bytestring"]
+	path = libraries/bytestring
+	url = http://darcs.haskell.org/libraries/bytestring.git/
+[submodule "libraries/Cabal"]
+	path = libraries/Cabal
+	url = http://darcs.haskell.org/libraries/Cabal.git/
+[submodule "libraries/containers"]
+	path = libraries/containers
+	url = http://darcs.haskell.org/libraries/containers.git/
+[submodule "libraries/haskeline"]
+	path = libraries/haskeline
+	url = http://darcs.haskell.org/libraries/haskeline.git/
+[submodule "libraries/pretty"]
+	path = libraries/pretty
+	url = http://darcs.haskell.org/libraries/pretty.git/
+[submodule "libraries/terminfo"]
+	path = libraries/terminfo
+	url = http://darcs.haskell.org/libraries/terminfo.git/
+[submodule "libraries/transformers"]
+	path = libraries/transformers
+	url = http://darcs.haskell.org/libraries/transformers.git/
+[submodule "libraries/xhtml"]
+	path = libraries/xhtml
+	url = http://darcs.haskell.org/libraries/xhtml.git/
+[submodule "libraries/Win32"]
+	path = libraries/Win32
+	url = http://darcs.haskell.org/libraries/Win32.git/
+[submodule "libraries/primitive"]
+	path = libraries/primitive
+	url = http://darcs.haskell.org/libraries/primitive.git/
+[submodule "libraries/vector"]
+	path = libraries/vector
+	url = http://darcs.haskell.org/libraries/vector.git/
+[submodule "libraries/time"]
+	path = libraries/time
+	url = http://darcs.haskell.org/libraries/time.git/
+[submodule "libraries/random"]
+	path = libraries/random
+	url = http://darcs.haskell.org/libraries/random.git/

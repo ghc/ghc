@@ -164,7 +164,7 @@ foreign import ccall interruptible
       <sect2 id="ffi-capi">
         <title>The CAPI calling convention</title>
         <para>
-          The <literal>CAPI</literal> extension allows a calling
+          The <literal>CApiFFI</literal> extension allows a calling
           convention of <literal>capi</literal> to be used in foreign
           declarations, e.g.
 
@@ -446,21 +446,25 @@ typedef enum {
           implemented in C or C++.  For example:</para>
 
 <programlisting>
- HsBool mylib_init(void){
-   int argc = ...
-   char *argv[] = ...
+#include &lt;stdlib.h&gt;
+#include "HsFFI.h"
 
-   // Initialize Haskell runtime
-   hs_init(&amp;argc, &amp;argv);
+HsBool mylib_init(void){
+  int argc = 2;
+  char *argv[] = { "+RTS", "-A32m", NULL };
+  char **pargv = argv;
 
-   // do any other initialization here and
-   // return false if there was a problem
-   return HS_BOOL_TRUE;
- }
+  // Initialize Haskell runtime
+  hs_init(&amp;argc, &amp;pargv);
 
- void mylib_end(void){
-   hs_exit();
- }
+  // do any other initialization here and
+  // return false if there was a problem
+  return HS_BOOL_TRUE;
+}
+
+void mylib_end(void){
+  hs_exit();
+}
 </programlisting>
 
         <para>The initialisation routine, <literal>mylib_init</literal>, calls

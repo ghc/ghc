@@ -15,9 +15,8 @@ module SPARC.Imm (
 
 where
 
-import OldCmm
+import Cmm
 import CLabel
-import BlockId
 
 import Outputable
 
@@ -71,7 +70,6 @@ litToImm lit
 		(ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
 		(ImmInt off)
 
-	CmmBlock id	-> ImmCLbl (infoTblLbl id)
-	_		-> panic "SPARC.Regs.litToImm: no match"
+        _               -> panic "SPARC.Regs.litToImm: no match"
 
 

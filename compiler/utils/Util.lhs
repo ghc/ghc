@@ -10,7 +10,7 @@ module Util (
         -- * Flags dependent on the compiler build
         ghciSupported, debugIsOn, ncgDebugIsOn,
         ghciTablesNextToCode, isDynamicGhcLib,
-        isWindowsHost, isWindowsTarget, isDarwinTarget,
+        isWindowsHost, isDarwinHost,
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -87,6 +87,7 @@ module Util (
         escapeSpaces,
         parseSearchPath,
         Direction(..), reslash,
+        makeRelativeTo,
 
         -- * Utils for defining Data instances
         abstractConstr, abstractDataType, mkNoRepType,
@@ -192,18 +193,11 @@ isWindowsHost = True
 isWindowsHost = False
 #endif
 
-isWindowsTarget :: Bool
-#ifdef mingw32_TARGET_OS
-isWindowsTarget = True
+isDarwinHost :: Bool
+#ifdef darwin_HOST_OS
+isDarwinHost = True
 #else
-isWindowsTarget = False
-#endif
-
-isDarwinTarget :: Bool
-#ifdef darwin_TARGET_OS
-isDarwinTarget = True
-#else
-isDarwinTarget = False
+isDarwinHost = False
 #endif
 \end{code}
 
@@ -1013,6 +1007,17 @@ reslash d = f
           slash = case d of
                   Forwards -> '/'
                   Backwards -> '\\'
+
+makeRelativeTo :: FilePath -> FilePath -> FilePath
+this `makeRelativeTo` that = directory </> thisFilename
+    where (thisDirectory, thisFilename) = splitFileName this
+          thatDirectory = dropFileName that
+          directory = joinPath $ f (splitPath thisDirectory)
+                                   (splitPath thatDirectory)
+
+          f (x : xs) (y : ys)
+           | x == y = f xs ys
+          f xs ys = replicate (length ys) ".." ++ xs
 \end{code}
 
 %************************************************************************

@@ -7,8 +7,8 @@
 module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,
-        gresFromAvails, 
-        reportUnusedNames, 
+        gresFromAvails,
+        reportUnusedNames,
     ) where
 
 #include "HsVersions.h"
@@ -151,7 +151,7 @@ rnImports imports = do
     combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
     combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
-    
+
     plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
          (decls, gbl_env2, imp_avails2,hpc_usage2)
       = ( decl:decls,
@@ -161,7 +161,7 @@ rnImports imports = do
 
 rnImportDecl  :: Module -> LImportDecl RdrName
               -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
-rnImportDecl this_mod 
+rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_only, ideclImplicit = implicit
@@ -183,7 +183,7 @@ rnImportDecl this_mod
         Just (False, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
-           | otherwise  -> ifWOptM Opt_WarnMissingImportList $
+           | otherwise  -> whenWOptM Opt_WarnMissingImportList $
                            addWarn (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
@@ -314,7 +314,7 @@ rnImportDecl this_mod
                    }
 
     -- Complain if we import a deprecated module
-    ifWOptM Opt_WarnWarningsDeprecations (
+    whenWOptM Opt_WarnWarningsDeprecations (
        case warns of
           WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
           _           -> return ()
@@ -414,10 +414,11 @@ extendGlobalRdrEnvRn avails new_fixities
 
               rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 gres
               fix_env' = foldl extend_fix_env     fix_env  gres
-              (rdr_env', dups) = findLocalDupsRdrEnv rdr_env3 new_occs
+              dups = findLocalDupsRdrEnv rdr_env3 new_occs
 
-              gbl_env' = gbl_env { tcg_rdr_env = rdr_env', tcg_fix_env = fix_env' }
+              gbl_env' = gbl_env { tcg_rdr_env = rdr_env3, tcg_fix_env = fix_env' }
 
+        ; traceRn (text "extendGlobalRdrEnvRn dups" <+> (ppr dups))
         ; mapM_ addDupDeclErr dups
 
         ; traceRn (text "extendGlobalRdrEnvRn" <+> (ppr new_fixities $$ ppr fix_env $$ ppr fix_env'))
@@ -471,7 +472,7 @@ used for source code.
         *** See "THE NAMING STORY" in HsDecls ****
 
 \begin{code}
-getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName 
+getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
                       -> RnM ((TcGblEnv, TcLclEnv), NameSet)
 -- Get all the top-level binders bound the group *except*
 -- for value bindings, which are treated separately
@@ -482,7 +483,7 @@ getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
 --      foreign imports
 --      (in hs-boot files) value signatures
 
-getLocalNonValBinders fixity_env 
+getLocalNonValBinders fixity_env
      (HsGroup { hs_valds  = val_binds,
                 hs_tyclds = tycl_decls,
                 hs_instds = inst_decls,
@@ -501,15 +502,15 @@ getLocalNonValBinders fixity_env
           -- Finish off with value binders:
           --    foreign decls for an ordinary module
           --    type sigs in case of a hs-boot file only
-        ; is_boot <- tcIsHsBoot 
+        ; is_boot <- tcIsHsBoot
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
                         | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = nti_avails ++ val_avails
-              new_bndrs = availsToNameSet avails `unionNameSets` 
+              new_bndrs = availsToNameSet avails `unionNameSets`
                           availsToNameSet tc_avails
-        ; envs <- extendGlobalRdrEnvRn avails fixity_env 
+        ; envs <- extendGlobalRdrEnvRn avails fixity_env
         ; return (envs, new_bndrs) } }
   where
     for_hs_bndrs :: [Located RdrName]
@@ -530,21 +531,26 @@ getLocalNonValBinders fixity_env
              ; return (AvailTC main_name names) }
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
-    new_assoc (L _ (FamInstD { lid_inst = d })) 
-      = do { avail <- new_ti Nothing d
+    new_assoc (L _ (TyFamInstD {})) = return []
+      -- type instances don't bind new names
+
+    new_assoc (L _ (DataFamInstD { dfid_inst = d }))
+      = do { avail <- new_di Nothing d
            ; return [avail] }
-    new_assoc (L _ (ClsInstD { cid_poly_ty = inst_ty, cid_fam_insts = ats }))
-          | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
+    new_assoc (L _ (ClsInstD { cid_inst = ClsInstDecl
+                             { cid_poly_ty = inst_ty
+                             , cid_datafam_insts = adts } }))
+      | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
-           ; mapM (new_ti (Just cls_nm) . unLoc) ats }
-          | otherwise
+           ; mapM (new_di (Just cls_nm) . unLoc) adts }
+      | otherwise
       = return []     -- Do not crash on ill-formed instances
                       -- Eg   instance !Show Int   Trac #3811c
 
-    new_ti :: Maybe Name -> FamInstDecl RdrName -> RnM AvailInfo
-    new_ti mb_cls ti_decl  -- ONLY for type/data instances
-        = do { main_name <- lookupFamInstName mb_cls (fid_tycon ti_decl)
-             ; sub_names <- mapM newTopSrcBinder (hsFamInstBinders ti_decl)
+    new_di :: Maybe Name -> DataFamInstDecl RdrName -> RnM AvailInfo
+    new_di mb_cls ti_decl
+        = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
+             ; sub_names <- mapM newTopSrcBinder (hsDataFamInstBinders ti_decl)
              ; return (AvailTC (unLoc main_name) sub_names) }
                         -- main_name is not bound here!
 \end{code}
@@ -629,7 +635,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
     occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing))
                                  | a <- all_avails, n <- availNames a]
       where
-        -- we know that (1) there are at most entries for one name, (2) their
+        -- we know that (1) there are at most 2 entries for one name, (2) their
         -- first component is identical, (3) they are for tys/cls, and (4) one
         -- entry has the name in its parent position (the other doesn't)
         combine (name, AvailTC p1 subs1, Nothing)
@@ -643,24 +649,32 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
     lookup_lie :: Bool -> LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
     lookup_lie opt_typeFamilies (L loc ieRdr)
         = do
-             stuff <- setSrcSpan loc $
-                      case lookup_ie opt_typeFamilies ieRdr of
-                            Failed err  -> addErr err >> return []
-                            Succeeded a -> return a
-             checkDodgyImport stuff
+             (stuff, warns) <- setSrcSpan loc .
+                liftM (fromMaybe ([],[])) $
+                run_lookup (lookup_ie opt_typeFamilies ieRdr)
+             mapM_ emit_warning warns
              return [ (L loc ie, avail) | (ie,avail) <- stuff ]
         where
             -- Warn when importing T(..) if T was exported abstractly
-            checkDodgyImport stuff
-                | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
-                = ifWOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
-                    -- NB. use the RdrName for reporting the warning
-                | IEThingAll {} <- ieRdr
-                , not (is_qual decl_spec)
-                = ifWOptM Opt_WarnMissingImportList $
-                  addWarn (missingImportListItem ieRdr)
-            checkDodgyImport _
-                = return ()
+            emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
+              addWarn (dodgyImportWarn n)
+            emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
+              addWarn (missingImportListItem ieRdr)
+            emit_warning BadImportW = whenWOptM Opt_WarnDodgyImports $
+              addWarn (lookup_err_msg BadImport)
+
+            run_lookup :: IELookupM a -> TcRn (Maybe a)
+            run_lookup m = case m of
+              Failed err -> addErr (lookup_err_msg err) >> return Nothing
+              Succeeded a -> return (Just a)
+
+            lookup_err_msg err = case err of
+              BadImport -> badImportItemErr iface decl_spec ieRdr all_avails
+              IllegalImport -> illegalImportItemErr
+              QualImportError rdr -> qualImportItemErr rdr
+              TypeItemError children -> typeItemErr
+                                        (head . filter isTyConName $ children)
+                                        (text "in import list")
 
         -- For each import item, we convert its RdrNames to Names,
         -- and at the same time construct an AvailInfo corresponding
@@ -672,78 +686,111 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
         -- data constructors of an associated family, we need separate
         -- AvailInfos for the data constructors and the family (as they have
         -- different parents).  See the discussion at occ_env.
-    lookup_ie :: Bool -> IE RdrName -> MaybeErr MsgDoc [(IE Name,AvailInfo)]
-    lookup_ie opt_typeFamilies ie
-      = let bad_ie :: MaybeErr MsgDoc a
-            bad_ie = Failed (badImportItemErr iface decl_spec ie all_avails)
+    lookup_ie :: Bool -> IE RdrName -> IELookupM ([(IE Name, AvailInfo)], [IELookupWarning])
+    lookup_ie opt_typeFamilies ie = handle_bad_import $ do
+      let lookup_name rdr
+            | isQual rdr
+            = failLookupWith (QualImportError rdr)
+            | Just nm <- lookupOccEnv occ_env (rdrNameOcc rdr)
+            = return nm
+            | otherwise
+            = failLookupWith BadImport
+      case ie of
+        IEVar n -> do
+            (name, avail, _) <- lookup_name n
+            return ([(IEVar name, trimAvail avail name)], [])
 
-            lookup_name rdr
-              | isQual rdr = Failed (qualImportItemErr rdr)
-              | Just nm <- lookupOccEnv occ_env (rdrNameOcc rdr) = return nm
-              | otherwise                                        = bad_ie
-        in
-        case ie of
-         IEVar n -> do
-             (name, avail, _) <- lookup_name n
-             return [(IEVar name, trimAvail avail name)]
-
-         IEThingAll tc -> do
-             (name, avail@(AvailTC name2 subs), mb_parent) <- lookup_name tc
-             case mb_parent of
-               -- non-associated ty/cls
-               Nothing     -> return [(IEThingAll name, avail)]
-               -- associated ty
-               Just parent -> return [(IEThingAll name,
-                                       AvailTC name2 (subs \\ [name])),
-                                      (IEThingAll name, AvailTC parent [name])]
-
-         IEThingAbs tc
-             | want_hiding   -- hiding ( C )
-                        -- Here the 'C' can be a data constructor
-                        --  *or* a type/class, or even both
-             -> let tc_name = lookup_name tc
-                    dc_name = lookup_name (setRdrNameSpace tc srcDataName)
-                in
-                case catMaybeErr [ tc_name, dc_name ] of
-                  []    -> bad_ie
-                  names -> return [mkIEThingAbs name | name <- names]
-             | otherwise
-             -> do nameAvail <- lookup_name tc
-                   return [mkIEThingAbs nameAvail]
-
-         IEThingWith tc ns -> do
-            (name, AvailTC _ subnames, mb_parent) <- lookup_name tc
-            let
-              env         = mkOccEnv [(nameOccName s, s) | s <- subnames]
-              mb_children = map (lookupOccEnv env . rdrNameOcc) ns
-            children <- if any isNothing mb_children
-                        then bad_ie
-                        else return (catMaybes mb_children)
-            -- check for proper import of type families
-            when (not opt_typeFamilies && any isTyConName children) $
-              Failed (typeItemErr (head . filter isTyConName $ children)
-                                  (text "in import list"))
+        IEThingAll tc -> do
+            (name, avail@(AvailTC name2 subs), mb_parent) <- lookup_name tc
+            let warns
+                  | null (drop 1 subs)
+                  = [DodgyImport tc]
+                  | not (is_qual decl_spec)
+                  = [MissingImportList]
+                  | otherwise
+                  = []
             case mb_parent of
               -- non-associated ty/cls
-              Nothing     -> return [(IEThingWith name children,
-                                      AvailTC name (name:children))]
+              Nothing     -> return ([(IEThingAll name, avail)], warns)
               -- associated ty
-              Just parent -> return [(IEThingWith name children,
+              Just parent -> return ([(IEThingAll name,
+                                       AvailTC name2 (subs \\ [name])),
+                                      (IEThingAll name, AvailTC parent [name])],
+                                     warns)
+
+        IEThingAbs tc
+            | want_hiding   -- hiding ( C )
+                       -- Here the 'C' can be a data constructor
+                       --  *or* a type/class, or even both
+            -> let tc_name = lookup_name tc
+                   dc_name = lookup_name (setRdrNameSpace tc srcDataName)
+               in
+               case catIELookupM [ tc_name, dc_name ] of
+                 []    -> failLookupWith BadImport
+                 names -> return ([mkIEThingAbs name | name <- names], [])
+            | otherwise
+            -> do nameAvail <- lookup_name tc
+                  return ([mkIEThingAbs nameAvail], [])
+
+        IEThingWith tc ns -> do
+           (name, AvailTC _ subnames, mb_parent) <- lookup_name tc
+           let
+             env         = mkOccEnv [(nameOccName s, s) | s <- subnames]
+             mb_children = map (lookupOccEnv env . rdrNameOcc) ns
+           children <- if any isNothing mb_children
+                       then failLookupWith BadImport
+                       else return (catMaybes mb_children)
+           -- check for proper import of type families
+           when (not opt_typeFamilies && any isTyConName children) $
+             failLookupWith (TypeItemError children)
+           case mb_parent of
+             -- non-associated ty/cls
+             Nothing     -> return ([(IEThingWith name children,
+                                      AvailTC name (name:children))],
+                                    [])
+             -- associated ty
+             Just parent -> return ([(IEThingWith name children,
                                       AvailTC name children),
                                      (IEThingWith name children,
-                                      AvailTC parent [name])]
+                                      AvailTC parent [name])],
+                                    [])
 
-         _other -> Failed illegalImportItemErr
-         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
-         -- all errors.
+        _other -> failLookupWith IllegalImport
+        -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
+        -- all errors.
 
       where
         mkIEThingAbs (n, av, Nothing    ) = (IEThingAbs n, trimAvail av n)
         mkIEThingAbs (n, _,  Just parent) = (IEThingAbs n, AvailTC parent [n])
 
+        handle_bad_import m = catchIELookup m $ \err -> case err of
+          BadImport | want_hiding -> return ([], [BadImportW])
+          _                       -> failLookupWith err
 
-catMaybeErr :: [MaybeErr err a] -> [a]
-catMaybeErr ms =  [ a | Succeeded a <- ms ]
+type IELookupM = MaybeErr IELookupError
+
+data IELookupWarning
+  = BadImportW
+  | MissingImportList
+  | DodgyImport RdrName
+  -- NB. use the RdrName for reporting a "dodgy" import
+
+data IELookupError
+  = QualImportError RdrName
+  | BadImport
+  | IllegalImport
+  | TypeItemError [Name]
+
+failLookupWith :: IELookupError -> IELookupM a
+failLookupWith err = Failed err
+
+catchIELookup :: IELookupM a -> (IELookupError -> IELookupM a) -> IELookupM a
+catchIELookup m h = case m of
+  Succeeded r -> return r
+  Failed err  -> h err
+
+catIELookupM :: [IELookupM a] -> [a]
+catIELookupM ms = [ a | Succeeded a <- ms ]
 \end{code}
 
 %************************************************************************
@@ -754,7 +801,7 @@ catMaybeErr ms =  [ a | Succeeded a <- ms ]
 
 \begin{code}
 greExportAvail :: GlobalRdrElt -> AvailInfo
-greExportAvail gre 
+greExportAvail gre
   = case gre_par gre of
       ParentIs p                  -> AvailTC p [me]
       NoParent   | isTyConName me -> AvailTC me [me]
@@ -764,7 +811,7 @@ greExportAvail gre
 
 plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
 plusAvail a1 a2
-  | debugIsOn && availName a1 /= availName a2 
+  | debugIsOn && availName a1 /= availName a2
   = pprPanic "RnEnv.plusAvail names differ" (hsep [ppr a1,ppr a2])
 plusAvail a1@(Avail {})         (Avail {})      = a1
 plusAvail (AvailTC _ [])        a2@(AvailTC {}) = a2
@@ -853,21 +900,21 @@ Suppose you see (Trac #5306)
         module M where
           import X( F )
           data instance F Int = FInt
-What does M export?  AvailTC F [FInt] 
+What does M export?  AvailTC F [FInt]
                   or AvailTC F [F,FInt]?
 The former is strictly right because F isn't defined in this module.
 But then you can never do an explicit import of M, thus
     import M( F( FInt ) )
-becuase F isn't exported by M.  Nor can you import FInt alone from here
+because F isn't exported by M.  Nor can you import FInt alone from here
     import M( FInt )
-because we don't have syntax to support that.  (It looks like an import of 
+because we don't have syntax to support that.  (It looks like an import of
 the type FInt.)
 
 At one point I implemented a compromise:
   * When constructing exports with no export list, or with module M(
     module M ), we add the parent to the exports as well.
-  * But not when you see module M( f ), even if f is a 
-    class method with a parent.  
+  * But not when you see module M( f ), even if f is a
+    class method with a parent.
   * Nor when you see module M( module N ), with N /= M.
 
 But the compromise seemed too much of a hack, so we backed it out.
@@ -946,7 +993,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
  = -- The same as (module M) where M is the current module name,
    -- so that's how we handle it.
    let
-       avails = [ greExportAvail gre 
+       avails = [ greExportAvail gre
                 | gre <- globalRdrEnvElts rdr_env
                 , isLocalGRE gre ]
    in
@@ -987,7 +1034,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                    ; names       = map gre_name gres }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIf (warnDodgyExports && exportValid && null names) 
+             ; warnIf (warnDodgyExports && exportValid && null names)
                       (nullModuleExport mod)
 
              ; addUsedRdrNames (concat [ [mkRdrQual mod occ, mkRdrUnqual occ]
@@ -1040,10 +1087,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_ie ie@(IEThingAll rdr)
         = do name <- lookupGlobalOccRn rdr
              let kids = findChildren kids_env name
-                 mkKidRdrName = case isQual_maybe rdr of
-                                Nothing -> mkRdrUnqual
-                                Just (modName, _) -> mkRdrQual modName
-             addUsedRdrNames $ map (mkKidRdrName . nameOccName) kids
+             addUsedKids rdr kids
              warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null kids) $
                   if isTyConName name
@@ -1066,6 +1110,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                 then do addErr (exportItemErr ie)
                         return (IEThingWith name [], AvailTC name [name])
                 else do let names = catMaybes mb_names
+                        addUsedKids rdr names
                         optTyFam <- xoptM Opt_TypeFamilies
                         when (not optTyFam && any isTyConName names) $
                           addErr (typeItemErr ( head
@@ -1085,6 +1130,14 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_doc_ie (IEDocNamed str)  = return (IEDocNamed str)
     lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
 
+    -- In an export item M.T(A,B,C), we want to treat the uses of
+    -- A,B,C as if they were M.A, M.B, M.C
+    addUsedKids parent_rdr kid_names
+       = addUsedRdrNames $ map (mk_kid_rdr . nameOccName) kid_names
+       where
+         mk_kid_rdr = case isQual_maybe parent_rdr of
+                         Nothing           -> mkRdrUnqual
+                         Just (modName, _) -> mkRdrQual modName
 
 isDoc :: IE RdrName -> Bool
 isDoc (IEDoc _)      = True
@@ -1166,14 +1219,14 @@ dupExport_ok :: Name -> IE RdrName -> IE RdrName -> Bool
 --        import Foo
 --        data instance T Int = TInt
 
-dupExport_ok n ie1 ie2 
+dupExport_ok n ie1 ie2
   = not (  single ie1 || single ie2
         || (explicit_in ie1 && explicit_in ie2) )
   where
     explicit_in (IEModuleContents _) = False                -- module M
     explicit_in (IEThingAll r) = nameOccName n == rdrNameOcc r  -- T(..)
     explicit_in _              = True
-  
+
     single (IEVar {})      = True
     single (IEThingAbs {}) = True
     single _               = False
@@ -1259,10 +1312,10 @@ warnUnusedImportDecls gbl_env
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
                        , ptext (sLit "Import usage") <+> ppr usage])
-       ; ifWOptM Opt_WarnUnusedImports $
+       ; whenWOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
-       ; ifDOptM Opt_D_dump_minimal_imports $
+       ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
     explicit_import (L _ decl) = unLoc (ideclName decl) /= pRELUDE_NAME
@@ -1273,54 +1326,83 @@ warnUnusedImportDecls gbl_env
         -- it just doesn't seem worth it
 \end{code}
 
+
+Note [The ImportMap]
+~~~~~~~~~~~~~~~~~~~~
+The ImportMap is a short-lived intermediate data struture records, for
+each import declaration, what stuff brought into scope by that
+declaration is actually used in the module.
+
+The SrcLoc is the location of the END of a particular 'import'
+declaration.  Why *END*?  Because we don't want to get confused
+by the implicit Prelude import. Consider (Trac #7476) the module
+    import Foo( foo )
+    main = print foo
+There is an implicit 'import Prelude(print)', and it gets a SrcSpan
+of line 1:1 (just the point, not a span). If we use the *START* of
+the SrcSpan to identify the import decl, we'll confuse the implicit
+import Prelude with the explicit 'import Foo'.  So we use the END.
+It's just a cheap hack; we could equally well use the Span too.
+
+The AvailInfos are the things imported from that decl (just a list,
+not normalised).
+
 \begin{code}
+type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
+
 findImportUsage :: [LImportDecl Name]
                 -> GlobalRdrEnv
                 -> [RdrName]
                 -> [ImportDeclUsage]
 
-type ImportMap = Map SrcLoc [AvailInfo]
--- The intermediate data struture records, for each import
--- declaration, what stuff brought into scope by that
--- declaration is actually used in the module.
---
--- The SrcLoc is the location of the start
--- of a particular 'import' declaration
---
--- The AvailInfos are the things imported from that decl
--- (just a list, not normalised)
-
 findImportUsage imports rdr_env rdrs
   = map unused_decl imports
   where
     import_usage :: ImportMap
-    import_usage = foldr (addUsedRdrName rdr_env) Map.empty rdrs
+    import_usage = foldr (extendImportMap rdr_env) Map.empty rdrs
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
-      = (decl, nubAvails used_avails, unused_imps)
+      = (decl, nubAvails used_avails, nameSetToList unused_imps)
       where
-        used_avails = Map.lookup (srcSpanStart loc) import_usage `orElse` []
-        dont_report_as_unused = foldr add emptyNameSet used_avails
-        add (Avail n) s = s `addOneToNameSet` n
-        add (AvailTC n ns) s = s `addListToNameSet` (n:ns)
+        used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
+                      -- srcSpanEnd: see Note [The ImportMap]
+        used_names   = availsToNameSet used_avails
+        used_parents = mkNameSet [n | AvailTC n _ <- used_avails]
+
+        unused_imps   -- Not trivial; see eg Trac #7454
+          = case imps of
+              Just (False, imp_ies) -> foldr (add_unused . unLoc) emptyNameSet imp_ies
+              _other -> emptyNameSet -- No explicit import list => no unused-name list
+
+        add_unused :: IE Name -> NameSet -> NameSet
+        add_unused (IEVar n)          acc = add_unused_name n acc
+        add_unused (IEThingAbs n)     acc = add_unused_name n acc
+        add_unused (IEThingAll n)     acc = add_unused_all  n acc
+        add_unused (IEThingWith p ns) acc = add_unused_with p ns acc
+        add_unused _                  acc = acc
+
+        add_unused_name n acc
+          | n `elemNameSet` used_names = acc
+          | otherwise                  = acc `addOneToNameSet` n
+        add_unused_all n acc
+          | n `elemNameSet` used_names   = acc
+          | n `elemNameSet` used_parents = acc
+          | otherwise                    = acc `addOneToNameSet` n
+        add_unused_with p ns acc
+          | all (`elemNameSet` acc1) ns = add_unused_name p acc1
+          | otherwise = acc1
+          where
+            acc1 = foldr add_unused_name acc ns
        -- If you use 'signum' from Num, then the user may well have
        -- imported Num(signum).  We don't want to complain that
-       -- Num is not itself mentioned.  Hence adding 'n' as
-       -- well to the list of of "don't report if unused" names
+       -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
-        unused_imps = case imps of
-                        Just (False, imp_ies) -> nameSetToList unused_imps
-                          where
-                            imp_names = mkNameSet (concatMap (ieNames . unLoc) imp_ies)
-                            unused_imps = imp_names `minusNameSet` dont_report_as_unused
 
-                        _other -> []    -- No explicit import list => no unused-name list
-
-addUsedRdrName :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
+extendImportMap :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
 -- For a used RdrName, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-addUsedRdrName rdr_env rdr imp_map
+extendImportMap rdr_env rdr imp_map
   | [gre] <- lookupGRE_RdrName rdr rdr_env
   , Imported imps <- gre_prov gre
   = add_imp gre (bestImport imps) imp_map
@@ -1332,7 +1414,8 @@ addUsedRdrName rdr_env rdr imp_map
       = Map.insertWith add decl_loc [avail] imp_map
       where
         add _ avails = avail : avails -- add is really just a specialised (++)
-        decl_loc = srcSpanStart (is_dloc imp_decl_spec)
+        decl_loc = srcSpanEnd (is_dloc imp_decl_spec)
+                   -- For srcSpanEnd see Note [The ImportMap]
         name     = gre_name gre
         avail    = case gre_par gre of
                       ParentIs p                  -> AvailTC p [name]
@@ -1498,7 +1581,7 @@ badImportItemErrDataCon dataType iface decl_spec ie
          ]
   where
     datacon_occ = rdrNameOcc $ ieName ie
-    datacon = parenSymOcc datacon_occ (ppr datacon_occ) 
+    datacon = parenSymOcc datacon_occ (ppr datacon_occ)
     source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
                   | otherwise     = empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )

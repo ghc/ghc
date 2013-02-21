@@ -78,6 +78,7 @@ static WeakStage weak_stage;
 /* Weak pointers
  */
 StgWeak *old_weak_ptr_list; // also pending finaliser list
+StgWeak *weak_ptr_list_tail;
 
 // List of threads found to be unreachable
 StgTSO *resurrected_threads;
@@ -90,6 +91,7 @@ initWeakForGC(void)
 {
     old_weak_ptr_list = weak_ptr_list;
     weak_ptr_list = NULL;
+    weak_ptr_list_tail = NULL;
     weak_stage = WeakPtrs;
     resurrected_threads = END_TSO_QUEUE;
 }
@@ -125,7 +127,7 @@ traverseWeakPtrList(void)
 	      continue;
 	  }
 	  
-          info = get_itbl(w);
+          info = get_itbl((StgClosure *)w);
 	  switch (info->type) {
 
 	  case WEAK:
@@ -139,11 +141,18 @@ traverseWeakPtrList(void)
 		  evacuate(&w->finalizer);
 		  // remove this weak ptr from the old_weak_ptr list 
 		  *last_w = w->link;
-		  // and put it on the new weak ptr list 
-		  next_w  = w->link;
-		  w->link = weak_ptr_list;
-		  weak_ptr_list = w;
-		  flag = rtsTrue;
+                  next_w  = w->link;
+
+                  // and put it on the new weak ptr list.
+                  // NB. we must retain the order of the weak_ptr_list (#7160)
+                  if (weak_ptr_list == NULL) {
+                      weak_ptr_list = w;
+                  } else {
+                      weak_ptr_list_tail->link = w;
+                  }
+                  weak_ptr_list_tail = w;
+                  w->link = NULL;
+                  flag = rtsTrue;
 
 		  debugTrace(DEBUG_weak, 
 			     "weak pointer still alive at %p -> %p",
@@ -260,7 +269,7 @@ static rtsBool tidyThreadList (generation *gen)
             t = tmp;
         }
         
-        ASSERT(get_itbl(t)->type == TSO);
+        ASSERT(get_itbl((StgClosure *)t)->type == TSO);
         next = t->global_link;
         
         // if the thread is not masking exceptions but there are

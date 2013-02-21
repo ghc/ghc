@@ -75,6 +75,8 @@ instance Outputable ForeignConvention where
 instance Outputable ForeignTarget where
     ppr = pprForeignTarget
 
+instance Outputable CmmReturnInfo where
+    ppr = pprReturnInfo
 
 instance Outputable (Block CmmNode C C) where
     ppr = pprBlock
@@ -100,7 +102,7 @@ pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
   ptext (sLit "updfr_space: ") <> ppr updfr_space
 
 pprTopInfo :: CmmTopInfo -> SDoc
-pprTopInfo (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
+pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
   vcat [ptext (sLit "info_tbl: ") <> ppr info_tbl,
         ptext (sLit "stack_info: ") <> ppr stack_info]
 
@@ -145,17 +147,18 @@ pprConvention (NativeDirectCall {}) = text "<native-direct-call-convention>"
 pprConvention (NativeReturn {})     = text "<native-ret-convention>"
 pprConvention  Slow                 = text "<slow-convention>"
 pprConvention  GC                   = text "<gc-convention>"
-pprConvention  PrimOpCall           = text "<primop-call-convention>"
-pprConvention  PrimOpReturn         = text "<primop-ret-convention>"
 
 pprForeignConvention :: ForeignConvention -> SDoc
-pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs
+pprForeignConvention (ForeignConvention c args res ret) =
+          doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res <+> ppr ret
+
+pprReturnInfo :: CmmReturnInfo -> SDoc
+pprReturnInfo CmmMayReturn = empty
+pprReturnInfo CmmNeverReturns = ptext (sLit "never returns")
 
 pprForeignTarget :: ForeignTarget -> SDoc
-pprForeignTarget (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
-  where ppr_fc :: ForeignConvention -> SDoc
-        ppr_fc (ForeignConvention c args res) =
-          doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res
+pprForeignTarget (ForeignTarget fn c) = ppr c <+> ppr_target fn
+  where
         ppr_target :: CmmExpr -> SDoc
         ppr_target t@(CmmLit _) = ppr t
         ppr_target fn'          = parens (ppr fn')
@@ -185,7 +188,8 @@ pprNode node = pp_node <+> pp_debug
       -- rep[lv] = expr;
       CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
           where
-            rep = ppr ( cmmExprType expr )
+            rep = sdocWithDynFlags $ \dflags ->
+                  ppr ( cmmExprType dflags expr )
 
       -- call "ccall" foo(x, y)[r1, r2];
       -- ToDo ppr volatile

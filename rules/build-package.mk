@@ -43,8 +43,6 @@ $(call clean-target,$1,$2,$1/$2)
 
 distclean : clean_$1_$2_config
 
-maintainer-clean : distclean
-
 .PHONY: clean_$1_$2_config
 clean_$1_$2_config:
 	$$(call removeFiles,$1/config.log $1/config.status $(wildcard $1/include/Hs*Config.h))
@@ -65,6 +63,10 @@ define build-package-helper
 # --- CONFIGURATION
 
 $(call package-config,$1,$2,$3)
+
+ifeq "$3" "1"
+$$($1_PACKAGE)_INSTALL_INFO = $1_$2
+endif
 
 # Bootstrapping libs are only built one way
 ifeq "$3" "0"
@@ -103,6 +105,7 @@ endif
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 $(call includes-sources,$1,$2)
+$(call distdir-opts,$1,$2,$3)
 
 $(call dependencies,$1,$2,$3)
 
@@ -115,25 +118,27 @@ $$(foreach way,$$($1_$2_WAYS),$$(eval \
     $$(call build-package-way,$1,$2,$$(way),$3) \
   ))
 
+# Programs will need to depend on either the vanilla lib (if -static
+# is the default) or the dyn lib (if -dynamic is the default). We
+# conservatively make them depend on both, to keep things simple.
+# If dyn libs are not being built then $$($1_$2_dyn_LIB) will just
+# expand to the empty string, and be ignored.
+$1_$2_PROGRAM_DEP_LIB = $$($1_$2_v_LIB) $$($1_$2_dyn_LIB)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_$2_PROGRAM_DEP_LIB = $$($1_$2_PROGRAM_DEP_LIB)
+
 # C and S files are possibly built the "dyn" way.
 ifeq "$$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)
 $(call c-suffix-rules,$1,$2,dyn,YES)
 endif
+$$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
+  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$$(dir))))
 
 $(call all-target,$1,all_$1_$2)
 # This give us things like
 #     all_libraries: all_libraries/base_dist-install
 ifneq "$$($1_$2_GROUP)" ""
 all_$$($1_$2_GROUP): all_$1_$2
-endif
-
-ifneq "$$(CHECKED_$1)" "YES"
-CHECKED_$1 = YES
-check_packages: check_$1
-.PHONY: check_$1
-check_$1: $$(GHC_CABAL_INPLACE)
-	CROSS_COMPILE="$(CrossCompilePrefix)" $$(GHC_CABAL_INPLACE) check $1
 endif
 
 ifneq "$3" "0"

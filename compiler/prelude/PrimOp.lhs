@@ -13,7 +13,7 @@ module PrimOp (
 
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
-        primOpIsCheap,
+        primOpIsCheap, primOpFixity,
 
         getPrimOpResultInfo,  PrimOpResultInfo(..),
 
@@ -31,7 +31,7 @@ import OccName          ( OccName, pprOccName, mkVarOccFS )
 import TyCon            ( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
 import Type             ( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
                           typePrimRep )
-import BasicTypes       ( Arity, TupleSort(..) )
+import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), TupleSort(..) )
 import ForeignCall      ( CLabelString )
 import Unique           ( Unique, mkPrimOpIdUnique )
 import Outputable
@@ -149,6 +149,17 @@ primOpStrictness :: PrimOp -> Arity -> StrictSig
         -- The arity should be the arity of the primop; that's why
         -- this function isn't exported.
 #include "primop-strictness.hs-incl"
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{Fixity}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+primOpFixity :: PrimOp -> Maybe Fixity
+#include "primop-fixity.hs-incl"
 \end{code}
 
 %************************************************************************

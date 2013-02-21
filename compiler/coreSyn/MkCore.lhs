@@ -74,8 +74,9 @@ import Type
 import Coercion
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
-import IdInfo		( vanillaIdInfo, setStrictnessInfo, setArityInfo )
-import Demand
+import IdInfo		( vanillaIdInfo, setStrictnessInfo, 
+                          setArityInfo )
+import Demand 
 import Name      hiding ( varName )
 import Outputable
 import FastString
@@ -84,6 +85,7 @@ import BasicTypes
 import Util
 import Pair
 import Constants
+import DynFlags
 
 import Data.Char        ( ord )
 import Data.List
@@ -102,14 +104,14 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 \begin{code}
 sortQuantVars :: [Var] -> [Var]
 -- Sort the variables (KindVars, TypeVars, and Ids) 
--- into order: Type, then Kind, then Id
+-- into order: Kind, then Type, then Id
 sortQuantVars = sortBy (comparing withCategory)
   where
     withCategory v = (category v, v)
     category :: Var -> Int
     category v
-     | isTyVar   v = 1
-     | isKindVar v = 2
+     | isKindVar v = 1
+     | isTyVar   v = 2
      | otherwise   = 3
 
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
@@ -233,20 +235,20 @@ mkCoreLams = mkLams
 
 \begin{code}
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
-mkIntExpr      :: Integer    -> CoreExpr            -- Result = I# i :: Int
-mkIntExpr  i = mkConApp intDataCon  [mkIntLit i]
+mkIntExpr :: DynFlags -> Integer -> CoreExpr        -- Result = I# i :: Int
+mkIntExpr dflags i = mkConApp intDataCon  [mkIntLit dflags i]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
-mkIntExprInt   :: Int        -> CoreExpr            -- Result = I# i :: Int
-mkIntExprInt  i = mkConApp intDataCon  [mkIntLitInt i]
+mkIntExprInt :: DynFlags -> Int -> CoreExpr         -- Result = I# i :: Int
+mkIntExprInt dflags i = mkConApp intDataCon  [mkIntLitInt dflags i]
 
 -- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
-mkWordExpr     :: Integer    -> CoreExpr
-mkWordExpr w = mkConApp wordDataCon [mkWordLit w]
+mkWordExpr :: DynFlags -> Integer -> CoreExpr
+mkWordExpr dflags w = mkConApp wordDataCon [mkWordLit dflags w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExprWord :: Word       -> CoreExpr
-mkWordExprWord w = mkConApp wordDataCon [mkWordLitWord w]
+mkWordExprWord :: DynFlags -> Word -> CoreExpr
+mkWordExprWord dflags w = mkConApp wordDataCon [mkWordLitWord dflags w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
@@ -283,11 +285,11 @@ mkStringExprFS str
 
   | all safeChar chars
   = do unpack_id <- lookupId unpackCStringName
-       return (App (Var unpack_id) (Lit (MachStr (fastStringToFastBytes str))))
+       return (App (Var unpack_id) (Lit (MachStr (fastStringToByteString str))))
 
   | otherwise
   = do unpack_id <- lookupId unpackCStringUtf8Name
-       return (App (Var unpack_id) (Lit (MachStr (fastStringToFastBytes str))))
+       return (App (Var unpack_id) (Lit (MachStr (fastStringToByteString str))))
 
   where
     chars = unpackFS str
@@ -732,7 +734,7 @@ pc_bottoming_Id :: Name -> Type -> Id
 pc_bottoming_Id name ty
  = mkVanillaGlobalWithInfo name ty bottoming_info
  where
-    bottoming_info = vanillaIdInfo `setStrictnessInfo` Just strict_sig
+    bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
 				   `setArityInfo`         1
 			-- Make arity and strictness agree
 
@@ -745,7 +747,7 @@ pc_bottoming_Id name ty
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
-        -- These "bottom" out, no matter what their arguments
+    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] botRes)
+    -- These "bottom" out, no matter what their arguments
 \end{code}
 

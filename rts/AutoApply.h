@@ -35,7 +35,7 @@
     }							\
     R1 = pap;						\
     Sp_adj(1 + n);					\
-    jump %ENTRY_CODE(Sp(0));
+    jump %ENTRY_CODE(Sp(0)) [R1];
 
 // Copy the old PAP, build a new one with the extra arg(s)
 // ret addr and m arguments taking up n words are on the stack.
@@ -74,7 +74,7 @@
      }								\
      R1 = new_pap;						\
      Sp_adj(n+1);						\
-     jump %ENTRY_CODE(Sp(0));
+     jump %ENTRY_CODE(Sp(0)) [R1];
 
 // Jump to target, saving CCCS and restoring it on return
 #if defined(PROFILING)
@@ -82,9 +82,9 @@
     Sp(-1) = CCCS;                              \
     Sp(-2) = stg_restore_cccs_info;             \
     Sp_adj(-2);                                 \
-    jump (target)
+    jump (target) [R1]
 #else
-#define jump_SAVE_CCCS(target) jump (target)
+#define jump_SAVE_CCCS(target) jump (target) [R1]
 #endif
 
 #endif /* APPLY_H */

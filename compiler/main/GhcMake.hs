@@ -55,6 +55,7 @@ import qualified Data.Map as Map
 import qualified FiniteMap as Map ( insertListWith )
 
 import Control.Monad
+import Data.IORef
 import Data.List
 import qualified Data.List as List
 import Data.Maybe
@@ -238,11 +239,18 @@ load how_much = do
         stable_mg = 
             [ AcyclicSCC ms
             | AcyclicSCC ms <- full_mg,
-              ms_mod_name ms `elem` stable_obj++stable_bco,
-              ms_mod_name ms `notElem` [ ms_mod_name ms' | 
-                                            AcyclicSCC ms' <- partial_mg ] ]
+              ms_mod_name ms `elem` stable_obj++stable_bco ]
+ 
+        -- the modules from partial_mg that are not also stable
+        -- NB. also keep cycles, we need to emit an error message later
+        unstable_mg = filter not_stable partial_mg
+          where not_stable (CyclicSCC _) = True
+                not_stable (AcyclicSCC ms)
+                   = ms_mod_name ms `notElem` stable_obj++stable_bco
 
-        mg = stable_mg ++ partial_mg
+        -- Load all the stable modules first, before attempting to load
+        -- an unstable module (#7231).
+        mg = stable_mg ++ unstable_mg
 
     -- clean up between compilations
     let cleanup hsc_env = intermediateCleanTempFiles dflags
@@ -282,7 +290,7 @@ load how_much = do
           -- that main() is going to come from somewhere else.
           --
           let ofile = outputFile dflags
-          let no_hs_main = dopt Opt_NoHsMain dflags
+          let no_hs_main = gopt Opt_NoHsMain dflags
           let 
             main_mod = mainModIs dflags
             a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
@@ -364,7 +372,8 @@ discardIC hsc_env
 
 intermediateCleanTempFiles :: DynFlags -> [ModSummary] -> HscEnv -> IO ()
 intermediateCleanTempFiles dflags summaries hsc_env
- = cleanTempFilesExcept dflags except
+ = do notIntermediate <- readIORef (filesToNotIntermediateClean dflags)
+      cleanTempFilesExcept dflags (notIntermediate ++ except)
   where
     except =
           -- Save preprocessed files. The preprocessed file *might* be
@@ -560,7 +569,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
            && all bco_ok scc
 
         object_ok ms
-          | dopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
                                          && same_as_prev t
           | otherwise = False
@@ -580,7 +589,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
                 -- a problem.
 
         bco_ok ms
-          | dopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | otherwise = case lookupUFM hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) && 
@@ -700,9 +709,9 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             prevailing_target = hscTarget (hsc_dflags hsc_env)
             local_target      = hscTarget dflags
 
-            -- If OPTIONS_GHC contains -fasm or -fvia-C, be careful that
+            -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
             -- we don't do anything dodgy: these should only work to change
-            -- from -fvia-C to -fasm and vice-versa, otherwise we could 
+            -- from -fllvm to -fasm and vice-versa, otherwise we could
             -- end up trying to link object code to byte code.
             target = if prevailing_target /= local_target
                         && (not (isObjectTarget prevailing_target)
@@ -943,7 +952,7 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
             let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
-                     | otherwise = ghcError (ProgramError "module does not exist")
+                     | otherwise = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVertices (seq root (reachableG graph root))
 
 type SummaryNode = (ModSummary, Int, [Int])
@@ -1412,11 +1421,11 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
                 | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
                   -- note: local_opts is only required if there's no Unlit phase
                 | xopt Opt_Cpp dflags'          = True
-                | dopt Opt_Pp  dflags'          = True
+                | gopt Opt_Pp  dflags'          = True
                 | otherwise                     = False
 
         when needs_preprocessing $
-           ghcError (ProgramError "buffer needs preprocesing; interactive check disabled")
+           throwGhcExceptionIO (ProgramError "buffer needs preprocesing; interactive check disabled")
 
         return (dflags', src_fn, buf)
 

@@ -14,7 +14,8 @@ import LlvmCodeGen.Data
 import LlvmCodeGen.Regs
 
 import CLabel
-import OldCmm
+import Cmm
+import Platform
 
 import FastString
 import Outputable
@@ -27,51 +28,42 @@ import Unique
 
 -- | Header code for LLVM modules
 pprLlvmHeader :: SDoc
-pprLlvmHeader =
+pprLlvmHeader = sdocWithDynFlags $ \dflags ->
     moduleLayout
     $+$ text ""
-    $+$ ppLlvmFunctionDecls (map snd ghcInternalFunctions)
+    $+$ ppLlvmFunctionDecls (map snd (ghcInternalFunctions dflags))
     $+$ ppLlvmMetas stgTBAA
     $+$ text ""
 
 
 -- | LLVM module layout description for the host target
 moduleLayout :: SDoc
-moduleLayout =
-#if i386_TARGET_ARCH
-
-#if darwin_TARGET_OS
-    text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:128:128-n8:16:32\""
-    $+$ text "target triple = \"i386-apple-darwin9.8\""
-#elif mingw32_TARGET_OS
-    text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32\""
-    $+$ text "target triple = \"i686-pc-win32\""
-#else /* Linux */
-    text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32\""
-    $+$ text "target triple = \"i386-pc-linux-gnu\""
-#endif
-
-#elif x86_64_TARGET_ARCH
-
-#if darwin_TARGET_OS
-    text "target datalayout = \"e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64\""
-    $+$ text "target triple = \"x86_64-apple-darwin10.0.0\""
-#else /* Linux */
-    text "target datalayout = \"e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64\""
-    $+$ text "target triple = \"x86_64-linux-gnu\""
-#endif
-
-#elif defined (arm_TARGET_ARCH)
-
-#if linux_TARGET_OS
-    text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
-    $+$ text "target triple = \"arm-unknown-linux-gnueabi\""
-#endif
-
-#else
-    -- FIX: Other targets
-    empty
-#endif
+moduleLayout = sdocWithPlatform $ \platform ->
+    case platform of
+    Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:128:128-n8:16:32\""
+        $+$ text "target triple = \"i386-apple-darwin9.8\""
+    Platform { platformArch = ArchX86, platformOS = OSMinGW32 } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32\""
+        $+$ text "target triple = \"i686-pc-win32\""
+    Platform { platformArch = ArchX86, platformOS = OSLinux } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32\""
+        $+$ text "target triple = \"i386-pc-linux-gnu\""
+    Platform { platformArch = ArchX86_64, platformOS = OSDarwin } ->
+        text "target datalayout = \"e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64\""
+        $+$ text "target triple = \"x86_64-apple-darwin10.0.0\""
+    Platform { platformArch = ArchX86_64, platformOS = OSLinux } ->
+        text "target datalayout = \"e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64\""
+        $+$ text "target triple = \"x86_64-linux-gnu\""
+    Platform { platformArch = ArchARM {}, platformOS = OSLinux } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
+        $+$ text "target triple = \"arm-unknown-linux-gnueabi\""
+    Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
+        $+$ text "target triple = \"arm-unknown-linux-androideabi\""
+    _ ->
+        -- FIX: Other targets
+        empty
 
 
 -- | Pretty print LLVM data code
@@ -94,7 +86,7 @@ pprLlvmCmmDecl :: LlvmEnv -> Int -> LlvmCmmDecl -> (SDoc, [LlvmVar])
 pprLlvmCmmDecl _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
+pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl live (ListGraph blks))
   = let (idoc, ivar) = case mb_info of
                         Nothing -> (empty, [])
                         Just (Statics info_lbl dat)
@@ -109,7 +101,7 @@ pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
                       else Internal
             lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
-            fun = mkLlvmFunc env lbl' link  sec' lmblocks
+            fun = mkLlvmFunc env live lbl' link  sec' lmblocks
         in ppLlvmFunction fun
     ), ivar)
 
@@ -117,14 +109,15 @@ pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
 -- | Pretty print CmmStatic
 pprInfoTable :: LlvmEnv -> Int -> CLabel -> CmmStatics -> (SDoc, [LlvmVar])
 pprInfoTable env count info_lbl stat
-  = let unres = genLlvmData env (Text, stat)
+  = let dflags = getDflags env
+        unres = genLlvmData env (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
         setSection ((LMGlobalVar _ ty l _ _ c), d)
             = let sec = mkLayoutSection count
                   ilabel = strCLabel_llvm env info_lbl
                               `appendFS` fsLit iTableSuf
-                  gv = LMGlobalVar ilabel ty l sec llvmInfAlign c
+                  gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
                   v = if l == Internal then [gv] else []
               in ((gv, d), v)
         setSection v = (v,[])

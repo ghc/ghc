@@ -1,6 +1,3 @@
-{-# OPTIONS -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
-
 -----------------------------------------------------------------------------
 --
 -- Makefile Dependency Generation
@@ -51,7 +48,25 @@ import Data.Maybe       ( isJust )
 doMkDependHS :: GhcMonad m => [FilePath] -> m ()
 doMkDependHS srcs = do
     -- Initialisation
-    dflags <- GHC.getSessionDynFlags
+    dflags0 <- GHC.getSessionDynFlags
+
+    -- We kludge things a bit for dependency generation. Rather than
+    -- generating dependencies for each way separately, we generate
+    -- them once and then duplicate them for each way's osuf/hisuf.
+    -- We therefore do the initial dependency generation with an empty
+    -- way and .o/.hi extensions, regardless of any flags that might
+    -- be specified.
+    let dflags = dflags0 {
+                     ways = [],
+                     buildTag = mkBuildTag [],
+                     hiSuf = "hi",
+                     objectSuf = "o"
+                 }
+    _ <- GHC.setSessionDynFlags dflags
+
+    when (null (depSuffixes dflags)) $ liftIO $
+        throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
+
     files <- liftIO $ beginMkDependHS dflags
 
     -- Do the downsweep to find all the modules
@@ -178,7 +193,7 @@ processDeps :: DynFlags
 
 processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    ghcError (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
+    throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags
@@ -263,24 +278,13 @@ writeDependency root hdl targets dep
 -----------------------------
 insertSuffixes
         :: FilePath     -- Original filename;   e.g. "foo.o"
-        -> [String]     -- Extra suffices       e.g. ["x","y"]
-        -> [FilePath]   -- Zapped filenames     e.g. ["foo.o", "foo.x_o", "foo.y_o"]
+        -> [String]     -- Suffix prefixes      e.g. ["x_", "y_"]
+        -> [FilePath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
         -- Note that that the extra bit gets inserted *before* the old suffix
-        -- We assume the old suffix contains no dots, so we can strip it with removeSuffix
-
-        -- NOTE: we used to have this comment
-                -- In order to construct hi files with alternate suffixes, we
-                -- now have to find the "basename" of the hi file.  This is
-                -- difficult because we can't just split the hi filename
-                -- at the last dot - the hisuf might have dots in it.  So we
-                -- check whether the hi filename ends in hisuf, and if it does,
-                -- we strip off hisuf, otherwise we strip everything after the
-                -- last dot.
-        -- But I'm not sure we care about hisufs with dots in them.
-        -- Lots of other things will break first!
-
+        -- We assume the old suffix contains no dots, so we know where to
+        -- split it
 insertSuffixes file_name extras
-  = file_name : [ basename <.> (extra ++ "_" ++ suffix) | extra <- extras ]
+  = [ basename <.> (extra ++ suffix) | extra <- extras ]
   where
     (basename, suffix) = case splitExtension file_name of
                          -- Drop the "." from the extension

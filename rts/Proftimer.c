@@ -25,21 +25,21 @@ static int ticks_to_heap_profile;
 // Time for a heap profile on the next context switch
 rtsBool performHeapProfile;
 
-#ifdef PROFILING
-
 void
 stopProfTimer( void )
 {
+#ifdef PROFILING
     do_prof_ticks = rtsFalse;
+#endif
 }
 
 void
 startProfTimer( void )
 {
+#ifdef PROFILING
     do_prof_ticks = rtsTrue;
-}
-
 #endif
+}
 
 void
 stopHeapProfTimer( void )

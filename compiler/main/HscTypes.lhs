@@ -37,6 +37,8 @@ module HscTypes (
 
         PackageInstEnv, PackageRuleBase,
 
+        mkSOName, soExt,
+
         -- * Annotations
         prepareAnnotations,
 
@@ -136,6 +138,7 @@ import Type
 import Annotations
 import Class
 import TyCon
+import CoAxiom
 import DataCon
 import PrelNames        ( gHC_PRIM, ioTyConName, printName )
 import Packages hiding  ( Version(..) )
@@ -157,6 +160,7 @@ import Fingerprint
 import MonadUtils
 import Bag
 import ErrUtils
+import Platform
 import Util
 
 import Control.Monad    ( mplus, guard, liftM, when )
@@ -232,7 +236,7 @@ instance Exception GhcApiError
 -- -Werror is enabled, or print them out otherwise.
 printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
 printOrThrowWarnings dflags warns
-  | dopt Opt_WarnIsError dflags
+  | gopt Opt_WarnIsError dflags
   = when (not (isEmptyBag warns)) $ do
       throwIO $ mkSrcErr $ warns `snocBag` warnIsErrorMsg dflags
   | otherwise
@@ -322,6 +326,10 @@ data HscEnv
                 -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
                 -- 'TcRunTypes.TcGblEnv'
  }
+
+instance ContainsDynFlags HscEnv where
+    extractDynFlags env = hsc_dflags env
+    replaceDynFlags env dflags = env {hsc_dflags = dflags}
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
@@ -448,7 +456,7 @@ lookupIfaceByModule dflags hpt pit mod
 -- modules imported by this one, directly or indirectly, and are in the Home
 -- Package Table.  This ensures that we don't see instances from modules @--make@
 -- compiled before this one, but which are not below this one.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst Branched])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
@@ -744,6 +752,22 @@ emptyModIface mod
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False }
 
+
+-- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
+mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
+                 -> (OccName -> Maybe (OccName, Fingerprint))
+mkIfaceHashCache pairs
+  = \occ -> lookupOccEnv env occ
+  where
+    env = foldr add_decl emptyOccEnv pairs
+    add_decl (v,d) env0 = foldr add env0 (ifaceDeclFingerprints v d)
+      where
+        add (occ,hash) env0 = extendOccEnv env0 occ (occ,hash)
+
+emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
+emptyIfaceHashCache _occ = Nothing
+
+
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
 -- for home modules only. Information relating to packages will be loaded into
 -- global environments in 'ExternalPackageState'.
@@ -753,7 +777,7 @@ data ModDetails
         md_exports   :: [AvailInfo],
         md_types     :: !TypeEnv,       -- ^ Local type environment for this particular module
         md_insts     :: ![ClsInst],    -- ^ 'DFunId's for the instances in this module
-        md_fam_insts :: ![FamInst],
+        md_fam_insts :: ![FamInst Branched],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
                                         -- they only annotate things also declared in this module
@@ -798,8 +822,9 @@ data ModGuts
                                          -- ToDo: I'm unconvinced this is actually used anywhere
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
-        mg_insts     :: ![ClsInst],     -- ^ Class instances declared in this module
-        mg_fam_insts :: ![FamInst],      -- ^ Family instances declared in this module
+        mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
+        mg_fam_insts :: ![FamInst Branched], 
+                                         -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
@@ -859,7 +884,7 @@ data CgGuts
         cg_binds     :: CoreProgram,
                 -- ^ The tidied main bindings, including
                 -- previously-implicit bindings for record and class
-                -- selectors, and data construtor wrappers.  But *not*
+                -- selectors, and data constructor wrappers.  But *not*
                 -- data constructor workers; reason: we we regard them
                 -- as part of the code-gen of tycons
 
@@ -928,7 +953,7 @@ data InteractiveContext
              -- ^ Variables defined automatically by the system (e.g.
              -- record field selectors).  See Notes [ic_sys_vars]
 
-         ic_instances  :: ([ClsInst], [FamInst]),
+         ic_instances  :: ([ClsInst], [FamInst Branched]),
              -- ^ All instances and family instances created during
              -- this session.  These are grabbed en masse after each
              -- update to be sure that proper overlapping is retained.
@@ -1098,7 +1123,7 @@ exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
 This is handled by the qual_mod component of PrintUnqualified, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
-    \begin{code}
+\begin{code}
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
@@ -1116,7 +1141,8 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
                    then NameNotInScope1
                    else NameNotInScope2
 
-        | otherwise = panic "mkPrintUnqualified"
+        | otherwise = NameNotInScope1   -- Can happen if 'f' is bound twice in the module
+                                        -- Eg  f = True; g = 0; f = False
       where
         mod = nameModule name
         occ = nameOccName name
@@ -1257,7 +1283,7 @@ extras_plus thing = thing : implicitTyThings thing
 -- For newtypes (only) add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
-  | Just co <- newTyConCo_maybe tc = [ACoAxiom co]
+  | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
   | otherwise                      = []
 
 -- | Returns @True@ if there should be no interface-file declaration
@@ -1329,7 +1355,7 @@ type TypeEnv = NameEnv TyThing
 emptyTypeEnv    :: TypeEnv
 typeEnvElts     :: TypeEnv -> [TyThing]
 typeEnvTyCons   :: TypeEnv -> [TyCon]
-typeEnvCoAxioms :: TypeEnv -> [CoAxiom]
+typeEnvCoAxioms :: TypeEnv -> [CoAxiom Branched]
 typeEnvIds      :: TypeEnv -> [Id]
 typeEnvDataCons :: TypeEnv -> [DataCon]
 typeEnvClasses  :: TypeEnv -> [Class]
@@ -1353,7 +1379,7 @@ mkTypeEnvWithImplicits things =
     `plusNameEnv`
   mkTypeEnv (concatMap implicitTyThings things)
 
-typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst] -> TypeEnv
+typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst Branched] -> TypeEnv
 typeEnvFromEntities ids tcs famInsts =
   mkTypeEnv (   map AnId ids
              ++ map ATyCon all_tcs
@@ -1394,7 +1420,8 @@ lookupType dflags hpt pte name
   -- in one-shot, we don't use the HPT
   | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg
   = do hm <- lookupUFM hpt (moduleName mod) -- Maybe monad
-       lookupNameEnv (md_types (hm_details hm)) name
+       x <- lookupNameEnv (md_types (hm_details hm)) name
+       return x
   | otherwise
   = lookupNameEnv pte name
   where 
@@ -1419,7 +1446,7 @@ tyThingTyCon (ATyCon tc) = tc
 tyThingTyCon other       = pprPanic "tyThingTyCon" (pprTyThing other)
 
 -- | Get the 'CoAxiom' from a 'TyThing' if it is a coercion axiom thing. Panics otherwise
-tyThingCoAxiom :: TyThing -> CoAxiom
+tyThingCoAxiom :: TyThing -> CoAxiom Branched
 tyThingCoAxiom (ACoAxiom ax) = ax
 tyThingCoAxiom other         = pprPanic "tyThingCoAxiom" (pprTyThing other)
 
@@ -1457,24 +1484,6 @@ class Monad m => MonadThings m where
 
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
-\end{code}
-
-\begin{code}
--- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
-mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
-                 -> (OccName -> Maybe (OccName, Fingerprint))
-mkIfaceHashCache pairs
-  = \occ -> lookupOccEnv env occ
-  where
-    env = foldr add_decl emptyOccEnv pairs
-    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclImplicitBndrs d)
-      where
-          decl_name = ifName d
-          env1 = extendOccEnv env0 decl_name (decl_name, v)
-          add_imp bndr env = extendOccEnv env bndr (decl_name, v)
-
-emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
-emptyIfaceHashCache _occ = Nothing
 \end{code}
 
 %************************************************************************
@@ -1779,6 +1788,22 @@ type OrigNameCache   = ModuleEnv (OccEnv Name)
 \end{code}
 
 
+\begin{code}
+mkSOName :: Platform -> FilePath -> FilePath
+mkSOName platform root
+    = case platformOS platform of
+      OSDarwin  -> ("lib" ++ root) <.> "dylib"
+      OSMinGW32 ->           root  <.> "dll"
+      _         -> ("lib" ++ root) <.> "so"
+
+soExt :: Platform -> FilePath
+soExt platform
+    = case platformOS platform of
+      OSDarwin  -> "dylib"
+      OSMinGW32 -> "dll"
+      _         -> "so"
+\end{code}
+
 
 %************************************************************************
 %*                                                                      *
@@ -1968,11 +1993,11 @@ on just the OccName easily in a Core pass.
 --
 data VectInfo
   = VectInfo
-    { vectInfoVar          :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
-    , vectInfoTyCon        :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
-    , vectInfoDataCon      :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
-    , vectInfoScalarVars   :: VarSet                      -- ^ set of purely scalar variables
-    , vectInfoScalarTyCons :: NameSet                     -- ^ set of scalar type constructors
+    { vectInfoVar            :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
+    , vectInfoTyCon          :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
+    , vectInfoDataCon        :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
+    , vectInfoParallelVars   :: VarSet                      -- ^ set of parallel variables
+    , vectInfoParallelTyCons :: NameSet                     -- ^ set of parallel type constructors
     }
 
 -- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated
@@ -1986,18 +2011,18 @@ data VectInfo
 --
 data IfaceVectInfo
   = IfaceVectInfo
-    { ifaceVectInfoVar          :: [Name]  -- ^ All variables in here have a vectorised variant
-    , ifaceVectInfoTyCon        :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
-                                           -- the name of the vectorised variant and those of its
-                                           -- data constructors are determined by
-                                           -- 'OccName.mkVectTyConOcc' and
-                                           -- 'OccName.mkVectDataConOcc'; the names of the
-                                           -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
-    , ifaceVectInfoTyConReuse   :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
-                                           -- coincides with the unconverted form; the name of the
-                                           -- isomorphisms is determined by 'OccName.mkVectIsoOcc'
-    , ifaceVectInfoScalarVars   :: [Name]  -- iface version of 'vectInfoScalarVar'
-    , ifaceVectInfoScalarTyCons :: [Name]  -- iface version of 'vectInfoScalarTyCon'
+    { ifaceVectInfoVar            :: [Name]  -- ^ All variables in here have a vectorised variant
+    , ifaceVectInfoTyCon          :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
+                                             -- the name of the vectorised variant and those of its
+                                             -- data constructors are determined by
+                                             -- 'OccName.mkVectTyConOcc' and
+                                             -- 'OccName.mkVectDataConOcc'; the names of the
+                                             -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
+    , ifaceVectInfoTyConReuse     :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
+                                             -- coincides with the unconverted form; the name of the
+                                             -- isomorphisms is determined by 'OccName.mkVectIsoOcc'
+    , ifaceVectInfoParallelVars   :: [Name]  -- iface version of 'vectInfoParallelVar'
+    , ifaceVectInfoParallelTyCons :: [Name]  -- iface version of 'vectInfoParallelTyCon'
     }
 
 noVectInfo :: VectInfo
@@ -2006,11 +2031,11 @@ noVectInfo
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 =
-  VectInfo (vectInfoVar          vi1 `plusVarEnv`    vectInfoVar          vi2)
-           (vectInfoTyCon        vi1 `plusNameEnv`   vectInfoTyCon        vi2)
-           (vectInfoDataCon      vi1 `plusNameEnv`   vectInfoDataCon      vi2)
-           (vectInfoScalarVars   vi1 `unionVarSet`   vectInfoScalarVars   vi2)
-           (vectInfoScalarTyCons vi1 `unionNameSets` vectInfoScalarTyCons vi2)
+  VectInfo (vectInfoVar            vi1 `plusVarEnv`    vectInfoVar            vi2)
+           (vectInfoTyCon          vi1 `plusNameEnv`   vectInfoTyCon          vi2)
+           (vectInfoDataCon        vi1 `plusNameEnv`   vectInfoDataCon        vi2)
+           (vectInfoParallelVars   vi1 `unionVarSet`   vectInfoParallelVars   vi2)
+           (vectInfoParallelTyCons vi1 `unionNameSets` vectInfoParallelTyCons vi2)
 
 concatVectInfo :: [VectInfo] -> VectInfo
 concatVectInfo = foldr plusVectInfo noVectInfo
@@ -2024,11 +2049,11 @@ isNoIfaceVectInfo (IfaceVectInfo l1 l2 l3 l4 l5)
 
 instance Outputable VectInfo where
   ppr info = vcat
-             [ ptext (sLit "variables     :") <+> ppr (vectInfoVar          info)
-             , ptext (sLit "tycons        :") <+> ppr (vectInfoTyCon        info)
-             , ptext (sLit "datacons      :") <+> ppr (vectInfoDataCon      info)
-             , ptext (sLit "scalar vars   :") <+> ppr (vectInfoScalarVars   info)
-             , ptext (sLit "scalar tycons :") <+> ppr (vectInfoScalarTyCons info)
+             [ ptext (sLit "variables       :") <+> ppr (vectInfoVar            info)
+             , ptext (sLit "tycons          :") <+> ppr (vectInfoTyCon          info)
+             , ptext (sLit "datacons        :") <+> ppr (vectInfoDataCon        info)
+             , ptext (sLit "parallel vars   :") <+> ppr (vectInfoParallelVars   info)
+             , ptext (sLit "parallel tycons :") <+> ppr (vectInfoParallelTyCons info)
              ]
 \end{code}
 

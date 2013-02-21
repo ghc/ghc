@@ -16,47 +16,35 @@ $(call trace, build-package-way($1,$2,$3))
 $(call profStart, build-package-way($1,$2,$3))
 
 $(call distdir-way-opts,$1,$2,$3,$4)
-$(call hs-suffix-rules,$1,$2,$3)
-$$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3,$$(dir))))
+$(call hs-suffix-way-rules,$1,$2,$3)
 
 $(call hs-objs,$1,$2,$3)
 
 # The .a/.so library file, indexed by two different sets of vars:
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
-$1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
-$$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
+$1_$2_$3_LIB_NAME = libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
+$1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_NAME)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
+# Note [inconsistent distdirs]
 # hack: the DEPS_LIBS mechanism assumes that the distdirs for packages
 # that depend on each other are the same, but that is not the case for
 # ghc where we use stage1/stage2 rather than dist/dist-install.
 # Really we should use a consistent scheme for distdirs, but in the
 # meantime we work around it by defining ghc-<ver>_dist-install_way_LIB:
 ifeq "$$($1_PACKAGE) $2" "ghc stage2"
-$$($1_PACKAGE)-$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
 endif
 
-# All the .a/.so library file dependencies for this library
-$1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEPS),$$($$(dep)_$2_$3_LIB))
-
-ifeq "$$(BootingFromHc)" "YES"
-$1_$2_$3_C_OBJS += $$(shell $$(FIND) $1/$2/build -name "*_stub.c" -print | sed 's/c$$$$/o/')
-endif
+# All the .a/.so library file dependencies for this library.
+#
+# The $(subst stage2,dist-install,..) is needed due to Note
+# [inconsistent distdirs].
+$1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEPS),$$($$(dep)_$(subst stage2,dist-install,$2)_$3_LIB))
 
 $1_$2_$3_NON_HS_OBJS = $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS)  $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
 $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
-
-# The quadrupled $'s here are because the _v_LIB variables aren't
-# necessarily set when this part of the makefile is read.
-# These deps aren't technically necessary in themselves, but they
-# turn the dependencies of programs on libraries into transitive
-# dependencies.
-ifeq "$4" "0"
-$$($1_$2_$3_LIB) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-boot_v_LIB))
-else
-$$($1_$2_$3_LIB) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-install_v_LIB))
-endif
 
 ifeq "$3" "dyn"
 
@@ -64,7 +52,7 @@ ifeq "$3" "dyn"
 # On windows we have to supply the extra libs this one links to when building it.
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_ALL_OBJS) \
+	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
          -no-auto-link-packages \
@@ -74,10 +62,9 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 
 else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_ALL_OBJS) \
+	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
-	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
-	     -dylib-install-name $(ghclibdir)/`basename "$$@" | sed 's/^libHS//;s/[-]ghc.*//'`/`basename "$$@"` \
+	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) $$(addprefix -L,$$($1_$2_EXTRA_LIBDIRS)) \
          -no-auto-link-packages \
          -o $$@
 endif
@@ -109,6 +96,9 @@ BINDIST_LIBS += $$($1_$2_$3_LIB)
 endif
 
 # Build the GHCi library
+ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+$1_$2_GHCI_LIB = $$($1_$2_dyn_LIB)
+else
 ifeq "$3" "v"
 $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
@@ -124,6 +114,7 @@ ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages
 ifneq "$4" "0"
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
+endif
 endif
 endif
 endif

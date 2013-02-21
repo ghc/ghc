@@ -26,10 +26,11 @@ import ghczmprim_GHCziTypes_True_closure;
  * to the scheduler marking the thread as finished.
  */
 
-#define CHECK_SENSIBLE_REGS() \
-    ASSERT(Hp != 0);			\
-    ASSERT(Sp != 0);			\
-    ASSERT(SpLim != 0);			\
+#define CHECK_SENSIBLE_REGS()                           \
+    ASSERT(Hp != 0);                                    \
+    ASSERT(HpAlloc == 0);                               \
+    ASSERT(Sp != 0);                                    \
+    ASSERT(SpLim != 0);                                 \
     ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp);
 
 /* -----------------------------------------------------------------------------
@@ -37,11 +38,9 @@ import ghczmprim_GHCziTypes_True_closure;
    -------------------------------------------------------------------------- */
 
 INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
-#if defined(PROFILING)
-  W_ unused,
-  W_ unused
-#endif
-)
+               W_ info_ptr,
+               PROF_HDR_FIELDS(W_,p1,p2))
+/* no return list: explicit stack layout */
 {
     /*
        The final exit.
@@ -85,7 +84,7 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
     StgRegTable_rRet(BaseReg) = ThreadFinished;
     R1 = BaseReg;
 
-    jump StgReturn;
+    jump StgReturn [R1];
 }
 
 /* -----------------------------------------------------------------------------
@@ -97,46 +96,57 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
    the thread's state away nicely.
    -------------------------------------------------------------------------- */
 
-stg_returnToStackTop
+stg_returnToStackTop /* no args: explicit stack layout */
 {
   LOAD_THREAD_STATE();
   CHECK_SENSIBLE_REGS();
-  jump %ENTRY_CODE(Sp(0));
+  jump %ENTRY_CODE(Sp(0)) [];
 }
 
-stg_returnToSched
+stg_returnToSched /* no args: explicit stack layout */
 {
+  W_ r1;
+  r1 = R1; // foreign calls may clobber R1
   SAVE_THREAD_STATE();
   foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
-  jump StgReturn;
+  R1 = r1;
+  jump StgReturn [R1];
 }
 
 // A variant of stg_returnToSched that doesn't call threadPaused() on the
 // current thread.  This is used for switching from compiled execution to the
 // interpreter, where calling threadPaused() on every switch would be too
 // expensive.
-stg_returnToSchedNotPaused
+stg_returnToSchedNotPaused /* no args: explicit stack layout */
 {
   SAVE_THREAD_STATE();
-  jump StgReturn;
+  jump StgReturn [R1];
 }
 
 // A variant of stg_returnToSched, but instead of returning directly to the
 // scheduler, we jump to the code fragment pointed to by R2.  This lets us
 // perform some final actions after making the thread safe, such as unlocking
 // the MVar on which we are about to block in SMP mode.
-stg_returnToSchedButFirst
+stg_returnToSchedButFirst /* no args: explicit stack layout */
 {
+  W_ r1, r2, r3;
+  r1 = R1;
+  r2 = R2;
+  r3 = R3;
   SAVE_THREAD_STATE();
+  // foreign calls may clobber R1/R2/.., so we save them above
   foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
-  jump R2;
+  R1 = r1;
+  R2 = r2;
+  R3 = r3;
+  jump R2 [R1,R3];
 }
 
-stg_threadFinished
+stg_threadFinished /* no args: explicit stack layout */
 {
   StgRegTable_rRet(BaseReg) = ThreadFinished;
   R1 = BaseReg;
-  jump StgReturn;
+  jump StgReturn [R1];
 }
 
 /* -----------------------------------------------------------------------------
@@ -153,31 +163,30 @@ stg_threadFinished
 
     ------------------------------------------------------------------------- */
 
-INFO_TABLE_RET(stg_forceIO, RET_SMALL)
-
+INFO_TABLE_RET(stg_forceIO, RET_SMALL, P_ info_ptr)
+    return (P_ ret)
 {
-  Sp_adj(1);
-  ENTER();
+    ENTER(ret);
 }
 
 /* -----------------------------------------------------------------------------
    Special STG entry points for module registration.
    -------------------------------------------------------------------------- */
 
-stg_init_finish
+stg_init_finish /* no args: explicit stack layout */
 {
-  jump StgReturn;
+  jump StgReturn [];
 }
 
 /* On entry to stg_init:
  *    init_stack[0] = &stg_init_ret;
  *    init_stack[1] = __stginit_Something;
  */
-stg_init
+stg_init /* no args: explicit stack layout */
 {
   W_ next;
   Sp = W_[BaseReg + OFFSET_StgRegTable_rSp];
   next = W_[Sp];
   Sp_adj(1);
-  jump next;
+  jump next [];
 }

@@ -42,7 +42,6 @@ import NameSet
 import Bag
 import Outputable
 import UniqSupply
-import Unique
 import UniqFM
 import DynFlags
 import Maybes
@@ -78,7 +77,6 @@ initTc :: HscEnv
 
 initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
-        meta_var     <- newIORef initTyVarUnique ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
@@ -148,11 +146,11 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_th_ctxt    = topStage,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_bndrs      = [],
                 tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
-                tcl_meta       = meta_var,
-                tcl_untch      = initTyVarUnique
+                tcl_untch      = noUntouchables
              } ;
         } ;
 
@@ -265,8 +263,11 @@ Command-line flags
 xoptM :: ExtensionFlag -> TcRnIf gbl lcl Bool
 xoptM flag = do { dflags <- getDynFlags; return (xopt flag dflags) }
 
-doptM :: DynFlag -> TcRnIf gbl lcl Bool
+doptM :: DumpFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDynFlags; return (dopt flag dflags) }
+
+goptM :: GeneralFlag -> TcRnIf gbl lcl Bool
+goptM flag = do { dflags <- getDynFlags; return (gopt flag dflags) }
 
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
 woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
@@ -275,29 +276,42 @@ setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                           env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
-unsetDOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetDOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-                            env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetGOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = gopt_unset (hsc_dflags top) flag}} )
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                             env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
-ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifDOptM flag thing_inside = do { b <- doptM flag ;
-                                if b then thing_inside else return () }
+whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenDOptM flag thing_inside = do b <- doptM flag
+                                 when b thing_inside
 
-ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifWOptM flag thing_inside = do { b <- woptM flag ;
-                                if b then thing_inside else return () }
+whenGOptM :: GeneralFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenGOptM flag thing_inside = do b <- goptM flag
+                                 when b thing_inside
 
-ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifXOptM flag thing_inside = do { b <- xoptM flag ;
-                                if b then thing_inside else return () }
+whenWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenWOptM flag thing_inside = do b <- woptM flag
+                                 when b thing_inside
+
+whenXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenXOptM flag thing_inside = do b <- xoptM flag
+                                 when b thing_inside
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
+\end{code}
+
+\begin{code}
+withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+withDoDynamicToo m = do env <- getEnv
+                        let dflags = extractDynFlags env
+                            dflags' = doDynamicToo dflags
+                            env' = replaceDynFlags env dflags'
+                        setEnv env' m
 \end{code}
 
 \begin{code}
@@ -345,16 +359,6 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 %************************************************************************
 
 \begin{code}
-newMetaUnique :: TcM Unique
--- The uniques for TcMetaTyVars are allocated specially
--- in guaranteed linear order, starting at zero for each module
-newMetaUnique
- = do { env <- getLclEnv
-      ; let meta_var = tcl_meta env
-      ; uniq <- readMutVar meta_var
-      ; writeMutVar meta_var (incrUnique uniq)
-      ; return uniq }
-
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv ;
@@ -379,21 +383,24 @@ newUniqueSupply
         writeMutVar u_var us1 ;
         return us2 }}}
 
-newLocalName :: Name -> TcRnIf gbl lcl Name
-newLocalName name       -- Make a clone
-  = do  { uniq <- newUnique
-        ; return (mkInternalName uniq (nameOccName name) (getSrcSpan name)) }
-
-newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
-newSysLocalIds fs tys
-  = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
+newLocalName :: Name -> TcM Name
+newLocalName name = newName (nameOccName name)
 
 newName :: OccName -> TcM Name
 newName occ
   = do { uniq <- newUnique
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
+
+newSysName :: OccName -> TcM Name
+newSysName occ
+  = do { uniq <- newUnique
+       ; return (mkSystemName uniq occ) }
+
+newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds fs tys
+  = do  { us <- newUniqueSupply
+        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -446,14 +453,14 @@ traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
-traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
-traceOptIf flag doc = ifDOptM flag $
+traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
+traceOptIf flag doc = whenDOptM flag $
                           do dflags <- getDynFlags
                              liftIO (printInfoForUser dflags alwaysQualify doc)
 
-traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
+traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
-traceOptTcRn flag doc = ifDOptM flag $ do
+traceOptTcRn flag doc = whenDOptM flag $ do
                         { loc  <- getSrcSpanM
                         ; let real_doc
                                 | opt_PprStyle_Debug = mkLocMessage SevInfo loc doc
@@ -470,8 +477,8 @@ debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
                   | otherwise         = dumpTcRn doc
 
-dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
-dumpOptTcRn flag doc = ifDOptM flag (dumpTcRn doc)
+dumpOptTcRn :: DumpFlag -> SDoc -> TcRn ()
+dumpOptTcRn flag doc = whenDOptM flag (dumpTcRn doc)
 \end{code}
 
 
@@ -482,9 +489,6 @@ dumpOptTcRn flag doc = ifDOptM flag (dumpTcRn doc)
 %************************************************************************
 
 \begin{code}
-getModule :: TcRn Module
-getModule = do { env <- getGblEnv; return (tcg_mod env) }
-
 setModule :: Module -> TcRn a -> TcRn a
 setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
 
@@ -636,8 +640,7 @@ discardWarnings thing_inside
 \begin{code}
 mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ErrMsg
 mkLongErrAt loc msg extra
-  = do { traceTc "Adding error:" (mkLocMessage SevError loc (msg $$ extra)) ;
-         rdr_env <- getGlobalRdrEnv ;
+  = do { rdr_env <- getGlobalRdrEnv ;
          dflags <- getDynFlags ;
          return $ mkLongErrMsg dflags loc (mkPrintUnqualified dflags rdr_env) msg extra }
 
@@ -649,13 +652,15 @@ reportErrors = mapM_ reportError
 
 reportError :: ErrMsg -> TcRn ()
 reportError err
-  = do { errs_var <- getErrsVar ;
+  = do { traceTc "Adding error:" (pprLocErrMsg err) ;
+         errs_var <- getErrsVar ;
          (warns, errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns, errs `snocBag` err) }
 
 reportWarning :: ErrMsg -> TcRn ()
 reportWarning warn
-  = do { errs_var <- getErrsVar ;
+  = do { traceTc "Adding warning:" (pprLocErrMsg warn) ;
+         errs_var <- getErrsVar ;
          (warns, errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns `snocBag` warn, errs) }
 
@@ -829,14 +834,18 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
-getCtLoc :: orig -> TcM (CtLoc orig)
+getCtLoc :: CtOrigin -> TcM CtLoc
 getCtLoc origin
-  = do { loc <- getSrcSpanM ; env <- getLclEnv ;
-         return (CtLoc origin loc (tcl_ctxt env)) }
+  = do { env <- getLclEnv 
+       ; return (CtLoc { ctl_origin = origin, ctl_env =  env, ctl_depth = 0 }) }
 
-setCtLoc :: CtLoc orig -> TcM a -> TcM a
-setCtLoc (CtLoc _ src_loc ctxt) thing_inside
-  = setSrcSpan src_loc (setErrCtxt ctxt thing_inside)
+setCtLoc :: CtLoc -> TcM a -> TcM a
+-- Set the SrcSpan and error context from the CtLoc
+setCtLoc (CtLoc { ctl_env = lcl }) thing_inside
+  = updLclEnv (\env -> env { tcl_loc = tcl_loc lcl
+                           , tcl_bndrs = tcl_bndrs lcl
+                           , tcl_ctxt = tcl_ctxt lcl }) 
+              thing_inside
 \end{code}
 
 %************************************************************************
@@ -1037,6 +1046,13 @@ emitImplications ct
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`addImplics` ct) }
 
+emitInsoluble :: Ct -> TcM ()
+emitInsoluble ct
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addInsols` unitBag ct) ;
+         v <- readTcRef lie_var ;
+         traceTc "emitInsoluble" (ppr v) }
+
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
 captureConstraints thing_inside
@@ -1049,20 +1065,27 @@ captureConstraints thing_inside
 captureUntouchables :: TcM a -> TcM (a, Untouchables)
 captureUntouchables thing_inside
   = do { env <- getLclEnv
-       ; low_meta <- readTcRef (tcl_meta env)
-       ; res <- setLclEnv (env { tcl_untch = low_meta })
+       ; let untch' = pushUntouchables (tcl_untch env)
+       ; res <- setLclEnv (env { tcl_untch = untch' })
                 thing_inside
-       ; high_meta <- readTcRef (tcl_meta env)
-       ; return (res, TouchableRange low_meta high_meta) }
+       ; return (res, untch') }
 
-isUntouchable :: TcTyVar -> TcM Bool
-isUntouchable tv
+getUntouchables :: TcM Untouchables
+getUntouchables = do { env <- getLclEnv
+                     ; return (tcl_untch env) }
+
+setUntouchables :: Untouchables -> TcM a -> TcM a
+setUntouchables untch thing_inside 
+  = updLclEnv (\env -> env { tcl_untch = untch }) thing_inside
+
+isTouchableTcM :: TcTyVar -> TcM Bool
+isTouchableTcM tv
     -- Kind variables are always touchable
   | isSuperKind (tyVarKind tv) 
   = return False
   | otherwise 
   = do { env <- getLclEnv
-                      ; return (varUnique tv < tcl_untch env) }
+       ; return (isTouchableMetaTyVar (tcl_untch env) tv) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }
@@ -1252,7 +1275,7 @@ forkM_maybe doc thing_inside
                     -- Bleat about errors in the forked thread, if -ddump-if-trace is on
                     -- Otherwise we silently discard errors. Errors can legitimately
                     -- happen when compiling interface signatures (see tcInterfaceSigs)
-                      ifDOptM Opt_D_dump_if_trace $ do
+                      whenDOptM Opt_D_dump_if_trace $ do
                           dflags <- getDynFlags
                           let msg = hang (text "forkM failed:" <+> doc)
                                        2 (text (show exn))

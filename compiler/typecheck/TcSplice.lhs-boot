@@ -18,7 +18,7 @@ tcSpliceType :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
 
 tcBracket :: HsBracket Name 
           -> TcRhoType
-          -> TcM (LHsExpr TcId)
+          -> TcM (HsExpr TcId)
 
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 

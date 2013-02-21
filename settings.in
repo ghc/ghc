@@ -1,6 +1,11 @@
 [("GCC extra via C opts", "@GccExtraViaCOpts@"),
  ("C compiler command", "@SettingsCCompilerCommand@"),
  ("C compiler flags", "@SettingsCCompilerFlags@"),
+ ("ld command", "@SettingsLdCommand@"),
+ ("ld flags", "@SettingsLdFlags@"),
+ ("ld supports compact unwind", "@LdHasNoCompactUnwind@"),
+ ("ld supports build-id", "@LdHasBuildId@"),
+ ("ld is GNU ld", "@LdIsGNULd@"),
  ("ar command", "@SettingsArCommand@"),
  ("ar flags", "@ArArgs@"),
  ("ar supports at file", "@ArSupportsAtFile@"),
@@ -14,6 +19,7 @@
  ("target has GNU nonexec stack", "@HaskellHaveGnuNonexecStack@"),
  ("target has .ident directive", "@HaskellHaveIdentDirective@"),
  ("target has subsections via symbols", "@HaskellHaveSubsectionsViaSymbols@"),
+ ("Unregisterised", "@Unregisterised@"),
  ("LLVM llc command", "@SettingsLlcCommand@"),
  ("LLVM opt command", "@SettingsOptCommand@")
  ]

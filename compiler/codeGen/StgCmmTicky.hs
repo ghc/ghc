@@ -46,8 +46,6 @@ module StgCmmTicky (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
 
 import StgCmmClosure
 import StgCmmUtils
@@ -65,7 +63,6 @@ import Name
 import Id
 import BasicTypes
 import FastString
-import Constants
 import Outputable
 
 import DynFlags
@@ -106,14 +103,14 @@ emitTickyCounter cl_info args
 -- krc: note that all the fields are I32 now; some were I16 before, 
 -- but the code generator wasn't handling that properly and it led to chaos, 
 -- panic and disorder.
-	    [ mkIntCLit 0,
-	      mkIntCLit (length args),	-- Arity
-	      mkIntCLit 0,		-- XXX: we no longer know this!  Words passed on stack
+	    [ mkIntCLit dflags 0,
+	      mkIntCLit dflags (length args),	-- Arity
+	      mkIntCLit dflags 0,		-- XXX: we no longer know this!  Words passed on stack
 	      fun_descr_lit,
 	      arg_descr_lit,
-	      zeroCLit, 		-- Entry count
-	      zeroCLit, 		-- Allocs
-	      zeroCLit 			-- Link
+	      zeroCLit dflags, 		-- Entry count
+	      zeroCLit dflags, 		-- Allocs
+	      zeroCLit dflags 			-- Link
 	    ] }
 
 -- When printing the name of a thing in a ticky file, we want to
@@ -164,10 +161,11 @@ tickyUpdateBhCaf cl_info
 tickyEnterFun :: ClosureInfo -> FCode ()
 tickyEnterFun cl_info
   = ifTicky $ 
-    do 	{ bumpTickyCounter ctr
+    do  { dflags <- getDynFlags
+        ; bumpTickyCounter ctr
 	; fun_ctr_lbl <- getTickyCtrLabel
 	; registerTickyCtr fun_ctr_lbl
-	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl oFFSET_StgEntCounter_entry_count)
+	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl (oFFSET_StgEntCounter_entry_count dflags))
         }
   where
     ctr | isStaticClosure cl_info = (fsLit "ENT_STATIC_FUN_DIRECT_ctr")
@@ -179,22 +177,23 @@ registerTickyCtr :: CLabel -> FCode ()
 --	    f_ct.link = ticky_entry_ctrs; 	/* hook this one onto the front of the list */
 --	    ticky_entry_ctrs = & (f_ct);	/* mark it as "registered" */
 --	    f_ct.registeredp = 1 }
-registerTickyCtr ctr_lbl
-  = emit =<< mkCmmIfThen test (catAGraphs register_stmts)
-  where
+registerTickyCtr ctr_lbl = do
+  dflags <- getDynFlags
+  let
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq wordWidth)
-              [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp)) bWord,
-               CmmLit (mkIntCLit 0)]
+    test = CmmMachOp (MO_Eq (wordWidth dflags))
+              [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
+                                (oFFSET_StgEntCounter_registeredp dflags))) (bWord dflags),
+               zeroExpr dflags]
     register_stmts
-      =	[ mkStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
-		   (CmmLoad ticky_entry_ctrs bWord)
-	, mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
-	, mkStore (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp))
-		   (CmmLit (mkIntCLit 1)) ]
+      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_link dflags)))
+                   (CmmLoad ticky_entry_ctrs (bWord dflags))
+        , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
+        , mkStore (CmmLit (cmmLabelOffB ctr_lbl
+                                (oFFSET_StgEntCounter_registeredp dflags)))
+                   (mkIntExpr dflags 1) ]
     ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
+  emit =<< mkCmmIfThen test (catAGraphs register_stmts)
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
 tickyReturnOldCon arity 
@@ -285,7 +284,7 @@ tickyDynAlloc rep lf
         | otherwise      -> return ()
   where
         -- will be needed when we fill in stubs
-    _cl_size   = heapClosureSize rep
+--    _cl_size   = heapClosureSize rep
 --    _slop_size = slopSize cl_info
 
     tick_alloc_thk 
@@ -314,26 +313,27 @@ tickyAllocHeap :: VirtualHpOffset -> FCode ()
 -- Must be lazy in the amount of allocation!
 tickyAllocHeap hp
   = ifTicky $
-    do	{ ticky_ctr <- getTickyCtrLabel
+    do  { dflags <- getDynFlags
+        ; ticky_ctr <- getTickyCtrLabel
 	; emit $ catAGraphs $
 	  if hp == 0 then [] 	-- Inside the emitMiddle to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
-	    addToMem REP_StgEntCounter_allocs 
+	    addToMem (rEP_StgEntCounter_allocs dflags)
 			(CmmLit (cmmLabelOffB ticky_ctr 
-				oFFSET_StgEntCounter_allocs)) hp,
+				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr")) 1,
+	    addToMemLbl (cLong dflags) (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr")) 1,
 		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_tot")) hp] }
+	    addToMemLbl (cLong dflags) (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_tot")) hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
 
 ifTicky :: FCode () -> FCode ()
 ifTicky code = do dflags <- getDynFlags
-                  if doingTickyProfiling dflags then code
-                                                else nopC
+                  if gopt Opt_Ticky dflags then code
+                                           else return ()
 
 -- All the ticky-ticky counters are declared "unsigned long" in C
 bumpTickyCounter :: FastString -> FCode ()
@@ -341,7 +341,8 @@ bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkCmmDataLabel rtsPackag
 
 bumpTickyCounter' :: CmmLit -> FCode ()
 -- krc: note that we're incrementing the _entry_count_ field of the ticky counter
-bumpTickyCounter' lhs = emit (addToMem cLong (CmmLit lhs) 1)
+bumpTickyCounter' lhs = do dflags <- getDynFlags
+                           emit (addToMem (cLong dflags) (CmmLit lhs) 1)
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram _lbl _n
@@ -409,6 +410,6 @@ showTypeCategory ty
 	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'	-- Bogus
 	  else if isEnumerationTyCon tycon		   then 'E'
 	  else if isTupleTyCon tycon			   then 'T'
-	  else if isJust (tyConSingleDataCon_maybe tycon)       then 'S'
+	  else if isJust (tyConSingleDataCon_maybe tycon)  then 'S'
 	  else if utc == listTyConKey			   then 'L'
 	  else 'M' -- oh, well...

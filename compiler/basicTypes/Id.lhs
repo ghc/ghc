@@ -5,13 +5,6 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:
@@ -24,76 +17,79 @@
 --
 -- * 'Id.Id' represents names that not only have a 'Name.Name' but also a 'TypeRep.Type' and some additional
 --   details (a 'IdInfo.IdInfo' and one of 'Var.LocalIdDetails' or 'IdInfo.GlobalIdDetails') that
---   are added, modified and inspected by various compiler passes. These 'Var.Var' names may either 
+--   are added, modified and inspected by various compiler passes. These 'Var.Var' names may either
 --   be global or local, see "Var#globalvslocal"
 --
 -- * 'Var.Var': see "Var#name_types"
 
 module Id (
         -- * The main types
-	Var, Id, isId,
+        Var, Id, isId,
 
-	-- ** Simple construction
-	mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
-	mkLocalId, mkLocalIdWithInfo, mkExportedLocalId,
-	mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
-	mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
-	mkWorkerId, mkWiredInIdName,
+        -- ** Simple construction
+        mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
+        mkLocalId, mkLocalIdWithInfo, mkExportedLocalId,
+        mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
+        mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
+        mkWorkerId, mkWiredInIdName,
 
-	-- ** Taking an Id apart
-	idName, idType, idUnique, idInfo, idDetails, idRepArity,
-	recordSelectorFieldLabel,
+        -- ** Taking an Id apart
+        idName, idType, idUnique, idInfo, idDetails, idRepArity,
+        recordSelectorFieldLabel,
 
-	-- ** Modifying an Id
-	setIdName, setIdUnique, Id.setIdType, 
-	setIdExported, setIdNotExported, 
-	globaliseId, localiseId, 
-	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
-	
+        -- ** Modifying an Id
+        setIdName, setIdUnique, Id.setIdType, 
+        setIdExported, setIdNotExported, 
+        globaliseId, localiseId, 
+        setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
+        zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
+        zapIdStrictness,
 
-	-- ** Predicates on Ids
-	isImplicitId, isDeadBinder, 
+        -- ** Predicates on Ids
+        isImplicitId, isDeadBinder, 
         isStrictId,
-	isExportedId, isLocalId, isGlobalId,
-	isRecordSelector, isNaughtyRecordSelector,
-        isClassOpId_maybe, isDFunId, 
-	isPrimOpId, isPrimOpId_maybe, 
-	isFCallId, isFCallId_maybe,
-	isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
+        isExportedId, isLocalId, isGlobalId,
+        isRecordSelector, isNaughtyRecordSelector,
+        isClassOpId_maybe, isDFunId,
+        isPrimOpId, isPrimOpId_maybe,
+        isFCallId, isFCallId_maybe,
+        isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
         isConLikeId, isBottomingId, idIsFrom,
         hasNoBinding,
 
-	-- ** Evidence variables
-	DictId, isDictId, dfunNSilent, isEvVar,
+        -- ** Evidence variables
+        DictId, isDictId, dfunNSilent, isEvVar,
 
-	-- ** Inline pragma stuff
-	idInlinePragma, setInlinePragma, modifyInlinePragma,
+        -- ** Inline pragma stuff
+        idInlinePragma, setInlinePragma, modifyInlinePragma,
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
-	-- ** One-shot lambdas
-	isOneShotBndr, isOneShotLambda, isStateHackType,
-	setOneShotLambda, clearOneShotLambda,
+        -- ** One-shot lambdas
+        isOneShotBndr, isOneShotLambda, isStateHackType,
+        setOneShotLambda, clearOneShotLambda,
 
-	-- ** Reading 'IdInfo' fields
-	idArity, 
-	idDemandInfo, idDemandInfo_maybe,
-	idStrictness, idStrictness_maybe, 
-	idUnfolding, realIdUnfolding,
-	idSpecialisation, idCoreRules, idHasRules,
-	idCafInfo,
-	idLBVarInfo,
-	idOccInfo,
+        -- ** Reading 'IdInfo' fields
+        idArity, 
+        idUnfolding, realIdUnfolding,
+        idSpecialisation, idCoreRules, idHasRules,
+        idCafInfo,
+        idLBVarInfo,
+        idOccInfo,
 
-	-- ** Writing 'IdInfo' fields
-	setIdUnfoldingLazily,
-	setIdUnfolding,
-	setIdArity,
-	setIdDemandInfo, 
-	setIdStrictness, zapIdStrictness,
-	setIdSpecialisation,
-	setIdCafInfo,
-	setIdOccInfo, zapIdOccInfo,
+        -- ** Writing 'IdInfo' fields
+        setIdUnfoldingLazily,
+        setIdUnfolding,
+        setIdArity,
+
+        setIdSpecialisation,
+        setIdCafInfo,
+        setIdOccInfo, zapIdOccInfo,
+
+        setIdDemandInfo, 
+        setIdStrictness, 
+
+        idDemandInfo, 
+        idStrictness,
 
     ) where
 
@@ -104,8 +100,8 @@ import CoreSyn ( CoreRule, Unfolding( NoUnfolding ) )
 import IdInfo
 import BasicTypes
 
--- Imported and re-exported 
-import Var( Var, Id, DictId,
+-- Imported and re-exported
+import Var( Id, DictId,
             idInfo, idDetails, globaliseId, varType,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
@@ -130,22 +126,24 @@ import Util
 import StaticFlags
 
 -- infixl so you can say (id `set` a `set` b)
-infixl 	1 `setIdUnfoldingLazily`,
-	  `setIdUnfolding`,
-	  `setIdArity`,
-	  `setIdOccInfo`,
-	  `setIdDemandInfo`,
-	  `setIdStrictness`,
-	  `setIdSpecialisation`,
-	  `setInlinePragma`,
-	  `setInlineActivation`,
-	  `idCafInfo`
+infixl  1 `setIdUnfoldingLazily`,
+          `setIdUnfolding`,
+          `setIdArity`,
+          `setIdOccInfo`,
+
+          `setIdSpecialisation`,
+          `setInlinePragma`,
+          `setInlineActivation`,
+          `idCafInfo`,
+
+          `setIdDemandInfo`,
+          `setIdStrictness`
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Basic Id manipulation}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -176,9 +174,9 @@ setIdNotExported :: Id -> Id
 setIdNotExported = Var.setIdNotExported
 
 localiseId :: Id -> Id
--- Make an with the same unique and type as the 
+-- Make an with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
-localiseId id 
+localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
@@ -199,17 +197,17 @@ modifyIdInfo fn id = setIdInfo id (fn (idInfo id))
 -- maybeModifyIdInfo tries to avoid unnecesary thrashing
 maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
 maybeModifyIdInfo (Just new_info) id = lazySetIdInfo id new_info
-maybeModifyIdInfo Nothing	  id = id
+maybeModifyIdInfo Nothing         id = id
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Simple Id construction}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Absolutely all Ids are made by mkId.  It is just like Var.mkId,
-but in addition it pins free-tyvar-info onto the Id's type, 
+but in addition it pins free-tyvar-info onto the Id's type,
 where it can easily be found.
 
 Note [Free type variables]
@@ -218,7 +216,7 @@ At one time we cached the free type variables of the type of an Id
 at the root of the type in a TyNote.  The idea was to avoid repeating
 the free-type-variable calculation.  But it turned out to slow down
 the compiler overall. I don't quite know why; perhaps finding free
-type variables of an Id isn't all that common whereas applying a 
+type variables of an Id isn't all that common whereas applying a
 substitution (which changes the free type variables) is more common.
 Anyway, we removed it in March 2008.
 
@@ -242,16 +240,16 @@ mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
-	-- Note [Free type variables]
+        -- Note [Free type variables]
 
--- | Create a local 'Id' that is marked as exported. 
+-- | Create a local 'Id' that is marked as exported.
 -- This prevents things attached to it from being removed as dead code.
 mkExportedLocalId :: Name -> Type -> Id
 mkExportedLocalId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
-	-- Note [Free type variables]
+        -- Note [Free type variables]
 
 
--- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal") 
+-- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Type -> Id
 mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
@@ -275,7 +273,7 @@ mkWiredInIdName mod fs uniq id
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
 @Uniques@, but that's OK because the templates are supposed to be
 instantiated before use.
- 
+
 \begin{code}
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
@@ -297,9 +295,9 @@ mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Special Ids}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -331,8 +329,8 @@ isNaughtyRecordSelector id = case Var.idDetails id of
                         _                               -> False
 
 isClassOpId_maybe id = case Var.idDetails id of
-			ClassOpId cls -> Just cls
-			_other        -> Nothing
+                        ClassOpId cls -> Just cls
+                        _other        -> Nothing
 
 isPrimOpId id = case Var.idDetails id of
                         PrimOpId _ -> True
@@ -384,14 +382,14 @@ hasNoBinding :: Id -> Bool
 -- binding, even though it is defined in this module.
 
 -- Data constructor workers used to be things of this kind, but
--- they aren't any more.  Instead, we inject a binding for 
--- them at the CorePrep stage. 
+-- they aren't any more.  Instead, we inject a binding for
+-- them at the CorePrep stage.
 -- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case Var.idDetails id of
-			PrimOpId _  	 -> True	-- See Note [Primop wrappers]
-			FCallId _   	 -> True
-			DataConWorkId dc -> isUnboxedTupleCon dc
-			_                -> False
+                        PrimOpId _       -> True        -- See Note [Primop wrappers]
+                        FCallId _        -> True
+                        DataConWorkId dc -> isUnboxedTupleCon dc
+                        _                -> False
 
 isImplicitId :: Id -> Bool
 -- ^ 'isImplicitId' tells whether an 'Id's info is implied by other
@@ -400,14 +398,14 @@ isImplicitId :: Id -> Bool
 isImplicitId id
   = case Var.idDetails id of
         FCallId {}       -> True
-	ClassOpId {}     -> True
+        ClassOpId {}     -> True
         PrimOpId {}      -> True
         DataConWorkId {} -> True
-	DataConWrapId {} -> True
-		-- These are are implied by their type or class decl;
-		-- remember that all type and class decls appear in the interface file.
-		-- The dfun id is not an implicit Id; it must *not* be omitted, because 
-		-- it carries version info for the instance decl
+        DataConWrapId {} -> True
+                -- These are are implied by their type or class decl;
+                -- remember that all type and class decls appear in the interface file.
+                -- The dfun id is not an implicit Id; it must *not* be omitted, because
+                -- it carries version info for the instance decl
         _               -> False
 
 idIsFrom :: Module -> Id -> Bool
@@ -432,13 +430,13 @@ used by GHCi, which does not implement primops direct at all.
 \begin{code}
 isDeadBinder :: Id -> Bool
 isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
-		  | otherwise = False	-- TyVars count as not dead
+                  | otherwise = False   -- TyVars count as not dead
 \end{code}
 
 %************************************************************************
-%*									*
-              Evidence variables									
-%*									*
+%*                                                                      *
+              Evidence variables
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -450,14 +448,14 @@ isDictId id = isDictTy (idType id)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{IdInfo stuff}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-	---------------------------------
-	-- ARITY
+        ---------------------------------
+        -- ARITY
 idArity :: Id -> Arity
 idArity id = arityInfo (idInfo id)
 
@@ -471,17 +469,14 @@ idRepArity x = typeRepArity (idArity x) (idType x)
 isBottomingId :: Id -> Bool
 isBottomingId id = isBottomingSig (idStrictness id)
 
-idStrictness_maybe :: Id -> Maybe StrictSig
 idStrictness :: Id -> StrictSig
-
-idStrictness_maybe id = strictnessInfo (idInfo id)
-idStrictness       id = idStrictness_maybe id `orElse` topSig
+idStrictness id = strictnessInfo (idInfo id)
 
 setIdStrictness :: Id -> StrictSig -> Id
-setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` Just sig) id
+setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` sig) id
 
 zapIdStrictness :: Id -> Id
-zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` Nothing) id
+zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` topSig) id
 
 -- | This predicate says whether the 'Id' has a strict demand placed on it or
 -- has a type such that it can always be evaluated strictly (e.g., an
@@ -492,14 +487,15 @@ zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` Nothing) id
 isStrictId :: Id -> Bool
 isStrictId id
   = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
-           (isStrictDmd (idDemandInfo id)) || 
-           (isStrictType (idType id))
+           (isStrictType (idType id)) ||
+           -- Take the best of both strictnesses - old and new               
+           (isStrictDmd (idDemandInfo id))
 
-	---------------------------------
-	-- UNFOLDING
+        ---------------------------------
+        -- UNFOLDING
 idUnfolding :: Id -> Unfolding
 -- Do not expose the unfolding of a loop breaker!
-idUnfolding id 
+idUnfolding id
   | isStrongLoopBreaker (occInfo info) = NoUnfolding
   | otherwise                          = unfoldingInfo info
   where
@@ -515,17 +511,14 @@ setIdUnfoldingLazily id unfolding = modifyIdInfo (`setUnfoldingInfoLazily` unfol
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
-idDemandInfo_maybe :: Id -> Maybe Demand
 idDemandInfo       :: Id -> Demand
-
-idDemandInfo_maybe id = demandInfo (idInfo id)
-idDemandInfo       id = demandInfo (idInfo id) `orElse` topDmd
+idDemandInfo       id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand -> Id
-setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` Just dmd) id
+setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
 
-	---------------------------------
-	-- SPECIALISATION
+        ---------------------------------
+        -- SPECIALISATION
 
 -- See Note [Specialisations and RULES in IdInfo] in IdInfo.lhs
 
@@ -541,16 +534,16 @@ idHasRules id = not (isEmptySpecInfo (idSpecialisation id))
 setIdSpecialisation :: Id -> SpecInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 
-	---------------------------------
-	-- CAF INFO
+        ---------------------------------
+        -- CAF INFO
 idCafInfo :: Id -> CafInfo
 idCafInfo id = cafInfo (idInfo id)
 
 setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
-	---------------------------------
-	-- Occcurrence INFO
+        ---------------------------------
+        -- Occcurrence INFO
 idOccInfo :: Id -> OccInfo
 idOccInfo id = occInfo (idInfo id)
 
@@ -562,8 +555,8 @@ zapIdOccInfo b = b `setIdOccInfo` NoOccInfo
 \end{code}
 
 
-	---------------------------------
-	-- INLINING
+        ---------------------------------
+        -- INLINING
 The inline pragma tells us to be very keen to inline this Id, but it's still
 OK not to if optimisation is switched off.
 
@@ -591,8 +584,8 @@ isConLikeId id = isDataConWorkId id || isConLike (idRuleMatchInfo id)
 \end{code}
 
 
-	---------------------------------
-	-- ONE-SHOT LAMBDAS
+        ---------------------------------
+        -- ONE-SHOT LAMBDAS
 \begin{code}
 idLBVarInfo :: Id -> LBVarInfo
 idLBVarInfo id = lbvarInfo (idInfo id)
@@ -608,29 +601,29 @@ isOneShotBndr id = isOneShotLambda id || isStateHackType (idType id)
 -- | Should we apply the state hack to values of this 'Type'?
 isStateHackType :: Type -> Bool
 isStateHackType ty
-  | opt_NoStateHack 
+  | opt_NoStateHack
   = False
   | otherwise
   = case tyConAppTyCon_maybe ty of
-	Just tycon -> tycon == statePrimTyCon
+        Just tycon -> tycon == statePrimTyCon
         _          -> False
-	-- This is a gross hack.  It claims that 
-	-- every function over realWorldStatePrimTy is a one-shot
-	-- function.  This is pretty true in practice, and makes a big
-	-- difference.  For example, consider
-	--	a `thenST` \ r -> ...E...
-	-- The early full laziness pass, if it doesn't know that r is one-shot
-	-- will pull out E (let's say it doesn't mention r) to give
-	--	let lvl = E in a `thenST` \ r -> ...lvl...
-	-- When `thenST` gets inlined, we end up with
-	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
-	-- and we don't re-inline E.
-	--
-	-- It would be better to spot that r was one-shot to start with, but
-	-- I don't want to rely on that.
-	--
-	-- Another good example is in fill_in in PrelPack.lhs.  We should be able to
-	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
+        -- This is a gross hack.  It claims that
+        -- every function over realWorldStatePrimTy is a one-shot
+        -- function.  This is pretty true in practice, and makes a big
+        -- difference.  For example, consider
+        --      a `thenST` \ r -> ...E...
+        -- The early full laziness pass, if it doesn't know that r is one-shot
+        -- will pull out E (let's say it doesn't mention r) to give
+        --      let lvl = E in a `thenST` \ r -> ...lvl...
+        -- When `thenST` gets inlined, we end up with
+        --      let lvl = E in \s -> case a s of (r, s') -> ...lvl...
+        -- and we don't re-inline E.
+        --
+        -- It would be better to spot that r was one-shot to start with, but
+        -- I don't want to rely on that.
+        --
+        -- Another good example is in fill_in in PrelPack.lhs.  We should be able to
+        -- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 
 -- | Returns whether the lambda associated with the 'Id' is certainly applied at most once.
@@ -644,13 +637,13 @@ setOneShotLambda :: Id -> Id
 setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
 
 clearOneShotLambda :: Id -> Id
-clearOneShotLambda id 
+clearOneShotLambda id
   | isOneShotLambda id = modifyIdInfo (`setLBVarInfo` NoLBVarInfo) id
-  | otherwise	       = id			
+  | otherwise          = id
 
 -- The OneShotLambda functions simply fiddle with the IdInfo flag
 -- But watch out: this may change the type of something else
---	f = \x -> e
+--      f = \x -> e
 -- If we change the one-shot-ness of x, f's type changes
 \end{code}
 
@@ -661,18 +654,18 @@ zapInfo zapper id = maybeModifyIdInfo (zapper (idInfo id)) id
 zapLamIdInfo :: Id -> Id
 zapLamIdInfo = zapInfo zapLamInfo
 
-zapDemandIdInfo :: Id -> Id
-zapDemandIdInfo = zapInfo zapDemandInfo
-
 zapFragileIdInfo :: Id -> Id
 zapFragileIdInfo = zapInfo zapFragileInfo 
+
+zapDemandIdInfo :: Id -> Id
+zapDemandIdInfo = zapInfo zapDemandInfo
 \end{code}
 
 Note [transferPolyIdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-This transfer is used in two places: 
-	FloatOut (long-distance let-floating)
-	SimplUtils.abstractFloats (short-distance let-floating)
+This transfer is used in two places:
+        FloatOut (long-distance let-floating)
+        SimplUtils.abstractFloats (short-distance let-floating)
 
 Consider the short-distance let-floating:
 
@@ -685,13 +678,13 @@ Then if we float thus
 
 we *do not* want to lose g's
   * strictness information
-  * arity 
+  * arity
   * inline pragma (though that is bit more debatable)
   * occurrence info
 
 Mostly this is just an optimisation, but it's *vital* to
 transfer the occurrence info.  Consider
-   
+
    NonRec { f = /\a. let Rec { g* = ..g.. } in ... }
 
 where the '*' means 'LoopBreaker'.  Then if we float we must get
@@ -708,8 +701,8 @@ It's not so simple to retain
   * rules
 so we simply discard those.  Sooner or later this may bite us.
 
-If we abstract wrt one or more *value* binders, we must modify the 
-arity and strictness info before transferring it.  E.g. 
+If we abstract wrt one or more *value* binders, we must modify the
+arity and strictness info before transferring it.  E.g.
       f = \x. e
 -->
       g' = \y. \x. e
@@ -717,26 +710,27 @@ arity and strictness info before transferring it.  E.g.
 Notice that g' has an arity one more than the original g
 
 \begin{code}
-transferPolyIdInfo :: Id	-- Original Id
-		   -> [Var]	-- Abstract wrt these variables
-		   -> Id	-- New Id
-		   -> Id
+transferPolyIdInfo :: Id        -- Original Id
+                   -> [Var]     -- Abstract wrt these variables
+                   -> Id        -- New Id
+                   -> Id
 transferPolyIdInfo old_id abstract_wrt new_id
   = modifyIdInfo transfer new_id
   where
-    arity_increase = count isId abstract_wrt	-- Arity increases by the
-    		     	   			-- number of value binders
+    arity_increase = count isId abstract_wrt    -- Arity increases by the
+                                                -- number of value binders
 
-    old_info 	    = idInfo old_id
+    old_info        = idInfo old_id
     old_arity       = arityInfo old_info
     old_inline_prag = inlinePragInfo old_info
     old_occ_info    = occInfo old_info
     new_arity       = old_arity + arity_increase
-    old_strictness  = strictnessInfo old_info
-    new_strictness  = fmap (increaseStrictSigArity arity_increase) old_strictness
 
-    transfer new_info = new_info `setStrictnessInfo` new_strictness
-			         `setArityInfo` new_arity
- 			         `setInlinePragInfo` old_inline_prag
-				 `setOccInfo` old_occ_info
+    old_strictness  = strictnessInfo old_info
+    new_strictness  = increaseStrictSigArity arity_increase old_strictness
+
+    transfer new_info = new_info `setArityInfo` new_arity
+                                 `setInlinePragInfo` old_inline_prag
+                                 `setOccInfo` old_occ_info
+                                 `setStrictnessInfo` new_strictness
 \end{code}

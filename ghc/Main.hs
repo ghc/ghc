@@ -37,7 +37,6 @@ import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
                           startPhase, isHaskellSrcFilename )
 import BasicTypes       ( failed )
 import StaticFlags
-import StaticFlagParser
 import DynFlags
 import ErrUtils
 import FastString
@@ -110,7 +109,6 @@ main = do
                    ShowSupportedExtensions -> showSupportedExtensions
                    ShowVersion             -> showVersion
                    ShowNumVersion          -> putStrLn cProjectVersion
-                   Print str               -> putStrLn str
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc mbMinusB $ do
@@ -162,7 +160,7 @@ main' postLoadMode dflags0 args flagWarnings = do
       dflags1a | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
                | otherwise                 = dflags1
-        where imp_qual_enabled = dflags1 `dopt_set` Opt_ImplicitImportQualified
+        where imp_qual_enabled = dflags1 `gopt_set` Opt_ImplicitImportQualified
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
@@ -182,11 +180,6 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ showBanner postLoadMode dflags2
 
-  -- we've finished manipulating the DynFlags, update the session
-  _ <- GHC.setSessionDynFlags dflags2
-  dflags3 <- GHC.getSessionDynFlags
-  hsc_env <- GHC.getSession
-
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right
      -- away - e.g., for win32 platforms, backslashes are converted
@@ -194,9 +187,12 @@ main' postLoadMode dflags0 args flagWarnings = do
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-  -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on
-  --       the command-line.
-  liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse objs)
+    dflags2a = dflags2 { ldInputs = objs ++ ldInputs dflags2 }
+
+  -- we've finished manipulating the DynFlags, update the session
+  _ <- GHC.setSessionDynFlags dflags2a
+  dflags3 <- GHC.getSessionDynFlags
+  hsc_env <- GHC.getSession
 
         ---------------- Display configuration -----------
   when (verbosity dflags3 >= 4) $
@@ -225,7 +221,7 @@ main' postLoadMode dflags0 args flagWarnings = do
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #ifndef GHCI
-ghciUI _ _ = ghcError (CmdLineError "not built for interactive use")
+ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
 ghciUI     = interactiveUI defaultGhciSettings
 #endif
@@ -251,7 +247,7 @@ partition_args (arg:args) srcs objs
 
     {-
       We split out the object files (.o, .dll) and add them
-      to v_Ld_inputs for use by the linker.
+      to ldInputs for use by the linker.
 
       The following things should be considered compilation manager inputs:
 
@@ -289,25 +285,25 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (notNull (filter isRTSWay (wayNames dflags))
+   when (notNull (filter wayRTSOnly (ways dflags))
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when (notNull (filter (not . isRTSWay) (wayNames dflags))
+   when ((filter (not . wayRTSOnly) (ways dflags) /= defaultWays (settings dflags))
          && isInterpretiveMode mode) $
-      do ghcError (UsageError
+      do throwGhcException (UsageError
                    "--interactive can't be used with -prof or -unreg.")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
-        then ghcError (UsageError "-ohi can only be used when compiling a single source file")
+        then throwGhcException (UsageError "-ohi can only be used when compiling a single source file")
         else do
 
         -- -o sanity checking
    if (srcs `lengthExceeds` 1 && isJust (outputFile dflags)
          && not (isLinkMode mode))
-        then ghcError (UsageError "can't apply -o to multiple source files")
+        then throwGhcException (UsageError "can't apply -o to multiple source files")
         else do
 
    let not_linking = not (isLinkMode mode) || isNoLink (ghcLink dflags)
@@ -318,7 +314,7 @@ checkOptions mode dflags srcs objs = do
         -- Check that there are some input files
         -- (except in the interactive case)
    if null srcs && (null objs || not_linking) && needsInputsMode mode
-        then ghcError (UsageError "no input files")
+        then throwGhcException (UsageError "no input files")
         else do
 
      -- Verify that output files point somewhere sensible.
@@ -349,7 +345,7 @@ verifyOutputFiles dflags = do
      when (not flg) (nonExistentDir "-ohi" hi)
  where
    nonExistentDir flg dir =
-     ghcError (CmdLineError ("error: directory portion of " ++
+     throwGhcException (CmdLineError ("error: directory portion of " ++
                              show dir ++ " does not exist (used with " ++
                              show flg ++ " option.)"))
 
@@ -363,7 +359,6 @@ data PreStartupMode
   = ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
   | ShowSupportedExtensions -- ghc --supported-extensions
-  | Print String            -- ghc --print-foo
 
 showVersionMode, showNumVersionMode, showSupportedExtensionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion
@@ -496,7 +491,7 @@ parseModeFlags args = do
              Nothing     -> doMakeMode
              Just (m, _) -> m
       errs = errs1 ++ map (mkGeneralLocated "on the commandline") errs2
-  when (not (null errs)) $ ghcError $ errorsToGhcException errs
+  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
   return (mode, flags' ++ leftover, warns)
 
 type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
@@ -549,21 +544,13 @@ mode_flags =
                                             addFlag "-no-link" f))
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , Flag "C"            (PassFlag setGenerateC)
+  , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
   , Flag "-make"        (PassFlag (setMode doMakeMode))
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   ]
-
-setGenerateC :: String -> EwM ModeM ()
-setGenerateC f
-  | cGhcUnregisterised /= "YES" = do
-        addWarn ("Compiler not unregisterised, so ignoring " ++ f)
-  | otherwise = do
-        setMode (stopBeforeMode HCc) f
-        addFlag "-fvia-C" f
 
 setMode :: Mode -> String -> EwM ModeM ()
 setMode newMode newFlag = liftEwM $ do
@@ -639,7 +626,9 @@ doMake srcs  = do
 
     o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
-    liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse o_files)
+    dflags <- GHC.getSessionDynFlags
+    let dflags' = dflags { ldInputs = o_files ++ ldInputs dflags }
+    _ <- GHC.setSessionDynFlags dflags'
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs
     GHC.setTargets targets
@@ -710,7 +699,7 @@ showUsage ghci dflags = do
 
 dumpFinalStats :: DynFlags -> IO ()
 dumpFinalStats dflags =
-  when (dopt Opt_D_faststring_stats dflags) $ dumpFastStringStats dflags
+  when (gopt Opt_D_faststring_stats dflags) $ dumpFastStringStats dflags
 
 dumpFastStringStats :: DynFlags -> IO ()
 dumpFastStringStats dflags = do
@@ -770,7 +759,7 @@ abiHash strs = do
          r <- findImportedModule hsc_env modname Nothing
          case r of
            Found _ m -> return m
-           _error    -> ghcError $ CmdLineError $ showSDoc dflags $
+           _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
   mods <- mapM find_it (map fst strs)
@@ -791,5 +780,10 @@ abiHash strs = do
 -- Util
 
 unknownFlagsErr :: [String] -> a
-unknownFlagsErr fs = ghcError (UsageError ("unrecognised flags: " ++ unwords fs))
-
+unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
+  where
+    oneError f =
+        "unrecognised flag: " ++ f ++ "\n" ++
+        (case fuzzyMatch f (nub allFlags) of
+            [] -> ""
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 

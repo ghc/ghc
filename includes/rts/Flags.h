@@ -53,6 +53,7 @@ struct GC_FLAGS {
     rtsBool frontpanel;
 
     Time    idleGCDelayTime;    /* units: TIME_RESOLUTION */
+    rtsBool doIdleGC;
 
     StgWord heapBase;           /* address to ask the OS for memory */
 };

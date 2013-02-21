@@ -20,8 +20,6 @@ define cmm-suffix-rules
 
 ifneq "$$(CLEANING)" "YES"
 
-ifneq "$$(BootingFromHc)" "YES"
-
 $1/$2/build/%.$$($3_way_)o : $1/%.cmm $$(rts_H_FILES) $$(includes_H_FILES) $$(includes_DERIVEDCONSTANTS) $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
@@ -47,8 +45,6 @@ $1/$2/build/%.$$($3_way_)hc : $1/$2/build/%.cmm $$(rts_H_FILES) $$(includes_H_FI
 #
 # $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$(includes_H_FILES) $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 # 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
-
-endif
 
 endif
 

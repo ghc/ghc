@@ -10,8 +10,8 @@ module ProfInit (profilingInitCode) where
 
 import CLabel
 import CostCentre
+import DynFlags
 import Outputable
-import StaticFlags
 import FastString
 import Module
 
@@ -23,9 +23,10 @@ import Module
 
 profilingInitCode :: Module -> CollectedCCs -> SDoc
 profilingInitCode this_mod (local_CCs, ___extern_CCs, singleton_CCSs)
- | not opt_SccProfilingOn = empty
- | otherwise
- = vcat
+ = sdocWithDynFlags $ \dflags ->
+   if not (gopt Opt_SccProfilingOn dflags)
+   then empty
+   else vcat
     [ text "static void prof_init_" <> ppr this_mod
          <> text "(void) __attribute__((constructor));"
     , text "static void prof_init_" <> ppr this_mod <> text "(void)"

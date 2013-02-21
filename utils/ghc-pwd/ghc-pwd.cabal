@@ -14,5 +14,5 @@ cabal-version: >=1.2
 Executable ghc-pwd
     Main-Is: ghc-pwd.hs
     Build-Depends: base       >= 3   && < 5,
-                   directory  >= 1   && < 1.2
+                   directory  >= 1   && < 1.3
 

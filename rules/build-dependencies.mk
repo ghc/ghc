@@ -22,7 +22,7 @@ $1_$2_depfile_c_asm = $$($1_$2_depfile_base).c_asm
 
 $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 
-$1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-dep-suffix $$(way))
+$1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$($1_$2_WAYS),-dep-suffix "$$(patsubst %o,%,$$($$(way)_osuf))")
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
 
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
@@ -34,8 +34,9 @@ $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
 ifneq "$$($1_$2_HS_SRCS)" ""
-	"$$($1_$2_HC_MK_DEPEND)" -M $$($1_$2_MKDEPENDHS_FLAGS) \
-	    $$(filter-out -split-objs, $$($1_$2_v_ALL_HC_OPTS)) \
+	"$$($1_$2_HC_MK_DEPEND)" -M \
+	    $$(filter-out -split-objs, $$($1_$2_$$(firstword $$($1_$2_WAYS))_ALL_HC_OPTS)) \
+	    $$($1_$2_MKDEPENDHS_FLAGS) \
 	    $$($1_$2_HS_SRCS)
 endif
 	echo "$1_$2_depfile_haskell_EXISTS = YES" >> $$@.tmp
@@ -125,7 +126,7 @@ endef
 #    to "i" on Windows and "" on any other platform.
 define addCFileDeps
 
-	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_v_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
+	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
 	$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
 

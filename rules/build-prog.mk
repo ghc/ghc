@@ -54,6 +54,28 @@ ifeq "$$($1_USES_CABAL)" "YES"
 $1_$2_USES_CABAL = YES
 endif
 
+ifeq "$$(Windows)" "YES"
+$1_$2_WANT_INPLACE_WRAPPER = NO
+else ifneq "$$($1_$2_INSTALL_INPLACE)" "YES"
+$1_$2_WANT_INPLACE_WRAPPER = NO
+else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
+$1_$2_WANT_INPLACE_WRAPPER = YES
+else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+$1_$2_WANT_INPLACE_WRAPPER = YES
+else
+$1_$2_WANT_INPLACE_WRAPPER = NO
+endif
+
+ifeq "$$(Windows)" "YES"
+$1_$2_WANT_INSTALLED_WRAPPER = NO
+else ifneq "$$($1_$2_INSTALL)" "YES"
+$1_$2_WANT_INSTALLED_WRAPPER = NO
+else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
+$1_$2_WANT_INSTALLED_WRAPPER = YES
+else
+$1_$2_WANT_INSTALLED_WRAPPER = NO
+endif
+
 $(call package-config,$1,$2,$3)
 
 $1_$2_depfile_base = $1/$2/build/.depend
@@ -66,8 +88,8 @@ $1_$2_INPLACE =
 endif
 else
 # Where do we install the inplace version?
-ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
-$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
+ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
+$1_$2_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG)
 else
 ifeq "$$($1_$2_TOPDIR)" "YES"
 $1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
@@ -93,7 +115,7 @@ $(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
 
 # INPLACE_BIN might be empty if we're distcleaning
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
+ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
 	"$$(CP)" -p $$< $$@
 endif
@@ -101,65 +123,94 @@ endif
 
 $(call shell-wrapper,$1,$2)
 
-$1_$2_WAYS = v
+ifeq "$$($1_$2_PROGRAM_WAY)" ""
+ifeq "$3" "0"
+$1_$2_PROGRAM_WAY = v
+else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+$1_$2_PROGRAM_WAY = dyn
+else
+$1_$2_PROGRAM_WAY = v
+endif
+endif
+
+$1_$2_WAYS = $$($1_$2_PROGRAM_WAY)
 
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 
 # --- IMPLICIT RULES
 
-# Just the 'v' way for programs
-$(call distdir-way-opts,$1,$2,v,$3)
+$(call distdir-opts,$1,$2,,$3)
+$(call distdir-way-opts,$1,$2,$$($1_$2_PROGRAM_WAY),$3)
 
 ifeq "$3" "0"
 # For stage 0, we use GHC to compile C sources so that we don't have to
 # worry about where the RTS header files are
-$(call c-suffix-rules,$1,$2,v,YES)
+$(call c-suffix-rules,$1,$2,$$($1_$2_PROGRAM_WAY),YES)
 else
 ifeq "$$($1_$2_UseGhcForCC)" "YES"
-$(call c-suffix-rules,$1,$2,v,YES)
+$(call c-suffix-rules,$1,$2,$$($1_$2_PROGRAM_WAY),YES)
 else
-$(call c-suffix-rules,$1,$2,v,NO)
+$(call c-suffix-rules,$1,$2,$$($1_$2_PROGRAM_WAY),NO)
 endif
 endif
 
-$(call hs-suffix-rules,$1,$2,v)
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,v,$$(dir))))
+  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$$(dir))))
+$(call hs-suffix-way-rules,$1,$2,$$($1_$2_PROGRAM_WAY))
 
-$(call c-objs,$1,$2,v)
-$(call hs-objs,$1,$2,v)
+$(call c-objs,$1,$2,$$($1_$2_PROGRAM_WAY))
+$(call hs-objs,$1,$2,$$($1_$2_PROGRAM_WAY))
 
 $1_$2_LINK_WITH_GCC = NO
-ifeq "$$(BootingFromHc)" "YES"
-$1_$2_LINK_WITH_GCC = YES
-endif
 
-ifeq "$$($1_$2_v_HS_OBJS)" ""
+ifeq "$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS)" ""
 # We don't want to link the GHC RTS into C-only programs. There's no
 # point, and it confuses the test that all GHC-compiled programs
 # were compiled with the right GHC.
-$1_$2_GHC_LD_OPTS = -no-auto-link-packages -no-hs-main
+$1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS += -no-auto-link-packages -no-hs-main
 endif
 
+# XXX
+# ifneq "$3" "0"
+# ifeq "$$(TargetOS_CPP)" "linux"
+# $1_$2_dyn_GHC_LD_OPTS += \
+#     -fno-use-rpaths \
+#     $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
+# else ifeq "$$(TargetOS_CPP)" "darwin"
+# $1_$2_dyn_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
+# endif
+# endif
+
 ifneq "$$(BINDIST)" "YES"
-# The quadrupled $'s here are because the _v_LIB variables aren't
+# The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) : \
-    $$(foreach dep,$$($1_$2_DEP_NAMES),\
-        $$(if $$(filter ghc,$$(dep)),\
-            $(if $(filter 0,$3),$$(compiler_stage1_v_LIB),\
-            $(if $(filter 1,$3),$$(compiler_stage2_v_LIB),\
-            $(if $(filter 2,$3),$$(compiler_stage2_v_LIB),\
+    $$(foreach dep,$$($1_$2_DEPS),\
+        $$(if $$(filter ghc%,$$(dep)),\
+            $(if $(filter 0,$3),$$(compiler_stage1_PROGRAM_DEP_LIB),\
+            $(if $(filter 1,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
+            $(if $(filter 2,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
             $$(error Bad build stage)))),\
-        $$$$(libraries/$$(dep)_dist-$(if $(filter 0,$3),boot,install)_v_LIB)))
+        $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
 
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
-$1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_GHC_LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+$1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+ifeq "$$(TargetOS_CPP)" "darwin"
+ifneq "$3" "0"
+ifeq "$$($1_$2_PROGRAM_WAY)" "dyn"
+# Use relative paths for all the libraries
+	install_name_tool $$(foreach d,$$($1_$2_TRANSITIVE_DEP_NAMES), -change $$(TOP)/$$($$($$d_INSTALL_INFO)_dyn_LIB) @loader_path/../$$d-$$($$($$d_INSTALL_INFO)_VERSION)/$$($$($$d_INSTALL_INFO)_dyn_LIB_NAME)) $$@
+# Use relative paths for the RTS. Rather than try to work out which RTS
+# way is being linked, we just change it for all ways
+	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../rts-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
+endif
+endif
+endif
 else
-$1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_CC)" -o $$@ $$($1_$2_v_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_v_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+$1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
 endif
 
 # Note [lib-depends] if this program is built with stage1 or greater, we
@@ -184,13 +235,23 @@ endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 ifeq "$$($1_$2_INSTALL)" "YES"
-ifeq "$$($1_$2_TOPDIR)" "YES"
-INSTALL_TOPDIRS += $1/$2/build/tmp/$$($1_$2_PROG)
+ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
+INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
+else ifeq "$$($1_$2_TOPDIR)" "YES"
+INSTALL_TOPDIRS  += $1/$2/build/tmp/$$($1_$2_PROG)
 else
-INSTALL_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
+INSTALL_BINS     += $1/$2/build/tmp/$$($1_$2_PROG)
 endif
 endif
 
 $(call dependencies,$1,$2,$3)
+
+# The Main module of a program implicitly depends on GHC.TopHandler
+# so we need to add a dependency for that. As we don't know which
+# module contains Main, we just make all modules in the program
+# depend on it.
+ifneq "$3" "0"
+$$(foreach o,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS),$$(eval $$(call add-dependency,$$o,libraries/base/dist-install/build/GHC/TopHandler.$$($$($1_$2_PROGRAM_WAY)_osuf))))
+endif
 
 endef

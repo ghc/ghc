@@ -6,32 +6,25 @@
 This module defines interface types and binders
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module IfaceType (
-	IfExtName, IfLclName,
+        IfExtName, IfLclName,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceTyCon(..), IfaceCoCon(..),
         IfaceTyLit(..),
-	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
+        IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 
-	-- Conversion from Type -> IfaceType
+        -- Conversion from Type -> IfaceType
         toIfaceType, toIfaceKind, toIfaceContext,
-	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, 
-	toIfaceTyCon, toIfaceTyCon_name,
+        toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs,
+        toIfaceTyCon, toIfaceTyCon_name,
 
         -- Conversion from Coercion -> IfaceType
         coToIfaceType,
 
-	-- Printing
-	pprIfaceType, pprParendIfaceType, pprIfaceContext,
-	pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs, pprIfaceBndrs,
-	tOP_PREC, tYCON_PREC, noParens, maybeParen, pprIfaceForAllPart
+        -- Printing
+        pprIfaceType, pprParendIfaceType, pprIfaceContext,
+        pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs, pprIfaceBndrs,
+        tOP_PREC, tYCON_PREC, noParens, maybeParen, pprIfaceForAllPart
 
     ) where
 
@@ -39,6 +32,7 @@ import Coercion
 import TypeRep hiding( maybeParen )
 import Unique( hasKey )
 import TyCon
+import CoAxiom
 import Id
 import Var
 import TysWiredIn
@@ -51,18 +45,18 @@ import FastString
 \end{code}
 
 %************************************************************************
-%*									*
-		Local (nested) binders
-%*									*
+%*                                                                      *
+                Local (nested) binders
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-type IfLclName = FastString	-- A local name in iface syntax
+type IfLclName = FastString     -- A local name in iface syntax
 
-type IfExtName = Name	-- An External or WiredIn Name can appear in IfaceSyn
-     	       	 	-- (However Internal or System Names never should)
+type IfExtName = Name   -- An External or WiredIn Name can appear in IfaceSyn
+                        -- (However Internal or System Names never should)
 
-data IfaceBndr 		-- Local (non-top-level) binders
+data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
 
@@ -73,13 +67,13 @@ type IfaceTvBndr  = (IfLclName, IfaceKind)
 type IfaceKind     = IfaceType
 type IfaceCoercion = IfaceType
 
-data IfaceType	   -- A kind of universal type, used for types, kinds, and coercions
-  = IfaceTyVar    IfLclName			-- Type/coercion variable only, not tycon
+data IfaceType     -- A kind of universal type, used for types, kinds, and coercions
+  = IfaceTyVar    IfLclName               -- Type/coercion variable only, not tycon
   | IfaceAppTy    IfaceType IfaceType
   | IfaceFunTy    IfaceType IfaceType
   | IfaceForAllTy IfaceTvBndr IfaceType
   | IfaceTyConApp IfaceTyCon [IfaceType]  -- Not necessarily saturated
-					  -- Includes newtypes, synonyms, tuples
+                                          -- Includes newtypes, synonyms, tuples
   | IfaceCoConApp IfaceCoCon [IfaceType]  -- Always saturated
   | IfaceLitTy IfaceTyLit
 
@@ -96,16 +90,16 @@ newtype IfaceTyCon = IfaceTc { ifaceTyConName :: IfExtName }
 
   -- Coercion constructors
 data IfaceCoCon
-  = IfaceCoAx IfExtName
+  = IfaceCoAx IfExtName Int -- Int is 0-indexed branch number
   | IfaceReflCo    | IfaceUnsafeCo  | IfaceSymCo
   | IfaceTransCo   | IfaceInstCo
-  | IfaceNthCo Int
+  | IfaceNthCo Int | IfaceLRCo LeftOrRight
 \end{code}
 
 %************************************************************************
-%*									*
-		Functions over IFaceTypes
-%*									*
+%*                                                                      *
+                Functions over IFaceTypes
+%*                                                                      *
 %************************************************************************
 
 
@@ -118,8 +112,8 @@ splitIfaceSigmaTy ty
     (tvs,   rho)   = split_foralls ty
     (theta, tau)   = split_rho rho
 
-    split_foralls (IfaceForAllTy tv ty) 
-	= case split_foralls ty of { (tvs, rho) -> (tv:tvs, rho) }
+    split_foralls (IfaceForAllTy tv ty)
+        = case split_foralls ty of { (tvs, rho) -> (tv:tvs, rho) }
     split_foralls rho = ([], rho)
 
     split_rho (IfaceFunTy ty1 ty2)
@@ -128,9 +122,9 @@ splitIfaceSigmaTy ty
 \end{code}
 
 %************************************************************************
-%*									*
-		Pretty-printing
-%*									*
+%*                                                                      *
+                Pretty-printing
+%*                                                                      *
 %************************************************************************
 
 Precedence
@@ -155,7 +149,7 @@ noParens pp = pp
 maybeParen :: Int -> Int -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
-  | otherwise		   = parens pretty
+  | otherwise              = parens pretty
 \end{code}
 
 
@@ -195,7 +189,7 @@ pprParendIfaceType = ppr_ty tYCON_PREC
 isIfacePredTy :: IfaceType -> Bool
 isIfacePredTy _  = False
 -- FIXME: fix this to print iface pred tys correctly
--- isIfacePredTy ty = ifaceTypeKind ty `eqKind` constraintKind
+-- isIfacePredTy ty = isConstraintKind (ifaceTypeKind ty)
 
 ppr_ty :: Int -> IfaceType -> SDoc
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
@@ -203,11 +197,11 @@ ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
 
 ppr_ty _ (IfaceLitTy n) = ppr_tylit n
 
-ppr_ty ctxt_prec (IfaceCoConApp tc tys) 
-  = maybeParen ctxt_prec tYCON_PREC 
-	       (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])
+ppr_ty ctxt_prec (IfaceCoConApp tc tys)
+  = maybeParen ctxt_prec tYCON_PREC
+               (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])
 
-	-- Function types
+        -- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec fUN_PREC $
@@ -216,7 +210,7 @@ ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
     arr | isIfacePredTy ty1 = darrow
         | otherwise         = arrow
 
-    ppr_fun_tail (IfaceFunTy ty1 ty2) 
+    ppr_fun_tail (IfaceFunTy ty1 ty2)
       = (arr <+> ppr_ty fUN_PREC ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty
       = [arr <+> pprIfaceType other_ty]
@@ -227,12 +221,12 @@ ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
 
 ppr_ty ctxt_prec ty@(IfaceForAllTy _ _)
   = maybeParen ctxt_prec fUN_PREC (pprIfaceForAllPart tvs theta (pprIfaceType tau))
- where		
+ where
     (tvs, theta, tau) = splitIfaceSigmaTy ty
-     
+
  -------------------
 pprIfaceForAllPart :: [IfaceTvBndr] -> IfaceContext -> SDoc -> SDoc
-pprIfaceForAllPart tvs ctxt doc 
+pprIfaceForAllPart tvs ctxt doc
   = sep [ppr_tvs, pprIfaceContext ctxt, doc]
   where
     ppr_tvs | null tvs  = empty
@@ -248,7 +242,7 @@ ppr_tc_app _         (IfaceTc n) [ty] | n == parrTyConName = paBrackets (pprIfac
 ppr_tc_app _         (IfaceTc n) tys
   | Just (ATyCon tc) <- wiredInNameTyThing_maybe n
   , Just sort <- tyConTuple_maybe tc
-  , tyConArity tc == length tys 
+  , tyConArity tc == length tys
   = tupleParens sort (sep (punctuate comma (map pprIfaceType tys)))
 ppr_tc_app ctxt_prec tc tys
   = maybeParen ctxt_prec tYCON_PREC
@@ -271,13 +265,14 @@ instance Outputable IfaceTyCon where
   ppr = ppr . ifaceTyConName
 
 instance Outputable IfaceCoCon where
-  ppr (IfaceCoAx n)    = ppr n
+  ppr (IfaceCoAx n i)  = ppr n <> brackets (ppr i)
   ppr IfaceReflCo      = ptext (sLit "Refl")
   ppr IfaceUnsafeCo    = ptext (sLit "Unsafe")
   ppr IfaceSymCo       = ptext (sLit "Sym")
   ppr IfaceTransCo     = ptext (sLit "Trans")
   ppr IfaceInstCo      = ptext (sLit "Inst")
   ppr (IfaceNthCo d)   = ptext (sLit "Nth:") <> int d
+  ppr (IfaceLRCo lr)   = ppr lr
 
 instance Outputable IfaceTyLit where
   ppr = ppr_tylit
@@ -290,13 +285,13 @@ pprIfaceContext theta = ppr_preds theta <+> darrow
 
 ppr_preds :: [IfacePredType] -> SDoc
 ppr_preds [pred] = ppr pred    -- No parens
-ppr_preds preds  = parens (sep (punctuate comma (map ppr preds))) 
+ppr_preds preds  = parens (sep (punctuate comma (map ppr preds)))
 \end{code}
 
 %************************************************************************
-%*									*
-	Conversion from Type to IfaceType
-%*									*
+%*                                                                      *
+        Conversion from Type to IfaceType
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -354,33 +349,36 @@ toIfaceContext = toIfaceTypes
 ----------------
 coToIfaceType :: Coercion -> IfaceType
 coToIfaceType (Refl ty)             = IfaceCoConApp IfaceReflCo [toIfaceType ty]
-coToIfaceType (TyConAppCo tc cos)   
+coToIfaceType (TyConAppCo tc cos)
   | tc `hasKey` funTyConKey
   , [arg,res] <- cos                = IfaceFunTy (coToIfaceType arg) (coToIfaceType res)
-  | otherwise                       = IfaceTyConApp (toIfaceTyCon tc) 
+  | otherwise                       = IfaceTyConApp (toIfaceTyCon tc)
                                                     (map coToIfaceType cos)
-coToIfaceType (AppCo co1 co2)       = IfaceAppTy    (coToIfaceType co1) 
+coToIfaceType (AppCo co1 co2)       = IfaceAppTy    (coToIfaceType co1)
                                                     (coToIfaceType co2)
-coToIfaceType (ForAllCo v co)       = IfaceForAllTy (toIfaceTvBndr v) 
+coToIfaceType (ForAllCo v co)       = IfaceForAllTy (toIfaceTvBndr v)
                                                     (coToIfaceType co)
 coToIfaceType (CoVarCo cv)          = IfaceTyVar  (toIfaceCoVar cv)
-coToIfaceType (AxiomInstCo con cos) = IfaceCoConApp (coAxiomToIfaceType con)
+coToIfaceType (AxiomInstCo con ind cos)
+                                    = IfaceCoConApp (coAxiomToIfaceType con ind)
                                                     (map coToIfaceType cos)
-coToIfaceType (UnsafeCo ty1 ty2)    = IfaceCoConApp IfaceUnsafeCo 
+coToIfaceType (UnsafeCo ty1 ty2)    = IfaceCoConApp IfaceUnsafeCo
                                                     [ toIfaceType ty1
                                                     , toIfaceType ty2 ]
-coToIfaceType (SymCo co)            = IfaceCoConApp IfaceSymCo 
+coToIfaceType (SymCo co)            = IfaceCoConApp IfaceSymCo
                                                     [ coToIfaceType co ]
 coToIfaceType (TransCo co1 co2)     = IfaceCoConApp IfaceTransCo
                                                     [ coToIfaceType co1
                                                     , coToIfaceType co2 ]
 coToIfaceType (NthCo d co)          = IfaceCoConApp (IfaceNthCo d)
                                                     [ coToIfaceType co ]
-coToIfaceType (InstCo co ty)        = IfaceCoConApp IfaceInstCo 
+coToIfaceType (LRCo lr co)          = IfaceCoConApp (IfaceLRCo lr)
+                                                    [ coToIfaceType co ]
+coToIfaceType (InstCo co ty)        = IfaceCoConApp IfaceInstCo
                                                     [ coToIfaceType co
                                                     , toIfaceType ty ]
 
-coAxiomToIfaceType :: CoAxiom -> IfaceCoCon
-coAxiomToIfaceType con = IfaceCoAx (coAxiomName con)
+coAxiomToIfaceType :: CoAxiom br -> Int -> IfaceCoCon
+coAxiomToIfaceType con ind = IfaceCoAx (coAxiomName con) ind
 \end{code}
 

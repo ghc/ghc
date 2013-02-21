@@ -35,7 +35,9 @@ module DriverPhases (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} DynFlags
 import Outputable
+import Platform
 import System.FilePath
 
 -----------------------------------------------------------------------------
@@ -130,33 +132,39 @@ eqPhase _           _          = False
 -- Partial ordering on phases: we want to know which phases will occur before
 -- which others.  This is used for sanity checking, to ensure that the
 -- pipeline will stop at some point (see DriverPipeline.runPipeline).
-happensBefore :: Phase -> Phase -> Bool
-StopLn `happensBefore` _ = False
-x      `happensBefore` y = after_x `eqPhase` y || after_x `happensBefore` y
-        where
-          after_x = nextPhase x
+happensBefore :: DynFlags -> Phase -> Phase -> Bool
+happensBefore dflags p1 p2 = p1 `happensBefore'` p2
+    where StopLn `happensBefore'` _ = False
+          x      `happensBefore'` y = after_x `eqPhase` y
+                                   || after_x `happensBefore'` y
+              where after_x = nextPhase dflags x
 
-nextPhase :: Phase -> Phase
--- A conservative approximation to the next phase, used in happensBefore
-nextPhase (Unlit sf) = Cpp  sf
-nextPhase (Cpp   sf) = HsPp sf
-nextPhase (HsPp  sf) = Hsc  sf
-nextPhase (Hsc   _)  = HCc
-nextPhase Splitter   = SplitAs
-nextPhase LlvmOpt    = LlvmLlc
-nextPhase LlvmLlc    = LlvmMangle
-nextPhase LlvmMangle = As
-nextPhase SplitAs    = MergeStub
-nextPhase As         = MergeStub
-nextPhase Ccpp       = As
-nextPhase Cc         = As
-nextPhase Cobjc      = As
-nextPhase Cobjcpp    = As
-nextPhase CmmCpp     = Cmm
-nextPhase Cmm        = HCc
-nextPhase HCc        = As
-nextPhase MergeStub  = StopLn
-nextPhase StopLn     = panic "nextPhase: nothing after StopLn"
+nextPhase :: DynFlags -> Phase -> Phase
+nextPhase dflags p
+    -- A conservative approximation to the next phase, used in happensBefore
+    = case p of
+      Unlit sf   -> Cpp  sf
+      Cpp   sf   -> HsPp sf
+      HsPp  sf   -> Hsc  sf
+      Hsc   _    -> maybeHCc
+      Splitter   -> SplitAs
+      LlvmOpt    -> LlvmLlc
+      LlvmLlc    -> LlvmMangle
+      LlvmMangle -> As
+      SplitAs    -> MergeStub
+      As         -> MergeStub
+      Ccpp       -> As
+      Cc         -> As
+      Cobjc      -> As
+      Cobjcpp    -> As
+      CmmCpp     -> Cmm
+      Cmm        -> maybeHCc
+      HCc        -> As
+      MergeStub  -> StopLn
+      StopLn     -> panic "nextPhase: nothing after StopLn"
+    where maybeHCc = if platformUnregisterised (targetPlatform dflags)
+                     then HCc
+                     else As
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.
@@ -228,49 +236,47 @@ extcoreish_suffixes          = [ "hcr" ]
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]
 
-objish_suffixes :: [String]
+objish_suffixes :: Platform -> [String]
 -- Use the appropriate suffix for the system on which
 -- the GHC-compiled code will run
-#if mingw32_TARGET_OS || cygwin32_TARGET_OS
-objish_suffixes     = [ "o", "O", "obj", "OBJ" ]
-#else
-objish_suffixes     = [ "o" ]
-#endif
+objish_suffixes platform = case platformOS platform of
+                           OSMinGW32 -> [ "o", "O", "obj", "OBJ" ]
+                           _         -> [ "o" ]
 
-dynlib_suffixes :: [String]
-#ifdef mingw32_TARGET_OS
-dynlib_suffixes = ["dll", "DLL"]
-#elif defined(darwin_TARGET_OS)
-dynlib_suffixes = ["dylib"]
-#else
-dynlib_suffixes = ["so"]
-#endif
+dynlib_suffixes :: Platform -> [String]
+dynlib_suffixes platform = case platformOS platform of
+                           OSMinGW32 -> ["dll", "DLL"]
+                           OSDarwin  -> ["dylib"]
+                           _         -> ["so"]
 
 isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix, isExtCoreSuffix,
-    isObjectSuffix, isHaskellUserSrcSuffix, isDynLibSuffix
+    isHaskellUserSrcSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
 isExtCoreSuffix        s = s `elem` extcoreish_suffixes
-isObjectSuffix         s = s `elem` objish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
-isDynLibSuffix         s = s `elem` dynlib_suffixes
+
+isObjectSuffix, isDynLibSuffix :: Platform -> String -> Bool
+isObjectSuffix platform s = s `elem` objish_suffixes platform
+isDynLibSuffix platform s = s `elem` dynlib_suffixes platform
 
 isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
-    isExtCoreFilename, isObjectFilename, isHaskellUserSrcFilename,
-    isDynLibFilename, isSourceFilename
+    isExtCoreFilename, isHaskellUserSrcFilename, isSourceFilename
  :: FilePath -> Bool
 -- takeExtension return .foo, so we drop 1 to get rid of the .
 isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
 isHaskellSrcFilename     f = isHaskellSrcSuffix     (drop 1 $ takeExtension f)
 isCishFilename           f = isCishSuffix           (drop 1 $ takeExtension f)
 isExtCoreFilename        f = isExtCoreSuffix        (drop 1 $ takeExtension f)
-isObjectFilename         f = isObjectSuffix         (drop 1 $ takeExtension f)
 isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
-isDynLibFilename         f = isDynLibSuffix         (drop 1 $ takeExtension f)
 isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
+
+isObjectFilename, isDynLibFilename :: Platform -> FilePath -> Bool
+isObjectFilename platform f = isObjectSuffix platform (drop 1 $ takeExtension f)
+isDynLibFilename platform f = isDynLibSuffix platform (drop 1 $ takeExtension f)
 

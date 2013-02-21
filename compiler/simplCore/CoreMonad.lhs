@@ -72,7 +72,7 @@ import PprCore
 import CoreUtils
 import CoreLint		( lintCoreBindings )
 import HscTypes
-import Module           ( Module )
+import Module
 import DynFlags
 import StaticFlags	
 import Rules            ( RuleBase )
@@ -142,8 +142,8 @@ endPass dflags pass binds rules
        ; lintPassResult dflags pass binds }      
   where
     mb_flag = case coreDumpFlag pass of
-                Just dflag | dopt dflag dflags                   -> Just dflag
-                           | dopt Opt_D_verbose_core2core dflags -> Just dflag
+                Just flag | dopt flag dflags                    -> Just flag
+                          | dopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
 
 dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
@@ -151,15 +151,15 @@ dumpIfSet dflags dump_me pass extra_info doc
   = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
 dumpPassResult :: DynFlags 
-               -> Maybe DynFlag		-- Just df => show details in a file whose
+               -> Maybe DumpFlag		-- Just df => show details in a file whose
 	       	  			--            name is specified by df
                -> SDoc 			-- Header
                -> SDoc 			-- Extra info to appear after header
                -> CoreProgram -> [CoreRule] 
                -> IO ()
 dumpPassResult dflags mb_flag hdr extra_info binds rules
-  | Just dflag <- mb_flag
-  = Err.dumpSDoc dflags dflag (showSDoc dflags hdr) dump_doc
+  | Just flag <- mb_flag
+  = Err.dumpSDoc dflags flag (showSDoc dflags hdr) dump_doc
 
   | otherwise
   = Err.debugTraceMsg dflags 2 size_doc
@@ -180,7 +180,7 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
 
 lintPassResult :: DynFlags -> CoreToDo -> CoreProgram -> IO ()
 lintPassResult dflags pass binds
-  = when (dopt Opt_DoCoreLinting dflags) $
+  = when (gopt Opt_DoCoreLinting dflags) $
     do { let (warns, errs) = lintCoreBindings binds
        ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults dflags pass warns errs binds  }
@@ -265,7 +265,7 @@ data CoreToDo           -- These are diff core-to-core passes,
 \end{code}
 
 \begin{code}
-coreDumpFlag :: CoreToDo -> Maybe DynFlag
+coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_dump_simpl_phases
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_dump_core_pipeline
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
@@ -480,7 +480,8 @@ zeroSimplCount	   :: DynFlags -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
 hasDetailedCounts  :: SimplCount -> Bool
 pprSimplCount	   :: SimplCount -> SDoc
-doSimplTick, doFreeSimplTick :: Tick -> SimplCount -> SimplCount
+doSimplTick        :: DynFlags -> Tick -> SimplCount -> SimplCount
+doFreeSimplTick    ::             Tick -> SimplCount -> SimplCount
 plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
 \end{code}
 
@@ -525,13 +526,14 @@ doFreeSimplTick tick sc@SimplCount { details = dts }
   = sc { details = dts `addTick` tick }
 doFreeSimplTick _ sc = sc 
 
-doSimplTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 }
-  | nl >= opt_HistorySize = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
-  | otherwise		  = sc1 { n_log = nl+1, log1 = tick : l1 }
+doSimplTick dflags tick
+    sc@(SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 })
+  | nl >= historySize dflags = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
+  | otherwise                = sc1 { n_log = nl+1, log1 = tick : l1 }
   where
     sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
 
-doSimplTick _ (VerySimplCount n) = VerySimplCount (n+1)
+doSimplTick _ _ (VerySimplCount n) = VerySimplCount (n+1)
 
 
 -- Don't use Map.unionWith because that's lazy, and we want to 
@@ -720,7 +722,7 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
-        cr_globals :: ((Bool, [String], [Way]),
+        cr_globals :: ((Bool, [String]),
 #ifdef GHCI
                        (MVar PersistentLinkerState, Bool))
 #else
@@ -861,9 +863,6 @@ getHscEnv = read cr_hsc_env
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
 
-getModule :: CoreM Module
-getModule = read cr_module
-
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
@@ -871,6 +870,9 @@ addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
 instance HasDynFlags CoreM where
     getDynFlags = fmap hsc_dflags getHscEnv
+
+instance HasModule CoreM where
+    getModule = read cr_module
 
 -- | The original name cache is the current mapping from 'Module' and
 -- 'OccName' to a compiler-wide unique 'Name'
@@ -920,8 +922,11 @@ argument to the plugin function so that we can turn this function into
 reinitializeGlobals :: CoreM ()
 reinitializeGlobals = do
     (sf_globals, linker_globals) <- read cr_globals
+    hsc_env <- getHscEnv
+    let dflags = hsc_dflags hsc_env
     liftIO $ restoreStaticFlagGlobals sf_globals
     liftIO $ restoreLinkerGlobals linker_globals
+    liftIO $ setUnsafeGlobalDynFlags dflags
 \end{code}
 
 %************************************************************************
@@ -1017,7 +1022,7 @@ debugTraceMsg :: SDoc -> CoreM ()
 debugTraceMsg = msg (flip Err.debugTraceMsg 3)
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
-dumpIfSet_dyn :: DynFlag -> String -> SDoc -> CoreM ()
+dumpIfSet_dyn :: DumpFlag -> String -> SDoc -> CoreM ()
 dumpIfSet_dyn flag str = msg (\dflags -> Err.dumpIfSet_dyn dflags flag str)
 \end{code}
 

@@ -4,7 +4,7 @@ import Var      ( Id )
 import TcType   ( Type )
 import DsMonad  ( DsM, EquationInfo, MatchResult )
 import CoreSyn  ( CoreExpr )
-import HsSyn    ( LPat, HsMatchContext, MatchGroup )
+import HsSyn    ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import Name     ( Name )
 
 match   :: [Id]
@@ -14,7 +14,7 @@ match   :: [Id]
 
 matchWrapper
         :: HsMatchContext Name
-        -> MatchGroup Id
+        -> MatchGroup Id (LHsExpr Id)
         -> DsM ([Id], CoreExpr)
 
 matchSimply

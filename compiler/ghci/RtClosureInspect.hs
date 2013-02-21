@@ -60,7 +60,6 @@ import PrelNames
 import TysWiredIn
 import DynFlags
 import Outputable as Ppr
-import Constants        ( wORD_SIZE )
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO ( IO(..) )
@@ -172,8 +171,8 @@ pAP_CODE = PAP
 #undef AP
 #undef PAP
 
-getClosureData :: a -> IO Closure
-getClosureData a =
+getClosureData :: DynFlags -> a -> IO Closure
+getClosureData dflags a =
    case unpackClosure# a of 
      (# iptr, ptrs, nptrs #) -> do
            let iptr'
@@ -185,7 +184,7 @@ getClosureData a =
                    -- but the Storable instance for info tables takes
                    -- into account the extra entry pointer when
                    -- !ghciTablesNextToCode, so we must adjust here:
-                   Ptr iptr `plusPtr` negate wORD_SIZE
+                   Ptr iptr `plusPtr` negate (wORD_SIZE dflags)
            itbl <- peek iptr'
            let tipe = readCType (BCI.tipe itbl)
                elems = fromIntegral (BCI.ptrs itbl)
@@ -224,11 +223,11 @@ isThunk ThunkSelector = True
 isThunk AP            = True
 isThunk _             = False
 
-isFullyEvaluated :: a -> IO Bool
-isFullyEvaluated a = do 
-  closure <- getClosureData a 
+isFullyEvaluated :: DynFlags -> a -> IO Bool
+isFullyEvaluated dflags a = do
+  closure <- getClosureData dflags a
   case tipe closure of
-    Constr -> do are_subs_evaluated <- amapM isFullyEvaluated (ptrs closure)
+    Constr -> do are_subs_evaluated <- amapM (isFullyEvaluated dflags) (ptrs closure)
                  return$ and are_subs_evaluated
     _      -> return False
   where amapM f = sequence . amap' f
@@ -691,6 +690,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             text "Type obtained: " <> ppr (termType term))
    return term
     where 
+  dflags = hsc_dflags hsc_env
 
   go :: Int -> Type -> Type -> HValue -> TcM Term
    -- [SPJ May 11] I don't understand the difference between my_ty and old_ty
@@ -699,13 +699,13 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   go 0 my_ty _old_ty a = do
     traceTR (text "Gave up reconstructing a term after" <>
                   int max_depth <> text " steps")
-    clos <- trIO $ getClosureData a
+    clos <- trIO $ getClosureData dflags a
     return (Suspension (tipe clos) my_ty a Nothing)
   go max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)   
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
-    clos <- trIO $ getClosureData a
+    clos <- trIO $ getClosureData dflags a
     case tipe clos of
 -- Thunks we may want to force
       t | isThunk t && force -> traceTR (text "Forcing a " <> text (show t)) >>
@@ -749,7 +749,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         -- In such case, we return a best approximation:
                         --  ignore the unpointed args, and recover the pointeds
                         -- This preserves laziness, and should be safe.
-		       traceTR (text "Nothing" <+> ppr dcname)
+		       traceTR (text "Not constructor" <+> ppr dcname)
                        let dflags = hsc_dflags hsc_env
                            tag = showPpr dflags dcname
                        vars     <- replicateM (length$ elems$ ptrs clos) 
@@ -758,7 +758,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                                               | (i, tv) <- zip [0..] vars]
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
-            traceTR (text "Just" <+> ppr dc)
+            traceTR (text "Is constructor" <+> (ppr dc $$ ppr my_ty))
             subTtypes <- getDataConArgTys dc my_ty
             subTerms <- extractSubTerms (\ty -> go (pred max_depth) ty ty) clos subTtypes
             return (Term my_ty (Right dc) a subTerms)
@@ -818,7 +818,8 @@ extractSubTerms recurse clos = liftM thirdOf3 . go 0 (nonPtrs clos)
         t <- appArr (recurse ty) (ptrs clos) ptr_i
         return (ptr_i + 1, ws, t)
       _ -> do
-        let (ws0, ws1) = splitAt (primRepSizeW rep) ws
+        dflags <- getDynFlags
+        let (ws0, ws1) = splitAt (primRepSizeW dflags rep) ws
         return (ptr_i, ws1, Prim ty ws0)
 
     unboxedTupleTerm ty terms = Term ty (Right (tupleCon UnboxedTuple (length terms)))
@@ -855,6 +856,8 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
    traceTR (text "RTTI completed. Type obtained:" <+> ppr new_ty)
    return new_ty
     where
+  dflags = hsc_dflags hsc_env
+
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
   search _ _ _ 0 = traceTR (text "Failed to reconstruct a type after " <>
                                 int max_depth <> text " steps")
@@ -869,7 +872,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
   go :: Type -> HValue -> TR [(Type, HValue)]
   go my_ty a = do
     traceTR (text "go" <+> ppr my_ty)
-    clos <- trIO $ getClosureData a
+    clos <- trIO $ getClosureData dflags a
     case tipe clos of
       Blackhole -> appArr (go my_ty) (ptrs clos) 0 -- carefully, don't eval the TSO
       Indirection _ -> go my_ty $! (ptrs clos ! 0)
@@ -936,14 +939,16 @@ getDataConArgTys :: DataCon -> Type -> TR [Type]
 -- not be fully known.  Moreover, the arg types might involve existentials;
 -- if so, make up fresh RTTI type variables for them
 getDataConArgTys dc con_app_ty
-  = do { (_, ex_tys, _) <- instTyVars ex_tvs
+  = do { (_, ex_tys, ex_subst) <- instTyVars ex_tvs
        ; let UnaryRep rep_con_app_ty = repType con_app_ty
+       ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty))
        ; ty_args <- case tcSplitTyConApp_maybe rep_con_app_ty of
                        Just (tc, ty_args) | dataConTyCon dc == tc
 		       	   -> ASSERT( univ_tvs `equalLength` ty_args) 
                               return ty_args
- 		       _   -> do { (_, ty_args, subst) <- instTyVars univ_tvs
-		       	         ; let res_ty = substTy subst (dataConOrigResTy dc)
+ 		       _   -> do { (_, ty_args, univ_subst) <- instTyVars univ_tvs
+		       	         ; let res_ty = substTy ex_subst (substTy univ_subst (dataConOrigResTy dc))
+                                   -- See Note [Constructor arg types]
                                  ; addConstraint rep_con_app_ty res_ty
                                  ; return ty_args }
 		-- It is necessary to check dataConTyCon dc == tc
@@ -951,10 +956,37 @@ getDataConArgTys dc con_app_ty
       		-- newtype and tcSplitTyConApp has not removed it. In
       		-- that case, we happily give up and don't match
        ; let subst = zipTopTvSubst (univ_tvs ++ ex_tvs) (ty_args ++ ex_tys)
+       ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr ty_args $$ ppr subst))
        ; return (substTys subst (dataConRepArgTys dc)) }
   where
     univ_tvs = dataConUnivTyVars dc
     ex_tvs   = dataConExTyVars dc
+
+{- Note [Constructor arg types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a GADT (cf Trac #7386)
+   data family D a b
+   data instance D [a] b where
+     MkT :: b -> D [a] (Maybe b)
+
+In getDataConArgTys
+* con_app_ty is the known type (from outside) of the constructor application, 
+  say D [Int] Bool
+
+* The data constructor MkT has a (representation) dataConTyCon = DList,
+  say where
+    data DList a b where
+      MkT :: b -> DList a (Maybe b)
+
+So the dataConTyCon of the data constructor, DList, differs from 
+the "outside" type, D. So we can't straightforwardly decompose the
+"outside" type, and we end up in the "_" branch of the case.
+
+Then we match the dataConOrigResTy of the data constructor against the
+outside type, hoping to get a substitution that tells how to instantiate
+the *representation* type constructor.   This looks a bit delicate to
+me, but it seems to work.
+-}
 
 -- Soundness checks
 --------------------

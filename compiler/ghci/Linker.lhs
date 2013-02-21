@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2005-2006
+% (c) The University of Glasgow 2005-2012
 %
 \begin{code}
 -- | The dynamic linker for GHCi.
@@ -44,13 +44,13 @@ import BasicTypes
 import Outputable
 import Panic
 import Util
-import StaticFlags
 import ErrUtils
 import SrcLoc
 import qualified Maybes
 import UniqSet
 import FastString
 import Config
+import Platform
 import SysTools
 import PrelNames
 
@@ -172,7 +172,7 @@ getHValue hsc_env name = do
   pls <- modifyPLS $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [nameModule name]
-             if (failed ok) then ghcError (ProgramError "")
+             if (failed ok) then throwGhcExceptionIO (ProgramError "")
                             else return (pls', pls')
             else
              return (pls, pls)
@@ -263,7 +263,7 @@ showLinkerState dflags
 --     @-l@ options in @v_Opt_l@,
 --
 --  d) Loading any @.o\/.dll@ files specified on the command line, now held
---     in @v_Ld_inputs@,
+--     in @ldInputs@,
 --
 --  e) Loading any MacOS frameworks.
 --
@@ -297,17 +297,18 @@ reallyInitDynLinker dflags =
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
-        ; cmdline_ld_inputs <- readIORef v_Ld_inputs
+        ; let cmdline_ld_inputs = ldInputs dflags
 
         ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
 
           -- (e) Link any MacOS frameworks
-        ; let framework_paths
-               | isDarwinTarget = frameworkPaths dflags
-               | otherwise      = []
-        ; let frameworks
-               | isDarwinTarget = cmdlineFrameworks dflags
-               | otherwise      = []
+        ; let platform = targetPlatform dflags
+        ; let framework_paths = case platformOS platform of
+                                OSDarwin -> frameworkPaths dflags
+                                _        -> []
+        ; let frameworks = case platformOS platform of
+                           OSDarwin -> cmdlineFrameworks dflags
+                           _        -> []
           -- Finally do (c),(d),(e)
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
                                ++ libspecs
@@ -320,7 +321,7 @@ reallyInitDynLinker dflags =
         ; ok <- resolveObjs
 
         ; if succeeded ok then maybePutStrLn dflags "done"
-          else ghcError (ProgramError "linking extra libraries/objects failed")
+          else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
         ; return pls
         }}
@@ -353,12 +354,13 @@ users?
 
 classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
 classifyLdInput dflags f
-  | isObjectFilename f = return (Just (Object f))
-  | isDynLibFilename f = return (Just (DLLPath f))
+  | isObjectFilename platform f = return (Just (Object f))
+  | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
         log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
+    where platform = targetPlatform dflags
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
 preloadLib dflags lib_paths framework_paths lib_spec
@@ -375,7 +377,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
                                                 else "not found")
 
           DLL dll_unadorned
-             -> do maybe_errstr <- loadDLL (mkSOName dll_unadorned)
+             -> do maybe_errstr <- loadDLL (mkSOName platform dll_unadorned)
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
@@ -386,19 +388,22 @@ preloadLib dflags lib_paths framework_paths lib_spec
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
 
-          Framework framework
-           | isDarwinTarget
-             -> do maybe_errstr <- loadFramework framework_paths framework
+          Framework framework ->
+              case platformOS (targetPlatform dflags) of
+              OSDarwin ->
+                do maybe_errstr <- loadFramework framework_paths framework
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm framework_paths lib_spec
-           | otherwise -> panic "preloadLib Framework"
+              _ -> panic "preloadLib Framework"
 
   where
+    platform = targetPlatform dflags
+
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
        = do maybePutStr dflags "failed.\n"
-            ghcError $
+            throwGhcExceptionIO $
               CmdLineError (
                     "user specified .o/.so/.DLL could not be loaded ("
                     ++ sys_errmsg ++ ")\nWhilst trying to load:  "
@@ -410,11 +415,17 @@ preloadLib dflags lib_paths framework_paths lib_spec
     preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else loadObj name >> return True
+                     else do if dYNAMIC_BY_DEFAULT dflags
+                                 then dynLoadObjs dflags [name]
+                                 else loadObj name
+                             return True
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else loadArchive name >> return True
+                     else do if dYNAMIC_BY_DEFAULT dflags
+                                 then panic "Loading archives not supported"
+                                 else loadArchive name
+                             return True
 \end{code}
 
 
@@ -444,7 +455,7 @@ linkExpr hsc_env span root_ul_bco
      -- Link the packages and modules required
    ; (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
    ; if failed ok then
-        ghcError (ProgramError "")
+        throwGhcExceptionIO (ProgramError "")
      else do {
 
      -- Link the expression itself
@@ -452,7 +463,7 @@ linkExpr hsc_env span root_ul_bco
          ce = closure_env pls
 
      -- Link the necessary packages and linkables
-   ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce [root_ul_bco]
+   ; (_, (root_hval:_)) <- linkSomeBCOs dflags False ie ce [root_ul_bco]
    ; return (pls, root_hval)
    }}}
    where
@@ -469,13 +480,16 @@ linkExpr hsc_env span root_ul_bco
         -- by default, so we can safely ignore them here.
 
 dieWith :: DynFlags -> SrcSpan -> MsgDoc -> IO a
-dieWith dflags span msg = ghcError (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
+dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
 checkNonStdWay dflags srcspan = do
   let tag = buildTag dflags
-  if null tag {-  || tag == "dyn" -} then return False else do
+      dynamicByDefault = dYNAMIC_BY_DEFAULT dflags
+  if (null tag && not dynamicByDefault) ||
+     (tag == "dyn" && dynamicByDefault)
+      then return False
     -- see #3604: object files compiled for way "dyn" need to link to the
     -- dynamic packages, so we can't load them into a statically-linked GHCi.
     -- we have to treat "dyn" in the same way as "prof".
@@ -485,9 +499,9 @@ checkNonStdWay dflags srcspan = do
     -- .o files or -dynamic .o files into GHCi (currently that's not possible
     -- because the dynamic objects contain refs to e.g. __stginit_base_Prelude_dyn
     -- whereas we have __stginit_base_Prelude_.
-  if (objectSuf dflags == normalObjectSuffix)
-     then failNonStd dflags srcspan
-     else return True
+      else if (objectSuf dflags == normalObjectSuffix) && not (null tag)
+      then failNonStd dflags srcspan
+      else return True
 
 normalObjectSuffix :: String
 normalObjectSuffix = phaseInputExt StopLn
@@ -552,7 +566,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           mb_iface <- initIfaceCheck hsc_env $
                         loadInterface msg mod (ImportByUser False)
           iface <- case mb_iface of
-                    Maybes.Failed err      -> ghcError (ProgramError (showSDoc dflags err))
+                    Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
                     Maybes.Succeeded iface -> return iface
 
           when (mi_boot iface) $ link_boot_mod_error mod
@@ -580,7 +594,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
 
     link_boot_mod_error mod =
-        ghcError (ProgramError (showSDoc dflags (
+        throwGhcExceptionIO (ProgramError (showSDoc dflags (
             text "module" <+> ppr mod <+>
             text "cannot be linked; it is only available as a boot module")))
 
@@ -622,15 +636,26 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
             adjust_ul (DotO file) = do
                 MASSERT (osuf `isSuffixOf` file)
-                let new_file = reverse (drop (length osuf + 1) (reverse file))
-                                 <.> normalObjectSuffix
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith dflags span $
-                          ptext (sLit "cannot find normal object file ")
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
-            adjust_ul _ = panic "adjust_ul"
+                let file_base = reverse (drop (length osuf + 1) (reverse file))
+                    dyn_file = file_base <.> "dyn_o"
+                    new_file = file_base <.> normalObjectSuffix
+                -- Note that even if dYNAMIC_BY_DEFAULT is on, we might
+                -- still have dynamic object files called .o, so we need
+                -- to try both filenames.
+                use_dyn <- if dYNAMIC_BY_DEFAULT dflags
+                           then do doesFileExist dyn_file
+                           else return False
+                if use_dyn
+                    then return (DotO dyn_file)
+                    else do ok <- doesFileExist new_file
+                            if (not ok)
+                               then dieWith dflags span $
+                                      ptext (sLit "cannot find normal object file ")
+                                            <> quotes (text new_file) $$ while_linking_expr
+                               else return (DotO new_file)
+            adjust_ul (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
+            adjust_ul (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
+            adjust_ul l@(BCOs {}) = return l
 \end{code}
 
 
@@ -652,7 +677,7 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
     -- Link the packages and modules required
     (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
     if failed ok
-      then ghcError (ProgramError "")
+      then throwGhcExceptionIO (ProgramError "")
       else do
 
     -- Link the expression itself
@@ -660,7 +685,7 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
         ce = closure_env pls
 
     -- Link the necessary packages and linkables
-    (final_gce, _) <- linkSomeBCOs False ie ce unlinkedBCOs
+    (final_gce, _) <- linkSomeBCOs dflags False ie ce unlinkedBCOs
     let pls2 = pls { closure_env = final_gce,
                      itbl_env    = ie }
     return (pls2, ()) --hvals)
@@ -692,7 +717,7 @@ linkModule hsc_env mod = do
   initDynLinker (hsc_dflags hsc_env)
   modifyPLS_ $ \pls -> do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
-    if (failed ok) then ghcError (ProgramError "could not link module")
+    if (failed ok) then throwGhcExceptionIO (ProgramError "could not link module")
       else return pls'
 \end{code}
 
@@ -719,7 +744,7 @@ linkModules dflags pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs pls1 bcos
+                pls2 <- dynLinkBCOs dflags pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -764,20 +789,50 @@ dynLinkObjs dflags pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
             unlinkeds                = concatMap linkableUnlinked new_objs
+            wanted_objs              = map nameOfObject unlinkeds
 
-        mapM_ loadObj (map nameOfObject unlinkeds)
+        if dYNAMIC_BY_DEFAULT dflags
+            then do dynLoadObjs dflags wanted_objs
+                    return (pls, Succeeded)
+            else do mapM_ loadObj wanted_objs
 
-        -- Link the all together
-        ok <- resolveObjs
+                    -- Link them all together
+                    ok <- resolveObjs
 
-        -- If resolving failed, unload all our
-        -- object modules and carry on
-        if succeeded ok then do
-                return (pls1, Succeeded)
-          else do
-                pls2 <- unload_wkr dflags [] pls1
-                return (pls2, Failed)
+                    -- If resolving failed, unload all our
+                    -- object modules and carry on
+                    if succeeded ok then do
+                            return (pls1, Succeeded)
+                      else do
+                            pls2 <- unload_wkr dflags [] pls1
+                            return (pls2, Failed)
 
+dynLoadObjs :: DynFlags -> [FilePath] -> IO ()
+dynLoadObjs dflags objs = do
+    let platform = targetPlatform dflags
+    soFile <- newTempName dflags (soExt platform)
+    let -- When running TH for a non-dynamic way, we still need to make
+        -- -l flags to link against the dynamic libraries, so we turn
+        -- Opt_Static off
+        dflags1 = gopt_unset dflags Opt_Static
+        dflags2 = dflags1 {
+                      -- We don't want to link the ldInputs in; we'll
+                      -- be calling dynLoadObjs with any objects that
+                      -- need to be linked.
+                      ldInputs = [],
+                      -- Even if we're e.g. profiling, we still want
+                      -- the vanilla dynamic libraries, so we set the
+                      -- ways / build tag to be just WayDyn.
+                      ways = [WayDyn],
+                      buildTag = mkBuildTag [WayDyn],
+                      outputFile = Just soFile
+                  }
+    linkDynLib dflags2 objs []
+    consIORef (filesToNotIntermediateClean dflags) soFile
+    m <- loadDLL soFile
+    case m of
+        Nothing -> return ()
+        Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
                -> [Linkable]    -- New linkables
@@ -799,8 +854,9 @@ rmDupLinkables already ls
 %************************************************************************
 
 \begin{code}
-dynLinkBCOs :: PersistentLinkerState -> [Linkable] -> IO PersistentLinkerState
-dynLinkBCOs pls bcos = do
+dynLinkBCOs :: DynFlags -> PersistentLinkerState -> [Linkable]
+            -> IO PersistentLinkerState
+dynLinkBCOs dflags pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -816,7 +872,7 @@ dynLinkBCOs pls bcos = do
             gce       = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        (final_gce, _linked_bcos) <- linkSomeBCOs True final_ie gce ul_bcos
+        (final_gce, _linked_bcos) <- linkSomeBCOs dflags True final_ie gce ul_bcos
                 -- XXX What happens to these linked_bcos?
 
         let pls2 = pls1 { closure_env = final_gce,
@@ -825,7 +881,8 @@ dynLinkBCOs pls bcos = do
         return pls2
 
 -- Link a bunch of BCOs and return them + updated closure env.
-linkSomeBCOs :: Bool    -- False <=> add _all_ BCOs to returned closure env
+linkSomeBCOs :: DynFlags
+             -> Bool    -- False <=> add _all_ BCOs to returned closure env
                         -- True  <=> add only toplevel BCOs to closure env
              -> ItblEnv
              -> ClosureEnv
@@ -835,11 +892,11 @@ linkSomeBCOs :: Bool    -- False <=> add _all_ BCOs to returned closure env
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs toplevs_only ie ce_in ul_bcos
+linkSomeBCOs dflags toplevs_only ie ce_in ul_bcos
    = do let nms = map unlinkedBCOName ul_bcos
         hvals <- fixIO
                     ( \ hvs -> let ce_out = extendClosureEnv ce_in (zipLazy nms hvs)
-                               in  mapM (linkBCO ie ce_out) ul_bcos )
+                               in  mapM (linkBCO dflags ie ce_out) ul_bcos )
         let ce_all_additions = zip nms hvals
             ce_top_additions = filter (isExternalName.fst) ce_all_additions
             ce_additions     = if toplevs_only then ce_top_additions
@@ -968,7 +1025,7 @@ data LibrarySpec
 -- just to get the DLL handle into the list.
 partOfGHCi :: [PackageName]
 partOfGHCi
- | isWindowsTarget || isDarwinTarget = []
+ | isWindowsHost || isDarwinHost = []
  | otherwise = map PackageName
                    ["base", "template-haskell", "editline"]
 
@@ -1027,13 +1084,14 @@ linkPackages' dflags new_pks pls = do
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = ghcError (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
 linkPackage dflags pkg
    = do
-        let dirs      =  Packages.libraryDirs pkg
+        let platform  = targetPlatform dflags
+            dirs      =  Packages.libraryDirs pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as
@@ -1070,8 +1128,8 @@ linkPackage dflags pkg
 
         -- See comments with partOfGHCi
         when (packageName pkg `notElem` partOfGHCi) $ do
-            loadFrameworks pkg
-            mapM_ load_dyn (known_dlls ++ map mkSOName dlls)
+            loadFrameworks platform pkg
+            mapM_ load_dyn (known_dlls ++ map (mkSOName platform) dlls)
 
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1082,7 +1140,7 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
         if succeeded ok then maybePutStrLn dflags "done."
-              else ghcError (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
+              else throwGhcExceptionIO (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
 
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
@@ -1093,13 +1151,14 @@ load_dyn :: FilePath -> IO ()
 load_dyn dll = do r <- loadDLL dll
                   case r of
                     Nothing  -> return ()
-                    Just err -> ghcError (CmdLineError ("can't load .so/.DLL for: "
+                    Just err -> throwGhcExceptionIO (CmdLineError ("can't load .so/.DLL for: "
                                                               ++ dll ++ " (" ++ err ++ ")" ))
 
-loadFrameworks :: InstalledPackageInfo_ ModuleName -> IO ()
-loadFrameworks pkg
- | isDarwinTarget = mapM_ load frameworks
- | otherwise = return ()
+loadFrameworks :: Platform -> InstalledPackageInfo_ ModuleName -> IO ()
+loadFrameworks platform pkg
+    = case platformOS platform of
+      OSDarwin -> mapM_ load frameworks
+      _        -> return ()
   where
     fw_dirs    = Packages.frameworkDirs pkg
     frameworks = Packages.frameworks pkg
@@ -1107,7 +1166,7 @@ loadFrameworks pkg
     load fw = do  r <- loadFramework fw_dirs fw
                   case r of
                     Nothing  -> return ()
-                    Just err -> ghcError (CmdLineError ("can't load framework: "
+                    Just err -> throwGhcExceptionIO (CmdLineError ("can't load framework: "
                                                         ++ fw ++ " (" ++ err ++ ")" ))
 
 -- Try to find an object file for a given library in the given paths.
@@ -1136,22 +1195,28 @@ locateLib dflags is_hs dirs lib
   | otherwise
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
-  = findHSDll `orElse` findObject `orElse` findArchive `orElse` assumeDll
+  = findHSDll `orElse` findDynObject `orElse` findDynArchive `orElse`
+                       findObject    `orElse` findArchive `orElse` assumeDll
    where
-     mk_obj_path dir = dir </> (lib <.> "o")
-     mk_arch_path dir = dir </> ("lib" ++ lib <.> "a")
+     mk_obj_path      dir = dir </> (lib <.> "o")
+     mk_dyn_obj_path  dir = dir </> (lib <.> "dyn_o")
+     mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
+     mk_dyn_arch_path dir = dir </> ("lib" ++ lib <.> "dyn_a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
-     mk_hs_dyn_lib_path dir = dir </> mkSOName hs_dyn_lib_name
+     mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
 
-     so_name = mkSOName lib
+     so_name = mkSOName platform lib
      mk_dyn_lib_path dir = dir </> so_name
 
-     findObject  = liftM (fmap Object)  $ findFile mk_obj_path  dirs
-     findArchive = liftM (fmap Archive) $ findFile mk_arch_path dirs
-     findHSDll   = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
-     findDll     = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path dirs
-     tryGcc      = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
+     findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
+     findDynObject  = do putStrLn "In findDynObject"
+                         liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
+     findArchive    = liftM (fmap Archive) $ findFile mk_arch_path       dirs
+     findDynArchive = liftM (fmap Archive) $ findFile mk_dyn_arch_path   dirs
+     findHSDll      = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
+     findDll        = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path    dirs
+     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
 
      assumeDll   = return (DLL lib)
      infixr `orElse`
@@ -1159,6 +1224,8 @@ locateLib dflags is_hs dirs lib
                        case m of
                            Just x -> return x
                            Nothing -> g
+
+     platform = targetPlatform dflags
 
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do
@@ -1172,13 +1239,7 @@ searchForLibUsingGcc dflags so dirs = do
       else return (Just file)
 
 -- ----------------------------------------------------------------------------
--- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
-
-mkSOName :: FilePath -> FilePath
-mkSOName root
- | isDarwinTarget  = ("lib" ++ root) <.> "dylib"
- | isWindowsTarget = root <.> "dll"
- | otherwise       = ("lib" ++ root) <.> "so"
+-- Loading a dynamic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
@@ -1212,15 +1273,12 @@ loadFramework extraPaths rootname
 findFile :: (FilePath -> FilePath)      -- Maps a directory path to a file path
          -> [FilePath]                  -- Directories to look in
          -> IO (Maybe FilePath)         -- The first file path to match
-findFile _ []
-  = return Nothing
-findFile mk_file_path (dir:dirs)
-  = do  { let file_path = mk_file_path dir
-        ; b <- doesFileExist file_path
-        ; if b then
-             return (Just file_path)
-          else
-             findFile mk_file_path dirs }
+findFile _            [] = return Nothing
+findFile mk_file_path (dir : dirs)
+  = do let file_path = mk_file_path dir
+       b <- doesFileExist file_path
+       if b then return (Just file_path)
+            else findFile mk_file_path dirs
 \end{code}
 
 \begin{code}

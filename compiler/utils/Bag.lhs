@@ -268,5 +268,6 @@ instance Data a => Data (Bag a) where
   toConstr _   = abstractConstr $ "Bag("++show (typeOf (undefined::a))++")"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Bag"
+  dataCast1 x  = gcast1 x
 \end{code}
 

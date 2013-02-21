@@ -51,6 +51,11 @@ words :-
     <0>         "Monadic"           { mkT TMonadic }
     <0>         "Compare"           { mkT TCompare }
     <0>         "GenPrimOp"         { mkT TGenPrimOp }
+    <0>         "fixity"            { mkT TFixity }
+    <0>         "infix"             { mkT TInfixN }
+    <0>         "infixl"            { mkT TInfixL }
+    <0>         "infixr"            { mkT TInfixR }
+    <0>         "Nothing"           { mkT TNothing }
     <0>         "thats_all_folks"   { mkT TThatsAllFolks }
     <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
     <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
