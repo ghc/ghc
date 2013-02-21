@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 
-define hs-suffix-rules  # args: $1 = dir,  $2 = distdir, $3 = way
+define hs-suffix-way-rules  # args: $1 = dir,  $2 = distdir, $3 = way
 
 ifneq "$$(BINDIST)" "YES"
 
@@ -37,5 +37,5 @@ $(call hi-rule,$1/$2/build/autogen,$1/$2/build,$3)
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
   $$(eval $$(call hi-rule,$1/$$(dir),$1/$2/build,$3)))
 
-endef # hs-suffix-rules
+endef # hs-suffix-way-rules
 

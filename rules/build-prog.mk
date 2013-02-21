@@ -154,7 +154,7 @@ $(call c-suffix-rules,$1,$2,$$($1_$2_PROGRAM_WAY),NO)
 endif
 endif
 
-$(call hs-suffix-rules,$1,$2,$$($1_$2_PROGRAM_WAY))
+$(call hs-suffix-way-rules,$1,$2,$$($1_$2_PROGRAM_WAY))
 
 $(call c-objs,$1,$2,$$($1_$2_PROGRAM_WAY))
 $(call hs-objs,$1,$2,$$($1_$2_PROGRAM_WAY))

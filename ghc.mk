@@ -227,7 +227,7 @@ include rules/cmm-objs.mk
 ifneq "$(CLEANING)" "YES"
 
 include rules/hs-suffix-rules-srcdir.mk
-include rules/hs-suffix-rules.mk
+include rules/hs-suffix-way-rules.mk
 include rules/hi-rule.mk
 include rules/c-suffix-rules.mk
 include rules/cmm-suffix-rules.mk
