@@ -582,9 +582,10 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 -- newtype deriving we allow deriving (forall a. C [a]).
 
                 -- Typeable is special
-        ; if className cls == typeableClassName
+        ; pprTrace "tvs, deriv_tvs, cls_tys, tc, tc_args" (ppr (tvs, deriv_tvs, cls_tys, tc, tc_args))
+        $ if className cls == typeableClassName
           then mkEqnHelp DerivOrigin
-                  (varSetElemsKvsFirst (mkVarSet tvs `extendVarSetList` deriv_tvs))
+                  tvs
                   cls cls_tys (mkTyConApp tc tc_args) Nothing
           else do {
 
@@ -812,16 +813,20 @@ mk_typeable_eqn orig tvs cls tycon tc_args mtheta
   = mk_typeable_eqn orig tvs cls tycon [] (Just [])
 
   | otherwise -- standalone deriving
-  = do  { checkTc (null tc_args)
+  = do  { pprTrace "tvs, tycon, tc_args" (ppr (tvs, tycon, tc_args))
+        $ checkTc (onlyKindVars tc_args)
                   (ptext (sLit "Derived typeable instance must be of form (Typeable")
                         <+> ppr tycon <> rparen)
         ; dfun_name <- new_dfun_name cls tycon
         ; loc <- getSrcSpanM
         ; return (Right $
-                  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = []
-                     , ds_cls = cls, ds_tys = tyConKind tycon : [mkTyConApp tycon []]
-                     , ds_tc = tycon, ds_tc_args = []
+                  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = tvs
+                     , ds_cls = cls, ds_tys = tyConKind tycon : [mkTyConApp tycon tc_args]
+                     , ds_tc = tycon, ds_tc_args = tc_args
                      , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
+  where onlyKindVars     = and . map (isJKVar . tcGetTyVar_maybe)
+        isJKVar (Just v) = isKindVar v
+        isJKVar _        = False
 
 ----------------------
 inferConstraints :: Class -> [TcType]
