@@ -24,16 +24,6 @@ module Text.Show.Functions () where
 
 import Prelude
 
-#ifndef __NHC__
 instance Show (a -> b) where
 	showsPrec _ _ = showString "<function>"
-#else
-instance (Show a,Show b) => Show (a->b) where
-  showsPrec d a = showString "<<function>>"
-
-  showsType a = showChar '(' . showsType value  . showString " -> " .
-                               showsType result . showChar ')'
-                where (value,result) = getTypes undefined
-                      getTypes x = (x,a x)
-#endif
 

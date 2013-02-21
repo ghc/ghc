@@ -55,7 +55,7 @@ It is not guaranteed that a finalizer will eventually run, and no
 attempt is made to run outstanding finalizers when the program exits.
 Therefore finalizers should not be relied on to clean up resources -
 other methods (eg. exception handlers) should be employed, possibly in
-addition to finalisers.
+addition to finalizers.
 
 References from the finalizer to the key are treated in the same way
 as references from the value to the key: they do not keep the key
@@ -76,6 +76,24 @@ such finalizer.
 
 If there are no other threads to run, the runtime system will check
 for runnable finalizers before declaring the system to be deadlocked.
+
+WARNING: weak pointers to ordinary non-primitive Haskell types are
+particularly fragile, because the compiler is free to optimise away or
+duplicate the underlying data structure.  Therefore attempting to
+place a finalizer on an ordinary Haskell type may well result in the
+finalizer running earlier than you expected.  This is not a problem
+for caches and memo tables where early finalization is benign.
+
+Finalizers /can/ be used reliably for types that are created explicitly
+and have identity, such as @IORef@ and @MVar@.  However, to place a
+finalizer on one of these types, you should use the specific operation
+provided for that type, e.g. @mkWeakIORef@ and @addMVarFinalizer@
+respectively (the non-uniformity is accidental).  These operations
+attach the finalizer to the primitive object inside the box
+(e.g. @MutVar#@ in the case of @IORef@), because attaching the
+finalizer to the box itself fails when the outer box is optimised away
+by the compiler.
+
 -}
 data Weak v = Weak (Weak# v)
 
@@ -116,7 +134,7 @@ deRefWeak (Weak w) = IO $ \s ->
 finalize :: Weak v -> IO ()
 finalize (Weak w) = IO $ \s ->
    case finalizeWeak# w s of
-        (# s1, 0#, _ #) -> (# s1, () #) -- already dead, or no finaliser
+        (# s1, 0#, _ #) -> (# s1, () #) -- already dead, or no finalizer
         (# s1, _,  f #) -> f s1
 
 {-

@@ -21,9 +21,9 @@
 
 module Data.Unique (
    -- * Unique objects
-   Unique,              -- instance (Eq, Ord)
-   newUnique,           -- :: IO Unique
-   hashUnique           -- :: Unique -> Int
+   Unique,
+   newUnique,
+   hashUnique
  ) where
 
 import Prelude

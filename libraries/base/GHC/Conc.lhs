@@ -30,66 +30,65 @@ module GHC.Conc
         ( ThreadId(..)
 
         -- * Forking and suchlike
-        , forkIO        -- :: IO a -> IO ThreadId
-        , forkIOUnmasked
+        , forkIO
         , forkIOWithUnmask
         , forkOn
-        , forkOnIO      -- :: Int -> IO a -> IO ThreadId
-        , forkOnIOUnmasked
         , forkOnWithUnmask
-        , numCapabilities -- :: Int
-        , getNumCapabilities -- :: IO Int
-        , setNumCapabilities -- :: Int -> IO ()
-        , getNumProcessors   -- :: IO Int
-        , numSparks       -- :: IO Int
-        , childHandler  -- :: Exception -> IO ()
-        , myThreadId    -- :: IO ThreadId
-        , killThread    -- :: ThreadId -> IO ()
-        , throwTo       -- :: ThreadId -> Exception -> IO ()
-        , par           -- :: a -> b -> b
-        , pseq          -- :: a -> b -> b
+        , numCapabilities
+        , getNumCapabilities
+        , setNumCapabilities
+        , getNumProcessors
+        , numSparks
+        , childHandler
+        , myThreadId
+        , killThread
+        , throwTo
+        , par
+        , pseq
         , runSparks
-        , yield         -- :: IO ()
-        , labelThread   -- :: ThreadId -> String -> IO ()
-        , mkWeakThreadId -- :: ThreadId -> IO (Weak ThreadId)
+        , yield
+        , labelThread
+        , mkWeakThreadId
 
         , ThreadStatus(..), BlockReason(..)
-        , threadStatus  -- :: ThreadId -> IO ThreadStatus
+        , threadStatus
         , threadCapability
 
         -- * Waiting
-        , threadDelay           -- :: Int -> IO ()
-        , registerDelay         -- :: Int -> IO (TVar Bool)
-        , threadWaitRead        -- :: Int -> IO ()
-        , threadWaitWrite       -- :: Int -> IO ()
-        , closeFdWith           -- :: (Fd -> IO ()) -> Fd -> IO ()
+        , threadDelay
+        , registerDelay
+        , threadWaitRead
+        , threadWaitWrite
+        , threadWaitReadSTM
+        , threadWaitWriteSTM
+        , closeFdWith
 
         -- * TVars
         , STM(..)
-        , atomically    -- :: STM a -> IO a
-        , retry         -- :: STM a
-        , orElse        -- :: STM a -> STM a -> STM a
-        , throwSTM      -- :: Exception e => e -> STM a
-        , catchSTM      -- :: Exception e => STM a -> (e -> STM a) -> STM a
-        , alwaysSucceeds -- :: STM a -> STM ()
-        , always        -- :: STM Bool -> STM ()
+        , atomically
+        , retry
+        , orElse
+        , throwSTM
+        , catchSTM
+        , alwaysSucceeds
+        , always
         , TVar(..)
-        , newTVar       -- :: a -> STM (TVar a)
-        , newTVarIO     -- :: a -> STM (TVar a)
-        , readTVar      -- :: TVar a -> STM a
-        , readTVarIO    -- :: TVar a -> IO a
-        , writeTVar     -- :: a -> TVar a -> STM ()
-        , unsafeIOToSTM -- :: IO a -> STM a
+        , newTVar
+        , newTVarIO
+        , readTVar
+        , readTVarIO
+        , writeTVar
+        , unsafeIOToSTM
 
         -- * Miscellaneous
         , withMVar
 #ifdef mingw32_HOST_OS
-        , asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-        , asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-        , asyncDoProc   -- :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
+        , asyncRead
+        , asyncWrite
+        , asyncDoProc
 
-        , asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
-        , asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
+        , asyncReadBA
+        , asyncWriteBA
 #endif
 
 #ifndef mingw32_HOST_OS
@@ -97,14 +96,15 @@ module GHC.Conc
 #endif
 
         , ensureIOManagerIsRunning
+        , ioManagerCapabilitiesChanged
 
 #ifdef mingw32_HOST_OS
         , ConsoleEvent(..)
         , win32ConsoleHandler
         , toWin32ConsoleEvent
 #endif
-        , setUncaughtExceptionHandler      -- :: (Exception -> IO ()) -> IO ()
-        , getUncaughtExceptionHandler      -- :: IO (Exception -> IO ())
+        , setUncaughtExceptionHandler
+        , getUncaughtExceptionHandler
 
         , reportError, reportStackOverflow
         ) where

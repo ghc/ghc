@@ -17,15 +17,13 @@
 
 module System.Environment
     (
-      getArgs,            -- :: IO [String]
-      getProgName,        -- :: IO String
-      getExecutablePath,  -- :: IO FilePath
-      getEnv,             -- :: String -> IO String
-      lookupEnv,          -- :: String -> IO (Maybe String)
-#ifndef __NHC__
+      getArgs,
+      getProgName,
+      getExecutablePath,
+      getEnv,
+      lookupEnv,
       withArgs,
       withProgName,
-#endif
 #ifdef __GLASGOW_HASKELL__
       getEnvironment,
 #endif
@@ -52,14 +50,6 @@ import Control.Monad
 
 #ifdef __HUGS__
 import Hugs.System
-#endif
-
-#ifdef __NHC__
-import System
-  ( getArgs
-  , getProgName
-  , getEnv
-  )
 #endif
 
 import System.Environment.ExecutablePath
@@ -238,7 +228,7 @@ lookupEnv name = withCWString name $ \s -> try_size s 256
           | otherwise  -> peekCWString p_value >>= return . Just
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetEnvironmentVariableW"
-  c_GetEnvironmentVariable :: LPTSTR -> LPTSTR -> DWORD -> IO DWORD
+  c_GetEnvironmentVariable :: LPWSTR -> LPWSTR -> DWORD -> IO DWORD
 #else
 lookupEnv name =
     withCString name $ \s -> do

@@ -327,50 +327,21 @@ branchMask :: Prefix -> Prefix -> Mask
 branchMask p1 p2
     = intFromNat (highestBitMask (natFromInt p1 `xor` natFromInt p2))
 
-{-
-Finding the highest bit mask in a word [x] can be done efficiently in
-three ways:
+-- The highestBitMask implementation is based on
+-- http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+-- which has been put in the public domain.
 
-* convert to a floating point value and the mantissa tells us the
-  [log2(x)] that corresponds with the highest bit position. The mantissa
-  is retrieved either via the standard C function [frexp] or by some bit
-  twiddling on IEEE compatible numbers (float). Note that one needs to
-  use at least [double] precision for an accurate mantissa of 32 bit
-  numbers.
-
-* use bit twiddling, a logarithmic sequence of bitwise or's and shifts (bit).
-
-* use processor specific assembler instruction (asm).
-
-The most portable way would be [bit], but is it efficient enough?
-I have measured the cycle counts of the different methods on an AMD
-Athlon-XP 1800 (~ Pentium III 1.8Ghz) using the RDTSC instruction:
-
-highestBitMask: method  cycles
-                --------------
-                 frexp   200
-                 float    33
-                 bit      11
-                 asm      12
-
-Wow, the bit twiddling is on today's RISC like machines even faster
-than a single CISC instruction (BSR)!
--}
-
--- | @highestBitMask@ returns a word where only the highest bit is
--- set.  It is found by first setting all bits in lower positions than
--- the highest bit and than taking an exclusive or with the original
--- value.  Allthough the function may look expensive, GHC compiles
--- this into excellent C code that subsequently compiled into highly
--- efficient machine code. The algorithm is derived from Jorg Arndt's
--- FXT library.
+-- | Return a word where only the highest bit is set.
 highestBitMask :: Nat -> Nat
-highestBitMask x0
-  = case (x0 .|. shiftRL x0 1) of
-     x1 -> case (x1 .|. shiftRL x1 2) of
-      x2 -> case (x2 .|. shiftRL x2 4) of
-       x3 -> case (x3 .|. shiftRL x3 8) of
-        x4 -> case (x4 .|. shiftRL x4 16) of
-         x5 -> case (x5 .|. shiftRL x5 32) of   -- for 64 bit platforms
-          x6 -> (x6 `xor` (shiftRL x6 1))
-
+highestBitMask x1 = let x2 = x1 .|. x1 `shiftRL` 1
+                        x3 = x2 .|. x2 `shiftRL` 2
+                        x4 = x3 .|. x3 `shiftRL` 4
+                        x5 = x4 .|. x4 `shiftRL` 8
+                        x6 = x5 .|. x5 `shiftRL` 16
+#if !(WORD_SIZE_IN_BITS==32)
+                        x7 = x6 .|. x6 `shiftRL` 32
+                     in x7 `xor` (x7 `shiftRL` 1)
+#else
+                     in x6 `xor` (x6 `shiftRL` 1)
+#endif
+{-# INLINE highestBitMask #-}

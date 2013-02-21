@@ -20,11 +20,11 @@
 module Foreign.StablePtr
         ( -- * Stable references to Haskell values
           StablePtr          -- abstract
-        , newStablePtr       -- :: a -> IO (StablePtr a)
-        , deRefStablePtr     -- :: StablePtr a -> IO a
-        , freeStablePtr      -- :: StablePtr a -> IO ()
-        , castStablePtrToPtr -- :: StablePtr a -> Ptr ()
-        , castPtrToStablePtr -- :: Ptr () -> StablePtr a
+        , newStablePtr
+        , deRefStablePtr
+        , freeStablePtr
+        , castStablePtrToPtr
+        , castPtrToStablePtr
         , -- ** The C-side interface
 
           -- $cinterface
@@ -36,17 +36,6 @@ import GHC.Stable
 
 #ifdef __HUGS__
 import Hugs.StablePtr
-#endif
-
-#ifdef __NHC__
-import NHC.FFI
-  ( StablePtr
-  , newStablePtr
-  , deRefStablePtr
-  , freeStablePtr
-  , castStablePtrToPtr
-  , castPtrToStablePtr
-  )
 #endif
 
 -- $cinterface

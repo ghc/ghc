@@ -17,17 +17,13 @@
 -----------------------------------------------------------------------------
 
 module Text.Show (
-   ShowS,               -- String -> String
-   Show(
-      showsPrec,        -- :: Int -> a -> ShowS
-      show,             -- :: a   -> String
-      showList          -- :: [a] -> ShowS 
-    ),
-   shows,               -- :: (Show a) => a -> ShowS
-   showChar,            -- :: Char -> ShowS
-   showString,          -- :: String -> ShowS
-   showParen,           -- :: Bool -> ShowS -> ShowS
-   showListWith,        -- :: (a -> ShowS) -> [a] -> ShowS 
+   ShowS,
+   Show(showsPrec, show, showList),
+   shows,
+   showChar,
+   showString,
+   showParen,
+   showListWith,
  ) where
 
 #ifdef __GLASGOW_HASKELL__

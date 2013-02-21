@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples, Rank2Types #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples, RankNTypes #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------

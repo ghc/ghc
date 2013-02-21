@@ -21,10 +21,10 @@ module Data.Ix
     (
     -- * The 'Ix' class
         Ix
-          ( range       -- :: (Ix a) => (a,a) -> [a]
-          , index       -- :: (Ix a) => (a,a) -> a   -> Int
-          , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
-          , rangeSize   -- :: (Ix a) => (a,a) -> Int
+          ( range
+          , index
+          , inRange
+          , rangeSize
           )
     -- Ix instances:
     --
@@ -70,9 +70,5 @@ import GHC.Arr
 
 #ifdef __HUGS__
 import Hugs.Prelude( Ix(..) )
-#endif
-
-#ifdef __NHC__
-import Ix (Ix(..))
 #endif
 

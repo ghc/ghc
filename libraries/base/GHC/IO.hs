@@ -37,7 +37,7 @@ module GHC.IO (
         catchException, catchAny, throwIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
         MaskingState(..), getMaskingState,
-        block, unblock, blocked, unsafeUnmask,
+        unsafeUnmask,
         onException, bracket, finally, evaluate
     ) where
 
@@ -191,7 +191,7 @@ unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
 --                             case writeIORef v r s of (# s1, _ #) ->
 --                             (# s1, r #)
 -- The strictness analyser will find that the binding for r is strict,
--- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
+-- (because of uPIO's strictness sig), and so it'll evaluate it before 
 -- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
 -- get a deadlock!  
 --
@@ -302,9 +302,6 @@ throwIO e = IO (raiseIO# (toException e))
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
 
-{-# DEPRECATED block "use Control.Exception.mask instead" #-}
--- | Note: this function is deprecated, please use 'mask' instead.
---
 -- Applying 'block' to a computation will
 -- execute that computation with asynchronous exceptions
 -- /blocked/.  That is, any thread which
@@ -322,9 +319,6 @@ throwIO e = IO (raiseIO# (toException e))
 block :: IO a -> IO a
 block (IO io) = IO $ maskAsyncExceptions# io
 
-{-# DEPRECATED unblock "use Control.Exception.mask instead" #-}
--- | Note: this function is deprecated, please use 'mask' instead.
---
 -- To re-enable asynchronous exceptions inside the scope of
 -- 'block', 'unblock' can be
 -- used.  It scopes in exactly the same way, so on exit from
@@ -357,12 +351,6 @@ getMaskingState  = IO $ \s ->
                              0# -> Unmasked
                              1# -> MaskedUninterruptible
                              _  -> MaskedInterruptible #)
-
-{-# DEPRECATED blocked "use Control.Exception.getMaskingState instead" #-}
--- | returns True if asynchronous exceptions are blocked in the
--- current thread.
-blocked :: IO Bool
-blocked = fmap (/= Unmasked) getMaskingState
 
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchException` \e -> do _ <- what

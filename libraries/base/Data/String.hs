@@ -37,8 +37,6 @@ import Data.List (lines, words, unlines, unwords)
 class IsString a where
     fromString :: String -> a
 
-#ifndef __NHC__
 instance IsString [Char] where
     fromString xs = xs
-#endif
 

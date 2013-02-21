@@ -1,9 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, PatternGuards #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
-#ifndef __NHC__
 {-# LANGUAGE DeriveDataTypeable #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -28,7 +26,7 @@ module Data.Fixed
 (
     div',mod',divMod',
 
-    Fixed,HasResolution(..),
+    Fixed(..), HasResolution(..),
     showFixed,
     E0,Uni,
     E1,Deci,
@@ -40,16 +38,13 @@ module Data.Fixed
 ) where
 
 import Prelude -- necessary to get dependencies right
-import Data.Char
-import Data.List
-#ifndef __NHC__
 import Data.Typeable
 import Data.Data
-#endif
+import GHC.Read
+import Text.ParserCombinators.ReadPrec
+import Text.Read.Lex
 
-#ifndef __NHC__
 default () -- avoid any defaulting shenanigans
-#endif
 
 -- | generalisation of 'div' to any instance of Real
 div' :: (Real a,Integral b) => a -> a -> b
@@ -67,13 +62,8 @@ mod' n d = n - (fromInteger f) * d where
 
 -- | The type parameter should be an instance of 'HasResolution'.
 newtype Fixed a = MkFixed Integer
-#ifndef __NHC__
         deriving (Eq,Ord,Typeable)
-#else
-        deriving (Eq,Ord)
-#endif
 
-#ifndef __NHC__
 -- We do this because the automatically derived Data instance requires (Data a) context.
 -- Our manual instance has the more general (Typeable a) context.
 tyFixed :: DataType
@@ -85,7 +75,6 @@ instance (Typeable a) => Data (Fixed a) where
     gunfold k z _ = k (z MkFixed)
     dataTypeOf _ = tyFixed
     toConstr _ = conMkFixed
-#endif
 
 class HasResolution a where
     resolution :: p a -> Integer
@@ -159,89 +148,65 @@ showFixed chopTrailingZeros fa@(MkFixed a) = (show i) ++ (withDot (showIntegerZe
     maxnum = 10 ^ digits
     fracNum = div (d * maxnum) res
 
-readsFixed :: (HasResolution a) => ReadS (Fixed a)
-readsFixed = readsSigned
-    where readsSigned ('-' : xs) = [ (negate x, rest)
-                                   | (x, rest) <- readsUnsigned xs ]
-          readsSigned xs = readsUnsigned xs
-          readsUnsigned xs = case span isDigit xs of
-                             ([], _) -> []
-                             (is, xs') ->
-                                 let i = fromInteger (read is)
-                                 in case xs' of
-                                    '.' : xs'' ->
-                                        case span isDigit xs'' of
-                                        ([], _) -> []
-                                        (js, xs''') ->
-                                            let j = fromInteger (read js)
-                                                l = genericLength js :: Integer
-                                            in [(i + (j / (10 ^ l)), xs''')]
-                                    _ -> [(i, xs')]
-
 instance (HasResolution a) => Show (Fixed a) where
     show = showFixed False
 
 instance (HasResolution a) => Read (Fixed a) where
-    readsPrec _ = readsFixed
+    readPrec     = readNumber convertFixed
+    readListPrec = readListPrecDefault
+    readList     = readListDefault
+
+convertFixed :: forall a . HasResolution a => Lexeme -> ReadPrec (Fixed a)
+convertFixed (Number n)
+ | Just (i, f) <- numberToFixed r n =
+    return (fromInteger i + (fromInteger f / (10 ^ r)))
+    where r = resolution (undefined :: Fixed a)
+convertFixed _ = pfail
 
 data E0 = E0
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E0 where
     resolution _ = 1
 -- | resolution of 1, this works the same as Integer
 type Uni = Fixed E0
 
 data E1 = E1
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E1 where
     resolution _ = 10
 -- | resolution of 10^-1 = .1
 type Deci = Fixed E1
 
 data E2 = E2
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E2 where
     resolution _ = 100
 -- | resolution of 10^-2 = .01, useful for many monetary currencies
 type Centi = Fixed E2
 
 data E3 = E3
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E3 where
     resolution _ = 1000
 -- | resolution of 10^-3 = .001
 type Milli = Fixed E3
 
 data E6 = E6
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E6 where
     resolution _ = 1000000
 -- | resolution of 10^-6 = .000001
 type Micro = Fixed E6
 
 data E9 = E9
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E9 where
     resolution _ = 1000000000
 -- | resolution of 10^-9 = .000000001
 type Nano = Fixed E9
 
 data E12 = E12
-#ifndef __NHC__
      deriving (Typeable)
-#endif
 instance HasResolution E12 where
     resolution _ = 1000000000000
 -- | resolution of 10^-12 = .000000000001

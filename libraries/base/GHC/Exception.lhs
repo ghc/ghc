@@ -165,8 +165,8 @@ throw e = raise# (toException e)
 \begin{code}
 -- |This is thrown when the user calls 'error'. The @String@ is the
 -- argument given to 'error'.
-data ErrorCall = ErrorCall String
-    deriving Typeable
+newtype ErrorCall = ErrorCall String
+    deriving (Eq, Ord, Typeable)
 
 instance Exception ErrorCall
 

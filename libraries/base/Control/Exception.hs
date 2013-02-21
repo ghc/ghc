@@ -44,14 +44,13 @@ module Control.Exception (
         ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         ArrayException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         AssertionFailed(..),
+        SomeAsyncException(..),
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable, Exception
+        asyncExceptionToException, asyncExceptionFromException,
 
 #if __GLASGOW_HASKELL__ || __HUGS__
         NonTermination(..),
         NestedAtomically(..),
-#endif
-#ifdef __NHC__
-        System.ExitCode(), -- instance Exception
 #endif
 
         BlockedIndefinitelyOnMVar(..),
@@ -109,20 +108,12 @@ module Control.Exception (
         -- asynchronous exceptions during a critical region.
 
         mask,
-#ifndef __NHC__
         mask_,
         uninterruptibleMask,
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
         allowInterrupt,
-#endif
-
-        -- ** (deprecated) Asynchronous exception control
-
-        block,
-        unblock,
-        blocked,
 
         -- *** Applying @mask@ to an exception handler
 
@@ -155,10 +146,6 @@ import GHC.IO (unsafeUnmask)
 import Data.Maybe
 #else
 import Prelude hiding (catch)
-#endif
-
-#ifdef __NHC__
-import System (ExitCode())
 #endif
 
 -- | You need this when using 'catches'.
@@ -353,12 +340,19 @@ kind of situation:
 The following operations are guaranteed not to be interruptible:
 
  * operations on 'IORef' from "Data.IORef"
+
  * STM transactions that do not use 'retry'
+
  * everything from the @Foreign@ modules
+
  * everything from @Control.Exception@
+
  * @tryTakeMVar@, @tryPutMVar@, @isEmptyMVar@
+
  * @takeMVar@ if the @MVar@ is definitely full, and conversely @putMVar@ if the @MVar@ is definitely empty
+
  * @newEmptyMVar@, @newMVar@
+
  * @forkIO@, @forkIOUnmasked@, @myThreadId@
 
 -}

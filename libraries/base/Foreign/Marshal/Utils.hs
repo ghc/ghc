@@ -20,32 +20,29 @@ module Foreign.Marshal.Utils (
 
   -- ** Combined allocation and marshalling
   --
-  with,          -- :: Storable a => a -> (Ptr a -> IO b) -> IO b
-  new,           -- :: Storable a => a -> IO (Ptr a)
+  with,
+  new,
 
   -- ** Marshalling of Boolean values (non-zero corresponds to 'True')
   --
-  fromBool,      -- :: Num a => Bool -> a
-  toBool,        -- :: Num a => a -> Bool
+  fromBool,
+  toBool,
 
   -- ** Marshalling of Maybe values
   --
-  maybeNew,      -- :: (      a -> IO (Ptr a))
-                 -- -> (Maybe a -> IO (Ptr a))
-  maybeWith,     -- :: (      a -> (Ptr b -> IO c) -> IO c)
-                 -- -> (Maybe a -> (Ptr b -> IO c) -> IO c)
-  maybePeek,     -- :: (Ptr a -> IO        b )
-                 -- -> (Ptr a -> IO (Maybe b))
+  maybeNew,
+  maybeWith,
+  maybePeek,
 
   -- ** Marshalling lists of storable objects
   --
-  withMany,      -- :: (a -> (b -> res) -> res) -> [a] -> ([b] -> res) -> res
+  withMany,
 
   -- ** Haskellish interface to memcpy and memmove
   -- | (argument order: destination, source)
   --
-  copyBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
-  moveBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
+  copyBytes,
+  moveBytes,
 ) where
 
 import Data.Maybe
@@ -58,10 +55,6 @@ import Foreign.Marshal.Alloc    ( malloc, alloca )
 import GHC.Real                 ( fromIntegral )
 import GHC.Num
 import GHC.Base
-#endif
-
-#ifdef __NHC__
-import Foreign.C.Types          ( CInt(..) )
 #endif
 
 -- combined allocation and marshalling

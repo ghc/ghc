@@ -11,9 +11,9 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- The Prelude: a standard module imported by default into all Haskell
--- modules.  For more documentation, see the Haskell 98 Report
--- <http://www.haskell.org/onlinereport/>.
+-- The Prelude: a standard module. The Prelude is imported by default
+-- into all Haskell modules unless either there is an explicit import
+-- statement for it, or the NoImplicitPrelude extension is enabled.
 --
 -----------------------------------------------------------------------------
 
@@ -37,13 +37,6 @@ module Prelude (
     -- *** Tuples
     fst, snd, curry, uncurry,
 
-#if defined(__NHC__)
-    []((:), []),        -- Not legal Haskell 98;
-                        -- ... available through built-in syntax
-    module Data.Tuple,  -- Includes tuple types
-    ()(..),             -- Not legal Haskell 98
-    (->),               -- ... available through built-in syntax
-#endif
 #ifdef __HUGS__
     (:),                -- Not legal Haskell 98
 #endif

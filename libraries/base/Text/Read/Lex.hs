@@ -17,19 +17,19 @@
 
 module Text.Read.Lex
   -- lexing types
-  ( Lexeme(..)  -- :: *; Show, Eq
+  ( Lexeme(..)
 
-  , numberToInteger, numberToRational, numberToRangedRational
+  , numberToInteger, numberToFixed, numberToRational, numberToRangedRational
 
   -- lexer
-  , lex         -- :: ReadP Lexeme      Skips leading spaces
-  , hsLex       -- :: ReadP String
-  , lexChar     -- :: ReadP Char        Reads just one char, with H98 escapes
+  , lex, expect
+  , hsLex
+  , lexChar
 
-  , readIntP    -- :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
-  , readOctP    -- :: Num a => ReadP a
-  , readDecP    -- :: Num a => ReadP a
-  , readHexP    -- :: Num a => ReadP a
+  , readIntP
+  , readOctP
+  , readDecP
+  , readHexP
   )
  where
 
@@ -41,7 +41,7 @@ import GHC.Char
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
-import GHC.Real( Integral, Rational, (%), fromIntegral,
+import GHC.Real( Rational, (%), fromIntegral,
                  toInteger, (^) )
 import GHC.List
 import GHC.Enum( minBound, maxBound )
@@ -81,6 +81,22 @@ numberToInteger :: Number -> Maybe Integer
 numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
 numberToInteger _ = Nothing
+
+numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
+numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart, 0)
+numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart, 0)
+numberToFixed p (MkDecimal iPart (Just fPart) Nothing)
+    = let i = val 10 0 iPart
+          f = val 10 0 (integerTake p (fPart ++ repeat 0))
+          -- Sigh, we really want genericTake, but that's above us in
+          -- the hierarchy, so we define our own version here (actually
+          -- specialised to Integer)
+          integerTake             :: Integer -> [a] -> [a]
+          integerTake n _ | n <= 0 = []
+          integerTake _ []        =  []
+          integerTake n (x:xs)    =  x : integerTake (n-1) xs
+      in Just (i, f)
+numberToFixed _ _ = Nothing
 
 -- This takes a floatRange, and if the Rational would be outside of
 -- the floatRange then it may return Nothing. Not that it will not
@@ -143,6 +159,11 @@ numberToRational (MkDecimal iPart mFPart mExp)
 
 lex :: ReadP Lexeme
 lex = skipSpaces >> lexToken
+
+expect :: Lexeme -> ReadP ()
+expect lexeme = do { skipSpaces 
+                   ; thing <- lexToken
+                   ; if thing == lexeme then return () else pfail }
 
 hsLex :: ReadP String
 -- ^ Haskell lexer: returns the lexed string, rather than the lexeme

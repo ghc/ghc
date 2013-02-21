@@ -18,21 +18,10 @@
 module Data.Ratio
     ( Ratio
     , Rational
-    , (%)               -- :: (Integral a) => a -> a -> Ratio a
-    , numerator         -- :: (Integral a) => Ratio a -> a
-    , denominator       -- :: (Integral a) => Ratio a -> a
-    , approxRational    -- :: (RealFrac a) => a -> a -> Rational
-
-    -- Ratio instances: 
-    --   (Integral a) => Eq   (Ratio a)
-    --   (Integral a) => Ord  (Ratio a)
-    --   (Integral a) => Num  (Ratio a)
-    --   (Integral a) => Real (Ratio a)
-    --   (Integral a) => Fractional (Ratio a)
-    --   (Integral a) => RealFrac (Ratio a)
-    --   (Integral a) => Enum     (Ratio a)
-    --   (Read a, Integral a) => Read (Ratio a)
-    --   (Integral a) => Show     (Ratio a)
+    , (%)
+    , numerator
+    , denominator
+    , approxRational
 
   ) where
 
@@ -45,10 +34,6 @@ import GHC.Real         -- The basic defns for Ratio
 #ifdef __HUGS__
 import Hugs.Prelude(Ratio(..), (%), numerator, denominator)
 #endif
-
-#ifdef __NHC__
-import Ratio (Ratio(..), (%), numerator, denominator, approxRational)
-#else
 
 -- -----------------------------------------------------------------------------
 -- approxRational
@@ -94,5 +79,4 @@ approxRational rat eps  =  simplest (rat-eps) (rat+eps)
                                            nd''       =  simplest' d' r' d r
                                            n''        =  numerator nd''
                                            d''        =  denominator nd''
-#endif
 

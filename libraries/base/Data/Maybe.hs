@@ -17,39 +17,23 @@
 
 module Data.Maybe
    (
-     Maybe(Nothing,Just)-- instance of: Eq, Ord, Show, Read,
-                        --              Functor, Monad, MonadPlus
+     Maybe(Nothing,Just)
 
-   , maybe              -- :: b -> (a -> b) -> Maybe a -> b
+   , maybe
 
-   , isJust             -- :: Maybe a -> Bool
-   , isNothing          -- :: Maybe a -> Bool
-   , fromJust           -- :: Maybe a -> a
-   , fromMaybe          -- :: a -> Maybe a -> a
-   , listToMaybe        -- :: [a] -> Maybe a
-   , maybeToList        -- :: Maybe a -> [a]
-   , catMaybes          -- :: [Maybe a] -> [a]
-   , mapMaybe           -- :: (a -> Maybe b) -> [a] -> [b]
+   , isJust
+   , isNothing
+   , fromJust
+   , fromMaybe
+   , listToMaybe
+   , maybeToList
+   , catMaybes
+   , mapMaybe
    ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 #endif
-
-#ifdef __NHC__
-import Prelude
-import Prelude (Maybe(..), maybe)
-import Maybe
-    ( isJust
-    , isNothing
-    , fromJust
-    , fromMaybe
-    , listToMaybe
-    , maybeToList
-    , catMaybes
-    , mapMaybe
-    )
-#else
 
 #ifndef __HUGS__
 -- ---------------------------------------------------------------------------
@@ -146,6 +130,4 @@ mapMaybe f (x:xs) =
  case f x of
   Nothing -> rs
   Just r  -> r:rs
-
-#endif /* else not __NHC__ */
 

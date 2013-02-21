@@ -256,12 +256,12 @@ slideContents :: Buffer Word8 -> IO (Buffer Word8)
 slideContents buf@Buffer{ bufL=l, bufR=r, bufRaw=raw } = do
   let elems = r - l
   withRawBuffer raw $ \p ->
-      do _ <- memcpy p (p `plusPtr` l) (fromIntegral elems)
+      do _ <- memmove p (p `plusPtr` l) (fromIntegral elems)
          return ()
   return buf{ bufL=0, bufR=elems }
 
-foreign import ccall unsafe "memcpy"
-   memcpy :: Ptr a -> Ptr a -> CSize -> IO (Ptr ())
+foreign import ccall unsafe "memmove"
+   memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
 
 summaryBuffer :: Buffer a -> String
 summaryBuffer buf = "buf" ++ show (bufSize buf) ++ "(" ++ show (bufL buf) ++ "-" ++ show (bufR buf) ++ ")"

@@ -55,7 +55,7 @@ module Control.Concurrent (
         -- * Scheduling
 
         -- $conc_scheduling     
-        yield,                  -- :: IO ()
+        yield,
 
         -- ** Blocking
 
@@ -63,15 +63,19 @@ module Control.Concurrent (
 
 #ifdef __GLASGOW_HASKELL__
         -- ** Waiting
-        threadDelay,            -- :: Int -> IO ()
-        threadWaitRead,         -- :: Int -> IO ()
-        threadWaitWrite,        -- :: Int -> IO ()
+        threadDelay,
+        threadWaitRead,
+        threadWaitWrite,
+        threadWaitReadSTM,
+        threadWaitWriteSTM,
 #endif
 
         -- * Communication abstractions
 
         module Control.Concurrent.MVar,
         module Control.Concurrent.Chan,
+        module Control.Concurrent.QSem,
+        module Control.Concurrent.QSemN,
 
 #ifdef __GLASGOW_HASKELL__
         -- * Bound Threads
@@ -103,9 +107,6 @@ module Control.Concurrent (
 
         -- $preemption
 
-        -- * Deprecated functions
-        forkIOUnmasked
-
     ) where
 
 import Prelude
@@ -114,7 +115,8 @@ import Control.Exception.Base as Exception
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exception
-import GHC.Conc hiding (threadWaitRead, threadWaitWrite)
+import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
+                        threadWaitReadSTM, threadWaitWriteSTM)
 import qualified GHC.Conc
 import GHC.IO           ( IO(..), unsafeInterleaveIO, unsafeUnmask )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
@@ -123,11 +125,12 @@ import GHC.Base
 import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types
-import Control.Monad    ( when )
+import Control.Monad
 
 #ifdef mingw32_HOST_OS
 import Foreign.C
 import System.IO
+import Data.Maybe (Maybe(..))
 #endif
 #endif
 
@@ -137,6 +140,8 @@ import Hugs.ConcBase
 
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
+import Control.Concurrent.QSem
+import Control.Concurrent.QSemN
 
 #ifdef __HUGS__
 type ThreadId = ()
@@ -442,6 +447,50 @@ threadWaitWrite fd
   | otherwise = error "threadWaitWrite requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWrite fd
+#endif
+
+-- | Returns an STM action that can be used to wait for data
+-- to read from a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitReadSTM :: Fd -> IO (STM (), IO ())
+threadWaitReadSTM fd
+#ifdef mingw32_HOST_OS
+  | threaded = do v <- newTVarIO Nothing
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 0)
+                                             atomically (writeTVar v $ Just result)
+                  let waitAction = do result <- readTVar v
+                                      case result of
+                                        Nothing         -> retry
+                                        Just (Right ()) -> return ()
+                                        Just (Left e)   -> throwSTM (e :: IOException)
+                  let killAction = return ()
+                  return (waitAction, killAction)
+  | otherwise = error "threadWaitReadSTM requires -threaded on Windows"
+#else
+  = GHC.Conc.threadWaitReadSTM fd
+#endif
+
+-- | Returns an STM action that can be used to wait until data
+-- can be written to a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
+threadWaitWriteSTM fd 
+#ifdef mingw32_HOST_OS
+  | threaded = do v <- newTVarIO Nothing
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 1)
+                                             atomically (writeTVar v $ Just result)
+                  let waitAction = do result <- readTVar v
+                                      case result of
+                                        Nothing         -> retry
+                                        Just (Right ()) -> return ()
+                                        Just (Left e)   -> throwSTM (e :: IOException)
+                  let killAction = return ()
+                  return (waitAction, killAction)
+  | otherwise = error "threadWaitWriteSTM requires -threaded on Windows"
+#else
+  = GHC.Conc.threadWaitWriteSTM fd
 #endif
 
 #ifdef mingw32_HOST_OS

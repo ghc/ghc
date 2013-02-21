@@ -21,47 +21,47 @@ module Foreign.Marshal.Array (
 
   -- ** Allocation
   --
-  mallocArray,    -- :: Storable a => Int -> IO (Ptr a)
-  mallocArray0,   -- :: Storable a => Int -> IO (Ptr a)
+  mallocArray,
+  mallocArray0,
 
-  allocaArray,    -- :: Storable a => Int -> (Ptr a -> IO b) -> IO b
-  allocaArray0,   -- :: Storable a => Int -> (Ptr a -> IO b) -> IO b
+  allocaArray,
+  allocaArray0,
 
-  reallocArray,   -- :: Storable a => Ptr a -> Int -> IO (Ptr a)
-  reallocArray0,  -- :: Storable a => Ptr a -> Int -> IO (Ptr a)
+  reallocArray,
+  reallocArray0,
 
   -- ** Marshalling
   --
-  peekArray,      -- :: Storable a =>         Int -> Ptr a -> IO [a]
-  peekArray0,     -- :: (Storable a, Eq a) => a   -> Ptr a -> IO [a]
+  peekArray,
+  peekArray0,
 
-  pokeArray,      -- :: Storable a =>      Ptr a -> [a] -> IO ()
-  pokeArray0,     -- :: Storable a => a -> Ptr a -> [a] -> IO ()
+  pokeArray,
+  pokeArray0,
 
   -- ** Combined allocation and marshalling
   --
-  newArray,       -- :: Storable a =>      [a] -> IO (Ptr a)
-  newArray0,      -- :: Storable a => a -> [a] -> IO (Ptr a)
+  newArray,
+  newArray0,
 
-  withArray,      -- :: Storable a =>      [a] -> (Ptr a -> IO b) -> IO b
-  withArray0,     -- :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
+  withArray,
+  withArray0,
 
-  withArrayLen,   -- :: Storable a =>      [a] -> (Int -> Ptr a -> IO b) -> IO b
-  withArrayLen0,  -- :: Storable a => a -> [a] -> (Int -> Ptr a -> IO b) -> IO b
+  withArrayLen,
+  withArrayLen0,
 
   -- ** Copying
 
   -- | (argument order: destination, source)
-  copyArray,      -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
-  moveArray,      -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
+  copyArray,
+  moveArray,
 
   -- ** Finding the length
   --
-  lengthArray0,   -- :: (Storable a, Eq a) => a -> Ptr a -> IO Int
+  lengthArray0,
 
   -- ** Indexing
   --
-  advancePtr,     -- :: Storable a => Ptr a -> Int -> Ptr a
+  advancePtr,
 ) where
 
 import Foreign.Ptr      (Ptr, plusPtr)

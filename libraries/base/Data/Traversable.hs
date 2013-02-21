@@ -16,14 +16,20 @@
 --
 -- See also
 --
---  * /Applicative Programming with Effects/,
---    by Conor McBride and Ross Paterson, online at
+--  * \"Applicative Programming with Effects\",
+--    by Conor McBride and Ross Paterson,
+--    /Journal of Functional Programming/ 18:1 (2008) 1-13, online at
 --    <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
 --
---  * /The Essence of the Iterator Pattern/,
+--  * \"The Essence of the Iterator Pattern\",
 --    by Jeremy Gibbons and Bruno Oliveira,
---    in /Mathematically-Structured Functional Programming/, 2006, and online at
+--    in /Mathematically-Structured Functional Programming/, 2006, online at
 --    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
+--
+--  * \"An Investigation of the Laws of Traversals\",
+--    by Mauro Jaskelioff and Ondrej Rypacek,
+--    in /Mathematically-Structured Functional Programming/, 2012, online at
+--    <http://arxiv.org/pdf/1202.2919>.
 --
 -- Note that the functions 'mapM' and 'sequence' generalize "Prelude"
 -- functions of the same names from lists to any 'Traversable' functor.
@@ -33,11 +39,14 @@
 -----------------------------------------------------------------------------
 
 module Data.Traversable (
+    -- * The 'Traversable' class
     Traversable(..),
+    -- * Utility functions
     for,
     forM,
     mapAccumL,
     mapAccumR,
+    -- * General definitions for superclass methods
     fmapDefault,
     foldMapDefault,
     ) where
@@ -52,14 +61,69 @@ import Data.Monoid (Monoid)
 import GHC.Arr
 #elif defined(__HUGS__)
 import Hugs.Array
-#elif defined(__NHC__)
-import Array
 #endif
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.
 --
 -- Minimal complete definition: 'traverse' or 'sequenceA'.
+--
+-- A definition of 'traverse' must satisfy the following laws:
+--
+-- [/naturality/]
+--   @t . 'traverse' f = 'traverse' (t . f)@
+--   for every applicative transformation @t@
+--
+-- [/identity/]
+--   @'traverse' Identity = Identity@
+--
+-- [/composition/]
+--   @'traverse' (Compose . 'fmap' g . f) = Compose . 'fmap' ('traverse' g) . 'traverse' f@
+--
+-- A definition of 'sequenceA' must satisfy the following laws:
+--
+-- [/naturality/]
+--   @t . 'sequenceA' = 'sequenceA' . 'fmap' t@
+--   for every applicative transformation @t@
+--
+-- [/identity/]
+--   @'sequenceA' . 'fmap' Identity = Identity@
+--
+-- [/composition/]
+--   @'sequenceA' . 'fmap' Compose = Compose . 'fmap' 'sequenceA' . 'sequenceA'@
+--
+-- where an /applicative transformation/ is a function
+--
+-- @t :: (Applicative f, Applicative g) => f a -> g a@
+--
+-- preserving the 'Applicative' operations, i.e.
+--
+--  * @t ('pure' x) = 'pure' x@
+--
+--  * @t (x '<*>' y) = t x '<*>' t y@
+--
+-- and the identity functor @Identity@ and composition of functors @Compose@
+-- are defined as
+--
+-- >   newtype Identity a = Identity a
+-- >
+-- >   instance Functor Identity where
+-- >     fmap f (Identity x) = Identity (f x)
+-- >
+-- >   instance Applicative Indentity where
+-- >     pure x = Identity x
+-- >     Identity f <*> Identity x = Identity (f x)
+-- >
+-- >   newtype Compose f g a = Compose (f (g a))
+-- >
+-- >   instance (Functor f, Functor g) => Functor (Compose f g) where
+-- >     fmap f (Compose x) = Compose (fmap (fmap f) x)
+-- >
+-- >   instance (Applicative f, Applicative g) => Applicative (Compose f g) where
+-- >     pure x = Compose (pure (pure x))
+-- >     Compose f <*> Compose x = Compose ((<*>) <$> f <*> x)
+--
+-- (The naturality law is implied by parametricity.)
 --
 -- Instances are similar to 'Functor', e.g. given a data type
 --

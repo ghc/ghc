@@ -9,11 +9,7 @@
 #ifndef __HSBASE_H__
 #define __HSBASE_H__
 
-#ifdef __NHC__
-# include "Nhc98BaseConfig.h"
-#else
 #include "HsBaseConfig.h"
-#endif
 
 /* ultra-evil... */
 #undef PACKAGE_BUGREPORT
@@ -141,6 +137,7 @@
 #if defined(__MINGW32__)
 /* in Win32Utils.c */
 extern void maperrno (void);
+extern int maperrno_func(DWORD dwErrorCode);
 extern HsWord64 getMonotonicUSec(void);
 #endif
 

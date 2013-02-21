@@ -24,11 +24,7 @@
 -- #hide
 module System.Posix.Internals where
 
-#ifdef __NHC__
-#define HTYPE_TCFLAG_T
-#else
-# include "HsBaseConfig.h"
-#endif
+#include "HsBaseConfig.h"
 
 #if ! (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 import Control.Monad
@@ -60,11 +56,6 @@ import qualified GHC.Foreign as GHC
 #elif __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 import Hugs.IO (IOMode(..))
-#elif __NHC__
-import GHC.IO.Device	-- yes, I know, but its portable, really!
-import System.IO
-import Control.Exception
-import DIOError
 #endif
 
 #ifdef __HUGS__
@@ -152,16 +143,12 @@ statGetType p_stat = do
         | otherwise             -> ioError ioe_unknownfiletype
     
 ioe_unknownfiletype :: IOException
-#ifndef __NHC__
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         "unknown file type"
-#  if __GLASGOW_HASKELL__
+#if __GLASGOW_HASKELL__
                         Nothing
-#  endif
-                        Nothing
-#else
-ioe_unknownfiletype = UserError "fdType" "unknown file type"
 #endif
+                        Nothing
 
 fdGetMode :: FD -> IO IOMode
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
@@ -191,20 +178,26 @@ fdGetMode fd = do
 withFilePath :: FilePath -> (CWString -> IO a) -> IO a
 withFilePath = withCWString
 
+newFilePath :: FilePath -> IO CWString
+newFilePath = newCWString
+
 peekFilePath :: CWString -> IO FilePath
 peekFilePath = peekCWString
 #else
 
 withFilePath :: FilePath -> (CString -> IO a) -> IO a
+newFilePath :: FilePath -> IO CString
 peekFilePath :: CString -> IO FilePath
 peekFilePathLen :: CStringLen -> IO FilePath
 
 #if __GLASGOW_HASKELL__
 withFilePath fp f = getFileSystemEncoding >>= \enc -> GHC.withCString enc fp f
+newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
 peekFilePath fp = getFileSystemEncoding >>= \enc -> GHC.peekCString enc fp
 peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
 #else
 withFilePath = withCString
+newFilePath = newCString
 peekFilePath = peekCString
 peekFilePathLen = peekCStringLen
 #endif
@@ -313,11 +306,7 @@ setCooked fd cooked = do
 
 ioe_unk_error :: String -> String -> IOException
 ioe_unk_error loc msg 
-#ifndef __NHC__
  = ioeSetErrorString (mkIOError OtherError loc Nothing Nothing) msg
-#else
- = UserError loc msg
-#endif
 
 -- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
 -- for Win32 consoles, hence setEcho ends up being the inverse of setCooked.
@@ -482,7 +471,8 @@ foreign import ccall unsafe "HsBase.h fork"
 foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt
 
-foreign import ccall unsafe "HsBase.h mkfifo"
+-- capi is required at least on Android
+foreign import capi unsafe "HsBase.h mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h pipe"
@@ -497,10 +487,12 @@ foreign import capi unsafe "signal.h sigaddset"
 foreign import capi unsafe "signal.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
-foreign import ccall unsafe "HsBase.h tcgetattr"
+-- capi is required at least on Android
+foreign import capi unsafe "HsBase.h tcgetattr"
    c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "HsBase.h tcsetattr"
+-- capi is required at least on Android
+foreign import capi unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
 foreign import capi unsafe "HsBase.h utime"

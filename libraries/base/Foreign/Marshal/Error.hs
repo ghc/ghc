@@ -17,17 +17,15 @@
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Error (
-  throwIf,       -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO a
-  throwIf_,      -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO ()
-  throwIfNeg,    -- :: (Ord a, Num a) 
-                 -- =>                (a -> String) -> IO a       -> IO a
-  throwIfNeg_,   -- :: (Ord a, Num a)
-                 -- =>                (a -> String) -> IO a       -> IO ()
-  throwIfNull,   -- ::                String        -> IO (Ptr a) -> IO (Ptr a)
+  throwIf,
+  throwIf_,
+  throwIfNeg,
+  throwIfNeg_,
+  throwIfNull,
 
   -- Discard return value
   --
-  void           -- IO a -> IO ()
+  void
 ) where
 
 import Foreign.Ptr
@@ -83,4 +81,4 @@ throwIfNull  = throwIf (== nullPtr) . const
 --
 void     :: IO a -> IO ()
 void act  = act >> return ()
-{-# DEPRECATED void "use Control.Monad.void instead" #-}
+{-# DEPRECATED void "use Control.Monad.void instead" #-} -- deprecated in 7.6

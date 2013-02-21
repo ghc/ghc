@@ -46,19 +46,19 @@
 module Foreign.Marshal.Alloc (
   -- * Memory allocation
   -- ** Local allocation
-  alloca,       -- :: Storable a =>        (Ptr a -> IO b) -> IO b
-  allocaBytes,  -- ::               Int -> (Ptr a -> IO b) -> IO b
-  allocaBytesAligned,  -- ::        Int -> Int -> (Ptr a -> IO b) -> IO b
+  alloca,
+  allocaBytes,
+  allocaBytesAligned,
 
   -- ** Dynamic allocation
-  malloc,       -- :: Storable a =>        IO (Ptr a)
-  mallocBytes,  -- ::               Int -> IO (Ptr a)
+  malloc,
+  mallocBytes,
 
-  realloc,      -- :: Storable b => Ptr a        -> IO (Ptr b)
-  reallocBytes, -- ::               Ptr a -> Int -> IO (Ptr a)
+  realloc,
+  reallocBytes,
 
-  free,         -- :: Ptr a -> IO ()
-  finalizerFree -- :: FinalizerPtr a
+  free,
+  finalizerFree
 ) where
 
 import Data.Maybe
@@ -76,9 +76,6 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-#elif defined(__NHC__)
-import NHC.FFI                  ( FinalizerPtr, CInt(..) )
-import IO                       ( bracket )
 #else
 import Control.Exception.Base   ( bracket )
 #endif

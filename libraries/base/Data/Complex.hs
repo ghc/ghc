@@ -23,25 +23,16 @@ module Data.Complex
         -- * Rectangular form
           Complex((:+))
 
-        , realPart      -- :: (RealFloat a) => Complex a -> a
-        , imagPart      -- :: (RealFloat a) => Complex a -> a
+        , realPart
+        , imagPart
         -- * Polar form
-        , mkPolar       -- :: (RealFloat a) => a -> a -> Complex a
-        , cis           -- :: (RealFloat a) => a -> Complex a
-        , polar         -- :: (RealFloat a) => Complex a -> (a,a)
-        , magnitude     -- :: (RealFloat a) => Complex a -> a
-        , phase         -- :: (RealFloat a) => Complex a -> a
+        , mkPolar
+        , cis
+        , polar
+        , magnitude
+        , phase
         -- * Conjugate
-        , conjugate     -- :: (RealFloat a) => Complex a -> Complex a
-
-        -- Complex instances:
-        --
-        --  (RealFloat a) => Eq         (Complex a)
-        --  (RealFloat a) => Read       (Complex a)
-        --  (RealFloat a) => Show       (Complex a)
-        --  (RealFloat a) => Num        (Complex a)
-        --  (RealFloat a) => Fractional (Complex a)
-        --  (RealFloat a) => Floating   (Complex a)
+        , conjugate
 
         )  where
 

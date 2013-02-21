@@ -14,17 +14,21 @@
 -- described in the PLDI \'94 paper by John Launchbury and Simon Peyton
 -- Jones /Lazy Functional State Threads/.
 --
+-- References (variables) that can be used within the @ST@ monad are
+-- provided by "Data.STRef", and arrays are provided by
+-- "Data.Array.ST".
+
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST (
         -- * The 'ST' Monad
         ST,             -- abstract, instance of Functor, Monad, Typeable.
-        runST,          -- :: (forall s. ST s a) -> a
-        fixST,          -- :: (a -> ST s a) -> ST s a
+        runST,
+        fixST,
 
         -- * Converting 'ST' to 'IO'
         RealWorld,              -- abstract
-        stToIO,                 -- :: ST RealWorld a -> IO a
+        stToIO,
 
         -- * Unsafe Functions
         unsafeInterleaveST,
@@ -35,9 +39,7 @@ module Control.Monad.ST (
 import Control.Monad.ST.Safe
 import qualified Control.Monad.ST.Unsafe as U
 
-{-# DEPRECATED unsafeInterleaveST, unsafeIOToST, unsafeSTToIO
-              "Please import from Control.Monad.ST.Unsafe instead; This will be removed in the next release"
- #-}
+{-# DEPRECATED unsafeInterleaveST, unsafeIOToST, unsafeSTToIO "Please import from Control.Monad.ST.Unsafe instead; This will be removed in the next release" #-} -- deprecated in 7.2
 
 {-# INLINE unsafeInterleaveST #-}
 unsafeInterleaveST :: ST s a -> ST s a

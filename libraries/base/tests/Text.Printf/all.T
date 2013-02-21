@@ -1,1 +1,1 @@
-test('1548', normal, compile_and_run, [''])
+test('T1548', normal, compile_and_run, [''])

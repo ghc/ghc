@@ -192,7 +192,7 @@ instance MonadPlus m => ArrowPlus (Kleisli m) where
 --
 --  * @'left' (f >>> g) = 'left' f >>> 'left' g@
 --
---  * @'left' f >>> 'arr' 'Left' = 'arr' 'Left' >>> f@
+--  * @f >>> 'arr' 'Left' = 'arr' 'Left' >>> 'left' f@
 --
 --  * @'left' f >>> 'arr' ('id' +++ g) = 'arr' ('id' +++ g) >>> 'left' f@
 --

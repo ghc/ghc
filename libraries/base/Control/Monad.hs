@@ -21,9 +21,9 @@ module Control.Monad
       Functor(fmap)
     , Monad((>>=), (>>), return, fail)
 
-    , MonadPlus (   -- class context: Monad
-          mzero     -- :: (MonadPlus m) => m a
-        , mplus     -- :: (MonadPlus m) => m a -> m a -> m a
+    , MonadPlus (
+          mzero
+        , mplus
         )
     -- * Functions
 
@@ -32,47 +32,47 @@ module Control.Monad
 
     -- ** Basic @Monad@ functions
 
-    , mapM          -- :: (Monad m) => (a -> m b) -> [a] -> m [b]
-    , mapM_         -- :: (Monad m) => (a -> m b) -> [a] -> m ()
-    , forM          -- :: (Monad m) => [a] -> (a -> m b) -> m [b]
-    , forM_         -- :: (Monad m) => [a] -> (a -> m b) -> m ()
-    , sequence      -- :: (Monad m) => [m a] -> m [a]
-    , sequence_     -- :: (Monad m) => [m a] -> m ()
-    , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
-    , (>=>)         -- :: (Monad m) => (a -> m b) -> (b -> m c) -> (a -> m c)
-    , (<=<)         -- :: (Monad m) => (b -> m c) -> (a -> m b) -> (a -> m c)
-    , forever       -- :: (Monad m) => m a -> m b
+    , mapM
+    , mapM_
+    , forM
+    , forM_
+    , sequence
+    , sequence_
+    , (=<<)
+    , (>=>)
+    , (<=<)
+    , forever
     , void
 
     -- ** Generalisations of list functions
 
-    , join          -- :: (Monad m) => m (m a) -> m a
-    , msum          -- :: (MonadPlus m) => [m a] -> m a
-    , mfilter       -- :: (MonadPlus m) => (a -> Bool) -> m a -> m a
-    , filterM       -- :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
-    , mapAndUnzipM  -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
-    , zipWithM      -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
-    , zipWithM_     -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
-    , foldM         -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
-    , foldM_        -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
-    , replicateM    -- :: (Monad m) => Int -> m a -> m [a]
-    , replicateM_   -- :: (Monad m) => Int -> m a -> m ()
+    , join
+    , msum
+    , mfilter
+    , filterM
+    , mapAndUnzipM
+    , zipWithM
+    , zipWithM_
+    , foldM
+    , foldM_
+    , replicateM
+    , replicateM_
 
     -- ** Conditional execution of monadic expressions
 
-    , guard         -- :: (MonadPlus m) => Bool -> m ()
-    , when          -- :: (Monad m) => Bool -> m () -> m ()
-    , unless        -- :: (Monad m) => Bool -> m () -> m ()
+    , guard
+    , when
+    , unless
 
     -- ** Monadic lifting operators
 
-    , liftM         -- :: (Monad m) => (a -> b) -> (m a -> m b)
-    , liftM2        -- :: (Monad m) => (a -> b -> c) -> (m a -> m b -> m c)
-    , liftM3        -- :: ...
-    , liftM4        -- :: ...
-    , liftM5        -- :: ...
+    , liftM
+    , liftM2
+    , liftM3
+    , liftM4
+    , liftM5
 
-    , ap            -- :: (Monad m) => m (a -> b) -> m a -> m b
+    , ap
 
     ) where
 
@@ -190,25 +190,10 @@ f >=> g     = \x -> f x >>= g
 
 -- | @'forever' act@ repeats the action infinitely.
 forever     :: (Monad m) => m a -> m b
-{-# INLINABLE forever #-}  -- See Note [Make forever INLINABLE]
-forever a   = a >> forever a
-
-{- Note [Make forever INLINABLE]
-
-If you say   x = forever a
-you'll get   x = a >> a >> a >> a >> ... etc ...
-and that can make a massive space leak (see Trac #5205)
-
-In some monads, where (>>) is expensive, this might be the right
-thing, but not in the IO monad.  We want to specialise 'forever' for
-the IO monad, so that eta expansion happens and there's no space leak.
-To achieve this we must make forever INLINABLE, so that it'll get
-specialised at call sites.
-
-Still delicate, though, because it depends on optimisation.  But there
-really is a space/time tradeoff here, and only optimisation reveals
-the "right" answer.
--}
+{-# INLINE forever #-}
+forever a   = let a' = a >> a' in a'
+-- Use explicit sharing here, as it is prevents a space leak regardless of
+-- optimizations.
 
 -- | @'void' value@ discards or ignores the result of evaluation, such as the return value of an 'IO' action.
 void :: Functor f => f a -> f ()

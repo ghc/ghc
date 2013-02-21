@@ -70,7 +70,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
            , MagicHash
            , UnboxedTuples
            , ExistentialQuantification
-           , Rank2Types
+           , RankNTypes
   #-}
 -- -fno-warn-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
@@ -82,13 +82,13 @@ Other Prelude modules are much easier with fewer complex dependencies.
 -- Module      :  GHC.Base
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
 -- Basic data types and classes.
--- 
+--
 -----------------------------------------------------------------------------
 
 #include "MachDeps.h"
@@ -99,15 +99,17 @@ module GHC.Base
         module GHC.Base,
         module GHC.Classes,
         module GHC.CString,
+        module GHC.Magic,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
         module GHC.Err          -- of people having to import it explicitly
-  ) 
+  )
         where
 
 import GHC.Types
 import GHC.Classes
 import GHC.CString
+import GHC.Magic
 import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 import {-# SOURCE #-} GHC.IO (failIO)
@@ -141,7 +143,7 @@ default ()              -- Double isn't available yet
 \begin{code}
 {-
 data  Bool  =  False | True
-data Ordering = LT | EQ | GT 
+data Ordering = LT | EQ | GT
 data Char = C# Char#
 type  String = [Char]
 data Int = I# Int#
@@ -264,7 +266,7 @@ The rest of the prelude list functions are in GHC.List.
 ----------------------------------------------
 --      foldr/build/augment
 ----------------------------------------------
-  
+
 \begin{code}
 -- | 'foldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a list, reduces the list
@@ -277,7 +279,7 @@ foldr            :: (a -> b -> b) -> b -> [a] -> b
 -- foldr f z (x:xs) =  f x (foldr f z xs)
 {-# INLINE [0] foldr #-}
 -- Inline only in the final stage, after the foldr/cons rule has had a chance
--- Also note that we inline it when it has *two* parameters, which are the 
+-- Also note that we inline it when it has *two* parameters, which are the
 -- ones we are keen about specialising!
 foldr k z = go
           where
@@ -318,10 +320,10 @@ augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 augment g xs = g (:) xs
 
 {-# RULES
-"fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) . 
+"fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) .
                 foldr k z (build g) = g k z
 
-"foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) . 
+"foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) .
                 foldr k z (augment g xs) = g k (foldr k z xs)
 
 "foldr/id"                        foldr (:) [] = \x  -> x
@@ -338,7 +340,7 @@ augment g xs = g (:) xs
 -- "foldr/cons" forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
 
 "foldr/single"  forall k z x. foldr k z [x] = k x z
-"foldr/nil"     forall k z.   foldr k z []  = z 
+"foldr/nil"     forall k z.   foldr k z []  = z
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
                        (h::forall b. (a->b->b) -> b -> b) .
@@ -353,7 +355,7 @@ augment g xs = g (:) xs
 
 
 ----------------------------------------------
---              map     
+--              map
 ----------------------------------------------
 
 \begin{code}
@@ -364,6 +366,9 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 
 map :: (a -> b) -> [a] -> [b]
+{-# NOINLINE [1] map #-}    -- We want the RULE to fire first.
+                            -- It's recursive, so won't inline anyway,
+                            -- but saying so is more explicit
 map _ []     = []
 map f (x:xs) = f x : map f xs
 
@@ -373,33 +378,33 @@ mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
 mapFB c f = \x ys -> c (f x) ys
 
 -- The rules for map work like this.
--- 
+--
 -- Up to (but not including) phase 1, we use the "map" rule to
--- rewrite all saturated applications of map with its build/fold 
+-- rewrite all saturated applications of map with its build/fold
 -- form, hoping for fusion to happen.
 -- In phase 1 and 0, we switch off that rule, inline build, and
 -- switch on the "mapList" rule, which rewrites the foldr/mapFB
--- thing back into plain map.  
+-- thing back into plain map.
 --
--- It's important that these two rules aren't both active at once 
--- (along with build's unfolding) else we'd get an infinite loop 
+-- It's important that these two rules aren't both active at once
+-- (along with build's unfolding) else we'd get an infinite loop
 -- in the rules.  Hence the activation control below.
 --
 -- The "mapFB" rule optimises compositions of map.
 --
--- This same pattern is followed by many other functions: 
+-- This same pattern is followed by many other functions:
 -- e.g. append, filter, iterate, repeat, etc.
 
 {-# RULES
 "map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
 "mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
-"mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g) 
+"mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
   #-}
 \end{code}
 
 
 ----------------------------------------------
---              append  
+--              append
 ----------------------------------------------
 \begin{code}
 -- | Append two lists, i.e.,
@@ -410,6 +415,9 @@ mapFB c f = \x ys -> c (f x) ys
 -- If the first list is not finite, the result is the first list.
 
 (++) :: [a] -> [a] -> [a]
+{-# NOINLINE [1] (++) #-}    -- We want the RULE to fire first.
+                             -- It's recursive, so won't inline anyway,
+                             -- but saying so is more explicit
 (++) []     ys = ys
 (++) (x:xs) ys = x : xs ++ ys
 
@@ -447,15 +455,6 @@ otherwise               =  True
 -- of type 'String'.
 --
 type String = [Char]
-
-{-# RULES
-"x# `eqChar#` x#" forall x#. x# `eqChar#` x# = True
-"x# `neChar#` x#" forall x#. x# `neChar#` x# = False
-"x# `gtChar#` x#" forall x#. x# `gtChar#` x# = False
-"x# `geChar#` x#" forall x#. x# `geChar#` x# = True
-"x# `leChar#` x#" forall x#. x# `leChar#` x# = True
-"x# `ltChar#` x#" forall x#. x# `ltChar#` x# = False
-  #-}
 
 unsafeChr :: Int -> Char
 unsafeChr (I# i#) = C# (chr# i#)
@@ -495,7 +494,7 @@ maxInt  = I# 0x3FFFFFFF#
 #elif WORD_SIZE_IN_BITS == 32
 minInt  = I# (-0x80000000#)
 maxInt  = I# 0x7FFFFFFF#
-#else 
+#else
 minInt  = I# (-0x8000000000000000#)
 maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 #endif
@@ -513,17 +512,6 @@ maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 id                      :: a -> a
 id x                    =  x
 
--- | The call '(lazy e)' means the same as 'e', but 'lazy' has a 
--- magical strictness property: it is lazy in its first argument, 
--- even though its semantics is strict.
-lazy :: a -> a
-lazy x = x
--- Implementation note: its strictness and unfolding are over-ridden
--- by the definition in MkId.lhs; in both cases to nothing at all.
--- That way, 'lazy' does not get inlined, and the strictness analyser
--- sees it as lazy.  Then the worker/wrapper phase inlines it.
--- Result: happiness
-
 -- Assertion function.  This simply ignores its boolean argument.
 -- The compiler may rewrite it to @('assertError' line)@.
 
@@ -533,7 +521,7 @@ lazy x = x
 -- call to 'assert'.
 --
 -- Assertions can normally be turned on or off with a compiler flag
--- (for GHC, assertions are normally on unless optimisation is turned on 
+-- (for GHC, assertions are normally on unless optimisation is turned on
 -- with @-O@ or the @-fignore-asserts@
 -- option is given).  When assertions are turned off, the first
 -- argument to 'assert' is ignored, and the second argument is
@@ -583,8 +571,10 @@ f $ x                   =  f x
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
 until                   :: (a -> Bool) -> (a -> a) -> a -> a
-until p f x | p x       =  x
-            | otherwise =  until p f (f x)
+until p f = go
+  where
+    go x | p x          = x
+         | otherwise    = go (f x)
 
 -- | 'asTypeOf' is a type-restricted version of 'const'.  It is usually
 -- used as an infix operator, and its typing forces its first argument
@@ -685,65 +675,6 @@ x# `divModInt#` y#
                               (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
  | otherwise                = x# `quotRemInt#` y#
 
-{-# RULES
-"x# +# 0#" forall x#. x# +# 0# = x#
-"0# +# x#" forall x#. 0# +# x# = x#
-"x# -# 0#" forall x#. x# -# 0# = x#
-"x# -# x#" forall x#. x# -# x# = 0#
-"x# *# 0#" forall x#. x# *# 0# = 0#
-"0# *# x#" forall x#. 0# *# x# = 0#
-"x# *# 1#" forall x#. x# *# 1# = x#
-"1# *# x#" forall x#. 1# *# x# = x#
-  #-}
-
-{-# RULES
-"x# ># x#"  forall x#. x# >#  x# = False
-"x# >=# x#" forall x#. x# >=# x# = True
-"x# ==# x#" forall x#. x# ==# x# = True
-"x# /=# x#" forall x#. x# /=# x# = False
-"x# <# x#"  forall x#. x# <#  x# = False
-"x# <=# x#" forall x#. x# <=# x# = True
-  #-}
-
-{-# RULES
-"plusFloat x 0.0"   forall x#. plusFloat#  x#   0.0# = x#
-"plusFloat 0.0 x"   forall x#. plusFloat#  0.0# x#   = x#
-"minusFloat x 0.0"  forall x#. minusFloat# x#   0.0# = x#
-"timesFloat x 1.0"  forall x#. timesFloat# x#   1.0# = x#
-"timesFloat 1.0 x"  forall x#. timesFloat# 1.0# x#   = x#
-"divideFloat x 1.0" forall x#. divideFloat# x#  1.0# = x#
-  #-}
-
-{-# RULES
-"plusDouble x 0.0"   forall x#. (+##) x#    0.0## = x#
-"plusDouble 0.0 x"   forall x#. (+##) 0.0## x#    = x#
-"minusDouble x 0.0"  forall x#. (-##) x#    0.0## = x#
-"timesDouble x 1.0"  forall x#. (*##) x#    1.0## = x#
-"timesDouble 1.0 x"  forall x#. (*##) 1.0## x#    = x#
-"divideDouble x 1.0" forall x#. (/##) x#    1.0## = x#
-  #-}
-
-{-
-We'd like to have more rules, but for example:
-
-This gives wrong answer (0) for NaN - NaN (should be NaN):
-    "minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
-
-This gives wrong answer (0) for 0 * NaN (should be NaN):
-    "timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
-
-This gives wrong answer (0) for NaN * 0 (should be NaN):
-    "timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
-
-These are tested by num014.
-
-Similarly for Float (#5178):
-
-"minusFloat x x"    forall x#. minusFloat# x#   x#   = 0.0#
-"timesFloat0.0 x"   forall x#. timesFloat# 0.0# x#   = 0.0#
-"timesFloat x 0.0"  forall x#. timesFloat# x#   0.0# = 0.0#
--}
-
 -- Wrappers for the shift operations.  The uncheckedShift# family are
 -- undefined when the amount being shifted by is greater than the size
 -- in bits of Int#, so these wrappers perform a check and return
@@ -781,19 +712,6 @@ a `iShiftRA#` b | b >=# WORD_SIZE_IN_BITS# = if a <# 0# then (-1#) else 0#
 iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
                 | otherwise                = a `uncheckedIShiftRL#` b
-
-#if WORD_SIZE_IN_BITS == 32
-{-# RULES
-"narrow32Int#"  forall x#. narrow32Int#   x# = x#
-"narrow32Word#" forall x#. narrow32Word#   x# = x#
-   #-}
-#endif
-
-{-# RULES
-"int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#
-"word2Int2Word" forall x#. word2Int# (int2Word# x#) = x#
-  #-}
-
 
 -- Rules for C strings (the functions themselves are now in GHC.CString)
 {-# RULES

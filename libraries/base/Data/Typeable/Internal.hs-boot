@@ -1,8 +1,9 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, PolyKinds #-}
 
 module Data.Typeable.Internal (
-    Typeable(typeOf),
+    Proxy(..),
+    Typeable(typeRep),
     TypeRep,
     TyCon,
     mkTyCon,
@@ -24,5 +25,7 @@ mkTyCon :: Word#   -> Word#   -> String -> String -> String -> TyCon
 
 mkTyConApp   :: TyCon -> [TypeRep] -> TypeRep
 
+data Proxy t = Proxy
+
 class Typeable a where
-  typeOf :: a -> TypeRep
+  typeRep :: proxy a -> TypeRep

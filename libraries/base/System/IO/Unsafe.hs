@@ -17,9 +17,9 @@
 
 module System.IO.Unsafe (
    -- * Unsafe 'System.IO.IO' operations
-   unsafePerformIO,     -- :: IO a -> a
-   unsafeDupablePerformIO, -- :: IO a -> a
-   unsafeInterleaveIO,  -- :: IO a -> IO a
+   unsafePerformIO,
+   unsafeDupablePerformIO,
+   unsafeInterleaveIO,
    unsafeFixIO,
   ) where
 
@@ -33,11 +33,6 @@ import Control.Exception
 
 #ifdef __HUGS__
 import Hugs.IOExts (unsafePerformIO, unsafeInterleaveIO)
-unsafeDupablePerformIO = unsafePerformIO
-#endif
-
-#ifdef __NHC__
-import NHC.Internal (unsafePerformIO, unsafeInterleaveIO)
 unsafeDupablePerformIO = unsafePerformIO
 #endif
 

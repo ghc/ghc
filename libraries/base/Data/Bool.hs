@@ -19,24 +19,13 @@ module Data.Bool (
    -- * Booleans
    Bool(..),
    -- ** Operations 
-   (&&),        -- :: Bool -> Bool -> Bool
-   (||),        -- :: Bool -> Bool -> Bool
-   not,         -- :: Bool -> Bool
-   otherwise,   -- :: Bool
+   (&&),
+   (||),
+   not,
+   otherwise,
   ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-#endif
-
-#ifdef __NHC__
-import Prelude
-import Prelude
-  ( Bool(..)
-  , (&&)
-  , (||)
-  , not
-  , otherwise
-  )
 #endif
 

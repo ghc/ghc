@@ -8,6 +8,24 @@
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Generics
+-- Copyright   :  (c) Universiteit Utrecht 2010-2011, University of Oxford 2012
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
+--
+-- Support for generic programming with a sum-of-products view. 
+-- For more information, please visit the HaskellWiki page
+-- (<http://www.haskell.org/haskellwiki/GHC.Generics>)
+-- or use the generic-deriving package on Hackage:
+-- <http://hackage.haskell.org/package/generic-deriving>.
+-- 
+-----------------------------------------------------------------------------
+
 module GHC.Generics  (
   -- * Generic representation types
     V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..)
@@ -45,31 +63,38 @@ data V1 p
 
 -- | Unit: used for constructors without arguments
 data U1 p = U1
+  deriving (Eq, Read, Show, Generic)
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
-
+  deriving (Eq, Read, Show, Generic)
 
 -- | Recursive calls of kind * -> *
 newtype Rec1 f p = Rec1 { unRec1 :: f p }
+  deriving (Eq, Read, Show, Generic)
 
 -- | Constants, additional parameters and recursion of kind *
 newtype K1 i c p = K1 { unK1 :: c }
+  deriving (Eq, Read, Show, Generic)
 
 -- | Meta-information (constructor names, etc.)
 newtype M1 i c f p = M1 { unM1 :: f p }
+  deriving (Eq, Read, Show, Generic)
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
 data (:+:) f g p = L1 (f p) | R1 (g p)
+  deriving (Eq, Read, Show, Generic)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
 data (:*:) f g p = f p :*: g p
+  deriving (Eq, Read, Show, Generic)
 
 -- | Composition of functors
 infixr 7 :.:
 newtype (:.:) f g p = Comp1 { unComp1 :: f (g p) }
+  deriving (Eq, Read, Show, Generic)
 
 -- | Tag for K1: recursion (of kind *)
 data R
@@ -80,8 +105,8 @@ data P
 type Rec0  = K1 R
 -- | Type synonym for encoding parameters (other than the last)
 type Par0  = K1 P
-{-# DEPRECATED Par0 "Par0 is no longer used; use Rec0 instead" #-}
-{-# DEPRECATED P "P is no longer used; use R instead" #-}
+{-# DEPRECATED Par0 "Par0 is no longer used; use Rec0 instead" #-} -- deprecated in 7.6
+{-# DEPRECATED P "P is no longer used; use R instead" #-} -- deprecated in 7.6
 
 -- | Tag for M1: datatype
 data D
@@ -106,6 +131,9 @@ class Datatype d where
   datatypeName :: t d (f :: * -> *) a -> [Char]
   -- | The fully-qualified name of the module where the type is declared
   moduleName   :: t d (f :: * -> *) a -> [Char]
+  -- | Marks if the datatype is actually a newtype
+  isNewtype    :: t d (f :: * -> *) a -> Bool
+  isNewtype _ = False
 
 
 -- | Class for datatypes that represent records
@@ -134,12 +162,12 @@ class Constructor c where
 
 -- | Datatype to represent the arity of a tuple.
 data Arity = NoArity | Arity Int
-  deriving (Eq, Show, Ord, Read)
+  deriving (Eq, Show, Ord, Read, Generic)
 
 -- | Datatype to represent the fixity of a constructor. An infix
 -- | declaration directly corresponds to an application of 'Infix'.
 data Fixity = Prefix | Infix Associativity Int
-  deriving (Eq, Show, Ord, Read)
+  deriving (Eq, Show, Ord, Read, Generic)
 
 -- | Get the precedence of a fixity value.
 prec :: Fixity -> Int
@@ -150,7 +178,7 @@ prec (Infix _ n) = n
 data Associativity = LeftAssociative
                    | RightAssociative
                    | NotAssociative
-  deriving (Eq, Show, Ord, Read)
+  deriving (Eq, Show, Ord, Read, Generic)
 
 -- | Representable types of kind *.
 -- This class is derivable in GHC with the DeriveGeneric flag on.
@@ -163,7 +191,8 @@ class Generic a where
   to    :: (Rep a) x -> a
 
 
--- | Representable types of kind * -> * (not yet derivable)
+-- | Representable types of kind * -> *.
+-- This class is derivable in GHC with the DeriveGeneric flag on.
 class Generic1 f where
   -- | Generic representation type
   type Rep1 f :: * -> *

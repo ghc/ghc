@@ -20,10 +20,10 @@
 
 module Data.Either (
    Either(..),
-   either,           -- :: (a -> c) -> (b -> c) -> Either a b -> c
-   lefts,            -- :: [Either a b] -> [a]
-   rights,           -- :: [Either a b] -> [b]
-   partitionEithers, -- :: [Either a b] -> ([a],[b])
+   either,
+   lefts,
+   rights,
+   partitionEithers,
  ) where
 
 #include "Typeable.h"

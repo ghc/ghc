@@ -25,14 +25,14 @@
 -- #hide
 module GHC.Err
        (
-         absentErr                 -- :: a
-       , divZeroError              -- :: a
-       , ratioZeroDenominatorError -- :: a
-       , overflowError             -- :: a
+         absentErr
+       , divZeroError
+       , ratioZeroDenominatorError
+       , overflowError
 
-       , error                     -- :: String -> a
+       , error
 
-       , undefined                 -- :: a
+       , undefined
        ) where
 
 import GHC.Types

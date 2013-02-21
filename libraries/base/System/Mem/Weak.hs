@@ -55,15 +55,15 @@ module System.Mem.Weak (
 	Weak,	    		-- abstract
 
 	-- * The general interface
-	mkWeak,      		-- :: k -> v -> Maybe (IO ()) -> IO (Weak v)
-	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
-	finalize,		-- :: Weak v -> IO ()
+	mkWeak,
+	deRefWeak,
+	finalize,
 
 	-- * Specialised versions
-	mkWeakPtr, 		-- :: k -> Maybe (IO ()) -> IO (Weak k)
-	addFinalizer, 		-- :: key -> IO () -> IO ()
-	mkWeakPair, 		-- :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
-	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
+	mkWeakPtr,
+	addFinalizer,
+	mkWeakPair,
+	-- replaceFinaliser
 
 	-- * A precise semantics
 	
@@ -94,15 +94,10 @@ mkWeakPtr key finalizer = mkWeak key key finalizer
   when the key becomes unreachable).
 
   Note: adding a finalizer to a 'Foreign.ForeignPtr.ForeignPtr' using
-  'addFinalizer' won't work as well as using the specialised version
-  'Foreign.ForeignPtr.addForeignPtrFinalizer' because the latter
-  version adds the finalizer to the primitive 'ForeignPtr#' object
-  inside, whereas the generic 'addFinalizer' will add the finalizer to
-  the box.  Optimisations tend to remove the box, which may cause the
-  finalizer to run earlier than you intended.  The same motivation
-  justifies the existence of
-  'Control.Concurrent.MVar.addMVarFinalizer' and
-  'Data.IORef.mkWeakIORef' (the non-uniformity is accidental).
+  'addFinalizer' won't work; use the specialised version
+  'Foreign.ForeignPtr.addForeignPtrFinalizer' instead.  For discussion
+  see the 'Weak' type.
+.
 -}
 addFinalizer :: key -> IO () -> IO ()
 addFinalizer key finalizer = do

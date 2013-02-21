@@ -123,5 +123,5 @@ writeBufNonBlocking dev bbuf = do
   let bytes = bufferElems bbuf
   res <- withBuffer bbuf $ \ptr ->
             IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf) bytes
-  return (res, bufferAdjustL res bbuf)
+  return (res, bufferAdjustL (bufL bbuf + res) bbuf)
 

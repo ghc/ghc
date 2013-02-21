@@ -4,7 +4,7 @@
            , BangPatterns
            , PatternGuards
            , NondecreasingIndentation
-           , Rank2Types
+           , RankNTypes
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
@@ -172,7 +172,7 @@ do_operation fun h act m = do
         _ | Just ioe <- fromException e ->
             ioError (augmentIOError ioe fun h)
         _ | Just async_ex <- fromException e -> do -- see Note [async]
-            let _ = async_ex :: AsyncException
+            let _ = async_ex :: SomeAsyncException
             t <- myThreadId
             throwTo t e
             do_operation fun h act m

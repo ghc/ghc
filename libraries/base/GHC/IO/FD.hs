@@ -217,7 +217,7 @@ nonblock_flags = o_NONBLOCK
 
 -- | Make a 'FD' from an existing file descriptor.  Fails if the FD
 -- refers to a directory.  If the FD refers to a file, `mkFD` locks
--- the file according to the Haskell 98 single writer/multiple reader
+-- the file according to the Haskell 2010 single writer/multiple reader
 -- locking semantics (this is why we need the `IOMode` argument too).
 mkFD :: CInt
      -> IOMode
@@ -315,7 +315,6 @@ stderr = stdFD 2
 
 close :: FD -> IO ()
 close fd =
-  (flip finally) (release fd) $
   do let closer realFd =
            throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
 #ifdef mingw32_HOST_OS
@@ -324,6 +323,12 @@ close fd =
            else
 #endif
              c_close (fromIntegral realFd)
+
+     -- release the lock *first*, because otherwise if we're preempted
+     -- after closing but before releasing, the FD may have been reused.
+     -- (#7646)
+     release fd
+
      closeFdWith closer (fromIntegral (fdFD fd))
 
 release :: FD -> IO ()

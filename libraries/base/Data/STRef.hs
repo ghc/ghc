@@ -17,12 +17,12 @@
 
 module Data.STRef (
         -- * STRefs
-        STRef,          -- abstract, instance Eq
-        newSTRef,       -- :: a -> ST s (STRef s a)
-        readSTRef,      -- :: STRef s a -> ST s a
-        writeSTRef,     -- :: STRef s a -> a -> ST s ()
-        modifySTRef,    -- :: STRef s a -> (a -> a) -> ST s ()
-        modifySTRef'    -- :: STRef s a -> (a -> a) -> ST s ()
+        STRef,          -- abstract
+        newSTRef,
+        readSTRef,
+        writeSTRef,
+        modifySTRef,
+        modifySTRef'
  ) where
 
 import Prelude

@@ -22,17 +22,17 @@
 module Control.Monad.ST.Imp (
         -- * The 'ST' Monad
         ST,             -- abstract, instance of Functor, Monad, Typeable.
-        runST,          -- :: (forall s. ST s a) -> a
-        fixST,          -- :: (a -> ST s a) -> ST s a
+        runST,
+        fixST,
 
         -- * Converting 'ST' to 'IO'
         RealWorld,              -- abstract
-        stToIO,                 -- :: ST RealWorld a -> IO a
+        stToIO,
 
         -- * Unsafe operations
-        unsafeInterleaveST,     -- :: ST s a -> ST s a
-        unsafeIOToST,           -- :: IO a -> ST s a
-        unsafeSTToIO            -- :: ST s a -> IO a
+        unsafeInterleaveST,
+        unsafeIOToST,
+        unsafeSTToIO
     ) where
 
 #if !defined(__GLASGOW_HASKELL__)

@@ -1,5 +1,6 @@
-import GHC.Handle
-import GHC.IOBase
+import GHC.IO
+import GHC.IO.Handle
+import GHC.IO.Handle.Types
 import System.IO
 import Control.Concurrent.MVar
 import Data.Typeable

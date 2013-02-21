@@ -5,17 +5,23 @@ AC_CONFIG_SRCDIR([include/HsBase.h])
 
 AC_CONFIG_HEADERS([include/HsBaseConfig.h include/EventConfig.h])
 
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
 AC_ARG_WITH([cc],
             [C compiler],
             [CC=$withval])
 AC_PROG_CC()
 
-case `uname -s` in
-    MINGW*|CYGWIN*)
+AC_MSG_CHECKING(for WINDOWS platform)
+case $host in
+    *mingw32*|*cygwin*)
         WINDOWS=YES;;
     *)
         WINDOWS=NO;;
 esac
+AC_MSG_RESULT($WINDOWS)
 
 # do we have long longs?
 AC_CHECK_TYPES([long long])
@@ -51,6 +57,12 @@ fi
 
 if test "$ac_cv_header_sys_event_h" = yes -a "$ac_cv_func_kqueue" = yes; then
   AC_DEFINE([HAVE_KQUEUE], [1], [Define if you have kqueue support.])
+
+  AC_CHECK_SIZEOF([kev.filter], [], [#include <sys/event.h>
+struct kevent kev;])
+
+  AC_CHECK_SIZEOF([kev.flags], [], [#include <sys/event.h>
+struct kevent kev;])
 fi
 
 if test "$ac_cv_header_poll_h" = yes -a "$ac_cv_func_poll" = yes; then

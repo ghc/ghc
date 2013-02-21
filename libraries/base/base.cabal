@@ -1,5 +1,6 @@
 name:           base
-version:        4.6.0.0
+version:        4.7.0.0
+-- GHC 7.6.1 released with 4.6.0.0
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
@@ -60,7 +61,6 @@ Library {
             GHC.ForeignPtr,
             GHC.Generics,
             GHC.GHCi,
-            GHC.Handle,
             GHC.IO,
             GHC.IO.Buffer,
             GHC.IO.BufferedIO,
@@ -83,7 +83,6 @@ Library {
             GHC.IO.Handle.Types,
             GHC.IO.IOMode,
             GHC.IOArray,
-            GHC.IOBase,
             GHC.IORef,
             GHC.IP,
             GHC.Int,
@@ -92,6 +91,7 @@ Library {
             GHC.Num,
             GHC.PArr,
             GHC.Pack,
+            GHC.Profiling,
             GHC.Ptr,
             GHC.Read,
             GHC.Real,
@@ -120,6 +120,8 @@ Library {
         Control.Concurrent,
         Control.Concurrent.Chan,
         Control.Concurrent.MVar,
+        Control.Concurrent.QSem,
+        Control.Concurrent.QSemN,
         Control.Exception,
         Control.Exception.Base
         Control.Monad,
@@ -161,6 +163,8 @@ Library {
         Data.Tuple,
         Data.Typeable,
         Data.Typeable.Internal,
+        Data.OldTypeable,
+        Data.OldTypeable.Internal,
         Data.Unique,
         Data.Version,
         Data.Word,
@@ -185,7 +189,7 @@ Library {
         Foreign.Safe,
         Foreign.StablePtr,
         Foreign.Storable,
-        LwConc.Substrate,
+				LwConc.Substrate,
         Numeric,
         Prelude,
         System.Console.GetOpt
@@ -224,9 +228,10 @@ Library {
         cbits/inputReady.c
         cbits/primFloat.c
         cbits/md5.c
+        cbits/sysconf.c
     include-dirs: include
     includes:    HsBase.h
-    install-includes:    HsBase.h HsBaseConfig.h EventConfig.h WCsubst.h consUtils.h Typeable.h
+    install-includes:    HsBase.h HsBaseConfig.h EventConfig.h WCsubst.h consUtils.h Typeable.h OldTypeable.h
     if os(windows) {
         extra-libraries: wsock32, user32, shell32
     }
@@ -242,6 +247,7 @@ Library {
             GHC.Event.Internal
             GHC.Event.KQueue
             GHC.Event.Manager
+            GHC.Event.TimerManager
             GHC.Event.PSQ
             GHC.Event.Poll
             GHC.Event.Thread

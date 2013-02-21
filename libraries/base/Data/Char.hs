@@ -36,20 +36,20 @@ module Data.Char
     , GeneralCategory(..), generalCategory
 
     -- * Case conversion
-    , toUpper, toLower, toTitle  -- :: Char -> Char
+    , toUpper, toLower, toTitle
 
     -- * Single digit characters
-    , digitToInt        -- :: Char -> Int
-    , intToDigit        -- :: Int  -> Char
+    , digitToInt
+    , intToDigit
 
     -- * Numeric representations
-    , ord               -- :: Char -> Int
-    , chr               -- :: Int  -> Char
+    , ord
+    , chr
 
     -- * String representations
-    , showLitChar       -- :: Char -> ShowS
-    , lexLitChar        -- :: ReadS String
-    , readLitChar       -- :: ReadS Char 
+    , showLitChar
+    , lexLitChar
+    , readLitChar
     ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -67,15 +67,6 @@ import GHC.Enum
 #ifdef __HUGS__
 import Hugs.Prelude (Ix)
 import Hugs.Char
-#endif
-
-#ifdef __NHC__
-import Prelude
-import Prelude(Char,String)
-import Char
-import Ix
-import NHC.FFI (CInt)
-foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> CInt
 #endif
 
 -- | Convert a single digit 'Char' to the corresponding 'Int'.  
@@ -133,7 +124,7 @@ data GeneralCategory
 
 -- | The Unicode general category of the character.
 generalCategory :: Char -> GeneralCategory
-#if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
+#if defined(__GLASGOW_HASKELL__)
 generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
 #endif
 #ifdef __HUGS__
@@ -202,10 +193,4 @@ isSeparator c = case generalCategory c of
         LineSeparator           -> True
         ParagraphSeparator      -> True
         _                       -> False
-
-#ifdef __NHC__
--- dummy implementation
-toTitle :: Char -> Char
-toTitle = toUpper
-#endif
 

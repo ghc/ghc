@@ -19,7 +19,7 @@
 
 -- #hide
 module GHC.List (
-   -- [] (..),          -- Not Haskell 98; built in syntax
+   -- [] (..),          -- built-in syntax; can't be used in export list
 
    map, (++), filter, concat,
    head, last, tail, init, null, length, (!!),
@@ -58,6 +58,7 @@ infix  4 `elem`, `notElem`
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
+{-# NOINLINE [1] head #-}
 
 badHead :: a
 badHead = errorEmptyList "head"
@@ -113,18 +114,32 @@ null (_:_)              =  False
 -- | /O(n)/. 'length' returns the length of a finite list as an 'Int'.
 -- It is an instance of the more general 'Data.List.genericLength',
 -- the result type of which may be any kind of number.
+{-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
-length l                =  len l 0#
-  where
-    len :: [a] -> Int# -> Int
-    len []     a# = I# a#
-    len (_:xs) a# = len xs (a# +# 1#)
+length l                =  lenAcc l 0#
+
+lenAcc :: [a] -> Int# -> Int
+lenAcc []     a# = I# a#
+lenAcc (_:xs) a# = lenAcc xs (a# +# 1#)
+
+incLen :: a -> (Int# -> Int) -> Int# -> Int
+incLen _ g x = g (x +# 1#)
+
+-- These rules make length into a good consumer
+-- Note that we use a higher-order-style use of foldr, so that
+-- the accumulating parameter can be evaluated strictly
+-- See Trac #876 for what goes wrong otherwise
+{-# RULES
+"length"     [~1] forall xs. length xs = foldr incLen I# xs 0#
+"lengthList" [1]  foldr incLen I# = lenAcc
+ #-}
 
 -- | 'filter', applied to a predicate and a list, returns the list of
 -- those elements that satisfy the predicate; i.e.,
 --
 -- > filter p xs = [ x | x <- xs, p x]
 
+{-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
 filter _pred []    = []
 filter pred (x:xs)
@@ -164,7 +179,7 @@ filterFB c p x r | p x       = x `c` r
 -- can be inlined, and then (often) strictness-analysed,
 -- and hence the classic space leak on foldl (+) 0 xs
 
-foldl        :: (a -> b -> a) -> a -> [b] -> a
+foldl        :: (b -> a -> b) -> b -> [a] -> b
 foldl f z0 xs0 = lgo z0 xs0
              where
                 lgo z []     =  z
@@ -179,7 +194,7 @@ foldl f z0 xs0 = lgo z0 xs0
 --
 -- > last (scanl f z xs) == foldl f z xs.
 
-scanl                   :: (a -> b -> a) -> a -> [b] -> [a]
+scanl                   :: (b -> a -> b) -> b -> [a] -> [b]
 scanl f q ls            =  q : (case ls of
                                 []   -> []
                                 x:xs -> scanl f (f q x) xs)
@@ -226,12 +241,13 @@ scanr1 f (x:xs)         =  f x q : qs
 --
 -- > iterate f x == [x, f x, f (f x), ...]
 
+{-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
 
+{-# NOINLINE [0] iterateFB #-}
 iterateFB :: (a -> b -> b) -> (a -> a) -> a -> b
 iterateFB c f x = x `c` iterateFB c f (f x)
-
 
 {-# RULES
 "iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
@@ -497,6 +513,9 @@ and (x:xs)      =  x && and xs
 or []           =  False
 or (x:xs)       =  x || or xs
 
+{-# NOINLINE [1] and #-}
+{-# NOINLINE [1] or #-}
+
 {-# RULES
 "and/build"     forall (g::forall b.(Bool->b->b)->b->b) . 
                 and (build g) = g (&&) True
@@ -525,6 +544,10 @@ any p (x:xs)    = p x || any p xs
 
 all _ []        =  True
 all p (x:xs)    =  p x && all p xs
+
+{-# NOINLINE [1] any #-}
+{-# NOINLINE [1] all #-}
+
 {-# RULES
 "any/build"     forall p (g::forall b.(a->b->b)->b->b) . 
                 any p (build g) = g ((||) . p) False
@@ -565,6 +588,8 @@ concatMap f             =  foldr ((++) . f) []
 -- | Concatenate a list of lists.
 concat :: [[a]] -> [a]
 concat = foldr (++) []
+
+{-# NOINLINE [1] concat #-}
 
 {-# RULES
   "concat" forall xs. concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
@@ -613,6 +638,8 @@ foldr2 _k z []    _ys    = z
 foldr2 _k z _xs   []     = z
 foldr2 k z (x:xs) (y:ys) = k x y (foldr2 k z xs ys)
 
+{-# NOINLINE [1] foldr2 #-}
+
 foldr2_left :: (a -> b -> c -> d) -> d -> a -> ([b] -> c) -> [b] -> d
 foldr2_left _k  z _x _r []     = z
 foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
@@ -649,6 +676,7 @@ Zips for larger tuples are in the List module.
 -- | 'zip' takes two lists and returns a list of corresponding pairs.
 -- If one input list is short, excess elements of the longer list are
 -- discarded.
+{-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
 zip (a:as) (b:bs) = (a,b) : zip as bs
 zip _      _      = []
@@ -684,6 +712,7 @@ zip3 _      _      _      = []
 -- as the first argument, instead of a tupling function.
 -- For example, @'zipWith' (+)@ is applied to two lists to produce the
 -- list of corresponding sums.
+{-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
 zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
 zipWith _ _      _      = []

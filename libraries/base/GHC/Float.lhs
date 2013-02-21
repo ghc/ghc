@@ -230,18 +230,23 @@ instance  Real Float  where
 
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
-    fromRational (n:%0)
-        | n == 0        = 0/0
-        | n < 0         = (-1)/0
-        | otherwise     = 1/0
-    fromRational (n:%d)
-        | n == 0        = encodeFloat 0 0
-        | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-        | otherwise     = fromRat'' minEx mantDigs n d
-          where
-            minEx       = FLT_MIN_EXP
-            mantDigs    = FLT_MANT_DIG
+    {-# INLINE fromRational #-}
+    fromRational (n:%d) = rationalToFloat n d
     recip x             =  1.0 / x
+
+rationalToFloat :: Integer -> Integer -> Float
+{-# NOINLINE [1] rationalToFloat #-}
+rationalToFloat n 0
+    | n == 0        = 0/0
+    | n < 0         = (-1)/0
+    | otherwise     = 1/0
+rationalToFloat n d
+    | n == 0        = encodeFloat 0 0
+    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
+    | otherwise     = fromRat'' minEx mantDigs n d
+      where
+        minEx       = FLT_MIN_EXP
+        mantDigs    = FLT_MANT_DIG
 
 -- RULES for Integer and Int
 {-# RULES
@@ -391,18 +396,23 @@ instance  Real Double  where
 
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
-    fromRational (n:%0)
-        | n == 0        = 0/0
-        | n < 0         = (-1)/0
-        | otherwise     = 1/0
-    fromRational (n:%d)
-        | n == 0        = encodeFloat 0 0
-        | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-        | otherwise     = fromRat'' minEx mantDigs n d
-          where
-            minEx       = DBL_MIN_EXP
-            mantDigs    = DBL_MANT_DIG
+    {-# INLINE fromRational #-}
+    fromRational (n:%d) = rationalToDouble n d
     recip x             =  1.0 / x
+
+rationalToDouble :: Integer -> Integer -> Double
+{-# NOINLINE [1] rationalToDouble #-}
+rationalToDouble n 0
+    | n == 0        = 0/0
+    | n < 0         = (-1)/0
+    | otherwise     = 1/0
+rationalToDouble n d
+    | n == 0        = encodeFloat 0 0
+    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
+    | otherwise     = fromRat'' minEx mantDigs n d
+      where
+        minEx       = DBL_MIN_EXP
+        mantDigs    = DBL_MANT_DIG
 
 instance  Floating Double  where
     pi                  =  3.141592653589793238
@@ -825,6 +835,8 @@ Now, here's Lennart's code (which works)
 "fromRat/Float"     fromRat = (fromRational :: Rational -> Float)
 "fromRat/Double"    fromRat = (fromRational :: Rational -> Double)
   #-}
+
+{-# NOINLINE [1] fromRat #-}
 fromRat :: (RealFloat a) => Rational -> a
 
 -- Deal with special cases first, delegating the real work to fromRat'
@@ -1098,9 +1110,18 @@ foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
 %*********************************************************
 
 \begin{code}
+
+word2Double :: Word -> Double
+word2Double (W# w) = D# (word2Double# w)
+
+word2Float :: Word -> Float
+word2Float (W# w) = F# (word2Float# w)
+
 {-# RULES
 "fromIntegral/Int->Float"   fromIntegral = int2Float
 "fromIntegral/Int->Double"  fromIntegral = int2Double
+"fromIntegral/Word->Float"  fromIntegral = word2Float
+"fromIntegral/Word->Double" fromIntegral = word2Double
 "realToFrac/Float->Float"   realToFrac   = id :: Float -> Float
 "realToFrac/Float->Double"  realToFrac   = float2Double
 "realToFrac/Double->Float"  realToFrac   = double2Float

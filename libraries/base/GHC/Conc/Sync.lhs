@@ -10,6 +10,7 @@
            , DeriveDataTypeable
            , StandaloneDeriving
            , RankNTypes
+           , PatternGuards
   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -40,63 +41,60 @@ module GHC.Conc.Sync
         ( ThreadId(..)
 
         -- * Forking and suchlike
-        , forkIO        -- :: IO a -> IO ThreadId
-        , forkIOUnmasked
+        , forkIO
         , forkIOWithUnmask
-        , forkOn      -- :: Int -> IO a -> IO ThreadId
-        , forkOnIO    -- DEPRECATED
-        , forkOnIOUnmasked
+        , forkOn
         , forkOnWithUnmask
-        , numCapabilities -- :: Int
-        , getNumCapabilities -- :: IO Int
-        , setNumCapabilities -- :: Int -> IO ()
-        , getNumProcessors   -- :: IO Int
-        , numSparks      -- :: IO Int
-        , childHandler  -- :: Exception -> IO ()
-        , myThreadId    -- :: IO ThreadId
-        , killThread    -- :: ThreadId -> IO ()
-        , throwTo       -- :: ThreadId -> Exception -> IO ()
-        , par           -- :: a -> b -> b
-        , pseq          -- :: a -> b -> b
+        , numCapabilities
+        , getNumCapabilities
+        , setNumCapabilities
+        , getNumProcessors
+        , numSparks
+        , childHandler
+        , myThreadId
+        , killThread
+        , throwTo
+        , par
+        , pseq
         , runSparks
-        , yield         -- :: IO ()
-        , labelThread   -- :: ThreadId -> String -> IO ()
-        , mkWeakThreadId -- :: ThreadId -> IO (Weak ThreadId)
+        , yield
+        , labelThread
+        , mkWeakThreadId
 
         , ThreadStatus(..), BlockReason(..)
-        , threadStatus  -- :: ThreadId -> IO ThreadStatus
+        , threadStatus
         , threadCapability
 
         -- * TVars
         , STM(..)
-        , atomically    -- :: STM a -> IO a
-        , retry         -- :: STM a
-        , orElse        -- :: STM a -> STM a -> STM a
-        , throwSTM      -- :: Exception e => e -> STM a
-        , catchSTM      -- :: Exception e => STM a -> (e -> STM a) -> STM a
-        , alwaysSucceeds -- :: STM a -> STM ()
-        , always        -- :: STM Bool -> STM ()
+        , atomically
+        , retry
+        , orElse
+        , throwSTM
+        , catchSTM
+        , alwaysSucceeds
+        , always
         , TVar(..)
-        , newTVar       -- :: a -> STM (TVar a)
-        , newTVarIO     -- :: a -> STM (TVar a)
-        , readTVar      -- :: TVar a -> STM a
-        , readTVarIO    -- :: TVar a -> IO a
-        , writeTVar     -- :: a -> TVar a -> STM ()
-        , unsafeIOToSTM -- :: IO a -> STM a
+        , newTVar
+        , newTVarIO
+        , readTVar
+        , readTVarIO
+        , writeTVar
+        , unsafeIOToSTM
 
         -- * Miscellaneous
         , withMVar
         , modifyMVar_
 
-        , setUncaughtExceptionHandler      -- :: (Exception -> IO ()) -> IO ()
-        , getUncaughtExceptionHandler      -- :: IO (Exception -> IO ())
+        , setUncaughtExceptionHandler
+        , getUncaughtExceptionHandler
 
         , reportError, reportStackOverflow
 
         , sharedCAF
         ) where
 
-import Foreign hiding (unsafePerformIO)
+import Foreign
 import Foreign.C
 
 #ifdef mingw32_HOST_OS
@@ -113,12 +111,14 @@ import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
 import GHC.IO
+import GHC.IO.Encoding.UTF8
 import GHC.IO.Exception
 import GHC.Exception
+import qualified GHC.Foreign
 import GHC.IORef
 import GHC.MVar
+import GHC.Ptr
 import GHC.Real         ( fromIntegral )
-import GHC.Pack         ( packCString# )
 import GHC.Show         ( Show(..), showString )
 import GHC.Weak
 
@@ -205,11 +205,6 @@ forkIO action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
-{-# DEPRECATED forkIOUnmasked "use forkIOWithUnmask instead" #-}
--- | This function is deprecated; use 'forkIOWithUnmask' instead
-forkIOUnmasked :: IO () -> IO ThreadId
-forkIOUnmasked io = forkIO (unsafeUnmask io)
-
 -- | Like 'forkIO', but the child thread is passed a function that can
 -- be used to unmask asynchronous exceptions.  This function is
 -- typically used in the following way
@@ -246,7 +241,7 @@ GHC note: the number of capabilities is specified by the @+RTS -N@
 option when the program is started.  Capabilities can be fixed to
 actual processor cores with @+RTS -qa@ if the underlying operating
 system supports that, although in practice this is usually unnecessary
-(and may actually degrade perforamnce in some cases - experimentation
+(and may actually degrade performance in some cases - experimentation
 is recommended).
 -}
 forkOn :: Int -> IO () -> IO ThreadId
@@ -254,16 +249,6 @@ forkOn (I# cpu) action = IO $ \ s ->
    case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
-
-{-# DEPRECATED forkOnIO "renamed to forkOn" #-}
--- | This function is deprecated; use 'forkOn' instead
-forkOnIO :: Int -> IO () -> IO ThreadId
-forkOnIO = forkOn
-
-{-# DEPRECATED forkOnIOUnmasked "use forkOnWithUnmask instead" #-}
--- | This function is deprecated; use 'forkOnWIthUnmask' instead
-forkOnIOUnmasked :: Int -> IO () -> IO ThreadId
-forkOnIOUnmasked cpu io = forkOn cpu (unsafeUnmask io)
 
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
 -- given CPU, as with 'forkOn'.
@@ -288,7 +273,7 @@ this value, use 'setNumCapabilities'.
 -}
 getNumCapabilities :: IO Int
 getNumCapabilities = do
-   n <- peek n_capabilities
+   n <- peek enabled_capabilities
    return (fromIntegral n)
 
 {- |
@@ -319,24 +304,18 @@ foreign import ccall unsafe "getNumberOfProcessors"
 numSparks :: IO Int
 numSparks = IO $ \s -> case numSparks# s of (# s', n #) -> (# s', I# n #)
 
-foreign import ccall "&n_capabilities" n_capabilities :: Ptr CInt
+foreign import ccall "&enabled_capabilities" enabled_capabilities :: Ptr CInt
 
 childHandler :: SomeException -> IO ()
 childHandler err = catchException (real_handler err) childHandler
 
 real_handler :: SomeException -> IO ()
-real_handler se@(SomeException ex) =
-  -- ignore thread GC and killThread exceptions:
-  case cast ex of
-  Just BlockedIndefinitelyOnMVar        -> return ()
-  _ -> case cast ex of
-       Just BlockedIndefinitelyOnSTM    -> return ()
-       _ -> case cast ex of
-            Just ThreadKilled           -> return ()
-            _ -> case cast ex of
-                 -- report all others:
-                 Just StackOverflow     -> reportStackOverflow
-                 _                      -> reportError se
+real_handler se
+  | Just BlockedIndefinitelyOnMVar <- fromException se  =  return ()
+  | Just BlockedIndefinitelyOnSTM  <- fromException se  =  return ()
+  | Just ThreadKilled              <- fromException se  =  return ()
+  | Just StackOverflow             <- fromException se  =  reportStackOverflow
+  | otherwise                                           =  reportError se
 
 {- | 'killThread' raises the 'ThreadKilled' exception in the given
 thread (GHC only).
@@ -427,10 +406,10 @@ Other applications like the graphical Concurrent Haskell Debugger
 -}
 
 labelThread :: ThreadId -> String -> IO ()
-labelThread (ThreadId t) str = IO $ \ s ->
-   let !ps  = packCString# str
-       !adr = byteArrayContents# ps in
-     case (labelThread# t adr s) of s1 -> (# s1, () #)
+labelThread (ThreadId t) str =
+    GHC.Foreign.withCString utf8 str $ \(Ptr p) ->
+    IO $ \ s ->
+     case labelThread# t p s of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'
 --                 but 'seq' is now defined in PrelGHC

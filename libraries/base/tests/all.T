@@ -9,17 +9,18 @@ test('assert', exit_code(1), compile_and_run, ['-fno-ignore-asserts'])
 test('CPUTime001', normal, compile_and_run, [''])
 test('readLitChar',   normal, compile_and_run, [''])
 test('unicode001',
-     if_platform('i386-unknown-openbsd', expect_fail),
+     when(platform('i386-unknown-openbsd'), expect_fail),
      compile_and_run,
      [''])
 test('unicode002',
-     if_platform('i386-unknown-openbsd', expect_fail),
+     when(platform('i386-unknown-openbsd'), expect_fail),
      compile_and_run,
      [''])
 test('data-fixed-show-read', normal, compile_and_run, [''])
 test('showDouble', normal, compile_and_run, [''])
 test('readDouble001', normal, compile_and_run, [''])
 test('readInteger001', normal, compile_and_run, [''])
+test('readFixed001', normal, compile_and_run, [''])
 test('lex001', normal, compile_and_run, [''])
 test('take001', extra_run_opts('1'), compile_and_run, [''])
 test('genericNegative001', extra_run_opts('-1'), compile_and_run, [''])
@@ -27,7 +28,7 @@ test('ix001', normal, compile_and_run, [''])
 
 # need to add -K64m to the compiler opts, so that GHCi gets it too
 test('ioref001',
-     [skip_if_fast,extra_run_opts('+RTS -K64m -RTS')],
+     [when(fast(), skip),extra_run_opts('+RTS -K64m -RTS')],
      compile_and_run,
      ['+RTS -K64m -RTS'])
 
@@ -47,10 +48,10 @@ test('hGetBuf003', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
 test('hPutBuf002', extra_clean(['hPutBuf002.out']), compile_and_run, [''])
 
-test('char001',   normal, compile_and_run, [''])
-test('char002',   normal, compile_and_run, [''])
+test('char001', 	normal, compile_and_run, [''])
+test('char002', 	normal, compile_and_run, [''])
 
-test('cstring001',   normal, compile_and_run, [''])
+test('cstring001', 	normal, compile_and_run, [''])
 
 test('length001',
      # This fails without -O, as it relies on a RULE being applied
@@ -58,48 +59,46 @@ test('length001',
      compile_and_run,
      [''])
 
-test('ratio001',   normal, compile_and_run, [''])
+test('ratio001', 	normal, compile_and_run, [''])
 
-test('rand001',    reqlib('random'), compile_and_run, [''])
-test('reads001',    normal, compile_and_run, [''])
-test('show001',    normal, compile_and_run, [''])
-test('text001',    normal, compile_and_run, [''])
+test('rand001',		reqlib('random'), compile_and_run, [''])
+test('reads001',		normal, compile_and_run, [''])
+test('show001',		normal, compile_and_run, [''])
+test('text001',		normal, compile_and_run, [''])
 
-test('tup001',    normal, compile_and_run, [''])
+test('tup001',		normal, compile_and_run, [''])
 
-test('addr001',    normal, compile_and_run, [''])
+test('addr001',		normal, compile_and_run, [''])
 test('dynamic001',      normal, compile_and_run, [''])
 test('dynamic002',      normal, compile_and_run, [''])
 test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
-test('dynamic004',      normal, compile_and_run, [''])
+test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
-test('enum01',          skip_if_fast, compile_and_run, ['-cpp'])
-test('enum02',     skip_if_fast, compile_and_run, ['-cpp'])
-test('enum03',     skip_if_fast, compile_and_run, ['-cpp'])
-test('enum04',     normal, compile_and_run, [''])
-test('exceptionsrun001',   normal, compile_and_run, [''])
-test('exceptionsrun002',   normal, compile_and_run, [''])
-test('list001'  ,  skip_if_fast, compile_and_run, [''])
-test('list002', skip_if_fast, compile_and_run, [''])
-test('list003', skip_if_fast, compile_and_run, [''])
+test('enum01',          when(fast(), skip), compile_and_run, ['-cpp'])
+test('enum02', 		when(fast(), skip), compile_and_run, ['-cpp'])
+test('enum03', 		when(fast(), skip), compile_and_run, ['-cpp'])
+test('enum04', 		normal, compile_and_run, [''])
+test('exceptionsrun001', 	normal, compile_and_run, [''])
+test('exceptionsrun002', 	normal, compile_and_run, [''])
+test('list001'	,	when(fast(), skip), compile_and_run, [''])
+test('list002', when(fast(), skip), compile_and_run, [''])
+test('list003', when(fast(), skip), compile_and_run, [''])
 
 test('memo001',
-     [skip_if_fast,
-      extra_run_opts('+RTS -A10k -RTS'),
+     [extra_run_opts('+RTS -A10k -RTS'),
       extra_clean(['Memo1.hi', 'Memo1.o'])],
      multimod_compile_and_run,
      ['memo001',''])
 
 test('memo002',
-     [skip_if_fast,
-      extra_run_opts('20'),
+     [extra_run_opts('20'),
       extra_clean(['Memo2.hi', 'Memo2.o'])],
-  multimod_compile_and_run, ['memo002',''])
+	multimod_compile_and_run, ['memo002',''])
 
 test('packedstring001', reqlib('packedstring'), compile_and_run, ['-package packedstring'])
 
 test('stableptr001',
-     [skip_if_fast, extra_run_opts('+RTS -K8m -RTS')],
+     [when(fast(), skip), extra_run_opts('+RTS -K8m -RTS')],
      compile_and_run, [''])
 test('stableptr003', normal, compile_and_run, [''])
 test('stableptr004', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
@@ -113,8 +112,13 @@ test('weak001', normal, compile_and_run, [''])
 #     cat: write error: Permission denied
 # Seems to be a known problem, e.g.
 #     http://mingw-users.1079350.n2.nabble.com/Bug-re-Unicode-on-the-console-td3121717.html
-test('4006', if_msys(expect_fail), compile_and_run, [''])
+test('T4006', when(msys(), expect_fail), compile_and_run, [''])
 
-test('5943', normal, compile_and_run, [''])
+test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
 test('T7034', normal, compile_and_run, [''])
+
+test('qsem001', normal, compile_and_run, [''])
+test('qsemn001', normal, compile_and_run, [''])
+
+test('T7457', normal, compile_and_run, [''])

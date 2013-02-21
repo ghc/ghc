@@ -23,35 +23,32 @@ module GHC.Read
   ( Read(..)   -- class
 
   -- ReadS type
-  , ReadS      -- :: *; = String -> [(a,String)]
+  , ReadS
 
-  -- H98 compatibility
-  , lex         -- :: ReadS String
-  , lexLitChar  -- :: ReadS String
-  , readLitChar -- :: ReadS Char
-  , lexDigits   -- :: ReadS String
+  -- H2010 compatibility
+  , lex
+  , lexLitChar
+  , readLitChar
+  , lexDigits
 
   -- defining readers
-  , lexP       -- :: ReadPrec Lexeme
-  , paren      -- :: ReadPrec a -> ReadPrec a
-  , parens     -- :: ReadPrec a -> ReadPrec a
-  , list       -- :: ReadPrec a -> ReadPrec [a]
-  , choose     -- :: [(String, ReadPrec a)] -> ReadPrec a
+  , lexP, expectP
+  , paren
+  , parens
+  , list
+  , choose
   , readListDefault, readListPrecDefault
+  , readNumber
 
   -- Temporary
   , readParen
-
-  -- XXX Can this be removed?
-  , readp
   )
  where
 
 import qualified Text.ParserCombinators.ReadP as P
 
 import Text.ParserCombinators.ReadP
-  ( ReadP
-  , ReadS
+  ( ReadS
   , readP_to_S
   )
 
@@ -83,7 +80,7 @@ import GHC.Arr
 -- @'readParen' 'False' p@ parses what @p@ parses, but optionally
 -- surrounded with parentheses.
 readParen       :: Bool -> ReadS a -> ReadS a
--- A Haskell 98 function
+-- A Haskell 2010 function
 readParen b g   =  if b then mandatory else optional
                    where optional r  = g r ++ mandatory r
                          mandatory r = do
@@ -131,7 +128,7 @@ readParen b g   =  if b then mandatory else optional
 -- > infixr 5 :^:
 -- > data Tree a =  Leaf a  |  Tree a :^: Tree a
 --
--- the derived instance of 'Read' in Haskell 98 is equivalent to
+-- the derived instance of 'Read' in Haskell 2010 is equivalent to
 --
 -- > instance (Read a) => Read (Tree a) where
 -- >
@@ -223,7 +220,7 @@ readListPrecDefault :: Read a => ReadPrec [a]
 readListPrecDefault = list readPrec
 
 ------------------------------------------------------------------------
--- H98 compatibility
+-- H2010 compatibility
 
 -- | The 'lex' function reads a single lexeme from the input, discarding
 -- initial white space, and returning the characters that constitute the
@@ -240,7 +237,7 @@ readListPrecDefault = list readPrec
 -- * Octal and hexadecimal numerics are not recognized as a single token
 --
 -- * Comments are not treated properly
-lex :: ReadS String             -- As defined by H98
+lex :: ReadS String             -- As defined by H2010
 lex s  = readP_to_S L.hsLex s
 
 -- | Read a string representation of a character, using Haskell
@@ -248,7 +245,7 @@ lex s  = readP_to_S L.hsLex s
 --
 -- > lexLitChar  "\\nHello"  =  [("\\n", "Hello")]
 --
-lexLitChar :: ReadS String      -- As defined by H98
+lexLitChar :: ReadS String      -- As defined by H2010
 lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
                               return s })
         -- There was a skipSpaces before the P.gather L.lexChar,
@@ -260,7 +257,7 @@ lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
 --
 -- > readLitChar "\\nHello"  =  [('\n', "Hello")]
 --
-readLitChar :: ReadS Char       -- As defined by H98
+readLitChar :: ReadS Char       -- As defined by H2010
 readLitChar = readP_to_S L.lexChar
 
 -- | Reads a non-empty string of decimal digits.
@@ -274,12 +271,15 @@ lexP :: ReadPrec L.Lexeme
 -- ^ Parse a single lexeme
 lexP = lift L.lex
 
+expectP :: L.Lexeme -> ReadPrec ()
+expectP lexeme = lift (L.expect lexeme)
+
 paren :: ReadPrec a -> ReadPrec a
 -- ^ @(paren p)@ parses \"(P0)\"
 --      where @p@ parses \"P0\" in precedence context zero
-paren p = do L.Punc "(" <- lexP
-             x          <- reset p
-             L.Punc ")" <- lexP
+paren p = do expectP (L.Punc "(")
+             x <- reset p
+             expectP (L.Punc ")")
              return x
 
 parens :: ReadPrec a -> ReadPrec a
@@ -296,7 +296,7 @@ list :: ReadPrec a -> ReadPrec [a]
 -- using the usual square-bracket syntax.
 list readx =
   parens
-  ( do L.Punc "[" <- lexP
+  ( do expectP (L.Punc "[")
        (listRest False +++ listNext)
   )
  where
@@ -348,7 +348,7 @@ instance Read Char where
          return s
      +++
       readListPrecDefault       -- Looks for ['f','o','o']
-    )                           -- (more generous than H98 spec)
+    )                           -- (more generous than H2010 spec)
 
   readList = readListDefault
 
@@ -412,12 +412,12 @@ parenthesis-like objects such as (...) and [...] can be an argument to
 instance Read a => Read (Maybe a) where
   readPrec =
     parens
-    (do L.Ident "Nothing" <- lexP
+    (do expectP (L.Ident "Nothing")
         return Nothing
      +++
      prec appPrec (
-        do L.Ident "Just" <- lexP
-           x              <- step readPrec
+        do expectP (L.Ident "Just")
+           x <- step readPrec
            return (Just x))
     )
 
@@ -431,7 +431,7 @@ instance Read a => Read [a] where
 
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readPrec = parens $ prec appPrec $
-               do L.Ident "array" <- lexP
+               do expectP (L.Ident "array")
                   theBounds <- step readPrec
                   vals   <- step readPrec
                   return (array theBounds vals)
@@ -508,9 +508,9 @@ instance (Integral a, Read a) => Read (Ratio a) where
   readPrec =
     parens
     ( prec ratioPrec
-      ( do x            <- step readPrec
-           L.Symbol "%" <- lexP
-           y            <- step readPrec
+      ( do x <- step readPrec
+           expectP (L.Symbol "%")
+           y <- step readPrec
            return (x % y)
       )
     )
@@ -547,7 +547,7 @@ wrap_tup :: ReadPrec a -> ReadPrec a
 wrap_tup p = parens (paren p)
 
 read_comma :: ReadPrec ()
-read_comma = do { L.Punc "," <- lexP; return () }
+read_comma = expectP (L.Punc ",")
 
 read_tup2 :: (Read a, Read b) => ReadPrec (a,b)
 -- Reads "a , b"  no parens!
@@ -682,9 +682,3 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readList     = readListDefault
 \end{code}
 
-\begin{code}
--- XXX Can this be removed?
-
-readp :: Read a => ReadP a
-readp = readPrec_to_P readPrec minPrec
-\end{code}

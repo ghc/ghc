@@ -33,9 +33,9 @@ module Data.Dynamic
         Dynamic,        -- abstract, instance of: Show, Typeable
 
         -- * Converting to and from @Dynamic@
-        toDyn,          -- :: Typeable a => a -> Dynamic
-        fromDyn,        -- :: Typeable a => Dynamic -> a -> a
-        fromDynamic,    -- :: Typeable a => Dynamic -> Maybe a
+        toDyn,
+        fromDyn,
+        fromDynamic,
         
         -- * Applying functions of dynamic type
         dynApply,
@@ -60,10 +60,6 @@ import Hugs.Prelude
 import Hugs.IO
 import Hugs.IORef
 import Hugs.IOExts
-#endif
-
-#ifdef __NHC__
-import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 #endif
 
 #include "Typeable.h"

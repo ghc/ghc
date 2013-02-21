@@ -21,16 +21,21 @@
 module Debug.Trace (
         -- * Tracing
         -- $tracing
-        trace,            -- :: String -> a -> a
+        trace,
         traceShow,
         traceStack,
-        traceIO,          -- :: String -> IO ()
+        traceIO,
         putTraceMsg,
 
         -- * Eventlog tracing
         -- $eventlog_tracing
         traceEvent,
         traceEventIO,
+        
+        -- * Execution phase markers
+        -- $markers
+        traceMarker,
+        traceMarkerIO,
   ) where
 
 import Prelude
@@ -81,7 +86,7 @@ foreign import ccall unsafe "HsBase.h debugBelch2"
 -- | Deprecated. Use 'traceIO'.
 putTraceMsg :: String -> IO ()
 putTraceMsg = traceIO
-{-# DEPRECATED putTraceMsg "Use Debug.Trace.traceIO" #-}
+{-# DEPRECATED putTraceMsg "Use Debug.Trace.traceIO" #-} -- deprecated in 7.4
 
 
 {-# NOINLINE trace #-}
@@ -118,6 +123,22 @@ variables @x@ and @z@:
 -}
 traceShow :: (Show a) => a -> b -> b
 traceShow = trace . show
+
+-- | like 'trace', but additionally prints a call stack if one is
+-- available.
+--
+-- In the current GHC implementation, the call stack is only
+-- availble if the program was compiled with @-prof@; otherwise
+-- 'traceStack' behaves exactly like 'trace'.  Entries in the call
+-- stack correspond to @SCC@ annotations, so it is a good idea to use
+-- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
+--
+traceStack :: String -> a -> a
+traceStack str expr = unsafePerformIO $ do
+   traceIO str
+   stack <- currentCallStack
+   when (not (null stack)) $ traceIO (renderStack stack)
+   return expr
 
 
 -- $eventlog_tracing
@@ -164,18 +185,56 @@ traceEventIO msg =
 traceEventIO msg = (return $! length msg) >> return ()
 #endif
 
--- | like 'trace', but additionally prints a call stack if one is
--- available.
+
+-- $markers
 --
--- In the current GHC implementation, the call stack is only
--- availble if the program was compiled with @-prof@; otherwise
--- 'traceStack' behaves exactly like 'trace'.  Entries in the call
--- stack correspond to @SCC@ annotations, so it is a good idea to use
--- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
+-- When looking at a profile for the execution of a program we often want to
+-- be able to mark certain points or phases in the execution and see that
+-- visually in the profile.
+
+-- For example, a program might have several distinct phases with different
+-- performance or resource behaviour in each phase. To properly interpret the
+-- profile graph we really want to see when each phase starts and ends.
 --
-traceStack :: String -> a -> a
-traceStack str expr = unsafePerformIO $ do
-   traceIO str
-   stack <- currentCallStack
-   when (not (null stack)) $ traceIO (renderStack stack)
-   return expr
+-- Markers let us do this: we can annotate the program to emit a marker at
+-- an appropriate point during execution and then see that in a profile.
+-- 
+-- Currently this feature is only supported in GHC by the eventlog tracing
+-- system, but in future it may also be supported by the heap profiling or
+-- other profiling tools. These function exists for other Haskell
+-- implementations but they have no effect. Note that the string message is
+-- always evaluated, whether or not profiling is available or enabled.
+
+{-# NOINLINE traceMarker #-}
+-- | The 'traceMarker' function emits a marker to the eventlog, if eventlog
+-- profiling is available and enabled at runtime. The @String@ is the name of
+-- the marker. The name is just used in the profiling tools to help you keep
+-- clear which marker is which.
+--
+-- This function is suitable for use in pure code. In an IO context use
+-- 'traceMarkerIO' instead.
+--
+-- Note that when using GHC's SMP runtime, it is possible (but rare) to get
+-- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
+-- that uses 'traceMarker'.
+--
+traceMarker :: String -> a -> a
+traceMarker msg expr = unsafeDupablePerformIO $ do
+    traceMarkerIO msg
+    return expr
+
+-- | The 'traceMarkerIO' function emits a marker to the eventlog, if eventlog
+-- profiling is available and enabled at runtime.
+--
+-- Compared to 'traceMarker', 'traceMarkerIO' sequences the event with respect to
+-- other IO actions.
+--
+traceMarkerIO :: String -> IO ()
+#ifdef __GLASGOW_HASKELL__
+traceMarkerIO msg =
+  GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
+    case traceMarker# p s of s' -> (# s', () #)
+#else
+traceMarkerIO msg = (return $! length msg) >> return ()
+#endif
+

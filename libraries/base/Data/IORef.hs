@@ -19,17 +19,17 @@ module Data.IORef
   ( 
         -- * IORefs
         IORef,                -- abstract, instance of: Eq, Typeable
-        newIORef,             -- :: a -> IO (IORef a)
-        readIORef,            -- :: IORef a -> IO a
-        writeIORef,           -- :: IORef a -> a -> IO ()
-        modifyIORef,          -- :: IORef a -> (a -> a) -> IO ()
-        modifyIORef',         -- :: IORef a -> (a -> a) -> IO ()
-        atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO b
-        atomicModifyIORef',   -- :: IORef a -> (a -> (a,b)) -> IO b
+        newIORef,
+        readIORef,
+        writeIORef,
+        modifyIORef,
+        modifyIORef',
+        atomicModifyIORef,
+        atomicModifyIORef',
         atomicWriteIORef,
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
-        mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
+        mkWeakIORef,
 #endif
         -- ** Memory Model
 
@@ -50,16 +50,6 @@ import qualified GHC.IORef
 import GHC.Weak
 #endif
 #endif /* __GLASGOW_HASKELL__ */
-
-#ifdef __NHC__
-import NHC.IOExtras
-    ( IORef
-    , newIORef
-    , readIORef
-    , writeIORef
-    , excludeFinalisers
-    )
-#endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
 -- |Make a 'Weak' pointer to an 'IORef', using the second argument as a finalizer
@@ -120,13 +110,6 @@ atomicModifyIORef = plainModifyIORef    -- Hugs has no preemption
   where plainModifyIORef r f = do
                 a <- readIORef r
                 case f a of (a',b) -> writeIORef r a' >> return b
-#elif defined(__NHC__)
-atomicModifyIORef r f =
-  excludeFinalisers $ do
-    a <- readIORef r
-    let (a',b) = f a
-    writeIORef r a'
-    return b
 #endif
 
 -- | Strict version of 'atomicModifyIORef'.  This forces both the value stored

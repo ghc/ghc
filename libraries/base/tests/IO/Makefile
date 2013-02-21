@@ -43,10 +43,10 @@ environment001-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 environment001.hs -o environment001 
 	GHC_TEST=马克斯 ./environment001 说
 
-3307-test:
-	"$(TEST_HC)" --make -fforce-recomp -v0 3307.hs -o 3307
+T3307-test:
+	"$(TEST_HC)" --make -fforce-recomp -v0 T3307.hs -o T3307
 	echo Ni hao > chinese-file-小说
 	echo chinese-file-小说 > chinese-name
 	# The tests are run in whatever the default locale is. This is almost always UTF-8,
 	# but in cmd on Windows it will be the non-Unicode CP850 locale.
-	./3307 chinese-file-小说
+	./T3307 chinese-file-小说

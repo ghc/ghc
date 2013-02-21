@@ -32,21 +32,24 @@
 -- #not-home
 module GHC.Conc.IO
         ( ensureIOManagerIsRunning
+        , ioManagerCapabilitiesChanged
 
         -- * Waiting
-        , threadDelay           -- :: Int -> IO ()
-        , registerDelay         -- :: Int -> IO (TVar Bool)
-        , threadWaitRead        -- :: Int -> IO ()
-        , threadWaitWrite       -- :: Int -> IO ()
-        , closeFdWith           -- :: (Fd -> IO ()) -> Fd -> IO ()
+        , threadDelay
+        , registerDelay
+        , threadWaitRead
+        , threadWaitWrite
+        , threadWaitReadSTM
+        , threadWaitWriteSTM
+        , closeFdWith
 
 #ifdef mingw32_HOST_OS
-        , asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-        , asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-        , asyncDoProc   -- :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
+        , asyncRead
+        , asyncWrite
+        , asyncDoProc
 
-        , asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
-        , asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
+        , asyncReadBA
+        , asyncWriteBA
 
         , ConsoleEvent(..)
         , win32ConsoleHandler
@@ -74,6 +77,13 @@ ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
 #else
 ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
+#endif
+
+ioManagerCapabilitiesChanged :: IO ()
+#ifndef mingw32_HOST_OS
+ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
+#else
+ioManagerCapabilitiesChanged = return ()
 #endif
 
 -- | Block the current thread until data is available to read on the
@@ -107,6 +117,44 @@ threadWaitWrite fd
         case fromIntegral fd of { I# fd# ->
         case waitWrite# fd# s of { s' -> (# s', () #)
         }}
+
+-- | Returns an STM action that can be used to wait for data
+-- to read from a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitReadSTM fd 
+#ifndef mingw32_HOST_OS
+  | threaded  = Event.threadWaitReadSTM fd
+#endif
+  | otherwise = do
+      m <- Sync.newTVarIO False
+      _ <- Sync.forkIO $ do
+        threadWaitRead fd
+        Sync.atomically $ Sync.writeTVar m True
+      let waitAction = do b <- Sync.readTVar m
+                          if b then return () else retry
+      let killAction = return ()
+      return (waitAction, killAction)
+
+-- | Returns an STM action that can be used to wait until data
+-- can be written to a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitWriteSTM fd 
+#ifndef mingw32_HOST_OS
+  | threaded  = Event.threadWaitWriteSTM fd
+#endif
+  | otherwise = do
+      m <- Sync.newTVarIO False
+      _ <- Sync.forkIO $ do
+        threadWaitWrite fd
+        Sync.atomically $ Sync.writeTVar m True
+      let waitAction = do b <- Sync.readTVar m
+                          if b then return () else retry
+      let killAction = return ()
+      return (waitAction, killAction)
 
 -- | Close a file descriptor in a concurrency-safe way (GHC only).  If
 -- you are using 'threadWaitRead' or 'threadWaitWrite' to perform

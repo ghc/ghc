@@ -23,27 +23,27 @@
 module Foreign.Marshal.Pool (
    -- * Pool management
    Pool,
-   newPool,             -- :: IO Pool
-   freePool,            -- :: Pool -> IO ()
-   withPool,            -- :: (Pool -> IO b) -> IO b
+   newPool,
+   freePool,
+   withPool,
 
    -- * (Re-)Allocation within a pool
-   pooledMalloc,        -- :: Storable a => Pool                 -> IO (Ptr a)
-   pooledMallocBytes,   -- ::               Pool          -> Int -> IO (Ptr a)
+   pooledMalloc,
+   pooledMallocBytes,
 
-   pooledRealloc,       -- :: Storable a => Pool -> Ptr a        -> IO (Ptr a)
-   pooledReallocBytes,  -- ::               Pool -> Ptr a -> Int -> IO (Ptr a)
+   pooledRealloc,
+   pooledReallocBytes,
 
-   pooledMallocArray,   -- :: Storable a => Pool ->          Int -> IO (Ptr a)
-   pooledMallocArray0,  -- :: Storable a => Pool ->          Int -> IO (Ptr a)
+   pooledMallocArray,
+   pooledMallocArray0,
 
-   pooledReallocArray,  -- :: Storable a => Pool -> Ptr a -> Int -> IO (Ptr a)
-   pooledReallocArray0, -- :: Storable a => Pool -> Ptr a -> Int -> IO (Ptr a)
+   pooledReallocArray,
+   pooledReallocArray0,
 
    -- * Combined allocation and marshalling
-   pooledNew,           -- :: Storable a => Pool -> a            -> IO (Ptr a)
-   pooledNewArray,      -- :: Storable a => Pool ->      [a]     -> IO (Ptr a)
-   pooledNewArray0      -- :: Storable a => Pool -> a -> [a]     -> IO (Ptr a)
+   pooledNew,
+   pooledNewArray,
+   pooledNewArray0
 ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -56,11 +56,7 @@ import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
 #else
 import Data.IORef            ( IORef, newIORef, readIORef, writeIORef )
-#if defined(__NHC__)
-import IO                    ( bracket )
-#else
 import Control.Exception.Base ( bracket )
-#endif
 #endif
 
 import Control.Monad         ( liftM )
@@ -73,7 +69,7 @@ import Foreign.Storable      ( Storable(sizeOf, poke) )
 
 --------------------------------------------------------------------------------
 
--- To avoid non-H98 stuff like existentially quantified data constructors, we
+-- To avoid non-H2010 stuff like existentially quantified data constructors, we
 -- simply use pointers to () below. Not very nice, but...
 
 -- | A memory pool.

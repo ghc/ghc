@@ -35,12 +35,6 @@ import GHC.Word
 import Hugs.Word
 #endif
 
-#ifdef __NHC__
-import NHC.FFI (Word8, Word16, Word32, Word64)
-import NHC.SizedTypes (Word8, Word16, Word32, Word64)   -- instances of Bits
-type Word = Word32
-#endif
-
 {- $notes
 
 * All arithmetic is performed modulo 2^n, where n is the number of

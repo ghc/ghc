@@ -17,159 +17,154 @@
 
 module Data.List
    (
-#ifdef __NHC__
-     [] (..)
-   ,
-#endif
-
    -- * Basic functions
 
-     (++)              -- :: [a] -> [a] -> [a]
-   , head              -- :: [a] -> a
-   , last              -- :: [a] -> a
-   , tail              -- :: [a] -> [a]
-   , init              -- :: [a] -> [a]
-   , null              -- :: [a] -> Bool
-   , length            -- :: [a] -> Int
+     (++)
+   , head
+   , last
+   , tail
+   , init
+   , null
+   , length
 
    -- * List transformations
-   , map               -- :: (a -> b) -> [a] -> [b]
-   , reverse           -- :: [a] -> [a]
+   , map
+   , reverse
 
-   , intersperse       -- :: a -> [a] -> [a]
-   , intercalate       -- :: [a] -> [[a]] -> [a]
-   , transpose         -- :: [[a]] -> [[a]]
+   , intersperse
+   , intercalate
+   , transpose
    
-   , subsequences      -- :: [a] -> [[a]]
-   , permutations      -- :: [a] -> [[a]]
+   , subsequences
+   , permutations
 
    -- * Reducing lists (folds)
 
-   , foldl             -- :: (a -> b -> a) -> a -> [b] -> a
-   , foldl'            -- :: (a -> b -> a) -> a -> [b] -> a
-   , foldl1            -- :: (a -> a -> a) -> [a] -> a
-   , foldl1'           -- :: (a -> a -> a) -> [a] -> a
-   , foldr             -- :: (a -> b -> b) -> b -> [a] -> b
-   , foldr1            -- :: (a -> a -> a) -> [a] -> a
+   , foldl
+   , foldl'
+   , foldl1
+   , foldl1'
+   , foldr
+   , foldr1
 
    -- ** Special folds
 
-   , concat            -- :: [[a]] -> [a]
-   , concatMap         -- :: (a -> [b]) -> [a] -> [b]
-   , and               -- :: [Bool] -> Bool
-   , or                -- :: [Bool] -> Bool
-   , any               -- :: (a -> Bool) -> [a] -> Bool
-   , all               -- :: (a -> Bool) -> [a] -> Bool
-   , sum               -- :: (Num a) => [a] -> a
-   , product           -- :: (Num a) => [a] -> a
-   , maximum           -- :: (Ord a) => [a] -> a
-   , minimum           -- :: (Ord a) => [a] -> a
+   , concat
+   , concatMap
+   , and
+   , or
+   , any
+   , all
+   , sum
+   , product
+   , maximum
+   , minimum
 
    -- * Building lists
 
    -- ** Scans
-   , scanl             -- :: (a -> b -> a) -> a -> [b] -> [a]
-   , scanl1            -- :: (a -> a -> a) -> [a] -> [a]
-   , scanr             -- :: (a -> b -> b) -> b -> [a] -> [b]
-   , scanr1            -- :: (a -> a -> a) -> [a] -> [a]
+   , scanl
+   , scanl1
+   , scanr
+   , scanr1
 
    -- ** Accumulating maps
-   , mapAccumL         -- :: (a -> b -> (a,c)) -> a -> [b] -> (a,[c])
-   , mapAccumR         -- :: (a -> b -> (a,c)) -> a -> [b] -> (a,[c])
+   , mapAccumL
+   , mapAccumR
 
    -- ** Infinite lists
-   , iterate           -- :: (a -> a) -> a -> [a]
-   , repeat            -- :: a -> [a]
-   , replicate         -- :: Int -> a -> [a]
-   , cycle             -- :: [a] -> [a]
+   , iterate
+   , repeat
+   , replicate
+   , cycle
 
    -- ** Unfolding
-   , unfoldr           -- :: (b -> Maybe (a, b)) -> b -> [a]
+   , unfoldr
 
    -- * Sublists
 
    -- ** Extracting sublists
-   , take              -- :: Int -> [a] -> [a]
-   , drop              -- :: Int -> [a] -> [a]
-   , splitAt           -- :: Int -> [a] -> ([a], [a])
+   , take
+   , drop
+   , splitAt
 
-   , takeWhile         -- :: (a -> Bool) -> [a] -> [a]
-   , dropWhile         -- :: (a -> Bool) -> [a] -> [a]
-   , dropWhileEnd      -- :: (a -> Bool) -> [a] -> [a]
-   , span              -- :: (a -> Bool) -> [a] -> ([a], [a])
-   , break             -- :: (a -> Bool) -> [a] -> ([a], [a])
+   , takeWhile
+   , dropWhile
+   , dropWhileEnd
+   , span
+   , break
 
-   , stripPrefix       -- :: Eq a => [a] -> [a] -> Maybe [a]
+   , stripPrefix
 
-   , group             -- :: Eq a => [a] -> [[a]]
+   , group
 
-   , inits             -- :: [a] -> [[a]]
-   , tails             -- :: [a] -> [[a]]
+   , inits
+   , tails
 
    -- ** Predicates
-   , isPrefixOf        -- :: (Eq a) => [a] -> [a] -> Bool
-   , isSuffixOf        -- :: (Eq a) => [a] -> [a] -> Bool
-   , isInfixOf         -- :: (Eq a) => [a] -> [a] -> Bool
+   , isPrefixOf
+   , isSuffixOf
+   , isInfixOf
 
    -- * Searching lists
 
    -- ** Searching by equality
-   , elem              -- :: a -> [a] -> Bool
-   , notElem           -- :: a -> [a] -> Bool
-   , lookup            -- :: (Eq a) => a -> [(a,b)] -> Maybe b
+   , elem
+   , notElem
+   , lookup
 
    -- ** Searching with a predicate
-   , find              -- :: (a -> Bool) -> [a] -> Maybe a
-   , filter            -- :: (a -> Bool) -> [a] -> [a]
-   , partition         -- :: (a -> Bool) -> [a] -> ([a], [a])
+   , find
+   , filter
+   , partition
 
    -- * Indexing lists
    -- | These functions treat a list @xs@ as a indexed collection,
    -- with indices ranging from 0 to @'length' xs - 1@.
 
-   , (!!)              -- :: [a] -> Int -> a
+   , (!!)
 
-   , elemIndex         -- :: (Eq a) => a -> [a] -> Maybe Int
-   , elemIndices       -- :: (Eq a) => a -> [a] -> [Int]
+   , elemIndex
+   , elemIndices
 
-   , findIndex         -- :: (a -> Bool) -> [a] -> Maybe Int
-   , findIndices       -- :: (a -> Bool) -> [a] -> [Int]
+   , findIndex
+   , findIndices
 
    -- * Zipping and unzipping lists
 
-   , zip               -- :: [a] -> [b] -> [(a,b)]
+   , zip
    , zip3
    , zip4, zip5, zip6, zip7
 
-   , zipWith           -- :: (a -> b -> c) -> [a] -> [b] -> [c]
+   , zipWith
    , zipWith3
    , zipWith4, zipWith5, zipWith6, zipWith7
 
-   , unzip             -- :: [(a,b)] -> ([a],[b])
+   , unzip
    , unzip3
    , unzip4, unzip5, unzip6, unzip7
 
    -- * Special lists
 
    -- ** Functions on strings
-   , lines             -- :: String   -> [String]
-   , words             -- :: String   -> [String]
-   , unlines           -- :: [String] -> String
-   , unwords           -- :: [String] -> String
+   , lines
+   , words
+   , unlines
+   , unwords
 
    -- ** \"Set\" operations
 
-   , nub               -- :: (Eq a) => [a] -> [a]
+   , nub
 
-   , delete            -- :: (Eq a) => a -> [a] -> [a]
-   , (\\)              -- :: (Eq a) => [a] -> [a] -> [a]
+   , delete
+   , (\\)
 
-   , union             -- :: (Eq a) => [a] -> [a] -> [a]
-   , intersect         -- :: (Eq a) => [a] -> [a] -> [a]
+   , union
+   , intersect
 
    -- ** Ordered lists
-   , sort              -- :: (Ord a) => [a] -> [a]
-   , insert            -- :: (Ord a) => a -> [a] -> [a]
+   , sort
+   , insert
 
    -- * Generalized functions
 
@@ -183,36 +178,32 @@ module Data.List
 
    -- *** User-supplied equality (replacing an @Eq@ context)
    -- | The predicate is assumed to define an equivalence.
-   , nubBy             -- :: (a -> a -> Bool) -> [a] -> [a]
-   , deleteBy          -- :: (a -> a -> Bool) -> a -> [a] -> [a]
-   , deleteFirstsBy    -- :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-   , unionBy           -- :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-   , intersectBy       -- :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-   , groupBy           -- :: (a -> a -> Bool) -> [a] -> [[a]]
+   , nubBy
+   , deleteBy
+   , deleteFirstsBy
+   , unionBy
+   , intersectBy
+   , groupBy
 
    -- *** User-supplied comparison (replacing an @Ord@ context)
    -- | The function is assumed to define a total ordering.
-   , sortBy            -- :: (a -> a -> Ordering) -> [a] -> [a]
-   , insertBy          -- :: (a -> a -> Ordering) -> a -> [a] -> [a]
-   , maximumBy         -- :: (a -> a -> Ordering) -> [a] -> a
-   , minimumBy         -- :: (a -> a -> Ordering) -> [a] -> a
+   , sortBy
+   , insertBy
+   , maximumBy
+   , minimumBy
 
    -- ** The \"@generic@\" operations
    -- | The prefix \`@generic@\' indicates an overloaded function that
    -- is a generalized version of a "Prelude" function.
 
-   , genericLength     -- :: (Integral a) => [b] -> a
-   , genericTake       -- :: (Integral a) => a -> [b] -> [b]
-   , genericDrop       -- :: (Integral a) => a -> [b] -> [b]
-   , genericSplitAt    -- :: (Integral a) => a -> [b] -> ([b], [b])
-   , genericIndex      -- :: (Integral a) => [b] -> a -> b
-   , genericReplicate  -- :: (Integral a) => a -> b -> [b]
+   , genericLength
+   , genericTake
+   , genericDrop
+   , genericSplitAt
+   , genericIndex
+   , genericReplicate
 
    ) where
-
-#ifdef __NHC__
-import Prelude
-#endif
 
 import Data.Maybe
 import Data.Char        ( isSpace )
@@ -509,7 +500,7 @@ mapAccumR f s (x:xs)    =  (s'', y:ys)
                                  (s', ys) = mapAccumR f s xs
 
 -- | The 'insert' function takes an element and a list and inserts the
--- element into the list at the last position where it is still less
+-- element into the list at the first position where it is less
 -- than or equal to the next element.  In particular, if the list
 -- is sorted before the call, the result will also be sorted.
 -- It is a special case of 'insertBy', which allows the programmer to
@@ -532,6 +523,7 @@ insertBy cmp x ys@(y:ys')
 -- It is a special case of 'Data.List.maximumBy', which allows the
 -- programmer to supply their own comparison function.
 maximum                 :: (Ord a) => [a] -> a
+{-# NOINLINE [1] maximum #-}
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
@@ -552,6 +544,7 @@ strictMaximum xs        =  foldl1' max xs
 -- It is a special case of 'Data.List.minimumBy', which allows the
 -- programmer to supply their own comparison function.
 minimum                 :: (Ord a) => [a] -> a
+{-# NOINLINE [1] minimum #-}
 minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
@@ -591,7 +584,8 @@ minimumBy cmp xs        =  foldl1 minBy xs
 -- | The 'genericLength' function is an overloaded version of 'length'.  In
 -- particular, instead of returning an 'Int', it returns any type which is
 -- an instance of 'Num'.  It is, however, less efficient than 'length'.
-genericLength           :: (Num i) => [b] -> i
+genericLength           :: (Num i) => [a] -> i
+{-# NOINLINE [1] genericLength #-}
 genericLength []        =  0
 genericLength (_:l)     =  1 + genericLength l
 
@@ -623,7 +617,7 @@ genericDrop n (_:xs)    =  genericDrop (n-1) xs
 
 -- | The 'genericSplitAt' function is an overloaded version of 'splitAt', which
 -- accepts any 'Integral' value as the position at which to split.
-genericSplitAt          :: (Integral i) => i -> [b] -> ([b],[b])
+genericSplitAt          :: (Integral i) => i -> [a] -> ([a], [a])
 genericSplitAt n xs | n <= 0 =  ([],xs)
 genericSplitAt _ []     =  ([],[])
 genericSplitAt n (x:xs) =  (x:xs',xs'') where
@@ -631,7 +625,7 @@ genericSplitAt n (x:xs) =  (x:xs',xs'') where
 
 -- | The 'genericIndex' function is an overloaded version of '!!', which
 -- accepts any 'Integral' value as the index.
-genericIndex :: (Integral a) => [b] -> a -> b
+genericIndex :: (Integral i) => [a] -> i -> a
 genericIndex (x:_)  0 = x
 genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
@@ -1001,7 +995,7 @@ unfoldr f b  =
 -- -----------------------------------------------------------------------------
 
 -- | A strict version of 'foldl'.
-foldl'           :: (a -> b -> a) -> a -> [b] -> a
+foldl'           :: (b -> a -> b) -> b -> [a] -> b
 #ifdef __GLASGOW_HASKELL__
 foldl' f z0 xs0 = lgo z0 xs0
     where lgo z []     = z
@@ -1030,8 +1024,13 @@ foldl1' _ []             =  errorEmptyList "foldl1'"
 
 {-# SPECIALISE sum     :: [Int] -> Int #-}
 {-# SPECIALISE sum     :: [Integer] -> Integer #-}
+{-# INLINABLE sum #-}
 {-# SPECIALISE product :: [Int] -> Int #-}
 {-# SPECIALISE product :: [Integer] -> Integer #-}
+{-# INLINABLE product #-}
+-- We make 'sum' and 'product' inlinable so that we get specialisations
+-- at other types.  See, for example, Trac #7507.
+
 -- | The 'sum' function computes the sum of a finite list of numbers.
 sum                     :: (Num a) => [a] -> a
 -- | The 'product' function computes the product of a finite list of numbers.

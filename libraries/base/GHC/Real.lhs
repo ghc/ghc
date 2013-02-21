@@ -461,6 +461,7 @@ instance  (Integral a)  => Enum (Ratio a)  where
 
 \begin{code}
 -- | general coercion from integral types
+{-# NOINLINE [1] fromIntegral #-}
 fromIntegral :: (Integral a, Num b) => a -> b
 fromIntegral = fromInteger . toInteger
 
@@ -476,6 +477,7 @@ fromIntegral = fromInteger . toInteger
 
 -- | general coercion to fractional types
 realToFrac :: (Real a, Fractional b) => a -> b
+{-# NOINLINE [1] realToFrac #-}
 realToFrac = fromRational . toRational
 \end{code}
 
@@ -506,7 +508,7 @@ odd             =  not . even
         Integer -> Integer -> Integer,
         Integer -> Int -> Integer,
         Int -> Int -> Int #-}
-{-# INLINABLE (^) #-}    -- See Note [Inlining (^)]
+{-# INLINABLE [1] (^) #-}    -- See Note [Inlining (^)]
 (^) :: (Num a, Integral b) => a -> b -> a
 x0 ^ y0 | y0 < 0    = error "Negative exponent"
         | y0 == 0   = 1
@@ -522,7 +524,7 @@ x0 ^ y0 | y0 < 0    = error "Negative exponent"
 
 -- | raise a number to an integral power
 (^^)            :: (Fractional a, Integral b) => a -> b -> a
-{-# INLINABLE (^^) #-}         -- See Note [Inlining (^)
+{-# INLINABLE [1] (^^) #-}         -- See Note [Inlining (^)
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 
 {- Note [Inlining (^)
@@ -644,6 +646,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 -- the result may be negative if one of the arguments is @'minBound'@ (and
 -- necessarily is if the other is @0@ or @'minBound'@) for such types.
 gcd             :: (Integral a) => a -> a -> a
+{-# NOINLINE [1] gcd #-}
 gcd x y         =  gcd' (abs x) (abs y)
                    where gcd' a 0  =  a
                          gcd' a b  =  gcd' b (a `rem` b)
@@ -651,6 +654,7 @@ gcd x y         =  gcd' (abs x) (abs y)
 -- | @'lcm' x y@ is the smallest positive integer that both @x@ and @y@ divide.
 lcm             :: (Integral a) => a -> a -> a
 {-# SPECIALISE lcm :: Int -> Int -> Int #-}
+{-# NOINLINE [1] lcm #-}
 lcm _ 0         =  0
 lcm 0 _         =  0
 lcm x y         =  abs ((x `quot` (gcd x y)) * y)

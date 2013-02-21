@@ -394,6 +394,7 @@ eftCharFB c n x0 y = go x0
                     go x | x ># y    = n
                          | otherwise = C# (chr# x) `c` go (x +# 1#)
 
+{-# NOINLINE [1] eftChar #-}
 eftChar :: Int# -> Int# -> String
 eftChar x y | x ># y    = []
             | otherwise = C# (chr# x) : eftChar (x +# 1#) y
@@ -408,6 +409,7 @@ efdCharFB c n x1 x2
   where
     !delta = x2 -# x1
 
+{-# NOINLINE [1] efdChar #-}
 efdChar :: Int# -> Int# -> String
 efdChar x1 x2
   | delta >=# 0# = go_up_char_list x1 delta 0x10FFFF#
@@ -423,6 +425,7 @@ efdtCharFB c n x1 x2 lim
   where
     !delta = x2 -# x1
 
+{-# NOINLINE [1] efdtChar #-}
 efdtChar :: Int# -> Int# -> Int# -> String
 efdtChar x1 x2 lim
   | delta >=# 0# = go_up_char_list x1 delta lim
@@ -512,6 +515,7 @@ instance  Enum Int  where
 "eftIntList"    [1] eftIntFB  (:) [] = eftInt
  #-}
 
+{-# NOINLINE [1] eftInt #-}
 eftInt :: Int# -> Int# -> [Int]
 -- [x1..x2]
 eftInt x0 y | x0 ># y    = []
@@ -547,6 +551,7 @@ efdInt x1 x2
  | x2 >=# x1 = case maxInt of I# y -> efdtIntUp x1 x2 y
  | otherwise = case minInt of I# y -> efdtIntDn x1 x2 y
 
+{-# NOINLINE [1] efdtInt #-}
 efdtInt :: Int# -> Int# -> Int# -> [Int]
 -- [x1,x2..y]
 efdtInt x1 x2 y
@@ -670,9 +675,11 @@ instance  Enum Integer  where
 "enumDeltaToInteger"    [1] enumDeltaToIntegerFB (:) [] = enumDeltaToInteger
  #-}
 
+{-# NOINLINE [0] enumDeltaIntegerFB #-}
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
 enumDeltaIntegerFB c x d = x `seq` (x `c` enumDeltaIntegerFB c (x+d) d)
 
+{-# NOINLINE [1] enumDeltaInteger #-}
 enumDeltaInteger :: Integer -> Integer -> [Integer]
 enumDeltaInteger x d = x `seq` (x : enumDeltaInteger (x+d) d)
 -- strict accumulator, so
@@ -687,6 +694,7 @@ enumDeltaToIntegerFB c n x delta lim
   | delta >= 0 = up_fb c n x delta lim
   | otherwise  = dn_fb c n x delta lim
 
+{-# NOINLINE [1] enumDeltaToInteger #-}
 enumDeltaToInteger :: Integer -> Integer -> Integer -> [Integer]
 enumDeltaToInteger x delta lim
   | delta >= 0 = up_list x delta lim

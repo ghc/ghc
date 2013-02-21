@@ -20,20 +20,20 @@ module GHC.Foreign (
     
     -- conversion of C strings into Haskell strings
     --
-    peekCString,       -- :: TextEncoding -> CString    -> IO String
-    peekCStringLen,    -- :: TextEncoding -> CStringLen -> IO String
+    peekCString,
+    peekCStringLen,
     
     -- conversion of Haskell strings into C strings
     --
-    newCString,        -- :: TextEncoding -> String -> IO CString
-    newCStringLen,     -- :: TextEncoding -> String -> IO CStringLen
+    newCString,
+    newCStringLen,
     
     -- conversion of Haskell strings into C strings using temporary storage
     --
-    withCString,       -- :: TextEncoding -> String -> (CString    -> IO a) -> IO a
-    withCStringLen,    -- :: TextEncoding -> String -> (CStringLen -> IO a) -> IO a
+    withCString,
+    withCStringLen,
     
-    charIsRepresentable, -- :: TextEncoding -> Char -> IO Bool
+    charIsRepresentable,
   ) where
 
 import Foreign.Marshal.Array

@@ -19,7 +19,7 @@
 -----------------------------------------------------------------------------
 
 module System.Mem (
- 	performGC	-- :: IO ()
+        performGC
   ) where
  
 import Prelude
@@ -31,9 +31,5 @@ import Hugs.IOExts
 #ifdef __GLASGOW_HASKELL__
 -- | Triggers an immediate garbage collection
 foreign import ccall {-safe-} "performMajorGC" performGC :: IO ()
-#endif
-
-#ifdef __NHC__
-import NHC.IOExtras (performGC)
 #endif
 

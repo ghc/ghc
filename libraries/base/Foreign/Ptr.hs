@@ -29,25 +29,24 @@ module Foreign.Ptr (
 
     -- * Data pointers
 
-    Ptr,      -- data Ptr a
-    nullPtr,      -- :: Ptr a
-    castPtr,      -- :: Ptr a -> Ptr b
-    plusPtr,      -- :: Ptr a -> Int -> Ptr b
-    alignPtr,     -- :: Ptr a -> Int -> Ptr a
-    minusPtr,     -- :: Ptr a -> Ptr b -> Int
+    Ptr,
+    nullPtr,
+    castPtr,
+    plusPtr,
+    alignPtr,
+    minusPtr,
 
     -- * Function pointers
 
-    FunPtr,      -- data FunPtr a
-    nullFunPtr,      -- :: FunPtr a
-    castFunPtr,      -- :: FunPtr a -> FunPtr b
-    castFunPtrToPtr, -- :: FunPtr a -> Ptr b
-    castPtrToFunPtr, -- :: Ptr a -> FunPtr b
+    FunPtr,
+    nullFunPtr,
+    castFunPtr,
+    castFunPtrToPtr,
+    castPtrToFunPtr,
 
-    freeHaskellFunPtr, -- :: FunPtr a -> IO ()
+    freeHaskellFunPtr,
     -- Free the function pointer created by foreign export dynamic.
 
-#ifndef __NHC__
     -- * Integral types with lossless conversion to and from pointers
     IntPtr,
     ptrToIntPtr,
@@ -55,7 +54,6 @@ module Foreign.Ptr (
     WordPtr,
     ptrToWordPtr,
     wordPtrToPtr
-#endif
  ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -75,23 +73,6 @@ import Data.Bits
 import Data.Typeable
 import Foreign.Storable ( Storable(..) )
 
-#ifdef __NHC__
-import NHC.FFI
-  ( Ptr
-  , nullPtr
-  , castPtr
-  , plusPtr
-  , alignPtr
-  , minusPtr
-  , FunPtr
-  , nullFunPtr
-  , castFunPtr
-  , castFunPtrToPtr
-  , castPtrToFunPtr
-  , freeHaskellFunPtr
-  )
-#endif
-
 #ifdef __HUGS__
 import Hugs.Ptr
 #endif
@@ -105,11 +86,10 @@ foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
 #endif
 
-#ifndef __NHC__
-# include "HsBaseConfig.h"
-# include "CTypes.h"
+#include "HsBaseConfig.h"
+#include "CTypes.h"
 
-# ifdef __GLASGOW_HASKELL__
+#ifdef __GLASGOW_HASKELL__
 -- | An unsigned integral type that can be losslessly converted to and from
 -- @Ptr@. This type is also compatible with the C99 type @uintptr_t@, and
 -- can be marshalled to and from that type safely.
@@ -138,7 +118,7 @@ ptrToIntPtr (Ptr a#) = IntPtr (I# (addr2Int# a#))
 intPtrToPtr :: IntPtr -> Ptr a
 intPtrToPtr (IntPtr (I# i#)) = Ptr (int2Addr# i#)
 
-# else /* !__GLASGOW_HASKELL__ */
+#else /* !__GLASGOW_HASKELL__ */
 
 INTEGRAL_TYPE(WordPtr,tyConWordPtr,"WordPtr",CUIntPtr)
 INTEGRAL_TYPE(IntPtr,tyConIntPtr,"IntPtr",CIntPtr)
@@ -157,6 +137,5 @@ foreign import ccall unsafe "__hscore_to_intptr"
 foreign import ccall unsafe "__hscore_from_intptr"
     intPtrToPtr :: IntPtr -> Ptr a
 
-# endif /* !__GLASGOW_HASKELL__ */
-#endif /* !__NHC_ */
+#endif /* !__GLASGOW_HASKELL__ */
 
