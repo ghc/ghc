@@ -30,7 +30,7 @@ $1/$2/build/%.$$($3_osuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$
 endif
 
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3,$$(dir))))
+  $$(eval $$(call hs-suffix-way-rules-srcdir,$1,$2,$3,$$(dir))))
 
 $(call hi-rule,$1/$2/build,$1/$2/build,$3)
 $(call hi-rule,$1/$2/build/autogen,$1/$2/build,$3)

@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 
-define hs-suffix-rules-srcdir
+define hs-suffix-way-rules-srcdir
 # args: $1 = dir,  $2 = distdir, $3 = way, $4 = srcdir
 
 # Preprocessing Haskell source
