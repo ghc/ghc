@@ -222,6 +222,8 @@ endef
 # And expand the above for each way:
 $(foreach way,$(rts_WAYS),$(eval $(call build-rts-way,$(way))))
 
+$(eval $(call distdir-opts,rts,dist))
+
 #-----------------------------------------------------------------------------
 # Flags for compiling every file
 
