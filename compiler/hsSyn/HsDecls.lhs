@@ -15,7 +15,8 @@ module HsDecls (
   HsDecl(..), LHsDecl, HsDataDefn(..),
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, TyClGroup,
-  isClassDecl, isDataDecl, isSynDecl, isFamilyDecl, tcdName,
+  isClassDecl, isDataDecl, isSynDecl, tcdName,
+  isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
@@ -476,7 +477,7 @@ data FamilyDecl name = FamilyDecl
 data FamilyFlavour
   = TypeFamily
   | DataFamily
-  deriving( Data, Typeable )
+  deriving( Data, Typeable, Eq )
 
 \end{code}
 
@@ -500,10 +501,20 @@ isClassDecl :: TyClDecl name -> Bool
 isClassDecl (ClassDecl {}) = True
 isClassDecl _              = False
 
--- | type family declaration
+-- | type/data family declaration
 isFamilyDecl :: TyClDecl name -> Bool
 isFamilyDecl (FamDecl {})  = True
 isFamilyDecl _other        = False
+
+-- | type family declaration
+isTypeFamilyDecl :: TyClDecl name -> Bool
+isTypeFamilyDecl (FamDecl d) = fdFlavour d == TypeFamily
+isTypeFamilyDecl _other      = False
+
+-- | data family declaration
+isDataFamilyDecl :: TyClDecl name -> Bool
+isDataFamilyDecl (FamDecl d) = fdFlavour d == DataFamily
+isDataFamilyDecl _other      = False
 \end{code}
 
 Dealing with names

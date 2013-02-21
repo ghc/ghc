@@ -379,7 +379,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
     deriveTypeable tys =
       [ L l (DerivDecl (L l (HsAppTy (noLoc (HsTyVar typeableClassName))
                                      (L l (HsTyVar (tcdName t))))))
-      | L l t <- tys ]
+      | L l t <- tys, not (isSynDecl t), not (isTypeFamilyDecl t) ]
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst Unbranched -> SDoc
