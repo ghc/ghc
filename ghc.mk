@@ -1,7 +1,6 @@
-
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2009-2013 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -355,7 +354,7 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl transformers
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
 ifeq "$(Windows)" "NO"
 PKGS_THAT_BUILD_WITH_STAGE0 += terminfo
 endif
