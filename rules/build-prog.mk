@@ -155,6 +155,8 @@ $(call c-suffix-rules,$1,$2,$$($1_$2_PROGRAM_WAY),NO)
 endif
 endif
 
+$$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
+  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$$(dir))))
 $(call hs-suffix-way-rules,$1,$2,$$($1_$2_PROGRAM_WAY))
 
 $(call c-objs,$1,$2,$$($1_$2_PROGRAM_WAY))

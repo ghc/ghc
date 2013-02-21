@@ -14,27 +14,7 @@
 define hs-suffix-way-rules-srcdir
 # args: $1 = dir,  $2 = distdir, $3 = way, $4 = srcdir
 
-# Preprocessing Haskell source
-
 ifneq "$$(BINDIST)" "YES"
-
-$1/$2/build/%.hs : $1/$4/%.ly | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
-
-$1/$2/build/%.hs : $1/$4/%.y | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
-
-$1/$2/build/%.hs : $1/$2/build/%.ly | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
-
-$1/$2/build/%.hs : $1/$2/build/%.y | $$$$(dir $$$$@)/.
-	$$(call cmd,HAPPY) $$($1_$2_ALL_HAPPY_OPTS) $$< -o $$@
-
-$1/$2/build/%.hs : $1/$4/%.x | $$$$(dir $$$$@)/.
-	$$(call cmd,ALEX) $$($1_$2_ALL_ALEX_OPTS) $$< -o $$@
-
-$1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$4/%.hsc $$(HSC2HS_INPLACE) | $$$$(dir $$$$@)/.
-	$$(call cmd,HSC2HS_INPLACE) $$($1_$2_ALL_HSC2HS_OPTS) $$< -o $$@
 
 # Compiling Haskell source
 
@@ -69,12 +49,6 @@ $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghc
 # 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -S $$< -o $$@
 
 # Now the rules for hs-boot files.
-
-$1/$2/build/%.hs-boot : $1/$4/%.hs-boot
-	"$$(CP)" $$< $$@
-
-$1/$2/build/%.lhs-boot : $1/$4/%.lhs-boot
-	"$$(CP)" $$< $$@
 
 $1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
