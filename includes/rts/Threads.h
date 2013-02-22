@@ -37,8 +37,6 @@ StgTSO *createIOThread        (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
 StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
-StgTSO *createStrictIOThread  (Capability *cap, nat stack_size,
-			       StgClosure *closure);
 
 void setOwningCapability (Capability* cap, StgTSO* tso, nat target);
 

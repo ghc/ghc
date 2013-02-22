@@ -189,7 +189,7 @@ Library {
         Foreign.Safe,
         Foreign.StablePtr,
         Foreign.Storable,
-				LwConc.Substrate,
+        LwConc.Substrate,
         Numeric,
         Prelude,
         System.Console.GetOpt
