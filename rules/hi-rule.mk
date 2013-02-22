@@ -71,25 +71,15 @@
 #
 # a/%.hi : a/%.o b/%.hs ;
 
-define hi-rule # $1 = source directory, $2 = object directory, $3 = way
-
-$(call hi-rule-helper,$2/%.$$($3_hisuf) : $2/%.$$($3_osuf) $1/%.hs)
-$(call hi-rule-helper,$2/%.$$($3_hisuf) : $2/%.$$($3_osuf) $1/%.lhs)
-
-$(call hi-rule-helper,$2/%.$$($3_way_)hi-boot : $2/%.$$($3_way_)o-boot $1/%.hs)
-$(call hi-rule-helper,$2/%.$$($3_way_)hi-boot : $2/%.$$($3_way_)o-boot $1/%.lhs)
-
-endef
-
 ifeq "$(ExtraMakefileSanityChecks)" "NO"
 
-define hi-rule-helper # $1 = rule header
+define hi-rule # $1 = rule header
 $1 ;
 endef
 
 else
 
-define hi-rule-helper # $1 = rule header
+define hi-rule # $1 = rule header
 $1
 	@if [ ! -f $$@ ] ; then \
 	    echo "Panic! $$< exists, but $$@ does not."; \

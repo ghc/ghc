@@ -48,7 +48,8 @@ endif
 #    Some packages are from the bootstrapping compiler, so are not
 #    within the build tree. On Windows this causes a problem as they look
 #    like bad rules, due to the two colons, so we filter them out.
-	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@
+	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@.tmp2
+	sed '/hs$$$$/ { p; s/o /hi /g; s/:/ : %hi: %o /; s/^/$$$$(eval $$$$(call hi-rule,/; s/$$$$/))/ }; /hs-boot$$$$/ { p; s/o-boot /hi-boot /g; s/:/ : %hi-boot: %o-boot /; s/^/$$$$(eval $$$$(call hi-rule,/; s/$$$$/))/ }' $$@.tmp2 > $$@
 
 # Some of the C files (directly or indirectly) include the generated
 # includes files.

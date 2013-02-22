@@ -32,10 +32,5 @@ endif
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
   $$(eval $$(call hs-suffix-way-rules-srcdir,$1,$2,$3,$$(dir))))
 
-$(call hi-rule,$1/$2/build,$1/$2/build,$3)
-$(call hi-rule,$1/$2/build/autogen,$1/$2/build,$3)
-$$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-  $$(eval $$(call hi-rule,$1/$$(dir),$1/$2/build,$3)))
-
 endef # hs-suffix-way-rules
 
