@@ -77,7 +77,7 @@ WAY_debug_p_NAME=debug profiled
 WAY_debug_p_HC_OPTS= -static -optc-DDEBUG -prof
 
 # Way 'thr_debug':
-WAY_thr_debug_NAME=threaded
+WAY_thr_debug_NAME=threaded debug
 WAY_thr_debug_HC_OPTS= -static -optc-DTHREADED_RTS -optc-DDEBUG
 
 # Way 'thr_debug_p':
