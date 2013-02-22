@@ -5,6 +5,7 @@
            , UnboxedTuples
            , ScopedTypeVariables
            , DeriveDataTypeable
+					 , StandaloneDeriving
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports -w -XBangPatterns #-}
 
@@ -162,6 +163,8 @@ import Data.Dynamic
 import Foreign.StablePtr
 import Foreign.C.Types
 
+#include "Typeable.h"
+
 ----------------------------------------------------------------------------
 -- PTM
 ----------------------------------------------------------------------------
@@ -172,8 +175,7 @@ newtype PTM a = PTM (State# RealWorld -> (# State# RealWorld, a #))
 unPTM :: PTM a -> (State# RealWorld -> (# State# RealWorld, a #))
 unPTM (PTM a) = a
 
-ptmTc = mkTyCon3 "ghc-prim" "LwConc.Substrate" "PTM"
-instance Typeable1 PTM where { typeOf1 _ = mkTyConApp ptmTc [] }
+INSTANCE_TYPEABLE1(PTM,ptmTc,"PTM")
 
 instance  Functor PTM where
    fmap f x = x >>= (return . f)
@@ -235,8 +237,7 @@ retry = PTM $ \s -> retry# s
 
 data PVar a = PVar (TVar# RealWorld a)
 
-pvarTc = mkTyCon3 "ghc-prim" "LwConc.Substrate" "PVar"
-instance Typeable1 PVar where { typeOf1 _ = mkTyConApp pvarTc [] }
+INSTANCE_TYPEABLE1(PVar,pvarTc,"PVar")
 
 instance Eq (PVar a) where
   (PVar tvar1#) == (PVar tvar2#) = sameTVar# tvar1# tvar2#
