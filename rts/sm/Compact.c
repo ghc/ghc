@@ -325,7 +325,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
         }
         continue;
 
-      case RET_BCO:
+      case RET_BCO: {
         StgBCO *bco;
         nat size;
 
@@ -337,6 +337,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
         thread_large_bitmap(p, BCO_BITMAP(bco), size);
         p += size;
         continue;
+      }
 
         // large bitmap (> 32 entries, or 64 on a 64-bit machine)
       case RET_BIG:
@@ -346,7 +347,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
         p += size;
         continue;
 
-      case RET_FUN:
+      case RET_FUN: {
         StgRetFun *ret_fun = (StgRetFun *)p;
         StgFunInfoTable *fun_info;
 
@@ -356,6 +357,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
         thread(&ret_fun->fun);
         p = thread_arg_block(fun_info, ret_fun->payload);
         continue;
+      }
 
       default:
         barf("thread_stack: weird activation record found on stack: %d",

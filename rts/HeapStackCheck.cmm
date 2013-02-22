@@ -137,7 +137,7 @@ stg_gc_noregs
 #define SWITCH              \
   StgRegTable_rRet(BaseReg) = ThreadSwitch; \
   R1 = BaseReg;             \
-  jump stg_returnToSched;
+  jump stg_returnToSched [R1];
 
 #define BLOCK_BUT_FIRST(c)			\
     PRE_RETURN(ThreadBlocked, ThreadRunGHC)     \
@@ -468,7 +468,7 @@ INFO_TABLE_RET ( stg_gc_fun, RET_FUN )
 
 stg_yield_noregs
 {
-    YIELD_GENERIC;
+  YIELD_GENERIC;
 }
 
 stg_switch_noregs

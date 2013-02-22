@@ -274,7 +274,7 @@ stg_getMaskingStatezh ()
 stg_killSContzh
 {
   /* args: R1 = SCont to kill, R2 = Exception */
-  jump stg_killThreadzh;
+  jump stg_killThreadzh [R1,R2];
 }
 
 stg_killThreadzh (P_ target, P_ exception)

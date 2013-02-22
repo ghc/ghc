@@ -2997,7 +2997,7 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
         tso->stackobj->sp = p;
         return CATCH_RETRY_FRAME;
 
-      case CATCH_STM_FRAME:
+      case CATCH_STM_FRAME: {
         StgTRecHeader *trec = tso -> trec;
         StgTRecHeader *outer = trec -> enclosing_trec;
         debugTrace(DEBUG_stm,
@@ -3008,6 +3008,7 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
         tso -> trec = outer;
         p = next;
         continue;
+      }
 
       case UNDERFLOW_FRAME:
         tso->stackobj->sp = p;

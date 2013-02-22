@@ -6,24 +6,24 @@
  *
  *----------------------------------------------------------------------
 
-  STM.h defines the C-level interface to the STM.  
+  STM.h defines the C-level interface to the STM.
 
   The design follows that of the PPoPP 2005 paper "Composable memory
   transactions" extended to include fine-grained locking of TVars.
 
   Three different implementations can be built.  In overview:
-  
+
   STM_UNIPROC  -- no locking at all: not safe for concurrent invocations
- 
+
   STM_CG_LOCK  -- coarse-grained locking : a single mutex protects all
                   TVars
- 
+
   STM_FG_LOCKS -- per-TVar exclusion : each TVar can be owned by at
                   most one TRec at any time.  This allows dynamically
                   non-conflicting transactions to commit in parallel.
                   The implementation treats reads optimisitcally --
-                  extra versioning information is retained in the 
-                  saw_update_by field of the TVars so that they do not 
+                  extra versioning information is retained in the
+                  saw_update_by field of the TVars so that they do not
                   need to be locked for reading.
 
   STM.C contains more details about the locking schemes used.
@@ -73,7 +73,7 @@ void stmAbortTransaction(Capability *cap, StgTRecHeader *trec);
 void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
 
 /*
- * Ensure that a subsequent commit / validation will fail.  We use this 
+ * Ensure that a subsequent commit / validation will fail.  We use this
  * in our current handling of transactions that may have become invalid
  * and started looping.  We strip their stack back to the ATOMICALLY_FRAME,
  * and, when the thread is next scheduled, discover it to be invalid and
@@ -107,13 +107,13 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec);
    These four operations return boolean results which should be interpreted
    as follows:
 
-   true  => The transaction record was definitely valid 
+   true  => The transaction record was definitely valid
 
    false => The transaction record may not have been valid
 
    Note that, for nested operations, validity here is solely in terms
    of the specified trec: it does not say whether those that it may be
-   nested are themselves valid.  Callers can check this with 
+   nested are themselves valid.  Callers can check this with
    stmValidateNestOfTransactions.
 
    The user of the STM should ensure that it is always safe to assume that a
@@ -140,13 +140,13 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Fill in the trec's list of invariants that might be violated by the current
- * transaction.  
+ * transaction.
  */
 
-StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, 
+StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap,
                                                 StgTRecHeader *trec);
 
-void stmAddInvariantToCheck(Capability *cap, 
+void stmAddInvariantToCheck(Capability *cap,
                             StgTRecHeader *trec,
                             StgClosure *code);
 
@@ -164,7 +164,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec);
  * Test whether the current transaction context is valid and, if so,
  * start the thread waiting for updates to any of the tvars it has
  * ready from and mark it as blocked.  It is an error to call stmWait
- * if the thread is already waiting.  
+ * if the thread is already waiting.
  */
 
 StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec);
@@ -183,6 +183,15 @@ StgBool stmReWait(Capability *cap, StgTSO *tso);
 
 /*----------------------------------------------------------------------
 
+TVar management operations
+--------------------------
+*/
+
+StgTVar *stmNewTVar(Capability *cap, StgClosure *new_value);
+
+
+/*----------------------------------------------------------------------
+
    Data access operations
    ----------------------
 */
@@ -193,7 +202,7 @@ StgBool stmReWait(Capability *cap, StgTSO *tso);
  */
 
 StgClosure *stmReadTVar(Capability *cap,
-                        StgTRecHeader *trec, 
+                        StgTRecHeader *trec,
                         StgTVar *tvar);
 
 /* Update the logical contents of 'tvar' within the context of the
@@ -202,7 +211,7 @@ StgClosure *stmReadTVar(Capability *cap,
 
 void stmWriteTVar(Capability *cap,
                   StgTRecHeader *trec,
-                  StgTVar *tvar, 
+                  StgTVar *tvar,
                   StgClosure *new_value);
 
 /*----------------------------------------------------------------------*/

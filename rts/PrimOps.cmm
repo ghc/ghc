@@ -667,7 +667,7 @@ again: MAYBE_GC(again);
 
     next_invariant = StgInvariantCheckQueue_invariant(q);
     R1 = StgAtomicInvariant_code(next_invariant);
-    jump stg_ap_v_fast;
+    jump stg_ap_v_fast [R1];
 
   } else {
     /* We've got no more invariants to check, try to commit. */
@@ -725,7 +725,7 @@ again: MAYBE_GC(again);
       //  - tso might be bound, or current task might be bound in which case we
       //    need to pass capability to correct task
       //  - task might have returned from a safe foreign call
-      jump stg_switch_noregs;
+      jump stg_switch_noregs [];
     } else {
       /* Transaction was not valid: try again */
       ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
@@ -733,7 +733,7 @@ again: MAYBE_GC(again);
       StgAtomicallyFrame_next_invariant_to_check(frame) = END_INVARIANT_CHECK_QUEUE;
       R1 = StgAtomicallyFrame_code(frame);
       Sp = frame;
-      jump stg_ap_v_fast;
+      jump stg_ap_v_fast [R1];
     }
   }
 }
@@ -797,7 +797,7 @@ stg_setScheduleSContActionzh ( W_ threadid, W_ schedule_scont_action )
 
 again: MAYBE_GC (again);
 
-  StgTSO_schedule_scont_action(threadid) = schedule_scont_action;
+  StgTSO_schedule_scont_action (threadid) = schedule_scont_action;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();
 }
@@ -808,7 +808,7 @@ stg_getScheduleSContActionzh ( W_ threadid )
 again: MAYBE_GC (again);
 
   W_ schedule_scont_action;
-  schedule_scont_action = StgTSO_schedule_scont_action(threadid);
+  schedule_scont_action = StgTSO_schedule_scont_action (threadid);
   return (schedule_scont_action);
 }
 

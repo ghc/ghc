@@ -589,49 +589,26 @@ isThreadSleeping (StgTSO* tso) {
    size appropriately.
    -------------------------------------------------------------------------- */
 
-  void
+void
 threadStackOverflow (Capability *cap, StgTSO *tso)
 {
-    StgStack *new_stack, *old_stack;
-    StgUnderflowFrame *frame;
-    W_ chunk_size;
+  StgStack *new_stack, *old_stack;
+  StgUnderflowFrame *frame;
+  W_ chunk_size;
 
-    IF_DEBUG(sanity,checkTSO(tso));
+  IF_DEBUG(sanity,checkTSO(tso));
 
-    if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
-        && !(tso->flags & TSO_BLOCKEX)) {
-        // NB. never raise a StackOverflow exception if the thread is
-        // inside Control.Exceptino.block.  It is impractical to protect
-        // against stack overflow exceptions, since virtually anything
-        // can raise one (even 'catch'), so this is the only sensible
-        // thing to do here.  See bug #767.
-        //
+  if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
+      && !(tso->flags & TSO_BLOCKEX)) {
+    // NB. never raise a StackOverflow exception if the thread is
+    // inside Control.Exceptino.block.  It is impractical to protect
+    // against stack overflow exceptions, since virtually anything
+    // can raise one (even 'catch'), so this is the only sensible
+    // thing to do here.  See bug #767.
+    //
 
-        if (tso->flags & TSO_SQUEEZED) {
-            return;
-        }
-        // #3677: In a stack overflow situation, stack squeezing may
-        // reduce the stack size, but we don't know whether it has been
-        // reduced enough for the stack check to succeed if we try
-        // again.  Fortunately stack squeezing is idempotent, so all we
-        // need to do is record whether *any* squeezing happened.  If we
-        // are at the stack's absolute -K limit, and stack squeezing
-        // happened, then we try running the thread again.  The
-        // TSO_SQUEEZED flag is set by threadPaused() to tell us whether
-        // squeezing happened or not.
-
-        debugTrace(DEBUG_gc,
-                   "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
-                   (long)tso->id, tso, (long)tso->stackobj->stack_size,
-                   RtsFlags.GcFlags.maxStkSize);
-        IF_DEBUG(gc,
-                 /* If we're debugging, just print out the top of the stack */
-                 printStackChunk(tso->stackobj->sp,
-                                 stg_min(tso->stackobj->stack + tso->stackobj->stack_size,
-                                         tso->stackobj->sp+64)));
-
-        // Send this thread the StackOverflow exception
-        throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
+    if (tso->flags & TSO_SQUEEZED) {
+      return;
     }
     // #3677: In a stack overflow situation, stack squeezing may
     // reduce the stack size, but we don't know whether it has been
@@ -656,7 +633,6 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     // Send this thread the StackOverflow exception
     throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
   }
-
 
   // We also want to avoid enlarging the stack if squeezing has
   // already released some of it.  However, we don't want to get into
@@ -722,31 +698,17 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
          sp < stg_min(old_stack->sp + RtsFlags.GcFlags.stkChunkBufferSize,
                       old_stack->stack + old_stack->stack_size); )
     {
-        StgWord *sp;
-        W_ chunk_words, size;
+      size = stack_frame_sizeW((StgClosure*)sp);
 
-        // find the boundary of the chunk of old stack we're going to
-        // copy to the new stack.  We skip over stack frames until we
-        // reach the smaller of
-        //
-        //   * the chunk buffer size (+RTS -kb)
-        //   * the end of the old stack
-        //
-        for (sp = old_stack->sp;
-             sp < stg_min(old_stack->sp + RtsFlags.GcFlags.stkChunkBufferSize,
-                          old_stack->stack + old_stack->stack_size); )
-        {
-            size = stack_frame_sizeW((StgClosure*)sp);
-
-            // if including this frame would exceed the size of the
-            // new stack (taking into account the underflow frame),
-            // then stop at the previous frame.
-            if (sp + size > old_stack->stack + (new_stack->stack_size -
-                                                sizeofW(StgUnderflowFrame))) {
-                break;
-            }
-            sp += size;
-        }
+      // if including this frame would exceed the size of the
+      // new stack (taking into account the underflow frame),
+      // then stop at the previous frame.
+      if (sp + size > old_stack->stack + (new_stack->stack_size -
+                                          sizeofW(StgUnderflowFrame))) {
+        break;
+      }
+      sp += size;
+    }
 
     if (sp == old_stack->stack + old_stack->stack_size) {
       //

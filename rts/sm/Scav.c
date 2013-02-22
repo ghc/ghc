@@ -1757,7 +1757,7 @@ follow_srt:
                       goto follow_srt;
                     }
 
-      case RET_FUN:
+      case RET_FUN: {
                     StgRetFun *ret_fun = (StgRetFun *)p;
                     StgFunInfoTable *fun_info;
 
@@ -1765,6 +1765,7 @@ follow_srt:
                     fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
                     p = scavenge_arg_block(fun_info, ret_fun->payload);
                     goto follow_srt;
+                    }
 
       default:
                     barf("scavenge_stack: weird activation record found on stack: %d", (int)(info->i.type));
