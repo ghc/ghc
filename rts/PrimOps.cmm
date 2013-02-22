@@ -738,7 +738,7 @@ again: MAYBE_GC(again);
   }
 }
 
-stg_setSContCapabilityzh ( W_ SCont, W_ int )
+stg_setSContCapabilityzh ( W_ scont , W_ target )
 {
 
 #if defined (THREADED_RTS)
