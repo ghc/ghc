@@ -396,6 +396,13 @@ wanteds = concat
           ,closureField  C    "StgTSO"      "bq"
           ,closureField_ Both "StgTSO_cccs" "StgTSO" "prof.cccs"
           ,closureField  Both "StgTSO"      "stackobj"
+          ,closureField  C    "StgTSO"      "schedule_scont_action"
+          ,closureField  C    "StgTSO"      "yield_control_action"
+          ,closureField  C    "StgTSO"      "finalizer"
+          ,closureField  C    "StgTSO"      "scont_status"
+          ,closureField  C    "StgTSO"      "tls"
+          ,closureField  C    "StgTSO"      "is_sleeping"
+          ,closureField  C    "StgTSO"      "is_upcall_thread"
 
           ,closureField       Both "StgStack" "sp"
           ,closureFieldOffset Both "StgStack" "stack"

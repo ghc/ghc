@@ -903,7 +903,7 @@ again: MAYBE_GC (again);
 stg_sleepCapabilityzh ()
 {
   StgTSO_is_sleeping (CurrentTSO) = 1::I32;
-  jump stg_retryzh;
+  jump stg_retryzh [];
 }
 
 
@@ -2294,7 +2294,7 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
     ccall threadPaused (MyCapability() "ptr", CurrentTSO "ptr");
 
     if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-        jump stg_threadFinished;
+        jump stg_threadFinished [];
     } else {
         LOAD_THREAD_STATE();
         ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
