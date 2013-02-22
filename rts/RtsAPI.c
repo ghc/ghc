@@ -419,7 +419,7 @@ createIOThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 }
 
 StgTSO *
-createUserLevelThread (Capability *cap, nat stack_size,  StgClosure *closure)
+createUserLevelThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   StgStack* stack;

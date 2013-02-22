@@ -2302,7 +2302,7 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
         if (Sp(0) == stg_noDuplicate_info) {
             Sp_adj(1);
         }
-				return ();
+        jump %ENTRY_CODE(Sp(0)) [];
     }
 }
 

@@ -121,13 +121,14 @@ checkStackFrame( StgPtr c )
                        BITMAP_BITS(info->i.layout.bitmap), size);
       return 1 + size;
 
-    case RET_BCO:
+    case RET_BCO: {
       StgBCO *bco;
       nat size;
       bco = (StgBCO *)*(c+1);
       size = BCO_BITMAP_SIZE(bco);
       checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
       return 2 + size;
+    }
 
     case RET_BIG: // large bitmap (> 32 entries)
       size = GET_LARGE_BITMAP(&info->i)->size;
@@ -135,6 +136,7 @@ checkStackFrame( StgPtr c )
       return 1 + size;
 
     case RET_FUN:
+    {
       StgFunInfoTable *fun_info;
       StgRetFun *ret_fun;
 
@@ -157,6 +159,7 @@ checkStackFrame( StgPtr c )
           break;
       }
       return sizeofW(StgRetFun) + size;
+    }
 
     default:
       barf("checkStackFrame: weird activation record found on stack (%p %d).",c,info->i.type);
@@ -369,128 +372,6 @@ checkClosure( StgClosure* p )
 	return ap_sizeW(ap);
     }
 
-        case THUNK:
-        case THUNK_1_0:
-        case THUNK_0_1:
-        case THUNK_1_1:
-        case THUNK_0_2:
-        case THUNK_2_0:
-            {
-                nat i;
-                for (i = 0; i < info->layout.payload.ptrs; i++) {
-                    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
-                }
-                return thunk_sizeW_fromITBL(info);
-            }
-
-        case FUN:
-        case FUN_1_0:
-        case FUN_0_1:
-        case FUN_1_1:
-        case FUN_0_2:
-        case FUN_2_0:
-        case CONSTR:
-        case CONSTR_1_0:
-        case CONSTR_0_1:
-        case CONSTR_1_1:
-        case CONSTR_0_2:
-        case CONSTR_2_0:
-        case IND_PERM:
-        case BLACKHOLE:
-        case PRIM:
-        case MUT_PRIM:
-        case MUT_VAR_CLEAN:
-        case MUT_VAR_DIRTY:
-        case CONSTR_STATIC:
-        case CONSTR_NOCAF_STATIC:
-        case THUNK_STATIC:
-        case FUN_STATIC:
-            {
-                nat i;
-                for (i = 0; i < info->layout.payload.ptrs; i++) {
-                    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
-                }
-                return sizeW_fromITBL(info);
-            }
-
-        case BLOCKING_QUEUE:
-            {
-                StgBlockingQueue *bq = (StgBlockingQueue *)p;
-
-                // NO: the BH might have been updated now
-                // ASSERT(get_itbl(bq->bh)->type == BLACKHOLE);
-                ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
-
-                ASSERT(get_itbl(bq->owner)->type == TSO);
-                ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE
-                       || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
-                ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE ||
-                       get_itbl(bq->link)->type == IND ||
-                       get_itbl(bq->link)->type == BLOCKING_QUEUE);
-
-                return sizeofW(StgBlockingQueue);
-            }
-
-        case BCO: {
-                      StgBCO *bco = (StgBCO *)p;
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->instrs));
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->literals));
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->ptrs));
-                      return bco_sizeW(bco);
-                  }
-
-        case IND_STATIC: /* (1, 0) closure */
-                  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgIndStatic*)p)->indirectee));
-                  return sizeW_fromITBL(info);
-
-        case WEAK:
-                  /* deal with these specially - the info table isn't
-                   * representative of the actual layout.
-                   */
-                  { StgWeak *w = (StgWeak *)p;
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
-                      if (w->link) {
-                          ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->link));
-                      }
-                      return sizeW_fromITBL(info);
-                  }
-
-        case THUNK_SELECTOR:
-                  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
-                  return THUNK_SELECTOR_sizeW();
-
-        case IND:
-                  {
-                      /* we don't expect to see any of these after GC
-                       * but they might appear during execution
-                       */
-                      StgInd *ind = (StgInd *)p;
-                      ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
-                      return sizeofW(StgInd);
-                  }
-
-        case RET_BCO:
-        case RET_SMALL:
-        case RET_BIG:
-        case RET_DYN:
-        case UPDATE_FRAME:
-        case UNDERFLOW_FRAME:
-        case STOP_FRAME:
-        case CATCH_FRAME:
-        case ATOMICALLY_FRAME:
-        case CATCH_RETRY_FRAME:
-        case CATCH_STM_FRAME:
-                  barf("checkClosure: stack frame");
-
-        case AP:
-                  {
-                      StgAP* ap = (StgAP *)p;
-                      checkPAP (ap->fun, ap->payload, ap->n_args);
-                      return ap_sizeW(ap);
-                  }
-
         case PAP:
                   {
                       StgPAP* pap = (StgPAP *)p;
@@ -656,10 +537,10 @@ checkTSO(StgTSO *tso)
     checkSTACK(tso->stackobj);
 }
 
-/* Check that all TSOs have been evacuated.
+/*
+   Check that all TSOs have been evacuated.
    Optionally also check the sanity of the TSOs.
-   */
-
+*/
 void
 checkGlobalTSOList (rtsBool checkTSOs)
 {
@@ -751,7 +632,7 @@ checkMutableLists (void)
 
 /*
    Check the static objects list.
-   */
+*/
 void
 checkStaticObjects ( StgClosure* static_objects )
 {
