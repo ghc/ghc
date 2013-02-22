@@ -135,6 +135,8 @@ endif
 
 $1_$2_WAYS = $$($1_$2_PROGRAM_WAY)
 
+$1_$2_DYNAMIC_TOO = NO
+
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 
