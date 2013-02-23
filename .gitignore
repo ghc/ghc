@@ -44,7 +44,7 @@ _darcs/
 
 /ghc-tarballs/
 /libraries/array/
-/libraries/base/
+#/libraries/base/
 /libraries/deepseq/
 /libraries/directory/
 /libraries/dph/

@@ -33,7 +33,7 @@ import GHC.Base
 import Data.List (lines, words, unlines, unwords)
 
 -- | Class for string-like datastructures; used by the overloaded string
---   extension (-foverloaded-strings in GHC).
+--   extension (-XOverloadedStrings in GHC).
 class IsString a where
     fromString :: String -> a
 
