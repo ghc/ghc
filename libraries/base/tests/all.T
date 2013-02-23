@@ -48,10 +48,10 @@ test('hGetBuf003', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
 test('hPutBuf002', extra_clean(['hPutBuf002.out']), compile_and_run, [''])
 
-test('char001', 	normal, compile_and_run, [''])
-test('char002', 	normal, compile_and_run, [''])
+test('char001',   normal, compile_and_run, [''])
+test('char002',   normal, compile_and_run, [''])
 
-test('cstring001', 	normal, compile_and_run, [''])
+test('cstring001',  normal, compile_and_run, [''])
 
 test('length001',
      # This fails without -O, as it relies on a RULE being applied
@@ -59,28 +59,28 @@ test('length001',
      compile_and_run,
      [''])
 
-test('ratio001', 	normal, compile_and_run, [''])
+test('ratio001',  normal, compile_and_run, [''])
 
-test('rand001',		reqlib('random'), compile_and_run, [''])
-test('reads001',		normal, compile_and_run, [''])
-test('show001',		normal, compile_and_run, [''])
-test('text001',		normal, compile_and_run, [''])
+test('rand001',   reqlib('random'), compile_and_run, [''])
+test('reads001',    normal, compile_and_run, [''])
+test('show001',   normal, compile_and_run, [''])
+test('text001',   normal, compile_and_run, [''])
 
-test('tup001',		normal, compile_and_run, [''])
+test('tup001',    normal, compile_and_run, [''])
 
-test('addr001',		normal, compile_and_run, [''])
+test('addr001',   normal, compile_and_run, [''])
 test('dynamic001',      normal, compile_and_run, [''])
 test('dynamic002',      normal, compile_and_run, [''])
 test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
 test('enum01',          when(fast(), skip), compile_and_run, ['-cpp'])
-test('enum02', 		when(fast(), skip), compile_and_run, ['-cpp'])
-test('enum03', 		when(fast(), skip), compile_and_run, ['-cpp'])
-test('enum04', 		normal, compile_and_run, [''])
-test('exceptionsrun001', 	normal, compile_and_run, [''])
-test('exceptionsrun002', 	normal, compile_and_run, [''])
-test('list001'	,	when(fast(), skip), compile_and_run, [''])
+test('enum02',    when(fast(), skip), compile_and_run, ['-cpp'])
+test('enum03',    when(fast(), skip), compile_and_run, ['-cpp'])
+test('enum04',    normal, compile_and_run, [''])
+test('exceptionsrun001',  normal, compile_and_run, [''])
+test('exceptionsrun002',  normal, compile_and_run, [''])
+test('list001'  , when(fast(), skip), compile_and_run, [''])
 test('list002', when(fast(), skip), compile_and_run, [''])
 test('list003', when(fast(), skip), compile_and_run, [''])
 
@@ -93,7 +93,7 @@ test('memo001',
 test('memo002',
      [extra_run_opts('20'),
       extra_clean(['Memo2.hi', 'Memo2.o'])],
-	multimod_compile_and_run, ['memo002',''])
+  multimod_compile_and_run, ['memo002',''])
 
 test('packedstring001', reqlib('packedstring'), compile_and_run, ['-package packedstring'])
 

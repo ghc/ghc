@@ -5,7 +5,7 @@
            , UnboxedTuples
            , ScopedTypeVariables
            , DeriveDataTypeable
-					 , StandaloneDeriving
+           , StandaloneDeriving
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports -w -XBangPatterns #-}
 
