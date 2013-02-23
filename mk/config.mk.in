@@ -127,6 +127,9 @@ endif
 # cabal-install's that are in the wild don't handle it properly.
 DYNAMIC_BY_DEFAULT = NO
 
+# For now, we unconditionally disable building with -dynamic-too
+DYNAMIC_TOO = NO
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
