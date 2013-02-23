@@ -303,13 +303,13 @@ data SContSwitchReason = Yielded |
                          Completed
 
 getIntFromStatus x = case x of
-                          SContRunning -> 0#
-                          SContSwitched Yielded -> 1#
-                          SContSwitched (BlockedInHaskell _) -> 2#
-                          SContSwitched BlockedInRTS -> 3#
-                          SContSwitched Completed -> 4#
-                          SContKilled -> 5#
-                          otherwise -> 6#
+                          SContRunning -> 0
+                          SContSwitched Yielded -> 1
+                          SContSwitched (BlockedInHaskell _) -> 2
+                          SContSwitched BlockedInRTS -> 3
+                          SContSwitched Completed -> 4
+                          SContKilled -> 5
+                          otherwise -> 6
 
 {-# INLINE getSContStatus #-}
 getSContStatus :: SCont -> PTM SContStatus
@@ -352,7 +352,7 @@ switchTo targetSCont = do
   -- Get Int# version of current thread's status to pass to atomicSwitch#
   currentSCont <- getSCont
   status <- getSContStatus currentSCont
-  let intStatus = getIntFromStatus status
+  let (I# intStatus) = getIntFromStatus status
   let SCont targetSCont# = targetSCont
   PTM $ \s ->
     case (atomicSwitch# targetSCont# intStatus s) of s1 -> (# s1, () #)
