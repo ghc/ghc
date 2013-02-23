@@ -519,6 +519,8 @@ wanteds = concat
                           "RTS_FLAGS" "DebugFlags.sanity"
           ,structField_ C "RtsFlags_DebugFlags_weak"
                           "RTS_FLAGS" "DebugFlags.weak"
+          ,structField_ C "RtsFlags_DebugFlags_scheduler"
+                          "RTS_FLAGS" "DebugFlags.scheduler"
           ,structField_ C "RtsFlags_GcFlags_initialStkSize"
                           "RTS_FLAGS" "GcFlags.initialStkSize"
           ,structField_ C "RtsFlags_MiscFlags_tickInterval"

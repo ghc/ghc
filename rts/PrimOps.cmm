@@ -566,7 +566,7 @@ STRING(stg_switch_reason_3, "BlockedInRTS")
 STRING(stg_switch_reason_4, "ThreadComplete")
 STRING(stg_switch_reason_5, "ThreadKilled")
 
-stg_scheduleThreadOnFreeCapzh ( W_ scont )
+stg_scheduleThreadOnFreeCapzh ( gcptr scont )
 {
   ccall scheduleThreadOnFreeCap (MyCapability () "ptr", scont "ptr");
 	return ();
@@ -577,7 +577,7 @@ stg_defaultUpcallErrorzh ()
   ccall barf ("defaultUpcall triggered\n");
 }
 
-stg_atomicSwitchzh ( W_ tso , W_ switch_reason )
+stg_atomicSwitchzh ( gcptr tso , W_ switch_reason )
 {
   /* switch_reason: 1 - Blocking on a concurrent data structure
    *                2 - Yielding on the scheduler
@@ -586,11 +586,12 @@ stg_atomicSwitchzh ( W_ tso , W_ switch_reason )
   W_ frame_type, frame, trec, outer, valid, limit, q, next_invariant;
   W_ cap;
 
-again: MAYBE_GC(again);
+	MAYBE_GC_P (stg_atomicSwitchzh, tso);
 
   #if defined(DEBUG) || defined (TRACING)
 
   cap = MyCapability ();
+	IF_DEBUG(scheduler,
   if (switch_reason == 1) {
     ccall debugBelch (stg_switch_msg, StgTSO_id(CurrentTSO),
                             stg_switch_reason_1, StgTSO_id(tso),
@@ -632,7 +633,7 @@ again: MAYBE_GC(again);
       	}
 			}
     }
-  }
+  })
 
   #endif
 
@@ -738,7 +739,7 @@ again: MAYBE_GC(again);
   }
 }
 
-stg_setSContCapabilityzh ( W_ scont , W_ target )
+stg_setSContCapabilityzh ( gcptr scont , W_ target )
 {
 
 #if defined (THREADED_RTS)
@@ -756,14 +757,14 @@ stg_getCurrentCapabilityzh ()
   return (result);
 }
 
-stg_getSContCapabilityzh ( W_ sc )
+stg_getSContCapabilityzh ( gcptr sc )
 {
   W_ result;
   result = TO_W_(Capability_no (StgTSO_cap (sc)));
   return (result);
 }
 
-stg_getSContIdzh ( W_ sc )
+stg_getSContIdzh ( gcptr sc )
 {
   W_ result;
   result = TO_W_(StgTSO_id (sc));
@@ -771,7 +772,7 @@ stg_getSContIdzh ( W_ sc )
 }
 
 
-stg_iCanRunSContzh ( W_ scont )
+stg_iCanRunSContzh ( gcptr scont )
 {
 
   W_ result;
@@ -792,78 +793,69 @@ stg_iCanRunSContzh ( W_ scont )
 /* Set the resume thread closure for the given TSO. This closure, when
  * evaluated, will add the given thread to its user-level scheduler.
  */
-stg_setScheduleSContActionzh ( W_ threadid, W_ schedule_scont_action )
+stg_setScheduleSContActionzh ( gcptr threadid, gcptr schedule_scont_action )
 {
-
-again: MAYBE_GC (again);
-
+	MAYBE_GC_PP (stg_setScheduleSContActionzh, threadid, schedule_scont_action);
   StgTSO_schedule_scont_action (threadid) = schedule_scont_action;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();
 }
 
-stg_getScheduleSContActionzh ( W_ threadid )
+stg_getScheduleSContActionzh ( gcptr threadid )
 {
 
-again: MAYBE_GC (again);
-
+	MAYBE_GC_P (stg_getScheduleSContActionzh, threadid);
   W_ schedule_scont_action;
   schedule_scont_action = StgTSO_schedule_scont_action (threadid);
   return (schedule_scont_action);
 }
 
-stg_setYieldControlActionzh ( W_ threadid, W_ yield_control_action )
+stg_setYieldControlActionzh ( gcptr threadid, gcptr yield_control_action )
 {
-
-again: MAYBE_GC (again);
-
+	MAYBE_GC_PP (stg_setYieldControlActionzh, threadid, yield_control_action);
   StgTSO_yield_control_action (threadid) = yield_control_action;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();
 }
 
-stg_getYieldControlActionzh ( W_ threadid )
+stg_getYieldControlActionzh ( gcptr threadid )
 {
 
-again: MAYBE_GC (again);
-
+	MAYBE_GC_P (stg_getYieldControlActionzh, threadid);
   W_ yield_control_action;
   yield_control_action = StgTSO_yield_control_action (threadid);
   return (yield_control_action);
 }
 
-stg_setSLSzh ( W_ tso, W_ tls )
+stg_setSLSzh ( gcptr tso, gcptr tls )
 {
 
-again: MAYBE_GC (again);
-
+	MAYBE_GC_PP (stg_setSLSzh, tso, tls);
   StgTSO_tls(tso) = tls;
   ccall dirty_TSO (StgTSO_cap(tso) "ptr", tso "ptr");
 	return ();
 }
 
-stg_getSLSzh ( W_ tso )
+stg_getSLSzh ( gcptr tso )
 {
  W_ tls;
  tls = StgTSO_tls(tso);
  return (tls);
 }
 
-stg_setFinalizzerzh ( W_ threadid, W_ finalizer )
+stg_setFinalizzerzh ( gcptr threadid, gcptr finalizer )
 {
 
-again: MAYBE_GC (again);
-
+	MAYBE_GC_PP (stg_setFinalizzerzh, threadid, finalizer);
   StgTSO_finalizer (threadid) = finalizer;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();
 }
 
-stg_newSContzh ( W_ closure )
+stg_newSContzh ( gcptr closure )
 {
 
-again: MAYBE_GC (again);
-
+	MAYBE_GC_P (stg_newSContzh, closure);
   W_ threadid;
 
   ("ptr" threadid) = ccall createUserLevelThread( MyCapability() "ptr",
@@ -880,21 +872,15 @@ stg_getSContzh ()
   return (CurrentTSO);
 }
 
-stg_isThreadBoundzh ( W_ scont )
+stg_isThreadBoundzh ( gcptr scont )
 {
-
-again: MAYBE_GC (again);
-
   W_ r;
   (r) = ccall isThreadBound(scont);
   return (r);
 }
 
-stg_getStatusTVarzh ( W_ scont )
+stg_getStatusTVarzh ( gcptr scont )
 {
-
-again: MAYBE_GC (again);
-
   W_ tvar;
   tvar = StgTSO_scont_status(scont);
   return (tvar);

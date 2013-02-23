@@ -228,7 +228,7 @@
    by tryWakeupThread() */
 #define ThreadMigrating     13
 /* MVar is blocked on a concurrent data structure in user-land */
-#define BlockedInHaskell     14
+#define BlockedInHaskell    14
 #define Yielded             15
 
 /*

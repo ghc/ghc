@@ -227,7 +227,7 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         break;
 
     case EVENT_STOP_THREAD:     // (cap, thread, status)
-        if (info1 == 6 + BlockedOnBlackHole) {
+        if (info1 == STOP_EVENT_OFFSET + BlockedOnBlackHole) {
             debugBelch("cap %d: thread %" FMT_Word " stopped (blocked on black hole owned by thread %lu)\n",
                        cap->no, (W_)tso->id, (long)info2);
         } else {
