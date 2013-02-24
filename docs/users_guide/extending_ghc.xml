@@ -226,12 +226,13 @@ install _ todo = do
   return (CoreDoPluginPass "Say name" pass : todo)
 
 pass :: ModGuts -> CoreM ModGuts
-pass = bindsOnlyPass (mapM printBind)
-  where printBind :: CoreBind -> CoreM CoreBind
-        printBind bndr@(NonRec b _) = do
-          putMsgS $ "Non-recursive binding named " ++ showSDoc (ppr b)
+pass = do dflags &lt;- getDynFlags
+          bindsOnlyPass (mapM (printBind dflags))
+  where printBind :: DynFlags -> CoreBind -> CoreM CoreBind
+        printBind dflags bndr@(NonRec b _) = do
+          putMsgS $ "Non-recursive binding named " ++ showSDoc dflags (ppr b)
           return bndr 
-        printBind bndr = return bndr
+        printBind _ bndr = return bndr
 </programlisting>
       </sect3>
 
