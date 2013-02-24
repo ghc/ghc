@@ -366,4 +366,5 @@ test('T7563', when(unregisterised(), skip), run_command,
      ['$MAKE -s --no-print-directory T7563'])
 test('T6037', expect_broken(6037), run_command,
      ['$MAKE -s --no-print-directory T6037'])
+test('T2507', normal, run_command, ['$MAKE -s --no-print-directory T2507'])
 
