@@ -1,4 +1,4 @@
 
 Boot.hs:5:13:
-    Not a data constructor: `forall'
+    Not a data constructor: ‛forall’
     Perhaps you intended to use -XExistentialQuantification

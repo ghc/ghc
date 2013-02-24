@@ -1,7 +1,7 @@
 
 mod144.hs:2:27:
-    Conflicting exports for `Bar':
-       `module Mod144_A' exports `Mod144_A.Bar'
-         imported from `Mod144_A' at mod144.hs:4:1-15
-       `module M' exports `M.Bar' defined at mod144.hs:6:13
+    Conflicting exports for ‛Bar’:
+       ‛module Mod144_A’ exports ‛Mod144_A.Bar’
+         imported from ‛Mod144_A’ at mod144.hs:4:1-15
+       ‛module M’ exports ‛M.Bar’ defined at mod144.hs:6:13
 exit(1)

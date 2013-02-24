@@ -1,6 +1,5 @@
 
 tcfail130.hs:10:7:
-    Unbound implicit parameter (?x::Int)
-      arising from a use of `woggle'
+    Unbound implicit parameter (?x::Int) arising from a use of ‛woggle’
     In the expression: woggle 3
-    In an equation for `foo': foo = woggle 3
+    In an equation for ‛foo’: foo = woggle 3

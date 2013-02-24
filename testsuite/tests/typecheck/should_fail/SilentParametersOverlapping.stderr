@@ -1,13 +1,13 @@
 
 SilentParametersOverlapping.hs:15:9:
-    Overlapping instances for C [(t0, t1)] arising from a use of `c'
+    Overlapping instances for C [(t0, t1)] arising from a use of ‛c’
     Matching givens (or their superclasses):
       (C [(a, b)])
         bound by the instance declaration
         at SilentParametersOverlapping.hs:14:37-45
     Matching instances:
       instance C [a] -- Defined at SilentParametersOverlapping.hs:11:10
-    (The choice depends on the instantiation of `t0, t1')
+    (The choice depends on the instantiation of ‛t0, t1’)
     In the expression: c [(undefined, undefined)]
-    In an equation for `b': b x = c [(undefined, undefined)]
-    In the instance declaration for `B [(a, b)]'
+    In an equation for ‛b’: b x = c [(undefined, undefined)]
+    In the instance declaration for ‛B [(a, b)]’

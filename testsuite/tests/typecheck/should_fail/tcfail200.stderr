@@ -1,9 +1,9 @@
 
 tcfail200.hs:5:15:
-    Couldn't match kind `*' with `#'
+    Couldn't match kind ‛*’ with ‛#’
     When matching types
       t1 :: *
       GHC.Prim.Int# :: #
     In the expression: 1#
     In the expression: (1#, 'c')
-    In an equation for `x': x = (1#, 'c')
+    In an equation for ‛x’: x = (1#, 'c')

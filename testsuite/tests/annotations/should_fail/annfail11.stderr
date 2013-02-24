@@ -1,4 +1,4 @@
 
-annfail11.hs:3:1: Not in scope: `length'
+annfail11.hs:3:1: Not in scope: ‛length’
 
-annfail11.hs:4:1: Not in scope: type constructor or class `Integer'
+annfail11.hs:4:1: Not in scope: type constructor or class ‛Integer’

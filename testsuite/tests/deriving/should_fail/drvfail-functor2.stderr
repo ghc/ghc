@@ -3,24 +3,24 @@ drvfail-functor2.hs:1:29: Warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 drvfail-functor2.hs:7:14:
-    Can't make a derived instance of `Functor InFunctionArgument':
-      Constructor `InFunctionArgument' must not use the type variable in a function argument
-    In the newtype declaration for `InFunctionArgument'
+    Can't make a derived instance of ‛Functor InFunctionArgument’:
+      Constructor ‛InFunctionArgument’ must not use the type variable in a function argument
+    In the newtype declaration for ‛InFunctionArgument’
 
 drvfail-functor2.hs:10:14:
-    Can't make a derived instance of `Functor OnSecondArg':
-      Constructor `OnSecondArg' must use the type variable only as the last argument of a data type
-    In the newtype declaration for `OnSecondArg'
+    Can't make a derived instance of ‛Functor OnSecondArg’:
+      Constructor ‛OnSecondArg’ must use the type variable only as the last argument of a data type
+    In the newtype declaration for ‛OnSecondArg’
 
 drvfail-functor2.hs:15:14:
-    Cannot derive well-kinded instance of form `Functor (NoArguments ...)'
-      Class `Functor' expects an argument of kind `* -> *'
-    In the newtype declaration for `NoArguments'
+    Cannot derive well-kinded instance of form ‛Functor (NoArguments ...)’
+      Class ‛Functor’ expects an argument of kind ‛* -> *’
+    In the newtype declaration for ‛NoArguments’
 
 drvfail-functor2.hs:20:14:
-    Can't make a derived instance of `Functor StupidConstraint':
-      Data type `StupidConstraint' must not have a class context (Eq a)
-    In the data declaration for `StupidConstraint'
+    Can't make a derived instance of ‛Functor StupidConstraint’:
+      Data type ‛StupidConstraint’ must not have a class context (Eq a)
+    In the data declaration for ‛StupidConstraint’
 
 drvfail-functor2.hs:26:14:
     No instance for (Functor NoFunctor)

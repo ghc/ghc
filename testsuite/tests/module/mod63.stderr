@@ -1,5 +1,5 @@
 
 mod63.hs:3:1:
-    Equations for `f' have different numbers of arguments
+    Equations for ‛f’ have different numbers of arguments
       mod63.hs:3:1-8
       mod63.hs:4:1-11

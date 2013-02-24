@@ -1,5 +1,5 @@
 
 mod22.hs:3:11:
-    Multiple declarations of `K'
+    Multiple declarations of ‛K’
     Declared at: mod22.hs:2:11
                  mod22.hs:3:11

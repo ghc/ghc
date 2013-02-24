@@ -3,14 +3,14 @@ werror.hs:6:1: Warning:
     Top-level binding with no type signature: main :: IO ()
 
 werror.hs:7:13: Warning:
-    This binding for `main' shadows the existing binding
+    This binding for ‛main’ shadows the existing binding
       defined at werror.hs:6:1
 
-werror.hs:7:13: Warning: Defined but not used: `main'
+werror.hs:7:13: Warning: Defined but not used: ‛main’
 
 werror.hs:8:1: Warning: Tab character
 
-werror.hs:10:1: Warning: Defined but not used: `f'
+werror.hs:10:1: Warning: Defined but not used: ‛f’
 
 werror.hs:10:1: Warning:
     Top-level binding with no type signature:
@@ -18,11 +18,11 @@ werror.hs:10:1: Warning:
 
 werror.hs:10:1: Warning:
     Pattern match(es) are overlapped
-    In an equation for `f': f [] = ...
+    In an equation for ‛f’: f [] = ...
 
 werror.hs:10:1: Warning:
     Pattern match(es) are non-exhaustive
-    In an equation for `f': Patterns not matched: _ : _
+    In an equation for ‛f’: Patterns not matched: _ : _
 
 <no location info>: 
 Failing due to -Werror.

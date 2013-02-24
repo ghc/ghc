@@ -1,7 +1,8 @@
 
 annfail03.hs:17:1:
-    GHC stage restriction: instance for `Data InModule'
-      is used in a top-level splice or annotation,
+    GHC stage restriction:
+      instance for ‛Data
+                      InModule’ is used in a top-level splice or annotation,
       and must be imported, not defined locally
     In the expression: InModule
     In the annotation: {-# ANN f InModule #-}

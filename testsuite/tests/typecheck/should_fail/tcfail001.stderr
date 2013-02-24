@@ -1,7 +1,7 @@
 
 tcfail001.hs:9:2:
-    Couldn't match expected type `[t0] -> [t1]' with actual type `[a]'
+    Couldn't match expected type ‛[t0] -> [t1]’ with actual type ‛[a]’
     Relevant bindings include op :: [a] (bound at tcfail001.hs:9:2)
-    The equation(s) for `op' have one argument,
-    but its type `[a]' has none
-    In the instance declaration for `A [a]'
+    The equation(s) for ‛op’ have one argument,
+    but its type ‛[a]’ has none
+    In the instance declaration for ‛A [a]’

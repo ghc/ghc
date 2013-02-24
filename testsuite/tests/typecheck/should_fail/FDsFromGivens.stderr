@@ -1,14 +1,14 @@
 
 FDsFromGivens.hs:21:15:
-    Couldn't match type `Char' with `[a]'
+    Couldn't match type ‛Char’ with ‛[a]’
     Relevant bindings include
       bar :: KCC -> a -> a (bound at FDsFromGivens.hs:21:1)
     When using functional dependencies to combine
       C Char Char,
         arising from a pattern with constructor
                        KCC :: C Char Char => () -> KCC,
-                     in an equation for `bar'
+                     in an equation for ‛bar’
         at FDsFromGivens.hs:21:6-10
-      C Char [a], arising from a use of `f' at FDsFromGivens.hs:21:15
+      C Char [a], arising from a use of ‛f’ at FDsFromGivens.hs:21:15
     In the expression: f
-    In an equation for `bar': bar (KCC _) = f
+    In an equation for ‛bar’: bar (KCC _) = f

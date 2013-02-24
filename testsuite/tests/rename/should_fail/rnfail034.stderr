@@ -2,5 +2,5 @@
 rnfail034.hs:4:11: Qualified name in binding position: M.y
 
 rnfail034.hs:4:26:
-    Not in scope: `M.y'
-    Perhaps you meant `M.g' (line 4)
+    Not in scope: ‛M.y’
+    Perhaps you meant ‛M.g’ (line 4)

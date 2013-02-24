@@ -1,4 +1,4 @@
 
 rnfail025.hs:3:1:
-    The type signature for `sig_without_a_defn'
+    The type signature for ‛sig_without_a_defn’
       lacks an accompanying binding

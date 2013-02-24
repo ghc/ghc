@@ -1,7 +1,7 @@
 
 annfail09.hs:11:11:
-    GHC stage restriction: `g'
-      is used in a top-level splice or annotation,
+    GHC stage restriction:
+      ‛g’ is used in a top-level splice or annotation,
       and must be imported, not defined locally
     In the expression: g
     In the annotation: {-# ANN f g #-}

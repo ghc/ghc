@@ -1,7 +1,7 @@
 
 C.hs:6:11:
-    Couldn't match expected type `bug1465-1.0:A.T'
-                with actual type `A.T'
+    Couldn't match expected type ‛bug1465-1.0:A.T’
+                with actual type ‛A.T’
     In the expression: B2.f
     In the expression: [B1.f, B2.f]
-    In an equation for `x': x = [B1.f, B2.f]
+    In an equation for ‛x’: x = [B1.f, B2.f]

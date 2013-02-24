@@ -1,20 +1,20 @@
 
 rw.hs:14:47:
-    Couldn't match expected type `a' with actual type `Int'
-      `a' is a rigid type variable bound by
+    Couldn't match expected type ‛a’ with actual type ‛Int’
+      ‛a’ is a rigid type variable bound by
           the type signature for writeInt :: T a -> IORef a -> IO ()
           at rw.hs:12:12
     Relevant bindings include
       writeInt :: T a -> IORef a -> IO () (bound at rw.hs:13:1)
       v :: T a (bound at rw.hs:13:10)
       ref :: IORef a (bound at rw.hs:13:12)
-    In the second argument of `writeIORef', namely `(1 :: Int)'
+    In the second argument of ‛writeIORef’, namely ‛(1 :: Int)’
     In the expression: writeIORef ref (1 :: Int)
     In a case alternative: ~(Li x) -> writeIORef ref (1 :: Int)
 
 rw.hs:19:51:
-    Couldn't match type `a' with `Bool'
-      `a' is a rigid type variable bound by
+    Couldn't match type ‛a’ with ‛Bool’
+      ‛a’ is a rigid type variable bound by
           the type signature for readBool :: T a -> IORef a -> IO ()
           at rw.hs:16:12
     Expected type: a -> Bool
@@ -23,6 +23,6 @@ rw.hs:19:51:
       readBool :: T a -> IORef a -> IO () (bound at rw.hs:17:1)
       v :: T a (bound at rw.hs:17:10)
       ref :: IORef a (bound at rw.hs:17:12)
-    In the second argument of `(.)', namely `not'
-    In the second argument of `(>>=)', namely `(print . not)'
+    In the second argument of ‛(.)’, namely ‛not’
+    In the second argument of ‛(>>=)’, namely ‛(print . not)’
     In the expression: readIORef ref >>= (print . not)

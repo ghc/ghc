@@ -4,4 +4,4 @@ tcfail020.hs:10:10:
       arising from the superclasses of an instance declaration
     from the context (A a)
       bound by the instance declaration at tcfail020.hs:10:10-23
-    In the instance declaration for `B [a]'
+    In the instance declaration for ‛B [a]’

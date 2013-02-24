@@ -1,14 +1,14 @@
 
 tcfail113.hs:12:7:
-    Expecting one more argument to `Maybe'
-    Expected kind `*', but `Maybe' has kind `* -> *'
-    In the type signature for `f': f :: [Maybe]
+    Expecting one more argument to ‛Maybe’
+    Expected kind ‛*’, but ‛Maybe’ has kind ‛* -> *’
+    In the type signature for ‛f’: f :: [Maybe]
 
 tcfail113.hs:15:8:
-    The first argument of `T' should have kind `* -> *',
-      but `Int' has kind `*'
-    In the type signature for `g': g :: T Int
+    The first argument of ‛T’ should have kind ‛* -> *’,
+      but ‛Int’ has kind ‛*’
+    In the type signature for ‛g’: g :: T Int
 
 tcfail113.hs:18:6:
-    `Int' is applied to too many type arguments
-    In the type signature for `h': h :: Int Int
+    ‛Int’ is applied to too many type arguments
+    In the type signature for ‛h’: h :: Int Int

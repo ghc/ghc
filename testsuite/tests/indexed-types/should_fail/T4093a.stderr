@@ -4,12 +4,12 @@ T4093a.hs:8:8:
     from the context (Foo e ~ Maybe e)
       bound by the type signature for hang :: Foo e ~ Maybe e => Foo e
       at T4093a.hs:7:9-34
-      `e' is a rigid type variable bound by
+      ‛e’ is a rigid type variable bound by
           the type signature for hang :: Foo e ~ Maybe e => Foo e
           at T4093a.hs:7:9
     Expected type: Foo e
       Actual type: Maybe ()
     Relevant bindings include hang :: Foo e (bound at T4093a.hs:8:1)
-    In the return type of a call of `Just'
+    In the return type of a call of ‛Just’
     In the expression: Just ()
-    In an equation for `hang': hang = Just ()
+    In an equation for ‛hang’: hang = Just ()

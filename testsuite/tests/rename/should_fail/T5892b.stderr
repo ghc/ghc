@@ -1,4 +1,4 @@
 
 T5892b.hs:11:7:
-    Not in scope: `T5892b.versionTags'
-    Perhaps you meant `T5892b.versionBranch' (line 7)
+    Not in scope: ‛T5892b.versionTags’
+    Perhaps you meant ‛T5892b.versionBranch’ (line 7)

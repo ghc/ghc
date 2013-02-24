@@ -1,16 +1,16 @@
 
 tcfail072.hs:23:13:
-    Could not deduce (Ord q0) arising from a use of `g'
+    Could not deduce (Ord q0) arising from a use of ‛g’
     from the context (Ord p, Ord q)
       bound by the type signature for
                  g :: (Ord p, Ord q) => AB p q -> Bool
       at tcfail072.hs:22:6-38
-    The type variable `q0' is ambiguous
+    The type variable ‛q0’ is ambiguous
     Note: there are several potential instances:
       instance Integral a => Ord (GHC.Real.Ratio a)
-        -- Defined in `GHC.Real'
-      instance Ord () -- Defined in `GHC.Classes'
-      instance (Ord a, Ord b) => Ord (a, b) -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Real’
+      instance Ord () -- Defined in ‛GHC.Classes’
+      instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‛GHC.Classes’
       ...plus 22 others
     In the expression: g A
-    In an equation for `g': g (B _ _) = g A
+    In an equation for ‛g’: g (B _ _) = g A

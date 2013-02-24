@@ -1,5 +1,5 @@
 
 mod21.hs:3:6:
-    Multiple declarations of `T'
+    Multiple declarations of ‛T’
     Declared at: mod21.hs:2:6
                  mod21.hs:3:6

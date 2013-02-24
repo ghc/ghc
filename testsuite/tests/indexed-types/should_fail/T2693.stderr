@@ -1,41 +1,41 @@
 
 T2693.hs:11:7:
-    Couldn't match expected type `TFn a' with actual type `TFn a0'
-    NB: `TFn' is a type function, and may not be injective
-    The type variable `a0' is ambiguous
-    When checking that `x' has the inferred type `forall a. TFn a'
+    Couldn't match expected type ‛TFn a’ with actual type ‛TFn a0’
+    NB: ‛TFn’ is a type function, and may not be injective
+    The type variable ‛a0’ is ambiguous
+    When checking that ‛x’ has the inferred type ‛forall a. TFn a’
     Probable cause: the inferred type is ambiguous
     In the expression:
       do { let Just x = ...;
            let n = fst x + fst x;
            return () }
-    In an equation for `f':
+    In an equation for ‛f’:
         f = do { let Just x = ...;
                  let n = ...;
                  return () }
 
 T2693.hs:19:15:
-    Couldn't match expected type `(a2, b0)' with actual type `TFn a3'
-    The type variables `a2', `b0', `a3' are ambiguous
+    Couldn't match expected type ‛(a2, b0)’ with actual type ‛TFn a3’
+    The type variables ‛a2’, ‛b0’, ‛a3’ are ambiguous
     Relevant bindings include n :: a2 (bound at T2693.hs:19:7)
-    In the first argument of `fst', namely `x'
-    In the first argument of `(+)', namely `fst x'
+    In the first argument of ‛fst’, namely ‛x’
+    In the first argument of ‛(+)’, namely ‛fst x’
     In the expression: fst x + snd x
 
 T2693.hs:19:23:
-    Couldn't match expected type `(a4, a2)' with actual type `TFn a5'
-    The type variables `a2', `a4', `a5' are ambiguous
+    Couldn't match expected type ‛(a4, a2)’ with actual type ‛TFn a5’
+    The type variables ‛a2’, ‛a4’, ‛a5’ are ambiguous
     Relevant bindings include n :: a2 (bound at T2693.hs:19:7)
-    In the first argument of `snd', namely `x'
-    In the second argument of `(+)', namely `snd x'
+    In the first argument of ‛snd’, namely ‛x’
+    In the second argument of ‛(+)’, namely ‛snd x’
     In the expression: fst x + snd x
 
 T2693.hs:29:20:
-    Couldn't match type `TFn a0' with `PVR a1'
-    The type variables `a0', `a1' are ambiguous
+    Couldn't match type ‛TFn a0’ with ‛PVR a1’
+    The type variables ‛a0’, ‛a1’ are ambiguous
     Expected type: () -> Maybe (PVR a1)
       Actual type: () -> Maybe (TFn a0)
-    In the first argument of `mapM', namely `g'
+    In the first argument of ‛mapM’, namely ‛g’
     In a stmt of a 'do' block: pvs <- mapM g undefined
     In the expression:
       do { pvs <- mapM g undefined;

@@ -1,7 +1,7 @@
 
 tcfail032.hs:14:8:
-    Couldn't match expected type `a1 -> Int' with actual type `t'
-      because type variable `a1' would escape its scope
+    Couldn't match expected type ‛a1 -> Int’ with actual type ‛t’
+      because type variable ‛a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       an expression type signature: Eq a1 => a1 -> Int
       at tcfail032.hs:14:8-30
@@ -9,4 +9,4 @@ tcfail032.hs:14:8:
       f :: t -> a -> Int (bound at tcfail032.hs:14:1)
       x :: t (bound at tcfail032.hs:14:3)
     In the expression: (x :: Eq a => a -> Int)
-    In an equation for `f': f x = (x :: Eq a => a -> Int)
+    In an equation for ‛f’: f x = (x :: Eq a => a -> Int)

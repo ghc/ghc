@@ -1,13 +1,13 @@
 
 tcfail080.hs:27:1:
     Could not deduce (Collection c0 a)
-      arising from the ambiguity check for `q'
+      arising from the ambiguity check for ‛q’
     from the context (Collection c a)
-      bound by the inferred type for `q': Collection c a => a -> Bool
+      bound by the inferred type for ‛q’: Collection c a => a -> Bool
       at tcfail080.hs:27:1-27
-    The type variable `c0' is ambiguous
-    When checking that `q'
-      has the inferred type `forall (c :: * -> *) a.
+    The type variable ‛c0’ is ambiguous
+    When checking that ‛q’
+      has the inferred type ‛forall (c :: * -> *) a.
                              Collection c a =>
-                             a -> Bool'
+                             a -> Bool’
     Probable cause: the inferred type is ambiguous

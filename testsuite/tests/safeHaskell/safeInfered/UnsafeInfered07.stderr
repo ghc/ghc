@@ -1,20 +1,20 @@
 [1 of 2] Compiling UnsafeInfered07_A ( UnsafeInfered07_A.hs, UnsafeInfered07_A.o )
 
 UnsafeInfered07_A.hs:4:1: Warning:
-    Module `Data.OldTypeable' is deprecated: Use Data.Typeable instead
+    Module ‛Data.OldTypeable’ is deprecated: Use Data.Typeable instead
 
 UnsafeInfered07_A.hs:8:10: Warning:
-    In the use of type constructor or class `Typeable'
+    In the use of type constructor or class ‛Typeable’
     (imported from Data.OldTypeable, but defined in Data.OldTypeable.Internal):
     Deprecated: "Use Data.Typeable.Internal instead"
 
 UnsafeInfered07_A.hs:8:10: Warning:
-    In the use of type constructor or class `Typeable'
+    In the use of type constructor or class ‛Typeable’
     (imported from Data.OldTypeable, but defined in Data.OldTypeable.Internal):
     Deprecated: "Use Data.Typeable.Internal instead"
 
 UnsafeInfered07_A.hs:9:16: Warning:
-    In the use of `typeOf'
+    In the use of ‛typeOf’
     (imported from Data.OldTypeable, but defined in Data.OldTypeable.Internal):
     Deprecated: "Use Data.Typeable.Internal instead"
 [2 of 2] Compiling UnsafeInfered07  ( UnsafeInfered07.hs, UnsafeInfered07.o )

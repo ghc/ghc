@@ -1,5 +1,5 @@
 
 T6037.hs:5:7:
-    Couldn't match expected type `Int' with actual type `()'
+    Couldn't match expected type ‛Int’ with actual type ‛()’
     In the expression: ()
-    In an equation for `f?o': f?o = ()
+    In an equation for ‛f?o’: f?o = ()

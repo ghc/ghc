@@ -1,4 +1,4 @@
 
-annfail01.hs:4:1: Not in scope: type constructor or class `Foo'
+annfail01.hs:4:1: Not in scope: type constructor or class ‛Foo’
 
-annfail01.hs:5:1: Not in scope: `f'
+annfail01.hs:5:1: Not in scope: ‛f’

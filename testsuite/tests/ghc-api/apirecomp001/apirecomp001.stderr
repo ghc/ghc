@@ -4,12 +4,12 @@ B.hs:4:1: Warning:
       answer_to_live_the_universe_and_everything :: Int
 
 B.hs:5:12: Warning:
-    Defaulting the following constraint(s) to type `Integer'
+    Defaulting the following constraint(s) to type ‛Integer’
       (Enum a0)
-        arising from the arithmetic sequence `1 .. 23 * 2' at B.hs:5:12-20
-      (Num a0) arising from the literal `1' at B.hs:5:13
-    In the first argument of `length', namely `[1 .. 23 * 2]'
-    In the first argument of `(-)', namely `length [1 .. 23 * 2]'
+        arising from the arithmetic sequence ‛1 .. 23 * 2’ at B.hs:5:12-20
+      (Num a0) arising from the literal ‛1’ at B.hs:5:13
+    In the first argument of ‛length’, namely ‛[1 .. 23 * 2]’
+    In the first argument of ‛(-)’, namely ‛length [1 .. 23 * 2]’
     In the expression: length [1 .. 23 * 2] - 4
 
 A.hs:7:1: Warning:
@@ -20,12 +20,12 @@ B.hs:4:1: Warning:
       answer_to_live_the_universe_and_everything :: Int
 
 B.hs:5:12: Warning:
-    Defaulting the following constraint(s) to type `Integer'
+    Defaulting the following constraint(s) to type ‛Integer’
       (Enum a0)
-        arising from the arithmetic sequence `1 .. 23 * 2' at B.hs:5:12-20
-      (Num a0) arising from the literal `1' at B.hs:5:13
-    In the first argument of `length', namely `[1 .. 23 * 2]'
-    In the first argument of `(-)', namely `length [1 .. 23 * 2]'
+        arising from the arithmetic sequence ‛1 .. 23 * 2’ at B.hs:5:12-20
+      (Num a0) arising from the literal ‛1’ at B.hs:5:13
+    In the first argument of ‛length’, namely ‛[1 .. 23 * 2]’
+    In the first argument of ‛(-)’, namely ‛length [1 .. 23 * 2]’
     In the expression: length [1 .. 23 * 2] - 4
 
 A.hs:7:1: Warning:

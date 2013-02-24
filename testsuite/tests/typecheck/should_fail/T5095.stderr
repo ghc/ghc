@@ -1,64 +1,64 @@
 
 T5095.hs:9:11:
-    Overlapping instances for Eq a arising from a use of `=='
+    Overlapping instances for Eq a arising from a use of ‛==’
     Matching instances:
       instance [overlap ok] Show a => Eq a -- Defined at T5095.hs:5:10
-      instance Eq a => Eq (GHC.Real.Ratio a) -- Defined in `GHC.Real'
-      instance Eq () -- Defined in `GHC.Classes'
-      instance (Eq a, Eq b) => Eq (a, b) -- Defined in `GHC.Classes'
+      instance Eq a => Eq (GHC.Real.Ratio a) -- Defined in ‛GHC.Real’
+      instance Eq () -- Defined in ‛GHC.Classes’
+      instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e) => Eq (a, b, c, d, e)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f) =>
                Eq (a, b, c, d, e, f)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g) =>
                Eq (a, b, c, d, e, f, g)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h) =>
                Eq (a, b, c, d, e, f, g, h)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i) =>
                Eq (a, b, c, d, e, f, g, h, i)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
                 Eq j) =>
                Eq (a, b, c, d, e, f, g, h, i, j)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
                 Eq j, Eq k) =>
                Eq (a, b, c, d, e, f, g, h, i, j, k)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
                 Eq j, Eq k, Eq l) =>
                Eq (a, b, c, d, e, f, g, h, i, j, k, l)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
                 Eq j, Eq k, Eq l, Eq m) =>
                Eq (a, b, c, d, e, f, g, h, i, j, k, l, m)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
                 Eq j, Eq k, Eq l, Eq m, Eq n) =>
                Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
-        -- Defined in `GHC.Classes'
+        -- Defined in ‛GHC.Classes’
       instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
                 Eq j, Eq k, Eq l, Eq m, Eq n, Eq o) =>
                Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-        -- Defined in `GHC.Classes'
-      instance Eq Bool -- Defined in `GHC.Classes'
-      instance Eq Char -- Defined in `GHC.Classes'
-      instance Eq Double -- Defined in `GHC.Classes'
-      instance Eq Float -- Defined in `GHC.Classes'
-      instance Eq Int -- Defined in `GHC.Classes'
-      instance Eq Ordering -- Defined in `GHC.Classes'
-      instance Eq GHC.Types.Word -- Defined in `GHC.Classes'
-      instance Eq a => Eq [a] -- Defined in `GHC.Classes'
-      instance Eq Integer -- Defined in `integer-gmp:GHC.Integer.Type'
-    (The choice depends on the instantiation of `a'
+        -- Defined in ‛GHC.Classes’
+      instance Eq Bool -- Defined in ‛GHC.Classes’
+      instance Eq Char -- Defined in ‛GHC.Classes’
+      instance Eq Double -- Defined in ‛GHC.Classes’
+      instance Eq Float -- Defined in ‛GHC.Classes’
+      instance Eq Int -- Defined in ‛GHC.Classes’
+      instance Eq Ordering -- Defined in ‛GHC.Classes’
+      instance Eq GHC.Types.Word -- Defined in ‛GHC.Classes’
+      instance Eq a => Eq [a] -- Defined in ‛GHC.Classes’
+      instance Eq Integer -- Defined in ‛integer-gmp:GHC.Integer.Type’
+    (The choice depends on the instantiation of ‛a’
      To pick the first instance above, use -XIncoherentInstances
      when compiling the other instance declarations)
     In the expression: x == y
-    In an equation for `f': f x y = x == y
+    In an equation for ‛f’: f x y = x == y

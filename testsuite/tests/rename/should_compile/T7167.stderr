@@ -1,2 +1,2 @@
 
-T7167.hs:5:1: Warning: Module `Data.List' does not export `foo'
+T7167.hs:5:1: Warning: Module ‛Data.List’ does not export ‛foo’

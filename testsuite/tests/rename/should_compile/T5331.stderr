@@ -1,13 +1,13 @@
 
-T5331.hs:8:17:
-    Warning: Unused quantified type variable `a'
-             In the definition of data constructor `S1'
+T5331.hs:8:17: Warning:
+    Unused quantified type variable ‛a’
+    In the definition of data constructor ‛S1’
 
-T5331.hs:11:16:
-    Warning: Unused quantified type variable `a'
-             In the definition of data constructor `W1'
+T5331.hs:11:16: Warning:
+    Unused quantified type variable ‛a’
+    In the definition of data constructor ‛W1’
 
-T5331.hs:13:13:
-    Warning: Unused quantified type variable `a'
-             In the type `forall a. Int'
-             In the type signature for `f'
+T5331.hs:13:13: Warning:
+    Unused quantified type variable ‛a’
+    In the type ‛forall a. Int’
+    In the type signature for ‛f’

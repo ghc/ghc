@@ -1,4 +1,4 @@
 
 mod102.hs:8:5:
-    Not in scope: `methB'
-    Perhaps you meant `methA' (imported from Mod102_AuxB)
+    Not in scope: ‛methB’
+    Perhaps you meant ‛methA’ (imported from Mod102_AuxB)

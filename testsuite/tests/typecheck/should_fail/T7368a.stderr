@@ -1,10 +1,10 @@
 
 T7368a.hs:8:6:
-    Couldn't match kind `*' with `* -> *'
+    Couldn't match kind ‛*’ with ‛* -> *’
     When matching types
       f :: * -> *
       Bad :: (* -> *) -> *
     Expected type: f (Bad f)
       Actual type: Bad t0
     In the pattern: Bad x
-    In an equation for `fun': fun (Bad x) = True
+    In an equation for ‛fun’: fun (Bad x) = True

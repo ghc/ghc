@@ -1,7 +1,7 @@
 
 tcfail152.hs:10:14:
-    No instance for (Integral a) arising from a use of `toInteger'
+    No instance for (Integral a) arising from a use of ‛toInteger’
     Possible fix:
-      add (Integral a) to the context of the data constructor `C'
+      add (Integral a) to the context of the data constructor ‛C’
     In the expression: toInteger x
-    In an equation for `test': test (C x) = toInteger x
+    In an equation for ‛test’: test (C x) = toInteger x

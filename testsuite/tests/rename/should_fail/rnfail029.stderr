@@ -1,8 +1,8 @@
 
 rnfail029.hs:2:36:
-    Conflicting exports for `map':
-       `Data.List.map' exports `Data.List.map'
-         imported qualified from `Data.List' at rnfail029.hs:3:1-26
-         (and originally defined in `GHC.Base')
-       `module ShouldFail' exports `ShouldFail.map'
+    Conflicting exports for ‛map’:
+       ‛Data.List.map’ exports ‛Data.List.map’
+         imported qualified from ‛Data.List’ at rnfail029.hs:3:1-26
+         (and originally defined in ‛GHC.Base’)
+       ‛module ShouldFail’ exports ‛ShouldFail.map’
          defined at rnfail029.hs:4:1

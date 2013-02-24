@@ -1,28 +1,28 @@
 
-read014.hs:4:1:
-    Warning: Top-level binding with no type signature:
-               ng1 :: forall t a. Num a => t -> a -> a
+read014.hs:4:1: Warning:
+    Top-level binding with no type signature:
+      ng1 :: forall t a. Num a => t -> a -> a
 
-read014.hs:4:5: Warning: Defined but not used: `x'
+read014.hs:4:5: Warning: Defined but not used: ‛x’
 
-read014.hs:6:10:
-    Warning: No explicit method or default declaration for `+'
-    In the instance declaration for `Num (a, b)'
+read014.hs:6:10: Warning:
+    No explicit method or default declaration for ‛+’
+    In the instance declaration for ‛Num (a, b)’
 
-read014.hs:6:10:
-    Warning: No explicit method or default declaration for `*'
-    In the instance declaration for `Num (a, b)'
+read014.hs:6:10: Warning:
+    No explicit method or default declaration for ‛*’
+    In the instance declaration for ‛Num (a, b)’
 
-read014.hs:6:10:
-    Warning: No explicit method or default declaration for `abs'
-    In the instance declaration for `Num (a, b)'
+read014.hs:6:10: Warning:
+    No explicit method or default declaration for ‛abs’
+    In the instance declaration for ‛Num (a, b)’
 
-read014.hs:6:10:
-    Warning: No explicit method or default declaration for `signum'
-    In the instance declaration for `Num (a, b)'
+read014.hs:6:10: Warning:
+    No explicit method or default declaration for ‛signum’
+    In the instance declaration for ‛Num (a, b)’
 
-read014.hs:6:10:
-    Warning: No explicit method or default declaration for `fromInteger'
-    In the instance declaration for `Num (a, b)'
+read014.hs:6:10: Warning:
+    No explicit method or default declaration for ‛fromInteger’
+    In the instance declaration for ‛Num (a, b)’
 
-read014.hs:8:53: Warning: Defined but not used: `x'
+read014.hs:8:53: Warning: Defined but not used: ‛x’

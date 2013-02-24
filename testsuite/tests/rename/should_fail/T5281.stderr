@@ -1,4 +1,4 @@
 
 T5281.hs:6:5: Warning:
-    In the use of `deprec' (imported from T5281A):
+    In the use of ‛deprec’ (imported from T5281A):
     Deprecated: "This is deprecated"

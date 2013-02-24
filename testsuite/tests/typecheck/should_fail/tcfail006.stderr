@@ -1,6 +1,6 @@
 
 tcfail006.hs:4:24:
-    No instance for (Num Bool) arising from the literal `1'
+    No instance for (Num Bool) arising from the literal ‛1’
     In the expression: 1
     In the expression: (True, 1)
     In a case alternative: True -> (True, 1)

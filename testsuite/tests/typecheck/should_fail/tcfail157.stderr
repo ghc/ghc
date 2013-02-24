@@ -1,12 +1,12 @@
 
 tcfail157.hs:27:10:
-    Variable `b' occurs more often than in the instance head
+    Variable ‛b’ occurs more often than in the instance head
       in the constraint: E m a b
     (Use -XUndecidableInstances to permit this)
-    In the instance declaration for `Foo m (a -> ())'
+    In the instance declaration for ‛Foo m (a -> ())’
 
 tcfail157.hs:27:10:
-    Variable `b' occurs more often than in the instance head
+    Variable ‛b’ occurs more often than in the instance head
       in the constraint: Foo m b
     (Use -XUndecidableInstances to permit this)
-    In the instance declaration for `Foo m (a -> ())'
+    In the instance declaration for ‛Foo m (a -> ())’

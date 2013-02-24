@@ -1,7 +1,7 @@
 
 <interactive>:11:1:
-    No instance for (Show a1) arising from a use of `print'
-    Cannot resolve unknown runtime type `a1'
+    No instance for (Show a1) arising from a use of ‛print’
+    Cannot resolve unknown runtime type ‛a1’
     Use :print or :force to determine these types
     Relevant bindings include it :: a1 (bound at <interactive>:11:1)
     Note: there are several potential instances:

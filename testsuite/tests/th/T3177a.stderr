@@ -1,10 +1,10 @@
 
 T3177a.hs:8:15:
-    `Int' is applied to too many type arguments
-    In the type `Int Int'
+    ‛Int’ is applied to too many type arguments
+    In the type ‛Int Int’
     In the Template Haskell quotation [t| Int Int |]
-    In the first argument of `id', namely `[t| Int Int |]'
+    In the first argument of ‛id’, namely ‛[t| Int Int |]’
 
 T3177a.hs:11:6:
-    `Int' is applied to too many type arguments
-    In the type signature for `g': g :: Int Int
+    ‛Int’ is applied to too many type arguments
+    In the type signature for ‛g’: g :: Int Int

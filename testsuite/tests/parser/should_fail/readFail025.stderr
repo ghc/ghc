@@ -1,4 +1,4 @@
 
 readFail025.hs:5:8:
-    Unexpected type `String' where type variable expected
-    In the declaration of `T String'
+    Unexpected type ‛String’ where type variable expected
+    In the declaration of ‛T String’

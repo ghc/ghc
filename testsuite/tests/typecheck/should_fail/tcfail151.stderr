@@ -3,6 +3,6 @@ tcfail151.hs:1:14: Warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail151.hs:8:6:
-    Expecting one more argument to `Name a'
-    Expected a constraint, but `Name a' has kind `* -> Constraint'
-    In the data declaration for `Exp'
+    Expecting one more argument to ‛Name a’
+    Expected a constraint, but ‛Name a’ has kind ‛* -> Constraint’
+    In the data declaration for ‛Exp’

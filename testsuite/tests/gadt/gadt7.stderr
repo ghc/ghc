@@ -1,15 +1,15 @@
 
 gadt7.hs:16:38:
-    Couldn't match expected type `t' with actual type `t1'
-      `t1' is untouchable
+    Couldn't match expected type ‛t’ with actual type ‛t1’
+      ‛t1’ is untouchable
         inside the constraints (t2 ~ Int)
         bound by a pattern with constructor
                    K :: T Int,
                  in a case alternative
         at gadt7.hs:16:33
-      `t1' is a rigid type variable bound by
+      ‛t1’ is a rigid type variable bound by
            the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
-      `t' is a rigid type variable bound by
+      ‛t’ is a rigid type variable bound by
           the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
     Relevant bindings include
       i1b :: T t2 -> t1 -> t (bound at gadt7.hs:16:1)

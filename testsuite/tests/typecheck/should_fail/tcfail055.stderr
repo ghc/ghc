@@ -1,5 +1,5 @@
 
 tcfail055.hs:3:8:
-    Couldn't match expected type `Float' with actual type `Int'
+    Couldn't match expected type ‛Float’ with actual type ‛Int’
     In the expression: (x + 1 :: Int) :: Float
-    In an equation for `f': f x = (x + 1 :: Int) :: Float
+    In an equation for ‛f’: f x = (x + 1 :: Int) :: Float

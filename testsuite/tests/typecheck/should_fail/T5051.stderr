@@ -1,11 +1,11 @@
 
 T5051.hs:11:11:
-    Overlapping instances for Eq [a] arising from a use of `>='
+    Overlapping instances for Eq [a] arising from a use of ‛>=’
     Matching instances:
-      instance Eq a => Eq [a] -- Defined in `GHC.Classes'
+      instance Eq a => Eq [a] -- Defined in ‛GHC.Classes’
       instance [overlap ok] Eq [T] -- Defined at T5051.hs:8:10
-    (The choice depends on the instantiation of `a'
+    (The choice depends on the instantiation of ‛a’
      To pick the first instance above, use -XIncoherentInstances
      when compiling the other instance declarations)
     In the expression: x >= x
-    In an equation for `foo': foo x = x >= x
+    In an equation for ‛foo’: foo x = x >= x

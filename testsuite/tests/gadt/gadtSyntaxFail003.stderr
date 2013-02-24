@@ -1,6 +1,6 @@
 
 gadtSyntaxFail003.hs:7:5:
-    Data constructor `C1' has existential type variables, a context, or a specialised result type
+    Data constructor ‛C1’ has existential type variables, a context, or a specialised result type
       (Use -XExistentialQuantification or -XGADTs to allow this)
-    In the definition of data constructor `C1'
-    In the data declaration for `Foo'
+    In the definition of data constructor ‛C1’
+    In the data declaration for ‛Foo’

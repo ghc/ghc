@@ -1,4 +1,4 @@
 
 tc167.hs:8:12:
-    Expecting a lifted type, but `Int#' is unlifted
-    In the type signature for `f': f :: ((->) Int#) Int#
+    Expecting a lifted type, but ‛Int#’ is unlifted
+    In the type signature for ‛f’: f :: ((->) Int#) Int#

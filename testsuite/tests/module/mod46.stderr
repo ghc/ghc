@@ -2,4 +2,4 @@
 mod46.hs:4:10:
     No instance for (Eq T)
       arising from the superclasses of an instance declaration
-    In the instance declaration for `Ord T'
+    In the instance declaration for ‛Ord T’

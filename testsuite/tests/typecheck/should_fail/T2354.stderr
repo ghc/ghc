@@ -1,6 +1,6 @@
 
 T2354.hs:4:3:
-    The INLINE pragma for default method `toInt' lacks an accompanying binding
+    The INLINE pragma for default method ‛toInt’ lacks an accompanying binding
 
 T2354.hs:6:3:
-    The INLINE pragma for default method `fromInt' lacks an accompanying binding
+    The INLINE pragma for default method ‛fromInt’ lacks an accompanying binding

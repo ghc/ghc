@@ -1,2 +1,2 @@
 
-mod125.hs:7:5: Not in scope: data constructor `T'
+mod125.hs:7:5: Not in scope: data constructor ‛T’

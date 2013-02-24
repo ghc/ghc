@@ -1,6 +1,6 @@
 
 tcfail156.hs:7:26:
     A newtype constructor cannot have an existential context,
-      but `Foo' does
-    In the definition of data constructor `Foo'
-    In the newtype declaration for `Foo'
+      but ‛Foo’ does
+    In the definition of data constructor ‛Foo’
+    In the newtype declaration for ‛Foo’

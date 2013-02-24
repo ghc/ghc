@@ -1,6 +1,6 @@
 
 mc25.hs:9:46:
-    Couldn't match type `Int' with `a -> t'
+    Couldn't match type ‛Int’ with ‛a -> t’
     Expected type: (a -> t) -> [a] -> [t1 a]
       Actual type: Int -> [a] -> [a]
     Relevant bindings include z :: [t1 t] (bound at mc25.hs:9:1)

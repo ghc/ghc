@@ -1,13 +1,13 @@
 
 gadt-escape1.hs:19:58:
-    Couldn't match type `t' with `ExpGADT Int'
-      `t' is untouchable
+    Couldn't match type ‛t’ with ‛ExpGADT Int’
+      ‛t’ is untouchable
         inside the constraints (t1 ~ Int)
         bound by a pattern with constructor
                    ExpInt :: Int -> ExpGADT Int,
                  in a case alternative
         at gadt-escape1.hs:19:43-50
-      `t' is a rigid type variable bound by
+      ‛t’ is a rigid type variable bound by
           the inferred type of weird1 :: t at gadt-escape1.hs:19:1
     Expected type: t
       Actual type: ExpGADT t1

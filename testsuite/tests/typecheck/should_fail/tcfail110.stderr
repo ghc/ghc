@@ -1,6 +1,6 @@
 
 tcfail110.hs:8:30:
-    Expecting one more argument to `Foo a'
-    Expected a type, but `Foo a' has kind `* -> *'
-    In the type signature for `bar':
+    Expecting one more argument to ‛Foo a’
+    Expected a type, but ‛Foo a’ has kind ‛* -> *’
+    In the type signature for ‛bar’:
       bar :: String -> (forall a. Foo a) -> IO ()

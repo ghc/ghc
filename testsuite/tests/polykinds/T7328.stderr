@@ -1,7 +1,7 @@
 
 T7328.hs:8:34:
     Kind occurs check
-    The first argument of `Foo' should have kind `k0',
-      but `f' has kind `k1 -> k0'
-    In the type `a ~ f i => Proxy (Foo f)'
-    In the class declaration for `Foo'
+    The first argument of ‛Foo’ should have kind ‛k0’,
+      but ‛f’ has kind ‛k1 -> k0’
+    In the type ‛a ~ f i => Proxy (Foo f)’
+    In the class declaration for ‛Foo’

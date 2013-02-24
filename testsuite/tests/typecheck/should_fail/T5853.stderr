@@ -8,7 +8,7 @@ T5853.hs:15:52:
                       Elem (Subst fa a) ~ a,
                       Subst (Subst fa a) (Elem fa) ~ fa)
       bound by the RULE "map/map" at T5853.hs:15:2-57
-    NB: `Subst' is a type function, and may not be injective
+    NB: ‛Subst’ is a type function, and may not be injective
     Relevant bindings include
       xs :: Subst fa a (bound at T5853.hs:15:23)
       g :: a -> Elem fa (bound at T5853.hs:15:21)

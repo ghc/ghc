@@ -1,6 +1,6 @@
 
 mod160.hs:12:5:
-    Not in scope: `m3'
+    Not in scope: ‛m3’
     Perhaps you meant one of these:
-      `m1' (imported from Mod159_D), `m2' (imported from Mod159_D)
+      ‛m1’ (imported from Mod159_D), ‛m2’ (imported from Mod159_D)
 exit(1)

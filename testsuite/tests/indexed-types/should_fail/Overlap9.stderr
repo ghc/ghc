@@ -7,6 +7,6 @@ Overlap9.hs:11:7:
     Relevant bindings include
       g :: a -> F a (bound at Overlap9.hs:11:1)
       x :: a (bound at Overlap9.hs:11:3)
-    In the return type of a call of `length'
+    In the return type of a call of ‛length’
     In the expression: length (show x)
-    In an equation for `g': g x = length (show x)
+    In an equation for ‛g’: g x = length (show x)

@@ -1,13 +1,13 @@
 
-tcfail204.hs:10:15:
-    Warning: Defaulting the following constraint(s) to type `Double'
-               (Fractional a0) arising from the literal `6.3'
-                               at tcfail204.hs:10:15-17
-               (RealFrac a0) arising from a use of `ceiling'
-                             at tcfail204.hs:10:7-13
-    In the first argument of `ceiling', namely `6.3'
+tcfail204.hs:10:15: Warning:
+    Defaulting the following constraint(s) to type ‛Double’
+      (Fractional a0)
+        arising from the literal ‛6.3’ at tcfail204.hs:10:15-17
+      (RealFrac a0)
+        arising from a use of ‛ceiling’ at tcfail204.hs:10:7-13
+    In the first argument of ‛ceiling’, namely ‛6.3’
     In the expression: ceiling 6.3
-    In an equation for `foo': foo = ceiling 6.3
+    In an equation for ‛foo’: foo = ceiling 6.3
 
 <no location info>: 
 Failing due to -Werror.

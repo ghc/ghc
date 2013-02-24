@@ -1,6 +1,6 @@
 
 T7019.hs:14:10:
-    Malformed predicate `C c'
+    Malformed predicate ‛C c’
     In the context: (C c)
     While checking an instance declaration
-    In the instance declaration for `Monad (Free c)'
+    In the instance declaration for ‛Monad (Free c)’

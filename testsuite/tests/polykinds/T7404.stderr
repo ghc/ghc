@@ -1,4 +1,4 @@
 
 T7404.hs:4:1:
-    Kind variable also used as type variable: `x'
-    In the declaration for type family `Foo'
+    Kind variable also used as type variable: ‛x’
+    In the declaration for type family ‛Foo’

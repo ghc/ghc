@@ -1,23 +1,23 @@
 
 drvfail009.hs:10:31:
-    Can't make a derived instance of `C T1'
+    Can't make a derived instance of ‛C T1’
       (even with cunning newtype deriving):
-      `C' does not have arity 1
-    In the newtype declaration for `T1'
+      ‛C’ does not have arity 1
+    In the newtype declaration for ‛T1’
 
 drvfail009.hs:13:31:
-    Cannot derive well-kinded instance of form `Monad (T2 ...)'
-      Class `Monad' expects an argument of kind `* -> *'
-    In the newtype declaration for `T2'
+    Cannot derive well-kinded instance of form ‛Monad (T2 ...)’
+      Class ‛Monad’ expects an argument of kind ‛* -> *’
+    In the newtype declaration for ‛T2’
 
 drvfail009.hs:16:33:
-    Can't make a derived instance of `Monad T3'
+    Can't make a derived instance of ‛Monad T3’
       (even with cunning newtype deriving):
       cannot eta-reduce the representation type enough
-    In the newtype declaration for `T3'
+    In the newtype declaration for ‛T3’
 
 drvfail009.hs:19:42:
-    Can't make a derived instance of `Monad T4'
+    Can't make a derived instance of ‛Monad T4’
       (even with cunning newtype deriving):
       cannot eta-reduce the representation type enough
-    In the newtype declaration for `T4'
+    In the newtype declaration for ‛T4’

@@ -2,8 +2,8 @@
 T6054.hs:7:14:
     No instance for (Bar () '() a0)
       arising from an expression type signature
-    In the first argument of `print', namely
-      `(Proxy :: Bar () a => Proxy a)'
+    In the first argument of ‛print’, namely
+      ‛(Proxy :: Bar () a => Proxy a)’
     In the expression: print (Proxy :: Bar () a => Proxy a)
-    In an equation for `foo':
+    In an equation for ‛foo’:
         foo = print (Proxy :: Bar () a => Proxy a)

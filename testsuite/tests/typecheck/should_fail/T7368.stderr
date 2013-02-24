@@ -1,20 +1,20 @@
 
 T7368.hs:3:10:
-    Couldn't match kind `* -> *' with `*'
+    Couldn't match kind ‛* -> *’ with ‛*’
     When matching types
       c0 :: (* -> *) -> *
       (->) a0 :: * -> *
     Expected type: a0 -> b0
       Actual type: c0 b1
-    In the return type of a call of `l'
-    Probable cause: `l' is applied to too many arguments
-    In the first argument of `b', namely `(l ())'
+    In the return type of a call of ‛l’
+    Probable cause: ‛l’ is applied to too many arguments
+    In the first argument of ‛b’, namely ‛(l ())’
     In the expression: b (l ())
 
 T7368.hs:3:13:
-    Couldn't match type `()' with `b0 a1'
+    Couldn't match type ‛()’ with ‛b0 a1’
     Expected type: b1 a1
       Actual type: ()
-    In the first argument of `l', namely `()'
-    In the first argument of `b', namely `(l ())'
+    In the first argument of ‛l’, namely ‛()’
+    In the first argument of ‛b’, namely ‛(l ())’
     In the expression: b (l ())

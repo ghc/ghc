@@ -1,8 +1,8 @@
 
-T2806.hs:13:11:
-    Warning: Pattern bindings containing unlifted types should use an outermost bang pattern:
-               (I# _x) = 4
-    In an equation for `foo':
+T2806.hs:13:11: Warning:
+    Pattern bindings containing unlifted types should use an outermost bang pattern:
+      (I# _x) = 4
+    In an equation for ‛foo’:
         foo
           = 3
           where

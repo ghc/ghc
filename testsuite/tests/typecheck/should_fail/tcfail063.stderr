@@ -1,5 +1,5 @@
 
 tcfail063.hs:6:9:
-    Expecting one more argument to `Num'
-    Expected a constraint, but `Num' has kind `* -> Constraint'
-    In the type signature for `moby': moby :: Num => Int -> a -> Int
+    Expecting one more argument to ‛Num’
+    Expected a constraint, but ‛Num’ has kind ‛* -> Constraint’
+    In the type signature for ‛moby’: moby :: Num => Int -> a -> Int

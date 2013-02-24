@@ -1,4 +1,4 @@
 
 C.hs:7:11: Warning:
-    Rule "f/g" may never fire because `f' might inline first
-    Probable fix: add an INLINE[n] or NOINLINE[n] pragma on `f'
+    Rule "f/g" may never fire because ‛f’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma on ‛f’

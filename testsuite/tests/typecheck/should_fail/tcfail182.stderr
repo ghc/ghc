@@ -1,8 +1,8 @@
 
 tcfail182.hs:9:3:
-    Couldn't match expected type `Prelude.Maybe a'
-                with actual type `Maybe t0'
+    Couldn't match expected type ‛Prelude.Maybe a’
+                with actual type ‛Maybe t0’
     Relevant bindings include
       f :: Prelude.Maybe a -> Int (bound at tcfail182.hs:9:1)
     In the pattern: Foo
-    In an equation for `f': f Foo = 3
+    In an equation for ‛f’: f Foo = 3

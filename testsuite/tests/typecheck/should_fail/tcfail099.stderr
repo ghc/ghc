@@ -1,16 +1,16 @@
 
 tcfail099.hs:9:20:
-    Couldn't match expected type `a' with actual type `t'
-      because type variable `a' would escape its scope
+    Couldn't match expected type ‛a’ with actual type ‛t’
+      because type variable ‛a’ would escape its scope
     This (rigid, skolem) type variable is bound by
       a pattern with constructor
         C :: forall a. (a -> Int) -> DS,
-      in an equation for `call'
+      in an equation for ‛call’
       at tcfail099.hs:9:7-9
     Relevant bindings include
       call :: DS -> t -> Int (bound at tcfail099.hs:9:1)
       f :: a -> Int (bound at tcfail099.hs:9:9)
       arg :: t (bound at tcfail099.hs:9:12)
-    In the first argument of `f', namely `arg'
+    In the first argument of ‛f’, namely ‛arg’
     In the expression: f arg
-    In an equation for `call': call (C f) arg = f arg
+    In an equation for ‛call’: call (C f) arg = f arg

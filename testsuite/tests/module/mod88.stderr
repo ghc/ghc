@@ -1,2 +1,2 @@
 
-mod88.hs:5:5: Not in scope: data constructor `Prelude.Left'
+mod88.hs:5:5: Not in scope: data constructor ‛Prelude.Left’

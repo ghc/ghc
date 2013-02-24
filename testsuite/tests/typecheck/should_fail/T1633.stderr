@@ -1,5 +1,5 @@
 
 T1633.hs:6:18:
-    The first argument of `Functor' should have kind `* -> *',
-      but `Bool' has kind `*'
-    In the instance declaration for `Functor Bool'
+    The first argument of ‛Functor’ should have kind ‛* -> *’,
+      but ‛Bool’ has kind ‛*’
+    In the instance declaration for ‛Functor Bool’

@@ -1,7 +1,7 @@
 
 <interactive>:12:1:
     Unsafe overlapping instances for Pos [Int]
-      arising from a use of `res'
+      arising from a use of ‛res’
     The matching instance is:
       instance [overlap ok] [safe] Pos [Int]
         -- Defined at <interactive>:10:10
@@ -10,4 +10,4 @@
     overlaps the following instances from different modules:
       instance [overlap ok] [safe] Pos [a] -- Defined at P13_A.hs:6:10
     In the expression: res [1 :: Int, 2 :: Int]
-    In an equation for `it': it = res [1 :: Int, 2 :: Int]
+    In an equation for ‛it’: it = res [1 :: Int, 2 :: Int]

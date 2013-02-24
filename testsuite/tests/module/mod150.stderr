@@ -1,7 +1,7 @@
 
 mod150.hs:2:20:
-    Conflicting exports for `id':
-       `module Prelude' exports `Prelude.id'
-         imported from `Prelude' at mod150.hs:2:8
-         (and originally defined in `GHC.Base')
-       `module M' exports `M.id' defined at mod150.hs:2:42
+    Conflicting exports for ‛id’:
+       ‛module Prelude’ exports ‛Prelude.id’
+         imported from ‛Prelude’ at mod150.hs:2:8
+         (and originally defined in ‛GHC.Base’)
+       ‛module M’ exports ‛M.id’ defined at mod150.hs:2:42

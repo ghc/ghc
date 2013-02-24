@@ -3,7 +3,7 @@ GenericTemplate.hs:219:14: Warning:
     Pattern bindings containing unlifted types should use an outermost bang pattern:
       sts1@((HappyCons (st1@(action)) (_)))
         = happyDrop k (HappyCons (st) (sts))
-    In an equation for `happyMonadReduce':
+    In an equation for ‛happyMonadReduce’:
         happyMonadReduce k nt fn j tk st sts stk
           = happyThen1
               (fn stk tk)
@@ -17,7 +17,7 @@ GenericTemplate.hs:226:14: Warning:
     Pattern bindings containing unlifted types should use an outermost bang pattern:
       sts1@((HappyCons (st1@(action)) (_)))
         = happyDrop k (HappyCons (st) (sts))
-    In an equation for `happyMonad2Reduce':
+    In an equation for ‛happyMonad2Reduce’:
         happyMonad2Reduce k nt fn j tk st sts stk
           = happyThen1
               (fn stk tk)

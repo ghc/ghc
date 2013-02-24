@@ -1,5 +1,5 @@
 
 rnfail002.hs:6:1:
-    Multiple declarations of `y'
+    Multiple declarations of ‛y’
     Declared at: rnfail002.hs:5:1
                  rnfail002.hs:6:1

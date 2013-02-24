@@ -1,5 +1,5 @@
 
-rn039.hs:6:16:
-    Warning: This binding for `-' shadows the existing binding
-               imported from `Prelude' at rn039.hs:2:8-20
-               (and originally defined in `GHC.Num')
+rn039.hs:6:16: Warning:
+    This binding for ‛-’ shadows the existing binding
+      imported from ‛Prelude’ at rn039.hs:2:8-20
+      (and originally defined in ‛GHC.Num’)

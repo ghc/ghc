@@ -4,7 +4,7 @@
 
 SafeLang10.hs:8:13:
     Unsafe overlapping instances for Pos [Int]
-      arising from a use of `res'
+      arising from a use of ‛res’
     The matching instance is:
       instance [overlap ok] [safe] Pos [Int]
         -- Defined at SafeLang10_B.hs:14:10
@@ -13,7 +13,7 @@ SafeLang10.hs:8:13:
     overlaps the following instances from different modules:
       instance Pos [a] -- Defined at SafeLang10_A.hs:13:10
     In the expression: res [(1 :: Int)]
-    In an equation for `r': r = res [(1 :: Int)]
+    In an equation for ‛r’: r = res [(1 :: Int)]
     In the expression:
       do { let r = res ...;
            putStrLn $ "Result: " ++ show r;

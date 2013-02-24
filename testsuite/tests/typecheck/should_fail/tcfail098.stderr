@@ -5,6 +5,6 @@ tcfail098.hs:12:10:
     from the context (Bar a)
       bound by an instance declaration: Bar a => Bar Bool
       at tcfail098.hs:12:10-26
-    The type variable `a0' is ambiguous
+    The type variable ‛a0’ is ambiguous
     In the ambiguity check for: forall a. Bar a => Bar Bool
-    In the instance declaration for `Bar Bool'
+    In the instance declaration for ‛Bar Bool’

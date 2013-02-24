@@ -1,7 +1,7 @@
 [1 of 2] Compiling UnsafeInfered11_A ( UnsafeInfered11_A.hs, UnsafeInfered11_A.o )
 
 UnsafeInfered11_A.hs:1:16: Warning:
-    `UnsafeInfered11_A' has been inferred as unsafe!
+    ‛UnsafeInfered11_A’ has been inferred as unsafe!
     Reason:
         UnsafeInfered11_A.hs:17:11: Warning:
             Rule "lookupx/T" ignored

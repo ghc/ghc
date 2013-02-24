@@ -1,18 +1,18 @@
 class Num a where
   (+) :: a -> a -> a
   ...
-  	-- Defined in `GHC.Num'
+  	-- Defined in ‛GHC.Num’
 infixl 6 +
 class Num a where
   (+) :: a -> a -> a
   ...
-  	-- Defined in `GHC.Num'
+  	-- Defined in ‛GHC.Num’
 infixl 6 +
 data Data.Complex.Complex a = !a Data.Complex.:+ !a
-  	-- Defined in `Data.Complex'
+  	-- Defined in ‛Data.Complex’
 infix 6 Data.Complex.:+
 data Data.Complex.Complex a = !a Data.Complex.:+ !a
-  	-- Defined in `Data.Complex'
+  	-- Defined in ‛Data.Complex’
 infix 6 Data.Complex.:+
 class (RealFrac a, Floating a) => RealFloat a where
   floatRadix :: a -> Integer
@@ -29,8 +29,8 @@ class (RealFrac a, Floating a) => RealFloat a where
   isNegativeZero :: a -> Bool
   isIEEE :: a -> Bool
   atan2 :: a -> a -> a
-  	-- Defined in `GHC.Float'
-instance RealFloat Float -- Defined in `GHC.Float'
-instance RealFloat Double -- Defined in `GHC.Float'
+  	-- Defined in ‛GHC.Float’
+instance RealFloat Float -- Defined in ‛GHC.Float’
+instance RealFloat Double -- Defined in ‛GHC.Float’
 Data.List.isPrefixOf :: Eq a => [a] -> [a] -> Bool
-  	-- Defined in `Data.List'
+  	-- Defined in ‛Data.List’

@@ -7,6 +7,6 @@ readFail042.hs:11:9:
     Unexpected transform statement in a list comprehension
     Use -XTransformListComp
 
-readFail042.hs:11:23: Not in scope: `by'
+readFail042.hs:11:23: Not in scope: ‛by’
 
-readFail042.hs:11:26: Not in scope: `x'
+readFail042.hs:11:26: Not in scope: ‛x’

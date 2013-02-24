@@ -1,64 +1,64 @@
 
 T5684.hs:25:12:
-    No instance for (A b6) arising from a use of `op'
+    No instance for (A b6) arising from a use of ‛op’
     In the expression: op True undefined
     In the expression:
       [op False False, op 'c' undefined, op True undefined]
-    In an equation for `flop1':
+    In an equation for ‛flop1’:
         flop1 = [op False False, op 'c' undefined, op True undefined]
 
 T5684.hs:30:12:
-    No instance for (A b5) arising from a use of `op'
+    No instance for (A b5) arising from a use of ‛op’
     In the expression: op True undefined
     In the expression:
       [op False False, op True undefined, op 'c' undefined]
-    In an equation for `flop2':
+    In an equation for ‛flop2’:
         flop2 = [op False False, op True undefined, op 'c' undefined]
 
 T5684.hs:36:12:
-    No instance for (A b4) arising from a use of `op'
+    No instance for (A b4) arising from a use of ‛op’
     In the expression: op True undefined
     In the expression:
       [op 'c' undefined, op True undefined, op False False]
-    In an equation for `flop3':
+    In an equation for ‛flop3’:
         flop3 = [op 'c' undefined, op True undefined, op False False]
 
 T5684.hs:42:12:
-    No instance for (A b3) arising from a use of `op'
+    No instance for (A b3) arising from a use of ‛op’
     In the expression: op True undefined
     In the expression:
       [op 'c' undefined, op False False, op True undefined]
-    In an equation for `flop4':
+    In an equation for ‛flop4’:
         flop4 = [op 'c' undefined, op False False, op True undefined]
 
 T5684.hs:46:12:
-    No instance for (A b2) arising from a use of `op'
+    No instance for (A b2) arising from a use of ‛op’
     In the expression: op True undefined
     In the expression:
       [op True undefined, op 'c' undefined, op False False]
-    In an equation for `flop5':
+    In an equation for ‛flop5’:
         flop5 = [op True undefined, op 'c' undefined, op False False]
 
 T5684.hs:52:12:
-    No instance for (A b0) arising from a use of `op'
+    No instance for (A b0) arising from a use of ‛op’
     In the expression: op True undefined
     In the expression:
       [op True undefined, op False False, op 'c' undefined]
-    In an equation for `flop6':
+    In an equation for ‛flop6’:
         flop6 = [op True undefined, op False False, op 'c' undefined]
 
 T5684.hs:53:12:
-    No instance for (A Bool) arising from a use of `op'
+    No instance for (A Bool) arising from a use of ‛op’
     In the expression: op False False
     In the expression:
       [op True undefined, op False False, op 'c' undefined]
-    In an equation for `flop6':
+    In an equation for ‛flop6’:
         flop6 = [op True undefined, op False False, op 'c' undefined]
 
 T5684.hs:54:12:
-    No instance for (B Char b1) arising from a use of `op'
+    No instance for (B Char b1) arising from a use of ‛op’
     In the expression: op 'c' undefined
     In the expression:
       [op True undefined, op False False, op 'c' undefined]
-    In an equation for `flop6':
+    In an equation for ‛flop6’:
         flop6 = [op True undefined, op False False, op 'c' undefined]

@@ -1,4 +1,4 @@
 
-Class3.hs:7:10:
-    Warning: No explicit method or default declaration for `foo'
-    In the instance declaration for `C ()'
+Class3.hs:7:10: Warning:
+    No explicit method or default declaration for ‛foo’
+    In the instance declaration for ‛C ()’

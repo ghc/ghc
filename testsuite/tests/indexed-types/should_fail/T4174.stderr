@@ -1,7 +1,7 @@
 
 T4174.hs:42:12:
-    Couldn't match type `False' with `True'
+    Couldn't match type ‛False’ with ‛True’
     Expected type: True
       Actual type: GHCVersion (WayOf m) :>=: GHC6'10 Minor1
     In the expression: sync_large_objects
-    In an equation for `testcase': testcase = sync_large_objects
+    In an equation for ‛testcase’: testcase = sync_large_objects

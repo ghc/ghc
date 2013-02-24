@@ -1,6 +1,6 @@
 
 T7410.hs:3:9:
-    Expecting one more argument to `Either Int'
-    The first argument of a tuple should have kind `*',
-      but `Either Int' has kind `* -> *'
-    In the type signature for `foo': foo :: (Either Int, Int)
+    Expecting one more argument to ‛Either Int’
+    The first argument of a tuple should have kind ‛*’,
+      but ‛Either Int’ has kind ‛* -> *’
+    In the type signature for ‛foo’: foo :: (Either Int, Int)

@@ -1,4 +1,4 @@
 
 mod17.hs:2:10:
-    The export item `C(m1, m2, m3, Left)'
+    The export item ‛C(m1, m2, m3, Left)’
     attempts to export constructors or class methods that are not visible here

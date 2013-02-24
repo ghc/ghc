@@ -2,5 +2,5 @@
 T5957.hs:3:9:
     Illegal polymorphic or qualified type: Show a => a -> String
     Perhaps you intended to use -XRankNTypes or -XRank2Types
-    In the type signature for `flex':
+    In the type signature for ‛flex’:
       flex :: Int -> Show a => a -> String

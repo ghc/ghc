@@ -1,8 +1,8 @@
 
-rn046.hs:2:1:
-    Warning: The import of `Data.List' is redundant
-               except perhaps to import instances from `Data.List'
-             To import instances alone, use: import Data.List()
+rn046.hs:2:1: Warning:
+    The import of ‛Data.List’ is redundant
+      except perhaps to import instances from ‛Data.List’
+    To import instances alone, use: import Data.List()
 
-rn046.hs:3:1:
-    Warning: The import of `ord' from module `Data.Char' is redundant
+rn046.hs:3:1: Warning:
+    The import of ‛ord’ from module ‛Data.Char’ is redundant

@@ -1,34 +1,34 @@
 
-T2245.hs:4:10:
-    Warning: No explicit method or default declaration for `+'
-    In the instance declaration for `Num T'
+T2245.hs:4:10: Warning:
+    No explicit method or default declaration for ‛+’
+    In the instance declaration for ‛Num T’
 
-T2245.hs:4:10:
-    Warning: No explicit method or default declaration for `*'
-    In the instance declaration for `Num T'
+T2245.hs:4:10: Warning:
+    No explicit method or default declaration for ‛*’
+    In the instance declaration for ‛Num T’
 
-T2245.hs:4:10:
-    Warning: No explicit method or default declaration for `abs'
-    In the instance declaration for `Num T'
+T2245.hs:4:10: Warning:
+    No explicit method or default declaration for ‛abs’
+    In the instance declaration for ‛Num T’
 
-T2245.hs:4:10:
-    Warning: No explicit method or default declaration for `signum'
-    In the instance declaration for `Num T'
+T2245.hs:4:10: Warning:
+    No explicit method or default declaration for ‛signum’
+    In the instance declaration for ‛Num T’
 
-T2245.hs:4:10:
-    Warning: No explicit method or default declaration for `fromInteger'
-    In the instance declaration for `Num T'
+T2245.hs:4:10: Warning:
+    No explicit method or default declaration for ‛fromInteger’
+    In the instance declaration for ‛Num T’
 
-T2245.hs:5:10:
-    Warning: No explicit method or default declaration for `fromRational'
-    In the instance declaration for `Fractional T'
+T2245.hs:5:10: Warning:
+    No explicit method or default declaration for ‛fromRational’
+    In the instance declaration for ‛Fractional T’
 
-T2245.hs:7:29:
-    Warning: Defaulting the following constraint(s) to type `T'
-               (Fractional b0)
-                 arising from the literal `1e400' at T2245.hs:7:29-33
-               (Ord b0) arising from a use of `<' at T2245.hs:7:27
-               (Read b0) arising from a use of `read' at T2245.hs:7:38-41
-    In the second argument of `(<)', namely `1e400'
-    In the first argument of `(.)', namely `(< 1e400)'
-    In the second argument of `(.)', namely `(< 1e400) . read'
+T2245.hs:7:29: Warning:
+    Defaulting the following constraint(s) to type ‛T’
+      (Fractional b0)
+        arising from the literal ‛1e400’ at T2245.hs:7:29-33
+      (Ord b0) arising from a use of ‛<’ at T2245.hs:7:27
+      (Read b0) arising from a use of ‛read’ at T2245.hs:7:38-41
+    In the second argument of ‛(<)’, namely ‛1e400’
+    In the first argument of ‛(.)’, namely ‛(< 1e400)’
+    In the second argument of ‛(.)’, namely ‛(< 1e400) . read’

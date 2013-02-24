@@ -1,7 +1,7 @@
 
 Overlap6.hs:16:7:
-    Couldn't match type `x' with `And x 'True'
-      `x' is a rigid type variable bound by
+    Couldn't match type ‛x’ with ‛And x 'True’
+      ‛x’ is a rigid type variable bound by
           the type signature for
             g :: Proxy Bool x -> Proxy Bool (And x 'True)
           at Overlap6.hs:15:6
@@ -12,4 +12,4 @@ Overlap6.hs:16:7:
         (bound at Overlap6.hs:16:1)
       x :: Proxy Bool x (bound at Overlap6.hs:16:3)
     In the expression: x
-    In an equation for `g': g x = x
+    In an equation for ‛g’: g x = x

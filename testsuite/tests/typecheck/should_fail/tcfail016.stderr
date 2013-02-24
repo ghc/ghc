@@ -1,24 +1,24 @@
 
 tcfail016.hs:9:20:
-    Couldn't match type `(t, Expr t)' with `Expr t'
+    Couldn't match type ‛(t, Expr t)’ with ‛Expr t’
     Expected type: Expr t
       Actual type: AnnExpr t
     Relevant bindings include
       g :: Expr t -> [[Char]] (bound at tcfail016.hs:8:1)
       e1 :: AnnExpr t (bound at tcfail016.hs:9:8)
       e2 :: AnnExpr t (bound at tcfail016.hs:9:11)
-    In the first argument of `g', namely `e1'
-    In the first argument of `(++)', namely `(g e1)'
+    In the first argument of ‛g’, namely ‛e1’
+    In the first argument of ‛(++)’, namely ‛(g e1)’
     In the expression: (g e1) ++ (g e2)
 
 tcfail016.hs:9:28:
-    Couldn't match type `(t, Expr t)' with `Expr t'
+    Couldn't match type ‛(t, Expr t)’ with ‛Expr t’
     Expected type: Expr t
       Actual type: AnnExpr t
     Relevant bindings include
       g :: Expr t -> [[Char]] (bound at tcfail016.hs:8:1)
       e1 :: AnnExpr t (bound at tcfail016.hs:9:8)
       e2 :: AnnExpr t (bound at tcfail016.hs:9:11)
-    In the first argument of `g', namely `e2'
-    In the second argument of `(++)', namely `(g e2)'
+    In the first argument of ‛g’, namely ‛e2’
+    In the second argument of ‛(++)’, namely ‛(g e2)’
     In the expression: (g e1) ++ (g e2)

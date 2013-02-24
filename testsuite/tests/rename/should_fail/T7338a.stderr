@@ -1,10 +1,10 @@
 
 T7338a.hs:7:4:
-    Duplicate type signatures for `a'
+    Duplicate type signatures for ‛a’
     at T7338a.hs:3:1
        T7338a.hs:7:4
 
 T7338a.hs:10:1:
-    Duplicate type signatures for `c'
+    Duplicate type signatures for ‛c’
     at T7338a.hs:7:1
        T7338a.hs:10:1

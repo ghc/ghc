@@ -1,5 +1,5 @@
 
 T5589.hs:4:1:
-    Duplicate type signatures for `aaa'
+    Duplicate type signatures for ‛aaa’
     at T5589.hs:3:6-8
        T5589.hs:4:1-3

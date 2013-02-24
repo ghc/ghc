@@ -1,4 +1,4 @@
 
 Dep02.hs:15:17: Warning:
-    In the use of `unsafeIOToST' (imported from Control.Monad.ST.Lazy):
+    In the use of ‛unsafeIOToST’ (imported from Control.Monad.ST.Lazy):
     Deprecated: "Please import from Control.Monad.ST.Lazy.Unsafe instead; This will be removed in the next release"

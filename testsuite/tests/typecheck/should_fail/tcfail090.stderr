@@ -1,8 +1,8 @@
 
 tcfail090.hs:8:9:
-    Couldn't match kind `*' with `#'
+    Couldn't match kind ‛*’ with ‛#’
     When matching types
       a0 :: *
       ByteArray# :: #
     In the expression: undefined
-    In an equation for `die': die _ = undefined
+    In an equation for ‛die’: die _ = undefined

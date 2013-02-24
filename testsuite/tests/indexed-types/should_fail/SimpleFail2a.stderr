@@ -1,6 +1,6 @@
 
 SimpleFail2a.hs:11:3:
     Type indexes must match class instance head
-    Found `a' but expected `Int'
-    In the data instance declaration for `Sd'
-    In the instance declaration for `C Int'
+    Found ‛a’ but expected ‛Int’
+    In the data instance declaration for ‛Sd’
+    In the instance declaration for ‛C Int’

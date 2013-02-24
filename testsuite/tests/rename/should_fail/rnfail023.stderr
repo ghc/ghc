@@ -1,9 +1,9 @@
 
 rnfail023.hs:7:1:
-    The type signature for `f' lacks an accompanying binding
+    The type signature for ‛f’ lacks an accompanying binding
 
 rnfail023.hs:8:12:
-    The INLINE pragma for `f' lacks an accompanying binding
+    The INLINE pragma for ‛f’ lacks an accompanying binding
 
 rnfail023.hs:14:7:
-    The type signature for `g' lacks an accompanying binding
+    The type signature for ‛g’ lacks an accompanying binding

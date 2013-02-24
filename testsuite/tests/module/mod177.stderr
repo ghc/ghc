@@ -1,5 +1,5 @@
 
-mod177.hs:4:1:
-    Warning: The import of `Data.Maybe' is redundant
-               except perhaps to import instances from `Data.Maybe'
-             To import instances alone, use: import Data.Maybe()
+mod177.hs:4:1: Warning:
+    The import of ‛Data.Maybe’ is redundant
+      except perhaps to import instances from ‛Data.Maybe’
+    To import instances alone, use: import Data.Maybe()

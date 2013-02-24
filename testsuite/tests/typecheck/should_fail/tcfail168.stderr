@@ -1,7 +1,7 @@
 
 tcfail168.hs:7:11:
-    Couldn't match expected type `IO a0'
-                with actual type `Char -> IO ()'
+    Couldn't match expected type ‛IO a0’
+                with actual type ‛Char -> IO ()’
     In a stmt of a 'do' block: putChar
     In the expression:
       do { putChar;
@@ -9,7 +9,7 @@ tcfail168.hs:7:11:
            putChar 'a';
            putChar 'a';
            .... }
-    In an equation for `foo':
+    In an equation for ‛foo’:
         foo
           = do { putChar;
                  putChar 'a';

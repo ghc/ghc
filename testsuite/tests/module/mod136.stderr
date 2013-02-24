@@ -1,6 +1,6 @@
 
 mod136.hs:6:5:
-    Not in scope: `zipWith5'
+    Not in scope: ‛zipWith5’
     Perhaps you meant one of these:
-      `zipWith' (imported from Mod136_A),
-      `zipWith3' (imported from Mod136_A)
+      ‛zipWith’ (imported from Mod136_A),
+      ‛zipWith3’ (imported from Mod136_A)

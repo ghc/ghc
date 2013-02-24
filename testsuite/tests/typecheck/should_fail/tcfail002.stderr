@@ -5,4 +5,4 @@ tcfail002.hs:4:7:
       c :: [t] -> t (bound at tcfail002.hs:3:1)
       z :: [t] (bound at tcfail002.hs:4:3)
     In the expression: z
-    In an equation for `c': c z = z
+    In an equation for ‛c’: c z = z

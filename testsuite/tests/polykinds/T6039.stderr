@@ -1,4 +1,4 @@
 
 T6039.hs:5:14:
-    Kind variable `j' cannot appear in a function position
-    In the kind `j k'
+    Kind variable ‛j’ cannot appear in a function position
+    In the kind ‛j k’

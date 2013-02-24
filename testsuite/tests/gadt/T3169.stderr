@@ -3,7 +3,7 @@ T3169.hs:13:22:
     Could not deduce (elt ~ Map b elt)
     from the context (Key a, Key b)
       bound by the instance declaration at T3169.hs:10:10-36
-      `elt' is a rigid type variable bound by
+      ‛elt’ is a rigid type variable bound by
             the type signature for
               lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
             at T3169.hs:12:3
@@ -14,7 +14,7 @@ T3169.hs:13:22:
         (bound at T3169.hs:12:3)
       b :: b (bound at T3169.hs:12:13)
       m :: Map (a, b) elt (bound at T3169.hs:12:17)
-    In the second argument of `lookup', namely `m'
+    In the second argument of ‛lookup’, namely ‛m’
     In the expression: lookup a m :: Maybe (Map b elt)
     In the expression:
       case lookup a m :: Maybe (Map b elt) of {

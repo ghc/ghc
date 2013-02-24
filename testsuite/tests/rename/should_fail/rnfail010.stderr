@@ -1,5 +1,5 @@
 
 rnfail010.hs:6:1:
-    Multiple declarations of `f'
+    Multiple declarations of ‛f’
     Declared at: rnfail010.hs:2:1
                  rnfail010.hs:6:1

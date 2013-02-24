@@ -1,6 +1,6 @@
 
 annfail07.hs:9:17:
-    Couldn't match expected type `[a0]' with actual type `Bool'
-    In the first argument of `head', namely `True'
+    Couldn't match expected type ‛[a0]’ with actual type ‛Bool’
+    In the first argument of ‛head’, namely ‛True’
     In the expression: (head True)
     In the annotation: {-# ANN f (head True) #-}

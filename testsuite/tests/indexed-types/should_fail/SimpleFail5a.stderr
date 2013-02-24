@@ -1,7 +1,7 @@
 
 SimpleFail5a.hs:31:11:
-    Couldn't match type `a' with `Int'
-      `a' is a rigid type variable bound by
+    Couldn't match type ‛a’ with ‛Int’
+      ‛a’ is a rigid type variable bound by
           the type signature for bar3wrong :: S3 a -> a
           at SimpleFail5a.hs:30:14
     Expected type: S3 a
@@ -9,4 +9,4 @@ SimpleFail5a.hs:31:11:
     Relevant bindings include
       bar3wrong :: S3 a -> a (bound at SimpleFail5a.hs:31:1)
     In the pattern: D3Int
-    In an equation for `bar3wrong': bar3wrong D3Int = 1
+    In an equation for ‛bar3wrong’: bar3wrong D3Int = 1

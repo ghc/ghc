@@ -1,5 +1,5 @@
 
 GenCannotDoRep1_6.hs:9:43:
-    Can't make a derived instance of `Generic1 T':
-      Constructor `T' must use the last type parameter only as the last argument of a data type, newtype, or (->)
-    In the data declaration for `T'
+    Can't make a derived instance of ‛Generic1 T’:
+      Constructor ‛T’ must use the last type parameter only as the last argument of a data type, newtype, or (->)
+    In the data declaration for ‛T’

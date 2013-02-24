@@ -1,32 +1,32 @@
 
 T5300.hs:11:7:
     Could not deduce (C1 a b c0)
-      arising from the ambiguity check for `f1'
+      arising from the ambiguity check for ‛f1’
     from the context (Monad m, C1 a b c)
       bound by the type signature for
                  f1 :: (Monad m, C1 a b c) => a -> StateT (T b) m a
       at T5300.hs:11:7-50
-    The type variable `c0' is ambiguous
+    The type variable ‛c0’ is ambiguous
     In the ambiguity check for:
       forall a b (m :: * -> *) c.
       (Monad m, C1 a b c) =>
       a -> StateT (T b) m a
-    In the type signature for `f1':
+    In the type signature for ‛f1’:
       f1 :: (Monad m, C1 a b c) => a -> StateT (T b) m a
 
 T5300.hs:14:7:
     Could not deduce (C1 a1 b1 c10)
-      arising from the ambiguity check for `f2'
+      arising from the ambiguity check for ‛f2’
     from the context (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
       bound by the type signature for
                  f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
                        a1 -> StateT (T b2) m a2
       at T5300.hs:14:7-69
-    The type variable `c10' is ambiguous
+    The type variable ‛c10’ is ambiguous
     In the ambiguity check for:
       forall a1 b2 (m :: * -> *) a2 b1 c1 c2.
       (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
       a1 -> StateT (T b2) m a2
-    In the type signature for `f2':
+    In the type signature for ‛f2’:
       f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
             a1 -> StateT (T b2) m a2

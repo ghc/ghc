@@ -1,7 +1,7 @@
 
 tcfail198.hs:6:36:
-    Couldn't match expected type `a1' with actual type `a'
-      because type variable `a1' would escape its scope
+    Couldn't match expected type ‛a1’ with actual type ‛a’
+      because type variable ‛a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       an expression type signature: a1
       at tcfail198.hs:6:36-41
@@ -10,5 +10,5 @@ tcfail198.hs:6:36:
       x :: a (bound at tcfail198.hs:6:19)
       xs :: [a] (bound at tcfail198.hs:6:21)
     In the expression: x :: a
-    In the second argument of `(++)', namely `[x :: a]'
+    In the second argument of ‛(++)’, namely ‛[x :: a]’
     In the expression: xs ++ [x :: a]

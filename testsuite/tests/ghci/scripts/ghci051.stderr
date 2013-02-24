@@ -1,7 +1,7 @@
 
 <interactive>:7:9:
-    Couldn't match type `T' with `main::Interactive.T'
+    Couldn't match type ‛T’ with ‛main::Interactive.T’
     Expected type: T'
       Actual type: T
     In the expression: C :: T'
-    In an equation for `c': c = C :: T'
+    In an equation for ‛c’: c = C :: T'

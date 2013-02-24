@@ -4,12 +4,12 @@ tcfail164.hs:11:5:
       Specify the type by giving a type signature
       e.g. (tagToEnum# x) :: Bool
     In the expression: tagToEnum# 0#
-    In an equation for `f': f = tagToEnum# 0#
+    In an equation for ‛f’: f = tagToEnum# 0#
 
 tcfail164.hs:17:34:
     Bad call to tagToEnum# at type Int
       Result type must be an enumeration type
     In the expression: tagToEnum# value#
-    In an equation for `readUnboxable':
+    In an equation for ‛readUnboxable’:
         readUnboxable (I# value#) = tagToEnum# value#
-    In the instance declaration for `Unboxable Int'
+    In the instance declaration for ‛Unboxable Int’

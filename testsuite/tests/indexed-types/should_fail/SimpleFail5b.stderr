@@ -1,7 +1,7 @@
 
 SimpleFail5b.hs:31:12:
-    Couldn't match type `Char' with `Int'
+    Couldn't match type ‛Char’ with ‛Int’
     Expected type: S3 Int
       Actual type: S3 Char
     In the pattern: D3Char
-    In an equation for bar3wrong': bar3wrong' D3Char = 'a'
+    In an equation for ‛bar3wrong'’: bar3wrong' D3Char = 'a'

@@ -1,8 +1,8 @@
 
-tcfail061.hs:5:17: Not in scope: type variable `b'
+tcfail061.hs:5:17: Not in scope: type variable ‛b’
 
-tcfail061.hs:5:19: Not in scope: type variable `b'
+tcfail061.hs:5:19: Not in scope: type variable ‛b’
 
-tcfail061.hs:11:22: Not in scope: type variable `b'
+tcfail061.hs:11:22: Not in scope: type variable ‛b’
 
-tcfail061.hs:11:24: Not in scope: type variable `b'
+tcfail061.hs:11:24: Not in scope: type variable ‛b’

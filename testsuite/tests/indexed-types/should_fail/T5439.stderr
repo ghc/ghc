@@ -1,7 +1,7 @@
 
 T5439.hs:83:28:
-    Couldn't match type `Attempt t0 -> Attempt (HElemOf l0)'
-                  with `Attempt (HElemOf rs)'
+    Couldn't match type ‛Attempt t0 -> Attempt (HElemOf l0)’
+                  with ‛Attempt (HElemOf rs)’
     Expected type: f (Attempt (HNth n0 l0) -> Attempt (HElemOf l0))
       Actual type: f (Attempt (WaitOpResult (WaitOps rs)))
     Relevant bindings include
@@ -13,16 +13,16 @@ T5439.hs:83:28:
         (bound at T5439.hs:62:22)
       register :: Bool -> Peano n -> WaitOps (HDrop n rs) -> IO Bool
         (bound at T5439.hs:65:9)
-    In the first argument of `complete', namely `ev'
+    In the first argument of ‛complete’, namely ‛ev’
     In the expression: complete ev
     In a stmt of a 'do' block:
       c <- complete ev $ inj $ Failure (e :: SomeException)
 
 T5439.hs:83:39:
-    Couldn't match expected type `Peano n0'
-                with actual type `Attempt α0'
-    In the return type of a call of `Failure'
-    In the second argument of `($)', namely
-      `Failure (e :: SomeException)'
-    In the second argument of `($)', namely
-      `inj $ Failure (e :: SomeException)'
+    Couldn't match expected type ‛Peano n0’
+                with actual type ‛Attempt α0’
+    In the return type of a call of ‛Failure’
+    In the second argument of ‛($)’, namely
+      ‛Failure (e :: SomeException)’
+    In the second argument of ‛($)’, namely
+      ‛inj $ Failure (e :: SomeException)’

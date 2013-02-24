@@ -1,2 +1,2 @@
 
-rnfail008.hs:18:9: `op3' is not a (visible) method of class `K'
+rnfail008.hs:18:9: ‛op3’ is not a (visible) method of class ‛K’

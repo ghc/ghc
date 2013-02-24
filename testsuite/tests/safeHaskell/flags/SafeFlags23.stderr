@@ -1,6 +1,6 @@
 
 SafeFlags23.hs:1:16: Warning:
-    `SafeFlags22' has been inferred as unsafe!
+    ‛SafeFlags22’ has been inferred as unsafe!
     Reason:
         SafeFlags23.hs:7:1:
             System.IO.Unsafe: Can't be safely imported!

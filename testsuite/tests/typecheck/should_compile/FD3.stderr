@@ -1,7 +1,7 @@
 
 FD3.hs:15:15:
-    Couldn't match type `a' with `(String, a)'
-      `a' is a rigid type variable bound by
+    Couldn't match type ‛a’ with ‛(String, a)’
+      ‛a’ is a rigid type variable bound by
           the type signature for translate :: (String, a) -> A a
           at FD3.hs:14:14
     Relevant bindings include
@@ -9,8 +9,8 @@ FD3.hs:15:15:
       a :: (String, a) (bound at FD3.hs:15:11)
     When using functional dependencies to combine
       MkA a a,
-        arising from the dependency `a -> b'
+        arising from the dependency ‛a -> b’
         in the instance declaration at FD3.hs:12:10
-      MkA (String, a) a, arising from a use of `mkA' at FD3.hs:15:15-17
+      MkA (String, a) a, arising from a use of ‛mkA’ at FD3.hs:15:15-17
     In the expression: mkA a
-    In an equation for `translate': translate a = mkA a
+    In an equation for ‛translate’: translate a = mkA a

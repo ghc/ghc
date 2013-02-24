@@ -2,4 +2,4 @@
 tcfail106.hs:14:10:
     No instance for (S Int)
       arising from the superclasses of an instance declaration
-    In the instance declaration for `D Int'
+    In the instance declaration for ‛D Int’

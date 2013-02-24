@@ -1,6 +1,6 @@
 
 tcfail003.hs:3:10:
-    No instance for (Num Char) arising from the literal `1'
+    No instance for (Num Char) arising from the literal ‛1’
     In the expression: 1
     In the expression: [1, 'a']
     In a pattern binding: (d : e) = [1, 'a']

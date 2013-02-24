@@ -1,4 +1,4 @@
 
-T2723.hs:15:5:
-    Warning: This binding for `field3' shadows the existing binding
-               defined at T2723.hs:7:1
+T2723.hs:15:5: Warning:
+    This binding for ‛field3’ shadows the existing binding
+      defined at T2723.hs:7:1

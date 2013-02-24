@@ -1,8 +1,8 @@
 
 tcfail027.hs:4:1:
     Cycle in class declaration (via superclasses): A -> B -> A
-    In the class declaration for `A'
+    In the class declaration for ‛A’
 
 tcfail027.hs:7:1:
     Cycle in class declaration (via superclasses): B -> A -> B
-    In the class declaration for `B'
+    In the class declaration for ‛B’

@@ -1,27 +1,27 @@
 
 <interactive>:7:4:
-    Couldn't match expected type `main::Interactive.Planet'
-                with actual type `Planet'
-    In the first argument of `pn', namely `Mercury'
+    Couldn't match expected type ‛main::Interactive.Planet’
+                with actual type ‛Planet’
+    In the first argument of ‛pn’, namely ‛Mercury’
     In the expression: pn Mercury
-    In an equation for `it': it = pn Mercury
+    In an equation for ‛it’: it = pn Mercury
 
 <interactive>:8:4:
-    Couldn't match expected type `main::Interactive.Planet'
-                with actual type `Planet'
-    In the first argument of `pn', namely `Venus'
+    Couldn't match expected type ‛main::Interactive.Planet’
+                with actual type ‛Planet’
+    In the first argument of ‛pn’, namely ‛Venus’
     In the expression: pn Venus
-    In an equation for `it': it = pn Venus
+    In an equation for ‛it’: it = pn Venus
 
 <interactive>:9:4:
-    Couldn't match expected type `main::Interactive.Planet'
-                with actual type `Planet'
-    In the first argument of `pn', namely `Mars'
+    Couldn't match expected type ‛main::Interactive.Planet’
+                with actual type ‛Planet’
+    In the first argument of ‛pn’, namely ‛Mars’
     In the expression: pn Mars
-    In an equation for `it': it = pn Mars
+    In an equation for ‛it’: it = pn Mars
 
 <interactive>:11:44:
-    Couldn't match expected type `Planet'
-                with actual type `main::Interactive.Planet'
+    Couldn't match expected type ‛Planet’
+                with actual type ‛main::Interactive.Planet’
     In the pattern: Earth
-    In an equation for `pn': pn Earth = "E"
+    In an equation for ‛pn’: pn Earth = "E"

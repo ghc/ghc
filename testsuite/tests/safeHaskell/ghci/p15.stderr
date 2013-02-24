@@ -1,9 +1,9 @@
 
 Top level: Warning:
-    Module `Data.OldTypeable' is deprecated: Use Data.Typeable instead
+    Module ‛Data.OldTypeable’ is deprecated: Use Data.Typeable instead
 
 <interactive>:10:36: Warning:
-    In the use of type constructor or class `Typeable'
+    In the use of type constructor or class ‛Typeable’
     (imported from Data.OldTypeable, but defined in Data.OldTypeable.Internal):
     Deprecated: "Use Data.Typeable.Internal instead"
 
@@ -11,8 +11,8 @@ Top level: Warning:
     Can't create hand written instances of Typeable in Safe Haskell! Can only derive them
 
 <interactive>:22:22:
-    No instance for (Typeable G) arising from a use of `cast'
+    No instance for (Typeable G) arising from a use of ‛cast’
     In the expression: (cast y) :: Maybe H
     In a pattern binding: (Just y_as_H) = (cast y) :: Maybe H
 
-<interactive>:23:1: Not in scope: `y_as_H'
+<interactive>:23:1: Not in scope: ‛y_as_H’

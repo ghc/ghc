@@ -1,2 +1,2 @@
 
-tcfail050.hs:3:7: Not in scope: data constructor `B'
+tcfail050.hs:3:7: Not in scope: data constructor ‛B’

@@ -1,5 +1,5 @@
 
 GenCannotDoRep1_7.hs:11:29:
-    Can't make a derived instance of `Generic1 T':
+    Can't make a derived instance of ‛Generic1 T’:
       must not apply type constructors that cannot be represented with `Rep1' (such as `B') to arguments that involve the last type parameter
-    In the data declaration for `T'
+    In the data declaration for ‛T’
