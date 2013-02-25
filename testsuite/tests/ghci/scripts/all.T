@@ -142,4 +142,6 @@ test('ghci058',
      ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])
+test('T7627', normal, ghci_script, ['T7627.script'])
+test('T7627b', normal, ghci_script, ['T7627b.script'])
 
