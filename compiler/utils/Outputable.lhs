@@ -72,6 +72,7 @@ module Outputable (
 
 import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
+                                  useUnicodeQuotes,
                                   unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
@@ -448,7 +449,11 @@ cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 -- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing begins or ends in a single quote
 -- so that we don't get `foo''.  Instead we just have foo'.
-quotes d = SDoc $ \sty ->
+quotes d =
+      sdocWithDynFlags $ \dflags ->
+      if useUnicodeQuotes dflags
+      then char '‛' <> d <> char '’'
+      else SDoc $ \sty ->
            let pp_d = runSDoc d sty
                str  = show pp_d
            in case (str, snocView str) of

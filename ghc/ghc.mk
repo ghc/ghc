@@ -177,7 +177,7 @@ else
 install: install_ghc_post
 .PHONY: install_ghc_post
 install_ghc_post: install_bins
-	$(call removeFiles,$(DESTDIR)$(bindir)/ghc.exe)
+	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc.exe")
 	"$(MV)" -f $(DESTDIR)$(bindir)/ghc-stage$(INSTALL_GHC_STAGE).exe $(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc.exe
 endif
 

@@ -75,6 +75,15 @@ else
 $1_$2_WAYS = $$(filter-out $$($1_$2_EXCLUDED_WAYS),$$(GhcLibWays))
 endif
 
+$1_$2_DYNAMIC_TOO = NO
+ifneq "$$(DYNAMIC_TOO)" "NO"
+ifneq "$$(filter v,$$($1_$2_WAYS))" ""
+ifneq "$$(filter dyn,$$($1_$2_WAYS))" ""
+$1_$2_DYNAMIC_TOO = YES
+endif
+endif
+endif
+
 # We must use a different dependency file if $(GhcLibWays) changes, so
 # encode the ways into the name of the file.
 $1_$2_WAYS_DASHED = $$(subst $$(space),,$$(patsubst %,-%,$$(strip $$($1_$2_WAYS))))
