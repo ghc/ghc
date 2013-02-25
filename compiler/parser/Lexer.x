@@ -339,7 +339,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0> {
-  "(#" / { ifExtension unboxedTuplesEnabled `alexAndPred` notFollowedBySymbol }
+  "(#" / { ifExtension unboxedTuplesEnabled }
          { token IToubxparen }
   "#)" / { ifExtension unboxedTuplesEnabled }
          { token ITcubxparen }

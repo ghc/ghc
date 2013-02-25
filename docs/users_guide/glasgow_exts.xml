@@ -225,6 +225,14 @@ the same.
 </para>
 
 <para>
+Note that when unboxed tuples are enabled,
+<literal>(#</literal> is a single lexeme, so for example when using
+operators like <literal>#</literal> and <literal>#-</literal> you need
+to write <literal>( # )</literal> and <literal>( #- )</literal> rather than
+<literal>(#)</literal> and <literal>(#-)</literal>.
+</para>
+
+<para>
 Unboxed tuples are used for functions that need to return multiple
 values, but they avoid the heap allocation normally associated with
 using fully-fledged tuples.  When an unboxed tuple is returned, the
