@@ -140,7 +140,7 @@ iconvRecode iconv_t
   input@Buffer{  bufRaw=iraw, bufL=ir, bufR=iw, bufSize=_  }  iscale
   output@Buffer{ bufRaw=oraw, bufL=_,  bufR=ow, bufSize=os }  oscale
   = do
-    iconv_trace ("haskelChar=" ++ show haskellChar)
+    iconv_trace ("haskellChar=" ++ show haskellChar)
     iconv_trace ("iconvRecode before, input=" ++ show (summaryBuffer input))
     iconv_trace ("iconvRecode before, output=" ++ show (summaryBuffer output))
     withRawBuffer iraw $ \ piraw -> do
