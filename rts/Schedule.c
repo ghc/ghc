@@ -1344,7 +1344,7 @@ scheduleHandleThreadBlocked(Capability *cap, StgTSO *t)
  * Handle a thread that returned to the scheduler with ThreadSwitch
  * -------------------------------------------------------------------------- */
 
-    static void
+static void
 scheduleHandleThreadSwitch( Capability* cap STG_UNUSED,
                             StgTSO *t STG_UNUSED)
 {
@@ -1356,7 +1356,7 @@ scheduleHandleThreadSwitch( Capability* cap STG_UNUSED,
  * Handle a thread that returned to the scheduler with ThreadFinished
  * -------------------------------------------------------------------------- */
 
-    static rtsBool
+static rtsBool
 scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 {
     /* Need to check whether this was a main thread, and if so,
