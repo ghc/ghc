@@ -2389,8 +2389,11 @@ dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToStr
                                        Nothing -> lexError "unknown pragma"
 
 known_pragma :: Map String Action -> AlexAccPred Int
-known_pragma prags _ _ len (AI _ buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
-                                          && (nextCharIsNot buf (\c -> isAlphaNum c || c == '_'))
+known_pragma prags _ (AI _ startbuf) _ (AI _ curbuf)
+ = isKnown && nextCharIsNot curbuf pragmaNameChar
+    where l = lexemeToString startbuf (byteDiff startbuf curbuf)
+          isKnown = isJust $ Map.lookup (clean_pragma l) prags
+          pragmaNameChar c = isAlphaNum c || c == '_'
 
 clean_pragma :: String -> String
 clean_pragma prag = canon_ws (map toLower (unprefix prag))
