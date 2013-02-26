@@ -44,6 +44,7 @@ import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 
 import Control.Monad
 import Data.List( partition )
+import Data.Traversable (traverse)
 import Maybes( orElse )
 \end{code}
 
@@ -339,7 +340,7 @@ rnAnnDecl (HsAnnotation provenance expr) = do
 
 rnAnnProvenance :: AnnProvenance RdrName -> RnM (AnnProvenance Name, FreeVars)
 rnAnnProvenance provenance = do
-    provenance' <- modifyAnnProvenanceNameM lookupTopBndrRn provenance
+    provenance' <- traverse lookupTopBndrRn provenance
     return (provenance', maybe emptyFVs unitFV (annProvenanceName_maybe provenance'))
 \end{code}
 
