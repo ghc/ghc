@@ -325,7 +325,7 @@ endif
 # Properties of packages
 
 # These lists say "if this package is built, here's a property it has"
-# They do not say "this package will be built"; see $(PACKAGES_xx) for that
+# They do not say "this package will be built"; see $(PACKAGES_STAGExx) for that
 
 # Packages that are built but not installed
 PKGS_THAT_ARE_INTREE_ONLY := haskeline terminfo xhtml
