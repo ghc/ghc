@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2013
  *
  * Performing updates.
  *
@@ -46,7 +46,7 @@
 								\
     OVERWRITING_CLOSURE(p1);                                    \
     StgInd_indirectee(p1) = p2;                                 \
-    prim %write_barrier();                                      \
+    prim_write_barrier;                                         \
     SET_INFO(p1, stg_BLACKHOLE_info);                           \
     LDV_RECORD_CREATE(p1);                                      \
     bd = Bdescr(p1);						\

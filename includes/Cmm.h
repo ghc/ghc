@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The University of Glasgow 2004-2012
+ * (c) The University of Glasgow 2004-2013
  *
  * This file is included at the top of all .cmm source files (and
  * *only* .cmm files).  It defines a collection of useful macros for
@@ -581,6 +581,12 @@
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
+#endif
+
+#ifdef THREADED_RTS
+#define prim_write_barrier prim %write_barrier()
+#else
+#define prim_write_barrier /* nothing */
 #endif
 
 /* -----------------------------------------------------------------------------

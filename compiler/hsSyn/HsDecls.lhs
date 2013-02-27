@@ -4,7 +4,8 @@
 %
 
 \begin{code}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
+             DeriveTraversable #-}
 
 -- | Abstract syntax of global declarations.
 --
@@ -54,7 +55,7 @@ module HsDecls (
   WarnDecl(..),  LWarnDecl,
   -- ** Annotations
   AnnDecl(..), LAnnDecl, 
-  AnnProvenance(..), annProvenanceName_maybe, modifyAnnProvenanceNameM,
+  AnnProvenance(..), annProvenanceName_maybe,
 
   -- * Grouping
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups
@@ -84,8 +85,9 @@ import SrcLoc
 import FastString
 
 import Bag
-import Control.Monad    ( liftM )
 import Data.Data        hiding (TyCon)
+import Data.Foldable (Foldable)
+import Data.Traversable
 \end{code}
 
 %************************************************************************
@@ -1359,20 +1361,12 @@ instance (OutputableBndr name) => Outputable (AnnDecl name) where
 data AnnProvenance name = ValueAnnProvenance name
                         | TypeAnnProvenance name
                         | ModuleAnnProvenance
-  deriving (Data, Typeable)
+  deriving (Data, Typeable, Functor, Foldable, Traversable)
 
 annProvenanceName_maybe :: AnnProvenance name -> Maybe name
 annProvenanceName_maybe (ValueAnnProvenance name) = Just name
 annProvenanceName_maybe (TypeAnnProvenance name)  = Just name
 annProvenanceName_maybe ModuleAnnProvenance       = Nothing
-
--- TODO: Replace with Traversable instance when GHC bootstrap version rises high enough
-modifyAnnProvenanceNameM :: Monad m => (before -> m after) -> AnnProvenance before -> m (AnnProvenance after)
-modifyAnnProvenanceNameM fm prov =
-    case prov of
-            ValueAnnProvenance name -> liftM ValueAnnProvenance (fm name)
-            TypeAnnProvenance name -> liftM TypeAnnProvenance (fm name)
-            ModuleAnnProvenance -> return ModuleAnnProvenance
 
 pprAnnProvenance :: OutputableBndr name => AnnProvenance name -> SDoc
 pprAnnProvenance ModuleAnnProvenance       = ptext (sLit "ANN module")

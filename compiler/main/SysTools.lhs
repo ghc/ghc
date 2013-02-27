@@ -284,10 +284,11 @@ initSysTools mbMinusB
                     ++ gcc_args
 
        -- Other things being equal, as and ld are simply gcc
+       gcc_link_args_str <- getSetting "C compiler link flags"
        let   as_prog  = gcc_prog
              as_args  = gcc_args
              ld_prog  = gcc_prog
-             ld_args  = gcc_args
+             ld_args  = gcc_args ++ map Option (words gcc_link_args_str)
 
        -- We just assume on command line
        lc_prog <- getSetting "LLVM llc command"

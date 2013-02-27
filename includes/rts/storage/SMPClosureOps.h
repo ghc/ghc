@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2005
+ * (c) The GHC Team, 2005-2013
  *
  * Macros for THREADED_RTS support
  *
@@ -12,7 +12,7 @@
 #ifdef CMINUSMINUS
 
 #define unlockClosure(ptr,info)                 \
-    prim %write_barrier();                      \
+    prim_write_barrier;                         \
     StgHeader_info(ptr) = info;    
 
 #else
