@@ -115,12 +115,6 @@ module Control.Exception (
         getMaskingState,
         allowInterrupt,
 
-        -- ** (deprecated) Asynchronous exception control
-
-        block,
-        unblock,
-        blocked,
-
         -- *** Applying @mask@ to an exception handler
 
         -- $block_handler

@@ -98,6 +98,19 @@ data ArgDescr a
    | ReqArg (String       -> a) String -- ^   option requires argument
    | OptArg (Maybe String -> a) String -- ^   optional argument
 
+instance Functor ArgOrder where
+    fmap _ RequireOrder      = RequireOrder
+    fmap _ Permute           = Permute
+    fmap f (ReturnInOrder g) = ReturnInOrder (f . g)
+
+instance Functor OptDescr where
+    fmap f (Option a b argDescr c) = Option a b (fmap f argDescr) c
+
+instance Functor ArgDescr where
+    fmap f (NoArg a)    = NoArg (f a)
+    fmap f (ReqArg g s) = ReqArg (f . g) s
+    fmap f (OptArg g s) = OptArg (f . g) s
+
 data OptKind a                -- kind of cmd line arg (internal use only):
    = Opt       a                --    an option
    | UnreqOpt  String           --    an un-recognized option
