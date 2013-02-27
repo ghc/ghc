@@ -1489,7 +1489,7 @@ extendLocalInstEnv dfuns thing_inside
 
 ***********************************************************************************
 *                                                                                 * 
-*            Simplifyf derived constraints
+*            Simplify derived constraints
 *                                                                                 *
 ***********************************************************************************
 
