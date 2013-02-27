@@ -384,7 +384,7 @@ getSContId (SCont sc) = PTM $ \s ->
   case getSContId# sc s of (# s, i #) -> (# s, (I# i) #)
 
 -----------------------------------------------------------------------------------
--- Thread-local Storage (TLS)
+-- SCont-local Storage (SLS)
 -----------------------------------------------------------------------------------
 
 setSLS :: SCont -> Dynamic -> IO ()
@@ -393,8 +393,6 @@ setSLS (SCont sc) v = IO $ \s ->
 
 getSLS :: SCont -> PTM Dynamic
 getSLS (SCont sc) = PTM $ \s -> getSLS# sc s
-
-tlsPair = (setSLS, getSLS)
 
 -----------------------------------------------------------------------------------
 -- yieldControlAction and friends..
