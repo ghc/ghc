@@ -1,5 +1,6 @@
 PROFILE := false
 DEBUG := false
+TOP := ..
 
 ifeq ($(DEBUG),true)
   DEBUG_FLG := -debug
@@ -16,12 +17,12 @@ endif
 
 GHC_OPTS = -rtsopts --make
 
-GHC    := ../inplace/bin/ghc-stage1 $(DEBUG_FLG) $(PROFILE_FLG) $(GHC_OPTS) $(GHC_OPTS_EXTRA)
+GHC := inplace/bin/ghc-stage1 $(DEBUG_FLG) $(PROFILE_FLG) $(GHC_OPTS)
 
 all: $(TARGETS)
 
 %.bin:	%.hs
-	$(GHC) $< -o $@
+	$(TOP)/$(GHC) $(GHC_OPTS_EXTRA) $< -o $@
 
 
 %.cmm:  %.hs

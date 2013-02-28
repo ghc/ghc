@@ -2836,7 +2836,7 @@ void wakeUpRts(void)
    exception.
    -------------------------------------------------------------------------- */
 
-    static void
+static void
 deleteThread (Capability *cap STG_UNUSED, StgTSO *tso)
 {
     // NOTE: must only be called on a TSO that we have exclusive
@@ -2851,7 +2851,7 @@ deleteThread (Capability *cap STG_UNUSED, StgTSO *tso)
 }
 
 #ifdef FORKPROCESS_PRIMOP_SUPPORTED
-    static void
+static void
 deleteThread_(Capability *cap, StgTSO *tso)
 { // for forkProcess only:
     // like deleteThread(), but we delete threads in foreign calls, too.
@@ -2874,7 +2874,7 @@ deleteThread_(Capability *cap, StgTSO *tso)
    C.  Who knows, it might be a useful re-useable thing here too.
    -------------------------------------------------------------------------- */
 
-    StgWord
+StgWord
 raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
 {
     Capability *cap = regTableToCapability(reg);

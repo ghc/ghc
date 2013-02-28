@@ -417,7 +417,7 @@ getYieldControlAction = do
 
 {-# INLINE yieldControlActionRts #-}
 yieldControlActionRts :: SCont -> IO () -- used by RTS
-yieldControlActionRts sc = atomically $ do
+yieldControlActionRts sc = Exception.catch (atomically $ do
   mySC <- getSCont
   setSContSwitchReason mySC Completed
   stat <- getSContStatus sc
@@ -426,7 +426,10 @@ yieldControlActionRts sc = atomically $ do
       SContSwitched Yielded -> return () -- Has been unblocked and put on the run queue
       otherwise -> error "yieldControlAction: Impossible status"
   switch <- getYieldControlActionSCont sc
-  switch
+  switch) (\e -> do {
+											print ("ERROR:" ++ show (e::IOException));
+											error "LwConc.Substrate.yieldControlActionRTS"
+											})
 
 -----------------------------------------------------------------------------------
 -- scheduleSContAction and friends..
@@ -451,14 +454,17 @@ getScheduleSContAction = do
 
 {-# INLINE scheduleSContActionRts #-}
 scheduleSContActionRts :: SCont -> IO () -- used by RTS
-scheduleSContActionRts sc = atomically $ do
+scheduleSContActionRts sc = Exception.catch (atomically $ do
   stat <- getSContStatus sc
   case stat of
     SContSwitched (BlockedInHaskell (ResumeToken t)) -> writePVar t False
     otherwise -> return ()
   setSContStatus sc $ SContSwitched Yielded
   unblock <- getScheduleSContActionSCont sc
-  unblock sc
+  unblock sc) (\e -> do {
+											print ("ERROR:" ++ show (e::IOException));
+											error "LwConc.Substrate.scheduleSContActionRTS"
+											})
 
 
 -----------------------------------------------------------------------------------
