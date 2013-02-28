@@ -591,10 +591,9 @@ runPipeline' start_phase stop_phase hsc_env env input_fn
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
 
-  (state', output_fn) <- unP (pipeLoop start_phase input_fn) env state
+  (state', (dflags, output_fn)) <- unP (pipeLoop start_phase input_fn) env state
 
-  let PipeState{ hsc_env=hsc_env', maybe_loc } = state'
-      dflags = hsc_dflags hsc_env'
+  let PipeState{ maybe_loc } = state'
 
   -- Sometimes, a compilation phase doesn't actually generate any output
   -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
@@ -682,14 +681,14 @@ phaseOutputFilename next_phase = do
 -- outer pipeline loop
 
 -- | pipeLoop runs phases until we reach the stop phase
-pipeLoop :: Phase -> FilePath -> CompPipeline FilePath
+pipeLoop :: Phase -> FilePath -> CompPipeline (DynFlags, FilePath)
 pipeLoop phase input_fn = do
   PipeEnv{stop_phase} <- getPipeEnv
   dflags <- getDynFlags
   let happensBefore' = happensBefore dflags
   case () of
    _ | phase `eqPhase` stop_phase            -- All done
-     -> return input_fn
+     -> return (dflags, input_fn)
 
      | not (phase `happensBefore'` stop_phase)
         -- Something has gone wrong.  We'll try to cover all the cases when
