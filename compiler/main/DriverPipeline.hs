@@ -584,10 +584,6 @@ runPipeline'
 runPipeline' start_phase stop_phase hsc_env env input_fn
              output maybe_loc maybe_stub_o
   = do
-  -- this is a function which will be used to calculate output file names
-  -- as we go along (we partially apply it to some of its inputs here)
-  let get_output_fn = getOutputFilename stop_phase output (src_basename env)
-
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
 
@@ -604,7 +600,8 @@ runPipeline' start_phase stop_phase hsc_env env input_fn
     Temporary ->
         return (dflags, output_fn)
     _ ->
-        do final_fn <- get_output_fn dflags stop_phase maybe_loc
+        do final_fn <- getOutputFilename stop_phase output (src_basename env)
+                                         dflags stop_phase maybe_loc
            when (final_fn /= output_fn) $ do
               let msg = ("Copying `" ++ output_fn ++"' to `" ++ final_fn ++ "'")
                   line_prag = Just ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}\n")
