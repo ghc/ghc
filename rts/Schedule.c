@@ -537,8 +537,9 @@ run_thread:
 
         //Handle upcall thread return
         if (isUpcallThread (t)) {
-            if (t->what_next == ThreadKilled)
-                barf ("Schedule: Upcall thread killed");
+            if (t->what_next == ThreadKilled && sched_state != SCHED_SHUTTING_DOWN)
+                barf ("Schedule: Upcall thread %d on capability %d killed\n",
+                      (int)t->id, (int)t->cap->no);
 
             if (ret == ThreadFinished) {
                 t->what_next = ThreadComplete;
@@ -1542,7 +1543,7 @@ static void releaseAllCapabilities(nat n, Capability *cap, Task *task)
  * Perform a garbage collection if necessary
  * -------------------------------------------------------------------------- */
 
-    static void
+static void
 scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
               rtsBool force_major)
 {

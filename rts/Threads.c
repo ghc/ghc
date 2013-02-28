@@ -260,7 +260,7 @@ setOwningCapability (Capability *cap USED_IF_DEBUG,
 
    ------------------------------------------------------------------------- */
 
-  void
+void
 tryWakeupThread (Capability *cap, StgTSO *tso)
 {
   traceEventThreadWakeup (cap, tso, tso->cap->no);
@@ -337,6 +337,12 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
   }
 
 unblock1:
+  if (tso->is_upcall_thread) {
+  /* XXX KC -- upcall threads needs to be appended to the run queue and would
+   * not have an attached upcall, which would make getResumeThreadUpcall fail.
+   * But is this correct? */
+    goto unblock2;
+  }
   tso->why_blocked = Yielded;
   pushUpcallReturning (cap, getResumeThreadUpcall (cap, tso));
   return;
