@@ -548,7 +548,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                               ++ input_fn))
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
-         r <- runPipeline' start_phase stop_phase hsc_env env input_fn
+         r <- runPipeline' start_phase hsc_env env input_fn
                            maybe_loc maybe_stub_o
 
          -- If we are compiling a Haskell module, and doing
@@ -566,21 +566,20 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                            Temporary -> Temporary
                  env' = env { output_spec = output' }
              hsc_env' <- newHscEnv dflags'
-             _ <- runPipeline' start_phase stop_phase hsc_env' env' input_fn
+             _ <- runPipeline' start_phase hsc_env' env' input_fn
                                maybe_loc maybe_stub_o
              return ()
          return r
 
 runPipeline'
   :: Phase                      -- ^ When to start
-  -> Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
   -> PipeEnv
   -> FilePath                   -- ^ Input filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
-runPipeline' start_phase stop_phase hsc_env env input_fn
+runPipeline' start_phase hsc_env env input_fn
              maybe_loc maybe_stub_o
   = do
   -- Execute the pipeline...
@@ -599,8 +598,9 @@ runPipeline' start_phase stop_phase hsc_env env input_fn
     Temporary ->
         return (dflags, output_fn)
     output ->
-        do final_fn <- getOutputFilename stop_phase output (src_basename env)
-                                         dflags stop_phase maybe_loc
+        do let stopPhase = stop_phase env
+           final_fn <- getOutputFilename stopPhase output (src_basename env)
+                                         dflags stopPhase maybe_loc
            when (final_fn /= output_fn) $ do
               let msg = ("Copying `" ++ output_fn ++"' to `" ++ final_fn ++ "'")
                   line_prag = Just ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}\n")
