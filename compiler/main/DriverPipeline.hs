@@ -549,7 +549,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
          r <- runPipeline' start_phase stop_phase hsc_env env input_fn
-                           output maybe_loc maybe_stub_o
+                           maybe_loc maybe_stub_o
 
          -- If we are compiling a Haskell module, and doing
          -- -dynamic-too, but couldn't do the -dynamic-too fast
@@ -567,7 +567,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                  env' = env { output_spec = output' }
              hsc_env' <- newHscEnv dflags'
              _ <- runPipeline' start_phase stop_phase hsc_env' env' input_fn
-                               output' maybe_loc maybe_stub_o
+                               maybe_loc maybe_stub_o
              return ()
          return r
 
@@ -577,12 +577,11 @@ runPipeline'
   -> HscEnv                     -- ^ Compilation environment
   -> PipeEnv
   -> FilePath                   -- ^ Input filename
-  -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
 runPipeline' start_phase stop_phase hsc_env env input_fn
-             output maybe_loc maybe_stub_o
+             maybe_loc maybe_stub_o
   = do
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
@@ -596,10 +595,10 @@ runPipeline' start_phase stop_phase hsc_env env input_fn
   -- stage, but we wanted to keep the output, then we have to explicitly
   -- copy the file, remembering to prepend a {-# LINE #-} pragma so that
   -- further compilation stages can tell what the original filename was.
-  case output of
+  case output_spec env of
     Temporary ->
         return (dflags, output_fn)
-    _ ->
+    output ->
         do final_fn <- getOutputFilename stop_phase output (src_basename env)
                                          dflags stop_phase maybe_loc
            when (final_fn /= output_fn) $ do
