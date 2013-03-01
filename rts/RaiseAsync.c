@@ -615,7 +615,7 @@ blockedThrowTo (Capability *cap, StgTSO *target, MessageThrowTo *msg)
 Returns: non-zero if an exception was raised, zero otherwise.
 -------------------------------------------------------------------------- */
 
-    int
+int
 maybePerformBlockedException (Capability *cap, StgTSO *tso)
 {
     MessageThrowTo *msg;

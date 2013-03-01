@@ -1,4 +1,4 @@
-TARGET := fasta.bin
+TARGET := fasta-vanilla.bin fasta-lwc.bin
 
 include ../../config.mk
 

@@ -319,12 +319,14 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         goto unblock2;
 
     case BlockedOnSTM:
-      if (tso->is_sleeping != 0) {
+      if (tso->is_sleeping) {
         tso->is_sleeping = 0;
         goto unblock2;
       }
-      else
+      else if (hasHaskellScheduler (tso))
         goto unblock1;
+      else
+        goto unblock2;
 
     case ThreadMigrating:
       goto unblock2;
@@ -343,6 +345,8 @@ unblock1:
    * But is this correct? */
     goto unblock2;
   }
+  debugTrace (DEBUG_sched, "tryWakeupThread: unblocking thread %d through unblock1",
+              (int)tso->id);
   tso->why_blocked = Yielded;
   pushUpcallReturning (cap, getResumeThreadUpcall (cap, tso));
   return;
@@ -350,6 +354,8 @@ unblock1:
 unblock2:
   // just run the thread now, if the BH is not really available,
   // we'll block again.
+  debugTrace (DEBUG_sched, "tryWakeupThread: unblocking thread %d through unblock2",
+              (int)tso->id);
   tso->why_blocked = NotBlocked;
   appendToRunQueue(cap,tso);
   return;
