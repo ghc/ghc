@@ -95,3 +95,5 @@ test('T7354a',
 test('T7536', normal, compile_fail, [''])
 
 test('T7560', normal, compile_fail, [''])
+test('T7729', normal, compile_fail, [''])
+test('T7729a', normal, compile_fail, [''])
