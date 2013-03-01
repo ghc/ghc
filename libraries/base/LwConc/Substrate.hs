@@ -428,9 +428,9 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
       otherwise -> error "yieldControlAction: Impossible status"
   switch <- getYieldControlActionSCont sc
   switch) (\e -> do {
-											hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
-											error "LwConc.Substrate.yieldControlActionRTS"
-											})
+                      hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
+                      error "LwConc.Substrate.yieldControlActionRTS"
+                      })
 
 -----------------------------------------------------------------------------------
 -- scheduleSContAction and friends..
@@ -463,9 +463,9 @@ scheduleSContActionRts sc = Exception.catch (atomically $ do
   setSContStatus sc $ SContSwitched Yielded
   unblock <- getScheduleSContActionSCont sc
   unblock sc) (\e -> do {
-											hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
-											error "LwConc.Substrate.scheduleSContActionRTS"
-											})
+                      hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
+                      error "LwConc.Substrate.scheduleSContActionRTS"
+                      })
 
 
 -----------------------------------------------------------------------------------
