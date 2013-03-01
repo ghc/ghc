@@ -35,7 +35,7 @@ test_bindist:
 	mkdir bindisttest/a/b/c
 	cd bindisttest/a/b/c/ && $(BZIP2_CMD) -cd ../../../../$(BIN_DIST_TEST_TAR_BZ2) | $(TAR_CMD) -xf -
 	$(SHELL) bindisttest/checkBinaries.sh $(ProjectVersion)
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 	mv bindisttest/a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
 	cd bindisttest/a/b/c/$(BIN_DIST_NAME) && ./configure --prefix=$(TOP)/$(BIN_DIST_INST_DIR) --with-gcc="$(WhatGccIsCalled)"

@@ -350,7 +350,7 @@ else
 # compiler already has installed (or up-to-date enough).
 
 PACKAGES_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
 
@@ -364,11 +364,11 @@ PACKAGES_STAGE1 += bytestring
 PACKAGES_STAGE1 += containers
 PACKAGES_STAGE1 += old-locale
 
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 PACKAGES_STAGE1 += Win32
 endif
 PACKAGES_STAGE1 += time
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE1 += unix
 endif
 
@@ -397,7 +397,7 @@ endif
 REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
 PACKAGES_STAGE1 += xhtml
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE1 += terminfo
 endif
 PACKAGES_STAGE1 += haskeline
@@ -566,7 +566,7 @@ BUILD_DIRS += \
    $(GHC_MKDIRHIER_DIR)
 endif
 
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 BUILD_DIRS += \
    $(GHC_TOUCHY_DIR)
 endif
@@ -753,7 +753,7 @@ endif
 # -----------------------------------------------------------------------------
 # Creating a local mingw copy on Windows
 
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 
 install : install_mingw
 .PHONY: install_mingw
@@ -765,7 +765,7 @@ install : install_perl
 install_perl : $(INPLACE_PERL)
 	"$(CP)" -Rp $(INPLACE_PERL) $(prefix)
 
-endif # Windows
+endif # Windows_Host
 
 ifneq "$(BINDIST)" "YES"
 $(ghc-prim-$(libraries/ghc-prim_dist-install_VERSION)_HADDOCK_FILE): \
@@ -870,7 +870,7 @@ INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/bin/ghc
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/bin/ghc-pkg
 else

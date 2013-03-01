@@ -30,7 +30,7 @@ $(eval $(call build-prog,utils/runghc,dist-install,1))
 install: install_runhaskell
 
 .PHONY: install_runhaskell
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 install_runhaskell: install_bins
 	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext) $(DESTDIR)$(bindir)/runhaskell$(exeext)
 else

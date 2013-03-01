@@ -128,11 +128,11 @@ LeadingUnderscore=@LeadingUnderscore@
 exeext=@exeext@
 soext=@soext@
 
-# Windows=YES if on a Windows platform
+# Windows_Host=YES if on a Windows platform
 ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32)" ""
-Windows=YES
+Windows_Host=YES
 else
-Windows=NO
+Windows_Host=NO
 endif
 
 # Tell the build system what the host operating system is

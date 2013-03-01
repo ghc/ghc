@@ -54,7 +54,7 @@ ifeq "$$($1_USES_CABAL)" "YES"
 $1_$2_USES_CABAL = YES
 endif
 
-ifeq "$$(Windows)" "YES"
+ifeq "$$(Windows_Host)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = NO
 else ifneq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = NO
@@ -66,7 +66,7 @@ else
 $1_$2_WANT_INPLACE_WRAPPER = NO
 endif
 
-ifeq "$$(Windows)" "YES"
+ifeq "$$(Windows_Host)" "YES"
 $1_$2_WANT_INSTALLED_WRAPPER = NO
 else ifneq "$$($1_$2_INSTALL)" "YES"
 $1_$2_WANT_INSTALLED_WRAPPER = NO

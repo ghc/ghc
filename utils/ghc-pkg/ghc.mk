@@ -75,7 +75,7 @@ endif
 # -----------------------------------------------------------------------------
 # Link ghc-pkg to ghc-pkg-$(ProjectVersion) when installing
 
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 install: install_utils/ghc-pkg_link
 
 .PHONY: install_utils/ghc-pkg_link
