@@ -351,7 +351,9 @@ else
 
 PACKAGES_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
 ifeq "$(Windows_Host)" "NO"
+ifneq "$(HostOS_CPP)" "ios"
 PACKAGES_STAGE0 += terminfo
+endif
 endif
 
 PACKAGES_STAGE1 += ghc-prim
@@ -397,8 +399,10 @@ endif
 REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
 PACKAGES_STAGE1 += xhtml
-ifeq "$(Windows_Host)" "NO"
+ifeq "$(Windows_Target)" "NO"
+ifneq "$(TargetOS_CPP)" "ios"
 PACKAGES_STAGE1 += terminfo
+endif
 endif
 PACKAGES_STAGE1 += haskeline
 

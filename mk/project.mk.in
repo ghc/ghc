@@ -135,6 +135,13 @@ else
 Windows_Host=NO
 endif
 
+# Windows_Target=YES if we are targetting a Windows platform
+ifneq "$(findstring $(TargetOS_CPP), mingw32 cygwin32)" ""
+Windows_Target=YES
+else
+Windows_Target=NO
+endif
+
 # Tell the build system what the host operating system is
 # This distinguishes "msys" and "cygwin", which are not
 # not distinguished by HOST_OS_CPP
