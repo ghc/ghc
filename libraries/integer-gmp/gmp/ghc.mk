@@ -33,7 +33,7 @@ clean_gmp:
 	$(call removeTrees,libraries/integer-gmp/gmp/gmpbuild)
 endif
 
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 # Apparently building on Windows fails when there is a system gmp
 # available, so we never try to use the system gmp on Windows
 libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
