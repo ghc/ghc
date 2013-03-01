@@ -104,9 +104,8 @@ libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
-# Temporarily turn off unused-import warnings for the binary package
-libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
-libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
+# binary upstream has some warnings, so don't use -Werror for it
+libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off -Werror for mtl
 libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
@@ -129,9 +128,6 @@ libraries/dph/dph-lifted-common-install_EXTRA_HC_OPTS += -Wwarn
 
 # We need to turn of deprecated warnings for SafeHaskell transition
 libraries/array_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
-libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
-libraries/binary/src/Data/Binary/Builder/Base_HC_OPTS += -fno-warn-warnings-deprecations
-libraries/binary/src/Data/Binary/Get_HC_OPTS += -fno-warn-warnings-deprecations
 
 # Temporarely disable inline rule shadowing warning
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
