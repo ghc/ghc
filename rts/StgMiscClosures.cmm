@@ -308,6 +308,7 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
     W_ r, info, owner, bd;
     P_ p, bq, msg;
+		gcptr trec;
 
     TICK_ENT_DYN_IND(); /* tick */
 
@@ -329,6 +330,14 @@ retry:
         info == stg_BLOCKING_QUEUE_CLEAN_info ||
         info == stg_BLOCKING_QUEUE_DIRTY_info)
     {
+        trec = StgTSO_trec (CurrentTSO);
+        if (trec != NO_TREC && StgTSO_is_upcall_thread (CurrentTSO) != 0::I32) {
+          (p) = ccall suspendAllComputation (MyCapability () "ptr", node "ptr");
+					if (p != 0) {
+						goto retry;
+					}
+				}
+
         ("ptr" msg) = ccall allocate(MyCapability() "ptr",
                                      BYTES_TO_WDS(SIZEOF_MessageBlackHole));
 

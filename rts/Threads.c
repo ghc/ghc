@@ -487,7 +487,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
    awaken any threads that are blocked on it.
    ------------------------------------------------------------------------- */
 
-  void
+void
 updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
 {
   StgClosure *v;
@@ -896,6 +896,9 @@ printThreadStatus(StgTSO *t)
   if (t->dirty) {
     debugBelch(" (TSO_DIRTY)");
   }
+  if (t->is_sleeping) {
+    debugBelch(" (SLEEPING)");
+  }
   debugBelch("\n");
 }
 
@@ -968,9 +971,13 @@ printStackFrames (StgTSO* tso) {
                          }
 
       case UNDERFLOW_FRAME: {
-                              fprintf (stderr, "UNDERFLOW\tframe %p\n", frame);
-                              break;
-                            }
+        fprintf (stderr, "UNDERFLOW\tframe %p\n", frame);
+        ASSERT(((StgUnderflowFrame*)frame)->info == &stg_stack_underflow_frame_info);
+        stack = (StgStack*)((StgUnderflowFrame*)frame)->next_chunk;
+        sp = stack->sp;
+        frame = sp;
+        continue;
+      }
 
       case STOP_FRAME: {
                          fprintf (stderr, "STOP\t\tframe %p\n", frame);

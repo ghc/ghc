@@ -76,7 +76,7 @@ throwToSingleThreaded__ (Capability *cap, StgTSO *tso, StgClosure *exception,
     removeFromQueues(cap,tso);
 
     raiseAsync(cap, tso, exception, stop_at_atomically,
-                      stop_here_excluding, stop_here_including);
+               stop_here_excluding, stop_here_including);
 }
 
 void
@@ -145,7 +145,14 @@ findLastUpdateFrame (StgTSO* tso) {
                 ret_frame = frame;
                 break;
 
-            case UNDERFLOW_FRAME:
+            case UNDERFLOW_FRAME: {
+                debugTrace (DEBUG_sched, "findLastUpdateFrame saw underflow");
+                ASSERT(((StgUnderflowFrame*)frame)->info == &stg_stack_underflow_frame_info);
+                stack = (StgStack*)((StgUnderflowFrame*)frame)->next_chunk;
+                sp = stack->sp;
+                frame = sp;
+                continue;
+            }
             case STOP_FRAME:
             case CATCH_FRAME:
             case ATOMICALLY_FRAME:

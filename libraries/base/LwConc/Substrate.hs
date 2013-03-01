@@ -157,6 +157,7 @@ import GHC.IO
 import Control.Monad    ( when )
 #endif
 
+import System.IO
 import GHC.Conc (yield, childHandler, getNumCapabilities)
 import Data.Typeable
 import Data.Dynamic
@@ -427,7 +428,7 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
       otherwise -> error "yieldControlAction: Impossible status"
   switch <- getYieldControlActionSCont sc
   switch) (\e -> do {
-											print ("ERROR:" ++ show (e::IOException));
+											hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
 											error "LwConc.Substrate.yieldControlActionRTS"
 											})
 
@@ -462,7 +463,7 @@ scheduleSContActionRts sc = Exception.catch (atomically $ do
   setSContStatus sc $ SContSwitched Yielded
   unblock <- getScheduleSContActionSCont sc
   unblock sc) (\e -> do {
-											print ("ERROR:" ++ show (e::IOException));
+											hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
 											error "LwConc.Substrate.scheduleSContActionRTS"
 											})
 
