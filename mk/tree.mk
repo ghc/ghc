@@ -17,19 +17,14 @@ endif
 
 GHC_UTILS_DIR           = utils
 GHC_INCLUDE_DIRS        = includes includes/dist includes/dist-derivedconstants/header includes/dist-ghcconstants/header
-GHC_COMPILER_DIR        = compiler
-GHC_PROG_DIR            = ghc
 GHC_RTS_DIR             = rts
 GHC_DRIVER_DIR          = driver
-GHC_COMPAT_DIR          = compat
 
 GHC_LTX_DIR             = $(GHC_UTILS_DIR)/ltx
 GHC_LNDIR_DIR           = $(GHC_UTILS_DIR)/lndir
 GHC_MKDIRHIER_DIR       = $(GHC_UTILS_DIR)/mkdirhier
-GHC_DOCBOOK_DIR         = $(GHC_UTILS_DIR)/docbook
 GHC_UNLIT_DIR           = $(GHC_UTILS_DIR)/unlit
 GHC_HP2PS_DIR           = $(GHC_UTILS_DIR)/hp2ps
-GHC_GHCTAGS_DIR         = $(GHC_UTILS_DIR)/ghctags
 GHC_HSC2HS_DIR          = $(GHC_UTILS_DIR)/hsc2hs
 GHC_TOUCHY_DIR          = $(GHC_UTILS_DIR)/touchy
 GHC_PKG_DIR             = $(GHC_UTILS_DIR)/ghc-pkg
