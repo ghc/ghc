@@ -24,7 +24,7 @@ Library {
     else
         build-depends: base >= 4 && < 5
 
-    build-depends: binary == 0.5.*,
+    build-depends: binary >= 0.5 && < 0.8,
                    Cabal >= 1.8 && < 1.18
 
     extensions: CPP
