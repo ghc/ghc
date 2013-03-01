@@ -10,8 +10,6 @@ def f( name, opts ):
 setTestOpts(f)
 
 # Check correct methods are deprecated
-test('Dep01', normal, compile, [''])
-test('Dep02', normal, compile, [''])
 test('Dep05', normal, compile_fail, [''])
 test('Dep06', normal, compile_fail, [''])
 test('Dep07', normal, compile_fail, [''])
