@@ -18,7 +18,8 @@ main = do
     q <- newChan
     replies <- replicateM w newEmptyMVar
     mapM_ (writeChan q) $ zip coords replies
-    replicateM_ 48 . forkIO $ worker q w m n
+    numProcs <- getNumCapabilities
+    replicateM_ numProcs . forkIO $ worker q w m n
 
     putStrLn ("P4\n"++show w++" "++show w)
     mapM_ (takeMVar >=> \b -> hPutBuf stdout b n) replies

@@ -30,7 +30,8 @@ main = do
     q <- newEmptyMVar
     replies <- replicateM w newEmptyMVar
     atomically $ mapM_ (asyncPutMVar q) $ zip coords replies
-    replicateM_ 48 . forkIO $ worker q w m n
+    numProcs <- getNumCapabilities
+    replicateM_ numProcs . forkIO $ worker q w m n
     yield
 
     putStrLn ("P4\n"++show w++" "++show w)
