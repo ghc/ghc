@@ -511,6 +511,24 @@ ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-inst
 endif
 BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
 
+# -----------------------------------------------
+# Haddock-related bits
+
+# Run Haddock for the packages that will be installed. We need to handle
+# compiler specially due to the different dist directory name.
+$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
+compiler_stage2_DO_HADDOCK = YES
+
+# Build the Haddock contents and index
+ifeq "$(HADDOCK_DOCS)" "YES"
+libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
+	cd libraries && sh gen_contents_index --intree
+ifeq "$(phase)" "final"
+$(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
+endif
+INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
+endif
+
 # ----------------------------------------
 # Special magic for the ghc-prim package
 
@@ -565,6 +583,9 @@ endif
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 
+# These need to be in dependency order, as some of the rules refer to
+# variables defined by their dependencies
+
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
    $(GHC_MKDIRHIER_DIR)
@@ -614,9 +635,7 @@ endif
 
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE1)) \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
-   libraries/dph
+   $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 endif
 
 
@@ -650,6 +669,12 @@ BUILD_DIRS += \
    $(MAYBE_HPC) \
    $(MAYBE_RUNGHC) \
    ghc
+
+ifneq "$(CLEANING)" "YES"
+BUILD_DIRS += \
+   $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
+   libraries/dph
+endif
 
 ifneq "$(BINDIST)" "YES"
 ifneq "$(CrossCompiling)-$(phase)" "YES-final"
@@ -685,24 +710,6 @@ $(foreach pkg,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist
 
 # Add $(GhcBootLibHcOpts) to all stage0 package builds
 $(foreach pkg,$(PACKAGES_STAGE0),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
-
-# -----------------------------------------------
-# Haddock-related bits
-
-# Run Haddock for the packages that will be installed. We need to handle
-# compiler specially due to the different dist directory name.
-$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
-compiler_stage2_DO_HADDOCK = YES
-
-# Build the Haddock contents and index
-ifeq "$(HADDOCK_DOCS)" "YES"
-libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
-	cd libraries && sh gen_contents_index --intree
-ifeq "$(phase)" "final"
-$(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
-endif
-INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
-endif
 
 # -----------------------------------------------------------------------------
 # Bootstrapping libraries
