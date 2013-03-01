@@ -28,22 +28,7 @@ module Control.Monad.ST.Lazy (
         -- * Converting 'ST' To 'IO'
         RealWorld,
         stToIO,
-
-        -- * Unsafe Functions
-        unsafeInterleaveST,
-        unsafeIOToST
     ) where
 
 import Control.Monad.ST.Lazy.Safe
-import qualified Control.Monad.ST.Lazy.Unsafe as U
-
-{-# DEPRECATED unsafeInterleaveST, unsafeIOToST "Please import from Control.Monad.ST.Lazy.Unsafe instead; This will be removed in the next release" #-} -- deprecated in 7.2
-
-{-# INLINE unsafeInterleaveST #-}
-unsafeInterleaveST :: ST s a -> ST s a
-unsafeInterleaveST = U.unsafeInterleaveST
-
-{-# INLINE unsafeIOToST #-}
-unsafeIOToST :: IO a -> ST s a
-unsafeIOToST = U.unsafeIOToST
 
