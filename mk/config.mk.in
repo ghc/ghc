@@ -315,10 +315,7 @@ SplitObjs=$(SupportsSplitObjs)
 # ----------------------------------------------------------------------------
 # Package-related things
 
-# Extra packages to add to the build, in dependency order
-EXTRA_PACKAGES =
-
-# Whether to install $(EXTRA_PACKAGES)
+# Whether to install the extra packages
 InstallExtraPackages = NO
 
 # Run "ghc-pkg check" on each package

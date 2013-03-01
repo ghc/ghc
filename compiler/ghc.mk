@@ -409,10 +409,6 @@ compiler_stage1_REGISTER_PACKAGE = NO
 
 endif
 
-# haddocking only happens for stage2
-compiler_stage1_DO_HADDOCK = NO
-compiler_stage3_DO_HADDOCK = NO
-
 # Don't do splitting for the GHC package, it takes too long and
 # there's not much benefit.
 compiler_stage1_SplitObjs = NO

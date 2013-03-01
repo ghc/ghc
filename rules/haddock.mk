@@ -15,7 +15,7 @@ define haddock  # args: $1 = dir,  $2 = distdir
 $(call trace, haddock($1,$2))
 $(call profStart, haddock($1,$2))
 
-ifneq "$$($1_$2_DO_HADDOCK)" "NO"
+ifeq "$$($1_$2_DO_HADDOCK)" "YES"
 
 ifeq "$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE)" ""
 $$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE = $1/$2/doc/html/$$($1_PACKAGE)/$$($1_PACKAGE).haddock

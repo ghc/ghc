@@ -271,7 +271,7 @@ include rules/build-package.mk
 include rules/build-package-way.mk
 include rules/haddock.mk
 include rules/tags-package.mk
-include rules/extra-packages.mk
+include rules/foreachLibrary.mk
 
 # -----------------------------------------------------------------------------
 # Registering hand-written package descriptions (used in rts)
@@ -322,54 +322,6 @@ endif
 	@:
 
 # -----------------------------------------------------------------------------
-# Properties of packages
-
-# These lists say "if this package is built, here's a property it has"
-# They do not say "this package will be built"; see $(PACKAGES_STAGExx) for that
-
-# Packages that are built but not installed
-PKGS_THAT_ARE_INTREE_ONLY := haskeline terminfo xhtml
-
-PKGS_THAT_ARE_DPH := \
-    dph/dph-base \
-    dph/dph-prim-interface dph/dph-prim-seq dph/dph-prim-par \
-    dph/dph-lifted-base \
-    dph/dph-lifted-boxed dph/dph-lifted-copy dph/dph-lifted-vseg \
-    vector primitive random
-
-# Packages that, if present, must be built by the stage2 compiler,
-# because they use TH and/or annotations, or depend on other stage2
-# packages:
-PKGS_THAT_BUILD_WITH_STAGE2 := $(PKGS_THAT_ARE_DPH)
-ifeq "$(CrossCompiling)" "NO"
-# We cannot use the stage 2 compiler, it runs on $(TARGETPLATFORM)
-PKGS_THAT_BUILD_WITH_STAGE2 +=  old-time haskell98 haskell2010
-endif
-
-# Packages that we shouldn't build if we don't have TH (e.g. because
-# we're building a profiled compiler):
-PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
-
-# Packages that are built by stage0, in addition to stage1.  These
-# packages are dependencies of GHC, that we do not assume the stage0
-# compiler already has installed (or up-to-date enough).
-#
-# We assume that the stage0 compiler has a suitable bytestring package,
-# so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
-ifeq "$(Windows)" "NO"
-PKGS_THAT_BUILD_WITH_STAGE0 += terminfo
-endif
-
-# $(EXTRA_PACKAGES)  is another classification, of packages built but
-#                    not installed
-#                    It is set in rules/extra-package.mk, 
-#                    by $(call extra-packages) a little further down 
-#                    this ghc.mk 
-
-
-
-# ----------------------------------------------------------------------------
 # Packages to build
 # The lists of packages that we *actually* going to build in each stage:
 #
@@ -377,83 +329,119 @@ endif
 #  $(PACKAGES_STAGE1)
 #  $(PACKAGES_STAGE2)
 #
-# These are automatically derived from
-#    (a) the set of packages in this source tree
-#    (b) the predicates above, e.g. $(PKGS_THAT_BUILD_WITH_STAGE2)
-#    (c) which platform we're on, and a few other things
-
-
-# no processing to do on this one: it really is the list of packages
-# to build with stage 0.
-PACKAGES_STAGE0 = $(PKGS_THAT_BUILD_WITH_STAGE0)
-
-define addPackageGeneral
-# args: $1 = PACKAGES variable, $2 = package, $3 = condition
-    ifeq "$3" ""
-        $1 += $2
-    else
-        ifeq "$$(CLEANING)" "YES"
-            $1 += $2
-        else
-            ifeq $3
-                $1 += $2
-            endif
-        endif
-    endif
-endef
-
-define addPackage # args: $1 = package, $2 = condition
-ifneq "$(filter $1,$(PKGS_THAT_USE_TH)) $(GhcProfiled)" "$1 YES"
-ifeq "$(filter $1,$(PKGS_THAT_BUILD_WITH_STAGE2))" "$1"
-ifneq "$(CrossCompiling)" "YES"
-$(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
-endif
-else
-$(call addPackageGeneral,PACKAGES_STAGE1,$1,$2)
-endif
-endif
-endef
-
-# Add all the packages. Note that we need to add them in dependency
+# Note that we need to add them to these variables in dependency
 # order, as this is the order that they get configured in.
 
-$(eval $(call addPackage,ghc-prim))
 ifeq "$(CLEANING)" "YES"
-$(eval $(call addPackage,integer-gmp))
-$(eval $(call addPackage,integer-simple))
+
+define addLibraryForCleaning
+# We just add all packages to both the stage 0 and stage 1 lists.
+# Stage 2 gets cleaned in the same way as stage 1, so no need to
+# add it there.
+PACKAGES_STAGE0 += $1
+PACKAGES_STAGE1 += $1
+endef
+$(eval $(call foreachLibrary,addLibraryForCleaning))
+
 else
-$(eval $(call addPackage,$(INTEGER_LIBRARY)))
+
+# Packages that are built by stage0. These packages are dependencies of
+# programs such as GHC and ghc-pkg, that we do not assume the stage0
+# compiler already has installed (or up-to-date enough).
+
+PACKAGES_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
+ifeq "$(Windows)" "NO"
+PACKAGES_STAGE0 += terminfo
 endif
-$(eval $(call addPackage,base))
-$(eval $(call addPackage,filepath))
-$(eval $(call addPackage,array))
-$(eval $(call addPackage,deepseq))
-$(eval $(call addPackage,bytestring))
-$(eval $(call addPackage,containers))
-$(eval $(call addPackage,old-locale))
-$(eval $(call addPackage,old-time))
 
-$(eval $(call addPackage,Win32,($$(Windows),YES)))
-$(eval $(call addPackage,time))
-$(eval $(call addPackage,unix,($$(Windows),NO)))
+PACKAGES_STAGE1 += ghc-prim
+PACKAGES_STAGE1 += $(INTEGER_LIBRARY)
+PACKAGES_STAGE1 += base
+PACKAGES_STAGE1 += filepath
+PACKAGES_STAGE1 += array
+PACKAGES_STAGE1 += deepseq
+PACKAGES_STAGE1 += bytestring
+PACKAGES_STAGE1 += containers
+PACKAGES_STAGE1 += old-locale
 
-$(eval $(call addPackage,directory))
-$(eval $(call addPackage,process))
-$(eval $(call addPackage,haskell98))
-$(eval $(call addPackage,haskell2010))
-$(eval $(call addPackage,hpc))
-$(eval $(call addPackage,pretty))
-$(eval $(call addPackage,template-haskell))
-$(eval $(call addPackage,Cabal/Cabal))
-$(eval $(call addPackage,binary))
-$(eval $(call addPackage,bin-package-db))
-$(eval $(call addPackage,hoopl))
-$(eval $(call addPackage,transformers))
-$(eval $(call addPackage,xhtml))
-$(eval $(call addPackage,terminfo,($$(Windows),NO)))
-$(eval $(call addPackage,haskeline))
+ifeq "$(Windows)" "YES"
+PACKAGES_STAGE1 += Win32
+endif
+PACKAGES_STAGE1 += time
+ifeq "$(Windows)" "NO"
+PACKAGES_STAGE1 += unix
+endif
 
-$(eval $(call extra-packages))
+PACKAGES_STAGE1 += directory
+PACKAGES_STAGE1 += process
+PACKAGES_STAGE1 += hpc
+PACKAGES_STAGE1 += pretty
+PACKAGES_STAGE1 += template-haskell
+PACKAGES_STAGE1 += Cabal/Cabal
+PACKAGES_STAGE1 += binary
+PACKAGES_STAGE1 += bin-package-db
+PACKAGES_STAGE1 += hoopl
+PACKAGES_STAGE1 += transformers
+
+ifneq "$(CrossCompiling)" "YES"
+PACKAGES_STAGE2 += old-time
+PACKAGES_STAGE2 += haskell98
+PACKAGES_STAGE2 += haskell2010
+endif
+
+# We normally install only the packages down to this point
+REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
+ifeq "$(Stage1Only)" "NO"
+REGULAR_INSTALL_PACKAGES += compiler
+endif
+REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
+
+PACKAGES_STAGE1 += xhtml
+ifeq "$(Windows)" "NO"
+PACKAGES_STAGE1 += terminfo
+endif
+PACKAGES_STAGE1 += haskeline
+
+# If we have built the programs with dynamic libraries, then
+# ghc will be dynamically linked against haskeline.so etc, so
+# we need the dynamic libraries of everything down to here
+REGULAR_INSTALL_DYNLIBS := $(addprefix libraries/,$(PACKAGES_STAGE1))
+REGULAR_INSTALL_DYNLIBS += $(addprefix libraries/,$(PACKAGES_STAGE2))
+REGULAR_INSTALL_DYNLIBS := $(filter-out $(REGULAR_INSTALL_PACKAGES),\
+                                        $(REGULAR_INSTALL_DYNLIBS))
+
+ifneq "$(CrossCompiling)" "YES"
+define addExtraPackage
+ifeq "$2" "-"
+# Do nothing; this package is already handled above
+else ifeq "$2 $$(GhcProfiled)" "dph YES"
+# Ignore the package: These packages need TH, which is incompatible
+# with a profiled GHC
+else
+PACKAGES_STAGE2 += $1
+endif
+endef
+$(eval $(call foreachLibrary,addExtraPackage))
+endif
+
+# If we want to just install evreything, then we want all the packages
+SUPERSIZE_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
+ifeq "$(Stage1Only)" "NO"
+SUPERSIZE_INSTALL_PACKAGES += compiler
+endif
+SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
+
+INSTALL_DYNLIBS  :=
+ifeq "$(InstallExtraPackages)" "NO"
+INSTALL_PACKAGES := $(REGULAR_INSTALL_PACKAGES)
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+INSTALL_DYNLIBS := $(REGULAR_INSTALL_DYNLIBS)
+endif
+else
+INSTALL_PACKAGES := $(SUPERSIZE_INSTALL_PACKAGES)
+endif
+
+endif
 
 # -------------------------------------------
 # Dependencies between package-data.mk files
@@ -622,8 +610,11 @@ endif
 
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
+   $(patsubst %, libraries/%, $(PACKAGES_STAGE1)) \
+   $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
+   libraries/dph
 endif
+
 
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 BUILD_DIRS += libraries/integer-gmp/gmp
@@ -666,22 +657,10 @@ endif
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
 
-ifneq "$(CLEANING)" "YES"
-# After compiler/, because these packages depend on it
-BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
-endif
-
 # ----------------------------------------------
 # Actually include all the sub-ghc.mk's
 
-# BUILD_DIRS_EXTRA needs to come after BUILD_DIRS, because stuff in
-# libraries/dph/ghc.mk refers to stuff defined earlier, in particular
-# things like $(libraries/dph/dph-base_dist-install_GHCI_LIB)
-ifeq "$(GhcProfiled)" "YES"
-BUILD_DIRS_EXTRA := $(filter-out libraries/dph,$(BUILD_DIRS_EXTRA))
-endif
-include $(patsubst %, %/ghc.mk, $(BUILD_DIRS) $(BUILD_DIRS_EXTRA))
+include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 
 # A useful pseudo-target (must be after the include above, because it needs
 # the value of things like $(libraries/base_dist-install_v_LIB).
@@ -706,10 +685,10 @@ $(foreach pkg,$(PACKAGES_STAGE0),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$
 # -----------------------------------------------
 # Haddock-related bits
 
-# Don't run Haddock for the package that will not be installed
-$(foreach p,$(PKGS_THAT_ARE_INTREE_ONLY),$(eval libraries/$p_dist-install_DO_HADDOCK = NO))
-# We don't haddock the bootstrapping libraries
-$(foreach p,$(PACKAGES_STAGE0),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
+# Run Haddock for the packages that will be installed. We need to handle
+# compiler specially due to the different dist directory name.
+$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
+compiler_stage2_DO_HADDOCK = YES
 
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
@@ -899,20 +878,8 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
-INSTALLED_PKG_DIRS := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifeq "$(Stage1Only)" "NO"
-INSTALLED_PKG_DIRS := $(INSTALLED_PKG_DIRS) compiler
-endif
-INSTALLED_PKG_DIRS := $(INSTALLED_PKG_DIRS) $(addprefix libraries/,$(PACKAGES_STAGE2))
-ifeq "$(InstallExtraPackages)" "NO"
-INSTALLED_PKG_DIRS := $(filter-out $(addprefix libraries/,$(EXTRA_PACKAGES)),\
-                                   $(INSTALLED_PKG_DIRS))
-endif
-INSTALLED_PKG_DIRS := $(filter-out $(addprefix libraries/,$(PKGS_THAT_ARE_INTREE_ONLY)),\
-                                   $(INSTALLED_PKG_DIRS))
-
 # Set the INSTALL_DISTDIR_p for each package; compiler is special
-$(foreach p,$(filter-out compiler,$(INSTALLED_PKG_DIRS)),\
+$(foreach p,$(filter-out compiler,$(INSTALL_PACKAGES)),\
    $(eval INSTALL_DISTDIR_$p = dist-install))
 INSTALL_DISTDIR_compiler = stage2
 
@@ -924,11 +891,9 @@ install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts-1.0")
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
-	$(foreach p, $(PKGS_THAT_ARE_INTREE_ONLY), \
+	$(foreach p, $(INSTALL_DYNLIBS), \
 	    $(call installLibsTo, $(wildcard libraries/$p/dist-install/build/*.so libraries/$p/dist-install/build/*.dll libraries/$p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$p-$(libraries/$p_dist-install_VERSION)"))
-endif
-	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
+	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(GHC_CABAL_INPLACE)" copy                        \
 	                                  "$(STRIP_CMD)"              \
@@ -938,7 +903,7 @@ endif
 	                                  '$(ghclibdir)'              \
 	                                  '$(docdir)/html/libraries'))
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
-	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
+	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(GHC_CABAL_INPLACE)" register                    \
 	                                  "$(INSTALLED_GHC_REAL)"     \
