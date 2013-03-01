@@ -139,6 +139,12 @@ struct Capability_ {
 
     // Stats on spark creation/conversion
     SparkCounters spark_stats;
+
+    // Indicates that a scheduler has picked up this capability in order to
+    // initiate parallel execution. This is utilized by
+    // schedulerThreadOnFreeCap function. Can modify only after grabbing hold
+    // of the capability!
+    rtsBool picked_up_by_ULS;
 #endif
     // Total words allocated by this cap since rts start
     W_ total_allocated;

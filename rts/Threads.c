@@ -908,7 +908,7 @@ printThreadStatus(StgTSO *t)
   debugBelch("\n");
 }
 
-  void
+void
 printAllThreads(void)
 {
   StgTSO *t, *next;

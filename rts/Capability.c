@@ -250,6 +250,7 @@ initCapability( Capability *cap, nat i )
   cap->spark_stats.converted  = 0;
   cap->spark_stats.gcd        = 0;
   cap->spark_stats.fizzled    = 0;
+  cap->picked_up_by_ULS       = rtsFalse;
 #endif
   cap->total_allocated        = 0;
 
