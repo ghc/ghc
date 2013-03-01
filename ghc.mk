@@ -32,7 +32,7 @@ utils/haddock_dist_MODULES += Paths_haddock
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_utils/haddock_data
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 install: install_utils/haddock_link
 endif
 endif
