@@ -20,8 +20,6 @@ GHC_INCLUDE_DIRS        = includes includes/dist includes/dist-derivedconstants/
 GHC_RTS_DIR             = rts
 GHC_DRIVER_DIR          = driver
 
-GHC_LTX_DIR             = $(GHC_UTILS_DIR)/ltx
-GHC_LNDIR_DIR           = $(GHC_UTILS_DIR)/lndir
 GHC_MKDIRHIER_DIR       = $(GHC_UTILS_DIR)/mkdirhier
 GHC_UNLIT_DIR           = $(GHC_UTILS_DIR)/unlit
 GHC_HP2PS_DIR           = $(GHC_UTILS_DIR)/hp2ps

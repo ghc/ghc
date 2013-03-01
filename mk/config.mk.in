@@ -433,9 +433,6 @@ SRC_HC_OPTS += -H32m -O
 # These flags make flex 8-bit
 SRC_FLEX_OPTS	+= -8
 
-# Flags for CPP when running GreenCard on .pgc files
-GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
-
 
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
@@ -444,8 +441,6 @@ GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
 #      xxx              the executable relative to the current dir
 
 GHC_UNLIT_PGM           = unlit$(exeext)
-GHC_HP2PS_PGM           = hp2ps$(exeext)
-GHC_GHCTAGS_PGM         = ghctags$(exeext)
 GHC_HSC2HS_PGM          = hsc2hs$(exeext)
 GHC_TOUCHY_PGM          = touchy$(exeext)
 GHC_SPLIT_PGM           = ghc-split
@@ -454,23 +449,10 @@ GHC_GENPRIMOP_PGM       = genprimopcode$(exeext)
 GHC_GENAPPLY_PGM        = genapply$(exeext)
 GHC_CABAL_PGM           = ghc-cabal$(exeext)
 GHC_PKG_PGM             = ghc-pkg$(exeext)
-GHC_LTX_PGM             = ltx$(exeext)
 GHC_MKDIRHIER_PGM       = mkdirhier
-GHC_LNDIR_PGM           = lndir
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-GHC_CP			= "xcopy /y"
-GHC_PERL		= perl
-else
-GHC_CP			= $(CP)
-GHC_PERL		= $(PERL)
-endif
-
-HP2PS			= $(GHC_HP2PS_DIR)/$(GHC_HP2PS_PGM)
 SPLIT			= $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
 SYSMAN 			= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
-LTX 			= $(GHC_LTX_DIR)/$(GHC_LTX_PGM)
-LNDIR			= $(GHC_LNDIR_DIR)/$(GHC_LNDIR_PGM)
 
 UNLIT			= $(INPLACE_LIB)/$(GHC_UNLIT_PGM)
 TOUCHY                  = $(INPLACE_LIB)/$(GHC_TOUCHY_PGM)
@@ -478,7 +460,6 @@ MKDIRHIER		= $(INPLACE_BIN)/$(GHC_MKDIRHIER_PGM)
 GHC_CABAL_INPLACE	= $(INPLACE_BIN)/$(GHC_CABAL_PGM)
 GENAPPLY_INPLACE	= $(INPLACE_BIN)/$(GHC_GENAPPLY_PGM)
 GHC_PKG_INPLACE		= $(INPLACE_BIN)/$(GHC_PKG_PGM)
-GHCTAGS_INPLACE		= $(INPLACE_BIN)/$(GHC_GHCTAGS_PGM)
 HSC2HS_INPLACE		= $(INPLACE_BIN)/$(GHC_HSC2HS_PGM)
 GENPRIMOP_INPLACE	= $(INPLACE_BIN)/$(GHC_GENPRIMOP_PGM)
 
@@ -689,17 +670,12 @@ FIND			= @FindCmd@
 INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 
-LATEX			= latex
-PDFLATEX                = pdflatex
-BIBTEX                  = bibtex
 LN_S			= @LN_S@
 MV			= mv
-NROFF			= nroff
 PERL 			= @PerlCmd@
 PIC			= pic
 RANLIB			= @RANLIB@
 SED			= @SedCmd@
-TR 			= tr
 SHELL			= /bin/sh
 
 HaveDtrace		= @HaveDtrace@
