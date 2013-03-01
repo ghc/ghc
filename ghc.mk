@@ -587,29 +587,24 @@ endif
 # variables defined by their dependencies
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += \
-   $(GHC_MKDIRHIER_DIR)
+BUILD_DIRS += $(GHC_MKDIRHIER_DIR)
 endif
 
 ifeq "$(Windows_Host)" "YES"
-BUILD_DIRS += \
-   $(GHC_TOUCHY_DIR)
+BUILD_DIRS += $(GHC_TOUCHY_DIR)
 endif
 
-BUILD_DIRS += \
-   docs/users_guide \
-   docs/man \
-   $(GHC_UNLIT_DIR) \
-   $(GHC_HP2PS_DIR)
+BUILD_DIRS += docs/users_guide
+BUILD_DIRS += docs/man
+BUILD_DIRS += $(GHC_UNLIT_DIR)
+BUILD_DIRS += $(GHC_HP2PS_DIR)
 
 ifneq "$(GhcUnregisterised)" "YES"
-BUILD_DIRS += \
-   $(GHC_SPLIT_DIR)
+BUILD_DIRS += $(GHC_SPLIT_DIR)
 endif
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += \
-   $(GHC_GENPRIMOP_DIR)
+BUILD_DIRS += $(GHC_GENPRIMOP_DIR)
 endif
 
 ifeq "$(Stage1Only)-$(phase)" "YES-final"
@@ -618,24 +613,21 @@ else
 MAYBE_GHCI=driver/ghci
 endif
 
-BUILD_DIRS += \
-   driver \
-   $(MAYBE_GHCI) \
-   driver/ghc \
-   driver/haddock \
-   libffi \
-   includes \
-   rts
+BUILD_DIRS += driver
+BUILD_DIRS += $(MAYBE_GHCI)
+BUILD_DIRS += driver/ghc
+BUILD_DIRS += driver/haddock
+BUILD_DIRS += libffi
+BUILD_DIRS += includes
+BUILD_DIRS += rts
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += \
-   bindisttest \
-   $(GHC_GENAPPLY_DIR)
+BUILD_DIRS += bindisttest 
+BUILD_DIRS += $(GHC_GENAPPLY_DIR)
 endif
 
 ifneq "$(CLEANING)" "YES"
-BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
+BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 endif
 
 
@@ -655,31 +647,28 @@ MAYBE_HPC=utils/hpc
 MAYBE_RUNGHC=utils/runghc
 endif
 
-BUILD_DIRS += \
-   utils/haddock \
-   utils/haddock/doc \
-   compiler \
-   $(GHC_HSC2HS_DIR) \
-   $(GHC_PKG_DIR) \
-   utils/deriveConstants \
-   utils/testremove \
-   $(MAYBE_GHCTAGS) \
-   utils/ghc-pwd \
-   $(GHC_CABAL_DIR) \
-   $(MAYBE_HPC) \
-   $(MAYBE_RUNGHC) \
-   ghc
+BUILD_DIRS += utils/haddock
+BUILD_DIRS += utils/haddock/doc
+BUILD_DIRS += compiler
+BUILD_DIRS += $(GHC_HSC2HS_DIR)
+BUILD_DIRS += $(GHC_PKG_DIR)
+BUILD_DIRS += utils/deriveConstants
+BUILD_DIRS += utils/testremove
+BUILD_DIRS += $(MAYBE_GHCTAGS)
+BUILD_DIRS += utils/ghc-pwd
+BUILD_DIRS += $(GHC_CABAL_DIR)
+BUILD_DIRS += $(MAYBE_HPC)
+BUILD_DIRS += $(MAYBE_RUNGHC)
+BUILD_DIRS += ghc
 
 ifneq "$(CLEANING)" "YES"
-BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
-   libraries/dph
+BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
+BUILD_DIRS += libraries/dph
 endif
 
 ifneq "$(BINDIST)" "YES"
 ifneq "$(CrossCompiling)-$(phase)" "YES-final"
-BUILD_DIRS += \
-   utils/mkUserGuidePart
+BUILD_DIRS += utils/mkUserGuidePart
 endif
 endif
 
