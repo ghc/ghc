@@ -530,6 +530,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
              env = PipeEnv{ pe_isHaskellishFile = isHaskellishFile,
                             stop_phase,
+                            src_filename = input_fn,
                             src_basename = basename,
                             src_suffix = suffix',
                             output_spec = output }
@@ -548,8 +549,8 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                               ++ input_fn))
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
-         r <- runPipeline' start_phase stop_phase hsc_env env input_fn
-                           output maybe_loc maybe_stub_o
+         r <- runPipeline' start_phase hsc_env env input_fn
+                           maybe_loc maybe_stub_o
 
          -- If we are compiling a Haskell module, and doing
          -- -dynamic-too, but couldn't do the -dynamic-too fast
@@ -566,51 +567,26 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                            Temporary -> Temporary
                  env' = env { output_spec = output' }
              hsc_env' <- newHscEnv dflags'
-             _ <- runPipeline' start_phase stop_phase hsc_env' env' input_fn
-                               output' maybe_loc maybe_stub_o
+             _ <- runPipeline' start_phase hsc_env' env' input_fn
+                               maybe_loc maybe_stub_o
              return ()
          return r
 
 runPipeline'
   :: Phase                      -- ^ When to start
-  -> Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
   -> PipeEnv
   -> FilePath                   -- ^ Input filename
-  -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
-runPipeline' start_phase stop_phase hsc_env env input_fn
-             output maybe_loc maybe_stub_o
+runPipeline' start_phase hsc_env env input_fn
+             maybe_loc maybe_stub_o
   = do
-  -- this is a function which will be used to calculate output file names
-  -- as we go along (we partially apply it to some of its inputs here)
-  let get_output_fn = getOutputFilename stop_phase output (src_basename env)
-
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
 
-  (state', output_fn) <- unP (pipeLoop start_phase input_fn) env state
-
-  let PipeState{ hsc_env=hsc_env', maybe_loc } = state'
-      dflags = hsc_dflags hsc_env'
-
-  -- Sometimes, a compilation phase doesn't actually generate any output
-  -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
-  -- stage, but we wanted to keep the output, then we have to explicitly
-  -- copy the file, remembering to prepend a {-# LINE #-} pragma so that
-  -- further compilation stages can tell what the original filename was.
-  case output of
-    Temporary ->
-        return (dflags, output_fn)
-    _ ->
-        do final_fn <- get_output_fn dflags stop_phase maybe_loc
-           when (final_fn /= output_fn) $ do
-              let msg = ("Copying `" ++ output_fn ++"' to `" ++ final_fn ++ "'")
-                  line_prag = Just ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}\n")
-              copyWithHeader dflags msg line_prag output_fn final_fn
-           return (dflags, final_fn)
+  evalP (pipeLoop start_phase input_fn) env state
 
 -- -----------------------------------------------------------------------------
 -- The pipeline uses a monad to carry around various bits of information
@@ -619,6 +595,7 @@ runPipeline' start_phase stop_phase hsc_env env input_fn
 data PipeEnv = PipeEnv {
        pe_isHaskellishFile :: Bool,
        stop_phase   :: Phase,       -- ^ Stop just before this phase
+       src_filename :: String,      -- ^ basename of original input source
        src_basename :: String,      -- ^ basename of original input source
        src_suffix   :: String,      -- ^ its extension
        output_spec  :: PipelineOutput -- ^ says where to put the pipeline output
@@ -662,6 +639,9 @@ setStubO stub_o = P $ \_env state ->
 
 newtype CompPipeline a = P { unP :: PipeEnv -> PipeState -> IO (PipeState, a) }
 
+evalP :: CompPipeline a -> PipeEnv -> PipeState -> IO a
+evalP f env st = liftM snd $ unP f env st
+
 instance Monad CompPipeline where
   return a = P $ \_env state -> return (state, a)
   P m >>= k = P $ \env state -> do (state',a) <- m env state
@@ -682,22 +662,41 @@ phaseOutputFilename next_phase = do
 -- outer pipeline loop
 
 -- | pipeLoop runs phases until we reach the stop phase
-pipeLoop :: Phase -> FilePath -> CompPipeline FilePath
+pipeLoop :: Phase -> FilePath -> CompPipeline (DynFlags, FilePath)
 pipeLoop phase input_fn = do
-  PipeEnv{stop_phase} <- getPipeEnv
+  env <- getPipeEnv
   dflags <- getDynFlags
   let happensBefore' = happensBefore dflags
+      stopPhase = stop_phase env
   case () of
-   _ | phase `eqPhase` stop_phase            -- All done
-     -> return input_fn
+   _ | phase `eqPhase` stopPhase            -- All done
+     -> -- Sometimes, a compilation phase doesn't actually generate any output
+        -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
+        -- stage, but we wanted to keep the output, then we have to explicitly
+        -- copy the file, remembering to prepend a {-# LINE #-} pragma so that
+        -- further compilation stages can tell what the original filename was.
+        case output_spec env of
+        Temporary ->
+            return (dflags, input_fn)
+        output ->
+            do pst <- getPipeState
+               final_fn <- liftIO $ getOutputFilename
+                                        stopPhase output (src_basename env)
+                                        dflags stopPhase (maybe_loc pst)
+               when (final_fn /= input_fn) $ do
+                  let msg = ("Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'")
+                      line_prag = Just ("{-# LINE 1 \"" ++ src_filename env ++ "\" #-}\n")
+                  liftIO $ copyWithHeader dflags msg line_prag input_fn final_fn
+               return (dflags, final_fn)
 
-     | not (phase `happensBefore'` stop_phase)
+
+     | not (phase `happensBefore'` stopPhase)
         -- Something has gone wrong.  We'll try to cover all the cases when
         -- this could happen, so if we reach here it is a panic.
         -- eg. it might happen if the -C flag is used on a source file that
         -- has {-# OPTIONS -fasm #-}.
      -> panic ("pipeLoop: at phase " ++ show phase ++
-           " but I wanted to stop at phase " ++ show stop_phase)
+           " but I wanted to stop at phase " ++ show stopPhase)
 
      | otherwise
      -> do liftIO $ debugTraceMsg dflags 4
