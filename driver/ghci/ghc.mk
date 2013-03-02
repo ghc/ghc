@@ -10,6 +10,7 @@
 #
 # -----------------------------------------------------------------------------
 
+ifeq "$(GhcWithInterpreter)" "YES"
 ifneq "$(Windows_Host)" "YES"
 
 install: install_driver_ghci
@@ -61,5 +62,6 @@ install_driver_ghcii:
 	cp $(GHCII_SCRIPT) $(GHCII_SCRIPT_VERSIONED)
 	$(EXECUTABLE_FILE) $(GHCII_SCRIPT_VERSIONED)
 
+endif
 endif
 

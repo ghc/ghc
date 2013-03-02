@@ -607,14 +607,8 @@ ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += $(GHC_GENPRIMOP_DIR)
 endif
 
-ifeq "$(Stage1Only)-$(phase)" "YES-final"
-MAYBE_GHCI=
-else
-MAYBE_GHCI=driver/ghci
-endif
-
 BUILD_DIRS += driver
-BUILD_DIRS += $(MAYBE_GHCI)
+BUILD_DIRS += driver/ghci
 BUILD_DIRS += driver/ghc
 BUILD_DIRS += driver/haddock
 BUILD_DIRS += libffi
