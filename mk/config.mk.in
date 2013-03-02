@@ -587,10 +587,20 @@ endif
 ifneq "$(Windows_Host)" "YES"
 SRC_HSC2HS_OPTS += --cross-safe
 endif
-SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)))
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
+
+define set_stage_HSC2HS_OPTS
+# $1 = stage
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --cflag=,$$(filter-out -O,$$(SRC_CC_OPTS) $$(CONF_CC_OPTS_STAGE$1)))
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --cflag=,$$(CONF_CPP_OPTS_STAGE$1))
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --lflag=,$$(CONF_GCC_LINKER_OPTS_STAGE$1))
+endef
+$(eval $(call set_stage_HSC2HS_OPTS,0))
+$(eval $(call set_stage_HSC2HS_OPTS,1))
+$(eval $(call set_stage_HSC2HS_OPTS,2))
 ifeq "$(CrossCompiling)" "YES"
-SRC_HSC2HS_OPTS += --cross-compile
+SRC_HSC2HS_OPTS_STAGE1 += --cross-compile
+SRC_HSC2HS_OPTS_STAGE2 += --cross-compile
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
