@@ -149,9 +149,8 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
 
-   let dflags' = dflags { hscTarget = hsc_lang,
-                                hscOutName = output_fn,
-                                extCoreName = basename ++ ".hcr" }
+   let dflags' = dflags { hscOutName = output_fn,
+                          extCoreName = basename ++ ".hcr" }
    let hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- -fforce-recomp should also work with --make
@@ -980,8 +979,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
         let next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
         output_fn  <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { hscTarget = hsc_lang,
-                               hscOutName = output_fn,
+        let dflags' = dflags { hscOutName = output_fn,
                                extCoreName = basename ++ ".hcr" }
 
         setDynFlags dflags'
@@ -1050,8 +1048,7 @@ runPhase Cmm input_fn dflags
 
         output_fn <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { hscTarget = hsc_lang,
-                               hscOutName = output_fn,
+        let dflags' = dflags { hscOutName = output_fn,
                                extCoreName = src_basename ++ ".hcr" }
 
         setDynFlags dflags'
