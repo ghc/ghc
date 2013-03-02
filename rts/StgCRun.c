@@ -686,7 +686,9 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
         ".globl " STG_RETURN "\n\t"
         THUMB_FUNC
+#if !defined(ios_HOST_OS)
         ".type " STG_RETURN ", %%function\n"
+#endif
         STG_RETURN ":\n\t"
         /*
          * Free the space we allocated
