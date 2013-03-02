@@ -707,30 +707,6 @@ ifeq "$(Windows_Host)" "YES"
 XARGS_OPTS = -s 20000
 endif
 
-#
-# In emergency situations, REAL_SHELL is used to perform shell commands
-# from within the ghc driver script, by scribbling the command line to
-# a temp file and then having $(REAL_SHELL) execute it. 
-#
-# The reason for having to do this is that overly long command lines
-# cause unnecessary trouble with some shells (e.g., /bin/sh on Solaris
-# 2.5.1), which is why this backdoor is provided. The situation of overly
-# long command lines is either encountered while doing `make boot' in compiler/, 
-# or when linking the compiler binary (`hsc'). 
-#
-# We do not use SHELL to execute long commands, as `make' will more than likely
-# override whatever setting you have in your environment while executing. 
-
-# By default, REAL_SHELL is set equal to SHELL, which is not really a smart move
-# as it is SHELL that will show up the bogosity in the first place, but setting
-# it to anything else isn't really portable.
-#
-#  ====> If long command lines cause you trouble, invoke `ghc' (via `make' or otherwise)
-# with REAL_SHELL set to something else than /bin/sh, for instance, your favourite
-# command shell.
-#
-REAL_SHELL     = $(SHELL)
-
 ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
 STRIP_CMD      = $(TOP)/inplace/mingw/bin/strip.exe
 else
