@@ -10,7 +10,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  MVar
+-- Module      :  LwConc.MVar
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
@@ -39,7 +39,6 @@ module LwConc.MVar
 import LwConc.Substrate
 import qualified Data.Sequence as Seq
 import GHC.IORef
-
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
 data MVPState a = Full a (Seq.Seq (a, PTM()))
