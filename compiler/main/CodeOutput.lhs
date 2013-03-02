@@ -49,7 +49,8 @@ codeOutput :: DynFlags
            -> ForeignStubs
            -> [PackageId]
            -> Stream IO RawCmmGroup ()                       -- Compiled C--
-           -> IO (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-})
+           -> IO (FilePath,
+                  (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
 
 codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
   = 
@@ -80,7 +81,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
              HscInterpreted -> panic "codeOutput: HscInterpreted";
              HscNothing     -> panic "codeOutput: HscNothing"
           }
-        ; return stubs_exist
+        ; return (filenm, stubs_exist)
         }
 
 doOutput :: String -> (Handle -> IO a) -> IO a

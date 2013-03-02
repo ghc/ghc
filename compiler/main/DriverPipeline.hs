@@ -108,7 +108,7 @@ compile = compile' (hscCompileNothing, hscCompileInteractive, hscCompileBatch)
 compile' :: 
            (Compiler (HscStatus, ModIface, ModDetails),
             Compiler (InteractiveStatus, ModIface, ModDetails),
-            Compiler (HscStatus, ModIface, ModDetails))
+            Compiler (FileOutputStatus, ModIface, ModDetails))
         -> HscEnv
         -> ModSummary      -- ^ summary for module being compiled
         -> Int             -- ^ module N ...
@@ -440,6 +440,10 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         -- When linking, the -o argument refers to the linker's output.
         -- otherwise, we use it as the name for the pipeline's output.
         output
+         -- If we are dong -fno-code, then act as if the output is
+         -- 'Temporary'. This stops GHC trying to copy files to their
+         -- final location.
+         | HscNothing <- hscTarget dflags = Temporary
          | StopLn <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
          | Just o_file <- mb_o_file = SpecificFile o_file
@@ -1011,7 +1015,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
                     -- than the source file (else we wouldn't be in HscNoRecomp)
                     -- but we touch it anyway, to keep 'make' happy (we think).
                     return (StopLn, o_file)
-          (HscRecomp hasStub _)
+          (HscRecomp hasStub mOutputFilename)
               -> do case hasStub of
                       Nothing -> return ()
                       Just stub_c ->
@@ -1019,12 +1023,19 @@ runPhase (Hsc src_flavour) input_fn dflags0
                              setStubO stub_o
                     -- In the case of hs-boot files, generate a dummy .o-boot
                     -- stamp file for the benefit of Make
-                    when (isHsBoot src_flavour) $ do
-                        liftIO $ touchObjectFile dflags' o_file
-                        whenGeneratingDynamicToo dflags' $ do
-                            let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
-                            liftIO $ touchObjectFile dflags' dyn_o_file
-                    return (next_phase, output_fn)
+                    outputFilename <-
+                        case mOutputFilename of
+                        Just x -> return x
+                        Nothing ->
+                            if isHsBoot src_flavour
+                            then do liftIO $ touchObjectFile dflags' o_file
+                                    whenGeneratingDynamicToo dflags' $ do
+                                        let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
+                                        liftIO $ touchObjectFile dflags' dyn_o_file
+                                    return o_file
+                            else return $ panic "runPhase Hsc: No output filename"
+
+                    return (next_phase, outputFilename)
 
 -----------------------------------------------------------------------------
 -- Cmm phase
