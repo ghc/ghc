@@ -579,14 +579,14 @@ stg_defaultUpcallErrorzh ()
 
 stg_atomicSwitchzh ( gcptr tso , W_ switch_reason )
 {
+
+again: MAYBE_GC(again);
   /* switch_reason: 1 - Blocking on a concurrent data structure
    *                2 - Yielding on the scheduler
    *                4 - Completing a thread
    */
   W_ frame_type, frame, trec, outer, valid, limit, q, next_invariant;
   W_ cap;
-
-	MAYBE_GC_P (stg_atomicSwitchzh, tso);
 
   #if defined(DEBUG) || defined (TRACING)
 

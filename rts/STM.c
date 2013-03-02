@@ -1354,16 +1354,16 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
       inv_old_trec = inv -> last_execution;
       if (inv_old_trec != NO_TREC) {
-	StgTRecChunk *c = inv_old_trec -> current_chunk;
-	while (c != END_STM_CHUNK_LIST) {
-	  unsigned int i;
-	  for (i = 0; i < c -> next_entry_idx; i ++) {
-	    TRecEntry *e = &(c -> entries[i]);
-	    TRACE("%p : ensuring we lock TVars for %p", trec, e -> tvar);
-	    merge_read_into (cap, trec, e -> tvar, e -> expected_value);
-	  }
-	  c = c -> prev_chunk;
-	}
+        StgTRecChunk *c = inv_old_trec -> current_chunk;
+        while (c != END_STM_CHUNK_LIST) {
+          unsigned int i;
+          for (i = 0; i < c -> next_entry_idx; i ++) {
+            TRecEntry *e = &(c -> entries[i]);
+            TRACE("%p : ensuring we lock TVars for %p", trec, e -> tvar);
+            merge_read_into (cap, trec, e -> tvar, e -> expected_value);
+          }
+          c = c -> prev_chunk;
+        }
       }
       q = q -> next_queue_entry;
     }
@@ -1410,43 +1410,43 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
       //    from the TVars they depended on last time they were executed
       //    and hook them on the TVars that they now depend on.
       if (touched_invariants) {
-	StgInvariantCheckQueue *q = trec -> invariants_to_check;
-	while (q != END_INVARIANT_CHECK_QUEUE) {
-	  StgAtomicInvariant *inv = q -> invariant;
-	  if (inv -> last_execution != NO_TREC) {
-	    disconnect_invariant(cap, inv);
-	  }
+        StgInvariantCheckQueue *q = trec -> invariants_to_check;
+        while (q != END_INVARIANT_CHECK_QUEUE) {
+          StgAtomicInvariant *inv = q -> invariant;
+          if (inv -> last_execution != NO_TREC) {
+            disconnect_invariant(cap, inv);
+          }
 
-	  TRACE("%p : hooking up new execution trec=%p", trec, q -> my_execution);
-	  connect_invariant_to_trec(cap, inv, q -> my_execution);
+          TRACE("%p : hooking up new execution trec=%p", trec, q -> my_execution);
+          connect_invariant_to_trec(cap, inv, q -> my_execution);
 
-	  TRACE("%p : unlocking invariant %p", trec, inv);
+          TRACE("%p : unlocking invariant %p", trec, inv);
           unlock_inv(inv);
 
-	  q = q -> next_queue_entry;
-	}
+          q = q -> next_queue_entry;
+        }
       }
 
       // 2. Make the updates required by the transaction
       FOR_EACH_ENTRY(trec, e, {
-        StgTVar *s;
-        s = e -> tvar;
-        if ((!use_read_phase) || (e -> new_value != e -> expected_value)) {
+          StgTVar *s;
+          s = e -> tvar;
+          if ((!use_read_phase) || (e -> new_value != e -> expected_value)) {
           // Either the entry is an update or we're not using a read phase:
-	  // write the value back to the TVar, unlocking it if necessary.
+          // write the value back to the TVar, unlocking it if necessary.
 
           ACQ_ASSERT(tvar_is_locked(s, trec));
           TRACE("%p : writing %p to %p, waking waiters", trec, e -> new_value, s);
           unpark_waiters_on(cap,s);
           IF_STM_FG_LOCKS({
-            s -> num_updates ++;
-          });
+                          s -> num_updates ++;
+                          });
           unlock_tvar(cap, trec, s, e -> new_value, TRUE);
-        }
-        ACQ_ASSERT(!tvar_is_locked(s, trec));
-      });
+          }
+          ACQ_ASSERT(!tvar_is_locked(s, trec));
+          });
     } else {
-        revert_ownership(cap, trec, FALSE);
+      revert_ownership(cap, trec, FALSE);
     }
   }
 
