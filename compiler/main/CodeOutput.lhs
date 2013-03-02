@@ -74,10 +74,10 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
         ; let filenm = hscOutName dflags 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
-             HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm linted_cmm_stream;
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
+             HscInterpreted -> panic "codeOutput: HscInterpreted";
              HscNothing     -> panic "codeOutput: HscNothing"
           }
         ; return stubs_exist
