@@ -851,18 +851,6 @@ dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
 AC_CHECK_FUNCS([eventfd])
 
-# test for GTK+
-AC_PATH_PROGS([GTK_CONFIG], [pkg-config])
-if test -n "$GTK_CONFIG"; then
-  if $GTK_CONFIG gtk+-2.0 --atleast-version=2.0; then
-    GTK_CONFIG="$GTK_CONFIG gtk+-2.0"
-  else
-    AC_MSG_WARN([GTK+ not usable, need at least version 2.0])
-    GTK_CONFIG=
-  fi
-fi
-AC_SUBST([GTK_CONFIG])
-
 # checking for PAPI
 AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
 AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])

@@ -345,9 +345,6 @@ LAX_DEPENDENCIES = NO
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-O2 -fomit-frame-pointer
 
-# Include the front panel code?  Needs GTK+.
-GhcRtsWithFrontPanel = NO
-
 # Include support for CPU performance counters via the PAPI library in the RTS?
 # (PAPI: http://icl.cs.utk.edu/papi/)
 GhcRtsWithPapi = NO
@@ -728,9 +725,6 @@ endif
 HSCOLOUR_CMD   = @HSCOLOUR@
 
 TIME_CMD       = @TimeCmd@
-
-# GTK+
-GTK_CONFIG_CMD = @GTK_CONFIG@
 
 # Set this if you want to use Inno Setup to build a Windows installer
 # when you make a bindist
