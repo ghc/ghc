@@ -665,7 +665,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * save callee-saves registers on behalf of the STG code.
          */
-        "stmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        "stmfd sp!, {r4-r11, ip, lr}\n\t"
 #if !defined(arm_HOST_ARCH_PRE_ARMv6)
         "vstmdb sp!, {d8-d11}\n\t"
 #endif
@@ -702,7 +702,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #if !defined(arm_HOST_ARCH_PRE_ARMv6)
         "vldmia sp!, {d8-d11}\n\t"
 #endif
-        "ldmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        "ldmfd sp!, {r4-r11, ip, lr}\n\t"
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
 #if !defined(__thumb__)
@@ -718,7 +718,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
            includes/stg/MachRegs.h Please note that Haskell code is
            compiled by GHC/LLVM into ARM code (not Thumb!), at least
            as of February 2012 */
-      : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%fp", "%ip", "%lr"
+      : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%11", "%ip", "%lr"
 #endif
     );
     return r;
