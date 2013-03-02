@@ -587,24 +587,24 @@ endif
 # variables defined by their dependencies
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += $(GHC_MKDIRHIER_DIR)
+BUILD_DIRS += utils/mkdirhier
 endif
 
 ifeq "$(Windows_Host)" "YES"
-BUILD_DIRS += $(GHC_TOUCHY_DIR)
+BUILD_DIRS += utils/touchy
 endif
 
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += docs/man
 BUILD_DIRS += $(GHC_UNLIT_DIR)
-BUILD_DIRS += $(GHC_HP2PS_DIR)
+BUILD_DIRS += utils/hp2ps
 
 ifneq "$(GhcUnregisterised)" "YES"
 BUILD_DIRS += $(GHC_SPLIT_DIR)
 endif
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += $(GHC_GENPRIMOP_DIR)
+BUILD_DIRS += utils/genprimopcode
 endif
 
 BUILD_DIRS += driver
@@ -617,7 +617,7 @@ BUILD_DIRS += rts
 
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += bindisttest 
-BUILD_DIRS += $(GHC_GENAPPLY_DIR)
+BUILD_DIRS += utils/genapply
 endif
 
 ifneq "$(CLEANING)" "YES"
@@ -644,8 +644,8 @@ endif
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
-BUILD_DIRS += $(GHC_HSC2HS_DIR)
-BUILD_DIRS += $(GHC_PKG_DIR)
+BUILD_DIRS += utils/hsc2hs
+BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/deriveConstants
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += $(MAYBE_GHCTAGS)

@@ -20,14 +20,7 @@ GHC_INCLUDE_DIRS        = includes includes/dist includes/dist-derivedconstants/
 GHC_RTS_DIR             = rts
 GHC_DRIVER_DIR          = driver
 
-GHC_MKDIRHIER_DIR       = $(GHC_UTILS_DIR)/mkdirhier
 GHC_UNLIT_DIR           = $(GHC_UTILS_DIR)/unlit
-GHC_HP2PS_DIR           = $(GHC_UTILS_DIR)/hp2ps
-GHC_HSC2HS_DIR          = $(GHC_UTILS_DIR)/hsc2hs
-GHC_TOUCHY_DIR          = $(GHC_UTILS_DIR)/touchy
-GHC_PKG_DIR             = $(GHC_UTILS_DIR)/ghc-pkg
-GHC_GENPRIMOP_DIR       = $(GHC_UTILS_DIR)/genprimopcode
-GHC_GENAPPLY_DIR        = $(GHC_UTILS_DIR)/genapply
 GHC_CABAL_DIR           = $(GHC_UTILS_DIR)/ghc-cabal
 GHC_SPLIT_DIR           = $(GHC_DRIVER_DIR)/split
 GHC_SYSMAN_DIR          = $(GHC_RTS_DIR)/parallel
