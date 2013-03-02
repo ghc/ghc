@@ -726,6 +726,8 @@ again: MAYBE_GC(again);
       //  - tso might be bound, or current task might be bound in which case we
       //    need to pass capability to correct task
       //  - task might have returned from a safe foreign call
+			//	- Pending upcalls
+			//	- and more..
       jump stg_switch_noregs [];
     } else {
       /* Transaction was not valid: try again */

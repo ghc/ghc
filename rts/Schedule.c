@@ -455,29 +455,28 @@ run_thread:
         dirty_TSO(cap,t);
         dirty_STACK(cap,t->stackobj);
 
-    switch (recent_activity)
-    {
-    case ACTIVITY_DONE_GC: {
-        // ACTIVITY_DONE_GC means we turned off the timer signal to
-        // conserve power (see #1623).  Re-enable it here.
-        nat prev;
-        prev = xchg((P_)&recent_activity, ACTIVITY_YES);
-        if (prev == ACTIVITY_DONE_GC) {
+        switch (recent_activity) {
+        case ACTIVITY_DONE_GC: {
+            // ACTIVITY_DONE_GC means we turned off the timer signal to
+            // conserve power (see #1623).  Re-enable it here.
+            nat prev;
+            prev = xchg((P_)&recent_activity, ACTIVITY_YES);
+            if (prev == ACTIVITY_DONE_GC) {
 #ifndef PROFILING
-            startTimer();
+                startTimer();
 #endif
+            }
+            break;
         }
-        break;
-    }
-    case ACTIVITY_INACTIVE:
-        // If we reached ACTIVITY_INACTIVE, then don't reset it until
-        // we've done the GC.  The thread running here might just be
-        // the IO manager thread that handle_tick() woke up via
-        // wakeUpRts().
-        break;
-    default:
-        recent_activity = ACTIVITY_YES;
-    }
+        case ACTIVITY_INACTIVE:
+            // If we reached ACTIVITY_INACTIVE, then don't reset it until
+            // we've done the GC.  The thread running here might just be
+            // the IO manager thread that handle_tick() woke up via
+            // wakeUpRts().
+            break;
+        default:
+            recent_activity = ACTIVITY_YES;
+        }
 
         traceEventRunThread(cap, t);
 
