@@ -711,50 +711,47 @@ pipeLoop phase input_fn = do
 getOutputFilename
   :: Phase -> PipelineOutput -> String
   -> DynFlags -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
-getOutputFilename stop_phase output basename
- = func
- where
-        func dflags next_phase maybe_location
-           | is_last_phase, Persistent <- output     = persistent_fn
-           | is_last_phase, SpecificFile f <- output = return f
-           | keep_this_output                        = persistent_fn
-           | otherwise                               = newTempName dflags suffix
-           where
-                hcsuf      = hcSuf dflags
-                odir       = objectDir dflags
-                osuf       = objectSuf dflags
-                keep_hc    = gopt Opt_KeepHcFiles dflags
-                keep_s     = gopt Opt_KeepSFiles dflags
-                keep_bc    = gopt Opt_KeepLlvmFiles dflags
+getOutputFilename stop_phase output basename dflags next_phase maybe_location
+ | is_last_phase, Persistent <- output     = persistent_fn
+ | is_last_phase, SpecificFile f <- output = return f
+ | keep_this_output                        = persistent_fn
+ | otherwise                               = newTempName dflags suffix
+    where
+          hcsuf      = hcSuf dflags
+          odir       = objectDir dflags
+          osuf       = objectSuf dflags
+          keep_hc    = gopt Opt_KeepHcFiles dflags
+          keep_s     = gopt Opt_KeepSFiles dflags
+          keep_bc    = gopt Opt_KeepLlvmFiles dflags
 
-                myPhaseInputExt HCc       = hcsuf
-                myPhaseInputExt MergeStub = osuf
-                myPhaseInputExt StopLn    = osuf
-                myPhaseInputExt other     = phaseInputExt other
+          myPhaseInputExt HCc       = hcsuf
+          myPhaseInputExt MergeStub = osuf
+          myPhaseInputExt StopLn    = osuf
+          myPhaseInputExt other     = phaseInputExt other
 
-                is_last_phase = next_phase `eqPhase` stop_phase
+          is_last_phase = next_phase `eqPhase` stop_phase
 
-                -- sometimes, we keep output from intermediate stages
-                keep_this_output =
-                     case next_phase of
-                             As      | keep_s     -> True
-                             LlvmOpt | keep_bc    -> True
-                             HCc     | keep_hc    -> True
-                             _other               -> False
+          -- sometimes, we keep output from intermediate stages
+          keep_this_output =
+               case next_phase of
+                       As      | keep_s     -> True
+                       LlvmOpt | keep_bc    -> True
+                       HCc     | keep_hc    -> True
+                       _other               -> False
 
-                suffix = myPhaseInputExt next_phase
+          suffix = myPhaseInputExt next_phase
 
-                -- persistent object files get put in odir
-                persistent_fn
-                   | StopLn <- next_phase = return odir_persistent
-                   | otherwise            = return persistent
+          -- persistent object files get put in odir
+          persistent_fn
+             | StopLn <- next_phase = return odir_persistent
+             | otherwise            = return persistent
 
-                persistent = basename <.> suffix
+          persistent = basename <.> suffix
 
-                odir_persistent
-                   | Just loc <- maybe_location = ml_obj_file loc
-                   | Just d <- odir = d </> persistent
-                   | otherwise      = persistent
+          odir_persistent
+             | Just loc <- maybe_location = ml_obj_file loc
+             | Just d <- odir = d </> persistent
+             | otherwise      = persistent
 
 
 -- -----------------------------------------------------------------------------
