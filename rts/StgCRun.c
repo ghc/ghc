@@ -684,7 +684,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
          */
         "bx %1\n\t"
 
-        ".global " STG_RETURN "\n\t"
+        ".globl " STG_RETURN "\n\t"
         THUMB_FUNC
         ".type " STG_RETURN ", %%function\n"
         STG_RETURN ":\n\t"
