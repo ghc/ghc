@@ -10,7 +10,8 @@ module Platform (
         ArmABI(..),
 
         target32Bit,
-        osElfTarget
+        osElfTarget,
+        platformUsesFrameworks,
 )
 
 where
@@ -60,6 +61,7 @@ data OS
         = OSUnknown
         | OSLinux
         | OSDarwin
+        | OSiOS
         | OSSolaris2
         | OSMinGW32
         | OSFreeBSD
@@ -107,6 +109,7 @@ osElfTarget OSOpenBSD   = True
 osElfTarget OSNetBSD    = True
 osElfTarget OSSolaris2  = True
 osElfTarget OSDarwin    = False
+osElfTarget OSiOS       = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
@@ -119,4 +122,12 @@ osElfTarget OSUnknown   = False
  -- ELF-specific functionality.  It is important to have a default for
  -- portability, otherwise we have to answer this question for every
  -- new platform we compile on (even unreg).
+
+osUsesFrameworks :: OS -> Bool
+osUsesFrameworks OSDarwin = True
+osUsesFrameworks OSiOS    = True
+osUsesFrameworks _        = False
+
+platformUsesFrameworks :: Platform -> Bool
+platformUsesFrameworks = osUsesFrameworks . platformOS
 

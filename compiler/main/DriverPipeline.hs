@@ -1100,14 +1100,12 @@ runPhase cc_phase input_fn dflags
              else getPackageExtraCcOpts dflags pkgs
 
         framework_paths <-
-            case platformOS platform of
-            OSDarwin ->
-                do pkgFrameworkPaths <- liftIO $ getPackageFrameworkPath dflags pkgs
-                   let cmdlineFrameworkPaths = frameworkPaths dflags
-                   return $ map ("-F"++)
-                                (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
-            _ ->
-                return []
+            if platformUsesFrameworks platform
+            then do pkgFrameworkPaths <- liftIO $ getPackageFrameworkPath dflags pkgs
+                    let cmdlineFrameworkPaths = frameworkPaths dflags
+                    return $ map ("-F"++)
+                                 (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
+            else return []
 
         let split_objs = gopt Opt_SplitObjs dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
@@ -1640,9 +1638,9 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 getLinkInfo :: DynFlags -> [PackageId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getPackageLinkOpts dflags dep_packages
-   pkg_frameworks <- case platformOS (targetPlatform dflags) of
-                     OSDarwin -> getPackageFrameworks dflags dep_packages
-                     _        -> return []
+   pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
+                     then getPackageFrameworks dflags dep_packages
+                     else return []
    let extra_ld_inputs = ldInputs dflags
    let
       link_info = (package_link_opts,
@@ -1787,38 +1785,31 @@ linkBinary dflags o_files dep_packages = do
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
     pkg_framework_path_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
-               return $ map ("-F" ++) pkg_framework_paths
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
+                return $ map ("-F" ++) pkg_framework_paths
+        else return []
 
     framework_path_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do let framework_paths = frameworkPaths dflags
-               return $ map ("-F" ++) framework_paths
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do let framework_paths = frameworkPaths dflags
+                return $ map ("-F" ++) framework_paths
+        else return []
 
     pkg_framework_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do pkg_frameworks <- getPackageFrameworks dflags dep_packages
-               return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do pkg_frameworks <- getPackageFrameworks dflags dep_packages
+                return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
+        else return []
 
     framework_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do let frameworks = cmdlineFrameworks dflags
-               -- reverse because they're added in reverse order from
-               -- the cmd line:
-               return $ concat [ ["-framework", fw] | fw <- reverse frameworks ]
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do let frameworks = cmdlineFrameworks dflags
+                -- reverse because they're added in reverse order from
+                -- the cmd line:
+                return $ concat [ ["-framework", fw]
+                                | fw <- reverse frameworks ]
+        else return []
 
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
