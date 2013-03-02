@@ -596,11 +596,11 @@ endif
 
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += docs/man
-BUILD_DIRS += $(GHC_UNLIT_DIR)
+BUILD_DIRS += utils/unlit
 BUILD_DIRS += utils/hp2ps
 
 ifneq "$(GhcUnregisterised)" "YES"
-BUILD_DIRS += $(GHC_SPLIT_DIR)
+BUILD_DIRS += driver/split
 endif
 
 ifneq "$(BINDIST)" "YES"
