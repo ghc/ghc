@@ -39,9 +39,6 @@ V = 1
 NO_INCLUDE_DEPS = NO
 NO_INCLUDE_PKGDATA = NO
 
-# Should we build latex docs?
-LATEX_DOCS = NO
-
 ################################################################################
 #
 # Variables that control how the compiler itself is built
