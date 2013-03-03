@@ -6,7 +6,13 @@ utils/haddock_dist_SHELL_WRAPPER = YES
 utils/haddock_dist_INSTALL = YES
 utils/haddock_dist_INSTALL_INPLACE = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME = haddock-ghc-$(ProjectVersion)
-utils/haddock_dist_PROG = haddock$(exeext)
+utils/haddock_dist_PROGNAME = haddock
+
+ifeq "$(HADDOCK_DOCS)" "NO"
+utils/haddock_dist_NOT_NEEDED = YES
+endif
+
+$(eval $(call build-prog,utils/haddock,dist,2))
 
 ifneq "$(BINDIST)" "YES"
 
@@ -21,12 +27,6 @@ $(INPLACE_LIB)/latex:
 	"$(CP)" -R utils/haddock/resources/latex $@
 
 endif
-
-ifeq "$(HADDOCK_DOCS)" "NO"
-utils/haddock_dist_NOT_NEEDED = YES
-endif
-
-$(eval $(call build-prog,utils/haddock,dist,2))
 
 utils/haddock_dist_MODULES += Paths_haddock
 
