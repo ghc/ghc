@@ -480,11 +480,6 @@ endif
 
 GHC_INPLACE = $(GHC_STAGE1)
 
-GHC_STAGE0_ABS = $(GHC)
-GHC_STAGE1_ABS = $(TOP)/$(INPLACE_BIN)/ghc-stage1$(exeext)
-GHC_STAGE2_ABS = $(TOP)/$(INPLACE_BIN)/ghc-stage2$(exeext)
-GHC_STAGE3_ABS = $(TOP)/$(INPLACE_BIN)/ghc-stage3$(exeext)
-
 GHC_STAGE0  = $(GHC)
 GHC_STAGE1  = $(INPLACE_BIN)/ghc-stage1$(exeext)
 GHC_STAGE2  = $(INPLACE_BIN)/ghc-stage2$(exeext)
