@@ -34,14 +34,12 @@ utils/ghc-pkg_dist_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
 utils/ghc-pkg_dist_WANT_INSTALLED_WRAPPER = YES
 
-INSTALL_LIBEXECS += utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)
-
 $(eval $(call shell-wrapper,utils/ghc-pkg,dist))
 
 endif
 
 utils/ghc-pkg_dist_USES_CABAL = YES
-utils/ghc-pkg_dist_PROG = ghc-pkg$(exeext)
+utils/ghc-pkg_dist_PROGNAME = ghc-pkg
 utils/ghc-pkg_dist_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist_INSTALL_INPLACE = YES
 
@@ -59,7 +57,7 @@ ifneq "$(Stage1Only)" "YES"
 
 utils/ghc-pkg_dist-install_USES_CABAL = YES
 
-utils/ghc-pkg_dist-install_PROG = ghc-pkg
+utils/ghc-pkg_dist-install_PROGNAME = ghc-pkg
 utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)

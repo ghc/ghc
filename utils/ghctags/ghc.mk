@@ -12,7 +12,7 @@
 
 utils/ghctags_USES_CABAL                   = YES
 utils/ghctags_PACKAGE                      = ghctags
-utils/ghctags_dist-install_PROG            = ghctags$(exeext)
+utils/ghctags_dist-install_PROGNAME        = ghctags
 utils/ghctags_dist-install_INSTALL         = NO
 utils/ghctags_dist-install_INSTALL_INPLACE = YES
 $(eval $(call build-prog,utils/ghctags,dist-install,2))

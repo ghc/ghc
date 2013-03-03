@@ -15,7 +15,7 @@
 #
 # utils/genapply_MODULES = Main
 # utils/genapply_HC_OPTS = -package Cabal
-# utils/genapply_dist_PROG = genapply
+# utils/genapply_dist_PROGNAME = genapply
 #
 # $(eval $(call build-prog,utils/genapply,dist-install,1))
 
@@ -27,9 +27,13 @@ $(call profStart, build-prog($1,$2,$3))
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
 ifneq "$$(CLEANING)" "YES"
-ifeq "$$($1_$2_PROG)" ""
-$$(error $1_$2_PROG is not set)
+ifeq "$$($1_$2_PROGNAME)" ""
+$$(error $1_$2_PROGNAME is not set)
 endif
+ifneq "$$($1_$2_PROG)" ""
+$$(error $1_$2_PROG is set)
+endif
+$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext)
 endif
 
 ifeq "$$(findstring $3,0 1 2)" ""
@@ -88,20 +92,20 @@ $1_$2_INPLACE =
 endif
 else
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifneq "$$($$($1_$2_PROG)_INPLACE)" ""
-$$(error $$($1_$2_PROG)_INPLACE defined twice)
+ifneq "$$($$($1_$2_PROGNAME)_INPLACE)" ""
+$$(error $$($1_$2_PROGNAME)_INPLACE defined twice)
 endif
 endif
 ifeq "$$($1_$2_TOPDIR)" "YES"
-$$($1_$2_PROG)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
+$$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
 else
-$$($1_$2_PROG)_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
+$$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
 endif
 # Where do we install the inplace version?
 ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
 $1_$2_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG)
 else
-$1_$2_INPLACE = $$($$($1_$2_PROG)_INPLACE)
+$1_$2_INPLACE = $$($$($1_$2_PROGNAME)_INPLACE)
 endif
 endif
 

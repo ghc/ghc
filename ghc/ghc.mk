@@ -72,9 +72,9 @@ ifeq "$(GhcProfiled)" "YES"
 ghc_stage2_PROGRAM_WAY = p
 endif
 
-ghc_stage1_PROG = ghc-stage1$(exeext)
-ghc_stage2_PROG = ghc-stage2$(exeext)
-ghc_stage3_PROG = ghc-stage3$(exeext)
+ghc_stage1_PROGNAME = ghc-stage1
+ghc_stage2_PROGNAME = ghc-stage2
+ghc_stage3_PROGNAME = ghc-stage3
 
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES

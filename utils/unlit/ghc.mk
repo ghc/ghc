@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 utils/unlit_dist_C_SRCS  = unlit.c
-utils/unlit_dist_PROG    = unlit$(exeext)
+utils/unlit_dist_PROGNAME = unlit
 utils/unlit_dist_TOPDIR  = YES
 utils/unlit_dist_INSTALL = YES
 utils/unlit_dist_INSTALL_INPLACE = YES

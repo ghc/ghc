@@ -14,5 +14,5 @@ utils/hpc_USES_CABAL                   = YES
 utils/hpc_PACKAGE                      = hpc-bin
 utils/hpc_dist-install_INSTALL         = YES
 utils/hpc_dist-install_INSTALL_INPLACE = YES
-utils/hpc_dist-install_PROG            = hpc$(exeext)
+utils/hpc_dist-install_PROGNAME        = hpc
 $(eval $(call build-prog,utils/hpc,dist-install,1))

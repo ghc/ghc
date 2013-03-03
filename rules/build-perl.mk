@@ -14,7 +14,7 @@
 # Build a perl script.  Invoke like this:
 #
 # driver/mangler_PERL_SRC = ghc-asm.lprl
-# driver/mangler_dist_PROG = ghc-asm
+# driver/mangler_dist_PROGNAME = ghc-asm
 #
 # $(eval $(call build-perl,driver/mangler,dist))
 
@@ -24,6 +24,15 @@ $(call profStart, build-perl($1,$2))
 # $1 = dir
 # $2 = distdir
 
+ifneq "$$(CLEANING)" "YES"
+ifeq "$$($1_$2_PROGNAME)" ""
+$$(error $1_$2_PROGNAME is not set)
+endif
+ifneq "$$($1_$2_PROG)" ""
+$$(error $1_$2_PROG is set)
+endif
+$1_$2_PROG = $$($1_$2_PROGNAME)
+
 ifneq "$$($$($1_$2_PROG)_INPLACE)" ""
 $$(error $$($1_$2_PROG)_INPLACE defined twice)
 endif
@@ -31,6 +40,7 @@ ifeq "$$($1_$2_TOPDIR)" "YES"
 $$($1_$2_PROG)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
 else
 $$($1_$2_PROG)_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
+endif
 endif
 
 $1_$2_INPLACE = $$($$($1_$2_PROG)_INPLACE)
