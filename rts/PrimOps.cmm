@@ -711,11 +711,6 @@ again: MAYBE_GC(again);
       StgTSO_trec(CurrentTSO) = NO_TREC;
       StgStack_sp(StgTSO_stackobj(CurrentTSO)) = Sp;
 
-      if (TO_W_(StgStack_dirty(StgTSO_stackobj(CurrentTSO))) == 0) {
-        ccall dirty_STACK (MyCapability () "ptr",
-                                 StgTSO_stackobj(CurrentTSO) "ptr");
-      }
-
       CurrentTSO = tso;
       StgTSO_why_blocked(CurrentTSO) = NotBlocked::I16;
       ("ptr" limit)  = ccall tso_SpLim (tso "ptr");
