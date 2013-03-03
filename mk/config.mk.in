@@ -434,7 +434,6 @@ SRC_FLEX_OPTS	+= -8
 #      xxx_PGM          the name of an executable, without the path
 #      xxx              the executable relative to the current dir
 
-TOUCHY              = $(INPLACE_LIB)/touchy$(exeext)
 MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
 
 GENERATED_FILE  = chmod a-w

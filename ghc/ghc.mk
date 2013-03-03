@@ -156,9 +156,9 @@ $(GHC_STAGE3) : | $$(ghc-split_INPLACE)
 endif
 
 ifeq "$(Windows_Host)" "YES"
-$(GHC_STAGE1) : | $(TOUCHY)
-$(GHC_STAGE2) : | $(TOUCHY)
-$(GHC_STAGE3) : | $(TOUCHY)
+$(GHC_STAGE1) : | $$(touchy_INPLACE)
+$(GHC_STAGE2) : | $$(touchy_INPLACE)
+$(GHC_STAGE3) : | $$(touchy_INPLACE)
 endif
 
 endif
