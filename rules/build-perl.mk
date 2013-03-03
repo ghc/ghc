@@ -24,11 +24,16 @@ $(call profStart, build-perl($1,$2))
 # $1 = dir
 # $2 = distdir
 
-ifeq "$$($1_$2_TOPDIR)" "YES"
-$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
-else
-$1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
+ifneq "$$($$($1_$2_PROG)_INPLACE)" ""
+$$(error $$($1_$2_PROG)_INPLACE defined twice)
 endif
+ifeq "$$($1_$2_TOPDIR)" "YES"
+$$($1_$2_PROG)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
+else
+$$($1_$2_PROG)_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
+endif
+
+$1_$2_INPLACE = $$($$($1_$2_PROG)_INPLACE)
 
 $(call all-target,$1_$2,$$($1_$2_INPLACE))
 

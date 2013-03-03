@@ -150,9 +150,9 @@ $(GHC_STAGE2) : | $(GHC_DEPENDENCIES)
 $(GHC_STAGE3) : | $(GHC_DEPENDENCIES)
 
 ifeq "$(GhcUnregisterised)" "NO"
-$(GHC_STAGE1) : | $(SPLIT)
-$(GHC_STAGE2) : | $(SPLIT)
-$(GHC_STAGE3) : | $(SPLIT)
+$(GHC_STAGE1) : | $$(ghc-split_INPLACE)
+$(GHC_STAGE2) : | $$(ghc-split_INPLACE)
+$(GHC_STAGE3) : | $$(ghc-split_INPLACE)
 endif
 
 ifeq "$(Windows_Host)" "YES"
