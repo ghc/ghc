@@ -42,8 +42,8 @@ import qualified Data.Sequence as Seq
 import GHC.IORef
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
-data MVPState a = Full a !(Seq.Seq (a, PTM()))
-                | Empty !(Seq.Seq (IORef a, PTM()))
+data MVPState a = Full a (Seq.Seq (a, PTM()))
+                | Empty (Seq.Seq (IORef a, PTM()))
 
 
 newMVar :: a -> IO (MVar a)
