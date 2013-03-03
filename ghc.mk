@@ -583,9 +583,6 @@ endif
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 
-# These need to be in dependency order, as some of the rules refer to
-# variables defined by their dependencies
-
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += utils/mkdirhier
 endif
@@ -621,7 +618,15 @@ BUILD_DIRS += utils/genapply
 endif
 
 ifneq "$(CLEANING)" "YES"
+# These are deliberately in reverse order, so as to ensure that
+# there is no need to have them in dependency order. That's important
+# because it's tricky to ensure that they are in dependency order when
+# cross-compiling, as some packages may only be in PACKAGES_STAGE0
+# or PACKAGES_STAGE1.
+BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
+BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0))
+BUILD_DIRS += libraries/dph
 endif
 
 
@@ -654,11 +659,6 @@ BUILD_DIRS += $(GHC_CABAL_DIR)
 BUILD_DIRS += $(MAYBE_HPC)
 BUILD_DIRS += $(MAYBE_RUNGHC)
 BUILD_DIRS += ghc
-
-ifneq "$(CLEANING)" "YES"
-BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
-BUILD_DIRS += libraries/dph
-endif
 
 ifneq "$(BINDIST)" "YES"
 ifneq "$(CrossCompiling)-$(phase)" "YES-final"

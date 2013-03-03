@@ -40,7 +40,10 @@ $1_$2_HADDOCK_FLAGS += --source-module=src/%{MODULE/./-}.html --source-entity=sr
 endif
 
 ifneq "$$(BINDIST)" "YES"
-$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$(INPLACE_BIN)/haddock$$(exeext) $$(GHC_CABAL_INPLACE) $$($1_$2_HS_SRCS) $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
+# We need the quadruple dollars for the dependencies, as it isn't
+# guaranteed that we are processing the packages in dependency order,
+# so we don't want to expand it yet.
+$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$(INPLACE_BIN)/haddock$$(exeext) $$(GHC_CABAL_INPLACE) $$($1_$2_HS_SRCS) $$$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
 	"$$(GHC_CABAL_INPLACE)" hscolour $2 $1
 endif
