@@ -984,7 +984,7 @@ unix-binary-dist-prep:
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
-	echo "ghc-cabal_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist" >> $(BIN_DIST_MK)
+	echo "override ghc-cabal_INPLACE = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist" >> $(BIN_DIST_MK)
 	echo "UseSystemLibFFI    = $(UseSystemLibFFI)"    >> $(BIN_DIST_MK)
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	$(call removeFiles,$(BIN_DIST_PREP_TAR))

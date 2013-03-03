@@ -20,6 +20,7 @@ CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
 ghc-cabal_INPLACE = inplace/bin/ghc-cabal$(exeext)
 
+ifneq "$(BINDIST)" "YES"
 $(ghc-cabal_INPLACE) : utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
@@ -40,6 +41,7 @@ utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): utils/ghc-cabal/Main.hs $(TOU
 	       -ilibraries/hpc \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS)
 	"$(TOUCH_CMD)" $@
+endif
 
 # touch is required, because otherwise if mkdirhier is newer, we
 # repeatedly rebuild ghc-cabal.
