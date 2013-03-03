@@ -434,11 +434,9 @@ SRC_FLEX_OPTS	+= -8
 #      xxx_PGM          the name of an executable, without the path
 #      xxx              the executable relative to the current dir
 
-GHC_UNLIT_PGM           = unlit$(exeext)
 GHC_SPLIT_PGM           = ghc-split
 
 SPLIT               = $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
-UNLIT               = $(INPLACE_LIB)/$(GHC_UNLIT_PGM)
 TOUCHY              = $(INPLACE_LIB)/touchy$(exeext)
 MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
 

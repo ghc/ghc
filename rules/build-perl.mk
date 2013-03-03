@@ -39,8 +39,8 @@ clean_$1 : clean_$1_$2
 # INPLACE_BIN etc. might be empty if we're cleaning
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$(BINDIST)" "YES"
-$1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$(UNLIT) | $$$$(dir $$$$@)/.
-	"$$(UNLIT)" $$(UNLIT_OPTS) $$< $$@
+$1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$$$(unlit_INPLACE) | $$$$(dir $$$$@)/.
+	"$$(unlit_INPLACE)" $$(UNLIT_OPTS) $$< $$@
 endif
 
 $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
