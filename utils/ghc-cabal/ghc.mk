@@ -18,7 +18,9 @@ CABAL_DOTTED_VERSION := $(shell grep "^Version:" libraries/Cabal/Cabal/Cabal.cab
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
-$(GHC_CABAL_INPLACE) : utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
+ghc-cabal_INPLACE = inplace/bin/ghc-cabal$(exeext)
+
+$(ghc-cabal_INPLACE) : utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
 utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
@@ -45,7 +47,7 @@ utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): utils/ghc-cabal/Main.hs $(TOU
 $(eval $(call clean-target,utils/ghc-cabal,dist,\
    utils/ghc-cabal/dist bootstrapping))
 
-$(eval $(call all-target,utils/ghc-cabal,$(GHC_CABAL_INPLACE)))
+$(eval $(call all-target,utils/ghc-cabal,$(ghc-cabal_INPLACE)))
 
 # -----------------------------------------------------------------------------
 # Now make another copy that goes in bindists. This needs to be built

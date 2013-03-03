@@ -43,9 +43,9 @@ ifneq "$$(BINDIST)" "YES"
 # We need the quadruple dollars for the dependencies, as it isn't
 # guaranteed that we are processing the packages in dependency order,
 # so we don't want to expand it yet.
-$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$(INPLACE_BIN)/haddock$$(exeext) $$(GHC_CABAL_INPLACE) $$($1_$2_HS_SRCS) $$$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
+$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$(INPLACE_BIN)/haddock$$(exeext) $$$$(ghc-cabal_INPLACE) $$($1_$2_HS_SRCS) $$$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
-	"$$(GHC_CABAL_INPLACE)" hscolour $2 $1
+	"$$(ghc-cabal_INPLACE)" hscolour $2 $1
 endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \

@@ -73,8 +73,8 @@ rts_H_FILES += $(DTRACEPROBES_H)
 endif
 
 # collect the -l flags that we need to link the rts dyn lib.
-rts/libs.depend : $(GHC_PKG_INPLACE)
-	"$(GHC_PKG_INPLACE)" field rts extra-libraries \
+rts/libs.depend : $$(ghc-pkg_INPLACE)
+	"$(ghc-pkg_INPLACE)" field rts extra-libraries \
 	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z0-9]*\)[ ]*/-l\1 /g' > $@
 
 

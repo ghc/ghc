@@ -441,8 +441,6 @@ SPLIT               = $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
 UNLIT               = $(INPLACE_LIB)/$(GHC_UNLIT_PGM)
 TOUCHY              = $(INPLACE_LIB)/touchy$(exeext)
 MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
-GHC_CABAL_INPLACE   = $(INPLACE_BIN)/ghc-cabal$(exeext)
-GHC_PKG_INPLACE     = $(INPLACE_BIN)/ghc-pkg$(exeext)
 
 GENERATED_FILE  = chmod a-w
 EXECUTABLE_FILE = chmod +x
