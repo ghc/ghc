@@ -31,6 +31,7 @@ module LwConc.MVar
 , putMVar       -- MVar a -> a -> IO ()
 , asyncPutMVar  -- MVar a -> a -> PTM ()
 , takeMVar      -- MVar a -> IO a
+, takeMVarWithHole -- MVar a -> IORef a -> IO a
 
 , readMVar      -- MVar a -> a
 , swapMVar      -- MVar a -> a -> IO a
@@ -41,8 +42,8 @@ import qualified Data.Sequence as Seq
 import GHC.IORef
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
-data MVPState a = Full a (Seq.Seq (a, PTM()))
-                | Empty (Seq.Seq (IORef a, PTM()))
+data MVPState a = Full a !(Seq.Seq (a, PTM()))
+                | Empty !(Seq.Seq (IORef a, PTM()))
 
 
 newMVar :: a -> IO (MVar a)
@@ -97,8 +98,9 @@ swapMVar (MVar ref) newValue = do
            unblockAct <- getScheduleSContAction
            token <- newResumeToken
            let wakeup = do {
-             oldValue <- unsafeIOToPTM $ readIORef hole;
-             -- put value back into the MVar
+             -- put new value into the MVar. MVar behavior assures that the
+             -- MVar ref will be empty with 0 or more pending readers. Hence,
+             -- this call wouldn't block.
              putMVarPTM (MVar ref) newValue;
              -- Should I resume?
              v <- isResumeTokenValid token;
@@ -110,7 +112,19 @@ swapMVar (MVar ref) newValue = do
            writePVar ref $ Empty $ ts Seq.|> (hole, wakeup)
            setSContSwitchReason sc $ BlockedInHaskell token
            blockAct
-         Full x _ -> unsafeIOToPTM $ writeIORef hole x
+         Full x (Seq.viewl -> Seq.EmptyL) -> do
+           -- First take the old value
+           writePVar ref $ Empty Seq.empty
+           unsafeIOToPTM $ writeIORef hole x
+           -- Now put the new value in
+           putMVarPTM (MVar ref) newValue
+         Full x (Seq.viewl -> (x', wakeup) Seq.:< ts) -> do
+           -- First take the old value
+           writePVar ref $ Full x' ts
+           unsafeIOToPTM $ writeIORef hole x
+           wakeup
+           -- Now put the new value in
+           putMVarPTM (MVar ref) newValue
   readIORef hole
 
 
@@ -160,11 +174,9 @@ putMVarPTM (MVar ref) x = do
 putMVar :: MVar a -> a -> IO ()
 putMVar mv x = atomically $ putMVarPTM mv x
 
-
-{-# INLINE takeMVar #-}
-takeMVar :: MVar a -> IO a
-takeMVar (MVar ref) = do
-  hole <- newIORef undefined
+{-# INLINE takeMVarWithHole #-}
+takeMVarWithHole :: MVar a -> IORef a -> IO a
+takeMVarWithHole (MVar ref) hole = do
   atomically $ do
     st <- readPVar ref
     case st of
@@ -191,3 +203,9 @@ takeMVar (MVar ref) = do
            unsafeIOToPTM $ writeIORef hole x
            wakeup
   readIORef hole
+
+{-# INLINE takeMVar #-}
+takeMVar :: MVar a -> IO a
+takeMVar m = do
+  hole <- newIORef undefined
+  takeMVarWithHole m hole

@@ -865,6 +865,10 @@ stg_newSContzh ( gcptr closure )
 				closure "ptr");
   StgTSO_why_blocked (threadid) = Yielded::I16;
 
+  // context switch soon, but not immediately: we don't want every
+  // newSCont to force a context-switch.
+  Capability_context_switch(MyCapability()) = 1 :: CInt;
+
   return (threadid);
 }
 

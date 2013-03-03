@@ -5,16 +5,12 @@ import LwConc.Concurrent
 import LwConc.Substrate
 import LwConc.MVar
 import System.Environment
+import Data.IORef
 
 initSched = do
   newSched
   n <- getNumCapabilities
-  spawnScheds $ n-1
-  where
-    spawnScheds 0 = return ()
-    spawnScheds n = do
-      newCapability
-      spawnScheds (n-1)
+  replicateM_ (n-1) newCapability
 
 -- Map over [2..] (2 until infinity), putting the value in mOut. The putting operation will block until
 -- mOut is empty. mOut will become empty when some other thread executes takeMVar (getting its value).
@@ -23,7 +19,8 @@ generate mOut = mapM_ (putMVar mOut) [2..]
 
 -- Take a value from mIn, divide it by a prime, if the remainder is not 0, put the value in mOut.
 primeFilter :: MVar Int -> MVar Int -> Int -> IO ()
-primeFilter mIn mOut prime = forever $ do
+primeFilter mIn mOut prime = do
+  forever $ do
     i <- takeMVar mIn
     when (i `mod` prime /= 0) (putMVar mOut i)
 

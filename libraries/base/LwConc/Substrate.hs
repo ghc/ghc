@@ -279,11 +279,13 @@ writePVar (PVar tvar#) val = PTM $ \s1# ->
 
 newtype ResumeToken = ResumeToken (PVar Bool)
 
+{-# INLINE newResumeToken #-}
 newResumeToken :: PTM ResumeToken
 newResumeToken = do
   t <- newPVar True
   return $ ResumeToken t
 
+{-# INLINE isResumeTokenValid #-}
 isResumeTokenValid :: ResumeToken -> PTM Bool
 isResumeTokenValid (ResumeToken t) = do
   v <- readPVar t
@@ -329,6 +331,7 @@ setSContSwitchReason :: SCont -> SContSwitchReason -> PTM ()
 setSContSwitchReason s reason = do
   setSContStatus s $ SContSwitched reason
 
+{-# INLINE initSContStatus #-}
 initSContStatus :: SContStatus
 initSContStatus = SContSwitched Yielded
 
@@ -388,10 +391,12 @@ getSContId (SCont sc) = PTM $ \s ->
 -- SCont-local Storage (SLS)
 -----------------------------------------------------------------------------------
 
+{-# INLINE setSLS #-}
 setSLS :: SCont -> Dynamic -> IO ()
 setSLS (SCont sc) v = IO $ \s ->
   case setSLS# sc v s of s -> (# s, () #)
 
+{-# INLINE getSLS #-}
 getSLS :: SCont -> PTM Dynamic
 getSLS (SCont sc) = PTM $ \s -> getSLS# sc s
 

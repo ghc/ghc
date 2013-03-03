@@ -3,6 +3,6 @@ TARGET := sieve-vanilla.bin sieve-lwc.bin
 include ../../config.mk
 
 TOP := ../../../
-GHC_OPTS_EXTRA=-threaded -XBangPatterns -prof
+GHC_OPTS_EXTRA=-XBangPatterns -O2 -prof -threaded
 
 all: $(TARGET)

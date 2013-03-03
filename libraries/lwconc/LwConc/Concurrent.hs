@@ -39,6 +39,7 @@ import Data.Dynamic
 -- The scheduler data structure has one (PVar (Seq SCont)) for every capability.
 newtype Sched = Sched (Array Int (PVar (Seq SCont)))
 
+{-# INLINE yieldControlAction #-}
 yieldControlAction :: Sched -> PTM ()
 yieldControlAction (Sched pa) = do
   -- Fetch current capability's scheduler
@@ -54,6 +55,7 @@ yieldControlAction (Sched pa) = do
       writePVar ref tl
       switchTo x
 
+{-# INLINE scheduleSContAction #-}
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction (Sched pa) sc = do
   -- Since we are making the given scont runnable, update its status to Yielded.
@@ -64,7 +66,6 @@ scheduleSContAction (Sched pa) sc = do
   contents <- readPVar ref
   -- Append the given task to the tail.
   writePVar ref $ contents |> sc
-
 
 
 newSched :: IO (Sched)
@@ -114,6 +115,7 @@ newCapability = do
 
 data SContKind = Bound | Unbound
 
+{-# INLINE fork #-}
 fork :: IO () -> SContKind -> IO SCont
 fork task kind = do
   currentSC <- getSContIO
@@ -154,6 +156,7 @@ fork task kind = do
   }
   return newSC
 
+{-# INLINE forkOS #-}
 forkIO :: IO () -> IO SCont
 forkIO task = fork task Unbound
 
