@@ -549,8 +549,8 @@ endef
 
 PRIMOPS_TXT_STAGE1 = compiler/stage1/build/primops.txt
 
-libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
-	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
+libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
+	"$(genprimopcode_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
 
 # Required so that Haddock documents the primops.
 libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
@@ -655,7 +655,7 @@ BUILD_DIRS += utils/deriveConstants
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += $(MAYBE_GHCTAGS)
 BUILD_DIRS += utils/ghc-pwd
-BUILD_DIRS += $(GHC_CABAL_DIR)
+BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += $(MAYBE_HPC)
 BUILD_DIRS += $(MAYBE_RUNGHC)
 BUILD_DIRS += ghc
@@ -767,9 +767,9 @@ $(ghc-prim-$(libraries/ghc-prim_dist-install_VERSION)_HADDOCK_FILE): \
 endif # BINDIST
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
-                            $(PRIMOPS_TXT_STAGE1) $(GENPRIMOP_INPLACE) \
+                            $(PRIMOPS_TXT_STAGE1) $$(genprimopcode_INPLACE) \
                           | $$(dir $$@)/.
-	"$(GENPRIMOP_INPLACE)" --make-haskell-source < $< > $@
+	"$(genprimopcode_INPLACE)" --make-haskell-source < $< > $@
 
 .PHONY: tags
 tags: tags_compiler

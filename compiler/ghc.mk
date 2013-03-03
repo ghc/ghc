@@ -246,33 +246,33 @@ compiler/stage$1/build/Parser.y: compiler/parser/Parser.y.pp
 compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp compiler/stage$1/$$(PLATFORM_H)
 	$$(CPP) $$(RAWCPP_FLAGS) -P $$(compiler_CPP_OPTS) -Icompiler/stage$1 -x c $$< | grep -v '^#pragma GCC' > $$@
 
-compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --data-decl          < $$< > $$@
-compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --primop-tag         < $$< > $$@
-compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --primop-list        < $$< > $$@
-compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --has-side-effects   < $$< > $$@
-compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --out-of-line        < $$< > $$@
-compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --commutable         < $$< > $$@
-compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --code-size          < $$< > $$@
-compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --can-fail           < $$< > $$@
-compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --strictness         < $$< > $$@
-compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --fixity             < $$< > $$@
-compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --primop-primop-info < $$< > $$@
+compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --data-decl          < $$< > $$@
+compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-tag         < $$< > $$@
+compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-list        < $$< > $$@
+compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --has-side-effects   < $$< > $$@
+compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --out-of-line        < $$< > $$@
+compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --commutable         < $$< > $$@
+compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --code-size          < $$< > $$@
+compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --can-fail           < $$< > $$@
+compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --strictness         < $$< > $$@
+compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --fixity             < $$< > $$@
+compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
 
 # Usages aren't used any more; but the generator 
 # can still generate them if we want them back
-compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --usage              < $$< > $$@
+compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --usage              < $$< > $$@
 
 endef
 

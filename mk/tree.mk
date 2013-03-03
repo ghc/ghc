@@ -20,8 +20,6 @@ GHC_INCLUDE_DIRS        = includes includes/dist includes/dist-derivedconstants/
 GHC_RTS_DIR             = rts
 GHC_DRIVER_DIR          = driver
 
-GHC_CABAL_DIR           = $(GHC_UTILS_DIR)/ghc-cabal
-
 INPLACE                 = inplace
 INPLACE_BIN             = $(INPLACE)/bin
 INPLACE_LIB             = $(INPLACE)/lib
