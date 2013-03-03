@@ -26,7 +26,7 @@ int rts_isProfiled(void);
  * putting the 8-byte fields on an 8-byte boundary.  Padding can
  * vary between C compilers, and we don't take into account any
  * possible padding when generating CCS and CC decls in the code
- * generator (compiler/codeGen/CgProf.hs).
+ * generator (compiler/codeGen/StgCmmProf.hs).
  */
 
 typedef struct CostCentre_ {
