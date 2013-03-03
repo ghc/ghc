@@ -1,9 +1,9 @@
 
 tcfail123.hs:11:9:
-    Couldn't match kind ‛*’ with ‛#’
+    Couldn't match kind ‛#’ with ‛*’
     When matching types
-      t0 :: *
       GHC.Prim.Int# :: #
+      t0 :: *
     In the first argument of ‛f’, namely ‛3#’
     In the expression: f 3#
     In an equation for ‛h’: h v = f 3#

@@ -1,9 +1,9 @@
 
 T3950.hs:15:13:
-    Couldn't match kind ‛* -> *’ with ‛*’
+    Couldn't match kind ‛*’ with ‛* -> *’
     When matching types
-      w :: (* -> * -> *) -> *
       Sealed :: (* -> *) -> *
+      w :: (* -> * -> *) -> *
     Expected type: w (Id p)
       Actual type: Sealed (Id p0 x0)
     In the first argument of ‛Just’, namely ‛rp'’

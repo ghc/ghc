@@ -1,9 +1,9 @@
 
 T5570.hs:7:16:
-    Couldn't match kind ‛*’ with ‛#’
+    Couldn't match kind ‛#’ with ‛*’
     When matching types
-      s0 :: *
       Double# :: #
+      s0 :: *
     In the second argument of ‛($)’, namely ‛D# $ 3.0##’
     In the expression: print $ D# $ 3.0##
     In an equation for ‛main’: main = print $ D# $ 3.0##
