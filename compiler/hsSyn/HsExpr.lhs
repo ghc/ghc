@@ -689,6 +689,12 @@ data HsCmd id
 
   | HsCmdDo     [CmdLStmt id]
                 PostTcType                      -- Type of the whole expression
+
+  | HsCmdCast   TcCoercion     -- A simpler version of HsWrap in HsExpr
+                (HsCmd id)     -- If   cmd :: arg1 --> res
+                               --       co :: arg1 ~ arg2
+                               -- Then (HsCmdCast co cmd) :: arg2 --> res
+                
   deriving (Data, Typeable)
 
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
@@ -705,7 +711,7 @@ type LHsCmdTop id = Located (HsCmdTop id)
 
 data HsCmdTop id
   = HsCmdTop (LHsCmd id)
-             [PostTcType]        -- types of inputs on the command's stack
+             PostTcType          -- Nested tuple of inputs on the command's stack
              PostTcType          -- return type of the command
              (CmdSyntaxTable id) -- See Note [CmdSyntaxTable]
   deriving (Data, Typeable)
@@ -772,8 +778,9 @@ ppr_cmd (HsCmdLet binds cmd)
   = sep [hang (ptext (sLit "let")) 2 (pprBinds binds),
          hang (ptext (sLit "in"))  2 (ppr cmd)]
 
-ppr_cmd (HsCmdDo stmts _) = pprDo ArrowExpr stmts
-
+ppr_cmd (HsCmdDo stmts _)  = pprDo ArrowExpr stmts
+ppr_cmd (HsCmdCast co cmd) = sep [ ppr_cmd cmd
+                                 , ptext (sLit "|>") <+> ppr co ]
 
 ppr_cmd (HsCmdArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, ptext (sLit "-<"), ppr_lexpr arg]
