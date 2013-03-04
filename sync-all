@@ -166,22 +166,20 @@ sub configure_repository {
     my $localpath = shift;
     my $scm = shift;
 
-    if ($scm eq "git") {
-        &scm($localpath, $scm, "config", "--local", "core.ignorecase", "true");
+    &scm($localpath, $scm, "config", "--local", "core.ignorecase", "true");
 
-        chdir($localpath);
-        open my $git_autocrlf, '-|', 'git', 'config', '--get', 'core.autocrlf'
-            or die "Executing git config failed: $!";
-        my $autocrlf = <$git_autocrlf>;
-        $autocrlf = "" unless defined($autocrlf);
-        chomp $autocrlf;
-        close($git_autocrlf);
-        chdir($initial_working_directory);
-        if ($autocrlf eq "true") {
-            &scm($localpath, $scm,
-                 "config", "--local", "core.autocrlf", "false");
-            &scm($localpath, $scm, "reset", "--hard");
-        }
+    chdir($localpath);
+    open my $git_autocrlf, '-|', 'git', 'config', '--get', 'core.autocrlf'
+        or die "Executing git config failed: $!";
+    my $autocrlf = <$git_autocrlf>;
+    $autocrlf = "" unless defined($autocrlf);
+    chomp $autocrlf;
+    close($git_autocrlf);
+    chdir($initial_working_directory);
+    if ($autocrlf eq "true") {
+        &scm($localpath, $scm,
+             "config", "--local", "core.autocrlf", "false");
+        &scm($localpath, $scm, "reset", "--hard");
     }
 }
 
@@ -286,7 +284,7 @@ sub scmall {
         $tag        = $$line{"tag"};
         $scm        = $$line{"vcs"};
         # Use the "remote" structure for bare git repositories
-        $localpath  = ($bare_flag && $scm eq "git") ?
+        $localpath  = ($bare_flag) ?
                       $$line{"remotepath"} : $$line{"localpath"};
         $remotepath = ($checked_out_tree) ?
                       $$line{"localpath"}  : $$line{"remotepath"};
@@ -307,7 +305,7 @@ sub scmall {
         rename "resume.tmp", "resume";
 
         # Check the SCM is OK as early as possible
-        die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
+        die "Unknown SCM: $scm" if ($scm ne "git");
 
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
@@ -338,31 +336,15 @@ sub scmall {
 
             # Note that we use "." as the path, as $localpath
             # doesn't exist yet.
-            if ($scm eq "darcs") {
-                # The first time round the loop, default the get-mode
-                if (not defined($get_mode)) {
-                    warning("adding --partial, to override use --complete");
-                    $get_mode = "--partial";
-                }
-                scm (".", $scm, "get", $get_mode, $path, $localpath, @args);
-            }
-            else {
-                my @argsWithBare = @args;
-                push @argsWithBare, $bare_flag if $bare_flag;
-                scm (".", $scm, "clone", $path, $localpath, @argsWithBare);
-                &configure_repository($localpath, $scm);
-            }
+            my @argsWithBare = @args;
+            push @argsWithBare, $bare_flag if $bare_flag;
+            scm (".", $scm, "clone", $path, $localpath, @argsWithBare);
+            &configure_repository($localpath, $scm);
             next;
         }
 
-        my $darcs_repo_present = 1 if -d "$localpath/_darcs";
         my $git_repo_present = 1 if -e "$localpath/.git" || ($bare_flag && -d "$localpath");
-        if ($darcs_repo_present) {
-            if ($git_repo_present) {
-                die "Found both _darcs and .git in $localpath";
-            }
-            $scm = "darcs";
-        } elsif ($git_repo_present) {
+        if ($git_repo_present) {
             $scm = "git";
         } elsif ($tag eq "") {
             die "Required repo $localpath is missing";
@@ -373,18 +355,6 @@ sub scmall {
 
         # Work out the arguments we should give to the SCM
         if ($command eq "status") {
-            if ($scm eq "darcs") {
-                $command = "whatsnew";
-            }
-            elsif ($scm eq "git") {
-                $command = "status";
-            }
-            else {
-                die "Unknown scm";
-            }
-
-            # Hack around 'darcs whatsnew' failing if there are no changes
-            $ignore_failure = 1;
             scm ($localpath, $scm, $command, @args);
         }
         elsif ($command eq "commit") {
@@ -457,15 +427,7 @@ sub scmall {
             gitNewWorkdir ($localpath, @args);
         }
         elsif ($command eq "send") {
-            if ($scm eq "darcs") {
-                $command = "send";
-            }
-            elsif ($scm eq "git") {
-                $command = "send-email";
-            }
-            else {
-                die "Unknown scm";
-            }
+            $command = "send-email";
             scm ($localpath, $scm, $command, @args);
         }
         elsif ($command eq "fetch") {
@@ -501,46 +463,36 @@ sub scmall {
         elsif ($command eq "checkout") {
             # Not all repos are necessarily branched, so ignore failure
             $ignore_failure = 1;
-            scm ($localpath, $scm, "checkout", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "checkout", @args);
         }
         elsif ($command eq "grep") {
             # Hack around 'git grep' failing if there are no matches
             $ignore_failure = 1;
-            scm ($localpath, $scm, "grep", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "grep", @args);
         }
         elsif ($command eq "diff") {
-            scm ($localpath, $scm, "diff", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "diff", @args);
         }
         elsif ($command eq "clean") {
-            scm ($localpath, $scm, "clean", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "clean", @args);
         }
         elsif ($command eq "reset") {
-            scm ($localpath, $scm, "reset", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "reset", @args);
         }
         elsif ($command eq "branch") {
-            scm ($localpath, $scm, "branch", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "branch", @args);
         }
         elsif ($command eq "config") {
-            scm ($localpath, $scm, "config", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "config", @args);
         }
         elsif ($command eq "repack") {
-            scm ($localpath, $scm, "repack", @args)
-                if $scm eq "git"
+            scm ($localpath, $scm, "repack", @args);
         }
         elsif ($command eq "format-patch") {
-            scm ($localpath, $scm, "format-patch", @args)
-                if $scm eq "git"
+            scm ($localpath, $scm, "format-patch", @args);
         }
         elsif ($command eq "gc") {
-            scm ($localpath, $scm, "gc", @args)
-                unless $scm eq "darcs";
+            scm ($localpath, $scm, "gc", @args);
         }
         elsif ($command eq "tag") {
             scm ($localpath, $scm, "tag", @args);
