@@ -424,10 +424,6 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 #
 SRC_HC_OPTS += -H32m -O
 
-# These flags make flex 8-bit
-SRC_FLEX_OPTS	+= -8
-
-
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
 #
@@ -594,14 +590,6 @@ DLLTOOL			= inplace/mingw/bin/dlltool.exe
 else ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
 DLLTOOL			= inplace/mingw/bin/dlltool.exe
 endif
-
-#-----------------------------------------------------------------------------
-# Flex (currently unused, could be moved to glafp-utils)
-
-# FLEX			= @LEX@
-# Don't bother with -lfl, we define our own yywrap()s anyway.
-# FLEX_LIB		= 
-#WAS:FLEX_LIB		= @LEXLIB@
 
 #-----------------------------------------------------------------------------
 # Other standard (ha!) Unix utilities
