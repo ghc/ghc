@@ -281,10 +281,6 @@ GhcLibHcOpts=-O2
 #
 StripLibraries=NO
 
-# These are the URL patterns that Haddock uses to generate the "Source
-# File" links on each page.
-PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
-
 # ----------------------------------------------------------------------------
 # Object-file splitting
 #
