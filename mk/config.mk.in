@@ -226,10 +226,8 @@ INTEGER_LIBRARY=integer-gmp
 GhcLibWays = v
 
 # In addition to the normal sequential way, the default is to also build
-# profiled prelude libraries unless we are booting from .hc files
-ifneq "$(BootingFromHc)" "YES"
+# profiled prelude libraries
 GhcLibWays += p
-endif
 
 ifeq "$(PlatformSupportsSharedLibs)" "YES"
 GhcLibWays += dyn
@@ -253,9 +251,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 GhcRTSWays=l
 
 # Usually want the debug version
-ifeq "$(BootingFromHc)" "NO"
 GhcRTSWays += debug 
-endif
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
