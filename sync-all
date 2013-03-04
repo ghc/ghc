@@ -105,12 +105,11 @@ sub parsePackages {
     foreach (@repos) {
         chomp;
         $lineNum++;
-        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +([^ ]+) +([^ ]+)$/) {
             my %line;
             $line{"localpath"}  = $1;
             $line{"tag"}        = $2;
             $line{"remotepath"} = $3;
-            $line{"vcs"}        = $4;
             push @packages, \%line;
         }
         elsif (! /^(#.*)?$/) {
@@ -164,9 +163,8 @@ sub gitNewWorkdir {
 
 sub configure_repository {
     my $localpath = shift;
-    my $scm = shift;
 
-    &scm($localpath, $scm, "config", "--local", "core.ignorecase", "true");
+    &git($localpath, "config", "--local", "core.ignorecase", "true");
 
     chdir($localpath);
     open my $git_autocrlf, '-|', 'git', 'config', '--get', 'core.autocrlf'
@@ -177,39 +175,36 @@ sub configure_repository {
     close($git_autocrlf);
     chdir($initial_working_directory);
     if ($autocrlf eq "true") {
-        &scm($localpath, $scm,
-             "config", "--local", "core.autocrlf", "false");
-        &scm($localpath, $scm, "reset", "--hard");
+        &git($localpath, "config", "--local", "core.autocrlf", "false");
+        &git($localpath, "reset", "--hard");
     }
 }
 
-sub scm {
+sub git {
     my $dir = shift;
-    my $scm = shift;
 
     if ($dir eq '.') {
-        message "== running $scm @_";
+        message "== running git @_";
     } else {
-        message "== $dir: running $scm @_";
+        message "== $dir: running git @_";
         chdir($dir);
     }
 
-    system ($scm, @_) == 0
+    system ("git", @_) == 0
         or $ignore_failure
-        or die "$scm failed: $?";
+        or die "git failed: $?";
 
     if ($dir ne '.') {
         chdir($initial_working_directory);
     }
 }
 
-sub scmall {
+sub gitall {
     my $command = shift;
 
     my $localpath;
     my $tag;
     my $remotepath;
-    my $scm;
     my $line;
     my $branch_name;
     my $subcommand;
@@ -282,7 +277,6 @@ sub scmall {
 
     for $line (@packages) {
         $tag        = $$line{"tag"};
-        $scm        = $$line{"vcs"};
         # Use the "remote" structure for bare git repositories
         $localpath  = ($bare_flag) ?
                       $$line{"remotepath"} : $$line{"localpath"};
@@ -303,9 +297,6 @@ sub scmall {
         print RESUME "$doing\n";
         close RESUME;
         rename "resume.tmp", "resume";
-
-        # Check the SCM is OK as early as possible
-        die "Unknown SCM: $scm" if ($scm ne "git");
 
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
@@ -330,7 +321,7 @@ sub scmall {
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
                     if $localpath ne ".";
-                &configure_repository($localpath, $scm);
+                &configure_repository($localpath);
                 next;
             }
 
@@ -338,29 +329,30 @@ sub scmall {
             # doesn't exist yet.
             my @argsWithBare = @args;
             push @argsWithBare, $bare_flag if $bare_flag;
-            scm (".", $scm, "clone", $path, $localpath, @argsWithBare);
-            &configure_repository($localpath, $scm);
+            &git(".", "clone", $path, $localpath, @argsWithBare);
+            &configure_repository($localpath);
             next;
         }
 
         my $git_repo_present = 1 if -e "$localpath/.git" || ($bare_flag && -d "$localpath");
-        if ($git_repo_present) {
-            $scm = "git";
-        } elsif ($tag eq "") {
-            die "Required repo $localpath is missing";
-        } else {
-             message "== $localpath repo not present; skipping";
-             next;
+        if (not $git_repo_present) {
+            if ($tag eq "") {
+                die "Required repo $localpath is missing";
+            }
+            else {
+                 message "== $localpath repo not present; skipping";
+                 next;
+            }
         }
 
         # Work out the arguments we should give to the SCM
         if ($command eq "status") {
-            scm ($localpath, $scm, $command, @args);
+            &git($localpath, $command, @args);
         }
         elsif ($command eq "commit") {
             # git fails if there is nothing to commit, so ignore failures
             $ignore_failure = 1;
-            scm ($localpath, $scm, "commit", @args);
+            &git($localpath, "commit", @args);
         }
         elsif ($command eq "check_submodules") {
             # If we have a submodule then check whether it is up-to-date
@@ -404,7 +396,7 @@ sub scmall {
             # described on
             # http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream
             if ($remotepath ne "-") {
-                scm ($localpath, $scm, "push", @args);
+                &git($localpath, "push", @args);
             }
         }
         elsif ($command eq "pull") {
@@ -421,24 +413,24 @@ sub scmall {
                 $realcmd = "pull";
                 @realargs = @args;
             }
-            scm ($localpath, $scm, $realcmd, @realargs);
+            &git($localpath, $realcmd, @realargs);
         }
         elsif ($command eq "new-workdir") {
             gitNewWorkdir ($localpath, @args);
         }
         elsif ($command eq "send") {
             $command = "send-email";
-            scm ($localpath, $scm, $command, @args);
+            &git($localpath, $command, @args);
         }
         elsif ($command eq "fetch") {
-            scm ($localpath, $scm, "fetch", @args);
+            &git($localpath, "fetch", @args);
         }
         elsif ($command eq "new") {
             my @scm_args = ("log", "$branch_name..");
-            scm ($localpath, $scm, @scm_args, @args);
+            &git($localpath, @scm_args, @args);
         }
         elsif ($command eq "log") {
-            scm ($localpath, $scm, "log", @args);
+            &git($localpath, "log", @args);
         }
         elsif ($command eq "remote") {
             my @scm_args;
@@ -458,44 +450,44 @@ sub scmall {
             } elsif ($subcommand eq 'set-url') {
                 @scm_args = ("remote", "set-url", $branch_name, $rpath);
             }
-            scm ($localpath, $scm, @scm_args, @args);
+            &git($localpath, @scm_args, @args);
         }
         elsif ($command eq "checkout") {
             # Not all repos are necessarily branched, so ignore failure
             $ignore_failure = 1;
-            scm ($localpath, $scm, "checkout", @args);
+            &git($localpath, "checkout", @args);
         }
         elsif ($command eq "grep") {
             # Hack around 'git grep' failing if there are no matches
             $ignore_failure = 1;
-            scm ($localpath, $scm, "grep", @args);
+            &git($localpath, "grep", @args);
         }
         elsif ($command eq "diff") {
-            scm ($localpath, $scm, "diff", @args);
+            &git($localpath, "diff", @args);
         }
         elsif ($command eq "clean") {
-            scm ($localpath, $scm, "clean", @args);
+            &git($localpath, "clean", @args);
         }
         elsif ($command eq "reset") {
-            scm ($localpath, $scm, "reset", @args);
+            &git($localpath, "reset", @args);
         }
         elsif ($command eq "branch") {
-            scm ($localpath, $scm, "branch", @args);
+            &git($localpath, "branch", @args);
         }
         elsif ($command eq "config") {
-            scm ($localpath, $scm, "config", @args);
+            &git($localpath, "config", @args);
         }
         elsif ($command eq "repack") {
-            scm ($localpath, $scm, "repack", @args);
+            &git($localpath, "repack", @args);
         }
         elsif ($command eq "format-patch") {
-            scm ($localpath, $scm, "format-patch", @args);
+            &git($localpath, "format-patch", @args);
         }
         elsif ($command eq "gc") {
-            scm ($localpath, $scm, "gc", @args);
+            &git($localpath, "gc", @args);
         }
         elsif ($command eq "tag") {
-            scm ($localpath, $scm, "tag", @args);
+            &git($localpath, "tag", @args);
         }
         else {
             die "Unknown command: $command";
@@ -793,28 +785,28 @@ sub main {
         }
 
         if ($command eq "push") {
-            scmall ("check_submodules", @_);
+            &gitall("check_submodules", @_);
         }
 
-        scmall ($command, @_);
+        &gitall($command, @_);
 
         my @submodule_args = grep(/^-q/,@_);
 
         if ($command eq "get") {
-            &scm(".", "git", "submodule", "init", @submodule_args);
+            &git(".", "submodule", "init", @submodule_args);
         }
         if ($command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
-                &scm(".", "git", "submodule", "init", @submodule_args);
+                &git(".", "submodule", "init", @submodule_args);
             }
         }
         if ($command eq "get" or $command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
-                &scm(".", "git", "submodule", "init", @submodule_args);
+                &git(".", "submodule", "init", @submodule_args);
             }
-            &scm(".", "git", "submodule", "update", @submodule_args);
+            &git(".", "submodule", "update", @submodule_args);
         }
     }
 }
