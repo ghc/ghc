@@ -1965,16 +1965,16 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-    if test "$$1" != ""; then
+    if test "$$1" == ""; then
         save_IFS=$IFS
         IFS=":;"
         for p in ${PATH}; do
-	    if test -d "${p}"; then
+            if test -d "${p}"; then
                 $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
                 if test -n "$1"; then
                     break
                 fi
-	    fi
+            fi
         done
         IFS=$save_IFS
     fi
