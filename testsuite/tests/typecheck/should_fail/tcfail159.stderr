@@ -1,9 +1,9 @@
 
 tcfail159.hs:9:11:
-    Couldn't match kind ‛*’ with ‛#’
+    Couldn't match kind ‛#’ with ‛*’
     When matching types
-      t0 :: *
       (# Int, Int #) :: #
+      t0 :: *
     In the pattern: ~(# p, q #)
     In a case alternative: ~(# p, q #) -> p
     In the expression: case h x of { ~(# p, q #) -> p }

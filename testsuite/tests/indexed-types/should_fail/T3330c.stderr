@@ -1,9 +1,9 @@
 
 T3330c.hs:23:43:
-    Couldn't match kind ‛*’ with ‛* -> *’
+    Couldn't match kind ‛* -> *’ with ‛*’
     When matching types
-      Der ((->) x) :: * -> *
       R :: (* -> *) -> *
+      Der ((->) x) :: * -> *
     Expected type: Der ((->) x) (f1 x)
       Actual type: R f1
     In the first argument of ‛plug’, namely ‛rf’

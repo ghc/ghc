@@ -1,4 +1,0 @@
-
-Dep01.hs:8:12: Warning:
-    In the use of ‛unsafeSTToIO’ (imported from Control.Monad.ST):
-    Deprecated: "Please import from Control.Monad.ST.Unsafe instead; This will be removed in the next release"

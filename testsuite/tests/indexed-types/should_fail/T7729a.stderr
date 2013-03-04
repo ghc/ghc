@@ -1,0 +1,8 @@
+
+T7729a.hs:28:31:
+    Occurs check: cannot construct the infinite type: m0 ~ t0 m0
+    Expected type: m0 a
+      Actual type: BasePrimMonad (Rand m) a
+    In the first argument of ‛lift’, namely ‛x’
+    In the first argument of ‛liftPrim’, namely ‛(lift x)’
+    In the expression: liftPrim (lift x)

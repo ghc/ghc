@@ -5,7 +5,6 @@ T7609.hs:7:16:
       but ‛Maybe’ has kind ‛* -> *’
     In the type signature for ‛f’: f :: (a `X` a, Maybe)
 
-T7609.hs:10:19:
-    Expecting one more argument to ‛Maybe’
-    Expected a type, but ‛Maybe’ has kind ‛* -> *’
+T7609.hs:10:7:
+    Expected a constraint, but ‛a `X` a’ has kind ‛*’
     In the type signature for ‛g’: g :: a `X` a => Maybe
