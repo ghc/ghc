@@ -17,7 +17,7 @@ $(call profStart, shell-wrapper($1,$2))
 # $2 = distdir
 
 ifeq "$$($1_$2_SHELL_WRAPPER_NAME)" ""
-$1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROG).wrapper
+$1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROGNAME).wrapper
 endif
 
 ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
@@ -90,7 +90,7 @@ endif
 
 ifeq "$$($1_$2_WANT_BINDIST_WRAPPER)" "YES"
 
-$1_$2_BINDIST_WRAPPER = $1/$2/build/tmp/$$($1_$2_PROG)-bindist
+$1_$2_BINDIST_WRAPPER = $1/$2/build/tmp/$$($1_$2_PROGNAME)-bindist
 
 all_$1_$2 : $$($1_$2_BINDIST_WRAPPER)
 

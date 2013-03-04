@@ -39,9 +39,6 @@ V = 1
 NO_INCLUDE_DEPS = NO
 NO_INCLUDE_PKGDATA = NO
 
-# Should we build latex docs?
-LATEX_DOCS = NO
-
 ################################################################################
 #
 # Variables that control how the compiler itself is built
@@ -198,7 +195,7 @@ endif
 
 # On Windows we normally want to make a relocatable bindist, to we
 # ignore flags like libdir
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 RelocatableBuild = YES
 else
 RelocatableBuild = NO
@@ -229,10 +226,8 @@ INTEGER_LIBRARY=integer-gmp
 GhcLibWays = v
 
 # In addition to the normal sequential way, the default is to also build
-# profiled prelude libraries unless we are booting from .hc files
-ifneq "$(BootingFromHc)" "YES"
+# profiled prelude libraries
 GhcLibWays += p
-endif
 
 ifeq "$(PlatformSupportsSharedLibs)" "YES"
 GhcLibWays += dyn
@@ -256,9 +251,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 GhcRTSWays=l
 
 # Usually want the debug version
-ifeq "$(BootingFromHc)" "NO"
 GhcRTSWays += debug 
-endif
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
@@ -284,10 +277,6 @@ GhcLibHcOpts=-O2
 #
 StripLibraries=NO
 
-# These are the URL patterns that Haddock uses to generate the "Source
-# File" links on each page.
-PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
-
 # ----------------------------------------------------------------------------
 # Object-file splitting
 #
@@ -305,7 +294,6 @@ SupportsSplitObjs := $(strip \
                     $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
                                $(filter YES,$(OsSupportsSplitObjs)),\
                                $(filter NO,$(SplitObjsBroken)),\
-                               $(filter NO,$(BootingFromHc)),\
                                $(filter NO,$(GhcUnregisterised))),\
                           YES,NO))
 
@@ -315,10 +303,7 @@ SplitObjs=$(SupportsSplitObjs)
 # ----------------------------------------------------------------------------
 # Package-related things
 
-# Extra packages to add to the build, in dependency order
-EXTRA_PACKAGES =
-
-# Whether to install $(EXTRA_PACKAGES)
+# Whether to install the extra packages
 InstallExtraPackages = NO
 
 # Run "ghc-pkg check" on each package
@@ -350,9 +335,6 @@ LAX_DEPENDENCIES = NO
 # optimisation.
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-O2 -fomit-frame-pointer
-
-# Include the front panel code?  Needs GTK+.
-GhcRtsWithFrontPanel = NO
 
 # Include support for CPU performance counters via the PAPI library in the RTS?
 # (PAPI: http://icl.cs.utk.edu/papi/)
@@ -433,57 +415,10 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 #
 SRC_HC_OPTS += -H32m -O
 
-# These flags make flex 8-bit
-SRC_FLEX_OPTS	+= -8
-
-# Flags for CPP when running GreenCard on .pgc files
-GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
-
-
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
-#
-#      xxx_PGM          the name of an executable, without the path
-#      xxx              the executable relative to the current dir
 
-GHC_UNLIT_PGM           = unlit$(exeext)
-GHC_HP2PS_PGM           = hp2ps$(exeext)
-GHC_GHCTAGS_PGM         = ghctags$(exeext)
-GHC_HSC2HS_PGM          = hsc2hs$(exeext)
-GHC_TOUCHY_PGM          = touchy$(exeext)
-GHC_SPLIT_PGM           = ghc-split
-GHC_SYSMAN_PGM          = SysMan
-GHC_GENPRIMOP_PGM       = genprimopcode$(exeext)
-GHC_GENAPPLY_PGM        = genapply$(exeext)
-GHC_CABAL_PGM           = ghc-cabal$(exeext)
-GHC_PKG_PGM             = ghc-pkg$(exeext)
-GHC_LTX_PGM             = ltx$(exeext)
-GHC_MKDIRHIER_PGM       = mkdirhier
-GHC_LNDIR_PGM           = lndir
-
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-GHC_CP			= "xcopy /y"
-GHC_PERL		= perl
-else
-GHC_CP			= $(CP)
-GHC_PERL		= $(PERL)
-endif
-
-HP2PS			= $(GHC_HP2PS_DIR)/$(GHC_HP2PS_PGM)
-SPLIT			= $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
-SYSMAN 			= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
-LTX 			= $(GHC_LTX_DIR)/$(GHC_LTX_PGM)
-LNDIR			= $(GHC_LNDIR_DIR)/$(GHC_LNDIR_PGM)
-
-UNLIT			= $(INPLACE_LIB)/$(GHC_UNLIT_PGM)
-TOUCHY                  = $(INPLACE_LIB)/$(GHC_TOUCHY_PGM)
-MKDIRHIER		= $(INPLACE_BIN)/$(GHC_MKDIRHIER_PGM)
-GHC_CABAL_INPLACE	= $(INPLACE_BIN)/$(GHC_CABAL_PGM)
-GENAPPLY_INPLACE	= $(INPLACE_BIN)/$(GHC_GENAPPLY_PGM)
-GHC_PKG_INPLACE		= $(INPLACE_BIN)/$(GHC_PKG_PGM)
-GHCTAGS_INPLACE		= $(INPLACE_BIN)/$(GHC_GHCTAGS_PGM)
-HSC2HS_INPLACE		= $(INPLACE_BIN)/$(GHC_HSC2HS_PGM)
-GENPRIMOP_INPLACE	= $(INPLACE_BIN)/$(GHC_GENPRIMOP_PGM)
+MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
 
 GENERATED_FILE  = chmod a-w
 EXECUTABLE_FILE = chmod +x
@@ -509,11 +444,6 @@ endif
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
 GHC_INPLACE = $(GHC_STAGE1)
-
-GHC_STAGE0_ABS = $(GHC)
-GHC_STAGE1_ABS = $(TOP)/$(INPLACE_BIN)/ghc-stage1$(exeext)
-GHC_STAGE2_ABS = $(TOP)/$(INPLACE_BIN)/ghc-stage2$(exeext)
-GHC_STAGE3_ABS = $(TOP)/$(INPLACE_BIN)/ghc-stage3$(exeext)
 
 GHC_STAGE0  = $(GHC)
 GHC_STAGE1  = $(INPLACE_BIN)/ghc-stage1$(exeext)
@@ -614,13 +544,23 @@ endif
 # The .hsc files aren't currently safe for cross-compilation on Windows:
 #     libraries\haskeline\.\System\Console\Haskeline\Backend\Win32.hsc:160
 #     directive "let" is not safe for cross-compilation
-ifneq "$(Windows)" "YES"
+ifneq "$(Windows_Host)" "YES"
 SRC_HSC2HS_OPTS += --cross-safe
 endif
-SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)))
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
+
+define set_stage_HSC2HS_OPTS
+# $1 = stage
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --cflag=,$$(filter-out -O,$$(SRC_CC_OPTS) $$(CONF_CC_OPTS_STAGE$1)))
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --cflag=,$$(CONF_CPP_OPTS_STAGE$1))
+SRC_HSC2HS_OPTS_STAGE$1 += $$(addprefix --lflag=,$$(CONF_GCC_LINKER_OPTS_STAGE$1))
+endef
+$(eval $(call set_stage_HSC2HS_OPTS,0))
+$(eval $(call set_stage_HSC2HS_OPTS,1))
+$(eval $(call set_stage_HSC2HS_OPTS,2))
 ifeq "$(CrossCompiling)" "YES"
-SRC_HSC2HS_OPTS += --cross-compile
+SRC_HSC2HS_OPTS_STAGE1 += --cross-compile
+SRC_HSC2HS_OPTS_STAGE2 += --cross-compile
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
@@ -638,14 +578,6 @@ DLLTOOL			= inplace/mingw/bin/dlltool.exe
 else ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
 DLLTOOL			= inplace/mingw/bin/dlltool.exe
 endif
-
-#-----------------------------------------------------------------------------
-# Flex (currently unused, could be moved to glafp-utils)
-
-# FLEX			= @LEX@
-# Don't bother with -lfl, we define our own yywrap()s anyway.
-# FLEX_LIB		= 
-#WAS:FLEX_LIB		= @LEXLIB@
 
 #-----------------------------------------------------------------------------
 # Other standard (ha!) Unix utilities
@@ -676,7 +608,6 @@ CP			= cp
 # It's not easy to separate the CPP program from its flags, as
 # AC_PROG_CPP defines CPP as "/usr/bin/gcc -E"
 CPP			= @CPP@ @CPPFLAGS@
-CTAGS 			= $(ETAGS)
 #
 # RAWCPP_FLAGS are the flags to give to cpp (viz, gcc -E) to persuade it to
 # behave plausibly on Haskell sources.
@@ -692,17 +623,12 @@ FIND			= @FindCmd@
 INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 
-LATEX			= latex
-PDFLATEX                = pdflatex
-BIBTEX                  = bibtex
 LN_S			= @LN_S@
 MV			= mv
-NROFF			= nroff
 PERL 			= @PerlCmd@
 PIC			= pic
 RANLIB			= @RANLIB@
 SED			= @SedCmd@
-TR 			= tr
 SHELL			= /bin/sh
 
 HaveDtrace		= @HaveDtrace@
@@ -735,33 +661,9 @@ LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@
 #     xargs: value for -s option should be < 28153
 # so we now use 20000 to be comfortably below this bound
 XARGS = xargs
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 XARGS_OPTS = -s 20000
 endif
-
-#
-# In emergency situations, REAL_SHELL is used to perform shell commands
-# from within the ghc driver script, by scribbling the command line to
-# a temp file and then having $(REAL_SHELL) execute it. 
-#
-# The reason for having to do this is that overly long command lines
-# cause unnecessary trouble with some shells (e.g., /bin/sh on Solaris
-# 2.5.1), which is why this backdoor is provided. The situation of overly
-# long command lines is either encountered while doing `make boot' in compiler/, 
-# or when linking the compiler binary (`hsc'). 
-#
-# We do not use SHELL to execute long commands, as `make' will more than likely
-# override whatever setting you have in your environment while executing. 
-
-# By default, REAL_SHELL is set equal to SHELL, which is not really a smart move
-# as it is SHELL that will show up the bogosity in the first place, but setting
-# it to anything else isn't really portable.
-#
-#  ====> If long command lines cause you trouble, invoke `ghc' (via `make' or otherwise)
-# with REAL_SHELL set to something else than /bin/sh, for instance, your favourite
-# command shell.
-#
-REAL_SHELL     = $(SHELL)
 
 ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
 STRIP_CMD      = $(TOP)/inplace/mingw/bin/strip.exe
@@ -773,7 +675,7 @@ TAR_CMD        = @TarCmd@
 BZIP2_CMD      = bzip2
 GZIP_CMD       = gzip
 
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 TOUCH_CMD      = $(utils/touchy_dist_INPLACE)
 TOUCH_DEP      = $(TOUCH_CMD)
 else
@@ -784,9 +686,6 @@ endif
 HSCOLOUR_CMD   = @HSCOLOUR@
 
 TIME_CMD       = @TimeCmd@
-
-# GTK+
-GTK_CONFIG_CMD = @GTK_CONFIG@
 
 # Set this if you want to use Inno Setup to build a Windows installer
 # when you make a bindist

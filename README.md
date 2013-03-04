@@ -79,22 +79,51 @@ repos in sync with the [sync-all script] [7].  To get the latest changes:
     $ ./sync-all pull
     $ ./sync-all get
 
+Filing bugs and feature requests
+================================
 
-Contributors
-============
+If you've encountered what you believe is a bug in GHC, or you'd like
+to propose a feature request, please let us know! Submit a ticket in
+our [bug tracker] [10] and we'll be sure to look into it. Remember:
+**Filing a bug is the best way to make sure your issue isn't lost over
+time**, so please feel free.
 
-Please see the list of [GHC contributors](http://www.haskell.org/ghc/contributors.html "www.haskell.org/ghc/contributors.html").
+If you're an active user of GHC, you may also be interested in joining
+the [glasgow-haskell-users] [11] mailing list, where developers and
+GHC users discuss various topics and hang out.
 
+Hacking & Developing GHC
+========================
 
-  [1]: http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
-  [2]: http://hackage.haskell.org/trac/ghc    "hackage.haskell.org/trac/ghc"
-  [3]: http://hackage.haskell.org/trac/ghc/wiki/Building
-       "hackage.haskell.org/trac/ghc/wiki/Building"
-  [4]: http://www.haskell.org/happy/          "www.haskell.org/happy/"
-  [5]: http://www.haskell.org/alex/           "www.haskell.org/alex/"
-  [6]: http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
-  [7]: http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll
-       "http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll"
-  [8]: http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation
-       "http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation"
-  [9]: http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
+Once you've filed a bug, maybe you'd like to fix it yourself? That
+would be great, and we'd surely love your company! If you're looking
+to hack on GHC, check out the guidelines in the `HACKING.md` file in
+this directory - they'll get you up to speed quickly.
+
+Contributors & Acknowledgements
+===============================
+
+GHC in its current form wouldn't exist without the hard work of
+[its many contributors] [12]. Over time, it has grown to include the
+efforts and research of many institutions, highly talented people, and
+groups from around the world. We'd like to thank them all, and invite
+you to join!
+
+  [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
+  [2]:  http://hackage.haskell.org/trac/ghc    "hackage.haskell.org/trac/ghc"
+  [3]:  http://hackage.haskell.org/trac/ghc/wiki/Building
+          "hackage.haskell.org/trac/ghc/wiki/Building"
+  [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
+  [5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
+  [6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
+  [7]:  http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll
+          "http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll"
+  [8]:  http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation
+          "http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation"
+  [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
+  [10]: http://hackage.haskell.org/trac/ghc/
+          "http://hackage.haskell.org/trac/ghc/"
+  [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
+          "http://www.haskell.org/pipermail/glasgow-haskell-users/"
+  [12]: http://hackage.haskell.org/trac/ghc/wiki/Contributors
+          "http://hackage.haskell.org/trac/ghc/wiki/Contributors"

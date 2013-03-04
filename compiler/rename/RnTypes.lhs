@@ -679,7 +679,7 @@ mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ 
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
        return (HsCmdArrForm op1 (Just fix1)
-	          [a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
+	          [a11, L loc (HsCmdTop (L loc new_c) placeHolderType placeHolderType [])])
 	-- TODO: locs are wrong
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2

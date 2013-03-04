@@ -33,8 +33,8 @@ $1/$2/build/%.hs : $1/$2/build/%.y | $$$$(dir $$$$@)/.
 $1/$2/build/%.hs : $1/$3/%.x | $$$$(dir $$$$@)/.
 	$$(call cmd,ALEX) $$($1_$2_ALL_ALEX_OPTS) $$< -o $$@
 
-$1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$3/%.hsc $$(HSC2HS_INPLACE) | $$$$(dir $$$$@)/.
-	$$(call cmd,HSC2HS_INPLACE) $$($1_$2_ALL_HSC2HS_OPTS) $$< -o $$@
+$1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$3/%.hsc $$$$(hsc2hs_INPLACE) | $$$$(dir $$$$@)/.
+	$$(call cmd,hsc2hs_INPLACE) $$($1_$2_ALL_HSC2HS_OPTS) $$< -o $$@
 
 # Now the rules for hs-boot files.
 

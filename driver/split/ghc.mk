@@ -11,9 +11,10 @@
 # -----------------------------------------------------------------------------
 
 driver/split_PERL_SRC  = ghc-split.lprl
-driver/split_dist_PROG = $(GHC_SPLIT_PGM)
+driver/split_dist_PROGNAME = ghc-split
 driver/split_dist_TOPDIR = YES
-driver/split_dist_INSTALL_IN = $(DESTDIR)$(topdir)
+driver/split_dist_INSTALL = YES
+driver/split_dist_INSTALL_INPLACE = YES
 
 $(eval $(call build-perl,driver/split,dist))
 

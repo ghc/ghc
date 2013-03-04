@@ -8226,7 +8226,7 @@ Thus combinators that produce arrows from arrows
 may also be used to build commands from commands.
 For example, the <literal>ArrowPlus</literal> class includes a combinator
 <programlisting>
-ArrowPlus a => (&lt;+>) :: a e c -> a e c -> a e c
+ArrowPlus a => (&lt;+>) :: a b c -> a b c -> a b c
 </programlisting>
 so we can use it to build commands:
 <programlisting>
@@ -8256,18 +8256,24 @@ expr' = (proc x -> returnA -&lt; x)
                 y &lt;- term -&lt; ()
                 expr' -&lt; x - y)
 </programlisting>
+We are actually using <literal>&lt;+></literal> here with the more specific type
+<programlisting>
+ArrowPlus a => (&lt;+>) :: a (e,()) c -> a (e,()) c -> a (e,()) c
+</programlisting>
 It is essential that this operator be polymorphic in <literal>e</literal>
 (representing the environment input to the command
 and thence to its subcommands)
 and satisfy the corresponding naturality property
 <screen>
-arr k >>> (f &lt;+> g) = (arr k >>> f) &lt;+> (arr k >>> g)
+arr (first k) >>> (f &lt;+> g) = (arr (first k) >>> f) &lt;+> (arr (first k) >>> g)
 </screen>
 at least for strict <literal>k</literal>.
 (This should be automatic if you're not using <function>seq</function>.)
 This ensures that environments seen by the subcommands are environments
 of the whole command,
 and also allows the translation to safely trim these environments.
+(The second component of the input pairs can contain unnamed input values,
+as described in the next section.)
 The operator must also not use any variable defined within the current
 arrow abstraction.
 </para>
@@ -8275,7 +8281,7 @@ arrow abstraction.
 <para>
 We could define our own operator
 <programlisting>
-untilA :: ArrowChoice a => a e () -> a e Bool -> a e ()
+untilA :: ArrowChoice a => a (e,s) () -> a (e,s) Bool -> a (e,s) ()
 untilA body cond = proc x ->
         b &lt;- cond -&lt; x
         if b then returnA -&lt; ()
@@ -8305,7 +8311,7 @@ the operator that attaches an exception handler will wish to pass the
 exception that occurred to the handler.
 Such an operator might have a type
 <screen>
-handleA :: ... => a e c -> a (e,Ex) c -> a e c
+handleA :: ... => a (e,s) c -> a (e,(Ex,s)) c -> a (e,s) c
 </screen>
 where <literal>Ex</literal> is the type of exceptions handled.
 You could then use this with arrow notation by writing a command
@@ -8320,22 +8326,24 @@ Though the syntax here looks like a functional lambda,
 we are talking about commands, and something different is going on.
 The input to the arrow represented by a command consists of values for
 the free local variables in the command, plus a stack of anonymous values.
-In all the prior examples, this stack was empty.
+In all the prior examples, we made no assumptions about this stack.
 In the second argument to <function>handleA</function>,
-this stack consists of one value, the value of the exception.
+the value of the exception has been added to the stack input to the handler.
 The command form of lambda merely gives this value a name.
 </para>
 
 <para>
 More concretely,
-the values on the stack are paired to the right of the environment.
+the input to a command consists of a pair of an environment and a stack.
+Each value on the stack is paired with the remainder of the stack,
+with an empty stack being <literal>()</literal>.
 So operators like <function>handleA</function> that pass
 extra inputs to their subcommands can be designed for use with the notation
-by pairing the values with the environment in this way.
+by placing the values on the stack paired with the environment in this way.
 More precisely, the type of each argument of the operator (and its result)
 should have the form
 <screen>
-a (...(e,t1), ... tn) t
+a (e, (t1, ... (tn, ())...)) t
 </screen>
 where <replaceable>e</replaceable> is a polymorphic variable
 (representing the environment)
@@ -8347,9 +8355,9 @@ The polymorphic variable <replaceable>e</replaceable> must not occur in
 However the arrows involved need not be the same.
 Here are some more examples of suitable operators:
 <screen>
-bracketA :: ... => a e b -> a (e,b) c -> a (e,c) d -> a e d
-runReader :: ... => a e c -> a' (e,State) c
-runState :: ... => a e c -> a' (e,State) (c,State)
+bracketA :: ... => a (e,s) b -> a (e,(b,s)) c -> a (e,(c,s)) d -> a (e,s) d
+runReader :: ... => a (e,s) c -> a' (e,(State,s)) c
+runState :: ... => a (e,s) c -> a' (e,(State,s)) (c,State)
 </screen>
 We can supply the extra input required by commands built with the last two
 by applying them to ordinary expressions, as in
@@ -8371,16 +8379,16 @@ are the core of the notation; everything else can be built using them,
 though the results would be somewhat clumsy.
 For example, we could simulate <literal>do</literal>-notation by defining
 <programlisting>
-bind :: Arrow a => a e b -> a (e,b) c -> a e c
+bind :: Arrow a => a (e,s) b -> a (e,(b,s)) c -> a (e,s) c
 u `bind` f = returnA &amp;&amp;&amp; u >>> f
 
-bind_ :: Arrow a => a e b -> a e c -> a e c
+bind_ :: Arrow a => a (e,s) b -> a (e,s) c -> a (e,s) c
 u `bind_` f = u `bind` (arr fst >>> f)
 </programlisting>
 We could simulate <literal>if</literal> by defining
 <programlisting>
-cond :: ArrowChoice a => a e b -> a e b -> a (e,Bool) b
-cond f g = arr (\ (e,b) -> if b then Left e else Right e) >>> f ||| g
+cond :: ArrowChoice a => a (e,s) b -> a (e,s) b -> a (e,(Bool,s)) b
+cond f g = arr (\ (e,(b,s)) -> if b then Left (e,s) else Right (e,s)) >>> f ||| g
 </programlisting>
 </para>
 
@@ -8402,6 +8410,14 @@ and <quote><literal>-&lt;&lt;</literal></quote> (higher-order).
 <listitem>
 <para>User-defined operators are flagged with banana brackets instead of
 a new <literal>form</literal> keyword.
+</para>
+</listitem>
+
+<listitem>
+<para>In the paper and the previous implementation,
+values on the stack were paired to the right of the environment
+in a single argument,
+but now the environment and stack are separate arguments.
 </para>
 </listitem>
 

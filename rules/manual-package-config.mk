@@ -15,7 +15,7 @@ define manual-package-config # args: $1 = dir
 $(call trace, manual-package-config($1))
 $(call profStart, manual-package-config($1))
 
-$1/package.conf.inplace : $1/package.conf.in $$(GHC_PKG_INPLACE)
+$1/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE)
 	$$(CPP) $$(RAWCPP_FLAGS) -P \
 		-DTOP='"$$(TOP)"' \
 		$$($1_PACKAGE_CPP_OPTS) \
@@ -23,7 +23,7 @@ $1/package.conf.inplace : $1/package.conf.in $$(GHC_PKG_INPLACE)
 	grep -v '^#pragma GCC' $$@.raw | \
 	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' > $$@
 
-	"$$(GHC_PKG_INPLACE)" update --force $$@
+	"$$(ghc-pkg_INPLACE)" update --force $$@
 
 # This is actually a real file, but we need to recreate it on every
 # "make install", so we declare it as phony

@@ -34,6 +34,7 @@ module HscMain
     -- * Compiling complete source files
     , Compiler
     , HscStatus' (..)
+    , FileOutputStatus
     , InteractiveStatus, HscStatus
     , hscCompileOneShot
     , hscCompileBatch
@@ -540,11 +541,12 @@ data HscStatus' a
 -- result type. Therefore we need to artificially distinguish some types. We do
 -- this by adding type tags which will simply be ignored by the caller.
 type HscStatus         = HscStatus' ()
+type FileOutputStatus  = HscStatus' (Maybe FilePath)
 type InteractiveStatus = HscStatus' (Maybe (CompiledByteCode, ModBreaks))
     -- INVARIANT: result is @Nothing@ <=> input was a boot file
 
-type OneShotResult     = HscStatus
-type BatchResult       = (HscStatus, ModIface, ModDetails)
+type OneShotResult     = FileOutputStatus
+type BatchResult       = (FileOutputStatus, ModIface, ModDetails)
 type NothingResult     = (HscStatus, ModIface, ModDetails)
 type InteractiveResult = (InteractiveStatus, ModIface, ModDetails)
 
@@ -687,21 +689,21 @@ hscOneShotCompiler = HsCompiler {
   , hscBackend = \tc_result mod_summary mb_old_hash -> do
         dflags <- getDynFlags
         case hscTarget dflags of
-            HscNothing -> return (HscRecomp Nothing ())
+            HscNothing -> return (HscRecomp Nothing Nothing)
             _otherw    -> genericHscBackend hscOneShotCompiler
                               tc_result mod_summary mb_old_hash
 
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
         (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
         hscWriteIface iface changed mod_summary
-        return (HscRecomp Nothing ())
+        return (HscRecomp Nothing Nothing)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
         guts <- hscSimplify' guts0
         (iface, changed, _details, cgguts) <- hscNormalIface guts mb_old_iface
         hscWriteIface iface changed mod_summary
-        hasStub <- hscGenHardCode cgguts mod_summary
-        return (HscRecomp hasStub ())
+        (outputFilename, hasStub) <- hscGenHardCode cgguts mod_summary
+        return (HscRecomp hasStub (Just outputFilename))
   }
 
 -- Compile Haskell, boot and extCore in OneShot mode.
@@ -737,18 +739,18 @@ hscBatchCompiler = HsCompiler {
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
         (iface, changed, details) <- hscSimpleIface tc_result mb_old_iface
         hscWriteIface iface changed mod_summary
-        return (HscRecomp Nothing (), iface, details)
+        return (HscRecomp Nothing Nothing, iface, details)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
         guts <- hscSimplify' guts0
         (iface, changed, details, cgguts) <- hscNormalIface guts mb_old_iface
         hscWriteIface iface changed mod_summary
-        hasStub <- hscGenHardCode cgguts mod_summary
-        return (HscRecomp hasStub (), iface, details)
+        (outputFilename, hasStub) <- hscGenHardCode cgguts mod_summary
+        return (HscRecomp hasStub (Just outputFilename), iface, details)
   }
 
 -- | Compile Haskell, boot and extCore in batch mode.
-hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileBatch :: Compiler (FileOutputStatus, ModIface, ModDetails)
 hscCompileBatch = genericHscCompile hscBatchCompiler batchMsg
 
 hscBatchBackendOnly :: TcGblEnv -> Compiler BatchResult
@@ -1256,7 +1258,7 @@ hscWriteIface iface no_change mod_summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: CgGuts -> ModSummary
-               -> Hsc (Maybe FilePath) -- ^ @Just f@ <=> _stub.c is f
+               -> Hsc (FilePath, Maybe FilePath) -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode cgguts mod_summary = do
     hsc_env <- getHscEnv
     liftIO $ do
@@ -1303,11 +1305,11 @@ hscGenHardCode cgguts mod_summary = do
                         return a
             rawcmms1 = Stream.mapM dump rawcmms0
 
-        (_stub_h_exists, stub_c_exists)
+        (output_filename, (_stub_h_exists, stub_c_exists))
             <- {-# SCC "codeOutput" #-}
                codeOutput dflags this_mod location foreign_stubs
                dependencies rawcmms1
-        return stub_c_exists
+        return (output_filename, stub_c_exists)
 
 
 hscInteractive :: (ModIface, ModDetails, CgGuts)

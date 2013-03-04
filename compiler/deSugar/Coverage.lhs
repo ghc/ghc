@@ -803,6 +803,9 @@ addTickHsCmd (HsCmdArrForm e fix cmdtop) =
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
+addTickHsCmd (HsCmdCast co cmd) 
+  = liftM2 HsCmdCast (return co) (addTickHsCmd cmd)
+
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
 

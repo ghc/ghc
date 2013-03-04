@@ -731,7 +731,9 @@ data CoreReader = CoreReader {
 }
 
 data CoreWriter = CoreWriter {
-        cw_simpl_count :: SimplCount
+        cw_simpl_count :: !SimplCount  
+        -- Making this strict fixes a nasty space leak
+        -- See Trac #7702
 }
 
 emptyWriter :: DynFlags -> CoreWriter

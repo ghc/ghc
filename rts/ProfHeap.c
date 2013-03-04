@@ -97,7 +97,7 @@ static void dumpCensus( Census *census );
 static rtsBool closureSatisfiesConstraints( StgClosure* p );
 
 /* ----------------------------------------------------------------------------
- * Find the "closure identity", which is a unique pointer reresenting
+ * Find the "closure identity", which is a unique pointer representing
  * the band to which this closure's heap space is attributed in the
  * heap profile.
  * ------------------------------------------------------------------------- */

@@ -730,6 +730,10 @@ zonkCmd   :: ZonkEnv -> HsCmd TcId    -> TcM (HsCmd Id)
 
 zonkLCmd  env cmd  = wrapLocM (zonkCmd env) cmd
 
+zonkCmd env (HsCmdCast co cmd)
+  = do { co' <- zonkTcLCoToLCo env co
+       ; cmd' <- zonkCmd env cmd 
+       ; return (HsCmdCast co' cmd') }
 zonkCmd env (HsCmdArrApp e1 e2 ty ho rl)
   = zonkLExpr env e1                    `thenM` \ new_e1 ->
     zonkLExpr env e2                    `thenM` \ new_e2 ->
@@ -786,7 +790,7 @@ zonkCmdTop env cmd = wrapLocM (zonk_cmd_top env) cmd
 zonk_cmd_top :: ZonkEnv -> HsCmdTop TcId -> TcM (HsCmdTop Id)
 zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
   = zonkLCmd env cmd                    `thenM` \ new_cmd ->
-    zonkTcTypeToTypes env stack_tys	`thenM` \ new_stack_tys ->
+    zonkTcTypeToType env stack_tys	`thenM` \ new_stack_tys ->
     zonkTcTypeToType env ty 		`thenM` \ new_ty ->
     mapSndM (zonkExpr env) ids		`thenM` \ new_ids ->
     returnM (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
