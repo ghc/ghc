@@ -4,8 +4,8 @@ module ShouldCompile where
 
 import Control.Arrow
 
-handle :: ArrowPlus a => a b c -> a (b,String) c -> a b c
-handle f h = proc b -> (f -< b) <+> (h -< (b,""))
+handle :: ArrowPlus a => a (b,s) c -> a (b,(String,s)) c -> a (b,s) c
+handle f h = proc (b,s) -> (f -< (b,s)) <+> (h -< (b,("FAIL",s)))
 
 f :: ArrowPlus a => a (Int,Int) String
 f = proc (x,y) ->
