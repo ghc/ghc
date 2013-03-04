@@ -617,7 +617,6 @@ CP			= cp
 # It's not easy to separate the CPP program from its flags, as
 # AC_PROG_CPP defines CPP as "/usr/bin/gcc -E"
 CPP			= @CPP@ @CPPFLAGS@
-CTAGS 			= $(ETAGS)
 #
 # RAWCPP_FLAGS are the flags to give to cpp (viz, gcc -E) to persuade it to
 # behave plausibly on Haskell sources.
