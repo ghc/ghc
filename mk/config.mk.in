@@ -426,9 +426,6 @@ SRC_HC_OPTS += -H32m -O
 
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
-#
-#      xxx_PGM          the name of an executable, without the path
-#      xxx              the executable relative to the current dir
 
 MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
 
