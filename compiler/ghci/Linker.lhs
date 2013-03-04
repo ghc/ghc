@@ -303,12 +303,12 @@ reallyInitDynLinker dflags =
 
           -- (e) Link any MacOS frameworks
         ; let platform = targetPlatform dflags
-        ; let framework_paths = case platformOS platform of
-                                OSDarwin -> frameworkPaths dflags
-                                _        -> []
-        ; let frameworks = case platformOS platform of
-                           OSDarwin -> cmdlineFrameworks dflags
-                           _        -> []
+        ; let framework_paths = if platformUsesFrameworks platform
+                                then frameworkPaths dflags
+                                else []
+        ; let frameworks = if platformUsesFrameworks platform
+                           then cmdlineFrameworks dflags
+                           else []
           -- Finally do (c),(d),(e)
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
                                ++ libspecs
@@ -389,13 +389,12 @@ preloadLib dflags lib_paths framework_paths lib_spec
                       Just mm -> preloadFailed mm lib_paths lib_spec
 
           Framework framework ->
-              case platformOS (targetPlatform dflags) of
-              OSDarwin ->
-                do maybe_errstr <- loadFramework framework_paths framework
-                   case maybe_errstr of
-                      Nothing -> maybePutStrLn dflags "done"
-                      Just mm -> preloadFailed mm framework_paths lib_spec
-              _ -> panic "preloadLib Framework"
+              if platformUsesFrameworks (targetPlatform dflags)
+              then do maybe_errstr <- loadFramework framework_paths framework
+                      case maybe_errstr of
+                         Nothing -> maybePutStrLn dflags "done"
+                         Just mm -> preloadFailed mm framework_paths lib_spec
+              else panic "preloadLib Framework"
 
   where
     platform = targetPlatform dflags
@@ -1156,9 +1155,9 @@ load_dyn dll = do r <- loadDLL dll
 
 loadFrameworks :: Platform -> InstalledPackageInfo_ ModuleName -> IO ()
 loadFrameworks platform pkg
-    = case platformOS platform of
-      OSDarwin -> mapM_ load frameworks
-      _        -> return ()
+    = if platformUsesFrameworks platform
+      then mapM_ load frameworks
+      else return ()
   where
     fw_dirs    = Packages.frameworkDirs pkg
     frameworks = Packages.frameworks pkg

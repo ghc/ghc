@@ -141,7 +141,7 @@ define addCFileDeps
 	$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
 
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 CASE_INSENSITIVE_SED = i
 else
 CASE_INSENSITIVE_SED =

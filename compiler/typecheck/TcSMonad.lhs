@@ -849,10 +849,13 @@ extractRelevantInerts :: Ct -> TcS Cts
 -- NB: This function contains logic specific to the constraint solver, maybe move there?
 extractRelevantInerts wi 
   = modifyInertTcS (extract_relevants wi)
-  where extract_relevants wi is 
+  where 
+        extract_relevants :: Ct -> InertSet -> (Cts,InertSet)
+        extract_relevants wi is 
           = let (cts,ics') = extract_ics_relevants wi (inert_cans is)
             in (cts, is { inert_cans = ics' }) 
             
+        extract_ics_relevants :: Ct -> InertCans -> (Cts, InertCans)
         extract_ics_relevants (CDictCan {cc_class = cl}) ics = 
             let (cts,dict_map) = getRelevantCts cl (inert_dicts ics) 
             in (cts, ics { inert_dicts = dict_map })

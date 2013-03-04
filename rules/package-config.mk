@@ -43,8 +43,8 @@ else
 $1_$2_HC_PKGCONF = 
 $1_$2_HC_CONFIG = $$(TOP)/$$(GHC_STAGE1)
 $1_$2_HC_CONFIG_DEP = $$(GHC_STAGE1)
-$1_$2_GHC_PKG = $$(TOP)/$$(GHC_PKG_INPLACE)
-$1_$2_GHC_PKG_DEP = $$(GHC_PKG_INPLACE)
+$1_$2_GHC_PKG = $$(TOP)/$$(ghc-pkg_INPLACE)
+$1_$2_GHC_PKG_DEP = $$$$(ghc-pkg_INPLACE)
 $1_$2_GHC_PKG_OPTS =
 # If stage is not 0 then we always use stage1 for making .depend, as later
 # stages aren't available early enough

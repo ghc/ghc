@@ -79,10 +79,11 @@ $1_$2_HSC2HS_LD_OPTS:=$$(shell for i in $$($1_$2_DIST_LD_OPTS); do echo \'--lfla
 endif
 
 $1_$2_ALL_HSC2HS_OPTS = \
- --cc=$$(WhatGccIsCalled) \
- --ld=$$(WhatGccIsCalled) \
+ --cc=$$(CC_STAGE$3) \
+ --ld=$$(CC_STAGE$3) \
  $$(CONF_HSC2HS_OPTS) \
  $$(SRC_HSC2HS_OPTS) \
+ $$(SRC_HSC2HS_OPTS_STAGE$3) \
  --cflag=-D__GLASGOW_HASKELL__=$$(if $$(filter 0,$3),$$(GhcCanonVersion),$$(ProjectVersionInt)) \
  --cflag=-D$$(HostArch_CPP)_HOST_ARCH=1 \
  --cflag=-D$$(HostOS_CPP)_HOST_OS=1 \

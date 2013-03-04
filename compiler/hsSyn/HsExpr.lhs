@@ -917,7 +917,7 @@ pprMatch ctxt (Match pats maybe_ty grhss)
     (herald, other_pats)
         = case ctxt of
             FunRhs fun is_infix
-                | not is_infix -> (ppr fun, pats)
+                | not is_infix -> (pprPrefixOcc fun, pats)
                         -- f x y z = e
                         -- Not pprBndr; the AbsBinds will
                         -- have printed the signature
@@ -928,7 +928,7 @@ pprMatch ctxt (Match pats maybe_ty grhss)
                 | otherwise -> (parens pp_infix, pats2)
                         -- (x &&& y) z = e
                 where
-                  pp_infix = pprParendLPat pat1 <+> ppr fun <+> pprParendLPat pat2
+                  pp_infix = pprParendLPat pat1 <+> pprInfixOcc fun <+> pprParendLPat pat2
 
             LambdaExpr -> (char '\\', pats)
 

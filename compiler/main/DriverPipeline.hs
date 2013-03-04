@@ -108,7 +108,7 @@ compile = compile' (hscCompileNothing, hscCompileInteractive, hscCompileBatch)
 compile' :: 
            (Compiler (HscStatus, ModIface, ModDetails),
             Compiler (InteractiveStatus, ModIface, ModDetails),
-            Compiler (HscStatus, ModIface, ModDetails))
+            Compiler (FileOutputStatus, ModIface, ModDetails))
         -> HscEnv
         -> ModSummary      -- ^ summary for module being compiled
         -> Int             -- ^ module N ...
@@ -149,9 +149,8 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
 
-   let dflags' = dflags { hscTarget = hsc_lang,
-                                hscOutName = output_fn,
-                                extCoreName = basename ++ ".hcr" }
+   let dflags' = dflags { hscOutName = output_fn,
+                          extCoreName = basename ++ ".hcr" }
    let hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- -fforce-recomp should also work with --make
@@ -441,6 +440,10 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         -- When linking, the -o argument refers to the linker's output.
         -- otherwise, we use it as the name for the pipeline's output.
         output
+         -- If we are dong -fno-code, then act as if the output is
+         -- 'Temporary'. This stops GHC trying to copy files to their
+         -- final location.
+         | HscNothing <- hscTarget dflags = Temporary
          | StopLn <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
          | Just o_file <- mb_o_file = SpecificFile o_file
@@ -712,50 +715,47 @@ pipeLoop phase input_fn = do
 getOutputFilename
   :: Phase -> PipelineOutput -> String
   -> DynFlags -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
-getOutputFilename stop_phase output basename
- = func
- where
-        func dflags next_phase maybe_location
-           | is_last_phase, Persistent <- output     = persistent_fn
-           | is_last_phase, SpecificFile f <- output = return f
-           | keep_this_output                        = persistent_fn
-           | otherwise                               = newTempName dflags suffix
-           where
-                hcsuf      = hcSuf dflags
-                odir       = objectDir dflags
-                osuf       = objectSuf dflags
-                keep_hc    = gopt Opt_KeepHcFiles dflags
-                keep_s     = gopt Opt_KeepSFiles dflags
-                keep_bc    = gopt Opt_KeepLlvmFiles dflags
+getOutputFilename stop_phase output basename dflags next_phase maybe_location
+ | is_last_phase, Persistent <- output     = persistent_fn
+ | is_last_phase, SpecificFile f <- output = return f
+ | keep_this_output                        = persistent_fn
+ | otherwise                               = newTempName dflags suffix
+    where
+          hcsuf      = hcSuf dflags
+          odir       = objectDir dflags
+          osuf       = objectSuf dflags
+          keep_hc    = gopt Opt_KeepHcFiles dflags
+          keep_s     = gopt Opt_KeepSFiles dflags
+          keep_bc    = gopt Opt_KeepLlvmFiles dflags
 
-                myPhaseInputExt HCc       = hcsuf
-                myPhaseInputExt MergeStub = osuf
-                myPhaseInputExt StopLn    = osuf
-                myPhaseInputExt other     = phaseInputExt other
+          myPhaseInputExt HCc       = hcsuf
+          myPhaseInputExt MergeStub = osuf
+          myPhaseInputExt StopLn    = osuf
+          myPhaseInputExt other     = phaseInputExt other
 
-                is_last_phase = next_phase `eqPhase` stop_phase
+          is_last_phase = next_phase `eqPhase` stop_phase
 
-                -- sometimes, we keep output from intermediate stages
-                keep_this_output =
-                     case next_phase of
-                             As      | keep_s     -> True
-                             LlvmOpt | keep_bc    -> True
-                             HCc     | keep_hc    -> True
-                             _other               -> False
+          -- sometimes, we keep output from intermediate stages
+          keep_this_output =
+               case next_phase of
+                       As      | keep_s     -> True
+                       LlvmOpt | keep_bc    -> True
+                       HCc     | keep_hc    -> True
+                       _other               -> False
 
-                suffix = myPhaseInputExt next_phase
+          suffix = myPhaseInputExt next_phase
 
-                -- persistent object files get put in odir
-                persistent_fn
-                   | StopLn <- next_phase = return odir_persistent
-                   | otherwise            = return persistent
+          -- persistent object files get put in odir
+          persistent_fn
+             | StopLn <- next_phase = return odir_persistent
+             | otherwise            = return persistent
 
-                persistent = basename <.> suffix
+          persistent = basename <.> suffix
 
-                odir_persistent
-                   | Just loc <- maybe_location = ml_obj_file loc
-                   | Just d <- odir = d </> persistent
-                   | otherwise      = persistent
+          odir_persistent
+             | Just loc <- maybe_location = ml_obj_file loc
+             | Just d <- odir = d </> persistent
+             | otherwise      = persistent
 
 
 -- -----------------------------------------------------------------------------
@@ -980,8 +980,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
         let next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
         output_fn  <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { hscTarget = hsc_lang,
-                               hscOutName = output_fn,
+        let dflags' = dflags { hscOutName = output_fn,
                                extCoreName = basename ++ ".hcr" }
 
         setDynFlags dflags'
@@ -1016,7 +1015,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
                     -- than the source file (else we wouldn't be in HscNoRecomp)
                     -- but we touch it anyway, to keep 'make' happy (we think).
                     return (StopLn, o_file)
-          (HscRecomp hasStub _)
+          (HscRecomp hasStub mOutputFilename)
               -> do case hasStub of
                       Nothing -> return ()
                       Just stub_c ->
@@ -1024,12 +1023,19 @@ runPhase (Hsc src_flavour) input_fn dflags0
                              setStubO stub_o
                     -- In the case of hs-boot files, generate a dummy .o-boot
                     -- stamp file for the benefit of Make
-                    when (isHsBoot src_flavour) $ do
-                        liftIO $ touchObjectFile dflags' o_file
-                        whenGeneratingDynamicToo dflags' $ do
-                            let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
-                            liftIO $ touchObjectFile dflags' dyn_o_file
-                    return (next_phase, output_fn)
+                    outputFilename <-
+                        case mOutputFilename of
+                        Just x -> return x
+                        Nothing ->
+                            if isHsBoot src_flavour
+                            then do liftIO $ touchObjectFile dflags' o_file
+                                    whenGeneratingDynamicToo dflags' $ do
+                                        let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
+                                        liftIO $ touchObjectFile dflags' dyn_o_file
+                                    return o_file
+                            else return $ panic "runPhase Hsc: No output filename"
+
+                    return (next_phase, outputFilename)
 
 -----------------------------------------------------------------------------
 -- Cmm phase
@@ -1050,8 +1056,7 @@ runPhase Cmm input_fn dflags
 
         output_fn <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { hscTarget = hsc_lang,
-                               hscOutName = output_fn,
+        let dflags' = dflags { hscOutName = output_fn,
                                extCoreName = src_basename ++ ".hcr" }
 
         setDynFlags dflags'
@@ -1100,14 +1105,12 @@ runPhase cc_phase input_fn dflags
              else getPackageExtraCcOpts dflags pkgs
 
         framework_paths <-
-            case platformOS platform of
-            OSDarwin ->
-                do pkgFrameworkPaths <- liftIO $ getPackageFrameworkPath dflags pkgs
-                   let cmdlineFrameworkPaths = frameworkPaths dflags
-                   return $ map ("-F"++)
-                                (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
-            _ ->
-                return []
+            if platformUsesFrameworks platform
+            then do pkgFrameworkPaths <- liftIO $ getPackageFrameworkPath dflags pkgs
+                    let cmdlineFrameworkPaths = frameworkPaths dflags
+                    return $ map ("-F"++)
+                                 (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
+            else return []
 
         let split_objs = gopt Opt_SplitObjs dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
@@ -1640,9 +1643,9 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 getLinkInfo :: DynFlags -> [PackageId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getPackageLinkOpts dflags dep_packages
-   pkg_frameworks <- case platformOS (targetPlatform dflags) of
-                     OSDarwin -> getPackageFrameworks dflags dep_packages
-                     _        -> return []
+   pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
+                     then getPackageFrameworks dflags dep_packages
+                     else return []
    let extra_ld_inputs = ldInputs dflags
    let
       link_info = (package_link_opts,
@@ -1787,38 +1790,31 @@ linkBinary dflags o_files dep_packages = do
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
     pkg_framework_path_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
-               return $ map ("-F" ++) pkg_framework_paths
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
+                return $ map ("-F" ++) pkg_framework_paths
+        else return []
 
     framework_path_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do let framework_paths = frameworkPaths dflags
-               return $ map ("-F" ++) framework_paths
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do let framework_paths = frameworkPaths dflags
+                return $ map ("-F" ++) framework_paths
+        else return []
 
     pkg_framework_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do pkg_frameworks <- getPackageFrameworks dflags dep_packages
-               return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do pkg_frameworks <- getPackageFrameworks dflags dep_packages
+                return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
+        else return []
 
     framework_opts <-
-        case platformOS platform of
-        OSDarwin ->
-            do let frameworks = cmdlineFrameworks dflags
-               -- reverse because they're added in reverse order from
-               -- the cmd line:
-               return $ concat [ ["-framework", fw] | fw <- reverse frameworks ]
-        _ ->
-            return []
+        if platformUsesFrameworks platform
+        then do let frameworks = cmdlineFrameworks dflags
+                -- reverse because they're added in reverse order from
+                -- the cmd line:
+                return $ concat [ ["-framework", fw]
+                                | fw <- reverse frameworks ]
+        else return []
 
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags

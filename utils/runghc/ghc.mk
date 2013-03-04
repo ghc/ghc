@@ -12,7 +12,7 @@
 
 utils/runghc_PACKAGE = runghc
 utils/runghc_dist-install_USES_CABAL = YES
-utils/runghc_dist-install_PROG    = runghc$(exeext)
+utils/runghc_dist-install_PROGNAME = runghc
 utils/runghc_dist-install_SHELL_WRAPPER = YES
 utils/runghc_dist-install_INSTALL = YES
 utils/runghc_dist-install_INSTALL_INPLACE = YES
@@ -30,7 +30,7 @@ $(eval $(call build-prog,utils/runghc,dist-install,1))
 install: install_runhaskell
 
 .PHONY: install_runhaskell
-ifeq "$(Windows)" "YES"
+ifeq "$(Windows_Host)" "YES"
 install_runhaskell: install_bins
 	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext) $(DESTDIR)$(bindir)/runhaskell$(exeext)
 else
