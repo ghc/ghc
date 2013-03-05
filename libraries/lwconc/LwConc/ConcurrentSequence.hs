@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LwConc.Schedulers.Concurrent
+-- Module      :  LwConc.Schedulers.ConcurrentSequence
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
@@ -15,7 +15,7 @@
 -----------------------------------------------------------------------------
 
 
-module LwConc.Concurrent
+module LwConc.ConcurrentSequence
 (
   Sched
 , SCont

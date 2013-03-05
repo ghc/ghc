@@ -1,7 +1,7 @@
 -- Compile with `ghc -threaded -with-rtsopts=-N concurrent_sieve.hs`
 
 import Control.Monad
-import LwConc.Concurrent
+import LwConc.ConcurrentList
 import LwConc.Substrate
 import LwConc.MVar
 import System.Environment
