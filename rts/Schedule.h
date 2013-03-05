@@ -212,13 +212,13 @@ appendToBlockedQueue(StgTSO *tso)
 
 /* Check whether various thread queues are empty
  */
-  INLINE_HEADER rtsBool
+INLINE_HEADER rtsBool
 emptyQueue (StgTSO *q)
 {
   return (q == END_TSO_QUEUE);
 }
 
-  INLINE_HEADER rtsBool
+INLINE_HEADER rtsBool
 emptyRunQueue(Capability *cap)
 {
   return emptyQueue(cap->run_queue_hd);
