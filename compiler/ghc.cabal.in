@@ -68,7 +68,7 @@ Library
     if flag(ghci)
         Build-Depends: template-haskell
         CPP-Options: -DGHCI
-        Include-Dirs: ../rts/dist/build
+        Include-Dirs: ../rts/dist/build @FFIIncludeDir@
 
     Build-Depends: bin-package-db
     Build-Depends: hoopl
