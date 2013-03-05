@@ -40,8 +40,6 @@ import UniqFM
 import Maybes           ( expectJust )
 import Exception        ( evaluate )
 
-import Distribution.Text
-import Distribution.Package hiding (PackageId)
 import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath

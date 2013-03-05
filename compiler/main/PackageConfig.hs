@@ -17,7 +17,10 @@ module PackageConfig (
         PackageIdentifier(..),
         defaultPackageConfig,
         packageConfigToInstalledPackageInfo,
-        installedPackageInfoToPackageConfig
+        installedPackageInfoToPackageConfig,
+        packageName,
+        PackageName(..),
+        simpleParse
     ) where
 
 #include "HsVersions.h"
