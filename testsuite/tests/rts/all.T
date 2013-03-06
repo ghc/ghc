@@ -169,3 +169,7 @@ test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
 test('T7815', [ multi_cpu_race,
                 extra_run_opts('50000 +RTS -N2 -RTS'),
                 only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
+
+# ignore_output because it contains a unique:
+#   ffishutdown: Main_dul: interrupted
+test('ffishutdown', [ ignore_output, only_ways(['threaded1','threaded2']) ], compile_and_run, [''])
