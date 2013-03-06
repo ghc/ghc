@@ -583,11 +583,10 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 -- newtype deriving we allow deriving (forall a. C [a]).
 
                 -- Typeable is special
-        ; pprTrace "tvs, deriv_tvs, cls_tys, tc, tc_args" (ppr (tvs, deriv_tvs, cls_tys, tc, tc_args))
-        $ if className cls == typeableClassName
+        ; if className cls == typeableClassName
           then mkEqnHelp DerivOrigin
-                  tvs
-                  cls cls_tys (mkTyConApp tc tc_args) Nothing
+                  tvs cls cls_tys
+                  (mkTyConApp tc (kindVarsOnly tc_args)) Nothing
           else do {
 
         -- Given data T a b c = ... deriving( C d ),
@@ -628,6 +627,12 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                   (typeFamilyPapErr tc cls cls_tys inst_ty)
 
         ; mkEqnHelp DerivOrigin (varSetElemsKvsFirst univ_tvs) cls cls_tys inst_ty Nothing } }
+  where
+    kindVarsOnly :: [Type] -> [Type]
+    kindVarsOnly [] = []
+    kindVarsOnly (t:ts) | Just v <- getTyVar_maybe t
+                        , isKindVar v = t : kindVarsOnly ts
+                        | otherwise   =     kindVarsOnly ts
 \end{code}
 
 Note [Deriving, type families, and partial applications]
@@ -812,8 +817,7 @@ mkPolyKindedTypeableEqn :: CtOrigin -> [TyVar] -> Class -> [TcType]
 mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta
   -- The kind-polymorphic Typeable class is less special; namely, there is no
   -- need to select the class with the right kind anymore, as we only have one.
-  = do  { pprTrace "tvs, tycon, tc_args" (ppr (tvs, tycon, tc_args))
-        $ checkTc (onlyKindVars tc_args)
+  = do  { checkTc (onlyKindVars tc_args)
                   (ptext (sLit "Derived typeable instance must be of form (Typeable")
                         <+> ppr tycon <> rparen)
         ; dfun_name <- new_dfun_name cls tycon
