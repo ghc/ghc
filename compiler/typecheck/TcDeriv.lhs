@@ -814,7 +814,7 @@ mkOldTypeableEqn orig tvs cls tycon tc_args mtheta
 mkPolyKindedTypeableEqn :: CtOrigin -> [TyVar] -> Class -> [TcType]
                         -> TyCon -> [TcType] -> DerivContext
                         -> TcM EarlyDerivSpec
-mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta
+mkPolyKindedTypeableEqn orig tvs cls _cls_tys tycon tc_args mtheta
   -- The kind-polymorphic Typeable class is less special; namely, there is no
   -- need to select the class with the right kind anymore, as we only have one.
   = do  { checkTc (onlyKindVars tc_args)
@@ -824,14 +824,15 @@ mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta
         ; loc <- getSrcSpanM
         ; return (Right $
                   DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name
-                     , ds_tvs = tvs, ds_cls = cls
-                     , ds_tys = cls_tys ++ [mkTyConApp tycon tc_args]
+                     , ds_tvs = filter isKindVar tvs, ds_cls = cls
+                     , ds_tys = instKi : [mkTyConApp tycon tc_args]
                      , ds_tc = tycon, ds_tc_args = tc_args
                      , ds_theta = mtheta `orElse` []  -- Context is empty for polykinded Typeable
                      , ds_newtype = False })  }
   where onlyKindVars     = and . map (isJKVar . tcGetTyVar_maybe)
         isJKVar (Just v) = isKindVar v
         isJKVar _        = False
+        instKi           = applyTys (tyConKind tycon) tc_args
 
 ----------------------
 inferConstraints :: Class -> [TcType]
