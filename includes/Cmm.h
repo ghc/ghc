@@ -394,16 +394,18 @@
 /* CCS_ALLOC wants the size in words, because ccs->mem_alloc is in words */
 #define CCCS_ALLOC(__alloc) CCS_ALLOC(BYTES_TO_WDS(__alloc), CCCS)
 
-#define HP_CHK_GEN_TICKY(alloc)                 \
-   HP_CHK_GEN(alloc);                           \
-   TICK_ALLOC_HEAP_NOCTR(alloc);
+#define HP_CHK_GEN_TICKY(bytes)                 \
+   HP_CHK_GEN(bytes);                           \
+   TICK_ALLOC_HEAP_NOCTR(bytes);
 
 #define HP_CHK_P(bytes, fun, arg)               \
    HEAP_CHECK(bytes, GC_PRIM_P(fun,arg))
 
-#define ALLOC_P_TICKY(alloc, fun, arg)          \
-   HP_CHK_P(alloc);                             \
-   TICK_ALLOC_HEAP_NOCTR(alloc);
+// TODO I'm not seeing where ALLOC_P_TICKY is used; can it be removed?
+//         -NSF March 2013
+#define ALLOC_P_TICKY(bytes, fun, arg)		\
+   HP_CHK_P(bytes);				\
+   TICK_ALLOC_HEAP_NOCTR(bytes);
 
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \
@@ -610,6 +612,7 @@
 #define TICK_ENT_AP()  			TICK_BUMP(ENT_AP_ctr)
 #define TICK_ENT_AP_STACK()  		TICK_BUMP(ENT_AP_STACK_ctr)
 #define TICK_ENT_BH()  			TICK_BUMP(ENT_BH_ctr)
+#define TICK_ENT_LNE() 			TICK_BUMP(ENT_LNE_ctr)
 #define TICK_UNKNOWN_CALL()  		TICK_BUMP(UNKNOWN_CALL_ctr)
 #define TICK_UPDF_PUSHED()  		TICK_BUMP(UPDF_PUSHED_ctr)
 #define TICK_CATCHF_PUSHED()  		TICK_BUMP(CATCHF_PUSHED_ctr)
@@ -626,14 +629,18 @@
 #define TICK_SLOW_CALL_PAP_CORRECT()	TICK_BUMP(SLOW_CALL_PAP_CORRECT_ctr)
 #define TICK_SLOW_CALL_PAP_TOO_MANY()	TICK_BUMP(SLOW_CALL_PAP_TOO_MANY_ctr)
 
-#define TICK_SLOW_CALL_v()  		TICK_BUMP(SLOW_CALL_v_ctr)
-#define TICK_SLOW_CALL_p()  		TICK_BUMP(SLOW_CALL_p_ctr)
-#define TICK_SLOW_CALL_pv()  		TICK_BUMP(SLOW_CALL_pv_ctr)
-#define TICK_SLOW_CALL_pp()  		TICK_BUMP(SLOW_CALL_pp_ctr)
-#define TICK_SLOW_CALL_ppp()  		TICK_BUMP(SLOW_CALL_ppp_ctr)
-#define TICK_SLOW_CALL_pppp()  		TICK_BUMP(SLOW_CALL_pppp_ctr)
-#define TICK_SLOW_CALL_ppppp()  	TICK_BUMP(SLOW_CALL_ppppp_ctr)
-#define TICK_SLOW_CALL_pppppp()  	TICK_BUMP(SLOW_CALL_pppppp_ctr)
+#define TICK_SLOW_CALL_fast_v16()    	TICK_BUMP(SLOW_CALL_fast_v16_ctr)
+#define TICK_SLOW_CALL_fast_v()  	TICK_BUMP(SLOW_CALL_fast_v_ctr)
+#define TICK_SLOW_CALL_fast_p()  	TICK_BUMP(SLOW_CALL_fast_p_ctr)
+#define TICK_SLOW_CALL_fast_pv()  	TICK_BUMP(SLOW_CALL_fast_pv_ctr)
+#define TICK_SLOW_CALL_fast_pp()  	TICK_BUMP(SLOW_CALL_fast_pp_ctr)
+#define TICK_SLOW_CALL_fast_ppv()  	TICK_BUMP(SLOW_CALL_fast_ppv_ctr)
+#define TICK_SLOW_CALL_fast_ppp()  	TICK_BUMP(SLOW_CALL_fast_ppp_ctr)
+#define TICK_SLOW_CALL_fast_pppv()  	TICK_BUMP(SLOW_CALL_fast_pppv_ctr)
+#define TICK_SLOW_CALL_fast_pppp()  	TICK_BUMP(SLOW_CALL_fast_pppp_ctr)
+#define TICK_SLOW_CALL_fast_ppppp()  	TICK_BUMP(SLOW_CALL_fast_ppppp_ctr)
+#define TICK_SLOW_CALL_fast_pppppp()  	TICK_BUMP(SLOW_CALL_fast_pppppp_ctr)
+#define TICK_VERY_SLOW_CALL()  		TICK_BUMP(VERY_SLOW_CALL_ctr)
 
 /* NOTE: TICK_HISTO_BY and TICK_HISTO 
    currently have no effect.
@@ -672,9 +679,9 @@
   TICK_BUMP(UPD_CON_IN_NEW_ctr);		\
   TICK_HISTO(UPD_CON_IN_NEW,n)
 
-#define TICK_ALLOC_HEAP_NOCTR(n)		\
-    TICK_BUMP(ALLOC_HEAP_ctr);			\
-    TICK_BUMP_BY(ALLOC_HEAP_tot,n)
+#define TICK_ALLOC_HEAP_NOCTR(bytes)		\
+    TICK_BUMP(ALLOC_RTS_ctr);			\
+    TICK_BUMP_BY(ALLOC_RTS_tot,bytes)
 
 /* -----------------------------------------------------------------------------
    Saving and restoring STG registers

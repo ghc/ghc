@@ -13,7 +13,7 @@ module StgCmmEnv (
         litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
         idInfoToAmode,
 
-        NonVoid(..), isVoidId, nonVoidIds,
+        NonVoid(..), unsafe_stripNV, isVoidId, nonVoidIds,
 
         addBindC, addBindsC,
 
@@ -54,6 +54,10 @@ import Outputable
 
 newtype NonVoid a = NonVoid a
   deriving (Eq, Show)
+
+-- Use with care; if used inappropriately, it could break invariants.
+unsafe_stripNV :: NonVoid a -> a
+unsafe_stripNV (NonVoid a) = a
 
 instance (Outputable a) => Outputable (NonVoid a) where
   ppr (NonVoid a) = ppr a

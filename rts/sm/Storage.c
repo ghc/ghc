@@ -638,7 +638,7 @@ allocate (Capability *cap, W_ n)
     bdescr *bd;
     StgPtr p;
 
-    TICK_ALLOC_HEAP_NOCTR(n);
+    TICK_ALLOC_HEAP_NOCTR(WDS(n));
     CCS_ALLOC(cap->r.rCCCS,n);
     
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
@@ -753,7 +753,7 @@ allocatePinned (Capability *cap, W_ n)
         return p;
     }
 
-    TICK_ALLOC_HEAP_NOCTR(n);
+    TICK_ALLOC_HEAP_NOCTR(WDS(n));
     CCS_ALLOC(cap->r.rCCCS,n);
 
     bd = cap->pinned_object_block;

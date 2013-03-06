@@ -150,7 +150,7 @@ stg_maskAsyncExceptionszh /* explicit stack */
         TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
 
     TICK_UNKNOWN_CALL();
-    TICK_SLOW_CALL_v();
+    TICK_SLOW_CALL_fast_v();
     jump stg_ap_v_fast [R1];
 }
 
@@ -178,7 +178,7 @@ stg_maskUninterruptiblezh /* explicit stack */
         (TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX) & ~TSO_INTERRUPTIBLE);
 
     TICK_UNKNOWN_CALL();
-    TICK_SLOW_CALL_v();
+    TICK_SLOW_CALL_fast_v();
     jump stg_ap_v_fast [R1];
 }
 
@@ -253,7 +253,7 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
 
     }
     TICK_UNKNOWN_CALL();
-    TICK_SLOW_CALL_v();
+    TICK_SLOW_CALL_fast_v();
     R1 = io;
     jump stg_ap_v_fast [R1];
 }
@@ -394,7 +394,7 @@ stg_catchzh ( P_ io,      /* :: IO a */
 
     /* Apply R1 to the realworld token */
     TICK_UNKNOWN_CALL();
-    TICK_SLOW_CALL_v();
+    TICK_SLOW_CALL_fast_v();
 
     jump stg_ap_v_fast
         (CATCH_FRAME_FIELDS(,,stg_catch_frame_info, CCCS, 0,
@@ -612,7 +612,7 @@ retry_pop_stack:
     R1 = handler;
     Sp_adj(-1);
     TICK_UNKNOWN_CALL();
-    TICK_SLOW_CALL_pv();
+    TICK_SLOW_CALL_fast_pv();
     jump RET_LBL(stg_ap_pv) [R1];
 }
 

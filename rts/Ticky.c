@@ -142,14 +142,14 @@ PrintTickyInfo(void)
 	(PC(INTAVG(ALLOC_##categ##_hst[3], ALLOC_##categ##_ctr))), \
 	(PC(INTAVG(ALLOC_##categ##_hst[4], ALLOC_##categ##_ctr)))
 
-  fprintf(tf,"%7ld (%5.1f%%) function values",
+  fprintf(tf,"%11ld (%5.1f%%) function values",
 	ALLOC_FUN_ctr,
 	PC(INTAVG(ALLOC_FUN_ctr, tot_allocs)));
   if (ALLOC_FUN_ctr != 0)
       fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FUN));
  
 
-  fprintf(tf,"\n%7ld (%5.1f%%) thunks",
+  fprintf(tf,"\n%11ld (%5.1f%%) thunks",
 	ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr,
 	PC(INTAVG(ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr, tot_allocs)));
 
@@ -159,37 +159,37 @@ PrintTickyInfo(void)
       fprintf(tf,"\t\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(THK));
 #undef ALLOC_THK_ctr
 
-  fprintf(tf,"\n%7ld (%5.1f%%) data values",
+  fprintf(tf,"\n%11ld (%5.1f%%) data values",
 	ALLOC_CON_ctr,
 	PC(INTAVG(ALLOC_CON_ctr, tot_allocs)));
   if (ALLOC_CON_ctr != 0)
       fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(CON));
 
-  fprintf(tf,"\n%7ld (%5.1f%%) big tuples",
+  fprintf(tf,"\n%11ld (%5.1f%%) big tuples",
 	ALLOC_TUP_ctr,
 	PC(INTAVG(ALLOC_TUP_ctr, tot_allocs)));
   if (ALLOC_TUP_ctr != 0)
       fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(TUP));
 
-  fprintf(tf,"\n%7ld (%5.1f%%) black holes",
+  fprintf(tf,"\n%11ld (%5.1f%%) black holes",
 	ALLOC_BH_ctr,
 	PC(INTAVG(ALLOC_BH_ctr, tot_allocs)));
   if (ALLOC_BH_ctr != 0)
       fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(BH));
 
-  fprintf(tf,"\n%7ld (%5.1f%%) prim things",
+  fprintf(tf,"\n%11ld (%5.1f%%) prim things",
 	ALLOC_PRIM_ctr,
 	PC(INTAVG(ALLOC_PRIM_ctr, tot_allocs)));
   if (ALLOC_PRIM_ctr != 0)
       fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(PRIM));
 
-  fprintf(tf,"\n%7ld (%5.1f%%) partial applications",
+  fprintf(tf,"\n%11ld (%5.1f%%) partial applications",
 	ALLOC_PAP_ctr,
 	PC(INTAVG(ALLOC_PAP_ctr, tot_allocs)));
   if (ALLOC_PAP_ctr != 0)
       fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(PAP));
 
-  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
+  fprintf(tf,"\n%11ld (%5.1f%%) thread state objects",
 	ALLOC_TSO_ctr,
 	PC(INTAVG(ALLOC_TSO_ctr, tot_allocs)));
   if (ALLOC_TSO_ctr != 0)
@@ -208,16 +208,16 @@ PrintTickyInfo(void)
 	tot_enters,
 	jump_direct_enters,
 	PC(INTAVG(jump_direct_enters,tot_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) thunks\n",
+  fprintf(tf,"%11ld (%5.1f%%) thunks\n",
 	tot_thk_enters,
 	PC(INTAVG(tot_thk_enters,tot_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) data values\n",
+  fprintf(tf,"%11ld (%5.1f%%) data values\n",
 	tot_con_enters,
 	PC(INTAVG(tot_con_enters,tot_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) normal indirections\n",
+  fprintf(tf,"%11ld (%5.1f%%) normal indirections\n",
 	tot_ind_enters,
 	PC(INTAVG(tot_ind_enters,tot_enters)));
-  fprintf(tf,"%7" FMT_Int " (%5.1f%%) permanent indirections\n",
+  fprintf(tf,"%11" FMT_Int " (%5.1f%%) permanent indirections\n",
 	ENT_PERM_IND_ctr,
 	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
 
@@ -239,22 +239,22 @@ PrintTickyInfo(void)
   fprintf(tf, "\n");
 
   fprintf(tf,"\nRETURNS: %ld\n", tot_returns);
-  fprintf(tf,"%7ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
+  fprintf(tf,"%11ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
 	tot_returns_of_new,
 	PC(INTAVG(tot_returns_of_new,tot_returns)));
 
   /* krc: comment out some of this stuff temporarily */
 
   /*
-  fprintf(tf, "\nRET_NEW:         %7ld: ", RET_NEW_ctr);
+  fprintf(tf, "\nRET_NEW:         %11ld: ", RET_NEW_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
 				PC(INTAVG(RET_NEW_hst[i],RET_NEW_ctr))); }
   fprintf(tf, "\n");
-  fprintf(tf, "RET_OLD:         %7ld: ", RET_OLD_ctr);
+  fprintf(tf, "RET_OLD:         %11ld: ", RET_OLD_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
 				PC(INTAVG(RET_OLD_hst[i],RET_OLD_ctr))); }
   fprintf(tf, "\n");
-  fprintf(tf, "RET_UNBOXED_TUP: %7ld: ", RET_UNBOXED_TUP_ctr);
+  fprintf(tf, "RET_UNBOXED_TUP: %11ld: ", RET_UNBOXED_TUP_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
 				    PC(INTAVG(RET_UNBOXED_TUP_hst[i],
 					      RET_UNBOXED_TUP_ctr))); }
@@ -268,33 +268,33 @@ PrintTickyInfo(void)
   fprintf(tf,"\nCATCH FRAMES:  %" FMT_Int "", CATCHF_PUSHED_ctr);
 
   if (UPDF_RCC_PUSHED_ctr != 0)
-     fprintf(tf,"%7" FMT_Int " restore cost centre frames (%" FMT_Int " omitted)\n",
+     fprintf(tf,"%11" FMT_Int " restore cost centre frames (%" FMT_Int " omitted)\n",
 	UPDF_RCC_PUSHED_ctr,
 	UPDF_RCC_OMITTED_ctr);
 
   fprintf(tf,"\nUPDATES: %ld\n", tot_updates);
-  fprintf(tf,"%7ld (%5.1f%%) data values\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
+  fprintf(tf,"%11ld (%5.1f%%) data values\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
 	con_updates,
 	PC(INTAVG(con_updates,tot_updates)),
 	UPD_CON_IN_PLACE_ctr, UPD_CON_IN_NEW_ctr);
-  fprintf(tf,"%7ld (%5.1f%%) partial applications\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
+  fprintf(tf,"%11ld (%5.1f%%) partial applications\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
 	pap_updates,
 	PC(INTAVG(pap_updates,tot_updates)),
 	UPD_PAP_IN_PLACE_ctr, UPD_PAP_IN_NEW_ctr);
-  fprintf(tf,"%7" FMT_Int " (%5.1f%%) updates by squeezing\n",
+  fprintf(tf,"%11" FMT_Int " (%5.1f%%) updates by squeezing\n",
 	UPD_SQUEEZED_ctr,
 	PC(INTAVG(UPD_SQUEEZED_ctr, tot_updates)));
 
   /* krc: also avoid dealing with this for now */
 #if FALSE
-  fprintf(tf, "\nUPD_CON_IN_NEW:   %7ld: ", UPD_CON_IN_NEW_ctr);
-  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_NEW_hst[i]); }
+  fprintf(tf, "\nUPD_CON_IN_NEW:   %11ld: ", UPD_CON_IN_NEW_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%11ld", UPD_CON_IN_NEW_hst[i]); }
   fprintf(tf, "\n");
-  fprintf(tf, "UPD_CON_IN_PLACE: %7ld: ", UPD_CON_IN_PLACE_ctr);
-  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_PLACE_hst[i]); }
+  fprintf(tf, "UPD_CON_IN_PLACE: %11ld: ", UPD_CON_IN_PLACE_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%11ld", UPD_CON_IN_PLACE_hst[i]); }
   fprintf(tf, "\n");
-  fprintf(tf, "UPD_PAP_IN_NEW:   %7ld: ", UPD_PAP_IN_NEW_ctr);
-  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_PAP_IN_NEW_hst[i]); }
+  fprintf(tf, "UPD_PAP_IN_NEW:   %11ld: ", UPD_PAP_IN_NEW_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%11ld", UPD_PAP_IN_NEW_hst[i]); }
   fprintf(tf, "\n");
 #endif
 
@@ -317,20 +317,39 @@ PrintTickyInfo(void)
   */
 
 #define PR_CTR(ctr) \
-  do { fprintf(tf,"%7" FMT_Int " " #ctr "\n", ctr); } while(0)
+  do { fprintf(tf,"%11" FMT_Int " " #ctr "\n", ctr); } while(0)
 /* COND_PR_CTR takes a boolean; if false then msg is the printname rather than ctr */
 #define COND_PR_CTR(ctr,b,msg) \
-    if (b) { fprintf(tf,"%7" FMT_Int " " #ctr "\n", ctr); } else { fprintf(tf,"%7" FMT_Int " " msg "\n", ctr); }
+    if (b) { fprintf(tf,"%11" FMT_Int " " #ctr "\n", ctr); } else { fprintf(tf,"%11" FMT_Int " " msg "\n", ctr); }
 #define PR_HST(hst,i) \
-  do { fprintf(tf,"%7ld " #hst "_" #i "\n", hst[i]); } while(0)
+  do { fprintf(tf,"%11ld " #hst "_" #i "\n", hst[i]); } while(0)
+
+  ALLOC_HEAP_ctr = (StgInt)ALLOC_HEAP_ctr + (StgInt)ALLOC_RTS_ctr;
+  ALLOC_HEAP_tot = (StgInt)ALLOC_HEAP_tot + (StgInt)ALLOC_RTS_tot;
 
   PR_CTR(ALLOC_HEAP_ctr);
   PR_CTR(ALLOC_HEAP_tot);
 
+  PR_CTR(ALLOC_RTS_ctr);
+  PR_CTR(ALLOC_RTS_tot);
+
   PR_CTR(ALLOC_FUN_ctr);
-  PR_CTR(ALLOC_FUN_adm);
   PR_CTR(ALLOC_FUN_gds);
-  PR_CTR(ALLOC_FUN_slp);
+
+  PR_CTR(ALLOC_PAP_ctr);
+  PR_CTR(ALLOC_PAP_adm);
+  PR_CTR(ALLOC_PAP_gds);
+
+  PR_CTR(ALLOC_UP_THK_ctr);
+  PR_CTR(ALLOC_SE_THK_ctr);
+  PR_CTR(ALLOC_THK_gds);
+
+  PR_CTR(ALLOC_CON_ctr);
+  PR_CTR(ALLOC_CON_gds);
+
+  PR_CTR(ALLOC_PRIM_ctr);
+  PR_CTR(ALLOC_PRIM_gds);
+  PR_CTR(ALLOC_PRIM_slp);
 
   /* krc: comment out some of this stuff temporarily
   PR_HST(ALLOC_FUN_hst,0);
@@ -384,9 +403,6 @@ PrintTickyInfo(void)
   PR_HST(ALLOC_PRIM_hst,2);
   PR_HST(ALLOC_PRIM_hst,3);
   PR_HST(ALLOC_PRIM_hst,4);
-  PR_CTR(ALLOC_PAP_ctr);
-  PR_CTR(ALLOC_PAP_adm);
-  PR_CTR(ALLOC_PAP_gds);
   PR_CTR(ALLOC_PAP_slp);
   PR_HST(ALLOC_PAP_hst,0);
   PR_HST(ALLOC_PAP_hst,1);
@@ -410,6 +426,7 @@ PrintTickyInfo(void)
   PR_CTR(ENT_DYN_CON_ctr);
   PR_CTR(ENT_STATIC_FUN_DIRECT_ctr);
   PR_CTR(ENT_DYN_FUN_DIRECT_ctr);
+  PR_CTR(ENT_LNE_ctr);
   PR_CTR(ENT_STATIC_IND_ctr);
   PR_CTR(ENT_DYN_IND_ctr);
 
@@ -435,21 +452,22 @@ PrintTickyInfo(void)
   PR_CTR(ENT_STATIC_THK_ctr);
   PR_CTR(ENT_DYN_THK_ctr);
 
-  PR_CTR(SLOW_CALL_v_ctr);
-  PR_CTR(SLOW_CALL_f_ctr);
-  PR_CTR(SLOW_CALL_d_ctr);
-  PR_CTR(SLOW_CALL_l_ctr);
-  PR_CTR(SLOW_CALL_n_ctr);
-  PR_CTR(SLOW_CALL_p_ctr);
-  PR_CTR(SLOW_CALL_pv_ctr);
-  PR_CTR(SLOW_CALL_pp_ctr);
-  PR_CTR(SLOW_CALL_ppv_ctr);
-  PR_CTR(SLOW_CALL_ppp_ctr);
-  PR_CTR(SLOW_CALL_pppv_ctr);
-  PR_CTR(SLOW_CALL_pppp_ctr);
-  PR_CTR(SLOW_CALL_ppppp_ctr);
-  PR_CTR(SLOW_CALL_pppppp_ctr);
-  PR_CTR(SLOW_CALL_OTHER_ctr);
+  PR_CTR(SLOW_CALL_fast_v16_ctr);
+  PR_CTR(SLOW_CALL_fast_v_ctr);
+  PR_CTR(SLOW_CALL_fast_f_ctr);
+  PR_CTR(SLOW_CALL_fast_d_ctr);
+  PR_CTR(SLOW_CALL_fast_l_ctr);
+  PR_CTR(SLOW_CALL_fast_n_ctr);
+  PR_CTR(SLOW_CALL_fast_p_ctr);
+  PR_CTR(SLOW_CALL_fast_pv_ctr);
+  PR_CTR(SLOW_CALL_fast_pp_ctr);
+  PR_CTR(SLOW_CALL_fast_ppv_ctr);
+  PR_CTR(SLOW_CALL_fast_ppp_ctr);
+  PR_CTR(SLOW_CALL_fast_pppv_ctr);
+  PR_CTR(SLOW_CALL_fast_pppp_ctr);
+  PR_CTR(SLOW_CALL_fast_ppppp_ctr);
+  PR_CTR(SLOW_CALL_fast_pppppp_ctr);
+  PR_CTR(VERY_SLOW_CALL_ctr);
 
   PR_CTR(UNKNOWN_CALL_ctr);
   PR_CTR(KNOWN_CALL_ctr);
@@ -574,19 +592,20 @@ printRegisteredCounterInfo (FILE *tf)
     StgEntCounter *p;
 
     if ( ticky_entry_ctrs != NULL ) {
+      fprintf(tf,"\nThe following table is explained by http://hackage.haskell.org/trac/ghc/wiki/Debugging/TickyTicky\nAll allocation numbers are in bytes.\n");
       fprintf(tf,"\n**************************************************\n\n");
     }
-    fprintf(tf, "%11s%11s %6s%6s    %-11s%-30s\n",
-	    "Entries", "Allocs", "Arity", "Stack", "Kinds", "Function");
+    fprintf(tf, "%11s%11s%11s  %-23s %s\n",
+	    "Entries", "Alloc", "Alloc'd", "Non-void Arguments", "STG Name");
     fprintf(tf, "--------------------------------------------------------------------------------\n");
     /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%11" FMT_Int "%11" FMT_Int " %6lu%6lu    %-11s%-30s",
+	fprintf(tf, "%11" FMT_Int "%11" FMT_Int "%11" FMT_Int " %3lu %-20.20s %s",
 		p->entry_count,
 		p->allocs,
+		p->allocd,
 		(unsigned long)p->arity,
-		(unsigned long)p->stk_args,
 		p->arg_kinds,
 		p->str);
 

@@ -100,7 +100,7 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
 
         -- SAY WHAT WE ARE ABOUT TO DO
         ; let rep = cit_rep info_tbl
-        ; tickyDynAlloc rep lf_info
+        ; tickyDynAlloc (toRednCountsLbl $ cit_lbl info_tbl) rep lf_info
         ; profDynAlloc rep use_cc
 
         -- FIND THE OFFSET OF THE INFO-PTR WORD
@@ -215,7 +215,6 @@ mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info
         =  staticGranHdr
         ++ staticParHdr
         ++ staticProfHdr dflags ccs
-        ++ staticTickyHdr
 
 -- JD: Simon had ellided this padding, but without it the C back end asserts
 -- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
@@ -527,7 +526,7 @@ heapCheck checkStack checkYield do_gc code
               stk_hwm | checkStack = Just (CmmLit CmmHighStackMark)
                       | otherwise  = Nothing
         ; codeOnly $ do_checks stk_hwm checkYield mb_alloc_bytes do_gc
-        ; tickyAllocHeap hpHw
+        ; tickyAllocHeap True hpHw
         ; doGranAllocate hpHw
         ; setRealHp hpHw
         ; code }

@@ -209,6 +209,7 @@ Library
         StgCmmGran
         StgCmmHeap
         StgCmmHpc
+        StgCmmArgRep
         StgCmmLayout
         StgCmmMonad
         StgCmmPrim

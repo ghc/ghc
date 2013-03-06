@@ -341,6 +341,9 @@ data GeneralFlag
    | Opt_PIC
    | Opt_SccProfilingOn
    | Opt_Ticky
+   | Opt_Ticky_Allocd
+   | Opt_Ticky_LNE
+   | Opt_Ticky_Dyn_Thunk
    | Opt_Static
    | Opt_RPath
    | Opt_RelativeDynlibPaths
@@ -2086,6 +2089,9 @@ dynamic_flags = [
   , Flag "hpcdir"         (SepArg setOptHpcDir)
   , Flag "ghci-script"    (hasArg addGhciScript)
   , Flag "interactive-print" (hasArg setInteractivePrint)
+  , Flag "ticky-allocd"      (NoArg (setGeneralFlag Opt_Ticky_Allocd))
+  , Flag "ticky-LNE"         (NoArg (setGeneralFlag Opt_Ticky_LNE))
+  , Flag "ticky-dyn-thunk"   (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
         ------- recompilation checker --------------------------------------
   , Flag "recomp"         (NoArg (do unSetGeneralFlag Opt_ForceRecomp
                                      deprecate "Use -fno-force-recomp instead"))

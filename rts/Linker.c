@@ -914,22 +914,24 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(ENT_AP_ctr)                         \
       SymI_HasProto(ENT_AP_STACK_ctr)                   \
       SymI_HasProto(ENT_BH_ctr)                         \
+      SymI_HasProto(ENT_LNE_ctr)                        \
       SymI_HasProto(UNKNOWN_CALL_ctr)                   \
-      SymI_HasProto(SLOW_CALL_v_ctr)                    \
-      SymI_HasProto(SLOW_CALL_f_ctr)                    \
-      SymI_HasProto(SLOW_CALL_d_ctr)                    \
-      SymI_HasProto(SLOW_CALL_l_ctr)                    \
-      SymI_HasProto(SLOW_CALL_n_ctr)                    \
-      SymI_HasProto(SLOW_CALL_p_ctr)                    \
-      SymI_HasProto(SLOW_CALL_pv_ctr)                   \
-      SymI_HasProto(SLOW_CALL_pp_ctr)                   \
-      SymI_HasProto(SLOW_CALL_ppv_ctr)                  \
-      SymI_HasProto(SLOW_CALL_ppp_ctr)                  \
-      SymI_HasProto(SLOW_CALL_pppv_ctr)                 \
-      SymI_HasProto(SLOW_CALL_pppp_ctr)                 \
-      SymI_HasProto(SLOW_CALL_ppppp_ctr)                \
-      SymI_HasProto(SLOW_CALL_pppppp_ctr)               \
-      SymI_HasProto(SLOW_CALL_OTHER_ctr)                \
+      SymI_HasProto(SLOW_CALL_fast_v16_ctr)                  \
+      SymI_HasProto(SLOW_CALL_fast_v_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_f_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_d_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_l_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_n_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_p_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_pv_ctr)                   \
+      SymI_HasProto(SLOW_CALL_fast_pp_ctr)                   \
+      SymI_HasProto(SLOW_CALL_fast_ppv_ctr)                  \
+      SymI_HasProto(SLOW_CALL_fast_ppp_ctr)                  \
+      SymI_HasProto(SLOW_CALL_fast_pppv_ctr)                 \
+      SymI_HasProto(SLOW_CALL_fast_pppp_ctr)                 \
+      SymI_HasProto(SLOW_CALL_fast_ppppp_ctr)                \
+      SymI_HasProto(SLOW_CALL_fast_pppppp_ctr)               \
+      SymI_HasProto(VERY_SLOW_CALL_ctr)                \
       SymI_HasProto(ticky_slow_call_unevald)            \
       SymI_HasProto(SLOW_CALL_ctr)                      \
       SymI_HasProto(MULTI_CHUNK_SLOW_CALL_ctr)          \
@@ -956,6 +958,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(UPD_PAP_IN_PLACE_ctr)               \
       SymI_HasProto(ALLOC_HEAP_ctr)                     \
       SymI_HasProto(ALLOC_HEAP_tot)                     \
+      SymI_HasProto(ALLOC_RTS_ctr)                      \
+      SymI_HasProto(ALLOC_RTS_tot)                      \
       SymI_HasProto(ALLOC_FUN_ctr)                      \
       SymI_HasProto(ALLOC_FUN_adm)                      \
       SymI_HasProto(ALLOC_FUN_gds)                      \

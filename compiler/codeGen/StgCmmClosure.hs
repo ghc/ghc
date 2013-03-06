@@ -49,7 +49,7 @@ module StgCmmClosure (
         -- ** Labels
         -- These just need the info table label
         closureInfoLabel, staticClosureLabel,
-        closureRednCountsLabel, closureSlowEntryLabel, closureLocalEntryLabel,
+        closureSlowEntryLabel, closureLocalEntryLabel,
 
         -- ** Predicates
         -- These are really just functions on LambdaFormInfo
@@ -771,9 +771,6 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
 
 staticClosureLabel :: ClosureInfo -> CLabel
 staticClosureLabel = toClosureLbl .  closureInfoLabel
-
-closureRednCountsLabel :: ClosureInfo -> CLabel
-closureRednCountsLabel = toRednCountsLbl . closureInfoLabel
 
 closureSlowEntryLabel :: ClosureInfo -> CLabel
 closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
