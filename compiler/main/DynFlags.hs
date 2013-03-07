@@ -247,6 +247,7 @@ data DumpFlag
    | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_mod_cycles
+   | Opt_D_dump_late_float
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
 
@@ -1509,6 +1510,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_ticked                 = False
           enableIfVerbose Opt_D_dump_view_pattern_commoning = False
           enableIfVerbose Opt_D_dump_mod_cycles             = False
+          enableIfVerbose Opt_D_dump_late_float             = False
           enableIfVerbose _                                 = True
 
 -- | Set a 'DumpFlag'
@@ -2227,6 +2229,7 @@ dynamic_flags = [
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
+  , Flag "ddump-late-float"        (setDumpFlag Opt_D_dump_late_float)
   , Flag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , Flag "ddump-to-file"           (NoArg (setGeneralFlag Opt_DumpToFile))
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
@@ -2239,6 +2242,8 @@ dynamic_flags = [
                                               setVerbosity $ Just 2))
   , Flag "dfaststring-stats"       (NoArg (setGeneralFlag Opt_D_faststring_stats))
   , Flag "dno-llvm-mangler"        (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
+
+  , Flag "ddump-late-float"           (setDumpFlag Opt_D_dump_late_float)
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 

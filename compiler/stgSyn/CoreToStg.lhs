@@ -42,6 +42,7 @@ import Outputable
 import MonadUtils
 import FastString
 import Util
+import StaticFlags      ( opt_NoLNE )
 import DynFlags
 import ForeignCall
 import PrimOp           ( PrimCall(..) )
@@ -709,7 +710,10 @@ coreToStgLet let_no_escape bind body = do
         checked_no_binder_escapes
                 | debugIsOn && not no_binder_escapes && any is_join_var binders
                 = pprTrace "Interesting!  A join var that isn't let-no-escaped" (ppr binders)
-                  False
+                  no_binder_escapes
+                | debugIsOn && no_binder_escapes && any ((0 ==) . idArity) binders
+                = pprTrace "Interesting!  A let-no-escape with zero arity" (ppr binders)
+                  no_binder_escapes
                 | otherwise = no_binder_escapes
 
                 -- Mustn't depend on the passed-in let_no_escape flag, since
@@ -718,7 +722,7 @@ coreToStgLet let_no_escape bind body = do
         new_let,
         free_in_whole_let,
         let_escs,
-        checked_no_binder_escapes
+        not opt_NoLNE && checked_no_binder_escapes
       )
   where
     set_of_binders = mkVarSet binders

@@ -144,6 +144,7 @@ getCoreToDo dflags
               , fps_stabilizeFirst = lateFloatStabilizeFirst dflags
               , fps_doSinglyRecSAT = lateFloatDoSinglyRecSAT dflags
               , fps_noInThunkInLambda = lateFloatNoInThunkInLambda dflags
+              , fps_trace          = dopt Opt_D_dump_late_float dflags
               }
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags

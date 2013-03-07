@@ -1,4 +1,4 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{SetLevels}
@@ -63,6 +63,7 @@ module SetLevels (
 
 #include "HsVersions.h"
 
+import StaticFlags
 import DynFlags
 
 import CoreSyn
@@ -76,6 +77,12 @@ import CoreSubst	( Subst, emptySubst, extendInScope, substBndr, substRecBndrs,
 			  extendIdSubst, extendSubstWithVar, cloneBndr, 
                           cloneRecIdBndrs, substTy, substCo )
 import MkCore           ( sortQuantVars ) 
+
+import SMRep            ( WordOff )
+import StgCmmArgRep     ( ArgRep(P), argRepSizeW, toArgRep )
+import StgCmmLayout     ( mkVirtHeapOffsets )
+import StgCmmClosure    ( idPrimRep, addIdReps )
+
 import Id
 import IdInfo
 import Var
@@ -95,6 +102,8 @@ import Outputable
 import FastString
 
 import qualified Data.IntSet as IntSet; import Data.IntSet ( IntSet )
+import Data.Maybe       ( isJust, mapMaybe )
+import Control.Monad    ( msum )
 \end{code}
 
 %************************************************************************
@@ -233,7 +242,7 @@ setLevels :: DynFlags
 setLevels dflags float_lams binds us
   = initLvl us (do_them init_env binds)
   where
-    init_env = initialEnv float_lams
+    init_env = initialEnv dflags float_lams
 
     do_them :: LevelEnv -> [CoreBind] -> LvlM [LevelledBind]
     do_them _ [] = return []
@@ -244,10 +253,10 @@ setLevels dflags float_lams binds us
 
 lvlTopBind :: DynFlags -> LevelEnv -> Bind Id -> LvlM (LevelledBind, LevelEnv)
 lvlTopBind dflags env (NonRec bndr rhs)
-  = do rhs' <- lvlExpr tOP_LEVEL env (analyzeFVs initFVEnv rhs)
-       let  -- floating impedes specialization, so: if the old RHS has
-            -- an unstable unfolding, "stablize it" so that it ends up
-            -- in the .hi file
+  = do rhs' <- lvlExpr tOP_LEVEL env (analyzeFVs (initFVEnv $ isFinalPass env) rhs)
+       let  -- lambda lifting impedes specialization, so: if the old
+            -- RHS has an unstable unfolding, "stablize it" so that it
+            -- ends up in the .hi file
             bndr1 | lateFloatStabilizeFirst dflags,
                     isFinalPass env, isUnstableUnfolding (realIdUnfolding bndr)
                               = bndr `setIdUnfolding` mkInlinableUnfolding dflags rhs
@@ -260,7 +269,7 @@ lvlTopBind _ env (Rec pairs)
   = do let (bndrs,rhss) = unzip pairs
            bndrs' = [TB b (StayPut tOP_LEVEL) | b <- bndrs]
            env'   = extendLvlEnv env bndrs'
-       rhss' <- mapM (lvlExpr tOP_LEVEL env' . analyzeFVs initFVEnv) rhss
+       rhss' <- mapM (lvlExpr tOP_LEVEL env' . analyzeFVs (initFVEnv $ isFinalPass env)) rhss
        return (Rec (bndrs' `zip` rhss'), env')
 \end{code}
 
@@ -488,14 +497,13 @@ lvlMFE True ctxt_lvl env e@(_, AnnCase {})
   = lvlExpr ctxt_lvl env e     -- Don't share cases
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvis, _)
-  |  isUnLiftedType ty		-- Can't let-bind it; see Note [Unlifted MFEs]
+  |  isFinalPass env -- see Note [Late Lambda Floating]; TODO float
+                     -- anonymous lambdas in the late pass?
+  || isUnLiftedType ty		-- Can't let-bind it; see Note [Unlifted MFEs]
      		    		-- This includes coercions, which we don't
 				-- want to float anyway
   || notWorthFloating ann_expr abs_vars
   || not float_me
-  || isFinalPass env -- see Note [Late Lambda Floating]: only float
-                     -- let bindings, since this passs is so
-                     -- aggressive
   = 	-- Don't float it out
     lvlExpr ctxt_lvl env ann_expr
 
@@ -509,7 +517,8 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvis, _)
     expr     = deAnnotate ann_expr
     ty       = exprType expr
     mb_bot   = exprBotStrictness_maybe expr
-    dest_lvl = destLevel ctxt_lvl env fvs (isFunction ann_expr) mb_bot
+    dest_lvl | shouldBeTopLevel mb_bot = tOP_LEVEL
+             | otherwise = destLevel env fvs
     abs_vars = abstractVars dest_lvl env fvs
 
 	-- A decision to float entails let-binding this thing, and we only do 
@@ -696,13 +705,13 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndr rhs@(rhs_fvis,_))
 	            --   (simplifier gets rid of them pronto)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
                     -- so we will ignore this case for now
-  || not (profitableFloat ctxt_lvl dest_lvl)
   || (isTopLvl dest_lvl && isUnLiftedType (idType bndr))
 	  -- We can't float an unlifted binding to top level, so we don't 
 	  -- float it at all.  It's a bit brutal, but unlifted bindings 
 	  -- aren't expensive either
-  || wouldForgetKnownCalls env binding_fvis abs_vars
-  || wouldCreatePAPsOrGrowThunks env body_fvis binding_fvs abs_vars bndr
+  || shouldNotFloat ctxt_lvl env
+       dest_lvl funRhs badTime spaceInfo
+       [bndr]  (ppr (abs_vars, binding_fvis', body_fvis'))
   = -- No float
     do rhs' <- lvlExpr ctxt_lvl env rhs
        let  (env', bndr') = substLetBndrNonRec env bndr bind_lvl
@@ -724,20 +733,30 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndr rhs@(rhs_fvis,_))
        return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env')
 
   where
+    badTime   = wouldIncreaseRuntime    env binding_fvis abs_ids
+    spaceInfo = wouldIncreaseAllocation env body_fvis    abs_ids [(bndr, prjFreeNonTopLevelIds rhs_fvis)]
+
     binding_fvis  = rhs_fvis `bothFVIs` assumeTheBest (idFreeVars bndr)
     binding_fvs   = prjFreeVars binding_fvis
     abs_vars   = abstractVars dest_lvl env binding_fvs
+    abs_ids    = filter isId abs_vars
 
-    dest_lvl = destLevel ctxt_lvl env binding_fvs (isFunction rhs) mb_bot where
+    dest_lvl | shouldBeTopLevel mb_bot || (isFinalPass env && funRhs) = tOP_LEVEL
+             | otherwise = destLevel env binding_fvs
+
+    funRhs = isFunction rhs
 
     mb_bot     = exprBotStrictness_maybe (deAnnotate rhs)
     bndr_w_str = annotateBotStr bndr mb_bot
 
+    -- for debug
+    binding_fvis' = filter (\x -> fviIsNonTopLevel x && isId (fviVar x)) $ varEnvElts binding_fvis
+    body_fvis'    = fst $ partitionVarEnv (isId . fviVar) $ body_fvis `restrictVarEnv` unitVarSet bndr
+
 lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
-  | not (profitableFloat ctxt_lvl dest_lvl)
-  || wouldForgetKnownCalls env bindings_fvis abs_vars
-  || flip any bndrs (\bndr ->
-       wouldCreatePAPsOrGrowThunks env scope_fvis bindings_fvs abs_vars bndr)
+  | shouldNotFloat ctxt_lvl env
+      dest_lvl funRhs badTime spaceInfo
+      bndrs (ppr (abs_vars, bindings_fvis', usage'))
   = do let bind_lvl = incMinorLvl ctxt_lvl
            (env', bndrs') = substLetBndrsRec env bndrs bind_lvl
            tagged_bndrs = [ TB bndr' (StayPut bind_lvl) 
@@ -791,88 +810,170 @@ lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
            , ctxt_lvl, new_env)
 
   where
+    badTime   = wouldIncreaseRuntime    env bindings_fvis abs_ids
+    spaceInfo = wouldIncreaseAllocation env usage         abs_ids $
+                  map (\(bndr, rhs) -> (bndr, prjFreeNonTopLevelIds $ fvisOf rhs)) pairs
+
     (bndrs,rhss) = unzip pairs
 
     rhss_fvis     = computeRecRHSsFVIs bndrs rhss
     bindings_fvis = delBindersFVIs bndrs rhss_fvis
-    bindings_fvs   = prjFreeVars bindings_fvis
-    scope_fvis    = body_fvis `bothFVIs` rhss_fvis
+    bindings_fvs  = prjFreeVars bindings_fvis
+    usage         = (body_fvis `bothFVIs` rhss_fvis)
 
-    dest_lvl = destLevel ctxt_lvl env' bindings_fvs (all isFunction rhss) Nothing where
-      -- see Note [Late Lambda Floating]
-      env' = case finalPass env of
-        Nothing  -> env -- not the final pass
-        Just fps -> env {le_switches = (le_switches env) {floatOutLambdas = fps_rec fps}}
+    dest_lvl | isFinalPass env, funRhs = tOP_LEVEL
+             | otherwise = destLevel env bindings_fvs
+
+    funRhs = all isFunction rhss
 
     abs_vars = abstractVars dest_lvl env bindings_fvs
+    abs_ids  = filter isId abs_vars
 
-profitableFloat :: Level -> Level -> Bool
-profitableFloat ctxt_lvl dest_lvl
-  =  (dest_lvl `ltMajLvl` ctxt_lvl)	-- Escapes a value lambda
-  || isTopLvl dest_lvl    		-- Going all the way to top level
+    -- for debug
+    usage'         = filter (isId . fviVar) $ varEnvElts $ usage `restrictVarEnv` mkVarSet bndrs
+    bindings_fvis' = fst $ partitionVarEnv (\x -> fviIsNonTopLevel x && isId (fviVar x)) bindings_fvis
 
-wouldCreatePAPsOrGrowThunks ::
-  LevelEnv ->
-  FVIs ->     -- ^ FVIs for the binding's *entire scope*
-  VarSet ->   -- ^ the binder's binding group's free variables
-  [Var] ->    -- ^ the abstracted variables
-  Id ->       -- ^ the binder
+shouldNotFloat ::
+  Level -> LevelEnv ->
+  Level -> Bool ->
+  Maybe Id -> [(Bool, Int, Int)] ->
+  [Id] -> SDoc ->
   Bool
-wouldCreatePAPsOrGrowThunks env scope_fvis binding_group_fvs abs_vars bndr =
-  need (finalPass env)                $ \fps ->
-  need (lookupVarEnv scope_fvis bndr) $ \fvi ->
-    let thunksMightGrow = newValueArgs > 1
-          -- by floating to top-level, the binder itself is removed
-          -- from thunks as a free variable
-          --
-          -- TODO should it be > n where n is the number of bindings
-          -- in the (rec) binding group that already occur in the
-          -- thunk?
-          where newValueArgs = length $ filter isId abs_vars
-        violatesPAPs        =
-          not (fps_createPAPs fps) &&
-          0 `IntSet.member` fvi_useInfo fvi
-        violatesThunkGrowth = (&&) thunksMightGrow $
-          (||) (fps_noInThunkInLambda fps && fvi_inThunkInLambda fvi) $
-          needTG (fvi_thunkGrowth fvi) $ \growth ->
-             -- NB Control-flow implies it occurs in a thunk at least
-             -- once.
-          let easierTest = need (fps_ifInThunk   fps) (growth_estimate >)
-                where growth_estimate =
-                        -- (- 1) discount for floating to top-level
-                        --
-                        -- TODO why isn't this abs_vars instead of binding_group_fvs?
-                        countFreeIds binding_group_fvs - 1
-              harderTest = need (fps_thunkGrowth fps) (growth >)
-          in easierTest || harderTest
-    in violatesPAPs || violatesThunkGrowth
-  where need   Nothing     _ = False
-        need   (Just x)    k = k x
-        needTG NotInThunk  _ = False
-        needTG (InThunk x) k = k x
+shouldNotFloat
+  ctxt_lvl env   dest_lvl funRhs   badTime spaceInfo   ids extra_sdoc
+  =  not profitable
+  || funRhs && case finalPass env of -- the final pass only affects lambdas
+       Nothing -> False
+       Just fps -> (if fps_trace fps then pprTrace msg msg_sdoc else (\x -> x)) $
+                   decision
+  where
+    profitable = (dest_lvl `ltMajLvl` ctxt_lvl) -- Escapes a value lambda
+              || isTopLvl dest_lvl -- Going all the way to top level
+
+    decision = isJust badTime || any (\(badPAP, tg, tgil) -> badPAP || tg > 0 || tgil > 0) spaceInfo
+    msg      = if decision then "late-no-float" else "late-float"
+    msg_sdoc = time $$ vcat (zipWith space ids spaceInfo) where
+      time = case badTime of
+               Nothing -> empty
+               Just id -> text "would-forget-fast-call to" <+> ppr id
+      space v (badPAP, tg, tgil) = vcat
+       [ ppr v
+       , text "createsPAPs: " <+> ppr badPAP
+       , text "thunkGrowth: " <+> ppr tg
+       , text "TG in lam: "   <+> ppr tgil
+       , if opt_PprStyle_Debug then extra_sdoc else empty
+       ]
+
+wouldIncreaseAllocation ::
+  LevelEnv ->
+  FVIs ->     -- FVIs for the binding's *entire scope*
+  [Id] ->     -- the abstracted value ids
+  [(Id, [Id])] ->      -- the binders in the binding group and their RHS's free IDs
+  [] -- for each binder:
+    ( Bool -- would create PAPs
+    , WordOff  -- estimated growth in lambdas
+    , WordOff  -- estimated growth in thunks in lambdas
+    )
+wouldIncreaseAllocation env usage abs_ids pairs = case finalPass env of
+  Nothing -> []
+  Just fps -> flip map bndrs $ \bndr -> case lookupVarEnv usage bndr of
+    Nothing -> (False, 0, 0) -- it's a dead variable
+    Just fvi ->
+      let violatesPAPs =
+            -- TODO consider refining this along the lines of thunk growth
+            --
+            -- TODO also, if we specialized on partial applications (eg
+            -- "map (f a) xs" becomes "$smap f a xs"), then maybe we could
+            -- relax this check
+            not (fps_createPAPs fps) && 0 `IntSet.member` fviUseInfo fvi
+
+          estimateGrowth :: WordOff -> Int -> VarSet -> WordOff
+          estimateGrowth discount numThunks freebies =
+            numThunks * (harm - benefit) - discount
+            where harm = idWords $ filter (not . flip elemVarSet freebies) abs_ids
+                    -- estimate for the increase in allocation per thunk
+                    --
+                    -- NB freebies prevents us from penalizing for the
+                    -- abs_ids that all the thunks already capture
+
+                  benefit = wORDS_PTR * count (flip elemVarSet freebies) bndrs
+                    -- per thunk discount for floating the bindings
+                    -- that all the thunks capture
+
+          -- If the thunk is NOT under a lambda, then we get a
+          -- discount for no longer allocating these bindings'
+          -- closures, since these bindings would be allocated at
+          -- least as many times as the thunk.
+          thunkGrowth
+           | Just discount <- fps_thunkGrowth fps =
+             withFreebies (fviFreebies fvi) $ estimateGrowth (closuresSize + discount * wORDS_PTR)
+           | Just limit <- fps_ifInThunk fps =
+             withFreebies (fviFreebies fvi)$ \_ _ -> if newValueArgs > limit then 1 else 0
+           | otherwise = 0
+
+          -- If the thunk is under a lambda, we do NOT discount for
+          -- not allocating these closures, since the thunk could be
+          -- allocated many more times than these bindings are.
+          thunkGrowthInLambda
+            | fps_noInThunkInLambda fps =
+              let noDiscount = 0
+                  ignoreNumThunks = 1
+              in withFreebies (fviLamFreebies fvi) $ \_numThunks freebies ->
+                   estimateGrowth noDiscount ignoreNumThunks freebies
+            | otherwise = 0
+
+      in (violatesPAPs, thunkGrowth, thunkGrowthInLambda)
+
+  where (bndrs, fidss) = unzip pairs
+
+        dflags = le_dflags env
+        wORDS_PTR = StgCmmArgRep.argRepSizeW dflags StgCmmArgRep.P
+
+        newValueArgs = length abs_ids
+
+        closuresSize = sum $ flip map fidss $ \fids ->
+          let (words, _, _) =
+                StgCmmLayout.mkVirtHeapOffsets dflags isUpdateable $
+                StgCmmClosure.addIdReps $ filter (`elem` abs_ids) fids
+                where isUpdateable = False -- functions are not updateable
+          in words
+
+        withFreebies :: Freebies -> (Int -> VarSet -> Int) -> Int
+        withFreebies (Freebies uniqs vs) k | 0 == n    = 0
+                                           | otherwise = k n (expandFloatedIds vs)
+          where n = IntSet.size uniqs
+                -- if f was a freebie, and f has been floated, then
+                -- f's abs_vars are now the freebies
+                expandFloatedIds =
+                  unionVarSets . map (absVarsOf (le_env env)) . varSetElems
+
+        -- the number of words used to represent these captured Ids in a closure
+        idWords :: [Id] -> WordOff
+        idWords ids = sum $ map (StgCmmArgRep.argRepSizeW dflags . toArgRep . StgCmmClosure.idPrimRep) ids
 
 -- see Note [Preserving Fast Entries]
-wouldForgetKnownCalls ::
+wouldIncreaseRuntime ::
   LevelEnv ->
-  FVIs ->      -- ^ FVIs for the bindings' RHS and RULES
-  [Var] ->
-  Bool
-wouldForgetKnownCalls env binding_group_fvis abs_vars = case prjFlags `fmap` finalPass env of
+  FVIs ->      -- FVIs for the bindings' RHS and RULES
+  [Id] ->      -- the abstracted value ids
+  Maybe Id     -- the forgotten id
+wouldIncreaseRuntime env binding_group_fvis abs_ids =
+  case prjFlags `fmap` finalPass env of
   -- is final pass...
   Just (noUnder, noExact, noOver) | noUnder || noExact || noOver ->
-    flip any abs_vars $ \abs_v ->
-      isId abs_v && -- NB arity of abs_v is always 0! but it has the
-                    -- same unique...
-      case lookupVarEnv binding_group_fvis abs_v of
-        Just fvi | not (IntSet.null uses) ->
-          (&&) (arity > 0) $ -- NB (arity > 0) iff "is known function"
-             (noUnder && arity > IntSet.findMin uses)
-          || (noExact && arity  `IntSet.member` uses)
-          || (noOver  && arity < IntSet.findMax uses)
-          where arity = idArity (fvi_var fvi)
-                uses = fvi_useInfo fvi
-        _ -> False
-  _ -> False
+    msum $ flip map abs_ids $ \abs_id ->
+      case lookupVarEnv binding_group_fvis abs_id of
+        Just fvi | not (IntSet.null uses),
+                   arity > 0, -- NB (arity > 0) iff "is known function"
+                      (noUnder && arity > IntSet.findMin uses)
+                   || (noExact && arity  `IntSet.member` uses)
+                   || (noOver  && arity < IntSet.findMax uses)
+                 -> Just abs_id
+          where arity = idArity (fviVar fvi)
+                  -- NB cannot use abs_id's arity! As a parameter, it's arity is 0.
+                uses = fviUseInfo fvi
+        _ -> Nothing
+  _ -> Nothing
   where prjFlags fps = ( not (fps_absUnsatVar   fps) -- -fno-late-abstract-undersat-var
                        , not (fps_absSatVar     fps) -- -fno-late-abstract-sat-var
                        , not (fps_absOversatVar fps) -- -fno-late-abstract-oversat-var
@@ -918,28 +1019,16 @@ lvlLamBndrs lvl bndrs
 \end{code}
 
 \begin{code}
-  -- Destination level is the max Id level of the expression
-  -- (We'll abstract the type variables, if any.)
-destLevel :: Level -> LevelEnv -> VarSet -> Bool ->
-             Maybe (Arity, StrictSig) -> Level
-destLevel ctxt_lvl env fvs is_function mb_bot
-  | Just {} <- mb_bot = tOP_LEVEL	-- Send bottoming bindings to the top 
-					-- regardless; see Note [Bottoming floats]
-  | forcedToFloat && is_function
-  = tOP_LEVEL	-- Send functions to top level; see
-		-- the comments with isFunction
+shouldBeTopLevel :: Maybe (Arity, StrictSig) -> Bool
+shouldBeTopLevel mb_bot = isJust mb_bot
+   -- Send bottoming bindings to the top regardless; see Note
+   -- [Bottoming floats]
 
-  | isFinalPass env = ctxt_lvl -- don't float; see Note [Late Lambda Floating]
-
-  | otherwise = maxFvLevel isId env fvs  -- Max over Ids only; the tyvars
-    	      		   	    	 -- will be abstracted
-  where
-    -- semantics of the -ffloat-lam-args and -ffloat-all-lams switches
-    forcedToFloat = case floatLams env of
-      Nothing -> True
-      Just n_args -> n_args > 0 -- n=0 case handled uniformly by the 'otherwise' case
-                     && countFreeIds fvs <= n_args
-
+-- Destination level is the max Id level of the expression (We'll
+-- abstract the type variables, if any.)
+destLevel :: LevelEnv -> VarSet -> Level
+destLevel env fvs = maxFvLevel isId env fvs
+  -- Max over Ids only; the tyvars will be abstracted
 
 isFunction :: CoreExprWithFVIs -> Bool
 -- The idea here is that we want to float *functions* to
@@ -967,12 +1056,12 @@ isFunction' (Lam b e) | isId b    = True
                       | otherwise = isFunction' e
 isFunction' _                     = False
 
-countFreeIds :: VarSet -> Int
+{-countFreeIds :: VarSet -> Int
 countFreeIds = foldVarSet add 0
   where
     add :: Var -> Int -> Int
     add v n | isId v    = n+1
-            | otherwise = n
+            | otherwise = n-}
 \end{code}
 
 
@@ -992,6 +1081,7 @@ data LevelEnv
                                         -- (since we want to substitute in LevelledExpr
                                         -- instead) but we do use the Co/TyVar substs
        , le_env      :: IdEnv ([Var], LevelledExpr)	-- Domain is pre-cloned Ids
+       , le_dflags   :: DynFlags
     }
         -- see Note [The Reason SetLevels Does Substitution]
 
@@ -1016,13 +1106,13 @@ data LevelEnv
 	--
 	-- The domain of the le_lvl_env is the *post-cloned* Ids
 
-initialEnv :: FloatOutSwitches -> LevelEnv
-initialEnv float_lams 
+initialEnv :: DynFlags -> FloatOutSwitches -> LevelEnv
+initialEnv dflags float_lams 
   = LE { le_switches = float_lams, le_lvl_env = emptyVarEnv
-       , le_subst = emptySubst, le_env = emptyVarEnv }
+       , le_subst = emptySubst, le_env = emptyVarEnv, le_dflags = dflags }
 
-floatLams :: LevelEnv -> Maybe Int
-floatLams le = floatOutLambdas (le_switches le)
+--floatLams :: LevelEnv -> Maybe Int
+--floatLams le = floatOutLambdas (le_switches le)
 
 finalPass :: LevelEnv -> Maybe FinalPassSwitches
 finalPass le = finalPass_ (le_switches le)
@@ -1358,20 +1448,67 @@ fvisOf = fst
 type FVIs = VarEnv FVInfo
 
 prjFreeVars :: FVIs -> VarSet
-prjFreeVars = mapVarEnv fvi_var
+prjFreeVars = mapVarEnv fviVar
 
-data FVInfo = FVInfo
-  { fvi_var             :: !Var
-  , fvi_useInfo         :: !UseInfo
-  , fvi_thunkGrowth     :: !ThunkGrowth
-  , fvi_inThunkInLambda :: !Bool
-  }
+prjFreeNonTopLevelIds :: FVIs -> [Id]
+prjFreeNonTopLevelIds = mapMaybe each . varEnvElts where
+  each fvi | isId v && fviIsNonTopLevel fvi = Just v
+           | otherwise = Nothing
+    where v = fviVar fvi
+
+data FVInfo = FVInfo {fvi_var :: !Var, fvi_info :: !FVInfo'}
+
+data FVInfo'
+ = TopLevelFV
+ | NonTopLevelFV
+   -- we need to record more information about let-bound functions
+ | LBFFV { fvi_useInfo     :: !UseInfo
+         -- ^ n `elem` useInfo ==> the variable occurs at least once
+         -- applied to n-many arguments
+         , fvi_freebies    :: !Freebies
+         -- ^ information about how this variable occurs in thunks
+         , fvi_lamFreebies :: !Freebies
+         -- ^ like fvi_freebies, but only for thunks that are declared
+         -- under lambda
+         }
+
+fviIsNonTopLevel :: FVInfo -> Bool
+fviIsNonTopLevel = w . fvi_info where
+  w LBFFV{}         = True
+  w NonTopLevelFV{} = True
+  w TopLevelFV{}    = False
+
+fviVar :: FVInfo -> Var
+fviVar = fvi_var
+
+fviUseInfo :: FVInfo -> UseInfo
+fviUseInfo = w . fvi_info where
+  w LBFFV { fvi_useInfo = x } = x
+  w NonTopLevelFV{} = zeroUseInfo
+  w TopLevelFV{}    = zeroUseInfo
+
+fviFreebies :: FVInfo -> Freebies
+fviFreebies = w . fvi_info where
+  w LBFFV { fvi_freebies = x } = x
+  w NonTopLevelFV{} = zeroFreebies
+  w TopLevelFV{}    = zeroFreebies
+
+fviLamFreebies :: FVInfo -> Freebies
+fviLamFreebies = w . fvi_info where
+  w LBFFV { fvi_lamFreebies = x } = x
+  w NonTopLevelFV{} = zeroFreebies
+  w TopLevelFV{}    = zeroFreebies
 
 instance Outputable FVInfo where
-  ppr (FVInfo v ui t tl) = ppr v <> text ":" <+>
-    text "usage:" <+> ppr (IntSet.toList ui) <+>
-    text "thunk growth:" <+> ppr t <+>
-    text "thunk lambda:" <+> ppr tl
+  ppr (FVInfo v info) = ppr v <> ppr info
+instance Outputable FVInfo' where
+  ppr TopLevelFV    = empty
+  ppr NonTopLevelFV = empty
+  ppr (LBFFV ui t tl) = text ":" <+> vcat
+    [ text "usage:" <+> ppr (IntSet.toList ui)
+    , text "freebies:" <+> ppr t
+    , text "lambda freebies:" <+> ppr tl
+    ]
 
 -- TODO As of 14 Feb 2013, I'm currently only ever using the intset
 -- elements by comparing them to statically known values (ie 0 and the
@@ -1388,22 +1525,39 @@ bothUseInfo :: UseInfo -> UseInfo -> UseInfo
 bothUseInfo = IntSet.union
 
 altUseInfo :: UseInfo -> UseInfo -> UseInfo
-altUseInfo = IntSet.union
+altUseInfo = bothUseInfo
 
--- | When f occurs in a thunk, how many of f's own free variables do
--- not occur in that thunk.
-data ThunkGrowth = NotInThunk | InThunk !Int deriving Show
+-- | for Freebies uniqs vs:
+--
+--   uniqs are the unique identifiers of thunks that the variable occurs in
+--
+--   vs is the set of variables that all of those thunks already
+--   capture (ie "the freebies", since we can abstract over them
+--   without increasing allocation)
+data Freebies = Freebies !IntSet !VarSet
 
-instance Outputable ThunkGrowth where ppr = text . show
+zeroFreebies :: Freebies
+zeroFreebies = Freebies IntSet.empty emptyVarSet
 
-bothThunkGrowth :: ThunkGrowth -> ThunkGrowth -> ThunkGrowth
-bothThunkGrowth (InThunk l) (InThunk r) = InThunk $ max l r
-bothThunkGrowth NotInThunk  x           = x
-bothThunkGrowth x           NotInThunk  = x
+instance Outputable Freebies where
+  ppr (Freebies uniqs vs)
+    | 0 == n = text "NotInThunk"
+    | otherwise = parens $ text "InThunk" <+> ppr n <+> ppr vs
+    where n = IntSet.size uniqs
 
-altThunkGrowth :: ThunkGrowth -> ThunkGrowth -> ThunkGrowth
-altThunkGrowth = bothThunkGrowth -- pessimistic
+bothFreebies :: Freebies -> Freebies -> Freebies
+bothFreebies (Freebies uniqs _) r | IntSet.null uniqs = r
+bothFreebies l (Freebies uniqs _) | IntSet.null uniqs = l
+bothFreebies (Freebies ln lvs) (Freebies rn rvs) =
+  Freebies (ln `IntSet.union` rn) (intersectVarSet lvs rvs)
 
+altFreebies :: Freebies -> Freebies -> Freebies
+altFreebies (Freebies uniqs _) r | IntSet.null uniqs = r
+altFreebies l (Freebies uniqs _) | IntSet.null uniqs = l
+altFreebies (Freebies ln lvs) (Freebies rn rvs) =
+  Freebies (if IntSet.size rn > IntSet.size ln then rn else ln) (intersectVarSet lvs rvs)
+  -- TODO we could be even more precise by carrying a list, one
+  -- element per alt
 
 
 {-
@@ -1435,20 +1589,28 @@ mergeMinMax (MinMax nL xL) (MinMax nR xR)
 
 
 bothFVI :: FVInfo -> FVInfo -> FVInfo
-bothFVI l r =
-  FVInfo { fvi_var         = fvi_var l
-         , fvi_useInfo     = fvi_useInfo    l `bothUseInfo`    fvi_useInfo r
-         , fvi_thunkGrowth = fvi_thunkGrowth l `bothThunkGrowth` fvi_thunkGrowth r
-         , fvi_inThunkInLambda = fvi_inThunkInLambda l || fvi_inThunkInLambda r
-         }
+bothFVI (FVInfo v l) (FVInfo _ r) = FVInfo v $ w l r where
+  w l TopLevelFV{} = l
+  w TopLevelFV{} r = r
+  w l NonTopLevelFV{} = l
+  w NonTopLevelFV{} r = r
+  w l r = LBFFV
+    { fvi_useInfo     = fvi_useInfo     l `bothUseInfo`  fvi_useInfo     r
+    , fvi_freebies    = fvi_freebies    l `bothFreebies` fvi_freebies    r
+    , fvi_lamFreebies = fvi_lamFreebies l `bothFreebies` fvi_lamFreebies r
+    }
 
 altFVI :: FVInfo -> FVInfo -> FVInfo
-altFVI l r =
-  FVInfo { fvi_var         = fvi_var l
-         , fvi_useInfo     = fvi_useInfo    l `altUseInfo`    fvi_useInfo    r
-         , fvi_thunkGrowth = fvi_thunkGrowth l `altThunkGrowth` fvi_thunkGrowth r
-         , fvi_inThunkInLambda = fvi_inThunkInLambda l || fvi_inThunkInLambda r
-         }
+altFVI (FVInfo v l) (FVInfo _ r) = FVInfo v $ w l r where
+  w l TopLevelFV{} = l
+  w TopLevelFV{} r = r
+  w l NonTopLevelFV{} = l
+  w NonTopLevelFV{} r = r
+  w l r = LBFFV
+    { fvi_useInfo     = fvi_useInfo     l `altUseInfo`  fvi_useInfo     r
+    , fvi_freebies    = fvi_freebies    l `altFreebies` fvi_freebies    r
+    , fvi_lamFreebies = fvi_lamFreebies l `altFreebies` fvi_lamFreebies r
+    }
 
 
 
@@ -1456,13 +1618,8 @@ noneFVIs :: FVIs
 noneFVIs = emptyVarEnv
 
 assumeTheBest :: VarSet -> FVIs
-assumeTheBest s = zipVarEnv vs $ flip map vs $ \v ->
- FVInfo { fvi_var = v
-        , fvi_useInfo  = zeroUseInfo
-        , fvi_thunkGrowth = NotInThunk
-        , fvi_inThunkInLambda = False
-        }
- where vs = varSetElems s
+assumeTheBest s = zipVarEnv vs $ flip map vs $ \v -> FVInfo v NonTopLevelFV
+  where vs = varSetElems s
 
 nonValueFVs :: VarSet -> FVIs
 nonValueFVs = assumeTheBest -- only value vars matter
@@ -1492,28 +1649,42 @@ delBinderFVIs b fvis =
 %************************************************************************
 
 \begin{code}
+data FVM' a = FVM' !Int a -- just a state monad with an mfix
+newtype FVM a = FVM { runFVM :: Int -> FVM' a }
+tickFVM :: FVM Int
+tickFVM = FVM $ \i -> FVM' (i + 1) i
+instance Monad FVM where
+  return a = FVM $ \i -> FVM' i a
+  FVM f >>= k = FVM $ \i -> case f i of FVM' i a -> runFVM (k a) i
+instance MonadFix FVM where
+  mfix f = FVM $ \i -> let r@(FVM' _ a) = runFVM (f a) i in r
+
 data FVEnv = FVEnv
-  { fve_runtimeArgs  :: !NumRuntimeArgs
+  { fve_isFinal      :: !Bool
+  , fve_runtimeArgs  :: !NumRuntimeArgs
   -- ^ how many runtmie arguments does the context apply this expression to?
-  , fve_letBndrsFVIs :: !LetFVIs
+  , fve_letBoundFunLvls :: !LetBoundFunLvls
   -- ^ each let-bound in-scope variable's bindings's free variables
-  , fve_feedback     :: !(Maybe (MajorLevel, FVIs))
-  -- ^ the free variables of the enclosing thunk binding
+  , fve_feedback     :: !(Maybe (Int, MajorLevel, FVIs))
+  -- ^ the level and free variables of the enclosing thunk binding
   , fve_majorLevel   :: !MajorLevel
   -- ^ number of enclosing lambdas
+  , fve_nonTopLevel  :: !VarSet
+  -- ^ the non-TopLevel variables in scope
   }
 
-type NumRuntimeArgs = Int         -- i <=> applied to i runtime arguments
-type LetFVIs        = VarEnv (MajorLevel, FVIs)
-  -- (k, (lvl, fvs)): k is let bound (under lvl lambdas), in scope,
-  -- and fvs are the free variables of k's own RHS
+type NumRuntimeArgs = Int -- i <=> applied to i runtime arguments
+type LetBoundFunLvls = VarEnv MajorLevel
+  -- (k, lvl): k is a let-bound function, bound under lvl-many lambdas
 
-initFVEnv :: FVEnv
-initFVEnv = FVEnv {
+initFVEnv :: Bool -> FVEnv
+initFVEnv b = FVEnv {
+  fve_isFinal = b,
   fve_runtimeArgs = 0,
-  fve_letBndrsFVIs = emptyVarEnv,
+  fve_letBoundFunLvls = emptyVarEnv,
   fve_feedback = Nothing,
-  fve_majorLevel = 0
+  fve_majorLevel = 0,
+  fve_nonTopLevel = emptyVarSet
   }
 
 unappliedEnv :: FVEnv -> FVEnv
@@ -1523,158 +1694,142 @@ appliedEnv :: FVEnv -> FVEnv
 appliedEnv env =
   env { fve_runtimeArgs = 1 + fve_runtimeArgs env }
 
-letBoundEnv :: Id -> FVIs -> FVEnv -> FVEnv
-letBoundEnv bndr binding_fvis env = env {
-  fve_letBndrsFVIs = extendVarEnv_C (\_ new -> new)
-                       (fve_letBndrsFVIs env)
-                       bndr
-                       (fve_majorLevel env, binding_fvis) }
+letBoundEnv :: Id -> CoreExpr -> FVEnv -> FVEnv
+letBoundEnv bndr rhs env
+   -- for the info that needs fve_letBoundFunLvls, we are only interested
+   -- in let-bound functions
+ | isFunction' rhs = env { fve_letBoundFunLvls = extendVarEnv_C (\_ new -> new)
+                             (fve_letBoundFunLvls env)
+                             bndr
+                             (fve_majorLevel env) }
+ | otherwise       = env
 
-letBoundsEnv :: [Id] -> FVIs -> FVEnv -> FVEnv
-letBoundsEnv bndrs bindings_fvis env =
-  foldl (\e bndr -> letBoundEnv bndr bindings_fvis e) env bndrs
+letBoundsEnv :: [(Id, CoreExpr)] -> FVEnv -> FVEnv
+letBoundsEnv binds env = foldl (\e (id, rhs) -> letBoundEnv id rhs e) env binds
 
-thunkBindingEnv :: FVIs -> FVEnv -> FVEnv
-thunkBindingEnv binding_fvis env = env {
-  fve_feedback = Just (fve_majorLevel env, binding_fvis) }
+thunkBindingEnv :: FVIs -> FVEnv -> FVM FVEnv
+thunkBindingEnv binding_fvis env = do
+  x <- tickFVM
+  return $ env { fve_feedback = Just (x, fve_majorLevel env, binding_fvis) }
 
 lambdaEnv :: FVEnv -> FVEnv
 lambdaEnv env = env { fve_majorLevel = 1 + fve_majorLevel env }
 
+extendEnv :: [Id] -> FVEnv -> FVEnv
+extendEnv bndrs env =
+  env { fve_nonTopLevel = extendVarSetList (fve_nonTopLevel env) bndrs }
+
 -- The circularity via fve_feedback in analyzeFVs could likely be
 -- eliminated. -NSF 5 Feb 2013
 
--- | Annotate a 'CoreExpr' with its (non-global) free type and value
+-- | Annotate a 'CoreExpr' with its non-TopLevel free type and value
 -- variables and its unapplied variables at every tree node
 analyzeFVs :: FVEnv -> CoreExpr -> CoreExprWithFVIs
+analyzeFVs env e = case runFVM (analyzeFVsM env e) 0 of FVM' _ x -> x
 
-analyzeFVs  env (Var v)
-  = (if isLocalVar v then unitVarEnv v fvi else noneFVIs, AnnVar v)
+analyzeFVsM :: FVEnv -> CoreExpr -> FVM CoreExprWithFVIs
+analyzeFVsM  env (Var v) =
+  return (if isLocalVar v then unitVarEnv v (FVInfo v fvi) else noneFVIs, AnnVar v)
   where
-    fvi = FVInfo { fvi_var             = v
-                 , fvi_useInfo         = IntSet.singleton (fve_runtimeArgs env)
-                 , fvi_thunkGrowth     = thunkGrowth
-                 , fvi_inThunkInLambda = inThunkInLambda
-                 }
-    -- thunkGrown = the number of value free variables used in this
-    -- variable's binding that do not already occur within the
-    -- enclosing thunk's RHS
-    --
-    -- inThunkInlambda = does this variable occur in a thunk that is
-    -- inside a lambda within the scope of its binding?
-    (thunkGrowth, inThunkInLambda) = case fve_feedback env of
-      Nothing -> (NotInThunk, False)
-      Just (this_thunks_lvl, this_thunks_fvs) -> -- control flow means
-                                                 -- we're in a thunk
-        (InThunk thunkGrowth', inThunkInLambda')
-        where
-          -- thunkGrowth' = compare this thunk's fvs to v's RHS's fvs
-          --
-          -- inThunkInlambda' = there is a lambda between this thunk
-          -- and v's binding
-          (thunkGrowth', inThunkInLambda') =
-            case lookupVarEnv (fve_letBndrsFVIs env) v of
-              Nothing     -> (0, False) -- not a let binder
-              Just (v_lvl, v_fvis) ->
-                (,)
-                    (subtract 1 $ -- discount for floating to top-level
-                     length $ filter (isId . fvi_var) $
-                     varEnvElts $ v_fvis `minusVarEnv` this_thunks_fvs)
+    fvi | not $ v `elemVarSet` fve_nonTopLevel env = TopLevelFV
+        | fve_isFinal env,
+          Just v_lvl <- lookupVarEnv (fve_letBoundFunLvls env) v
+          = -- v is a let-bound function
+            let (thunkInLam, freebies) = case fve_feedback env of
+                  Just (thunk_uniq, thunks_lvl, thunks_fvis)
+                    | v `elemVarEnv` thunks_fvis -- this occurrence is free in a thunk
+                      -> (thunks_lvl > v_lvl, Freebies (IntSet.singleton thunk_uniq) (prjFreeVars thunks_fvis))
+                  _   -> (False, zeroFreebies)
+            in LBFFV { fvi_useInfo = IntSet.singleton (fve_runtimeArgs env)
+                     , fvi_freebies = freebies
+                     , fvi_lamFreebies = if thunkInLam then freebies else zeroFreebies
+                     }
+        | otherwise = NonTopLevelFV
 
-                    (this_thunks_lvl > v_lvl)
+analyzeFVsM _env (Lit lit) = return (noneFVIs, AnnLit lit)
 
-analyzeFVs _env (Lit lit) = (noneFVIs, AnnLit lit)
+analyzeFVsM  env (Lam b body) = do
+  body' <- flip analyzeFVsM body $ extendEnv [b] $ lambdaEnv $ unappliedEnv env
+  return (b `delBinderFVIs` fvisOf body', AnnLam b body')
 
-analyzeFVs  env (Lam b body)
-  = (b `delBinderFVIs` bfvi, AnnLam b body')
-  where
-    bfvi  = fvisOf body'
-    body' = analyzeFVs (lambdaEnv $ unappliedEnv env) body
+analyzeFVsM  env (App fun arg) = do
+  let argIsAThunk = not (exprIsTrivial' arg)
+  fun2 <- flip analyzeFVsM fun $ if isRuntimeArg arg
+                                then appliedEnv env
+                                else            env
+  (arg_fvis, arg2) <- mfix $ \ ~(arg_fvis, _) -> do
+    env <- if argIsAThunk
+             then thunkBindingEnv arg_fvis {- <-- circular -} env
+             else return env
+    arg2 <- flip analyzeFVsM arg $ unappliedEnv env
+    return $ let arg_fvis = fvisOf arg2
+             in (arg_fvis, arg2)
 
-analyzeFVs  env (App fun arg)
-  = (fvisOf fun2 `bothFVIs` arg_fvis, AnnApp fun2 arg2)
-  where
-    fun2 = analyzeFVs env' fun where
-      env' = if isRuntimeArg arg
-             then appliedEnv env
-             else            env
-    arg2     = analyzeFVs (unappliedEnv $
-                           if exprIsTrivial' arg
-                           then env
-                           else thunkBindingEnv arg_fvis {- <-- circular -} env) arg
-    arg_fvis = fvisOf arg2
+  return (fvisOf fun2 `bothFVIs` arg_fvis, AnnApp fun2 arg2)
 
-analyzeFVs env (Case scrut bndr ty alts)
-  = ((bndr `delBinderFVIs` alts_fvis)
-     `bothFVIs` fvisOf scrut2
-     `bothFVIs` nonValueFVs (tyVarsOfType ty),
-     AnnCase scrut2 bndr ty alts2)
-  where
-    scrut2 = analyzeFVs (unappliedEnv env) scrut
+analyzeFVsM env (Case scrut bndr ty alts) = do
+  scrut2 <- analyzeFVsM (unappliedEnv env) scrut
 
-    (alts_fvis_s, alts2) = mapAndUnzip fv_alt alts
-    alts_fvis            = foldr altFVIs noneFVIs alts_fvis_s
+  (alts_fvis_s, alts2) <- flip mapAndUnzipM alts $ \(con,args,rhs) -> do
+    rhs2 <- flip analyzeFVsM rhs $ unappliedEnv $
+                                   extendEnv (bndr : args) env
+    return (delBindersFVIs args (fvisOf rhs2), (con, args, rhs2))
 
-    fv_alt (con,args,rhs)
-      = (delBindersFVIs args (fvisOf rhs2), (con, args, rhs2))
-        where rhs2 = analyzeFVs (unappliedEnv env) rhs
+  let alts_fvis = foldr altFVIs noneFVIs alts_fvis_s
 
-analyzeFVs env (Let (NonRec binder rhs) body)
-  = (binding_fvis `bothFVIs` body_fvis `bothFVIs`
-     assumeTheBest (bndrRuleAndUnfoldingVars binder),
-     AnnLet (AnnNonRec binder rhs2) body2)
-  where
-    rhs2      = analyzeFVs (unappliedEnv rhs_env) rhs
-      where rhs_env | isFunction' rhs = env -- NB ignoring functions since we hope they float
-                    | otherwise       = thunkBindingEnv binding_fvis {- <-- circular -} env
+  return ( (bndr `delBinderFVIs` alts_fvis)
+           `bothFVIs` fvisOf scrut2
+           `bothFVIs` nonValueFVs (tyVarsOfType ty)
+         , AnnCase scrut2 bndr ty alts2 )
 
-    binding_fvis = fvisOf rhs2
+analyzeFVsM env (Let (NonRec binder rhs) body) = do
+  (binding_fvis, rhs2) <- mfix $ \ ~(binding_fvis, _) -> do
+    env <- thunkBindingEnv binding_fvis {- <-- circular -} env
+    rhs2 <- analyzeFVsM (unappliedEnv env) rhs
+    return $ let binding_fvis = fvisOf rhs2
+             in (binding_fvis, rhs2)
 
-    body2     = analyzeFVs (unappliedEnv $
-                            letBoundEnv binder binding_fvis {- <-- circular -}
-                              env) body
-    body_fvis = binder `delBinderFVIs` fvisOf body2
+  body2 <- flip analyzeFVsM body $ extendEnv [binder] $ unappliedEnv $ letBoundEnv binder rhs env
 
-analyzeFVs env (Let (Rec binds) body)
-  = (all_fvis,
-     AnnLet (AnnRec (binders `zip` rhss2)) body2)
-  where
-    (binders, rhss) = unzip binds
+  let body_fvis = binder `delBinderFVIs` fvisOf body2
 
-    rhss2      = map analyze_rhs rhss
-      where analyze_rhs rhs = rhs2
-              where rhs2 = analyzeFVs
-                             (unappliedEnv $
-                              letBoundsEnv binders bindings_fvis {- <-- circular -}
-                                env')
-                             rhs
-                    env' | isFunction' rhs = env -- NB ignoring functions since we hope they float
-                         | otherwise       = thunkBindingEnv bindings_fvis {- <-- circular -} env
+  return ( binding_fvis `bothFVIs` body_fvis `bothFVIs`
+           assumeTheBest (bndrRuleAndUnfoldingVars binder)
+         , AnnLet (AnnNonRec binder rhs2) body2 )
 
-    bindings_fvis = delBindersFVIs binders $ computeRecRHSsFVIs binders rhss2
+analyzeFVsM env (Let (Rec binds) body) = do
+  let (binders, rhss) = unzip binds
 
-    body2      = analyzeFVs (unappliedEnv $
-                             letBoundsEnv binders bindings_fvis {- <-- circular -}
-                               env)
-                            body
-    all_fvis   = bothFVIs bindings_fvis $ delBindersFVIs binders $ fvisOf body2
+  (bindings_fvis, rhss2) <- mfix $ \ ~(bindings_fvis, _) -> do
+    env <- thunkBindingEnv bindings_fvis {- <-- circular -} env
+    rhss2 <- flip mapM rhss $ \rhs -> do
+      flip analyzeFVsM rhs $ extendEnv binders $
+                             unappliedEnv $
+                             letBoundsEnv binds env
+    return $ let bindings_fvis = delBindersFVIs binders $ computeRecRHSsFVIs binders rhss2
+             in (bindings_fvis, rhss2)
 
-analyzeFVs  env (Cast expr co)
-  = (fvisOf expr2 `bothFVIs` cfvis, AnnCast expr2 (cfvis, co))
-  where
-    expr2 = analyzeFVs env expr
-    cfvis  = nonValueFVs $ tyCoVarsOfCo co
 
-analyzeFVs  env (Tick tickish expr)
-  = (tickishFVIs tickish `bothFVIs` fvisOf expr2, AnnTick tickish expr2)
-  where
-    expr2 = analyzeFVs env expr
-    tickishFVIs (Breakpoint _ ids) = nonValueFVs (mkVarSet ids)
-    tickishFVIs _                  = noneFVIs
+  body2 <- flip analyzeFVsM body $ extendEnv binders $ unappliedEnv $ letBoundsEnv binds env
 
-analyzeFVs _env (Type ty) = (nonValueFVs $ tyVarsOfType ty, AnnType ty)
+  let all_fvis = bothFVIs bindings_fvis $ delBindersFVIs binders $ fvisOf body2
 
-analyzeFVs _env (Coercion co) = (nonValueFVs $ tyCoVarsOfCo co, AnnCoercion co)
+  return  (all_fvis , AnnLet (AnnRec (binders `zip` rhss2)) body2)
+
+analyzeFVsM  env (Cast expr co) = do
+  expr2 <- analyzeFVsM env expr
+  let cfvis = nonValueFVs $ tyCoVarsOfCo co
+  return (fvisOf expr2 `bothFVIs` cfvis, AnnCast expr2 (cfvis, co))
+
+analyzeFVsM  env (Tick tickish expr) = do
+ expr2 <- analyzeFVsM env expr
+ let tickishFVIs (Breakpoint _ ids) = nonValueFVs (mkVarSet ids)
+     tickishFVIs _                  = noneFVIs
+ return (tickishFVIs tickish `bothFVIs` fvisOf expr2, AnnTick tickish expr2)
+
+analyzeFVsM _env (Type ty) = return (nonValueFVs $ tyVarsOfType ty, AnnType ty)
+
+analyzeFVsM _env (Coercion co) = return (nonValueFVs $ tyCoVarsOfCo co, AnnCoercion co)
 
 computeRecRHSsFVIs :: [Var] -> [CoreExprWithFVIs] -> FVIs
 computeRecRHSsFVIs binders rhss2 =

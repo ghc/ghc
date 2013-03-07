@@ -384,6 +384,7 @@ data FinalPassSwitches = FinalPassSwitches
   , fps_noInThunkInLambda :: !Bool
   -- ^ disallow the floating of a binding if it occurs in thunk that
   -- is allocated inside a lambda inside the bindings' scope
+  , fps_trace             :: !Bool
   }
 
 instance Outputable FloatOutSwitches where
