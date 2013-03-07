@@ -27,6 +27,7 @@ module System.Timeout ( timeout ) where
 #ifdef __GLASGOW_HASKELL__
 import Control.Concurrent
 import Control.Exception   (Exception(..), handleJust, bracket,
+                            uninterruptibleMask_,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import Data.Typeable
@@ -90,8 +91,9 @@ timeout n f
                    (\_ -> return Nothing)
                    (bracket (forkIOWithUnmask $ \unmask ->
                                  unmask $ threadDelay n >> throwTo pid ex)
-                            (killThread)
+                            (uninterruptibleMask_ . killThread)
                             (\_ -> fmap Just f))
+        -- #7719 explains why we need uninterruptibleMask_ above.
 #else
 timeout n f = fmap Just f
 #endif /* !__GLASGOW_HASKELL__ */
