@@ -1401,7 +1401,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                              `setIdArity` count isId spec_lam_args
               spec_str   = calcSpecStrictness fn spec_lam_args pats
                 -- Conditionally use result of new worker-wrapper transform
-              (spec_lam_args, spec_call_args) = mkWorkerArgs qvars False body_ty
+              (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars False body_ty
                 -- Usual w/w hack to avoid generating 
                 -- a spec_rhs of unlifted type and no args
 

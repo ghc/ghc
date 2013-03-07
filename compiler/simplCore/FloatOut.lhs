@@ -125,7 +125,7 @@ floatOutwards :: FloatOutSwitches
 
 floatOutwards float_sws dflags us pgm
   = do {
-	let { annotated_w_levels = setLevels float_sws pgm us ;
+	let { annotated_w_levels = setLevels dflags float_sws pgm us ;
 	      (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
 	    } ;
 
