@@ -20,7 +20,7 @@ module DriverPipeline (
 
         -- Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess,
-   compile, compile',
+   compileOne, compileOne',
    link,
 
   ) where
@@ -51,6 +51,7 @@ import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
 import Platform
+import TcRnTypes
 
 import Exception
 import Data.IORef       ( readIORef )
@@ -94,33 +95,31 @@ preprocess hsc_env (filename, mb_phase) =
 --
 -- NB.  No old interface can also mean that the source has changed.
 
-compile :: HscEnv
-        -> ModSummary      -- ^ summary for module being compiled
-        -> Int             -- ^ module N ...
-        -> Int             -- ^ ... of M
-        -> Maybe ModIface  -- ^ old interface, if we have one
-        -> Maybe Linkable  -- ^ old linkable, if we have one
-        -> SourceModified
-        -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
+compileOne :: HscEnv
+           -> ModSummary      -- ^ summary for module being compiled
+           -> Int             -- ^ module N ...
+           -> Int             -- ^ ... of M
+           -> Maybe ModIface  -- ^ old interface, if we have one
+           -> Maybe Linkable  -- ^ old linkable, if we have one
+           -> SourceModified
+           -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
-compile = compile' (hscCompileNothing, hscCompileInteractive, hscCompileBatch)
+compileOne = compileOne' Nothing (Just batchMsg)
 
-compile' :: 
-           (Compiler (HscStatus, ModIface, ModDetails),
-            Compiler (InteractiveStatus, ModIface, ModDetails),
-            Compiler (FileOutputStatus, ModIface, ModDetails))
-        -> HscEnv
-        -> ModSummary      -- ^ summary for module being compiled
-        -> Int             -- ^ module N ...
-        -> Int             -- ^ ... of M
-        -> Maybe ModIface  -- ^ old interface, if we have one
-        -> Maybe Linkable  -- ^ old linkable, if we have one
-        -> SourceModified
-        -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
+compileOne' :: Maybe TcGblEnv
+            -> Maybe Messager
+            -> HscEnv
+            -> ModSummary      -- ^ summary for module being compiled
+            -> Int             -- ^ module N ...
+            -> Int             -- ^ ... of M
+            -> Maybe ModIface  -- ^ old interface, if we have one
+            -> Maybe Linkable  -- ^ old linkable, if we have one
+            -> SourceModified
+            -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
-compile' (nothingCompiler, interactiveCompiler, batchCompiler)
-        hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
-        source_modified0
+compileOne' m_tc_result mHscMessage
+            hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
+            source_modified0
  = do
    let dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -160,80 +159,101 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
          | otherwise = source_modified0
        object_filename = ml_obj_file location
 
-   let handleBatch HscNoRecomp
-           = ASSERT (isJust maybe_old_linkable)
-             return maybe_old_linkable
+   let always_do_basic_recompilation_check = case hsc_lang of
+                                             HscInterpreted -> True
+                                             _ -> False
 
-       handleBatch (HscRecomp hasStub _)
-           | isHsBoot src_flavour
-               = do when (isObjectTarget hsc_lang) $ -- interpreted reaches here too
-                       liftIO $ touchObjectFile dflags' object_filename
-                    return maybe_old_linkable
+   e <- genericHscCompileGetFrontendResult
+            always_do_basic_recompilation_check
+            m_tc_result mHscMessage
+            hsc_env' summary source_modified mb_old_iface (mod_index, nmods)
 
-           | otherwise
-               = do (hs_unlinked, unlinked_time) <-
-                        case hsc_lang of
-                          HscNothing ->
-                            return ([], ms_hs_date summary)
-                          -- We're in --make mode: finish the compilation pipeline.
-                          _other -> do
-                            maybe_stub_o <- case hasStub of
-                               Nothing -> return Nothing
-                               Just stub_c -> do
-                                 stub_o <- compileStub hsc_env' stub_c
-                                 return (Just stub_o)
-                            _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
-                                              (Just basename)
-                                              Persistent
-                                              (Just location)
-                                              maybe_stub_o
-                                  -- The object filename comes from the ModLocation
-                            o_time <- getModificationUTCTime object_filename
-                            return ([DotO object_filename], o_time)
-                    
-                    let linkable = LM unlinked_time this_mod hs_unlinked
-                    return (Just linkable)
+   case e of
+       Left iface ->
+           do details <- genModDetails hsc_env iface
+              MASSERT (isJust maybe_old_linkable)
+              return (HomeModInfo{ hm_details  = details,
+                                   hm_iface    = iface,
+                                   hm_linkable = maybe_old_linkable })
 
-       handleInterpreted HscNoRecomp
-           = ASSERT (isJust maybe_old_linkable)
-             return maybe_old_linkable
-       handleInterpreted (HscRecomp _hasStub Nothing)
-           = ASSERT (isHsBoot src_flavour)
-             return maybe_old_linkable
-       handleInterpreted (HscRecomp hasStub (Just (comp_bc, modBreaks)))
-           = do stub_o <- case hasStub of
-                            Nothing -> return []
-                            Just stub_c -> do
-                              stub_o <- compileStub hsc_env' stub_c
-                              return [DotO stub_o]
+       Right (tc_result, mb_old_hash) ->
+           -- run the compiler
+           case hsc_lang of
+               HscInterpreted ->
+                   case ms_hsc_src summary of
+                   HsBootFile ->
+                       do (iface, _changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                          return (HomeModInfo{ hm_details  = details,
+                                               hm_iface    = iface,
+                                               hm_linkable = maybe_old_linkable })
+                   _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
+                           guts <- hscSimplify hsc_env' guts0
+                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
+                           HscRecomp hasStub (comp_bc, modBreaks) <- hscInteractive hsc_env' cgguts summary
 
-                let hs_unlinked = [BCOs comp_bc modBreaks]
-                    unlinked_time = ms_hs_date summary
-                  -- Why do we use the timestamp of the source file here,
-                  -- rather than the current time?  This works better in
-                  -- the case where the local clock is out of sync
-                  -- with the filesystem's clock.  It's just as accurate:
-                  -- if the source is modified, then the linkable will
-                  -- be out of date.
-                let linkable = LM unlinked_time this_mod
-                               (hs_unlinked ++ stub_o)
-                return (Just linkable)
+                           stub_o <- case hasStub of
+                                     Nothing -> return []
+                                     Just stub_c -> do
+                                         stub_o <- compileStub hsc_env' stub_c
+                                         return [DotO stub_o]
 
-   let -- runCompiler :: Compiler result -> (result -> Maybe Linkable)
-       --            -> m HomeModInfo
-       runCompiler compiler handle
-           = do (result, iface, details)
-                    <- compiler hsc_env' summary source_modified mb_old_iface
-                                (Just (mod_index, nmods))
-                linkable <- handle result
-                return (HomeModInfo{ hm_details  = details,
-                                     hm_iface    = iface,
-                                     hm_linkable = linkable })
-   -- run the compiler
-   case hsc_lang of
-      HscInterpreted -> runCompiler interactiveCompiler handleInterpreted
-      HscNothing     -> runCompiler nothingCompiler     handleBatch
-      _other         -> runCompiler batchCompiler       handleBatch
+                           let hs_unlinked = [BCOs comp_bc modBreaks]
+                               unlinked_time = ms_hs_date summary
+                             -- Why do we use the timestamp of the source file here,
+                             -- rather than the current time?  This works better in
+                             -- the case where the local clock is out of sync
+                             -- with the filesystem's clock.  It's just as accurate:
+                             -- if the source is modified, then the linkable will
+                             -- be out of date.
+                           let linkable = LM unlinked_time this_mod
+                                          (hs_unlinked ++ stub_o)
+
+                           return (HomeModInfo{ hm_details  = details,
+                                                hm_iface    = iface,
+                                                hm_linkable = Just linkable })
+               HscNothing ->
+                   do (iface, _changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                      let linkable = if isHsBoot src_flavour
+                                     then maybe_old_linkable
+                                     else Just (LM (ms_hs_date summary) this_mod [])
+                      return (HomeModInfo{ hm_details  = details,
+                                           hm_iface    = iface,
+                                           hm_linkable = linkable })
+
+               _ ->
+                   case ms_hsc_src summary of
+                   HsBootFile ->
+                       do (iface, changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                          hscWriteIface dflags' iface changed summary
+                          touchObjectFile dflags' object_filename
+                          return (HomeModInfo{ hm_details  = details,
+                                               hm_iface    = iface,
+                                               hm_linkable = maybe_old_linkable })
+
+                   _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
+                           guts <- hscSimplify hsc_env' guts0
+                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
+                           hscWriteIface dflags' iface changed summary
+                           (_outputFilename, hasStub) <- hscGenHardCode hsc_env' cgguts summary
+
+                           -- We're in --make mode: finish the compilation pipeline.
+                           maybe_stub_o <- case hasStub of
+                                      Nothing -> return Nothing
+                                      Just stub_c -> do
+                                          stub_o <- compileStub hsc_env' stub_c
+                                          return (Just stub_o)
+                           _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
+                                             (Just basename)
+                                             Persistent
+                                             (Just location)
+                                             maybe_stub_o
+                                 -- The object filename comes from the ModLocation
+                           o_time <- getModificationUTCTime object_filename
+                           let linkable = LM o_time this_mod [DotO object_filename]
+
+                           return (HomeModInfo{ hm_details  = details,
+                                                hm_iface    = iface,
+                                                hm_linkable = Just linkable })
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
@@ -1005,17 +1025,15 @@ runPhase (Hsc src_flavour) input_fn dflags0
   -- run the compiler!
         result <- liftIO $ hscCompileOneShot hsc_env'
                                mod_summary source_unchanged
-                               Nothing -- No iface
-                               Nothing -- No "module i of n" progress info
 
         case result of
-          HscNoRecomp
+          Nothing
               -> do liftIO $ touchObjectFile dflags' o_file
                     -- The .o file must have a later modification date
-                    -- than the source file (else we wouldn't be in HscNoRecomp)
+                    -- than the source file (else we wouldn't get Nothing)
                     -- but we touch it anyway, to keep 'make' happy (we think).
                     return (StopLn, o_file)
-          (HscRecomp hasStub mOutputFilename)
+          (Just (HscRecomp hasStub mOutputFilename))
               -> do case hasStub of
                       Nothing -> return ()
                       Just stub_c ->
