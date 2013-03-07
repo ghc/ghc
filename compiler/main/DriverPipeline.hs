@@ -189,7 +189,7 @@ compileOne' m_tc_result mHscMessage
                    _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
                            guts <- hscSimplify hsc_env' guts0
                            (iface, _changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
-                           HscRecomp hasStub (comp_bc, modBreaks) <- hscInteractive hsc_env' cgguts summary
+                           (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env' cgguts summary
 
                            stub_o <- case hasStub of
                                      Nothing -> return []
@@ -1027,31 +1027,29 @@ runPhase (Hsc src_flavour) input_fn dflags0
                                mod_summary source_unchanged
 
         case result of
-          Nothing
-              -> do liftIO $ touchObjectFile dflags' o_file
-                    -- The .o file must have a later modification date
-                    -- than the source file (else we wouldn't get Nothing)
-                    -- but we touch it anyway, to keep 'make' happy (we think).
-                    return (StopLn, o_file)
-          (Just (HscRecomp hasStub mOutputFilename))
-              -> do case hasStub of
-                      Nothing -> return ()
-                      Just stub_c ->
-                          do stub_o <- liftIO $ compileStub hsc_env' stub_c
-                             setStubO stub_o
-                    -- In the case of hs-boot files, generate a dummy .o-boot
-                    -- stamp file for the benefit of Make
-                    outputFilename <-
-                        case mOutputFilename of
-                        Just x -> return x
-                        Nothing ->
-                            if isHsBoot src_flavour
-                            then do liftIO $ touchObjectFile dflags' o_file
-                                    whenGeneratingDynamicToo dflags' $ do
-                                        let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
-                                        liftIO $ touchObjectFile dflags' dyn_o_file
-                                    return o_file
-                            else return $ panic "runPhase Hsc: No output filename"
+            HscNotGeneratingCode ->
+                return (next_phase,
+                        panic "No output filename from Hsc when no-code")
+            HscUpToDate ->
+                do liftIO $ touchObjectFile dflags' o_file
+                   -- The .o file must have a later modification date
+                   -- than the source file (else we wouldn't get Nothing)
+                   -- but we touch it anyway, to keep 'make' happy (we think).
+                   return (StopLn, o_file)
+            HscUpdateBoot ->
+                do -- In the case of hs-boot files, generate a dummy .o-boot
+                   -- stamp file for the benefit of Make
+                   liftIO $ touchObjectFile dflags' o_file
+                   whenGeneratingDynamicToo dflags' $ do
+                       let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
+                       liftIO $ touchObjectFile dflags' dyn_o_file
+                   return (next_phase, o_file)
+            HscRecomp outputFilename mStub
+              -> do case mStub of
+                        Nothing -> return ()
+                        Just stub_c ->
+                            do stub_o <- liftIO $ compileStub hsc_env' stub_c
+                               setStubO stub_o
 
                     return (next_phase, outputFilename)
 

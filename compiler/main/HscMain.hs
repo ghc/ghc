@@ -525,13 +525,16 @@ This is the only thing that isn't caught by the type-system.
 
 
 -- | Status of a compilation to hard-code
-data HscStatus a
-    = HscRecomp
+data HscStatus
+    = HscNotGeneratingCode
+    | HscUpToDate
+    | HscUpdateBoot
+    | HscRecomp
+          FilePath
           (Maybe FilePath) -- Has stub files. This is a hack. We can't compile
                            -- C files here since it's done in DriverPipeline.
                            -- For now we just return True if we want the caller
                            -- to compile them for us.
-          a
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
 
@@ -620,7 +623,7 @@ genericHscFrontend mod_summary
 hscCompileOneShot :: HscEnv
                   -> ModSummary
                   -> SourceModified
-                  -> IO (Maybe (HscStatus (Maybe FilePath)))
+                  -> IO HscStatus
 hscCompileOneShot hsc_env mod_summary src_changed
   = do
     -- One-shot mode needs a knot-tying mutable variable for interface
@@ -633,27 +636,27 @@ hscCompileOneShot hsc_env mod_summary src_changed
 
         skip = do msg UpToDate
                   dumpIfaceStats hsc_env'
-                  return Nothing
+                  return HscUpToDate
 
         compile mb_old_hash reason = runHsc hsc_env' $ do
             liftIO $ msg reason
             tc_result <- genericHscFrontend mod_summary
             dflags <- getDynFlags
             case hscTarget dflags of
-                HscNothing -> return (Just (HscRecomp Nothing Nothing))
+                HscNothing -> return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
                     HsBootFile ->
                         do (iface, changed, _) <- hscSimpleIface' tc_result mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
-                           return (Just (HscRecomp Nothing Nothing))
+                           return HscUpdateBoot
                     _ ->
                         do guts0 <- hscDesugar' (ms_location mod_summary) tc_result
                            guts <- hscSimplify' guts0
                            (iface, changed, _details, cgguts) <- hscNormalIface' guts mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
-                           (outputFilename, hasStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary
-                           return (Just (HscRecomp hasStub (Just outputFilename)))
+                           (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary
+                           return $ HscRecomp outputFilename mStub
 
         stable = case src_changed of
                      SourceUnmodifiedAndStable -> True
@@ -1194,7 +1197,7 @@ hscGenHardCode hsc_env cgguts mod_summary = do
 hscInteractive :: HscEnv
                -> CgGuts
                -> ModSummary
-               -> IO (HscStatus (CompiledByteCode, ModBreaks))
+               -> IO (Maybe FilePath, CompiledByteCode, ModBreaks)
 #ifdef GHCI
 hscInteractive hsc_env cgguts mod_summary = do
     let dflags = hsc_dflags hsc_env
@@ -1221,7 +1224,7 @@ hscInteractive hsc_env cgguts mod_summary = do
     ------------------ Create f-x-dynamic C-side stuff ---
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs dflags this_mod location foreign_stubs
-    return (HscRecomp istub_c_exists (comp_bc, mod_breaks))
+    return (istub_c_exists, comp_bc, mod_breaks)
 #else
 hscInteractive _ _ = panic "GHC not compiled with interpreter"
 #endif
