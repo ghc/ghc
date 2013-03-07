@@ -1445,9 +1445,12 @@ runPhase LlvmLlc input_fn dflags
 
     let lc_opts = getOpts dflags opt_lc
         opt_lvl = max 0 (min 2 $ optLevel dflags)
-        rmodel | gopt Opt_PIC dflags          = "pic"
-               | not (gopt Opt_Static dflags) = "dynamic-no-pic"
-               | otherwise                    = "static"
+        -- iOS requires external references to be loaded indirectly from the
+        -- DATA segment or dyld traps at runtime writing into TEXT: see #7722
+        rmodel | platformOS (targetPlatform dflags) == OSiOS = "dynamic-no-pic"
+               | gopt Opt_PIC dflags                         = "pic"
+               | not (gopt Opt_Static dflags)                = "dynamic-no-pic"
+               | otherwise                                   = "static"
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
              | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
