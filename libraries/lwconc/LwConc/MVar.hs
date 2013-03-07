@@ -41,22 +41,26 @@ import LwConc.Substrate
 import qualified Data.Sequence as Seq
 import GHC.IORef
 
+#define _INL_(x) {-# INLINE x #-}
+
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
 data MVPState a = Full a (Seq.Seq (a, PTM()))
                 | Empty (Seq.Seq (IORef a, PTM()))
 
 
+_INL_(newMVar)
 newMVar :: a -> IO (MVar a)
 newMVar x = do
   ref <- newPVarIO $ Full x Seq.empty
   return $ MVar ref
 
+_INL_(newEmptyMVar)
 newEmptyMVar :: IO (MVar a)
 newEmptyMVar = do
   ref <- newPVarIO $ Empty Seq.empty
   return $ MVar ref
 
-{-# INLINE readMVar #-}
+_INL_(readMVar)
 readMVar :: MVar a -> IO a
 readMVar (MVar ref) = do
   hole <- newIORef undefined
@@ -85,7 +89,7 @@ readMVar (MVar ref) = do
          Full x _ -> unsafeIOToPTM $ writeIORef hole x
   readIORef hole
 
-{-# INLINE swapMVar #-}
+_INL_(swapMVar)
 swapMVar :: MVar a -> a -> IO a
 swapMVar (MVar ref) newValue = do
   hole <- newIORef undefined
@@ -128,7 +132,7 @@ swapMVar (MVar ref) newValue = do
   readIORef hole
 
 
-{-# INLINE asyncPutMVar #-}
+_INL_(asyncPutMVar)
 asyncPutMVar :: MVar a -> a -> PTM ()
 asyncPutMVar (MVar ref) x = do
   st <- readPVar ref
@@ -143,7 +147,7 @@ asyncPutMVar (MVar ref) x = do
          writePVar ref $ Full x' $ ts Seq.|> (x, return ())
 
 
-{-# INLINE putMVarPTM #-}
+_INL_(putMVarPTM)
 putMVarPTM :: MVar a -> a -> PTM ()
 putMVarPTM (MVar ref) x = do
   st <- readPVar ref
@@ -170,11 +174,11 @@ putMVarPTM (MVar ref) x = do
          setSContSwitchReason sc $ BlockedInHaskell token
          blockAct
 
-{-# INLINE putMVar #-}
+_INL_(putMVar)
 putMVar :: MVar a -> a -> IO ()
 putMVar mv x = atomically $ putMVarPTM mv x
 
-{-# INLINE takeMVarWithHole #-}
+_INL_(takeMVarWithHole)
 takeMVarWithHole :: MVar a -> IORef a -> IO a
 takeMVarWithHole (MVar ref) hole = do
   atomically $ do
@@ -204,7 +208,7 @@ takeMVarWithHole (MVar ref) hole = do
            wakeup
   readIORef hole
 
-{-# INLINE takeMVar #-}
+_INL_(takeMVar)
 takeMVar :: MVar a -> IO a
 takeMVar m = do
   hole <- newIORef undefined

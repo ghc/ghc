@@ -17,6 +17,7 @@ Library
     exposed-modules:
       LwConc.ConcurrentSequence
       LwConc.ConcurrentList
+      LwConc.MVarList
       LwConc.MVar
     extensions: CPP
     Build-Depends: base       >= 4.2   && < 5,

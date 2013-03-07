@@ -792,7 +792,6 @@ stg_iCanRunSContzh ( gcptr scont )
  */
 stg_setScheduleSContActionzh ( gcptr threadid, gcptr schedule_scont_action )
 {
-	MAYBE_GC_PP (stg_setScheduleSContActionzh, threadid, schedule_scont_action);
   StgTSO_schedule_scont_action (threadid) = schedule_scont_action;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();
@@ -801,7 +800,6 @@ stg_setScheduleSContActionzh ( gcptr threadid, gcptr schedule_scont_action )
 stg_getScheduleSContActionzh ( gcptr threadid )
 {
 
-	MAYBE_GC_P (stg_getScheduleSContActionzh, threadid);
   W_ schedule_scont_action;
   schedule_scont_action = StgTSO_schedule_scont_action (threadid);
   return (schedule_scont_action);
@@ -809,7 +807,6 @@ stg_getScheduleSContActionzh ( gcptr threadid )
 
 stg_setYieldControlActionzh ( gcptr threadid, gcptr yield_control_action )
 {
-	MAYBE_GC_PP (stg_setYieldControlActionzh, threadid, yield_control_action);
   StgTSO_yield_control_action (threadid) = yield_control_action;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();
@@ -818,7 +815,6 @@ stg_setYieldControlActionzh ( gcptr threadid, gcptr yield_control_action )
 stg_getYieldControlActionzh ( gcptr threadid )
 {
 
-	MAYBE_GC_P (stg_getYieldControlActionzh, threadid);
   W_ yield_control_action;
   yield_control_action = StgTSO_yield_control_action (threadid);
   return (yield_control_action);
@@ -827,7 +823,6 @@ stg_getYieldControlActionzh ( gcptr threadid )
 stg_setSLSzh ( gcptr tso, gcptr tls )
 {
 
-	MAYBE_GC_PP (stg_setSLSzh, tso, tls);
   StgTSO_tls(tso) = tls;
   ccall dirty_TSO (StgTSO_cap(tso) "ptr", tso "ptr");
 	return ();
@@ -843,7 +838,6 @@ stg_getSLSzh ( gcptr tso )
 stg_setFinalizzerzh ( gcptr threadid, gcptr finalizer )
 {
 
-	MAYBE_GC_PP (stg_setFinalizzerzh, threadid, finalizer);
   StgTSO_finalizer (threadid) = finalizer;
   ccall dirty_TSO (MyCapability () "ptr", threadid "ptr");
 	return ();

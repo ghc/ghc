@@ -35,10 +35,12 @@ import LwConc.Substrate
 import Data.Array.IArray
 import Data.Dynamic
 
+#define _INL_(x) {-# INLINE x #-}
+
 -- The scheduler data structure has one (PVar (Seq SCont)) for every capability.
 newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
-{-# INLINE yieldControlAction #-}
+_INL_(yieldControlAction)
 yieldControlAction :: Sched -> PTM ()
 yieldControlAction (Sched pa) = do
   -- Fetch current capability's scheduler
@@ -48,17 +50,17 @@ yieldControlAction (Sched pa) = do
   case front of
     [] -> do
       back <- readPVar backRef
-      case back of
+      case reverse back of
         [] -> sleepCapability
         x:tl -> do
-          writePVar frontRef $ reverse tl
+          writePVar frontRef tl
           writePVar backRef []
           switchTo x
     x:tl -> do
       writePVar frontRef $ tl
       switchTo x
 
-{-# INLINE scheduleSContAction #-}
+_INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction (Sched pa) sc = do
   -- Since we are making the given scont runnable, update its status to Yielded.
@@ -71,6 +73,7 @@ scheduleSContAction (Sched pa) sc = do
   writePVar backRef $ sc:back
 
 
+_INL_(newSched)
 newSched :: IO (Sched)
 newSched = do
   -- This token will be used to spawn in a round-robin fashion on different
@@ -98,6 +101,7 @@ newSched = do
       createPVarList (n-1) $ (frontRef,backRef):l
     }
 
+_INL_(newCapability)
 newCapability :: IO ()
 newCapability = do
  -- Initial task body
@@ -119,7 +123,7 @@ newCapability = do
 
 data SContKind = Bound | Unbound
 
-{-# INLINE fork #-}
+_INL_(fork)
 fork :: IO () -> SContKind -> IO SCont
 fork task kind = do
   currentSC <- getSContIO
@@ -160,13 +164,15 @@ fork task kind = do
   }
   return newSC
 
-{-# INLINE forkOS #-}
+_INL_(forkIO)
 forkIO :: IO () -> IO SCont
 forkIO task = fork task Unbound
 
+_INL_(forkOS)
 forkOS :: IO () -> IO SCont
 forkOS task = fork task Bound
 
+_INL_(yield)
 yield :: IO ()
 yield = atomically $ do
   s <- getSCont
