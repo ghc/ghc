@@ -43,6 +43,7 @@ import HscMain
 import HsSyn
 import HscTypes
 import InstEnv
+import FamInstEnv ( FamInst, Branched, orphNamesOfFamInst )
 import TyCon
 import Type     hiding( typeKind )
 import TcType           hiding( typeKind )
@@ -925,20 +926,25 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
+getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst Branched]))
 getInfo allInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
          Nothing -> return Nothing
-         Just (thing, fixity, ispecs) -> do
+         Just (thing, fixity, cls_insts, fam_insts) -> do
            let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
-           return (Just (thing, fixity, filter (plausible rdr_env) ispecs))
+
+           -- Filter the instances based on whether the constituent names of their
+           -- instance heads are all in scope.
+           let cls_insts' = filter (plausible rdr_env . orphNamesOfClsInst) cls_insts
+               fam_insts' = filter (plausible rdr_env . orphNamesOfFamInst) fam_insts
+           return (Just (thing, fixity, cls_insts', fam_insts'))
   where
-    plausible rdr_env ispec
+    plausible rdr_env names
           -- Dfun involving only names that are in ic_rn_glb_env
         = allInfo
-       || all ok (nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec)
+       || all ok (nameSetToList names)
         where   -- A name is ok if it's in the rdr_env,
                 -- whether qualified or not
           ok n | n == name         = True       -- The one we looked for in the first place!
