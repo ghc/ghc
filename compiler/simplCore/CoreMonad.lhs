@@ -762,7 +762,8 @@ instance Monad CoreM where
     mx >>= f = CoreM $ \s -> do
             (x, s', w1) <- unCoreM mx s
             (y, s'', w2) <- unCoreM (f x) s'
-            return (y, s'', w1 `plusWriter` w2)
+            let w = w1 `plusWriter` w2 -- forcing w before returning avoids a space leak (Trac #7702)
+            return $ seq w (y, s'', w)
 
 instance Applicative CoreM where
     pure = return
