@@ -36,4 +36,5 @@ test('T1133',
      extra_clean(['T1133.o-boot', 'T1133.hi-boot']),
      run_command,
      ['$MAKE --no-print-directory -s T1133'])
+test('T7704', normal, compile, [''])
 test('T7710', normal, compile, [''])
