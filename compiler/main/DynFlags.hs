@@ -164,6 +164,7 @@ import Data.Int
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
@@ -1831,20 +1832,16 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc theWays)))
 
-  {-
-  TODO: This test doesn't quite work: We don't want to give an error
-  when e.g. compiling a C file, only when compiling Haskell files.
-  when doingDynamicToo $
-      unless (isJust (outputFile dflags4) == isJust (dynOutputFile dflags4)) $
+  whenGeneratingDynamicToo dflags3 $
+      unless (isJust (outputFile dflags3) == isJust (dynOutputFile dflags3)) $
           liftIO $ throwGhcExceptionIO $ CmdLineError
               "With -dynamic-too, must give -dyno iff giving -o"
-  -}
 
-  let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
+  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
 
-  liftIO $ setUnsafeGlobalDynFlags dflags5
+  liftIO $ setUnsafeGlobalDynFlags dflags4
 
-  return (dflags5, leftover, consistency_warnings ++ sh_warns ++ warns)
+  return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
