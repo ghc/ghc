@@ -321,6 +321,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
                                               else []
 
         ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls'
+        ; traceTc "tcDeriving 1" (ppr early_specs)
 
         -- for each type, determine the auxliary declarations that are common
         -- to multiple derivations involving that type (e.g. Generic and
@@ -584,8 +585,8 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 -- Typeable is special
         ; if className cls == typeableClassName
           then mkEqnHelp DerivOrigin
-                  (varSetElemsKvsFirst (mkVarSet tvs `extendVarSetList` deriv_tvs))
-                  cls cls_tys (mkTyConApp tc tc_args) Nothing
+                  tvs cls cls_tys
+                  (mkTyConApp tc (kindVarsOnly tc_args)) Nothing
           else do {
 
         -- Given data T a b c = ... deriving( C d ),
@@ -626,6 +627,12 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                   (typeFamilyPapErr tc cls cls_tys inst_ty)
 
         ; mkEqnHelp DerivOrigin (varSetElemsKvsFirst univ_tvs) cls cls_tys inst_ty Nothing } }
+  where
+    kindVarsOnly :: [Type] -> [Type]
+    kindVarsOnly [] = []
+    kindVarsOnly (t:ts) | Just v <- getTyVar_maybe t
+                        , isKindVar v = t : kindVarsOnly ts
+                        | otherwise   =     kindVarsOnly ts
 \end{code}
 
 Note [Deriving, type families, and partial applications]
@@ -682,13 +689,13 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
       = do { dflags <- getDynFlags
            ; case checkOldTypeableConditions (dflags, tycon, tc_args) of
                Just err -> bale_out err
-               Nothing  -> mk_old_typeable_eqn orig tvs cls tycon tc_args mtheta }
+               Nothing  -> mkOldTypeableEqn orig tvs cls tycon tc_args mtheta }
 
       | className cls == typeableClassName
       = do { dflags <- getDynFlags
            ; case checkTypeableConditions (dflags, tycon, tc_args) of
                Just err -> bale_out err
-               Nothing  -> mk_typeable_eqn orig tvs cls tycon tc_args mtheta }
+               Nothing  -> mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta }
 
       | isDataFamilyTyCon tycon
       , length tc_args /= tyConArity tycon
@@ -770,10 +777,12 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
     inst_tys = [mkTyConApp tycon tc_args]
 
 ----------------------
-mk_old_typeable_eqn :: CtOrigin -> [TyVar] -> Class
+mkOldTypeableEqn :: CtOrigin -> [TyVar] -> Class
                     -> TyCon -> [TcType] -> DerivContext
                     -> TcM EarlyDerivSpec
-mk_old_typeable_eqn orig tvs cls tycon tc_args mtheta
+-- The "old" (pre GHC 7.8 polykinded Typeable) deriving Typeable
+-- used a horrid family of classes: Typeable, Typeable1, Typeable2, ... Typeable7
+mkOldTypeableEqn orig tvs cls tycon tc_args mtheta
         -- The Typeable class is special in several ways
         --        data T a b = ... deriving( Typeable )
         -- gives
@@ -788,7 +797,7 @@ mk_old_typeable_eqn orig tvs cls tycon tc_args mtheta
                   (ptext (sLit "Use deriving( Typeable ) on a data type declaration"))
         ; real_cls <- tcLookupClass (oldTypeableClassNames `getNth` tyConArity tycon)
                       -- See Note [Getting base classes]
-        ; mk_old_typeable_eqn orig tvs real_cls tycon [] (Just []) }
+        ; mkOldTypeableEqn orig tvs real_cls tycon [] (Just []) }
 
   | otherwise           -- standalone deriving
   = do  { checkTc (null tc_args)
@@ -802,26 +811,28 @@ mk_old_typeable_eqn orig tvs cls tycon tc_args mtheta
                      , ds_tc = tycon, ds_tc_args = []
                      , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
 
-mk_typeable_eqn :: CtOrigin -> [TyVar] -> Class
-                -> TyCon -> [TcType] -> DerivContext
-                -> TcM EarlyDerivSpec
-mk_typeable_eqn orig tvs cls tycon tc_args mtheta
+mkPolyKindedTypeableEqn :: CtOrigin -> [TyVar] -> Class -> [TcType]
+                        -> TyCon -> [TcType] -> DerivContext
+                        -> TcM EarlyDerivSpec
+mkPolyKindedTypeableEqn orig tvs cls _cls_tys tycon tc_args mtheta
   -- The kind-polymorphic Typeable class is less special; namely, there is no
   -- need to select the class with the right kind anymore, as we only have one.
-  | isNothing mtheta    -- deriving on a data type decl
-  = mk_typeable_eqn orig tvs cls tycon [] (Just [])
-
-  | otherwise -- standalone deriving
-  = do  { checkTc (null tc_args)
+  = do  { checkTc (onlyKindVars tc_args)
                   (ptext (sLit "Derived typeable instance must be of form (Typeable")
                         <+> ppr tycon <> rparen)
         ; dfun_name <- new_dfun_name cls tycon
         ; loc <- getSrcSpanM
         ; return (Right $
-                  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = []
-                     , ds_cls = cls, ds_tys = tyConKind tycon : [mkTyConApp tycon []]
-                     , ds_tc = tycon, ds_tc_args = []
-                     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
+                  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name
+                     , ds_tvs = filter isKindVar tvs, ds_cls = cls
+                     , ds_tys = instKi : [mkTyConApp tycon tc_args]
+                     , ds_tc = tycon, ds_tc_args = tc_args
+                     , ds_theta = mtheta `orElse` []  -- Context is empty for polykinded Typeable
+                     , ds_newtype = False })  }
+  where onlyKindVars     = and . map (isJKVar . tcGetTyVar_maybe)
+        isJKVar (Just v) = isKindVar v
+        isJKVar _        = False
+        instKi           = applyTys (tyConKind tycon) tc_args
 
 ----------------------
 inferConstraints :: Class -> [TcType]
