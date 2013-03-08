@@ -313,14 +313,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
           is_boot <- tcIsHsBoot
         ; traceTc "tcDeriving" (ppr is_boot)
 
-        -- If -XAutoDeriveTypeable is on, add Typeable instances for each
-        -- datatype and class defined in this module
-        ; isAutoDeriveTypeable <- xoptM Opt_AutoDeriveTypeable
-        ; let deriv_decls' = deriv_decls ++ if isAutoDeriveTypeable
-                                              then deriveTypeable tycl_decls
-                                              else []
-
-        ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls'
+        ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
         ; traceTc "tcDeriving 1" (ppr early_specs)
 
         -- for each type, determine the auxliary declarations that are common
@@ -375,12 +368,6 @@ tcDeriving tycl_decls inst_decls deriv_decls
                 (vcat (map pprRepTy (bagToList repFamInsts))))
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
-
-    deriveTypeable :: [LTyClDecl Name] -> [LDerivDecl Name]
-    deriveTypeable tys =
-      [ L l (DerivDecl (L l (HsAppTy (noLoc (HsTyVar typeableClassName))
-                                     (L l (HsTyVar (tcdName t))))))
-      | L l t <- tys, not (isSynDecl t), not (isTypeFamilyDecl t) ]
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst Unbranched -> SDoc
@@ -492,17 +479,38 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
         ; eqns2 <- concatMapM (recoverM (return []) . deriveInstDecl) inst_decls
         ; eqns3 <- mapAndRecoverM deriveStandalone deriv_decls
         ; let eqns = eqns1 ++ eqns2 ++ eqns3
+
+        -- If AutoDeriveTypeable is set, we automatically add Typeable instances
+        -- for every data type and type class declared in the module
+        ; isAutoTypeable <- xoptM Opt_AutoDeriveTypeable
+        ; let eqns4 = if isAutoTypeable then deriveTypeable tycl_decls eqns else []
+        ; eqns4' <- mapAndRecoverM deriveStandalone eqns4
+        ; let eqns' = eqns ++ eqns4'
+
         ; if is_boot then   -- No 'deriving' at all in hs-boot files
-              do { unless (null eqns) (add_deriv_err (head eqns))
+              do { unless (null eqns') (add_deriv_err (head eqns'))
                  ; return [] }
-          else return eqns }
+          else return eqns' }
   where
+    deriveTypeable :: [LTyClDecl Name] -> [EarlyDerivSpec] -> [LDerivDecl Name]
+    deriveTypeable tys dss =
+      [ L l (DerivDecl (L l (HsAppTy (noLoc (HsTyVar typeableClassName))
+                                     (L l (HsTyVar (tcdName t))))))
+      | L l t <- tys
+        -- Don't add Typeable instances for type synonyms and type families
+      , not (isSynDecl t), not (isTypeFamilyDecl t)
+        -- ... nor if the user has already given a deriving clause
+      , not (hasInstance (tcdName t) dss) ]
+
+    -- Check if an automatically generated DS for deriving Typeable should be
+    -- ommitted because the user had manually requested for an instance
+    hasInstance :: Name -> [EarlyDerivSpec] -> Bool
+    hasInstance n = any (\ds -> n == tyConName (either ds_tc ds_tc ds))
+
     add_deriv_err eqn
-       = setSrcSpan loc $
+       = setSrcSpan (either ds_loc ds_loc eqn) $
          addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
                     2 (ptext (sLit "Use an instance declaration instead")))
-       where
-         loc = case eqn of  { Left ds -> ds_loc ds; Right ds -> ds_loc ds }
 
 ------------------------------------------------------------------
 deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
