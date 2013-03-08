@@ -466,7 +466,7 @@ scheduleSContActionRts sc = Exception.catch (atomically $ do
   case stat of
     SContSwitched (BlockedInHaskell (ResumeToken t)) -> writePVar t False
     otherwise -> return ()
-  setSContStatus sc $ SContSwitched Yielded
+  -- setSContStatus sc $ SContSwitched Yielded
   unblock <- getScheduleSContActionSCont sc
   unblock sc) (\e -> do {
                       hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
