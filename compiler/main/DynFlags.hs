@@ -1831,17 +1831,6 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc theWays)))
 
-  -- TODO: This is an ugly hack. Do something better.
-  -- -fPIC affects the CMM code we generate, so if
-  -- we are in -dynamic-too mode we need -fPIC to be on during the
-  -- shared part of the compilation.
-  let doingDynamicToo = gopt Opt_BuildDynamicToo dflags3
-      platform = targetPlatform dflags3
-      dflags4 = if doingDynamicToo
-                then foldr setGeneralFlag' dflags3
-                           (wayGeneralFlags platform WayDyn)
-                else dflags3
-
   {-
   TODO: This test doesn't quite work: We don't want to give an error
   when e.g. compiling a C file, only when compiling Haskell files.
