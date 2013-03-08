@@ -49,9 +49,9 @@ arrive !mpv !finish !ch = do
             w <- takeMVarWithHole mpv hole1
             case w of
                 Nobody 0
-                 -> atomically $do
-                      asyncPutMVar mpv w
-                      asyncPutMVar finish (t, b)
+                  -> do
+                      putMVar mpv w
+                      putMVar finish (t, b)
                 Nobody q -> do
                     putMVar mpv $ Somebody q ch waker
                     ch' <- takeMVarWithHole waker hole2
@@ -63,9 +63,8 @@ arrive !mpv !finish !ch = do
                     poke ch  c''
                     poke ch' c''
                     let !q' = q-1
-                    atomically $ do
-                      asyncPutMVar waker' ch
-                      asyncPutMVar mpv $ Nobody q'
+                    putMVar waker' ch
+                    putMVar mpv $ Nobody q'
                     go (t+1) $ inc ch' b
     go 0 0
 
