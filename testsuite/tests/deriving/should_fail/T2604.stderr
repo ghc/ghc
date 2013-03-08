@@ -1,10 +1,10 @@
 
 T2604.hs:7:35:
-    Can't make a derived instance of ‛Typeable * (DList a)’:
+    Can't make a derived instance of ‛Typeable * DList’:
       You need -XDeriveDataTypeable to derive an instance for this class
     In the data declaration for ‛DList’
 
 T2604.hs:9:38:
-    Can't make a derived instance of ‛Typeable * (NList a)’:
+    Can't make a derived instance of ‛Typeable * NList’:
       You need -XDeriveDataTypeable to derive an instance for this class
     In the newtype declaration for ‛NList’
