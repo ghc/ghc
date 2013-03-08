@@ -50,10 +50,10 @@ arrive !mpv !finish !ch = do
             case w of
                 Nobody 0
                   -> do
-                      putMVar mpv w
-                      putMVar finish (t, b)
+                      atomically $ asyncPutMVar mpv w
+                      atomically $ asyncPutMVar finish (t, b)
                 Nobody q -> do
-                    putMVar mpv $ Somebody q ch waker
+                    atomically $ asyncPutMVar mpv $ Somebody q ch waker
                     ch' <- takeMVarWithHole waker hole2
                     go (t+1) $ inc ch' b
                 Somebody q ch' waker' -> do
@@ -63,8 +63,8 @@ arrive !mpv !finish !ch = do
                     poke ch  c''
                     poke ch' c''
                     let !q' = q-1
-                    putMVar waker' ch
-                    putMVar mpv $ Nobody q'
+                    atomically $ asyncPutMVar waker' ch
+                    atomically $ asyncPutMVar mpv $ Nobody q'
                     go (t+1) $ inc ch' b
     go 0 0
 
@@ -87,7 +87,7 @@ run n cpu cs = do
       putStrLn ""
 
 initSched = do
-  newSched
+  newSchedFastUserLevelWakeup
   n <- getNumCapabilities
   replicateM_ (n-1) newCapability
 
