@@ -529,12 +529,7 @@ data HscStatus
     = HscNotGeneratingCode
     | HscUpToDate
     | HscUpdateBoot
-    | HscRecomp
-          FilePath
-          (Maybe FilePath) -- Has stub files. This is a hack. We can't compile
-                           -- C files here since it's done in DriverPipeline.
-                           -- For now we just return True if we want the caller
-                           -- to compile them for us.
+    | HscRecomp CgGuts ModSummary
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
 
@@ -655,8 +650,7 @@ hscCompileOneShot hsc_env mod_summary src_changed
                            guts <- hscSimplify' guts0
                            (iface, changed, _details, cgguts) <- hscNormalIface' guts mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
-                           (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary
-                           return $ HscRecomp outputFilename mStub
+                           return $ HscRecomp cgguts mod_summary
 
         stable = case src_changed of
                      SourceUnmodifiedAndStable -> True
