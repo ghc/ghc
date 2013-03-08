@@ -260,7 +260,7 @@ import InteractiveEval
 
 import HscMain
 import GhcMake
-import DriverPipeline   ( compile' )
+import DriverPipeline   ( compileOne' )
 import GhcMonad
 import TcRnMonad        ( finalSafeMode )
 import TcRnTypes
@@ -838,11 +838,9 @@ loadModule tcm = do
 
    -- compile doesn't change the session
    hsc_env <- getSession
-   mod_info <- liftIO $ compile' (hscNothingBackendOnly     tcg,
-                                  hscInteractiveBackendOnly tcg,
-                                  hscBatchBackendOnly       tcg)
-                                  hsc_env ms 1 1 Nothing mb_linkable
-                                  source_modified
+   mod_info <- liftIO $ compileOne' (Just tcg) Nothing
+                                    hsc_env ms 1 1 Nothing mb_linkable
+                                    source_modified
 
    modifySession $ \e -> e{ hsc_HPT = addToUFM (hsc_HPT e) mod mod_info }
    return tcm

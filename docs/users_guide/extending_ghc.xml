@@ -90,10 +90,10 @@ data Foo = ...
 <programlisting>
 import GHC
 import GHC.Paths ( libdir )
-import DynFlags ( defaultDynFlags )
+import DynFlags ( defaultLogAction )
  
 main = 
-    defaultErrorHandler defaultDynFlags $ do
+    defaultErrorHandler defaultLogAction $ do
       runGhc (Just libdir) $ do
         dflags &lt;- getSessionDynFlags
         setSessionDynFlags dflags

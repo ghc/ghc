@@ -489,10 +489,6 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
     nat size, i;
 
-#if defined(PROFILING)
-    if (era <= 0) return;
-#endif
-
     size = closure_sizeW(p);
 
     // For LDV profiling, we need to record the closure as dead

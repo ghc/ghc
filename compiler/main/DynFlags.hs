@@ -2728,6 +2728,9 @@ impliedFlags
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
     , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)  -- Ditto polymorphic kinds
 
+    -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
+    , (Opt_AutoDeriveTypeable, turnOn, Opt_DeriveDataTypeable)
+
     -- We turn this on so that we can export associated type
     -- type synonyms in subordinates (e.g. MyClass(type AssocType))
     , (Opt_TypeFamilies,     turnOn, Opt_ExplicitNamespaces)

@@ -60,8 +60,9 @@ data CmmNode e x where
       -- Semantics: clobbers any GlobalRegs for which callerSaves r == True
       -- See Note [foreign calls clobber GlobalRegs]
       --
-      -- Also, there is a current bug for what can be put in
-      -- arguments, see Note [Register Parameter Passing]
+      -- Invariant: the arguments and the ForeignTarget must not
+      -- mention any registers for which CodeGen.Platform.callerSaves
+      -- is True.  See Note [Register Parameter Passing].
 
   CmmBranch :: ULabel -> CmmNode O C
                                    -- Goto another block in the same procedure
