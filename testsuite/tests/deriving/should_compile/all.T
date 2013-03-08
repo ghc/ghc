@@ -38,3 +38,5 @@ test('T1133',
      ['$MAKE --no-print-directory -s T1133'])
 test('T7704', normal, compile, [''])
 test('T7710', normal, compile, [''])
+
+test('AutoDeriveTypeable', normal, compile, [''])
