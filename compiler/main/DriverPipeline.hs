@@ -725,7 +725,17 @@ pipeLoop phase input_fn = do
      -> do liftIO $ debugTraceMsg dflags 4
                                   (ptext (sLit "Running phase") <+> ppr phase)
            (next_phase, output_fn) <- runPhase phase input_fn dflags
-           pipeLoop next_phase output_fn
+           r <- pipeLoop next_phase output_fn
+           case next_phase of
+               HscOut {} ->
+                   whenGeneratingDynamicToo dflags $ do
+                       setDynFlags $ doDynamicToo dflags
+                       -- TODO shouldn't ignore result:
+                       _ <- pipeLoop next_phase output_fn
+                       return ()
+               _ ->
+                   return ()
+           return r
 
 -- -----------------------------------------------------------------------------
 -- In each phase, we need to know into what filename to generate the
@@ -1025,9 +1035,6 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                 do -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
                    liftIO $ touchObjectFile dflags o_file
-                   whenGeneratingDynamicToo dflags $ do
-                       let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags))
-                       liftIO $ touchObjectFile dflags dyn_o_file
                    return (RealPhase next_phase, o_file)
             HscRecomp cgguts mod_summary
               -> do output_fn <- phaseOutputFilename next_phase
@@ -1292,16 +1299,6 @@ runPhase (RealPhase As) input_fn dflags
 
         liftIO $ debugTraceMsg dflags 4 (text "Running the assembler")
         runAssembler input_fn output_fn
-        -- If we're compiling a Haskell module (isHaskellishFile), and
-        -- we're doing -dynamic-too, then we also need to assemble the
-        -- -dyn assembly file.
-        env <- getPipeEnv
-        when (pe_isHaskellishFile env) $ whenGeneratingDynamicToo dflags $ do
-            liftIO $ debugTraceMsg dflags 4
-                         (text "Running the assembler again for -dynamic-too")
-            runAssembler (input_fn ++ "-dyn")
-                         (replaceExtension output_fn (dynObjectSuf dflags))
-
         return (RealPhase next_phase, output_fn)
 
 
@@ -1517,12 +1514,6 @@ runPhase (RealPhase MergeStub) input_fn dflags
          panic "runPhase(MergeStub): no stub"
        Just stub_o -> do
          liftIO $ joinObjectFiles dflags [input_fn, stub_o] output_fn
-         whenGeneratingDynamicToo dflags $ do
-           liftIO $ debugTraceMsg dflags 4
-                        (text "Merging stub again for -dynamic-too")
-           let dyn_input_fn  = replaceExtension input_fn  (dynObjectSuf dflags)
-               dyn_output_fn = replaceExtension output_fn (dynObjectSuf dflags)
-           liftIO $ joinObjectFiles dflags [dyn_input_fn, stub_o] dyn_output_fn
          return (RealPhase StopLn, output_fn)
 
 -- warning suppression
