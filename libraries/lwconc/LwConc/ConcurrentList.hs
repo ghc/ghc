@@ -24,6 +24,7 @@ module LwConc.ConcurrentList
 , newCapability      -- IO ()
 , forkIO             -- IO () -> IO SCont
 , forkOS             -- IO () -> IO SCont
+, forkOn             -- Int -> IO () -> IO SCont
 , yield              -- IO ()
 
 , throwTo            -- Exception e => SCont -> e -> IO ()
@@ -37,7 +38,8 @@ import Data.Dynamic
 
 #define _INL_(x) {-# INLINE x #-}
 
--- The scheduler data structure has one (PVar (Seq SCont)) for every capability.
+-- The scheduler data structure has one (PVar [SCont], PVar [SCont]) for every
+-- capability.
 newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
@@ -69,8 +71,12 @@ scheduleSContAction (Sched pa) sc = do
   cap <- getSContCapability sc
   let (_,backRef) = pa ! cap
   back <- readPVar backRef
-  -- Append the given task to the tail.
+  -- Append the given task to the tail
   writePVar backRef $ sc:back
+  -- let (frontRef,_) = pa ! cap
+  -- front <- readPVar frontRef
+  -- -- Append the given task to the head.
+  -- writePVar frontRef $ sc:front
 
 
 _INL_(newSched)
@@ -124,8 +130,8 @@ newCapability = do
 data SContKind = Bound | Unbound
 
 _INL_(fork)
-fork :: IO () -> SContKind -> IO SCont
-fork task kind = do
+fork :: IO () -> Maybe Int -> SContKind -> IO SCont
+fork task on kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
   -- epilogue: Switch to next thread after completion
@@ -156,7 +162,9 @@ fork task kind = do
     return t
   }
   -- Set SCont Affinity
-  setSContCapability newSC t
+  case on of
+    Nothing -> setSContCapability newSC t
+    Just t' -> setSContCapability newSC t'
   -- Schedule new Scont
   atomically $ do {
     ssa <- getScheduleSContAction;
@@ -166,11 +174,16 @@ fork task kind = do
 
 _INL_(forkIO)
 forkIO :: IO () -> IO SCont
-forkIO task = fork task Unbound
+forkIO task = fork task Nothing Unbound
 
 _INL_(forkOS)
 forkOS :: IO () -> IO SCont
-forkOS task = fork task Bound
+forkOS task = fork task Nothing Bound
+
+_INL_(forkOn)
+forkOn :: Int -> IO () -> IO SCont
+forkOn on task = fork task (Just on) Unbound
+
 
 _INL_(yield)
 yield :: IO ()

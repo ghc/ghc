@@ -19,7 +19,7 @@ import Foreign.Marshal.Array
 import Foreign
 import Text.Printf
 import LwConc.Substrate
-import LwConc.Concurrent
+import LwConc.ConcurrentList
 import LwConc.MVar
 import Control.Monad
 import GHC.Base

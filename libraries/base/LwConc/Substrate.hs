@@ -424,6 +424,7 @@ getYieldControlAction = do
 {-# INLINE yieldControlActionRts #-}
 yieldControlActionRts :: SCont -> IO () -- used by RTS
 yieldControlActionRts sc = Exception.catch (atomically $ do
+  -- mySC is the upcall thread. Set its status to Completed.
   mySC <- getSCont
   setSContSwitchReason mySC Completed
   stat <- getSContStatus sc
