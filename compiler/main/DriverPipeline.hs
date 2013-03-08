@@ -466,7 +466,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
          | HscNothing <- hscTarget dflags = Temporary
          | StopLn <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
-         | Just o_file <- mb_o_file = SpecificFile o_file
+         | isJust mb_o_file = SpecificFile
                 -- -o foo applies to the file we are compiling now
          | otherwise = Persistent
 
@@ -503,8 +503,10 @@ data PipelineOutput
         -- ^ We want a persistent file, i.e. a file in the current directory
         -- derived from the input filename, but with the appropriate extension.
         -- eg. in "ghc -c Foo.hs" the output goes into ./Foo.o.
-  | SpecificFile FilePath
-        -- ^ The output must go into the specified file.
+  | SpecificFile
+        -- ^ The output must go into the specific outputFile in DynFlags.
+        -- We don't store the filename in the constructor as it changes
+        -- when doing -dynamic-too.
     deriving Show
 
 -- | Run a compilation pipeline, consisting of multiple phases.
@@ -583,14 +585,8 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
              debugTraceMsg dflags 4
                  (text "Running the pipeline again for -dynamic-too")
              let dflags' = doDynamicToo dflags
-                 -- TODO: This should use -dyno
-                 output' = case output of
-                           SpecificFile fn -> SpecificFile (replaceExtension fn (objectSuf dflags'))
-                           Persistent -> Persistent
-                           Temporary -> Temporary
-                 env' = env { output_spec = output' }
              hsc_env' <- newHscEnv dflags'
-             _ <- runPipeline' start_phase hsc_env' env' input_fn
+             _ <- runPipeline' start_phase hsc_env' env input_fn
                                maybe_loc maybe_stub_o
              return ()
          return r
@@ -746,10 +742,13 @@ getOutputFilename
   :: Phase -> PipelineOutput -> String
   -> DynFlags -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
 getOutputFilename stop_phase output basename dflags next_phase maybe_location
- | is_last_phase, Persistent <- output     = persistent_fn
- | is_last_phase, SpecificFile f <- output = return f
- | keep_this_output                        = persistent_fn
- | otherwise                               = newTempName dflags suffix
+ | is_last_phase, Persistent   <- output = persistent_fn
+ | is_last_phase, SpecificFile <- output = case outputFile dflags of
+                                           Just f -> return f
+                                           Nothing ->
+                                               panic "SpecificFile: No filename"
+ | keep_this_output                      = persistent_fn
+ | otherwise                             = newTempName dflags suffix
     where
           hcsuf      = hcSuf dflags
           odir       = objectDir dflags
