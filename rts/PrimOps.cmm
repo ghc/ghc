@@ -739,6 +739,8 @@ again: MAYBE_GC(again);
 stg_setSContCapabilityzh ( gcptr scont , W_ target )
 {
 
+again: MAYBE_GC(again);
+
 #if defined (THREADED_RTS)
   ccall setOwningCapability (MyCapability() "ptr", scont, target);
 #endif
@@ -856,7 +858,7 @@ stg_newSContzh ( gcptr closure )
 
   // context switch soon, but not immediately: we don't want every
   // newSCont to force a context-switch.
-  Capability_context_switch(MyCapability()) = 1 :: CInt;
+  // Capability_context_switch(MyCapability()) = 1 :: CInt;
 
   return (threadid);
 }

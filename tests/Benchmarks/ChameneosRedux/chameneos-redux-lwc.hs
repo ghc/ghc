@@ -10,7 +10,7 @@
 
 import LwConc.Substrate
 import LwConc.ConcurrentList
-import LwConc.MVarList
+import LwConc.MVar
 import Control.Monad
 import Data.Char
 import Data.IORef
@@ -50,10 +50,10 @@ arrive !mpv !finish !ch = do
             case w of
                 Nobody 0
                   -> do
-                      atomically $ asyncPutMVar mpv w
-                      atomically $ asyncPutMVar finish (t, b)
+                      putMVar mpv w
+                      putMVar finish (t, b)
                 Nobody q -> do
-                    atomically $ asyncPutMVar mpv $ Somebody q ch waker
+                    putMVar mpv $ Somebody q ch waker
                     ch' <- takeMVarWithHole waker hole2
                     go (t+1) $ inc ch' b
                 Somebody q ch' waker' -> do
@@ -62,9 +62,9 @@ arrive !mpv !finish !ch = do
                     let !c'' = complement c c'
                     poke ch  c''
                     poke ch' c''
+                    putMVar waker' ch
                     let !q' = q-1
-                    atomically $ asyncPutMVar waker' ch
-                    atomically $ asyncPutMVar mpv $ Nobody q'
+                    putMVar mpv $ Nobody q'
                     go (t+1) $ inc ch' b
     go 0 0
 
