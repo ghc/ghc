@@ -71,22 +71,19 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 mkCgIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
 mkCgIdInfo dflags id lf expr
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = CmmLoc expr, 
-               cg_tag = lfDynTag dflags lf }
+             , cg_loc = CmmLoc expr }
 
 litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
 litIdInfo dflags id lf lit
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = CmmLoc (addDynTag dflags (CmmLit lit) tag) 
-             , cg_tag = tag }
+             , cg_loc = CmmLoc (addDynTag dflags (CmmLit lit) tag) }
   where
     tag = lfDynTag dflags lf
 
 lneIdInfo :: DynFlags -> Id -> [NonVoid Id] -> CgIdInfo
 lneIdInfo dflags id regs
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = LneLoc blk_id (map (idToReg dflags) regs)
-             , cg_tag = lfDynTag dflags lf }
+             , cg_loc = LneLoc blk_id (map (idToReg dflags) regs) }
   where
     lf     = mkLFLetNoEscape
     blk_id = mkBlockId (idUnique id)
