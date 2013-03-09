@@ -560,7 +560,8 @@ findAndReadIface doc_str mod hi_boot_file
               dflags <- getDynFlags
               whenGeneratingDynamicToo dflags $ withDoDynamicToo $ do
                   let ref = canGenerateDynamicToo dflags
-                      dynFilePath = replaceExtension filePath (dynHiSuf dflags)
+                      dynFilePath = addBootSuffix_maybe hi_boot_file
+                                  $ replaceExtension filePath (dynHiSuf dflags)
                   r <- read_file dynFilePath
                   case r of
                       Succeeded (dynIface, _)
