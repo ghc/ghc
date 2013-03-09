@@ -100,7 +100,6 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
  $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
- $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too)) \
  $$($1_$2_HC_OPTS) \
  $$(CONF_HC_OPTS_STAGE$4) \
  $$($1_$2_MORE_HC_OPTS) \
@@ -117,6 +116,7 @@ $1_$2_$3_MOST_HC_OPTS = \
 # for a given ($1,$2,$3).
 $1_$2_$3_ALL_HC_OPTS = \
  $$($1_$2_$3_MOST_HC_OPTS) \
+ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too)) \
  -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build \
  -hisuf $$($3_hisuf) -osuf  $$($3_osuf) -hcsuf $$($3_hcsuf)
 
