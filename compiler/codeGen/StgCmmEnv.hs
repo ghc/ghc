@@ -5,31 +5,23 @@
 -- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module StgCmmEnv (
-	CgIdInfo,
+        CgIdInfo,
 
-	cgIdInfoId, cgIdInfoLF,
+        cgIdInfoId, cgIdInfoLF,
 
         litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
-	idInfoToAmode,
+        idInfoToAmode,
 
         NonVoid(..), isVoidId, nonVoidIds,
 
-	addBindC, addBindsC,
+        addBindC, addBindsC,
 
-	bindArgsToRegs, bindToReg, rebindToReg,
-	bindArgToReg, idToReg,
+        bindArgsToRegs, bindToReg, rebindToReg,
+        bindArgToReg, idToReg,
         getArgAmode, getNonVoidArgAmodes,
-	getCgIdInfo, 
-	maybeLetNoEscape, 
+        getCgIdInfo, 
+        maybeLetNoEscape, 
     ) where
 
 #include "HsVersions.h"
@@ -55,7 +47,7 @@ import StgSyn
 import Outputable
 
 -------------------------------------
---	Non-void types
+--        Non-void types
 -------------------------------------
 -- We frequently need the invariant that an Id or a an argument
 -- is of a non-void type. This type is a witness to the invariant.
@@ -73,7 +65,7 @@ nonVoidIds :: [Id] -> [NonVoid Id]
 nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 
 -------------------------------------
---	Manipulating CgIdInfo
+--        Manipulating CgIdInfo
 -------------------------------------
 
 mkCgIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
@@ -86,7 +78,7 @@ litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
 litIdInfo dflags id lf lit
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc (addDynTag dflags (CmmLit lit) tag) 
-	     , cg_tag = tag }
+             , cg_tag = tag }
   where
     tag = lfDynTag dflags lf
 
@@ -114,7 +106,7 @@ idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
 idInfoToAmode (CgIdInfo { cg_loc = CmmLoc e }) = e
 idInfoToAmode cg_info
-  = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))	-- LneLoc
+  = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))        -- LneLoc
 
 addDynTag :: DynFlags -> CmmExpr -> DynTag -> CmmExpr
 -- A tag adds a byte offset to the pointer
@@ -128,12 +120,12 @@ cgIdInfoLF = cg_lf
 
 maybeLetNoEscape :: CgIdInfo -> Maybe (BlockId, [LocalReg])
 maybeLetNoEscape (CgIdInfo { cg_loc = LneLoc blk_id args}) = Just (blk_id, args)
-maybeLetNoEscape _other   				   = Nothing
+maybeLetNoEscape _other                                      = Nothing
 
 
 
 ---------------------------------------------------------
---	The binding environment
+--        The binding environment
 -- 
 -- There are three basic routines, for adding (addBindC), 
 -- modifying(modifyBindC) and looking up (getCgIdInfo) bindings.
@@ -141,53 +133,53 @@ maybeLetNoEscape _other   				   = Nothing
 
 addBindC :: Id -> CgIdInfo -> FCode ()
 addBindC name stuff_to_bind = do
-	binds <- getBinds
-	setBinds $ extendVarEnv binds name stuff_to_bind
+        binds <- getBinds
+        setBinds $ extendVarEnv binds name stuff_to_bind
 
 addBindsC :: [CgIdInfo] -> FCode ()
 addBindsC new_bindings = do
-	binds <- getBinds
-	let new_binds = foldl (\ binds info -> extendVarEnv binds (cg_id info) info)
-			      binds
-			      new_bindings
-	setBinds new_binds
+        binds <- getBinds
+        let new_binds = foldl (\ binds info -> extendVarEnv binds (cg_id info) info)
+                              binds
+                              new_bindings
+        setBinds new_binds
 
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
-  = do	{ 	-- Try local bindings first
-	; local_binds  <- getBinds
-	; case lookupVarEnv local_binds id of {
-	    Just info -> return info ;
-	    Nothing   -> do
+  = do        {         -- Try local bindings first
+        ; local_binds  <- getBinds
+        ; case lookupVarEnv local_binds id of {
+            Just info -> return info ;
+            Nothing   -> do
 
-	{ 	-- Try top-level bindings
-	  static_binds <- getStaticBinds
-	; case lookupVarEnv static_binds id of {
-	    Just info -> return info ;
-	    Nothing   ->
+        {         -- Try top-level bindings
+          static_binds <- getStaticBinds
+        ; case lookupVarEnv static_binds id of {
+            Just info -> return info ;
+            Nothing   ->
 
-		-- Should be imported; make up a CgIdInfo for it
-	let 
-	    name = idName id
-	in
-	if isExternalName name then do
-	    let ext_lbl = CmmLabel (mkClosureLabel name $ idCafInfo id)
+                -- Should be imported; make up a CgIdInfo for it
+        let 
+            name = idName id
+        in
+        if isExternalName name then do
+            let ext_lbl = CmmLabel (mkClosureLabel name $ idCafInfo id)
             dflags <- getDynFlags
-	    return (litIdInfo dflags id (mkLFImported id) ext_lbl)
-	else
-	-- Bug	
-	cgLookupPanic id
-	}}}}
+            return (litIdInfo dflags id (mkLFImported id) ext_lbl)
+        else
+            -- Bug        
+            cgLookupPanic id
+        }}}}
     
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
-  = do	static_binds <- getStaticBinds
-	local_binds <- getBinds
+  = do  static_binds <- getStaticBinds
+        local_binds <- getBinds
         pprPanic "StgCmmEnv: variable not found"
-		(vcat [ppr id,
-		ptext (sLit "static binds for:"),
-		vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
-		ptext (sLit "local binds for:"),
+                (vcat [ppr id,
+                ptext (sLit "static binds for:"),
+                vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
+                ptext (sLit "local binds for:"),
                 vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ]
               ])
 
@@ -205,11 +197,11 @@ getNonVoidArgAmodes [] = return []
 getNonVoidArgAmodes (arg:args)
   | isVoidRep (argPrimRep arg) = getNonVoidArgAmodes args
   | otherwise = do { amode  <- getArgAmode (NonVoid arg)
-	 	   ; amodes <- getNonVoidArgAmodes args
-	 	   ; return ( amode : amodes ) }
+                    ; amodes <- getNonVoidArgAmodes args
+                    ; return ( amode : amodes ) }
 
 ------------------------------------------------------------------------
---	Interface functions for binding and re-binding names
+--        Interface functions for binding and re-binding names
 ------------------------------------------------------------------------
 
 bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
@@ -224,8 +216,8 @@ rebindToReg :: NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so 
 -- get its LF info from the envt
 rebindToReg nvid@(NonVoid id)
-  = do	{ info <- getCgIdInfo id
-	; bindToReg nvid (cgIdInfoLF info) }
+  = do  { info <- getCgIdInfo id
+        ; bindToReg nvid (cgIdInfoLF info) }
 
 bindArgToReg :: NonVoid Id -> FCode LocalReg
 bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
