@@ -9,8 +9,8 @@
    -}
 
 import LwConc.Substrate
-import LwConc.ConcurrentList
-import LwConc.MVar
+import ConcurrentList
+import MVarList
 import Control.Monad
 import Data.Char
 import Data.IORef
