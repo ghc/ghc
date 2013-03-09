@@ -68,8 +68,8 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 --        Manipulating CgIdInfo
 -------------------------------------
 
-mkCgIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
-mkCgIdInfo dflags id lf expr
+mkCgIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
+mkCgIdInfo id lf expr
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc expr }
 
@@ -93,7 +93,7 @@ rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
   = do dflags <- getDynFlags
        reg <- newTemp (gcWord dflags)
-       return (mkCgIdInfo dflags id lf_info (CmmReg (CmmLocal reg)), reg)
+       return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
 mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
 mkRhsInit dflags reg lf_info expr
@@ -206,7 +206,7 @@ bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 bindToReg nvid@(NonVoid id) lf_info
   = do dflags <- getDynFlags
        let reg = idToReg dflags nvid
-       addBindC id (mkCgIdInfo dflags id lf_info (CmmReg (CmmLocal reg)))
+       addBindC id (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
        return reg
 
 rebindToReg :: NonVoid Id -> FCode LocalReg
