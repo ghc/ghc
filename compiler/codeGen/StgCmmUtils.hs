@@ -29,9 +29,9 @@ module StgCmmUtils (
         cmmOffsetW, cmmOffsetB,
         cmmOffsetLitW, cmmOffsetLitB,
         cmmLoadIndexW,
-        cmmConstrTag, cmmConstrTag1,
+        cmmConstrTag1,
 
-        cmmUntag, cmmIsTagged, cmmGetTag,
+        cmmUntag, cmmIsTagged,
 
         addToMem, addToMemE, addToMemLbl,
         mkWordCLit,

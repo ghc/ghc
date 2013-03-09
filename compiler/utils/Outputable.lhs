@@ -825,9 +825,12 @@ intWithCommas :: Integral a => a -> SDoc
 intWithCommas n
   | n < 0     = char '-' <> intWithCommas (-n)
   | q == 0    = int (fromIntegral r)
-  | otherwise = intWithCommas q <> comma <> int (fromIntegral r)
+  | otherwise = intWithCommas q <> comma <> zeroes <> int (fromIntegral r)
   where
     (q,r) = n `quotRem` 1000
+    zeroes | r >= 100  = empty
+           | r >= 10   = char '0'
+           | otherwise = ptext (sLit "00")
 
 -- | Converts an integer to a verbal index:
 --
