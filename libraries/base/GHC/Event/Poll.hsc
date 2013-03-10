@@ -31,7 +31,8 @@ import Control.Monad ((=<<), liftM, liftM2, unless)
 import Data.Bits (Bits, (.|.), (.&.))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
-import Foreign.C.Types (CInt(..), CShort(..), CULong(..))
+import Data.Word
+import Foreign.C.Types (CInt(..), CShort(..))
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
@@ -167,8 +168,8 @@ instance Storable PollFd where
       #{poke struct pollfd, revents} ptr (pfdRevents p)
 
 foreign import ccall safe "poll.h poll"
-    c_poll :: Ptr PollFd -> CULong -> CInt -> IO CInt
+    c_poll :: Ptr PollFd -> (#type nfds_t) -> CInt -> IO CInt
 
 foreign import ccall unsafe "poll.h poll"
-    c_poll_unsafe :: Ptr PollFd -> CULong -> CInt -> IO CInt
+    c_poll_unsafe :: Ptr PollFd -> (#type nfds_t) -> CInt -> IO CInt
 #endif /* defined(HAVE_POLL_H) */
