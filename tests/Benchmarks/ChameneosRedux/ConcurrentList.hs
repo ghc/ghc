@@ -44,7 +44,7 @@ newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> PTM ()
-yieldControlAction (Sched pa) = do
+yieldControlAction !(Sched pa) = do
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
   let !(frontRef, backRef) = pa ! cc
@@ -64,7 +64,7 @@ yieldControlAction (Sched pa) = do
 
 _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
-scheduleSContAction (Sched pa) sc = do
+scheduleSContAction !(Sched pa) !sc = do
   stat <- getSContStatus sc
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
@@ -74,10 +74,10 @@ scheduleSContAction (Sched pa) sc = do
   case stat of
     SContSwitched (BlockedInHaskell _) -> do
       front <- readPVar frontRef
-      writePVar frontRef $ sc:front
+      writePVar frontRef $! sc:front
     _ -> do
       back <- readPVar backRef
-      writePVar backRef $ sc:back
+      writePVar backRef $! sc:back
 
 
 _INL_(newSched)
@@ -94,19 +94,17 @@ newSched = do
   rl <- createPVarList nc []
   let !sched = Sched (listArray (0, nc-1) rl)
   -- Initialize scheduler actions
-  atomically $ do {
-  setYieldControlAction s $ yieldControlAction sched;
-  setScheduleSContAction s $ scheduleSContAction sched
-  }
+  atomically $ do
+    setYieldControlAction s $! yieldControlAction sched
+    setScheduleSContAction s $! scheduleSContAction sched
   -- return scheduler
   return sched
   where
     createPVarList 0 l = return l
-    createPVarList n l = do {
-      frontRef <- newPVarIO [];
-      backRef <- newPVarIO [];
-      createPVarList (n-1) $ (frontRef,backRef):l
-    }
+    createPVarList n l = do
+      frontRef <- newPVarIO []
+      backRef <- newPVarIO []
+      createPVarList (n-1) $! (frontRef,backRef):l
 
 _INL_(newCapability)
 newCapability :: IO ()
@@ -120,19 +118,19 @@ newCapability = do
  }
  -- Create and initialize new task
  s <- newSCont initTask
- atomically $ do {
-   yca <- getYieldControlAction;
-   setYieldControlAction s yca;
-   ssa <- getScheduleSContAction;
+ atomically $ do
+   yca <- getYieldControlAction
+   setYieldControlAction s yca
+   ssa <- getScheduleSContAction
    setScheduleSContAction s ssa
- }
+
  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound
 
 _INL_(fork)
 fork :: IO () -> Maybe Int -> SContKind -> IO SCont
-fork task on kind = do
+fork !task !on kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
   -- epilogue: Switch to next thread after completion
