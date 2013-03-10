@@ -1,9 +1,5 @@
 {-# LANGUAGE GADTs #-}
 
-{-# OPTIONS_GHC -fno-warn-deprecations #-}
--- Warnings from deprecated blockToNodeList
-
-
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.
