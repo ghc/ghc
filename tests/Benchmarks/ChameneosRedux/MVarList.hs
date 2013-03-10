@@ -39,38 +39,40 @@ import GHC.IORef
 
 #define _INL_(x) {-# INLINE x #-}
 
-data Queue a = Queue ![a]
+data Queue a = Queue ![a] ![a]
 
 _INL_(emptyQueue)
 emptyQueue :: Queue a
-emptyQueue = Queue []
+emptyQueue = Queue [] []
 
 _INL_(enque)
 enque :: Queue a -> a -> Queue a
-enque (Queue front) e = Queue $ e:front
+enque (Queue front back) e = Queue front $ e:back
 
 _INL_(deque)
 deque :: Queue a -> (Queue a, Maybe a)
-deque (Queue front) =
+deque (Queue front back) =
   case front of
-    [] -> (emptyQueue, Nothing)
-    x:tl -> (Queue tl, Just x)
+    [] -> (case reverse back of
+            [] -> (emptyQueue, Nothing)
+            x:tl -> (Queue tl [], Just x))
+    x:tl -> (Queue tl back, Just x)
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
-data MVPState a = Full a (Queue (a, PTM()))
+data MVPState a = Full !a (Queue (a, PTM()))
                 | Empty (Queue (IORef a, PTM()))
 
 
 _INL_(newMVar)
 newMVar :: a -> IO (MVar a)
 newMVar x = do
-  ref <- newPVarIO $ Full x emptyQueue
+  ref <- newPVarIO $! Full x emptyQueue
   return $ MVar ref
 
 _INL_(newEmptyMVar)
 newEmptyMVar :: IO (MVar a)
 newEmptyMVar = do
-  ref <- newPVarIO $ Empty emptyQueue
+  ref <- newPVarIO $! Empty emptyQueue
   return $ MVar ref
 
 
@@ -82,45 +84,44 @@ asyncPutMVar (MVar ref) x = do
        Empty ts ->
          case deque ts of
            (_, Nothing) -> do
-             writePVar ref $ Full x emptyQueue
+             writePVar ref $! Full x emptyQueue
            (ts', Just (hole, wakeup)) -> do
-             unsafeIOToPTM $ writeIORef hole x
-             writePVar ref $ Empty ts'
+             unsafeIOToPTM $! writeIORef hole x
+             writePVar ref $! Empty ts'
              wakeup
        Full x' ts -> do
          writePVar ref $ Full x' $ enque ts (x, return ())
 
 
 _INL_(putMVarPTM)
-putMVarPTM :: MVar a -> a -> PTM ()
-putMVarPTM (MVar ref) x = do
+putMVarPTM :: MVar a -> a -> ResumeToken -> PTM ()
+putMVarPTM (MVar ref) x token = do
   st <- readPVar ref
   case st of
        Empty ts -> do
          case deque ts of
            (_, Nothing) -> do
-             writePVar ref $ Full x emptyQueue
+             writePVar ref $! Full x emptyQueue
            (ts', Just (hole, wakeup)) -> do
-             unsafeIOToPTM $ writeIORef hole x
-             writePVar ref $ Empty ts'
+             unsafeIOToPTM $! writeIORef hole x
+             writePVar ref $! Empty ts'
              wakeup
        Full x' ts -> do
          blockAct <- getYieldControlAction
          sc <- getSCont
          unblockAct <- getScheduleSContAction
-         token <- newResumeToken
-         let wakeup = unblockAct sc
-         writePVar ref $ Full x' $ enque ts (x, wakeup)
-         setSContSwitchReason sc $ BlockedInHaskell token
+         let !wakeup = unblockAct sc
+         writePVar ref $! Full x' $! enque ts (x, wakeup)
+         setSContSwitchReason sc $! BlockedInHaskell token
          blockAct
 
 _INL_(putMVar)
-putMVar :: MVar a -> a -> IO ()
-putMVar mv x = atomically $ putMVarPTM mv x
+putMVar :: MVar a -> a -> ResumeToken -> IO ()
+putMVar mv x token = atomically $ putMVarPTM mv x token
 
 _INL_(takeMVarWithHole)
-takeMVarWithHole :: MVar a -> IORef a -> IO a
-takeMVarWithHole (MVar ref) hole = do
+takeMVarWithHole :: MVar a -> IORef a -> ResumeToken -> IO a
+takeMVarWithHole (MVar ref) hole token = do
   atomically $ do
     st <- readPVar ref
     case st of
@@ -128,24 +129,23 @@ takeMVarWithHole (MVar ref) hole = do
         blockAct <- getYieldControlAction
         sc <- getSCont
         unblockAct <- getScheduleSContAction
-        token <- newResumeToken
-        let wakeup = unblockAct sc
-        writePVar ref $ Empty $ enque ts (hole, wakeup)
-        setSContSwitchReason sc $ BlockedInHaskell token
+        let !wakeup = unblockAct sc
+        writePVar ref $! Empty $! enque ts (hole, wakeup)
+        setSContSwitchReason sc $! BlockedInHaskell token
         blockAct
       Full x ts -> do
         case deque ts of
           (_, Nothing) -> do
-            writePVar ref $ Empty emptyQueue
-            unsafeIOToPTM $ writeIORef hole x
+            writePVar ref $! Empty emptyQueue
+            unsafeIOToPTM $! writeIORef hole x
           (ts', Just (x', wakeup)) -> do
-            writePVar ref $ Full x' ts'
-            unsafeIOToPTM $ writeIORef hole x
+            writePVar ref $! Full x' ts'
+            unsafeIOToPTM $! writeIORef hole x
             wakeup
   readIORef hole
 
 _INL_(takeMVar)
-takeMVar :: MVar a -> IO a
-takeMVar m = do
+takeMVar :: MVar a -> ResumeToken -> IO a
+takeMVar m token = do
   hole <- newIORef undefined
-  takeMVarWithHole m hole
+  takeMVarWithHole m hole token

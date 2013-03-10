@@ -41,20 +41,21 @@ data MP = Nobody !Int | Somebody !Int !Chameneous !(MVar Chameneous)
 
 arrive :: MVar MP -> MVar (Int, Int) -> Chameneous -> IO ()
 arrive !mpv !finish !ch = do
-    waker <- newEmptyMVar
-    hole1 <- newIORef undefined
-    hole2 <- newIORef undefined
+    !waker <- newEmptyMVar
+    !hole1 <- newIORef undefined
+    !hole2 <- newIORef undefined
+    !tk <- atomically $ newResumeToken
     let inc x = (fromEnum (ch == x) +)
         go !t !b = do
-            w <- takeMVarWithHole mpv hole1
+            w <- takeMVarWithHole mpv hole1 tk
             case w of
                 Nobody 0
                   -> do
-                      putMVar mpv w
-                      putMVar finish (t, b)
+                      putMVar mpv w tk
+                      putMVar finish (t, b) tk
                 Nobody q -> do
-                    putMVar mpv $ Somebody q ch waker
-                    ch' <- takeMVarWithHole waker hole2
+                    putMVar mpv (Somebody q ch waker) tk
+                    ch' <- takeMVarWithHole waker hole2 tk
                     go (t+1) $ inc ch' b
                 Somebody q ch' waker' -> do
                     c  <- peek ch
@@ -62,9 +63,9 @@ arrive !mpv !finish !ch = do
                     let !c'' = complement c c'
                     poke ch  c''
                     poke ch' c''
-                    putMVar waker' ch
                     let !q' = q-1
-                    putMVar mpv $ Nobody q'
+                    putMVar waker' ch tk
+                    putMVar mpv (Nobody q') tk
                     go (t+1) $ inc ch' b
     go 0 0
 
@@ -77,17 +78,18 @@ run n cpu cs = do
   fs    <- replicateM (length cs) newEmptyMVar
   mpv   <- newMVar (Nobody n)
   hole <- newIORef undefined
+  tk <- atomically $ newResumeToken
   withArrayLen cs $ \ n cols -> do
     zipWithM_ ((forkOn cpu .) . arrive mpv) fs (take n (iterate (`advancePtr` 1) cols))
     return $ do
       putStrLn . map toLower . unwords . ([]:) . map show $ cs
-      ns    <- mapM (\m -> takeMVarWithHole m hole) fs
+      ns    <- mapM (\m -> takeMVarWithHole m hole tk) fs
       putStr . map toLower . unlines $ [unwords [show n, showN b] | (n, b) <- ns]
       putStrLn . (" "++) . showN . sum . map fst $ ns
       putStrLn ""
 
 initSched = do
-  newSchedFastUserLevelWakeup
+  newSched
   n <- getNumCapabilities
   replicateM_ (n-1) newCapability
 

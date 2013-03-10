@@ -21,7 +21,6 @@ module ConcurrentList
 , SCont
 
 , newSched           -- IO (Sched)
-, newSchedFastUserLevelWakeup -- IO (Sched)
 , newCapability      -- IO ()
 , forkIO             -- IO () -> IO SCont
 , forkOS             -- IO () -> IO SCont
@@ -48,7 +47,7 @@ yieldControlAction :: Sched -> PTM ()
 yieldControlAction (Sched pa) = do
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
-  let (frontRef, backRef) = pa ! cc
+  let !(frontRef, backRef) = pa ! cc
   front <- readPVar frontRef
   case front of
     [] -> do
@@ -64,14 +63,14 @@ yieldControlAction (Sched pa) = do
       switchTo x
 
 _INL_(scheduleSContAction)
-scheduleSContAction :: Sched -> Bool -> SCont -> PTM ()
-scheduleSContAction (Sched pa) fastWakeup sc = do
+scheduleSContAction :: Sched -> SCont -> PTM ()
+scheduleSContAction (Sched pa) sc = do
   stat <- getSContStatus sc
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
   cap <- getSContCapability sc
-  let (frontRef,backRef) = pa ! cap
+  let !(frontRef,backRef) = pa ! cap
   case stat of
     SContSwitched (BlockedInHaskell _) -> do
       front <- readPVar frontRef
@@ -81,9 +80,9 @@ scheduleSContAction (Sched pa) fastWakeup sc = do
       writePVar backRef $ sc:back
 
 
-_INL_(newSchedInternal)
-newSchedInternal :: Bool -> IO (Sched)
-newSchedInternal kind = do
+_INL_(newSched)
+newSched:: IO (Sched)
+newSched = do
   -- This token will be used to spawn in a round-robin fashion on different
   -- capabilities.
   token <- newPVarIO (0::Int)
@@ -93,11 +92,11 @@ newSchedInternal kind = do
   -- Create the scheduler data structure
   nc <- getNumCapabilities
   rl <- createPVarList nc []
-  let sched = Sched (listArray (0, nc-1) rl)
+  let !sched = Sched (listArray (0, nc-1) rl)
   -- Initialize scheduler actions
   atomically $ do {
   setYieldControlAction s $ yieldControlAction sched;
-  setScheduleSContAction s $ scheduleSContAction sched kind
+  setScheduleSContAction s $ scheduleSContAction sched
   }
   -- return scheduler
   return sched
@@ -109,21 +108,11 @@ newSchedInternal kind = do
       createPVarList (n-1) $ (frontRef,backRef):l
     }
 
-_INL_(newSched)
-newSched :: IO (Sched)
-newSched = do
-  newSchedInternal False
-
-_INL_(newSchedFastUserLevelWakeup)
-newSchedFastUserLevelWakeup :: IO (Sched)
-newSchedFastUserLevelWakeup = do
-  newSchedInternal True
-
 _INL_(newCapability)
 newCapability :: IO ()
 newCapability = do
  -- Initial task body
- let initTask = atomically $ do {
+ let !initTask = atomically $ do {
   s <- getSCont;
   yca <- getYieldControlAction;
   setSContSwitchReason s Completed;
@@ -147,13 +136,13 @@ fork task on kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
   -- epilogue: Switch to next thread after completion
-  let epilogue = atomically $ do {
+  let !epilogue = atomically $ do {
     sc <- getSCont;
     setSContSwitchReason sc Completed;
     switchToNext <- getYieldControlAction;
     switchToNext
   }
-  let makeSCont = case kind of
+  let !makeSCont = case kind of
                     Bound -> newBoundSCont
                     Unbound -> newSCont
   newSC <- makeSCont (task >> epilogue)
@@ -203,7 +192,7 @@ yield = atomically $ do
   s <- getSCont
   -- Append current SCont to scheduler
   ssa <- getScheduleSContAction
-  let append = ssa s
+  let !append = ssa s
   append
   -- Switch to next SCont from Scheduler
   switchToNext <- getYieldControlAction
