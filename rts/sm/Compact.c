@@ -917,11 +917,13 @@ compact(StgClosure *static_objects)
     markScheduler((evac_fn)thread_root, NULL);
 
     // the weak pointer lists...
-    if (weak_ptr_list != NULL) {
-	thread((void *)&weak_ptr_list);
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        if (generations[g].weak_ptr_list != NULL)
+            thread((void *)&generations[g].weak_ptr_list);
     }
-    if (old_weak_ptr_list != NULL) {
-	thread((void *)&old_weak_ptr_list); // tmp
+
+    if (dead_weak_ptr_list != NULL) {
+	thread((void *)&dead_weak_ptr_list); // tmp
     }
 
     // mutable lists

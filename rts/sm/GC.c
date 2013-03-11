@@ -699,7 +699,7 @@ GarbageCollect (nat collect_gen,
   // Start any pending finalizers.  Must be after
   // updateStableTables() and stableUnlock() (see #4221).
   RELEASE_SM_LOCK;
-  scheduleFinalizers(cap, old_weak_ptr_list);
+  scheduleFinalizers(cap, dead_weak_ptr_list);
   ACQUIRE_SM_LOCK;
 
   // check sanity after GC

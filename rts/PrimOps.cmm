@@ -380,8 +380,8 @@ stg_mkWeakzh ( gcptr key,
   StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
 
   ACQUIRE_LOCK(sm_mutex);
-  StgWeak_link(w)       = W_[weak_ptr_list];
-  W_[weak_ptr_list]     = w;
+  StgWeak_link(w) = generation_weak_ptr_list(W_[g0]);
+  generation_weak_ptr_list(W_[g0]) = w;
   RELEASE_LOCK(sm_mutex);
 
   IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));

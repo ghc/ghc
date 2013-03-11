@@ -346,6 +346,7 @@ wanteds = concat
 
           ,structSize C  "generation"
           ,structField C "generation" "n_new_large_words"
+          ,structField C "generation" "weak_ptr_list"
 
           ,structSize Both   "CostCentreStack"
           ,structField C     "CostCentreStack" "ccsID"

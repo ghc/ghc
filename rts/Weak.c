@@ -16,8 +16,6 @@
 #include "Prelude.h"
 #include "Trace.h"
 
-StgWeak *weak_ptr_list;
-
 void
 runCFinalizers(StgCFinalizerList *list)
 {

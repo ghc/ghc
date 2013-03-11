@@ -93,6 +93,8 @@ initGeneration (generation *gen, int g)
 #endif
     gen->threads = END_TSO_QUEUE;
     gen->old_threads = END_TSO_QUEUE;
+    gen->weak_ptr_list = NULL;
+    gen->old_weak_ptr_list = NULL;
 }
 
 void
@@ -169,7 +171,6 @@ initStorage (void)
 
   generations[0].max_blocks = 0;
 
-  weak_ptr_list = NULL;
   caf_list = END_OF_STATIC_LIST;
   revertible_caf_list = END_OF_STATIC_LIST;
    
