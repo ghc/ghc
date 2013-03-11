@@ -18,13 +18,12 @@ import FastString
 import MonadUtils       ( liftIO )
 import SrcLoc
 
--- Every GHC comes with Cabal anyways, so this is not a bad new dependency
 import Distribution.Simple.GHC ( componentGhcOptions )
 import Distribution.Simple.Configure ( getPersistBuildConfig )
 import Distribution.Simple.Compiler ( compilerVersion )
 import Distribution.Simple.Program.GHC ( renderGhcOptions )
 import Distribution.PackageDescription ( library, libBuildInfo )
-import Distribution.Simple.LocalBuildInfo ( localPkgDescr, buildDir, libraryConfig, compiler )
+import Distribution.Simple.LocalBuildInfo
 import qualified Distribution.Verbosity as V
 
 import Control.Monad hiding (mapM)
@@ -183,7 +182,11 @@ flagsFromCabal :: FilePath -> IO [String]
 flagsFromCabal distPref = do
   lbi <- getPersistBuildConfig distPref
   let pd = localPkgDescr lbi
-  case (library pd, libraryConfig lbi) of
+      findLibraryConfig []                         = Nothing
+      findLibraryConfig ((CLibName, clbi, _) :  _) = Just clbi
+      findLibraryConfig (_                   : xs) = findLibraryConfig xs
+      mLibraryConfig = findLibraryConfig (componentsConfigs lbi)
+  case (library pd, mLibraryConfig) of
     (Just lib, Just clbi) ->
       let bi = libBuildInfo lib
           odir = buildDir lbi

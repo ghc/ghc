@@ -218,18 +218,15 @@ doRegister ghc ghcpkg topdir directory distDir
             let Just ghcPkgProg = lookupProgram ghcPkgProgram' progs'
             instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
-            let mlc = libraryConfig lbi
-                mlc' = case mlc of
-                       Just lc ->
-                           let cipds = componentPackageDeps lc
-                               cipds' = [ (fixupPackageId instInfos ipid, pid)
-                                        | (ipid,pid) <- cipds ]
-                           in Just $ lc {
-                                         componentPackageDeps = cipds'
-                                     }
-                       Nothing -> Nothing
+            let updateComponentConfig (cn, clbi, deps)
+                    = (cn, updateComponentLocalBuildInfo clbi, deps)
+                updateComponentLocalBuildInfo (ComponentLocalBuildInfo cpds)
+                    = ComponentLocalBuildInfo
+                          [ (fixupPackageId instInfos ipid, pid)
+                          | (ipid,pid) <- cpds ]
+                ccs' = map updateComponentConfig (componentsConfigs lbi)
                 lbi' = lbi {
-                               libraryConfig = mlc',
+                               componentsConfigs = ccs',
                                installedPkgs = installedPkgs',
                                installDirTemplates = idts,
                                withPrograms = progs'
@@ -309,8 +306,13 @@ generate config_args distdir directory
       -- generate Paths_<pkg>.hs and cabal-macros.h
       writeAutogenFiles verbosity pd lbi
 
+      let findLibraryConfig []                         = Nothing
+          findLibraryConfig ((CLibName, clbi, _) :  _) = Just clbi
+          findLibraryConfig (_                   : xs) = findLibraryConfig xs
+          mLibraryConfig = findLibraryConfig (componentsConfigs lbi)
+
       -- generate inplace-pkg-config
-      case (library pd, libraryConfig lbi) of
+      case (library pd, mLibraryConfig) of
           (Nothing, Nothing) -> return ()
           (Just lib, Just clbi) -> do
               cwd <- getCurrentDirectory
@@ -323,7 +325,12 @@ generate config_args distdir directory
                               }
                   content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
               writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
-          _ -> error "Inconsistent lib components; can't happen?"
+          (Just _, Nothing) ->
+              -- There is a library, but we aren't building it
+              -- Happens e.g. with haddock, which has both a library
+              -- and executable in its .cabal file.
+              return ()
+          (Nothing, Just _) -> die ["Library local build info, but no library in package description"]
 
       let
           libBiModules lib = (libBuildInfo lib, libModules lib)
