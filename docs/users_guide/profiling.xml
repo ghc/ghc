@@ -357,7 +357,13 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
       cost centre <literal>M.CAF</literal>, where <literal>M</literal>
       is the name of the module.  It is also possible to give each CAF
       a different stack, using the option
-      <option>-fprof-cafs</option><indexterm><primary><option>-fprof-cafs</option></primary></indexterm>.</para>
+      <option>-fprof-cafs</option><indexterm><primary><option>-fprof-cafs</option></primary></indexterm>.
+      This is especially useful when compiling with
+      <option>-ffull-laziness</option> (as is default with
+      <option>-O</option> and higher), as constants in function bodies
+      will be lifted to the top-level and become CAFs.  You will probably
+      need to consult the Core (<option>-ddump-simpl</option>) in order
+      to determine what these CAFs correspond to.</para>
     </sect2>
   </sect1>
 
