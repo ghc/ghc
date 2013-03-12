@@ -27,13 +27,11 @@ $1_$2_$3_LIB_NAME = libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_NAME)
 $$($1_PACKAGE)-$$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
-ifeq "$3" "dyn"
 ifeq "$$(HostOS_CPP)" "mingw32"
 ifneq "$$($1_$2_dll0_HS_OBJS)" ""
 $1_$2_$3_LIB0_ROOT = HS$$($1_PACKAGE)-$$($1_$2_VERSION)-0$$($3_libsuf)
 $1_$2_$3_LIB0_NAME = lib$$($1_$2_$3_LIB0_ROOT)
 $1_$2_$3_LIB0 = $1/$2/build/$$($1_$2_$3_LIB0_NAME)
-endif
 endif
 endif
 
@@ -63,12 +61,19 @@ ifeq "$3" "dyn"
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 ifneq "$$($1_$2_$3_LIB0)" ""
-	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
 	$$(call build-dll,$1,$2,$3,-L$1/$2/build -l$$($1_$2_$3_LIB0_ROOT),$$(filter-out $$($1_$2_dll0_HS_OBJS),$$($1_$2_$3_HS_OBJS)) $$($1_$2_$3_NON_HS_OBJS),$$@)
 else
 	$$(call build-dll,$1,$2,$3,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
 endif
+
+ifneq "$$($1_$2_$3_LIB0)" ""
+$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
+$$($1_$2_$3_LIB0) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
+	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
+endif
+
 else
+
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
@@ -92,6 +97,15 @@ else
 	"$$(XARGS)" $$(XARGS_OPTS) "$$($1_$2_AR)" $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@ < $$@.contents
 endif
 	$$(call removeFiles,$$@.contents)
+
+ifeq "$$(HostOS_CPP)" "mingw32"
+ifneq "$$($1_$2_$3_LIB0)" ""
+$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
+$$($1_$2_$3_LIB0) :
+	$$(call cmd,$1_$2_AR) $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@
+endif
+endif
+
 endif
 
 $(call all-target,$1_$2,all_$1_$2_$3)

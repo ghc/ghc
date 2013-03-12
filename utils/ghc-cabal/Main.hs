@@ -6,6 +6,7 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
 import Distribution.PackageDescription.Parse
+import Distribution.System
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
@@ -280,6 +281,25 @@ fixupPackageId ipinfos (InstalledPackageId ipi)
            f [] = error ("Installed package ID not registered: " ++ show ipi)
        in f ipinfos
 
+-- On Windows we need to split the ghc package into 2 pieces, or the
+-- DLL that it makes contains too many symbols (#5987). There are
+-- therefore 2 libraries, not just the 1 that Cabal assumes.
+mangleLbi :: FilePath -> FilePath -> LocalBuildInfo -> LocalBuildInfo
+mangleLbi "compiler" "stage2" lbi
+ | isWindows =
+    let ccs' = [ (cn, updateComponentLocalBuildInfo clbi, cns)
+               | (cn, clbi, cns) <- componentsConfigs lbi ]
+        updateComponentLocalBuildInfo clbi@(LibComponentLocalBuildInfo {})
+            = let cls' = concat [ [ LibraryName n, LibraryName (n ++ "-0") ]
+                                | LibraryName n <- componentLibraries clbi ]
+              in clbi { componentLibraries = cls' }
+        updateComponentLocalBuildInfo clbi = clbi
+    in lbi { componentsConfigs = ccs' }
+    where isWindows = case hostPlatform lbi of
+                      Platform _ Windows -> True
+                      _                  -> False
+mangleLbi _ _ lbi = lbi
+
 generate :: [String] -> FilePath -> FilePath -> IO ()
 generate config_args distdir directory
  = withCurrentDirectory directory
@@ -290,8 +310,11 @@ generate config_args distdir directory
       withArgs (["configure", "--distdir", distdir] ++ config_args)
                runDefaultMain
 
-      lbi <- getPersistBuildConfig distdir
-      let pd0 = localPkgDescr lbi
+      lbi0 <- getPersistBuildConfig distdir
+      let lbi = mangleLbi directory distdir lbi0
+          pd0 = localPkgDescr lbi
+
+      writePersistBuildConfig distdir lbi
 
       hooked_bi <-
            if (buildType pd0 == Just Configure) || (buildType pd0 == Just Custom)

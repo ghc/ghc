@@ -887,9 +887,6 @@ install_packages: rts/package.conf.install
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
 	$(foreach p, $(INSTALL_DYNLIBS), \
 	    $(call installLibsTo, $(wildcard libraries/$p/dist-install/build/*.so libraries/$p/dist-install/build/*.dll libraries/$p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$p-$(libraries/$p_dist-install_VERSION)"))
-ifneq "$(compiler_stage2_dyn_LIB0)" ""
-	$(call installLibsTo, $(compiler_stage2_dyn_LIB0), "$(DESTDIR)$(topdir)/ghc-$(compiler_stage2_VERSION)")
-endif
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \
