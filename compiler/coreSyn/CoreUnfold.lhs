@@ -401,8 +401,10 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                       -- on nullary constructors
                     | otherwise       = size_up_call f [] 0
 
-    size_up (App fun arg) = size_up arg  `addSizeNSD`
-                            size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
+    size_up (App fun arg)
+      | isTyCoArg arg = size_up fun
+      | otherwise     = size_up arg  `addSizeNSD`
+                        size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
 
     size_up (Lam b e)
       | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)
