@@ -295,14 +295,6 @@ endif
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=ghci
 
-ifeq "$(BuildSharedLibs)" "YES"
-# There are too many symbols to make a Windows DLL for the ghc package,
-# so we don't build it the dyn way; see trac #5987
-ifneq "$(TargetOS_CPP)" "mingw32"
-compiler_stage2_CONFIGURE_OPTS += --enable-shared
-endif
-endif
-
 ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?
@@ -403,13 +395,15 @@ compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
 
-ifeq "$(TargetOS_CPP)" "mingw32"
-# There are too many symbols to make a Windows DLL for the ghc package,
-# so we don't build it the dyn way; see trac #5987
-compiler_stage1_EXCLUDED_WAYS := dyn
-compiler_stage2_EXCLUDED_WAYS := dyn
-compiler_stage3_EXCLUDED_WAYS := dyn
-endif
+# There are too many symbols in the ghc package for a Windows DLL.
+# We therefore need to split some of the modules off into a separate
+# DLL. This clump is at the bottom of the package:
+compiler_stage2_dll0_MODULES = DynFlags FastString DriverPhases PrelNames Panic Config Unique Name RdrName Outputable OccName Pretty BufWrite Encoding UniqFM UniqSet Binary FastMutInt Util BasicTypes Module FiniteMap StaticFlags SrcLoc NameSet CmdLineParser Bag MonadUtils Constants ErrUtils Maybes Exception
+# Then some modules higher up the tree:
+compiler_stage2_dll0_MODULES += TypeRep Type Var IdInfo Demand CoreSyn Coercion Literal DataCon CostCentre TysPrim VarEnv ListSetOps TyCon TysWiredIn Unify CoAxiom Kind VarSet ForeignCall Pair MkId CoreUtils PprCore PrimOp Id CoreFVs TcType FamInstEnv OccurAnal Digraph InstEnv Class PrelRules CoreSubst CoreUnfold MkCore HscTypes CoreArity PackageConfig IfaceSyn HsImpExp ByteCodeAsm Annotations Serialized ByteCodeItbls SMRep HsDoc StgCmmLayout ByteCodeInstr StgCmmEnv MkGraph StgCmmMonad CLabel CmmType PprCmmExpr OrdList CmmMachOp CmmExpr CmmNode CodeGen.Platform CodeGen.Platform.Arm CodeGen.Platform.NoRegs CodeGen.Platform.X86 CodeGen.Platform.X86_64 CodeGen.Platform.SPARC CodeGen.Platform.PPC CodeGen.Platform.PPC_Darwin Platform Reg StgCmmClosure CmmUtils StgCmmUtils StgSyn Cmm Hoopl.Dataflow CmmCallConv Packages RegClass UniqSupply CmmInfo StgCmmTicky StgCmmProf IfaceType NameEnv Avail OptCoercion Bitmap Stream
+
+compiler_stage2_dll0_HS_OBJS = \
+    $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))
 
 # if stage is set to something other than "1" or "", disable stage 1
 ifneq "$(filter-out 1,$(stage))" ""
