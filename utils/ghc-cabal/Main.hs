@@ -220,10 +220,12 @@ doRegister ghc ghcpkg topdir directory distDir
             let installedPkgs' = PackageIndex.fromList instInfos
             let updateComponentConfig (cn, clbi, deps)
                     = (cn, updateComponentLocalBuildInfo clbi, deps)
-                updateComponentLocalBuildInfo (ComponentLocalBuildInfo cpds)
-                    = ComponentLocalBuildInfo
-                          [ (fixupPackageId instInfos ipid, pid)
-                          | (ipid,pid) <- cpds ]
+                updateComponentLocalBuildInfo clbi
+                    = clbi {
+                          componentPackageDeps =
+                              [ (fixupPackageId instInfos ipid, pid)
+                              | (ipid,pid) <- componentPackageDeps clbi ]
+                      }
                 ccs' = map updateComponentConfig (componentsConfigs lbi)
                 lbi' = lbi {
                                componentsConfigs = ccs',
@@ -306,31 +308,18 @@ generate config_args distdir directory
       -- generate Paths_<pkg>.hs and cabal-macros.h
       writeAutogenFiles verbosity pd lbi
 
-      let findLibraryConfig []                         = Nothing
-          findLibraryConfig ((CLibName, clbi, _) :  _) = Just clbi
-          findLibraryConfig (_                   : xs) = findLibraryConfig xs
-          mLibraryConfig = findLibraryConfig (componentsConfigs lbi)
-
       -- generate inplace-pkg-config
-      case (library pd, mLibraryConfig) of
-          (Nothing, Nothing) -> return ()
-          (Just lib, Just clbi) -> do
-              cwd <- getCurrentDirectory
-              let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
-              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
-                                         pd lib lbi clbi
-                  final_ipi = installedPkgInfo {
-                                  Installed.installedPackageId = ipid,
-                                  Installed.haddockHTMLs = []
-                              }
-                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
-              writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
-          (Just _, Nothing) ->
-              -- There is a library, but we aren't building it
-              -- Happens e.g. with haddock, which has both a library
-              -- and executable in its .cabal file.
-              return ()
-          (Nothing, Just _) -> die ["Library local build info, but no library in package description"]
+      withLibLBI pd lbi $ \lib clbi ->
+          do cwd <- getCurrentDirectory
+             let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
+             let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
+                                        pd lib lbi clbi
+                 final_ipi = installedPkgInfo {
+                                 Installed.installedPackageId = ipid,
+                                 Installed.haddockHTMLs = []
+                             }
+                 content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
+             writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
 
       let
           libBiModules lib = (libBuildInfo lib, libModules lib)
