@@ -3344,6 +3344,8 @@ compilerInfo dflags
        ("RTS ways",                    cGhcRTSWays),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
+       ("GHC Dynamic",                 if cDYNAMIC_GHC_PROGRAMS
+                                       then "YES" else "NO"),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),

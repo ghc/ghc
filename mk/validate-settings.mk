@@ -37,8 +37,8 @@ GhcStage2HcOpts += -O -dcore-lint
 GhcLibHcOpts    += -O -dcore-lint
 
 # We define DefaultFastGhcLibWays in this style so that the value is
-# correct even if the user alters DYNAMIC_BY_DEFAULT
-DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),dyn,v)
+# correct even if the user alters DYNAMIC_GHC_PROGRAMS
+DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),dyn,v)
 DefaultProfGhcLibWays = $(if $(filter $(GhcProfiled),YES),p,)
 
 ifeq "$(ValidateSpeed)" "FAST"

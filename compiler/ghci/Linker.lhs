@@ -414,14 +414,14 @@ preloadLib dflags lib_paths framework_paths lib_spec
     preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if dYNAMIC_BY_DEFAULT dflags
+                     else do if cDYNAMIC_GHC_PROGRAMS
                                  then dynLoadObjs dflags [name]
                                  else loadObj name
                              return True
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if dYNAMIC_BY_DEFAULT dflags
+                     else do if cDYNAMIC_GHC_PROGRAMS
                                  then panic "Loading archives not supported"
                                  else loadArchive name
                              return True
@@ -485,9 +485,8 @@ dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mk
 checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
 checkNonStdWay dflags srcspan = do
   let tag = buildTag dflags
-      dynamicByDefault = dYNAMIC_BY_DEFAULT dflags
-  if (null tag && not dynamicByDefault) ||
-     (tag == "dyn" && dynamicByDefault)
+  if (null tag && not cDYNAMIC_GHC_PROGRAMS) ||
+     (tag == "dyn" && cDYNAMIC_GHC_PROGRAMS)
       then return False
     -- see #3604: object files compiled for way "dyn" need to link to the
     -- dynamic packages, so we can't load them into a statically-linked GHCi.
@@ -638,10 +637,9 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                 let file_base = reverse (drop (length osuf + 1) (reverse file))
                     dyn_file = file_base <.> "dyn_o"
                     new_file = file_base <.> normalObjectSuffix
-                -- Note that even if dYNAMIC_BY_DEFAULT is on, we might
-                -- still have dynamic object files called .o, so we need
-                -- to try both filenames.
-                use_dyn <- if dYNAMIC_BY_DEFAULT dflags
+                -- When looking for dynamic object files, we try both
+                -- .dyn_o and .o, with a preference for the former.
+                use_dyn <- if cDYNAMIC_GHC_PROGRAMS
                            then do doesFileExist dyn_file
                            else return False
                 if use_dyn
@@ -790,7 +788,7 @@ dynLinkObjs dflags pls objs = do
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
-        if dYNAMIC_BY_DEFAULT dflags
+        if cDYNAMIC_GHC_PROGRAMS
             then do dynLoadObjs dflags wanted_objs
                     return (pls, Succeeded)
             else do mapM_ loadObj wanted_objs
@@ -1185,7 +1183,7 @@ locateLib dflags is_hs dirs lib
     --
   = findDll `orElse` findArchive `orElse` tryGcc `orElse` assumeDll
 
-  | not isDynamicGhcLib
+  | not cDYNAMIC_GHC_PROGRAMS
     -- When the GHC package was not compiled as dynamic library
     -- (=DYNAMIC not set), we search for .o libraries or, if they
     -- don't exist, .a libraries.
@@ -1194,13 +1192,11 @@ locateLib dflags is_hs dirs lib
   | otherwise
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
-  = findHSDll `orElse` findDynObject `orElse` findDynArchive `orElse`
-                       findObject    `orElse` findArchive `orElse` assumeDll
+  = findHSDll `orElse` findDynObject `orElse` assumeDll
    where
      mk_obj_path      dir = dir </> (lib <.> "o")
      mk_dyn_obj_path  dir = dir </> (lib <.> "dyn_o")
      mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
-     mk_dyn_arch_path dir = dir </> ("lib" ++ lib <.> "dyn_a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
      mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
@@ -1209,10 +1205,8 @@ locateLib dflags is_hs dirs lib
      mk_dyn_lib_path dir = dir </> so_name
 
      findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
-     findDynObject  = do putStrLn "In findDynObject"
-                         liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
+     findDynObject  = liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
      findArchive    = liftM (fmap Archive) $ findFile mk_arch_path       dirs
-     findDynArchive = liftM (fmap Archive) $ findFile mk_dyn_arch_path   dirs
      findHSDll      = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
      findDll        = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path    dirs
      tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs

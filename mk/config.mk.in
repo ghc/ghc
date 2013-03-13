@@ -124,7 +124,14 @@ endif
 # cabal-install's that are in the wild don't handle it properly.
 DYNAMIC_BY_DEFAULT = NO
 
+# If building both v and dyn ways, then use -dynamic-too to build them.
+# This makes the build faster.
 DYNAMIC_TOO = YES
+
+# Use the dynamic way when building programs in the GHC tree. In
+# particular, this means that GHCi will use DLLs rather than loading
+# object files directly.
+DYNAMIC_GHC_PROGRAMS = YES
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
@@ -168,7 +175,7 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else 
-GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_BY_DEFAULT)),YES,NO)
+GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
 endif
 
 # GhcEnableTablesNextToCode tells us whether the target architecture

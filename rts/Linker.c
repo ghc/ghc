@@ -141,10 +141,10 @@
 // warnings like
 //    error: function might be possible candidate for attribute ‘noreturn’
 // from gcc:
-#ifdef DYNAMIC_BY_DEFAULT
-int dynamicByDefault = 1;
+#ifdef DYNAMIC_GHC_PROGRAMS
+int dynamicGhcPrograms = 1;
 #else
-int dynamicByDefault = 0;
+int dynamicGhcPrograms = 0;
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -2116,8 +2116,8 @@ loadArchive( pathchar *path )
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%" PATH_FMT" '\n", path));
 
-    if (dynamicByDefault) {
-        barf("loadArchive called, but using dynlibs by default (%s)", path);
+    if (dynamicGhcPrograms) {
+        barf("loadArchive called, but using dynamic GHC (%s)", path);
     }
 
     gnuFileIndex = NULL;
@@ -2511,8 +2511,8 @@ loadObj( pathchar *path )
 #endif
    IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
 
-   if (dynamicByDefault) {
-       barf("loadObj called, but using dynlibs by default (%s)", path);
+   if (dynamicGhcPrograms) {
+       barf("loadObj called, but using dynamic GHC (%s)", path);
    }
 
    initLinker();

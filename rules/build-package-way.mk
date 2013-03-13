@@ -119,7 +119,7 @@ BINDIST_LIBS += $$($1_$2_$3_LIB0)
 endif
 
 # Build the GHCi library
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_GHCI_LIB = $$($1_$2_dyn_LIB)
 else
 ifeq "$3" "v"

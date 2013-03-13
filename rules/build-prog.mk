@@ -64,7 +64,7 @@ else ifneq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = NO
 else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = YES
-else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+else ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = YES
 else
 $1_$2_WANT_INPLACE_WRAPPER = NO
@@ -136,7 +136,7 @@ $(call shell-wrapper,$1,$2)
 ifeq "$$($1_$2_PROGRAM_WAY)" ""
 ifeq "$3" "0"
 $1_$2_PROGRAM_WAY = v
-else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+else ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_PROGRAM_WAY = dyn
 else
 $1_$2_PROGRAM_WAY = v

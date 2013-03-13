@@ -111,6 +111,12 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 else
 	@echo 'cLibFFI               = False'                               >> $@
 endif
+	@echo 'cDYNAMIC_GHC_PROGRAMS :: Bool'                               >> $@
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
+	@echo 'cDYNAMIC_GHC_PROGRAMS = True'                                >> $@
+else
+	@echo 'cDYNAMIC_GHC_PROGRAMS = False'                               >> $@
+endif
 	@echo done.
 
 # -----------------------------------------------------------------------------
@@ -482,6 +488,10 @@ $(foreach way,$(compiler_stage3_WAYS),\
 # GHC itself doesn't know about the above dependencies, so we have to
 # switch off the recompilation checker for that module:
 compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
+
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
+compiler/utils/Util_HC_OPTS += -DDYNAMIC_GHC_PROGRAMS
+endif
 
 # LibFFI.hs #includes ffi.h
 ifneq "$(UseSystemLibFFI)" "YES"

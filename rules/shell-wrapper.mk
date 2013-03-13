@@ -44,7 +44,7 @@ $$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
 	echo 'pgmgcc="$$(WhatGccIsCalled)"'                                  >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_DIRS_SEARCHPATH))' >> $$@
 endif
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
@@ -99,7 +99,7 @@ BINDIST_EXTRAS += $$($1_$2_BINDIST_WRAPPER)
 $$($1_$2_BINDIST_WRAPPER): $1/$2/build/tmp/$$($1_$2_PROG)
 	$$(call removeFiles,                                                  $$@)
 	echo '#!$$(SHELL)'                                                 >> $$@
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_REL_DIRS_SEARCHPATH))' >> $$@
 endif
 	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@

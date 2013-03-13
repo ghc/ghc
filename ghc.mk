@@ -128,13 +128,13 @@ include mk/ways.mk
 include mk/custom-settings.mk
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 ifeq "$(findstring dyn,$(GhcLibWays))" ""
-$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_BY_DEFAULT) is YES)
+$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_GHC_PROGRAMS) is YES)
 endif
 else
 ifeq "$(findstring v,$(GhcLibWays))" ""
-$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
+$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_GHC_PROGRAMS) is not YES)
 endif
 endif
 ifeq "$(GhcProfiled)" "YES"
@@ -196,7 +196,7 @@ include rules/way-prelims.mk
 $(foreach way,$(ALL_WAYS),\
   $(eval $(call way-prelims,$(way))))
 
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 GHCI_WAY = dyn
 HADDOCK_WAY = dyn
 else
@@ -438,7 +438,7 @@ SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 INSTALL_DYNLIBS  :=
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALL_PACKAGES := $(REGULAR_INSTALL_PACKAGES)
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 INSTALL_DYNLIBS := $(REGULAR_INSTALL_DYNLIBS)
 endif
 else
@@ -1260,7 +1260,7 @@ bootstrapping-files: $(libffi_HEADERS)
 ifeq "$(HADDOCK_DOCS)" "YES"
 BINDIST_HADDOCK_FLAG = --with-haddock="$(BINDIST_PREFIX)/bin/haddock"
 endif
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 BINDIST_LIBRARY_FLAGS = --enable-shared --disable-library-vanilla
 else
 BINDIST_LIBRARY_FLAGS = --enable-library-vanilla --disable-shared

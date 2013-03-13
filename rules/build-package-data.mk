@@ -22,7 +22,7 @@ $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
 ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
 $1_$2_CONFIGURE_OPTS += --enable-library-vanilla
 ifeq "$$(GhcWithInterpreter)" "YES"
-ifneq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifneq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
 endif
 endif
