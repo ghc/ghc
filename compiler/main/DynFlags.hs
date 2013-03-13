@@ -1055,20 +1055,8 @@ wayDesc WayNDP      = "Nested data parallelism"
 
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayGeneralFlags _ WayThreaded = []
-wayGeneralFlags _ WayDebug = []
-wayGeneralFlags platform WayDyn =
-        case platformOS platform of
-            -- On Windows, code that is to be linked into a dynamic
-            -- library must be compiled with -fPIC. Labels not in
-            -- the current package are assumed to be in a DLL
-            -- different from the current one.
-            OSMinGW32 -> [Opt_PIC]
-            OSDarwin  -> [Opt_PIC]
-            OSLinux   -> [Opt_PIC] -- This needs to be here for GHCi to work:
-                                   -- GHCi links objects into a .so before
-                                   -- loading the .so using the system linker.
-                                   -- Only PIC objects can be linked into a .so.
-            _         -> []
+wayGeneralFlags _ WayDebug    = []
+wayGeneralFlags _ WayDyn      = [Opt_PIC]
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
 wayGeneralFlags _ WayPar      = [Opt_Parallel]
