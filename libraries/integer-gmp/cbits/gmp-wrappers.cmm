@@ -394,9 +394,9 @@ integer_cmm_gcdIntzh (W_ int1, W_ int2)
     W_ r;
     W_ mp_tmp_w;
 
-    STK_CHK_GEN_N (1 * SIZEOF_MP_INT);
+    STK_CHK_GEN_N (1 * SIZEOF_W);
 
-    mp_tmp_w = Sp - 1 * SIZEOF_MP_INT;
+    mp_tmp_w = Sp - 1 * SIZEOF_W;
 
     W_[mp_tmp_w] = int1;
     (r) = ccall __gmpn_gcd_1(mp_tmp_w "ptr", 1, int2);
