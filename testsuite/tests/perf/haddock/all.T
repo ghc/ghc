@@ -56,21 +56,23 @@ test('haddock.Cabal',
            # 2012-08-14: 116 (x86/OSX)
            # 2013-02-10:  89 (x86/Windows)
      ,stats_num_field('max_bytes_used',
-          [(wordsize(64), 80590280, 15)
+          [(wordsize(64), 95356616, 15)
             # 2012-08-14: 74119424 (amd64/Linux)
             # 2012-08-29: 77992512 (amd64/Linux, new codegen)
             # 2012-10-02: 91341568 (amd64/Linux)
             # 2012-10-08: 80590280 (amd64/Linux)
+            # 2013-03-13: 95356616 (amd64/Linux) Cabal updated
           ,(platform('i386-unknown-mingw32'), 44224896, 1)
             # 2012-10-30:                     44224896 (x86/Windows)
           ,(wordsize(32), 46563344, 1)])
             # 2012-08-14: 47461532 (x86/OSX)
             # 2013-02-10: 46563344 (x86/OSX)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 3373401360, 2)
+          [(wordsize(64), 3626604824, 2)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
+            # 2013-03-13: 3626604824 (amd64/Linux) Cabal updated
           ,(platform('i386-unknown-mingw32'), 1906532680, 1)
             # 2012-10-30:                     1733638168 (x86/Windows)
             # 2013-02-10:                     1906532680 (x86/Windows)
