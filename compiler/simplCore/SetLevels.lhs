@@ -102,6 +102,7 @@ import Outputable
 import FastString
 
 import qualified Data.IntSet as IntSet; import Data.IntSet ( IntSet )
+import qualified Data.IntMap as IntMap; import Data.IntMap ( IntMap )
 import Data.Maybe       ( isJust, mapMaybe )
 import Control.Monad    ( msum )
 \end{code}
@@ -711,7 +712,7 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndr rhs@(rhs_fvis,_))
 	  -- aren't expensive either
   || shouldNotFloat ctxt_lvl env
        dest_lvl funRhs badTime spaceInfo
-       [bndr]  (ppr (abs_vars, binding_fvis', body_fvis'))
+       [bndr] extra_sdoc
   = -- No float
     do rhs' <- lvlExpr ctxt_lvl env rhs
        let  (env', bndr') = substLetBndrNonRec env bndr bind_lvl
@@ -750,13 +751,14 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndr rhs@(rhs_fvis,_))
     bndr_w_str = annotateBotStr bndr mb_bot
 
     -- for debug
-    binding_fvis' = filter (\x -> fviIsNonTopLevel x && isId (fviVar x)) $ varEnvElts binding_fvis
-    body_fvis'    = fst $ partitionVarEnv (isId . fviVar) $ body_fvis `restrictVarEnv` unitVarSet bndr
+    extra_sdoc = ppr (abs_vars, binding_fvis', body_fvis') where
+      binding_fvis' = filter (\x -> fviIsNonTopLevel x && isId (fviVar x)) $ varEnvElts binding_fvis
+      body_fvis'    = filter (isId . fviVar) $ varEnvElts $ body_fvis `restrictVarEnv` unitVarSet bndr
 
 lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
   | shouldNotFloat ctxt_lvl env
       dest_lvl funRhs badTime spaceInfo
-      bndrs (ppr (abs_vars, bindings_fvis', usage'))
+      bndrs extra_sdoc
   = do let bind_lvl = incMinorLvl ctxt_lvl
            (env', bndrs') = substLetBndrsRec env bndrs bind_lvl
            tagged_bndrs = [ TB bndr' (StayPut bind_lvl) 
@@ -830,8 +832,9 @@ lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
     abs_ids  = filter isId abs_vars
 
     -- for debug
-    usage'         = filter (isId . fviVar) $ varEnvElts $ usage `restrictVarEnv` mkVarSet bndrs
-    bindings_fvis' = fst $ partitionVarEnv (\x -> fviIsNonTopLevel x && isId (fviVar x)) bindings_fvis
+    extra_sdoc = ppr (abs_vars, bindings_fvis', usage')where
+      usage'         = filter (isId . fviVar) $ varEnvElts $ usage `restrictVarEnv` mkVarSet bndrs
+      bindings_fvis' = filter (\x -> fviIsNonTopLevel x && isId (fviVar x)) $ varEnvElts bindings_fvis
 
 shouldNotFloat ::
   Level -> LevelEnv ->
@@ -855,7 +858,7 @@ shouldNotFloat
     msg_sdoc = time $$ vcat (zipWith space ids spaceInfo) where
       time = case badTime of
                Nothing -> empty
-               Just id -> text "would-forget-fast-call to" <+> ppr id
+               Just id -> text "would-forget-fast-call" <+> ppr id
       space v (badPAP, tg, tgil) = vcat
        [ ppr v
        , text "createsPAPs: " <+> ppr badPAP
@@ -941,7 +944,7 @@ wouldIncreaseAllocation env usage abs_ids pairs = case finalPass env of
         withFreebies :: Freebies -> (Int -> VarSet -> Int) -> Int
         withFreebies (Freebies uniqs vs) k | 0 == n    = 0
                                            | otherwise = k n (expandFloatedIds vs)
-          where n = IntSet.size uniqs
+          where n = IntMap.size uniqs
                 -- if f was a freebie, and f has been floated, then
                 -- f's abs_vars are now the freebies
                 expandFloatedIds =
@@ -1529,33 +1532,40 @@ altUseInfo = bothUseInfo
 
 -- | for Freebies uniqs vs:
 --
---   uniqs are the unique identifiers of thunks that the variable occurs in
+--   uniqs are the unique identifiers of thunks that the variable
+--   occurs in (mapped to their name, if they have one)
 --
 --   vs is the set of variables that all of those thunks already
 --   capture (ie "the freebies", since we can abstract over them
 --   without increasing allocation)
-data Freebies = Freebies !IntSet !VarSet
+data Freebies = Freebies !(IntMap (Maybe Id)) !VarSet
 
 zeroFreebies :: Freebies
-zeroFreebies = Freebies IntSet.empty emptyVarSet
+zeroFreebies = Freebies IntMap.empty emptyVarSet
 
 instance Outputable Freebies where
   ppr (Freebies uniqs vs)
     | 0 == n = text "NotInThunk"
-    | otherwise = parens $ text "InThunk" <+> ppr n <+> ppr vs
-    where n = IntSet.size uniqs
+    | otherwise = text "InThunk" <+> vcat [
+        text "in:" <+> if opt_PprStyle_Debug
+          then parens size <+> ppr (IntMap.elems uniqs)
+          else size
+      , text "freebies:" <+> ppr vs
+      ]
+    where n = IntMap.size uniqs
+          size = ppr n
 
 bothFreebies :: Freebies -> Freebies -> Freebies
-bothFreebies (Freebies uniqs _) r | IntSet.null uniqs = r
-bothFreebies l (Freebies uniqs _) | IntSet.null uniqs = l
+bothFreebies (Freebies uniqs _) r | IntMap.null uniqs = r
+bothFreebies l (Freebies uniqs _) | IntMap.null uniqs = l
 bothFreebies (Freebies ln lvs) (Freebies rn rvs) =
-  Freebies (ln `IntSet.union` rn) (intersectVarSet lvs rvs)
+  Freebies (ln `IntMap.union` rn) (intersectVarSet lvs rvs)
 
 altFreebies :: Freebies -> Freebies -> Freebies
-altFreebies (Freebies uniqs _) r | IntSet.null uniqs = r
-altFreebies l (Freebies uniqs _) | IntSet.null uniqs = l
+altFreebies (Freebies uniqs _) r | IntMap.null uniqs = r
+altFreebies l (Freebies uniqs _) | IntMap.null uniqs = l
 altFreebies (Freebies ln lvs) (Freebies rn rvs) =
-  Freebies (if IntSet.size rn > IntSet.size ln then rn else ln) (intersectVarSet lvs rvs)
+  Freebies (if IntMap.size rn > IntMap.size ln then rn else ln) (intersectVarSet lvs rvs)
   -- TODO we could be even more precise by carrying a list, one
   -- element per alt
 
@@ -1665,8 +1675,9 @@ data FVEnv = FVEnv
   -- ^ how many runtmie arguments does the context apply this expression to?
   , fve_letBoundFunLvls :: !LetBoundFunLvls
   -- ^ each let-bound in-scope variable's bindings's free variables
-  , fve_feedback     :: !(Maybe (Int, MajorLevel, FVIs))
-  -- ^ the level and free variables of the enclosing thunk binding
+  , fve_feedback     :: !(Maybe (Int, Maybe Id, MajorLevel, FVIs))
+  -- ^ the unique marker, id if named, level, and free variables of
+  -- the enclosing thunk binding
   , fve_majorLevel   :: !MajorLevel
   -- ^ number of enclosing lambdas
   , fve_nonTopLevel  :: !VarSet
@@ -1707,10 +1718,10 @@ letBoundEnv bndr rhs env
 letBoundsEnv :: [(Id, CoreExpr)] -> FVEnv -> FVEnv
 letBoundsEnv binds env = foldl (\e (id, rhs) -> letBoundEnv id rhs e) env binds
 
-thunkBindingEnv :: FVIs -> FVEnv -> FVM FVEnv
-thunkBindingEnv binding_fvis env = do
+thunkBindingEnv :: Maybe Id -> FVIs -> FVEnv -> FVM FVEnv
+thunkBindingEnv mb_id binding_fvis env = do
   x <- tickFVM
-  return $ env { fve_feedback = Just (x, fve_majorLevel env, binding_fvis) }
+  return $ env { fve_feedback = Just (x, mb_id, fve_majorLevel env, binding_fvis) }
 
 lambdaEnv :: FVEnv -> FVEnv
 lambdaEnv env = env { fve_majorLevel = 1 + fve_majorLevel env }
@@ -1736,9 +1747,11 @@ analyzeFVsM  env (Var v) =
           Just v_lvl <- lookupVarEnv (fve_letBoundFunLvls env) v
           = -- v is a let-bound function
             let (thunkInLam, freebies) = case fve_feedback env of
-                  Just (thunk_uniq, thunks_lvl, thunks_fvis)
-                    | v `elemVarEnv` thunks_fvis -- this occurrence is free in a thunk
-                      -> (thunks_lvl > v_lvl, Freebies (IntSet.singleton thunk_uniq) (prjFreeVars thunks_fvis))
+                  Just (thunk_uniq, thunk_mb_id, thunks_lvl, thunks_fvis)
+                    | maybe True (/= v) thunk_mb_id, -- a closure doesn't capture itself
+                      v `elemVarEnv` thunks_fvis -- it is not declared in this thunk
+                      -- the thunk's closure captures this variable
+                      -> (thunks_lvl > v_lvl, Freebies (IntMap.singleton thunk_uniq thunk_mb_id) (prjFreeVars thunks_fvis))
                   _   -> (False, zeroFreebies)
             in LBFFV { fvi_useInfo = IntSet.singleton (fve_runtimeArgs env)
                      , fvi_freebies = freebies
@@ -1755,17 +1768,15 @@ analyzeFVsM  env (Lam b body) = do
 analyzeFVsM  env (App fun arg) = do
   let argIsAThunk = not (exprIsTrivial' arg)
   fun2 <- flip analyzeFVsM fun $ if isRuntimeArg arg
-                                then appliedEnv env
-                                else            env
-  (arg_fvis, arg2) <- mfix $ \ ~(arg_fvis, _) -> do
+                                 then appliedEnv env
+                                 else            env
+  arg2 <- mfix $ \(fvisOf -> arg_fvis) -> do
     env <- if argIsAThunk
-             then thunkBindingEnv arg_fvis {- <-- circular -} env
+             then thunkBindingEnv Nothing arg_fvis env
              else return env
-    arg2 <- flip analyzeFVsM arg $ unappliedEnv env
-    return $ let arg_fvis = fvisOf arg2
-             in (arg_fvis, arg2)
+    analyzeFVsM (unappliedEnv env) arg
 
-  return (fvisOf fun2 `bothFVIs` arg_fvis, AnnApp fun2 arg2)
+  return (fvisOf fun2 `bothFVIs` fvisOf arg2, AnnApp fun2 arg2)
 
 analyzeFVsM env (Case scrut bndr ty alts) = do
   scrut2 <- analyzeFVsM (unappliedEnv env) scrut
@@ -1783,53 +1794,47 @@ analyzeFVsM env (Case scrut bndr ty alts) = do
          , AnnCase scrut2 bndr ty alts2 )
 
 analyzeFVsM env (Let (NonRec binder rhs) body) = do
-  (binding_fvis, rhs2) <- mfix $ \ ~(binding_fvis, _) -> do
-    env <- thunkBindingEnv binding_fvis {- <-- circular -} env
-    rhs2 <- analyzeFVsM (unappliedEnv env) rhs
-    return $ let binding_fvis = fvisOf rhs2
-             in (binding_fvis, rhs2)
+  rhs2 <- mfix $ \(fvisOf -> rhs_fvis) -> do
+    env <- thunkBindingEnv (Just binder) rhs_fvis env
+    analyzeFVsM (unappliedEnv env) rhs
 
   body2 <- flip analyzeFVsM body $ extendEnv [binder] $ unappliedEnv $ letBoundEnv binder rhs env
 
-  let body_fvis = binder `delBinderFVIs` fvisOf body2
-
-  return ( binding_fvis `bothFVIs` body_fvis `bothFVIs`
+  return ( fvisOf rhs2 `bothFVIs`
+           (binder `delBinderFVIs` fvisOf body2) `bothFVIs`
            assumeTheBest (bndrRuleAndUnfoldingVars binder)
          , AnnLet (AnnNonRec binder rhs2) body2 )
 
 analyzeFVsM env (Let (Rec binds) body) = do
-  let (binders, rhss) = unzip binds
+  let binders = map fst binds
 
-  (bindings_fvis, rhss2) <- mfix $ \ ~(bindings_fvis, _) -> do
-    env <- thunkBindingEnv bindings_fvis {- <-- circular -} env
-    rhss2 <- flip mapM rhss $ \rhs -> do
+  rhss2 <- flip mapM binds $ \(binder, rhs) ->
+    mfix $ \(fvisOf -> rhs_fvis) -> do
+      env <- thunkBindingEnv (Just binder) rhs_fvis env
       flip analyzeFVsM rhs $ extendEnv binders $
                              unappliedEnv $
                              letBoundsEnv binds env
-    return $ let bindings_fvis = delBindersFVIs binders $ computeRecRHSsFVIs binders rhss2
-             in (bindings_fvis, rhss2)
-
 
   body2 <- flip analyzeFVsM body $ extendEnv binders $ unappliedEnv $ letBoundsEnv binds env
 
-  let all_fvis = bothFVIs bindings_fvis $ delBindersFVIs binders $ fvisOf body2
-
-  return  (all_fvis , AnnLet (AnnRec (binders `zip` rhss2)) body2)
+  return  ( delBindersFVIs binders $
+            fvisOf body2 `bothFVIs` computeRecRHSsFVIs binders rhss2
+          , AnnLet (AnnRec (binders `zip` rhss2)) body2)
 
 analyzeFVsM  env (Cast expr co) = do
-  expr2 <- analyzeFVsM env expr
   let cfvis = nonValueFVs $ tyCoVarsOfCo co
-  return (fvisOf expr2 `bothFVIs` cfvis, AnnCast expr2 (cfvis, co))
+
+  expr2 <- analyzeFVsM env expr
+  return ( fvisOf expr2 `bothFVIs` cfvis , AnnCast expr2 (cfvis, co) )
 
 analyzeFVsM  env (Tick tickish expr) = do
  expr2 <- analyzeFVsM env expr
- let tickishFVIs (Breakpoint _ ids) = nonValueFVs (mkVarSet ids)
-     tickishFVIs _                  = noneFVIs
- return (tickishFVIs tickish `bothFVIs` fvisOf expr2, AnnTick tickish expr2)
+ return ( tickishFVIs tickish `bothFVIs` fvisOf expr2 , AnnTick tickish expr2 )
 
 analyzeFVsM _env (Type ty) = return (nonValueFVs $ tyVarsOfType ty, AnnType ty)
 
 analyzeFVsM _env (Coercion co) = return (nonValueFVs $ tyCoVarsOfCo co, AnnCoercion co)
+
 
 computeRecRHSsFVIs :: [Var] -> [CoreExprWithFVIs] -> FVIs
 computeRecRHSsFVIs binders rhss2 =
@@ -1837,6 +1842,9 @@ computeRecRHSsFVIs binders rhss2 =
         (foldr (bothFVIs . fvisOf) emptyVarEnv rhss2)
         binders
 
+tickishFVIs :: Tickish Id -> FVIs
+tickishFVIs (Breakpoint _ ids) = nonValueFVs (mkVarSet ids)
+tickishFVIs _                  = noneFVIs
 
 
 exprIsTrivial' :: CoreExpr -> Bool
