@@ -1391,11 +1391,13 @@ checkValidClass :: Class -> TcM ()
 checkValidClass cls
   = do  { constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
         ; multi_param_type_classes <- xoptM Opt_MultiParamTypeClasses
+        ; nullary_type_classes <- xoptM Opt_NullaryTypeClasses
         ; fundep_classes <- xoptM Opt_FunctionalDependencies
 
-        -- Check that the class is unary, unless GlaExs
-        ; checkTc (notNull tyvars) (nullaryClassErr cls)
-        ; checkTc (multi_param_type_classes || unary) (classArityErr cls)
+        -- Check that the class is unary, unless multiparameter or
+        -- nullary type classes are enabled
+        ; checkTc (nullary_type_classes || notNull tyvars) (nullaryClassErr cls)
+        ; checkTc (multi_param_type_classes || arity <= 1) (classArityErr cls)
         ; checkTc (fundep_classes || null fundeps) (classFunDepsErr cls)
 
         -- Check the super-classes
@@ -1411,7 +1413,7 @@ checkValidClass cls
         ; mapM_ check_at_defs at_stuff  }
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
-    unary = count isTypeVar tyvars == 1   -- Ignore kind variables
+    arity = count isTypeVar tyvars    -- Ignore kind variables
 
     check_op constrained_class_methods (sel_id, dm)
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -1428,8 +1430,10 @@ checkValidClass cls
                 --   class Error e => Game b mv e | b -> mv e where
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
+                -- The check is disabled for nullary type classes,
+                -- since there is no possible ambiguity
         ; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
-        ; checkTc (tyVarsOfType tau `intersectsVarSet` grown_tyvars)
+        ; checkTc (arity == 0 || tyVarsOfType tau `intersectsVarSet` grown_tyvars)
                   (noClassTyVarErr cls sel_id)
 
         ; case dm of
@@ -1733,7 +1737,8 @@ classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
 
 nullaryClassErr :: Class -> SDoc
 nullaryClassErr cls
-  = ptext (sLit "No parameters for class")  <+> quotes (ppr cls)
+  = vcat [ptext (sLit "No parameters for class") <+> quotes (ppr cls),
+          parens (ptext (sLit "Use -XNullaryTypeClasses to allow no-parameter classes"))]
 
 classArityErr :: Class -> SDoc
 classArityErr cls

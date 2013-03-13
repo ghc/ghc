@@ -736,8 +736,11 @@ checkValidInstHead ctxt clas cls_args
             ; checkTc (xopt Opt_FlexibleInstances dflags ||
                        all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr clas cls_args head_type_args_tyvars_msg)
+            ; checkTc (xopt Opt_NullaryTypeClasses dflags ||
+                       not (null ty_args))
+                 (instTypeErr clas cls_args head_no_type_msg)
             ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
-                       isSingleton ty_args)  -- Only count type arguments
+                       length ty_args <= 1)  -- Only count type arguments
                  (instTypeErr clas cls_args head_one_type_msg) }
 
          -- May not contain type family applications
@@ -768,6 +771,10 @@ checkValidInstHead ctxt clas cls_args
     head_one_type_msg = parens (
                 text "Only one type can be given in an instance head." $$
                 text "Use -XMultiParamTypeClasses if you want to allow more.")
+
+    head_no_type_msg = parens (
+                text "No parameters in the instance head." $$
+                text "Use -XNullaryTypeClasses if you want to allow this.")
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg

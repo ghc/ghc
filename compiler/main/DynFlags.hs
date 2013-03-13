@@ -513,6 +513,7 @@ data ExtensionFlag
    | Opt_FlexibleInstances
    | Opt_ConstrainedClassMethods
    | Opt_MultiParamTypeClasses
+   | Opt_NullaryTypeClasses
    | Opt_FunctionalDependencies
    | Opt_UnicodeSyntax
    | Opt_ExistentialQuantification
@@ -2650,6 +2651,7 @@ xFlags = [
   ( "FlexibleInstances",                Opt_FlexibleInstances, nop ),
   ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, nop ),
   ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, nop ),
+  ( "NullaryTypeClasses",               Opt_NullaryTypeClasses, nop ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
   ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
