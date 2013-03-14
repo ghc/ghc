@@ -371,20 +371,21 @@ data FinalPassSwitches = FinalPassSwitches
   -- ^ abstracting over oversaturated applied variables?
   , fps_createPAPs     :: !Bool
   -- ^ allowed to float functions occuring unapplied
-  , fps_thunkGrowth    :: !(Maybe Int)
-  -- ^ limits the number of free variables added to thunks using the floated function
-  , fps_ifInThunk        :: !(Maybe Int)
-  -- ^ limits the number of abstracted variables allowed if the binder occurs in a thunk
+  , fps_cloGrowth    :: !(Maybe Int)
+  -- ^ limits the number of free variables added to closures using the floated function
+  , fps_ifInClo        :: !(Maybe Int)
+  -- ^ limits the number of abstracted variables allowed if the binder occurs in a closure
   , fps_stabilizeFirst   :: !Bool
   -- ^ stabilizes an unstable unfolding before floating things out of
   -- it, since floating out precludes specialization at the call-site
   , fps_doSinglyRecSAT   :: !Bool
   -- ^ do a SAT transform on singly recursive floaters if that have
   -- more than one value abs var
-  , fps_noInThunkInLambda :: !Bool
-  -- ^ disallow the floating of a binding if it occurs in thunk that
-  -- is allocated inside a lambda inside the bindings' scope
+  , fps_cloGrowthInLam :: !(Maybe Int)
+  -- ^ disallow the floating of a binding if it occurs in closure that
+  -- is allocated inside a lambda
   , fps_trace             :: !Bool
+  , fps_retry             :: !Bool
   }
 
 instance Outputable FloatOutSwitches where
@@ -408,7 +409,8 @@ pprFinalPassSwitches sw = sep $ punctuate comma $
   , ptext (sLit "AbsUnsatVar =") <+> ppr (fps_absUnsatVar sw)
   , ptext (sLit "AbsSatVar =") <+> ppr (fps_absSatVar sw)
   , ptext (sLit "AbsOversatVar =") <+> ppr (fps_absOversatVar sw)
-  , ptext (sLit "ThunkGrowth =") <+> ppr (fps_thunkGrowth sw)
+  , ptext (sLit "ClosureGrowth =") <+> ppr (fps_cloGrowth sw)
+  , ptext (sLit "ClosureGrowthInLam =") <+> ppr (fps_cloGrowthInLam sw)
   , ptext (sLit "StabilizeFirst =") <+> ppr (fps_stabilizeFirst sw)
   , ptext (sLit "DoSinglyRecSAT =") <+> ppr (fps_doSinglyRecSAT sw)
   ]

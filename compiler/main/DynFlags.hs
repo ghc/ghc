@@ -1,11 +1,4 @@
--------------------------------------------------------------------------------
---
--- | Dynamic flags
---
--- Most flags are dynamic flags, which means they can change from compilation
--- to compilation using @OPTIONS_GHC@ pragmas, and in a multi-session GHC each
--- session can be using different dynamic flags. Dynamic flags can also be set
--- at the prompt in GHCi.
+
 --
 -- (c) The University of Glasgow 2005
 --
@@ -576,12 +569,13 @@ data DynFlags = DynFlags {
   lateFloatAbsSatVar    :: Bool,        -- ^ allowed to abstract      saturated applied let-bound variables?
   lateFloatAbsOversatVar :: Bool,       -- ^ allowed to abstract  oversaturated applied let-bound variables?
   lateFloatCreatePAPs   :: Bool,        -- ^ allowed to float function bindings that occur unapplied
-  lateFloatIfInThunk    :: Maybe Int,   -- ^ Limit on # abstracted variables for floating a binding that occurs in a thunk
-  lateFloatThunkGrowth  :: Maybe Int,   -- ^ Limit on # additional free variables for thunks in which the function occurs
+  lateFloatIfInClo      :: Maybe Int,   -- ^ Limit on # abstracted variables for floating a binding that occurs in a closure
+  lateFloatCloGrowth    :: Maybe Int,   -- ^ Limit on # additional free variables for closures in which the function occurs
   lateFloatSimpl        :: Bool,        -- ^ follow the late lambda lift with a simplification pass?
   lateFloatStabilizeFirst :: Bool,
   lateFloatDoSinglyRecSAT :: Bool,
-  lateFloatNoInThunkInLambda :: Bool,
+  lateFloatCloGrowthInLam :: Maybe Int,
+  lateFloatRetry          :: Bool,
   
   protectLastArg        :: Bool,
 
@@ -1239,6 +1233,7 @@ defaultDynFlags mySettings =
         liberateCaseThreshold   = Just 2000,
 
         floatLamArgs            = Just 0,  -- Default: float only if no fvs
+
         lateFloatLamOn          = False,
         lateFloatNonRecLam      = Nothing,
         lateFloatRecLam         = Just 0,
@@ -1246,12 +1241,13 @@ defaultDynFlags mySettings =
         lateFloatAbsSatVar      = False,
         lateFloatAbsOversatVar  = False,
         lateFloatCreatePAPs     = False,
-        lateFloatIfInThunk      = Nothing,
-        lateFloatThunkGrowth    = Nothing,
+        lateFloatIfInClo        = Nothing,
+        lateFloatCloGrowth      = Nothing,
         lateFloatSimpl          = True,
         lateFloatStabilizeFirst = False,
         lateFloatDoSinglyRecSAT = False,
-        lateFloatNoInThunkInLambda = False,
+        lateFloatCloGrowthInLam = Nothing,
+        lateFloatRetry          = False,
 
 
         protectLastArg          = False,
@@ -2291,10 +2287,10 @@ dynamic_flags = [
   , Flag "flate-float"                          (noArg       (\d -> d{ lateFloatLamOn = True }))
   , Flag "fno-late-float"                       (noArg       (\d -> d{ lateFloatLamOn = False }))
   , Flag "flate-float-nonrec-lam-limit"         (intSuffix (\n d -> d{ lateFloatLamOn = True, lateFloatNonRecLam = Just n }))
-  , Flag "flate-float-nonrec-lam-all"           (noArg       (\d -> d{ lateFloatLamOn = True, lateFloatNonRecLam = Nothing }))
+  , Flag "flate-float-nonrec-lam-any"           (noArg       (\d -> d{ lateFloatLamOn = True, lateFloatNonRecLam = Nothing }))
   , Flag "fno-late-float-nonrec-lam"            (noArg       (\d -> d{ lateFloatNonRecLam = Just 0 }))
   , Flag "flate-float-rec-lam-limit"            (intSuffix (\n d -> d{ lateFloatLamOn = True, lateFloatRecLam = Just n }))
-  , Flag "flate-float-rec-lam-all"              (noArg       (\d -> d{ lateFloatLamOn = True, lateFloatRecLam = Nothing }))
+  , Flag "flate-float-rec-lam-any"              (noArg       (\d -> d{ lateFloatLamOn = True, lateFloatRecLam = Nothing }))
   , Flag "fno-late-float-rec-lam"               (noArg       (\d -> d{ lateFloatRecLam = Just 0 }))
   , Flag "flate-float-abstract-undersat-var"    (noArg       (\d -> d{ lateFloatAbsUnsatVar = True }))
   , Flag "fno-late-float-abstract-undersat-var" (noArg       (\d -> d{ lateFloatAbsUnsatVar = False }))
@@ -2304,12 +2300,12 @@ dynamic_flags = [
   , Flag "fno-late-float-abstract-oversat-var"  (noArg       (\d -> d{ lateFloatAbsOversatVar = False }))
   , Flag "flate-float-create-PAPs"              (noArg       (\d -> d{ lateFloatCreatePAPs = True }))
   , Flag "fno-late-float-create-PAPs"           (noArg       (\d -> d{ lateFloatCreatePAPs = False }))
-  , Flag "flate-float-thunk-growth-limit"       (intSuffix (\n d -> d{ lateFloatThunkGrowth = Just n }))
-  , Flag "flate-float-thunk-growth-any"         (noArg       (\d -> d{ lateFloatThunkGrowth = Nothing }))
-  , Flag "fno-late-float-thunk-growth"          (noArg       (\d -> d{ lateFloatThunkGrowth = Just 0 }))
-  , Flag "flate-float-in-thunk-limit"           (intSuffix (\n d -> d{ lateFloatIfInThunk = Just n }))
-  , Flag "flate-float-in-thunk-all"             (noArg       (\d -> d{ lateFloatIfInThunk = Nothing }))
-  , Flag "fno-late-float-in-thunk"              (noArg       (\d -> d{ lateFloatIfInThunk = Just 0 }))
+  , Flag "flate-float-clo-growth-limit"         (intSuffix (\n d -> d{ lateFloatCloGrowth = Just n }))
+  , Flag "flate-float-clo-growth-any"           (noArg       (\d -> d{ lateFloatCloGrowth = Nothing }))
+  , Flag "fno-late-float-clo-growth"            (noArg       (\d -> d{ lateFloatCloGrowth = Just 0 }))
+  , Flag "flate-float-in-clo-limit"             (intSuffix (\n d -> d{ lateFloatIfInClo = Just n }))
+  , Flag "flate-float-in-clo-any"               (noArg       (\d -> d{ lateFloatIfInClo = Nothing }))
+  , Flag "fno-late-float-in-clo"                (noArg       (\d -> d{ lateFloatIfInClo = Just 0 }))
   , Flag "flate-float-simpl"                    (noArg       (\d -> d{ lateFloatSimpl = True }))
   , Flag "fno-late-float-simpl"                 (noArg       (\d -> d{ lateFloatSimpl = False }))
 
@@ -2319,8 +2315,12 @@ dynamic_flags = [
   , Flag "flate-float-do-singly-rec-SAT"        (noArg       (\d -> d{ lateFloatDoSinglyRecSAT = True }))
   , Flag "fno-late-do-singly-rec-SAT"           (noArg       (\d -> d{ lateFloatDoSinglyRecSAT = False }))
 
-  , Flag "flate-float-in-thunk-in-lam"          (noArg       (\d -> d{ lateFloatNoInThunkInLambda = False }))
-  , Flag "fno-late-float-in-thunk-in-lam"       (noArg       (\d -> d{ lateFloatNoInThunkInLambda = True }))
+  , Flag "flate-float-clo-growth-in-lam-limit"      (intSuffix (\n d -> d{ lateFloatCloGrowthInLam = Just n }))
+  , Flag "flate-float-clo-growth-in-lam-any"        (noArg       (\d -> d{ lateFloatCloGrowthInLam = Nothing }))
+  , Flag "fno-late-float-clo-growth-in-lam"         (noArg       (\d -> d{ lateFloatCloGrowthInLam = Just 0 }))
+
+  , Flag "flate-float-retry"                    (noArg       (\d -> d{ lateFloatRetry = True }))
+  , Flag "fno-late-float-retry"                 (noArg       (\d -> d{ lateFloatRetry = False }))
 
   , Flag "fprotect-last-arg"           (noArg (\d -> d{ protectLastArg = True }))
   , Flag "fno-protect-last-arg"        (noArg (\d -> d{ protectLastArg = False }))

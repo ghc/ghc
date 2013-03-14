@@ -139,12 +139,13 @@ getCoreToDo dflags
               , fps_absSatVar      = lateFloatAbsSatVar      dflags
               , fps_absOversatVar  = lateFloatAbsOversatVar  dflags
               , fps_createPAPs     = lateFloatCreatePAPs     dflags
-              , fps_ifInThunk      = lateFloatIfInThunk      dflags
-              , fps_thunkGrowth    = lateFloatThunkGrowth    dflags
+              , fps_ifInClo        = lateFloatIfInClo        dflags
+              , fps_cloGrowth      = lateFloatCloGrowth      dflags
               , fps_stabilizeFirst = lateFloatStabilizeFirst dflags
               , fps_doSinglyRecSAT = lateFloatDoSinglyRecSAT dflags
-              , fps_noInThunkInLambda = lateFloatNoInThunkInLambda dflags
+              , fps_cloGrowthInLam = lateFloatCloGrowthInLam dflags
               , fps_trace          = dopt Opt_D_dump_late_float dflags
+              , fps_retry          = lateFloatRetry          dflags
               }
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags

@@ -83,6 +83,7 @@ import StgCmmArgRep     ( ArgRep(P), argRepSizeW, toArgRep )
 import StgCmmLayout     ( mkVirtHeapOffsets )
 import StgCmmClosure    ( idPrimRep, addIdReps )
 
+import Demand           ( isStrictDmd, splitStrictSig )
 import Id
 import IdInfo
 import Var
@@ -101,12 +102,10 @@ import MonadUtils
 import Outputable
 import FastString
 
-import qualified Data.List
 import qualified Data.IntSet as IntSet; import Data.IntSet ( IntSet )
 import qualified Data.IntMap as IntMap; import Data.IntMap ( IntMap )
-import qualified Data.Map as Map; import Data.Map ( Map )
 import Data.Maybe       ( isJust, mapMaybe )
-import Control.Monad    ( msum )
+import Control.Monad    ( when )
 \end{code}
 
 %************************************************************************
@@ -712,30 +711,49 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndr rhs@(rhs_fvis,_))
 	  -- We can't float an unlifted binding to top level, so we don't 
 	  -- float it at all.  It's a bit brutal, but unlifted bindings 
 	  -- aren't expensive either
-  || shouldNotFloat ctxt_lvl env
-       dest_lvl funRhs badTime spaceInfo
-       [bndr] extra_sdoc
-  = -- No float
-    do rhs' <- lvlExpr ctxt_lvl env rhs
+     = doNotFloat
+  | Just{} <- floatDecision emptyVarSet, not (lateRetry env) = doNotFloat
+  | Just pinners <- floatDecision emptyVarSet =
+      case isEmptyVarEnv pinners of
+        False -> do -- merely pinned
+          tellLvlM $ unitVarEnv bndr (bndr, pinners)
+          doNotFloat
+        True -> do -- not floating for space reasons
+          (result, pinnees) <- hijackLvlM doNotFloat
+          let (roots, pinnees') = partitionPinnees [bndr] pinnees
+          tellLvlM pinnees'
+          case isEmptyVarSet $ roots `delVarSet` bndr of
+            True -> return result -- the space reasons are valid
+            False -> case floatDecision roots of
+              Nothing -> doFloat -- a successful unpinning: the space
+                                 -- reasons were invalid
+              Just pinners -> do
+                -- if space is no longer the reason, announce that we're pinned
+                when (not $ isEmptyVarSet pinners) $ tellLvlM $ unitVarEnv bndr (bndr, pinners)
+                return result
+  | otherwise = doFloat
+  where
+    doNotFloat = do
+       rhs' <- lvlExpr ctxt_lvl env rhs
        let  (env', bndr') = substLetBndrNonRec env bndr bind_lvl
             bind_lvl      = incMinorLvl ctxt_lvl
             tagged_bndr   = TB bndr' (StayPut bind_lvl)
        return (NonRec tagged_bndr rhs', bind_lvl, env')
 
-  -- Otherwise we are going to float
-  | null abs_vars
-  = do  -- No type abstraction; clone existing binder
-       rhs' <- lvlExpr dest_lvl env rhs
-       (env', bndr') <- cloneVar env bndr dest_lvl
-       return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env') 
+    doFloat | null abs_vars = do  -- No type abstraction; clone existing binder
+      rhs' <- lvlExpr dest_lvl env rhs
+      (env', bndr') <- cloneVar env bndr dest_lvl
+      return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env')
 
-  | otherwise
-  = do  -- Yes, type abstraction; create a new binder, extend substitution, etc
-       rhs' <- lvlFloatRhs abs_vars dest_lvl env rhs
-       (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr_w_str]
-       return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env')
+            | otherwise = do  -- Yes, type abstraction; create a new binder, extend substitution, etc
+      rhs' <- lvlFloatRhs abs_vars dest_lvl env rhs
+      (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr_w_str]
+      return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env')
 
-  where
+    floatDecision = shouldNotFloat ctxt_lvl env
+                     dest_lvl funRhs badTime spaceInfo
+                     [bndr] extra_sdoc
+
     badTime   = wouldIncreaseRuntime    env binding_fvis abs_ids
     spaceInfo = wouldIncreaseAllocation env body_fvis    abs_ids [(bndr, prjFreeNonTopLevelIds rhs_fvis)]
 
@@ -758,10 +776,9 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndr rhs@(rhs_fvis,_))
       body_fvis'    = filter (isId . fviVar) $ varEnvElts $ body_fvis `restrictVarEnv` unitVarSet bndr
 
 lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
-  | shouldNotFloat ctxt_lvl env
-      dest_lvl funRhs badTime spaceInfo
-      bndrs extra_sdoc
-  = do let bind_lvl = incMinorLvl ctxt_lvl
+  | Just pinners <- floatDecision emptyVarSet
+  = do when (lateRetry env && not (isEmptyVarEnv pinners)) $ tellLvlM $ mkVarEnv [ (b, (b, pinners)) | b <- bndrs ]
+       let bind_lvl = incMinorLvl ctxt_lvl
            (env', bndrs') = substLetBndrsRec env bndrs bind_lvl
            tagged_bndrs = [ TB bndr' (StayPut bind_lvl) 
                           | bndr' <- bndrs' ] 
@@ -814,6 +831,10 @@ lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
            , ctxt_lvl, new_env)
 
   where
+    floatDecision = shouldNotFloat ctxt_lvl env
+                      dest_lvl funRhs badTime spaceInfo
+                      bndrs extra_sdoc
+
     badTime   = wouldIncreaseRuntime    env bindings_fvis abs_ids
     spaceInfo = wouldIncreaseAllocation env usage         abs_ids $
                   map (\(bndr, rhs) -> (bndr, prjFreeNonTopLevelIds $ fvisOf rhs)) pairs
@@ -841,39 +862,82 @@ lvlBind ctxt_lvl env body_fvis (AnnRec pairs)
 shouldNotFloat ::
   Level -> LevelEnv ->
   Level -> Bool ->
-  Maybe Id -> [(Bool, WordOff, WordOff)] ->
+  VarSet -> (VarSet -> [(Bool, WordOff, WordOff)]) ->
   [Id] -> SDoc ->
-  Bool
+  VarSet -> -- pinnees to ignore
+  Maybe VarSet -- Nothing <=> float, Just x <=> do not float, not
+               -- (null x) <=> forgetting fast calls to the ids in x
+               -- are the only thing pinning this binding
 shouldNotFloat
-  ctxt_lvl env   dest_lvl funRhs   badTime spaceInfo   ids extra_sdoc
-  =  not profitable
-  || funRhs && case finalPass env of -- the final pass only affects lambdas
-       Nothing -> False
-       Just fps -> (if fps_trace fps then pprTrace msg msg_sdoc else (\x -> x)) $
-                   decision
-  where
+  ctxt_lvl env   dest_lvl funRhs   badTime spaceInfo'   ids extra_sdoc
+  pinnees
+  | profitable = Nothing -- always float if profitable
+  | funRhs, Just fps <- finalPass env =
+    -- the final pass might float "otherwise unprofitable" lambdas
+    checkFinalPass fps
+  | otherwise = Just emptyVarSet -- do not float
+ where
+    checkFinalPass fps =
+      let isBadTime = not (isEmptyVarSet badTime)
+
+          isBadSpace = flip any spaceInfo $ \(createsPAPs, tg, tgil) ->
+            papViolation createsPAPs ||
+            tgViolation tg || tgilViolation tgil
+
+          msg      = if isBadTime || isBadSpace then "late-no-float" else "late-float"
+
+          papViolation = (not (fps_createPAPs fps) &&)
+
+          tgViolation = case fps_cloGrowth fps of
+            Nothing -> const False
+            Just limit -> (> limit * wORDS_PTR)
+
+                -- If the closure is NOT under a lambda, then we get
+                -- a discount for no longer allocating these
+                -- bindings' closures, since these bindings would be
+                -- allocated at least as many times as the closure.
+
+       -- TODO                | Just limit <- fps_ifInClo fps =
+
+          tgilViolation = case fps_cloGrowthInLam fps of
+            Nothing -> const False
+            Just limit -> (> limit * wORDS_PTR)
+
+                 -- If the closure is under a lambda, we do NOT
+                 -- discount for not allocating these bindings'
+                 -- closures, since the closure could be allocated
+                 -- many more times than these bindings are.
+
+      in (if fps_trace fps then pprTrace msg msg_sdoc else (\x -> x)) $
+         if isBadSpace then Just emptyVarSet
+         else if isBadTime then Just badTime
+         else Nothing
+
+    spaceInfo = spaceInfo' pinnees
+
     profitable = (dest_lvl `ltMajLvl` ctxt_lvl) -- Escapes a value lambda
               || isTopLvl dest_lvl -- Going all the way to top level
-
-    decision = isJust badTime || any (\(badPAP, tg, tgil) -> badPAP || tg > 0 || tgil > 0) spaceInfo
-    msg      = if decision then "late-no-float" else "late-float"
     msg_sdoc = time $$ vcat (zipWith space ids spaceInfo) where
-      time = case badTime of
-               Nothing -> empty
-               Just id -> text "would-forget-fast-call" <+> ppr id
+      time = case varSetElems badTime of
+               [] -> empty
+               ids -> text "would-forget-fast-calls" <+> ppr ids
       space v (badPAP, tg, tgil) = vcat
        [ ppr v
-       , text "createsPAPs: " <+> ppr badPAP
-       , text "closureGrowth: " <+> ppr tg
-       , text "CG in lam: "   <+> ppr tgil
+       , if not (isEmptyVarSet pinnees) then text "pinnees:" <+> ppr (varSetElems pinnees) else empty
+       , text "createsPAPs:" <+> ppr badPAP
+       , text "closureGrowth:" <+> ppr tg
+       , text "CG in lam:"   <+> ppr tgil
        , if opt_PprStyle_Debug then extra_sdoc else empty
        ]
+
+    wORDS_PTR = StgCmmArgRep.argRepSizeW (le_dflags env) StgCmmArgRep.P
 
 wouldIncreaseAllocation ::
   LevelEnv ->
   FVIs ->     -- FVIs for the binding's *entire scope*
   [Id] ->     -- the abstracted value ids
   [(Id, [Id])] ->      -- the binders in the binding group and their RHS's free IDs
+  VarSet -> -- ignore these as captors
   [] -- for each binder:
     ( Bool -- would create PAPs
     , WordOff  -- (per closure level, ascending) estimated increases
@@ -881,11 +945,12 @@ wouldIncreaseAllocation ::
     , WordOff  -- (per closure level, ascending) estimated increases
                -- for closures that ARE allocated under a lambda
     )
-wouldIncreaseAllocation env usage abs_ids pairs = case finalPass env of
+wouldIncreaseAllocation env usage abs_ids pairs pinnees = case finalPass env of
   Nothing -> []
-  Just fps -> flip map bndrs $ \bndr -> case lookupVarEnv usage bndr of
+  Just _fps -> flip map bndrs $ \bndr -> case lookupVarEnv usage bndr of
     Nothing -> (False, 0, 0) -- it's a dead variable
     Just fvi ->
+      let v_lvl = fviLevel fvi in
       let violatesPAPs =
             -- TODO consider refining this along the lines of closure
             -- growth
@@ -893,7 +958,23 @@ wouldIncreaseAllocation env usage abs_ids pairs = case finalPass env of
             -- TODO also, if we specialized on partial applications (eg
             -- "map (f a) xs" becomes "$smap f a xs"), then maybe we could
             -- relax this check
-            not (fps_createPAPs fps) && 0 `IntSet.member` fviUseInfo fvi
+            0 `IntSet.member` fviUseInfo fvi
+
+          withFreebies :: Captors -> (VarSet -> WordOff) -> (WordOff, WordOff)
+          withFreebies (Captors cs) k = IntMap.foldl on_snoc (0, 0) cs where
+            on_snoc acc@(!cg, !cgil) cli
+              | Just id <- cli_id cli, id `elemVarSet` pinnees = acc -- ignore the pinnees
+              | otherwise = (cg + cgNew, cgil + cgilNew)
+              where (cgNew, cgilNew)
+                  -- there's a lambda between this cli and v's binding
+                      | cli_lvl cli > v_lvl = (0, new)
+                      | otherwise       = (new, 0) -- there is no such lambda
+
+                    new = k $ expandFloatedIds $ prjFreeVars $ cli_fvis cli
+          withFreebies (BothCaptors l r) k = withFreebies l k `both` withFreebies r k
+            where both (a, b) (x, y) = (a + x, b + y)
+          withFreebies (AltCaptors l r) k = withFreebies l k `alt` withFreebies r k
+            where alt (a, b) (x, y) = (a `max` x, b `max` y)
 
           estimateGrowth :: VarSet -> WordOff
           estimateGrowth freebies = harm - benefit
@@ -906,35 +987,25 @@ wouldIncreaseAllocation env usage abs_ids pairs = case finalPass env of
                   benefit = wORDS_PTR * count (flip elemVarSet freebies) bndrs
                     -- decrease in allocation due to floating the bindings
 
-          -- If the closure is NOT under a lambda, then we get a
-          -- discount for no longer allocating these bindings'
-          -- closures, since these bindings would be allocated at
-          -- least as many times as the closure.
-          closureGrowth
-           | Just discount <- fps_thunkGrowth fps =
-             subtract (closuresSize + discount * wORDS_PTR) $
-             withFreebies (fviCaptors fvi) estimateGrowth
-           | Just limit <- fps_ifInThunk fps =
-             withFreebies (fviCaptors fvi)$ \_ -> if newValueArgs > limit then 1 else 0
-           | otherwise = 0
+          (closureGrowth, closureGrowthInLambda)
+             = withFreebies (fviCaptors fvi) estimateGrowth
 
-          -- If the closure is under a lambda, we do NOT discount for
-          -- not allocating these bindings' closures, since the
-          -- closure could be allocated many more times than these
-          -- bindings are.
-          closureGrowthInLambda
-            | fps_noInThunkInLambda fps = withFreebies (fviLamCaptors fvi) estimateGrowth
-            | otherwise = 0
+      in (violatesPAPs, closureGrowth - closuresSize, closureGrowthInLambda)
 
-      in (violatesPAPs, closureGrowth, closureGrowthInLambda)
+  where -- if a freebie was floated, then its abs_vars are now
+        -- freebies
+        expandFloatedIds = unionVarSets . map (absVarsOf (le_env env)) . varSetElems
 
-  where (bndrs, fidss) = unzip pairs
+        (bndrs, fidss) = unzip pairs
 
         dflags = le_dflags env
         wORDS_PTR = StgCmmArgRep.argRepSizeW dflags StgCmmArgRep.P
 
-        newValueArgs = length abs_ids
+        _newValueArgs = length abs_ids
 
+        -- NB assuming this closure is not LNE
+        --
+        -- TODO: is an LNE allowed to occur in a closure?
         closuresSize = (\x -> if opt_PprStyle_Debug then pprTrace "closuresSize" (ppr x) x else x) $
                        sum $ flip map fidss $ \fids ->
           let (words, _, _) =
@@ -942,18 +1013,6 @@ wouldIncreaseAllocation env usage abs_ids pairs = case finalPass env of
                 StgCmmClosure.addIdReps $ filter (`elem` abs_ids) fids
                 where isUpdateable = False -- functions are not updateable
           in words
-
-        withFreebies :: Captors -> (VarSet -> Int) -> Int
-        withFreebies (Captors cs) k = IntMap.foldl on_snoc 0 cs where
-          on_snoc acc cli = (+) acc $
-            k $ expandFloatedIds $ prjFreeVars $ cli_fvis cli
-
-          -- if a freebie was floated, then its abs_vars are now
-          -- freebies
-          expandFloatedIds =
-            unionVarSets . map (absVarsOf (le_env env)) . varSetElems
-        withFreebies (BothCaptors l r) k = withFreebies l k + withFreebies r k
-        withFreebies (AltCaptors l r) k = withFreebies l k `max` withFreebies r k
 
         -- the number of words used to represent these Ids in a
         -- closure
@@ -965,12 +1024,12 @@ wouldIncreaseRuntime ::
   LevelEnv ->
   FVIs ->      -- FVIs for the bindings' RHS and RULES
   [Id] ->      -- the abstracted value ids
-  Maybe Id     -- the forgotten id
+  VarSet       -- the forgotten ids
 wouldIncreaseRuntime env binding_group_fvis abs_ids =
   case prjFlags `fmap` finalPass env of
   -- is final pass...
   Just (noUnder, noExact, noOver) | noUnder || noExact || noOver ->
-    msum $ flip map abs_ids $ \abs_id ->
+    mkVarSet $ flip mapMaybe abs_ids $ \abs_id ->
       case lookupVarEnv binding_group_fvis abs_id of
         Just fvi | not (IntSet.null uses),
                    arity > 0, -- NB (arity > 0) iff "is known function"
@@ -982,16 +1041,34 @@ wouldIncreaseRuntime env binding_group_fvis abs_ids =
                   -- NB cannot use abs_id's arity! As a parameter, it's arity is 0.
                 uses = fviUseInfo fvi
         _ -> Nothing
-  _ -> Nothing
+  _ -> emptyVarSet
   where prjFlags fps = ( not (fps_absUnsatVar   fps) -- -fno-late-abstract-undersat-var
                        , not (fps_absSatVar     fps) -- -fno-late-abstract-sat-var
                        , not (fps_absOversatVar fps) -- -fno-late-abstract-oversat-var
                        )
+
+-- partition the pinnees by whether or not they are ultimately (ie
+-- transitively) pinned by nothing but these binders
+partitionPinnees :: [Id] -> PinnedLBFs -> (VarSet, PinnedLBFs)
+partitionPinnees bndrs pinnees = go $ PartitionState False (mkVarSet bndrs) pinnees where
+  go st
+    | ps_stop st = (ps_roots st, ps_nonroots st) -- no new roots
+    | otherwise = go $ foldVarEnv isARoot (st { ps_stop = True, ps_nonroots = emptyVarEnv}) (ps_nonroots st)
+
+data PartitionState = PartitionState {ps_stop :: !Bool, ps_roots :: VarSet, ps_nonroots :: PinnedLBFs }
+
+isARoot :: (Id, VarSet) -> PartitionState -> PartitionState
+isARoot p@(id, pinners) !st@PartitionState { ps_roots = roots }
+  -- if id is pinned only by roots, it's also a root
+  | isEmptyVarEnv (pinners `minusVarSet` roots) = st { ps_stop = False, ps_roots = extendVarSet roots id }
+  | otherwise = st { ps_nonroots = extendVarEnv (ps_nonroots st) id p }
+
+
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
 
 lvlFloatRhs :: [CoreBndr] -> Level -> LevelEnv -> CoreExprWithFVIs
-            -> UniqSM (Expr LevelledBndr)
+            -> LvlM (Expr LevelledBndr)
 lvlFloatRhs abs_vars dest_lvl env rhs = do
     rhs' <- lvlExpr rhs_lvl rhs_env rhs
     return (mkLams abs_vars_w_lvls rhs')
@@ -1136,6 +1213,11 @@ doSinglyRecSAT le = case finalPass le of
   Nothing  -> False
   Just fps -> fps_doSinglyRecSAT fps
 
+lateRetry :: LevelEnv -> Bool
+lateRetry le = case finalPass le of
+  Nothing  -> False
+  Just fps -> fps_retry fps
+
 floatConsts :: LevelEnv -> Bool
 floatConsts le = floatOutConstants (le_switches le)
 
@@ -1276,15 +1358,30 @@ absVarsOf id_env v
 \end{code}
 
 \begin{code}
-type LvlM result = UniqSM result
+type PinnedLBFs = VarEnv (Id, VarSet) -- (g, fs, hs) <=> pinned by fs, captured by hs
 
-initLvl :: UniqSupply -> UniqSM a -> a
-initLvl = initUs_
+newtype LvlM a = LvlM (UniqSM (a, PinnedLBFs))
+instance Monad LvlM where
+  return a = LvlM $ return (a, emptyVarEnv)
+  LvlM m >>= k = LvlM $ m >>= \ ~(a, w) ->
+    case k a of
+      LvlM m -> m >>= \ ~(b, w') -> return (b, plusVarEnv_C (\ ~(id, x) ~(_, y) -> (id, unionVarSet x y)) w w')
+instance MonadUnique LvlM where
+  getUniqueSupplyM = LvlM $ getUniqueSupplyM >>= \a -> return (a, emptyVarEnv)
+
+tellLvlM :: PinnedLBFs -> LvlM ()
+tellLvlM pinned = LvlM $ return ((), pinned)
+
+hijackLvlM :: LvlM a -> LvlM (a, PinnedLBFs)
+hijackLvlM (LvlM m) = LvlM $ m >>= \p -> return (p, emptyVarEnv)
+
+initLvl :: UniqSupply -> LvlM a -> a
+initLvl us (LvlM m) = fst $ initUs_ us m
 \end{code}
 
 
 \begin{code}
-newPolyBndrs :: Level -> LevelEnv -> [Var] -> [Id] -> UniqSM (LevelEnv, [Id])
+newPolyBndrs :: Level -> LevelEnv -> [Var] -> [Id] -> LvlM (LevelEnv, [Id])
 newPolyBndrs dest_lvl env abs_vars bndrs = do
     uniqs <- getUniquesM
     let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
@@ -1476,38 +1573,31 @@ data FVInfo'
          -- applied to n-many arguments
          , fvi_captors    :: Captors
          -- ^ the closures this variable occurs in
-         , fvi_lamCaptors :: Captors
-         -- ^ like fvi_captors, but only for closures that are
-         -- declared under lambda
+         , fvi_lvl         :: MajorLevel -- of its declaration
          }
 
 data ClosureInfo = ClosureInfo
   { cli_key      :: !Int -- unique marker
   , cli_id       :: Maybe Id -- Nothing <=> argument closure
-  , cli_clo_lvl  :: ClosureLevel
-  , cli_lvl      :: MajorLevel
   , cli_fvis     :: FVIs
+  , cli_lvl      :: MajorLevel
   }
 
 instance Outputable ClosureInfo where
-  ppr (ClosureInfo key id clo_lvl lvl fvis)
-    | opt_PprStyle_Debug = base <+>
-       text "clo_lvl:" <+> ppr clo_lvl <+> text "lam_lvl:" <+> ppr lvl $$
+  ppr (ClosureInfo key id fvis lvl)
+    | opt_PprStyle_Debug = base <+> text "lvl:" <+> ppr lvl $$
        text "fvs:" <+> ppr (varSetElems $ prjFreeVars fvis)
     | otherwise = base
     where base = maybe (text "<arg>") ppr id <+> parens (ppr key)
 
-type ClosureNest = [ClosureInfo]
-  -- the first element is a subexpression of the second, which is a
-  -- subexpression of the third, and so on
-
 data Captors = Captors (IntMap ClosureInfo)
-                  -- key: closure id    (ie cli_id)
+                  -- key: closure id    (ie cli_key)
              | AltCaptors Captors Captors
              | BothCaptors Captors Captors
 
-
 bothCaptors :: Captors -> Captors -> Captors
+bothCaptors (Captors l) r | IntMap.null l = r
+bothCaptors l (Captors r) | IntMap.null r = l
 bothCaptors (Captors x) (Captors y) = Captors $ IntMap.union x y
 bothCaptors x           y           = BothCaptors x y
 
@@ -1516,8 +1606,8 @@ altCaptors (Captors l) r | IntMap.null l = r
 altCaptors l (Captors r) | IntMap.null r = l
 altCaptors l r = AltCaptors l r
 
-mkCaptors :: [ClosureInfo] -> Captors
-mkCaptors clis = Captors $ IntMap.fromList [ (cli_key cli, cli) | cli <- clis ]
+insertCaptor :: ClosureInfo -> Captors -> Captors
+insertCaptor cli cs = Captors (IntMap.singleton (cli_key cli) cli) `bothCaptors` cs
 
 fviIsNonTopLevel :: FVInfo -> Bool
 fviIsNonTopLevel = w . fvi_info where
@@ -1540,21 +1630,21 @@ fviCaptors = w . fvi_info where
   w NonTopLevelFV{} = zeroCaptors
   w TopLevelFV{}    = zeroCaptors
 
-fviLamCaptors :: FVInfo -> Captors
-fviLamCaptors = w . fvi_info where
-  w LBFFV { fvi_lamCaptors = x } = x
-  w NonTopLevelFV{} = zeroCaptors
-  w TopLevelFV{}    = zeroCaptors
+fviLevel :: FVInfo -> MajorLevel
+fviLevel = w . fvi_info where
+  w LBFFV { fvi_lvl = x } = x
+  w NonTopLevelFV{} = 0
+  w TopLevelFV{}    = 0
 
 instance Outputable FVInfo where
   ppr (FVInfo v info) = ppr v <> ppr info
 instance Outputable FVInfo' where
   ppr TopLevelFV    = empty
   ppr NonTopLevelFV = empty
-  ppr (LBFFV ui t tl) = text ":" <+> vcat
-    [ text "usage:" <+> ppr (IntSet.toList ui)
-    , text "captors:" <+> ppr t
-    , text "lambda captors:" <+> ppr tl
+  ppr (LBFFV ui cs lvl) = text ":" <+> vcat
+    [ text "lvl:" <+> ppr lvl
+    , text "usage:" <+> ppr (IntSet.toList ui)
+    , text "captors:" <+> ppr cs
     ]
 
 -- TODO As of 14 Feb 2013, I'm currently only ever using the intset
@@ -1578,8 +1668,8 @@ zeroCaptors :: Captors
 zeroCaptors = Captors IntMap.empty
 
 instance Outputable Captors where
-  ppr (BothCaptors l r) = parens $ vcat [ppr l, text "*", ppr r]
-  ppr (AltCaptors l r) = parens $ vcat [ppr l, text "+", ppr r]
+  ppr (BothCaptors l r) = parens $ vcat [ppr l, text "BOTH", ppr r]
+  ppr (AltCaptors l r) = parens $ vcat [ppr l, text "ALT", ppr r]
   ppr (Captors m) = vcat $ map tweak $ IntMap.elems m
     where tweak cli | opt_PprStyle_Debug = ppr cli
                     | otherwise          = ppr $ cli_id cli
@@ -1621,9 +1711,9 @@ bothFVI (FVInfo v l) (FVInfo _ r) = FVInfo v $ w l r where
   w l NonTopLevelFV{} = l
   w NonTopLevelFV{} r = r
   w l r = LBFFV
-    { fvi_useInfo    = fvi_useInfo    l `bothUseInfo` fvi_useInfo    r
-    , fvi_captors    = fvi_captors    l `bothCaptors` fvi_captors    r
-    , fvi_lamCaptors = fvi_lamCaptors l `bothCaptors` fvi_lamCaptors r
+    { fvi_useInfo    = fvi_useInfo    l `bothUseInfo`  fvi_useInfo    r
+    , fvi_captors    = fvi_captors    l `bothCaptors`  fvi_captors    r
+    , fvi_lvl        = fvi_lvl l
     }
 
 altFVI :: FVInfo -> FVInfo -> FVInfo
@@ -1635,7 +1725,7 @@ altFVI (FVInfo v l) (FVInfo _ r) = FVInfo v $ w l r where
   w l r = LBFFV
     { fvi_useInfo    = fvi_useInfo    l `altUseInfo` fvi_useInfo    r
     , fvi_captors    = fvi_captors    l `altCaptors` fvi_captors    r
-    , fvi_lamCaptors = fvi_lamCaptors l `altCaptors` fvi_lamCaptors r
+    , fvi_lvl        = fvi_lvl l
     }
 
 
@@ -1675,24 +1765,23 @@ delBinderFVIs b fvis =
 %************************************************************************
 
 \begin{code}
-data FVM' a = FVM' !Int a -- just a state monad with an mfix
+data FVM' a = FVM' !Int !a -- just a state monad
 newtype FVM a = FVM { runFVM :: Int -> FVM' a }
-tickFVM :: FVM Int
-tickFVM = FVM $ \i -> FVM' (i + 1) i
+gensymFVM :: FVM Int
+gensymFVM = FVM $ \i -> FVM' (i + 1) i
 instance Monad FVM where
   return a = FVM $ \i -> FVM' i a
   FVM f >>= k = FVM $ \i -> case f i of FVM' i a -> runFVM (k a) i
-instance MonadFix FVM where
-  mfix f = FVM $ \i -> let r@(FVM' _ a) = runFVM (f a) i in r
+--instance MonadFix FVM where
+--  mfix f = FVM $ \i -> let r@(FVM' _ a) = runFVM (f a) i in r
 
 data FVEnv = FVEnv
   { fve_isFinal      :: !Bool
+  , fve_argumentDemands :: Maybe [Bool]
   , fve_runtimeArgs  :: !NumRuntimeArgs
   -- ^ how many runtmie arguments does the context apply this expression to?
   , fve_letBoundFunLvls :: !LetBoundFunLvls
   -- ^ each let-bound in-scope variable's bindings's free variables
-  , fve_feedback     :: (ClosureLevel, ClosureNest)
-  -- ^ first field is the length of the list
   , fve_majorLevel   :: !MajorLevel
   -- ^ number of enclosing lambdas
   , fve_nonTopLevel  :: !VarSet
@@ -1700,22 +1789,21 @@ data FVEnv = FVEnv
   }
 
 type NumRuntimeArgs = Int -- i <=> applied to i runtime arguments
-type ClosureLevel = Int -- depth wrt to closures
-type LetBoundFunLvls = VarEnv (ClosureLevel, MajorLevel)
+type LetBoundFunLvls = VarEnv MajorLevel
   -- (k, lvl): k is a let-bound function, bound under lvl-many lambdas
 
 initFVEnv :: Bool -> FVEnv
 initFVEnv b = FVEnv {
   fve_isFinal = b,
+  fve_argumentDemands = Nothing,
   fve_runtimeArgs = 0,
   fve_letBoundFunLvls = emptyVarEnv,
-  fve_feedback = (0, []),
   fve_majorLevel = 0,
   fve_nonTopLevel = emptyVarSet
   }
 
 unappliedEnv :: FVEnv -> FVEnv
-unappliedEnv env = env { fve_runtimeArgs = 0 }
+unappliedEnv env = env { fve_runtimeArgs = 0, fve_argumentDemands = Nothing }
 
 appliedEnv :: FVEnv -> FVEnv
 appliedEnv env =
@@ -1728,17 +1816,22 @@ letBoundEnv bndr rhs env
  | isFunction' rhs = env { fve_letBoundFunLvls = extendVarEnv_C (\_ new -> new)
                              (fve_letBoundFunLvls env)
                              bndr
-                             (fst $ fve_feedback env, fve_majorLevel env) }
+                             (fve_majorLevel env) }
  | otherwise       = env
 
 letBoundsEnv :: [(Id, CoreExpr)] -> FVEnv -> FVEnv
 letBoundsEnv binds env = foldl (\e (id, rhs) -> letBoundEnv id rhs e) env binds
 
-closureBindingEnv :: Maybe Id -> FVIs -> FVEnv -> FVM FVEnv
-closureBindingEnv mb_id binding_fvis env = do
-  x <- tickFVM
-  return $ env { fve_feedback = let (!n, xs) = fve_feedback env
-                                in (1 + n, ClosureInfo x mb_id n (fve_majorLevel env) binding_fvis : xs)  }
+closureBindingFVIs :: FVEnv -> Maybe Id -> FVIs -> FVM FVIs
+closureBindingFVIs env mb_id rhs_fvis = gensymFVM >>= \key -> return $
+  let cli = ClosureInfo { cli_key = key, cli_id = mb_id, cli_fvis = fvis', cli_lvl = fve_majorLevel env }
+      fvis' = flip mapVarEnv rhs_fvis $ \fvi -> case fvi of
+        FVInfo v (LBFFV use cs lvl) -> FVInfo v $ (\cs -> LBFFV use cs lvl) $
+          if Just v == mb_id
+          then cs -- a closure does not capture itself
+          else insertCaptor cli cs
+        o -> o
+  in fvis'
 
 lambdaEnv :: FVEnv -> FVEnv
 lambdaEnv env = env { fve_majorLevel = 1 + fve_majorLevel env }
@@ -1761,12 +1854,12 @@ analyzeFVsM  env (Var v) =
   where
     fvi | not $ v `elemVarSet` fve_nonTopLevel env = TopLevelFV
         | fve_isFinal env,
-          Just (v_clo_lvl, v_lvl) <- lookupVarEnv (fve_letBoundFunLvls env) v
+          Just v_lvl <- lookupVarEnv (fve_letBoundFunLvls env) v
           = -- v is a let-bound function
 --            let (clo_lvl, closureNest) = fve_feedback env
 --            in
 --            let all_captors = case take (clo_lvl - v_clo_lvl) closureNest of
-            let all_captors = case take 1 $ snd $ fve_feedback env of
+{-            let all_captors = case take 1 $ snd $ fve_feedback env of
                        -- a closure does not capture itself
                   (cl:cls) | Just id <- cli_id cl, id == v -> cls
                   o -> o
@@ -1774,10 +1867,10 @@ analyzeFVsM  env (Var v) =
             let (escaping_captors, dominated_captors) =
                   -- TODO I think this can use Data.List.break
                   Data.List.partition (\cli -> cli_lvl cli > v_lvl) all_captors
-            in LBFFV { fvi_useInfo    = IntSet.singleton (fve_runtimeArgs env)
-                     , fvi_captors    = mkCaptors dominated_captors
-                     , fvi_lamCaptors = mkCaptors escaping_captors
-                     }
+            in -} LBFFV { fvi_useInfo    = IntSet.singleton (fve_runtimeArgs env)
+                        , fvi_captors    = zeroCaptors -- filled in on the way up
+                        , fvi_lvl        = v_lvl
+                        }
         | otherwise = NonTopLevelFV
 
 analyzeFVsM _env (Lit lit) = return (noneFVIs, AnnLit lit)
@@ -1786,16 +1879,30 @@ analyzeFVsM  env (Lam b body) = do
   body' <- flip analyzeFVsM body $ extendEnv [b] $ lambdaEnv $ unappliedEnv env
   return (b `delBinderFVIs` fvisOf body', AnnLam b body')
 
-analyzeFVsM  env (App fun arg) = do
-  let argIsAClosure = not (exprIsTrivial' arg)
+analyzeFVsM  env app@(App fun arg) = do
+  let argDmds = case fve_argumentDemands env of
+        Nothing   -> computeArgumentDemands app
+        Just dmds -> dmds
+
+  let (argIsStrictlyDemanded, dmds') = case argDmds of
+        [] -> (False, []) -- for some reason, we couldn't determine
+                          -- argument strictness for this application
+        isStrDmd : dmds -> (isStrDmd, dmds)
+      funEnv = env { fve_argumentDemands = Just dmds' }
+
+  let argIsAClosure = not $ argIsStrictlyDemanded || exprIsTrivial' arg
+
   fun2 <- flip analyzeFVsM fun $ if isRuntimeArg arg
-                                 then appliedEnv env
-                                 else            env
-  arg2 <- mfix $ \(fvisOf -> arg_fvis) -> do
-    env <- if argIsAClosure
-             then closureBindingEnv Nothing arg_fvis env
-             else return env
-    analyzeFVsM (unappliedEnv env) arg
+                                 then appliedEnv funEnv
+                                 else            funEnv
+  arg2 <- analyzeFVsM (unappliedEnv env) arg
+
+  arg2 <- do
+    let arg_fvis = fvisOf arg2
+    arg_fvis <- if argIsAClosure
+      then closureBindingFVIs env Nothing arg_fvis
+      else return arg_fvis
+    return (arg_fvis, snd arg2)
 
   return (fvisOf fun2 `bothFVIs` fvisOf arg2, AnnApp fun2 arg2)
 
@@ -1815,11 +1922,13 @@ analyzeFVsM env (Case scrut bndr ty alts) = do
          , AnnCase scrut2 bndr ty alts2 )
 
 analyzeFVsM env (Let (NonRec binder rhs) body) = do
-  rhs2 <- mfix $ \(fvisOf -> rhs_fvis) -> do
-    env <- closureBindingEnv (Just binder) rhs_fvis env
-    analyzeFVsM (unappliedEnv env) rhs
+  rhs2 <- analyzeFVsM (unappliedEnv env) rhs
 
   body2 <- flip analyzeFVsM body $ extendEnv [binder] $ unappliedEnv $ letBoundEnv binder rhs env
+
+  rhs2 <- do
+    rhs_fvis <- closureBindingFVIs env (Just binder) (fvisOf rhs2)
+    return (rhs_fvis, snd rhs2)
 
   return ( fvisOf rhs2 `bothFVIs`
            (binder `delBinderFVIs` fvisOf body2) `bothFVIs`
@@ -1829,11 +1938,11 @@ analyzeFVsM env (Let (NonRec binder rhs) body) = do
 analyzeFVsM env (Let (Rec binds) body) = do
   let binders = map fst binds
 
-  rhss2 <- flip mapM binds $ \(binder, rhs) ->
-    mfix $ \(fvisOf -> rhs_fvis) -> do
-      env <- closureBindingEnv (Just binder) rhs_fvis $ extendEnv binders $
-                                                        letBoundsEnv binds env
-      analyzeFVsM (unappliedEnv env) rhs
+  rhss2 <- flip mapM binds $ \(binder, rhs) -> do
+    rhs2 <- flip analyzeFVsM rhs $ unappliedEnv $ extendEnv binders $ letBoundsEnv binds env
+    let rhs_fvis = fvisOf rhs2
+    rhs_fvis <- closureBindingFVIs env (Just binder) rhs_fvis
+    return $ (rhs_fvis, snd rhs2)
 
   body2 <- flip analyzeFVsM body $ extendEnv binders $ unappliedEnv $ letBoundsEnv binds env
 
@@ -1861,6 +1970,20 @@ computeRecRHSsFVIs binders rhss2 =
   foldr (bothFVIs . assumeTheBest . idRuleAndUnfoldingVars)
         (foldr (bothFVIs . fvisOf) emptyVarEnv rhss2)
         binders
+
+-- should mirror CorePrep.cpeApp.collect_args
+computeArgumentDemands :: CoreExpr -> [Bool]
+computeArgumentDemands e = go e 0 where
+  go (App f a) as | isRuntimeArg a = go f (1 + as)
+                  | otherwise      = go f as
+  go (Cast f _) as = go f as
+  go (Tick _ f) as = go f as
+  go e          as = case e of
+    Var fid | length argStricts <= as -> -- at least saturated
+      reverse argStricts ++ replicate (as - length argStricts) False
+      where argStricts = map isStrictDmd $ fst $ splitStrictSig $ idStrictness fid
+    _       -> []
+
 
 tickishFVIs :: Tickish Id -> FVIs
 tickishFVIs (Breakpoint _ ids) = nonValueFVs (mkVarSet ids)
