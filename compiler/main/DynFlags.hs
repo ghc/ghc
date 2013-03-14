@@ -1121,16 +1121,8 @@ wayOptl platform WayThreaded =
         OSOpenBSD  -> ["-pthread"]
         OSNetBSD   -> ["-pthread"]
         _          -> []
-wayOptl _ WayDebug = []
-wayOptl platform WayDyn =
-        case platformOS platform of
-        OSOpenBSD -> -- Without this, linking the shared libHSffi fails
-                     -- because it uses pthread mutexes.
-                     ["-optl-pthread"]
-        OSNetBSD -> -- Without this, linking the shared libHSffi fails
-                    -- because it uses pthread mutexes.
-                    ["-optl-pthread"]
-        _ -> []
+wayOptl _ WayDebug      = []
+wayOptl _ WayDyn        = []
 wayOptl _ WayProf       = []
 wayOptl _ WayEventLog   = []
 wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
