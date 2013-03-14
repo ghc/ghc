@@ -11,7 +11,7 @@
 :load D.hs
 
 -- compile A & reload
-:shell "$HC" $HC_OPTS -fforce-recomp -c A.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
 :reload
 
 B.g 42
@@ -21,7 +21,7 @@ B.g 42
 -- swap A2 for A, compile & reload
 :shell sleep 1
 :shell cp A2.hs A.hs
-:shell "$HC" $HC_OPTS -fforce-recomp -c A.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
 :reload
 -- the system should ignore the compiled version and compile its own.
 

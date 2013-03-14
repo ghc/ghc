@@ -28,7 +28,7 @@ a 42
 
 putStrLn "Run 3"
 -- compile D, check that :reload doesn't pick it up
-:shell "$HC" $HC_OPTS -c D.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -c D.hs
 :reload
 :type (A.a,B.b,C.c,D.d)
 a 42
@@ -41,21 +41,21 @@ a 42
 
 putStrLn "Run 5"
 -- D,C compiled
-:shell "$HC" $HC_OPTS -c C.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -c C.hs
 :load A
 :type (A.a,B.b,C.c,D.d)
 a 42
 
 putStrLn "Run 6"
 -- D,C,B compiled
-:shell "$HC" $HC_OPTS -c B.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -c B.hs
 :load A
 :type (A.a,B.b,C.c,D.d)
 a 42
 
 putStrLn "Run 7"
 -- D,C,B,A compiled
-:shell "$HC" $HC_OPTS -c A.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -c A.hs
 :load A
 :type (A.a,B.b,C.c,D.d)
 a 42
@@ -83,7 +83,7 @@ a 42
 
 putStrLn "Run 11"
 -- A,B,C compiled (better not use A.o, B.o, C.o)
-:shell "$HC" $HC_OPTS --make -v0 A
+:shell "$HC" $HC_OPTS $ghciWayFlags --make -v0 A
 :shell rm D.o
 :load A
 :type (A.a,B.b,C.c,D.d)

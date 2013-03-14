@@ -15,6 +15,6 @@ package.%:
 	
 	echo "[]" > pkg.$*/local.package.conf
 	
-	pkg.$*/setup configure --distdir pkg.$*/dist -v0 $(CABAL_MINIMAL_BUILD) --prefix="$(HERE)/pkg.$*/install" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=pkg.$*/local.package.conf
+	pkg.$*/setup configure --distdir pkg.$*/dist -v0 $(CABAL_PLUGIN_BUILD) --prefix="$(HERE)/pkg.$*/install" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=pkg.$*/local.package.conf
 	pkg.$*/setup build     --distdir pkg.$*/dist -v0
 	pkg.$*/setup install   --distdir pkg.$*/dist -v0

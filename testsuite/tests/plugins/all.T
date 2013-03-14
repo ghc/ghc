@@ -29,11 +29,11 @@ test('plugins04',
 
 test('plugins05',
      [ extra_clean(['HomePackagePlugin.hi', 'HomePackagePlugin.o']),
-       expect_fail_for(['dyn'] + prof_ways) ],
+       only_ways([config.ghc_plugin_way]) ],
      multimod_compile_and_run, ['plugins05', '-package ghc'])
 
 test('plugins06',
      [ extra_clean(['LinkerTicklingPlugin.hi', 'LinkerTicklingPlugin.o']),
-       expect_fail_for(['dyn'] + prof_ways) ],
+       only_ways([config.ghc_plugin_way]) ],
      multimod_compile_and_run, ['plugins06', '-package ghc'])
 

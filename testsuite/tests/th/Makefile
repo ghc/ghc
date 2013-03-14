@@ -5,12 +5,12 @@ include $(TOP)/mk/test.mk
 # Trac 2386 requires batch-compile not --make
 # Very important: without -O 
 T2386:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T2386_Lib.hs -fforce-recomp
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T2386.hs -fforce-recomp
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T2386_Lib.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T2386.hs
 
 T7445:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T7445a.hs -fforce-recomp
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T7445.hs -fforce-recomp
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T7445a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T7445.hs
 
 HC_OPTS = -XTemplateHaskell -package template-haskell
 
@@ -27,10 +27,10 @@ TH_Depends:
 	$(RM) TH_Depends.o TH_Depends.hi
 	$(RM) TH_Depends_External.o TH_Depends_External.hi
 	echo "first run" > TH_Depends_external.txt
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 TH_Depends
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
 	./TH_Depends
 	sleep 2
 	echo "second run" > TH_Depends_external.txt
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 TH_Depends
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
 	./TH_Depends
 

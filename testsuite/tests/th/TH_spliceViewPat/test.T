@@ -11,4 +11,4 @@ setTestOpts(when(compiler_profiled(), skip))
 test('TH_spliceViewPat',
      extra_clean(['Main.o', 'Main.hi', 'A.o', 'A.hi']),
      multimod_compile_and_run,
-     ['Main', ''])
+     ['Main', config.ghc_th_way_flags])

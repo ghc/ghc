@@ -486,9 +486,9 @@ T3364:
 .PHONY: T706
 T706:
 	cp T706a.hs T706.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -c T706.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) $(ghciWayFlags) -c T706.hs
 	cp T706b.hs T706.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -c T706.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) $(ghciWayFlags) -c T706.hs
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive -ignore-dot-ghci -v0 T706
 
 .PHONY: T5584

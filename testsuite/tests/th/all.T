@@ -32,14 +32,14 @@ test('TH_repPatSig', normal, compile_fail, [''])
 test('TH_spliceE5',
      extra_clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o']),
      multimod_compile_and_run,
-     ['TH_spliceE5.hs', '-v0'])
+     ['TH_spliceE5.hs', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_spliceE6', normal, compile, ['-v0'])
 
 test('TH_NestedSplices',
      extra_clean(['TH_NestedSplices_Lib.hi', 'TH_NestedSplices_Lib.o']),
      multimod_compile,
-     ['TH_NestedSplices.hs', '-v0'])
+     ['TH_NestedSplices.hs', '-v0 ' + config.ghc_th_way_flags])
 
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
@@ -57,7 +57,7 @@ test('TH_spliceE5_prof',
 test('TH_spliceD1',
      extra_clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o']),
      multimod_compile_fail,
-     ['TH_spliceD1', '-v0'])
+     ['TH_spliceD1', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_spliceD2',
      extra_clean(['TH_spliceD2_Lib.hi', 'TH_spliceD2_Lib.o']),
@@ -78,21 +78,21 @@ test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3',
      extra_clean(['TH_spliceDecl3_Lib.hi', 'TH_spliceDecl3_Lib.o']),
      multimod_compile,
-     ['TH_spliceDecl3', '-v0'])
+     ['TH_spliceDecl3', '-v0 ' + config.ghc_th_way_flags])
 test('TH_spliceDecl4',
      extra_clean(['TH_spliceDecl4_Lib.hi', 'TH_spliceDecl4_Lib.o']),
      multimod_compile,
-     ['TH_spliceDecl4', '-v0'])
+     ['TH_spliceDecl4', '-v0 ' + config.ghc_th_way_flags])
 
 test('T2597a',
      extra_clean(['T2597a_Lib.hi', 'T2597a_Lib.o']),
      multimod_compile,
-     ['T2597a', '-v0'])
+     ['T2597a', '-v0 ' + config.ghc_th_way_flags])
 
 test('T2597b',
      extra_clean(['T2597b_Lib.hi', 'T2597b_Lib.o']),
      multimod_compile_fail,
-     ['T2597b', '-v0'])
+     ['T2597b', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_spliceE1', normal, compile_and_run, [''])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
@@ -108,7 +108,7 @@ test('TH_tuple1', normal, compile, ['-v0'])
 test('TH_genEx',
      extra_clean(['TH_genExLib.hi', 'TH_genExLib.o']),
      multimod_compile,
-     ['TH_genEx', '-v0'])
+     ['TH_genEx', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_where', normal, compile_and_run, [''])
 
@@ -145,7 +145,7 @@ test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
 	      ['$MAKE -s --no-print-directory T2386'] )
 
 test('T2685', extra_clean(['T2685a.hi','T2685a.o']),
-              multimod_compile, ['T2685','-v0'])
+              multimod_compile, ['T2685', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_sections', normal, compile, ['-v0'])
 
@@ -167,10 +167,11 @@ test('T3100', normal, compile, ['-v0'])
 test('T3920', normal, compile_and_run, ['-v0'])
 
 test('T3600', extra_clean(['T3600a.hi','T3600a.o']),
-              multimod_compile, ['T3600','-v0'])
+              multimod_compile, ['T3600', '-v0 ' + config.ghc_th_way_flags])
 test('T3845', normal, compile, ['-v0'])
 test('T3899', extra_clean(['T3899a.hi','T3899a.o']),
-              multimod_compile, ['T3899','-v0 -ddump-splices -dsuppress-uniques'])
+              multimod_compile,
+              ['T3899','-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
 test('T4056', normal, compile, ['-v0'])
 test('T4188', normal, compile, ['-v0'])
 test('T4233', normal, compile, ['-v0'])
@@ -190,7 +191,7 @@ test('T5362', normal, compile, ['-v0'])
 test('TH_unresolvedInfix',
      extra_clean(['TH_unresolvedInfix_Lib.hi', 'TH_unresolvedInfix_Lib.o']),
      multimod_compile_and_run,
-     ['TH_unresolvedInfix.hs', '-v0'])
+     ['TH_unresolvedInfix.hs', '-v0 ' + config.ghc_th_way_flags])
 test('TH_unresolvedInfix2',
      normal,
      compile_fail,
@@ -203,10 +204,11 @@ test('T5410', normal, compile_and_run, ['-v0'])
 test('TH_lookupName',
      extra_clean(['TH_lookupName_Lib.hi', 'TH_lookupName_Lib.o']),
      multimod_compile_and_run,
-     ['TH_lookupName.hs', ''])
+     ['TH_lookupName.hs', config.ghc_th_way_flags])
 test('T5452', normal, compile, ['-v0'])
 test('T5434', extra_clean(['T5434a.hi','T5434a.o']),
-              multimod_compile, ['T5434','-v0 -Wall'])
+              multimod_compile,
+              ['T5434','-v0 -Wall ' + config.ghc_th_way_flags])
 test('T5508', normal, compile, ['-v0 -ddump-splices'])
 test('TH_Depends',
      [extra_clean(['TH_Depends_External.o', 'TH_Depends_External.hi',
@@ -214,11 +216,12 @@ test('TH_Depends',
      run_command,
      ['$MAKE -s --no-print-directory TH_Depends'])
 test('T5597', extra_clean(['T5597a.hi','T5597a.o']),
-              multimod_compile, ['T5597','-v0'])
+              multimod_compile, ['T5597', '-v0 ' + config.ghc_th_way_flags])
 test('T5665', extra_clean(['T5665a.hi','T5665a.o']),
-              multimod_compile, ['T5665','-v0'])
+              multimod_compile, ['T5665', '-v0 ' + config.ghc_th_way_flags])
 test('T5700', extra_clean(['T5700a.hi','T5700a.o']),
-              multimod_compile, ['T5700','-v0 -ddump-splices'])
+              multimod_compile,
+              ['T5700','-v0 -ddump-splices ' + config.ghc_th_way_flags])
 test('T5721', normal, compile, ['-v0'])
 
 test('TH_PromotedTuple', normal, compile, ['-v0 -ddump-splices'])
@@ -231,12 +234,13 @@ test('T1541', normal, compile, ['-v0'])
 test('T5883', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T5882', normal, compile, ['-v0'])
 test('T5886', extra_clean(['T5886a.hi','T5886a.o']),
-              multimod_compile, ['T5886','-v0'])
+              multimod_compile, ['T5886','-v0 ' + config.ghc_th_way_flags])
 test('T4135', normal, compile, ['-v0'])
 test('T5971', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('T5968', normal, compile, ['-v0'])
 test('T5984', extra_clean(['T5984_Lib.hi', 'T5984_Lib.o']),
-              multimod_compile, ['T5984', '-v0 -ddump-splices'])
+              multimod_compile,
+              ['T5984', '-v0 -ddump-splices ' + config.ghc_th_way_flags])
 test('T5555', extra_clean(['T5555_Lib.hi', 'T5555_Lib.o']),
               multimod_compile, ['T5555', '-v0'])
 test('T5976', normal, compile_fail, ['-v0'])
@@ -249,9 +253,9 @@ test('TH_StringPrimL', normal, compile_and_run, [''])
 test('T7064',
      extra_clean(['T7064a.hi', 'T7064a.o']),
      multimod_compile_and_run,
-     ['T7064.hs', '-v0'])
+     ['T7064.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T7092', extra_clean(['T7092a.hi','T7092a.o']),
-              multimod_compile, ['T7092','-v0'])
+              multimod_compile, ['T7092', '-v0 ' + config.ghc_th_way_flags])
 test('T7276', normal, compile_fail, ['-v0'])
 test('T7276a', combined_output, ghci_script, ['T7276a.script'])
 
@@ -266,7 +270,7 @@ test('T7445', extra_clean(['T7445a.hi', 'T7445a.o']),
 test('T7532',
      extra_clean(['T7532a.hi', 'T7532a.o']),
      multimod_compile,
-     ['T7532', '-v0'])
+     ['T7532', '-v0 ' + config.ghc_th_way_flags])
 test('T2222', normal, compile, ['-v0'])
 test('T1849', normal, ghci_script, ['T1849.script'])
 test('T7681', normal, compile, ['-v0'])

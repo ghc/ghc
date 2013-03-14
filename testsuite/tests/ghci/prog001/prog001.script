@@ -26,13 +26,13 @@ main
 main
 
 -- compile D & reload
-:shell "$HC" $HC_OPTS -fforce-recomp -c D.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
 :reload
 main
 
 -- change D, recompile & reload
 :shell cp D2.hs D.hs
-:shell "$HC" $HC_OPTS -fforce-recomp -c D.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
 :reload
 :load A.hs
 

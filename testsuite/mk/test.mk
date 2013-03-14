@@ -104,6 +104,14 @@ RUNTEST_OPTS += -e ghc_dynamic_by_default=False
 CABAL_MINIMAL_BUILD = --enable-library-vanilla --disable-shared
 endif
 
+ifeq "$(GhcDynamic)" "YES"
+RUNTEST_OPTS += -e ghc_dynamic=True
+CABAL_PLUGIN_BUILD = --enable-shared --disable-library-vanilla
+else
+RUNTEST_OPTS += -e ghc_dynamic=False
+CABAL_PLUGIN_BUILD = --enable-library-vanilla --disable-shared
+endif
+
 ifeq "$(GhcWithSMP)" "YES"
 RUNTEST_OPTS += -e ghc_with_smp=1
 else
