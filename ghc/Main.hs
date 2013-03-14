@@ -143,7 +143,15 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
-  let dflags1 = dflags0{ ghcMode   = mode,
+  let dflags1 = case lang of
+                HscInterpreted ->
+                    let interpWayGeneralFlags = concatMap (wayGeneralFlags (targetPlatform dflags0)) interpWays
+                    in foldl gopt_set
+                             (updateWays $ dflags0 { ways = interpWays })
+                             interpWayGeneralFlags
+                _ ->
+                    dflags0
+      dflags2 = dflags1{ ghcMode   = mode,
                          hscTarget = lang,
                          ghcLink   = link,
                          -- leave out hscOutName for now
@@ -157,28 +165,28 @@ main' postLoadMode dflags0 args flagWarnings = do
       -- can be overriden from the command-line
       -- XXX: this should really be in the interactive DynFlags, but
       -- we don't set that until later in interactiveUI
-      dflags1a | DoInteractive <- postLoadMode = imp_qual_enabled
+      dflags3  | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
-               | otherwise                 = dflags1
-        where imp_qual_enabled = dflags1 `gopt_set` Opt_ImplicitImportQualified
+               | otherwise                     = dflags2
+        where imp_qual_enabled = dflags2 `gopt_set` Opt_ImplicitImportQualified
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
-  (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a args
+  (dflags4, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags3 args
 
-  GHC.prettyPrintGhcErrors dflags2 $ do
+  GHC.prettyPrintGhcErrors dflags4 $ do
 
   let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings dflags2 flagWarnings'
+         liftIO $ handleFlagWarnings dflags4 flagWarnings'
 
         -- make sure we clean up after ourselves
-  GHC.defaultCleanupHandler dflags2 $ do
+  GHC.defaultCleanupHandler dflags4 $ do
 
-  liftIO $ showBanner postLoadMode dflags2
+  liftIO $ showBanner postLoadMode dflags4
 
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right
@@ -187,29 +195,29 @@ main' postLoadMode dflags0 args flagWarnings = do
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-    dflags2a = dflags2 { ldInputs = objs ++ ldInputs dflags2 }
+    dflags5 = dflags4 { ldInputs = objs ++ ldInputs dflags4 }
 
   -- we've finished manipulating the DynFlags, update the session
-  _ <- GHC.setSessionDynFlags dflags2a
-  dflags3 <- GHC.getSessionDynFlags
+  _ <- GHC.setSessionDynFlags dflags5
+  dflags6 <- GHC.getSessionDynFlags
   hsc_env <- GHC.getSession
 
         ---------------- Display configuration -----------
-  when (verbosity dflags3 >= 4) $
-        liftIO $ dumpPackages dflags3
+  when (verbosity dflags6 >= 4) $
+        liftIO $ dumpPackages dflags6
 
-  when (verbosity dflags3 >= 3) $ do
+  when (verbosity dflags6 >= 3) $ do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
         ---------------- Final sanity checking -----------
-  liftIO $ checkOptions postLoadMode dflags3 srcs objs
+  liftIO $ checkOptions postLoadMode dflags6 srcs objs
 
   ---------------- Do the business -----------
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
-       ShowInterface f        -> liftIO $ doShowIface dflags3 f
+       ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
@@ -217,7 +225,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
 
-  liftIO $ dumpFinalStats dflags3
+  liftIO $ dumpFinalStats dflags6
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #ifndef GHCI
@@ -225,6 +233,11 @@ ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
 ghciUI     = interactiveUI defaultGhciSettings
 #endif
+
+interpWays :: [Way]
+interpWays = if cDYNAMIC_GHC_PROGRAMS
+             then [WayDyn]
+             else []
 
 -- -----------------------------------------------------------------------------
 -- Splitting arguments into source files and object files.  This is where we
@@ -290,7 +303,7 @@ checkOptions mode dflags srcs objs = do
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((filter (not . wayRTSOnly) (ways dflags) /= defaultWays (settings dflags))
+   when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
          && isInterpretiveMode mode) $
       do throwGhcException (UsageError
                    "--interactive can't be used with -prof or -unreg.")

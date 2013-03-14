@@ -50,7 +50,8 @@ module DynFlags (
 
         printOutputForUser, printInfoForUser,
 
-        Way(..), mkBuildTag, wayRTSOnly,
+        Way(..), mkBuildTag, wayRTSOnly, updateWays,
+        wayGeneralFlags,
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
@@ -1847,11 +1848,10 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
     = let theWays = sort $ nub $ ways dflags
-          theBuildTag = mkBuildTag (filter (not . wayRTSOnly) theWays)
       in dflags {
              ways        = theWays,
-             buildTag    = theBuildTag,
-             rtsBuildTag = mkBuildTag theWays
+             buildTag    = mkBuildTag (filter (not . wayRTSOnly) theWays),
+             rtsBuildTag = mkBuildTag                            theWays
          }
 
 -- | Check (and potentially disable) any extensions that aren't allowed
