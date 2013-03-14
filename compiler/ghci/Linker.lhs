@@ -70,8 +70,6 @@ import System.Directory hiding (findFile)
 import System.Directory
 #endif
 
-import Distribution.Package hiding (depends, PackageId)
-
 import Exception
 \end{code}
 
