@@ -131,7 +131,12 @@ DYNAMIC_TOO = YES
 # Use the dynamic way when building programs in the GHC tree. In
 # particular, this means that GHCi will use DLLs rather than loading
 # object files directly.
+ifeq "$(TargetOS_CPP)" "mingw32"
+# This doesn't work on Windows yet
+DYNAMIC_GHC_PROGRAMS = NO
+else
 DYNAMIC_GHC_PROGRAMS = YES
+endif
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
