@@ -64,14 +64,14 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
             export {
               expItemInstances =
                 case mb_info of
-                  Just (_, _, instances) ->
+                  Just (_, _, cls_instances, _fam_instances) ->
 {-
                     let insts = map (first synifyInstHead) $ sortImage (first instHead)
                                 [ (instanceSig i, getName i) | i <- instances ]
 -}
                     let insts = map (first synifyInstHead) $ sortImage (first instHead) $
                                 filter (\((_,_,cls,tys),_) -> not $ isInstanceHidden expInfo cls tys)
-                                [ (instanceHead' i, getName i) | i <- instances ]
+                                [ (instanceHead' i, getName i) | i <- cls_instances ]
                     in [ (inst, lookupInstDoc name iface ifaceMap instIfaceMap)
                        | (inst, name) <- insts ]
                   Nothing -> []
@@ -116,7 +116,7 @@ dropSilentArgs dfun theta = drop (dfunNSilent dfun) theta
 
 -- | Like GHC's getInfo but doesn't cut things out depending on the
 -- interative context, which we don't set sufficiently anyway.
-getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
+getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst Branched]))
 getAllInfo name = withSession $ \hsc_env -> do 
    (_msgs, r) <- liftIO $ tcRnGetInfo hsc_env name
    return r
