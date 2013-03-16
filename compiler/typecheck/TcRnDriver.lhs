@@ -76,7 +76,6 @@ import DataCon
 import Type
 import Class
 import CoAxiom  ( CoAxBranch(..) )
-import TcType   ( orphNamesOfDFunHead )
 import Inst     ( tcGetInstEnvs )
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
@@ -1735,7 +1734,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst]))
+            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst Branched]))
 
 -- Used to implement :info in GHCi
 --
@@ -1757,29 +1756,41 @@ tcRnGetInfo hsc_env name
 
     thing  <- tcRnLookupName' name
     fixity <- lookupFixityRn name
-    ispecs <- lookupInsts thing
-    return (thing, fixity, ispecs)
+    (cls_insts, fam_insts) <- lookupInsts thing
+    return (thing, fixity, cls_insts, fam_insts)
 
-lookupInsts :: TyThing -> TcM [ClsInst]
+lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst Branched])
 lookupInsts (ATyCon tc)
   | Just cls <- tyConClass_maybe tc
   = do  { inst_envs <- tcGetInstEnvs
-        ; return (classInstances inst_envs cls) }
+        ; return (classInstances inst_envs cls, []) }
+
+  | isFamilyTyCon tc || isTyConAssoc tc
+  = do  { inst_envs <- tcGetFamInstEnvs
+        ; return ([], familyInstances inst_envs tc) }
 
   | otherwise
   = do  { (pkg_ie, home_ie) <- tcGetInstEnvs
+        ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
                 -- Load all instances for all classes that are
                 -- in the type environment (which are all the ones
                 -- we've seen in any interface file so far)
-        ; return [ ispec        -- Search all
+
+          -- Return only the instances relevant to the given thing, i.e.
+          -- the instances whose head contains the thing's name.
+        ; let cls_insts =
+                 [ ispec        -- Search all
                  | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie
-                 , let dfun = instanceDFunId ispec
-                 , relevant dfun ] }
+                 , tc_name `elemNameSet` orphNamesOfClsInst ispec ]
+        ; let fam_insts =
+                 [ fispec
+                 | fispec <- famInstEnvElts home_fie ++ famInstEnvElts pkg_fie
+                 , tc_name `elemNameSet` orphNamesOfFamInst fispec ]
+        ; return (cls_insts, fam_insts) }
   where
-    relevant df = tc_name `elemNameSet` orphNamesOfDFunHead (idType df)
     tc_name     = tyConName tc
 
-lookupInsts _ = return []
+lookupInsts _ = return ([],[])
 
 loadUnqualIfaces :: HscEnv -> InteractiveContext -> TcM ()
 -- Load the interface for everything that is in scope unqualified

@@ -76,7 +76,7 @@ module TcType (
   -- Misc type manipulators
   deNoteType, occurCheckExpand, OccCheckResult(..),
   orphNamesOfType, orphNamesOfDFunHead, orphNamesOfCo,
-  orphNamesOfCoCon,
+  orphNamesOfTypes, orphNamesOfCoCon,
   getDFunTyKey,
   evVarPred_maybe, evVarPred,
 

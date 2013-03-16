@@ -182,6 +182,8 @@ module GHC (
         pprInstance, pprInstanceHdr,
         pprFamInst,
 
+        FamInst, Branched,
+
         -- ** Types and Kinds
         Type, splitForAllTys, funResultTy, 
         pprParendType, pprTypeApp, 
