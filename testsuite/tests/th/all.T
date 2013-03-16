@@ -242,7 +242,7 @@ test('T5984', extra_clean(['T5984_Lib.hi', 'T5984_Lib.o']),
               multimod_compile,
               ['T5984', '-v0 -ddump-splices ' + config.ghc_th_way_flags])
 test('T5555', extra_clean(['T5555_Lib.hi', 'T5555_Lib.o']),
-              multimod_compile, ['T5555', '-v0'])
+              multimod_compile, ['T5555', '-v0 ' + config.ghc_th_way_flags])
 test('T5976', normal, compile_fail, ['-v0'])
 test('T5795', normal, compile_fail, ['-v0'])
 test('T6005', normal, compile, ['-v0'])
