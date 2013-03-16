@@ -640,7 +640,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                 -- When looking for dynamic object files, we try both
                 -- .dyn_o and .o, with a preference for the former.
                 use_dyn <- if cDYNAMIC_GHC_PROGRAMS
-                           then do doesFileExist dyn_file
+                           then doesFileExist dyn_file
                            else return False
                 if use_dyn
                     then return (DotO dyn_file)

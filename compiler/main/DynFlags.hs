@@ -74,6 +74,7 @@ module DynFlags (
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- Settings -> DynFlags
         defaultWays,
+        interpWays,
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
         defaultLogAction,
@@ -1336,6 +1337,11 @@ defaultWays :: Settings -> [Way]
 defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then [WayDyn]
                        else []
+
+interpWays :: [Way]
+interpWays = if cDYNAMIC_GHC_PROGRAMS
+             then [WayDyn]
+             else []
 
 --------------------------------------------------------------------------
 

@@ -234,11 +234,6 @@ ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
 ghciUI     = interactiveUI defaultGhciSettings
 #endif
 
-interpWays :: [Way]
-interpWays = if cDYNAMIC_GHC_PROGRAMS
-             then [WayDyn]
-             else []
-
 -- -----------------------------------------------------------------------------
 -- Splitting arguments into source files and object files.  This is where we
 -- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
