@@ -14,7 +14,7 @@ test('plugins02',
      [pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins02'),
       clean_cmd('$MAKE -s --no-print-directory -C simple-plugin clean.plugins02')],
      compile_fail,
-     ['-package-db simple-plugin/pkg.plugins02/local.package.conf -fplugin Simple.BadlyTypedPlugin -package simple-plugin'])
+     ['-package-db simple-plugin/pkg.plugins02/local.package.conf -fplugin Simple.BadlyTypedPlugin -package simple-plugin ' + config.ghci_way_flags])
 
 test('plugins03',
      [pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins03'),
