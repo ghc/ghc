@@ -145,10 +145,15 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   let dflags1 = case lang of
                 HscInterpreted ->
-                    let interpWayGeneralFlags = concatMap (wayGeneralFlags (targetPlatform dflags0)) interpWays
-                    in foldl gopt_set
-                             (updateWays $ dflags0 { ways = interpWays })
-                             interpWayGeneralFlags
+                    let platform = targetPlatform dflags0
+                        dflags0a = updateWays $ dflags0 { ways = interpWays }
+                        dflags0b = foldl gopt_set dflags0a
+                                 $ concatMap (wayGeneralFlags platform)
+                                             interpWays
+                        dflags0c = foldl gopt_unset dflags0b
+                                 $ concatMap (wayUnsetGeneralFlags platform)
+                                             interpWays
+                    in dflags0c
                 _ ->
                     dflags0
       dflags2 = dflags1{ ghcMode   = mode,

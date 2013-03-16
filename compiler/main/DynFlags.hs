@@ -51,7 +51,7 @@ module DynFlags (
         printOutputForUser, printInfoForUser,
 
         Way(..), mkBuildTag, wayRTSOnly, updateWays,
-        wayGeneralFlags,
+        wayGeneralFlags, wayUnsetGeneralFlags,
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
@@ -1075,6 +1075,16 @@ wayGeneralFlags _ WayPar      = [Opt_Parallel]
 wayGeneralFlags _ WayGran     = [Opt_GranMacros]
 wayGeneralFlags _ WayNDP      = []
 
+wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
+wayUnsetGeneralFlags _ WayThreaded = []
+wayUnsetGeneralFlags _ WayDebug    = []
+wayUnsetGeneralFlags _ WayDyn      = [Opt_Static]
+wayUnsetGeneralFlags _ WayProf     = []
+wayUnsetGeneralFlags _ WayEventLog = []
+wayUnsetGeneralFlags _ WayPar      = []
+wayUnsetGeneralFlags _ WayGran     = []
+wayUnsetGeneralFlags _ WayNDP      = []
+
 wayExtras :: Platform -> Way -> DynFlags -> DynFlags
 wayExtras _ WayThreaded dflags = dflags
 wayExtras _ WayDebug    dflags = dflags
@@ -1163,15 +1173,14 @@ generateDynamicTooConditional dflags canGen cannotGen notTryingToGen
       else notTryingToGen
 
 doDynamicToo :: DynFlags -> DynFlags
-doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0
-                           dflags2 = addWay' WayDyn dflags1
-                           dflags3 = dflags2 {
-                                         outputFile = dynOutputFile dflags2,
-                                         hiSuf = dynHiSuf dflags2,
-                                         objectSuf = dynObjectSuf dflags2
+doDynamicToo dflags0 = let dflags1 = addWay' WayDyn dflags0
+                           dflags2 = dflags1 {
+                                         outputFile = dynOutputFile dflags1,
+                                         hiSuf = dynHiSuf dflags1,
+                                         objectSuf = dynObjectSuf dflags1
                                      }
-                           dflags4 = updateWays dflags3
-                       in dflags4
+                           dflags3 = updateWays dflags2
+                       in dflags3
 
 -----------------------------------------------------------------------------
 
@@ -1969,10 +1978,8 @@ dynamic_flags = [
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  , Flag "static"         (NoArg (do setGeneralFlag Opt_Static
-                                     removeWay WayDyn))
-  , Flag "dynamic"        (NoArg (do unSetGeneralFlag Opt_Static
-                                     addWay WayDyn))
+  , Flag "static"         (NoArg (removeWay WayDyn))
+  , Flag "dynamic"        (NoArg (addWay WayDyn))
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ()))
   , Flag "relative-dynlib-paths"  (NoArg (setGeneralFlag Opt_RelativeDynlibPaths))
@@ -2981,8 +2988,11 @@ addWay' :: Way -> DynFlags -> DynFlags
 addWay' w dflags0 = let platform = targetPlatform dflags0
                         dflags1 = dflags0 { ways = w : ways dflags0 }
                         dflags2 = wayExtras platform w dflags1
-                        dflags3 = foldr setGeneralFlag' dflags2 (wayGeneralFlags platform w)
-                    in dflags3
+                        dflags3 = foldr setGeneralFlag' dflags2
+                                        (wayGeneralFlags platform w)
+                        dflags4 = foldr unSetGeneralFlag' dflags3
+                                        (wayUnsetGeneralFlags platform w)
+                    in dflags4
 
 removeWay :: Way -> DynP ()
 removeWay w = do
@@ -2991,6 +3001,7 @@ removeWay w = do
   let platform = targetPlatform dfs
   -- XXX: wayExtras?
   mapM_ unSetGeneralFlag $ wayGeneralFlags platform w
+  mapM_ setGeneralFlag $ wayUnsetGeneralFlags platform w
   -- turn Opt_PIC back on if necessary for this platform:
   mapM_ setGeneralFlag $ default_PIC platform
 
