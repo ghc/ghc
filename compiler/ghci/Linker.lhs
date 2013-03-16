@@ -482,12 +482,10 @@ dieWith :: DynFlags -> SrcSpan -> MsgDoc -> IO a
 dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 
-checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
-checkNonStdWay dflags srcspan = do
-  let tag = buildTag dflags
-  if (null tag && not cDYNAMIC_GHC_PROGRAMS) ||
-     (tag == "dyn" && cDYNAMIC_GHC_PROGRAMS)
-      then return False
+checkNonStdWay :: DynFlags -> SrcSpan -> IO (Maybe FilePath)
+checkNonStdWay dflags srcspan =
+  if interpWays == haskellWays
+      then return Nothing
     -- see #3604: object files compiled for way "dyn" need to link to the
     -- dynamic packages, so we can't load them into a statically-linked GHCi.
     -- we have to treat "dyn" in the same way as "prof".
@@ -497,23 +495,28 @@ checkNonStdWay dflags srcspan = do
     -- .o files or -dynamic .o files into GHCi (currently that's not possible
     -- because the dynamic objects contain refs to e.g. __stginit_base_Prelude_dyn
     -- whereas we have __stginit_base_Prelude_.
-      else if (objectSuf dflags == normalObjectSuffix) && not (null tag)
+      else if objectSuf dflags == normalObjectSuffix && not (null haskellWays)
       then failNonStd dflags srcspan
-      else return True
+      else return $ Just $ if cDYNAMIC_GHC_PROGRAMS
+                           then "dyn_o"
+                           else "o"
+    where haskellWays = filter (not . wayRTSOnly) (ways dflags)
 
 normalObjectSuffix :: String
 normalObjectSuffix = phaseInputExt StopLn
 
-failNonStd :: DynFlags -> SrcSpan -> IO Bool
+failNonStd :: DynFlags -> SrcSpan -> IO (Maybe FilePath)
 failNonStd dflags srcspan = dieWith dflags srcspan $
   ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
-  ptext (sLit "You need to build the program twice: once the normal way, and then") $$
+  ptext (sLit "You need to build the program twice: once the") <+> ghciWay <+> ptext (sLit "way, and then") $$
   ptext (sLit "in the desired way using -osuf to set the object file suffix.")
-
+    where ghciWay = if cDYNAMIC_GHC_PROGRAMS
+                    then ptext (sLit "dynamic")
+                    else ptext (sLit "normal")
 
 getLinkDeps :: HscEnv -> HomePackageTable
             -> PersistentLinkerState
-            -> Bool                             -- replace object suffices?
+            -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
             -> IO ([Linkable], [PackageId])     -- ... then link these first
@@ -541,7 +544,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
         let { osuf = objectSuf dflags } ;
-        lnks_needed <- mapM (get_linkable osuf replace_osuf) mods_needed ;
+        lnks_needed <- mapM (get_linkable osuf) mods_needed ;
 
         return (lnks_needed, pkgs_needed) }
   where
@@ -606,7 +609,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
         -- This one is a build-system bug
 
-    get_linkable osuf replace_osuf mod_name      -- A home-package module
+    get_linkable osuf mod_name      -- A home-package module
         | Just mod_info <- lookupUFM hpt mod_name
         = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
@@ -626,33 +629,26 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
               }}
 
             adjust_linkable lnk
-                | replace_osuf = do
-                        new_uls <- mapM adjust_ul (linkableUnlinked lnk)
+                | Just new_osuf <- replace_osuf = do
+                        new_uls <- mapM (adjust_ul new_osuf)
+                                        (linkableUnlinked lnk)
                         return lnk{ linkableUnlinked=new_uls }
                 | otherwise =
                         return lnk
 
-            adjust_ul (DotO file) = do
+            adjust_ul new_osuf (DotO file) = do
                 MASSERT (osuf `isSuffixOf` file)
                 let file_base = reverse (drop (length osuf + 1) (reverse file))
-                    dyn_file = file_base <.> "dyn_o"
-                    new_file = file_base <.> normalObjectSuffix
-                -- When looking for dynamic object files, we try both
-                -- .dyn_o and .o, with a preference for the former.
-                use_dyn <- if cDYNAMIC_GHC_PROGRAMS
-                           then doesFileExist dyn_file
-                           else return False
-                if use_dyn
-                    then return (DotO dyn_file)
-                    else do ok <- doesFileExist new_file
-                            if (not ok)
-                               then dieWith dflags span $
-                                      ptext (sLit "cannot find normal object file ")
-                                            <> quotes (text new_file) $$ while_linking_expr
-                               else return (DotO new_file)
-            adjust_ul (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
-            adjust_ul (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
-            adjust_ul l@(BCOs {}) = return l
+                    new_file = file_base <.> new_osuf
+                ok <- doesFileExist new_file
+                if (not ok)
+                   then dieWith dflags span $
+                          ptext (sLit "cannot find normal object file ")
+                                <> quotes (text new_file) $$ while_linking_expr
+                   else return (DotO new_file)
+            adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
+            adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
+            adjust_ul _ l@(BCOs {}) = return l
 \end{code}
 
 
