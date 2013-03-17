@@ -73,7 +73,11 @@ else
 # We don't look for the .hi file if this is for a program, as if the
 # Main module is in foo.hs then we get foo.o but Main.hi
 define ohi-sanity-check
-	@for f in $4.$($3_osuf) $(if $($1_$2_PROG),,$4.$($3_hisuf)) $(if $(findstring YES,$($1_$2_DYNAMIC_TOO)),$4.$(dyn_osuf) $4.$(dyn_hisuf)); do \
+	@for f in $4.$($3_osuf) \
+	          $(if $($1_$2_PROG),,$4.$($3_hisuf)) \
+	          $(if $(findstring v,$3), \
+	              $(if $(findstring YES,$($1_$2_DYNAMIC_TOO)), \
+	                  $4.$(dyn_osuf) $4.$(dyn_hisuf))); do \
 	    if [ ! -f $$f ]; then \
 	        echo "Panic! $$f not created."; \
 	        exit 1; \
