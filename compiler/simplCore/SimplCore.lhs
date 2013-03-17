@@ -146,6 +146,8 @@ getCoreToDo dflags
               , fps_doSinglyRecSAT = lateFloatDoSinglyRecSAT dflags
               , fps_cloGrowthInLam = lateFloatCloGrowthInLam dflags
               , fps_trace          = dopt Opt_D_dump_late_float dflags
+              , fps_strictness     = lateFloatStrictness     dflags
+              , fps_LNE            = lateFloatEscAnal        dflags
               , fps_retry          = lateFloatRetry          dflags
               }
     static_args   = gopt Opt_StaticArgumentTransformation dflags

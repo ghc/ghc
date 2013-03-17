@@ -576,6 +576,8 @@ data DynFlags = DynFlags {
   lateFloatStabilizeFirst :: Bool,
   lateFloatDoSinglyRecSAT :: Bool,
   lateFloatCloGrowthInLam :: Maybe Int,
+  lateFloatStrictness     :: Bool,        -- ^ use strictness in the late-float
+  lateFloatEscAnal            :: Bool,        -- ^ predict LNEs in the late-float
   lateFloatRetry          :: Bool,
   
   protectLastArg        :: Bool,
@@ -1249,6 +1251,8 @@ defaultDynFlags mySettings =
         lateFloatStabilizeFirst = False,
         lateFloatDoSinglyRecSAT = False,
         lateFloatCloGrowthInLam = Nothing,
+        lateFloatStrictness     = True,
+        lateFloatEscAnal            = True,
         lateFloatRetry          = False,
 
 
@@ -2297,7 +2301,8 @@ dynamic_flags = [
   , Flag "flate-float-abstract-LNE-var"         (noArg       (\d -> d{ lateFloatAbsLNEVar = True }))
   , Flag "fno-late-float-abstract-LNE-var"      (noArg       (\d -> d{ lateFloatAbsLNEVar = False }))
   , Flag "flate-float-abstract-undersat-var"    (noArg       (\d -> d{ lateFloatAbsUnsatVar = True }))
-  , Flag "fno-late-float-abstract-undersat-var" (noArg       (\d -> d{ lateFloatAbsUnsatVar = False }))
+  , Flag "fno-late-float-abstract-undersat-var" (noArg       (\d -> d{ lateFloatAbsUnsatVar = False
+                                                                     , lateFloatEscAnal = True }))
   , Flag "flate-float-abstract-sat-var"         (noArg       (\d -> d{ lateFloatAbsSatVar = True }))
   , Flag "fno-late-float-abstract-sat-var"      (noArg       (\d -> d{ lateFloatAbsSatVar = False }))
   , Flag "flate-float-abstract-oversat-var"     (noArg       (\d -> d{ lateFloatAbsOversatVar = True }))
@@ -2319,10 +2324,16 @@ dynamic_flags = [
   , Flag "flate-float-do-singly-rec-SAT"        (noArg       (\d -> d{ lateFloatDoSinglyRecSAT = True }))
   , Flag "fno-late-do-singly-rec-SAT"           (noArg       (\d -> d{ lateFloatDoSinglyRecSAT = False }))
 
-  , Flag "flate-float-clo-growth-in-lam-limit"      (intSuffix (\n d -> d{ lateFloatCloGrowthInLam = Just n }))
-  , Flag "flate-float-clo-growth-in-lam-any"        (noArg       (\d -> d{ lateFloatCloGrowthInLam = Nothing }))
-  , Flag "fno-late-float-clo-growth-in-lam"         (noArg       (\d -> d{ lateFloatCloGrowthInLam = Just 0 }))
+  , Flag "flate-float-clo-growth-in-lam-limit"  (intSuffix (\n d -> d{ lateFloatCloGrowthInLam = Just n }))
+  , Flag "flate-float-clo-growth-in-lam-any"    (noArg       (\d -> d{ lateFloatCloGrowthInLam = Nothing }))
+  , Flag "fno-late-float-clo-growth-in-lam"     (noArg       (\d -> d{ lateFloatCloGrowthInLam = Just 0 }))
 
+  , Flag "flate-float-strictness"               (noArg       (\d -> d{ lateFloatStrictness = True }))
+  , Flag "fno-late-float-strictness"            (noArg       (\d -> d{ lateFloatStrictness = False }))
+
+  , Flag "flate-float-esc-anal"                 (noArg       (\d -> d{ lateFloatEscAnal = True }))
+  , Flag "fno-late-float-esc-anal"              (noArg       (\d -> d{ lateFloatEscAnal = False
+                                                                     , lateFloatAbsLNEVar = True }))
   , Flag "flate-float-retry"                    (noArg       (\d -> d{ lateFloatRetry = True }))
   , Flag "fno-late-float-retry"                 (noArg       (\d -> d{ lateFloatRetry = False }))
 

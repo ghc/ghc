@@ -255,7 +255,7 @@ setLevels dflags float_lams binds us
 
 lvlTopBind :: DynFlags -> LevelEnv -> Bind Id -> LvlM (LevelledBind, LevelEnv)
 lvlTopBind dflags env (NonRec bndr rhs)
-  = do rhs' <- lvlExpr tOP_LEVEL env (analyzeFVs (initFVEnv $ isFinalPass env) rhs)
+  = do rhs' <- lvlExpr tOP_LEVEL env (analyzeFVs (initFVEnv $ finalPass env) rhs)
        let  -- lambda lifting impedes specialization, so: if the old
             -- RHS has an unstable unfolding, "stablize it" so that it
             -- ends up in the .hi file
@@ -271,7 +271,7 @@ lvlTopBind _ env (Rec pairs)
   = do let (bndrs,rhss) = unzip pairs
            bndrs' = [TB b (StayPut tOP_LEVEL) | b <- bndrs]
            env'   = extendLvlEnv env bndrs'
-       rhss' <- mapM (lvlExpr tOP_LEVEL env' . analyzeFVs (initFVEnv $ isFinalPass env)) rhss
+       rhss' <- mapM (lvlExpr tOP_LEVEL env' . analyzeFVs (initFVEnv $ finalPass env)) rhss
        return (Rec (bndrs' `zip` rhss'), env')
 \end{code}
 
@@ -875,12 +875,11 @@ decideBindFloat ctxt_lvl env body_fvis is_bot all_funs isLNE binding_fvis_s =
         abs_vars = abstractVars dest_lvl env bindings_fvs
 
         badTime   = wouldIncreaseRuntime    env abs_ids bindings_fvis
-        spaceInfo = wouldIncreaseAllocation env abs_ids isLNE rhs_nonTopLevelFreeIds_s scope_fvis
+        spaceInfo = wouldIncreaseAllocation env abs_ids rhs_nonTopLevelFreeIds_s scope_fvis
 
         -- for -ddump-late-float with -dppr-debug
-        extra_sdoc = vcat [ text "abs_vars:" <+> ppr abs_vars
-                          , text "bindingsFVIs:" <+> ppr bindings_fvis'
-                          , ppr scope_fvis'] where
+        extra_sdoc = vcat [ text "bindings:" <+> ppr bindings_fvis'
+                          , text "scope:" <+> ppr scope_fvis'] where
           bindings_fvis' = filter (\x -> fviIsNonTopLevel x && isId (fviVar x)) $ varEnvElts bindings_fvis
           scope_fvis'    = filter (isId . fviVar) $ varEnvElts $ scope_fvis `restrictVarEnv` mkVarSet ids
 
@@ -1002,7 +1001,6 @@ wouldIncreaseRuntime env abs_ids binding_group_fvis =
 wouldIncreaseAllocation ::
   LevelEnv ->
   [Id] ->         -- the abstracted value ids
-  Bool ->         -- LNE?
   [(Id, [Id])] -> -- the binders in the binding group and their RHS's free IDs
   FVIs ->         -- wrt the binding's *entire scope*
   VarSet ->       -- pinnees: ignore these as captors
@@ -1013,7 +1011,7 @@ wouldIncreaseAllocation ::
     , WordOff  -- estimated increases for closures that ARE allocated
                -- under a lambda
     )
-wouldIncreaseAllocation env abs_ids isLNE pairs usage pinnees = case finalPass env of
+wouldIncreaseAllocation env abs_ids pairs usage pinnees = case finalPass env of
   Nothing -> []
   Just _fps -> flip map bndrs $ \bndr -> case lookupVarEnv usage bndr of
     Nothing -> (False, 0, 0) -- it's a dead variable
@@ -1834,6 +1832,8 @@ gensymFVM = do
 
 data FVEnv = FVEnv
   { fve_isFinal      :: !Bool
+  , fve_useDmd       :: !Bool
+  , fve_useLNE       :: !Bool
   , fve_argumentDemands :: Maybe [Bool]
   , fve_runtimeArgs  :: !NumRuntimeArgs
   , fve_letBoundLvls :: !LetBoundFunLvls
@@ -1848,15 +1848,20 @@ type LetBoundFunLvls = VarEnv (MajorLevel, Bool)
   -- (k, (lvl, b)): k is let-bound (ie nested), bound under lvl-many
   -- lambdas, b <=> k is a function
 
-initFVEnv :: Bool -> FVEnv
-initFVEnv b = FVEnv {
-  fve_isFinal = b,
+initFVEnv :: Maybe FinalPassSwitches -> FVEnv
+initFVEnv mb_fps = FVEnv {
+  fve_isFinal = isFinal,
+  fve_useDmd = useDmd,
+  fve_useLNE = useLNE,
   fve_argumentDemands = Nothing,
   fve_runtimeArgs = 0,
   fve_letBoundLvls = emptyVarEnv,
   fve_majorLevel = 0,
   fve_nonTopLevel = emptyVarSet
   }
+  where (isFinal, useDmd, useLNE) = case mb_fps of
+          Nothing -> (False, False, False)
+          Just fps -> (True, fps_strictness fps, fps_LNE fps)
 
 unappliedEnv :: FVEnv -> FVEnv
 unappliedEnv env = env { fve_runtimeArgs = 0, fve_argumentDemands = Nothing }
@@ -1955,7 +1960,7 @@ analyzeFVsM  env app@(App fun arg) = do
         isStrDmd : dmds -> (isStrDmd, dmds)
       funEnv = env { fve_argumentDemands = Just dmds' }
 
-  let argIsAClosure = not $ argIsStrictlyDemanded || exprIsTrivial' arg
+  let argIsAClosure = not $ (fve_useDmd env && argIsStrictlyDemanded) || exprIsTrivial' arg
 
   (fun2, fun_esc) <- flip analyzeFVsM fun $ if isRuntimeArg arg
                                             then appliedEnv funEnv
@@ -2003,13 +2008,13 @@ analyzeFVsM env (Let (NonRec binder rhs) body) = do
 
   (body2, body_esc) <- flip analyzeFVsM body $ extendEnv [binder] $ unappliedEnv $ letBoundEnv binder rhs env
 
-  let isLNE = not $ binder `elemVarSet` body_esc
+  let isLNE = (&&) (fve_useLNE env) $ not $ binder `elemVarSet` body_esc
 
   (rhs2, rhs_esc) <-
     let rhs_fvis = fvisOf rhs2 in
     if isLNE then return p else
     let rhs_esc = mkVarSet $ prjFreeNonTopLevelIds rhs_fvis in -- all closure/scrutinee free ids escape
-    if isStrictDmd $ idDemandInfo binder
+    if fve_useDmd env && isStrictDmd (idDemandInfo binder)
     then return (rhs2, rhs_esc) -- won't be a closure, since it's strictly demanded
     else do
       rhs_fvis <- closureBindingFVIs env (Just binder) rhs_fvis
@@ -2032,7 +2037,7 @@ analyzeFVsM env (Let (Rec binds) body) = do
   (body2, body_esc) <- flip analyzeFVsM body $ extendEnv binders $ unappliedEnv $ letBoundsEnv binds env
 
   let scope_esc = unionVarSets (body_esc : rhs_esc_s)
-  let isLNE = not $ any (`elemVarSet` scope_esc) binders
+  let isLNE = (&&) (fve_useLNE env) $ not $ any (`elemVarSet` scope_esc) binders
 
   (rhss2, scope_esc) <- if isLNE then return (map snd binds2, scope_esc) else do
     (rhss2, rhs_esc_s) <- flip mapAndUnzipM binds2 $ \(binder, rhs2) -> do

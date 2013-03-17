@@ -387,6 +387,8 @@ data FinalPassSwitches = FinalPassSwitches
   -- ^ disallow the floating of a binding if it occurs in closure that
   -- is allocated inside a lambda
   , fps_trace             :: !Bool
+  , fps_strictness        :: !Bool
+  , fps_LNE               :: !Bool
   , fps_retry             :: !Bool
   }
 
