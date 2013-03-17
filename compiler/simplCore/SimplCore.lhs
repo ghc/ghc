@@ -135,6 +135,7 @@ getCoreToDo dflags
       where nonrec = lateFloatNonRecLam dflags
             fps = FinalPassSwitches
               { fps_rec            = lateFloatRecLam         dflags
+              , fps_absLNEVar      = lateFloatAbsLNEVar      dflags
               , fps_absUnsatVar    = lateFloatAbsUnsatVar    dflags
               , fps_absSatVar      = lateFloatAbsSatVar      dflags
               , fps_absOversatVar  = lateFloatAbsOversatVar  dflags

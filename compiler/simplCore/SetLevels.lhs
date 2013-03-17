@@ -377,7 +377,14 @@ lvlExpr ctxt_lvl env expr@(_, AnnLam {}) = do
 	-- [See SetLevels rev 1.50 for a version with this approach.]
 
 lvlExpr ctxt_lvl env (_, AnnLet bind body) = do
-    (bind', new_lvl, new_env) <- lvlBind ctxt_lvl env (fvisOf body) bind
+    let (bndrs, isLNE) = case bind of
+          AnnNonRec (TB b isLNE) _ -> ([b], isLNE)
+          AnnRec pairs -> foldr (\ (TB b lne, _) (bs, !isLNE) -> (b : bs, isLNE && lne))
+                                ([], True) pairs
+
+    env <- return $ if isLNE then lneLvlEnv env bndrs else env
+
+    (bind', new_lvl, new_env) <- lvlBind ctxt_lvl env isLNE (fvisOf body) bind
     body' <- lvlExpr new_lvl new_env body
     return (Let bind' body')
 
@@ -725,23 +732,22 @@ instance DeTag Bind where
 lvlBind :: Level		-- Context level; might be Top even for bindings 
 				-- nested in the RHS of a top level binding
 	-> LevelEnv
+        -> Bool                 -- is it LNE?
         -> FVIs                 -- free variables (& info) of the body
 	-> CoreBindWithFVIs
 	-> LvlM (LevelledBind, Level, LevelEnv)
 
-lvlBind ctxt_lvl env body_fvis (AnnNonRec bndrTB rhs@(rhs_fvis,_))
+lvlBind ctxt_lvl env isLNE body_fvis (AnnNonRec (TB bndr _) rhs@(rhs_fvis,_))
   | isTyVar bndr    -- Don't do anything for TyVar binders
 	            --   (simplifier gets rid of them pronto)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
                     -- so we will ignore this case for now
      = doNotFloat
   | otherwise =
-    case decideBindFloat ctxt_lvl env body_fvis (isJust mb_bot) (isFunctionAnn rhs) (Left (bndrTB, rhs_fvis)) of
+    case decideBindFloat ctxt_lvl env body_fvis (isJust mb_bot) (isFunctionAnn rhs) isLNE (Left (bndr, rhs_fvis)) of
       Nothing -> doNotFloat
       Just p -> uncurry doFloat p
   where
-    bndr = unTag bndrTB
-
     mb_bot     = exprBotStrictness_maybe (deTag $ deAnnotate rhs)
     bndr_w_str = annotateBotStr bndr mb_bot
 
@@ -768,12 +774,12 @@ lvlBind ctxt_lvl env body_fvis (AnnNonRec bndrTB rhs@(rhs_fvis,_))
         (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr_w_str]
         return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env')
 
-lvlBind ctxt_lvl env body_fvis (AnnRec pairsTB) =
+lvlBind ctxt_lvl env isLNE body_fvis (AnnRec pairsTB) =
   let pairs = map (\(bndr, rhs) -> (unTag bndr, rhs)) pairsTB
-      bndrsTB = map fst pairsTB
       (bndrs,rhss) = unzip pairs
+
   in
-  case decideBindFloat ctxt_lvl env body_fvis False (all isFunctionAnn rhss) (Right (bndrsTB, map fvisOf rhss)) of
+  case decideBindFloat ctxt_lvl env body_fvis False (all isFunctionAnn rhss) isLNE (Right (bndrs, map fvisOf rhss)) of
   Nothing -> do -- decided to not float
 --  | Just pinners <- floatDecision emptyVarSet
   -- when (lateRetry env && not (isEmptyVarEnv pinners)) $ tellLvlM $ mkVarEnv [ (b, (b, pinners)) | b <- bndrs ]
@@ -835,10 +841,11 @@ decideBindFloat ::
   Level -> LevelEnv -> FVIs ->
   Bool -> -- are all RHSs bottoming?
   Bool -> -- are all RHSs functions?
-  Either (TaggedBndr Bool, FVIs) ([TaggedBndr Bool], [FVIs]) -> -- let or letrec, with RHSs' infos
+  Bool -> -- isLNE
+  Either (Var, FVIs) ([Var], [FVIs]) -> -- let or letrec, with RHSs' infos
   Maybe (Level, [Var]) -- Just (lvl, vs) <=> float to lvl with
                        -- abs_vars = vs, Nothing <=> do not float
-decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
+decideBindFloat ctxt_lvl env body_fvis is_bot all_funs isLNE binding_fvis_s =
   maybe conventionalFloatOut lateLambdaLift (finalPass env)
   where
     conventionalFloatOut =
@@ -853,7 +860,10 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
           || isTopLvl dest_lvl -- Going all the way to top level
 
     lateLambdaLift fps
-      | only_funs, Nothing <- decider emptyVarEnv = Just (dest_lvl, abs_vars)
+      | all_funs, -- only late lift functions
+        (||) (fps_absLNEVar fps) $ -- do not abstract over let-no-escape variables
+          null $ filter (`elemVarSet` le_LNEs env) abs_ids,
+        Nothing <- decider emptyVarEnv = Just (dest_lvl, abs_vars)
            -- TODO Just x <- decider emptyVarEnv -> do the retry stuff
       | otherwise = Nothing -- do not lift
       where
@@ -876,17 +886,16 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
 
     bindings_fvs = prjFreeVars bindings_fvis
 
-    (isRec, ids, rhss_fvis, scope_fvis, bindings_fvis, rhs_nonTopLevelFreeIds_s, isLNE) = case binding_fvis_s of
-      Left (TB bndr isLNE, rhs_fvis)     -> -- a non-recursive let
+    (isRec, ids, rhss_fvis, scope_fvis, bindings_fvis, rhs_nonTopLevelFreeIds_s) = case binding_fvis_s of
+      Left (bndr, rhs_fvis)     -> -- a non-recursive let
         ( False
         , [bndr]
         , rhs_fvis
         , body_fvis
         , rhss_fvis `bothFVIs` assumeTheBest (idFreeVars bndr)
         , [(bndr, prjFreeNonTopLevelIds rhs_fvis)]
-        , isLNE
         )
-      Right (bndrsTB, rhs_fvis_s) -> -- a letrec
+      Right (bndrs, rhs_fvis_s) -> -- a letrec
         ( True
         , bndrs
         , rhss_fvis
@@ -894,10 +903,8 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
         , delBindersFVIs bndrs rhss_fvis
         , zipWith (\bndr rhs_fvis -> (bndr, prjFreeNonTopLevelIds rhs_fvis))
             bndrs rhs_fvis_s
-        , all (\(TB _ b) -> b) bndrsTB
         )
-        where bndrs = map unTag bndrsTB
-              rhss_fvis = computeRecRHSsFVIs bndrs rhs_fvis_s
+        where rhss_fvis = computeRecRHSsFVIs bndrs rhs_fvis_s
 
 decideLateLambdaFloat ::
   LevelEnv ->
@@ -1215,6 +1222,7 @@ data LevelEnv
                                         -- instead) but we do use the Co/TyVar substs
        , le_env      :: IdEnv ([Var], LevelledExpr)	-- Domain is pre-cloned Ids
        , le_dflags   :: DynFlags
+       , le_LNEs     :: VarSet
     }
         -- see Note [The Reason SetLevels Does Substitution]
 
@@ -1242,7 +1250,7 @@ data LevelEnv
 initialEnv :: DynFlags -> FloatOutSwitches -> LevelEnv
 initialEnv dflags float_lams 
   = LE { le_switches = float_lams, le_lvl_env = emptyVarEnv
-       , le_subst = emptySubst, le_env = emptyVarEnv, le_dflags = dflags }
+       , le_subst = emptySubst, le_env = emptyVarEnv, le_dflags = dflags, le_LNEs = emptyVarSet }
 
 --floatLams :: LevelEnv -> Maybe Int
 --floatLams le = floatOutLambdas (le_switches le)
@@ -1270,6 +1278,9 @@ floatConsts le = floatOutConstants (le_switches le)
 
 floatPAPs :: LevelEnv -> Bool
 floatPAPs le = floatOutPartialApplications (le_switches le)
+
+lneLvlEnv :: LevelEnv -> [Id] -> LevelEnv
+lneLvlEnv env lnes = env { le_LNEs = extendVarSetList (le_LNEs env) lnes }
 
 -- see Note [The Reason SetLevels Does Substitution]
 extendLvlEnv :: LevelEnv -> [LevelledBndr] -> LevelEnv
@@ -1437,7 +1448,8 @@ newPolyBndrs dest_lvl env abs_vars bndrs = do
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ 	-- Note [transferPolyIdInfo] in Id.lhs
 			     mkSysLocal (mkFastString str) uniq poly_ty
 			   where
-			     str     = "poly_" ++ occNameString (getOccName bndr)
+			     str     = (if isFinalPass env then "llf_" else "poly_")
+                                        ++ occNameString (getOccName bndr)
 			     poly_ty = mkPiTypes abs_vars (idType bndr)
 
 newLvlVar :: [CoreBndr] -> Type 	-- Abstract wrt these bndrs
@@ -1824,9 +1836,7 @@ data FVEnv = FVEnv
   { fve_isFinal      :: !Bool
   , fve_argumentDemands :: Maybe [Bool]
   , fve_runtimeArgs  :: !NumRuntimeArgs
-  -- ^ how many runtmie arguments does the context apply this expression to?
   , fve_letBoundLvls :: !LetBoundFunLvls
-  -- ^ each let-bound in-scope variable's bindings's free variables
   , fve_majorLevel   :: !MajorLevel
   -- ^ number of enclosing lambdas
   , fve_nonTopLevel  :: !VarSet
@@ -1835,8 +1845,8 @@ data FVEnv = FVEnv
 
 type NumRuntimeArgs = Int -- i <=> applied to i runtime arguments
 type LetBoundFunLvls = VarEnv (MajorLevel, Bool)
-  -- (k, (lvl, b)): k is let-bound, bound under lvl-many lambdas, b
-  -- <=> k is a function
+  -- (k, (lvl, b)): k is let-bound (ie nested), bound under lvl-many
+  -- lambdas, b <=> k is a function
 
 initFVEnv :: Bool -> FVEnv
 initFVEnv b = FVEnv {

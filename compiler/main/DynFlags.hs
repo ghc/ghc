@@ -565,6 +565,7 @@ data DynFlags = DynFlags {
   lateFloatLamOn        :: Bool,        -- ^ Enable the late lambda lift pass
   lateFloatNonRecLam    :: Maybe Int,   -- ^ Limit on # abstracted variables for *late* non-recursive function floating (Nothing => all, Just 0 => none)
   lateFloatRecLam       :: Maybe Int,   -- ^   "    " "     "          "     for *late*     recursive function floating
+  lateFloatAbsLNEVar    :: Bool,        -- ^ allowed to abstract LNE variables?
   lateFloatAbsUnsatVar  :: Bool,        -- ^ allowed to abstract undersaturated applied let-bound variables?
   lateFloatAbsSatVar    :: Bool,        -- ^ allowed to abstract      saturated applied let-bound variables?
   lateFloatAbsOversatVar :: Bool,       -- ^ allowed to abstract  oversaturated applied let-bound variables?
@@ -1237,6 +1238,7 @@ defaultDynFlags mySettings =
         lateFloatLamOn          = False,
         lateFloatNonRecLam      = Nothing,
         lateFloatRecLam         = Just 0,
+        lateFloatAbsLNEVar      = False,
         lateFloatAbsUnsatVar    = True,
         lateFloatAbsSatVar      = False,
         lateFloatAbsOversatVar  = False,
@@ -2292,6 +2294,8 @@ dynamic_flags = [
   , Flag "flate-float-rec-lam-limit"            (intSuffix (\n d -> d{ lateFloatLamOn = True, lateFloatRecLam = Just n }))
   , Flag "flate-float-rec-lam-any"              (noArg       (\d -> d{ lateFloatLamOn = True, lateFloatRecLam = Nothing }))
   , Flag "fno-late-float-rec-lam"               (noArg       (\d -> d{ lateFloatRecLam = Just 0 }))
+  , Flag "flate-float-abstract-LNE-var"         (noArg       (\d -> d{ lateFloatAbsLNEVar = True }))
+  , Flag "fno-late-float-abstract-LNE-var"      (noArg       (\d -> d{ lateFloatAbsLNEVar = False }))
   , Flag "flate-float-abstract-undersat-var"    (noArg       (\d -> d{ lateFloatAbsUnsatVar = True }))
   , Flag "fno-late-float-abstract-undersat-var" (noArg       (\d -> d{ lateFloatAbsUnsatVar = False }))
   , Flag "flate-float-abstract-sat-var"         (noArg       (\d -> d{ lateFloatAbsSatVar = True }))
