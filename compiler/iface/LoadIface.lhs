@@ -547,7 +547,7 @@ findAndReadIface doc_str mod hi_boot_file
                                            (moduleName mod) err))
     where read_file file_path = do
               traceIf (ptext (sLit "readIFace") <+> text file_path)
-              read_result <- readIface mod file_path hi_boot_file
+              read_result <- readIface mod file_path
               case read_result of
                 Failed err -> return (Failed (badIfaceFile file_path err))
                 Succeeded iface 
@@ -579,12 +579,12 @@ findAndReadIface doc_str mod hi_boot_file
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: Module -> FilePath -> IsBootInterface 
+readIface :: Module -> FilePath
           -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed 
 
-readIface wanted_mod file_path _
+readIface wanted_mod file_path
   = do  { res <- tryMostM $
                  readBinIface CheckHiWay QuietBinIFaceReading file_path
         ; case res of
