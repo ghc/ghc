@@ -106,7 +106,6 @@ import FastString
 import qualified Data.IntSet as IntSet; import Data.IntSet ( IntSet )
 import qualified Data.IntMap as IntMap; import Data.IntMap ( IntMap )
 import Data.Maybe       ( isJust, mapMaybe )
-import Control.Monad    ( when )
 \end{code}
 
 %************************************************************************
@@ -699,9 +698,6 @@ The binding stuff works for top level too.
 unTag :: TaggedBndr b -> CoreBndr
 unTag (TB b _) = b
 
-unTagAlt :: (AltCon, [TaggedBndr b], TaggedExpr b) -> (AltCon, [CoreBndr], TaggedExpr b)
-unTagAlt (con, args, rhs) = (con, map unTag args, rhs)
-
 unTagAnnAlt :: (AltCon, [TaggedBndr b], AnnExpr (TaggedBndr b) annot) ->
                (AltCon, [  CoreBndr  ], AnnExpr (TaggedBndr b) annot)
 unTagAnnAlt (con, args, rhs) = (con, map unTag args, rhs)
@@ -863,7 +859,7 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
       where
         dest_lvl = tOP_LEVEL
 
-        decider = decideLateLambdaFloat env badTime spaceInfo ids extra_sdoc fps
+        decider = decideLateLambdaFloat env isRec isLNE badTime spaceInfo ids extra_sdoc fps
 
         abs_ids  = filter isId abs_vars
         abs_vars = abstractVars dest_lvl env bindings_fvs
@@ -879,9 +875,11 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
           scope_fvis'    = filter (isId . fviVar) $ varEnvElts $ scope_fvis `restrictVarEnv` mkVarSet ids
 
     bindings_fvs = prjFreeVars bindings_fvis
-    (ids, rhss_fvis, scope_fvis, bindings_fvis, rhs_nonTopLevelFreeIds_s, isLNE) = case binding_fvis_s of
+
+    (isRec, ids, rhss_fvis, scope_fvis, bindings_fvis, rhs_nonTopLevelFreeIds_s, isLNE) = case binding_fvis_s of
       Left (TB bndr isLNE, rhs_fvis)     -> -- a non-recursive let
-        ( [bndr]
+        ( False
+        , [bndr]
         , rhs_fvis
         , body_fvis
         , rhss_fvis `bothFVIs` assumeTheBest (idFreeVars bndr)
@@ -889,7 +887,8 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
         , isLNE
         )
       Right (bndrsTB, rhs_fvis_s) -> -- a letrec
-        ( bndrs
+        ( True
+        , bndrs
         , rhss_fvis
         , body_fvis `bothFVIs` rhss_fvis
         , delBindersFVIs bndrs rhss_fvis
@@ -902,6 +901,8 @@ decideBindFloat ctxt_lvl env body_fvis is_bot only_funs binding_fvis_s =
 
 decideLateLambdaFloat ::
   LevelEnv ->
+  Bool ->
+  Bool ->
   VarSet -> (VarSet -> [(Bool, WordOff, WordOff)]) ->
   [Id] -> SDoc ->
   FinalPassSwitches ->
@@ -909,14 +910,15 @@ decideLateLambdaFloat ::
   Maybe VarSet -- Nothing <=> float to tOP_LEVEL, Just x <=> do not
                -- float, not (null x) <=> forgetting fast calls to the
                -- ids in x are the only thing pinning this binding
-decideLateLambdaFloat env badTime spaceInfo' ids extra_sdoc fps pinnees
+decideLateLambdaFloat env isRec isLNE badTime spaceInfo' ids extra_sdoc fps pinnees
   = (if fps_trace fps then pprTrace msg msg_sdoc else (\x -> x)) $
        if isBadSpace then Just emptyVarSet
        else if isBadTime then Just badTime
        else Nothing
 
   where
-    msg = if isBadTime || isBadSpace then "late-no-float" else "late-float"
+    msg = (if isBadTime || isBadSpace then "late-no-float" else "late-float")
+          ++ if isRec then "(rec)" else ""
 
     isBadTime = not (isEmptyVarSet badTime)
 
@@ -952,7 +954,7 @@ decideLateLambdaFloat env badTime spaceInfo' ids extra_sdoc fps pinnees
                [] -> empty
                ids -> text "would-forget-fast-calls" <+> ppr ids
       space v (badPAP, tg, tgil) = vcat
-       [ ppr v
+       [ ppr v <+> if isLNE then parens (text "LNE") else empty
        , if not (isEmptyVarSet pinnees) then text "pinnees:" <+> ppr (varSetElems pinnees) else empty
        , text "createsPAPs:" <+> ppr badPAP
        , text "closureGrowth:" <+> ppr tg
@@ -1058,7 +1060,6 @@ wouldIncreaseAllocation env abs_ids isLNE pairs usage pinnees = case finalPass e
       dflags = le_dflags env
       wORDS_PTR = StgCmmArgRep.argRepSizeW dflags StgCmmArgRep.P
 
-      -- NB dangerously assuming this closure is not LNE
       closuresSize = (\x -> if opt_PprStyle_Debug then pprTrace "closuresSize" (ppr x) x else x) $
                      sum $ flip map fidss $ \fids ->
         let (words, _, _) =
@@ -1811,7 +1812,7 @@ delBinderFVIs b fvis =
 %************************************************************************
 
 \begin{code}
-newtype FVM = State Int
+type FVM = State Int
 
 gensymFVM :: FVM Int
 gensymFVM = do
@@ -1824,7 +1825,7 @@ data FVEnv = FVEnv
   , fve_argumentDemands :: Maybe [Bool]
   , fve_runtimeArgs  :: !NumRuntimeArgs
   -- ^ how many runtmie arguments does the context apply this expression to?
-  , fve_letBoundFunLvls :: !LetBoundFunLvls
+  , fve_letBoundLvls :: !LetBoundFunLvls
   -- ^ each let-bound in-scope variable's bindings's free variables
   , fve_majorLevel   :: !MajorLevel
   -- ^ number of enclosing lambdas
@@ -1833,15 +1834,16 @@ data FVEnv = FVEnv
   }
 
 type NumRuntimeArgs = Int -- i <=> applied to i runtime arguments
-type LetBoundFunLvls = VarEnv MajorLevel
-  -- (k, lvl): k is a let-bound function, bound under lvl-many lambdas
+type LetBoundFunLvls = VarEnv (MajorLevel, Bool)
+  -- (k, (lvl, b)): k is let-bound, bound under lvl-many lambdas, b
+  -- <=> k is a function
 
 initFVEnv :: Bool -> FVEnv
 initFVEnv b = FVEnv {
   fve_isFinal = b,
   fve_argumentDemands = Nothing,
   fve_runtimeArgs = 0,
-  fve_letBoundFunLvls = emptyVarEnv,
+  fve_letBoundLvls = emptyVarEnv,
   fve_majorLevel = 0,
   fve_nonTopLevel = emptyVarSet
   }
@@ -1854,15 +1856,13 @@ appliedEnv env =
   env { fve_runtimeArgs = 1 + fve_runtimeArgs env }
 
 letBoundEnv :: Id -> CoreExpr -> FVEnv -> FVEnv
-letBoundEnv bndr rhs env
-   -- for the info that needs fve_letBoundFunLvls, we are only interested
+letBoundEnv bndr rhs env =
+   -- for the info that needs fve_letBoundLvls, we are only interested
    -- in let-bound functions
- | isFunction rhs =
-   env { fve_letBoundFunLvls = extendVarEnv_C (\_ new -> new)
-           (fve_letBoundFunLvls env)
+   env { fve_letBoundLvls = extendVarEnv_C (\_ new -> new)
+           (fve_letBoundLvls env)
            bndr
-           (fve_majorLevel env) }
- | otherwise       = env
+           (fve_majorLevel env, isFunction rhs) }
 
 letBoundsEnv :: [(Id, CoreExpr)] -> FVEnv -> FVEnv
 letBoundsEnv binds env = foldl (\e (id, rhs) -> letBoundEnv id rhs e) env binds
@@ -1902,8 +1902,8 @@ analyzeFVsM  env (Var v) =
 
     (fvi, escapes) | not $ v `elemVarSet` fve_nonTopLevel env = (TopLevelFV, False)
         | fve_isFinal env,
-          Just v_lvl <- lookupVarEnv (fve_letBoundFunLvls env) v
-          = -- v is a let-bound function
+          Just (v_lvl, v_is_fun) <- lookupVarEnv (fve_letBoundLvls env) v
+          = -- v is let-bound
 --            let (clo_lvl, closureNest) = fve_feedback env
 --            in
 --            let all_captors = case take (clo_lvl - v_clo_lvl) closureNest of
@@ -1915,22 +1915,24 @@ analyzeFVsM  env (Var v) =
             let (escaping_captors, dominated_captors) =
                   -- TODO I think this can use Data.List.break
                   Data.List.partition (\cli -> cli_lvl cli > v_lvl) all_captors
-            in -} ( LBFFV { fvi_useInfo    = IntSet.singleton n_runtime_args
-                          , fvi_captors    = zeroCaptors -- filled in on the way up
-                          , fvi_lvl        = v_lvl
-                          }
-                  , -- a variable occurrence implies escapingness if
-                    -- its a let-bound variable and applies
-                    -- undersaturated
-                    n_runtime_args < idArity v
+            in -} ( if not v_is_fun then NonTopLevelFV -- it's not a function
+                    else LBFFV { fvi_useInfo    = IntSet.singleton n_runtime_args
+                               , fvi_captors    = zeroCaptors -- filled in on the way up
+                               , fvi_lvl        = v_lvl
+                               }
+                  , -- an occurrence of a let-bound variable escapes
+                    -- if it is under- or over-saturated
+                    n_runtime_args /= idArity v
                   )
         | otherwise = (NonTopLevelFV, False)
 
-analyzeFVsM _env (Lit lit) = return (noneFVIs, AnnLit lit)
+analyzeFVsM _env (Lit lit) = return ((noneFVIs, AnnLit lit), emptyVarSet)
 
 analyzeFVsM  env (Lam b body) = do
-  body' <- flip analyzeFVsM body $ extendEnv [b] $ lambdaEnv $ unappliedEnv env
-  return (b `delBinderFVIs` fvisOf body', AnnLam (TB b False) body')
+  (body', esc_vars) <- flip analyzeFVsM body $ extendEnv [b] $ lambdaEnv $ unappliedEnv env
+  return ( (b `delBinderFVIs` fvisOf body', AnnLam (TB b False) body')
+         , esc_vars `delVarSet` b
+         )
 
 analyzeFVsM  env app@(App fun arg) = do
   let argDmds = case fve_argumentDemands env of
@@ -1945,10 +1947,12 @@ analyzeFVsM  env app@(App fun arg) = do
 
   let argIsAClosure = not $ argIsStrictlyDemanded || exprIsTrivial' arg
 
-  fun2 <- flip analyzeFVsM fun $ if isRuntimeArg arg
-                                 then appliedEnv funEnv
-                                 else            funEnv
-  arg2 <- analyzeFVsM (unappliedEnv env) arg
+  (fun2, fun_esc) <- flip analyzeFVsM fun $ if isRuntimeArg arg
+                                            then appliedEnv funEnv
+                                            else            funEnv
+  (arg2, _arg_esc) <- analyzeFVsM (unappliedEnv env) arg
+  let arg_esc = prjFreeNonTopLevelIds (fvisOf arg2)
+        -- all arg free ids escape
 
   arg2 <- do
     let arg_fvis = fvisOf arg2
@@ -1957,68 +1961,99 @@ analyzeFVsM  env app@(App fun arg) = do
       else return arg_fvis
     return (arg_fvis, snd arg2)
 
-  return (fvisOf fun2 `bothFVIs` fvisOf arg2, AnnApp fun2 arg2)
+  return ( (fvisOf fun2 `bothFVIs` fvisOf arg2, AnnApp fun2 arg2)
+         , fun_esc `extendVarSetList` arg_esc
+         )
 
 analyzeFVsM env (Case scrut bndr ty alts) = do
-  scrut2 <- analyzeFVsM (unappliedEnv env) scrut
+  (scrut2, _scrut_esc) <- analyzeFVsM (unappliedEnv env) scrut
+  let scrut_fvis = fvisOf scrut2
 
-  (alts_fvis_s, alts2) <- flip mapAndUnzipM alts $ \(con,args,rhs) -> do
-    rhs2 <- flip analyzeFVsM rhs $ unappliedEnv $
-                                   extendEnv (bndr : args) env
-    return (delBindersFVIs args (fvisOf rhs2), (con, map (flip TB False) args, rhs2))
+  x <- flip mapM alts $ \(con,args,rhs) -> do
+    (rhs2, rhs_esc) <- flip analyzeFVsM rhs $ unappliedEnv $
+                                              extendEnv (bndr : args) env
+    return ( (delBindersFVIs args (fvisOf rhs2), (con, map (flip TB False) args, rhs2))
+           , rhs_esc `delVarSetList` args
+           )
+  let (pairs, rhs_escs) = unzip x
+      (alts_fvis_s, alts2) = unzip pairs
 
   let alts_fvis = foldr altFVIs noneFVIs alts_fvis_s
 
-  return ( (bndr `delBinderFVIs` alts_fvis)
-           `bothFVIs` fvisOf scrut2
-           `bothFVIs` nonValueFVs (tyVarsOfType ty)
-         , AnnCase scrut2 (TB bndr False) ty alts2 )
+  return ( ( (bndr `delBinderFVIs` alts_fvis)
+             `bothFVIs` scrut_fvis
+             `bothFVIs` nonValueFVs (tyVarsOfType ty)
+           , AnnCase scrut2 (TB bndr False) ty alts2 )
+         , (unionVarSets rhs_escs `delVarSet` bndr)
+           `extendVarSetList` prjFreeNonTopLevelIds scrut_fvis
+         )
 
 analyzeFVsM env (Let (NonRec binder rhs) body) = do
-  let isLNE = False
+  p@(rhs2, _rhs_esc) <- analyzeFVsM (unappliedEnv env) rhs
 
-  rhs2 <- analyzeFVsM (unappliedEnv env) rhs
+  (body2, body_esc) <- flip analyzeFVsM body $ extendEnv [binder] $ unappliedEnv $ letBoundEnv binder rhs env
 
-  body2 <- flip analyzeFVsM body $ extendEnv [binder] $ unappliedEnv $ letBoundEnv binder rhs env
+  let isLNE = not $ binder `elemVarSet` body_esc
 
-  rhs2 <- do
-    rhs_fvis <- closureBindingFVIs env (Just binder) (fvisOf rhs2)
-    return (rhs_fvis, snd rhs2)
+  (rhs2, rhs_esc) <-
+    let rhs_fvis = fvisOf rhs2 in
+    if isLNE then return p else
+    let rhs_esc = mkVarSet $ prjFreeNonTopLevelIds rhs_fvis in -- all closure/scrutinee free ids escape
+    if isStrictDmd $ idDemandInfo binder
+    then return (rhs2, rhs_esc) -- won't be a closure, since it's strictly demanded
+    else do
+      rhs_fvis <- closureBindingFVIs env (Just binder) rhs_fvis
+      return ( (rhs_fvis, snd rhs2) , rhs_esc )
 
-  return ( fvisOf rhs2 `bothFVIs`
-           (binder `delBinderFVIs` fvisOf body2) `bothFVIs`
-           assumeTheBest (bndrRuleAndUnfoldingVars binder)
-         , AnnLet (AnnNonRec (TB binder isLNE) rhs2) body2 )
+  return ( ( fvisOf rhs2 `bothFVIs`
+             (binder `delBinderFVIs` fvisOf body2) `bothFVIs`
+             assumeTheBest (bndrRuleAndUnfoldingVars binder)
+           , AnnLet (AnnNonRec (TB binder isLNE) rhs2) body2 )
+         , (body_esc `delVarSet` binder) `unionVarSet` rhs_esc
+         )
 
 analyzeFVsM env (Let (Rec binds) body) = do
   let binders = map fst binds
-      isLNE = False
 
-  rhss2 <- flip mapM binds $ \(binder, rhs) -> do
-    rhs2 <- flip analyzeFVsM rhs $ unappliedEnv $ extendEnv binders $ letBoundsEnv binds env
-    let rhs_fvis = fvisOf rhs2
-    rhs_fvis <- closureBindingFVIs env (Just binder) rhs_fvis
-    return $ (rhs_fvis, snd rhs2)
+  (binds2, rhs_esc_s) <- flip mapAndUnzipM binds $ \(binder, rhs) -> do
+    (rhs2, rhs_esc) <- flip analyzeFVsM rhs $ unappliedEnv $ extendEnv binders $ letBoundsEnv binds env
+    return ((binder, rhs2), rhs_esc)
 
-  body2 <- flip analyzeFVsM body $ extendEnv binders $ unappliedEnv $ letBoundsEnv binds env
+  (body2, body_esc) <- flip analyzeFVsM body $ extendEnv binders $ unappliedEnv $ letBoundsEnv binds env
 
-  return  ( delBindersFVIs binders $
-            fvisOf body2 `bothFVIs` computeRecRHSsFVIs binders (map fvisOf rhss2)
-          , AnnLet (AnnRec (map (flip TB isLNE) binders `zip` rhss2)) body2)
+  let scope_esc = unionVarSets (body_esc : rhs_esc_s)
+  let isLNE = not $ any (`elemVarSet` scope_esc) binders
+
+  (rhss2, scope_esc) <- if isLNE then return (map snd binds2, scope_esc) else do
+    (rhss2, rhs_esc_s) <- flip mapAndUnzipM binds2 $ \(binder, rhs2) -> do
+      let rhs_fvis = fvisOf rhs2
+      rhs_fvis <- closureBindingFVIs env (Just binder) rhs_fvis
+      return ( (rhs_fvis, snd rhs2)
+             , prjFreeNonTopLevelIds rhs_fvis -- all closure free ids escape
+             )
+    return (rhss2, body_esc `unionVarSet` mkVarSet (concat rhs_esc_s))
+
+  return ( ( delBindersFVIs binders $
+           fvisOf body2 `bothFVIs` computeRecRHSsFVIs binders (map fvisOf rhss2)
+           , AnnLet (AnnRec (map (flip TB isLNE) binders `zip` rhss2)) body2)
+         , scope_esc `delVarSetList` binders
+         )
 
 analyzeFVsM  env (Cast expr co) = do
   let cfvis = nonValueFVs $ tyCoVarsOfCo co
 
-  expr2 <- analyzeFVsM env expr
-  return ( fvisOf expr2 `bothFVIs` cfvis , AnnCast expr2 (cfvis, co) )
+  (expr2, esc) <- analyzeFVsM env expr
+  return ( ( fvisOf expr2 `bothFVIs` cfvis , AnnCast expr2 (cfvis, co) )
+         , esc )
 
 analyzeFVsM  env (Tick tickish expr) = do
- expr2 <- analyzeFVsM env expr
- return ( tickishFVIs tickish `bothFVIs` fvisOf expr2 , AnnTick tickish expr2 )
+ (expr2, esc ) <- analyzeFVsM env expr
+ return ( ( tickishFVIs tickish `bothFVIs` fvisOf expr2 , AnnTick tickish expr2 )
+        , esc)
 
-analyzeFVsM _env (Type ty) = return (nonValueFVs $ tyVarsOfType ty, AnnType ty)
+analyzeFVsM _env (Type ty) = return ( (nonValueFVs $ tyVarsOfType ty, AnnType ty), emptyVarSet )
 
-analyzeFVsM _env (Coercion co) = return (nonValueFVs $ tyCoVarsOfCo co, AnnCoercion co)
+analyzeFVsM _env (Coercion co) = return ( (nonValueFVs $ tyCoVarsOfCo co, AnnCoercion co), emptyVarSet )
 
 
 computeRecRHSsFVIs :: [Var] -> [FVIs] -> FVIs
