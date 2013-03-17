@@ -221,12 +221,6 @@ BeConservative = NO
 
 ExtraMakefileSanityChecks = NO
 
-#
-# Building various ways?
-# (right now, empty if not).
-BuildingParallel=$(subst mp,YES,$(filter mp,$(WAYS)))
-BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
-
 #------------------------------------------------------------------------------
 # Options for Libraries
 
