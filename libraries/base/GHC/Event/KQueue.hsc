@@ -28,12 +28,13 @@ available = False
 {-# INLINE available #-}
 #else
 
-import Control.Monad (when, void)
+import Control.Monad (when)
 import Data.Bits (Bits(..))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
 import Data.Word (Word16, Word32)
-import Foreign.C.Error (throwErrnoIfMinus1)
+import Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
+                        eNOTSUP, getErrno, throwErrno)
 import Foreign.C.Types
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, nullPtr)
@@ -88,7 +89,7 @@ delete kq = do
   _ <- c_close . fromKQueueFd . kqueueFd $ kq
   return ()
 
-modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO ()
+modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO Bool
 modifyFd kq fd oevt nevt
   | nevt == mempty = do
       let !ev = event fd (toFilter oevt) flagDelete noteEOF
@@ -102,7 +103,7 @@ toFilter evt
   | evt `E.eventIs` E.evtRead = filterRead
   | otherwise                 = filterWrite
 
-modifyFdOnce :: KQueue -> Fd -> E.Event -> IO ()
+modifyFdOnce :: KQueue -> Fd -> E.Event -> IO Bool
 modifyFdOnce kq fd evt = do
     let !ev = event fd (toFilter evt) (flagAdd .|. flagOneshot) noteEOF
     kqueueControl (kqueueFd kq) ev
@@ -224,28 +225,38 @@ instance Storable TimeSpec where
 kqueue :: IO KQueueFd
 kqueue = KQueueFd `fmap` throwErrnoIfMinus1 "kqueue" c_kqueue
 
-kqueueControl :: KQueueFd -> Event -> IO ()
-kqueueControl kfd ev = void $
+kqueueControl :: KQueueFd -> Event -> IO Bool
+kqueueControl kfd ev =
     withTimeSpec (TimeSpec 0 0) $ \tp ->
-        withEvent ev $ \evp -> kevent False kfd evp 1 nullPtr 0 tp
+        withEvent ev $ \evp -> do
+            res <- kevent False kfd evp 1 nullPtr 0 tp
+            if res == -1
+              then do
+               err <- getErrno
+               case err of
+                 _ | err == eINTR  -> return True
+                 _ | err == eINVAL -> return False
+                 _ | err == eNOTSUP -> return False
+                 _                 -> throwErrno "kevent"
+              else return True
 
 kqueueWait :: KQueueFd -> Ptr Event -> Int -> TimeSpec -> IO Int
 kqueueWait fd es cap tm =
+    fmap fromIntegral $ E.throwErrnoIfMinus1NoRetry "kevent" $
     withTimeSpec tm $ kevent True fd nullPtr 0 es cap
 
 kqueueWaitNonBlock :: KQueueFd -> Ptr Event -> Int -> IO Int
 kqueueWaitNonBlock fd es cap =
+    fmap fromIntegral $ E.throwErrnoIfMinus1NoRetry "kevent" $
     withTimeSpec (TimeSpec 0 0) $ kevent False fd nullPtr 0 es cap
 
 -- TODO: We cannot retry on EINTR as the timeout would be wrong.
 -- Perhaps we should just return without calling any callbacks.
 kevent :: Bool -> KQueueFd -> Ptr Event -> Int -> Ptr Event -> Int -> Ptr TimeSpec
-       -> IO Int
+       -> IO CInt
 kevent safe k chs chlen evs evlen ts
-    = fmap fromIntegral $ E.throwErrnoIfMinus1NoRetry "kevent" $
-      if safe 
-      then c_kevent k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
-      else c_kevent_unsafe k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
+  | safe      = c_kevent k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
+  | otherwise = c_kevent_unsafe k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
 
 withEvent :: Event -> (Ptr Event -> IO a) -> IO a
 withEvent ev f = alloca $ \ptr -> poke ptr ev >> f ptr

@@ -59,12 +59,13 @@ new :: IO E.Backend
 new = E.backend poll modifyFd modifyFdOnce (\_ -> return ()) `liftM`
       liftM2 Poll (newMVar =<< A.empty) A.empty
 
-modifyFd :: Poll -> Fd -> E.Event -> E.Event -> IO ()
+modifyFd :: Poll -> Fd -> E.Event -> E.Event -> IO Bool
 modifyFd p fd oevt nevt =
-  withMVar (pollChanges p) $ \ary ->
+  withMVar (pollChanges p) $ \ary -> do
     A.snoc ary $ PollFd fd (fromEvent nevt) (fromEvent oevt)
+    return True
 
-modifyFdOnce :: Poll -> Fd -> E.Event -> IO ()
+modifyFdOnce :: Poll -> Fd -> E.Event -> IO Bool
 modifyFdOnce = error "modifyFdOnce not supported in Poll backend"
 
 reworkFd :: Poll -> PollFd -> IO ()

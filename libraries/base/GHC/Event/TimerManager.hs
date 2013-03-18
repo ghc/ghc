@@ -160,8 +160,8 @@ newWith be = do
                          , emUniqueSource = us
                          , emControl = ctrl
                          }
-  I.modifyFd be (controlReadFd ctrl) mempty evtRead
-  I.modifyFd be (wakeupReadFd ctrl) mempty evtRead
+  _ <- I.modifyFd be (controlReadFd ctrl) mempty evtRead
+  _ <- I.modifyFd be (wakeupReadFd ctrl) mempty evtRead
   return mgr
 
 -- | Asynchronously shuts down the event manager, if running.

@@ -102,19 +102,19 @@ data Backend = forall a. Backend {
                   -> Fd       -- file descriptor
                   -> Event    -- old events to watch for ('mempty' for new)
                   -> Event    -- new events to watch for ('mempty' to delete)
-                  -> IO ()
+                  -> IO Bool
 
     , _beModifyFdOnce :: a
                          -> Fd    -- file descriptor
                          -> Event -- new events to watch
-                         -> IO ()
+                         -> IO Bool
 
     , _beDelete :: a -> IO ()
     }
 
 backend :: (a -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int)
-        -> (a -> Fd -> Event -> Event -> IO ())
-        -> (a -> Fd -> Event -> IO ())
+        -> (a -> Fd -> Event -> Event -> IO Bool)
+        -> (a -> Fd -> Event -> IO Bool)
         -> (a -> IO ())
         -> a
         -> Backend
@@ -126,11 +126,17 @@ poll :: Backend -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int
 poll (Backend bState bPoll _ _ _) = bPoll bState
 {-# INLINE poll #-}
 
-modifyFd :: Backend -> Fd -> Event -> Event -> IO ()
+-- | Returns 'True' if the modification succeeded.
+-- Returns 'False' if this backend does not support
+-- event notifications on this type of file.
+modifyFd :: Backend -> Fd -> Event -> Event -> IO Bool
 modifyFd (Backend bState _ bModifyFd _ _) = bModifyFd bState
 {-# INLINE modifyFd #-}
 
-modifyFdOnce :: Backend -> Fd -> Event -> IO ()
+-- | Returns 'True' if the modification succeeded.
+-- Returns 'False' if this backend does not support
+-- event notifications on this type of file.
+modifyFdOnce :: Backend -> Fd -> Event -> IO Bool
 modifyFdOnce (Backend bState _ _ bModifyFdOnce _) = bModifyFdOnce bState
 {-# INLINE modifyFdOnce #-}
 
