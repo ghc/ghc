@@ -1,5 +1,1 @@
-*** Exception (reporting due to +RTS -xc): (base:GHC.Exception.SomeException), stack trace: 
-  Main.foo,
-  called from Main.main,
-  called from Main.CAF
 T7319: test

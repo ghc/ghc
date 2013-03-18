@@ -97,11 +97,15 @@ test('T6146', normal, compile_and_run, [''])
 test('T5900', normal, compile_and_run, [''])
 test('T7163', normal, compile_and_run, [''])
 
+# T7319 now gives the same results in every 'way', so treat it as normal
+test('T7319', exit_code(1), compile_and_run, [''])
+
 # Gives different results when optimised, so restrict to just one way
-test('T7319', [ extra_ways(['prof']), only_ways(['prof']), exit_code(1),
-                req_profiling,
-                extra_hc_opts('-fprof-auto'),
-                extra_run_opts('+RTS -xc') ], compile_and_run, [''])
+#test('T7319', [ extra_ways(['prof']), only_ways(['prof']), exit_code(1),
+#                req_profiling,
+#                extra_hc_opts('-fprof-auto'),
+#                extra_run_opts('+RTS -xc') ], compile_and_run, [''])
+
 test('Word2Float32', unless(wordsize(32), skip), compile_and_run, [''])
 test('Word2Float64', unless(wordsize(64), skip), compile_and_run, [''])
 
