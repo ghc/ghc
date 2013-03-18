@@ -308,7 +308,7 @@ def doing_ghci():
     return 'ghci' in config.run_ways
 
 def ghci_dynamic( ):
-    return config.ghc_dynamic_by_default
+    return config.ghc_dynamic
 
 def fast():
     return config.fast

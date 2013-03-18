@@ -164,6 +164,16 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include $(ghc-config-mk)
 endif
 
+ifeq "$(GhcDynamic)" "YES"
+ghcThWayFlags     = -dynamic
+ghciWayFlags      = -dynamic
+ghcPluginWayFlags = -dynamic
+else
+ghcThWayFlags     = -static
+ghciWayFlags      = -static
+ghcPluginWayFlags = -static
+endif
+
 # -----------------------------------------------------------------------------
 
 ifeq "$(HostOS)" "mingw32"

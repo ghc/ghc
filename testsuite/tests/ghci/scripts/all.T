@@ -137,7 +137,8 @@ test('T6106',
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
 test('ghci058',
-     extra_clean(['Ghci058.hs', 'Ghci058.hi', 'Ghci058.o']),
+     [extra_clean(['Ghci058.hs', 'Ghci058.hi', 'Ghci058.o']),
+      cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
      ghci_script,
      ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])

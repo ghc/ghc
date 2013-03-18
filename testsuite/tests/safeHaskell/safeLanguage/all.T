@@ -36,7 +36,7 @@ test('SafeLang11',
       extra_clean(['SafeLang11_A.o', 'SafeLang11_A.hi',
                    'SafeLang11_B.o', 'SafeLang11_B.hi'])],
      multimod_compile_and_run,
-     ['SafeLang11', ''])
+     ['SafeLang11', config.ghc_th_way_flags])
 test('SafeLang12', normal, multimod_compile_fail, ['SafeLang12', ''])
 test('SafeLang13',
      extra_clean(['SafeLang13_A.o', 'SafeLang13_A.hi']),

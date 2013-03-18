@@ -18,9 +18,9 @@ clean:
 
 recomp009: clean
 	cp Sub1.hs Sub.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -v0 --make Main.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) $(ghcThWayFlags) -v0 --make Main.hs
 	./Main
 	sleep 1
 	cp Sub2.hs Sub.hs
-	-'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -v0 --make Main.hs
+	-'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) $(ghcThWayFlags) -v0 --make Main.hs
 	./Main

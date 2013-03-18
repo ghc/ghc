@@ -1,0 +1,5 @@
+
+TcNullaryTCFail.hs:5:10:
+    Duplicate instance declarations:
+      instance A -- Defined at TcNullaryTCFail.hs:5:10
+      instance A -- Defined at TcNullaryTCFail.hs:6:10

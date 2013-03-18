@@ -39,7 +39,8 @@ expectedGhcOnlyExtensions = [
                              "TypeHoles",
                              "OverloadedLists",
                              "EmptyCase",
-                             "AutoDeriveTypeable"]
+                             "AutoDeriveTypeable",
+                             "NullaryTypeClasses"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

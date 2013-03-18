@@ -95,3 +95,4 @@ test('ParserLambdaCase', when(compiler_lt('ghc', '7.5'), skip), compile, [''])
 test('T5243', extra_clean(['T5243A.hi', 'T5243A.o']),
      multimod_compile, ['T5243',''])
 test('T7118', normal, compile, [''])
+test('T7776', normal, compile, [''])

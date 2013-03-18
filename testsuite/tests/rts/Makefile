@@ -61,4 +61,4 @@ T7037:
 	./T7037_main
 
 T7040_ghci_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7040_ghci_c.c
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghciWayFlags) -c T7040_ghci_c.c

@@ -70,6 +70,8 @@ else:
     if (ghc_with_dynamic_rts == 1):
         config.run_ways.append('dyn')
 
+config.ghc_dynamic = ghc_dynamic
+
 if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
     config.run_ways.append('profthreaded')
 
@@ -199,4 +201,16 @@ def get_compiler_info():
         config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
     except:
         config.package_conf_cache_file = ''
+
+    if compilerInfoDict["GHC Dynamic"] == "YES":
+        config.ghc_th_way_flags = "-dynamic"
+        config.ghci_way_flags   = "-dynamic"
+        config.ghc_th_way       = "dyn"
+        config.ghc_plugin_way   = "dyn"
+    elif compilerInfoDict["GHC Dynamic"] == "NO":
+        config.ghc_th_way_flags = "-static"
+        config.ghci_way_flags   = "-static"
+        config.ghc_plugin_way   = "normal"
+    else:
+        raise 'Bad value for "GHC Dynamic"'
 
