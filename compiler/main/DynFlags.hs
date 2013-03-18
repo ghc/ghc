@@ -758,6 +758,7 @@ data Settings = Settings {
   sSystemPackageConfig   :: FilePath,
   sLdSupportsCompactUnwind :: Bool,
   sLdSupportsBuildId       :: Bool,
+  sLdSupportsFilelist      :: Bool,
   sLdIsGnuLd               :: Bool,
   -- commands for particular phases
   sPgm_L                 :: String,
