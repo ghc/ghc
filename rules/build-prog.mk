@@ -183,17 +183,6 @@ ifeq "$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS)" ""
 $1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS += -no-auto-link-packages -no-hs-main
 endif
 
-# XXX
-# ifneq "$3" "0"
-# ifeq "$$(TargetOS_CPP)" "linux"
-# $1_$2_dyn_GHC_LD_OPTS += \
-#     -fno-use-rpaths \
-#     $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
-# else ifeq "$$(TargetOS_CPP)" "darwin"
-# $1_$2_dyn_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
-# endif
-# endif
-
 ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
