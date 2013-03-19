@@ -88,21 +88,15 @@ GhcDynamic=NO
 # GhcProfiled=YES means compile a profiled stage-2 compiler
 GhcProfiled=NO
 
-# Do we support shared libs?
-SharedLibsPlatformList =                        \
-    i386-unknown-linux   x86_64-unknown-linux   \
-    i386-unknown-freebsd x86_64-unknown-freebsd \
-    i386-unknown-openbsd x86_64-unknown-openbsd \
-    i386-unknown-netbsd  x86_64-unknown-netbsd  \
-    i386-unknown-mingw32 x86_64-unknown-mingw32 \
-    i386-apple-darwin    x86_64-apple-darwin    powerpc-apple-darwin
+# Soem platforms don't support shared libraries
+NoSharedLibsPlatformList =
 
-ifeq "$(SOLARIS_BROKEN_SHLD)" "NO"
-SharedLibsPlatformList += i386-unknown-solaris2
+ifeq "$(SOLARIS_BROKEN_SHLD)" "YES"
+NoSharedLibsPlatformList += i386-unknown-solaris2
 endif
 
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
-	$(SharedLibsPlatformList)),YES,NO)
+    $(NoSharedLibsPlatformList)),NO,YES)
 
 # DYNAMIC_BY_DEFAULT says whether this compiler will default to
 # building dynamic executables, i.e. -dynamic is on.  We do this for
