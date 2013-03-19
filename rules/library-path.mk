@@ -11,11 +11,11 @@
 # -----------------------------------------------------------------------------
 
 # $1 = paths to prepend
-ifeq "$(TargetOS_CPP)" "linux"
-prependLibraryPath = export LD_LIBRARY_PATH="$1:$$LD_LIBRARY_PATH"
+ifeq "$(TargetOS_CPP)" "mingw32"
+prependLibraryPath = $(error Do not know how to prependLibraryPath on Windows)
 else ifeq "$(TargetOS_CPP)" "darwin"
 prependLibraryPath = export DYLD_LIBRARY_PATH="$1:$$DYLD_LIBRARY_PATH"
 else
-prependLibraryPath = $(error Do not know how to prependLibraryPath on $(TargetOS_CPP))
+prependLibraryPath = export LD_LIBRARY_PATH="$1:$$LD_LIBRARY_PATH"
 endif
 
