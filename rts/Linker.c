@@ -1281,12 +1281,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_ap_7_upd_info)                                  \
       SymI_HasProto(stg_exit)                                           \
       SymI_HasProto(stg_sel_0_upd_info)                                 \
-      SymI_HasProto(stg_sel_10_upd_info)                                \
-      SymI_HasProto(stg_sel_11_upd_info)                                \
-      SymI_HasProto(stg_sel_12_upd_info)                                \
-      SymI_HasProto(stg_sel_13_upd_info)                                \
-      SymI_HasProto(stg_sel_14_upd_info)                                \
-      SymI_HasProto(stg_sel_15_upd_info)                                \
       SymI_HasProto(stg_sel_1_upd_info)                                 \
       SymI_HasProto(stg_sel_2_upd_info)                                 \
       SymI_HasProto(stg_sel_3_upd_info)                                 \
@@ -1296,6 +1290,28 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_sel_7_upd_info)                                 \
       SymI_HasProto(stg_sel_8_upd_info)                                 \
       SymI_HasProto(stg_sel_9_upd_info)                                 \
+      SymI_HasProto(stg_sel_10_upd_info)                                \
+      SymI_HasProto(stg_sel_11_upd_info)                                \
+      SymI_HasProto(stg_sel_12_upd_info)                                \
+      SymI_HasProto(stg_sel_13_upd_info)                                \
+      SymI_HasProto(stg_sel_14_upd_info)                                \
+      SymI_HasProto(stg_sel_15_upd_info)                                \
+      SymI_HasProto(stg_sel_0_noupd_info)                                 \
+      SymI_HasProto(stg_sel_1_noupd_info)                                 \
+      SymI_HasProto(stg_sel_2_noupd_info)                                 \
+      SymI_HasProto(stg_sel_3_noupd_info)                                 \
+      SymI_HasProto(stg_sel_4_noupd_info)                                 \
+      SymI_HasProto(stg_sel_5_noupd_info)                                 \
+      SymI_HasProto(stg_sel_6_noupd_info)                                 \
+      SymI_HasProto(stg_sel_7_noupd_info)                                 \
+      SymI_HasProto(stg_sel_8_noupd_info)                                 \
+      SymI_HasProto(stg_sel_9_noupd_info)                                 \
+      SymI_HasProto(stg_sel_10_noupd_info)                                \
+      SymI_HasProto(stg_sel_11_noupd_info)                                \
+      SymI_HasProto(stg_sel_12_noupd_info)                                \
+      SymI_HasProto(stg_sel_13_noupd_info)                                \
+      SymI_HasProto(stg_sel_14_noupd_info)                                \
+      SymI_HasProto(stg_sel_15_noupd_info)                                \
       SymI_HasProto(stg_upd_frame_info)                                 \
       SymI_HasProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \
