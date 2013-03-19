@@ -243,6 +243,7 @@ initSysTools mbMinusB
                                ++ tntc_gcc_args)
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
+       ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
        ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
        perl_path <- getSetting "perl command"
 
@@ -315,6 +316,7 @@ initSysTools mbMinusB
                     sSystemPackageConfig = pkgconfig_path,
                     sLdSupportsCompactUnwind = ldSupportsCompactUnwind,
                     sLdSupportsBuildId       = ldSupportsBuildId,
+                    sLdSupportsFilelist      = ldSupportsFilelist,
                     sLdIsGnuLd               = ldIsGnuLd,
                     sPgm_L   = unlit_path,
                     sPgm_P   = (cpp_prog, cpp_args),

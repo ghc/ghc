@@ -2134,6 +2134,12 @@ joinObjectFiles dflags o_files output_fn = do
           script <- newTempName dflags "ldscript"
           writeFile script $ "INPUT(" ++ unwords o_files ++ ")"
           ld_r [SysTools.FileOption "" script]
+     else if sLdSupportsFilelist mySettings
+     then do
+          filelist <- newTempName dflags "filelist"
+          writeFile filelist $ unlines o_files
+          ld_r [SysTools.Option "-Wl,-filelist",
+                SysTools.FileOption "-Wl," filelist]
      else do
           ld_r (map (SysTools.FileOption "") o_files)
 
