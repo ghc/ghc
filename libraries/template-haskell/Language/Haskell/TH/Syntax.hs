@@ -575,7 +575,7 @@ data NameFlavour
 --
 -- The long term solution to this is to use the binary package for annotation serialization and
 -- then remove this instance. However, to do _that_ we need to wait on binary to become stable, since
--- boot libraries cannot be upgraded seperately from GHC itself.
+-- boot libraries cannot be upgraded separately from GHC itself.
 --
 -- This instance cannot be derived automatically due to bug #2701
 instance Data NameFlavour where
