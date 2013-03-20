@@ -388,7 +388,8 @@ data FinalPassSwitches = FinalPassSwitches
   -- is allocated inside a lambda
   , fps_trace             :: !Bool
   , fps_strictness        :: !Bool
-  , fps_LNE               :: !Bool
+  , fps_ignoreLNEClo      :: !Bool
+  , fps_floatLNE0         :: !Bool
   , fps_retry             :: !Bool
   }
 

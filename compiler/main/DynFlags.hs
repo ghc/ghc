@@ -577,7 +577,8 @@ data DynFlags = DynFlags {
   lateFloatDoSinglyRecSAT :: Bool,
   lateFloatCloGrowthInLam :: Maybe Int,
   lateFloatStrictness     :: Bool,        -- ^ use strictness in the late-float
-  lateFloatEscAnal            :: Bool,        -- ^ predict LNEs in the late-float
+  lateFloatIgnoreLNEClo   :: Bool,        -- ^ predict LNEs in the late-float
+  lateFloatLNE0           :: Bool,        -- ^ float zero-arity LNEs
   lateFloatRetry          :: Bool,
   
   protectLastArg        :: Bool,
@@ -1252,7 +1253,8 @@ defaultDynFlags mySettings =
         lateFloatDoSinglyRecSAT = False,
         lateFloatCloGrowthInLam = Nothing,
         lateFloatStrictness     = True,
-        lateFloatEscAnal            = True,
+        lateFloatIgnoreLNEClo   = True,
+        lateFloatLNE0           = True,
         lateFloatRetry          = False,
 
 
@@ -2298,11 +2300,10 @@ dynamic_flags = [
   , Flag "flate-float-rec-lam-limit"            (intSuffix (\n d -> d{ lateFloatLamOn = True, lateFloatRecLam = Just n }))
   , Flag "flate-float-rec-lam-any"              (noArg       (\d -> d{ lateFloatLamOn = True, lateFloatRecLam = Nothing }))
   , Flag "fno-late-float-rec-lam"               (noArg       (\d -> d{ lateFloatRecLam = Just 0 }))
-  , Flag "flate-float-abstract-LNE-var"         (noArg       (\d -> d{ lateFloatAbsLNEVar = True }))
+  , Flag "flate-float-abstract-LNE-var"         (noArg       (\d -> d{ lateFloatAbsLNEVar = True}))
   , Flag "fno-late-float-abstract-LNE-var"      (noArg       (\d -> d{ lateFloatAbsLNEVar = False }))
   , Flag "flate-float-abstract-undersat-var"    (noArg       (\d -> d{ lateFloatAbsUnsatVar = True }))
-  , Flag "fno-late-float-abstract-undersat-var" (noArg       (\d -> d{ lateFloatAbsUnsatVar = False
-                                                                     , lateFloatEscAnal = True }))
+  , Flag "fno-late-float-abstract-undersat-var" (noArg       (\d -> d{ lateFloatAbsUnsatVar = False }))
   , Flag "flate-float-abstract-sat-var"         (noArg       (\d -> d{ lateFloatAbsSatVar = True }))
   , Flag "fno-late-float-abstract-sat-var"      (noArg       (\d -> d{ lateFloatAbsSatVar = False }))
   , Flag "flate-float-abstract-oversat-var"     (noArg       (\d -> d{ lateFloatAbsOversatVar = True }))
@@ -2331,9 +2332,11 @@ dynamic_flags = [
   , Flag "flate-float-strictness"               (noArg       (\d -> d{ lateFloatStrictness = True }))
   , Flag "fno-late-float-strictness"            (noArg       (\d -> d{ lateFloatStrictness = False }))
 
-  , Flag "flate-float-esc-anal"                 (noArg       (\d -> d{ lateFloatEscAnal = True }))
-  , Flag "fno-late-float-esc-anal"              (noArg       (\d -> d{ lateFloatEscAnal = False
-                                                                     , lateFloatAbsLNEVar = True }))
+  , Flag "flate-float-ignore-LNE-clo"           (noArg       (\d -> d{ lateFloatIgnoreLNEClo = True }))
+  , Flag "fno-late-float-ignore-LNE-clo"        (noArg       (\d -> d{ lateFloatIgnoreLNEClo = False }))
+  , Flag "flate-float-LNE0"                     (noArg       (\d -> d{ lateFloatLNE0 = True }))
+  , Flag "fno-late-float-LNE0"                  (noArg       (\d -> d{ lateFloatLNE0 = False }))
+
   , Flag "flate-float-retry"                    (noArg       (\d -> d{ lateFloatRetry = True }))
   , Flag "fno-late-float-retry"                 (noArg       (\d -> d{ lateFloatRetry = False }))
 

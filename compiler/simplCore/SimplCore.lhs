@@ -147,7 +147,8 @@ getCoreToDo dflags
               , fps_cloGrowthInLam = lateFloatCloGrowthInLam dflags
               , fps_trace          = dopt Opt_D_dump_late_float dflags
               , fps_strictness     = lateFloatStrictness     dflags
-              , fps_LNE            = lateFloatEscAnal        dflags
+              , fps_ignoreLNEClo   = lateFloatIgnoreLNEClo   dflags
+              , fps_floatLNE0      = lateFloatLNE0           dflags
               , fps_retry          = lateFloatRetry          dflags
               }
     static_args   = gopt Opt_StaticArgumentTransformation dflags
@@ -324,6 +325,8 @@ getCoreToDo dflags
 
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter,
+
+        maybe_rule_check (Phase 0),
 
         runMaybe late_lambda_float $ \ (nonrec, fps) -> CoreDoPasses
           [ CoreDoFloatOutwards $ FloatOutSwitches
