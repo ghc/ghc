@@ -29,7 +29,7 @@ all_rts : $(ALL_RTS_LIBS)
 # -----------------------------------------------------------------------------
 # Defining the sources
 
-ALL_DIRS = hooks parallel sm eventlog
+ALL_DIRS = hooks sm eventlog
 
 ifeq "$(HostOS_CPP)" "mingw32"
 ALL_DIRS += win32
@@ -37,11 +37,7 @@ else
 ALL_DIRS += posix
 endif
 
-EXCLUDED_SRCS :=
-EXCLUDED_SRCS += rts/parallel/SysMan.c
-EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
-
-rts_C_SRCS := $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
+rts_C_SRCS := $(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c))
 rts_CMM_SRCS := $(wildcard rts/*.cmm)
 
 # Don't compile .S files when bootstrapping a new arch
