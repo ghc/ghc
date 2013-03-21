@@ -1967,7 +1967,9 @@ analyzeFVsM  env app@(App fun arg) = do
         Nothing   -> computeArgumentDemands app
         Just dmds -> dmds
 
-  let (argIsStrictlyDemanded, dmds') = case argDmds of
+  let (argIsStrictlyDemanded, dmds')
+        | isTyCoArg arg = (False, argDmds)
+        | otherwise     = case argDmds of
         [] -> (False, []) -- for some reason, we couldn't determine
                           -- argument strictness for this application
         isStrDmd : dmds -> (isStrDmd, dmds)
@@ -1985,7 +1987,7 @@ analyzeFVsM  env app@(App fun arg) = do
   x <- gensymFVM
   arg2 <- return $
     let arg_fvis = fvisOf arg2
-        new_arg_fvis = if argIsAClosure
+        new_arg_fvis = if fve_isFinal env && argIsAClosure
                    then closureBindingFVIs x env Nothing arg_fvis
                    else arg_fvis
     in (new_arg_fvis, snd arg2)
