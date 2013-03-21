@@ -1643,7 +1643,7 @@ When the scrutinee is a GlobalId we must take care in two ways
  i) In order to *know* whether 'x' occurs free in the RHS, we need its
     occurrence info. BUT, we don't gather occurrence info for
     GlobalIds.  That's the reason for the (small) occ_gbl_scrut env in 
-    OccEnv is for: it says "gather occurrence info for these.
+    OccEnv is for: it says "gather occurrence info for these".
 
  ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
      has an External Name. See, for example, SimplEnv Note [Global Ids in

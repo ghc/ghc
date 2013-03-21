@@ -560,7 +560,7 @@ Note [NoSpecConstr]
 ~~~~~~~~~~~~~~~~~~~
 The ignoreDataCon stuff allows you to say
     {-# ANN type T NoSpecConstr #-}
-to mean "don't specialise on arguments of this type.  It was added
+to mean "don't specialise on arguments of this type".  It was added
 before we had ForceSpecConstr.  Lacking ForceSpecConstr we specialised
 regardless of size; and then we needed a way to turn that *off*.  Now
 that we have ForceSpecConstr, this NoSpecConstr is probably redundant.
