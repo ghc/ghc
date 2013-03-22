@@ -1067,7 +1067,12 @@ wayGeneralFlags _ WayNDP      = []
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayUnsetGeneralFlags _ WayThreaded = []
 wayUnsetGeneralFlags _ WayDebug    = []
-wayUnsetGeneralFlags _ WayDyn      = [Opt_Static]
+wayUnsetGeneralFlags _ WayDyn      = [Opt_Static,
+                                      -- There's no point splitting objects
+                                      -- when we're going to be dynamically
+                                      -- linking. Plus it breaks compilation
+                                      -- on OSX x86.
+                                      Opt_SplitObjs]
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 wayUnsetGeneralFlags _ WayPar      = []
