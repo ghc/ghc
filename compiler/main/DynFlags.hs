@@ -1054,6 +1054,7 @@ wayDesc WayPar      = "Parallel"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
+-- Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayGeneralFlags _ WayThreaded = []
 wayGeneralFlags _ WayDebug    = []
@@ -1064,11 +1065,11 @@ wayGeneralFlags _ WayPar      = [Opt_Parallel]
 wayGeneralFlags _ WayGran     = [Opt_GranMacros]
 wayGeneralFlags _ WayNDP      = []
 
+-- Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayUnsetGeneralFlags _ WayThreaded = []
 wayUnsetGeneralFlags _ WayDebug    = []
-wayUnsetGeneralFlags _ WayDyn      = [Opt_Static,
-                                      -- There's no point splitting objects
+wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
                                       -- when we're going to be dynamically
                                       -- linking. Plus it breaks compilation
                                       -- on OSX x86.
@@ -1849,7 +1850,10 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
     = let theWays = sort $ nub $ ways dflags
-      in dflags {
+          f = if WayDyn `elem` theWays then unSetGeneralFlag'
+                                       else setGeneralFlag'
+      in f Opt_Static
+       $ dflags {
              ways        = theWays,
              buildTag    = mkBuildTag (filter (not . wayRTSOnly) theWays),
              rtsBuildTag = mkBuildTag                            theWays
@@ -1964,7 +1968,7 @@ dynamic_flags = [
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  , Flag "static"         (NoArg (removeWay WayDyn))
+  , Flag "static"         (NoArg removeWayDyn)
   , Flag "dynamic"        (NoArg (addWay WayDyn))
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ()))
@@ -2687,7 +2691,7 @@ defaultFlags settings
 
     ++ (if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
         then wayGeneralFlags platform WayDyn
-        else [Opt_Static])
+        else [])
 
     where platform = sTargetPlatform settings
 
@@ -2980,16 +2984,8 @@ addWay' w dflags0 = let platform = targetPlatform dflags0
                                         (wayUnsetGeneralFlags platform w)
                     in dflags4
 
-removeWay :: Way -> DynP ()
-removeWay w = do
-  upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
-  dfs <- liftEwM getCmdLineState
-  let platform = targetPlatform dfs
-  -- XXX: wayExtras?
-  mapM_ unSetGeneralFlag $ wayGeneralFlags platform w
-  mapM_ setGeneralFlag $ wayUnsetGeneralFlags platform w
-  -- turn Opt_PIC back on if necessary for this platform:
-  mapM_ setGeneralFlag $ default_PIC platform
+removeWayDyn :: DynP ()
+removeWayDyn = upd (\dfs -> dfs { ways = filter (WayDyn /=) (ways dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
