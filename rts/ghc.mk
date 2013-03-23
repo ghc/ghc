@@ -104,13 +104,6 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 ifneq "$(UseSystemLibFFI)" "YES"
-rts_ffi_objs_stamp = rts/dist/ffi/stamp
-rts_ffi_objs       = rts/dist/ffi/*.o
-
-$(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) $(TOUCH_DEP) | $$(dir $$@)/.
-	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
-	"$(TOUCH_CMD)" $@
-
 # This is a little hacky. We don't know the SO version, so we only
 # depend on libffi.so, but copy libffi.so*
 rts/dist/build/libffi$(soext): libffi/build/inst/lib/libffi$(soext)
@@ -174,8 +167,8 @@ endif
 
 rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
-ifneq "$(UseSystemLibFFI)" "YES"
-rts_dist_FFI_SO = rts/dist/build/libffi$(soext)
+ifneq "$$(UseSystemLibFFI)" "YES"
+rts_dist_FFI_SO = rts/dist/build/libffi$$(soext)
 else
 rts_dist_FFI_SO =
 endif
@@ -188,7 +181,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/b
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages -Lrts/dist/build -l$(LIBFFI_WINDOWS_LIB) `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
-ifneq "$(UseSystemLibFFI)" "YES"
+ifneq "$$(UseSystemLibFFI)" "YES"
 LIBFFI_LIBS = -Lrts/dist/build -lffi 
 ifeq "$$(TargetElf)" "YES"
 LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN'
@@ -205,10 +198,17 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend $$(rts_d
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
 endif
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_ffi_objs_stamp)
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_ffi_objs) $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
+
+ifneq "$$(UseSystemLibFFI)" "YES"
+$$(rts_$1_LIB) : rts/dist/build/libCffi$$($1_libsuf)
+rts/dist/build/libCffi$$($1_libsuf): libffi/build/inst/lib/libffi.a
+	cp $$< $$@
+endif
+
 endif
 
 endif
@@ -459,13 +459,15 @@ endif
 
 ifeq "$(UseSystemLibFFI)" "YES"
 
-rts_PACKAGE_CPP_OPTS    += -DFFI_INCLUDE_DIR=$(FFIIncludeDir)
-rts_PACKAGE_CPP_OPTS    += -DFFI_LIB_DIR=$(FFILibDir)
+rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=$(FFIIncludeDir)
+rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=$(FFILibDir)
+rts_PACKAGE_CPP_OPTS += '-DFFI_LIB='
 
 else # UseSystemLibFFI==YES
 
-rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=""
-rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=""
+rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=
+rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=
+rts_PACKAGE_CPP_OPTS += '-DFFI_LIB="Cffi"'
 
 endif
 
@@ -544,8 +546,11 @@ rts/package.conf.inplace : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 # installing
 
 RTS_INSTALL_LIBS += $(ALL_RTS_LIBS)
+ifneq "$(UseSystemLibFFI)" "YES"
 RTS_INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
-RTS_INSTALL_LIBS += $(wildcard rts/dist/build/$(LIBFFI_DLL))
+RTS_INSTALL_LIBS += $(foreach w,$(filter-out dyn,$(rts_WAYS)),rts/dist/build/libffi$($w_libsuf))
+RTS_INSTALL_LIBS += rts/dist/build/$(LIBFFI_DLL)
+endif
 
 ifneq "$(UseSystemLibFFI)" "YES"
 install: install_libffi_headers
