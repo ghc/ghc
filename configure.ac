@@ -151,8 +151,9 @@ then
     fi
 fi
 
-GHC_PACKAGE_DB_FLAG=package-db
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
+                    GHC_PACKAGE_DB_FLAG=package-conf,
+                    GHC_PACKAGE_DB_FLAG=package-db)
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
