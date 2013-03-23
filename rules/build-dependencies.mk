@@ -35,7 +35,7 @@ $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC
 	$$(call removeFiles,$$@.tmp)
 ifneq "$$($1_$2_HS_SRCS)" ""
 	"$$($1_$2_HC_MK_DEPEND)" -M \
-	    $$(filter-out -split-objs, $$($1_$2_$$(firstword $$($1_$2_WAYS))_ALL_HC_OPTS)) \
+	    $$($1_$2_$$(firstword $$($1_$2_WAYS))_MOST_DIR_HC_OPTS) \
 	    $$($1_$2_MKDEPENDHS_FLAGS) \
 	    $$($1_$2_HS_SRCS)
 endif

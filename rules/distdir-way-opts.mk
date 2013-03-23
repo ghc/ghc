@@ -99,7 +99,6 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
- $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
  $$($1_$2_HC_OPTS) \
  $$(CONF_HC_OPTS_STAGE$4) \
  $$($1_$2_MORE_HC_OPTS) \
@@ -109,16 +108,20 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(SRC_HC_WARNING_OPTS) \
  $$(EXTRA_HC_OPTS)
 
+$1_$2_$3_MOST_DIR_HC_OPTS = \
+ $$($1_$2_$3_MOST_HC_OPTS) \
+ -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build
+
 # NB. CONF_HC_OPTS_STAGE$4 has to be late enough to override $1_$2_HC_OPTS, so
 # that -O0 is effective (see #5484)
 
 # $1_$2_$3_ALL_HC_OPTS: this is all the options we will pass to GHC
 # for a given ($1,$2,$3).
 $1_$2_$3_ALL_HC_OPTS = \
- $$($1_$2_$3_MOST_HC_OPTS) \
- $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too)) \
- -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build \
- -hisuf $$($3_hisuf) -osuf  $$($3_osuf) -hcsuf $$($3_hcsuf)
+ -hisuf $$($3_hisuf) -osuf  $$($3_osuf) -hcsuf $$($3_hcsuf) \
+ $$($1_$2_$3_MOST_DIR_HC_OPTS) \
+ $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
+ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too))
 
 ifeq "$3" "dyn"
 ifneq "$4" "0"
