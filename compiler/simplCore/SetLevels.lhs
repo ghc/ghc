@@ -258,7 +258,7 @@ lvlTopBind dflags env (NonRec bndr rhs)
        let  -- lambda lifting impedes specialization, so: if the old
             -- RHS has an unstable unfolding, "stablize it" so that it
             -- ends up in the .hi file
-            bndr1 | lateFloatStabilizeFirst dflags,
+            bndr1 | gopt Opt_LLF_Stabilize dflags,
                     isFinalPass env, isUnstableUnfolding (realIdUnfolding bndr)
                               = bndr `setIdUnfolding` mkInlinableUnfolding dflags rhs
                   | otherwise = bndr
@@ -796,40 +796,6 @@ lvlBind ctxt_lvl env isLNE body_fvis (AnnRec pairsTB) =
       return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
              , ctxt_lvl, new_env)
 
-  -- ToDo: when enabling the floatLambda stuff,
-  --       I think we want to stop doing this
-    | doSinglyRecSAT env && isSingleton pairs && count isId abs_vars > 1 -> do
-  	-- Special case for self recursion where there are
-	-- several variables carried around: build a local loop:	
-	--	poly_f = \abs_vars. \lam_vars . letrec f = \lam_vars. rhs in f lam_vars
-	-- This just makes the closures a bit smaller.  If we don't do
-	-- this, allocation rises significantly on some programs
-	--
-	-- We could elaborate it for the case where there are several
-	-- mutually functions, but it's quite a bit more complicated
-	-- 
-	-- This all seems a bit ad hoc -- sigh
-      let
-          (bndr,rhs) = head pairs
-          (rhs_lvl, abs_vars_w_lvls) = lvlLamBndrs dest_lvl abs_vars
-          rhs_env = extendLvlEnv env abs_vars_w_lvls
-      (rhs_env', new_bndr) <- cloneVar rhs_env bndr rhs_lvl
-      let
-          (lam_bndrsTB, rhs_body)     = collectAnnBndrs rhs
-          lam_bndrs                   = map unTag lam_bndrsTB
-          (body_lvl, new_lam_bndrs) = lvlLamBndrs rhs_lvl lam_bndrs
-          body_env                  = extendLvlEnv rhs_env' new_lam_bndrs
-      new_rhs_body <- lvlExpr body_lvl body_env rhs_body
-      (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
-      return (Rec [(TB poly_bndr (FloatMe dest_lvl)
-                  , mkLams abs_vars_w_lvls $
-                    mkLams new_lam_bndrs $
-                    Let (Rec [( TB new_bndr (StayPut rhs_lvl)
-                             , mkLams new_lam_bndrs new_rhs_body)])
-                      (mkVarApps (Var new_bndr) lam_bndrs))]
-             , ctxt_lvl
-             , poly_env)
-
     | otherwise -> do  -- Non-null abs_vars
       (new_env, new_bndrs) <- newPolyBndrs dest_lvl env abs_vars bndrs
       new_rhss <- mapM (lvlFloatRhs abs_vars dest_lvl new_env) rhss
@@ -1270,11 +1236,6 @@ isFinalPass :: LevelEnv -> Bool
 isFinalPass le = case finalPass le of
   Nothing -> False
   Just _  -> True
-
-doSinglyRecSAT :: LevelEnv -> Bool
-doSinglyRecSAT le = case finalPass le of
-  Nothing  -> False
-  Just fps -> fps_doSinglyRecSAT fps
 
 lateRetry :: LevelEnv -> Bool
 lateRetry le = case finalPass le of

@@ -129,27 +129,26 @@ getCoreToDo dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
     liberate_case = gopt Opt_LiberateCase                 dflags
     late_lambda_float =
-      if not (lateFloatLamOn dflags)
+      if not (gopt Opt_LLF dflags)
          || Just 0 == nonrec && Just 0 == fps_rec fps
       then Nothing else Just (nonrec, fps)
       where nonrec = lateFloatNonRecLam dflags
             fps = FinalPassSwitches
-              { fps_rec            = lateFloatRecLam         dflags
-              , fps_absLNEVar      = lateFloatAbsLNEVar      dflags
-              , fps_absUnsatVar    = lateFloatAbsUnsatVar    dflags
-              , fps_absSatVar      = lateFloatAbsSatVar      dflags
-              , fps_absOversatVar  = lateFloatAbsOversatVar  dflags
-              , fps_createPAPs     = lateFloatCreatePAPs     dflags
-              , fps_ifInClo        = lateFloatIfInClo        dflags
-              , fps_cloGrowth      = lateFloatCloGrowth      dflags
-              , fps_stabilizeFirst = lateFloatStabilizeFirst dflags
-              , fps_doSinglyRecSAT = lateFloatDoSinglyRecSAT dflags
-              , fps_cloGrowthInLam = lateFloatCloGrowthInLam dflags
-              , fps_trace          = dopt Opt_D_dump_late_float dflags
-              , fps_strictness     = lateFloatStrictness     dflags
-              , fps_ignoreLNEClo   = lateFloatIgnoreLNEClo   dflags
-              , fps_floatLNE0      = lateFloatLNE0           dflags
-              , fps_retry          = lateFloatRetry          dflags
+              { fps_trace          = dopt Opt_D_dump_late_float dflags
+              , fps_stabilizeFirst = gopt Opt_LLF_Stabilize     dflags
+              , fps_rec            = lateFloatRecLam            dflags
+              , fps_absLNEVar      = gopt Opt_LLF_AbsLNE        dflags
+              , fps_absUnsatVar    = gopt Opt_LLF_AbsUnsat      dflags
+              , fps_absSatVar      = gopt Opt_LLF_AbsSat        dflags
+              , fps_absOversatVar  = gopt Opt_LLF_AbsOversat    dflags
+              , fps_createPAPs     = gopt Opt_LLF_CreatePAPs    dflags
+              , fps_ifInClo        = lateFloatIfInClo           dflags
+              , fps_cloGrowth      = lateFloatCloGrowth         dflags
+              , fps_cloGrowthInLam = lateFloatCloGrowthInLam    dflags
+              , fps_ignoreLNEClo   = gopt Opt_LLF_IgnoreLNEClo  dflags
+              , fps_strictness     = gopt Opt_LLF_UseStr        dflags
+              , fps_floatLNE0      = gopt Opt_LLF_FloatLNE0     dflags
+              , fps_retry          = gopt Opt_LLF_Retry         dflags
               }
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
@@ -335,7 +334,7 @@ getCoreToDo dflags
               , floatOutPartialApplications = False
               , finalPass_                  = Just fps
               }
-          , runWhen (lateFloatSimpl dflags) $ simpl_phase 0 ["post-late-float-lam"] max_iter
+          , runWhen (gopt Opt_LLF_Simpl dflags) $ simpl_phase 0 ["post-late-float-lam"] max_iter
           ],
         -- TODO this is an experimental FloatOut pass. The intention
         -- is to use extra space on the stack for passing arguments

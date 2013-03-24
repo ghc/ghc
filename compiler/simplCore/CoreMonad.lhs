@@ -380,9 +380,6 @@ data FinalPassSwitches = FinalPassSwitches
   , fps_stabilizeFirst   :: !Bool
   -- ^ stabilizes an unstable unfolding before floating things out of
   -- it, since floating out precludes specialization at the call-site
-  , fps_doSinglyRecSAT   :: !Bool
-  -- ^ do a SAT transform on singly recursive floaters if that have
-  -- more than one value abs var
   , fps_cloGrowthInLam :: !(Maybe Int)
   -- ^ disallow the floating of a binding if it occurs in closure that
   -- is allocated inside a lambda
@@ -417,7 +414,6 @@ pprFinalPassSwitches sw = sep $ punctuate comma $
   , ptext (sLit "ClosureGrowth =") <+> ppr (fps_cloGrowth sw)
   , ptext (sLit "ClosureGrowthInLam =") <+> ppr (fps_cloGrowthInLam sw)
   , ptext (sLit "StabilizeFirst =") <+> ppr (fps_stabilizeFirst sw)
-  , ptext (sLit "DoSinglyRecSAT =") <+> ppr (fps_doSinglyRecSAT sw)
   ]
 
 -- The core-to-core pass ordering is derived from the DynFlags:

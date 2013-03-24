@@ -534,7 +534,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                  (xs `unionBags` ys) 
                                  d2  -- Ignore d1
 
-    ignoringRealWorld = ufIgnoreRealWorld dflags
+    ignoringRealWorld = gopt Opt_IgnoreRealWorld dflags
 
     isRealWorldId id = ignoringRealWorld &&
       idType id `eqType` realWorldStatePrimTy

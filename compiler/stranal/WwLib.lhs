@@ -190,7 +190,7 @@ mkWorkerArgs :: DynFlags -> [Var]
 	     -> ([Var],	-- Lambda bound args
 		 [Var])	-- Args at call site
 mkWorkerArgs dflags args all_one_shot res_ty
-    | any isId args || not (protectLastArg dflags || isUnLiftedType res_ty)
+    | any isId args || not (gopt Opt_ProtectLastValArg dflags || isUnLiftedType res_ty)
     = (args, args)
     | otherwise	
     = (args ++ [newArg], args ++ [realWorldPrimId])

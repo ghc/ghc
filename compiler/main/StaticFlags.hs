@@ -38,7 +38,6 @@ module StaticFlags (
 	opt_CprOff,
 	opt_NoOptCoercion,
         opt_NoFlatCache,
-        opt_NoLNE,
 
         -- For the parser
         addOpt, removeOpt, v_opt_C_ready,
@@ -159,7 +158,6 @@ isStaticFlag f =
     "fruntime-types",
     "fno-opt-coercion",
     "fno-flat-cache",
-    "fno-LNE",
     "fhardwire-lib-paths",
     "fcpr-off"
     ]
@@ -214,10 +212,6 @@ opt_NoOptCoercion  = lookUp  (fsLit "-fno-opt-coercion")
 
 opt_NoFlatCache    :: Bool
 opt_NoFlatCache     = lookUp  (fsLit "-fno-flat-cache")
-
-opt_NoLNE    :: Bool
-opt_NoLNE     = lookUp  (fsLit "-fno-LNE")
-
 
 -----------------------------------------------------------------------------
 -- Convert sizes like "3.5M" into integers
