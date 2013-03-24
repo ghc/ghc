@@ -201,7 +201,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkVendor() {
         case [$]1 in
-        dec|unknown|hp|apple|next|sun|sgi|ibm|montavista)
+        dec|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld)
             ;;
         *)
             echo "Unknown vendor [$]1"
