@@ -548,7 +548,7 @@ rts/package.conf.inplace : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 RTS_INSTALL_LIBS += $(ALL_RTS_LIBS)
 ifneq "$(UseSystemLibFFI)" "YES"
 RTS_INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
-RTS_INSTALL_LIBS += $(foreach w,$(filter-out dyn,$(rts_WAYS)),rts/dist/build/libffi$($w_libsuf))
+RTS_INSTALL_LIBS += $(foreach w,$(filter-out dyn,$(rts_WAYS)),rts/dist/build/libCffi$($w_libsuf))
 RTS_INSTALL_LIBS += rts/dist/build/$(LIBFFI_DLL)
 endif
 
