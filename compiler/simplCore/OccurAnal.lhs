@@ -156,35 +156,26 @@ occAnalBind _ env imp_rules_edges (Rec pairs) body_usage
 
 Note [Dead code]
 ~~~~~~~~~~~~~~~~
-Dropping dead code for recursive bindings is done in a very simple way:
+Dropping dead code for a cyclic Strongly Connected Component is done
+in a very simple way:
 
-        the entire set of bindings is dropped if none of its binders are
-        mentioned in its body; otherwise none are.
+        the entire SCC is dropped if none of its binders are mentioned
+        in the body; otherwise the whole thing is kept.
 
-This seems to miss an obvious improvement.
+The key observation is that dead code elimination happens after
+dependency analysis: so 'occAnalBind' processes SCCs instead of the
+original term's binding groups.
 
-        letrec  f = ...g...
-                g = ...f...
-        in
-        ...g...
-===>
+Thus 'occAnalBind' does indeed drop 'f' in an example like
+
         letrec f = ...g...
                g = ...(...g...)...
         in
-        ...g...
+           ...g...
 
-Now 'f' is unused! But it's OK!  Dependency analysis will sort this
-out into a letrec for 'g' and a 'let' for 'f', and then 'f' will get
-dropped.  It isn't easy to do a perfect job in one blow.  Consider
-
-        letrec f = ...g...
-               g = ...h...
-               h = ...k...
-               k = ...m...
-               m = ...m...
-        in
-        ...m...
-
+when 'g' no longer uses 'f' at all (eg 'f' does not occur in a RULE in
+'g'). 'occAnalBind' first consumes 'CyclicSCC g' and then it consumes
+'AcyclicSCC f', where 'body_usage' won't contain 'f'.
 
 ------------------------------------------------------------
 Note [Forming Rec groups]
