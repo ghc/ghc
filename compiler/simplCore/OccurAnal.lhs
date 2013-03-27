@@ -14,7 +14,7 @@ core expression with (hopefully) improved usage information.
 \begin{code}
 {-# LANGUAGE BangPatterns #-}
 module OccurAnal (
-        occurAnalysePgm, occurAnalyseExpr
+        occurAnalysePgm, occurAnalyseExpr, occurAnalyseExpr_NoBinderSwap
     ) where
 
 #include "HsVersions.h"
@@ -94,9 +94,16 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurence info returned
-occurAnalyseExpr expr
-  = snd (occAnal (initOccEnv all_active_rules) expr)
+occurAnalyseExpr = occurAnalyseExpr' True -- do binder swap
+
+occurAnalyseExpr_NoBinderSwap :: CoreExpr -> CoreExpr
+occurAnalyseExpr_NoBinderSwap = occurAnalyseExpr' False -- do not do binder swap
+
+occurAnalyseExpr' :: Bool -> CoreExpr -> CoreExpr
+occurAnalyseExpr' enable_binder_swap expr
+  = snd (occAnal env expr)
   where
+    env = (initOccEnv all_active_rules) {occ_binder_swap = enable_binder_swap}
     -- To be conservative, we say that all inlines and rules are active
     all_active_rules = \_ -> True
 \end{code}
@@ -1405,21 +1412,23 @@ occAnalAlt :: (OccEnv, Maybe (Id, CoreExpr))
 occAnalAlt (env, scrut_bind) case_bndr (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage1, rhs1) ->
     let
-        (rhs_usage2, rhs2) = wrapProxy scrut_bind case_bndr rhs_usage1 rhs1 
+        (rhs_usage2, rhs2) =
+          wrapProxy (occ_binder_swap env) scrut_bind case_bndr rhs_usage1 rhs1 
         (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage2 bndrs
         bndrs' = tagged_bndrs      -- See Note [Binders in case alternatives]
     in
     (alt_usg, (con, bndrs', rhs2)) }
 
-wrapProxy :: Maybe (Id, CoreExpr) -> Id -> UsageDetails -> CoreExpr -> (UsageDetails, CoreExpr)
-wrapProxy (Just (scrut_var, rhs)) case_bndr body_usg body
-  | scrut_var `usedIn` body_usg
+wrapProxy :: Bool -> Maybe (Id, CoreExpr) -> Id -> UsageDetails -> CoreExpr -> (UsageDetails, CoreExpr)
+wrapProxy enable_binder_swap (Just (scrut_var, rhs)) case_bndr body_usg body
+  | enable_binder_swap,
+    scrut_var `usedIn` body_usg
   = ( body_usg' +++ unitVarEnv case_bndr NoOccInfo
     , Let (NonRec tagged_scrut_var rhs) body )
   where
     (body_usg', tagged_scrut_var) = tagBinder body_usg scrut_var
     
-wrapProxy _ _ body_usg body 
+wrapProxy _ _ _ body_usg body 
   = (body_usg, body)
 \end{code}
 
@@ -1432,11 +1441,13 @@ wrapProxy _ _ body_usg body
 
 \begin{code}
 data OccEnv
-  = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
-           , occ_ctxt       :: !CtxtTy       -- Tells about linearity
-           , occ_gbl_scrut  :: GlobalScruts
-           , occ_rule_act   :: Activation -> Bool   -- Which rules are active
+  = OccEnv { occ_encl        :: !OccEncl      -- Enclosing context information
+           , occ_ctxt        :: !CtxtTy       -- Tells about linearity
+           , occ_gbl_scrut   :: GlobalScruts
+           , occ_rule_act    :: Activation -> Bool   -- Which rules are active
              -- See Note [Finding rule RHS free vars]
+           , occ_binder_swap :: !Bool -- enable the binder_swap
+             -- See CorePrep Note [Dead code in CorePrep]
     }
 
 type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
@@ -1475,7 +1486,8 @@ initOccEnv active_rule
   = OccEnv { occ_encl  = OccVanilla
            , occ_ctxt  = []
            , occ_gbl_scrut = emptyVarSet --  PE emptyVarEnv emptyVarSet
-           , occ_rule_act = active_rule }
+           , occ_rule_act = active_rule
+           , occ_binder_swap = True }
 
 vanillaCtxt :: OccEnv -> OccEnv
 vanillaCtxt env = env { occ_encl = OccVanilla, occ_ctxt = [] }
