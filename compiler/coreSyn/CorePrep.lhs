@@ -270,7 +270,7 @@ partial applications. But it's easier to let them through.
 
 Note [Dead code in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Imagine that we got an input program like this:
+Imagine that we got an input program like this (see Trac #4962):
 
   f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
   f x = (g True (Just x) + g () (Just x), g)
