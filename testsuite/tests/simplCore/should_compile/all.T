@@ -160,3 +160,7 @@ test('T5366',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T5366'])
+test('T7796',
+     extra_clean(['T7796.prep']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7796'])
