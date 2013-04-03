@@ -752,32 +752,30 @@ floatEqualities skols can_given wanteds@(WC { wc_flat = flats })
   = do { let (float_eqs, remaining_flats) = partitionBag is_floatable flats
        ; untch <- TcS.getUntouchables
        ; mapM_ (promoteTyVar untch) (varSetElems (tyVarsOfCts float_eqs))
+             -- See Note [Promoting unification variables]
        ; ty_binds <- getTcSTyBindsMap
-       ; traceTcS "floatEqualities" (vcat [ text "Floated eqs =" <+> ppr float_eqs
+       ; traceTcS "floatEqualities" (vcat [ text "Flats =" <+> ppr flats
+                                          , text "Floated eqs =" <+> ppr float_eqs
                                           , text "Ty binds =" <+> ppr ty_binds])
        ; return (float_eqs, wanteds { wc_flat = remaining_flats }) }
   where 
-    skol_set = growSkols wanteds (mkVarSet skols)
+      -- See Note [Float equalities from under a skolem binding]
+    skol_set = fixVarSet mk_next (mkVarSet skols)
+    mk_next tvs = foldrBag grow_one tvs flats
+    grow_one (CFunEqCan { cc_tyargs = xis, cc_rhs = rhs }) tvs
+       | intersectsVarSet tvs (tyVarsOfTypes xis) 
+       = tvs `unionVarSet` tyVarsOfType rhs
+    grow_one _ tvs = tvs
 
     is_floatable :: Ct -> Bool
-    is_floatable ct
-       = isEqPred pred && skol_set `disjointVarSet` tyVarsOfType pred
+    is_floatable ct = isEqPred pred && skol_set `disjointVarSet` tyVarsOfType pred
        where
          pred = ctPred ct
-
-growSkols :: WantedConstraints -> VarSet -> VarSet
--- Find all the type variables that might possibly be unified
--- with a type that mentions a skolem.  This test is very conservative.
--- I don't *think* we need look inside the implications, because any 
--- relevant unification variables in there are untouchable.
-growSkols (WC { wc_flat = flats }) skols
-  = growThetaTyVars theta skols
-  where
-    theta = foldrBag ((:) . ctPred) [] flats
 
 promoteTyVar :: Untouchables -> TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore
 -- invariant (MetaTvInv) in Note [Untouchable type variables] in TcType
+-- See Note [Promoting unification variables]
 promoteTyVar untch tv 
   | isFloatedTouchableMetaTyVar untch tv
   = do { cloned_tv <- TcS.cloneMetaTyVar tv
@@ -957,6 +955,49 @@ Principle:
 Consequence: classes with functional dependencies don't matter (since there is 
 no evidence for a fundep equality), but equality superclasses do matter (since 
 they carry evidence).
+
+Note [Float equalities from under a skolem binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might worry about skolem escape with all this floating.
+For example, consider
+    [2] forall a. (a ~ F beta[2] delta, 
+                   Maybe beta[2] ~ gamma[1])
+
+The (Maybe beta ~ gamma) doesn't mention 'a', so we float it, and
+solve with gamma := beta. But what if later delta:=Int, and 
+  F b Int = b.  
+Then we'd get a ~ beta[2], and solve to get beta:=a, and now the
+skolem has escaped!
+
+But it's ok: when we float (Maybe beta[2] ~ gamma[1]), we promote beta[2]
+to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
+
+Previously we tried to "grow" the skol_set with the contraints, to get
+all the tyvars that could *conceivably* unify with the skolems, but that
+was far too conservative (Trac #7804). Example: this should be fine:
+    f :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
+    f = error "Urk" :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
+
+BUT (sigh) we have to be careful.  Here are some edge cases:
+
+a)    [2]forall a. (F a delta[1] ~ beta[2],   delta[1] ~ Maybe beta[2])
+b)    [2]forall a. (F b ty ~ beta[2],         G beta[2] ~ gamma[2])
+c)    [2]forall a. (F a ty ~ beta[2],         delta[1] ~ Maybe beta[2])
+
+In (a) we *must* float out the second equality, 
+       else we can't solve at all (Trac #7804).
+
+In (b) we *must not* float out the second equality.  
+       It will ultimately be solved (by flattening) in situ, but if we
+       float it we'll promote beta,gamma, and render the first equality insoluble.
+
+In (c) it would be OK to float the second equality but better not to.
+       If we flatten we see (delta[1] ~ Maybe (F a ty)), which is a 
+       skolem-escape problem.  If we float the secodn equality we'll 
+       end up with (F a ty ~ beta'[1]), which is a less explicable error.
+
+Hence we start with the skolems, grow them by the CFunEqCans, and
+float ones that don't mention the grown variables.  Seems very ad hoc.
 
 Note [Promoting unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
