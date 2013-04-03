@@ -161,10 +161,11 @@ test('T3064',
       compiler_stats_num_field('peak_megabytes_allocated',
           [(wordsize(32), 14, 1),
         # expected value: 14 (x86/Linux 28-06-2012):
-           (wordsize(64), 23, 10)]),
+           (wordsize(64), 26, 10)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
+            # (amd64/Linux) 2013-04-03: 26
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 111189536, 10),
