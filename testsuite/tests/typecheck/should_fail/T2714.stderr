@@ -1,9 +1,9 @@
 
 T2714.hs:8:5:
-    Couldn't match type ‛c’ with ‛f0 (a -> b)’
-      ‛c’ is a rigid type variable bound by
-          the type signature for f :: ((a -> b) -> b) -> c -> a
-          at T2714.hs:8:1
+    Couldn't match type ‛a’ with ‛f0 b’
+      ‛a’ is a rigid type variable bound by
+          the type signature for f :: ((a -> b) -> b) -> forall c. c -> a
+          at T2714.hs:7:6
     Expected type: ((a -> b) -> b) -> c -> a
       Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
     Relevant bindings include
@@ -12,10 +12,10 @@ T2714.hs:8:5:
     In an equation for ‛f’: f = ffmap
 
 T2714.hs:8:5:
-    Couldn't match type ‛a’ with ‛f0 b’
-      ‛a’ is a rigid type variable bound by
-          the type signature for f :: ((a -> b) -> b) -> forall c. c -> a
-          at T2714.hs:7:6
+    Couldn't match type ‛c’ with ‛f0 (a -> b)’
+      ‛c’ is a rigid type variable bound by
+          the type signature for f :: ((a -> b) -> b) -> c -> a
+          at T2714.hs:8:1
     Expected type: ((a -> b) -> b) -> c -> a
       Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
     Relevant bindings include
