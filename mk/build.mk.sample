@@ -33,7 +33,7 @@
 # A development build, working on the stage 2 compiler:
 #BuildFlavour = devel2
 
-GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),dyn,v)
+GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
 
 # Uncomment this to get prettier build output.
 # Please use V = 1 when reporting GHC bugs.
