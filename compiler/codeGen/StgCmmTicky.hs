@@ -70,9 +70,12 @@ module StgCmmTicky (
 
   tickyDynAlloc,
   tickyAllocHeap,
+
   tickyAllocPrim,
   tickyAllocThunk,
   tickyAllocPAP,
+  tickyHeapCheck,
+  tickyStackCheck,
 
   tickyUnknownCall, tickyDirectCall,
 
@@ -480,6 +483,12 @@ tickyAllocPAP _goods _slop = ifTicky $ do
   bumpTickyCounter    (fsLit "ALLOC_PAP_ctr")
   bumpTickyCounterByE (fsLit "ALLOC_PAP_gds") _goods
   bumpTickyCounterByE (fsLit "ALLOC_PAP_slp") _slop
+
+tickyHeapCheck :: FCode ()
+tickyHeapCheck = ifTicky $ bumpTickyCounter (fsLit "HEAP_CHK_ctr")
+
+tickyStackCheck :: FCode ()
+tickyStackCheck = ifTicky $ bumpTickyCounter (fsLit "STK_CHK_ctr")
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils

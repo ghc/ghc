@@ -570,10 +570,11 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 
   case mb_stk_hwm of
     Nothing -> return ()
-    Just stk_hwm -> emit =<< mkCmmIfGoto (sp_oflo stk_hwm) gc_id
+    Just stk_hwm -> tickyStackCheck >> (emit =<< mkCmmIfGoto (sp_oflo stk_hwm) gc_id)
 
   if (isJust mb_alloc_lit)
     then do
+     tickyHeapCheck
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
     else do

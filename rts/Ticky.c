@@ -330,6 +330,9 @@ PrintTickyInfo(void)
   PR_CTR(ALLOC_HEAP_ctr);
   PR_CTR(ALLOC_HEAP_tot);
 
+  PR_CTR(HEAP_CHK_ctr);
+  PR_CTR(STK_CHK_ctr);
+
   PR_CTR(ALLOC_RTS_ctr);
   PR_CTR(ALLOC_RTS_tot);
 

@@ -373,6 +373,7 @@
    CCCS_ALLOC(bytes);
 
 #define HEAP_CHECK(bytes,failure)                       \
+    TICK_BUMP(HEAP_CHK_ctr);				\
     Hp = Hp + (bytes);                                  \
     if (Hp > HpLim) { HpAlloc = (bytes); failure; }     \
     TICK_ALLOC_HEAP_NOCTR(bytes);
@@ -476,6 +477,7 @@
    }
 
 #define STK_CHK(n, fun)                         \
+    TICK_BUMP(STK_CHK_ctr); 			\
     if (Sp - (n) < SpLim) {                     \
         GC_PRIM(fun)                            \
     }
