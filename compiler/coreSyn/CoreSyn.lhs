@@ -60,7 +60,7 @@ module CoreSyn (
 	maybeUnfoldingTemplate, otherCons, unfoldingArity,
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding, isStableCoreUnfolding_maybe,
+        isStableUnfolding, isStableCoreUnfolding_maybe, isUnstableUnfolding,
         isClosedUnfolding, hasSomeUnfolding, 
 	canUnfold, neverUnfoldGuidance, isStableSource,
 
@@ -932,6 +932,10 @@ isStableUnfolding :: Unfolding -> Bool
 isStableUnfolding (CoreUnfolding { uf_src = src }) = isStableSource src
 isStableUnfolding (DFunUnfolding {})		   = True
 isStableUnfolding _                                = False
+
+isUnstableUnfolding :: Unfolding -> Bool
+isUnstableUnfolding (CoreUnfolding { uf_src = src }) = not (isStableSource src)
+isUnstableUnfolding _                                = False
 
 unfoldingArity :: Unfolding -> Arity
 unfoldingArity (CoreUnfolding { uf_arity = arity }) = arity

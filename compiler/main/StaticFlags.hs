@@ -213,7 +213,6 @@ opt_NoOptCoercion  = lookUp  (fsLit "-fno-opt-coercion")
 opt_NoFlatCache    :: Bool
 opt_NoFlatCache     = lookUp  (fsLit "-fno-flat-cache")
 
-
 -----------------------------------------------------------------------------
 -- Convert sizes like "3.5M" into integers
 

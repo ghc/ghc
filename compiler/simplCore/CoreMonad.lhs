@@ -17,7 +17,7 @@ module CoreMonad (
     -- * Configuration of the core-to-core passes
     CoreToDo(..), runWhen, runMaybe,
     SimplifierMode(..),
-    FloatOutSwitches(..),
+    FloatOutSwitches(..), FinalPassSwitches(..),
     dumpSimplPhase, pprPassDetails, 
 
     -- * Plugins
@@ -345,19 +345,51 @@ instance Outputable SimplifierMode where
 
 \begin{code}
 data FloatOutSwitches = FloatOutSwitches {
-  floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
-                                   -- doing so will abstract over n or fewer 
-                                   -- value variables
-				   -- Nothing <=> float all lambdas to top level,
-                                   --             regardless of how many free variables
-                                   -- Just 0 is the vanilla case: float a lambda
-                                   --    iff it has no free vars
-
-  floatOutConstants :: Bool,       -- ^ True <=> float constants to top level,
-                                   --            even if they do not escape a lambda
-  floatOutPartialApplications :: Bool -- ^ True <=> float out partial applications
-                                            --            based on arity information.
+  floatOutLambdas   :: Maybe Int,
+  -- ^ Just n <=> float lambdas to top level, if doing so will
+  -- abstract over n or fewer value variables Nothing <=> float all
+  -- lambdas to top level, regardless of how many free variables Just
+  -- 0 is the vanilla case: float a lambda iff it has no free vars
+  floatOutConstants :: Bool,
+  -- ^ True <=> float constants to top level, even if they do not
+  -- escape a lambda
+  floatOutPartialApplications :: Bool,
+  -- ^ True <=> float out partial applications based on arity
+  -- information.
+  finalPass_        :: Maybe FinalPassSwitches
+  -- ^ Nothing <=> not the final pass, behave like normal
   }
+
+data FinalPassSwitches = FinalPassSwitches
+  { fps_rec            :: !(Maybe Int)
+  -- ^ used as floatOutLambdas for recursive lambdas
+  , fps_absLNEVar    :: !Bool
+  -- ^ abstract over let-no-escaped variables?
+  , fps_absUnsatVar    :: !Bool
+  -- ^ abstract over undersaturated applied variables?
+  , fps_absSatVar      :: !Bool
+  -- ^ abstract over exactly saturated applied variables? Doing so might lose some fast entries
+  , fps_absOversatVar  :: !Bool
+  -- ^ abstracting over oversaturated applied variables?
+  , fps_createPAPs     :: !Bool
+  -- ^ allowed to float functions occuring unapplied
+  , fps_cloGrowth    :: !(Maybe Int)
+  -- ^ limits the number of free variables added to closures using the floated function
+  , fps_ifInClo        :: !(Maybe Int)
+  -- ^ limits the number of abstracted variables allowed if the binder occurs in a closure
+  , fps_stabilizeFirst   :: !Bool
+  -- ^ stabilizes an unstable unfolding before floating things out of
+  -- it, since floating out precludes specialization at the call-site
+  , fps_cloGrowthInLam :: !(Maybe Int)
+  -- ^ disallow the floating of a binding if it occurs in closure that
+  -- is allocated inside a lambda
+  , fps_trace             :: !Bool
+  , fps_strictness        :: !Bool
+  , fps_ignoreLNEClo      :: !Bool
+  , fps_floatLNE0         :: !Bool
+  , fps_retry             :: !Bool
+  }
+
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
 
@@ -367,7 +399,22 @@ pprFloatOutSwitches sw
      sep $ punctuate comma $ 
      [ ptext (sLit "Lam =")    <+> ppr (floatOutLambdas sw)
      , ptext (sLit "Consts =") <+> ppr (floatOutConstants sw)
-     , ptext (sLit "PAPs =")   <+> ppr (floatOutPartialApplications sw) ])
+     , ptext (sLit "PAPs =")   <+> ppr (floatOutPartialApplications sw)
+     , ptext (sLit "Late =")   <+> ppr (finalPass_ sw)])
+
+instance Outputable FinalPassSwitches where
+    ppr = pprFinalPassSwitches
+
+pprFinalPassSwitches :: FinalPassSwitches -> SDoc
+pprFinalPassSwitches sw = sep $ punctuate comma $
+  [ ptext (sLit "Rec =")    <+> ppr (fps_rec sw)
+  , ptext (sLit "AbsUnsatVar =") <+> ppr (fps_absUnsatVar sw)
+  , ptext (sLit "AbsSatVar =") <+> ppr (fps_absSatVar sw)
+  , ptext (sLit "AbsOversatVar =") <+> ppr (fps_absOversatVar sw)
+  , ptext (sLit "ClosureGrowth =") <+> ppr (fps_cloGrowth sw)
+  , ptext (sLit "ClosureGrowthInLam =") <+> ppr (fps_cloGrowthInLam sw)
+  , ptext (sLit "StabilizeFirst =") <+> ppr (fps_stabilizeFirst sw)
+  ]
 
 -- The core-to-core pass ordering is derived from the DynFlags:
 runWhen :: Bool -> CoreToDo -> CoreToDo

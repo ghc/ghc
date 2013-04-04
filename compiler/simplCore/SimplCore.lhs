@@ -128,6 +128,28 @@ getCoreToDo dflags
     cse           = gopt Opt_CSE                          dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
     liberate_case = gopt Opt_LiberateCase                 dflags
+    late_lambda_float =
+      if not (gopt Opt_LLF dflags)
+         || Just 0 == nonrec && Just 0 == fps_rec fps
+      then Nothing else Just (nonrec, fps)
+      where nonrec = lateFloatNonRecLam dflags
+            fps = FinalPassSwitches
+              { fps_trace          = dopt Opt_D_dump_late_float dflags
+              , fps_stabilizeFirst = gopt Opt_LLF_Stabilize     dflags
+              , fps_rec            = lateFloatRecLam            dflags
+              , fps_absLNEVar      = gopt Opt_LLF_AbsLNE        dflags
+              , fps_absUnsatVar    = gopt Opt_LLF_AbsUnsat      dflags
+              , fps_absSatVar      = gopt Opt_LLF_AbsSat        dflags
+              , fps_absOversatVar  = gopt Opt_LLF_AbsOversat    dflags
+              , fps_createPAPs     = gopt Opt_LLF_CreatePAPs    dflags
+              , fps_ifInClo        = lateFloatIfInClo           dflags
+              , fps_cloGrowth      = lateFloatCloGrowth         dflags
+              , fps_cloGrowthInLam = lateFloatCloGrowthInLam    dflags
+              , fps_ignoreLNEClo   = gopt Opt_LLF_IgnoreLNEClo  dflags
+              , fps_strictness     = gopt Opt_LLF_UseStr        dflags
+              , fps_floatLNE0      = gopt Opt_LLF_FloatLNE0     dflags
+              , fps_retry          = gopt Opt_LLF_Retry         dflags
+              }
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
@@ -229,7 +251,8 @@ getCoreToDo dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas   = Just 0,
                                  floatOutConstants = True,
-                                 floatOutPartialApplications = False },
+                                 floatOutPartialApplications = False,
+                                 finalPass_        = Nothing },
                 -- Was: gentleFloatOutSwitches
                 --
                 -- I have no idea why, but not floating constants to
@@ -270,7 +293,8 @@ getCoreToDo dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas   = floatLamArgs dflags,
                                  floatOutConstants = True,
-                                 floatOutPartialApplications = True },
+                                 floatOutPartialApplications = True,
+                                 finalPass_        = Nothing},
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens
                 -- after fusion and other stuff, so the early pass doesn't
@@ -298,10 +322,30 @@ getCoreToDo dflags
 
         runWhen spec_constr CoreDoSpecConstr,
 
+        -- Final clean-up simplification:
+        simpl_phase 0 ["final"] max_iter,
+
         maybe_rule_check (Phase 0),
 
-        -- Final clean-up simplification:
-        simpl_phase 0 ["final"] max_iter
+        runMaybe late_lambda_float $ \ (nonrec, fps) -> CoreDoPasses
+          [ CoreDoFloatOutwards $ FloatOutSwitches
+              { floatOutLambdas             = nonrec
+              , floatOutConstants           = False
+              , floatOutPartialApplications = False
+              , finalPass_                  = Just fps
+              }
+          , runWhen (gopt Opt_LLF_Simpl dflags) $ simpl_phase 0 ["post-late-float-lam"] max_iter
+          ],
+        -- TODO this is an experimental FloatOut pass. The intention
+        -- is to use extra space on the stack for passing arguments
+        -- and extra space in the TEXT section in order to avoid
+        -- dynamic allocations of lambda-forms. It is hoped to
+        -- supplant let-no-escape.
+
+        -- TODO look into the comment about nofib/spectral/hartel/wang
+        -- on the previous floatOut pass
+
+        maybe_rule_check (Phase 0)
      ]
 \end{code}
 
@@ -387,7 +431,7 @@ doCorePass _      CoreLiberateCase          = {-# SCC "LiberateCase" #-}
 doCorePass dflags CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
                                               doPass (floatInwards dflags)
 
-doCorePass _      (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
+doCorePass _     (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
                                               doPassDUM (floatOutwards f)
 
 doCorePass _      CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}

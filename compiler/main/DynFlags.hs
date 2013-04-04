@@ -1,11 +1,4 @@
--------------------------------------------------------------------------------
---
--- | Dynamic flags
---
--- Most flags are dynamic flags, which means they can change from compilation
--- to compilation using @OPTIONS_GHC@ pragmas, and in a multi-session GHC each
--- session can be using different dynamic flags. Dynamic flags can also be set
--- at the prompt in GHCi.
+
 --
 -- (c) The University of Glasgow 2005
 --
@@ -250,6 +243,7 @@ data DumpFlag
    | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_mod_cycles
+   | Opt_D_dump_late_float
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
 
@@ -299,6 +293,24 @@ data GeneralFlag
    | Opt_CmmElimCommonBlocks
    | Opt_OmitYields
    | Opt_SimpleListLiterals
+
+   | Opt_ProtectLastValArg
+   | Opt_IgnoreRealWorld
+
+   | Opt_NoLNE
+
+   | Opt_LLF        -- ^ Enable the late lambda lift pass
+   | Opt_LLF_AbsLNE        -- ^ allowed to abstract LNE variables?
+   | Opt_LLF_AbsUnsat        -- ^ allowed to abstract undersaturated applied let-bound variables?
+   | Opt_LLF_AbsSat        -- ^ allowed to abstract      saturated applied let-bound variables?
+   | Opt_LLF_AbsOversat       -- ^ allowed to abstract  oversaturated applied let-bound variables?
+   | Opt_LLF_CreatePAPs        -- ^ allowed to float function bindings that occur unapplied
+   | Opt_LLF_Simpl        -- ^ follow the late lambda lift with a simplification pass?
+   | Opt_LLF_Stabilize
+   | Opt_LLF_UseStr        -- ^ use strictness in the late-float
+   | Opt_LLF_IgnoreLNEClo        -- ^ predict LNEs in the late-float
+   | Opt_LLF_FloatLNE0        -- ^ float zero-arity LNEs
+   | Opt_LLF_Retry
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -577,6 +589,13 @@ data DynFlags = DynFlags {
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
+
+  lateFloatNonRecLam    :: Maybe Int,   -- ^ Limit on # abstracted variables for *late* non-recursive function floating (Nothing => all, Just 0 => none)
+  lateFloatRecLam       :: Maybe Int,   -- ^   "    " "     "          "     for *late*     recursive function floating
+  lateFloatIfInClo      :: Maybe Int,   -- ^ Limit on # abstracted variables for floating a binding that occurs in a closure
+  lateFloatCloGrowth    :: Maybe Int,   -- ^ Limit on # additional free variables for closures in which the function occurs
+  lateFloatCloGrowthInLam :: Maybe Int,
+
   historySize           :: Int,
 
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
@@ -1224,7 +1243,9 @@ defaultDynFlags mySettings =
         specConstrCount         = Just 3,
         specConstrRecursive     = 3,
         liberateCaseThreshold   = Just 2000,
-        floatLamArgs            = Just 0, -- Default: float only if no fvs
+
+        floatLamArgs            = Just 0,  -- Default: float only if no fvs
+
         historySize             = 20,
         strictnessBefore        = [],
 
@@ -1482,6 +1503,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_ticked                 = False
           enableIfVerbose Opt_D_dump_view_pattern_commoning = False
           enableIfVerbose Opt_D_dump_mod_cycles             = False
+          enableIfVerbose Opt_D_dump_late_float             = False
           enableIfVerbose _                                 = True
 
 -- | Set a 'DumpFlag'
@@ -2188,6 +2210,7 @@ dynamic_flags = [
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
+  , Flag "ddump-late-float"        (setDumpFlag Opt_D_dump_late_float)
   , Flag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , Flag "ddump-to-file"           (NoArg (setGeneralFlag Opt_DumpToFile))
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
@@ -2200,6 +2223,8 @@ dynamic_flags = [
                                               setVerbosity $ Just 2))
   , Flag "dfaststring-stats"       (NoArg (setGeneralFlag Opt_D_faststring_stats))
   , Flag "dno-llvm-mangler"        (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
+
+  , Flag "ddump-late-float"           (setDumpFlag Opt_D_dump_late_float)
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
@@ -2244,6 +2269,23 @@ dynamic_flags = [
   , Flag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
   , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
+
+  , Flag "flate-float-nonrec-lam-limit"         (intSuffix (\n d -> d{ lateFloatNonRecLam = Just n }))
+  , Flag "flate-float-nonrec-lam-any"           (noArg       (\d -> d{ lateFloatNonRecLam = Nothing }))
+  , Flag "fno-late-float-nonrec-lam"            (noArg       (\d -> d{ lateFloatNonRecLam = Just 0 }))
+  , Flag "flate-float-rec-lam-limit"            (intSuffix (\n d -> d{ lateFloatRecLam = Just n }))
+  , Flag "flate-float-rec-lam-any"              (noArg       (\d -> d{ lateFloatRecLam = Nothing }))
+  , Flag "fno-late-float-rec-lam"               (noArg       (\d -> d{ lateFloatRecLam = Just 0 }))
+  , Flag "flate-float-clo-growth-limit"         (intSuffix (\n d -> d{ lateFloatCloGrowth = Just n }))
+  , Flag "flate-float-clo-growth-any"           (noArg       (\d -> d{ lateFloatCloGrowth = Nothing }))
+  , Flag "fno-late-float-clo-growth"            (noArg       (\d -> d{ lateFloatCloGrowth = Just 0 }))
+  , Flag "flate-float-in-clo-limit"             (intSuffix (\n d -> d{ lateFloatIfInClo = Just n }))
+  , Flag "flate-float-in-clo-any"               (noArg       (\d -> d{ lateFloatIfInClo = Nothing }))
+  , Flag "fno-late-float-in-clo"                (noArg       (\d -> d{ lateFloatIfInClo = Just 0 }))
+  , Flag "flate-float-clo-growth-in-lam-limit"  (intSuffix (\n d -> d{ lateFloatCloGrowthInLam = Just n }))
+  , Flag "flate-float-clo-growth-in-lam-any"    (noArg       (\d -> d{ lateFloatCloGrowthInLam = Nothing }))
+  , Flag "fno-late-float-clo-growth-in-lam"     (noArg       (\d -> d{ lateFloatCloGrowthInLam = Just 0 }))
+
   , Flag "fhistory-size"               (intSuffix (\n d -> d{ historySize = n }))
 
   , Flag "funfolding-creation-threshold" (intSuffix   (\n d -> d {ufCreationThreshold = n}))
@@ -2251,6 +2293,7 @@ dynamic_flags = [
   , Flag "funfolding-fun-discount"       (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
   , Flag "funfolding-dict-discount"      (intSuffix   (\n d -> d {ufDictDiscount = n}))
   , Flag "funfolding-keeness-factor"     (floatSuffix (\n d -> d {ufKeenessFactor = n}))
+
 
   , Flag "fmax-worker-args" (intSuffix (\n d -> d {maxWorkerArgs = n}))
 
@@ -2501,7 +2544,25 @@ fFlags = [
   ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
   ( "hpc",                              Opt_Hpc, nop ),
   ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
-  ( "use-rpaths",                       Opt_RPath, nop )
+  ( "use-rpaths",                       Opt_RPath, nop ),
+
+  ( "protect-last-val-arg",             Opt_ProtectLastValArg, nop),
+  ( "unfolding-ignore-RealWorld",       Opt_IgnoreRealWorld, nop),
+  ( "no-LNE",                           Opt_NoLNE, nop),
+
+  ( "late-float",                       Opt_LLF, nop),
+  ( "late-float-abstract-LNE",          Opt_LLF_AbsLNE, nop),
+  ( "late-float-abstract-undersat",     Opt_LLF_AbsUnsat, nop),
+  ( "late-float-abstract-sat",          Opt_LLF_AbsSat, nop),
+  ( "late-float-abstract-oversat",      Opt_LLF_AbsOversat, nop),
+  ( "late-float-create-PAPs",           Opt_LLF_CreatePAPs, nop),
+  ( "late-float-simpl",                 Opt_LLF_Simpl, nop),
+  ( "late-float-stabilize",             Opt_LLF_Stabilize, nop),
+  ( "late-float-use-strictness",        Opt_LLF_UseStr, nop),
+  ( "late-float-ignore-LNE-clo",        Opt_LLF_IgnoreLNEClo, nop),
+  ( "late-float-LNE0",                  Opt_LLF_FloatLNE0, nop),
+  ( "late-float-retry",                 Opt_LLF_Retry, nop)
+
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
