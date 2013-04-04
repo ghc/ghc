@@ -958,6 +958,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(UPD_PAP_IN_PLACE_ctr)               \
       SymI_HasProto(ALLOC_HEAP_ctr)                     \
       SymI_HasProto(ALLOC_HEAP_tot)                     \
+      SymI_HasProto(HEAP_CHK_ctr)			\
+      SymI_HasProto(STK_CHK_ctr)                        \
       SymI_HasProto(ALLOC_RTS_ctr)                      \
       SymI_HasProto(ALLOC_RTS_tot)                      \
       SymI_HasProto(ALLOC_FUN_ctr)                      \
