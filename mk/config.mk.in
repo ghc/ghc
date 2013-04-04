@@ -95,7 +95,7 @@ TargetElf = YES
 endif
 
 # Some platforms don't support shared libraries
-NoSharedLibsPlatformList =
+NoSharedLibsPlatformList = arm-unknown-linux
 
 ifeq "$(SOLARIS_BROKEN_SHLD)" "YES"
 NoSharedLibsPlatformList += i386-unknown-solaris2
