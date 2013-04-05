@@ -665,7 +665,7 @@ Literal integers *can* be big (mkInteger [...coefficients...]), but
 need not be (S# n).  We just use an aribitrary big-ish constant here
 so that, in particular, we don't inline top-level defns like
    n = S# 5
-There's no point in doing so -- any optimsations will see the S#
+There's no point in doing so -- any optimisations will see the S#
 through n's unfolding.  Nor will a big size inhibit unfoldings functions
 that mention a literal Integer, because the float-out pass will float
 all those constants to top level.

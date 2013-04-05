@@ -99,7 +99,7 @@ data RegAllocStats
         { ra_spillInstrs        :: UniqFM [Int] }
 
 
--- | The register alloctor state
+-- | The register allocator state
 data RA_State freeRegs
         = RA_State
 
