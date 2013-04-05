@@ -163,9 +163,7 @@ data HsBindLR idL idR
         --      2. ftvs is a subset of tvs
         --      3. ftvs includes all tyvars free in ds
         --
-        -- See section 9 of static semantics paper for more details.
-        -- (You can get a PhD for explaining the True Meaning
-        --  of this last construct.)
+        -- See Note [AbsBinds]
 
 data ABExport id
   = ABE { abe_poly  :: id           -- Any INLINE pragmas is attached to this Id
@@ -179,6 +177,66 @@ placeHolderNames :: NameSet
 -- Used for the NameSet in FunBind and PatBind prior to the renamer
 placeHolderNames = panic "placeHolderNames"
 \end{code}
+
+Note [AbsBinds]
+~~~~~~~~~~~~~~~
+The AbsBinds constructor is used in the output of the type checker, to record
+*typechecked* and *generalised* bindings.  Consider a module M, with this
+top-level binding
+    M.reverse []     = []
+    M.reverse (x:xs) = M.reverse xs ++ [x]
+
+In Hindley-Milner, a recursive binding is typechecked with the *recursive* uses
+being *monomorphic*.  So after typechecking *and* deugaring we will get something
+like this
+ 
+    M.reverse :: forall a. [a] -> [a]
+      = /\a. letrec 
+                reverse :: [a] -> [a] = \xs -> case xs of
+                                                []     -> []
+                                                (x:xs) -> reverse xs ++ [x]
+             in reverse
+
+Notice that 'M.reverse' is polymorphic as expected, but there is a local
+defintion for plain 'reverse' which is *monomorphic*.  The type variable
+'a' scopes over the entire letrec.
+
+That's after desugaring.  What about after type checking but before desugaring?  
+That's where AbsBinds comes in.  It looks like this:
+
+   AbsBinds { abs_tvs     = [a]
+            , abs_exports = [ABE { abe_poly = M.reverse :: forall a. [a] -> [a],
+                                 , abe_mono = reverse :: a -> a}]
+            , abs_binds = { reverse :: [a] -> [a] 
+                               = \xs -> case xs of
+                                            []     -> []
+                                            (x:xs) -> reverse xs ++ [x] } }
+
+Here,
+  * abs_tvs says what type variables are abstracted over the binding group, 
+    just 'a' in this case.
+  * abs_binds is the *monomorphic* bindings of the group
+  * abs_exports describes how to get the polymorphic Id 'M.reverse' from the 
+    monomorphic one 'reverse'
+
+Notice that the *original* function (the polymorphic one you thought
+you were defining) appears in the abe_poly field of the
+abs_exports. The bindings in abs_binds are for fresh, local, Ids with
+a *monomorphic* Id.
+
+If there is a group of mutually recusive functions without type
+signatures, we get one AbsBinds with the monomorphic versions of the
+bindings in abs_binds, and one element of abe_exports for each
+variable bound in the mutually recursive group.  This is true even for
+pattern bindings.  Example:
+        (f,g) = (\x -> x, f)
+After type checking we get
+   AbsBinds { abs_tvs     = [a]
+            , abs_exports = [ ABE { abe_poly = M.f :: forall a. a -> a
+                                  , abe_mono = f :: a -> a }
+                            , ABE { abe_poly = M.g :: forall a. a -> a
+                                  , abe_mono = g :: a -> a }]
+            , abs_binds = { (f,g) = (\x -> x, f) }
 
 Note [AbsBinds wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~
