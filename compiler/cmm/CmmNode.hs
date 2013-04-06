@@ -1,6 +1,7 @@
 -- CmmNode type for representation using Hoopl graphs.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-tabs #-}
@@ -199,20 +200,8 @@ way is done in cmm/CmmOpt.hs currently.  We should fix this!
 
 ---------------------------------------------
 -- Eq instance of CmmNode
--- It is a shame GHC cannot infer it by itself :(
 
-instance Eq (CmmNode e x) where
-  (CmmEntry a)                 == (CmmEntry a')                   = a==a'
-  (CmmComment a)               == (CmmComment a')                 = a==a'
-  (CmmAssign a b)              == (CmmAssign a' b')               = a==a' && b==b'
-  (CmmStore a b)               == (CmmStore a' b')                = a==a' && b==b'
-  (CmmUnsafeForeignCall a b c) == (CmmUnsafeForeignCall a' b' c') = a==a' && b==b' && c==c'
-  (CmmBranch a)                == (CmmBranch a')                  = a==a'
-  (CmmCondBranch a b c)        == (CmmCondBranch a' b' c')        = a==a' && b==b' && c==c'
-  (CmmSwitch a b)              == (CmmSwitch a' b')               = a==a' && b==b'
-  (CmmCall a b c d e f)          == (CmmCall a' b' c' d' e' f')   = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
-  (CmmForeignCall a b c d e f) == (CmmForeignCall a' b' c' d' e' f') = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
-  _                            == _                               = False
+deriving instance Eq (CmmNode e x)
 
 ----------------------------------------------
 -- Hoopl instances of CmmNode
