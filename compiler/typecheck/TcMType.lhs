@@ -641,7 +641,7 @@ skolemiseSigTv tv
 \end{code}
 
 \begin{code}
-zonkImplication :: Implication -> TcM Implication
+zonkImplication :: Implication -> TcM (Bag Implication)
 zonkImplication implic@(Implic { ic_untch  = untch
                                , ic_binds  = binds_var
                                , ic_skols  = skols
@@ -653,11 +653,14 @@ zonkImplication implic@(Implic { ic_untch  = untch
        ; given'  <- mapM zonkEvVar given
        ; info'   <- zonkSkolemInfo info
        ; wanted' <- zonkWCRec binds_var untch wanted
-       ; return (implic { ic_skols = skols'
-                        , ic_given = given'
-                        , ic_fsks  = []  -- Zonking removes all FlatSkol tyvars
-                        , ic_wanted = wanted'
-                        , ic_info = info' }) }
+       ; if isEmptyWC wanted' 
+         then return emptyBag
+         else return $ unitBag $
+              implic { ic_fsks   = []  -- Zonking removes all FlatSkol tyvars
+                     , ic_skols  = skols'
+                     , ic_given  = given'
+                     , ic_wanted = wanted'
+                     , ic_info   = info' } }
 
 zonkEvVar :: EvVar -> TcM EvVar
 zonkEvVar var = do { ty' <- zonkTcType (varType var)
@@ -675,7 +678,7 @@ zonkWCRec :: EvBindsVar
           -> WantedConstraints -> TcM WantedConstraints
 zonkWCRec binds_var untch (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
   = do { flat'   <- zonkFlats binds_var untch flat
-       ; implic' <- mapBagM zonkImplication implic
+       ; implic' <- flatMapBagM zonkImplication implic
        ; insol'  <- zonkCts insol -- No need to do the more elaborate zonkFlats thing
        ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
 
