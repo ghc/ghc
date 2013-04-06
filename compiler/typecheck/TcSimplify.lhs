@@ -375,8 +375,10 @@ having to be passed at each call site.  But of course, the WHOLE
 IDEA is that ?y should be passed at each call site (that's what
 dynamic binding means) so we'd better infer the second.
 
-BOTTOM LINE: when *inferring types* you *must* quantify 
-over implicit parameters. See the predicate isFreeWhenInferring.
+BOTTOM LINE: when *inferring types* you must quantify over implicit
+parameters, *even if* they don't mention the bound type variables.
+Reason: because implicit parameters, uniquely, have local instance
+declarations. See the predicate quantifyPred.
 
 Note [Quantification with errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
