@@ -184,11 +184,11 @@ cpsTop hsc_env proc =
                              || not (tablesNextToCode dflags)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
-        usingInconsistentPicReg = ( platformArch platform == ArchX86 ||
-                                    platformArch platform == ArchPPC
-                                  )
-                               && platformOS platform == OSDarwin
-                               && gopt Opt_PIC dflags
+        usingInconsistentPicReg
+           = case (platformArch platform, platformOS platform, gopt Opt_PIC dflags)
+             of   (ArchX86, OSDarwin, pic) -> pic
+                  (ArchPPC, OSDarwin, pic) -> pic
+                  _                        -> False
 
 {- Note [inconsistent-pic-reg]
 
