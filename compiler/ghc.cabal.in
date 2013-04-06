@@ -288,6 +288,7 @@ Library
         HscStats
         HscTypes
         InteractiveEval
+        InteractiveEvalTypes
         PackageConfig
         Packages
         PlatformConstants

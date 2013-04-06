@@ -114,7 +114,7 @@ module HscTypes (
 
 #ifdef GHCI
 import ByteCodeAsm      ( CompiledByteCode )
-import {-# SOURCE #-}  InteractiveEval ( Resume )
+import InteractiveEvalTypes ( Resume )
 #endif
 
 import HsSyn
