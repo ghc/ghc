@@ -485,6 +485,7 @@ utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/dll-split/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hpc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
@@ -654,6 +655,7 @@ BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/deriveConstants
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += $(MAYBE_GHCTAGS)
+BUILD_DIRS += utils/dll-split
 BUILD_DIRS += utils/ghc-pwd
 BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += $(MAYBE_HPC)

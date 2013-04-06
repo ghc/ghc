@@ -1,0 +1,21 @@
+Name: dll-split
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: XXX
+Description:
+	XXX
+Category: Development
+build-type: Simple
+cabal-version: >=1.2
+
+Executable dll-split
+    Main-Is: Main.hs
+
+    Build-Depends: base       >= 4   && < 5,
+                   containers,
+                   filepath
+
