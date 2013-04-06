@@ -496,17 +496,6 @@ ifneq "$(UseSystemLibFFI)" "YES"
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)
 endif
 
-# On Windows it seems we also need to link directly to libffi
-ifeq "$(HostOS_CPP)" "mingw32"
-define windowsDynLinkToFfi
-# $1 = way
-ifneq "$$(findstring dyn, $1)" ""
-compiler_stage2_$1_ALL_HC_OPTS += -l$$(LIBFFI_WINDOWS_LIB)
-endif
-endef
-$(foreach way,$(GhcLibWays),$(eval $(call windowsDynLinkToFfi,$(way))))
-endif
-
 # Note [munge-stage1-package-config]
 # Strip the date/patchlevel from the version of stage1.  See Note
 # [fiddle-stage1-version] above.
