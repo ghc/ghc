@@ -4,13 +4,6 @@
 \section[SimplCore]{Driver for simplifying @Core@ programs}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
@@ -203,7 +196,7 @@ getCoreToDo dflags
        [ vectorisation
        , CoreDoSimplify max_iter
              (base_mode { sm_phase = Phase 0
-                        , sm_names = ["Non-opt simplification"] }) 
+                        , sm_names = ["Non-opt simplification"] })
        ]
 
      else {- opt_level >= 1 -} [
@@ -498,16 +491,16 @@ simplifyExpr dflags expr
 
         ; us <-  mkSplitUniqSupply 's'
 
-	; let sz = exprSize expr
+        ; let sz = exprSize expr
 
         ; (expr', counts) <- initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
-				 simplExprGently (simplEnvForGHCi dflags) expr
+                                 simplExprGently (simplEnvForGHCi dflags) expr
 
         ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics" (pprSimplCount counts)
 
-	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
-			(pprCoreExpr expr')
+        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+                        (pprCoreExpr expr')
 
         ; return expr'
         }
@@ -618,16 +611,16 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                    -- that the binders representing variable vectorisation declarations are kept alive.
                    -- (In contrast to automatically vectorised variables, their unvectorised versions
                    -- don't depend on them.)
-                 vectVars = mkVarSet $ 
-                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr 
+                 vectVars = mkVarSet $
+                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr
                                         | Vect bndr _ <- mg_vect_decls guts]
                               ++
-                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr 
+                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr
                                         | bndr <- bindersOfBinds binds]
                                         -- FIXME: This second comprehensions is only needed as long as we
                                         --        have vectorised bindings where we get "Could NOT call
                                         --        vectorised from original version".
-              ;  (maybeVects, maybeVectVars) 
+              ;  (maybeVects, maybeVectVars)
                    = case sm_phase mode of
                        InitialPhase -> (mg_vect_decls guts, vectVars)
                        _            -> ([], vectVars)
