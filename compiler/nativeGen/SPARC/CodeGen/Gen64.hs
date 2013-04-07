@@ -36,7 +36,7 @@ import Outputable
 
 -- | Code to assign a 64 bit value to memory.
 assignMem_I64Code 
-	:: CmmExpr 		-- ^ expr producing the desination address
+	:: CmmExpr 		-- ^ expr producing the destination address
 	-> CmmExpr 		-- ^ expr producing the source value.
 	-> NatM InstrBlock
 
