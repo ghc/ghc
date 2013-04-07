@@ -729,10 +729,10 @@ initializePicBase_ppc ArchPPC os picReg
 
 
 initializePicBase_ppc ArchPPC OSDarwin picReg
-        (CmmProc info lab live (ListGraph blocks) : statics)
-        = return (CmmProc info lab live (ListGraph (b':tail blocks)) : statics)
+        (CmmProc info lab live (ListGraph (entry:blocks)) : statics) -- just one entry because of splitting
+        = return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
 
-        where   BasicBlock bID insns = head blocks
+        where   BasicBlock bID insns = entry
                 b' = BasicBlock bID (PPC.FETCHPC picReg : insns)
 
 
