@@ -428,7 +428,7 @@ endef
 $(eval $(call foreachLibrary,addExtraPackage))
 endif
 
-# If we want to just install evreything, then we want all the packages
+# If we want to just install everything, then we want all the packages
 SUPERSIZE_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
 ifeq "$(Stage1Only)" "NO"
 SUPERSIZE_INSTALL_PACKAGES += compiler
@@ -724,7 +724,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 # Make sure we have all the GHCi libs by the time we've built
 # ghc-stage2.  DPH includes a bit of Template Haskell which needs the
-# GHCI libs, and we don't have a better way to express that dependency.
+# GHCi libs, and we don't have a better way to express that dependency.
 #
 GHCI_LIBS = $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_GHCI_LIB)) \
 	    $(compiler_stage2_GHCI_LIB)
