@@ -1246,6 +1246,12 @@ defaultDynFlags mySettings =
 
         floatLamArgs            = Just 0,  -- Default: float only if no fvs
 
+        lateFloatNonRecLam      = Just 0,
+        lateFloatRecLam         = Just 0,
+        lateFloatIfInClo        = Nothing,
+        lateFloatCloGrowth      = Just 0,
+        lateFloatCloGrowthInLam = Just 0,
+
         historySize             = 20,
         strictnessBefore        = [],
 
