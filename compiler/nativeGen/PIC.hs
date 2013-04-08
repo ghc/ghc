@@ -710,16 +710,23 @@ initializePicBase_ppc ArchPPC os picReg
                                 (PPC.ImmCLbl gotOffLabel)
                                 (PPC.ImmCLbl mkPicBaseLabel)
 
-            BasicBlock bID insns
-                        = head blocks
+            blocks' = case blocks of
+                       [] -> []
+                       (b:bs) -> fetchPC b : map maybeFetchPC bs
 
-            b' = BasicBlock bID (PPC.FETCHPC picReg
-                               : PPC.LD PPC.archWordSize tmp
-                                    (PPC.AddrRegImm picReg offsetToOffset)
-                               : PPC.ADD picReg picReg (PPC.RIReg tmp)
-                               : insns)
+            maybeFetchPC b@(BasicBlock bID _)
+              | bID `mapMember` info = fetchPC b
+              | otherwise            = b
 
-        return (CmmProc info lab live (ListGraph (b' : tail blocks)) : gotOffset : statics)
+            fetchPC (BasicBlock bID insns) =
+              BasicBlock bID (PPC.FETCHPC picReg
+                              : PPC.LD PPC.archWordSize tmp
+                                   (PPC.AddrRegImm picReg offsetToOffset)
+                              : PPC.ADD picReg picReg (PPC.RIReg tmp)
+                              : insns)
+
+        return (CmmProc info lab live (ListGraph blocks') : gotOffset : statics)
+
 
 initializePicBase_ppc ArchPPC OSDarwin picReg
         (CmmProc info lab live (ListGraph blocks) : statics)
