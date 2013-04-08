@@ -388,6 +388,9 @@ data FinalPassSwitches = FinalPassSwitches
   , fps_ignoreLNEClo      :: !Bool
   , fps_floatLNE0         :: !Bool
   , fps_retry             :: !Bool
+  , fps_singlySAT         :: !Bool
+  -- ^ if a singly recursive let is entered by its body no more than
+  -- once, perform SAT and then float
   }
 
 instance Outputable FloatOutSwitches where
