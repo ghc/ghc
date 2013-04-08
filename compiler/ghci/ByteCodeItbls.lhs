@@ -285,8 +285,8 @@ data StgConInfoTable = StgConInfoTable {
 
 sizeOfConItbl :: StgConInfoTable -> Int
 sizeOfConItbl conInfoTable
-      = sum [ sizeOf (conDesc conInfoTable)
-            , sizeOf (infoTable conInfoTable) ]
+      = sum [ fieldSz conDesc conInfoTable
+            , fieldSz infoTable conInfoTable ]
 
 pokeConItbl :: DynFlags -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
             -> IO ()
@@ -374,7 +374,7 @@ instance Storable StgInfoTable where
 #endif
               }
 
-fieldSz :: (Storable a, Storable b) => (a -> b) -> a -> Int
+fieldSz :: Storable b => (a -> b) -> a -> Int
 fieldSz sel x = sizeOf (sel x)
 
 newtype State s m a = State (s -> m (s, a))
