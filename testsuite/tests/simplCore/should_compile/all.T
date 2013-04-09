@@ -167,3 +167,16 @@ test('T7796',
 test('T5550', normal, compile, [''])
 test('T7865', normal, run_command, ['$MAKE -s --no-print-directory T7865'])
 test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
+test('T7702', 
+     [when(compiler_lt('ghc', '7.2.1'), skip), 
+      pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702'), 
+      clean_cmd('$MAKE -s --no-print-directory -C T7702plugin clean.T7702'), 
+      # we say 18mb peak allocated +/- 70% because other compiler flags have 
+      # a large effect on allocation which is hard to separate from the 
+      # allocation done by the plugin... but a regression allocates > 90mb 
+      compiler_stats_num_field('peak_megabytes_allocated',
+          [(wordsize(32), 18, 70), (wordsize(64), 18, 70)]) 
+     ], 
+     compile, 
+     ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.ghci_way_flags])
+
