@@ -310,8 +310,8 @@ data GeneralFlag
    | Opt_LLF_UseStr        -- ^ use strictness in the late-float
    | Opt_LLF_IgnoreLNEClo        -- ^ predict LNEs in the late-float
    | Opt_LLF_FloatLNE0        -- ^ float zero-arity LNEs
+   | Opt_LLF_OneShot
    | Opt_LLF_Retry
-   | Opt_LLF_SinglySAT
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2566,9 +2566,8 @@ fFlags = [
   ( "late-float-use-strictness",        Opt_LLF_UseStr, nop),
   ( "late-float-ignore-LNE-clo",        Opt_LLF_IgnoreLNEClo, nop),
   ( "late-float-LNE0",                  Opt_LLF_FloatLNE0, nop),
-  ( "late-float-retry",                 Opt_LLF_Retry, nop),
-  ( "late-float-singly-SAT-fallback",   Opt_LLF_SinglySAT, nop)
-
+  ( "late-float-oneshot",               Opt_LLF_OneShot, nop),
+  ( "late-float-retry",                 Opt_LLF_Retry, nop)
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
