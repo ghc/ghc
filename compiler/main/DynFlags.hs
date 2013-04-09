@@ -2231,8 +2231,6 @@ dynamic_flags = [
   , Flag "dfaststring-stats"       (NoArg (setGeneralFlag Opt_D_faststring_stats))
   , Flag "dno-llvm-mangler"        (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
 
-  , Flag "ddump-late-float"           (setDumpFlag Opt_D_dump_late_float)
-
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
   , Flag "monly-2-regs" (NoArg (addWarn "The -monly-2-regs flag does nothing; it will be removed in a future GHC release"))

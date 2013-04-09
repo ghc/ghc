@@ -47,6 +47,7 @@ data ArgRep = P   -- GC Ptr
             | F   -- Float
             | D   -- Double
             | V16 -- 16-byte (128-bit) vectors of Float/Double/Int8/Word32/etc.
+  deriving (Eq)
 instance Outputable ArgRep where ppr = text . argRepString
 
 argRepString :: ArgRep -> String
