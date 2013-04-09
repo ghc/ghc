@@ -165,3 +165,8 @@ test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] 
 test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
 # hpc should fail this, because it tags every variable occurrence with
 # a different tick.  It's probably a bug if it works, hence expect_fail.
+
+# Run this test alone (via, high_memory_usage) to increase chances of seeing the race.
+test('T7815', [ high_memory_usage,
+                extra_run_opts('50000 +RTS -N2 -RTS'),
+                only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
