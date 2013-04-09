@@ -263,10 +263,8 @@ byte6 w = fromIntegral (w `shiftR` 48)
 byte7 w = fromIntegral (w `shiftR` 56)
 #endif
 
-#ifndef __HADDOCK__
 -- entry point for direct returns for created constr itbls
 foreign import ccall "&stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
-#endif
 
 
 
