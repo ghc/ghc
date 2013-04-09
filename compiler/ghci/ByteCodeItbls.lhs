@@ -15,7 +15,6 @@ ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 
 module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
                      , StgInfoTable(..)
-                     , State(..), runState, evalState, execState, MonadT(..)
                      ) where
 
 #include "HsVersions.h"
@@ -29,10 +28,10 @@ import Type             ( flattenRepType, repType, typePrimRep )
 import StgCmmLayout     ( mkVirtHeapOffsets )
 import Util
 
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 import Foreign
 import Foreign.C
-
-import Control.Monad    ( liftM )
 
 import GHC.Exts         ( Int(I#), addr2Int# )
 import GHC.Ptr          ( Ptr(..) )
@@ -289,7 +288,7 @@ sizeOfConItbl conInfoTable
 pokeConItbl :: DynFlags -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
             -> IO ()
 pokeConItbl dflags wr_ptr ex_ptr itbl
-      = evalState (castPtr wr_ptr) $ do
+      = flip evalStateT (castPtr wr_ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
            store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB dflags))
 #endif
@@ -332,7 +331,7 @@ instance Storable StgInfoTable where
       = SIZEOF_VOID_P
 
    poke a0 itbl
-      = evalState (castPtr a0)
+      = flip evalStateT (castPtr a0)
       $ do
 #ifndef GHCI_TABLES_NEXT_TO_CODE
            store (entry  itbl)
@@ -346,7 +345,7 @@ instance Storable StgInfoTable where
 #endif
 
    peek a0
-      = evalState (castPtr a0)
+      = flip evalStateT (castPtr a0)
       $ do
 #ifndef GHCI_TABLES_NEXT_TO_CODE
            entry'  <- load
@@ -375,34 +374,13 @@ instance Storable StgInfoTable where
 fieldSz :: Storable b => (a -> b) -> a -> Int
 fieldSz sel x = sizeOf (sel x)
 
-newtype State s m a = State (s -> m (s, a))
-
-instance Monad m => Monad (State s m) where
-  return a      = State (\s -> return (s, a))
-  State m >>= k = State (\s -> m s >>= \(s', a) -> case k a of State n -> n s')
-  fail str      = State (\_ -> fail str)
-
-class (Monad m, Monad (t m)) => MonadT t m where
-  lift :: m a -> t m a
-
-instance Monad m => MonadT (State s) m where
-  lift m        = State (\s -> m >>= \a -> return (s, a))
-
-runState :: Monad m => s -> State s m a -> m (s, a)
-runState s (State m) = m s
-
-evalState :: Monad m => s -> State s m a -> m a
-evalState s m = liftM snd (runState s m)
-
-execState :: Monad m => s -> State s m a -> m s
-execState s m = liftM fst (runState s m)
-
-type PtrIO = State (Ptr Word8) IO
+type PtrIO = StateT (Ptr Word8) IO
 
 advance :: Storable a => PtrIO (Ptr a)
-advance = State adv where
-    adv addr = case castPtr addr of { addrCast -> return
-        (addr `plusPtr` sizeOfPointee addrCast, addrCast) }
+advance = state adv
+    where adv addr = case castPtr addr of
+                     addrCast ->
+                         (addrCast, addr `plusPtr` sizeOfPointee addrCast)
 
 sizeOfPointee :: (Storable a) => Ptr a -> Int
 sizeOfPointee addr = sizeOf (typeHack addr)
