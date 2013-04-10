@@ -41,17 +41,14 @@ data BufferCodec from to state = BufferCodec {
    -- if there is either not enough room in @to@, or @from@ does not
    -- contain a complete multibyte sequence.
    --
+   -- If multiple CodingProgress returns are possible, OutputUnderflow must be
+   -- preferred to InvalidSequence. This allows GHC's IO library to assume that
+   -- if we observe InvalidSequence there is at least a single element available
+   -- in the output buffer.
+   --
    -- The fact that as many elements as possible are translated is used by the IO
    -- library in order to report translation errors at the point they
    -- actually occur, rather than when the buffer is translated.
-   --
-   -- To allow us to use iconv as a BufferCode efficiently, character buffers are
-   -- defined to contain lone surrogates instead of those private use characters that
-   -- are used for roundtripping. Thus, Chars poked and peeked from a character buffer
-   -- must undergo surrogatifyRoundtripCharacter and desurrogatifyRoundtripCharacter
-   -- respectively.
-   --
-   -- For more information on this, see Note [Roundtripping] in GHC.IO.Encoding.Failure.
   
   recover :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
    -- ^ The @recover@ function is used to continue decoding
