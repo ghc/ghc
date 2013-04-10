@@ -144,6 +144,7 @@ test('encoding001',
      compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
+test('encoding003', normal, compile_and_run, [''])
 
 test('environment001',
      [when(msys(), expect_fail), # Doesn't work on MSYS; see #5599
