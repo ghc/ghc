@@ -299,6 +299,7 @@ data GeneralFlag
    | Opt_CmmElimCommonBlocks
    | Opt_OmitYields
    | Opt_SimpleListLiterals
+   | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2487,6 +2488,7 @@ fFlags = [
   ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
   ( "omit-yields",                      Opt_OmitYields, nop ),
   ( "simple-list-literals",             Opt_SimpleListLiterals, nop ),
+  ( "fun-to-thunk",                     Opt_FunToThunk, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),

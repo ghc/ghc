@@ -1551,6 +1551,17 @@
           </row>
 
           <row>
+            <entry><option>-ffun-to-thunk</option></entry>
+            <entry>Worker-wrapper removes unused arguments; this flag
+            lets it thusly remove all value lambdas. Doing so creates
+            a thunk where it was previously a function closure, which
+            may save recomputation but also risks a space leak. Off by
+            default.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-fun-to-thunk</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fdo-eta-reduction</option></entry>
             <entry>Enable eta-reduction. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
