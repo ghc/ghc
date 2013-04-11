@@ -311,7 +311,7 @@ data GeneralFlag
    | Opt_LLF_IgnoreLNEClo        -- ^ predict LNEs in the late-float
    | Opt_LLF_FloatLNE0        -- ^ float zero-arity LNEs
    | Opt_LLF_OneShot
-   | Opt_LLF_Retry
+   | Opt_LLF_LeaveLNE
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2567,7 +2567,7 @@ fFlags = [
   ( "late-float-ignore-LNE-clo",        Opt_LLF_IgnoreLNEClo, nop),
   ( "late-float-LNE0",                  Opt_LLF_FloatLNE0, nop),
   ( "late-float-oneshot",               Opt_LLF_OneShot, nop),
-  ( "late-float-retry",                 Opt_LLF_Retry, nop)
+  ( "late-float-leave-LNE",             Opt_LLF_LeaveLNE, nop)
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

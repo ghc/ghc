@@ -363,8 +363,6 @@ data FloatOutSwitches = FloatOutSwitches {
 data FinalPassSwitches = FinalPassSwitches
   { fps_rec            :: !(Maybe Int)
   -- ^ used as floatOutLambdas for recursive lambdas
-  , fps_absLNEVar    :: !Bool
-  -- ^ abstract over let-no-escaped variables?
   , fps_absUnsatVar    :: !Bool
   -- ^ abstract over undersaturated applied variables?
   , fps_absSatVar      :: !Bool
@@ -388,7 +386,7 @@ data FinalPassSwitches = FinalPassSwitches
   , fps_ignoreLNEClo      :: !Bool
   , fps_floatLNE0         :: !Bool
   , fps_oneShot           :: !Bool
-  , fps_retry             :: !Bool
+  , fps_leaveLNE          :: !Bool
   }
 
 instance Outputable FloatOutSwitches where

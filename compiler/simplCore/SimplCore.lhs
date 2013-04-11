@@ -149,7 +149,7 @@ getCoreToDo dflags
               , fps_strictness     = gopt Opt_LLF_UseStr        dflags
               , fps_floatLNE0      = gopt Opt_LLF_FloatLNE0     dflags
               , fps_oneShot        = gopt Opt_LLF_OneShot       dflags
-              , fps_retry          = gopt Opt_LLF_Retry         dflags
+              , fps_leaveLNE       = gopt Opt_LLF_LeaveLNE      dflags
               }
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags

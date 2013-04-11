@@ -684,6 +684,16 @@ OLD comment was:
 		|| (strict_ctxt && not (exprIsBottom expr))
 	to the condition above. We should really try this out.
 
+Node [Lifting LNEs]
+~~~~~~~~~~~~~~~~~~~
+
+Lifting LNEs is dubious. The only benefit of lifting an LNE is the
+reduction in expression size increasing the likelihood of inlining,
+eg. LNEs do not allocate and by definition cannot pin other function
+closures.
+
+However a function call seems to be a bit slower than an LNE entry;
+TODO investigate the CMM difference.
 
 %************************************************************************
 %*									*
@@ -770,8 +780,6 @@ lvlBind ctxt_lvl env binding@(AnnRec pairsTB) =
   in
   case decideBindFloat ctxt_lvl env False binding of
   Nothing -> do -- decided to not float
---  | Just pinners <- floatDecision emptyVarSet
-  -- when (lateRetry env && not (isEmptyVarEnv pinners)) $ tellLvlM $ mkVarEnv [ (b, (b, pinners)) | b <- bndrs ]
     let bind_lvl = incMinorLvl ctxt_lvl
         (env', bndrs') = substLetBndrsRec env bndrs bind_lvl
         tagged_bndrs = [ TB bndr' (StayPut bind_lvl) 
@@ -818,9 +826,10 @@ decideBindFloat ctxt_lvl init_env is_bot binding =
           || isTopLvl dest_lvl -- Going all the way to top level
 
     lateLambdaLift fps
-      | all_funs || (fps_floatLNE0 fps && isLNE), -- only late lift functions and zero-arity LNEs
+      | all_funs || (fps_floatLNE0 fps && isLNE),
+          -- only lift functions or zero-arity LNEs
+        not (fps_leaveLNE fps && isLNE), -- see Note [Lifting LNEs]
         Nothing <- decider emptyVarEnv = Just (tOP_LEVEL, abs_vars)
-           -- TODO Just x <- decider emptyVarEnv -> do the retry stuff
       | otherwise = Nothing -- do not lift
       where
         abs_vars = abstractVars tOP_LEVEL env bindings_fvs
@@ -899,10 +908,10 @@ decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo
     if floating then Nothing else Just $
     if isBadSpace
     then emptyVarSet -- do not float, ever
-    else unionVarSet badTime spoiledLNEs
+    else badTime
          -- not floating, in order to not abstract over these
   where
-    floating = not $ spoilsLNEs || isBadTime || isBadSpace
+    floating = not $ isBadTime || isBadSpace
 
     msg = (if floating then "late-float" else "late-no-float")
           ++ (if isRec then "(rec " ++ show (length ids) ++ ")" else "")
@@ -912,8 +921,7 @@ decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo
 
     spaceInfo = spaceInfo' pinnees
 
-    spoilsLNEs | fps_absLNEVar fps = False -- allow abstraction over let-no-escape variables
-               | otherwise = not $ isEmptyVarSet spoiledLNEs
+    -- this should always be empty, by definition of LNE
     spoiledLNEs = le_LNEs env `intersectVarSet` abs_ids_set
 
     isBadSpace | fps_oneShot fps && all_one_shot = False
@@ -953,7 +961,7 @@ decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo
        , text "closureGrowth:" <+> ppr cg
        , text "CG in lam:"   <+> ppr cgil
        , text "fast-calls:" <+> ppr (varSetElems badTime)
-       , text "spoiledLNEs:" <+> ppr spoiledLNEs
+       , if null spoiledLNEs then empty else text "spoiledLNEs!!:" <+> ppr spoiledLNEs
        , if opt_PprStyle_Debug then extra_sdoc else empty
        ]
 
@@ -1019,8 +1027,7 @@ wouldIncreaseAllocation env isLNE abs_ids_set pairs (FISilt _ scope_fiis scope_s
     Nothing -> (False, closuresSize, 0, 0) -- it's a dead variable. Huh.
     Just fii -> (violatesPAPs, closuresSize, closureGrowth, closureGrowthInLambda)
       where
-        violatesPAPs | isLNE = False -- might be a zero-arity LNE
-                     | otherwise = let (unapplied,_,_,_) = fii_useInfo fii in unapplied
+        violatesPAPs = let (unapplied,_,_,_) = fii_useInfo fii in unapplied
           -- TODO consider incorporating PAP creation into the closure
           -- growth calculation (ie identifying each PAP, whether its
           -- in a lambda, etc), instead of having it as a separate all
@@ -1063,45 +1070,6 @@ wouldIncreaseAllocation env isLNE abs_ids_set pairs (FISilt _ scope_fiis scope_s
       argRep_sizer :: ArgRep -> WordOff
       argRep_sizer = StgCmmArgRep.argRepSizeW dflags
 
-{- TODO stuff for the retrying the lambda float
-
-  | Just{} <- floatDecision emptyVarSet, not (lateRetry env) = doNotFloat
-  | Just pinners <- floatDecision emptyVarSet =
-      case isEmptyVarEnv pinners of
-        False -> do -- merely pinned
-          tellLvlM $ unitVarEnv bndr (bndr, pinners)
-          doNotFloat
-        True -> do -- not floating for space reasons
-          (result, pinnees) <- hijackLvlM doNotFloat
-          let (roots, pinnees') = partitionPinnees [bndr] pinnees
-          tellLvlM pinnees'
-          case isEmptyVarSet $ roots `delVarSet` bndr of
-            True -> return result -- the space reasons are valid
-            False -> case floatDecision roots of
-              Nothing -> doFloat -- a successful unpinning: the space
-                                 -- reasons were invalid
-              Just pinners -> do
-                -- if space is no longer the reason, announce that we're pinned
-                when (not $ isEmptyVarSet pinners) $ tellLvlM $ unitVarEnv bndr (bndr, pinners)
-                return result
-
--- partition the pinnees by whether or not they are ultimately (ie
--- transitively) pinned by nothing but these binders
-partitionPinnees :: [Id] -> PinnedLBFs -> (VarSet, PinnedLBFs)
-partitionPinnees bndrs pinnees = go $ PartitionState False (mkVarSet bndrs) pinnees where
-  go st
-    | ps_stop st = (ps_roots st, ps_nonroots st) -- no new roots
-    | otherwise = go $ foldVarEnv isARoot (st { ps_stop = True, ps_nonroots = emptyVarEnv}) (ps_nonroots st)
-
-data PartitionState = PartitionState {ps_stop :: !Bool, ps_roots :: VarSet, ps_nonroots :: PinnedLBFs }
-
-isARoot :: (Id, VarSet) -> PartitionState -> PartitionState
-isARoot p@(id, pinners) !st@PartitionState { ps_roots = roots }
-  -- if id is pinned only by roots, it's also a root
-  | isEmptyVarEnv (pinners `minusVarSet` roots) = st { ps_stop = False, ps_roots = extendVarSet roots id }
-  | otherwise = st { ps_nonroots = extendVarEnv (ps_nonroots st) id p }
-
--}
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
 
@@ -1179,12 +1147,6 @@ isFunction (Lam b e) | isId (getVar b)    = True
 -- isFunction (_, AnnTick _ e)          = isFunction e  -- dubious
 isFunction _                           = False
 
-{-countFreeIds :: VarSet -> Int
-countFreeIds = foldVarSet add 0
-  where
-    add :: Var -> Int -> Int
-    add v n | isId v    = n+1
-            | otherwise = n-}
 \end{code}
 
 
@@ -1246,11 +1208,6 @@ isFinalPass le = case finalPass le of
   Nothing -> False
   Just _  -> True
 
-{-lateRetry :: LevelEnv -> Bool
-lateRetry le = case finalPass le of
-  Nothing  -> False
-  Just fps -> fps_retry fps
--}
 floatConsts :: LevelEnv -> Bool
 floatConsts le = floatOutConstants (le_switches le)
 
@@ -1404,12 +1361,6 @@ instance Monad LvlM where
       LvlM m -> m >>= \ ~(b, w') -> return (b, plusVarEnv_C (\ ~(id, x) ~(_, y) -> (id, unionVarSet x y)) w w')
 instance MonadUnique LvlM where
   getUniqueSupplyM = LvlM $ getUniqueSupplyM >>= \a -> return (a, emptyVarEnv)
-
-{-tellLvlM :: PinnedLBFs -> LvlM ()
-tellLvlM pinned = LvlM $ return ((), pinned)
-
-hijackLvlM :: LvlM a -> LvlM (a, PinnedLBFs)
-hijackLvlM (LvlM m) = LvlM $ m >>= \p -> return (p, emptyVarEnv)-}
 
 initLvl :: UniqSupply -> LvlM a -> a
 initLvl us (LvlM m) = fst $ initUs_ us m
@@ -1667,8 +1618,8 @@ delBinderFVs b fvs = fvs `delVarSet` b `unionVarSet` varTypeTyVars b
 -- cost of lifting f.
 --
 -- NB That floating cannot change the abs_ids of a function closure
--- because nothing floats past a lambda. TODO What about for
--- zero-arity LNEs?
+-- because nothing floats past a lambda. TODO What about zero-arity
+-- LNEs?
 --
 -- We are *approximating* CorePrep because we do not actually float
 -- anything: thus some of the emulated decisions might be
@@ -1794,18 +1745,18 @@ type FVM = Identity
 -- Note [recognizing LNE]
 -- ~~~~~~~~~~~~~~~~~~~~~~
 -- We track escaping variables in order to recognize LNEs. This helps
--- in a couple ways:
+-- in a couple of ways:
 --
---  (1) we lift zero-arity LNEs (cf decideBindFloat)
+--  (1) it is ok to lift a "thunk" if it is actually LNE
 --
---  (2) LNEs are not proper closures: adding free variables to one
---      does not increase allocation (cf closureFVUp)
+--  (2) LNEs are not actually closures, so adding free variables to
+--      one does not increase allocation (cf closureFVUp)
 --
 -- (See Note [FVUp] for the semantics of E, F, and E'.)
 --
 -- NB The escaping variables in E are the same as the escaping
--- variables in F and E'. The example suggesting they might be
--- different is this sort of floating:
+-- variables in F and E'. A deceptive example suggesting they might
+-- instead be different is this sort of floating:
 --
 --   let t = lne j = ...
 --           in E[j]
@@ -1815,12 +1766,13 @@ type FVM = Identity
 --   let j = ...
 --       t = E[j]
 --
--- Since j floated out of t, it is no longer LNE. However, this
--- example is impossible: j would not float out of t. A binding only
--- floats out of a closure if doing so would reveal a head normal form
--- (cf wantFloatNested and CoreUtil's Note [exprIsHNF]), and for all
--- such forms, the free ids of the arguments are escaping. Thus: LNE
--- bindings do not float out of closures.
+-- Since j hypothetically floated out of t, it is no longer
+-- LNE. However, this example is impossible: j would not float out of
+-- t. A binding only floats out of a closure if doing so would reveal
+-- a head normal form (cf wantFloatNested and CoreUtil's Note
+-- [exprIsHNF]), and for all such forms, the free ids of the arguments
+-- are defined to be escaping. Thus: LNE bindings do not float out of
+-- closures.
 
 -- Note [FVUp for closures and floats]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
