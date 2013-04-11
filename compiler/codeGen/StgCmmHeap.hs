@@ -42,6 +42,7 @@ import Cmm
 import CmmUtils
 import CostCentre
 import IdInfo( CafInfo(..), mayHaveCafRefs )
+import Id ( Id )
 import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
@@ -54,7 +55,8 @@ import Data.Maybe (isJust)
 -----------------------------------------------------------
 
 allocDynClosure
-        :: CmmInfoTable
+        :: Maybe Id
+        -> CmmInfoTable
         -> LambdaFormInfo
         -> CmmExpr              -- Cost Centre to stick in the object
         -> CmmExpr              -- Cost Centre to blame for this alloc
@@ -66,7 +68,7 @@ allocDynClosure
         -> FCode CmmExpr -- returns Hp+n
 
 allocDynClosureCmm
-        :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
+        :: Maybe Id -> CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
         -> [(CmmExpr, VirtualHpOffset)]
         -> FCode CmmExpr -- returns Hp+n
 
@@ -88,19 +90,19 @@ allocDynClosureCmm
 -- significant - see test T4801.
 
 
-allocDynClosure info_tbl lf_info use_cc _blame_cc args_w_offsets
+allocDynClosure mb_id info_tbl lf_info use_cc _blame_cc args_w_offsets
   = do  { let (args, offsets) = unzip args_w_offsets
         ; cmm_args <- mapM getArgAmode args     -- No void args
-        ; allocDynClosureCmm info_tbl lf_info
+        ; allocDynClosureCmm mb_id info_tbl lf_info
                              use_cc _blame_cc (zip cmm_args offsets)
         }
 
-allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
+allocDynClosureCmm mb_id info_tbl lf_info use_cc _blame_cc amodes_w_offsets
   = do  { virt_hp <- getVirtHp
 
         -- SAY WHAT WE ARE ABOUT TO DO
         ; let rep = cit_rep info_tbl
-        ; tickyDynAlloc (toRednCountsLbl $ cit_lbl info_tbl) rep lf_info
+        ; tickyDynAlloc mb_id rep lf_info
         ; profDynAlloc rep use_cc
 
         -- FIND THE OFFSET OF THE INFO-PTR WORD
