@@ -610,11 +610,10 @@ cgConApp con stg_args
 
   | otherwise   --  Boxed constructors; allocate and return
   = ASSERT( stg_args `lengthIs` dataConRepRepArity con )
-    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con) False
+    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con)
                                      currentCCS con stg_args
-                -- The first "con" says that the name bound to this
-                -- closure is is "con", which is a bit of a fudge, but
-                -- it only affects profiling (hence the False)
+                -- The first "con" says that the name bound to this closure is
+                -- is "con", which is a bit of a fudge, but it only affects profiling
 
         ; emit =<< fcode_init
         ; emitReturn [idInfoToAmode idinfo] }

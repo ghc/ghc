@@ -514,7 +514,7 @@ getTickyCtrLabel = do
         info <- getInfoDown
         return (cgd_ticky info)
 
-setTickyCtrLabel :: CLabel -> FCode a -> FCode a
+setTickyCtrLabel :: CLabel -> FCode () -> FCode ()
 setTickyCtrLabel ticky code = do
         info <- getInfoDown
         withInfoDown code (info {cgd_ticky = ticky})
