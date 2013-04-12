@@ -1102,9 +1102,9 @@ check_main dflags tcg_env
 ppMainFn :: RdrName -> SDoc
 ppMainFn main_fn
   | main_fn == main_RDR_Unqual
-  = ptext (sLit "function") <+> quotes (ppr main_fn)
+  = ptext (sLit "IO action") <+> quotes (ppr main_fn)
   | otherwise
-  = ptext (sLit "main function") <+> quotes (ppr main_fn)
+  = ptext (sLit "main IO action") <+> quotes (ppr main_fn)
 
 -- | Get the unqualified name of the function to use as the \"main\" for the main module.
 -- Either returns the default name or the one configured on the command line with -main-is
