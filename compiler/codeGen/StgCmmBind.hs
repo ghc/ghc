@@ -204,8 +204,9 @@ cgRhs :: Id
                                   -- (see above)
                )
 
-cgRhs name (StgRhsCon cc con args)
-  = buildDynCon name cc con args
+cgRhs id (StgRhsCon cc con args)
+  = withNewTickyCounterThunk (idName id) $
+    buildDynCon id True cc con args
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag _srt args body)
   = do dflags <- getDynFlags
@@ -363,7 +364,7 @@ mkRhsClosure _ bndr cc _ fvs upd_flag args body
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
         ; let info_tbl = mkCmmInfo closure_info
-        ; hp_plus_n <- allocDynClosure info_tbl lf_info use_cc blame_cc
+        ; hp_plus_n <- allocDynClosure (Just bndr) info_tbl lf_info use_cc blame_cc
                                          (map toVarArg fv_details)
 
         -- RETURN
@@ -381,8 +382,9 @@ cgRhsStdThunk bndr lf_info payload
        ; return (id_info, gen_code reg)
        }
  where
- gen_code reg
-  = do  -- AHA!  A STANDARD-FORM THUNK
+ gen_code reg  -- AHA!  A STANDARD-FORM THUNK
+  = withNewTickyCounterStdThunk (idName bndr) $
+    do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
   ; dflags <- getDynFlags
@@ -397,9 +399,11 @@ cgRhsStdThunk bndr lf_info payload
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
   ; let use_cc = curCCS; blame_cc = curCCS
 
+  ; tickyEnterStdThunk
+
         -- BUILD THE OBJECT
   ; let info_tbl = mkCmmInfo closure_info
-  ; hp_plus_n <- allocDynClosure info_tbl lf_info
+  ; hp_plus_n <- allocDynClosure (Just bndr) info_tbl lf_info
                                    use_cc blame_cc payload_w_offsets
 
         -- RETURN
@@ -448,7 +452,8 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
 
 closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
   | arity == 0 -- No args i.e. thunk
-  = withNewTickyCounterThunk cl_info $
+  = ASSERT ( not (isStaticClosure cl_info) )
+    withNewTickyCounterThunk (closureName cl_info) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
    where
@@ -552,7 +557,7 @@ thunkCode cl_info fv_details _cc node arity body
             -- that cc of enclosing scope will be recorded
             -- in update frame CAF/DICT functions will be
             -- subsumed by this enclosing cc
-            do { tickyEnterThunk cl_info
+            do { tickyEnterThunk
                ; enterCostCentreThunk (CmmReg nodeReg)
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
@@ -717,7 +722,7 @@ link_caf node _is_upd = do
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
 
-  ; hp_rel <- allocDynClosureCmm cafBlackHoleInfoTable mkLFBlackHole
+  ; hp_rel <- allocDynClosureCmm Nothing cafBlackHoleInfoTable mkLFBlackHole
                                          use_cc blame_cc [(tso,fixedHdrSize dflags)]
         -- small optimisation: we duplicate the hp_rel expression in
         -- both the newCAF call and the value returned below.
