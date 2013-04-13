@@ -4,13 +4,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual,
      UpdFrameOffset, Convention(..),
@@ -50,13 +43,13 @@ data CmmNode e x where
     -- Assign to memory location.  Size is
     -- given by cmmExprType of the rhs.
 
-  CmmUnsafeForeignCall ::         -- An unsafe foreign call;
-                                  -- see Note [Foreign calls]
-  		       		  -- Like a "fat machine instruction"; can occur
-				  -- in the middle of a block
-      ForeignTarget ->            -- call target
-      [CmmFormal] ->               -- zero or more results
-      [CmmActual] ->               -- zero or more arguments
+  CmmUnsafeForeignCall ::       -- An unsafe foreign call;
+                                -- see Note [Foreign calls]
+                                -- Like a "fat machine instruction"; can occur
+                                -- in the middle of a block
+      ForeignTarget ->          -- call target
+      [CmmFormal] ->            -- zero or more results
+      [CmmActual] ->            -- zero or more arguments
       CmmNode O O
       -- Semantics: clobbers any GlobalRegs for which callerSaves r == True
       -- See Note [foreign calls clobber GlobalRegs]
@@ -124,7 +117,7 @@ data CmmNode e x where
   } -> CmmNode O C
 
   CmmForeignCall :: {           -- A safe foreign call; see Note [Foreign calls]
-  		    		-- Always the last node of a block
+                                -- Always the last node of a block
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: [CmmFormal],     -- zero or more results
       args  :: [CmmActual],     -- zero or more arguments; see Note [Register parameter passing]
@@ -143,14 +136,14 @@ instruction".  In particular, they do *not* kill all live registers,
 just the registers they return to (there was a bit of code in GHC that
 conservatively assumed otherwise.)  However, see [Register parameter passing].
 
-Safe ones are trickier.  A safe foreign call 
+Safe ones are trickier.  A safe foreign call
      r = f(x)
 ultimately expands to
-     push "return address"	-- Never used to return to; 
-     	  	  		-- just points an info table
+     push "return address"      -- Never used to return to;
+                                -- just points an info table
      save registers into TSO
      call suspendThread
-     r = f(x)			-- Make the call
+     r = f(x)                   -- Make the call
      call resumeThread
      restore registers
      pop "return address"
@@ -354,7 +347,7 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
 -----------------------------------
 -- mapping Expr in CmmNode
 
-mapForeignTarget :: (CmmExpr -> CmmExpr) -> ForeignTarget -> ForeignTarget 
+mapForeignTarget :: (CmmExpr -> CmmExpr) -> ForeignTarget -> ForeignTarget
 mapForeignTarget exp   (ForeignTarget e c) = ForeignTarget (exp e) c
 mapForeignTarget _   m@(PrimTarget _)      = m
 
@@ -430,7 +423,7 @@ mapExpDeepM f = mapExpM $ wrapRecExpM f
 -----------------------------------
 -- folding Expr in CmmNode
 
-foldExpForeignTarget :: (CmmExpr -> z -> z) -> ForeignTarget -> z -> z 
+foldExpForeignTarget :: (CmmExpr -> z -> z) -> ForeignTarget -> z -> z
 foldExpForeignTarget exp (ForeignTarget e _) z = exp e z
 foldExpForeignTarget _   (PrimTarget _)      z = z
 
