@@ -22,9 +22,15 @@ import GHC.Prim (
     int2Word#, int2Double#, int2Float#, word2Int#,
     -- Operations on Int# that we use for operations on S#
     quotInt#, remInt#, negateInt#,
-    (==#), (/=#), (<=#), (>=#), (<#), (>#), (*#), (-#),
+    (*#), (-#),
+    (==$#), (/=$#), (<=$#), (>=$#), (<$#), (>$#),
     mulIntMayOflo#, addIntC#, subIntC#,
-    and#, or#, xor#
+    and#, or#, xor#,
+    tagToEnum#
+ )
+
+import GHC.PrimWrappers (
+    (==#), (/=#), (<=#), (>=#), (<#), (>#)
  )
 
 import GHC.Integer.GMP.Prim (
@@ -301,19 +307,25 @@ divExact (J# sa a) (J# sb b)
 %*********************************************************
 
 \begin{code}
-{-# NOINLINE eqInteger #-}
-eqInteger :: Integer -> Integer -> Bool
-eqInteger (S# i)     (S# j)     = i ==# j
-eqInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i ==# 0#
-eqInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i ==# 0#
-eqInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==# 0#
+{-# NOINLINE eqInteger# #-}
+eqInteger# :: Integer -> Integer -> Int#
+eqInteger# (S# i)     (S# j)     = i ==$# j
+eqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i ==$# 0#
+eqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i ==$# 0#
+eqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==$# 0#
 
-{-# NOINLINE neqInteger #-}
-neqInteger :: Integer -> Integer -> Bool
-neqInteger (S# i)     (S# j)     = i /=# j
-neqInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i /=# 0#
-neqInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i /=# 0#
-neqInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=# 0#
+{-# NOINLINE neqInteger# #-}
+neqInteger# :: Integer -> Integer -> Int#
+neqInteger# (S# i)     (S# j)     = i /=$# j
+neqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i /=$# 0#
+neqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i /=$# 0#
+neqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=$# 0#
+
+{-# INLINE eqInteger  #-}
+{-# INLINE neqInteger #-}
+eqInteger, neqInteger :: Integer -> Integer -> Bool
+eqInteger  a b = tagToEnum# (a `eqInteger#`  b)
+neqInteger a b = tagToEnum# (a `neqInteger#` b)
 
 instance  Eq Integer  where
     (==) = eqInteger
@@ -321,33 +333,43 @@ instance  Eq Integer  where
 
 ------------------------------------------------------------------------
 
-{-# NOINLINE leInteger #-}
-leInteger :: Integer -> Integer -> Bool
-leInteger (S# i)     (S# j)     = i <=# j
-leInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i <=# 0#
-leInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i >=# 0#
-leInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=# 0#
+{-# NOINLINE leInteger# #-}
+leInteger# :: Integer -> Integer -> Int#
+leInteger# (S# i)     (S# j)     = i <=$# j
+leInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <=$# 0#
+leInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i >=$# 0#
+leInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=$# 0#
 
-{-# NOINLINE gtInteger #-}
-gtInteger :: Integer -> Integer -> Bool
-gtInteger (S# i)     (S# j)     = i ># j
-gtInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i ># 0#
-gtInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i <# 0#
-gtInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ># 0#
+{-# NOINLINE gtInteger# #-}
+gtInteger# :: Integer -> Integer -> Int#
+gtInteger# (S# i)     (S# j)     = i >$# j
+gtInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i >$# 0#
+gtInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <$# 0#
+gtInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >$# 0#
 
-{-# NOINLINE ltInteger #-}
-ltInteger :: Integer -> Integer -> Bool
-ltInteger (S# i)     (S# j)     = i <# j
-ltInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i <# 0#
-ltInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i ># 0#
-ltInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <# 0#
+{-# NOINLINE ltInteger# #-}
+ltInteger# :: Integer -> Integer -> Int#
+ltInteger# (S# i)     (S# j)     = i <$# j
+ltInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <$# 0#
+ltInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i >$# 0#
+ltInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <$# 0#
 
-{-# NOINLINE geInteger #-}
-geInteger :: Integer -> Integer -> Bool
-geInteger (S# i)     (S# j)     = i >=# j
-geInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i >=# 0#
-geInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i <=# 0#
-geInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=# 0#
+{-# NOINLINE geInteger# #-}
+geInteger# :: Integer -> Integer -> Int#
+geInteger# (S# i)     (S# j)     = i >=$# j
+geInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i >=$# 0#
+geInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <=$# 0#
+geInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=$# 0#
+
+{-# INLINE leInteger #-}
+{-# INLINE ltInteger #-}
+{-# INLINE geInteger #-}
+{-# INLINE gtInteger #-}
+leInteger, gtInteger, ltInteger, geInteger :: Integer -> Integer -> Bool
+leInteger a b = tagToEnum# (a `leInteger#` b)
+gtInteger a b = tagToEnum# (a `gtInteger#` b)
+ltInteger a b = tagToEnum# (a `ltInteger#` b)
+geInteger a b = tagToEnum# (a `geInteger#` b)
 
 {-# NOINLINE compareInteger #-}
 compareInteger :: Integer -> Integer -> Ordering
@@ -373,8 +395,8 @@ compareInteger (J# s1 d1) (J# s2 d2)
 
 instance Ord Integer where
     (<=) = leInteger
-    (>)  = gtInteger
     (<)  = ltInteger
+    (>)  = gtInteger
     (>=) = geInteger
     compare = compareInteger
 \end{code}
@@ -570,7 +592,7 @@ testBitInteger (J# s d) i = testBitInteger# s d i /=# 0#
 -- This is used by hashUnique
 
 -- | hashInteger returns the same value as 'fromIntegral', although in
--- unboxed form.  It might be a reasonable hash function for 'Integer', 
+-- unboxed form.  It might be a reasonable hash function for 'Integer',
 -- given a suitable distribution of 'Integer' values.
 
 hashInteger :: Integer -> Int#

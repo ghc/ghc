@@ -18,6 +18,7 @@ module GHC.Integer.Logarithms.Internals
     ) where
 
 import GHC.Prim
+import GHC.PrimWrappers
 import GHC.Integer.Type
 
 -- When larger word sizes become common, add support for those,

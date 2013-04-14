@@ -53,6 +53,7 @@ module GHC.Integer.GMP.Prim (
   ) where
 
 import GHC.Prim
+import GHC.PrimWrappers
 
 -- Double isn't available yet, and we shouldn't be using defaults anyway:
 default ()

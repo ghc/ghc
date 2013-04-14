@@ -27,6 +27,8 @@ module GHC.Integer (
     plusInteger, minusInteger, timesInteger, negateInteger,
     eqInteger, neqInteger, absInteger, signumInteger,
     leInteger, gtInteger, ltInteger, geInteger, compareInteger,
+    eqInteger#, neqInteger#,
+    leInteger#, gtInteger#, ltInteger#, geInteger#,
     divModInteger, divInteger, modInteger,
     quotRemInteger, quotInteger, remInteger,
     encodeFloatInteger, floatFromInteger,
