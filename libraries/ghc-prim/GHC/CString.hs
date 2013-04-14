@@ -22,6 +22,7 @@ module GHC.CString (
 
 import GHC.Types
 import GHC.Prim
+import GHC.PrimWrappers
 
 -----------------------------------------------------------------------------
 -- Unpacking C strings}

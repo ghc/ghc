@@ -23,6 +23,7 @@ module GHC.Classes where
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
 import GHC.Prim
+import GHC.PrimWrappers
 import GHC.Tuple
 import GHC.Types
 

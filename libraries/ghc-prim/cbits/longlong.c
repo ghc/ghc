@@ -32,21 +32,19 @@ The exceptions to the rule are primops that cast to and from
 
 /* Relational operators */
 
-static inline HsBool mkBool(int b) { return b ? HS_BOOL_TRUE : HS_BOOL_FALSE; }
+HsInt64 hs_gtWord64 (HsWord64 a, HsWord64 b) {return a >  b;}
+HsInt64 hs_geWord64 (HsWord64 a, HsWord64 b) {return a >= b;}
+HsInt64 hs_eqWord64 (HsWord64 a, HsWord64 b) {return a == b;}
+HsInt64 hs_neWord64 (HsWord64 a, HsWord64 b) {return a != b;}
+HsInt64 hs_ltWord64 (HsWord64 a, HsWord64 b) {return a <  b;}
+HsInt64 hs_leWord64 (HsWord64 a, HsWord64 b) {return a <= b;}
 
-HsBool hs_gtWord64 (HsWord64 a, HsWord64 b) {return mkBool(a >  b);}
-HsBool hs_geWord64 (HsWord64 a, HsWord64 b) {return mkBool(a >= b);}
-HsBool hs_eqWord64 (HsWord64 a, HsWord64 b) {return mkBool(a == b);}
-HsBool hs_neWord64 (HsWord64 a, HsWord64 b) {return mkBool(a != b);}
-HsBool hs_ltWord64 (HsWord64 a, HsWord64 b) {return mkBool(a <  b);}
-HsBool hs_leWord64 (HsWord64 a, HsWord64 b) {return mkBool(a <= b);}
-
-HsBool hs_gtInt64 (HsInt64 a, HsInt64 b) {return mkBool(a >  b);}
-HsBool hs_geInt64 (HsInt64 a, HsInt64 b) {return mkBool(a >= b);}
-HsBool hs_eqInt64 (HsInt64 a, HsInt64 b) {return mkBool(a == b);}
-HsBool hs_neInt64 (HsInt64 a, HsInt64 b) {return mkBool(a != b);}
-HsBool hs_ltInt64 (HsInt64 a, HsInt64 b) {return mkBool(a <  b);}
-HsBool hs_leInt64 (HsInt64 a, HsInt64 b) {return mkBool(a <= b);}
+HsInt64 hs_gtInt64 (HsInt64 a, HsInt64 b) {return a >  b;}
+HsInt64 hs_geInt64 (HsInt64 a, HsInt64 b) {return a >= b;}
+HsInt64 hs_eqInt64 (HsInt64 a, HsInt64 b) {return a == b;}
+HsInt64 hs_neInt64 (HsInt64 a, HsInt64 b) {return a != b;}
+HsInt64 hs_ltInt64 (HsInt64 a, HsInt64 b) {return a <  b;}
+HsInt64 hs_leInt64 (HsInt64 a, HsInt64 b) {return a <= b;}
 
 /* Arithmetic operators */
 
