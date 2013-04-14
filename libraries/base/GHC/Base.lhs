@@ -11,10 +11,14 @@ The overall structure of the GHC Prelude is a bit tricky.
 So the rough structure is as follows, in (linearised) dependency order
 
 
-GHC.Prim                Has no implementation.  It defines built-in things, and
+GHC.Prim        Has no implementation.  It defines built-in things, and
                 by importing it you bring them into scope.
                 The source file is GHC.Prim.hi-boot, which is just
                 copied to make GHC.Prim.hi
+
+GHC.PrimWrappers
+                Provides wrappers for built-in comparison operators.
+                These wrappers take unboxed operands and return a Bool.
 
 GHC.Base        Classes: Eq, Ord, Functor, Monad
                 Types:   list, (), Int, Bool, Ordering, Char, String
@@ -101,8 +105,9 @@ module GHC.Base
         module GHC.CString,
         module GHC.Magic,
         module GHC.Types,
-        module GHC.Prim,    -- Re-export GHC.Prim and [boot] GHC.Err, to avoid lots
-        module GHC.Err      -- of people having to import it explicitly
+        module GHC.Prim,        -- Re-export GHC.Prim, GHC.PrimWrappers and
+        module GHC.PrimWrappers,-- [boot] GHC.Err, to avoid lots of people having to
+        module GHC.Err          -- import it explicitly
   )
         where
 
@@ -112,6 +117,7 @@ import GHC.CString
 import GHC.Magic
 import GHC.Prim
 import GHC.Err
+import GHC.PrimWrappers
 import {-# SOURCE #-} GHC.IO (failIO)
 
 -- This is not strictly speaking required by this module, but is an
@@ -734,4 +740,3 @@ a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
 data RealWorld
 \end{code}
 #endif
-

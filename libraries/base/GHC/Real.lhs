@@ -385,27 +385,31 @@ instance  Real Integer  where
 instance  Integral Integer where
     toInteger n      = n
 
+    {-# INLINE quot #-}
     _ `quot` 0 = divZeroError
     n `quot` d = n `quotInteger` d
 
+    {-# INLINE rem #-}
     _ `rem` 0 = divZeroError
-    n `rem`  d = n `remInteger`  d
+    n `rem` d = n `remInteger` d
 
+    {-# INLINE div #-}
     _ `div` 0 = divZeroError
     n `div` d = n `divInteger` d
 
+    {-# INLINE mod #-}
     _ `mod` 0 = divZeroError
-    n `mod`  d = n `modInteger`  d
+    n `mod` d = n `modInteger` d
 
+    {-# INLINE divMod #-}
     _ `divMod` 0 = divZeroError
-    a `divMod` b = case a `divModInteger` b of
-                   (# x, y #) -> (x, y)
+    n `divMod` d = case n `divModInteger` d of
+                     (# x, y #) -> (x, y)
 
+    {-# INLINE quotRem #-}
     _ `quotRem` 0 = divZeroError
-    a `quotRem` b = case a `quotRemInteger` b of
-                    (# q, r #) -> (q, r)
-
-    -- use the defaults for div & mod
+    n `quotRem` d = case n `quotRemInteger` d of
+                      (# q, r #) -> (q, r)
 \end{code}
 
 

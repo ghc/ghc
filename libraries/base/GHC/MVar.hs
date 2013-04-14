@@ -45,7 +45,7 @@ as a a box, which may be empty or full.
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
 instance Eq (MVar a) where
-        (MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
+        (MVar mvar1#) == (MVar mvar2#) = tagToEnum# (sameMVar# mvar1# mvar2#)
 
 {-
 M-Vars are rendezvous points for concurrent threads.  They begin
