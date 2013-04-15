@@ -109,21 +109,19 @@ cgTopRhsCon id con args
 
 buildDynCon :: Id                 -- Name of the thing to which this constr will
                                   -- be bound
-            -> Bool   -- is it genuinely bound to that name, or just for profiling?
             -> CostCentreStack    -- Where to grab cost centre from;
                                   -- current CCS if currentOrSubsumedCCS
             -> DataCon            -- The data constructor
             -> [StgArg]           -- Its args
             -> FCode (CgIdInfo, FCode CmmAGraph)
                -- Return details about how to find it and initialization code
-buildDynCon binder actually_bound cc con args
+buildDynCon binder cc con args
     = do dflags <- getDynFlags
-         buildDynCon' dflags (targetPlatform dflags) binder actually_bound cc con args
-
+         buildDynCon' dflags (targetPlatform dflags) binder cc con args
 
 buildDynCon' :: DynFlags
              -> Platform
-             -> Id -> Bool
+             -> Id
              -> CostCentreStack
              -> DataCon
              -> [StgArg]
@@ -150,7 +148,7 @@ premature looking at the args will cause the compiler to black-hole!
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
-buildDynCon' dflags _ binder _ _cc con []
+buildDynCon' dflags _ binder _cc con []
   = return (litIdInfo dflags binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             return mkNop)
@@ -181,7 +179,7 @@ We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-buildDynCon' dflags platform binder _ _cc con [arg]
+buildDynCon' dflags platform binder _cc con [arg]
   | maybeIntLikeCon con
   , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
   , StgLitArg (MachInt val) <- arg
@@ -195,7 +193,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
         ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
                  , return mkNop) }
 
-buildDynCon' dflags platform binder _ _cc con [arg]
+buildDynCon' dflags platform binder _cc con [arg]
   | maybeCharLikeCon con
   , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
   , StgLitArg (MachChar val) <- arg
@@ -210,7 +208,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
                  , return mkNop) }
 
 -------- buildDynCon': the general case -----------
-buildDynCon' dflags _ binder actually_bound ccs con args
+buildDynCon' dflags _ binder ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -224,10 +222,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
                 nonptr_wds = tot_wds - ptr_wds
                 info_tbl = mkDataConInfoTable dflags con False
                                 ptr_wds nonptr_wds
-          ; let ticky_name | actually_bound = Just binder
-                           | otherwise = Nothing
-
-          ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
+          ; hp_plus_n <- allocDynClosure info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where

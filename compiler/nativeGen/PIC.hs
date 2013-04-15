@@ -771,19 +771,11 @@ initializePicBase_x86 ArchX86 os picReg
              BasicBlock bID (X86.FETCHGOT picReg : insns)
 
 initializePicBase_x86 ArchX86 OSDarwin picReg
-        (CmmProc info lab live (ListGraph blocks) : statics)
-        = return (CmmProc info lab live (ListGraph blocks') : statics)
+        (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
+        = return (CmmProc info lab live (ListGraph (block':blocks)) : statics)
 
-    where blocks' = case blocks of
-                     [] -> []
-                     (b:bs) -> fetchPC b : map maybeFetchPC bs
-
-          maybeFetchPC b@(BasicBlock bID _)
-            | bID `mapMember` info = fetchPC b
-            | otherwise            = b
-
-          fetchPC (BasicBlock bID insns) =
-             BasicBlock bID (X86.FETCHPC picReg : insns)
+    where BasicBlock bID insns = entry
+          block' = BasicBlock bID (X86.FETCHPC picReg : insns)
 
 initializePicBase_x86 _ _ _ _
         = panic "initializePicBase_x86: not needed"
