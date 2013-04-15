@@ -1099,31 +1099,35 @@ check_main dflags tcg_env
                 <+> ptext (sLit "is not defined in module") <+> quotes (ppr main_mod)
     pp_main_fn = ppMainFn main_fn
 
+-- | Get the unqualified name of the function to use as the \"main\" for the main module.
+-- Either returns the default name or the one configured on the command line with -main-is
+getMainFun :: DynFlags -> RdrName
+getMainFun dflags = case mainFunIs dflags of
+    		      Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
+    		      Nothing -> main_RDR_Unqual
+
+checkMainExported :: TcGblEnv -> TcM ()
+checkMainExported tcg_env
+  = case tcg_main tcg_env of
+      Nothing -> return () -- not the main module
+      Just main_name -> 
+         do { dflags <- getDynFlags
+            ; let main_mod = mainModIs dflags
+            ; checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
+                ptext (sLit "The") <+> ppMainFn (nameRdrName main_name) <+>
+                ptext (sLit "is not exported by module") <+> quotes (ppr main_mod) }
+
 ppMainFn :: RdrName -> SDoc
 ppMainFn main_fn
-  | main_fn == main_RDR_Unqual
+  | rdrNameOcc main_fn == mainOcc
   = ptext (sLit "IO action") <+> quotes (ppr main_fn)
   | otherwise
   = ptext (sLit "main IO action") <+> quotes (ppr main_fn)
 
--- | Get the unqualified name of the function to use as the \"main\" for the main module.
--- Either returns the default name or the one configured on the command line with -main-is
-getMainFun :: DynFlags -> RdrName
-getMainFun dflags = case (mainFunIs dflags) of
-    Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
-    Nothing -> main_RDR_Unqual
-
-checkMainExported :: TcGblEnv -> TcM ()
-checkMainExported tcg_env = do
-  dflags    <- getDynFlags
-  case tcg_main tcg_env of
-    Nothing -> return () -- not the main module
-    Just main_name -> do
-      let main_mod = mainModIs dflags
-      checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
-              ptext (sLit "The") <+> ppMainFn (nameRdrName main_name) <+>
-              ptext (sLit "is not exported by module") <+> quotes (ppr main_mod)
+mainOcc :: OccName
+mainOcc = mkVarOccFS (fsLit "main")
 \end{code}
+
 
 Note [Root-main Id]
 ~~~~~~~~~~~~~~~~~~~
