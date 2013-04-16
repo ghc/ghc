@@ -276,16 +276,26 @@ check_type ctxt rank (AppTy ty1 ty2)
         ; check_arg_type ctxt rank ty2 }
 
 check_type ctxt rank ty@(TyConApp tc tys)
-  | isSynTyCon tc
-  = do  {       -- Check that the synonym has enough args
-                -- This applies equally to open and closed synonyms
-                -- It's OK to have an *over-applied* type synonym
-                --      data Tree a b = ...
-                --      type Foo a = Tree [a]
-                --      f :: Foo a b -> ...
-          checkTc (tyConArity tc <= length tys) arity_msg
+  | isSynTyCon tc          = check_syn_tc_app ctxt rank ty tc tys
+  | isUnboxedTupleTyCon tc = check_ubx_tuple  ctxt      ty    tys
+  | otherwise              = mapM_ (check_arg_type ctxt rank) tys
 
-        -- See Note [Liberal type synonyms]
+check_type _ _ (LitTy {}) = return ()
+
+check_type _ _ ty = pprPanic "check_type" (ppr ty)
+
+----------------------------------------
+check_syn_tc_app :: UserTypeCtxt -> Rank -> KindOrType 
+                 -> TyCon -> [KindOrType] -> TcM ()
+check_syn_tc_app ctxt rank ty tc tys
+  | tc_arity <= n_args   -- Saturated
+       -- Check that the synonym has enough args
+       -- This applies equally to open and closed synonyms
+       -- It's OK to have an *over-applied* type synonym
+       --      data Tree a b = ...
+       --      type Foo a = Tree [a]
+       --      f :: Foo a b -> ...
+  = do  { -- See Note [Liberal type synonyms]
         ; liberal <- xoptM Opt_LiberalTypeSynonyms
         ; if not liberal || isSynFamilyTyCon tc then
                 -- For H98 and synonym families, do check the type args
@@ -294,12 +304,24 @@ check_type ctxt rank ty@(TyConApp tc tys)
           else  -- In the liberal case (only for closed syns), expand then check
           case tcView ty of   
              Just ty' -> check_type ctxt rank ty' 
-             Nothing  -> pprPanic "check_tau_type" (ppr ty)
-    }
-    
-  | isUnboxedTupleTyCon tc
+             Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
+
+  | GhciCtxt <- ctxt  -- Accept under-saturated type synonyms in 
+                      -- GHCi :kind commands; see Trac #7586
+  = mapM_ (check_mono_type ctxt synArgMonoType) tys
+
+  | otherwise
+  = failWithTc (arityErr "Type synonym" (tyConName tc) tc_arity n_args)
+  where
+    n_args = length tys
+    tc_arity  = tyConArity tc
+         
+----------------------------------------
+check_ubx_tuple :: UserTypeCtxt -> KindOrType 
+                -> [KindOrType] -> TcM ()
+check_ubx_tuple ctxt ty tys
   = do  { ub_tuples_allowed <- xoptM Opt_UnboxedTuples
-        ; checkTc ub_tuples_allowed ubx_tup_msg
+        ; checkTc ub_tuples_allowed (ubxArgTyErr ty)
 
         ; impred <- xoptM Opt_ImpredicativeTypes        
         ; let rank' = if impred then ArbitraryRank else tyConArgMonoType
@@ -307,21 +329,7 @@ check_type ctxt rank ty@(TyConApp tc tys)
                 -- However, args are allowed to be unlifted, or
                 -- more unboxed tuples, so can't use check_arg_ty
         ; mapM_ (check_type ctxt rank') tys }
-
-  | otherwise
-  = mapM_ (check_arg_type ctxt rank) tys
-
-  where
-    n_args    = length tys
-    tc_arity  = tyConArity tc
-
-    arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
-    ubx_tup_msg = ubxArgTyErr ty
-
-check_type _ _ (LitTy {}) = return ()
-
-check_type _ _ ty = pprPanic "check_type" (ppr ty)
-
+    
 ----------------------------------------
 check_arg_type :: UserTypeCtxt -> Rank -> KindOrType -> TcM ()
 -- The sort of type that can instantiate a type variable,
