@@ -946,7 +946,7 @@ shadowIPs gs m
                       _          -> False
 
   purgeShadowed is = is { inert_cans = purgeCans (inert_cans is)
-                        , inert_solved = purgeSolved (inert_solved is)
+                        , inert_solved_dicts = purgeSolved (inert_solved_dicts is)
                         }
 
   purgeDicts    = snd . partitionCCanMap isShadowedCt

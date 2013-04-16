@@ -39,7 +39,7 @@ import Util
 
 import TysWiredIn ( eqTyCon )
 
-import Data.Maybe ( isJust, fromMaybe )
+import Data.Maybe ( fromMaybe )
 -- import Data.List  ( zip4 )
 \end{code}
 
@@ -849,7 +849,7 @@ emitKindConstraint ct
                   xdecomp x = [mkEvKindCast x (evTermCoercion kev)]
                   xev = XEvTerm xcomp xdecomp
 
-            ; ctevs <- xCtFlavor_cache False fl [mkTcEqPred ty1 ty2] xev 
+            ; ctevs <- xCtFlavor fl [mkTcEqPred ty1 ty2] xev 
                      -- Important: Do not cache original as Solved since we are supposed to 
                      -- solve /exactly/ the same constraint later! Example:
                      -- (alpha :: kappa0) 
@@ -1181,14 +1181,14 @@ canEqLeafTyVarLeftRec :: SubGoalDepth
 canEqLeafTyVarLeftRec d fl tv s2              -- fl :: tv ~ s2
   = do {  traceTcS "canEqLeafTyVarLeftRec" $ pprEq (mkTyVarTy tv) s2
        ; (xi1,co1) <- flattenTyVar d FMFullFlatten fl tv -- co1 :: xi1 ~ tv
-       ; let is_still_var = isJust (getTyVar_maybe xi1) 
        
        ; traceTcS "canEqLeafTyVarLeftRec2" $ empty 
          
        ; let co = mkTcTyConAppCo eqTyCon $ [ mkTcReflCo (defaultKind $ typeKind s2)
                                            , co1, mkTcReflCo s2]
              -- co :: (xi1 ~ s2) ~ (tv ~ s2)
-       ; mb <- rewriteCtFlavor_cache (if is_still_var then False else True) fl (mkTcEqPred xi1 s2) co
+       ; mb <- rewriteCtFlavor fl (mkTcEqPred xi1 s2) co
+                -- NB that rewriteCtFlavor does not cache the result
                 -- See Note [Caching loops]
 
        ; traceTcS "canEqLeafTyVarLeftRec3" $ empty 
@@ -1221,19 +1221,18 @@ canEqLeafTyVarLeft d fl tv s2       -- eqv : tv ~ s2
        -- Not reflexivity but maybe an occurs error
        { let occ_check_result = occurCheckExpand tv xi2
              xi2' = fromMaybe xi2 occ_check_result
-             
-             not_occ_err = isJust occ_check_result
-                  -- Delicate: don't want to cache as solved a constraint with occurs error!
              co = mkTcTyConAppCo eqTyCon $
                   [mkTcReflCo (defaultKind $ typeKind s2), mkTcReflCo tv_ty, co2]
-       ; mb <- rewriteCtFlavor_cache not_occ_err fl (mkTcEqPred tv_ty xi2') co
+       ; mb <- rewriteCtFlavor fl (mkTcEqPred tv_ty xi2') co
+                -- NB that rewriteCtFlavor does not cache the result (as it used to)
+                -- which would be wrong if the constraint has an occurs error
+
        ; case mb of
-           Just new_fl -> if not_occ_err then 
-                            continueWith $
-                            CTyEqCan { cc_ev = new_fl, cc_depth = d
-                                     , cc_tyvar  = tv, cc_rhs    = xi2' }
-                          else
-                            canEqFailure d new_fl
+           Just new_fl -> case occ_check_result of
+                            Just {} -> continueWith $
+                                       CTyEqCan { cc_ev = new_fl, cc_depth = d
+                                                , cc_tyvar  = tv, cc_rhs = xi2' }
+                            Nothing -> canEqFailure d new_fl
            Nothing -> return Stop
         } }
 \end{code}

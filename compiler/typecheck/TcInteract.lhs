@@ -391,7 +391,7 @@ kick_out_rewritable ct is@(IS { inert_cans =
                                      , inert_irreds = irs_in }
                    , inert_frozen = fro_in } 
                 -- NB: Notice that don't rewrite 
-                -- inert_solved, inert_flat_cache and inert_solved_funeqs
+                -- inert_solved_dicts, and inert_solved_funeqs
                 -- optimistically. But when we lookup we have to take the 
                 -- subsitution into account
     fl = cc_ev ct
@@ -774,8 +774,8 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
              -- xdecomp : (F args ~ xi2) -> [(xi2 ~ xi1)]                 
              xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co1)]
 
-       ; ctevs <- xCtFlavor_cache False fl2 [mkTcEqPred xi2 xi1] xev
-                         -- Why not simply xCtFlavor? See Note [Cache-caused loops]
+       ; ctevs <- xCtFlavor fl2 [mkTcEqPred xi2 xi1] xev
+                         -- See Note [Cache-caused loops]
                          -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
        ; add_to_work d2 ctevs 
        ; irWorkItemConsumed "FunEq/FunEq" }
@@ -792,8 +792,8 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
              -- xdecomp : (F args ~ xi1) -> [(xi2 ~ xi1)]
              xdecomp x = [EvCoercion (mkTcSymCo co2 `mkTcTransCo` evTermCoercion x)]
 
-       ; ctevs <- xCtFlavor_cache False fl1 [mkTcEqPred xi2 xi1] xev 
-                          -- Why not simply xCtFlavor? See Note [Cache-caused loops]
+       ; ctevs <- xCtFlavor fl1 [mkTcEqPred xi2 xi1] xev 
+                          -- See Note [Cache-caused loops]
                           -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
        ; add_to_work d1 ctevs 
@@ -1455,8 +1455,8 @@ doTopReactDict inerts workItem fl cls xis depth
              | isWanted fl 
              -> do { lkup_inst_res  <- matchClassInst inerts cls xis (getWantedLoc fl)
                    ; case lkup_inst_res of
-                       GenInst wtvs ev_term -> 
-                         addToSolved fl >> doSolveFromInstance wtvs ev_term
+                       GenInst wtvs ev_term -> do { addSolvedDict fl 
+                                                  ; doSolveFromInstance wtvs ev_term }
                        NoInstance -> return NoTopInt }
              | otherwise
              -> return NoTopInt }
@@ -1514,8 +1514,7 @@ doTopReactFunEq fl tc args xi d
     -- Found a top-level instance
     do {    -- Add it to the solved goals
          unless (isDerived fl) $
-         do { addSolvedFunEq fl            
-            ; addToSolved fl }
+         do { addSolvedFunEq fl }
 
        ; let coe_ax = famInstAxiom famInst 
        ; succeed_with (mkTcAxInstCo coe_ax rep_tys)
@@ -1524,6 +1523,7 @@ doTopReactFunEq fl tc args xi d
     succeed_with :: TcCoercion -> TcType -> TcS TopInteractResult
     succeed_with coe rhs_ty 
       = do { ctevs <- xCtFlavor fl [mkTcEqPred rhs_ty xi] xev
+           ; traceTcS ("doTopReactFunEq ") (ppr ctevs)
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $
                          CNonCanonical { cc_ev = ctev
