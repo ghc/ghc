@@ -209,4 +209,5 @@ test('T7489', normal, compile, [''])
 test('T7585', normal, compile, [''])
 test('T7282', normal, compile, [''])
 test('T7804', normal, compile, [''])
+test('T7837', normal, compile, ['-O -ddump-rule-firings'])
 
