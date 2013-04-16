@@ -1103,8 +1103,8 @@ check_main dflags tcg_env
 -- Either returns the default name or the one configured on the command line with -main-is
 getMainFun :: DynFlags -> RdrName
 getMainFun dflags = case mainFunIs dflags of
-    		      Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
-    		      Nothing -> main_RDR_Unqual
+                      Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
+                      Nothing -> main_RDR_Unqual
 
 checkMainExported :: TcGblEnv -> TcM ()
 checkMainExported tcg_env
