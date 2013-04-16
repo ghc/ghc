@@ -121,10 +121,10 @@ revert to SimplCheck when going under an implication.
 * Step 2: Zonk the ORIGINAL lhs constraints, and partition them into
           the ones we will quantify over, and the others
 
-* Step 3: Decide on the type varialbes to quantify over
+* Step 3: Decide on the type variables to quantify over
 
 * Step 4: Simplify the LHS and RHS constraints separately, using the
-          quantified constraint sas givens
+          quantified constraints as givens
 
 
 \begin{code}

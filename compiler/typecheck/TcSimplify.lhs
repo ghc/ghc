@@ -511,7 +511,8 @@ simplifyRule name lhs_wanted rhs_wanted
        ; traceTc "simplifyRule" $
          vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
               , text "zonked_lhs_flats" <+> ppr zonked_lhs_flats 
-              , text "q_cts"      <+> ppr q_cts ]
+              , text "q_cts"      <+> ppr q_cts
+              , text "non_q_cts"  <+> ppr non_q_cts ]
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
                 , lhs_wanted { wc_flat = non_q_cts }) }
