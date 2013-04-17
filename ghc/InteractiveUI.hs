@@ -2947,9 +2947,10 @@ showException se =
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
-ghciHandle :: ExceptionMonad m => (SomeException -> m a) -> m a -> m a
-ghciHandle h m = gmask $ \restore ->
-                 gcatch (restore m) $ \e -> restore (h e)
+ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
+ghciHandle h m = gmask $ \restore -> do
+                 dflags <- getDynFlags
+                 gcatch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
 
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
 ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)
