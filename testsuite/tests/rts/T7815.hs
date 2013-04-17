@@ -17,7 +17,7 @@ test n = do
         guard (d || c)
         writeTVar dog False
         writeTVar cat False
-  
+
   replicateM_ n (do
     forkIO (atomically setDog)
     forkIO (atomically setCat)
