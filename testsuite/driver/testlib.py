@@ -387,6 +387,11 @@ def _namebase( opts, nb ):
 def high_memory_usage(name, opts):
     opts.alone = True
 
+# If a test is for a multi-CPU race, then running the test alone
+# increases the chance that we'll actually see it.
+def multi_cpu_race(name, opts):
+    opts.alone = True
+
 # ---
 def literate( name, opts ):
     opts.literate = 1;
