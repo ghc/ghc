@@ -20,7 +20,7 @@ module GHC.IO.Encoding.Types (
     BufferCodec(..),
     TextEncoding(..),
     TextEncoder, TextDecoder,
-    EncodeBuffer, DecodeBuffer,
+    CodeBuffer, EncodeBuffer, DecodeBuffer,
     CodingProgress(..)
   ) where
 
@@ -34,7 +34,7 @@ import GHC.IO.Buffer
 -- Text encoders/decoders
 
 data BufferCodec from to state = BufferCodec {
-  encode :: Buffer from -> Buffer to -> IO (CodingProgress, Buffer from, Buffer to),
+  encode :: CodeBuffer from to,
    -- ^ The @encode@ function translates elements of the buffer @from@
    -- to the buffer @to@.  It should translate as many elements as possible
    -- given the sizes of the buffers, including translating zero elements
@@ -90,11 +90,9 @@ data BufferCodec from to state = BufferCodec {
    -- call to 'getState'.
  }
 
-type DecodeBuffer = Buffer Word8 -> Buffer Char
-                  -> IO (CodingProgress, Buffer Word8, Buffer Char)
-
-type EncodeBuffer = Buffer Char -> Buffer Word8
-                  -> IO (CodingProgress, Buffer Char, Buffer Word8)
+type CodeBuffer from to = Buffer from -> Buffer to -> IO (CodingProgress, Buffer from, Buffer to)
+type DecodeBuffer = CodeBuffer Word8 Char
+type EncodeBuffer = CodeBuffer Char Word8
 
 type TextDecoder state = BufferCodec Word8 CharBufElem state
 type TextEncoder state = BufferCodec CharBufElem Word8 state

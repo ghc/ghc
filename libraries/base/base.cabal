@@ -109,7 +109,8 @@ Library {
             GHC.Word,
             System.Timeout
         if os(windows)
-            exposed-modules: GHC.IO.Encoding.CodePage.Table
+            exposed-modules: GHC.IO.Encoding.CodePage.API
+                             GHC.IO.Encoding.CodePage.Table
                              GHC.Conc.Windows
                              GHC.Windows
     }

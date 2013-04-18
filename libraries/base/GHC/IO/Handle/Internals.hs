@@ -57,6 +57,7 @@ module GHC.IO.Handle.Internals (
 import GHC.IO
 import GHC.IO.IOMode
 import GHC.IO.Encoding as Encoding
+import GHC.IO.Encoding.Types (CodeBuffer)
 import GHC.IO.Handle.Types
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO (BufferedIO)
@@ -370,24 +371,26 @@ ioe_bufsiz n = ioException
 streamEncode :: BufferCodec from to state
              -> Buffer from -> Buffer to
              -> IO (Buffer from, Buffer to)
-streamEncode codec from to = go (from, to)
-  where 
-    go (from, to) = do
+streamEncode codec from to = fmap (\(_, from', to') -> (from', to')) $ recoveringEncode codec from to
+
+-- | Just like 'encode', but interleaves calls to 'encode' with calls to 'recover' in order to make as much progress as possible
+recoveringEncode :: BufferCodec from to state -> CodeBuffer from to
+recoveringEncode codec from to = go from to
+  where
+    go from to = do
       (why, from', to') <- encode codec from to
       -- When we are dealing with Handles, we don't care about input/output
       -- underflow particularly, and we want to delay errors about invalid
       -- sequences as far as possible.
       case why of
-        Encoding.InvalidSequence | bufL from == bufL from' -> do
+        InvalidSequence | bufL from == bufL from' -> do
           -- NB: it is OK to call recover here. Because we saw InvalidSequence, by the invariants
           -- on "encode" it must be the case that there is at least one elements available in the output
           -- buffer. Furthermore, clearly there is at least one element in the input buffer since we found
           -- something invalid there!
-          --debugIO $ "Before streamEncode recovery: from=" ++ summaryBuffer from' ++ ", to=" ++ summaryBuffer to'
           (from', to') <- recover codec from' to'
-          --debugIO $ "After streamEncode recovery: from=" ++ summaryBuffer from' ++ ", to=" ++ summaryBuffer to'
-          go (from', to')
-        _ -> return (from', to')
+          go from' to'
+        _ -> return (why, from', to')
 
 -- -----------------------------------------------------------------------------
 -- Handle Finalizers
