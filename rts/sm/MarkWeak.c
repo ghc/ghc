@@ -122,7 +122,7 @@ traverseWeakPtrList(void)
 	   * called on a live weak pointer object.  Just remove it.
 	   */
 	  if (w->header.info == &stg_DEAD_WEAK_info) {
-	      next_w = ((StgDeadWeak *)w)->link;
+	      next_w = w->link;
 	      *last_w = next_w;
 	      continue;
 	  }
@@ -144,7 +144,6 @@ traverseWeakPtrList(void)
                   next_w  = w->link;
 
                   // and put it on the new weak ptr list.
-                  // NB. we must retain the order of the weak_ptr_list (#7160)
                   if (weak_ptr_list == NULL) {
                       weak_ptr_list = w;
                   } else {
@@ -332,7 +331,7 @@ markWeakPtrList ( void )
       evacuate((StgClosure **)last_w);
       w = *last_w;
       if (w->header.info == &stg_DEAD_WEAK_info) {
-          last_w = &(((StgDeadWeak*)w)->link);
+          last_w = &(w->link);
       } else {
           last_w = &(w->link);
       }

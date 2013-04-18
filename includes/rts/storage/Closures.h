@@ -191,17 +191,21 @@ typedef struct _StgStableName {
 
 typedef struct _StgWeak {	/* Weak v */
   StgHeader header;
-  StgClosure *cfinalizer;
+  StgClosure *cfinalizers;
   StgClosure *key;
   StgClosure *value;		/* v */
   StgClosure *finalizer;
   struct _StgWeak *link;
 } StgWeak;
 
-typedef struct _StgDeadWeak {	/* Weak v */
+typedef struct _StgCFinalizerList {
   StgHeader header;
-  struct _StgWeak *link;
-} StgDeadWeak;
+  StgClosure *link;
+  void (*fptr)(void);
+  void *ptr;
+  void *eptr;
+  StgWord flag; /* has environment (0 or 1) */
+} StgCFinalizerList;
 
 /* Byte code objects.  These are fixed size objects with pointers to
  * four arrays, designed so that a BCO can be easily "re-linked" to

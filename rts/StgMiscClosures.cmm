@@ -439,6 +439,15 @@ INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
 { foreign "C" barf("DEAD_WEAK object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
+   C finalizer lists
+
+   Singly linked lists that chain multiple C finalizers on a weak pointer.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALIZER_LIST")
+{ foreign "C" barf("C_FINALIZER_LIST object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
    NO_FINALIZER
 
    This is a static nullary constructor (like []) that we use to mark an empty
