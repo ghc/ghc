@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-6-3">
+  <title>Release notes for version 7.6.3</title>
+
+  <para>
+    The 7.6.3 release is a bugfix release. The changes relative to
+    7.6.2 are listed below.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            A bug which could cause GHC to accept or infer an incorrect
+            type, resulting in a <literal>&lt;&lt;loop&gt;&gt;</literal>
+            at runtime, has been fixed.
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>
+
