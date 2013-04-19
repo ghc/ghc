@@ -610,6 +610,7 @@ BUILD_DIRS += driver/ghci
 BUILD_DIRS += driver/ghc
 BUILD_DIRS += driver/haddock
 BUILD_DIRS += libffi
+BUILD_DIRS += utils/deriveConstants
 BUILD_DIRS += includes
 BUILD_DIRS += rts
 
@@ -652,7 +653,6 @@ BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
 BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
-BUILD_DIRS += utils/deriveConstants
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += $(MAYBE_GHCTAGS)
 BUILD_DIRS += utils/dll-split

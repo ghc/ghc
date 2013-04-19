@@ -158,19 +158,19 @@ ifneq "$(BINDIST)" "YES"
 $(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
 $(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
 
-$(includes_DERIVEDCONSTANTS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_TYPE): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-type -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_VALUE): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_VALUE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-wrappers -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-exports -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
