@@ -29,7 +29,7 @@ sub getrepo {
         # Figure out where to get the other repositories from,
         # based on where this GHC repo came from.
         my $git_dir = $bare_flag ? "--git-dir=ghc.git" : "";
-        my $branch  = `git $git_dir branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
+        my $branch  = `git $git_dir rev-parse --abbrev-ref HEAD`;          chomp $branch;
         my $remote  = `git $git_dir config branch.$branch.remote`;         chomp $remote;
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
