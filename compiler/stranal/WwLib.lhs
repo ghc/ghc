@@ -140,7 +140,7 @@ mkWwBodies dflags fun_ty demands res_info one_shots
         -- Do CPR w/w.  See Note [Always do CPR w/w]
 	; (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
 
-	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args all_one_shots cpr_res_ty
+	; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args all_one_shots cpr_res_ty
 	; return ([idDemandInfo v | v <- work_call_args, isId v],
                   wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
                   mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
@@ -184,22 +184,38 @@ add a void argument.  E.g.
 We use the state-token type which generates no code.
 
 \begin{code}
-mkWorkerArgs :: [Var]
+mkWorkerArgs :: DynFlags -> [Var]
              -> Bool    -- Whether all arguments are one-shot
 	     -> Type	-- Type of body
 	     -> ([Var],	-- Lambda bound args
 		 [Var])	-- Args at call site
-mkWorkerArgs args all_one_shot res_ty
-    | any isId args || not (isUnLiftedType res_ty)
+mkWorkerArgs dflags args all_one_shot res_ty
+    | any isId args || not needsAValueLambda
     = (args, args)
     | otherwise	
     = (args ++ [newArg], args ++ [realWorldPrimId])
     where
+      needsAValueLambda =
+        isUnLiftedType res_ty
+        || not (gopt Opt_FunToThunk dflags)
+           -- see Note [Protecting the last value argument]
+
       -- see Note [All One-Shot Arguments of a Worker]
       newArg = if all_one_shot 
                then setOneShotLambda voidArgId
                else voidArgId     
 \end{code}
+
+Note [Protecting the last value argument]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the user writes (\_ -> E), they might be intentionally disallowing
+the sharing of E. Since absence analysis and worker-wrapper are keen
+to remove such unused arguments, we add in a void argument to prevent
+the function from becoming a thunk.
+
+The user can avoid that argument with the -ffun-to-thunk
+flag. However, removing all the value argus may introduce space leaks.
 
 Note [All One-Shot Arguments of a Worker]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

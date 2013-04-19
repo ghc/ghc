@@ -128,13 +128,13 @@ include mk/ways.mk
 include mk/custom-settings.mk
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 ifeq "$(findstring dyn,$(GhcLibWays))" ""
-$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_BY_DEFAULT) is YES)
+$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_GHC_PROGRAMS) is YES)
 endif
 else
 ifeq "$(findstring v,$(GhcLibWays))" ""
-$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
+$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_GHC_PROGRAMS) is not YES)
 endif
 endif
 ifeq "$(GhcProfiled)" "YES"
@@ -196,7 +196,7 @@ include rules/way-prelims.mk
 $(foreach way,$(ALL_WAYS),\
   $(eval $(call way-prelims,$(way))))
 
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 GHCI_WAY = dyn
 HADDOCK_WAY = dyn
 else
@@ -428,7 +428,7 @@ endef
 $(eval $(call foreachLibrary,addExtraPackage))
 endif
 
-# If we want to just install evreything, then we want all the packages
+# If we want to just install everything, then we want all the packages
 SUPERSIZE_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
 ifeq "$(Stage1Only)" "NO"
 SUPERSIZE_INSTALL_PACKAGES += compiler
@@ -438,7 +438,7 @@ SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 INSTALL_DYNLIBS  :=
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALL_PACKAGES := $(REGULAR_INSTALL_PACKAGES)
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 INSTALL_DYNLIBS := $(REGULAR_INSTALL_DYNLIBS)
 endif
 else
@@ -485,6 +485,7 @@ utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/dll-split/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hpc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
@@ -654,6 +655,7 @@ BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/deriveConstants
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += $(MAYBE_GHCTAGS)
+BUILD_DIRS += utils/dll-split
 BUILD_DIRS += utils/ghc-pwd
 BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += $(MAYBE_HPC)
@@ -722,7 +724,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 # Make sure we have all the GHCi libs by the time we've built
 # ghc-stage2.  DPH includes a bit of Template Haskell which needs the
-# GHCI libs, and we don't have a better way to express that dependency.
+# GHCi libs, and we don't have a better way to express that dependency.
 #
 GHCI_LIBS = $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_GHCI_LIB)) \
 	    $(compiler_stage2_GHCI_LIB)
@@ -886,7 +888,7 @@ install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts-1.0")
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
 	$(foreach p, $(INSTALL_DYNLIBS), \
-	    $(call installLibsTo, $(wildcard libraries/$p/dist-install/build/*.so libraries/$p/dist-install/build/*.dll libraries/$p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$p-$(libraries/$p_dist-install_VERSION)"))
+	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_PACKAGE)-$($p_dist-install_VERSION)"))
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \
@@ -1260,7 +1262,7 @@ bootstrapping-files: $(libffi_HEADERS)
 ifeq "$(HADDOCK_DOCS)" "YES"
 BINDIST_HADDOCK_FLAG = --with-haddock="$(BINDIST_PREFIX)/bin/haddock"
 endif
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 BINDIST_LIBRARY_FLAGS = --enable-shared --disable-library-vanilla
 else
 BINDIST_LIBRARY_FLAGS = --enable-library-vanilla --disable-shared

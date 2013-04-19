@@ -207,10 +207,8 @@ cmpFS f1@(FastString u1 _ _ _) f2@(FastString u2 _ _ _) =
   if u1 == u2 then EQ else
   compare (fastStringToByteString f1) (fastStringToByteString f2)
 
-#ifndef __HADDOCK__
 foreign import ccall unsafe "ghc_memcmp"
   memcmp :: Ptr a -> Ptr b -> Int -> IO Int
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Construction

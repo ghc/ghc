@@ -1,9 +1,4 @@
 {-# LANGUAGE GADTs #-}
--- ToDo: remove -fno-warn-warnings-deprecations
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
--- ToDo: remove -fno-warn-incomplete-patterns
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-
 module CmmCommonBlockElim
   ( elimCommonBlocks
   )

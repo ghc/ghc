@@ -1,9 +1,3 @@
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module CmmCallConv (
   ParamLocation(..),
@@ -93,7 +87,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
               ty = arg_ty r
               w  = typeWidth ty
               gcp | isGcPtrType ty = VGcPtr
-                  | otherwise  	   = VNonGcPtr
+                  | otherwise      = VNonGcPtr
               hasSseRegs = mAX_Real_SSE_REG dflags /= 0
 
 
@@ -133,7 +127,7 @@ getRegsWithoutNode dflags =
   ( filter (\r -> r VGcPtr /= node) (realVanillaRegs dflags)
   , realFloatRegs dflags
   , realDoubleRegs dflags
-  , realLongRegs dflags 
+  , realLongRegs dflags
   , sseRegNos dflags)
 
 -- getRegsWithNode uses R1/node even if it isn't a register

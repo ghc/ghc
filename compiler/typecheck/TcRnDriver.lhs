@@ -76,7 +76,6 @@ import DataCon
 import Type
 import Class
 import CoAxiom  ( CoAxBranch(..) )
-import TcType   ( orphNamesOfDFunHead )
 import Inst     ( tcGetInstEnvs )
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
@@ -1100,31 +1099,35 @@ check_main dflags tcg_env
                 <+> ptext (sLit "is not defined in module") <+> quotes (ppr main_mod)
     pp_main_fn = ppMainFn main_fn
 
-ppMainFn :: RdrName -> SDoc
-ppMainFn main_fn
-  | main_fn == main_RDR_Unqual
-  = ptext (sLit "function") <+> quotes (ppr main_fn)
-  | otherwise
-  = ptext (sLit "main function") <+> quotes (ppr main_fn)
-
 -- | Get the unqualified name of the function to use as the \"main\" for the main module.
 -- Either returns the default name or the one configured on the command line with -main-is
 getMainFun :: DynFlags -> RdrName
-getMainFun dflags = case (mainFunIs dflags) of
-    Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
-    Nothing -> main_RDR_Unqual
+getMainFun dflags = case mainFunIs dflags of
+                      Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
+                      Nothing -> main_RDR_Unqual
 
 checkMainExported :: TcGblEnv -> TcM ()
-checkMainExported tcg_env = do
-  dflags    <- getDynFlags
-  case tcg_main tcg_env of
-    Nothing -> return () -- not the main module
-    Just main_name -> do
-      let main_mod = mainModIs dflags
-      checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
-              ptext (sLit "The") <+> ppMainFn (nameRdrName main_name) <+>
-              ptext (sLit "is not exported by module") <+> quotes (ppr main_mod)
+checkMainExported tcg_env
+  = case tcg_main tcg_env of
+      Nothing -> return () -- not the main module
+      Just main_name -> 
+         do { dflags <- getDynFlags
+            ; let main_mod = mainModIs dflags
+            ; checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
+                ptext (sLit "The") <+> ppMainFn (nameRdrName main_name) <+>
+                ptext (sLit "is not exported by module") <+> quotes (ppr main_mod) }
+
+ppMainFn :: RdrName -> SDoc
+ppMainFn main_fn
+  | rdrNameOcc main_fn == mainOcc
+  = ptext (sLit "IO action") <+> quotes (ppr main_fn)
+  | otherwise
+  = ptext (sLit "main IO action") <+> quotes (ppr main_fn)
+
+mainOcc :: OccName
+mainOcc = mkVarOccFS (fsLit "main")
 \end{code}
+
 
 Note [Root-main Id]
 ~~~~~~~~~~~~~~~~~~~
@@ -1735,7 +1738,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst]))
+            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst Branched]))
 
 -- Used to implement :info in GHCi
 --
@@ -1757,29 +1760,41 @@ tcRnGetInfo hsc_env name
 
     thing  <- tcRnLookupName' name
     fixity <- lookupFixityRn name
-    ispecs <- lookupInsts thing
-    return (thing, fixity, ispecs)
+    (cls_insts, fam_insts) <- lookupInsts thing
+    return (thing, fixity, cls_insts, fam_insts)
 
-lookupInsts :: TyThing -> TcM [ClsInst]
+lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst Branched])
 lookupInsts (ATyCon tc)
   | Just cls <- tyConClass_maybe tc
   = do  { inst_envs <- tcGetInstEnvs
-        ; return (classInstances inst_envs cls) }
+        ; return (classInstances inst_envs cls, []) }
+
+  | isFamilyTyCon tc || isTyConAssoc tc
+  = do  { inst_envs <- tcGetFamInstEnvs
+        ; return ([], familyInstances inst_envs tc) }
 
   | otherwise
   = do  { (pkg_ie, home_ie) <- tcGetInstEnvs
+        ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
                 -- Load all instances for all classes that are
                 -- in the type environment (which are all the ones
                 -- we've seen in any interface file so far)
-        ; return [ ispec        -- Search all
+
+          -- Return only the instances relevant to the given thing, i.e.
+          -- the instances whose head contains the thing's name.
+        ; let cls_insts =
+                 [ ispec        -- Search all
                  | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie
-                 , let dfun = instanceDFunId ispec
-                 , relevant dfun ] }
+                 , tc_name `elemNameSet` orphNamesOfClsInst ispec ]
+        ; let fam_insts =
+                 [ fispec
+                 | fispec <- famInstEnvElts home_fie ++ famInstEnvElts pkg_fie
+                 , tc_name `elemNameSet` orphNamesOfFamInst fispec ]
+        ; return (cls_insts, fam_insts) }
   where
-    relevant df = tc_name `elemNameSet` orphNamesOfDFunHead (idType df)
     tc_name     = tyConName tc
 
-lookupInsts _ = return []
+lookupInsts _ = return ([],[])
 
 loadUnqualIfaces :: HscEnv -> InteractiveContext -> TcM ()
 -- Load the interface for everything that is in scope unqualified

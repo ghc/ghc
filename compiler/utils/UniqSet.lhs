@@ -9,13 +9,6 @@ Based on @UniqFMs@ (as you would expect).
 Basically, the things need to be in class @Uniquable@.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module UniqSet (
         -- * Unique set type
         UniqSet,    -- type synonym for UniqFM a
@@ -46,9 +39,9 @@ import Unique
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The signature of the module}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}

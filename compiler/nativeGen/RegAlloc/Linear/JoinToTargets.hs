@@ -4,7 +4,7 @@
 --      The first time we encounter a jump to a particular basic block, we
 --      record the assignment of temporaries.  The next time we encounter a
 --      jump to the same block, we compare our current assignment to the
---      stored one.  They might be different if spilling has occrred in one
+--      stored one.  They might be different if spilling has occurred in one
 --      branch; so some fixup code will be required to match up the assignments.
 --
 module RegAlloc.Linear.JoinToTargets (joinToTargets) where

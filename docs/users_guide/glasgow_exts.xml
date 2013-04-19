@@ -3434,7 +3434,8 @@ can be mentioned in the <literal>deriving</literal> clause.
 <para>
 The flag <option>-XAutoDeriveTypeable</option> triggers the generation
 of derived <literal>Typeable</literal> instances for every datatype and type
-class declaration in the module it is used.
+class declaration in the module it is used. This flag implies
+<option>-XDeriveDataTypeable</option> (<xref linkend="deriving-typeable"/>).
 </para>
 
 </sect2>
@@ -3792,6 +3793,35 @@ We use default signatures to simplify generic programming in GHC
 (<xref linkend="generic-programming"/>).
 </para>
 
+
+</sect3>
+
+<sect3 id="nullary-type-classes">
+<title>Nullary type classes</title>
+Nullary (no parameter) type classes are enabled with <option>-XNullaryTypeClasses</option>.
+Since there are no available parameters, there can be at most one instance
+of a nullary class. A nullary type class might be used to document some assumption
+in a type signature (such as reliance on the Riemann hypothesis) or add some
+globally configurable settings in a program. For example,
+
+<programlisting>
+  class RiemannHypothesis where
+    assumeRH :: a -> a
+
+  -- Deterministic version of the Miller test
+  -- correctness depends on the generalized Riemann hypothesis 
+  isPrime :: RiemannHypothesis => Integer -> Bool
+  isPrime n = assumeRH (...)
+</programlisting>
+
+The type signature of <literal>isPrime</literal> informs users that its correctness
+depends on an unproven conjecture. If the function is used, the user has
+to acknowledge the dependence with:
+
+<programlisting>
+  instance RiemannHypothesis where
+    assumeRH = id
+</programlisting>
 
 </sect3>
 </sect2>
@@ -7151,8 +7181,24 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 
 </sect2>
 
+<sect2>
+<title>Bindings and generalisation</title>
 
-<sect2 id="typing-binds">
+<sect3 id="monomorphism">
+<title>Switching off the dreaded Monomorphism Restriction</title>
+          <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
+
+<para>Haskell's monomorphism restriction (see
+<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
+4.5.5</ulink>
+of the Haskell Report)
+can be completely switched off by
+<option>-XNoMonomorphismRestriction</option>.
+</para>
+</sect3>
+
+
+<sect3 id="typing-binds">
 <title>Generalised typing of mutually recursive bindings</title>
 
 <para>
@@ -7213,23 +7259,9 @@ pattern binding must have the same context.  For example, this is fine:
   g y = (y &lt;= y) || f True
 </programlisting>
 </para>
-</sect2>
+</sect3>
 
-<sect2 id="monomorphism">
-<title>Switching off the dreaded Monomorphism Restriction</title>
-          <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
-
-<para>Haskell's monomorphism restriction (see
-<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
-4.5.5</ulink>
-of the Haskell Report)
-can be completely switched off by
-<option>-XNoMonomorphismRestriction</option>.
-</para>
-</sect2>
-
-
-<sect2 id="mono-local-binds">
+<sect3 id="mono-local-binds">
 <title>Let-generalisation</title>
 <para>
 An ML-style language usually generalises the type of any let-bound or where-bound variable,
@@ -7258,11 +7290,13 @@ All of this applies only to bindings that lack an explicit type signature, so th
 infer its type.  If you supply a type signature, then that fixes type of the binding, end of story.
 </para><para>
 The rationale for this more conservative strategy is given in 
-<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">the papers</ulink> "Let should not be generalised" and "Modular type inference with local assumptions".
+<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">the papers</ulink> "Let should not be generalised" and "Modular type inference with local assumptions", and 
+a related <ulink url="http://hackage.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7">blog post</ulink>.
 </para><para>
 The flag <option>-XMonoLocalBinds</option> is implied by <option>-XTypeFamilies</option> and <option>-XGADTs</option>.  You can switch it off again
 with <option>-XNoMonoLocalBinds</option> but type inference becomes less predicatable if you do so. (Read the papers!)
 </para>
+</sect3>
 </sect2>
 
 <sect2 id="type-holes">

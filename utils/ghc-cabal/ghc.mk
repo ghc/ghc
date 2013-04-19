@@ -14,7 +14,7 @@
 
 # Euch, hideous hack:
 # XXX This should be in a different Makefile
-CABAL_DOTTED_VERSION := $(shell grep "^Version:" libraries/Cabal/Cabal/Cabal.cabal | sed "s/^Version: //")
+CABAL_DOTTED_VERSION := $(shell grep "^version:" libraries/Cabal/Cabal/Cabal.cabal | sed "s/^version: //")
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 

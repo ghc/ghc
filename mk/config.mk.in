@@ -88,21 +88,21 @@ GhcDynamic=NO
 # GhcProfiled=YES means compile a profiled stage-2 compiler
 GhcProfiled=NO
 
-# Do we support shared libs?
-SharedLibsPlatformList =                        \
-    i386-unknown-linux   x86_64-unknown-linux   \
-    i386-unknown-freebsd x86_64-unknown-freebsd \
-    i386-unknown-openbsd x86_64-unknown-openbsd \
-    i386-unknown-netbsd  x86_64-unknown-netbsd  \
-    i386-unknown-mingw32 x86_64-unknown-mingw32 \
-    i386-apple-darwin    x86_64-apple-darwin    powerpc-apple-darwin
+ifeq "$(findstring $(TargetOS_CPP),linux freebsd dragonfly openbsd netbsd solaris2 kfreebsdgnu haiku linux-android)" ""
+TargetElf = NO
+else
+TargetElf = YES
+endif
 
-ifeq "$(SOLARIS_BROKEN_SHLD)" "NO"
-SharedLibsPlatformList += i386-unknown-solaris2
+# Some platforms don't support shared libraries
+NoSharedLibsPlatformList =
+
+ifeq "$(SOLARIS_BROKEN_SHLD)" "YES"
+NoSharedLibsPlatformList += i386-unknown-solaris2
 endif
 
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
-	$(SharedLibsPlatformList)),YES,NO)
+    $(NoSharedLibsPlatformList)),NO,YES)
 
 # DYNAMIC_BY_DEFAULT says whether this compiler will default to
 # building dynamic executables, i.e. -dynamic is on.  We do this for
@@ -124,8 +124,19 @@ endif
 # cabal-install's that are in the wild don't handle it properly.
 DYNAMIC_BY_DEFAULT = NO
 
-# For now, we unconditionally disable building with -dynamic-too
-DYNAMIC_TOO = NO
+# If building both v and dyn ways, then use -dynamic-too to build them.
+# This makes the build faster.
+DYNAMIC_TOO = YES
+
+# Use the dynamic way when building programs in the GHC tree. In
+# particular, this means that GHCi will use DLLs rather than loading
+# object files directly.
+ifeq "$(TargetOS_CPP)" "mingw32"
+# This doesn't work on Windows yet
+DYNAMIC_GHC_PROGRAMS = NO
+else
+DYNAMIC_GHC_PROGRAMS = YES
+endif
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
@@ -169,7 +180,7 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else 
-GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_BY_DEFAULT)),YES,NO)
+GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
 endif
 
 # GhcEnableTablesNextToCode tells us whether the target architecture
@@ -210,12 +221,6 @@ BeConservative = NO
 
 ExtraMakefileSanityChecks = NO
 
-#
-# Building various ways?
-# (right now, empty if not).
-BuildingParallel=$(subst mp,YES,$(filter mp,$(WAYS)))
-BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
-
 #------------------------------------------------------------------------------
 # Options for Libraries
 
@@ -226,10 +231,8 @@ INTEGER_LIBRARY=integer-gmp
 GhcLibWays = v
 
 # In addition to the normal sequential way, the default is to also build
-# profiled prelude libraries unless we are booting from .hc files
-ifneq "$(BootingFromHc)" "YES"
+# profiled prelude libraries
 GhcLibWays += p
-endif
 
 ifeq "$(PlatformSupportsSharedLibs)" "YES"
 GhcLibWays += dyn
@@ -253,9 +256,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 GhcRTSWays=l
 
 # Usually want the debug version
-ifeq "$(BootingFromHc)" "NO"
 GhcRTSWays += debug 
-endif
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
@@ -281,10 +282,6 @@ GhcLibHcOpts=-O2
 #
 StripLibraries=NO
 
-# These are the URL patterns that Haddock uses to generate the "Source
-# File" links on each page.
-PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
-
 # ----------------------------------------------------------------------------
 # Object-file splitting
 #
@@ -302,7 +299,6 @@ SupportsSplitObjs := $(strip \
                     $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
                                $(filter YES,$(OsSupportsSplitObjs)),\
                                $(filter NO,$(SplitObjsBroken)),\
-                               $(filter NO,$(BootingFromHc)),\
                                $(filter NO,$(GhcUnregisterised))),\
                           YES,NO))
 
@@ -424,15 +420,8 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 #
 SRC_HC_OPTS += -H32m -O
 
-# These flags make flex 8-bit
-SRC_FLEX_OPTS	+= -8
-
-
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
-#
-#      xxx_PGM          the name of an executable, without the path
-#      xxx              the executable relative to the current dir
 
 MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
 
@@ -596,14 +585,6 @@ DLLTOOL			= inplace/mingw/bin/dlltool.exe
 endif
 
 #-----------------------------------------------------------------------------
-# Flex (currently unused, could be moved to glafp-utils)
-
-# FLEX			= @LEX@
-# Don't bother with -lfl, we define our own yywrap()s anyway.
-# FLEX_LIB		= 
-#WAS:FLEX_LIB		= @LEXLIB@
-
-#-----------------------------------------------------------------------------
 # Other standard (ha!) Unix utilities
 
 AR			= @ArCmd@
@@ -632,7 +613,6 @@ CP			= cp
 # It's not easy to separate the CPP program from its flags, as
 # AC_PROG_CPP defines CPP as "/usr/bin/gcc -E"
 CPP			= @CPP@ @CPPFLAGS@
-CTAGS 			= $(ETAGS)
 #
 # RAWCPP_FLAGS are the flags to give to cpp (viz, gcc -E) to persuade it to
 # behave plausibly on Haskell sources.
@@ -758,14 +738,13 @@ ALEX			= @AlexCmd@
 ALEX_VERSION		= @AlexVersion@		
 Alex3			= @Alex3@
 #
-# Options to pass to Happy when we're going to compile the output with GHC
+# Options to pass to Alex when we're going to compile the output with GHC
 #
+SRC_ALEX_OPTS = -g
 ifeq "$(Alex3)" "YES"
-# We aren't using the Unicode support in Alex 3.0 yet, in fact we do our own
+# The compiler isn't using the Unicode support in Alex 3.0 yet, in fact we do our own
 # Unicode handling, so diable Alex's.
-SRC_ALEX_OPTS		= -g --latin1
-else
-SRC_ALEX_OPTS		= -g
+compiler_ALEX_OPTS = --latin1
 endif
 
 # Should we build haddock docs?

@@ -1022,7 +1022,7 @@ infoThing allInfo str = do
     let pefas = gopt Opt_PrintExplicitForalls dflags
     names     <- GHC.parseName str
     mb_stuffs <- mapM (GHC.getInfo allInfo) names
-    let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
+    let filtered = filterOutChildren (\(t,_f,_ci,_fi) -> t) (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map (pprInfo pefas) filtered)
 
   -- Filter out names whose parent is also there Good
@@ -1037,11 +1037,13 @@ filterOutChildren get_thing xs
                      Just p  -> getName p `elemNameSet` all_names
                      Nothing -> False
 
-pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
-pprInfo pefas (thing, fixity, insts)
+pprInfo :: PrintExplicitForalls
+        -> (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst GHC.Branched]) -> SDoc
+pprInfo pefas (thing, fixity, cls_insts, fam_insts)
   =  pprTyThingInContextLoc pefas thing
   $$ show_fixity
-  $$ vcat (map GHC.pprInstance insts)
+  $$ vcat (map GHC.pprInstance cls_insts)
+  $$ vcat (map GHC.pprFamInst  fam_insts)
   where
     show_fixity
         | fixity == GHC.defaultFixity = empty
@@ -2191,8 +2193,10 @@ showBindings = do
         let pefas = gopt Opt_PrintExplicitForalls dflags
         mb_stuff <- GHC.getInfo False (getName tt)
         return $ maybe (text "") (pprTT pefas) mb_stuff
-    pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
-    pprTT pefas (thing, fixity, _insts) =
+
+    pprTT :: PrintExplicitForalls
+          -> (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst GHC.Branched]) -> SDoc
+    pprTT pefas (thing, fixity, _cls_insts, _fam_insts) =
         pprTyThing pefas thing
         $$ show_fixity
       where

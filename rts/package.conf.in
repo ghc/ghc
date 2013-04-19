@@ -21,7 +21,7 @@ library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR
 library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR
 #endif
 
-hs-libraries:   "HSrts"
+hs-libraries:   "HSrts" FFI_LIB
 
 extra-libraries:
 #ifdef HAVE_LIBM

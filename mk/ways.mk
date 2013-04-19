@@ -70,7 +70,7 @@ WAY_thr_l_HC_OPTS= -static -optc-DTHREADED_RTS -eventlog
 
 # Way 'debug':
 WAY_debug_NAME=debug
-WAY_debug_HC_OPTS= -static -optc-DDEBUG
+WAY_debug_HC_OPTS= -static -optc-DDEBUG -ticky -DTICKY_TICKY
 
 # Way 'debug_p':
 WAY_debug_p_NAME=debug profiled
@@ -104,7 +104,7 @@ WAY_thr_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DTHREADED_RTS -optc-DDEBUG
 
 # Way 'debug_dyn':
 WAY_debug_dyn_NAME=debug_dyn
-WAY_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DDEBUG
+WAY_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DDEBUG -ticky -DTICKY_TICKY
 
 # Way 'l_dyn':
 WAY_l_dyn_NAME=event logging dynamic

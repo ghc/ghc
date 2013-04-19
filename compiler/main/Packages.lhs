@@ -896,8 +896,16 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
         rts_tag = mkBuildTag ways2
 
-        mkDynName | gopt Opt_Static dflags = id
-                  | otherwise = (++ ("-ghc" ++ cProjectVersion))
+        mkDynName x
+         | gopt Opt_Static dflags       = x
+         | "HS" `isPrefixOf` x          = x ++ "-ghc" ++ cProjectVersion
+           -- For non-Haskell libraries, we use the name "Cfoo". The .a
+           -- file is libCfoo.a, and the .so is libfoo.so. That way the
+           -- linker knows what we mean for the vanilla (-lCfoo) and dyn
+           -- (-lfoo) ways. We therefore need to strip the 'C' off here.
+         | Just x' <- stripPrefix "C" x = x'
+         | otherwise
+            = panic ("Don't understand library name " ++ x)
 
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
         addSuffix other_lib      = other_lib ++ (expandTag tag)

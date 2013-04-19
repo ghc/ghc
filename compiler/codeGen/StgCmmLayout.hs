@@ -24,7 +24,7 @@ module StgCmmLayout (
 
 	mkVirtHeapOffsets, mkVirtConstrOffsets, getHpRelOffset, hpRel,
 
-        ArgRep(..), toArgRep, argRepSizeW
+        ArgRep(..), toArgRep, argRepSizeW -- re-exported from StgCmmArgRep
   ) where
 
 
@@ -32,6 +32,7 @@ module StgCmmLayout (
 
 import StgCmmClosure
 import StgCmmEnv
+import StgCmmArgRep -- notably: ( slowCallPattern )
 import StgCmmTicky
 import StgCmmMonad
 import StgCmmUtils
@@ -46,12 +47,11 @@ import CLabel
 import StgSyn
 import Id
 import Name
-import TyCon		( PrimRep(..), primElemRepSizeB )
+import TyCon		( PrimRep(..) )
 import BasicTypes	( RepArity )
 import DynFlags
 import Module
 
-import Constants
 import Util
 import Data.List
 import Outputable
@@ -148,7 +148,7 @@ adjustHpBackwards
 		then mkNop
 		else mkAssign hpReg new_hp)	-- Generates nothing when vHp==rHp
 
-	; tickyAllocHeap adjust_words		-- ...ditto
+	; tickyAllocHeap False adjust_words		-- ...ditto
 
 	; setRealHp vHp
 	}
@@ -297,82 +297,6 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
     this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
     save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just curCCS)]
     save_cccs_lbl = mkCmmRetInfoLabel rtsPackageId (fsLit "stg_restore_cccs")
-
-
-
--- These cases were found to cover about 99% of all slow calls:
-slowCallPattern :: [ArgRep] -> (FastString, RepArity)
--- Returns the generic apply function and arity
-slowCallPattern (P: P: P: P: P: P: _) = (fsLit "stg_ap_pppppp", 6)
-slowCallPattern (P: P: P: P: P: _)    = (fsLit "stg_ap_ppppp", 5)
-slowCallPattern (P: P: P: P: _)       = (fsLit "stg_ap_pppp", 4)
-slowCallPattern (P: P: P: V: _)       = (fsLit "stg_ap_pppv", 4)
-slowCallPattern (P: P: P: _)          = (fsLit "stg_ap_ppp", 3)
-slowCallPattern (P: P: V: _)          = (fsLit "stg_ap_ppv", 3)
-slowCallPattern (P: P: _)	      = (fsLit "stg_ap_pp", 2)
-slowCallPattern (P: V: _)	      = (fsLit "stg_ap_pv", 2)
-slowCallPattern (P: _)		      = (fsLit "stg_ap_p", 1)
-slowCallPattern (V: _)		      = (fsLit "stg_ap_v", 1)
-slowCallPattern (N: _)		      = (fsLit "stg_ap_n", 1)
-slowCallPattern (F: _)		      = (fsLit "stg_ap_f", 1)
-slowCallPattern (D: _)		      = (fsLit "stg_ap_d", 1)
-slowCallPattern (L: _)		      = (fsLit "stg_ap_l", 1)
-slowCallPattern (V16: _)	      = (fsLit "stg_ap_v16", 1)
-slowCallPattern []		      = (fsLit "stg_ap_0", 0)
-
-
--------------------------------------------------------------------------
---      Classifying arguments: ArgRep
--------------------------------------------------------------------------
-
--- ArgRep is exported, but only for use in the byte-code generator which
--- also needs to know about the classification of arguments.
-
-data ArgRep = P   -- GC Ptr
-            | N   -- Word-sized non-ptr
-            | L   -- 64-bit non-ptr (long)
-            | V   -- Void
-            | F   -- Float
-            | D   -- Double
-            | V16 -- 16-byte (128-bit) vectors of Float/Double/Int8/Word32/etc.
-instance Outputable ArgRep where
-  ppr P   = text "P"
-  ppr N   = text "N"
-  ppr L   = text "L"
-  ppr V   = text "V"
-  ppr F   = text "F"
-  ppr D   = text "D"
-  ppr V16 = text "V16"
-
-toArgRep :: PrimRep -> ArgRep
-toArgRep VoidRep           = V
-toArgRep PtrRep            = P
-toArgRep IntRep            = N
-toArgRep WordRep           = N
-toArgRep AddrRep           = N
-toArgRep Int64Rep          = L
-toArgRep Word64Rep         = L
-toArgRep FloatRep          = F
-toArgRep DoubleRep         = D
-toArgRep (VecRep len elem)
-    | len*primElemRepSizeB elem == 16 = V16
-    | otherwise                       = error "toArgRep: bad vector primrep"
-
-isNonV :: ArgRep -> Bool
-isNonV V = False
-isNonV _ = True
-
-argRepSizeW :: DynFlags -> ArgRep -> WordOff                -- Size in words
-argRepSizeW _      N   = 1
-argRepSizeW _      P   = 1
-argRepSizeW _      F   = 1
-argRepSizeW dflags L   = wORD64_SIZE        `quot` wORD_SIZE dflags
-argRepSizeW dflags D   = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-argRepSizeW _      V   = 0
-argRepSizeW dflags V16 = 16                 `quot` wORD_SIZE dflags
-
-idArgRep :: Id -> ArgRep
-idArgRep = toArgRep . idPrimRep
 
 -------------------------------------------------------------------------
 ----	Laying out objects on the heap and stack

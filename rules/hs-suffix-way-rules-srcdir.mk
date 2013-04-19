@@ -20,9 +20,11 @@ ifneq "$$(BINDIST)" "YES"
 
 $1/$2/build/%.$$($3_osuf) : $1/$4/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
+	$$(call ohi-sanity-check,$1,$2,$3,$1/$2/build/$$*)
 
 $1/$2/build/%.$$($3_osuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
+	$$(call ohi-sanity-check,$1,$2,$3,$1/$2/build/$$*)
 
 $1/$2/build/%.$$($3_hcsuf) : $1/$4/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -C $$< -o $$@
@@ -64,4 +66,23 @@ $1/$2/build/%_stub.$$($3_osuf): $1/$2/build/%.$$($3_osuf)
 endif
 
 endef
+
+ifeq "$(ExtraMakefileSanityChecks)" "NO"
+ohi-sanity-check =
+else
+# We don't look for the .hi file if this is for a program, as if the
+# Main module is in foo.hs then we get foo.o but Main.hi
+define ohi-sanity-check
+	@for f in $4.$($3_osuf) \
+	          $(if $($1_$2_PROG),,$4.$($3_hisuf)) \
+	          $(if $(findstring v,$3), \
+	              $(if $(findstring YES,$($1_$2_DYNAMIC_TOO)), \
+	                  $4.$(dyn_osuf) $4.$(dyn_hisuf))); do \
+	    if [ ! -f $$f ]; then \
+	        echo "Panic! $$f not created."; \
+	        exit 1; \
+	    fi; \
+	done
+endef
+endif
 

@@ -18,8 +18,14 @@ $(call profStart, build-package-data($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
+$1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
 ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
 $1_$2_CONFIGURE_OPTS += --enable-library-vanilla
+ifeq "$$(GhcWithInterpreter)" "YES"
+ifneq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
+$1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
+endif
+endif
 else
 $1_$2_CONFIGURE_OPTS += --disable-library-vanilla
 endif
@@ -34,13 +40,6 @@ ifeq "$$(filter dyn,$$($1_$2_WAYS))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
 else
 $1_$2_CONFIGURE_OPTS += --disable-shared
-endif
-
-$1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
-ifeq "$$(GhcWithInterpreter)" "YES"
-ifneq "$$(DYNAMIC_BY_DEFAULT)" "YES"
-$1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
-endif
 endif
 
 ifeq "$$(HSCOLOUR_SRCS)" "YES"

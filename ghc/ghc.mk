@@ -161,6 +161,12 @@ $(GHC_STAGE2) : | $$(touchy_INPLACE)
 $(GHC_STAGE3) : | $$(touchy_INPLACE)
 endif
 
+# Modules like vector:Data.Vector.Fusion.Stream.Monadic use annotations,
+# which means they depend on GHC.Desugar. To ensure that This module is
+# available by the time it is needed, we make the stage 2 compiler
+# depend on it.
+$(GHC_STAGE2) : $(foreach w,$(GhcLibWays),libraries/base/dist-install/build/GHC/Desugar.$($w_osuf))
+
 endif
 
 INSTALL_LIBS += settings

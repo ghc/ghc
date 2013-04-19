@@ -27,6 +27,14 @@ $1_$2_$3_LIB_NAME = libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_NAME)
 $$($1_PACKAGE)-$$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
+ifeq "$$(HostOS_CPP)" "mingw32"
+ifneq "$$($1_$2_dll0_HS_OBJS)" ""
+$1_$2_$3_LIB0_ROOT = HS$$($1_PACKAGE)-$$($1_$2_VERSION)-0$$($3_libsuf)
+$1_$2_$3_LIB0_NAME = lib$$($1_$2_$3_LIB0_ROOT)
+$1_$2_$3_LIB0 = $1/$2/build/$$($1_$2_$3_LIB0_NAME)
+endif
+endif
+
 # Note [inconsistent distdirs]
 # hack: the DEPS_LIBS mechanism assumes that the distdirs for packages
 # that depend on each other are the same, but that is not the case for
@@ -48,19 +56,35 @@ $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
 
 ifeq "$3" "dyn"
 
+ifneq "$$($1_$2_dll0_MODULES)" ""
+$$($1_$2_$3_LIB)  : $1/$2/dll-split.stamp
+ifneq "$$($1_$2_$3_LIB0)" ""
+$$($1_$2_$3_LIB0) : $1/$2/dll-split.stamp
+endif
+endif
+
+$1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) inplace/bin/dll-split$$(exeext)
+	inplace/bin/dll-split $$< "$$($1_$2_dll0_START_MODULE)" "$$($1_$2_dll0_MODULES)"
+	touch $$@
+
 # Link a dynamic library
 # On windows we have to supply the extra libs this one links to when building it.
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
-         -shared -dynamic -dynload deploy \
-	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
-         -no-auto-link-packages \
-         -o $$@
-# Now check that the DLL doesn't have too many symbols. See trac #5987.
-	case `$$(OBJDUMP) -p $$@ | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$$$/ q" | grep "\[ *0\]" | wc -l` in 1) echo DLL $$@ OK;; 0) echo No symbols in DLL $$@; exit 1;; [0-9]*) echo Too many symbols in DLL $$@; exit 1;; *) echo bad DLL $$@; exit 1;; esac
+ifneq "$$($1_$2_$3_LIB0)" ""
+	$$(call build-dll,$1,$2,$3,-L$1/$2/build -l$$($1_$2_$3_LIB0_ROOT),$$(filter-out $$($1_$2_dll0_HS_OBJS),$$($1_$2_$3_HS_OBJS)) $$($1_$2_$3_NON_HS_OBJS),$$@)
+else
+	$$(call build-dll,$1,$2,$3,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
+endif
+
+ifneq "$$($1_$2_$3_LIB0)" ""
+$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
+$$($1_$2_$3_LIB0) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
+	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
+endif
 
 else
+
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
@@ -84,6 +108,15 @@ else
 	"$$(XARGS)" $$(XARGS_OPTS) "$$($1_$2_AR)" $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@ < $$@.contents
 endif
 	$$(call removeFiles,$$@.contents)
+
+ifeq "$$(HostOS_CPP)" "mingw32"
+ifneq "$$($1_$2_$3_LIB0)" ""
+$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
+$$($1_$2_$3_LIB0) :
+	$$(call cmd,$1_$2_AR) $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@
+endif
+endif
+
 endif
 
 $(call all-target,$1_$2,all_$1_$2_$3)
@@ -93,10 +126,11 @@ $(call all-target,$1_$2_$3,$$($1_$2_$3_LIB))
 ifneq "$4" "0"
 BINDIST_HI += $$($1_$2_$3_HI)
 BINDIST_LIBS += $$($1_$2_$3_LIB)
+BINDIST_LIBS += $$($1_$2_$3_LIB0)
 endif
 
 # Build the GHCi library
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_GHCI_LIB = $$($1_$2_dyn_LIB)
 else
 ifeq "$3" "v"
@@ -120,5 +154,22 @@ endif
 endif
 
 $(call profEnd, build-package-way($1,$2,$3))
+endef
+
+# $1 = dir
+# $2 = distdir
+# $3 = way
+# $4 = extra flags
+# $5 = object files to link
+# $6 = output filename
+define build-dll
+	$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 $5 \
+	    -shared -dynamic -dynload deploy \
+	    $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
+	    -no-auto-link-packages \
+	    -o $6
+# Now check that the DLL doesn't have too many symbols. See trac #5987.
+	SYMBOLS=`$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail -n +2 | wc -l`; echo "Number of symbols in $6: $$SYMBOLS"
+	case `$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | grep "\[ *0\]" | wc -l` in 1) echo DLL $6 OK;; 0) echo No symbols in DLL $6; exit 1;; [0-9]*) echo Too many symbols in DLL $6; $(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail; exit 1;; *) echo bad DLL $6; exit 1;; esac
 endef
 

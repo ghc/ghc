@@ -748,7 +748,10 @@ dsEvTerm (EvCast tm co)
 
 dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
                                      ; return (Var df `mkTyApps` tys `mkApps` tms') }
-dsEvTerm (EvCoercion co)         = dsTcCoercion co mkEqBox
+
+dsEvTerm (EvCoercion (TcCoVarCo v)) = return (Var v)  -- See Note [Simple coercions]
+dsEvTerm (EvCoercion co)            = dsTcCoercion co mkEqBox
+
 dsEvTerm (EvTupleSel v n)
    = do { tm' <- dsEvTerm v
         ; let scrut_ty = exprType tm'
@@ -801,7 +804,6 @@ dsTcCoercion co thing_inside
              subst = mkCvSubst emptyInScopeSet [(eqv, mkCoVarCo cov) | (eqv, cov) <- eqvs_covs]
              result_expr = thing_inside (ds_tc_coercion subst co)
              result_ty   = exprType result_expr
-
 
        ; return (foldr (wrap_in_case result_ty) result_expr eqvs_covs) }
   where
@@ -862,3 +864,30 @@ ds_tc_coercion subst tc_co
      | Just co <- Coercion.lookupCoVar subst v = co
      | otherwise  = pprPanic "ds_tc_coercion" (ppr v $$ ppr tc_co)
 \end{code}
+
+Note [Simple coercions]
+~~~~~~~~~~~~~~~~~~~~~~~
+We have a special case for coercions that are simple variables.
+Suppose   cv :: a ~ b   is in scope
+Lacking the special case, if we see
+	f a b cv
+we'd desguar to
+        f a b (case cv of EqBox (cv# :: a ~# b) -> EqBox cv#)
+which is a bit stupid.  The special case does the obvious thing.
+
+This turns out to be important when desugaring the LHS of a RULE
+(see Trac #7837).  Suppose we have
+    normalise        :: (a ~ Scalar a) => a -> a
+    normalise_Double :: Double -> Double
+    {-# RULES "normalise" normalise = normalise_Double #-}
+
+Then the RULE we want looks like
+     forall a, (cv:a~Scalar a). 
+       normalise a cv = normalise_Double
+But without the special case we generate the redundant box/unbox,
+which simpleOpt (currently) doesn't remove. So the rule never matches.
+
+Maybe simpleOpt should be smarter.  But it seems like a good plan
+to simply never generate the redundant box/unbox in the first place.
+
+

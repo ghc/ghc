@@ -1,4 +1,4 @@
-# Despite the name "package", this file contains the master list of 
+# Despite the name "package", this file contains the master list of
 # the *repositories* that make up GHC. It is parsed by
 # * boot
 # * sync-all
@@ -14,18 +14,17 @@
 #    - The main GHC source repo
 #    - Each boot package lives in a repo
 #    - DPH is a repo that contains several packages
-#    - Haddock and hsc2hs are applications, built on top of GHC, 
+#    - Haddock and hsc2hs are applications, built on top of GHC,
 #        and in turn needed to bootstrap GHC
 #    - ghc-tarballs is need to build GHC
 #    - nofib and testsuite are optional helpers
 #
 # The format of the lines in this file is:
-#   localpath    tag    remotepath    VCS
+#   localpath    tag    remotepath
 # where
 #   * 'localpath' is where to put the repository in a checked out tree.
 #   * 'remotepath' is where the repository is in the central repository.
 #     It is - for submodules.
-#   * 'VCS' is what version control system the repo uses.
 #
 #   * The 'tag' determines when "darcs-all get" will get the
 #     repo. If the tag is "-" then it will always get it, but if there
@@ -33,53 +32,53 @@
 #     if you want to get the packages with an "extralibs" or "testsuite"
 #     tag then you need to use "darcs-all --extra --testsuite get".
 #     Support for new tags must be manually added to the darcs-all script.
-# 
+#
 #     'tag' is also used to determine which packages the build system
-#     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra' 
+#     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra'
 #     both give this property
 #
 # Lines that start with a '#' are comments.
 #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#    localpath                tag           remotepath                          VCS
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ghc-tarballs                    -           ghc-tarballs.git                    git
-utils/hsc2hs                    -           hsc2hs.git                          git
-utils/haddock                   -           haddock.git                         git
-libraries/array                 -           packages/array.git                  git
-libraries/base                  -           packages/base.git                   git
-libraries/binary                -           -                                   git
-libraries/bytestring            -           -                                   git
-libraries/Cabal                 -           -                                   git
-libraries/containers            -           -                                   git
-libraries/deepseq               -           packages/deepseq.git                git
-libraries/directory             -           packages/directory.git              git
-libraries/filepath              -           packages/filepath.git               git
-libraries/ghc-prim              -           packages/ghc-prim.git               git
-libraries/haskeline             -           -                                   git
-libraries/haskell98             -           packages/haskell98.git              git
-libraries/haskell2010           -           packages/haskell2010.git            git
-libraries/hoopl                 -           packages/hoopl.git                  git
-libraries/hpc                   -           packages/hpc.git                    git
-libraries/integer-gmp           -           packages/integer-gmp.git            git
-libraries/integer-simple        -           packages/integer-simple.git         git
-libraries/old-locale            -           packages/old-locale.git             git
-libraries/old-time              -           packages/old-time.git               git
-libraries/pretty                -           -                                   git
-libraries/process               -           packages/process.git                git
-libraries/template-haskell      -           packages/template-haskell.git       git
-libraries/terminfo              -           -                                   git
-libraries/time                  -           -                                   git
-libraries/transformers          -           -                                   git
-libraries/unix                  -           packages/unix.git                   git
-libraries/Win32                 -           -                                   git
-libraries/xhtml                 -           -                                   git
-testsuite                       testsuite   testsuite.git                       git
-nofib                           nofib       nofib.git                           git
-libraries/parallel              extra       packages/parallel.git               git
-libraries/stm                   extra       packages/stm.git                    git
-libraries/random                dph         -                                   git
-libraries/primitive             dph         -                                   git
-libraries/vector                dph         -                                   git
-libraries/dph                   dph         packages/dph.git                    git
-.                               -           ghc.git                             git
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#    localpath                tag           remotepath
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ghc-tarballs                    -           ghc-tarballs.git
+utils/hsc2hs                    -           hsc2hs.git
+utils/haddock                   -           haddock.git
+libraries/array                 -           packages/array.git
+libraries/base                  -           packages/base.git
+libraries/binary                -           -
+libraries/bytestring            -           -
+libraries/Cabal                 -           -
+libraries/containers            -           -
+libraries/deepseq               -           packages/deepseq.git
+libraries/directory             -           packages/directory.git
+libraries/filepath              -           packages/filepath.git
+libraries/ghc-prim              -           packages/ghc-prim.git
+libraries/haskeline             -           -
+libraries/haskell98             -           packages/haskell98.git
+libraries/haskell2010           -           packages/haskell2010.git
+libraries/hoopl                 -           packages/hoopl.git
+libraries/hpc                   -           packages/hpc.git
+libraries/integer-gmp           -           packages/integer-gmp.git
+libraries/integer-simple        -           packages/integer-simple.git
+libraries/old-locale            -           packages/old-locale.git
+libraries/old-time              -           packages/old-time.git
+libraries/pretty                -           -
+libraries/process               -           packages/process.git
+libraries/template-haskell      -           packages/template-haskell.git
+libraries/terminfo              -           -
+libraries/time                  -           -
+libraries/transformers          -           -
+libraries/unix                  -           packages/unix.git
+libraries/Win32                 -           -
+libraries/xhtml                 -           -
+testsuite                       testsuite   testsuite.git
+nofib                           nofib       nofib.git
+libraries/parallel              extra       packages/parallel.git
+libraries/stm                   extra       packages/stm.git
+libraries/random                dph         -
+libraries/primitive             dph         -
+libraries/vector                dph         -
+libraries/dph                   dph         packages/dph.git
+.                               -           ghc.git

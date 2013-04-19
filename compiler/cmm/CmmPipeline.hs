@@ -62,7 +62,7 @@ cpsTop hsc_env proc =
        --
        CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
             return $ cmmCfgOptsProc splitting_proc_points proc
-       dump Opt_D_dump_cmm_cfg "Post control-flow optimsations" g
+       dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
        let !TopInfo {stack_info=StackInfo { arg_space = entry_off
                                           , do_layout = do_layout }} = h
@@ -135,7 +135,7 @@ cpsTop hsc_env proc =
                              else gs
             gs <- return (map removeUnreachableBlocksProc gs)
                 -- Note [unreachable blocks]
-            dumps Opt_D_dump_cmm_cfg "Post control-flow optimsations" gs
+            dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" gs
 
             return (cafEnv, gs)
 
@@ -155,7 +155,7 @@ cpsTop hsc_env proc =
                              else g
             g <- return (removeUnreachableBlocksProc g)
                 -- Note [unreachable blocks]
-            dump' Opt_D_dump_cmm_cfg "Post control-flow optimsations" g
+            dump' Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
             return (cafEnv, [g])
 
@@ -184,11 +184,11 @@ cpsTop hsc_env proc =
                              || not (tablesNextToCode dflags)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
-        usingInconsistentPicReg = ( platformArch platform == ArchX86 ||
-                                    platformArch platform == ArchPPC
-                                  )
-                               && platformOS platform == OSDarwin
-                               && gopt Opt_PIC dflags
+        usingInconsistentPicReg
+           = case (platformArch platform, platformOS platform, gopt Opt_PIC dflags)
+             of   (ArchX86, OSDarwin, pic) -> pic
+                  (ArchPPC, OSDarwin, pic) -> pic
+                  _                        -> False
 
 {- Note [inconsistent-pic-reg]
 

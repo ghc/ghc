@@ -389,7 +389,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
         int sz = totalArgumentSize(typeString);
         
         adjustorStub->call[0] = 0xe8;
-        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)adjustorStub + 5);
+        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)code + 5);
         adjustorStub->hptr = hptr;
         adjustorStub->wptr = wptr;
         

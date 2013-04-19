@@ -330,8 +330,17 @@ rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
                                      
 rnPatAndThen mk (SigPatIn pat sig)
-  = do { pat' <- rnLPatAndThen mk pat
-       ; sig' <- rnHsSigCps sig
+  -- When renaming a pattern type signature (e.g. f (a :: T) = ...), it is
+  -- important to rename its type signature _before_ renaming the rest of the
+  -- pattern, so that type variables are first bound by the _outermost_ pattern
+  -- type signature they occur in. This keeps the type checker happy when
+  -- pattern type signatures happen to be nested (#7827)
+  --
+  -- f ((Just (x :: a) :: Maybe a)
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~^       `a' is first bound here
+  -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
+  = do { sig' <- rnHsSigCps sig
+       ; pat' <- rnLPatAndThen mk pat
        ; return (SigPatIn pat' sig') }
        
 rnPatAndThen mk (LitPat lit)

@@ -100,7 +100,7 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
 
         -- SAY WHAT WE ARE ABOUT TO DO
         ; let rep = cit_rep info_tbl
-        ; tickyDynAlloc rep lf_info
+        ; tickyDynAlloc (toRednCountsLbl $ cit_lbl info_tbl) rep lf_info
         ; profDynAlloc rep use_cc
 
         -- FIND THE OFFSET OF THE INFO-PTR WORD
@@ -215,7 +215,6 @@ mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info
         =  staticGranHdr
         ++ staticParHdr
         ++ staticProfHdr dflags ccs
-        ++ staticTickyHdr
 
 -- JD: Simon had ellided this padding, but without it the C back end asserts
 -- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
@@ -527,7 +526,7 @@ heapCheck checkStack checkYield do_gc code
               stk_hwm | checkStack = Just (CmmLit CmmHighStackMark)
                       | otherwise  = Nothing
         ; codeOnly $ do_checks stk_hwm checkYield mb_alloc_bytes do_gc
-        ; tickyAllocHeap hpHw
+        ; tickyAllocHeap True hpHw
         ; doGranAllocate hpHw
         ; setRealHp hpHw
         ; code }
@@ -571,10 +570,11 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 
   case mb_stk_hwm of
     Nothing -> return ()
-    Just stk_hwm -> emit =<< mkCmmIfGoto (sp_oflo stk_hwm) gc_id
+    Just stk_hwm -> tickyStackCheck >> (emit =<< mkCmmIfGoto (sp_oflo stk_hwm) gc_id)
 
   if (isJust mb_alloc_lit)
     then do
+     tickyHeapCheck
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
     else do
@@ -594,86 +594,3 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
                 -- stack check succeeds.  Otherwise we might end up
                 -- with slop at the end of the current block, which can
                 -- confuse the LDV profiler.
-
-{-
-
-{- Unboxed tuple alternatives and let-no-escapes (the two most annoying
-constructs to generate code for!)  For unboxed tuple returns, there
-are an arbitrary number of possibly unboxed return values, some of
-which will be in registers, and the others will be on the stack.  We
-always organise the stack-resident fields into pointers &
-non-pointers, and pass the number of each to the heap check code. -}
-
-unbxTupleHeapCheck
-        :: [(Id, GlobalReg)]    -- Live registers
-        -> WordOff      -- no. of stack slots containing ptrs
-        -> WordOff      -- no. of stack slots containing nonptrs
-        -> CmmAGraph    -- code to insert in the failure path
-        -> FCode ()
-        -> FCode ()
-
-unbxTupleHeapCheck regs ptrs nptrs fail_code code
-  -- We can't manage more than 255 pointers/non-pointers
-  -- in a generic heap check.
-  | ptrs > 255 || nptrs > 255 = panic "altHeapCheck"
-  | otherwise
-  = initHeapUsage $ \ hpHw -> do
-        { codeOnly $ do { do_checks 0 {- no stack check -} hpHw
-                                    full_fail_code rts_label
-                        ; tickyAllocHeap hpHw }
-        ; setRealHp hpHw
-        ; code }
-  where
-    full_fail_code  = fail_code `plusStmts` oneStmt assign_liveness
-    assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9))      -- Ho ho ho!
-                                (CmmLit (mkWordCLit liveness))
-    liveness        = mkRegLiveness regs ptrs nptrs
-    rts_label       = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_ut")))
-
-
-{- Old Gransim com -- I have no idea whether it still makes sense (SLPJ Sep07)
-For GrAnSim the code for doing a heap check and doing a context switch
-has been separated. Especially, the HEAP_CHK macro only performs a
-heap check. THREAD_CONTEXT_SWITCH should be used for doing a context
-switch. GRAN_FETCH_AND_RESCHEDULE must be put at the beginning of
-every slow entry code in order to simulate the fetching of
-closures. If fetching is necessary (i.e. current closure is not local)
-then an automatic context switch is done. -}
-
-
-When failing a check, we save a return address on the stack and
-jump to a pre-compiled code fragment that saves the live registers
-and returns to the scheduler.
-
-The return address in most cases will be the beginning of the basic
-block in which the check resides, since we need to perform the check
-again on re-entry because someone else might have stolen the resource
-in the meantime.
-
-%************************************************************************
-%*                                                                      *
-     Generic Heap/Stack Checks - used in the RTS
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-hpChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-hpChkGen bytes liveness reentry
-  = do_checks' bytes True assigns stg_gc_gen
-  where
-    assigns = mkStmts [
-                CmmAssign (CmmGlobal (VanillaReg 9))  liveness,
-                CmmAssign (CmmGlobal (VanillaReg 10)) reentry
-                ]
-
--- a heap check where R1 points to the closure to enter on return, and
--- we want to assign to Sp[0] on failure (used in AutoApply.cmm:BUILD_PAP).
-hpChkNodePointsAssignSp0 :: CmmExpr -> CmmExpr -> FCode ()
-hpChkNodePointsAssignSp0 bytes sp0
-  = do_checks' bytes True assign stg_gc_enter1
-  where assign = oneStmt (CmmStore (CmmReg spReg) sp0)
-
-stg_gc_gen    = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_gen")))
-\end{code}
-
--}

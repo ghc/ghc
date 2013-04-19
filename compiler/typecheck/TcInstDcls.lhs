@@ -1229,7 +1229,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     ----------------------
     mk_meth_spec_prags :: Id -> [LTcSpecPrag] -> TcSpecPrags
-        -- Adapt the SPECIALISE pragmas to work for this method Id
+        -- Adapt the 'SPECIALISE instance' pragmas to work for this method Id
         -- There are two sources:
         --   * spec_prags_for_me: {-# SPECIALISE op :: <blah> #-}
         --   * spec_prags_from_inst: derived from {-# SPECIALISE instance :: <blah> #-}

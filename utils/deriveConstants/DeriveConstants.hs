@@ -365,6 +365,7 @@ wanteds = concat
           ,closurePayload C "StgClosure" "payload"
 
           ,structFieldH Both "StgEntCounter" "allocs"
+          ,structFieldH Both "StgEntCounter" "allocd"
           ,structField  Both "StgEntCounter" "registeredp"
           ,structField  Both "StgEntCounter" "link"
           ,structField  Both "StgEntCounter" "entry_count"

@@ -64,7 +64,7 @@ else ifneq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = NO
 else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = YES
-else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+else ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_WANT_INPLACE_WRAPPER = YES
 else
 $1_$2_WANT_INPLACE_WRAPPER = NO
@@ -136,7 +136,7 @@ $(call shell-wrapper,$1,$2)
 ifeq "$$($1_$2_PROGRAM_WAY)" ""
 ifeq "$3" "0"
 $1_$2_PROGRAM_WAY = v
-else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+else ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_PROGRAM_WAY = dyn
 else
 $1_$2_PROGRAM_WAY = v
@@ -183,21 +183,10 @@ ifeq "$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS)" ""
 $1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS += -no-auto-link-packages -no-hs-main
 endif
 
-# XXX
-# ifneq "$3" "0"
-# ifeq "$$(TargetOS_CPP)" "linux"
-# $1_$2_dyn_GHC_LD_OPTS += \
-#     -fno-use-rpaths \
-#     $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
-# else ifeq "$$(TargetOS_CPP)" "darwin"
-# $1_$2_dyn_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
-# endif
-# endif
-
 ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
-$1/$2/build/tmp/$$($1_$2_PROG) : \
+$1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
     $$(foreach dep,$$($1_$2_DEPS),\
         $$(if $$(filter ghc%,$$(dep)),\
             $(if $(filter 0,$3),$$(compiler_stage1_PROGRAM_DEP_LIB),\
@@ -206,6 +195,13 @@ $1/$2/build/tmp/$$($1_$2_PROG) : \
             $$(error Bad build stage)))),\
         $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
 
+ifeq "$$(Windows_Host) $$($1_$2_PROGRAM_WAY)" "YES dyn"
+$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG).c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_HC) -no-hs-main -optc-g -optc-O0 $$< -o $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG).dll : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
+	$$(call build-dll,$1,$2,$$($1_$2_PROGRAM_WAY),,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS),$$@)
+else
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
@@ -223,6 +219,7 @@ endif
 else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+endif
 endif
 
 # Note [lib-depends] if this program is built with stage1 or greater, we

@@ -1,10 +1,4 @@
 {-# LANGUAGE GADTs, NoMonoLocalBinds #-}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 -- Norman likes local bindings
 -- If this module lives on I'd like to get rid of the NoMonoLocalBinds
@@ -164,7 +158,7 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- 1. Build a table of all the CAFs used in the procedure.
 -- 2. Compute the C_SRT describing the subset of CAFs live at each procpoint.
 --
--- When building the local view of the SRT, we first make sure that all the CAFs are 
+-- When building the local view of the SRT, we first make sure that all the CAFs are
 -- in the SRT. Then, if the number of CAFs is small enough to fit in a bitmap,
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
@@ -240,7 +234,7 @@ to_SRT dflags top_srt off len bmp
        return (Just tbl, C_SRT srt_desc_lbl 0 (srtEscape dflags))
   | otherwise
   = return (Nothing, C_SRT top_srt off (toStgHalfWord dflags (fromStgWord (head bmp))))
-	-- The fromIntegral converts to StgHalfWord
+        -- The fromIntegral converts to StgHalfWord
 
 -- Gather CAF info for a procedure, but only if the procedure
 -- doesn't have a static closure.

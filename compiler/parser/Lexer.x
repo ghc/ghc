@@ -679,7 +679,7 @@ reservedSymsFM = listToUFM $
        ,("->",  ITrarrow,   always)
        ,("@",   ITat,       always)
        ,("~",   ITtilde,    always)
-       ,("~#",  ITtildehsh, always)
+       ,("~#",  ITtildehsh, magicHashEnabled)
        ,("=>",  ITdarrow,   always)
        ,("-",   ITminus,    always)
        ,("!",   ITbang,     always)

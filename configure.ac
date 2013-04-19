@@ -117,6 +117,9 @@ if test "$WithGhc" != ""; then
 
   BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os])
   BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
+  dnl ToDo, once "ld command" is reliably available.
+  dnl Then, we can remove the LD_STAGE0 hack in mk/build-package-date.mk
+  dnl BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
   if test "x$OS_STAGE0" != "xOSDarwin"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
     BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
@@ -148,8 +151,9 @@ then
     fi
 fi
 
-GHC_PACKAGE_DB_FLAG=package-db
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
+                    GHC_PACKAGE_DB_FLAG=package-conf,
+                    GHC_PACKAGE_DB_FLAG=package-db)
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
@@ -554,6 +558,7 @@ FP_PROG_LD_ReduceMemoryOverheads
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
 FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
 
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])

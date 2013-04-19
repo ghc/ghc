@@ -6,6 +6,7 @@
  ("ld flags", "@SettingsLdFlags@"),
  ("ld supports compact unwind", "@LdHasNoCompactUnwind@"),
  ("ld supports build-id", "@LdHasBuildId@"),
+ ("ld supports filelist", "@LdHasFilelist@"),
  ("ld is GNU ld", "@LdIsGNULd@"),
  ("ar command", "@SettingsArCommand@"),
  ("ar flags", "@ArArgs@"),

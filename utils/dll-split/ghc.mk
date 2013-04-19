@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 #
-# (c) 2010 The University of Glasgow
+# (c) 2009 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -10,12 +10,9 @@
 #
 # -----------------------------------------------------------------------------
 
-# $1 = paths to prepend
-ifeq "$(TargetOS_CPP)" "mingw32"
-prependLibraryPath = $(error Do not know how to prependLibraryPath on Windows)
-else ifeq "$(TargetOS_CPP)" "darwin"
-prependLibraryPath = export DYLD_LIBRARY_PATH="$1:$$DYLD_LIBRARY_PATH"
-else
-prependLibraryPath = export LD_LIBRARY_PATH="$1:$$LD_LIBRARY_PATH"
-endif
-
+utils/dll-split_USES_CABAL                   = YES
+utils/dll-split_PACKAGE                      = dll-split
+utils/dll-split_dist-install_PROGNAME        = dll-split
+utils/dll-split_dist-install_INSTALL         = NO
+utils/dll-split_dist-install_INSTALL_INPLACE = YES
+$(eval $(call build-prog,utils/dll-split,dist-install,1))

@@ -79,8 +79,8 @@ $1_$2_HSC2HS_LD_OPTS:=$$(shell for i in $$($1_$2_DIST_LD_OPTS); do echo \'--lfla
 endif
 
 $1_$2_ALL_HSC2HS_OPTS = \
- --cc=$$(CC_STAGE$3) \
- --ld=$$(CC_STAGE$3) \
+ '--cc=$$(CC_STAGE$3)' \
+ '--ld=$$(CC_STAGE$3)' \
  $$(CONF_HSC2HS_OPTS) \
  $$(SRC_HSC2HS_OPTS) \
  $$(SRC_HSC2HS_OPTS_STAGE$3) \
@@ -96,7 +96,7 @@ $1_$2_ALL_HSC2HS_OPTS = \
 
 $1_$2_ALL_ALEX_OPTS = \
  $$(CONF_ALEX_OPTS) \
- $$(SRC_ALEX_OPTS)
+ $$(SRC_ALEX_OPTS) \
  $$($1_ALEX_OPTS) \
  $$($1_$2_ALEX_OPTS) \
  $$(EXTRA_ALEX_OPTS)

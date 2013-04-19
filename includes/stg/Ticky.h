@@ -59,24 +59,26 @@ EXTERN StgInt ENT_PAP_ctr INIT(0);
 EXTERN StgInt ENT_AP_ctr INIT(0);
 EXTERN StgInt ENT_AP_STACK_ctr INIT(0);
 EXTERN StgInt ENT_BH_ctr INIT(0);
+EXTERN StgInt ENT_LNE_ctr INIT(0);
 
 EXTERN StgInt UNKNOWN_CALL_ctr INIT(0);
 
-EXTERN StgInt SLOW_CALL_v_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_f_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_d_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_l_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_n_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_p_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_pv_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_pp_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_ppv_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_ppp_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_pppv_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_pppp_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_ppppp_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_pppppp_ctr INIT(0);
-EXTERN StgInt SLOW_CALL_OTHER_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_v16_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_v_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_f_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_d_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_l_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_n_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_p_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_pv_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_pp_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_ppv_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_ppp_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_pppv_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_pppp_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_ppppp_ctr INIT(0);
+EXTERN StgInt SLOW_CALL_fast_pppppp_ctr INIT(0);
+EXTERN StgInt VERY_SLOW_CALL_ctr INIT(0);
 
 EXTERN StgInt ticky_slow_call_unevald;
 EXTERN StgInt SLOW_CALL_ctr INIT(0);
@@ -107,12 +109,18 @@ EXTERN StgInt UPD_PAP_IN_NEW_ctr INIT(0);
 EXTERN StgInt UPD_PAP_IN_PLACE_ctr INIT(0);
 
 EXTERN StgInt ALLOC_HEAP_ctr INIT(0);
-EXTERN StgInt ALLOC_HEAP_tot;
+EXTERN StgInt ALLOC_HEAP_tot INIT(0);
+
+EXTERN StgInt HEAP_CHK_ctr INIT(0);
+EXTERN StgInt STK_CHK_ctr INIT(0);
+
+EXTERN StgInt ALLOC_RTS_ctr INIT(0);
+EXTERN StgInt ALLOC_RTS_tot INIT(0);
 
 EXTERN StgInt ALLOC_FUN_ctr INIT(0);
-EXTERN StgInt ALLOC_FUN_adm;
-EXTERN StgInt ALLOC_FUN_gds;
-EXTERN StgInt ALLOC_FUN_slp;
+EXTERN StgInt ALLOC_FUN_adm INIT(0);
+EXTERN StgInt ALLOC_FUN_gds INIT(0);
+EXTERN StgInt ALLOC_FUN_slp INIT(0);
 
 EXTERN StgInt UPD_NEW_IND_ctr INIT(0);
 EXTERN StgInt UPD_NEW_PERM_IND_ctr INIT(0);
@@ -184,11 +192,14 @@ EXTERN StgInt RET_SEMI_loads_avoided INIT(0);
    TICKY_TICKY is defined or not. */
   
 #ifndef CMINUSMINUS
+#define TICK_BUMP_BY(ctr,n) ctr = (StgInt) ctr + n
+#define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
+
 #define TICK_ALLOC_PRIM(x,y,z)
 #define TICK_UPD_OLD_IND()
 #define TICK_UPD_NEW_IND()
 #define TICK_UPD_SQUEEZED()
-#define TICK_ALLOC_HEAP_NOCTR(x)
+#define TICK_ALLOC_HEAP_NOCTR(bytes)
 #define TICK_GC_FAILED_PROMOTION()
 #define TICK_ALLOC_TSO()
 #define TICK_ALLOC_STACK(g)

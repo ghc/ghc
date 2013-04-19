@@ -1,9 +1,5 @@
 {-# LANGUAGE GADTs #-}
 
-{-# OPTIONS_GHC -fno-warn-deprecations #-}
--- Warnings from deprecated blockToNodeList
-
-
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.
@@ -42,8 +38,8 @@ module CmmUtils(
         blankWord,
 
         -- Tagging
-        cmmTagMask, cmmPointerMask, cmmUntag, cmmGetTag, cmmIsTagged,
-        cmmConstrTag, cmmConstrTag1,
+        cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
+        cmmConstrTag1,
 
         -- Liveness and bitmaps
         mkLiveness,
@@ -371,19 +367,16 @@ cmmPointerMask dflags = mkIntExpr dflags (complement (tAG_MASK dflags))
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged
-cmmUntag, cmmGetTag :: DynFlags -> CmmExpr -> CmmExpr
+cmmUntag :: DynFlags -> CmmExpr -> CmmExpr
 cmmUntag _ e@(CmmLit (CmmLabel _)) = e
 -- Default case
 cmmUntag dflags e = cmmAndWord dflags e (cmmPointerMask dflags)
-
-cmmGetTag dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 
 -- Test if a closure pointer is untagged
 cmmIsTagged :: DynFlags -> CmmExpr -> CmmExpr
 cmmIsTagged dflags e = cmmNeWord dflags (cmmAndWord dflags e (cmmTagMask dflags)) (zeroExpr dflags)
 
-cmmConstrTag, cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
-cmmConstrTag dflags e = cmmSubWord dflags (cmmAndWord dflags e (cmmTagMask dflags)) (mkIntExpr dflags 1)
+cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
 -- Get constructor tag, but one based.
 cmmConstrTag1 dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 

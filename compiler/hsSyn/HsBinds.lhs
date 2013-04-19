@@ -7,18 +7,11 @@
 Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module HsBinds where
 
-import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr, 
+import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                MatchGroup, pprFunBind,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
@@ -32,7 +25,7 @@ import Type
 import Name
 import NameSet
 import BasicTypes
-import Outputable	
+import Outputable
 import SrcLoc
 import Var
 import Bag
@@ -368,9 +361,9 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
-  = hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars) 
+  = hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars)
                                   <+> brackets (interpp'SP dictvars))
-       2 $ braces $ vcat 
+       2 $ braces $ vcat
     [ ptext (sLit "Exports:") <+> brackets (sep (punctuate comma (map ppr exports)))
     , ptext (sLit "Exported types:") <+> vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
     , ptext (sLit "Binds:") <+> pprLHsBinds val_binds

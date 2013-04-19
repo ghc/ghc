@@ -506,21 +506,16 @@ isPromotableType :: NameSet -> Type -> Bool
 -- Must line up with DataCon.promoteType
 -- But the function lives here because we must treat the
 -- *recursive* tycons as promotable
-isPromotableType rec_tcs ty
-  = case splitForAllTys ty of
-      (_, rho) -> go rho
+isPromotableType rec_tcs con_arg_ty
+  = go con_arg_ty
   where
-    go (TyConApp tc tys) 
-      | tys `lengthIs` tyConArity tc 
-      ,  tyConName tc `elemNameSet` rec_tcs 
-      || isJust (promotableTyCon_maybe tc) 
-                       = all go tys
-      | otherwise      = False
-    go (FunTy arg res) = go arg && go res
-    go (AppTy arg res) = go arg && go res
-    go (ForAllTy _ ty) = go ty
-    go (TyVarTy {})    = True
-    go (LitTy {})      = False
+    go (TyConApp tc tys) =  tys `lengthIs` tyConArity tc 
+                         && (tyConName tc `elemNameSet` rec_tcs 
+                             || isJust (promotableTyCon_maybe tc))
+                         && all go tys
+    go (FunTy arg res) 	 = go arg && go res
+    go (TyVarTy {})    	 = True
+    go _               	 = False
 \end{code}
 
 

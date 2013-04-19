@@ -111,6 +111,12 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 else
 	@echo 'cLibFFI               = False'                               >> $@
 endif
+	@echo 'cDYNAMIC_GHC_PROGRAMS :: Bool'                               >> $@
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
+	@echo 'cDYNAMIC_GHC_PROGRAMS = True'                                >> $@
+else
+	@echo 'cDYNAMIC_GHC_PROGRAMS = False'                               >> $@
+endif
 	@echo done.
 
 # -----------------------------------------------------------------------------
@@ -295,14 +301,6 @@ endif
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=ghci
 
-ifeq "$(BuildSharedLibs)" "YES"
-# There are too many symbols to make a Windows DLL for the ghc package,
-# so we don't build it the dyn way; see trac #5987
-ifneq "$(TargetOS_CPP)" "mingw32"
-compiler_stage2_CONFIGURE_OPTS += --enable-shared
-endif
-endif
-
 ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?
@@ -403,13 +401,14 @@ compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
 
-ifeq "$(TargetOS_CPP)" "mingw32"
-# There are too many symbols to make a Windows DLL for the ghc package,
-# so we don't build it the dyn way; see trac #5987
-compiler_stage1_EXCLUDED_WAYS := dyn
-compiler_stage2_EXCLUDED_WAYS := dyn
-compiler_stage3_EXCLUDED_WAYS := dyn
-endif
+# There are too many symbols in the ghc package for a Windows DLL.
+# We therefore need to split some of the modules off into a separate
+# DLL. This clump are the modules reachable from DynFlags:
+compiler_stage2_dll0_START_MODULE = DynFlags
+compiler_stage2_dll0_MODULES = Annotations Avail Bag BasicTypes Binary Bitmap BlockId BreakArray BufWrite ByteCodeAsm ByteCodeInstr ByteCodeItbls ByteCodeLink CLabel Class CmdLineParser Cmm CmmCallConv CmmExpr CmmInfo CmmMachOp CmmNode CmmType CmmUtils CoAxiom CodeGen.Platform CodeGen.Platform.ARM CodeGen.Platform.NoRegs CodeGen.Platform.PPC CodeGen.Platform.PPC_Darwin CodeGen.Platform.SPARC CodeGen.Platform.X86 CodeGen.Platform.X86_64 Coercion Config Constants CoreArity CoreFVs CoreSubst CoreSyn CoreTidy CoreUnfold CoreUtils CostCentre DataCon Demand Digraph DriverPhases DynFlags Encoding ErrUtils Exception FamInstEnv FastBool FastFunctions FastMutInt FastString FastTypes Fingerprint FiniteMap ForeignCall Hoopl Hoopl.Dataflow HsBinds HsDecls HsDoc HsExpr HsImpExp HsLit HsPat HsSyn HsTypes HsUtils HscTypes Id IdInfo IfaceSyn IfaceType InstEnv InteractiveEvalTypes Kind ListSetOps Literal Maybes MkCore MkGraph MkId Module MonadUtils Name NameEnv NameSet ObjLink OccName OccurAnal OptCoercion OrdList Outputable PackageConfig Packages Pair Panic Platform PlatformConstants PprCmm PprCmmDecl PprCmmExpr PprCore PrelNames PrelRules Pretty PrimOp RdrName Reg RegClass Rules SMRep Serialized SrcLoc StaticFlags StgCmmArgRep StgCmmClosure StgCmmEnv StgCmmLayout StgCmmMonad StgCmmProf StgCmmTicky StgCmmUtils StgSyn Stream StringBuffer TcEvidence TcType TyCon Type TypeRep TysPrim TysWiredIn Unify UniqFM UniqSet UniqSupply Unique Util Var VarEnv VarSet
+
+compiler_stage2_dll0_HS_OBJS = \
+    $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))
 
 # if stage is set to something other than "1" or "", disable stage 1
 ifneq "$(filter-out 1,$(stage))" ""
@@ -489,20 +488,13 @@ $(foreach way,$(compiler_stage3_WAYS),\
 # switch off the recompilation checker for that module:
 compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
 
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
+compiler/utils/Util_HC_OPTS += -DDYNAMIC_GHC_PROGRAMS
+endif
+
 # LibFFI.hs #includes ffi.h
 ifneq "$(UseSystemLibFFI)" "YES"
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)
-endif
-
-# On Windows it seems we also need to link directly to libffi
-ifeq "$(HostOS_CPP)" "mingw32"
-define windowsDynLinkToFfi
-# $1 = way
-ifneq "$$(findstring dyn, $1)" ""
-compiler_stage2_$1_ALL_HC_OPTS += -l$$(LIBFFI_WINDOWS_LIB)
-endif
-endef
-$(foreach way,$(GhcLibWays),$(eval $(call windowsDynLinkToFfi,$(way))))
 endif
 
 # Note [munge-stage1-package-config]
