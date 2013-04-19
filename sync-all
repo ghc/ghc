@@ -506,6 +506,42 @@ sub gitall {
         elsif ($command eq "tag") {
             &git($localpath, "tag", @args);
         }
+        elsif ($command eq "compare") {
+            # Don't compare the subrepos; it doesn't work properly as
+            # they aren't on a branch.
+            next if $remotepath eq "-";
+
+            my $compareto;
+            if ($#args eq -1) {
+                $compareto = $path;
+            }
+            elsif ($#args eq 0) {
+                $compareto = "$args[0]/$localpath";
+            }
+            elsif ($#args eq 1 && $args[0] eq "-b") {
+                $compareto = "$args[1]/$remotepath";
+            }
+            else {
+                die "Bad args for compare";
+            }
+            print "$localpath";
+            print (' ' x (40 - length($localpath)));
+            my $branch = &readgit($localpath, "rev-parse", "--abbrev-ref", "HEAD");
+            die "Bad branch: $branch"
+                unless $branch =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+            my $us   = &readgit(".", "ls-remote", $localpath, "refs/heads/$branch");
+            my $them = &readgit(".", "ls-remote", $compareto, "refs/heads/$branch");
+            $us   =~ s/[[:space:]].*//;
+            $them =~ s/[[:space:]].*//;
+            die "Bad commit of mine: $us"     unless (length($us)   eq 40);
+            die "Bad commit of theirs: $them" unless (length($them) eq 40);
+            if ($us eq $them) {
+                print "same\n";
+            }
+            else {
+                print "DIFFERENT\n";
+            }
+        }
         else {
             die "Unknown command: $command";
         }
@@ -577,6 +613,17 @@ remote set-url [--push] <remote-name>
     repos to use" below). For a repository on the local filesystem it
     would point to the ghc repository, and for a remote repository it
     points to the directory containing "ghc.git".
+
+compare
+compare reporoot
+compare -b reporoot
+
+    Compare the git HEADs of the repos to the origin repos, or the
+    repos under reporoot (which is assumde to be a checked-out tree
+    unless the -b flag is used).
+
+    1 line is printed for each repo, indicating whether the repo is
+    at the "same" or a "DIFFERENT" commit.
 
 These commands just run the equivalent git command on each repository, passing
 any extra arguments to git:
