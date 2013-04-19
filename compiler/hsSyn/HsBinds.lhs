@@ -575,22 +575,22 @@ ppr_sig (TypeSig vars ty)         = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (GenericSig vars ty)      = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (IdSig id)                = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig fix_sig)          = ppr fix_sig
-ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec var (ppr ty) inl)
-ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
+ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec (unLoc var) (ppr ty) inl)
+ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 
-instance Outputable name => Outputable (FixitySig name) where
-  ppr (FixitySig name fixity) = sep [ppr fixity, ppr name]
+instance OutputableBndr name => Outputable (FixitySig name) where
+  ppr (FixitySig name fixity) = sep [ppr fixity, pprInfixOcc (unLoc name)]
 
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}")
 
-pprVarSig :: (Outputable id) => [id] -> SDoc -> SDoc
+pprVarSig :: (OutputableBndr id) => [id] -> SDoc -> SDoc
 pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
   where
-    pprvars = hsep $ punctuate comma (map ppr vars)
+    pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
-pprSpec :: (Outputable id) => id -> SDoc -> InlinePragma -> SDoc
+pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma -> SDoc
 pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty

@@ -1555,7 +1555,7 @@ pprHsSigCtxt ctxt hs_ty = sep [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> co
     pp_sig (ForSigCtxt n)  = pp_n_colon n
     pp_sig _               = ppr (unLoc hs_ty)
 
-    pp_n_colon n = ppr n <+> dcolon <+> ppr (unLoc hs_ty)
+    pp_n_colon n = pprPrefixOcc n <+> dcolon <+> ppr (unLoc hs_ty)
 
 badPatSigTvs :: TcType -> [TyVar] -> SDoc
 badPatSigTvs sig_ty bad_tvs

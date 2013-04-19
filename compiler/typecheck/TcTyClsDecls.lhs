@@ -1733,7 +1733,7 @@ dataConCtxt con = ptext (sLit "In the definition of data constructor") <+> quote
 
 classOpCtxt :: Var -> Type -> SDoc
 classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
-                              nest 2 (ppr sel_id <+> dcolon <+> ppr tau)]
+                              nest 2 (pprPrefixOcc sel_id <+> dcolon <+> ppr tau)]
 
 nullaryClassErr :: Class -> SDoc
 nullaryClassErr cls

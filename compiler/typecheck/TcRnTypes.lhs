@@ -1480,7 +1480,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol (FunSigCtxt f) ty)
                             = hang (ptext (sLit "the type signature for"))
-                                 2 (ppr f <+> dcolon <+> ppr ty)
+                                 2 (pprPrefixOcc f <+> dcolon <+> ppr ty)
 pprSkolInfo (SigSkol cx ty) = hang (pprUserTypeCtxt cx <> colon)
                                  2 (ppr ty)
 pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter bindings for")

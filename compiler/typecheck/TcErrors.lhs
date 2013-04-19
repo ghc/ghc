@@ -1164,7 +1164,7 @@ relevantBindings ctxt ct
        | otherwise
        = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
             ; let id_tvs = tyVarsOfType tidy_ty
-                  doc = sep [ ppr id <+> dcolon <+> ppr tidy_ty
+                  doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
 		            , nest 2 (parens (ptext (sLit "bound at")
 			    	 <+> ppr (getSrcLoc id)))]
             ; if id_tvs `intersectsVarSet` ct_tvs 
