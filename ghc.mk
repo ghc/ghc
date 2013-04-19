@@ -1081,7 +1081,7 @@ SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
     ghc.spec.in ghc.spec settings.in VERSION \
-    boot boot-pkgs packages ghc.mk
+    boot packages ghc.mk
 
 VERSION :
 	echo $(ProjectVersion) >VERSION
