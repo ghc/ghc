@@ -390,7 +390,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
         occurs_once = not (l `elemRegSet` live)
                       && lookupUFM usages l == Just 1
 
-        inl_node = mapExpDeep inline node
+        inl_node = mapExpDeep inline node   -- mapExpDeep is where the inlining actually takes place!
            where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
                  inline (CmmRegOff (CmmLocal l') off) | l == l'
                     = cmmOffset dflags rhs off
