@@ -18,76 +18,20 @@ my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo
 
 my %tags;
 
-# Figure out where to get the other repositories from.
-sub getrepo {
-    my $repo;
+sub inDir {
+    my $dir = shift;
+    my $code = shift;
 
-    if (defined($defaultrepo)) {
-        $repo = $defaultrepo;
-        chomp $repo;
-    } else {
-        # Figure out where to get the other repositories from,
-        # based on where this GHC repo came from.
-        my $git_dir = $bare_flag ? "--git-dir=ghc.git" : "";
-        my $branch  = `git $git_dir rev-parse --abbrev-ref HEAD`;          chomp $branch;
-        my $remote  = `git $git_dir config branch.$branch.remote`;         chomp $remote;
-        if ($remote eq "") {
-            # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
-            $remote = "origin";
-        }
-        $repo       = `git $git_dir config remote.$remote.url`;            chomp $repo;
+    if ($dir ne '.') {
+        chdir($dir);
     }
 
-    my $repo_base;
-    my $checked_out_tree;
+    my $result = &$code();
 
-    if ($repo =~ /^...*:/) {
-        # HTTP or SSH
-        # Above regex says "at least two chars before the :", to avoid
-        # catching Win32 drives ("C:\").
-        $repo_base = $repo;
-
-        # --checked-out is needed if you want to use a checked-out repo
-        # over SSH or HTTP
-        if ($checked_out_flag) {
-            $checked_out_tree = 1;
-        } else {
-            $checked_out_tree = 0;
-        }
-
-        # Don't drop the last part of the path if specified with -r, as
-        # it expects repos of the form:
-        #
-        #   http://darcs.haskell.org
-        #
-        # rather than
-        #
-        #   http://darcs.haskell.org/ghc
-        #
-        if (!$defaultrepo) {
-            $repo_base =~ s#/[^/]+/?$##;
-        }
+    if ($dir ne '.') {
+        chdir($initial_working_directory);
     }
-    elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
-        # Local filesystem, either absolute (C:/ or /) or relative (../) path
-        $repo_base = $repo;
-        if (-f "$repo/HEAD") {
-            # assume a local mirror:
-            $checked_out_tree = 0;
-            $repo_base =~ s#/[^/]+/?$##;
-        } elsif (-d "$repo/ghc.git") {
-            # assume a local mirror:
-            $checked_out_tree = 0;
-        } else {
-            # assume a checked-out tree:
-            $checked_out_tree = 1;
-        }
-    }
-    else {
-        die "Couldn't work out repo";
-    }
-
-    return $repo_base, $checked_out_tree;
+    return $result;
 }
 
 sub parsePackages {
@@ -161,42 +105,121 @@ sub gitNewWorkdir {
     }
 }
 
+sub git {
+    my $dir = shift;
+    my @args = @_;
+
+    &inDir($dir, sub {
+        my $prefix = $dir eq '.' ? "" : "$dir: ";
+        message "== ${prefix}running git @args";
+
+        system ("git", @args) == 0
+            or $ignore_failure
+            or die "git failed: $?";
+    });
+}
+
+sub readgit {
+    my $dir = shift;
+    my @args = @_;
+
+    &inDir($dir, sub {
+        open my $fh, '-|', 'git', @args
+            or die "Executing git @args failed: $!";
+        my $line = <$fh>;
+        $line = "" unless defined($line);
+        chomp $line;
+        close $fh;
+        return $line;
+    });
+}
+
 sub configure_repository {
     my $localpath = shift;
 
     &git($localpath, "config", "--local", "core.ignorecase", "true");
 
-    chdir($localpath);
-    open my $git_autocrlf, '-|', 'git', 'config', '--get', 'core.autocrlf'
-        or die "Executing git config failed: $!";
-    my $autocrlf = <$git_autocrlf>;
-    $autocrlf = "" unless defined($autocrlf);
-    chomp $autocrlf;
-    close($git_autocrlf);
-    chdir($initial_working_directory);
+    my $autocrlf = &readgit($localpath, 'config', '--get', 'core.autocrlf');
     if ($autocrlf eq "true") {
         &git($localpath, "config", "--local", "core.autocrlf", "false");
         &git($localpath, "reset", "--hard");
     }
 }
 
-sub git {
-    my $dir = shift;
+# Figure out where to get the other repositories from.
+sub getrepo {
+    my $repo;
 
-    if ($dir eq '.') {
-        message "== running git @_";
+    if (defined($defaultrepo)) {
+        $repo = $defaultrepo;
+        chomp $repo;
     } else {
-        message "== $dir: running git @_";
-        chdir($dir);
+        # Figure out where to get the other repositories from,
+        # based on where this GHC repo came from.
+        my $git_dir = $bare_flag ? "ghc.git" : ".";
+        my $branch = &readgit($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
+        die "Bad branch: $branch"
+            unless $branch =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+        my $remote = &readgit($git_dir, "config", "branch.$branch.remote");
+        if ($remote eq "") {
+            # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
+            $remote = "origin";
+        }
+        die "Bad remote: $remote"
+            unless $remote =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+        $repo = &readgit($git_dir, "config", "remote.$remote.url");
     }
 
-    system ("git", @_) == 0
-        or $ignore_failure
-        or die "git failed: $?";
+    my $repo_base;
+    my $checked_out_tree;
 
-    if ($dir ne '.') {
-        chdir($initial_working_directory);
+    if ($repo =~ /^...*:/) {
+        # HTTP or SSH
+        # Above regex says "at least two chars before the :", to avoid
+        # catching Win32 drives ("C:\").
+        $repo_base = $repo;
+
+        # --checked-out is needed if you want to use a checked-out repo
+        # over SSH or HTTP
+        if ($checked_out_flag) {
+            $checked_out_tree = 1;
+        } else {
+            $checked_out_tree = 0;
+        }
+
+        # Don't drop the last part of the path if specified with -r, as
+        # it expects repos of the form:
+        #
+        #   http://darcs.haskell.org
+        #
+        # rather than
+        #
+        #   http://darcs.haskell.org/ghc
+        #
+        if (!$defaultrepo) {
+            $repo_base =~ s#/[^/]+/?$##;
+        }
     }
+    elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
+        # Local filesystem, either absolute (C:/ or /) or relative (../) path
+        $repo_base = $repo;
+        if (-f "$repo/HEAD") {
+            # assume a local mirror:
+            $checked_out_tree = 0;
+            $repo_base =~ s#/[^/]+/?$##;
+        } elsif (-d "$repo/ghc.git") {
+            # assume a local mirror:
+            $checked_out_tree = 0;
+        } else {
+            # assume a checked-out tree:
+            $checked_out_tree = 1;
+        }
+    }
+    else {
+        die "Couldn't work out repo";
+    }
+
+    return $repo_base, $checked_out_tree;
 }
 
 sub gitall {
@@ -375,13 +398,7 @@ sub gitall {
                 }
                 close($lsremote);
 
-                open my $revparse, '-|', 'git', 'rev-parse', '--verify', 'HEAD'
-                    or die "Executing rev-parse failed: $!";
-                my $myhead;
-                $myhead = <$revparse>;
-                    # or die "Failed to read from rev-parse: $!";
-                chomp $myhead;
-                close($revparse);
+                my $myhead = &readgit('.', 'rev-parse', '--verify', 'HEAD');
 
                 if (not defined($remote_heads{$myhead})) {
                     die "Sub module $localpath needs to be pushed; see http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream";
