@@ -16,8 +16,8 @@ Derived instances:
       (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
       = GenDerivOutput1_0.Nil
     GHC.Generics.to1
-      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.:*: (GHC.Generics.M1 g1)
-                                                                           (GHC.Generics.M1 g2)))))
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
+                                                                             (GHC.Generics.M1 g2)))))
       = GenDerivOutput1_0.Cons
           (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   

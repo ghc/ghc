@@ -16,8 +16,8 @@ Derived instances:
       (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
       = GenDerivOutput.Nil
     GHC.Generics.to
-      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.:*: (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                                                                           (GHC.Generics.M1 (GHC.Generics.K1 g2))))))
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                                                             (GHC.Generics.M1 (GHC.Generics.K1 g2))))))
       = GenDerivOutput.Cons g1 g2
   
   instance GHC.Generics.Generic1 GenDerivOutput.List where
@@ -35,8 +35,8 @@ Derived instances:
       (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
       = GenDerivOutput.Nil
     GHC.Generics.to1
-      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.:*: (GHC.Generics.M1 g1)
-                                                                           (GHC.Generics.M1 g2)))))
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
+                                                                             (GHC.Generics.M1 g2)))))
       = GenDerivOutput.Cons
           (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
@@ -60,8 +60,8 @@ Derived instances:
       (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
       = GenDerivOutput.Empty
     GHC.Generics.to
-      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.:*: (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                                                                           (GHC.Generics.M1 (GHC.Generics.K1 g2))))))
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                                                             (GHC.Generics.M1 (GHC.Generics.K1 g2))))))
       = GenDerivOutput.Rose g1 g2
   
   instance GHC.Generics.Generic1 GenDerivOutput.Rose where
@@ -81,8 +81,8 @@ Derived instances:
       (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
       = GenDerivOutput.Empty
     GHC.Generics.to1
-      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.:*: (GHC.Generics.M1 g1)
-                                                                           (GHC.Generics.M1 g2)))))
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
+                                                                             (GHC.Generics.M1 g2)))))
       = GenDerivOutput.Rose
           (GHC.Generics.unPar1 g1)
           ((GHC.Base..)
