@@ -1047,7 +1047,7 @@ publish-docs:
 #
 
 # A source dist is built from a complete build tree, because we
-# require some extra files not contained in a darcs checkout: the
+# require some extra files not contained in a git checkout: the
 # output from Happy and Alex, for example.
 #
 # The steps performed by 'make dist' are as follows:
