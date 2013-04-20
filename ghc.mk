@@ -1288,7 +1288,7 @@ endif
 # hsc2hs is needed, e.g. to make the .hs files for hpc.
 phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
-# genprimopcode is needed ot make the .hs-incl files that are in the
+# genprimopcode is needed to make the .hs-incl files that are in the
 # ghc package.
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_c_asm)
