@@ -500,6 +500,11 @@ endif
 # --------------------------------
 # Misc package-related settings
 
+# Run Haddock for the packages that will be installed. We need to handle
+# compiler specially due to the different dist directory name.
+$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
+compiler_stage2_DO_HADDOCK = YES
+
 BOOT_PKG_CONSTRAINTS := \
     $(foreach d,$(PACKAGES_STAGE0),\
         $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
@@ -732,11 +737,6 @@ endif
 
 # -----------------------------------------------
 # Haddock-related bits
-
-# Run Haddock for the packages that will be installed. We need to handle
-# compiler specially due to the different dist directory name.
-$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
-compiler_stage2_DO_HADDOCK = YES
 
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
