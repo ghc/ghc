@@ -385,9 +385,6 @@ BIN_DIST_PREP_TAR_BZ2 = $(BIN_DIST_PREP_TAR).bz2
 BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 BIN_DIST_LIST         = bindist-list
 
-WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-$(TargetArch_CPP)-windows
-WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
-
 # -----------------------------------------------------------------------------
 # Utilities programs: flags 
 
@@ -685,10 +682,6 @@ endif
 HSCOLOUR_CMD   = @HSCOLOUR@
 
 TIME_CMD       = @TimeCmd@
-
-# Set this if you want to use Inno Setup to build a Windows installer
-# when you make a bindist
-ISCC_CMD       =
 
 #-----------------------------------------------------------------------------
 # DocBook XML stuff

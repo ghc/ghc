@@ -999,13 +999,6 @@ windows-binary-dist-prep:
 	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
 	cd bindistprep && "$(TAR_CMD)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
-windows-installer:
-ifeq "$(ISCC_CMD)" ""
-	@echo No ISCC_CMD, so not making installer
-else
-	"$(ISCC_CMD)" /O. /Fbindistprep/$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
-endif
-
 # tryTimes tries to run its third argument multiple times, until it
 # succeeds. Don't call it directly; call try10Times instead.
 # The first and second argument to tryTimes are lists of values.
@@ -1023,9 +1016,6 @@ try10Times = $(call tryTimes,,x x x x x x x x x x,$1) { echo Failed; false; }
 .PHONY: publish-binary-dist
 publish-binary-dist:
 	$(call try10Times,$(PublishCp) $(BIN_DIST_TAR_BZ2) $(PublishLocation)/dist)
-ifeq "$(mingw32_TARGET_OS)" "1"
-	$(call try10Times,$(PublishCp) $(WINDOWS_INSTALLER) $(PublishLocation)/dist)
-endif
 
 ifeq "$(mingw32_TARGET_OS)" "1"
 DOCDIR_TO_PUBLISH = $(BIN_DIST_INST_DIR)/doc
