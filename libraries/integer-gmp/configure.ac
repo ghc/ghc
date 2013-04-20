@@ -1,7 +1,7 @@
 AC_INIT([Haskell integer (GMP)], [0.1], [libraries@haskell.org], [integer])
 
 # Safety check: Ensure that we are in the correct source directory.
-AC_CONFIG_SRCDIR([cbits/mkGmpDerivedConstants.c])
+AC_CONFIG_SRCDIR([cbits/gmp-wrappers.cmm])
 
 AC_CANONICAL_TARGET
 

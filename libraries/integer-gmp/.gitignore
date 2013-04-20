@@ -4,7 +4,7 @@ config.log
 config.status
 configure
 dist-install/
-ghc.mk
+^/ghc.mk
 gmp/config.mk
 integer-gmp.buildinfo
 cbits/GmpDerivedConstants.h
