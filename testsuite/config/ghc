@@ -202,16 +202,25 @@ def get_compiler_info():
     except:
         config.package_conf_cache_file = ''
 
-    if compilerInfoDict["GHC Dynamic"] == "YES":
+    try:
+        if compilerInfoDict["GHC Dynamic"] == "YES":
+            ghcDynamic = True
+        elif compilerInfoDict["GHC Dynamic"] == "NO":
+            ghcDynamic = False
+        else:
+            raise 'Bad value for "GHC Dynamic"'
+    except KeyError:
+        # GHC < 7.7 doesn't have a "GHC Dynamic" field
+        ghcDynamic = False
+
+    if ghcDynamic:
         config.ghc_th_way_flags = "-dynamic"
         config.ghci_way_flags   = "-dynamic"
         config.ghc_th_way       = "dyn"
         config.ghc_plugin_way   = "dyn"
-    elif compilerInfoDict["GHC Dynamic"] == "NO":
+    else:
         config.ghc_th_way_flags = "-static"
         config.ghci_way_flags   = "-static"
         config.ghc_th_way       = "normal"
         config.ghc_plugin_way   = "normal"
-    else:
-        raise 'Bad value for "GHC Dynamic"'
 
