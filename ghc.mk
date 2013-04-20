@@ -1285,8 +1285,6 @@ endif
 # dependencies for those tools, so we build their dependency files
 # here.
 .PHONY: phase_0_builds
-phase_0_builds: $(utils/ghc-pkg_dist_depfile_haskell)
-phase_0_builds: $(utils/ghc-pkg_dist_depfile_c_asm)
 # hsc2hs is needed, e.g. to make the .hs files for hpc.
 phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
