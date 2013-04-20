@@ -1276,13 +1276,28 @@ endif
 # -----------------------------------------------------------------------------
 # Numbered phase targets
 
+# In phase 1, we'll be building dependency files for most things
+# built by the bootstrapping compiler while make is 'include'ing
+# makefiles. But in order to build dependency files, we'll need to
+# build any automatically generated .hs files, which means that
+# we'll need to be able to build any tools that generate .hs files
+# etc. But in order to do that, we need to already know the
+# dependencies for those tools, so we build their dependency files
+# here.
 .PHONY: phase_0_builds
 phase_0_builds: $(utils/ghc-pkg_dist_depfile_haskell)
 phase_0_builds: $(utils/ghc-pkg_dist_depfile_c_asm)
+# hsc2hs is needed, e.g. to make the .hs files for hpc.
 phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
+# genprimopcode is needed ot make the .hs-incl files that are in the
+# ghc package.
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_c_asm)
+# deriveConstants is used to create header files included in the
+# ghc package.
+phase_0_builds: $(utils/deriveConstants_dist_depfile_haskell)
+phase_0_builds: $(utils/deriveConstants_dist_depfile_c_asm)
 
 .PHONY: phase_1_builds
 phase_1_builds: $(PACKAGE_DATA_MKS)
