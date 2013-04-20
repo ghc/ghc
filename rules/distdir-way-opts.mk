@@ -140,6 +140,7 @@ $1_$2_$3_ALL_CC_OPTS = \
  $$($1_$2_DIST_GCC_CC_OPTS) \
  $$($1_$2_$3_CC_OPTS) \
  $$($$(basename $$<)_CC_OPTS) \
+ $$($1_$2_EXTRA_CC_OPTS) \
  $$(EXTRA_CC_OPTS)
 
 $1_$2_$3_GHC_CC_OPTS = \
@@ -148,6 +149,7 @@ $1_$2_$3_GHC_CC_OPTS = \
      $$($1_$2_DIST_CC_OPTS) \
      $$($1_$2_$3_CC_OPTS) \
      $$($$(basename $$<)_CC_OPTS) \
+     $$($1_$2_EXTRA_CC_OPTS) \
      $$(EXTRA_CC_OPTS)) \
  $$($1_$2_$3_MOST_HC_OPTS)
 

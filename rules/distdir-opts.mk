@@ -15,6 +15,10 @@
 
 define distdir-opts # args: $1 = dir, $2 = distdir, $3 = stage
 
+ifeq "$3" ""
+$$(error Stage not given for distdir-opts $1 $2)
+endif
+
 ifeq "$3" "0"
 # This is a bit of a hack.
 # If we are compiling something with the bootstrapping compiler on

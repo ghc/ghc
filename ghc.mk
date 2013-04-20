@@ -614,8 +614,10 @@ endif
 
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 BUILD_DIRS += libraries/integer-gmp/gmp
+BUILD_DIRS += libraries/integer-gmp/mkGmpDerivedConstants
 else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 BUILD_DIRS += libraries/integer-gmp/gmp
+BUILD_DIRS += libraries/integer-gmp/mkGmpDerivedConstants
 endif
 
 ifeq "$(CrossCompiling)-$(phase)" "YES-final"
