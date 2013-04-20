@@ -125,7 +125,10 @@ BuildVendor_CPP                 = @BuildVendor_CPP@
 LeadingUnderscore=@LeadingUnderscore@
 
 # Pin a suffix on executables? If so, what (Windows only).
-exeext=@exeext@
+exeext0=@exeext@
+exeext1=@exeext@
+exeext2=@exeext@
+exeext3=@exeext@
 soext=@soext@
 
 # Windows_Host=YES if on a Windows platform

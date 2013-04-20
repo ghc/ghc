@@ -33,7 +33,7 @@ endif
 ifneq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is set)
 endif
-$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext)
+$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext$3)
 endif
 
 ifeq "$$(findstring $3,0 1 2)" ""

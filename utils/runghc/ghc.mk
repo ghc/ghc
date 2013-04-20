@@ -32,7 +32,7 @@ install: install_runhaskell
 .PHONY: install_runhaskell
 ifeq "$(Windows_Host)" "YES"
 install_runhaskell: install_bins
-	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext) $(DESTDIR)$(bindir)/runhaskell$(exeext)
+	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext1) $(DESTDIR)$(bindir)/runhaskell$(exeext1)
 else
 install_runhaskell:
 	$(call removeFiles,"$(DESTDIR)$(bindir)/runhaskell")

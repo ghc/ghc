@@ -38,7 +38,7 @@ driver/ghci_dist_OTHER_OBJS = driver/ghci/ghci.res
 
 $(eval $(call build-prog,driver/ghci,dist,1))
 
-driver/ghci_dist_PROG_VER = ghci-$(ProjectVersion)$(exeext)
+driver/ghci_dist_PROG_VER = ghci-$(ProjectVersion)$(exeext1)
 
 INSTALL_BINS += driver/ghci/dist/build/tmp/$(driver/ghci_dist_PROG_VER)
 
