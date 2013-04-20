@@ -512,24 +512,6 @@ ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-inst
 endif
 BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
 
-# -----------------------------------------------
-# Haddock-related bits
-
-# Run Haddock for the packages that will be installed. We need to handle
-# compiler specially due to the different dist directory name.
-$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
-compiler_stage2_DO_HADDOCK = YES
-
-# Build the Haddock contents and index
-ifeq "$(HADDOCK_DOCS)" "YES"
-libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
-	cd libraries && sh gen_contents_index --intree
-ifeq "$(phase)" "final"
-$(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
-endif
-INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
-endif
-
 # ----------------------------------------
 # Special magic for the ghc-prim package
 
@@ -592,8 +574,6 @@ ifeq "$(Windows_Host)" "YES"
 BUILD_DIRS += utils/touchy
 endif
 
-BUILD_DIRS += docs/users_guide
-BUILD_DIRS += docs/man
 BUILD_DIRS += utils/unlit
 BUILD_DIRS += utils/hp2ps
 
@@ -668,6 +648,8 @@ BUILD_DIRS += utils/mkUserGuidePart
 endif
 endif
 
+BUILD_DIRS += docs/users_guide
+BUILD_DIRS += docs/man
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
 
@@ -744,6 +726,24 @@ $(foreach way, $(GhcLibWays),$(eval \
 libraries/vector/dist-install/build/Data/Vector/Fusion/Stream/Monadic.$($(way)_osuf): \
     $(libraries/primitive_dist-install_$(GHCI_lib_way)_LIB) \
   ))
+endif
+
+# -----------------------------------------------
+# Haddock-related bits
+
+# Run Haddock for the packages that will be installed. We need to handle
+# compiler specially due to the different dist directory name.
+$(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
+compiler_stage2_DO_HADDOCK = YES
+
+# Build the Haddock contents and index
+ifeq "$(HADDOCK_DOCS)" "YES"
+libraries/dist-haddock/index.html: $(haddock_INPLACE) $(ALL_HADDOCK_FILES)
+	cd libraries && sh gen_contents_index --intree
+ifeq "$(phase)" "final"
+$(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
+endif
+INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
 endif
 
 # -----------------------------------------------------------------------------

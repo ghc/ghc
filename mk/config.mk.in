@@ -444,16 +444,10 @@ ifneq "$(wildcard $(GHC).exe)" ""
 GHC := $(GHC).exe
 endif
 
-# Sometimes we want to invoke ghc from the build tree in different
-# places (eg. it's handy to have a nofib & a ghc build in the same
-# tree).  We can refer to "this ghc" as $(GHC_INPLACE):
-
-GHC_INPLACE = $(GHC_STAGE1)
-
 GHC_STAGE0  = $(GHC)
-GHC_STAGE1  = $(INPLACE_BIN)/ghc-stage1$(exeext)
-GHC_STAGE2  = $(INPLACE_BIN)/ghc-stage2$(exeext)
-GHC_STAGE3  = $(INPLACE_BIN)/ghc-stage3$(exeext)
+GHC_STAGE1  = $(ghc-stage1_INPLACE)
+GHC_STAGE2  = $(ghc-stage2_INPLACE)
+GHC_STAGE3  = $(ghc-stage3_INPLACE)
 
 BOOTSTRAPPING_CONF = libraries/bootstrapping.conf
 

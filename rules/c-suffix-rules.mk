@@ -21,22 +21,22 @@ ifneq "$$(BINDIST)" "YES"
 
 ifeq "$4" "YES"
 
-$1/$2/build/%.$$($3_osuf) : $1/%.c $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
+$1/$2/build/%.$$($3_osuf) : $1/%.c $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.c $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.c $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_way_)s $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_way_)s $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/%.S $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
+$1/$2/build/%.$$($3_osuf) : $1/%.S $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)s : $1/$2/build/%.c $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_way_)s : $1/$2/build/%.c $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -S $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)s : $1/%.c $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_way_)s : $1/%.c $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -S $$< -o $$@
 
 else

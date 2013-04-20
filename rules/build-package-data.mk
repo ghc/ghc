@@ -98,7 +98,7 @@ $1/$2/build/autogen/cabal_macros.h : $1/$2/package-data.mk
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in
 # the build tree.
-$1/$2/package-data.mk : $$$$(ghc-cabal_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_CONFIG_DEP)
+$1/$2/package-data.mk : $$$$(ghc-cabal_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_CONFIG_DEP)
 # Checking packages built with the bootstrapping compiler would
 # generally be a waste of time. Either we will rebuild them with
 # stage1/stage2, or we don't really care about them.

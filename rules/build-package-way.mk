@@ -63,8 +63,8 @@ $$($1_$2_$3_LIB0) : $1/$2/dll-split.stamp
 endif
 endif
 
-$1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) inplace/bin/dll-split$$(exeext)
-	inplace/bin/dll-split $$< "$$($1_$2_dll0_START_MODULE)" "$$($1_$2_dll0_MODULES)"
+$1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) $$$$(dll-split_INPLACE)
+	$$(dll-split_INPLACE) $$< "$$($1_$2_dll0_START_MODULE)" "$$($1_$2_dll0_MODULES)"
 	touch $$@
 
 # Link a dynamic library
