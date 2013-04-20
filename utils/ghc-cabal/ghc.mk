@@ -18,17 +18,18 @@ CABAL_DOTTED_VERSION := $(shell grep "^version:" libraries/Cabal/Cabal/Cabal.cab
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
+ghc-cabal_DIST_BINARY = utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext)
 ghc-cabal_INPLACE = inplace/bin/ghc-cabal$(exeext)
 
 ifneq "$(BINDIST)" "YES"
-$(ghc-cabal_INPLACE) : utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
+$(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
 
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
+$(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-cabal/Main.hs -o $@ \
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
