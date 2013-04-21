@@ -42,6 +42,8 @@ endif
 
 $(call clean-target,$1,$2,$1/$2)
 
+$$(eval $$(call build-prog-vars,$1,$2,$3))
+
 ifneq "$$($1_$2_NOT_NEEDED)" "YES"
 $$(eval $$(call build-prog-helper,$1,$2,$3))
 endif
@@ -49,7 +51,7 @@ $(call profEnd, build-prog($1,$2,$3))
 endef
 
 
-define build-prog-helper
+define build-prog-vars
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -80,8 +82,6 @@ else
 $1_$2_WANT_INSTALLED_WRAPPER = NO
 endif
 
-$(call package-config,$1,$2,$3)
-
 $1_$2_depfile_base = $1/$2/build/.depend
 
 ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
@@ -108,6 +108,15 @@ else
 $1_$2_INPLACE = $$($$($1_$2_PROGNAME)_INPLACE)
 endif
 endif
+
+endef
+
+define build-prog-helper
+# $1 = dir
+# $2 = distdir
+# $3 = GHC stage to use (0 == bootstrapping compiler)
+
+$(call package-config,$1,$2,$3)
 
 ifeq "$$($1_$2_USES_CABAL)" "YES"
 $(call build-package-data,$1,$2,$3)
