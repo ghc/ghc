@@ -625,28 +625,18 @@ BUILD_DIRS += libraries/integer-gmp/gmp
 BUILD_DIRS += libraries/integer-gmp/mkGmpDerivedConstants
 endif
 
-ifeq "$(CrossCompiling)-$(phase)" "YES-final"
-MAYBE_GHCTAGS=
-MAYBE_HPC=
-MAYBE_RUNGHC=
-else
-MAYBE_GHCTAGS=utils/ghctags
-MAYBE_HPC=utils/hpc
-MAYBE_RUNGHC=utils/runghc
-endif
-
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
 BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
-BUILD_DIRS += $(MAYBE_GHCTAGS)
+BUILD_DIRS += utils/ghctags
 BUILD_DIRS += utils/dll-split
 BUILD_DIRS += utils/ghc-pwd
 BUILD_DIRS += utils/ghc-cabal
-BUILD_DIRS += $(MAYBE_HPC)
-BUILD_DIRS += $(MAYBE_RUNGHC)
+BUILD_DIRS += utils/hpc
+BUILD_DIRS += utils/runghc
 BUILD_DIRS += ghc
 
 ifneq "$(BINDIST)" "YES"
