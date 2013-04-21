@@ -132,7 +132,7 @@ createAdjustor (int cconv,
     }
 
     r = ffi_prep_closure_loc(cl, cif, (void*)wptr, hptr/*userdata*/, code);
-    if (r != FFI_OK) barf("ffi_prep_closure failed: %d", r);
+    if (r != FFI_OK) barf("ffi_prep_closure_loc failed: %d", r);
 
     return (void*)code;
 }
