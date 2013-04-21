@@ -197,10 +197,10 @@ newtype Filter = Filter Word16
 #endif
     deriving (Bits, Eq, Num, Show, Storable)
 
-#{enum Filter, Filter
- , filterRead   = EVFILT_READ
- , filterWrite  = EVFILT_WRITE
- }
+filterRead :: Filter
+filterRead = Filter (#const EVFILT_READ)
+filterWrite :: Filter
+filterWrite  = Filter (#const EVFILT_WRITE)
 
 data TimeSpec = TimeSpec {
       tv_sec  :: {-# UNPACK #-} !CTime
