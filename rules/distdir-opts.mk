@@ -89,8 +89,6 @@ $1_$2_ALL_HSC2HS_OPTS = \
  $$(SRC_HSC2HS_OPTS) \
  $$(SRC_HSC2HS_OPTS_STAGE$3) \
  --cflag=-D__GLASGOW_HASKELL__=$$(if $$(filter 0,$3),$$(GhcCanonVersion),$$(ProjectVersionInt)) \
- --cflag=-D$$(HostArch_CPP)_HOST_ARCH=1 \
- --cflag=-D$$(HostOS_CPP)_HOST_OS=1 \
  $$($1_$2_HSC2HS_CC_OPTS) \
  $$($1_$2_HSC2HS_LD_OPTS) \
  --cflag=-I$1/$2/build/autogen \

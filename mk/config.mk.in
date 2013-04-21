@@ -558,6 +558,9 @@ ifeq "$(CrossCompiling)" "YES"
 SRC_HSC2HS_OPTS_STAGE1 += --cross-compile
 SRC_HSC2HS_OPTS_STAGE2 += --cross-compile
 endif
+SRC_HSC2HS_OPTS_STAGE0 += --cflag=-D$(HostArch_CPP)_HOST_ARCH=1 --cflag=-D$(HostOS_CPP)_HOST_OS=1
+SRC_HSC2HS_OPTS_STAGE1 += --cflag=-D$(TargetArch_CPP)_HOST_ARCH=1 --cflag=-D$(TargetOS_CPP)_HOST_OS=1
+SRC_HSC2HS_OPTS_STAGE2 += --cflag=-D$(TargetArch_CPP)_HOST_ARCH=1 --cflag=-D$(TargetOS_CPP)_HOST_OS=1
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 WINDRES = $(INPLACE_MINGW)/bin/windres
