@@ -26,7 +26,6 @@ module System.Timeout ( timeout ) where
 
 #ifdef __GLASGOW_HASKELL__
 import Control.Concurrent
-import Control.Concurrent.MVar
 import GHC.Event           (getSystemTimerManager,
                             registerTimeout, unregisterTimeout)
 import Control.Exception   (Exception(..), handleJust, bracket,
@@ -106,8 +105,8 @@ timeout n f
         let handleTimeout = do
                 v <- isEmptyMVar lock
                 when v $ void $ forkIOWithUnmask $ \unmask -> unmask $ do
-                    v <- tryPutMVar lock =<< myThreadId
-                    when v $ throwTo pid ex
+                    v2 <- tryPutMVar lock =<< myThreadId
+                    when v2 $ throwTo pid ex
             cleanupTimeout key = uninterruptibleMask_ $ do
                 v <- tryPutMVar lock undefined
                 if v then unregisterTimeout tm key
