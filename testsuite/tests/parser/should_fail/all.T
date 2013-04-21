@@ -77,3 +77,4 @@ test('ParserNoMultiWayIf', when(compiler_lt('ghc', '7.5'), skip), compile_fail, 
 
 test('T5425', normal, compile_fail, [''])
 test('T984', normal, compile_fail, [''])
+test('T7848', normal, compile_fail, ['-dppr-user-length=100'])
