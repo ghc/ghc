@@ -1,0 +1,24 @@
+
+T7786.hs:89:22:
+    Couldn't match type ‛Intersect
+                           [KeySegment] (BuriedUnder sub k ('Empty [KeySegment])) inv’
+                  with ‛'Empty [KeySegment]’
+    Inaccessible code in
+      a pattern with constructor
+        Nil :: forall (k :: BOX). Sing (Inventory k) ('Empty k),
+      in a pattern binding in
+           'do' block
+    Relevant bindings include
+      addSub :: Database inv
+                -> Sing [KeySegment] k
+                -> Database sub
+                -> Maybe (Database (BuriedUnder sub k inv))
+        (bound at T7786.hs:89:1)
+      db :: Database inv (bound at T7786.hs:89:8)
+      k :: Sing [KeySegment] k (bound at T7786.hs:89:11)
+      sub :: Database sub (bound at T7786.hs:89:13)
+    In the pattern: Nil
+    In the pattern: Nil :: Sing xxx
+    In a stmt of a 'do' block:
+      Nil :: Sing xxx <- return
+                           (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
