@@ -94,7 +94,7 @@ instance HasDynFlags CmmParse where
 loopDecls :: CmmParse a -> CmmParse a
 loopDecls (EC fcode) =
       EC $ \e globalDecls -> do
-        (_, a) <- F.fixC (\ ~(decls, _) -> fcode (addListToUFM e (decls ++ globalDecls)) globalDecls)
+        (_, a) <- F.fixC (\ ~(decls, _) -> fcode (addListToUFM e decls) globalDecls)
         return (globalDecls, a)
 
 
