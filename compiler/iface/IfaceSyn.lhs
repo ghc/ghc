@@ -767,7 +767,7 @@ instance Outputable IfaceUnfolding where
                                         pprParendIfaceExpr e]
   ppr (IfLclWrapper a wkr) = ptext (sLit "Worker(lcl):") <+> ppr wkr
                              <+> parens (ptext (sLit "arity") <+> int a)
-  ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext0:") <+> ppr wkr
+  ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext):") <+> ppr wkr
                              <+> parens (ptext (sLit "arity") <+> int a)
   ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:")
                              <+> brackets (pprWithCommas ppr ns)
