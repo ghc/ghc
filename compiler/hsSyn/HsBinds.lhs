@@ -187,7 +187,7 @@ top-level binding
     M.reverse (x:xs) = M.reverse xs ++ [x]
 
 In Hindley-Milner, a recursive binding is typechecked with the *recursive* uses
-being *monomorphic*.  So after typechecking *and* deugaring we will get something
+being *monomorphic*.  So after typechecking *and* desugaring we will get something
 like this
  
     M.reverse :: forall a. [a] -> [a]
@@ -198,7 +198,7 @@ like this
              in reverse
 
 Notice that 'M.reverse' is polymorphic as expected, but there is a local
-defintion for plain 'reverse' which is *monomorphic*.  The type variable
+definition for plain 'reverse' which is *monomorphic*.  The type variable
 'a' scopes over the entire letrec.
 
 That's after desugaring.  What about after type checking but before desugaring?  
@@ -224,7 +224,7 @@ you were defining) appears in the abe_poly field of the
 abs_exports. The bindings in abs_binds are for fresh, local, Ids with
 a *monomorphic* Id.
 
-If there is a group of mutually recusive functions without type
+If there is a group of mutually recursive functions without type
 signatures, we get one AbsBinds with the monomorphic versions of the
 bindings in abs_binds, and one element of abe_exports for each
 variable bound in the mutually recursive group.  This is true even for
@@ -240,7 +240,7 @@ After type checking we get
 
 Note [AbsBinds wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Consdider
+Consider
    (f,g) = (\x.x, \y.y)
 This ultimately desugars to something like this:
    tup :: forall a b. (a->a, b->b)
