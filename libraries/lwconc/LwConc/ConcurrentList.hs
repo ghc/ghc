@@ -21,7 +21,6 @@ module LwConc.ConcurrentList
 , SCont
 
 , newSched           -- IO (Sched)
-, newSchedFastUserLevelWakeup -- IO (Sched)
 , newCapability      -- IO ()
 , forkIO             -- IO () -> IO SCont
 , forkOS             -- IO () -> IO SCont
@@ -64,31 +63,21 @@ yieldControlAction (Sched pa) = do
       switchTo x
 
 _INL_(scheduleSContAction)
-scheduleSContAction :: Sched -> Bool -> SCont -> PTM ()
-scheduleSContAction (Sched pa) fastWakeup sc = do
+scheduleSContAction :: Sched -> SCont -> PTM ()
+scheduleSContAction (Sched pa) sc = do
   stat <- getSContStatus sc
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
   cap <- getSContCapability sc
-  let (frontRef,backRef) = pa ! cap
-  if fastWakeup
-    then do
-      case stat of
-        SContSwitched (BlockedInHaskell _) -> do
-          front <- readPVar frontRef
-          writePVar frontRef $ sc:front
-        _ -> do
-          back <- readPVar backRef
-          writePVar backRef $ sc:back
-    else do
-      back <- readPVar backRef
-      writePVar backRef $ sc:back
+  let (_,backRef) = pa ! cap
+  back <- readPVar backRef
+  writePVar backRef $ sc:back
 
 
-_INL_(newSchedInternal)
-newSchedInternal :: Bool -> IO (Sched)
-newSchedInternal kind = do
+_INL_(newSched)
+newSched :: IO (Sched)
+newSched = do
   -- This token will be used to spawn in a round-robin fashion on different
   -- capabilities.
   token <- newPVarIO (0::Int)
@@ -102,7 +91,7 @@ newSchedInternal kind = do
   -- Initialize scheduler actions
   atomically $ do {
   setYieldControlAction s $ yieldControlAction sched;
-  setScheduleSContAction s $ scheduleSContAction sched kind
+  setScheduleSContAction s $ scheduleSContAction sched
   }
   -- return scheduler
   return sched
@@ -113,16 +102,6 @@ newSchedInternal kind = do
       backRef <- newPVarIO [];
       createPVarList (n-1) $ (frontRef,backRef):l
     }
-
-_INL_(newSched)
-newSched :: IO (Sched)
-newSched = do
-  newSchedInternal False
-
-_INL_(newSchedFastUserLevelWakeup)
-newSchedFastUserLevelWakeup :: IO (Sched)
-newSchedFastUserLevelWakeup = do
-  newSchedInternal True
 
 _INL_(newCapability)
 newCapability :: IO ()
