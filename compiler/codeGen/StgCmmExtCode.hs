@@ -10,7 +10,7 @@
 -- back in circularly (to avoid a two-pass algorithm).
 
 module StgCmmExtCode (
-        CmmParse(..),
+        CmmParse, unEC,
         Named(..), Env,
         
         loopDecls,
