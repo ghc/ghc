@@ -702,9 +702,9 @@ zonkFlats binds_var untch cts
       , Just tv <- getTyVar_maybe ty_rhs
       , ASSERT2( not (isFloatedTouchableMetaTyVar untch tv), ppr tv )
         isTouchableMetaTyVar untch tv
-      , typeKind ty_lhs `tcIsSubKind` tyVarKind tv
+      , not (isSigTyVar tv) || isTyVarTy ty_lhs     -- Never unify a SigTyVar with a non-tyvar
+      , typeKind ty_lhs `tcIsSubKind` tyVarKind tv  -- c.f. TcInteract.trySpontaneousEqOneWay
       , not (tv `elemVarSet` tyVarsOfType ty_lhs)
---       , Just ty_lhs' <- occurCheck tv ty_lhs
       = ASSERT2( isWantedCt orig_ct, ppr orig_ct )
         ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
         do { writeMetaTyVar tv ty_lhs
