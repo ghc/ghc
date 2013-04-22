@@ -1,7 +1,6 @@
 
 tcfail123.hs:11:9:
-    Couldn't match kind ‛*’ with ‛#’
-    When matching types
+    Kind incompatibility when matching types:
       t0 :: *
       GHC.Prim.Int# :: #
     In the first argument of ‛f’, namely ‛3#’

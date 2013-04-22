@@ -1,12 +1,5 @@
 
-T5236.hs:13:9:
-    Couldn't match type ‛A’ with ‛B’
-    When using functional dependencies to combine
-      Id A A,
-        arising from the dependency ‛a -> b’
-        in the instance declaration at T5236.hs:10:10
-      Id A B,
-        arising from the type signature for loop :: Id A B => Bool
-        at T5236.hs:13:9-22
-    In the ambiguity check for: Id A B => Bool
-    In the type signature for ‛loop’: loop :: Id A B => Bool
+T5236.hs:17:5:
+    No instance for (Id A B) arising from a use of ‛loop’
+    In the expression: loop
+    In an equation for ‛f’: f = loop

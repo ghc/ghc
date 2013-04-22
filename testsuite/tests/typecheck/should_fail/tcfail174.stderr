@@ -5,3 +5,31 @@ tcfail174.hs:9:10:
     In the first argument of ‛Base’, namely ‛id’
     In the expression: Base id
     In an equation for ‛g’: g = Base id
+
+tcfail174.hs:13:14:
+    Couldn't match type ‛a’ with ‛a1’
+      because type variable ‛a1’ would escape its scope
+    This (rigid, skolem) type variable is bound by
+      the type forall a2. a2 -> a2
+      at tcfail174.hs:13:14
+    Expected type: Capture (forall x. x -> a)
+      Actual type: Capture (forall a. a -> a)
+    Relevant bindings include
+      h1 :: Capture a (bound at tcfail174.hs:13:1)
+    In the first argument of ‛Capture’, namely ‛g’
+    In the expression: Capture g
+    In an equation for ‛h1’: h1 = Capture g
+
+tcfail174.hs:16:14:
+    Couldn't match type ‛a’ with ‛b’
+      ‛a’ is a rigid type variable bound by
+          the type forall a1. a1 -> a1 at tcfail174.hs:16:14
+      ‛b’ is a rigid type variable bound by
+          the type signature for h2 :: Capture b at tcfail174.hs:15:7
+    Expected type: Capture (forall x. x -> b)
+      Actual type: Capture (forall a. a -> a)
+    Relevant bindings include
+      h2 :: Capture b (bound at tcfail174.hs:16:1)
+    In the first argument of ‛Capture’, namely ‛g’
+    In the expression: Capture g
+    In an equation for ‛h2’: h2 = Capture g

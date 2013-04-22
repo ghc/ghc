@@ -1,4 +1,15 @@
 
+mc22.hs:10:9:
+    No instance for (Functor t) arising from a use of ‛fmap’
+    Possible fix:
+      add (Functor t) to the context of
+        a type expected by the context: (a -> b) -> t a -> t b
+        or the inferred type of foo :: [t [Char]]
+    In the expression: fmap
+    In a stmt of a monad comprehension: then group using take 5
+    In the expression:
+      [x + 1 | x <- ["Hello", "World"], then group using take 5]
+
 mc22.hs:10:26:
     Couldn't match type ‛a’ with ‛t a’
       ‛a’ is a rigid type variable bound by

@@ -1,10 +1,5 @@
 
 T5978.hs:22:11:
-    Couldn't match type ‛Bool’ with ‛Char’
-    When using functional dependencies to combine
-      C Double Bool,
-        arising from the dependency ‛from -> to’
-        in the instance declaration at T5978.hs:8:10
-      C Double Char, arising from a use of ‛polyBar’ at T5978.hs:22:11-17
+    No instance for (C Double Char) arising from a use of ‛polyBar’
     In the expression: polyBar id monoFoo
     In an equation for ‛monoBar’: monoBar = polyBar id monoFoo

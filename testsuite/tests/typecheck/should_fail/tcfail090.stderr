@@ -1,7 +1,6 @@
 
 tcfail090.hs:8:9:
-    Couldn't match kind ‛*’ with ‛#’
-    When matching types
+    Kind incompatibility when matching types:
       a0 :: *
       ByteArray# :: #
     In the expression: undefined

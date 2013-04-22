@@ -1,9 +1,11 @@
 
 tcfail200.hs:5:15:
-    Couldn't match kind ‛*’ with ‛#’
-    When matching types
-      t1 :: *
+    Kind incompatibility when matching types:
+      t0 :: *
       GHC.Prim.Int# :: #
+    Relevant bindings include
+      f :: (t0, Char) (bound at tcfail200.hs:5:1)
+      x :: (t0, Char) (bound at tcfail200.hs:5:9)
     In the expression: 1#
     In the expression: (1#, 'c')
     In an equation for ‛x’: x = (1#, 'c')

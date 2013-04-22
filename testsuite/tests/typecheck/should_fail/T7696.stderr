@@ -1,15 +1,5 @@
 
 T7696.hs:7:6:
-    Couldn't match kind ‛* -> *’ with ‛*’
-    When matching types
-      m0 :: * -> *
-      () :: *
-    Expected type: ((), w ())
-      Actual type: (m0 a0, t0 m0)
-    In the expression: f1
-    In an equation for ‛f2’: f2 = f1
-
-T7696.hs:7:6:
     Couldn't match type ‛m0 a0’ with ‛()’
     Expected type: ((), w ())
       Actual type: (m0 a0, t0 m0)

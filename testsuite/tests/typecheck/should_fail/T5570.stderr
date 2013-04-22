@@ -1,7 +1,6 @@
 
 T5570.hs:7:16:
-    Couldn't match kind ‛*’ with ‛#’
-    When matching types
+    Kind incompatibility when matching types:
       s0 :: *
       Double# :: #
     In the second argument of ‛($)’, namely ‛D# $ 3.0##’
