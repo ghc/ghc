@@ -22,9 +22,13 @@ module Debug.Trace (
         -- * Tracing
         -- $tracing
         trace,
+        traceId,
         traceShow,
+        traceShowId,
         traceStack,
         traceIO,
+        traceM,
+        traceShowM,
         putTraceMsg,
 
         -- * Eventlog tracing
@@ -109,6 +113,12 @@ trace string expr = unsafePerformIO $ do
     return expr
 
 {-|
+Like 'trace' but returns the message instead of a third value.
+-}
+traceId :: String -> String
+traceId a = trace a a
+
+{-|
 Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
 
 This makes it convenient for printing the values of interesting variables or
@@ -123,6 +133,38 @@ variables @x@ and @z@:
 -}
 traceShow :: (Show a) => a -> b -> b
 traceShow = trace . show
+
+{-|
+Like 'traceShow' but returns the shown value instead of a third value.
+-}
+traceShowId :: (Show a) => a -> a
+traceShowId a = trace (show a) a
+
+{-|
+Like 'trace' but returning unit in an arbitrary monad. Allows for convenient
+use in do-notation. Note that the application of 'trace' is not an action in the
+monad, as 'traceIO' is in the 'IO' monad.
+
+> ... = do
+>   x <- ...
+>   traceM $ "x: " ++ show x
+>   y <- ...
+>   traceM $ "y: " ++ show y
+-}
+traceM :: (Monad m) => String -> m ()
+traceM string = trace string $ return ()
+
+{-|
+Like 'traceM', but uses 'show' on the argument to convert it to a 'String'.
+
+> ... = do
+>   x <- ...
+>   traceMShow $ x
+>   y <- ...
+>   traceMShow $ x + y
+-}
+traceShowM :: (Show a, Monad m) => a -> m ()
+traceShowM = traceM . show
 
 -- | like 'trace', but additionally prints a call stack if one is
 -- available.

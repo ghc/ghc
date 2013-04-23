@@ -7,7 +7,7 @@
 -- Module      :  GHC.Word
 -- Copyright   :  (c) The University of Glasgow, 1997-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -162,32 +162,32 @@ instance FiniteBits Word8 where
 
 {-# RULES
 "properFraction/Float->(Word8,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Word8) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Word8) n, y :: Float) }
 "truncate/Float->Word8"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Word8) (truncate x)
+    truncate = (fromIntegral :: Int -> Word8) . (truncate :: Float -> Int)
 "floor/Float->Word8"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Word8) (floor x)
+    floor    = (fromIntegral :: Int -> Word8) . (floor :: Float -> Int)
 "ceiling/Float->Word8"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Word8) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Word8) . (ceiling :: Float -> Int)
 "round/Float->Word8"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Word8) (round x)
+    round    = (fromIntegral :: Int -> Word8) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Word8,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Word8) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Word8) n, y :: Double) }
 "truncate/Double->Word8"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Word8) (truncate x)
+    truncate = (fromIntegral :: Int -> Word8) . (truncate :: Double -> Int)
 "floor/Double->Word8"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Word8) (floor x)
+    floor    = (fromIntegral :: Int -> Word8) . (floor :: Double -> Int)
 "ceiling/Double->Word8"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Word8) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Word8) . (ceiling :: Double -> Int)
 "round/Double->Word8"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Word8) (round x)
+    round    = (fromIntegral :: Int -> Word8) . (round  :: Double -> Int)
   #-}
 
 ------------------------------------------------------------------------
@@ -310,32 +310,32 @@ instance FiniteBits Word16 where
 
 {-# RULES
 "properFraction/Float->(Word16,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Word16) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Word16) n, y :: Float) }
 "truncate/Float->Word16"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Word16) (truncate x)
+    truncate = (fromIntegral :: Int -> Word16) . (truncate :: Float -> Int)
 "floor/Float->Word16"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Word16) (floor x)
+    floor    = (fromIntegral :: Int -> Word16) . (floor :: Float -> Int)
 "ceiling/Float->Word16"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Word16) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Word16) . (ceiling :: Float -> Int)
 "round/Float->Word16"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Word16) (round x)
+    round    = (fromIntegral :: Int -> Word16) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Word16,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Word16) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Word16) n, y :: Double) }
 "truncate/Double->Word16"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Word16) (truncate x)
+    truncate = (fromIntegral :: Int -> Word16) . (truncate :: Double -> Int)
 "floor/Double->Word16"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Word16) (floor x)
+    floor    = (fromIntegral :: Int -> Word16) . (floor :: Double -> Int)
 "ceiling/Double->Word16"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Word16) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Word16) . (ceiling :: Double -> Int)
 "round/Double->Word16"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Word16) (round x)
+    round    = (fromIntegral :: Int -> Word16) . (round  :: Double -> Int)
   #-}
 
 ------------------------------------------------------------------------
@@ -351,32 +351,32 @@ instance FiniteBits Word16 where
 
 {-# RULES
 "properFraction/Float->(Word32,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Word32) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Word32) n, y :: Float) }
 "truncate/Float->Word32"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Word32) (truncate x)
+    truncate = (fromIntegral :: Int -> Word32) . (truncate :: Float -> Int)
 "floor/Float->Word32"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Word32) (floor x)
+    floor    = (fromIntegral :: Int -> Word32) . (floor :: Float -> Int)
 "ceiling/Float->Word32"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Word32) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Word32) . (ceiling :: Float -> Int)
 "round/Float->Word32"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Word32) (round x)
+    round    = (fromIntegral :: Int -> Word32) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Word32,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Word32) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Word32) n, y :: Double) }
 "truncate/Double->Word32"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Word32) (truncate x)
+    truncate = (fromIntegral :: Int -> Word32) . (truncate :: Double -> Int)
 "floor/Double->Word32"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Word32) (floor x)
+    floor    = (fromIntegral :: Int -> Word32) . (floor :: Double -> Int)
 "ceiling/Double->Word32"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Word32) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Word32) . (ceiling :: Double -> Int)
 "round/Double->Word32"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Word32) (round x)
+    round    = (fromIntegral :: Int -> Word32) . (round  :: Double -> Int)
   #-}
 
 #endif
@@ -517,7 +517,7 @@ instance Ix Word32 where
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
 
-instance Read Word32 where  
+instance Read Word32 where
 #if WORD_SIZE_IN_BITS < 33
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 #else

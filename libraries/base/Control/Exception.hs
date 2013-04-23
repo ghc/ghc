@@ -345,7 +345,7 @@ The following operations are guaranteed not to be interruptible:
 
  * everything from the @Foreign@ modules
 
- * everything from @Control.Exception@
+ * everything from @Control.Exception@ except for 'throwTo'
 
  * @tryTakeMVar@, @tryPutMVar@, @isEmptyMVar@
 
