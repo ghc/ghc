@@ -1,4 +1,3 @@
-
 %
 % (c) The University of Glasgow, 1992-2006
 %
@@ -29,7 +28,7 @@ module HsUtils(
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkLHsWrapCo,
   coToHsWrapper, mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
-  mkLHsPar, 
+  mkLHsPar, mkHsCmdCast,
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -393,6 +392,10 @@ mkHsWrapCo co e | isTcReflCo co = e
 mkLHsWrapCo :: TcCoercion -> LHsExpr id -> LHsExpr id
 mkLHsWrapCo co (L loc e) | isTcReflCo co = L loc e
                          | otherwise     = L loc (mkHsWrap (WpCast co) e)
+
+mkHsCmdCast :: TcCoercion -> HsCmd id -> HsCmd id
+mkHsCmdCast co cmd | isTcReflCo co = cmd
+                   | otherwise     = HsCmdCast co cmd
 
 coToHsWrapper :: TcCoercion -> HsWrapper
 coToHsWrapper co | isTcReflCo co = idHsWrapper

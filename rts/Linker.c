@@ -141,10 +141,10 @@
 // warnings like
 //    error: function might be possible candidate for attribute ‘noreturn’
 // from gcc:
-#ifdef DYNAMIC_BY_DEFAULT
-int dynamicByDefault = 1;
+#ifdef DYNAMIC_GHC_PROGRAMS
+int dynamicGhcPrograms = 1;
 #else
-int dynamicByDefault = 0;
+int dynamicGhcPrograms = 0;
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -914,22 +914,24 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(ENT_AP_ctr)                         \
       SymI_HasProto(ENT_AP_STACK_ctr)                   \
       SymI_HasProto(ENT_BH_ctr)                         \
+      SymI_HasProto(ENT_LNE_ctr)                        \
       SymI_HasProto(UNKNOWN_CALL_ctr)                   \
-      SymI_HasProto(SLOW_CALL_v_ctr)                    \
-      SymI_HasProto(SLOW_CALL_f_ctr)                    \
-      SymI_HasProto(SLOW_CALL_d_ctr)                    \
-      SymI_HasProto(SLOW_CALL_l_ctr)                    \
-      SymI_HasProto(SLOW_CALL_n_ctr)                    \
-      SymI_HasProto(SLOW_CALL_p_ctr)                    \
-      SymI_HasProto(SLOW_CALL_pv_ctr)                   \
-      SymI_HasProto(SLOW_CALL_pp_ctr)                   \
-      SymI_HasProto(SLOW_CALL_ppv_ctr)                  \
-      SymI_HasProto(SLOW_CALL_ppp_ctr)                  \
-      SymI_HasProto(SLOW_CALL_pppv_ctr)                 \
-      SymI_HasProto(SLOW_CALL_pppp_ctr)                 \
-      SymI_HasProto(SLOW_CALL_ppppp_ctr)                \
-      SymI_HasProto(SLOW_CALL_pppppp_ctr)               \
-      SymI_HasProto(SLOW_CALL_OTHER_ctr)                \
+      SymI_HasProto(SLOW_CALL_fast_v16_ctr)                  \
+      SymI_HasProto(SLOW_CALL_fast_v_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_f_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_d_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_l_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_n_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_p_ctr)                    \
+      SymI_HasProto(SLOW_CALL_fast_pv_ctr)                   \
+      SymI_HasProto(SLOW_CALL_fast_pp_ctr)                   \
+      SymI_HasProto(SLOW_CALL_fast_ppv_ctr)                  \
+      SymI_HasProto(SLOW_CALL_fast_ppp_ctr)                  \
+      SymI_HasProto(SLOW_CALL_fast_pppv_ctr)                 \
+      SymI_HasProto(SLOW_CALL_fast_pppp_ctr)                 \
+      SymI_HasProto(SLOW_CALL_fast_ppppp_ctr)                \
+      SymI_HasProto(SLOW_CALL_fast_pppppp_ctr)               \
+      SymI_HasProto(VERY_SLOW_CALL_ctr)                \
       SymI_HasProto(ticky_slow_call_unevald)            \
       SymI_HasProto(SLOW_CALL_ctr)                      \
       SymI_HasProto(MULTI_CHUNK_SLOW_CALL_ctr)          \
@@ -956,6 +958,10 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(UPD_PAP_IN_PLACE_ctr)               \
       SymI_HasProto(ALLOC_HEAP_ctr)                     \
       SymI_HasProto(ALLOC_HEAP_tot)                     \
+      SymI_HasProto(HEAP_CHK_ctr)			\
+      SymI_HasProto(STK_CHK_ctr)                        \
+      SymI_HasProto(ALLOC_RTS_ctr)                      \
+      SymI_HasProto(ALLOC_RTS_tot)                      \
       SymI_HasProto(ALLOC_FUN_ctr)                      \
       SymI_HasProto(ALLOC_FUN_adm)                      \
       SymI_HasProto(ALLOC_FUN_gds)                      \
@@ -1296,12 +1302,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_ap_7_upd_info)                                  \
       SymI_HasProto(stg_exit)                                           \
       SymI_HasProto(stg_sel_0_upd_info)                                 \
-      SymI_HasProto(stg_sel_10_upd_info)                                \
-      SymI_HasProto(stg_sel_11_upd_info)                                \
-      SymI_HasProto(stg_sel_12_upd_info)                                \
-      SymI_HasProto(stg_sel_13_upd_info)                                \
-      SymI_HasProto(stg_sel_14_upd_info)                                \
-      SymI_HasProto(stg_sel_15_upd_info)                                \
       SymI_HasProto(stg_sel_1_upd_info)                                 \
       SymI_HasProto(stg_sel_2_upd_info)                                 \
       SymI_HasProto(stg_sel_3_upd_info)                                 \
@@ -1311,6 +1311,28 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_sel_7_upd_info)                                 \
       SymI_HasProto(stg_sel_8_upd_info)                                 \
       SymI_HasProto(stg_sel_9_upd_info)                                 \
+      SymI_HasProto(stg_sel_10_upd_info)                                \
+      SymI_HasProto(stg_sel_11_upd_info)                                \
+      SymI_HasProto(stg_sel_12_upd_info)                                \
+      SymI_HasProto(stg_sel_13_upd_info)                                \
+      SymI_HasProto(stg_sel_14_upd_info)                                \
+      SymI_HasProto(stg_sel_15_upd_info)                                \
+      SymI_HasProto(stg_sel_0_noupd_info)                                 \
+      SymI_HasProto(stg_sel_1_noupd_info)                                 \
+      SymI_HasProto(stg_sel_2_noupd_info)                                 \
+      SymI_HasProto(stg_sel_3_noupd_info)                                 \
+      SymI_HasProto(stg_sel_4_noupd_info)                                 \
+      SymI_HasProto(stg_sel_5_noupd_info)                                 \
+      SymI_HasProto(stg_sel_6_noupd_info)                                 \
+      SymI_HasProto(stg_sel_7_noupd_info)                                 \
+      SymI_HasProto(stg_sel_8_noupd_info)                                 \
+      SymI_HasProto(stg_sel_9_noupd_info)                                 \
+      SymI_HasProto(stg_sel_10_noupd_info)                                \
+      SymI_HasProto(stg_sel_11_noupd_info)                                \
+      SymI_HasProto(stg_sel_12_noupd_info)                                \
+      SymI_HasProto(stg_sel_13_noupd_info)                                \
+      SymI_HasProto(stg_sel_14_noupd_info)                                \
+      SymI_HasProto(stg_sel_15_noupd_info)                                \
       SymI_HasProto(stg_upd_frame_info)                                 \
       SymI_HasProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \
@@ -2137,8 +2159,8 @@ loadArchive( pathchar *path )
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%" PATH_FMT" '\n", path));
 
-    if (dynamicByDefault) {
-        barf("loadArchive called, but using dynlibs by default (%s)", path);
+    if (dynamicGhcPrograms) {
+        barf("loadArchive called, but using dynamic GHC (%s)", path);
     }
 
     gnuFileIndex = NULL;
@@ -2532,8 +2554,8 @@ loadObj( pathchar *path )
 #endif
    IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
 
-   if (dynamicByDefault) {
-       barf("loadObj called, but using dynlibs by default (%s)", path);
+   if (dynamicGhcPrograms) {
+       barf("loadObj called, but using dynamic GHC (%s)", path);
    }
 
    initLinker();

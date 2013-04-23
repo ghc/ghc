@@ -881,13 +881,12 @@ data Ct
       cc_loc  :: CtLoc
     }
 
-  | CIrredEvCan {  -- These stand for yet-unknown predicates
+  | CIrredEvCan {  -- These stand for yet-unusable predicates
       cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
-                   -- In CIrredEvCan, the ctev_pred of the evidence is flat
-                   -- and hence it may only be of the form (tv xi1 xi2 ... xin)
-                   -- Since, if it were a type constructor application, that'd make the
-                   -- whole constraint a CDictCan, or CTyEqCan. And it can't be
-                   -- a type family application either because it's a Xi type.
+        -- The ctev_pred of the evidence is 
+        -- of form   (tv xi1 xi2 ... xin)
+        --      or   (t1 ~ t2)   where not (kind(t1) `compatKind` kind(t2)
+        -- See Note [CIrredEvCan constraints]
       cc_loc :: CtLoc
     }
 
@@ -904,8 +903,8 @@ data Ct
     }
 
   | CFunEqCan {  -- F xis ~ xi
-                 -- Invariant: * isSynFamilyTyCon cc_fun
-                 --            * typeKind (F xis) `compatKind` typeKind xi
+       -- Invariant: * isSynFamilyTyCon cc_fun
+       --            * typeKind (F xis) `compatKind` typeKind xi
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
       cc_tyargs :: [Xi],        -- Either under-saturated or exactly saturated
@@ -913,7 +912,6 @@ data Ct
                                 --    we should have decomposed)
 
       cc_loc  :: CtLoc
-
     }
 
   | CNonCanonical { -- See Note [NonCanonical Semantics]
@@ -927,6 +925,23 @@ data Ct
       cc_occ :: OccName    -- The name of this hole
     }
 \end{code}
+
+Note [CIrredEvCan constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CIrredEvCan constraints are used for constraints that are "stuck"
+   - we can't solve them (yet)
+   - we can't use them to solve other constraints
+   - but they may become soluble if we substitute for some
+     of the type variables in the constraint
+
+Example 1:  (c Int), where c :: * -> Constraint.  We can't do anything 
+            with this yet, but if later c := Num, *then* we can solve it
+
+Example 2:  a ~ b, where a :: *, b :: k, where k is a kind variable
+            We don't want to use this to substitute 'b' for 'a', in case
+            'k' is subequently unifed with (say) *->*, because then 
+            we'd have ill-kinded types floating about.  Rather we want
+            to defer using the equality altogether until 'k' get resolved.
 
 Note [Ct/evidence invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -955,12 +970,32 @@ ctPred :: Ct -> PredType
 ctPred ct = ctEvPred (cc_ev ct)
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
-dropDerivedWC wc@(WC { wc_flat = flats })
-  = wc { wc_flat = filterBag isWantedCt flats }
-    -- Don't filter the insolubles, because derived
-    -- insolubles should stay so that we report them.
+-- See Note [Insoluble derived constraints]
+dropDerivedWC wc@(WC { wc_flat = flats, wc_insol = insols })
+  = wc { wc_flat  = filterBag isWantedCt          flats
+       , wc_insol = filterBag (not . isDerivedCt) insols  }
+    -- Keep Givens from insols because they indicate unreachable code
     -- The implications are (recursively) already filtered
 \end{code}
+
+Note [Insoluble derived constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we discard derived constraints at the end of constraint solving;
+see dropDerivedWC.  For example, 
+
+ * If we have an unsolved (Ord a), we don't want to complain about 
+   an unsolved (Eq a) as well.
+ * If we have kind-incompatible (a::* ~ Int#::#) equality, we 
+   don't want to complain about the kind error twice.  
+
+Arguably, for *some* derived contraints we might want to report errors. 
+Notably, functional dependencies.  If we have  
+    class C a b | a -> b
+and we have
+    [W] C a b, [W] C a c
+where a,b,c are all signature variables.  Then we could reasonably
+report an error unifying (b ~ c). But it's probably not worth it;
+after all, we also get an error because we can't discharge the constraint.
 
 
 %************************************************************************
@@ -1465,7 +1500,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol (FunSigCtxt f) ty)
                             = hang (ptext (sLit "the type signature for"))
-                                 2 (ppr f <+> dcolon <+> ppr ty)
+                                 2 (pprPrefixOcc f <+> dcolon <+> ppr ty)
 pprSkolInfo (SigSkol cx ty) = hang (pprUserTypeCtxt cx <> colon)
                                  2 (ppr ty)
 pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter bindings for")

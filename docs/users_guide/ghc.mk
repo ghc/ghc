@@ -20,8 +20,8 @@ docs/users_guide_DOCBOOK_SOURCES :=                           \
            $(wildcard docs/users_guide/*.xml)                 \
            $(basename $(wildcard docs/users_guide/*.xml.in)))
 
-$(docs/users_guide_GENERATED_DOCBOOK_SOURCES): %.xml: inplace/bin/mkUserGuidePart$(exeext)
-	inplace/bin/mkUserGuidePart$(exeext) $@
+$(docs/users_guide_GENERATED_DOCBOOK_SOURCES): %.xml: $(mkUserGuidePart_INPLACE)
+	$(mkUserGuidePart_INPLACE) $@
 
 $(eval $(call docbook,docs/users_guide,users_guide))
 

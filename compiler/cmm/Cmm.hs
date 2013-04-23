@@ -1,6 +1,5 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module Cmm (
      -- * Cmm top-level datatypes

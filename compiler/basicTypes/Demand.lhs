@@ -161,10 +161,6 @@ seqStrDmdList :: [StrDmd] -> ()
 seqStrDmdList [] = ()
 seqStrDmdList (d:ds) = seqStrDmd d `seq` seqStrDmdList ds
 
-isStrict :: StrDmd -> Bool
-isStrict Lazy = False
-isStrict _    = True
-
 -- Splitting polymorphic demands
 splitStrProdDmd :: Int -> StrDmd -> [StrDmd]
 splitStrProdDmd n Lazy         = replicate n Lazy
@@ -376,7 +372,11 @@ seqDemandList [] = ()
 seqDemandList (d:ds) = seqDemand d `seq` seqDemandList ds
 
 isStrictDmd :: Demand -> Bool
-isStrictDmd (JD {strd = x}) = isStrict x
+-- See Note [Strict demands]
+isStrictDmd (JD {absd = Abs})  = False
+isStrictDmd (JD {strd = Lazy}) = False
+isStrictDmd _                  = True
+
 
 isUsedDmd :: Demand -> Bool
 isUsedDmd (JD {absd = x}) = isUsed x
@@ -399,6 +399,25 @@ defer (JD {absd = a}) = mkJointDmd strTop a
 -- use :: Demand -> Demand
 -- use (JD {strd = d}) = mkJointDmd d top
 \end{code}
+
+Note [Strict demands]
+~~~~~~~~~~~~~~~~~~~~~
+isStrictDmd returns true only of demands that are 
+   both strict
+   and  used
+In particular, it is False for <HyperStr, Abs>, which can and does
+arise in, say (Trac #7319)
+   f x = raise# <some exception>
+Then 'x' is not used, so f gets strictness <HyperStr,Abs> -> .
+Now the w/w generates
+   fx = let x <HyperStr,Abs> = absentError "unused"
+        in raise <some exception>
+At this point we really don't want to convert to
+   fx = case absentError "unused" of x -> raise <some exception>
+Since the program is going to diverge, this swaps one error for another,
+but it's really a bad idea to *ever* evaluate an absent argument.
+In Trac #7319 we get
+   T7319.exe: Oops!  Entered absent arg w_s1Hd{v} [lid] [base:GHC.Base.String{tc 36u}]
 
 Note [Dealing with call demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

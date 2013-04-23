@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 utils/deriveConstants_dist_MODULES = DeriveConstants
-utils/deriveConstants_dist_PROG    = deriveConstants$(exeext)
+utils/deriveConstants_dist_PROGNAME = deriveConstants
 utils/deriveConstants_dist_INSTALL_INPLACE = YES
 utils/deriveConstants_HC_OPTS += -package process -package containers
 

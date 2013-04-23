@@ -4,9 +4,6 @@
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
--- TODO: Get rid of this flag:
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-
 -- This module implements generalized code motion for assignments to
 -- local registers, inlining and sinking when possible.  It also does
 -- some amount of rewriting for stores to register slots, which are

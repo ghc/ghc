@@ -151,14 +151,14 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     }
 
 --------------------
-nativeCodeGen :: DynFlags -> [(Handle, DynFlags)] -> UniqSupply
+nativeCodeGen :: DynFlags -> Handle -> UniqSupply
               -> Stream IO RawCmmGroup ()
               -> IO UniqSupply
-nativeCodeGen dflags hds us cmms
+nativeCodeGen dflags h us cmms
  = let platform = targetPlatform dflags
        nCG' :: (Outputable statics, Outputable instr, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO UniqSupply
-       nCG' ncgImpl = nativeCodeGen' dflags ncgImpl hds us cmms
+       nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
    in case platformArch platform of
       ArchX86     -> nCG' (x86NcgImpl    dflags)
       ArchX86_64  -> nCG' (x86_64NcgImpl dflags)
@@ -247,7 +247,6 @@ noAllocMoreStack amount _
         ++  "   You can still file a bug report if you like.\n"
 
 
-type NativeGenState statics instr = (BufHandle, DynFlags, NativeGenAcc statics instr)
 type NativeGenAcc statics instr
         = ([[CLabel]],
            [([NatCmmDecl statics instr],
@@ -257,21 +256,19 @@ type NativeGenAcc statics instr
 nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
-               -> [(Handle, DynFlags)]
+               -> Handle
                -> UniqSupply
                -> Stream IO RawCmmGroup ()
                -> IO UniqSupply
-nativeCodeGen' dflags ncgImpl hds us cmms
+nativeCodeGen' dflags ncgImpl h us cmms
  = do
         let split_cmms  = Stream.map add_split cmms
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
-        let mkNgs (h, dflags) = do bufh <- newBufHandle h
-                                   return (bufh, dflags, ([], []))
-        ngss <- mapM mkNgs hds
-        (ngss', us') <- cmmNativeGenStream ncgImpl us split_cmms ngss
-        mapM_ (finishNativeGen ncgImpl) ngss'
+        bufh <- newBufHandle h
+        (ngs, us') <- cmmNativeGenStream dflags ncgImpl bufh us split_cmms ([], [])
+        finishNativeGen dflags ncgImpl bufh ngs
 
         return us'
 
@@ -284,10 +281,12 @@ nativeCodeGen' dflags ncgImpl hds us cmms
 
 
 finishNativeGen :: Instruction instr
-                => NcgImpl statics instr jumpDest
-                -> NativeGenState statics instr
+                => DynFlags
+                -> NcgImpl statics instr jumpDest
+                -> BufHandle
+                -> NativeGenAcc statics instr
                 -> IO ()
-finishNativeGen ncgImpl (bufh@(BufHandle _ _ h), dflags, (imports, prof))
+finishNativeGen dflags ncgImpl bufh@(BufHandle _ _ h) (imports, prof)
  = do
         bFlush bufh
 
@@ -335,52 +334,39 @@ finishNativeGen ncgImpl (bufh@(BufHandle _ _ h), dflags, (imports, prof))
                 $ makeImportsDoc dflags (concat imports)
 
 cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
-              => NcgImpl statics instr jumpDest
+              => DynFlags
+              -> NcgImpl statics instr jumpDest
+              -> BufHandle
               -> UniqSupply
               -> Stream IO RawCmmGroup ()
-              -> [NativeGenState statics instr]
-              -> IO ([NativeGenState statics instr], UniqSupply)
+              -> NativeGenAcc statics instr
+              -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGenStream ncgImpl us cmm_stream ngss
+cmmNativeGenStream dflags ncgImpl h us cmm_stream ngs@(impAcc, profAcc)
  = do r <- Stream.runStream cmm_stream
       case r of
           Left () ->
-              return ([ (h, dflags, (reverse impAcc, reverse profAcc))
-                      | (h, dflags, (impAcc, profAcc)) <- ngss ]
-                     , us)
+              return ((reverse impAcc, reverse profAcc) , us)
           Right (cmms, cmm_stream') -> do
-              (ngss',us') <- cmmNativeGens ncgImpl us cmms ngss
-              cmmNativeGenStream ncgImpl us' cmm_stream' ngss'
+              (ngs',us') <- cmmNativeGens dflags ncgImpl h us cmms ngs 0
+              cmmNativeGenStream dflags ncgImpl h us' cmm_stream' ngs'
 
 -- | Do native code generation on all these cmms.
 --
 cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
-              => NcgImpl statics instr jumpDest
+              => DynFlags
+              -> NcgImpl statics instr jumpDest
+              -> BufHandle
               -> UniqSupply
               -> [RawCmmDecl]
-              -> [NativeGenState statics instr]
-              -> IO ([NativeGenState statics instr], UniqSupply)
+              -> NativeGenAcc statics instr
+              -> Int
+              -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens _       us _    [] = return ([], us)
-cmmNativeGens ncgImpl us cmms (ngs : ngss)
- = do (ngs', us') <- cmmNativeGens' ncgImpl us cmms ngs 0
-      (ngss', us'') <- cmmNativeGens ncgImpl us' cmms ngss
-      return (ngs' : ngss', us'')
-
--- | Do native code generation on all these cmms.
---
-cmmNativeGens' :: (Outputable statics, Outputable instr, Instruction instr)
-               => NcgImpl statics instr jumpDest
-               -> UniqSupply
-               -> [RawCmmDecl]
-               -> NativeGenState statics instr
-               -> Int
-               -> IO (NativeGenState statics instr, UniqSupply)
-
-cmmNativeGens' _ us [] ngs _
+cmmNativeGens _ _ _ us [] ngs _
         = return (ngs, us)
 
-cmmNativeGens' ncgImpl us (cmm : cmms) (h, dflags, (impAcc, profAcc)) count
+cmmNativeGens dflags ncgImpl h us (cmm : cmms) (impAcc, profAcc) count
  = do
         (us', native, imports, colorStats, linearStats)
                 <- {-# SCC "cmmNativeGen" #-} cmmNativeGen dflags ncgImpl us cmm count
@@ -400,10 +386,9 @@ cmmNativeGens' ncgImpl us (cmm : cmms) (h, dflags, (impAcc, profAcc)) count
         -- force evaluation all this stuff to avoid space leaks
         {-# SCC "seqString" #-} evaluate $ seqString (showSDoc dflags $ vcat $ map ppr imports)
 
-        cmmNativeGens' ncgImpl
-            us' cmms (h, dflags,
-                      ((imports : impAcc),
-                       ((lsPprNative, colorStats, linearStats) : profAcc)))
+        cmmNativeGens dflags ncgImpl h
+            us' cmms ((imports : impAcc),
+                      ((lsPprNative, colorStats, linearStats) : profAcc))
                      count'
 
  where  seqString []            = ()

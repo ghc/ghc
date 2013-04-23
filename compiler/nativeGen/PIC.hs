@@ -710,22 +710,29 @@ initializePicBase_ppc ArchPPC os picReg
                                 (PPC.ImmCLbl gotOffLabel)
                                 (PPC.ImmCLbl mkPicBaseLabel)
 
-            BasicBlock bID insns
-                        = head blocks
+            blocks' = case blocks of
+                       [] -> []
+                       (b:bs) -> fetchPC b : map maybeFetchPC bs
 
-            b' = BasicBlock bID (PPC.FETCHPC picReg
-                               : PPC.LD PPC.archWordSize tmp
-                                    (PPC.AddrRegImm picReg offsetToOffset)
-                               : PPC.ADD picReg picReg (PPC.RIReg tmp)
-                               : insns)
+            maybeFetchPC b@(BasicBlock bID _)
+              | bID `mapMember` info = fetchPC b
+              | otherwise            = b
 
-        return (CmmProc info lab live (ListGraph (b' : tail blocks)) : gotOffset : statics)
+            fetchPC (BasicBlock bID insns) =
+              BasicBlock bID (PPC.FETCHPC picReg
+                              : PPC.LD PPC.archWordSize tmp
+                                   (PPC.AddrRegImm picReg offsetToOffset)
+                              : PPC.ADD picReg picReg (PPC.RIReg tmp)
+                              : insns)
+
+        return (CmmProc info lab live (ListGraph blocks') : gotOffset : statics)
+
 
 initializePicBase_ppc ArchPPC OSDarwin picReg
-        (CmmProc info lab live (ListGraph blocks) : statics)
-        = return (CmmProc info lab live (ListGraph (b':tail blocks)) : statics)
+        (CmmProc info lab live (ListGraph (entry:blocks)) : statics) -- just one entry because of splitting
+        = return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
 
-        where   BasicBlock bID insns = head blocks
+        where   BasicBlock bID insns = entry
                 b' = BasicBlock bID (PPC.FETCHPC picReg : insns)
 
 
@@ -764,19 +771,11 @@ initializePicBase_x86 ArchX86 os picReg
              BasicBlock bID (X86.FETCHGOT picReg : insns)
 
 initializePicBase_x86 ArchX86 OSDarwin picReg
-        (CmmProc info lab live (ListGraph blocks) : statics)
-        = return (CmmProc info lab live (ListGraph blocks') : statics)
+        (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
+        = return (CmmProc info lab live (ListGraph (block':blocks)) : statics)
 
-    where blocks' = case blocks of
-                     [] -> []
-                     (b:bs) -> fetchPC b : map maybeFetchPC bs
-
-          maybeFetchPC b@(BasicBlock bID _)
-            | bID `mapMember` info = fetchPC b
-            | otherwise            = b
-
-          fetchPC (BasicBlock bID insns) =
-             BasicBlock bID (X86.FETCHPC picReg : insns)
+    where BasicBlock bID insns = entry
+          block' = BasicBlock bID (X86.FETCHPC picReg : insns)
 
 initializePicBase_x86 _ _ _ _
         = panic "initializePicBase_x86: not needed"

@@ -17,7 +17,7 @@ $(call profStart, shell-wrapper($1,$2))
 # $2 = distdir
 
 ifeq "$$($1_$2_SHELL_WRAPPER_NAME)" ""
-$1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROG).wrapper
+$1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROGNAME).wrapper
 endif
 
 ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
@@ -44,7 +44,7 @@ $$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
 	echo 'pgmgcc="$$(WhatGccIsCalled)"'                                  >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_DIRS_SEARCHPATH))' >> $$@
 endif
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
@@ -90,7 +90,7 @@ endif
 
 ifeq "$$($1_$2_WANT_BINDIST_WRAPPER)" "YES"
 
-$1_$2_BINDIST_WRAPPER = $1/$2/build/tmp/$$($1_$2_PROG)-bindist
+$1_$2_BINDIST_WRAPPER = $1/$2/build/tmp/$$($1_$2_PROGNAME)-bindist
 
 all_$1_$2 : $$($1_$2_BINDIST_WRAPPER)
 
@@ -99,7 +99,7 @@ BINDIST_EXTRAS += $$($1_$2_BINDIST_WRAPPER)
 $$($1_$2_BINDIST_WRAPPER): $1/$2/build/tmp/$$($1_$2_PROG)
 	$$(call removeFiles,                                                  $$@)
 	echo '#!$$(SHELL)'                                                 >> $$@
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_REL_DIRS_SEARCHPATH))' >> $$@
 endif
 	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@

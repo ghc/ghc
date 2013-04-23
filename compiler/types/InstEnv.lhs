@@ -15,7 +15,7 @@ module InstEnv (
 
         InstEnv, emptyInstEnv, extendInstEnv, overwriteInstEnv, 
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
-        classInstances, instanceBindFun,
+        classInstances, orphNamesOfClsInst, instanceBindFun,
         instanceCantMatch, roughMatchTcs
     ) where
 
@@ -25,6 +25,7 @@ import Class
 import Var
 import VarSet
 import Name
+import NameSet
 import TcType
 import TyCon
 import Unify
@@ -398,6 +399,16 @@ classInstances (pkg_ie, home_ie) cls
     get env = case lookupUFM env cls of
                 Just (ClsIE insts) -> insts
                 Nothing            -> []
+
+-- | Collects the names of concrete types and type constructors that make
+-- up the head of a class instance. For instance, given `class Foo a b`:
+--
+-- `instance Foo (Either (Maybe Int) a) Bool` would yield
+--      [Either, Maybe, Int, Bool]
+--
+-- Used in the implementation of ":info" in GHCi.
+orphNamesOfClsInst :: ClsInst -> NameSet
+orphNamesOfClsInst = orphNamesOfDFunHead . idType . instanceDFunId
 
 extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
 extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs

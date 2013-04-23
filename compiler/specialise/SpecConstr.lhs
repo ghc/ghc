@@ -31,6 +31,7 @@ import DataCon
 import Coercion         hiding( substTy, substCo )
 import Rules
 import Type             hiding ( substTy )
+import TyCon            ( isRecursiveTyCon )
 import Id
 import MkCore           ( mkImpossibleExpr )
 import Var
@@ -457,6 +458,8 @@ sc_force to True when calling specLoop. This flag does three things:
         (see specialise)
   * Specialise even for arguments that are not scrutinised in the loop
         (see argToPat; Trac #4488)
+  * Only specialise on recursive types a finite number of times
+        (see is_too_recursive; Trac #5550)
 
 This flag is inherited for nested non-recursive bindings (which are likely to
 be join points and hence should be fully specialised) but reset for nested
@@ -619,21 +622,25 @@ specConstrProgram guts
 %************************************************************************
 
 \begin{code}
-data ScEnv = SCE { sc_dflags :: DynFlags,
-                   sc_size  :: Maybe Int,       -- Size threshold
-                   sc_count :: Maybe Int,       -- Max # of specialisations for any one fn
+data ScEnv = SCE { sc_dflags    :: DynFlags,
+                   sc_size      :: Maybe Int,   -- Size threshold
+                   sc_count     :: Maybe Int,   -- Max # of specialisations for any one fn
                                                 -- See Note [Avoiding exponential blowup]
-                   sc_force :: Bool,            -- Force specialisation?
+
+                   sc_recursive :: Int,         -- Max # of specialisations over recursive type.
+                                                -- Stops ForceSpecConstr from diverging.
+
+                   sc_force     :: Bool,        -- Force specialisation?
                                                 -- See Note [Forcing specialisation]
 
-                   sc_subst :: Subst,           -- Current substitution
+                   sc_subst     :: Subst,       -- Current substitution
                                                 -- Maps InIds to OutExprs
 
                    sc_how_bound :: HowBoundEnv,
                         -- Binds interesting non-top-level variables
                         -- Domain is OutVars (*after* applying the substitution)
 
-                   sc_vals  :: ValueEnv,
+                   sc_vals      :: ValueEnv,
                         -- Domain is OutIds (*after* applying the substitution)
                         -- Used even for top-level bindings (but not imported ones)
 
@@ -665,13 +672,14 @@ instance Outputable Value where
 ---------------------
 initScEnv :: DynFlags -> UniqFM SpecConstrAnnotation -> ScEnv
 initScEnv dflags anns
-  = SCE { sc_dflags = dflags,
-          sc_size = specConstrThreshold dflags,
-          sc_count = specConstrCount dflags,
-          sc_force = False,
-          sc_subst = emptySubst,
-          sc_how_bound = emptyVarEnv,
-          sc_vals = emptyVarEnv,
+  = SCE { sc_dflags      = dflags,
+          sc_size        = specConstrThreshold dflags,
+          sc_count       = specConstrCount     dflags,
+          sc_recursive   = specConstrRecursive dflags,
+          sc_force       = False,
+          sc_subst       = emptySubst,
+          sc_how_bound   = emptyVarEnv,
+          sc_vals        = emptyVarEnv,
           sc_annotations = anns }
 
 data HowBound = RecFun  -- These are the recursive functions for which
@@ -1401,7 +1409,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                              `setIdArity` count isId spec_lam_args
               spec_str   = calcSpecStrictness fn spec_lam_args pats
                 -- Conditionally use result of new worker-wrapper transform
-              (spec_lam_args, spec_call_args) = mkWorkerArgs qvars False body_ty
+              (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars False body_ty
                 -- Usual w/w hack to avoid generating 
                 -- a spec_rhs of unlifted type and no args
 
@@ -1518,15 +1526,35 @@ callsToPats :: ScEnv -> [OneSpec] -> [ArgOcc] -> [Call] -> UniqSM (Bool, [CallPa
 callsToPats env done_specs bndr_occs calls
   = do  { mb_pats <- mapM (callToPats env bndr_occs) calls
 
-        ; let good_pats :: [CallPat]
+        ; let good_pats :: [(CallPat, ValueEnv)]
               good_pats = catMaybes mb_pats
               done_pats = [p | OS p _ _ _ <- done_specs]
               is_done p = any (samePat p) done_pats
+              no_recursive = map fst (filterOut (is_too_recursive env) good_pats)
 
         ; return (any isNothing mb_pats,
-                  filterOut is_done (nubBy samePat good_pats)) }
+                  filterOut is_done (nubBy samePat no_recursive)) }
 
-callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
+is_too_recursive :: ScEnv -> (CallPat, ValueEnv) -> Bool
+    -- Count the number of recursive constructors in a call pattern,
+    -- filter out if there are more than the maximum.
+    -- This is only necessary if ForceSpecConstr is in effect:
+    -- otherwise specConstrCount will cause specialisation to terminate.
+is_too_recursive env ((_,exprs), val_env)
+ = sc_force env && maximum (map go exprs) > sc_recursive env
+ where
+  go e
+   | Just (ConVal (DataAlt dc) args) <- isValue val_env e
+   , isRecursiveTyCon (dataConTyCon dc)
+   = 1 + sum (map go args)
+
+   |App f a                          <- e
+   = go f + go a
+
+   | otherwise
+   = 0
+
+callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe (CallPat, ValueEnv))
         -- The [Var] is the variables to quantify over in the rule
         --      Type variables come first, since they may scope
         --      over the following term variables
@@ -1553,9 +1581,9 @@ callToPats env bndr_occs (con_env, args)
               sanitise id   = id `setIdType` expandTypeSynonyms (idType id)
                 -- See Note [Free type variables of the qvar types]
 
-        ; -- pprTrace "callToPats"  (ppr args $$ ppr prs $$ ppr bndr_occs) $
+        ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
           if interesting
-          then return (Just (qvars', pats))
+          then return (Just ((qvars', pats), con_env))
           else return Nothing }
 
     -- argToPat takes an actual argument, and returns an abstracted

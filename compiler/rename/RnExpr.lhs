@@ -433,7 +433,7 @@ rnCmdTop = wrapLocFstM rnCmdTop'
 	-- Generate the rebindable syntax for the monad
         ; (cmd_names', cmd_fvs) <- lookupSyntaxNames cmd_names
 
-        ; return (HsCmdTop cmd' [] placeHolderType (cmd_names `zip` cmd_names'), 
+        ; return (HsCmdTop cmd' placeHolderType placeHolderType (cmd_names `zip` cmd_names'), 
 	          fvCmd `plusFV` cmd_fvs) }
 
 rnLCmd :: LHsCmd RdrName -> RnM (LHsCmd Name, FreeVars)
@@ -511,6 +511,7 @@ rnCmd (HsCmdDo stmts _)
   = do  { ((stmts', _), fvs) <- rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
         ; return ( HsCmdDo stmts' placeHolderType, fvs ) }
 
+rnCmd cmd@(HsCmdCast {}) = pprPanic "rnCmd" (ppr cmd)
 
 ---------------------------------------------------
 type CmdNeeds = FreeVars	-- Only inhabitants are 
@@ -527,6 +528,7 @@ methodNamesCmd (HsCmdArrApp _arrow _arg _ HsFirstOrderApp _rtl)
 methodNamesCmd (HsCmdArrApp _arrow _arg _ HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
+methodNamesCmd (HsCmdCast _ cmd) = methodNamesCmd cmd
 
 methodNamesCmd (HsCmdPar c) = methodNamesLCmd c
 

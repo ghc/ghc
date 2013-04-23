@@ -36,13 +36,7 @@ readBinPackageDB file
       (\err -> error ("While parsing " ++ show file ++ ": " ++ err))
 
 catchUserError :: IO a -> (String -> IO a) -> IO a
-#ifdef BASE3
-catchUserError io f = io `Exception.catch` \e -> case e of
-                                                 ErrorCall err -> f err
-                                                 _ -> throw e
-#else
 catchUserError io f = io `Exception.catch` \(ErrorCall err) -> f err
-#endif
 
 writeBinPackageDB :: Binary m => FilePath -> [InstalledPackageInfo_ m] -> IO ()
 writeBinPackageDB file ipis = Bin.encodeFile file ipis

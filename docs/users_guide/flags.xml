@@ -1069,7 +1069,8 @@
           </row>
           <row>
             <entry><option>-XAutoDeriveTypeable</option></entry>
-            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.</entry>
+            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.
+            Implies <option>-XDeriveDataTypeable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoAutoDeriveTypeable</option></entry>
           </row>
@@ -1121,6 +1122,12 @@
             <entry>Enable <link linkend="multi-param-type-classes">multi parameter type classes</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMultiParamTypeClasses</option></entry>
+          </row>
+          <row>
+            <entry><option>-XNullaryTypeClasses</option></entry>
+            <entry>Enable <link linkend="nullary-type-classes">nullary (no parameter) type classes</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoNullaryTypeClasses</option></entry>
           </row>
           <row>
             <entry><option>-XFunctionalDependencies</option></entry>
@@ -1541,6 +1548,17 @@
             <entry>Make dictionaries strict</entry>
             <entry>static</entry>
             <entry><option>-fno-dicts-strict</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-ffun-to-thunk</option></entry>
+            <entry>Worker-wrapper removes unused arguments; this flag
+            lets it thusly remove all value lambdas. Doing so creates
+            a thunk where it was previously a function closure, which
+            may save recomputation but also risks a space leak. Off by
+            default.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-fun-to-thunk</option></entry>
           </row>
 
           <row>

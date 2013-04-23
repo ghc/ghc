@@ -50,7 +50,7 @@ initFreeRegs platform
 
                         
 -- | Get all the free registers of this class.
-getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazilly
+getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazily
 getFreeRegs cls (FreeRegs g f d)
         | RcInteger <- cls = map RealRegSingle                  $ go 1 g 1 0  
         | RcFloat   <- cls = map RealRegSingle                  $ go 1 f 1 32 

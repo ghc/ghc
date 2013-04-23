@@ -228,7 +228,7 @@ pprDataConDecl pefas ss gadt_style dataCon
     user_ify bang                      = bang
 
     maybe_show_label (lbl,bty)
-	| showSub ss lbl = Just (ppr lbl <+> dcolon <+> pprBangTy bty)
+	| showSub ss lbl = Just (ppr_bndr lbl <+> dcolon <+> pprBangTy bty)
 	| otherwise      = Nothing
 
     ppr_fields [ty1, ty2]

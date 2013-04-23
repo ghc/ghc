@@ -201,7 +201,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkVendor() {
         case [$]1 in
-        dec|unknown|hp|apple|next|sun|sgi|ibm|montavista)
+        dec|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld)
             ;;
         *)
             echo "Unknown vendor [$]1"
@@ -863,7 +863,7 @@ AC_SUBST(HappyVersion)
 
 dnl
 dnl Check for Alex and version.  If we're building GHC, then we need
-dnl at least Alex version 2.0.1.
+dnl at least Alex version 2.1.1.
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
@@ -879,12 +879,17 @@ else
 fi;
 changequote([, ])dnl
 ])
+FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.0],
+  [Alex3=YES],[Alex3=NO])
 if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.1.0],
       [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.0],
-      [Alex3=YES],[Alex3=NO])
+fi
+if test ! -f utils/haddock/src/Haddock/Lex.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.0],
+      [AC_MSG_ERROR([Alex version 3.0 or later is required to compile Haddock.])])[]
 fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
@@ -996,6 +1001,38 @@ else
 fi
 AC_SUBST([LdHasNoCompactUnwind])
 ])# FP_PROG_LD_NO_COMPACT_UNWIND
+
+
+# FP_PROG_LD_FILELIST
+# -------------------
+
+# Sets the output variable LdHasFilelist to YES if ld supports
+# -filelist, or NO otherwise.
+AC_DEFUN([FP_PROG_LD_FILELIST],
+[
+AC_CACHE_CHECK([whether ld understands -filelist], [fp_cv_ld_has_filelist],
+[
+    echo 'int foo() { return 0; }' > conftest1.c
+    echo 'int bar() { return 0; }' > conftest2.c
+    ${CC-cc} -c conftest1.c
+    ${CC-cc} -c conftest2.c
+    echo conftest1.o  > conftest.o-files
+    echo conftest2.o >> conftest.o-files
+    if ${LdCmd} -r -filelist conftest.o-files -o conftest.o > /dev/null 2>&1
+    then
+        fp_cv_ld_has_filelist=yes
+    else
+        fp_cv_ld_has_filelist=no
+    fi
+    rm -rf conftest*
+])
+if test "$fp_cv_ld_has_filelist" = yes; then
+    LdHasFilelist=YES
+else
+    LdHasFilelist=NO
+fi
+AC_SUBST([LdHasFilelist])
+])# FP_PROG_LD_FILELIST
 
 
 # FP_PROG_AR
@@ -1965,16 +2002,16 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-    if test "$$1" != ""; then
+    if test "$$1" == ""; then
         save_IFS=$IFS
         IFS=":;"
         for p in ${PATH}; do
-	    if test -d "${p}"; then
+            if test -d "${p}"; then
                 $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
                 if test -n "$1"; then
                     break
                 fi
-	    fi
+            fi
         done
         IFS=$save_IFS
     fi

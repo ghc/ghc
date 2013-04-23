@@ -29,11 +29,11 @@ module StgCmmUtils (
         cmmOffsetW, cmmOffsetB,
         cmmOffsetLitW, cmmOffsetLitB,
         cmmLoadIndexW,
-        cmmConstrTag, cmmConstrTag1,
+        cmmConstrTag1,
 
-        cmmUntag, cmmIsTagged, cmmGetTag,
+        cmmUntag, cmmIsTagged,
 
-        addToMem, addToMemE, addToMemLbl,
+        addToMem, addToMemE, addToMemLblE, addToMemLbl,
         mkWordCLit,
         newStringCLit, newByteStringCLit,
         blankWord
@@ -117,6 +117,9 @@ mkSimpleLit _ other             = pprPanic "mkSimpleLit" (ppr other)
 
 addToMemLbl :: CmmType -> CLabel -> Int -> CmmAGraph
 addToMemLbl rep lbl n = addToMem rep (CmmLit (CmmLabel lbl)) n
+
+addToMemLblE :: CmmType -> CLabel -> CmmExpr -> CmmAGraph
+addToMemLblE rep lbl = addToMemE rep (CmmLit (CmmLabel lbl))
 
 addToMem :: CmmType     -- rep of the counter
          -> CmmExpr     -- Address

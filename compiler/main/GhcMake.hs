@@ -742,14 +742,14 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 
             compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
             compile_it  mb_linkable src_modified =
-                  compile hsc_env summary' mod_index nmods 
-                          mb_old_iface mb_linkable src_modified
+                  compileOne hsc_env summary' mod_index nmods
+                             mb_old_iface mb_linkable src_modified
 
             compile_it_discard_iface :: Maybe Linkable -> SourceModified
                                      -> IO HomeModInfo
             compile_it_discard_iface mb_linkable  src_modified =
-                  compile hsc_env summary' mod_index nmods
-                          Nothing mb_linkable src_modified
+                  compileOne hsc_env summary' mod_index nmods
+                             Nothing mb_linkable src_modified
 
             -- With the HscNothing target we create empty linkables to avoid
             -- recompilation.  We have to detect these to recompile anyway if

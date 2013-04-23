@@ -37,6 +37,8 @@ import Util
 
 import Control.Monad
 import Control.Monad.ST ( runST )
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 
 import Data.Array.MArray
 import Data.Array.Unboxed ( listArray )
@@ -151,7 +153,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   -- pass 2: run assembler and generate instructions, literals and pointers
   let initial_state = (emptySS, emptySS, emptySS)
-  (final_insns, final_lits, final_ptrs) <- execState initial_state $ runAsm dflags long_jumps env asm
+  (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm dflags long_jumps env asm
 
   -- precomputed size should be equal to final size
   ASSERT (n_insns == sizeSS final_insns) return ()
@@ -245,20 +247,20 @@ largeOp long_jumps op = case op of
    LabelOp _ -> long_jumps
 -- LargeOp _ -> True
 
-runAsm :: DynFlags -> Bool -> LabelEnv -> Assembler a -> State AsmState IO a
+runAsm :: DynFlags -> Bool -> LabelEnv -> Assembler a -> StateT AsmState IO a
 runAsm dflags long_jumps e = go
   where
     go (NullAsm x) = return x
     go (AllocPtr p_io k) = do
       p <- lift p_io
-      w <- State $ \(st_i0,st_l0,st_p0) -> do
+      w <- state $ \(st_i0,st_l0,st_p0) ->
         let st_p1 = addToSS st_p0 p
-        return ((st_i0,st_l0,st_p1), sizeSS st_p0)
+        in (sizeSS st_p0, (st_i0,st_l0,st_p1))
       go $ k w
     go (AllocLit lits k) = do
-      w <- State $ \(st_i0,st_l0,st_p0) -> do
+      w <- state $ \(st_i0,st_l0,st_p0) ->
         let st_l1 = addListToSS st_l0 lits
-        return ((st_i0,st_l1,st_p0), sizeSS st_l0)
+        in (sizeSS st_l0, (st_i0,st_l1,st_p0))
       go $ k w
     go (AllocLabel _ k) = go k
     go (Emit w ops k) = do
@@ -271,9 +273,9 @@ runAsm dflags long_jumps e = go
           expand (LabelOp w) = expand (Op (e w))
           expand (Op w) = if largeOps then largeArg dflags w else [fromIntegral w]
 --        expand (LargeOp w) = largeArg dflags w
-      State $ \(st_i0,st_l0,st_p0) -> do
+      state $ \(st_i0,st_l0,st_p0) ->
         let st_i1 = addListToSS st_i0 (opcode : words)
-        return ((st_i1,st_l0,st_p0), ())
+        in ((), (st_i1,st_l0,st_p0))
       go k
 
 type LabelEnvMap = Map Word16 Word

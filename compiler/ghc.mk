@@ -101,27 +101,21 @@ endif
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
 	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
-	@echo 'cGHC_DRIVER_DIR       :: String'                             >> $@
-	@echo 'cGHC_DRIVER_DIR       = "$(GHC_DRIVER_DIR)"'                 >> $@
 	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
-	@echo 'cGHC_UNLIT_PGM        = "$(GHC_UNLIT_PGM)"'                  >> $@
-	@echo 'cGHC_UNLIT_DIR        :: String'                             >> $@
-	@echo 'cGHC_UNLIT_DIR        = "$(GHC_UNLIT_DIR)"'                  >> $@
+	@echo 'cGHC_UNLIT_PGM        = "$(utils/unlit_dist_PROG)"'          >> $@
 	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
-	@echo 'cGHC_SPLIT_PGM        = "$(GHC_SPLIT_PGM)"'                  >> $@
-	@echo 'cGHC_SPLIT_DIR        :: String'                             >> $@
-	@echo 'cGHC_SPLIT_DIR        = "$(GHC_SPLIT_DIR)"'                  >> $@
-	@echo 'cGHC_SYSMAN_PGM       :: String'                             >> $@
-	@echo 'cGHC_SYSMAN_PGM       = "$(GHC_SYSMAN)"'                     >> $@
-	@echo 'cGHC_SYSMAN_DIR       :: String'                             >> $@
-	@echo 'cGHC_SYSMAN_DIR       = "$(GHC_SYSMAN_DIR)"'                 >> $@
-	@echo 'cDEFAULT_TMPDIR       :: String'                             >> $@
-	@echo 'cDEFAULT_TMPDIR       = "$(DEFAULT_TMPDIR)"'                 >> $@
+	@echo 'cGHC_SPLIT_PGM        = "$(driver/split_dist_PROG)"'         >> $@
 	@echo 'cLibFFI               :: Bool'                               >> $@
 ifeq "$(UseLibFFIForAdjustors)" "YES"
 	@echo 'cLibFFI               = True'                                >> $@
 else
 	@echo 'cLibFFI               = False'                               >> $@
+endif
+	@echo 'cDYNAMIC_GHC_PROGRAMS :: Bool'                               >> $@
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
+	@echo 'cDYNAMIC_GHC_PROGRAMS = True'                                >> $@
+else
+	@echo 'cDYNAMIC_GHC_PROGRAMS = False'                               >> $@
 endif
 	@echo done.
 
@@ -258,33 +252,33 @@ compiler/stage$1/build/Parser.y: compiler/parser/Parser.y.pp
 compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp compiler/stage$1/$$(PLATFORM_H)
 	$$(CPP) $$(RAWCPP_FLAGS) -P $$(compiler_CPP_OPTS) -Icompiler/stage$1 -x c $$< | grep -v '^#pragma GCC' > $$@
 
-compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --data-decl          < $$< > $$@
-compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --primop-tag         < $$< > $$@
-compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --primop-list        < $$< > $$@
-compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --has-side-effects   < $$< > $$@
-compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --out-of-line        < $$< > $$@
-compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --commutable         < $$< > $$@
-compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --code-size          < $$< > $$@
-compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --can-fail           < $$< > $$@
-compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --strictness         < $$< > $$@
-compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --fixity             < $$< > $$@
-compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --primop-primop-info < $$< > $$@
+compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --data-decl          < $$< > $$@
+compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-tag         < $$< > $$@
+compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-list        < $$< > $$@
+compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --has-side-effects   < $$< > $$@
+compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --out-of-line        < $$< > $$@
+compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --commutable         < $$< > $$@
+compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --code-size          < $$< > $$@
+compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --can-fail           < $$< > $$@
+compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --strictness         < $$< > $$@
+compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --fixity             < $$< > $$@
+compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
 
 # Usages aren't used any more; but the generator 
 # can still generate them if we want them back
-compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
-	"$$(GENPRIMOP_INPLACE)" --usage              < $$< > $$@
+compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --usage              < $$< > $$@
 
 endef
 
@@ -306,14 +300,6 @@ endif
 
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=ghci
-
-ifeq "$(BuildSharedLibs)" "YES"
-# There are too many symbols to make a Windows DLL for the ghc package,
-# so we don't build it the dyn way; see trac #5987
-ifneq "$(TargetOS_CPP)" "mingw32"
-compiler_stage2_CONFIGURE_OPTS += --enable-shared
-endif
-endif
 
 ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
@@ -409,23 +395,20 @@ compiler_stage1_REGISTER_PACKAGE = NO
 
 endif
 
-# haddocking only happens for stage2
-compiler_stage1_DO_HADDOCK = NO
-compiler_stage3_DO_HADDOCK = NO
-
 # Don't do splitting for the GHC package, it takes too long and
 # there's not much benefit.
 compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
 
-ifeq "$(TargetOS_CPP)" "mingw32"
-# There are too many symbols to make a Windows DLL for the ghc package,
-# so we don't build it the dyn way; see trac #5987
-compiler_stage1_EXCLUDED_WAYS := dyn
-compiler_stage2_EXCLUDED_WAYS := dyn
-compiler_stage3_EXCLUDED_WAYS := dyn
-endif
+# There are too many symbols in the ghc package for a Windows DLL.
+# We therefore need to split some of the modules off into a separate
+# DLL. This clump are the modules reachable from DynFlags:
+compiler_stage2_dll0_START_MODULE = DynFlags
+compiler_stage2_dll0_MODULES = Annotations Avail Bag BasicTypes Binary Bitmap BlockId BreakArray BufWrite ByteCodeAsm ByteCodeInstr ByteCodeItbls ByteCodeLink CLabel Class CmdLineParser Cmm CmmCallConv CmmExpr CmmInfo CmmMachOp CmmNode CmmType CmmUtils CoAxiom CodeGen.Platform CodeGen.Platform.ARM CodeGen.Platform.NoRegs CodeGen.Platform.PPC CodeGen.Platform.PPC_Darwin CodeGen.Platform.SPARC CodeGen.Platform.X86 CodeGen.Platform.X86_64 Coercion Config Constants CoreArity CoreFVs CoreSubst CoreSyn CoreTidy CoreUnfold CoreUtils CostCentre DataCon Demand Digraph DriverPhases DynFlags Encoding ErrUtils Exception FamInstEnv FastBool FastFunctions FastMutInt FastString FastTypes Fingerprint FiniteMap ForeignCall Hoopl Hoopl.Dataflow HsBinds HsDecls HsDoc HsExpr HsImpExp HsLit HsPat HsSyn HsTypes HsUtils HscTypes Id IdInfo IfaceSyn IfaceType InstEnv InteractiveEvalTypes Kind ListSetOps Literal Maybes MkCore MkGraph MkId Module MonadUtils Name NameEnv NameSet ObjLink OccName OccurAnal OptCoercion OrdList Outputable PackageConfig Packages Pair Panic Platform PlatformConstants PprCmm PprCmmDecl PprCmmExpr PprCore PrelNames PrelRules Pretty PrimOp RdrName Reg RegClass Rules SMRep Serialized SrcLoc StaticFlags StgCmmArgRep StgCmmClosure StgCmmEnv StgCmmLayout StgCmmMonad StgCmmProf StgCmmTicky StgCmmUtils StgSyn Stream StringBuffer TcEvidence TcType TyCon Type TypeRep TysPrim TysWiredIn Unify UniqFM UniqSet UniqSupply Unique Util Var VarEnv VarSet
+
+compiler_stage2_dll0_HS_OBJS = \
+    $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))
 
 # if stage is set to something other than "1" or "", disable stage 1
 ifneq "$(filter-out 1,$(stage))" ""
@@ -505,20 +488,13 @@ $(foreach way,$(compiler_stage3_WAYS),\
 # switch off the recompilation checker for that module:
 compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
 
+ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
+compiler/utils/Util_HC_OPTS += -DDYNAMIC_GHC_PROGRAMS
+endif
+
 # LibFFI.hs #includes ffi.h
 ifneq "$(UseSystemLibFFI)" "YES"
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)
-endif
-
-# On Windows it seems we also need to link directly to libffi
-ifeq "$(HostOS_CPP)" "mingw32"
-define windowsDynLinkToFfi
-# $1 = way
-ifneq "$$(findstring dyn, $1)" ""
-compiler_stage2_$1_ALL_HC_OPTS += -l$$(LIBFFI_WINDOWS_LIB)
-endif
-endef
-$(foreach way,$(GhcLibWays),$(eval $(call windowsDynLinkToFfi,$(way))))
 endif
 
 # Note [munge-stage1-package-config]

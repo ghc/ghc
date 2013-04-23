@@ -1464,7 +1464,7 @@ exp10 :: { LHsExpr RdrName }
         | 'proc' aexp '->' exp  
                         {% checkPattern empty $2 >>= \ p -> 
                             checkCommand $4 >>= \ cmd ->
-                            return (LL $ HsProc p (LL $ HsCmdTop cmd [] 
+                            return (LL $ HsProc p (LL $ HsCmdTop cmd placeHolderType
                                                     placeHolderType undefined)) }
                                                 -- TODO: is LL right here?
 
@@ -1559,7 +1559,7 @@ cmdargs :: { [LHsCmdTop RdrName] }
 
 acmd    :: { LHsCmdTop RdrName }
         : aexp2                 {% checkCommand $1 >>= \ cmd ->
-                                    return (L1 $ HsCmdTop cmd [] placeHolderType undefined) }
+                                    return (L1 $ HsCmdTop cmd placeHolderType placeHolderType undefined) }
 
 cvtopbody :: { [LHsDecl RdrName] }
         :  '{'            cvtopdecls0 '}'               { $2 }

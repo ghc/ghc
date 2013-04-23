@@ -117,6 +117,9 @@ if test "$WithGhc" != ""; then
 
   BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os])
   BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
+  dnl ToDo, once "ld command" is reliably available.
+  dnl Then, we can remove the LD_STAGE0 hack in mk/build-package-date.mk
+  dnl BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
   if test "x$OS_STAGE0" != "xOSDarwin"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
     BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
@@ -148,8 +151,9 @@ then
     fi
 fi
 
-GHC_PACKAGE_DB_FLAG=package-db
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
+                    GHC_PACKAGE_DB_FLAG=package-conf,
+                    GHC_PACKAGE_DB_FLAG=package-db)
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
@@ -554,6 +558,7 @@ FP_PROG_LD_ReduceMemoryOverheads
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
 FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
 
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
@@ -851,18 +856,6 @@ dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
 AC_CHECK_FUNCS([eventfd])
 
-# test for GTK+
-AC_PATH_PROGS([GTK_CONFIG], [pkg-config])
-if test -n "$GTK_CONFIG"; then
-  if $GTK_CONFIG gtk+-2.0 --atleast-version=2.0; then
-    GTK_CONFIG="$GTK_CONFIG gtk+-2.0"
-  else
-    AC_MSG_WARN([GTK+ not usable, need at least version 2.0])
-    GTK_CONFIG=
-  fi
-fi
-AC_SUBST([GTK_CONFIG])
-
 # checking for PAPI
 AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
 AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])
@@ -908,7 +901,7 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal ghc.spec settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/ghc.iss distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal ghc.spec settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
 

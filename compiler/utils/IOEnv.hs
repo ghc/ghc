@@ -208,23 +208,3 @@ updEnv :: (env -> env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnv #-}
 updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
 
-
-----------------------------------------------------------------------
--- Standard combinators, but specialised for this monad
--- (for efficiency)
-----------------------------------------------------------------------
-
--- {-# SPECIALIZE mapM          :: (a -> IOEnv env b) -> [a] -> IOEnv env [b] #-}
--- {-# SPECIALIZE mapM_         :: (a -> IOEnv env b) -> [a] -> IOEnv env () #-}
--- {-# SPECIALIZE mapSndM       :: (b -> IOEnv env c) -> [(a,b)] -> IOEnv env [(a,c)] #-}
--- {-# SPECIALIZE sequence      :: [IOEnv env a] -> IOEnv env [a] #-}
--- {-# SPECIALIZE sequence_     :: [IOEnv env a] -> IOEnv env () #-}
--- {-# SPECIALIZE foldlM        :: (a -> b -> IOEnv env a)  -> a -> [b] -> IOEnv env a #-}
--- {-# SPECIALIZE foldrM        :: (b -> a -> IOEnv env a)  -> a -> [b] -> IOEnv env a #-}
--- {-# SPECIALIZE mapAndUnzipM  :: (a -> IOEnv env (b,c))   -> [a] -> IOEnv env ([b],[c]) #-}
--- {-# SPECIALIZE mapAndUnzip3M :: (a -> IOEnv env (b,c,d)) -> [a] -> IOEnv env ([b],[c],[d]) #-}
--- {-# SPECIALIZE zipWithM      :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env [c] #-}
--- {-# SPECIALIZE zipWithM_     :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env () #-}
--- {-# SPECIALIZE anyM          :: (a -> IOEnv env Bool) -> [a] -> IOEnv env Bool #-}
--- {-# SPECIALIZE when          :: Bool -> IOEnv env a -> IOEnv env () #-}
--- {-# SPECIALIZE unless        :: Bool -> IOEnv env a -> IOEnv env () #-}

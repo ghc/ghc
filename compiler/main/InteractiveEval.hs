@@ -38,11 +38,14 @@ module InteractiveEval (
 
 #include "HsVersions.h"
 
+import InteractiveEvalTypes
+
 import GhcMonad
 import HscMain
 import HsSyn
 import HscTypes
 import InstEnv
+import FamInstEnv ( FamInst, Branched, orphNamesOfFamInst )
 import TyCon
 import Type     hiding( typeKind )
 import TcType           hiding( typeKind )
@@ -88,37 +91,6 @@ import System.IO.Unsafe
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
 
-data RunResult
-  = RunOk [Name]                -- ^ names bound by this evaluation
-  | RunException SomeException  -- ^ statement raised an exception
-  | RunBreak ThreadId [Name] (Maybe BreakInfo)
-
-data Status
-   = Break Bool HValue BreakInfo ThreadId
-          -- ^ the computation hit a breakpoint (Bool <=> was an exception)
-   | Complete (Either SomeException [HValue])
-          -- ^ the computation completed with either an exception or a value
-
-data Resume
-   = Resume {
-       resumeStmt      :: String,       -- the original statement
-       resumeThreadId  :: ThreadId,     -- thread running the computation
-       resumeBreakMVar :: MVar (),
-       resumeStatMVar  :: MVar Status,
-       resumeBindings  :: ([TyThing], GlobalRdrEnv),
-       resumeFinalIds  :: [Id],         -- [Id] to bind on completion
-       resumeApStack   :: HValue,       -- The object from which we can get
-                                        -- value of the free variables.
-       resumeBreakInfo :: Maybe BreakInfo,
-                                        -- the breakpoint we stopped at
-                                        -- (Nothing <=> exception)
-       resumeSpan      :: SrcSpan,      -- just a cache, otherwise it's a pain
-                                        -- to fetch the ModDetails & ModBreaks
-                                        -- to get this.
-       resumeHistory   :: [History],
-       resumeHistoryIx :: Int           -- 0 <==> at the top of the history
-   }
-
 getResumeContext :: GhcMonad m => m [Resume]
 getResumeContext = withSession (return . ic_resume . hsc_IC)
 
@@ -130,13 +102,6 @@ data SingleStep
 isStep :: SingleStep -> Bool
 isStep RunToCompletion = False
 isStep _ = True
-
-data History
-   = History {
-        historyApStack   :: HValue,
-        historyBreakInfo :: BreakInfo,
-        historyEnclosingDecls :: [String]  -- declarations enclosing the breakpoint
-   }
 
 mkHistory :: HscEnv -> HValue -> BreakInfo -> History
 mkHistory hsc_env hval bi = let
@@ -925,20 +890,25 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
+getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst Branched]))
 getInfo allInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
          Nothing -> return Nothing
-         Just (thing, fixity, ispecs) -> do
+         Just (thing, fixity, cls_insts, fam_insts) -> do
            let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
-           return (Just (thing, fixity, filter (plausible rdr_env) ispecs))
+
+           -- Filter the instances based on whether the constituent names of their
+           -- instance heads are all in scope.
+           let cls_insts' = filter (plausible rdr_env . orphNamesOfClsInst) cls_insts
+               fam_insts' = filter (plausible rdr_env . orphNamesOfFamInst) fam_insts
+           return (Just (thing, fixity, cls_insts', fam_insts'))
   where
-    plausible rdr_env ispec
+    plausible rdr_env names
           -- Dfun involving only names that are in ic_rn_glb_env
         = allInfo
-       || all ok (nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec)
+       || all ok (nameSetToList names)
         where   -- A name is ok if it's in the rdr_env,
                 -- whether qualified or not
           ok n | n == name         = True       -- The one we looked for in the first place!

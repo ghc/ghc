@@ -52,7 +52,8 @@ doDirectory ignoreSizeChanges p1 p2
           mkFileInfo fp@('g':'h':'c':'-':x:xs)
            | isDigit x = return [(("ghc-", "VERSION", dropWhile isVersionChar xs), fp)]
            | otherwise = die ["No version number in " ++ show fp]
-          mkFileInfo fp = die ["Unrecognised filename " ++ show fp]
+          mkFileInfo fp = do warn ["Unrecognised filename " ++ show fp]
+                             return []
       fss1' <- mapM mkFileInfo fs1
       fss2' <- mapM mkFileInfo fs2
       let fs1' = sort $ concat fss1'

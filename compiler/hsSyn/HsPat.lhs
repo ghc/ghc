@@ -232,7 +232,7 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
         parens (pprBndr LambdaBind var)         -- Could pass the site to pprPat
                                                 -- but is it worth it?
     else
-        ppr var
+        pprPrefixOcc var
 
 pprParendLPat :: (OutputableBndr name) => LPat name -> SDoc
 pprParendLPat (L _ p) = pprParendPat p
@@ -246,14 +246,14 @@ pprPat (VarPat var)       = pprPatBndr var
 pprPat (WildPat _)        = char '_'
 pprPat (LazyPat pat)      = char '~' <> pprParendLPat pat
 pprPat (BangPat pat)      = char '!' <> pprParendLPat pat
-pprPat (AsPat name pat)   = hcat [ppr name, char '@', pprParendLPat pat]
+pprPat (AsPat name pat)   = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
 pprPat (ViewPat expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat pat)         = parens (ppr pat)
 pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = paBrackets (interpp'SP pats)
 pprPat (TuplePat pats bx _) = tupleParens (boxityNormalTupleSort bx) (interpp'SP pats)
 
-pprPat (ConPatIn con details) = pprUserCon con details
+pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
 pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                     pat_binds = binds, pat_args = details })
   = getPprStyle $ \ sty ->      -- Tiresome; in TcBinds.tcRhs we print out a
@@ -262,7 +262,7 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
         ppr con <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
                                , ppr binds])
                 <+> pprConArgs details
-    else pprUserCon con details
+    else pprUserCon (unLoc con) details
 
 pprPat (LitPat s)           = ppr s
 pprPat (NPat l Nothing  _)  = ppr l
@@ -273,9 +273,9 @@ pprPat (CoPat co pat _)     = pprHsWrapper (ppr pat) co
 pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)   = ppr pat <+> dcolon <+> ppr ty
 
-pprUserCon :: (Outputable con, OutputableBndr id) => con -> HsConPatDetails id -> SDoc
-pprUserCon c (InfixCon p1 p2) = ppr p1 <+> ppr c <+> ppr p2
-pprUserCon c details          = ppr c <+> pprConArgs details
+pprUserCon :: (OutputableBndr con, OutputableBndr id) => con -> HsConPatDetails id -> SDoc
+pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
+pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
 pprConArgs ::  OutputableBndr id => HsConPatDetails id -> SDoc
 pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)

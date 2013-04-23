@@ -125,14 +125,24 @@ BuildVendor_CPP                 = @BuildVendor_CPP@
 LeadingUnderscore=@LeadingUnderscore@
 
 # Pin a suffix on executables? If so, what (Windows only).
-exeext=@exeext@
+exeext0=@exeext@
+exeext1=@exeext@
+exeext2=@exeext@
+exeext3=@exeext@
 soext=@soext@
 
-# Windows=YES if on a Windows platform
+# Windows_Host=YES if on a Windows platform
 ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32)" ""
-Windows=YES
+Windows_Host=YES
 else
-Windows=NO
+Windows_Host=NO
+endif
+
+# Windows_Target=YES if we are targetting a Windows platform
+ifneq "$(findstring $(TargetOS_CPP), mingw32 cygwin32)" ""
+Windows_Target=YES
+else
+Windows_Target=NO
 endif
 
 # Tell the build system what the host operating system is

@@ -24,7 +24,6 @@ you will screw up the layout where they are used in case expressions!
 
 /* Global variables may not work in other Haskell implementations,
  * but we need them currently! so the conditional on GLASGOW won't do. */
-#ifndef __HADDOCK__
 #if defined(__GLASGOW_HASKELL__) || !defined(__GLASGOW_HASKELL__)
 #define GLOBAL_VAR(name,value,ty)  \
 {-# NOINLINE name #-};             \
@@ -33,15 +32,6 @@ name = Util.global (value);
 
 #define GLOBAL_VAR_M(name,value,ty) \
 {-# NOINLINE name #-};              \
-name :: IORef (ty);                 \
-name = Util.globalM (value);
-#endif
-#else /* __HADDOCK__ */
-#define GLOBAL_VAR(name,value,ty)  \
-name :: IORef (ty);                \
-name = Util.global (value);
-
-#define GLOBAL_VAR_M(name,value,ty) \
 name :: IORef (ty);                 \
 name = Util.globalM (value);
 #endif

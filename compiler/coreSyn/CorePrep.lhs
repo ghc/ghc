@@ -13,6 +13,8 @@ module CorePrep (
 
 #include "HsVersions.h"
 
+import OccurAnal
+
 import HscTypes
 import PrelNames
 import CoreUtils
@@ -270,7 +272,7 @@ partial applications. But it's easier to let them through.
 
 Note [Dead code in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Imagine that we got an input program like this:
+Imagine that we got an input program like this (see Trac #4962):
 
   f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
   f x = (g True (Just x) + g () (Just x), g)
@@ -306,11 +308,12 @@ unreachable g$Bool and g$Unit functions.
 
 The way we fix this is to:
  * In cloneBndr, drop all unfoldings/rules
- * In deFloatTop, run a simple dead code analyser on each top-level RHS to drop
-   the dead local bindings. (we used to run the occurrence analyser to do
-   this job, but the occurrence analyser sometimes introduces new let
-   bindings for case binders, which lead to the bug in #5433, hence we
-   now have a special-purpose dead code analyser).
+
+ * In deFloatTop, run a simple dead code analyser on each top-level
+   RHS to drop the dead local bindings. For that call to OccAnal, we
+   disable the binder swap, else the occurrence analyser sometimes
+   introduces new let bindings for cased binders, which lead to the bug
+   in #5433.
 
 The reason we don't just OccAnal the whole output of CorePrep is that
 the tidier ensures that all top-level binders are GlobalIds, so they
@@ -1014,64 +1017,11 @@ deFloatTop (Floats _ floats)
     get b            _  = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
-    occurAnalyseRHSs (NonRec x e) = NonRec x (fst (dropDeadCode e))
-    occurAnalyseRHSs (Rec xes)    = Rec [ (x, fst (dropDeadCode e))
-                                        | (x, e) <- xes]
+    occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr_NoBinderSwap e)
+    occurAnalyseRHSs (Rec xes)    = Rec [(x, occurAnalyseExpr_NoBinderSwap e) | (x, e) <- xes]
 
 ---------------------------------------------------------------------------
--- Simple dead-code analyser, see Note [Dead code in CorePrep]
 
-dropDeadCode :: CoreExpr -> (CoreExpr, VarSet)
-dropDeadCode (Var v)
-  = (Var v, if isLocalId v then unitVarSet v else emptyVarSet)
-dropDeadCode (App fun arg)
-  = (App fun' arg', fun_fvs `unionVarSet` arg_fvs)
-  where !(fun', fun_fvs) = dropDeadCode fun
-        !(arg', arg_fvs) = dropDeadCode arg
-dropDeadCode (Lam v e)
-  = (Lam v e', delVarSet fvs v)
-  where !(e', fvs) = dropDeadCode e
-dropDeadCode (Let (NonRec v rhs) body)
-  | v `elemVarSet` body_fvs
-  = (Let (NonRec v rhs') body', rhs_fvs `unionVarSet` (body_fvs `delVarSet` v))
-  | otherwise
-  = (body', body_fvs) -- drop the dead let bind!
-  where !(body', body_fvs) = dropDeadCode body
-        !(rhs',  rhs_fvs)  = dropDeadCode rhs
-dropDeadCode (Let (Rec prs) body)
-  | any (`elemVarSet` all_fvs) bndrs
-    -- approximation: strictly speaking we should do SCC analysis here,
-    -- but for simplicity we just look to see whether any of the binders
-    -- is used and drop the entire group if all are unused.
-  = (Let (Rec (zip bndrs rhss')) body', all_fvs `delVarSetList` bndrs)
-  | otherwise
-  = (body', body_fvs) -- drop the dead let bind!
-  where !(body', body_fvs) = dropDeadCode body
-        !(bndrs, rhss)     = unzip prs
-        !(rhss', rhs_fvss) = unzip (map dropDeadCode rhss)
-        all_fvs            = unionVarSets (body_fvs : rhs_fvss)
-
-dropDeadCode (Case scrut bndr t alts)
-  = (Case scrut' bndr t alts', scrut_fvs `unionVarSet` alts_fvs)
-  where !(scrut', scrut_fvs) = dropDeadCode scrut
-        !(alts',  alts_fvs)  = dropDeadCodeAlts alts
-dropDeadCode (Cast e c)
-  = (Cast e' c, fvs)
-  where !(e', fvs) = dropDeadCode e
-dropDeadCode (Tick t e)
-  = (Tick t e', fvs')
-  where !(e', fvs) = dropDeadCode e
-        fvs' | Breakpoint _ xs <- t =  fvs `unionVarSet` mkVarSet xs
-             | otherwise            =  fvs
-dropDeadCode e = (e, emptyVarSet)  -- Lit, Type, Coercion
-
-dropDeadCodeAlts :: [CoreAlt] -> ([CoreAlt], VarSet)
-dropDeadCodeAlts alts = (alts', unionVarSets fvss)
-  where !(alts', fvss) = unzip (map do_alt alts)
-        do_alt (c, vs, e) = ((c,vs,e'), fvs `delVarSetList` vs)
-          where !(e', fvs) = dropDeadCode e
-
--------------------------------------------
 canFloatFromNoCaf :: Platform -> Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
        -- Note [CafInfo and floating]
 canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs

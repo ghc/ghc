@@ -6,7 +6,7 @@ endif
 
 label_ALEX=ALEX
 label_HAPPY=HAPPY
-label_HSC2HS_INPLACE=HSC2HS
+label_hsc2hs_INPLACE=HSC2HS
 
 
 

@@ -1,23 +1,16 @@
 --
 -- (c) The University of Glasgow 2003-2006
--- 
+--
 
 -- Functions for constructing bitmaps, which are used in various
 -- places in generated code (stack frame liveness masks, function
 -- argument liveness masks, SRT bitmaps).
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module Bitmap ( 
-	Bitmap, mkBitmap,
-	intsToBitmap, intsToReverseBitmap,
-	mAX_SMALL_BITMAP_SIZE,
-	seqBitmap,
+module Bitmap (
+        Bitmap, mkBitmap,
+        intsToBitmap, intsToReverseBitmap,
+        mAX_SMALL_BITMAP_SIZE,
+        seqBitmap,
   ) where
 
 #include "HsVersions.h"
@@ -53,8 +46,8 @@ chunkToBitmap dflags chunk =
 intsToBitmap :: DynFlags -> Int -> [Int] -> Bitmap
 intsToBitmap dflags size slots{- must be sorted -}
   | size <= 0 = []
-  | otherwise = 
-    (foldr (.|.) (toStgWord dflags 0) (map (toStgWord dflags 1 `shiftL`) these)) : 
+  | otherwise =
+    (foldr (.|.) (toStgWord dflags 0) (map (toStgWord dflags 1 `shiftL`) these)) :
         intsToBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
              (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
    where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
@@ -67,7 +60,7 @@ intsToBitmap dflags size slots{- must be sorted -}
 intsToReverseBitmap :: DynFlags -> Int -> [Int] -> Bitmap
 intsToReverseBitmap dflags size slots{- must be sorted -}
   | size <= 0 = []
-  | otherwise = 
+  | otherwise =
     (foldr xor (toStgWord dflags init) (map (toStgWord dflags 1 `shiftL`) these)) :
         intsToReverseBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
              (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)

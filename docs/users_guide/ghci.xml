@@ -2410,9 +2410,11 @@ Prelude> :. cmds.ghci
 	  and (b) all the other things mentioned in the instance
 	  are in scope (either qualified or otherwise) as a result of
 	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
+          <para>
           The command <literal>:info!</literal> works in a similar fashion
           but it removes restriction (b), showing all instances that are in
           scope and mention <replaceable>name</replaceable> in their head.
+          </para>
 	</listitem>
       </varlistentry>
 
@@ -2426,7 +2428,21 @@ Prelude> :. cmds.ghci
 	  <para>Infers and prints the kind of
 	  <replaceable>type</replaceable>. The latter can be an arbitrary
 	    type expression, including a partial application of a type constructor,
-	    such as <literal>Either Int</literal>.  If you specify the 
+	    such as <literal>Either Int</literal>.  In fact, <literal>:kind</literal>
+            even allows you to write a partial application of a type synonym (usually disallowed),
+            so that this works:
+<programlisting>
+ghci> type T a b = (a,b,a)
+ghci> :k T Int Bool
+T Int Bool :: *
+ghci> :k T
+T :: * -> * -> *
+ghci> :k T Int
+T Int :: * -> *
+</programlisting>
+            </para>
+            <para>
+            If you specify the 
             optional "<literal>!</literal>", GHC will in addition normalise the type
             by expanding out type synonyms and evaluating type-function applications,
             and display the normalised result.</para>

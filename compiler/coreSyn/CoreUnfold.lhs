@@ -61,6 +61,7 @@ import IdInfo
 import BasicTypes	( Arity )
 import Type
 import PrelNames
+import TysPrim          ( realWorldStatePrimTy )
 import Bag
 import Util
 import FastTypes
@@ -395,16 +396,19 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     size_up (Type _)   = sizeZero           -- Types cost nothing
     size_up (Coercion _) = sizeZero
     size_up (Lit lit)  = sizeN (litSize lit)
-    size_up (Var f)    = size_up_call f []  -- Make sure we get constructor
-    	    	       	 	      	    -- discounts even on nullary constructors
+    size_up (Var f) | isRealWorldId f = sizeZero
+                      -- Make sure we get constructor discounts even
+                      -- on nullary constructors
+                    | otherwise       = size_up_call f [] 0
 
-    size_up (App fun (Type _)) = size_up fun
-    size_up (App fun (Coercion _)) = size_up fun
-    size_up (App fun arg)      = size_up arg  `addSizeNSD`
-                                 size_up_app fun [arg]
+    size_up (App fun arg)
+      | isTyCoArg arg = size_up fun
+      | otherwise     = size_up arg  `addSizeNSD`
+                        size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
 
-    size_up (Lam b e) | isId b    = lamScrutDiscount dflags (size_up e `addSizeN` 10)
-		      | otherwise = size_up e
+    size_up (Lam b e)
+      | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)
+      | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
       = size_up rhs		`addSizeNSD`
@@ -480,22 +484,23 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 
     ------------ 
     -- size_up_app is used when there's ONE OR MORE value args
-    size_up_app (App fun arg) args 
-	| isTyCoArg arg		   = size_up_app fun args
-	| otherwise		   = size_up arg  `addSizeNSD`
-                                     size_up_app fun (arg:args)
-    size_up_app (Var fun)     args = size_up_call fun args
-    size_up_app other         args = size_up other `addSizeN` length args
+    size_up_app (App fun arg) args voids
+	| isTyCoArg arg                  = size_up_app fun args voids
+	| isRealWorldExpr arg            = size_up_app fun (arg:args) (voids + 1)
+	| otherwise		         = size_up arg  `addSizeNSD`
+                                           size_up_app fun (arg:args) voids
+    size_up_app (Var fun)     args voids = size_up_call fun args voids
+    size_up_app other         args voids = size_up other `addSizeN` (length args - voids)
 
     ------------ 
-    size_up_call :: Id -> [CoreExpr] -> ExprSize
-    size_up_call fun val_args
+    size_up_call :: Id -> [CoreExpr] -> Int -> ExprSize
+    size_up_call fun val_args voids
        = case idDetails fun of
            FCallId _        -> sizeN (10 * (1 + length val_args))
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op      -> primOpSize op (length val_args)
 	   ClassOpId _ 	    -> classOpSize dflags top_args val_args
-	   _     	    -> funSize dflags top_args fun (length val_args)
+	   _     	    -> funSize dflags top_args fun (length val_args) voids
 
     ------------ 
     size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 10
@@ -528,6 +533,12 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 	= mkSizeIs bOMB_OUT_SIZE (n1 +# n2) 
                                  (xs `unionBags` ys) 
                                  d2  -- Ignore d1
+
+    isRealWorldId id = idType id `eqType` realWorldStatePrimTy
+
+    -- an expression of type State# RealWorld must be a variable
+    isRealWorldExpr (Var id) = isRealWorldId id
+    isRealWorldExpr _        = False
 \end{code}
 
 
@@ -560,17 +571,17 @@ classOpSize dflags top_args (arg1 : other_args)
 		     	      -> unitBag (dict, ufDictDiscount dflags)
 		     _other   -> emptyBag
     		     
-funSize :: DynFlags -> [Id] -> Id -> Int -> ExprSize
+funSize :: DynFlags -> [Id] -> Id -> Int -> Int -> ExprSize
 -- Size for functions that are not constructors or primops
 -- Note [Function applications]
-funSize dflags top_args fun n_val_args
+funSize dflags top_args fun n_val_args voids
   | fun `hasKey` buildIdKey   = buildSize
   | fun `hasKey` augmentIdKey = augmentSize
   | otherwise = SizeIs (iUnbox size) arg_discount (iUnbox res_discount)
   where
     some_val_args = n_val_args > 0
 
-    size | some_val_args = 10 * (1 + n_val_args)
+    size | some_val_args = 10 * (1 + n_val_args - voids)
          | otherwise     = 0
 	-- The 1+ is for the function itself
 	-- Add 1 for each non-trivial arg;
@@ -665,7 +676,7 @@ Literal integers *can* be big (mkInteger [...coefficients...]), but
 need not be (S# n).  We just use an aribitrary big-ish constant here
 so that, in particular, we don't inline top-level defns like
    n = S# 5
-There's no point in doing so -- any optimsations will see the S#
+There's no point in doing so -- any optimisations will see the S#
 through n's unfolding.  Nor will a big size inhibit unfoldings functions
 that mention a literal Integer, because the float-out pass will float
 all those constants to top level.

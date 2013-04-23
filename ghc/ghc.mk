@@ -72,9 +72,9 @@ ifeq "$(GhcProfiled)" "YES"
 ghc_stage2_PROGRAM_WAY = p
 endif
 
-ghc_stage1_PROG = ghc-stage1$(exeext)
-ghc_stage2_PROG = ghc-stage2$(exeext)
-ghc_stage3_PROG = ghc-stage3$(exeext)
+ghc_stage1_PROGNAME = ghc-stage1
+ghc_stage2_PROGNAME = ghc-stage2
+ghc_stage3_PROGNAME = ghc-stage3
 
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES
@@ -141,7 +141,7 @@ $(INPLACE_LIB)/platformConstants: $(includes_GHCCONSTANTS_HASKELL_VALUE)
 # The GHC programs need to depend on all the helper programs they might call,
 # and the settings files they use
 
-GHC_DEPENDENCIES += $(UNLIT)
+GHC_DEPENDENCIES += $$(unlit_INPLACE)
 GHC_DEPENDENCIES += $(INPLACE_LIB)/settings
 GHC_DEPENDENCIES += $(INPLACE_LIB)/platformConstants
 
@@ -150,22 +150,28 @@ $(GHC_STAGE2) : | $(GHC_DEPENDENCIES)
 $(GHC_STAGE3) : | $(GHC_DEPENDENCIES)
 
 ifeq "$(GhcUnregisterised)" "NO"
-$(GHC_STAGE1) : | $(SPLIT)
-$(GHC_STAGE2) : | $(SPLIT)
-$(GHC_STAGE3) : | $(SPLIT)
+$(GHC_STAGE1) : | $$(ghc-split_INPLACE)
+$(GHC_STAGE2) : | $$(ghc-split_INPLACE)
+$(GHC_STAGE3) : | $$(ghc-split_INPLACE)
 endif
 
-ifeq "$(Windows)" "YES"
-$(GHC_STAGE1) : | $(TOUCHY)
-$(GHC_STAGE2) : | $(TOUCHY)
-$(GHC_STAGE3) : | $(TOUCHY)
+ifeq "$(Windows_Host)" "YES"
+$(GHC_STAGE1) : | $$(touchy_INPLACE)
+$(GHC_STAGE2) : | $$(touchy_INPLACE)
+$(GHC_STAGE3) : | $$(touchy_INPLACE)
 endif
+
+# Modules like vector:Data.Vector.Fusion.Stream.Monadic use annotations,
+# which means they depend on GHC.Desugar. To ensure that This module is
+# available by the time it is needed, we make the stage 2 compiler
+# depend on it.
+$(GHC_STAGE2) : $(foreach w,$(GhcLibWays),libraries/base/dist-install/build/GHC/Desugar.$($w_osuf))
 
 endif
 
 INSTALL_LIBS += settings
 
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows_Host)" "NO"
 install: install_ghc_link
 .PHONY: install_ghc_link
 install_ghc_link: 

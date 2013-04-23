@@ -1103,7 +1103,7 @@ traceTcConstraints :: String -> TcM ()
 traceTcConstraints msg
   = do { lie_var <- getConstraintVar
        ; lie     <- readTcRef lie_var
-       ; traceTc (msg ++ "LIE:") (ppr lie)
+       ; traceTc (msg ++ ": LIE:") (ppr lie)
        }
 \end{code}
 

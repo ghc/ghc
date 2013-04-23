@@ -131,8 +131,8 @@ createAdjustor (int cconv,
         barf("createAdjustor: failed to allocate memory");
     }
 
-    r = ffi_prep_closure(cl, cif, (void*)wptr, hptr/*userdata*/);
-    if (r != FFI_OK) barf("ffi_prep_closure failed: %d", r);
+    r = ffi_prep_closure_loc(cl, cif, (void*)wptr, hptr/*userdata*/, code);
+    if (r != FFI_OK) barf("ffi_prep_closure_loc failed: %d", r);
 
     return (void*)code;
 }
@@ -389,7 +389,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
         int sz = totalArgumentSize(typeString);
         
         adjustorStub->call[0] = 0xe8;
-        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)adjustorStub + 5);
+        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)code + 5);
         adjustorStub->hptr = hptr;
         adjustorStub->wptr = wptr;
         

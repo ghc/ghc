@@ -204,23 +204,26 @@ emitForeignCall safety results target args
     dflags <- getDynFlags
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
     emit caller_save
-    emit $ mkUnsafeCall target results args
+    target' <- load_target_into_temp target
+    args' <- mapM maybe_assign_temp args
+    emit $ mkUnsafeCall target' results args'
     emit caller_load
     return AssignedDirectly
 
   | otherwise = do
     dflags <- getDynFlags
     updfr_off <- getUpdFrameOff
-    temp_target <- load_target_into_temp target
+    target' <- load_target_into_temp target
+    args' <- mapM maybe_assign_temp args
     k <- newLabelC
     let (off, _, copyout) = copyInOflow dflags NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
     emit $
            (    mkStore (CmmStackSlot (Young k) (widthInBytes (wordWidth dflags)))
                         (CmmLit (CmmBlock k))
-            <*> mkLast (CmmForeignCall { tgt  = temp_target
+            <*> mkLast (CmmForeignCall { tgt  = target'
                                        , res  = results
-                                       , args = args
+                                       , args = args'
                                        , succ = k
                                        , updfr = updfr_off
                                        , intrbl = playInterruptible safety })
@@ -229,22 +232,6 @@ emitForeignCall safety results target args
            )
     return (ReturnedTo k off)
 
-
-{-
---      THINK ABOUT THIS (used to happen)
--- we might need to load arguments into temporaries before
--- making the call, because certain global registers might
--- overlap with registers that the C calling convention uses
--- for passing arguments.
---
--- This is a HACK; really it should be done in the back end, but
--- it's easier to generate the temporaries here.
-load_args_into_temps = mapM arg_assign_temp
-  where arg_assign_temp (e,hint) = do
-           tmp <- maybe_assign_temp e
-           return (tmp,hint)
--}
-
 load_target_into_temp :: ForeignTarget -> FCode ForeignTarget
 load_target_into_temp (ForeignTarget expr conv) = do
   tmp <- maybe_assign_temp expr
@@ -252,17 +239,23 @@ load_target_into_temp (ForeignTarget expr conv) = do
 load_target_into_temp other_target@(PrimTarget _) =
   return other_target
 
+-- What we want to do here is create a new temporary for the foreign
+-- call argument if it is not safe to use the expression directly,
+-- because the expression mentions caller-saves GlobalRegs (see
+-- Note [Register Parameter Passing]).
+--
+-- However, we can't pattern-match on the expression here, because
+-- this is used in a loop by CmmParse, and testing the expression
+-- results in a black hole.  So we always create a temporary, and rely
+-- on CmmSink to clean it up later.  (Yuck, ToDo).  The generated code
+-- ends up being the same, at least for the RTS .cmm code.
+--
 maybe_assign_temp :: CmmExpr -> FCode CmmExpr
-maybe_assign_temp e
-  | hasNoGlobalRegs e = return e
-  | otherwise         = do
-        dflags <- getDynFlags
-        -- don't use assignTemp, it uses its own notion of "trivial"
-        -- expressions, which are wrong here.
-        -- this is a NonPtr because it only duplicates an existing
-        reg <- newTemp (cmmExprType dflags e) --TODO FIXME NOW
-        emitAssign (CmmLocal reg) e
-        return (CmmReg (CmmLocal reg))
+maybe_assign_temp e = do
+  dflags <- getDynFlags
+  reg <- newTemp (cmmExprType dflags e)
+  emitAssign (CmmLocal reg) e
+  return (CmmReg (CmmLocal reg))
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO

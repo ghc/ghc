@@ -529,6 +529,10 @@ instance NamedThing DataCon where
 instance Outputable DataCon where
     ppr con = ppr (dataConName con)
 
+instance OutputableBndr DataCon where
+    pprInfixOcc con = pprInfixName (dataConName con)
+    pprPrefixOcc con = pprPrefixName (dataConName con)
+
 instance Data.Data DataCon where
     -- don't traverse?
     toConstr _   = abstractConstr "DataCon"

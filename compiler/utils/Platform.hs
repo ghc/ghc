@@ -10,7 +10,9 @@ module Platform (
         ArmABI(..),
 
         target32Bit,
-        osElfTarget
+        isARM,
+        osElfTarget,
+        platformUsesFrameworks,
 )
 
 where
@@ -53,6 +55,9 @@ data Arch
         | ArchMipsel
         deriving (Read, Show, Eq)
 
+isARM :: Arch -> Bool
+isARM (ArchARM {}) = True
+isARM _ = False
 
 -- | Operating systems that the native code generator knows about.
 --      Having OSUnknown should produce a sensible default, but no promises.
@@ -60,6 +65,7 @@ data OS
         = OSUnknown
         | OSLinux
         | OSDarwin
+        | OSiOS
         | OSSolaris2
         | OSMinGW32
         | OSFreeBSD
@@ -107,6 +113,7 @@ osElfTarget OSOpenBSD   = True
 osElfTarget OSNetBSD    = True
 osElfTarget OSSolaris2  = True
 osElfTarget OSDarwin    = False
+osElfTarget OSiOS       = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
@@ -119,4 +126,12 @@ osElfTarget OSUnknown   = False
  -- ELF-specific functionality.  It is important to have a default for
  -- portability, otherwise we have to answer this question for every
  -- new platform we compile on (even unreg).
+
+osUsesFrameworks :: OS -> Bool
+osUsesFrameworks OSDarwin = True
+osUsesFrameworks OSiOS    = True
+osUsesFrameworks _        = False
+
+platformUsesFrameworks :: Platform -> Bool
+platformUsesFrameworks = osUsesFrameworks . platformOS
 
