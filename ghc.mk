@@ -325,7 +325,7 @@ endif
 # Packages to build
 # The lists of packages that we *actually* going to build in each stage:
 #
-#  $(PACKAGES_STAGE0) 
+#  $(PACKAGES_STAGE0)
 #  $(PACKAGES_STAGE1)
 #  $(PACKAGES_STAGE2)
 #
@@ -365,6 +365,7 @@ PACKAGES_STAGE1 += deepseq
 PACKAGES_STAGE1 += bytestring
 PACKAGES_STAGE1 += containers
 PACKAGES_STAGE1 += old-locale
+PACKAGES_STAGE1 += lwconc
 
 ifeq "$(Windows_Host)" "YES"
 PACKAGES_STAGE1 += Win32
@@ -600,7 +601,7 @@ BUILD_DIRS += includes
 BUILD_DIRS += rts
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += bindisttest 
+BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
 endif
 
@@ -662,10 +663,10 @@ stage1_libs : $(ALL_STAGE1_LIBS)
 
 # ----------------------------------------------
 # Per-package compiler flags
-# 
-# If you want to add per-package compiler flags, this 
+#
+# If you want to add per-package compiler flags, this
 # is the place to do it.  Do it like this for package <pkg>
-#   
+#
 #   libraries/<pkg>_dist-boot_HC_OPTS += -Wwarn
 #   libraries/<pkg>_dist-install_HC_OPTS += -Wwarn
 
