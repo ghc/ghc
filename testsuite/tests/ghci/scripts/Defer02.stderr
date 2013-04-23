@@ -88,6 +88,11 @@
     In the type signature for ‛k’: k :: Int ~ Bool => Int -> Bool
 
 ../../typecheck/should_run/Defer01.hs:45:6: Warning:
+    Couldn't match expected type ‛Bool’ with actual type ‛Int’
+    In the ambiguity check for: Int ~ Bool => Int -> Bool
+    In the type signature for ‛k’: k :: Int ~ Bool => Int -> Bool
+
+../../typecheck/should_run/Defer01.hs:45:6: Warning:
     Couldn't match type ‛Int’ with ‛Bool’
     Inaccessible code in
       the type signature for k :: Int ~ Bool => Int -> Bool
