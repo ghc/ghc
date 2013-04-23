@@ -731,7 +731,7 @@ link_caf node _is_upd = do
         -- This must be done *before* the info table pointer is overwritten,
         -- because the old info table ptr is needed for reversion
   ; ret <- newTemp (bWord dflags)
-  ; emitRtsCallGen [(ret,NoHint)] rtsPackageId (fsLit "newCAF")
+  ; emitRtsCallGen [(ret,NoHint)] (mkForeignLabel (fsLit "newCAF") Nothing ForeignLabelInExternalPackage IsFunction)
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
         (CmmReg (CmmLocal node), AddrHint),
         (hp_rel, AddrHint) ]

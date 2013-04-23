@@ -36,7 +36,6 @@ import CLabel
 import CmmUtils
 import PrimOp
 import SMRep
-import Module
 import FastString
 import Outputable
 import Util
@@ -214,7 +213,7 @@ emitPrimOp _ [res] ParOp [arg]
         -- later, we might want to inline it.
     emitCCall
         [(res,NoHint)]
-        (CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
+        (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
         [(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)]
 
 emitPrimOp dflags [res] SparkOp [arg]
@@ -226,7 +225,7 @@ emitPrimOp dflags [res] SparkOp [arg]
         tmp2 <- newTemp (bWord dflags)
         emitCCall
             [(tmp2,NoHint)]
-            (CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
+            (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
             [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
