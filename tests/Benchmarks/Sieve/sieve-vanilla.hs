@@ -1,5 +1,3 @@
--- Compile with `ghc -threaded -with-rtsopts=-N concurrent_sieve.hs`
-
 import Control.Concurrent
 import Control.Monad
 
