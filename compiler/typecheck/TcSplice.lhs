@@ -358,7 +358,7 @@ tcBracket brack res_ty
           -- It's best to simplify the constraint now, even though in
           -- principle some later unification might be useful for it,
           -- because we don't want these essentially-junk TH implication
-          -- contraints floating around nested inside other constraints
+          -- constraints floating around nested inside other constraints
           -- See for example Trac #4949
        ; _binds2 <- simplifyTop lie
 

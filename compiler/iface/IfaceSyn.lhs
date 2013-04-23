@@ -150,7 +150,7 @@ data IfaceConDecl
         ifConInfix   :: Bool,                   -- True <=> declared infix
         ifConUnivTvs :: [IfaceTvBndr],          -- Universal tyvars
         ifConExTvs   :: [IfaceTvBndr],          -- Existential tyvars
-        ifConEqSpec  :: [(OccName,IfaceType)],  -- Equality contraints
+        ifConEqSpec  :: [(OccName,IfaceType)],  -- Equality constraints
         ifConCtxt    :: IfaceContext,           -- Non-stupid context
         ifConArgTys  :: [IfaceType],            -- Arg types
         ifConFields  :: [OccName],              -- ...ditto... (field labels)

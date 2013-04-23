@@ -137,7 +137,7 @@ go with option (i), implemented at SimplifyTop. Namely:
 Now, that has to do with class defaulting. However there exists type variable /kind/
 defaulting. Again this is done at the top-level and the plan is:
      - At the top-level, once you had a go at solving the constraint, do 
-       figure out /all/ the touchable unification variables of the wanted contraints.
+       figure out /all/ the touchable unification variables of the wanted constraints.
      - Apply defaulting to their kinds
 
 More details in Note [DefaultTyVar].
@@ -456,7 +456,7 @@ situations like
 When inferring a type for 'g', we don't want to apply the
 instance decl, because then we can't satisfy (C t).  So we
 just notice that g isn't quantified over 't' and partition
-the contraints before simplifying.
+the constraints before simplifying.
 
 This only half-works, but then let-generalisation only half-works.
 
@@ -975,7 +975,7 @@ skolem has escaped!
 But it's ok: when we float (Maybe beta[2] ~ gamma[1]), we promote beta[2]
 to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
 
-Previously we tried to "grow" the skol_set with the contraints, to get
+Previously we tried to "grow" the skol_set with the constraints, to get
 all the tyvars that could *conceivably* unify with the skolems, but that
 was far too conservative (Trac #7804). Example: this should be fine:
     f :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int

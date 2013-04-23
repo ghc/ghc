@@ -432,7 +432,7 @@ alternatives, so it adds a default case, as it always does.  A later
 pass may remove it if it's inaccessible.  (See also Note [Empty case
 alternatives] in CoreSyn.)
 
-We do *not* deugar simply to
+We do *not* desugar simply to
    error "empty case" 
 or some such, because 'x' might be bound to (error "hello"), in which
 case we want to see that "hello" exception, not (error "empty case").

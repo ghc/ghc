@@ -256,7 +256,7 @@ course.
 
 Note [extra_fvs (1): avoid floating into RHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consdider let x=\y....t... in body.  We do not necessarily want to float 
+Consider let x=\y....t... in body.  We do not necessarily want to float 
 a binding for t into the RHS, because it'll immediately be floated out
 again.  (It won't go inside the lambda else we risk losing work.)
 In letrec, we need to be more careful still. We don't want to transform
