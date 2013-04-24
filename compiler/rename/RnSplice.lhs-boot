@@ -9,8 +9,10 @@ import NameSet
 
 import Outputable
 
-rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
-rnBracket :: HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
+rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
+
+rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
+rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
 
 checkTH :: Outputable a => a -> String -> RnM ()
 \end{code}

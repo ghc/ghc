@@ -24,7 +24,7 @@ module RnTypes (
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
 #endif 	/* GHCI */
-import {-# SOURCE #-} RnSplice( rnSplice )
+import {-# SOURCE #-} RnSplice( rnSpliceType )
 
 import DynFlags
 import HsSyn
@@ -248,8 +248,7 @@ rnHsTyKi isType doc (HsEqTy ty1 ty2)
 
 rnHsTyKi isType _ (HsSpliceTy sp _ k)
   = ASSERT( isType )
-    do { (sp', fvs) <- rnSplice sp      -- ToDo: deal with fvs
-       ; return (HsSpliceTy sp' fvs k, fvs) }
+    rnSpliceType sp k
 
 rnHsTyKi isType doc (HsDocTy ty haddock_doc)
   = ASSERT( isType )
