@@ -245,9 +245,10 @@ void
 setOwningCapability (Capability *cap USED_IF_DEBUG,
                      StgTSO *tso,
                      nat target) {
-  ASSERT (cap == tso->cap);
   debugTrace (DEBUG_sched, "cap %d: Setting the capability of thread %d to %d",
               cap->no, tso->id, target);
+  ASSERT (cap == tso->cap);
+  ASSERT (target < enabled_capabilities);
   tso->cap = &capabilities[target];
 }
 

@@ -36,7 +36,7 @@ import LwConc.Substrate
 import Data.Array.IArray
 import Data.Dynamic
 
-#define _INL_(x) {-# INLINE x #-}
+#include "profile.h"
 
 -- The scheduler data structure has one (PVar [SCont], PVar [SCont]) for every
 -- capability.
@@ -86,7 +86,7 @@ newSched = do
   -- This token will be used to spawn in a round-robin fashion on different
   -- capabilities.
   token <- newPVarIO (0::Int)
-  -- Save the token in the Thread-local State (TLS)
+  -- Save the token in the Thread-local State (SLS)
   s <- getSContIO
   setSLS s $ toDyn token
   -- Create the scheduler data structure
@@ -123,14 +123,13 @@ newCapability = do
    setYieldControlAction s yca
    ssa <- getScheduleSContAction
    setScheduleSContAction s ssa
-
  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound
 
 _INL_(fork)
 fork :: IO () -> Maybe Int -> SContKind -> IO SCont
-fork !task !on kind = do
+fork !task !on !kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
   -- epilogue: Switch to next thread after completion
@@ -144,11 +143,11 @@ fork !task !on kind = do
                     Bound -> newBoundSCont
                     Unbound -> newSCont
   newSC <- makeSCont (task >> epilogue)
-  -- Initialize TLS
-  tls <- atomically $ getSLS currentSC
-  setSLS newSC $ tls
-  let token::PVar Int = case fromDynamic tls of
-                          Nothing -> error "TLS"
+  -- Initialize SLS
+  sls <- atomically $ getSLS currentSC
+  setSLS newSC $ sls
+  let token::PVar Int = case fromDynamic sls of
+                          Nothing -> error "SLS"
                           Just x -> x
   t <- atomically $ do {
     -- Initialize scheduler actions
@@ -163,7 +162,7 @@ fork !task !on kind = do
   -- Set SCont Affinity
   case on of
     Nothing -> setSContCapability newSC t
-    Just t' -> setSContCapability newSC t'
+    Just t' -> setSContCapability newSC (t' `mod` nc)
   -- Schedule new Scont
   atomically $ do {
     ssa <- getScheduleSContAction;

@@ -37,7 +37,7 @@ module MVarList
 import LwConc.Substrate
 import GHC.IORef
 
-#define _INL_(x) {-# INLINE x #-}
+#include "profile.h"
 
 data Queue a = Queue ![a] ![a]
 

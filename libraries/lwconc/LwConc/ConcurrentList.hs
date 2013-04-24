@@ -160,7 +160,7 @@ fork task on kind = do
   -- Set SCont Affinity
   case on of
     Nothing -> setSContCapability newSC t
-    Just t' -> setSContCapability newSC t'
+    Just t' -> setSContCapability newSC $ t' `mod` nc
   -- Schedule new Scont
   atomically $ do {
     ssa <- getScheduleSContAction;
