@@ -51,7 +51,7 @@ enque (Queue front back) e = Queue front $ e:back
 
 _INL_(deque)
 deque :: Queue a -> (Queue a, Maybe a)
-deque (Queue front back) =
+deque (Queue !front !back) =
   case front of
     [] -> (case reverse back of
             [] -> (emptyQueue, Nothing)

@@ -77,8 +77,8 @@ run :: Int -> Int -> [Color] -> IO (IO ())
 run n cpu cs = do
   fs    <- replicateM (length cs) newEmptyMVar
   mpv   <- newMVar (Nobody n)
-  hole <- newIORef undefined
-  tk <- atomically $ newResumeToken
+  hole  <- newIORef undefined
+  tk    <- atomically $ newResumeToken
   withArrayLen cs $ \ n cols -> do
     zipWithM_ ((forkOn cpu .) . arrive mpv) fs (take n (iterate (`advancePtr` 1) cols))
     return $ do

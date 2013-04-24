@@ -24,9 +24,9 @@ newtype Color = C Int deriving (Storable,Enum)
 #define B (C 0)
 
 instance Show Color where
-	show Y = "yellow"
-	show R = "red"
-	show B = "blue"
+  show Y = "yellow"
+  show R = "red"
+  show B = "blue"
 
 complement :: Color -> Color -> Color
 complement !a !b = case a of
@@ -48,11 +48,10 @@ arrive !mpv !finish !ch = do
                  -> do
                     putMVar mpv w
                     putMVar finish (t, b)
-  		Nobody q -> do
+                Nobody q -> do
                     putMVar mpv $ Somebody q ch waker
                     ch' <- takeMVar waker
                     go (t+1) $ inc ch' b
-
                 Somebody q ch' waker' -> do
                     c  <- peek ch
                     c' <- peek ch'
@@ -74,14 +73,13 @@ run n cpu cs = do
     fs    <- replicateM (length cs) newEmptyMVar
     mpv   <- newMVar (Nobody n)
     withArrayLen cs $ \ n cols -> do
-    	zipWithM_ ((forkOn cpu .) . arrive mpv) fs (take n (iterate (`advancePtr` 1) cols))
-
-    	return $ do
-	  putStrLn . map toLower . unwords . ([]:) . map show $ cs
-	  ns    <- mapM takeMVar fs
-	  putStr . map toLower . unlines $ [unwords [show n, showN b] | (n, b) <- ns]
-	  putStrLn . (" "++) . showN . sum . map fst $ ns
-	  putStrLn ""
+      zipWithM_ ((forkOn cpu .) . arrive mpv) fs (take n (iterate (`advancePtr` 1) cols))
+      return $ do
+        putStrLn . map toLower . unwords . ([]:) . map show $ cs
+        ns    <- mapM takeMVar fs
+        putStr . map toLower . unlines $ [unwords [show n, showN b] | (n, b) <- ns]
+        putStrLn . (" "++) . showN . sum . map fst $ ns
+        putStrLn ""
 
 main = do
     putStrLn . map toLower . unlines $
