@@ -157,19 +157,9 @@ rnExpr (NegApp e _)
 -- Template Haskell extensions
 -- Don't ifdef-GHCI them because we want to fail gracefully
 -- (not with an rnExpr crash) in a stage-1 compiler.
-rnExpr e@(HsBracket br_body)
-  = do
-    thEnabled <- xoptM Opt_TemplateHaskell
-    unless thEnabled $
-      failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
-                      , ptext (sLit "Perhaps you intended to use -XTemplateHaskell") ] )
-    checkTH e "bracket"
-    (body', fvs_e) <- rnBracket br_body
-    return (HsBracket body', fvs_e)
+rnExpr e@(HsBracket br_body) = rnBracket e br_body
 
-rnExpr (HsSpliceE splice)
-  = rnSplice splice             `thenM` \ (splice', fvs) ->
-    return (HsSpliceE splice', fvs)
+rnExpr (HsSpliceE splice) = rnSpliceExpr splice
 
 #ifndef GHCI
 rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
