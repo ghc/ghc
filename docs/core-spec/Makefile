@@ -4,7 +4,7 @@ OTT_OPTS  = -tex_show_meta false
 TARGET    = core-spec
 
 $(TARGET).pdf: $(TARGET).tex $(OTT_TEX)
-	latexmk -pdf $<
+	latex -output-format=pdf $<
 
 $(TARGET).tex: $(TARGET).mng $(OTT_FILES)
 	ott $(OTT_OPTS) -tex_filter $< $@ $(OTT_FILES)
