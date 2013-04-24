@@ -416,6 +416,12 @@ tc_bracket _ (PatBr pat)
 tc_bracket _ (DecBrL _)
   = panic "tc_bracket: Unexpected DecBrL"
 
+tc_bracket _ (TExpBr expr)
+  = do  { any_ty <- newFlexiTyVarTy openTypeKind
+        ; _ <- tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
+        ; tcMetaTy expQTyConName }
+        -- Result type is ExpQ (= Q Exp)
+
 quotedNameStageErr :: HsBracket Name -> SDoc
 quotedNameStageErr br
   = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr br
@@ -430,7 +436,7 @@ quotedNameStageErr br
 %************************************************************************
 
 \begin{code}
-tcSpliceExpr (HsSplice name expr) res_ty
+tcSpliceExpr (HsSplice _ name expr) res_ty
   = setSrcSpan (getLoc expr)    $ do
     { stage <- getStage
     ; case stage of {
@@ -530,7 +536,7 @@ We don't want the type checker to see these bogus unbound variables.
 Very like splicing an expression, but we don't yet share code.
 
 \begin{code}
-tcSpliceType (HsSplice name hs_expr) _
+tcSpliceType (HsSplice _ name hs_expr) _
   = setSrcSpan (getLoc hs_expr) $ do
     { stage <- getStage
     ; case stage of {

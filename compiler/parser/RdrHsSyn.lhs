@@ -204,9 +204,9 @@ mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- but if she wrote, say,
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
-mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
-mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr       Explicit)
-mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr Implicit)
+mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))              = QuasiQuoteD qq
+mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ _ expr))) = SpliceD (SpliceDecl expr       Explicit)
+mkTopSpliceDecl other_expr                            = SpliceD (SpliceDecl other_expr Implicit)
 
 
 mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
