@@ -347,8 +347,12 @@ incorrect.
 '[t|'           { L _ ITopenTypQuote  }      
 '[d|'           { L _ ITopenDecQuote  }      
 '|]'            { L _ ITcloseQuote    }
+'[||'           { L _ ITopenTExpQuote   }
+'||]'           { L _ ITcloseTExpQuote  }
 TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('            { L _ ITparenEscape   }     -- $( exp )
+TH_ID_TY_SPLICE { L _ (ITidTyEscape _)  }   -- $$x
+'$$('           { L _ ITparenTyEscape   }   -- $$( exp )
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
@@ -1484,6 +1488,10 @@ aexp2   :: { LHsExpr RdrName }
                                         (L1 $ HsVar (mkUnqual varName 
                                                         (getTH_ID_SPLICE $1)))) } 
         | '$(' exp ')'          { LL $ HsSpliceE (mkHsSplice $2) }               
+        | TH_ID_TY_SPLICE       { L1 $ HsSpliceE (mkHsSplice 
+                                        (L1 $ HsVar (mkUnqual varName 
+                                                        (getTH_ID_TY_SPLICE $1)))) } 
+        | '$$(' exp ')'         { LL $ HsSpliceE (mkHsSplice $2) }               
 
 
         | SIMPLEQUOTE  qvar     { LL $ HsBracket (VarBr True  (unLoc $2)) }
@@ -1491,6 +1499,7 @@ aexp2   :: { LHsExpr RdrName }
         | TH_TY_QUOTE tyvar     { LL $ HsBracket (VarBr False (unLoc $2)) }
         | TH_TY_QUOTE gtycon    { LL $ HsBracket (VarBr False (unLoc $2)) }
         | '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }                       
+        | '[||' exp '||]'       { LL $ HsBracket (ExpBr $2) }                       
         | '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }                       
         | '[p|' infixexp '|]'   {% checkPattern $2 >>= \p ->
                                         return (LL $ HsBracket (PatBr p)) }
@@ -2104,6 +2113,7 @@ getPRIMWORD     (L _ (ITprimword x)) = x
 getPRIMFLOAT    (L _ (ITprimfloat  x)) = x
 getPRIMDOUBLE   (L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x
+getTH_ID_TY_SPLICE (L _ (ITidTyEscape x)) = x
 getINLINE       (L _ (ITinline_prag inl conl)) = (inl,conl)
 getSPEC_INLINE  (L _ (ITspec_inline_prag True))  = (Inline,  FunLike)
 getSPEC_INLINE  (L _ (ITspec_inline_prag False)) = (NoInline,FunLike)
