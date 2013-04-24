@@ -11,7 +11,6 @@ import Name
 import NameSet
 import HsSyn
 import LoadIface        ( loadInterfaceForName )
-import Module
 import Outputable
 import RdrName
 import RnEnv
