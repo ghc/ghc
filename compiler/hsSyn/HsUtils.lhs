@@ -54,7 +54,7 @@ module HsUtils(
   emptyRecStmt, mkRecStmt, 
 
   -- Template Haskell
-  unqualSplice, mkHsSpliceTy, mkHsSplice, mkHsQuasiQuote, unqualQuasiQuote,
+  unqualSplice, mkHsSpliceTy, mkHsSplice, mkHsTExpSplice, mkHsQuasiQuote, unqualQuasiQuote,
 
   -- Flags
   noRebindableInfo, 
@@ -247,7 +247,10 @@ mkHsOpApp :: LHsExpr id -> id -> LHsExpr id -> HsExpr id
 mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 
 mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
-mkHsSplice e = HsSplice unqualSplice e
+mkHsSplice e = HsSplice False unqualSplice e
+
+mkHsTExpSplice :: LHsExpr RdrName -> HsSplice RdrName
+mkHsTExpSplice e = HsSplice True unqualSplice e
 
 mkHsSpliceTy :: LHsExpr RdrName -> HsType RdrName
 mkHsSpliceTy e = HsSpliceTy (mkHsSplice e) emptyFVs placeHolderKind

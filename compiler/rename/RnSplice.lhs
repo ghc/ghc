@@ -52,7 +52,7 @@ type checker.  Not very satisfactory really.
 
 \begin{code}
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
-rnSplice (HsSplice n expr)
+rnSplice (HsSplice isTyped n expr)
   = do  { checkTH expr "splice"
         ; loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L loc n)
@@ -65,7 +65,7 @@ rnSplice (HsSplice n expr)
                                                     isLocalGRE gre]
               lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
-        ; return (HsSplice n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
+        ; return (HsSplice isTyped n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
 \end{code}
 
 \begin{code}
@@ -159,4 +159,7 @@ rn_bracket (DecBrL decls)
         ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
 
 rn_bracket (DecBrG _) = panic "rn_bracket: unexpected DecBrG"
+
+rn_bracket (TExpBr e) = do { (e', fvs) <- rnLExpr e
+                           ; return (TExpBr e', fvs) }
 \end{code}

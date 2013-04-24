@@ -1318,6 +1318,7 @@ pprQuals quals = interpp'SP quals
 
 \begin{code}
 data HsSplice id  = HsSplice            --  $z  or $(f 4)
+                        Bool            -- True if typed, False if untyped
                         id              -- The id is just a unique name to
                         (LHsExpr id)    -- identify this splice point
   deriving (Data, Typeable)
@@ -1326,8 +1327,9 @@ instance OutputableBndr id => Outputable (HsSplice id) where
   ppr = pprSplice
 
 pprSplice :: OutputableBndr id => HsSplice id -> SDoc
-pprSplice (HsSplice n e)
-    = char '$' <> ifPprDebug (brackets (ppr n)) <> eDoc
+pprSplice (HsSplice isTyped n e)
+    = (if isTyped then ptext (sLit "$$") else char '$')
+      <> ifPprDebug (brackets (ppr n)) <> eDoc
     where
           -- We use pprLExpr to match pprParendExpr:
           --     Using pprLExpr makes sure that we go 'deeper'
@@ -1345,6 +1347,7 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | TypBr (LHsType id)   -- [t| type  |]
                   | VarBr Bool id        -- True: 'x, False: ''T
                                          -- (The Bool flag is used only in pprHsBracket)
+                  | TExpBr (LHsExpr id)  -- [||  expr  ||]
   deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsBracket id) where
@@ -1359,10 +1362,14 @@ pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
 pprHsBracket (TypBr t)   = thBrackets (char 't') (ppr t)
 pprHsBracket (VarBr True n)  = char '\''         <> ppr n
 pprHsBracket (VarBr False n) = ptext (sLit "''") <> ppr n
+pprHsBracket (TExpBr e)  = thTyBrackets (ppr e)
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>
                              pp_body <+> ptext (sLit "|]")
+
+thTyBrackets :: SDoc -> SDoc
+thTyBrackets pp_body = ptext (sLit "[||") <+> pp_body <+> ptext (sLit "||]")
 \end{code}
 
 %************************************************************************

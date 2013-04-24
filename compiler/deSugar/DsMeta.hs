@@ -82,6 +82,7 @@ dsBracket brack splices
     do_brack (TypBr t)   = do { MkC t1  <- repLTy t    ; return t1 }
     do_brack (DecBrG gp) = do { MkC ds1 <- repTopDs gp ; return ds1 }
     do_brack (DecBrL _)  = panic "dsBracket: unexpected DecBrL"
+    do_brack (TExpBr e)  = do { MkC e1  <- repLE e     ; return e1 }
 
 {- -------------- Examples --------------------
 
@@ -901,7 +902,7 @@ repRole (L _ Nothing)                 = rep2 inferRName []
 repSplice :: HsSplice Name -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsSplice n _)
+repSplice (HsSplice _ n _)
  = do { mb_val <- dsLookupMetaEnv n
        ; case mb_val of
            Just (Splice e) -> do { e' <- dsExpr e

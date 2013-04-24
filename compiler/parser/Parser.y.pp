@@ -1556,10 +1556,10 @@ aexp2   :: { LHsExpr RdrName }
                                         (L1 $ HsVar (mkUnqual varName
                                                         (getTH_ID_SPLICE $1)))) }
         | '$(' exp ')'          { LL $ HsSpliceE (mkHsSplice $2) }
-        | TH_ID_TY_SPLICE       { L1 $ HsSpliceE (mkHsSplice
+        | TH_ID_TY_SPLICE       { L1 $ HsSpliceE (mkHsTExpSplice
                                         (L1 $ HsVar (mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))) }
-        | '$$(' exp ')'         { LL $ HsSpliceE (mkHsSplice $2) }
+        | '$$(' exp ')'         { LL $ HsSpliceE (mkHsTExpSplice $2) }
 
 
         | SIMPLEQUOTE  qvar     { LL $ HsBracket (VarBr True  (unLoc $2)) }
@@ -1567,7 +1567,7 @@ aexp2   :: { LHsExpr RdrName }
         | TH_TY_QUOTE tyvar     { LL $ HsBracket (VarBr False (unLoc $2)) }
         | TH_TY_QUOTE gtycon    { LL $ HsBracket (VarBr False (unLoc $2)) }
         | '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }
-        | '[||' exp '||]'       { LL $ HsBracket (ExpBr $2) }
+        | '[||' exp '||]'       { LL $ HsBracket (TExpBr $2) }
         | '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }
         | '[p|' infixexp '|]'   {% checkPattern empty $2 >>= \p ->
                                         return (LL $ HsBracket (PatBr p)) }
