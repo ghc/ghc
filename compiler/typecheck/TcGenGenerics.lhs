@@ -213,10 +213,10 @@ canDoGenerics tc tc_args
               (if (not (null (tyConStupidTheta tc)))
                 then (Just (tc_name <+> text "must not have a datatype context"))
                 else Nothing) :
-          -- The type should not be instantiated (see #5939)
+          -- The type arguments should not be instantiated (see #5939)
           -- Data family indices can be instantiated; the `tc_args` here are the
           -- representation tycon args
-              (if (all isTyVarTy tc_args)
+              (if (all isTyVarTy (filterOut isKindTy tc_args))
                 then Nothing
                 else Just (tc_name <+> text "must not be instantiated;" <+>
                            text "try deriving `" <> tc_name <+> tc_tys <>
