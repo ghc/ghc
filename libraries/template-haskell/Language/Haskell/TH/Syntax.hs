@@ -136,6 +136,14 @@ instance Applicative Q where
   pure x = Q (pure x)
   Q f <*> Q x = Q (f <*> x)
 
+-----------------------------------------------------
+--
+--		The TExp type
+--
+-----------------------------------------------------
+
+newtype TExp a = TExp { unType :: Q Exp }
+
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
 
