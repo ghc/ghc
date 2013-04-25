@@ -46,7 +46,7 @@ module TcEnv(
 
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel, 
-        topIdLvl, thTopLevelId, thRnBrack, isBrackStage,
+        topIdLvl, thTopLevelId, isBrackStage,
 
         -- New Ids
         newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
@@ -571,12 +571,6 @@ tcMetaTy :: Name -> TcM Type
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
     return (mkTyConApp t [])
-
-thRnBrack :: ThStage
--- Used *only* to indicate that we are inside a TH bracket during renaming
--- Tested by TcEnv.isBrackStage
--- See Note [Top-level Names in Template Haskell decl quotes]
-thRnBrack = Brack False (panic "thRnBrack1") (panic "thRnBrack2") (panic "thRnBrack3") 
 
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
