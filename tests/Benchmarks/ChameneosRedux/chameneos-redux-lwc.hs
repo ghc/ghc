@@ -49,10 +49,9 @@ arrive !mpv !finish !ch = do
         go !t !b = do
             w <- takeMVarWithHole mpv hole1 tk
             case w of
-                Nobody 0
-                  -> do
-                      putMVar mpv w tk
-                      putMVar finish (t, b) tk
+                Nobody 0 -> do
+                    putMVar mpv w tk
+                    putMVar finish (t, b) tk
                 Nobody q -> do
                     putMVar mpv (Somebody q ch waker) tk
                     ch' <- takeMVarWithHole waker hole2 tk

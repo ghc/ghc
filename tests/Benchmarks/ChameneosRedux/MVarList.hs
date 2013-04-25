@@ -39,24 +39,42 @@ import GHC.IORef
 
 #include "profile.h"
 
-data Queue a = Queue ![a] ![a]
+-- data Queue a = Queue ![a] ![a]
+-- 
+-- _INL_(emptyQueue)
+-- emptyQueue :: Queue a
+-- emptyQueue = Queue [] []
+-- 
+-- _INL_(enque)
+-- enque :: Queue a -> a -> Queue a
+-- enque (Queue front back) e = Queue front $ e:back
+-- 
+-- _INL_(deque)
+-- deque :: Queue a -> (Queue a, Maybe a)
+-- deque (Queue !front !back) =
+--   case front of
+--     [] -> (case reverse back of
+--             [] -> (emptyQueue, Nothing)
+--             x:tl -> (Queue tl [], Just x))
+--     x:tl -> (Queue tl back, Just x)
+
+-- NOTE KC: Even a list seems to work just as well as a queue.
+newtype Queue a = Queue [a]
 
 _INL_(emptyQueue)
 emptyQueue :: Queue a
-emptyQueue = Queue [] []
+emptyQueue = Queue []
 
 _INL_(enque)
 enque :: Queue a -> a -> Queue a
-enque (Queue front back) e = Queue front $ e:back
+enque (Queue q) e = Queue $! e:q
 
 _INL_(deque)
 deque :: Queue a -> (Queue a, Maybe a)
-deque (Queue !front !back) =
-  case front of
-    [] -> (case reverse back of
-            [] -> (emptyQueue, Nothing)
-            x:tl -> (Queue tl [], Just x))
-    x:tl -> (Queue tl back, Just x)
+deque (Queue q) =
+  case q of
+    [] -> (emptyQueue, Nothing)
+    x:tl -> (Queue tl, Just x)
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
 data MVPState a = Full !a (Queue (a, PTM()))
@@ -67,13 +85,13 @@ _INL_(newMVar)
 newMVar :: a -> IO (MVar a)
 newMVar x = do
   ref <- newPVarIO $! Full x emptyQueue
-  return $ MVar ref
+  return $! MVar ref
 
 _INL_(newEmptyMVar)
 newEmptyMVar :: IO (MVar a)
 newEmptyMVar = do
   ref <- newPVarIO $! Empty emptyQueue
-  return $ MVar ref
+  return $! MVar ref
 
 
 _INL_(asyncPutMVar)
