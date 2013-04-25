@@ -59,7 +59,7 @@ import GHC.IORef
 --     x:tl -> (Queue tl back, Just x)
 
 -- NOTE KC: Even a list seems to work just as well as a queue.
-newtype Queue a = Queue [a]
+data Queue a = Queue [a]
 
 _INL_(emptyQueue)
 emptyQueue :: Queue a

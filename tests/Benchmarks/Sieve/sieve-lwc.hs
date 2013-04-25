@@ -18,9 +18,8 @@ generate mOut = mapM_ (putMVar mOut) [2..]
 -- Take a value from mIn, divide it by a prime, if the remainder is not 0, put the value in mOut.
 primeFilter :: MVar Int -> MVar Int -> Int -> IO ()
 primeFilter mIn mOut prime = do
-  hole <- newIORef 0
   forever $ do
-    i <- takeMVarWithHole mIn hole
+    i <- takeMVar mIn
     when (i `mod` prime /= 0) (putMVar mOut i)
 
 -- Take the first commandline argument and call it numArg.
@@ -34,15 +33,14 @@ main = do
   mIn <- newEmptyMVar
   forkIO $ generate mIn
   out <- replicateM (read numArg) newEmptyMVar
-  hole <- newIORef 0
-  foldM_ (linkFilter hole) mIn out
+  foldM_ linkFilter mIn out
 
 -- Take a value from mIn, and call it prime. Then show that prime. Make a new thread that
 -- runs primeFilter with mIn, mOut and the prime. When this function is used as a fold
 -- function, mOut becomes the mIn of the next iteration.
-linkFilter :: IORef Int -> MVar Int -> MVar Int -> IO (MVar Int)
-linkFilter hole mIn mOut = do
-  prime <- takeMVarWithHole mIn hole
+linkFilter :: MVar Int -> MVar Int -> IO (MVar Int)
+linkFilter mIn mOut = do
+  prime <- takeMVar mIn
   putStrLn $ show prime
   forkIO $ primeFilter mIn mOut prime
   return mOut
