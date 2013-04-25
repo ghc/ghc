@@ -1,7 +1,7 @@
 import Control.Monad
-import LwConc.ConcurrentList
 import LwConc.Substrate
-import LwConc.MVar
+import ConcurrentList
+import MVarList
 import System.Environment
 import Data.IORef
 
@@ -29,13 +29,13 @@ primeFilter mIn mOut prime = do
 -- calling the result out.
 -- Fold over the elements of out, with the function linkFilter, having mIn as the first value.
 main = do
-          initSched
-          numArg:_ <- getArgs
-          mIn <- newEmptyMVar
-          forkIO $ generate mIn
-          out <- replicateM (read numArg) newEmptyMVar
-          hole <- newIORef 0
-          foldM_ (linkFilter hole) mIn out
+  initSched
+  numArg:_ <- getArgs
+  mIn <- newEmptyMVar
+  forkIO $ generate mIn
+  out <- replicateM (read numArg) newEmptyMVar
+  hole <- newIORef 0
+  foldM_ (linkFilter hole) mIn out
 
 -- Take a value from mIn, and call it prime. Then show that prime. Make a new thread that
 -- runs primeFilter with mIn, mOut and the prime. When this function is used as a fold
