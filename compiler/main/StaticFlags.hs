@@ -144,14 +144,9 @@ isStaticFlag :: String -> Bool
 isStaticFlag f =
   f `elem` [
     "fdicts-strict",
-    "fspec-inline-join-points",
-    "fno-hi-version-check",
-    "dno-black-holing",
     "fno-state-hack",
-    "fruntime-types",
     "fno-opt-coercion",
     "fno-flat-cache",
-    "fhardwire-lib-paths",
     "fcpr-off"
     ]
 
