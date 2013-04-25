@@ -470,24 +470,26 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
                 -- This code will be run *at compile time*;
                 --   the result replaces the splice
                 -- Binding level = 0
+      Bool      -- True if in a typed splice, False otherwise
 
   | Comp        -- Ordinary Haskell code
                 -- Binding level = 1
 
   | Brack                       -- Inside brackets
+      Bool                      --   True if inside a typed bracket, False otherwise
       ThStage                   --   Binding level = level(stage) + 1
       (TcRef [PendingSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints) --     and type constraints here
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
-topAnnStage    = Splice
-topSpliceStage = Splice
+topAnnStage    = Splice False
+topSpliceStage = Splice False
 
 instance Outputable ThStage where
-   ppr Splice        = text "Splice"
-   ppr Comp          = text "Comp"
-   ppr (Brack s _ _) = text "Brack" <> parens (ppr s)
+   ppr (Splice _)      = text "Splice"
+   ppr Comp            = text "Comp"
+   ppr (Brack _ s _ _) = text "Brack" <> parens (ppr s)
 
 type ThLevel = Int
         -- See Note [Template Haskell levels] in TcSplice
@@ -508,9 +510,9 @@ outerLevel = 1  -- Things defined outside brackets
 --      g2 = $(f ...)           is not OK; because we havn't compiled f yet
 
 thLevel :: ThStage -> ThLevel
-thLevel Splice        = 0
-thLevel Comp          = 1
-thLevel (Brack s _ _) = thLevel s + 1
+thLevel (Splice _)      = 0
+thLevel Comp            = 1
+thLevel (Brack _ s _ _) = thLevel s + 1
 
 ---------------------------
 -- Arrow-notation context

@@ -558,7 +558,7 @@ thRnBrack :: ThStage
 -- Used *only* to indicate that we are inside a TH bracket during renaming
 -- Tested by TcEnv.isBrackStage
 -- See Note [Top-level Names in Template Haskell decl quotes]
-thRnBrack = Brack (panic "thRnBrack1") (panic "thRnBrack2") (panic "thRnBrack3") 
+thRnBrack = Brack False (panic "thRnBrack1") (panic "thRnBrack2") (panic "thRnBrack3") 
 
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
@@ -762,7 +762,7 @@ notFound name
   = do { lcl_env <- getLclEnv
        ; let stage = tcl_th_ctxt lcl_env
        ; case stage of   -- See Note [Out of scope might be a staging error]
-           Splice -> stageRestrictionError (quotes (ppr name))
+           Splice {} -> stageRestrictionError (quotes (ppr name))
            _ -> failWithTc $
                 vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),

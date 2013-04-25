@@ -1235,10 +1235,10 @@ checkCrossStageLifting :: Id -> ThLevel -> ThStage -> TcM ()
 -- Examples   \x -> [| x |]
 --            [| map |]
 
-checkCrossStageLifting _ _ Comp   = return ()
-checkCrossStageLifting _ _ Splice = return ()
+checkCrossStageLifting _ _ Comp      = return ()
+checkCrossStageLifting _ _ (Splice _) = return ()
 
-checkCrossStageLifting id _ (Brack _ ps_var lie_var)
+checkCrossStageLifting id _ (Brack _ _ ps_var lie_var)
   | thTopLevelId id
   =     -- Top-level identifiers in this module,
         -- (which have External Names)

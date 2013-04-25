@@ -1213,6 +1213,10 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | TExpBr (LHsExpr id)  -- [||  expr  ||]
   deriving (Data, Typeable)
 
+isTypedBracket :: HsBracket id -> Bool
+isTypedBracket (TExpBr {}) = True
+isTypedBracket _           = False
+
 instance OutputableBndr id => Outputable (HsBracket id) where
   ppr = pprHsBracket
 
