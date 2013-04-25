@@ -77,25 +77,25 @@ Note [FamInsts and CoAxioms]
       F ty1 .. tyn where F is a type family
 
 * A FamInstBranch corresponds to a CoAxBranch -- it represents
-  one alternative in a family instance group. We could theoretically
+  one alternative in a branched family instance. We could theoretically
   not have FamInstBranches and just use the CoAxBranches within
   the CoAxiom stored in the FamInst, but for one problem: we want to
   cache the "rough match" top-level tycon names for quick matching.
   This data is not stored in a CoAxBranch, so we use FamInstBranches
   instead.
 
-Note [fi_group field]
-~~~~~~~~~~~~~~~~~~~~~
+Note [fi_branched field]
+~~~~~~~~~~~~~~~~~~~~~~~~
 A FamInst stores whether or not it was declared with "type instance where"
 for two reasons: 
   1. for accurate pretty-printing; and 
   2. because confluent overlap is disallowed between branches 
      declared in groups. 
-Note that this "group-ness" is properly associated with the FamInst,
+Note that this "branched-ness" is properly associated with the FamInst,
 which thinks about overlap, and not in the CoAxiom, which blindly
 assumes that it is part of a consistent axiom set.
 
-A "group" with fi_group=True can have just one element, however.
+A "branched" instance with fi_branched=True can have just one branch, however.
 
 Note [Why we need fib_rhs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -114,8 +114,8 @@ data FamInst br -- See Note [FamInsts and CoAxioms], Note [Branched axioms] in C
   = FamInst { fi_axiom    :: CoAxiom br      -- The new coercion axiom introduced
                                              -- by this family instance
             , fi_flavor   :: FamFlavor
-            , fi_group    :: Bool            -- True <=> declared with "type instance where"
-                                             -- See Note [fi_group field]
+            , fi_branched :: Bool            -- True <=> declared with "type instance where"
+                                             -- See Note [fi_branched field]
 
             -- Everything below here is a redundant,
             -- cached version of the two things above,
@@ -213,12 +213,12 @@ instance Outputable (FamInst br) where
 -- Prints the FamInst as a family instance declaration
 pprFamInst :: FamInst br -> SDoc
 pprFamInst (FamInst { fi_branches = brs, fi_flavor = SynFamilyInst
-                    , fi_group = True, fi_axiom = axiom })
+                    , fi_branched = True, fi_axiom = axiom })
   = hang (ptext (sLit "type instance where"))
        2 (vcat [pprCoAxBranchHdr axiom i | i <- brListIndices brs])
 
 pprFamInst fi@(FamInst { fi_flavor = flavor
-                       , fi_group = False, fi_axiom = ax })
+                       , fi_branched = False, fi_axiom = ax })
   = pprFamFlavor flavor <+> pp_instance
     <+> pprCoAxBranchHdr ax 0
   where
@@ -265,16 +265,16 @@ also.
 -- interface file.  In particular, we get the rough match info from the iface
 -- (instead of computing it here).
 mkImportedFamInst :: Name               -- Name of the family
-                  -> Bool               -- is this a group?
+                  -> Bool               -- is this a branched instance?
                   -> [[Maybe Name]]     -- Rough match info, per branch
                   -> CoAxiom Branched   -- Axiom introduced
                   -> FamInst Branched   -- Resulting family instance
-mkImportedFamInst fam group roughs axiom
+mkImportedFamInst fam branched roughs axiom
   = FamInst {
       fi_fam      = fam,
       fi_axiom    = axiom,
       fi_flavor   = flavor,
-      fi_group    = group,
+      fi_branched = branched,
       fi_branches = branches }
   where
      -- Lazy match (See note [Lazy axiom match])
@@ -442,8 +442,8 @@ desugared to
 
 we return the matching instance '(FamInst{.., fi_tycon = :R42T}, Int)'.
 
-Note [Instance checking within groups]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Branched instance checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Consider the following:
 
@@ -454,33 +454,47 @@ type instance where
 g :: Show a => a -> F a
 g x = length (show x)
 
-Should that type-check? No. We need to allow for the possibility
-that 'a' might be Int and therefore 'F a' should be Bool. We can
-simplify 'F a' to Int only when we can be sure that 'a' is not Int.
+Should that type-check? No. We need to allow for the possibility that 'a'
+might be Int and therefore 'F a' should be Bool. We can simplify 'F a' to Int
+only when we can be sure that 'a' is not Int.
 
-To achieve this, after finding a possible match within an instance group, we
-have to go back to all previous FamInstBranchess and check that, under the
-substitution induced by the match, other matches are not possible. This is
-similar to what happens with class instance selection, when we need to
-guarantee that there is only a match and no unifiers. The exact algorithm is
-different here because the the potentially-overlapping group is closed.
+To achieve this, after finding a possible match within an instance, we have to
+go back to all previous FamInstBranchess and check that, under the
+substitution induced by the match, other branches are surely apart. (See
+[Apartness] in types/Unify.lhs.) This is similar to what happens with class
+instance selection, when we need to guarantee that there is only a match and
+no unifiers. The exact algorithm is different here because the the
+potentially-overlapping group is closed.
 
-ALTERNATE APPROACH: As we are processing the branches, we could check if an
-instance unifies but does not match. If this happens, there is no possible
-match and we can fail right away. This might be more efficient.
+As another example, consider this:
 
-Note [Early failure optimisation for instance groups]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As we're searching through the instances for a match, it is
-possible that we find an branch within an instance that matches, but
-a previous branch still unifies. In this case, we can abort the
-search, because any other instance that matches will necessarily
-overlap with the instance group we're currently searching. Because
-overlap among instance groups is disallowed, we know that that
-no such other instance exists.
+type family G x
+type instance where
+  G Int = Bool
+  G a   = Double
 
-Note [Confluence checking within groups]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+type family H y
+-- no instances
+
+Now, we want to simplify (G (H Char)). We can't, because (H Char) might later
+simplify to be Int. So, (G (H Char)) is stuck, for now.
+
+ALTERNATE APPROACH: As we are processing the branches, we could check if a
+branch is not surely apart from an application but does not match that
+application. If this happens, there is no possible match and we can fail right
+away. This might be more efficient.
+
+Note [Early failure optimisation for branched instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As we're searching through the instances for a match, it is possible that we
+find a branch within an instance that matches, but a previous branch is not
+surely apart from the target application. In this case, we can abort the
+search, because any other instance that matches will necessarily overlap with
+the instance we're currently searching. Because overlap among branched
+instances is disallowed, we know that that no such other instance exists.
+
+Note [Confluence checking within branched instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC allows type family instances to have overlapping patterns as long as the
 right-hand sides are coincident in the region of overlap. Can we extend this
 notion of confluent overlap to branched instances? Not in any obvious way.
@@ -512,7 +526,7 @@ So, why is this not a problem with non-branched confluent overlap? Because
 we don't need to verify that an application is apart from anything. The
 non-branched confluent overlap check happens when we add the instance to the
 environment -- we're unifying among patterns, which cannot contain type family
-appplications. So, we're safe there and can continue supporting that feature.
+applications. So, we're safe there and can continue supporting that feature.
 
 \begin{code}
 -- when matching a type family application, we get a FamInst,
@@ -551,7 +565,7 @@ lookupFamInstEnv
           Just subst
             | checkConflict seen match_tys
             -> (Nothing, StopSearching) -- we found an incoherence, so stop searching
-            -- see Note [Early failure optimisation for instance groups]
+            -- see Note [Early failure optimisation for branched instances]
 
             | otherwise
             -> (Just subst, KeepSearching)
@@ -561,13 +575,13 @@ lookupFamInstEnv
       where
         tpl_tv_set = mkVarSet tpl_tvs
 
-    -- see Note [Instance checking within groups]
+    -- see Note [Branched instance checking]
     checkConflict :: [FamInstBranch] -- the previous branches in the instance that matched
                   -> [Type]          -- the types in the tyfam application we are matching
                   -> Bool            -- is there a conflict?
     checkConflict [] _ = False
     checkConflict ((FamInstBranch { fib_lhs = tpl_tys }) : rest) match_tys
-          -- see Note [Confluence checking within groups]
+          -- see Note [Confluence checking within branched instances]
       | SurelyApart <- tcApartTys instanceBindFun tpl_tys match_tys
       = checkConflict rest match_tys
       | otherwise
@@ -640,7 +654,7 @@ returned; if the instance is not relevant, Nothing is returned. The MatchFun
 also indicates what the search algorithm should do next: it could
 KeepSearching or StopSearching.
 
-When to StopSearching? See Note [Early failure optimisation for instance groups]
+When to StopSearching? See Note [Early failure optimisation for branched instances]
 
 For class instances, these two variants of lookup are combined into one
 function (cf, @InstEnv@).  We don't do that for family instances as the
@@ -671,7 +685,7 @@ data ContSearch = KeepSearching
 -- Might be a one-way match or a unifier
 type MatchFun =  [FamInstBranch]     -- the previous branches in the instance
               -> FamInstBranch       -- the individual branch to check
-              -> Bool                -- is this branch a part of a group?
+              -> Bool                -- is this branch a part of a branched instance?
               -> [Type]              -- the types to match against
               -> (Maybe TvSubst, ContSearch)
 
@@ -705,7 +719,7 @@ lookup_fam_inst_env' match_fun _one_sided ie fam tys
 
 find :: MatchFun -> [Type] -> [FamInst Branched] -> [FamInstMatch]
 find _         _         [] = []
-find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_group = is_group }) : rest)
+find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_branched = is_branched }) : rest)
   = case findBranch [] (fromBranchList branches) 0 of
       (Just match, StopSearching) -> [match]
       (Just match, KeepSearching) -> match : find match_fun match_tys rest
@@ -723,7 +737,7 @@ find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_group = is_
       | instanceCantMatch rough_tcs mb_tcs
       = findBranch seen rest (ind+1) -- branch won't unify later; no need to add to 'seen'
       | otherwise
-      = case match_fun seen branch is_group match_tys of
+      = case match_fun seen branch is_branched match_tys of
           (Nothing, KeepSearching) -> findBranch (branch : seen) rest (ind+1)
           (Nothing, StopSearching) -> (Nothing, StopSearching)
           (Just subst, cont)       -> (Just match, cont)

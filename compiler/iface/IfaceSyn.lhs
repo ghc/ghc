@@ -177,11 +177,11 @@ data IfaceClsInst
 -- match types, one per branch... but each "rough match types" is itself
 -- a list of Maybe IfaceTyCon. So, we get [[Maybe IfaceTyCon]].
 data IfaceFamInst
-  = IfaceFamInst { ifFamInstFam   :: IfExtName            -- Family name
-                 , ifFamInstGroup :: Bool                 -- Is this a group?
-                 , ifFamInstTys   :: [[Maybe IfaceTyCon]] -- See above
-                 , ifFamInstAxiom :: IfExtName            -- The axiom
-                 , ifFamInstOrph  :: Maybe OccName        -- Just like IfaceClsInst
+  = IfaceFamInst { ifFamInstFam      :: IfExtName            -- Family name
+                 , ifFamInstBranched :: Bool                 -- Is this branched?
+                 , ifFamInstTys      :: [[Maybe IfaceTyCon]] -- See above
+                 , ifFamInstAxiom    :: IfExtName            -- The axiom
+                 , ifFamInstOrph     :: Maybe OccName        -- Just like IfaceClsInst
                  }
 
 data IfaceRule

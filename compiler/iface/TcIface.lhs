@@ -659,11 +659,11 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
 
 tcIfaceFamInst :: IfaceFamInst -> IfL (FamInst Branched)
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcss
-                             , ifFamInstGroup = group, ifFamInstAxiom = axiom_name } )
+                             , ifFamInstBranched = branched, ifFamInstAxiom = axiom_name } )
     = do { axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
                      tcIfaceCoAxiom axiom_name
          ; let mb_tcss' = map (map (fmap ifaceTyConName)) mb_tcss
-         ; return (mkImportedFamInst fam group mb_tcss' axiom') }
+         ; return (mkImportedFamInst fam branched mb_tcss' axiom') }
 \end{code}
 
 
