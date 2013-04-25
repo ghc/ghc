@@ -331,7 +331,12 @@ tcBracket brack res_ty
                    2 (ppr brack)) $
     do {        -- Check for nested brackets
          cur_stage <- getStage
-       ; checkTc (not (isBrackStage cur_stage)) illegalBracket
+       ; case cur_stage of
+           { Splice True  -> checkTc (isTypedBracket brack) illegalUntypedBracket
+           ; Splice False -> checkTc (not (isTypedBracket brack)) illegalTypedBracket
+           ; Comp         -> return ()
+           ; Brack {}     -> failWithTc illegalBracket
+           }
 
         -- Brackets are desugared to code that mentions the TH package
        ; recordThUse
@@ -341,7 +346,7 @@ tcBracket brack res_ty
         -- it again when we actually use it.
        ; pending_splices <- newMutVar []
        ; lie_var <- getConstraintVar
-       ; let brack_stage = Brack cur_stage pending_splices lie_var
+       ; let brack_stage = Brack (isTypedBracket brack) cur_stage pending_splices lie_var
 
           -- We want to check that there aren't any constraints that
           -- can't be satisfied (e.g. Show Foo, where Foo has no Show
@@ -427,8 +432,13 @@ tc_bracket _ (DecBrL _)
 tc_bracket _ (TExpBr expr)
   = do  { any_ty <- newFlexiTyVarTy openTypeKind
         ; _ <- tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
-        ; tcMetaTy expQTyConName }
-        -- Result type is ExpQ (= Q Exp)
+        ; tcTExpTy any_ty }
+        -- Result type is TExp tau
+
+tcTExpTy :: TcType -> TcM TcType
+tcTExpTy tau = do
+    t <- tcLookupTyCon tExpTyConName
+    return (mkTyConApp t [tau])
 
 quotedNameStageErr :: HsBracket Name -> SDoc
 quotedNameStageErr br
@@ -444,14 +454,14 @@ quotedNameStageErr br
 %************************************************************************
 
 \begin{code}
-tcSpliceExpr (HsSplice _ name expr) res_ty
+tcSpliceExpr (HsSplice isTypedSplice name expr) res_ty
   = setSrcSpan (getLoc expr)    $ do
     { stage <- getStage
     ; case stage of {
-        Splice -> tcTopSplice expr res_ty ;
-        Comp   -> tcTopSplice expr res_ty ;
+        Splice {} -> tcTopSplice isTypedSplice expr res_ty ;
+        Comp      -> tcTopSplice isTypedSplice expr res_ty ;
 
-        Brack pop_stage ps_var lie_var -> do
+        Brack isTypedBrack pop_stage ps_var lie_var -> do
 
         -- See Note [How brackets and nested splices are handled]
         -- A splice inside brackets
@@ -460,7 +470,16 @@ tcSpliceExpr (HsSplice _ name expr) res_ty
         -- Here (h 4) :: Q Exp
         -- but $(h 4) :: forall a.a     i.e. anything!
 
-     { meta_exp_ty <- tcMetaTy expQTyConName
+     { when (isTypedBrack && not isTypedSplice) $
+           failWithTc illegalUntypedSplice
+     ; when (not isTypedBrack && isTypedSplice) $
+           failWithTc illegalTypedSplice
+     ; meta_exp_ty <- if isTypedSplice
+                      then do { any_ty <- newFlexiTyVarTy openTypeKind
+                              ; tcTExpTy any_ty
+                              }
+                      else tcMetaTy expQTyConName
+
      ; expr' <- setStage pop_stage $
                 setConstraintVar lie_var    $
                 tcMonoExpr expr meta_exp_ty
@@ -472,13 +491,17 @@ tcSpliceExpr (HsSplice _ name expr) res_ty
      ; return (panic "tcSpliceExpr")    -- The returned expression is ignored
      }}}
 
-tcTopSplice :: LHsExpr Name -> TcRhoType -> TcM (HsExpr Id)
+tcTopSplice :: Bool -> LHsExpr Name -> TcRhoType -> TcM (HsExpr Id)
 -- Note [How top-level splices are handled]
-tcTopSplice expr res_ty
-  = do { meta_exp_ty <- tcMetaTy expQTyConName
+tcTopSplice isTypedSplice expr res_ty
+  = do { meta_exp_ty <- if isTypedSplice
+                        then do { any_ty <- newFlexiTyVarTy openTypeKind
+                                ; tcTExpTy any_ty
+                                }
+                        else tcMetaTy expQTyConName
 
         -- Typecheck the expression
-       ; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_exp_ty)
+       ; zonked_q_expr <- tcTopSpliceExpr isTypedSplice (tcMonoExpr expr meta_exp_ty)
 
         -- Run the expression
        ; expr2 <- runMetaE zonked_q_expr
@@ -497,7 +520,7 @@ spliceResultDoc expr
         , ptext (sLit "To see what the splice expanded to, use -ddump-splices")]
 
 -------------------
-tcTopSpliceExpr :: TcM (LHsExpr Id) -> TcM (LHsExpr Id)
+tcTopSpliceExpr :: Bool -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 -- Note [How top-level splices are handled]
 -- Type check an expression that is the body of a top-level splice
 --   (the caller will compile and run it)
@@ -507,7 +530,7 @@ tcTopSpliceExpr :: TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 -- The recursive call to tcMonoExpr will simply expand the
 -- inner escape before dealing with the outer one
 
-tcTopSpliceExpr tc_action
+tcTopSpliceExpr isTypedSplice tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
     unsetGOptM Opt_DeferTypeErrors $
@@ -516,7 +539,7 @@ tcTopSpliceExpr tc_action
                    -- coerce, so we get a seg-fault if, say we
                    -- splice a type into a place where an expression
                    -- is expected (Trac #7276)
-    setStage Splice $
+    setStage (Splice isTypedSplice) $
     do {    -- Typecheck the expression
          (expr', lie) <- captureConstraints tc_action
 
@@ -548,10 +571,10 @@ tcSpliceType (HsSplice _ name hs_expr) _
   = setSrcSpan (getLoc hs_expr) $ do
     { stage <- getStage
     ; case stage of {
-        Splice -> tcTopSpliceType hs_expr ;
-        Comp   -> tcTopSpliceType hs_expr ;
+        Splice {} -> tcTopSpliceType hs_expr ;
+        Comp      -> tcTopSpliceType hs_expr ;
 
-        Brack pop_level ps_var lie_var -> do
+        Brack _ pop_level ps_var lie_var -> do
            -- See Note [How brackets and nested splices are handled]
            -- A splice inside brackets
     { meta_ty <- tcMetaTy typeQTyConName
@@ -578,7 +601,7 @@ tcTopSpliceType expr
   = do  { meta_ty <- tcMetaTy typeQTyConName
 
         -- Typecheck the expression
-        ; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_ty)
+        ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr meta_ty)
 
         -- Run the expression
         ; hs_ty2 <- runMetaT zonked_q_expr
@@ -604,7 +627,7 @@ tcTopSpliceType expr
 --      tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceDecls expr
   = do  { list_q <- tcMetaTy decsQTyConName     -- Q [Dec]
-        ; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr list_q)
+        ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr list_q)
 
                 -- Run the expression
         ; decls <- runMetaD zonked_q_expr
@@ -631,7 +654,7 @@ runAnnotation target expr = do
     -- Check the instances we require live in another module (we want to execute it..)
     -- and check identifiers live in other modules using TH stage checks. tcSimplifyStagedExpr
     -- also resolves the LIE constraints to detect e.g. instance ambiguity
-    zonked_wrapped_expr' <- tcTopSpliceExpr $
+    zonked_wrapped_expr' <- tcTopSpliceExpr False $
            do { (expr', expr_ty) <- tcInferRhoNC expr
                 -- We manually wrap the typechecked expression in a call to toAnnotationWrapper
                 -- By instantiating the call >here< it gets registered in the
@@ -741,7 +764,7 @@ runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
         ; meta_exp_ty <- tcMetaTy meta_ty
 
         -- Typecheck the expression
-        ; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_exp_ty)
+        ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr meta_exp_ty)
 
         -- Run the expression
         ; result <- runMetaQ meta_ops zonked_q_expr
@@ -1011,6 +1034,18 @@ showSplice what before after
 
 illegalBracket :: SDoc
 illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (without intervening splices)")
+
+illegalTypedBracket :: SDoc
+illegalTypedBracket = ptext (sLit "Typed brackets may only appear in typed slices.")
+
+illegalUntypedBracket :: SDoc
+illegalUntypedBracket = ptext (sLit "Untyped brackets may only appear in untyped slices.")
+
+illegalTypedSplice :: SDoc
+illegalTypedSplice = ptext (sLit "Typed splices may not appear in untyped brackets")
+
+illegalUntypedSplice :: SDoc
+illegalUntypedSplice = ptext (sLit "Untyped splices may not appear in typed brackets")
 #endif  /* GHCI */
 \end{code}
 
