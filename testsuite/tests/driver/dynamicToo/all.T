@@ -12,3 +12,13 @@ test('dynamicToo001',
      run_command,
      ['$MAKE -s --no-print-directory dynamicToo001'])
 
+test('dynamicToo002',
+     [extra_clean(['A002.o',      'B002.o',      'C002.o',
+                   'A002.hi',     'B002.hi',     'C002.hi',
+                   'A002.dyn_o',  'B002.dyn_o',  'C002.dyn_o',
+                   'A002.dyn_hi', 'B002.dyn_hi', 'C002.dyn_hi']),
+      unless(have_vanilla(), skip),
+      unless(have_dynamic(), skip)],
+     run_command,
+     ['$MAKE -s --no-print-directory dynamicToo002'])
+
