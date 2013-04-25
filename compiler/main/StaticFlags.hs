@@ -1,10 +1,3 @@
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -23,20 +16,20 @@ module StaticFlags (
         -- entry point
         parseStaticFlags,
 
-	staticFlags,
+        staticFlags,
         initStaticOpts,
 
-	-- Output style options
-	opt_PprStyle_Debug,
+        -- Output style options
+        opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
-	-- language opts
-	opt_DictsStrict,
+        -- language opts
+        opt_DictsStrict,
 
-	-- optimisation opts
-	opt_NoStateHack,
-	opt_CprOff,
-	opt_NoOptCoercion,
+        -- optimisation opts
+        opt_NoStateHack,
+        opt_CprOff,
+        opt_NoOptCoercion,
         opt_NoFlatCache,
 
         -- For the parser
@@ -52,13 +45,13 @@ import CmdLineParser
 import FastString
 import SrcLoc
 import Util
--- import Maybes		( firstJusts )
+-- import Maybes                ( firstJusts )
 import Panic
 
 import Control.Monad
 import Data.Char
 import Data.IORef
-import System.IO.Unsafe	( unsafePerformIO )
+import System.IO.Unsafe ( unsafePerformIO )
 
 
 -----------------------------------------------------------------------------
@@ -114,7 +107,7 @@ staticFlags = unsafePerformIO $ do
 -- All the static flags should appear in this list.  It describes how each
 -- static flag should be processed.  Two main purposes:
 -- (a) if a command-line flag doesn't appear in the list, GHC can complain
--- (b) a command-line flag may remove, or add, other flags; e.g. the "-fno-X" 
+-- (b) a command-line flag may remove, or add, other flags; e.g. the "-fno-X"
 --     things
 --
 -- The common (PassFlag addOpt) action puts the static flag into the bunch of
@@ -198,10 +191,10 @@ opt_NoDebugOutput  = lookUp  (fsLit "-dno-debug-output")
 
 -- language opts
 opt_DictsStrict    :: Bool
-opt_DictsStrict	   = lookUp  (fsLit "-fdicts-strict")
+opt_DictsStrict    = lookUp  (fsLit "-fdicts-strict")
 
 opt_NoStateHack    :: Bool
-opt_NoStateHack	   = lookUp  (fsLit "-fno-state-hack")
+opt_NoStateHack    = lookUp  (fsLit "-fno-state-hack")
 
 -- Switch off CPR analysis in the new demand analyser
 opt_CprOff         :: Bool
@@ -254,29 +247,29 @@ foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
 lookup_str       :: String -> Maybe String
 lookup_str sw
    = case firstJusts (map (stripPrefix sw) staticFlags) of
-	Just ('=' : str) -> Just str
-	Just str         -> Just str
-	Nothing		 -> Nothing
+        Just ('=' : str) -> Just str
+        Just str         -> Just str
+        Nothing          -> Nothing
 
 lookup_def_int   :: String -> Int -> Int
 lookup_def_int sw def = case (lookup_str sw) of
-			    Nothing -> def		-- Use default
-		  	    Just xx -> try_read sw xx
+                            Nothing -> def              -- Use default
+                            Just xx -> try_read sw xx
 
 lookup_def_float :: String -> Float -> Float
 lookup_def_float sw def = case (lookup_str sw) of
-			    Nothing -> def		-- Use default
-		  	    Just xx -> try_read sw xx
+                            Nothing -> def              -- Use default
+                            Just xx -> try_read sw xx
 
 try_read :: Read a => String -> String -> a
 -- (try_read sw str) tries to read s; if it fails, it
 -- bleats about flag sw
 try_read sw str
   = case reads str of
-	((x,_):_) -> x	-- Be forgiving: ignore trailing goop, and alternative parses
-	[]	  -> throwGhcException (UsageError ("Malformed argument " ++ str ++ " for flag " ++ sw))
-			-- ToDo: hack alert. We should really parse the arguments
-			-- 	 and announce errors in a more civilised way.
+        ((x,_):_) -> x  -- Be forgiving: ignore trailing goop, and alternative parses
+        []        -> throwGhcException (UsageError ("Malformed argument " ++ str ++ " for flag " ++ sw))
+                        -- ToDo: hack alert. We should really parse the arguments
+                        --       and announce errors in a more civilised way.
 -}
 
 
