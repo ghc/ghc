@@ -20,7 +20,7 @@ CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
 ghc-cabal_DIST_BINARY_NAME = ghc-cabal$(exeext0)
 ghc-cabal_DIST_BINARY = utils/ghc-cabal/dist/build/tmp/$(ghc-cabal_DIST_BINARY_NAME)
-ghc-cabal_INPLACE = inplace/bin/ghc-cabal$(ghc-cabal_DIST_BINARY_NAME)
+ghc-cabal_INPLACE = inplace/bin/$(ghc-cabal_DIST_BINARY_NAME)
 
 ifneq "$(BINDIST)" "YES"
 $(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
