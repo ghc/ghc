@@ -28,16 +28,16 @@ dynamic002Check = [ -f $1 ] || echo $1 missing
 # Check that "--make -dynamic-too" works
 dynamicToo002:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -dynamic-too -v0 --make C002
-	$(call dynamic002Check,A001.o)
-	$(call dynamic002Check,B001.o)
-	$(call dynamic002Check,C001.o)
-	$(call dynamic002Check,A001.hi)
-	$(call dynamic002Check,B001.hi)
-	$(call dynamic002Check,C001.hi)
-	$(call dynamic002Check,A001.dyn_o)
-	$(call dynamic002Check,B001.dyn_o)
-	$(call dynamic002Check,C001.dyn_o)
-	$(call dynamic002Check,A001.dyn_hi)
-	$(call dynamic002Check,B001.dyn_hi)
-	$(call dynamic002Check,C001.dyn_hi)
+	$(call dynamic002Check,A002.o)
+	$(call dynamic002Check,B002.o)
+	$(call dynamic002Check,C002.o)
+	$(call dynamic002Check,A002.hi)
+	$(call dynamic002Check,B002.hi)
+	$(call dynamic002Check,C002.hi)
+	$(call dynamic002Check,A002.dyn_o)
+	$(call dynamic002Check,B002.dyn_o)
+	$(call dynamic002Check,C002.dyn_o)
+	$(call dynamic002Check,A002.dyn_hi)
+	$(call dynamic002Check,B002.dyn_hi)
+	$(call dynamic002Check,C002.dyn_hi)
 
