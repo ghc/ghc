@@ -1173,7 +1173,8 @@ doDynamicToo dflags0 = let dflags1 = addWay' WayDyn dflags0
                                          objectSuf = dynObjectSuf dflags1
                                      }
                            dflags3 = updateWays dflags2
-                       in dflags3
+                           dflags4 = gopt_unset dflags3 Opt_BuildDynamicToo
+                       in dflags4
 
 -----------------------------------------------------------------------------
 

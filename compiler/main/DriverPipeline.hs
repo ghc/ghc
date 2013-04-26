@@ -78,7 +78,7 @@ preprocess :: HscEnv
            -> IO (DynFlags, FilePath)
 preprocess hsc_env (filename, mb_phase) =
   ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename)
-  runPipeline anyHsc hsc_env (filename, mb_phase)
+  runPipeline anyHsc hsc_env (filename, fmap RealPhase mb_phase)
         Nothing Temporary Nothing{-no ModLocation-} Nothing{-no stub-}
 
 -- ---------------------------------------------------------------------------
@@ -234,19 +234,16 @@ compileOne' m_tc_result mHscMessage
                            guts <- hscSimplify hsc_env' guts0
                            (iface, changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
                            hscWriteIface dflags' iface changed summary
-                           (_outputFilename, hasStub) <- hscGenHardCode hsc_env' cgguts summary
 
                            -- We're in --make mode: finish the compilation pipeline.
-                           maybe_stub_o <- case hasStub of
-                                      Nothing -> return Nothing
-                                      Just stub_c -> do
-                                          stub_o <- compileStub hsc_env' stub_c
-                                          return (Just stub_o)
-                           _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
+                           let mod_name = ms_mod_name summary
+                           _ <- runPipeline StopLn hsc_env'
+                                             (output_fn,
+                                              Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
                                              (Just basename)
                                              Persistent
                                              (Just location)
-                                             maybe_stub_o
+                                             Nothing
                                  -- The object filename comes from the ModLocation
                            o_time <- getModificationUTCTime object_filename
                            let linkable = LM o_time this_mod [DotO object_filename]
@@ -475,7 +472,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
                         _          -> stop_phase
 
    ( _, out_file) <- runPipeline stop_phase' hsc_env
-                            (src, mb_phase) Nothing output
+                            (src, fmap RealPhase mb_phase) Nothing output
                             Nothing{-no ModLocation-} Nothing
    return out_file
 
@@ -521,12 +518,12 @@ data PipelineOutput
 runPipeline
   :: Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
-  -> (FilePath,Maybe Phase)     -- ^ Input filename (and maybe -x suffix)
+  -> (FilePath,Maybe PhasePlus) -- ^ Input filename (and maybe -x suffix)
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
-  -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
+  -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
 runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
              mb_basename output maybe_loc maybe_stub_o
 
@@ -543,13 +540,14 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                       | otherwise             = input_basename
 
              -- If we were given a -x flag, then use that phase to start from
-             start_phase = fromMaybe (startPhase suffix') mb_phase
+             start_phase = fromMaybe (RealPhase (startPhase suffix')) mb_phase
 
-             isHaskell (Unlit _) = True
-             isHaskell (Cpp   _) = True
-             isHaskell (HsPp  _) = True
-             isHaskell (Hsc   _) = True
-             isHaskell _         = False
+             isHaskell (RealPhase (Unlit _)) = True
+             isHaskell (RealPhase (Cpp   _)) = True
+             isHaskell (RealPhase (HsPp  _)) = True
+             isHaskell (RealPhase (Hsc   _)) = True
+             isHaskell (HscOut {})           = True
+             isHaskell _                     = False
 
              isHaskellishFile = isHaskell start_phase
 
@@ -568,10 +566,13 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- before B in a normal compilation pipeline.
 
          let happensBefore' = happensBefore dflags
-         when (not (start_phase `happensBefore'` stop_phase)) $
-               throwGhcExceptionIO (UsageError
-                           ("cannot compile this file to desired target: "
-                              ++ input_fn))
+         case start_phase of
+             RealPhase start_phase' ->
+                 when (not (start_phase' `happensBefore'` stop_phase)) $
+                       throwGhcExceptionIO (UsageError
+                                   ("cannot compile this file to desired target: "
+                                      ++ input_fn))
+             HscOut {} -> return ()
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
          r <- runPipeline' start_phase hsc_env env input_fn
@@ -592,7 +593,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          return r
 
 runPipeline'
-  :: Phase                      -- ^ When to start
+  :: PhasePlus                  -- ^ When to start
   -> HscEnv                     -- ^ Compilation environment
   -> PipeEnv
   -> FilePath                   -- ^ Input filename
@@ -605,7 +606,7 @@ runPipeline' start_phase hsc_env env input_fn
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
 
-  evalP (pipeLoop (RealPhase start_phase) input_fn) env state
+  evalP (pipeLoop start_phase input_fn) env state
 
 -- -----------------------------------------------------------------------------
 -- The pipeline uses a monad to carry around various bits of information
@@ -722,12 +723,12 @@ pipeLoop phase input_fn = do
                                   (ptext (sLit "Running phase") <+> ppr phase)
            (next_phase, output_fn) <- runPhase phase input_fn dflags
            r <- pipeLoop next_phase output_fn
-           case next_phase of
+           case phase of
                HscOut {} ->
                    whenGeneratingDynamicToo dflags $ do
                        setDynFlags $ doDynamicToo dflags
                        -- TODO shouldn't ignore result:
-                       _ <- pipeLoop next_phase output_fn
+                       _ <- pipeLoop phase input_fn
                        return ()
                _ ->
                    return ()
