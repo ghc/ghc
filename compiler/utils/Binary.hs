@@ -635,11 +635,16 @@ lazyPut bh a = do
     putAt bh pre_a q    -- fill in slot before a with ptr to q
     seekBin bh q        -- finally carry on writing at q
 
+-- XXX: This function is not thread-safe on BinIO handles.
 lazyGet :: Binary a => BinHandle -> IO a
 lazyGet bh = do
     p <- get bh -- a BinPtr
     p_a <- tellBin bh
-    a <- unsafeInterleaveIO (getAt bh p_a)
+    a <- unsafeInterleaveIO $ do
+        -- NB: Use a fresh off_r variable in the child thread, for thread
+        -- safety.
+        off_r <- newFastMutInt
+        getAt bh { _off_r = off_r } p_a
     seekBin bh p -- skip over the object for now
     return a
 
