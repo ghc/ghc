@@ -125,7 +125,7 @@ $1_$2_$3_ALL_HC_OPTS = \
 
 ifeq "$3" "dyn"
 ifneq "$4" "0"
-ifeq "$$(TargetOS_CPP)" "linux"
+ifeq "$$(TargetElf)" "YES"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
     $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-z -optl-Wl,origin
