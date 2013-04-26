@@ -616,10 +616,11 @@ genericHscFrontend mod_summary
 
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: HscEnv
+                  -> FilePath
                   -> ModSummary
                   -> SourceModified
                   -> IO HscStatus
-hscCompileOneShot hsc_env mod_summary src_changed
+hscCompileOneShot hsc_env extCore_filename mod_summary src_changed
   = do
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
@@ -648,7 +649,7 @@ hscCompileOneShot hsc_env mod_summary src_changed
                     _ ->
                         do guts0 <- hscDesugar' (ms_location mod_summary) tc_result
                            guts <- hscSimplify' guts0
-                           (iface, changed, _details, cgguts) <- hscNormalIface' guts mb_old_hash
+                           (iface, changed, _details, cgguts) <- hscNormalIface' extCore_filename guts mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return $ HscRecomp cgguts mod_summary
 
@@ -1082,16 +1083,18 @@ hscSimpleIface' tc_result mb_old_iface = do
     return (new_iface, no_change, details)
 
 hscNormalIface :: HscEnv
+               -> FilePath
                -> ModGuts
                -> Maybe Fingerprint
                -> IO (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface hsc_env simpl_result mb_old_iface =
-    runHsc hsc_env $ hscNormalIface' simpl_result mb_old_iface
+hscNormalIface hsc_env extCore_filename simpl_result mb_old_iface =
+    runHsc hsc_env $ hscNormalIface' extCore_filename simpl_result mb_old_iface
 
-hscNormalIface' :: ModGuts
+hscNormalIface' :: FilePath
+                -> ModGuts
                 -> Maybe Fingerprint
                 -> Hsc (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface' simpl_result mb_old_iface = do
+hscNormalIface' extCore_filename simpl_result mb_old_iface = do
     hsc_env <- getHscEnv
     (cg_guts, details) <- {-# SCC "CoreTidy" #-}
                           liftIO $ tidyProgram hsc_env simpl_result
@@ -1110,7 +1113,7 @@ hscNormalIface' simpl_result mb_old_iface = do
     -- This should definitely be here and not after CorePrep,
     -- because CorePrep produces unqualified constructor wrapper declarations,
     -- so its output isn't valid External Core (without some preprocessing).
-    liftIO $ emitExternalCore (hsc_dflags hsc_env) cg_guts
+    liftIO $ emitExternalCore (hsc_dflags hsc_env) extCore_filename cg_guts
     liftIO $ dumpIfaceStats hsc_env
 
     -- Return the prepared code.
@@ -1556,11 +1559,11 @@ hscParseThingWithLocation source linenumber parser str
             return thing
 
 hscCompileCore :: HscEnv -> Bool -> SafeHaskellMode -> ModSummary
-               -> CoreProgram -> FilePath -> IO ()
-hscCompileCore hsc_env simplify safe_mode mod_summary binds output_filename
+               -> CoreProgram -> FilePath -> FilePath -> IO ()
+hscCompileCore hsc_env simplify safe_mode mod_summary binds output_filename extCore_filename
   = runHsc hsc_env $ do
         guts <- maybe_simplify (mkModGuts (ms_mod mod_summary) safe_mode binds)
-        (iface, changed, _details, cgguts) <- hscNormalIface' guts Nothing
+        (iface, changed, _details, cgguts) <- hscNormalIface' extCore_filename guts Nothing
         liftIO $ hscWriteIface (hsc_dflags hsc_env) iface changed mod_summary
         _ <- liftIO $ hscGenHardCode hsc_env cgguts mod_summary output_filename
         return ()

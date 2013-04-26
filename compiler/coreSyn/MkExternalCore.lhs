@@ -37,16 +37,15 @@ import qualified Data.ByteString as BS
 import Data.Char
 import System.IO
 
-emitExternalCore :: DynFlags -> CgGuts -> IO ()
-emitExternalCore dflags cg_guts
+emitExternalCore :: DynFlags -> FilePath -> CgGuts -> IO ()
+emitExternalCore dflags extCore_filename cg_guts
  | gopt Opt_EmitExternalCore dflags
- = (do handle <- openFile corename WriteMode
+ = (do handle <- openFile extCore_filename WriteMode
        hPutStrLn handle (show (mkExternalCore dflags cg_guts))
        hClose handle)
    `catchIO` (\_ -> pprPanic "Failed to open or write external core output file"
-                             (text corename))
-   where corename = extCoreName dflags
-emitExternalCore _ _
+                             (text extCore_filename))
+emitExternalCore _ _ _
  | otherwise
  = return ()
 

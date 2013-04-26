@@ -148,8 +148,7 @@ compileOne' m_tc_result mHscMessage
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
 
-   let dflags' = dflags { extCoreName = basename ++ ".hcr" }
-   let hsc_env' = hsc_env { hsc_dflags = dflags' }
+   let extCore_filename = basename ++ ".hcr"
 
    -- -fforce-recomp should also work with --make
    let force_recomp = gopt Opt_ForceRecomp dflags
@@ -165,7 +164,7 @@ compileOne' m_tc_result mHscMessage
    e <- genericHscCompileGetFrontendResult
             always_do_basic_recompilation_check
             m_tc_result mHscMessage
-            hsc_env' summary source_modified mb_old_iface (mod_index, nmods)
+            hsc_env summary source_modified mb_old_iface (mod_index, nmods)
 
    case e of
        Left iface ->
@@ -181,19 +180,19 @@ compileOne' m_tc_result mHscMessage
                HscInterpreted ->
                    case ms_hsc_src summary of
                    HsBootFile ->
-                       do (iface, _changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                       do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                           return (HomeModInfo{ hm_details  = details,
                                                hm_iface    = iface,
                                                hm_linkable = maybe_old_linkable })
-                   _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
-                           guts <- hscSimplify hsc_env' guts0
-                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
-                           (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env' cgguts summary
+                   _ -> do guts0 <- hscDesugar hsc_env summary tc_result
+                           guts <- hscSimplify hsc_env guts0
+                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env extCore_filename guts mb_old_hash
+                           (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env cgguts summary
 
                            stub_o <- case hasStub of
                                      Nothing -> return []
                                      Just stub_c -> do
-                                         stub_o <- compileStub hsc_env' stub_c
+                                         stub_o <- compileStub hsc_env stub_c
                                          return [DotO stub_o]
 
                            let hs_unlinked = [BCOs comp_bc modBreaks]
@@ -211,7 +210,7 @@ compileOne' m_tc_result mHscMessage
                                                 hm_iface    = iface,
                                                 hm_linkable = Just linkable })
                HscNothing ->
-                   do (iface, _changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                   do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                       let linkable = if isHsBoot src_flavour
                                      then maybe_old_linkable
                                      else Just (LM (ms_hs_date summary) this_mod [])
@@ -222,21 +221,21 @@ compileOne' m_tc_result mHscMessage
                _ ->
                    case ms_hsc_src summary of
                    HsBootFile ->
-                       do (iface, changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
-                          hscWriteIface dflags' iface changed summary
-                          touchObjectFile dflags' object_filename
+                       do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                          hscWriteIface dflags iface changed summary
+                          touchObjectFile dflags object_filename
                           return (HomeModInfo{ hm_details  = details,
                                                hm_iface    = iface,
                                                hm_linkable = maybe_old_linkable })
 
-                   _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
-                           guts <- hscSimplify hsc_env' guts0
-                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
-                           hscWriteIface dflags' iface changed summary
+                   _ -> do guts0 <- hscDesugar hsc_env summary tc_result
+                           guts <- hscSimplify hsc_env guts0
+                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env extCore_filename guts mb_old_hash
+                           hscWriteIface dflags iface changed summary
 
                            -- We're in --make mode: finish the compilation pipeline.
                            let mod_name = ms_mod_name summary
-                           _ <- runPipeline StopLn hsc_env'
+                           _ <- runPipeline StopLn hsc_env
                                              (output_fn,
                                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
                                              (Just basename)
@@ -984,9 +983,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                   then return SourceUnmodified
                                   else return SourceModified
 
-        let dflags' = dflags { extCoreName = basename ++ ".hcr" }
+        let extCore_filename = basename ++ ".hcr"
 
-        setDynFlags dflags'
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
@@ -1006,7 +1004,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                         ms_srcimps      = src_imps }
 
   -- run the compiler!
-        result <- liftIO $ hscCompileOneShot hsc_env'
+        result <- liftIO $ hscCompileOneShot hsc_env' extCore_filename
                                mod_summary source_unchanged
 
         return (HscOut src_flavour mod_name result,
@@ -1061,16 +1059,12 @@ runPhase (RealPhase CmmCpp) input_fn dflags
 
 runPhase (RealPhase Cmm) input_fn dflags
   = do
-        PipeEnv{src_basename} <- getPipeEnv
         let hsc_lang = hscTarget dflags
 
         let next_phase = hscPostBackendPhase dflags HsSrcFile hsc_lang
 
         output_fn <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { extCoreName = src_basename ++ ".hcr" }
-
-        setDynFlags dflags'
         PipeState{hsc_env} <- getPipeState
 
         liftIO $ hscCompileCmmFile hsc_env input_fn output_fn

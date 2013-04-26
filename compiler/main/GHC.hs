@@ -892,8 +892,10 @@ compileToCoreSimplified = compileCore True
 -- The resulting .o, .hi, and executable files, if any, are stored in the
 -- current directory, and named according to the module name.
 -- This has only so far been tested with a single self-contained module.
-compileCoreToObj :: GhcMonad m => Bool -> CoreModule -> FilePath -> m ()
-compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) output_fn = do
+compileCoreToObj :: GhcMonad m
+                 => Bool -> CoreModule -> FilePath -> FilePath -> m ()
+compileCoreToObj simplify cm@(CoreModule{ cm_module = mName })
+                 output_fn extCore_filename = do
   dflags      <- getSessionDynFlags
   currentTime <- liftIO $ getCurrentTime
   cwd         <- liftIO $ getCurrentDirectory
@@ -919,7 +921,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) output_fn = do
       }
 
   hsc_env <- getSession
-  liftIO $ hscCompileCore hsc_env simplify (cm_safe cm) modSum (cm_binds cm) output_fn
+  liftIO $ hscCompileCore hsc_env simplify (cm_safe cm) modSum (cm_binds cm) output_fn extCore_filename
 
 
 compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
