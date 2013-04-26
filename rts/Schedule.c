@@ -541,8 +541,8 @@ run_thread:
              * out. Why and where it happens is still a mystery?
              */
             if (t->what_next == ThreadKilled && sched_state != SCHED_SHUTTING_DOWN) {
-                debugTrace (DEBUG_sched, "Schedule: Upcall thread %d on capability %d killed\n",
-                      (int)t->id, (int)t->cap->no);
+                debugTrace (DEBUG_sched, "Schedule: Upcall thread %d on capability %d killed",
+                            (int)t->id, (int)t->cap->no);
             }
 
             if (ret == ThreadFinished) {
@@ -960,8 +960,7 @@ scheduleResumeBlockedOnForeignCall(Capability *cap USED_IF_THREADS)
         incall->uls_stat == UserLevelSchedulerBlocked) {
 
         debugTrace (DEBUG_sched, "resuming scheduler associated with task %p"
-                    " with incall %p",
-                    incall->task, incall);
+                    " with incall %p", incall->task, incall);
         //Inform the task associated with the incall that we have resumed the
         //scheduler.
         incall->uls_stat = UserLevelSchedulerRunning;
@@ -2539,11 +2538,8 @@ retry:
         }
     }
 
-    if (!done) {
-      debugTrace (DEBUG_sched, "scheduleThreadOnFreeCap: thread %d is retrying",
-                  (int)tso->id);
+    if (!done)
       goto retry;
-    }
     debugTrace (DEBUG_sched, "scheduleThreadOnFreeCap: thread %d scheduled on cap %d",
                 (int)tso->id, (int)cap0->no);
 

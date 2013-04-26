@@ -99,8 +99,8 @@ prepareUpcallThread (Capability* cap, StgTSO* current_thread)
       initUpcallThreadOnCapability (cap);
 
     upcall_thread = cap->upcall_thread;
-    debugTrace (DEBUG_sched, "Switching to upcall_thread %d. Saving current "
-                "thread %d.", cap->upcall_thread->id,
+    debugTrace (DEBUG_sched, "cap %d: switching to upcall_thread %d. Saving current "
+                "thread %d.", (int)cap->no, cap->upcall_thread->id,
                 (current_thread == (StgTSO*)END_TSO_QUEUE)?-1:(int)current_thread->id);
 
     //Save current thread
@@ -162,8 +162,8 @@ restoreCurrentThreadIfNecessary (Capability* cap, StgTSO* current_thread) {
     //Save the upcall thread
     cap->upcall_thread = current_thread;
 
-    debugTrace (DEBUG_sched, "Saving upcall thread %d and restoring original"
-                " thread %d", current_thread->id,
+    debugTrace (DEBUG_sched, "cap %d: saving upcall thread %d and restoring original"
+                " thread %d", (int)cap->no, current_thread->id,
                 (return_thread == (StgTSO*)END_TSO_QUEUE)?-1:(int)return_thread->id);
   }
   else {

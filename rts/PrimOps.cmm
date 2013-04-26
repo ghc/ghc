@@ -886,8 +886,7 @@ stg_getStatusTVarzh ( gcptr scont )
 stg_sleepCapabilityzh ()
 {
 	IF_DEBUG (scheduler,
-		ccall debugBelch ("stg_sleepCapability: thread %d\n",
-		StgTSO_id(CurrentTSO)));
+		ccall debugBelch ("stg_sleepCapability: thread %d\n", StgTSO_id(CurrentTSO)));
   StgTSO_is_sleeping (CurrentTSO) = 1::I32;
   jump stg_retryzh [];
 }
