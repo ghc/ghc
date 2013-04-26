@@ -186,7 +186,7 @@ else
 ifneq "$$(UseSystemLibFFI)" "YES"
 LIBFFI_LIBS = -Lrts/dist/build -lffi 
 ifeq "$$(TargetElf)" "YES"
-LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN'
+LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN' -optl-Wl,-z -optl-Wl,origin
 endif
 
 else
