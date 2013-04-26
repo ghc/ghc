@@ -960,8 +960,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
         let o_file = ml_obj_file location -- The real object file
 
-        setModLocation location
-
   -- Figure out if the source has changed, for recompilation avoidance.
   --
   -- Setting source_unchanged to True means that M.o seems
@@ -1016,6 +1014,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
 runPhase (HscOut src_flavour mod_name result) _ dflags = do
         location <- getLocation src_flavour mod_name
+        setModLocation location
+
         let o_file = ml_obj_file location -- The real object file
             hsc_lang = hscTarget dflags
             next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
