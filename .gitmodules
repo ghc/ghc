@@ -19,9 +19,11 @@
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
 	url = http://darcs.haskell.org/libraries/terminfo.git/
+	ignore = dirty
 [submodule "libraries/transformers"]
 	path = libraries/transformers
 	url = http://darcs.haskell.org/libraries/transformers.git/
+	ignore = dirty
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
 	url = http://darcs.haskell.org/libraries/xhtml.git/
@@ -31,12 +33,15 @@
 [submodule "libraries/primitive"]
 	path = libraries/primitive
 	url = http://darcs.haskell.org/libraries/primitive.git/
+	ignore = dirty
 [submodule "libraries/vector"]
 	path = libraries/vector
 	url = http://darcs.haskell.org/libraries/vector.git/
+	ignore = dirty
 [submodule "libraries/time"]
 	path = libraries/time
 	url = http://darcs.haskell.org/libraries/time.git/
+	ignore = dirty
 [submodule "libraries/random"]
 	path = libraries/random
 	url = http://darcs.haskell.org/libraries/random.git/
