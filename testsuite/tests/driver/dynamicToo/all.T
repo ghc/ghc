@@ -18,7 +18,8 @@ test('dynamicToo002',
                    'A002.dyn_o',  'B002.dyn_o',  'C002.dyn_o',
                    'A002.dyn_hi', 'B002.dyn_hi', 'C002.dyn_hi']),
       unless(have_vanilla(), skip),
-      unless(have_dynamic(), skip)],
+      unless(have_dynamic(), skip),
+      expect_broken(7864)],
      run_command,
      ['$MAKE -s --no-print-directory dynamicToo002'])
 
