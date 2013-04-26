@@ -1,4 +1,4 @@
-TARGET := chameneos-redux-vanilla.bin chameneos-redux-lwc.bin
+TARGET := chameneos-redux-vanilla.bin chameneos-redux-lwc.bin chameneos-redux-TMVar.bin
 
 include ../../config.mk
 

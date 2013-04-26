@@ -2530,12 +2530,7 @@ retry:
     for (i=0; i < n_capabilities; i++) {
         cap0 = &capabilities[i];
         if (cap != cap0 && tryGrabCapability(cap0,task)) {
-            if (!emptyRunQueue(cap0)
-                || cap->returning_tasks_hd != NULL
-                || cap->inbox != (Message*)END_TSO_QUEUE
-                || cap0->picked_up_by_ULS) {
-                // it already has some work, we just grabbed it at
-                // the wrong moment.  Or maybe it's deadlocked!
+            if (cap0->picked_up_by_ULS) {
                 releaseCapability(cap0);
             } else {
                 done = rtsTrue;
@@ -2544,7 +2539,11 @@ retry:
         }
     }
 
-    if (!done) goto retry;
+    if (!done) {
+      debugTrace (DEBUG_sched, "scheduleThreadOnFreeCap: thread %d is retrying",
+                  (int)tso->id);
+      goto retry;
+    }
     debugTrace (DEBUG_sched, "scheduleThreadOnFreeCap: thread %d scheduled on cap %d",
                 (int)tso->id, (int)cap0->no);
 
