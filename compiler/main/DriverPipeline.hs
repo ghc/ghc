@@ -148,8 +148,7 @@ compileOne' m_tc_result mHscMessage
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
 
-   let dflags' = dflags { hscOutName = output_fn,
-                          extCoreName = basename ++ ".hcr" }
+   let dflags' = dflags { extCoreName = basename ++ ".hcr" }
    let hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- -fforce-recomp should also work with --make
@@ -1039,11 +1038,9 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
             HscRecomp cgguts mod_summary
               -> do output_fn <- phaseOutputFilename next_phase
 
-                    let dflags' = dflags { hscOutName = output_fn }
-                    setDynFlags dflags'
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary
+                    (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary output_fn
                     case mStub of
                         Nothing -> return ()
                         Just stub_c ->
@@ -1071,13 +1068,12 @@ runPhase (RealPhase Cmm) input_fn dflags
 
         output_fn <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { hscOutName = output_fn,
-                               extCoreName = src_basename ++ ".hcr" }
+        let dflags' = dflags { extCoreName = src_basename ++ ".hcr" }
 
         setDynFlags dflags'
         PipeState{hsc_env} <- getPipeState
 
-        liftIO $ hscCompileCmmFile hsc_env input_fn
+        liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
 
         return (RealPhase next_phase, output_fn)
 

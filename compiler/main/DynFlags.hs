@@ -560,7 +560,6 @@ data DynFlags = DynFlags {
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
   settings              :: Settings,
-  hscOutName            :: String,      -- ^ Name of the output file
   extCoreName           :: String,      -- ^ Name of the .hcr output file
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
@@ -1213,7 +1212,6 @@ defaultDynFlags mySettings =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        hscOutName              = "",
         extCoreName             = "",
         verbosity               = 0,
         optLevel                = 0,
