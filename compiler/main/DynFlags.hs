@@ -3354,8 +3354,7 @@ compilerInfo dflags
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
-       -- -dynamic-too doesn't work with --make yet; #7864
-       ("Support dynamic-too",         "NO"),
+       ("Support dynamic-too",         "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
        ("GHC Dynamic",                 if cDYNAMIC_GHC_PROGRAMS
