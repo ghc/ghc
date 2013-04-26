@@ -2,15 +2,8 @@
 % (c) The University of Glasgow 2001-2006
 %
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module MkExternalCore (
-	emitExternalCore
+        emitExternalCore
 ) where
 
 #include "HsVersions.h"
@@ -18,7 +11,7 @@ module MkExternalCore (
 import qualified ExternalCore as C
 import Module
 import CoreSyn
-import HscTypes	
+import HscTypes
 import TyCon
 import CoAxiom
 -- import Class
@@ -98,14 +91,14 @@ collect_tdefs :: DynFlags -> TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs dflags tcon tdefs
   | isAlgTyCon tcon = tdef: tdefs
   where
-    tdef | isNewTyCon tcon = 
-                C.Newtype (qtc dflags tcon) 
+    tdef | isNewTyCon tcon =
+                C.Newtype (qtc dflags tcon)
                   (qcc dflags (newTyConCo tcon))
-                  (map make_tbind tyvars) 
+                  (map make_tbind tyvars)
                   (make_ty dflags (snd (newTyConRhs tcon)))
-         | otherwise = 
-                C.Data (qtc dflags tcon) (map make_tbind tyvars) 
-                   (map (make_cdef dflags) (tyConDataCons tcon)) 
+         | otherwise =
+                C.Data (qtc dflags tcon) (map make_tbind tyvars)
+                   (map (make_cdef dflags) (tyConDataCons tcon))
     tyvars = tyConTyVars tcon
 
 collect_tdefs _ _ tdefs = tdefs
@@ -118,20 +111,20 @@ qcc dflags = make_con_qid dflags . co_ax_name
 
 make_cdef :: DynFlags -> DataCon -> C.Cdef
 make_cdef dflags dcon =  C.Constr dcon_name existentials tys
-  where 
+  where
     dcon_name    = make_qid dflags False False (dataConName dcon)
     existentials = map make_tbind ex_tyvars
     ex_tyvars    = dataConExTyVars dcon
-    tys 	 = map (make_ty dflags) (dataConRepArgTys dcon)
+    tys          = map (make_ty dflags) (dataConRepArgTys dcon)
 
 make_tbind :: TyVar -> C.Tbind
 make_tbind tv = (make_var_id (tyVarName tv), make_kind (tyVarKind tv))
-    
+
 make_vbind :: DynFlags -> Var -> C.Vbind
 make_vbind dflags v = (make_var_id  (Var.varName v), make_ty dflags (varType v))
 
 make_vdef :: Bool -> CoreBind -> CoreM C.Vdefg
-make_vdef topLevel b = 
+make_vdef topLevel b =
   case b of
     NonRec v e -> f (v,e)     >>= (return . C.Nonrec)
     Rec ves    -> mapM f ves  >>= (return . C.Rec)
@@ -144,7 +137,7 @@ make_vdef topLevel b =
           -- use local flag to determine where to add the module name
           dflags <- getDynFlags
           return (local, make_qid dflags local True vName, make_ty dflags (varType v),rhs)
-  	where vName = Var.varName v
+        where vName = Var.varName v
 
 make_exp :: CoreExpr -> CoreM C.Exp
 make_exp (Var v) = do
@@ -153,11 +146,11 @@ make_exp (Var v) = do
   dflags <- getDynFlags
   return $
      case idDetails v of
-       FCallId (CCall (CCallSpec (StaticTarget nm _ True) callconv _)) 
+       FCallId (CCall (CCallSpec (StaticTarget nm _ True) callconv _))
            -> C.External (unpackFS nm) (showPpr dflags callconv) (make_ty dflags (varType v))
        FCallId (CCall (CCallSpec (StaticTarget _ _ False) _ _)) ->
            panic "make_exp: FFI values not supported"
-       FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
+       FCallId (CCall (CCallSpec DynamicTarget     callconv _))
            -> C.DynExternal            (showPpr dflags callconv) (make_ty dflags (varType v))
        -- Constructors are always exported, so make sure to declare them
        -- with qualified names
@@ -175,7 +168,7 @@ make_exp (App e1 e2) = do
    rator <- make_exp e1
    rand <- make_exp e2
    return $ C.App rator rand
-make_exp (Lam v e) | isTyVar v = make_exp e >>= (\ b -> 
+make_exp (Lam v e) | isTyVar v = make_exp e >>= (\ b ->
                                     return $ C.Lam (C.Tb (make_tbind v)) b)
 make_exp (Lam v e) | otherwise = do b <- make_exp e
                                     dflags <- getDynFlags
@@ -202,8 +195,8 @@ make_alt (DataAlt dcon, vs, e) = do
     return $ C.Acon (make_con_qid dflags (dataConName dcon))
            (map make_tbind tbs)
            (map (make_vbind dflags) vbs)
-	   newE
-	where (tbs,vbs) = span isTyVar vs
+           newE
+        where (tbs,vbs) = span isTyVar vs
 make_alt (LitAlt l,_,e)   = do x <- make_exp e
                                dflags <- getDynFlags
                                return $ C.Alit (make_lit dflags l) x
@@ -215,14 +208,14 @@ make_alt a@(DEFAULT,_ ,_) = pprPanic ("MkExternalCore: make_alt: DEFAULT "
 
 
 make_lit :: DynFlags -> Literal -> C.Lit
-make_lit dflags l = 
+make_lit dflags l =
   case l of
     -- Note that we need to check whether the character is "big".
     -- External Core only allows character literals up to '\xff'.
     MachChar i | i <= chr 0xff -> C.Lchar i t
     -- For a character bigger than 0xff, we represent it in ext-core
     -- as an int lit with a char type.
-    MachChar i             -> C.Lint (fromIntegral $ ord i) t 
+    MachChar i             -> C.Lint (fromIntegral $ ord i) t
     MachStr s -> C.Lstring (BS.unpack s) t
     MachNullAddr -> C.Lint 0 t
     MachInt i -> C.Lint i t
@@ -233,7 +226,7 @@ make_lit dflags l =
     MachDouble r -> C.Lrational r t
     LitInteger i _ -> C.Lint i t
     _ -> pprPanic "MkExternalCore died: make_lit" (ppr l)
-  where 
+  where
     t = make_ty dflags (literalType l)
 
 -- Expand type synonyms, then convert.
@@ -241,32 +234,32 @@ make_ty :: DynFlags -> Type -> C.Ty     -- Be sure to expand types recursively!
                                         -- example: FilePath ~> String ~> [Char]
 make_ty dflags t | Just expanded <- tcView t = make_ty dflags expanded
 make_ty dflags t = make_ty' dflags t
- 
+
 -- note calls to make_ty so as to expand types recursively
 make_ty' :: DynFlags -> Type -> C.Ty
 make_ty' _      (TyVarTy tv)     = C.Tvar (make_var_id (tyVarName tv))
-make_ty' dflags (AppTy t1 t2) 	  = C.Tapp (make_ty dflags t1) (make_ty dflags t2)
-make_ty' dflags (FunTy t1 t2) 	  = make_ty dflags (TyConApp funTyCon [t1,t2])
+make_ty' dflags (AppTy t1 t2)     = C.Tapp (make_ty dflags t1) (make_ty dflags t2)
+make_ty' dflags (FunTy t1 t2)     = make_ty dflags (TyConApp funTyCon [t1,t2])
 make_ty' dflags (ForAllTy tv t)  = C.Tforall (make_tbind tv) (make_ty dflags t)
 make_ty' dflags (TyConApp tc ts) = make_tyConApp dflags tc ts
 make_ty' _      (LitTy {})       = panic "MkExernalCore can't do literal types yet"
 
 -- Newtypes are treated just like any other type constructor; not expanded
 -- Reason: predTypeRep does substitution and, while substitution deals
--- 	   correctly with name capture, it's only correct if you see the uniques!
---	   If you just see occurrence names, name capture may occur.
+--         correctly with name capture, it's only correct if you see the uniques!
+--         If you just see occurrence names, name capture may occur.
 -- Example: newtype A a = A (forall b. b -> a)
---	    test :: forall q b. q -> A b
---	    test _ = undefined
--- 	Here the 'a' gets substituted by 'b', which is captured.
+--          test :: forall q b. q -> A b
+--          test _ = undefined
+--      Here the 'a' gets substituted by 'b', which is captured.
 -- Another solution would be to expand newtypes before tidying; but that would
 -- expose the representation in interface files, which definitely isn't right.
 -- Maybe CoreTidy should know whether to expand newtypes or not?
 
 make_tyConApp :: DynFlags -> TyCon -> [Type] -> C.Ty
 make_tyConApp dflags tc ts =
-  foldl C.Tapp (C.Tcon (qtc dflags tc)) 
-	    (map (make_ty dflags) ts)
+  foldl C.Tapp (C.Tcon (qtc dflags tc))
+            (map (make_ty dflags) ts)
 
 make_kind :: Kind -> C.Kind
 make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
@@ -303,13 +296,13 @@ make_mid dflags m
               <> text ":"
               <> (pprEncoded $ pprModuleName $ moduleName m)
      where pprEncoded = pprCode CStyle
-               
+
 make_qid :: DynFlags -> Bool -> Bool -> Name -> C.Qual C.Id
 make_qid dflags force_unqual is_var n = (mname,make_id is_var n)
-    where mname = 
+    where mname =
            case nameModule_maybe n of
             Just m | not force_unqual -> make_mid dflags m
-            _ -> "" 
+            _ -> ""
 
 make_var_qid :: DynFlags -> Bool -> Name -> C.Qual C.Id
 make_var_qid dflags force_unqual = make_qid dflags force_unqual True
@@ -338,8 +331,8 @@ make_lr CRight = C.CRight
 -- Used for both tycon app coercions and axiom instantiations.
 make_conAppCo :: DynFlags -> C.Qual C.Tcon -> [Coercion] -> C.Ty
 make_conAppCo dflags con cos =
-  foldl C.Tapp (C.Tcon con) 
-	    (map (make_co dflags) cos)
+  foldl C.Tapp (C.Tcon con)
+            (map (make_co dflags) cos)
 
 -------
 isALocal :: Name -> CoreM Bool
