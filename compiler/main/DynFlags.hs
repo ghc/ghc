@@ -2767,6 +2767,7 @@ optLevelFlags
     , ([1,2],   Opt_FullLaziness)
     , ([1,2],   Opt_Specialise)
     , ([1,2],   Opt_FloatIn)
+    , ([1,2],   Opt_UnboxSmallStrictFields)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)

@@ -1901,11 +1901,12 @@ f "2"    = 2
             <indexterm><primary>constructor fields, strict</primary></indexterm>
           </term>
           <listitem>
-            <para>This option causes all constructor fields which are
-            marked strict (i.e. &ldquo;!&rdquo;) and which
-            representation is smaller or equal to the size of a
-            pointer to be unpacked, if possible. It is equivalent to
-            adding an <literal>UNPACK</literal> pragma (see <xref
+            <para><emphasis>On by default.</emphasis>. This option
+            causes all constructor fields which are marked strict
+            (i.e. &ldquo;!&rdquo;) and which representation is smaller
+            or equal to the size of a pointer to be unpacked, if
+            possible. It is equivalent to adding an
+            <literal>UNPACK</literal> pragma (see <xref
             linkend="unpack-pragma"/>) to every strict constructor
             field that fulfils the size restriction.
             </para>
