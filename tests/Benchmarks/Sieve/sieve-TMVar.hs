@@ -42,6 +42,6 @@ main = do
 linkFilter :: TMVar Int -> TMVar Int -> IO (TMVar Int)
 linkFilter mIn mOut = do
   prime <- atomically $ takeTMVar mIn
-  putStrLn $ show prime
+  debugPrint $ show prime
   forkIO $ primeFilter mIn mOut prime
   return mOut

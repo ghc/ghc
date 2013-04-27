@@ -329,7 +329,9 @@ hs_exit_(rtsBool wait_foreign)
 
     OnExitHook();
 
-    flushStdHandles();
+    //XXX KC -- flush handle enters Haskell and can block on MVars associated
+    //with IOManager (often does). This is a temporary solution.
+    //flushStdHandles();
 
     // sanity check
 #if defined(DEBUG)

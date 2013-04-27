@@ -114,12 +114,11 @@ newCapability = do
  }
  -- Create and initialize new task
  s <- newSCont initTask
- atomically $ do {
-   yca <- getYieldControlAction;
-   setYieldControlAction s yca;
-   ssa <- getScheduleSContAction;
+ atomically $ do
+   yca <- getYieldControlAction
+   setYieldControlAction s yca
+   ssa <- getScheduleSContAction
    setScheduleSContAction s ssa
- }
  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound

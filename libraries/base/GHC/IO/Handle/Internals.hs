@@ -30,7 +30,7 @@
 module GHC.IO.Handle.Internals (
   withHandle, withHandle', withHandle_,
   withHandle__', withHandle_', withAllHandles__,
-  wantWritableHandle, wantReadableHandle, wantReadableHandle_, 
+  wantWritableHandle, wantReadableHandle, wantReadableHandle_,
   wantSeekableHandle,
 
   mkHandle, mkFileHandle, mkDuplexHandle,
@@ -52,6 +52,7 @@ module GHC.IO.Handle.Internals (
   HandleFinalizer, handleFinalizer,
 
   debugIO,
+	debugPrint,
  ) where
 
 import GHC.IO
@@ -371,7 +372,7 @@ streamEncode :: BufferCodec from to state
              -> Buffer from -> Buffer to
              -> IO (Buffer from, Buffer to)
 streamEncode codec from to = go (from, to)
-  where 
+  where
     go (from, to) = do
       (why, from', to') <- encode codec from to
       -- When we are dealing with Handles, we don't care about input/output
@@ -439,8 +440,8 @@ getCharBuffer dev state = do
   ioref  <- newIORef buffer
   is_tty <- IODevice.isTerminal dev
 
-  let buffer_mode 
-         | is_tty    = LineBuffering 
+  let buffer_mode
+         | is_tty    = LineBuffering
          | otherwise = BlockBuffering Nothing
 
   return (ioref, buffer_mode)
@@ -570,10 +571,10 @@ flushCharReadBuffer Handle__{..} = do
 
       -- restore the codec state
       setState decoder codec_state
-    
+
       (bbuf1,cbuf1) <- (streamEncode decoder) bbuf0
                                cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
-    
+
       debugIO ("finished, bbuf=" ++ summaryBuffer bbuf1 ++
                " cbuf=" ++ summaryBuffer cbuf1)
 
@@ -622,7 +623,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
    bbufref <- newIORef bbuf
    last_decode <- newIORef (error "codec_state", bbuf)
 
-   (cbufref,bmode) <- 
+   (cbufref,bmode) <-
          if buffered then getCharBuffer dev buf_state
                      else mkUnBuffer buf_state
 
@@ -645,7 +646,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
 
 -- | makes a new 'Handle'
 mkFileHandle :: (IODevice dev, BufferedIO dev, Typeable dev)
-             => dev -- ^ the underlying IO device, which must support 
+             => dev -- ^ the underlying IO device, which must support
                     -- 'IODevice', 'BufferedIO' and 'Typeable'
              -> FilePath
                     -- ^ a string describing the 'Handle', e.g. the file
@@ -669,13 +670,13 @@ mkDuplexHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
                -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
 mkDuplexHandle dev filepath mb_codec tr_newlines = do
 
-  write_side@(FileHandle _ write_m) <- 
+  write_side@(FileHandle _ write_m) <-
        mkHandle dev filepath WriteHandle True mb_codec
                         tr_newlines
                         (Just handleFinalizer)
                         Nothing -- no othersie
 
-  read_side@(FileHandle _ read_m) <- 
+  read_side@(FileHandle _ read_m) <-
       mkHandle dev filepath ReadHandle True mb_codec
                         tr_newlines
                         Nothing -- no finalizer
@@ -709,7 +710,7 @@ openTextEncoding (Just TextEncoding{..}) ha_type cont = do
     mb_encoder <- if isWritableHandleType ha_type then do
                      encoder <- mkTextEncoder
                      return (Just encoder)
-                  else 
+                  else
                      return Nothing
     cont mb_encoder mb_decoder
 
@@ -729,7 +730,7 @@ closeTextCodecs Handle__{..} = do
 -- use.
 hClose_help :: Handle__ -> IO (Handle__, Maybe SomeException)
 hClose_help handle_ =
-  case haType handle_ of 
+  case haType handle_ of
       ClosedHandle -> return (handle_,Nothing)
       _ -> do mb_exc1 <- trymaybe $ flushWriteBuffer handle_ -- interruptible
                     -- it is important that hClose doesn't fail and
@@ -748,10 +749,10 @@ hClose_handle_ h_@Handle__{..} = do
     -- close the file descriptor, but not when this is the read
     -- side of a duplex handle.
     -- If an exception is raised by the close(), we want to continue
-    -- to close the handle and release the lock if it has one, then 
+    -- to close the handle and release the lock if it has one, then
     -- we return the exception to the caller of hClose_help which can
     -- raise it if necessary.
-    maybe_exception <- 
+    maybe_exception <-
       case haOtherSide of
         Nothing -> trymaybe $ IODevice.close haDevice
         Just _  -> return Nothing
@@ -760,7 +761,7 @@ hClose_handle_ h_@Handle__{..} = do
     writeIORef haBuffers BufferListNil
     writeIORef haCharBuffer noCharBuffer
     writeIORef haByteBuffer noByteBuffer
-  
+
     -- release our encoder/decoder
     closeTextCodecs h_
 
@@ -784,13 +785,13 @@ noByteBuffer = unsafePerformIO $ newByteBuffer 1 ReadBuffer
 hLookAhead_ :: Handle__ -> IO Char
 hLookAhead_ handle_@Handle__{..} = do
     buf <- readIORef haCharBuffer
-  
+
     -- fill up the read buffer if necessary
     new_buf <- if isEmptyBuffer buf
                   then readTextDevice handle_ buf
                   else return buf
     writeIORef haCharBuffer new_buf
-  
+
     peekCharBuf (bufRaw buf) (bufL buf)
 
 -- ---------------------------------------------------------------------------
@@ -804,11 +805,16 @@ debugIO s
          return ()
  | otherwise = return ()
 
+debugPrint :: String -> IO ()
+debugPrint s = do _ <- withCStringLen (s ++ "\n") $
+                     \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
+                  return ()
+
 -- ----------------------------------------------------------------------------
 -- Text input/output
 
 -- Read characters into the provided buffer.  Return when any
--- characters are available; raise an exception if the end of 
+-- characters are available; raise an exception if the end of
 -- file is reached.
 --
 -- In uses of readTextDevice within base, the input buffer is either:
@@ -825,7 +831,7 @@ readTextDevice h_@Handle__{..} cbuf = do
   --
   bbuf0 <- readIORef haByteBuffer
 
-  debugIO ("readTextDevice: cbuf=" ++ summaryBuffer cbuf ++ 
+  debugIO ("readTextDevice: cbuf=" ++ summaryBuffer cbuf ++
         " bbuf=" ++ summaryBuffer bbuf0)
 
   bbuf1 <- if not (isEmptyBuffer bbuf0)
@@ -837,7 +843,7 @@ readTextDevice h_@Handle__{..} cbuf = do
 
   debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf1)
 
-  (bbuf2,cbuf') <- 
+  (bbuf2,cbuf') <-
       case haDecoder of
           Nothing      -> do
                writeIORef haLastDecode (error "codec_state", bbuf1)
@@ -847,7 +853,7 @@ readTextDevice h_@Handle__{..} cbuf = do
                writeIORef haLastDecode (state, bbuf1)
                (streamEncode decoder) bbuf1 cbuf
 
-  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
+  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++
         " bbuf=" ++ summaryBuffer bbuf2)
 
   -- We can't return from readTextDevice without reading at least a single extra character,
@@ -871,7 +877,7 @@ readTextDevice' h_@Handle__{..} bbuf0 cbuf0 = do
   -- readTextDevice only calls us if we got some bytes but not some characters.
   -- This can't occur if haDecoder is Nothing because latin1_decode accepts all bytes.
   let Just decoder = haDecoder
-  
+
   (r,bbuf2) <- Buffered.fillReadBuffer haDevice bbuf1
   if r == 0
    then do
@@ -893,15 +899,15 @@ readTextDevice' h_@Handle__{..} bbuf0 cbuf0 = do
       else return cbuf1
    else do
     debugIO ("readTextDevice' after reading: bbuf=" ++ summaryBuffer bbuf2)
-  
+
     (bbuf3,cbuf1) <- do
        state <- getState decoder
        writeIORef haLastDecode (state, bbuf2)
        (streamEncode decoder) bbuf2 cbuf0
-  
-    debugIO ("readTextDevice' after decoding: cbuf=" ++ summaryBuffer cbuf1 ++ 
+
+    debugIO ("readTextDevice' after decoding: cbuf=" ++ summaryBuffer cbuf1 ++
           " bbuf=" ++ summaryBuffer bbuf3)
-  
+
     writeIORef haByteBuffer bbuf3
     if bufR cbuf0 == bufR cbuf1
        then readTextDevice' h_ bbuf3 cbuf1

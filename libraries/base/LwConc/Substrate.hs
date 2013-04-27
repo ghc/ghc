@@ -143,6 +143,8 @@ module LwConc.Substrate
 
 , defaultUpcall           -- IO ()
 , defaultExceptionHandler  -- SomeException -> IO ()
+, debugPrint
+
 ) where
 
 
@@ -155,6 +157,7 @@ import GHC.Base
 import GHC.Prim
 import GHC.IO
 import Control.Monad    ( when )
+import GHC.IO.Handle.Internals
 #endif
 
 import System.IO
@@ -487,11 +490,17 @@ defaultUpcall :: IO ()
 defaultUpcall = IO $ \s-> (# defaultUpcallError# s, () #)
 
 defaultExceptionHandler :: Exception.SomeException -> IO ()
-defaultExceptionHandler _ = atomically $ do
-  s <- getSCont
-  setSContStatus s SContKilled
-  yca <- getYieldControlAction
-  yca
+defaultExceptionHandler e = do
+  debugPrint ("defaultExceptionHandler: " ++ show (e::Exception.SomeException))
+  defaultUpcall
+-- defaultExceptionHandler e = do
+--   hPutStrLn stderr ("defaultExceptionHandler: "
+--                     ++ show (e::Exception.SomeException))
+--   atomically $ do
+--     s <- getSCont
+--     setSContStatus s SContKilled
+--     yca <- getYieldControlAction
+--     yca
 
 
 ----------------------------------------------------------------------------
