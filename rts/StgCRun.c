@@ -118,8 +118,10 @@ StgWord8 *win32AllocStack(void)
 
 #ifdef darwin_HOST_OS
 #define STG_GLOBAL ".globl "
+#define STG_HIDDEN ".private_extern "
 #else
 #define STG_GLOBAL ".global "
+#define STG_HIDDEN ".hidden "
 #endif
 
 /*
@@ -164,6 +166,7 @@ StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
         STG_GLOBAL STG_RUN "\n"
+        STG_HIDDEN STG_RUN "\n"
         STG_RUN ":\n\t"
 
         /*
@@ -236,7 +239,13 @@ StgRunIsImplementedInAssembler(void)
 
 #ifdef x86_64_HOST_ARCH
 
-extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
+#define STG_GLOBAL ".globl "
+
+#ifdef darwin_HOST_OS
+#define STG_HIDDEN ".private_extern "
+#else
+#define STG_HIDDEN ".hidden "
+#endif
 
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
@@ -245,7 +254,8 @@ StgRunIsImplementedInAssembler(void)
         /*
          * save callee-saves registers on behalf of the STG code.
          */
-        ".globl " STG_RUN "\n"
+        STG_GLOBAL STG_RUN "\n"
+        STG_HIDDEN STG_RUN "\n"
         STG_RUN ":\n\t"
         "subq %1, %%rsp\n\t"
         "movq %%rsp, %%rax\n\t"
@@ -400,7 +410,13 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #ifdef powerpc_HOST_ARCH
 
-extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
+#define STG_GLOBAL ".globl "
+
+#ifdef darwin_HOST_OS
+#define STG_HIDDEN ".private_extern "
+#else
+#define STG_HIDDEN ".hidden "
+#endif
 
 #ifdef darwin_HOST_OS
 void StgRunIsImplementedInAssembler(void)
@@ -408,11 +424,12 @@ void StgRunIsImplementedInAssembler(void)
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
             // if the toolchain supports deadstripping, we have to
             // prevent it here (it tends to get confused here).
-        __asm__ volatile (".no_dead_strip _StgRunIsImplementedInAssembler");
+        __asm__ volatile (".no_dead_strip _StgRunIsImplementedInAssembler\n");
 #endif
         __asm__ volatile (
-                "\n.globl _StgRun\n"
-                "_StgRun:\n"
+                STG_GLOBAL STG_RUN "\n"
+                STG_HIDDEN STG_RUN "\n"
+                STG_RUN ":\n"
                 "\tmflr r0\n"
                 "\tbl saveFP # f14\n"
                 "\tstmw r13,-220(r1)\n"
@@ -446,6 +463,7 @@ StgRunIsImplementedInAssembler(void)
 {
         __asm__ volatile (
                 "\t.globl StgRun\n"
+                "\t.hidden StgRun\n"
                 "\t.type StgRun,@function\n"
                 "StgRun:\n"
                 "\tmflr 0\n"
@@ -518,8 +536,6 @@ StgRunIsImplementedInAssembler(void)
 #ifdef powerpc64_HOST_ARCH
 
 #ifdef linux_HOST_OS
-extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
-
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
@@ -534,6 +550,7 @@ StgRunIsImplementedInAssembler(void)
                 ".section \".opd\",\"aw\"\n"
                 ".align 3\n"
                 ".globl StgRun\n"
+                ".hidden StgRun\n"
                 "StgRun:\n"
                 "\t.quad\t.StgRun,.TOC.@tocbase,0\n"
                 "\t.size StgRun,24\n"
