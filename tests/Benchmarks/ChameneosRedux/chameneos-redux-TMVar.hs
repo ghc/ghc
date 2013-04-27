@@ -9,8 +9,8 @@
    -}
 
 import LwConc.Substrate
+import LwConc.PTM.TMVar
 import ConcurrentList
-import TMVar
 import Control.Monad
 import Data.Char
 import System.Environment

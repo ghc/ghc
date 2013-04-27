@@ -2,7 +2,7 @@ import Control.Monad
 import Control.Exception
 import LwConc.Substrate
 import ConcurrentList
-import TMVar
+import LwConc.PTM.TMVar
 import System.Environment
 import Data.IORef
 
