@@ -44,7 +44,7 @@ module LwConc.Substrate
 , newPVar                 -- a -> PTM (PVar a)
 , newPVarIO               -- a -> IO (PVar a)
 , readPVar                -- PVar a -> PTM a
-, readPVarIO							-- PVar a -> IO a
+, readPVarIO              -- PVar a -> IO a
 , writePVar               -- PVar a -> a -> PTM ()
 
 ------------------------------------------------------------------------------

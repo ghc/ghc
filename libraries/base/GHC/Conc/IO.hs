@@ -123,7 +123,7 @@ threadWaitWrite fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitReadSTM fd 
+threadWaitReadSTM fd
 #ifndef mingw32_HOST_OS
   | threaded  = Event.threadWaitReadSTM fd
 #endif
@@ -142,7 +142,7 @@ threadWaitReadSTM fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitWriteSTM fd 
+threadWaitWriteSTM fd
 #ifndef mingw32_HOST_OS
   | threaded  = Event.threadWaitWriteSTM fd
 #endif
