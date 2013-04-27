@@ -134,6 +134,10 @@ DYNAMIC_TOO = YES
 ifeq "$(TargetOS_CPP)" "mingw32"
 # This doesn't work on Windows yet
 DYNAMIC_GHC_PROGRAMS = NO
+else ifeq "$(TargetOS_CPP)" "freebsd"
+# FreeBSD cannot do proper resolution for $ORIGIN (due to a bug in
+# rtld(1)), so disable it by default (see #7819).
+DYNAMIC_GHC_PROGRAMS = NO
 else
 DYNAMIC_GHC_PROGRAMS = YES
 endif
