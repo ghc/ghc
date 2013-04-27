@@ -52,7 +52,7 @@ module GHC.IO.Handle.Internals (
   HandleFinalizer, handleFinalizer,
 
   debugIO,
-	debugPrint,
+  debugPrint,
  ) where
 
 import GHC.IO
