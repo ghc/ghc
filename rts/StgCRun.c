@@ -166,7 +166,9 @@ StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
         STG_GLOBAL STG_RUN "\n"
+#if !defined(mingw32_HOST_OS)
         STG_HIDDEN STG_RUN "\n"
+#endif
         STG_RUN ":\n\t"
 
         /*
@@ -255,7 +257,9 @@ StgRunIsImplementedInAssembler(void)
          * save callee-saves registers on behalf of the STG code.
          */
         STG_GLOBAL STG_RUN "\n"
+#if !defined(mingw32_HOST_OS)
         STG_HIDDEN STG_RUN "\n"
+#endif
         STG_RUN ":\n\t"
         "subq %1, %%rsp\n\t"
         "movq %%rsp, %%rax\n\t"
