@@ -41,6 +41,9 @@ extra-libraries:
 			      ,"gdi32"      /* for the linker */
 			      ,"winmm"      /* for the linker */
 #endif
+#ifdef freebsd_HOST_OS
+			      , "pthread" /* for pthread_getthreadid_np() */
+#endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
 			      ,"bfd", "iberty"	/* for debugging */
 #endif
