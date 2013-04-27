@@ -1819,7 +1819,13 @@ linkBinary dflags o_files dep_packages = do
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_packages
 
-    pkg_link_opts <- getPackageLinkOpts dflags dep_packages
+    pkg_link_opts <- if platformBinariesAreStaticLibs platform
+                     then -- If building an executable really means
+                          -- making a static library (e.g. iOS), then
+                          -- we don't want the options (like -lm)
+                          -- that getPackageLinkOpts gives us. #7720
+                          return []
+                     else getPackageLinkOpts dflags dep_packages
 
     pkg_framework_path_opts <-
         if platformUsesFrameworks platform
