@@ -25,16 +25,19 @@
 module System.Timeout ( timeout ) where
 
 #ifdef __GLASGOW_HASKELL__
-import Control.Concurrent
+#ifndef mingw32_HOST_OS
+import Control.Monad
 import GHC.Event           (getSystemTimerManager,
                             registerTimeout, unregisterTimeout)
+#endif
+
+import Control.Concurrent
 import Control.Exception   (Exception(..), handleJust, bracket,
                             uninterruptibleMask_,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
-import Control.Monad
 
 -- An internal type that is thrown as a dynamic exception to
 -- interrupt the running IO computation when the timeout has
@@ -87,6 +90,7 @@ timeout :: Int -> IO a -> IO (Maybe a)
 timeout n f
     | n <  0    = fmap Just f
     | n == 0    = return Nothing
+#ifndef mingw32_HOST_OS
     | rtsSupportsBoundThreads = do
         -- In the threaded RTS, we use the Timer Manager to delay the
         -- (fairly expensive) 'forkIO' call until the timeout has expired.
@@ -116,6 +120,7 @@ timeout n f
                    (bracket (registerTimeout tm n handleTimeout)
                             cleanupTimeout
                             (\_ -> fmap Just f))
+#endif
     | otherwise = do
         pid <- myThreadId
         ex  <- fmap Timeout newUnique
