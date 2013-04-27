@@ -19,6 +19,16 @@ Library
       LwConc.ConcurrentList
       LwConc.MVarList
       LwConc.MVar
+      LwConc.PTM
+      LwConc.PTM.TArray
+      LwConc.PTM.TVar
+      LwConc.PTM.TChan
+      LwConc.PTM.TMVar
+      LwConc.PTM.TQueue
+      LwConc.PTM.TBQueue
+      LwConc.PTM.TSem
+    other-modules:
+      LwConc.Sequential.PTM
     extensions: CPP
     Build-Depends: base       >= 4.2   && < 5,
                    array,

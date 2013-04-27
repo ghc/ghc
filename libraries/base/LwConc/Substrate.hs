@@ -44,6 +44,7 @@ module LwConc.Substrate
 , newPVar                 -- a -> PTM (PVar a)
 , newPVarIO               -- a -> IO (PVar a)
 , readPVar                -- PVar a -> PTM a
+, readPVarIO							-- PVar a -> IO a
 , writePVar               -- PVar a -> a -> PTM ()
 
 ------------------------------------------------------------------------------
@@ -267,6 +268,12 @@ newPVarIO val = IO $ \s1# ->
 {-# INLINE readPVar #-}
 readPVar :: PVar a -> PTM a
 readPVar (PVar tvar#) = PTM $ \s# -> readTVar# tvar# s#
+
+-- |Return the current value stored in a PVar
+{-# INLINE readPVarIO #-}
+readPVarIO :: PVar a -> IO a
+readPVarIO (PVar tvar#) = IO $ \s# -> readTVar# tvar# s#
+
 
 -- |Write the supplied value into a PVar
 {-# INLINE writePVar #-}
