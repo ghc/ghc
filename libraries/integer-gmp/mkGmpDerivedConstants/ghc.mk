@@ -24,3 +24,9 @@ GmpDerivedConstants_HEADER = libraries/integer-gmp/mkGmpDerivedConstants/dist/Gm
 $(GmpDerivedConstants_HEADER): $(mkGmpDerivedConstants_INPLACE)
 	$< > $@
 
+ifneq "$(HaveLibGmp)" "YES"
+ifneq "$(HaveFrameworkGMP)" "YES"
+$(libraries/integer-gmp/mkGmpDerivedConstants_dist_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h
+endif
+endif
+
