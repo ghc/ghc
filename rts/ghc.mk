@@ -68,10 +68,12 @@ DTRACEPROBES_H = rts/dist/build/RtsProbes.h
 rts_H_FILES += $(DTRACEPROBES_H)
 endif
 
-# collect the -l flags that we need to link the rts dyn lib.
+# collect the -l and -L flags that we need to link the rts dyn lib.
 rts/libs.depend : $$(ghc-pkg_INPLACE)
 	"$(ghc-pkg_INPLACE)" --simple-output field rts extra-libraries \
 	  | -e 's/\([a-z0-9]\+\)/-l\1/g' > $@
+	"$(ghc-pkg_INPLACE)" --simple-output field rts library-dirs \
+	  | -e 's/\([a-z0-9]\+\)/-L\1/g' >> $@
 
 
 # ----------------------------------------------------------------------------
