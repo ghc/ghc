@@ -16,9 +16,9 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR
+library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR FFI_LIB_DIR
 #else /* !INSTALLING */
-library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR
+library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR FFI_LIB_DIR
 #endif
 
 hs-libraries:   "HSrts" FFI_LIB
