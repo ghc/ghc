@@ -1156,28 +1156,32 @@ describeField verbosity my_flags pkgarg fields expand_pkgroot = do
   fns <- toFields fields
   ps <- findPackages flag_db_stack pkgarg
   mapM_ (selectFields fns) ps
-  where toFields [] = return []
-        toFields (f:fs) = case toField f of
+  where defaultShowFun = if FlagSimpleOutput `elem` my_flags
+                         then showSimpleInstalledPackageInfoField
+                         else showInstalledPackageInfoField
+        toFields [] = return []
+        toFields (f:fs) = case toField defaultShowFun f of
             Nothing -> die ("unknown field: " ++ f)
             Just fn -> do fns <- toFields fs
                           return (fn:fns)
         selectFields fns pinfo = mapM_ (\fn->putStrLn (fn pinfo)) fns
 
-toField :: String -> Maybe (InstalledPackageInfo -> String)
+toField :: (String -> Maybe (InstalledPackageInfo -> String)) -> String
+        -> Maybe (InstalledPackageInfo -> String)
 -- backwards compatibility:
-toField "import_dirs"     = Just $ strList . importDirs
-toField "source_dirs"     = Just $ strList . importDirs
-toField "library_dirs"    = Just $ strList . libraryDirs
-toField "hs_libraries"    = Just $ strList . hsLibraries
-toField "extra_libraries" = Just $ strList . extraLibraries
-toField "include_dirs"    = Just $ strList . includeDirs
-toField "c_includes"      = Just $ strList . includes
-toField "package_deps"    = Just $ strList . map display. depends
-toField "extra_cc_opts"   = Just $ strList . ccOptions
-toField "extra_ld_opts"   = Just $ strList . ldOptions
-toField "framework_dirs"  = Just $ strList . frameworkDirs
-toField "extra_frameworks"= Just $ strList . frameworks
-toField s                 = showInstalledPackageInfoField s
+toField _ "import_dirs"      = Just $ strList . importDirs
+toField _ "source_dirs"      = Just $ strList . importDirs
+toField _ "library_dirs"     = Just $ strList . libraryDirs
+toField _ "hs_libraries"     = Just $ strList . hsLibraries
+toField _ "extra_libraries"  = Just $ strList . extraLibraries
+toField _ "include_dirs"     = Just $ strList . includeDirs
+toField _ "c_includes"       = Just $ strList . includes
+toField _ "package_deps"     = Just $ strList . map display. depends
+toField _ "extra_cc_opts"    = Just $ strList . ccOptions
+toField _ "extra_ld_opts"    = Just $ strList . ldOptions
+toField _ "framework_dirs"   = Just $ strList . frameworkDirs
+toField _ "extra_frameworks" = Just $ strList . frameworks
+toField defaultShowFun s     = defaultShowFun s
 
 strList :: [String] -> String
 strList = show
