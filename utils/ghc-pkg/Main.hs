@@ -1153,17 +1153,15 @@ describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> Bool -> IO ()
 describeField verbosity my_flags pkgarg fields expand_pkgroot = do
   (_, _, flag_db_stack) <- 
       getPkgDatabases verbosity False True{-use cache-} expand_pkgroot my_flags
-  fns <- toFields fields
+  fns <- mapM toField fields
   ps <- findPackages flag_db_stack pkgarg
   mapM_ (selectFields fns) ps
   where showFun = if FlagSimpleOutput `elem` my_flags
                   then showSimpleInstalledPackageInfoField
                   else showInstalledPackageInfoField
-        toFields [] = return []
-        toFields (f:fs) = case showFun f of
-            Nothing -> die ("unknown field: " ++ f)
-            Just fn -> do fns <- toFields fs
-                          return (fn:fns)
+        toField f = case showFun f of
+                    Nothing -> die ("unknown field: " ++ f)
+                    Just fn -> return fn
         selectFields fns pinfo = mapM_ (\fn->putStrLn (fn pinfo)) fns
 
 
