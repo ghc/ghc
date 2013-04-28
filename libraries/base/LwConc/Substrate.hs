@@ -500,14 +500,11 @@ defaultExceptionHandler :: Exception.SomeException -> IO ()
 defaultExceptionHandler e = do
   debugPrint ("defaultExceptionHandler: " ++ show (e::Exception.SomeException))
   defaultUpcall
--- defaultExceptionHandler e = do
---   hPutStrLn stderr ("defaultExceptionHandler: "
---                     ++ show (e::Exception.SomeException))
---   atomically $ do
---     s <- getSCont
---     setSContStatus s SContKilled
---     yca <- getYieldControlAction
---     yca
+  atomically $ do
+    s <- getSCont
+    setSContStatus s SContKilled
+    yca <- getYieldControlAction
+    yca
 
 
 ----------------------------------------------------------------------------

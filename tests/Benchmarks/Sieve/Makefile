@@ -1,4 +1,4 @@
-TARGET := sieve-vanilla.bin sieve-lwc.bin sieve-TMVar.bin
+TARGET := sieve-vanilla.bin sieve-lwc.bin sieve-TMVar.bin sieve-vanilla-TMVar.bin
 
 include ../../config.mk
 

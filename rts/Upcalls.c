@@ -117,16 +117,10 @@ prepareUpcallThread (Capability* cap, StgTSO* current_thread)
   if (upcall_thread->what_next != ThreadComplete)
     return upcall_thread;
 
-  StgClosure* upcall = popUpcallQueue (cap);
-
   ASSERT (upcall_thread->what_next != ThreadKilled);
   upcall_thread->_link = (StgTSO*)END_TSO_QUEUE;
   upcall_thread->what_next = ThreadRunGHC;
   upcall_thread->why_blocked = NotBlocked;
-  //Save the upcall in the finalzer slot of the upcall thread so that it can be
-  //retrieved quickly if the upcall happens to block on a black hole -- KC.
-  upcall_thread->finalizer = upcall;
-
 
   StgStack* stack = upcall_thread->stackobj;
   dirty_STACK (cap, stack);
@@ -136,6 +130,13 @@ prepareUpcallThread (Capability* cap, StgTSO* current_thread)
   stack->sp -= sizeofW(StgStopFrame);
   SET_HDR((StgClosure*)stack->sp,
           (StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
+
+  //Finally, insert an upcall picked up from the upcall queue
+  StgClosure* upcall = popUpcallQueue (cap);
+  //XXX KC Save the upcall in the finalzer slot of the upcall thread so that
+  //it can be retrieved quickly if the upcall happens to block on a black
+  //hole.
+  upcall_thread->finalizer = upcall;
   pushCallToClosure (cap, upcall_thread, upcall);
 
   return upcall_thread;

@@ -720,7 +720,7 @@ shouldYieldCapability (Capability *cap, Task *task, rtsBool didGcLast)
 // the tests in testsuite/concurrent (all ways) after modifying this,
 // and also check the benchmarks in nofib/parallel for regressions.
 
-    static void
+static void
 scheduleYield (Capability **pcap, Task *task)
 {
     Capability *cap = *pcap;
@@ -956,7 +956,8 @@ scheduleResumeBlockedOnForeignCall(Capability *cap USED_IF_THREADS)
     //Safely work
     ACQUIRE_LOCK (&cap->lock);
     incall = cap->suspended_ccalls_hd;
-    if (incall &&
+    if (incall && //incall is not NULL
+        !isBoundTask (incall->task) &&
         incall->uls_stat == UserLevelSchedulerBlocked) {
 
         debugTrace (DEBUG_sched, "resuming scheduler associated with task %p"
@@ -2244,16 +2245,16 @@ deleteAllThreads ( Capability *cap )
    Locks required: sched_mutex
    -------------------------------------------------------------------------- */
 
-    STATIC_INLINE void
-suspendTask (Capability *cap, Task *task, rtsBool append_to_head)
+STATIC_INLINE void
+suspendTask (Capability *cap, Task *task, rtsBool appendToHead)
 {
     InCall *incall;
 
     incall = task->incall;
     ASSERT(incall->next == NULL && incall->prev == NULL);
-    if (append_to_head) {
-        //If appending at the head of the list, make sure that the scheduler can be
-        //resumed.
+    if (appendToHead) {
+        //If appending at the head of the list, make sure that a user-level
+        //scheduler exists.
         ASSERT (incall->uls_stat == UserLevelSchedulerBlocked);
         incall->next = cap->suspended_ccalls_hd;
         incall->prev = NULL;
@@ -2276,8 +2277,8 @@ suspendTask (Capability *cap, Task *task, rtsBool append_to_head)
             cap->suspended_ccalls_hd = incall;
         }
     }
-    debugTrace (DEBUG_sched, "suspendTask: task %p task->incall %p",
-                task, incall);
+    debugTrace (DEBUG_sched, "cap %d: suspendTask: task %p task->incall %p appendToHead %d",
+                (int)cap->no, task, incall, (int)appendToHead);
 }
 
 STATIC_INLINE void
@@ -2287,8 +2288,8 @@ recoverSuspendedTask (Capability *cap, Task *task)
 
     incall = task->incall;
 
-    debugTrace (DEBUG_sched, "recoverSuspendedTask: task %p task->incall %p",
-                task, incall);
+    debugTrace (DEBUG_sched, "cap %d: recoverSuspendedTask: task %p task->incall %p",
+                (int)cap->no, task, incall);
     if (incall->prev) {
         incall->prev->next = incall->next;
     } else {
@@ -2307,6 +2308,8 @@ recoverSuspendedTask (Capability *cap, Task *task)
 #if defined (THREADED_RTS)
 static void
 relegateTask (Capability *cap, Task* task) {
+    debugTrace (DEBUG_sched, "cap %d: relegateTask: task %p",
+                (int)cap->no, task);
     //Remove the task from the suspended_ccalls list
     recoverSuspendedTask (cap, task);
     //Add to the back of the list
@@ -2343,7 +2346,7 @@ suspendThread (StgRegTable *reg, rtsBool interruptible)
 #if mingw32_HOST_OS
     StgWord32 saved_winerror;
 #endif
-    rtsBool append_to_head = rtsTrue;
+    rtsBool appendToHead = rtsTrue;
 
     saved_errno = errno;
 #if mingw32_HOST_OS
@@ -2377,20 +2380,27 @@ suspendThread (StgRegTable *reg, rtsBool interruptible)
 #if defined (THREADED_RTS)
     if (!hasHaskellScheduler (tso) || isUpcallThread (tso)) {
         task->incall->uls_stat = NoUserLevelScheduler;
-        append_to_head = rtsFalse;
+        appendToHead = rtsFalse;
     }
-    else
+    else {
         task->incall->uls_stat = UserLevelSchedulerBlocked;
+        //XXX KC -- If the thread is running a user-level scheduler, but is
+        //bound, we add it to the tail of the queue. We also avoid resuming the
+        //scheduler of such threads since it seems to cause errors with the
+        //IOManager.
+        if (isBoundTask (task))
+          appendToHead = rtsFalse;
+    }
 #else
     task->incall->uls_stat = NoUserLevelScheduler;
-    append_to_head = rtsFalse;
+    appendToHead = rtsFalse;
 #endif
 
     ACQUIRE_LOCK(&cap->lock);
 
     //If scheduler is suspended, append to the head of the list so that a worker
     //may resume the scheduler.
-    suspendTask (cap, task, append_to_head);
+    suspendTask (cap, task, appendToHead);
     cap->in_haskell = rtsFalse;
     releaseCapability_(cap,rtsFalse);
 

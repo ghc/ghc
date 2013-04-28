@@ -5,6 +5,7 @@ import ConcurrentList
 import LwConc.PTM.TMVar
 import System.Environment
 import Data.IORef
+import Debug.Trace
 
 initSched = uninterruptibleMask_ $ do
   newSched
@@ -42,6 +43,7 @@ main = do
 linkFilter :: TMVar Int -> TMVar Int -> IO (TMVar Int)
 linkFilter mIn mOut = do
   prime <- atomically $ takeTMVar mIn
-  debugPrint $ show prime
+  putStrLn $ show prime
+  traceIO $ show prime
   forkIO $ primeFilter mIn mOut prime
   return mOut
