@@ -314,7 +314,11 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
       }
 
     case BlockedOnBlackHole:
-      if (hasHaskellScheduler (tso)) //Note: Upcall threads do not have a user-level scheduler
+      if (tso->is_sleeping) {
+        tso->is_sleeping = 0;
+        goto unblock2;
+      }
+      else if (hasHaskellScheduler (tso)) //Note: Upcall threads do not have a user-level scheduler
         goto unblock1;
       else
         goto unblock2;

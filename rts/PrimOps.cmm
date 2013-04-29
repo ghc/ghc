@@ -633,7 +633,7 @@ again: MAYBE_GC(again);
       	}
 			}
     }
-  })
+  } )
 
   #endif
 
@@ -1375,6 +1375,14 @@ retry_pop_stack:
     jump stg_block_stmwait [R3];
   } else {
     // Transaction was not valid: retry immediately
+
+		/* KC thread is no longer considered sleeping since the transaction is being
+		 * retried. See stg_sleepCapability. The correct solution is to make the
+		 * tso->is_sleeping variable into a TVar. This would avoid having to reason
+		 * explicitly about the states being manipulated.
+		 */
+  	StgTSO_is_sleeping (CurrentTSO) = 0::I32;
+
     ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
     StgTSO_trec(CurrentTSO) = trec;
     Sp = frame;

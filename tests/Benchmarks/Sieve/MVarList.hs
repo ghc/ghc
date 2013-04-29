@@ -62,8 +62,8 @@ deque (TwoListQueue !front !back) =
     x:tl -> (TwoListQueue tl back, Just x)
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
-data MVPState a = Full a (TwoListQueue (a, PTM()))
-                | Empty (TwoListQueue (IORef a, PTM()))
+data MVPState a = Full a {-# UNPACK #-} !(TwoListQueue (a, PTM()))
+                | Empty {-# UNPACK #-} !(TwoListQueue (IORef a, PTM()))
 
 
 _INL_(newMVar)

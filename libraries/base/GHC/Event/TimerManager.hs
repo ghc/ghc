@@ -54,6 +54,10 @@ import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
+import System.Posix.Internals hiding (FD)
+
+import Foreign.Safe (castPtr)
+import Foreign.C
 
 import qualified GHC.Event.Internal as I
 import qualified GHC.Event.PSQ as Q
@@ -120,6 +124,20 @@ data TimerManager = TimerManager
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
     }
+
+------------------------------------------------------------------------
+-- Creation
+
+c_DEBUG_DUMP :: Bool
+c_DEBUG_DUMP = True
+
+debugIO :: String -> IO ()
+debugIO s
+ | c_DEBUG_DUMP
+    = do _ <- withCStringLen (s ++ "\n") $
+                  \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
+         return ()
+ | otherwise = return ()
 
 ------------------------------------------------------------------------
 -- Creation
