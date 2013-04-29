@@ -192,11 +192,22 @@ tcHsSigTypeNC ctxt (L loc hs_ty)
 -----------------
 tcHsInstHead :: UserTypeCtxt -> LHsType Name -> TcM ([TyVar], ThetaType, Class, [Type])
 -- Like tcHsSigTypeNC, but for an instance head.
-tcHsInstHead ctxt lhs_ty@(L loc hs_ty)
+tcHsInstHead user_ctxt lhs_ty@(L loc hs_ty)
   = setSrcSpan loc $    -- The "In the type..." context comes from the caller
-    do { ty <- tcCheckHsTypeAndGen hs_ty constraintKind
-       ; ty <- zonkTcType ty
-       ; checkValidInstance ctxt lhs_ty ty }
+    do { inst_ty <- tc_inst_head hs_ty
+       ; kvs     <- kindGeneralize (tyVarsOfType inst_ty) []
+       ; inst_ty <- zonkTcType (mkForAllTys kvs inst_ty)
+       ; checkValidInstance user_ctxt lhs_ty inst_ty }
+
+tc_inst_head :: HsType Name -> TcM TcType
+tc_inst_head (HsForAllTy _ hs_tvs hs_ctxt hs_ty)
+  = tcHsTyVarBndrs hs_tvs $ \ tvs -> 
+    do { ctxt <- tcHsContext hs_ctxt
+       ; ty   <- tc_lhs_type hs_ty ekConstraint    -- Body for forall has kind Constraint
+       ; return (mkSigmaTy tvs ctxt ty) }
+
+tc_inst_head hs_ty
+  = tc_hs_type hs_ty ekConstraint
 
 -----------------
 tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type])
@@ -376,12 +387,18 @@ tc_hs_type hs_ty@(HsAppTy ty1 ty2) exp_kind
     (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
 
 --------- Foralls
-tc_hs_type (HsForAllTy _ hs_tvs context ty) exp_kind
+tc_hs_type hs_ty@(HsForAllTy _ hs_tvs context ty) exp_kind
   = tcHsTyVarBndrs hs_tvs $ \ tvs' -> 
     -- Do not kind-generalise here!  See Note [Kind generalisation]
     do { ctxt' <- tcHsContext context
-       ; ty'   <- tc_lhs_type ty exp_kind
-           -- Why exp_kind?  See Note [Body kind of forall]
+       ; ty' <- if null (unLoc context) then  -- Plain forall, no context
+                   tc_lhs_type ty exp_kind    -- Why exp_kind?  See Note [Body kind of forall]
+                else     
+                   -- If there is a context, then this forall is really a
+                   -- *function*, so the kind of the result really is *
+                   -- The body kind (result of the function can be * or #, hence ekOpen
+                   do { checkExpectedKind hs_ty liftedTypeKind exp_kind
+                      ; tc_lhs_type ty ekOpen }
        ; return (mkSigmaTy tvs' ctxt' ty') }
 
 --------- Lists, arrays, and tuples

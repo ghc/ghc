@@ -8,7 +8,7 @@ module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   expectedKindInCtxt, 
   checkValidTheta, checkValidFamPats,
-  checkValidInstHead, checkValidInstance, validDerivPred,
+  checkValidInstance, validDerivPred,
   checkInstTermination, checkValidTyFamInst, checkTyFamFreeness, 
   checkConsistentFamInst,
   arityErr, badATErr
@@ -827,11 +827,9 @@ validDerivPred tv_set pred
 checkValidInstance :: UserTypeCtxt -> LHsType Name -> Type
                    -> TcM ([TyVar], ThetaType, Class, [Type])
 checkValidInstance ctxt hs_type ty
-  = do { let (tvs, theta, tau) = tcSplitSigmaTy ty
-       ; case getClassPredTys_maybe tau of {
-           Nothing          -> failWithTc (ptext (sLit "Malformed instance type")) ;
-           Just (clas,inst_tys)  -> 
-    do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
+  | Just (clas,inst_tys) <- getClassPredTys_maybe tau
+  , inst_tys `lengthIs` classArity clas
+  = do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
         ; checkValidTheta ctxt theta
 
         -- The Termination and Coverate Conditions
@@ -853,8 +851,12 @@ checkValidInstance ctxt hs_type ty
                   ; checkTc (checkInstCoverage clas inst_tys)
                             (instTypeErr clas inst_tys msg) }
                   
-        ; return (tvs, theta, clas, inst_tys) } } }
+        ; return (tvs, theta, clas, inst_tys) } 
+
+  | otherwise 
+  = failWithTc (ptext (sLit "Malformed instance head:") <+> ppr tau)
   where
+    (tvs, theta, tau) = tcSplitSigmaTy ty
     msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
                          undecidableMsg])
 
