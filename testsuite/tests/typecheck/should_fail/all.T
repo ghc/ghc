@@ -306,3 +306,4 @@ test('TcNullaryTCFail', when(compiler_lt('ghc', '7.7'), skip), compile_fail, [''
 test('T7857', normal, compile_fail, [''])
 test('T7778', normal, compile_fail, [''])
 test('T7851', normal, compile_fail, [''])
+test('T7856', normal, compile_fail, [''])
