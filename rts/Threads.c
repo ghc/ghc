@@ -109,7 +109,7 @@ createThread(Capability *cap, W_ size)
   tso->flags = 0;
   tso->dirty = 1;
   tso->is_upcall_thread = 0;
-  tso->is_sleeping = 0;
+  tso->is_sleeping = rtsFalse;
   tso->_link = END_TSO_QUEUE;
 
   tso->saved_errno = 0;
@@ -315,7 +315,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
 
     case BlockedOnBlackHole:
       if (tso->is_sleeping) {
-        tso->is_sleeping = 0;
+        tso->is_sleeping = rtsFalse;
         goto unblock2;
       }
       else if (hasHaskellScheduler (tso)) //Note: Upcall threads do not have a user-level scheduler
@@ -325,7 +325,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
 
     case BlockedOnSTM:
       if (tso->is_sleeping) {
-        tso->is_sleeping = 0;
+        tso->is_sleeping = rtsFalse;
         goto unblock2;
       }
       else if (hasHaskellScheduler (tso))

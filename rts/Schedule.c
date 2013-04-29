@@ -438,6 +438,8 @@ run_thread:
         ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
         ASSERT(t->cap == cap);
         ASSERT(t->bound ? t->bound->task->cap == cap : 1);
+        t->is_sleeping = rtsFalse;
+
 
         prev_what_next = t->what_next;
 

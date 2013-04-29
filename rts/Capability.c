@@ -389,9 +389,8 @@ moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
 void initUpcallThreadOnCapability (Capability* cap) {
   cap->upcall_thread = createThread (cap, RtsFlags.GcFlags.initialStkSize);
   cap->upcall_thread->what_next = ThreadComplete; //Default state of upcall
-  //thread is ThreadComplete
   cap->upcall_thread->is_upcall_thread = rtsTrue;
-  labelThread (cap, cap->upcall_thread, "Upcall thread");
+  //labelThread (cap, cap->upcall_thread, "Upcall thread");
   debugTrace (DEBUG_sched, "allocated upcall thread (%d) for capability %d",
               cap->upcall_thread->id, cap->no);
 }

@@ -1,6 +1,6 @@
 import Control.Concurrent
 import Control.Monad
-
+import GHC.Conc
 import System.Environment
 
 -- Map over [2..] (2 until infinity), putting the value in mOut. The putting operation will block until
@@ -10,7 +10,10 @@ generate mOut = mapM_ (putMVar mOut) [2..]
 
 -- Take a value from mIn, divide it by a prime, if the remainder is not 0, put the value in mOut.
 primeFilter :: MVar Int -> MVar Int -> Int -> IO ()
-primeFilter mIn mOut prime = forever $ do
+primeFilter mIn mOut prime = do
+  tid <- myThreadId
+  labelThread tid $ "ThrPrime:" ++ show prime
+  forever $ do
     i <- takeMVar mIn
     when (i `mod` prime /= 0) (putMVar mOut i)
 
