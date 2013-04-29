@@ -4,21 +4,18 @@
                 with actual type ‛Planet’
     In the first argument of ‛pn’, namely ‛Mercury’
     In the expression: pn Mercury
-    In an equation for ‛it’: it = pn Mercury
 
 <interactive>:8:4:
     Couldn't match expected type ‛main::Interactive.Planet’
                 with actual type ‛Planet’
     In the first argument of ‛pn’, namely ‛Venus’
     In the expression: pn Venus
-    In an equation for ‛it’: it = pn Venus
 
 <interactive>:9:4:
     Couldn't match expected type ‛main::Interactive.Planet’
                 with actual type ‛Planet’
     In the first argument of ‛pn’, namely ‛Mars’
     In the expression: pn Mars
-    In an equation for ‛it’: it = pn Mars
 
 <interactive>:11:44:
     Couldn't match expected type ‛Planet’

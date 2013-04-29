@@ -18,4 +18,3 @@ T4179.hs:26:16:
         (bound at T4179.hs:26:1)
     In the first argument of ‛foldDoC’, namely ‛op’
     In the expression: foldDoC op
-    In an equation for ‛fCon’: fCon = foldDoC op

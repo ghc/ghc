@@ -11,7 +11,6 @@ T2544.hs:15:18:
       empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:15:4)
     In the first argument of ‛BiApp’, namely ‛empty’
     In the expression: BiApp empty empty
-    In an equation for ‛empty’: empty = BiApp empty empty
 
 T2544.hs:15:24:
     Could not deduce (IxMap i1 ~ IxMap r)
@@ -25,4 +24,3 @@ T2544.hs:15:24:
       empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:15:4)
     In the second argument of ‛BiApp’, namely ‛empty’
     In the expression: BiApp empty empty
-    In an equation for ‛empty’: empty = BiApp empty empty

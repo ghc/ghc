@@ -16,6 +16,3 @@ T3169.hs:13:22:
       m :: Map (a, b) elt (bound at T3169.hs:12:17)
     In the second argument of ‛lookup’, namely ‛m’
     In the expression: lookup a m :: Maybe (Map b elt)
-    In the expression:
-      case lookup a m :: Maybe (Map b elt) of {
-        Just (m2 :: Map b elt) -> lookup b m2 :: Maybe elt }

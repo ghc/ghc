@@ -1,7 +1,6 @@
 
 tcfail177.hs:10:12:
     Couldn't match expected type ‛Bool’ with actual type ‛Int’
-    In the return type of a call of ‛foo’
     In the expression:
       foo
         [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]

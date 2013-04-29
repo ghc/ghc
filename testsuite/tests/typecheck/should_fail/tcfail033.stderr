@@ -7,4 +7,3 @@ tcfail033.hs:4:12:
       y :: t1 (bound at tcfail033.hs:4:19)
     In the expression: x
     In the expression: [x | (x, y) <- buglet]
-    In an equation for ‛buglet’: buglet = [x | (x, y) <- buglet]

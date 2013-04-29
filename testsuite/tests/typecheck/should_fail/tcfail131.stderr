@@ -9,6 +9,5 @@ tcfail131.hs:7:9:
     Relevant bindings include
       g :: b -> b (bound at tcfail131.hs:7:3)
       x :: b (bound at tcfail131.hs:7:5)
-    In the return type of a call of ‛f’
     In the expression: f x x
     In an equation for ‛g’: g x = f x x

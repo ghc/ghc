@@ -8,10 +8,6 @@ tc211.hs:15:22:
                                 (forall a. a -> a)
                                 -> [forall a. a -> a] -> [forall a. a -> a]’, namely
       ‛(head foo)’
-    In the expression:
-      ((:) ::
-         (forall a. a -> a) -> [forall a. a -> a] -> [forall a. a -> a])
-        (head foo) foo
 
 tc211.hs:48:19:
     Could not deduce (Num a2) arising from the literal ‛3’
@@ -84,9 +80,3 @@ tc211.hs:70:9:
          List (forall a. a -> a)
          -> (forall a. a -> a) -> (forall a. a -> a))
         xs1 (\ x -> x)
-    In an equation for ‛bar4’:
-        bar4
-          = (foo2 ::
-               List (forall a. a -> a)
-               -> (forall a. a -> a) -> (forall a. a -> a))
-              xs1 (\ x -> x)

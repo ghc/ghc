@@ -17,7 +17,6 @@ tcfail068.hs:14:9:
     Relevant bindings include
       itgen :: (Int, Int) -> a -> IndTree s a
         (bound at tcfail068.hs:12:1)
-    In the return type of a call of ‛newSTArray’
     In the first argument of ‛runST’, namely
       ‛(newSTArray ((1, 1), n) x)’
     In the expression: runST (newSTArray ((1, 1), n) x)
@@ -45,9 +44,6 @@ tcfail068.hs:19:21:
       arr :: IndTree s a (bound at tcfail068.hs:17:11)
     In the first argument of ‛readSTArray’, namely ‛arr’
     In the first argument of ‛(>>=)’, namely ‛readSTArray arr i’
-    In the first argument of ‛runST’, namely
-      ‛(readSTArray arr i
-        >>= \ val -> writeSTArray arr i (f val) >> return arr)’
 
 tcfail068.hs:24:35:
     Could not deduce (s ~ s1)
@@ -75,7 +71,6 @@ tcfail068.hs:24:35:
         (bound at tcfail068.hs:29:9)
       itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a)
         (bound at tcfail068.hs:26:9)
-    In the return type of a call of ‛itrap'’
     In the first argument of ‛runST’, namely ‛(itrap' i k)’
     In the expression: runST (itrap' i k)
 
@@ -122,6 +117,5 @@ tcfail068.hs:36:46:
         (bound at tcfail068.hs:41:9)
       itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
         (bound at tcfail068.hs:38:9)
-    In the return type of a call of ‛itrapstate'’
     In the first argument of ‛runST’, namely ‛(itrapstate' i k s)’
     In the expression: runST (itrapstate' i k s)

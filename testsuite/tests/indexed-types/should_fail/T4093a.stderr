@@ -10,6 +10,5 @@ T4093a.hs:8:8:
     Expected type: Foo e
       Actual type: Maybe ()
     Relevant bindings include hang :: Foo e (bound at T4093a.hs:8:1)
-    In the return type of a call of ‛Just’
     In the expression: Just ()
     In an equation for ‛hang’: hang = Just ()

@@ -7,9 +7,3 @@ T3950.hs:15:13:
       rp :: Bool -> Maybe (w (Id p)) (bound at T3950.hs:15:1)
     In the first argument of ‛Just’, namely ‛rp'’
     In the expression: Just rp'
-    In an equation for ‛rp’:
-        rp _
-          = Just rp'
-          where
-              rp' :: Sealed (Id p x)
-              rp' = undefined

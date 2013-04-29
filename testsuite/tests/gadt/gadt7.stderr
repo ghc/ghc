@@ -17,4 +17,3 @@ gadt7.hs:16:38:
       y1 :: t1 (bound at gadt7.hs:16:16)
     In the expression: y1
     In a case alternative: K -> y1
-    In the expression: case t1 of { K -> y1 }

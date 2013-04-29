@@ -5,7 +5,6 @@ T6069.hs:13:15:
       Actual type: (forall s. ST s b0) -> b0
     In the second argument of ‛(.)’, namely ‛runST’
     In the expression: print . runST
-    In the expression: (print . runST) fourty_two
 
 T6069.hs:14:15:
     Couldn't match type ‛ST s1 Int’ with ‛forall s. ST s b1’
@@ -13,7 +12,6 @@ T6069.hs:14:15:
       Actual type: (forall s. ST s b1) -> b1
     In the second argument of ‛(.)’, namely ‛runST’
     In the expression: (print . runST)
-    In the expression: (print . runST) $ fourty_two
 
 T6069.hs:15:16:
     Couldn't match type ‛ST s2 Int’ with ‛forall s. ST s b2’
@@ -21,4 +19,3 @@ T6069.hs:15:16:
       Actual type: (forall s. ST s b2) -> b2
     In the second argument of ‛(.)’, namely ‛runST’
     In the first argument of ‛($)’, namely ‛(print . runST)’
-    In the expression: (print . runST) $

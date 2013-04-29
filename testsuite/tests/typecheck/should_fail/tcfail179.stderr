@@ -15,4 +15,3 @@ tcfail179.hs:14:39:
       x :: x (bound at tcfail179.hs:14:26)
     In the first argument of ‛g’, namely ‛x’
     In the expression: g x id
-    In a pattern binding: (x, _, b) = g x id

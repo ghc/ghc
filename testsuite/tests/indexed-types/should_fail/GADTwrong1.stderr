@@ -18,4 +18,3 @@ GADTwrong1.hs:12:19:
       y :: a1 (bound at GADTwrong1.hs:12:14)
     In the expression: y
     In a case alternative: T y -> y
-    In the expression: case T x :: T (Const b) of { T y -> y }

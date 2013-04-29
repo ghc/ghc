@@ -25,4 +25,3 @@ rw.hs:19:51:
       ref :: IORef a (bound at rw.hs:17:12)
     In the second argument of ‛(.)’, namely ‛not’
     In the second argument of ‛(>>=)’, namely ‛(print . not)’
-    In the expression: readIORef ref >>= (print . not)

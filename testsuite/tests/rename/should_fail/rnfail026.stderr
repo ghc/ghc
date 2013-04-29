@@ -1,7 +1,7 @@
 
-rnfail026.hs:16:35:
+rnfail026.hs:16:17:
     The first argument of ‛Monad’ should have kind ‛* -> *’,
-      but ‛Set a’ has kind ‛*’
+      but ‛forall a. Eq a => Set a’ has kind ‛*’
     In the instance declaration for ‛Monad (forall a. Eq a => Set a)’
 
 rnfail026.hs:19:10:

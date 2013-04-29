@@ -15,5 +15,3 @@ gadt-escape1.hs:19:58:
       weird1 :: t (bound at gadt-escape1.hs:19:1)
     In the expression: a
     In a case alternative: Hidden (ExpInt _) a -> a
-    In the expression:
-      case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }

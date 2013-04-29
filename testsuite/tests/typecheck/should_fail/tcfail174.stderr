@@ -4,7 +4,6 @@ tcfail174.hs:9:10:
                 with actual type ‛a0 -> a0’
     In the first argument of ‛Base’, namely ‛id’
     In the expression: Base id
-    In an equation for ‛g’: g = Base id
 
 tcfail174.hs:13:14:
     Couldn't match type ‛a’ with ‛a1’
@@ -18,7 +17,6 @@ tcfail174.hs:13:14:
       h1 :: Capture a (bound at tcfail174.hs:13:1)
     In the first argument of ‛Capture’, namely ‛g’
     In the expression: Capture g
-    In an equation for ‛h1’: h1 = Capture g
 
 tcfail174.hs:16:14:
     Couldn't match type ‛a’ with ‛b’
@@ -32,4 +30,3 @@ tcfail174.hs:16:14:
       h2 :: Capture b (bound at tcfail174.hs:16:1)
     In the first argument of ‛Capture’, namely ‛g’
     In the expression: Capture g
-    In an equation for ‛h2’: h2 = Capture g

@@ -11,4 +11,3 @@ tcfail198.hs:6:36:
       xs :: [a] (bound at tcfail198.hs:6:21)
     In the expression: x :: a
     In the second argument of ‛(++)’, namely ‛[x :: a]’
-    In the expression: xs ++ [x :: a]

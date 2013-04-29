@@ -13,4 +13,3 @@ tcfail103.hs:15:23:
       g :: ST s Int (bound at tcfail103.hs:15:9)
     In the first argument of ‛readSTRef’, namely ‛v’
     In the expression: readSTRef v
-    In an equation for ‛g’: g = readSTRef v

@@ -9,7 +9,6 @@ T4099.hs:11:30:
       x :: T b (bound at T4099.hs:11:8)
     In the second argument of ‛foo’, namely ‛x’
     In the expression: foo (error "urk") x
-    In an equation for ‛bar1’: bar1 a x = foo (error "urk") x
 
 T4099.hs:14:30:
     Couldn't match expected type ‛T a1’ with actual type ‛Maybe b’
@@ -20,4 +19,3 @@ T4099.hs:14:30:
       x :: Maybe b (bound at T4099.hs:14:8)
     In the second argument of ‛foo’, namely ‛x’
     In the expression: foo (error "urk") x
-    In an equation for ‛bar2’: bar2 a x = foo (error "urk") x

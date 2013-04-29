@@ -4,11 +4,9 @@
                 with actual type ‛Planet’
     In the second argument of ‛(==)’, namely ‛Mercury’
     In the expression: mercury == Mercury
-    In an equation for ‛it’: it = mercury == Mercury
 
 <interactive>:10:10:
     Couldn't match expected type ‛Planet’
                 with actual type ‛main::Interactive.Planet’
     In the second argument of ‛(==)’, namely ‛Earth’
     In the expression: Venus == Earth
-    In an equation for ‛it’: it = Venus == Earth

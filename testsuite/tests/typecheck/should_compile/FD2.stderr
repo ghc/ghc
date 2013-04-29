@@ -26,6 +26,5 @@ FD2.hs:26:34:
       mf :: e1 -> Maybe e1 -> Maybe e1 (bound at FD2.hs:25:12)
       x :: e1 (bound at FD2.hs:26:15)
       y :: e1 (bound at FD2.hs:26:23)
-    In the return type of a call of ‛f’
     In the first argument of ‛Just’, namely ‛(f x y)’
     In the expression: Just (f x y)

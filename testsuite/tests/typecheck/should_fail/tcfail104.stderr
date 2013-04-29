@@ -4,13 +4,9 @@ tcfail104.hs:16:19:
                 with actual type ‛forall a. a -> a’
     In the expression: x
     In the expression: (\ x -> x)
-    In the expression:
-      if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)
 
 tcfail104.hs:22:39:
     Couldn't match expected type ‛forall a. a -> a’
                 with actual type ‛a0 -> a0’
     In the expression: x
     In the expression: (\ (x :: forall a. a -> a) -> x)
-    In the expression:
-      if v then (\ x -> x) else (\ (x :: forall a. a -> a) -> x)

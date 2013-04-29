@@ -8,7 +8,6 @@ tcfail153.hs:6:7:
     Relevant bindings include
       f :: a -> [a] (bound at tcfail153.hs:6:1)
       x :: a (bound at tcfail153.hs:6:3)
-    In the return type of a call of ‛g’
     In the expression: g x
     In an equation for ‛f’:
         f x

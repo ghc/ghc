@@ -51,14 +51,12 @@
       x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
     In the expression: x
     In the expression: (x, 'c')
-    In an equation for ‛h’: h x = (x, 'c')
 
 ../../typecheck/should_run/Defer01.hs:39:17: Warning:
     Couldn't match expected type ‛Bool’ with actual type ‛T a’
     Relevant bindings include
       i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
       a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
-    In the return type of a call of ‛K’
     In the first argument of ‛not’, namely ‛(K a)’
     In the expression: (not (K a))
 
@@ -105,9 +103,9 @@
 ../../typecheck/should_run/Defer01.hs:49:5: Warning:
     Couldn't match expected type ‛IO a0’
                 with actual type ‛Char -> IO ()’
+    Probable cause: ‛putChar’ is applied to too few arguments
     In the first argument of ‛(>>)’, namely ‛putChar’
     In the expression: putChar >> putChar 'p'
-    In an equation for ‛l’: l = putChar >> putChar 'p'
 *** Exception: ../../typecheck/should_run/Defer01.hs:11:40:
     Couldn't match type ‛Char’ with ‛[Char]’
     Expected type: String
@@ -131,7 +129,6 @@
     Couldn't match type ‛Bool’ with ‛Int’
     Expected type: C Int
       Actual type: C Bool
-    In the return type of a call of ‛C2’
     In the first argument of ‛c’, namely ‛(C2 True)’
     In the first argument of ‛print’, namely ‛(c (C2 True))’
 *** Exception: ../../typecheck/should_run/Defer01.hs:28:5:
@@ -159,14 +156,12 @@
       x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
     In the expression: x
     In the expression: (x, 'c')
-    In an equation for ‛h’: h x = (x, 'c')
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:39:17:
     Couldn't match expected type ‛Bool’ with actual type ‛T a’
     Relevant bindings include
       i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
       a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
-    In the return type of a call of ‛K’
     In the first argument of ‛not’, namely ‛(K a)’
     In the expression: (not (K a))
 (deferred type error)
@@ -184,7 +179,7 @@
 *** Exception: ../../typecheck/should_run/Defer01.hs:49:5:
     Couldn't match expected type ‛IO a0’
                 with actual type ‛Char -> IO ()’
+    Probable cause: ‛putChar’ is applied to too few arguments
     In the first argument of ‛(>>)’, namely ‛putChar’
     In the expression: putChar >> putChar 'p'
-    In an equation for ‛l’: l = putChar >> putChar 'p'
 (deferred type error)

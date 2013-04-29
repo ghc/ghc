@@ -6,4 +6,3 @@ tcfail014.hs:5:33:
       z :: t8 -> t7 (bound at tcfail014.hs:5:27)
     In the first argument of ‛z’, namely ‛z’
     In the expression: z z
-    In an equation for ‛h’: h z = z z

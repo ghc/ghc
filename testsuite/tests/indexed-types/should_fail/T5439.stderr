@@ -15,13 +15,10 @@ T5439.hs:83:28:
         (bound at T5439.hs:65:9)
     In the first argument of ‛complete’, namely ‛ev’
     In the expression: complete ev
-    In a stmt of a 'do' block:
-      c <- complete ev $ inj $ Failure (e :: SomeException)
 
 T5439.hs:83:39:
     Couldn't match expected type ‛Peano n0’
                 with actual type ‛Attempt α0’
-    In the return type of a call of ‛Failure’
     In the second argument of ‛($)’, namely
       ‛Failure (e :: SomeException)’
     In the second argument of ‛($)’, namely

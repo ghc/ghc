@@ -14,4 +14,3 @@ T2688.hs:8:22:
       s :: s (bound at T2688.hs:8:10)
     In the second argument of ‛(/)’, namely ‛s’
     In the second argument of ‛(*^)’, namely ‛(1 / s)’
-    In the expression: v *^ (1 / s)

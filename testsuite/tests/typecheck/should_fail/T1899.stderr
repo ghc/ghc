@@ -7,6 +7,5 @@ T1899.hs:12:29:
     Relevant bindings include
       transRHS :: [a] -> Int -> Constraint a (bound at T1899.hs:10:2)
       varSet :: [a] (bound at T1899.hs:10:11)
-    In the return type of a call of ‛Auxiliary’
     In the first argument of ‛Prop’, namely ‛(Auxiliary undefined)’
     In the expression: Prop (Auxiliary undefined)

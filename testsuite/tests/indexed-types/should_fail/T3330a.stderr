@@ -14,7 +14,6 @@ T3330a.hs:19:34:
       x :: PF s r ix (bound at T3330a.hs:19:12)
     In the first argument of ‛hmapM’, namely ‛p’
     In the first argument of ‛execWriter’, namely ‛(hmapM p collect x)’
-    In the expression: execWriter (hmapM p collect x)
 
 T3330a.hs:19:34:
     Couldn't match type ‛s’ with ‛(->) (s0 ix0 -> ix1)’
@@ -30,7 +29,6 @@ T3330a.hs:19:34:
       x :: PF s r ix (bound at T3330a.hs:19:12)
     In the first argument of ‛hmapM’, namely ‛p’
     In the first argument of ‛execWriter’, namely ‛(hmapM p collect x)’
-    In the expression: execWriter (hmapM p collect x)
 
 T3330a.hs:19:44:
     Couldn't match type ‛ix’ with ‛r0 ix0 -> Writer [AnyF s0] (r0 ix0)’
@@ -45,4 +43,3 @@ T3330a.hs:19:44:
       x :: PF s r ix (bound at T3330a.hs:19:12)
     In the third argument of ‛hmapM’, namely ‛x’
     In the first argument of ‛execWriter’, namely ‛(hmapM p collect x)’
-    In the expression: execWriter (hmapM p collect x)

@@ -7,4 +7,3 @@ T3102.hs:11:12:
       Actual type: ((?p::Int) => a0) -> String
     In the first argument of ‛f’, namely ‛t’
     In the expression: f t
-    In an equation for ‛result’: result = f t

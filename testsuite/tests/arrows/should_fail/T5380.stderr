@@ -11,8 +11,6 @@ T5380.hs:7:27:
       b :: not_bool (bound at T5380.hs:7:7)
     In the expression: b
     In the expression: proc () -> if b then f -< () else f -< ()
-    In an equation for ‛testB’:
-        testB b f = proc () -> if b then f -< () else f -< ()
 
 T5380.hs:7:34:
     Couldn't match type ‛not_unit’ with ‛()’
@@ -27,5 +25,3 @@ T5380.hs:7:34:
         (bound at T5380.hs:7:1)
     In the expression: f
     In the expression: proc () -> if b then f -< () else f -< ()
-    In an equation for ‛testB’:
-        testB b f = proc () -> if b then f -< () else f -< ()

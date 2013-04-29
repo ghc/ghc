@@ -13,4 +13,3 @@ tcfail099.hs:9:20:
       arg :: t (bound at tcfail099.hs:9:12)
     In the first argument of ‛f’, namely ‛arg’
     In the expression: f arg
-    In an equation for ‛call’: call (C f) arg = f arg

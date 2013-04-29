@@ -15,7 +15,6 @@ T2494.hs:15:14:
         (bound at T2494.hs:13:11)
     In the first argument of ‛foo’, namely ‛g’
     In the second argument of ‛foo’, namely ‛(foo g x)’
-    In the expression: foo f (foo g x)
 
 T2494.hs:15:30:
     Couldn't match type ‛a’ with ‛b’
@@ -33,4 +32,3 @@ T2494.hs:15:30:
         (bound at T2494.hs:13:11)
     In the second argument of ‛(.)’, namely ‛g’
     In the first argument of ‛foo’, namely ‛(f . g)’
-    In the expression: foo (f . g) x

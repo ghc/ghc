@@ -11,4 +11,3 @@ tcfail065.hs:29:20:
       x :: x1 (bound at tcfail065.hs:29:8)
     In the first argument of ‛X’, namely ‛x’
     In the expression: X x
-    In an equation for ‛setX’: setX x (X _) = X x

@@ -6,7 +6,6 @@ T7734.hs:4:13:
       x :: t2 -> t1 (bound at T7734.hs:4:1)
     In the first argument of ‛x’, namely ‛x’
     In the expression: x x
-    In an equation for ‛f’: x `f` y = x x
 
 T7734.hs:5:13:
     Occurs check: cannot construct the infinite type: t2 ~ t2 -> t1
@@ -15,4 +14,3 @@ T7734.hs:5:13:
       x :: t2 -> t1 (bound at T7734.hs:5:5)
     In the first argument of ‛x’, namely ‛x’
     In the expression: x x
-    In an equation for ‛&’: (&) x y = x x

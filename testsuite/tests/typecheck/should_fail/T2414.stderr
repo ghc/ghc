@@ -5,4 +5,3 @@ T2414.hs:9:13:
       Actual type: b0 -> Maybe b0
     In the first argument of ‛unfoldr’, namely ‛Just’
     In the expression: unfoldr Just
-    In an equation for ‛f’: f = unfoldr Just

@@ -17,6 +17,5 @@ mc22.hs:10:26:
     Expected type: [a] -> [t a]
       Actual type: [a] -> [a]
     Relevant bindings include foo :: [t [Char]] (bound at mc22.hs:8:1)
-    In the return type of a call of ‛take’
     In the expression: take 5
     In a stmt of a monad comprehension: then group using take 5

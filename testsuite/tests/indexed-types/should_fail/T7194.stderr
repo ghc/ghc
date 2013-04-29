@@ -9,6 +9,5 @@ T7194.hs:18:35:
       x :: b0 (bound at T7194.hs:17:9)
       g :: a -> Int (bound at T7194.hs:18:18)
       y :: a (bound at T7194.hs:18:20)
-    In the return type of a call of ‛foo’
     In the expression: foo y
     In the first argument of ‛length’, namely ‛[x, foo y]’

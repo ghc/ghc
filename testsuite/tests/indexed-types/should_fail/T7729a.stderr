@@ -5,4 +5,3 @@ T7729a.hs:28:31:
       Actual type: BasePrimMonad (Rand m) a
     In the first argument of ‛lift’, namely ‛x’
     In the first argument of ‛liftPrim’, namely ‛(lift x)’
-    In the expression: liftPrim (lift x)

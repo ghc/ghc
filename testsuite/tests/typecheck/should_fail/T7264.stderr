@@ -10,4 +10,3 @@ T7264.hs:13:19:
       val :: a (bound at T7264.hs:13:8)
     In the first argument of ‛mmap’, namely ‛Foo’
     In the expression: mmap Foo (Just val)
-    In an equation for ‛mkFoo2’: mkFoo2 val = mmap Foo (Just val)

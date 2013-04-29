@@ -13,4 +13,3 @@ T7594.hs:25:11:
     Relevant bindings include bar :: b (bound at T7594.hs:25:1)
     In the first argument of ‛app’, namely ‛print’
     In the expression: app print q
-    In an equation for ‛bar’: bar = app print q

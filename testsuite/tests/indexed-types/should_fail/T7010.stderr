@@ -5,4 +5,3 @@ T7010.hs:53:27:
       Actual type: (Float, ValueTuple Float)
     In the first argument of ‛withArgs’, namely ‛plug’
     In the expression: withArgs plug
-    In an equation for ‛filterFormants’: filterFormants = withArgs plug

@@ -10,12 +10,6 @@ simpl017.hs:44:12:
       f :: [E m i] -> E' v0 m a (bound at simpl017.hs:43:9)
     In the first argument of ‛return’, namely ‛f’
     In a stmt of a 'do' block: return f
-    In the first argument of ‛E’, namely
-      ‛(do { let ix :: [E m i] -> m i
-                 ix [i] = runE i
-                 {-# INLINE f #-}
-                 ....;
-             return f })’
 
 simpl017.hs:63:5:
     Couldn't match type ‛forall v.

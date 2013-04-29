@@ -8,4 +8,3 @@ T7354.hs:28:11:
       foo :: Prim [a] a -> t (bound at T7354.hs:28:1)
     In the first argument of ‛ana’, namely ‛alg’
     In the expression: ana alg
-    In an equation for ‛foo’: foo = ana alg

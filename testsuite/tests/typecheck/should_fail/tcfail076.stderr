@@ -12,6 +12,5 @@ tcfail076.hs:18:82:
     Relevant bindings include
       cont :: a -> m res (bound at tcfail076.hs:18:37)
       cont' :: b -> m res1 (bound at tcfail076.hs:18:73)
-    In the return type of a call of ‛cont’
     In the expression: cont a
     In the first argument of ‛KContT’, namely ‛(\ cont' -> cont a)’

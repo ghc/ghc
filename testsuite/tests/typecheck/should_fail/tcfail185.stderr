@@ -9,9 +9,3 @@ tcfail185.hs:7:46:
         y3 = y2
         ....
       in x
-    In the expression:
-      \ x y
-        -> let
-             y1 = ...
-             ....
-           in x

@@ -22,4 +22,3 @@ T3330c.hs:23:43:
       x :: x (bound at T3330c.hs:23:29)
     In the first argument of ‛plug’, namely ‛rf’
     In the first argument of ‛Inl’, namely ‛(plug rf df x)’
-    In the expression: Inl (plug rf df x)

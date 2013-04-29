@@ -16,4 +16,3 @@ mc25.hs:9:46:
     Relevant bindings include z :: [t1 t] (bound at mc25.hs:9:1)
     In the expression: take
     In a stmt of a monad comprehension: then group by x using take
-    In the expression: [x | x <- [1 .. 10], then group by x using take]

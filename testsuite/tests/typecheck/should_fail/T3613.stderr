@@ -5,7 +5,6 @@ T3613.hs:14:20:
       Actual type: IO ()
     In the first argument of ‛(>>)’, namely ‛bar’
     In the first argument of ‛fooThen’, namely ‛(bar >> undefined)’
-    In the expression: fooThen (bar >> undefined)
 
 T3613.hs:17:24:
     Couldn't match type ‛IO’ with ‛Maybe’
@@ -15,7 +14,3 @@ T3613.hs:17:24:
     In the first argument of ‛fooThen’, namely
       ‛(do { bar;
              undefined })’
-    In the expression:
-      fooThen
-        (do { bar;
-              undefined })
