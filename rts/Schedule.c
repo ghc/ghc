@@ -956,8 +956,8 @@ scheduleResumeBlockedOnForeignCall(Capability *cap USED_IF_THREADS)
     //Safely work
     ACQUIRE_LOCK (&cap->lock);
     incall = cap->suspended_ccalls_hd;
-    if (incall && //incall is not NULL
-        !isBoundTask (incall->task) &&
+    if (rtsFalse && //XXX disable
+        incall && //incall is not NULL
         incall->uls_stat == UserLevelSchedulerBlocked) {
 
         debugTrace (DEBUG_sched, "resuming scheduler associated with task %p"
@@ -2384,12 +2384,6 @@ suspendThread (StgRegTable *reg, rtsBool interruptible)
     }
     else {
         task->incall->uls_stat = UserLevelSchedulerBlocked;
-        //XXX KC -- If the thread is running a user-level scheduler, but is
-        //bound, we add it to the tail of the queue. We also avoid resuming the
-        //scheduler of such threads since it seems to cause errors with the
-        //IOManager.
-        if (isBoundTask (task))
-          appendToHead = rtsFalse;
     }
 #else
     task->incall->uls_stat = NoUserLevelScheduler;
@@ -2459,31 +2453,32 @@ resumeThread (void *task_)
         }
     }
 
+    /* We might have GC'd, mark the TSO dirty again */
+    dirty_TSO(cap,tso);
+    dirty_STACK(cap,tso->stackobj);
+    IF_DEBUG(sanity, checkTSO(tso));
+    tso->saved_errno = errno;
+
 #if defined(THREADED_RTS)
     //Check whether a worker has resumed our scheduler
     if (incall->uls_stat == UserLevelSchedulerRunning) {
         //Evaluate the unblock action on the upcall thread
+        debugTrace (DEBUG_sched, "cap %d: resumeThread: ULS for thread %d already resumed. errno=%d.",
+                    (int)cap->no, tso->id, errno);
         pushUpcallReturning (cap, getResumeThreadUpcall (cap, tso));
         tso->why_blocked = Yielded;
         tso = prepareUpcallThread (cap, (StgTSO*)END_TSO_QUEUE);
     }
 #endif
 
-
     traceEventRunThread(cap, tso);
 
     cap->r.rCurrentTSO = tso;
     cap->in_haskell = rtsTrue;
-    errno = saved_errno;
+    errno = tso->saved_errno;
 #if mingw32_HOST_OS
     SetLastError(saved_winerror);
 #endif
-
-    /* We might have GC'd, mark the TSO dirty again */
-    dirty_TSO(cap,tso);
-    dirty_STACK(cap,tso->stackobj);
-
-    IF_DEBUG(sanity, checkTSO(tso));
 
     return &cap->r;
 }
