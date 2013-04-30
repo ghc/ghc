@@ -32,9 +32,10 @@ primeFilter mIn mOut prime = do
 main = do
   initSched
   numArg:_ <- getArgs
-  mIn <- atomically $ newEmptyTMVar
+  let n = read numArg
+  mIn <- newEmptyTMVarIO
   forkIO $ generate mIn
-  out <- replicateM (read numArg) (atomically newEmptyTMVar)
+  out <- replicateM n newEmptyTMVarIO
   foldM_ linkFilter mIn out
 
 -- Take a value from mIn, and call it prime. Then show that prime. Make a new thread that
@@ -44,5 +45,6 @@ linkFilter :: TMVar Int -> TMVar Int -> IO (TMVar Int)
 linkFilter mIn mOut = do
   prime <- atomically $ takeTMVar mIn
   putStrLn $ show prime
+  -- debugPrint $ show prime
   forkIO $ primeFilter mIn mOut prime
   return mOut

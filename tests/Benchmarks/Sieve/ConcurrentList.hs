@@ -44,10 +44,10 @@ newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> PTM ()
-yieldControlAction (Sched pa) = do
+yieldControlAction !(Sched pa) = do
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
-  let (frontRef, backRef)= pa ! cc
+  let !(frontRef, backRef)= pa ! cc
   front <- readPVar frontRef
   case front of
     [] -> do
@@ -64,14 +64,14 @@ yieldControlAction (Sched pa) = do
 
 _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
-scheduleSContAction (Sched pa) sc = do
+scheduleSContAction !(Sched pa) !sc = do
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
-  cap <- getSContCapability sc
+  !cap <- getSContCapability sc
   let (_,backRef) = pa ! cap
-  back <- readPVar backRef
-  writePVar backRef $ sc:back
+  !back <- readPVar backRef
+  writePVar backRef $! sc:back
 
 
 _INL_(newSched)

@@ -523,7 +523,6 @@ run_thread:
         t->saved_winerror = GetLastError();
 #endif
 
-
         if (ret == ThreadBlocked) {
             if (t->why_blocked == BlockedOnBlackHole) {
                 StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
@@ -835,6 +834,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                 t->_link = END_TSO_QUEUE;
                 if (t->bound == task->incall // don't move my bound thread
                     || t->is_upcall_thread // don't move upcall thread
+                    // XXX the following is inplace to avoid a hard to debug
+                    // deadlock that occurs in sieve-lwc. Should be fixed!
+                    || hasHaskellScheduler(t) //don't move user-level schedulers
                     || tsoLocked(t)) {  // don't move a locked thread
                     setTSOLink(cap, prev, t);
                     setTSOPrev(cap, t, prev);
@@ -958,7 +960,8 @@ scheduleResumeBlockedOnForeignCall(Capability *cap USED_IF_THREADS)
     //Safely work
     ACQUIRE_LOCK (&cap->lock);
     incall = cap->suspended_ccalls_hd;
-    if (rtsFalse && //XXX disable
+    if (rtsFalse && //XXX KC: disabled! causes an IOError (Bad address) on
+                    //sieve-TMVar.hs. Should be fixed!
         incall && //incall is not NULL
         incall->uls_stat == UserLevelSchedulerBlocked) {
 

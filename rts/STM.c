@@ -905,7 +905,7 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
       s = e -> tvar;
       if (entry_is_read_only(e)) {
         TRACE("%p : check_read_only for TVar %p, saw %ld", trec, s, e -> num_updates);
-        
+
         // Note we need both checks and in this order as the TVar could be
         // locked by another transaction that is committing but has not yet
         // incremented `num_updates` (See #7815).

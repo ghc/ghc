@@ -633,7 +633,7 @@ again: MAYBE_GC(again);
       	}
 			}
     }
-  } )
+  })
 
   #endif
 
@@ -887,6 +887,7 @@ stg_sleepCapabilityzh ()
 {
 	IF_DEBUG (scheduler,
 		ccall debugBelch ("stg_sleepCapability: thread %d\n", StgTSO_id(CurrentTSO)));
+  ASSERT (StgTSO_is_sleeping (CurrentTSO) == 0::I32);
   StgTSO_is_sleeping (CurrentTSO) = 1::I32;
   jump stg_retryzh [];
 }
