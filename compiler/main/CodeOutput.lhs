@@ -45,6 +45,7 @@ import System.IO
 \begin{code}
 codeOutput :: DynFlags
            -> Module
+           -> FilePath
            -> ModLocation
            -> ForeignStubs
            -> [PackageId]
@@ -52,7 +53,7 @@ codeOutput :: DynFlags
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
 
-codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
+codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
   = 
     do  {
         -- Lint each CmmGroup as it goes past
@@ -72,7 +73,6 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
                 }
 
         ; showPass dflags "CodeOutput"
-        ; let filenm = hscOutName dflags 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
              HscAsm         -> outputAsm dflags filenm linted_cmm_stream;

@@ -16,9 +16,9 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR
+library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR FFI_LIB_DIR
 #else /* !INSTALLING */
-library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR
+library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR FFI_LIB_DIR
 #endif
 
 hs-libraries:   "HSrts" FFI_LIB
@@ -40,6 +40,9 @@ extra-libraries:
 			      ,"wsock32"	/* for the linker */
 			      ,"gdi32"      /* for the linker */
 			      ,"winmm"      /* for the linker */
+#endif
+#ifdef freebsd_HOST_OS
+			      , "pthread" /* for pthread_getthreadid_np() */
 #endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
 			      ,"bfd", "iberty"	/* for debugging */

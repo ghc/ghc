@@ -84,7 +84,7 @@ createThread(Capability *cap, W_ size)
   stack_size = round_to_mblocks(size - sizeofW(StgTSO));
   stack = (StgStack *)allocate(cap, stack_size);
   TICK_ALLOC_STACK(stack_size);
-  SET_HDR(stack, &stg_STACK_info, CCS_SYSTEM);
+  SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
   stack->stack_size   = stack_size - sizeofW(StgStack);
   stack->sp           = stack->stack + stack->stack_size;
   stack->dirty        = 1;
@@ -687,7 +687,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                 chunk_size * sizeof(W_));
 
   new_stack = (StgStack*) allocate(cap, chunk_size);
-  SET_HDR(new_stack, &stg_STACK_info, CCS_SYSTEM);
+  SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
   TICK_ALLOC_STACK(chunk_size);
 
   new_stack->dirty = 0; // begin clean, we'll mark it dirty below

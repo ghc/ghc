@@ -10,7 +10,7 @@
 -- back in circularly (to avoid a two-pass algorithm).
 
 module StgCmmExtCode (
-        CmmParse(..),
+        CmmParse, unEC,
         Named(..), Env,
         
         loopDecls,
@@ -94,7 +94,7 @@ instance HasDynFlags CmmParse where
 loopDecls :: CmmParse a -> CmmParse a
 loopDecls (EC fcode) =
       EC $ \e globalDecls -> do
-        (_, a) <- F.fixC (\ ~(decls, _) -> fcode (addListToUFM e (decls ++ globalDecls)) globalDecls)
+        (_, a) <- F.fixC (\ ~(decls, _) -> fcode (addListToUFM e decls) globalDecls)
         return (globalDecls, a)
 
 
@@ -103,16 +103,18 @@ getEnv :: CmmParse Env
 getEnv  = EC $ \e s -> return (s, e)
 
 
+addDecl :: FastString -> Named -> ExtCode
+addDecl name named = EC $ \_ s -> return ((name, named) : s, ())
+
+
 -- | Add a new variable to the list of local declarations. 
 --      The CmmExpr says where the value is stored. 
 addVarDecl :: FastString -> CmmExpr -> ExtCode
-addVarDecl var expr 
-        = EC $ \_ s -> return ((var, VarN expr):s, ())
+addVarDecl var expr = addDecl var (VarN expr)
 
 -- | Add a new label to the list of local declarations.
 addLabel :: FastString -> BlockId -> ExtCode
-addLabel name block_id 
-        = EC $ \_ s -> return ((name, LabelN block_id):s, ())
+addLabel name block_id = addDecl name (LabelN block_id)
 
 
 -- | Create a fresh local variable of a given type.
@@ -144,8 +146,7 @@ newFunctionName
         -> PackageId    -- ^ package of the current module
         -> ExtCode
         
-newFunctionName name pkg
-        = EC $ \_ s -> return ((name, FunN pkg):s, ())
+newFunctionName name pkg = addDecl name (FunN pkg)
         
         
 -- | Add an imported foreign label to the list of local declarations.

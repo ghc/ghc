@@ -560,8 +560,6 @@ data DynFlags = DynFlags {
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
   settings              :: Settings,
-  hscOutName            :: String,      -- ^ Name of the output file
-  extCoreName           :: String,      -- ^ Name of the .hcr output file
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   simplPhases           :: Int,         -- ^ Number of simplifier phases
@@ -1173,7 +1171,8 @@ doDynamicToo dflags0 = let dflags1 = addWay' WayDyn dflags0
                                          objectSuf = dynObjectSuf dflags1
                                      }
                            dflags3 = updateWays dflags2
-                       in dflags3
+                           dflags4 = gopt_unset dflags3 Opt_BuildDynamicToo
+                       in dflags4
 
 -----------------------------------------------------------------------------
 
@@ -1212,8 +1211,6 @@ defaultDynFlags mySettings =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        hscOutName              = "",
-        extCoreName             = "",
         verbosity               = 0,
         optLevel                = 0,
         simplPhases             = 2,
@@ -3353,6 +3350,7 @@ compilerInfo dflags
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
+       ("Support dynamic-too",         "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
        ("GHC Dynamic",                 if cDYNAMIC_GHC_PROGRAMS

@@ -77,7 +77,7 @@ can unify with the supplied arguments. After all, it is possible that some
 of the type arguments are lambda-bound type variables whose instantiation may
 cause an earlier match among the branches. We wish to prohibit this behavior,
 so the type checker rules out the choice of a branch where a previous branch
-can unify. See also [Instance checking within groups] in FamInstEnv.hs.
+can unify. See also [Branched instance checking] in FamInstEnv.hs.
 
 For example, the following is malformed, where 'a' is a lambda-bound type
 variable:

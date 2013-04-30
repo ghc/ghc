@@ -78,7 +78,7 @@ preprocess :: HscEnv
            -> IO (DynFlags, FilePath)
 preprocess hsc_env (filename, mb_phase) =
   ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename)
-  runPipeline anyHsc hsc_env (filename, mb_phase)
+  runPipeline anyHsc hsc_env (filename, fmap RealPhase mb_phase)
         Nothing Temporary Nothing{-no ModLocation-} Nothing{-no stub-}
 
 -- ---------------------------------------------------------------------------
@@ -148,9 +148,7 @@ compileOne' m_tc_result mHscMessage
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
 
-   let dflags' = dflags { hscOutName = output_fn,
-                          extCoreName = basename ++ ".hcr" }
-   let hsc_env' = hsc_env { hsc_dflags = dflags' }
+   let extCore_filename = basename ++ ".hcr"
 
    -- -fforce-recomp should also work with --make
    let force_recomp = gopt Opt_ForceRecomp dflags
@@ -166,7 +164,7 @@ compileOne' m_tc_result mHscMessage
    e <- genericHscCompileGetFrontendResult
             always_do_basic_recompilation_check
             m_tc_result mHscMessage
-            hsc_env' summary source_modified mb_old_iface (mod_index, nmods)
+            hsc_env summary source_modified mb_old_iface (mod_index, nmods)
 
    case e of
        Left iface ->
@@ -182,19 +180,19 @@ compileOne' m_tc_result mHscMessage
                HscInterpreted ->
                    case ms_hsc_src summary of
                    HsBootFile ->
-                       do (iface, _changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                       do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                           return (HomeModInfo{ hm_details  = details,
                                                hm_iface    = iface,
                                                hm_linkable = maybe_old_linkable })
-                   _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
-                           guts <- hscSimplify hsc_env' guts0
-                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
-                           (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env' cgguts summary
+                   _ -> do guts0 <- hscDesugar hsc_env summary tc_result
+                           guts <- hscSimplify hsc_env guts0
+                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env extCore_filename guts mb_old_hash
+                           (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env cgguts summary
 
                            stub_o <- case hasStub of
                                      Nothing -> return []
                                      Just stub_c -> do
-                                         stub_o <- compileStub hsc_env' stub_c
+                                         stub_o <- compileStub hsc_env stub_c
                                          return [DotO stub_o]
 
                            let hs_unlinked = [BCOs comp_bc modBreaks]
@@ -212,7 +210,7 @@ compileOne' m_tc_result mHscMessage
                                                 hm_iface    = iface,
                                                 hm_linkable = Just linkable })
                HscNothing ->
-                   do (iface, _changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
+                   do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                       let linkable = if isHsBoot src_flavour
                                      then maybe_old_linkable
                                      else Just (LM (ms_hs_date summary) this_mod [])
@@ -223,30 +221,27 @@ compileOne' m_tc_result mHscMessage
                _ ->
                    case ms_hsc_src summary of
                    HsBootFile ->
-                       do (iface, changed, details) <- hscSimpleIface hsc_env' tc_result mb_old_hash
-                          hscWriteIface dflags' iface changed summary
-                          touchObjectFile dflags' object_filename
+                       do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                          hscWriteIface dflags iface changed summary
+                          touchObjectFile dflags object_filename
                           return (HomeModInfo{ hm_details  = details,
                                                hm_iface    = iface,
                                                hm_linkable = maybe_old_linkable })
 
-                   _ -> do guts0 <- hscDesugar hsc_env' summary tc_result
-                           guts <- hscSimplify hsc_env' guts0
-                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env' guts mb_old_hash
-                           hscWriteIface dflags' iface changed summary
-                           (_outputFilename, hasStub) <- hscGenHardCode hsc_env' cgguts summary
+                   _ -> do guts0 <- hscDesugar hsc_env summary tc_result
+                           guts <- hscSimplify hsc_env guts0
+                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env extCore_filename guts mb_old_hash
+                           hscWriteIface dflags iface changed summary
 
                            -- We're in --make mode: finish the compilation pipeline.
-                           maybe_stub_o <- case hasStub of
-                                      Nothing -> return Nothing
-                                      Just stub_c -> do
-                                          stub_o <- compileStub hsc_env' stub_c
-                                          return (Just stub_o)
-                           _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
+                           let mod_name = ms_mod_name summary
+                           _ <- runPipeline StopLn hsc_env
+                                             (output_fn,
+                                              Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
                                              (Just basename)
                                              Persistent
                                              (Just location)
-                                             maybe_stub_o
+                                             Nothing
                                  -- The object filename comes from the ModLocation
                            o_time <- getModificationUTCTime object_filename
                            let linkable = LM o_time this_mod [DotO object_filename]
@@ -475,7 +470,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
                         _          -> stop_phase
 
    ( _, out_file) <- runPipeline stop_phase' hsc_env
-                            (src, mb_phase) Nothing output
+                            (src, fmap RealPhase mb_phase) Nothing output
                             Nothing{-no ModLocation-} Nothing
    return out_file
 
@@ -521,12 +516,12 @@ data PipelineOutput
 runPipeline
   :: Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
-  -> (FilePath,Maybe Phase)     -- ^ Input filename (and maybe -x suffix)
+  -> (FilePath,Maybe PhasePlus) -- ^ Input filename (and maybe -x suffix)
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
-  -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
+  -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
 runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
              mb_basename output maybe_loc maybe_stub_o
 
@@ -543,13 +538,14 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                       | otherwise             = input_basename
 
              -- If we were given a -x flag, then use that phase to start from
-             start_phase = fromMaybe (startPhase suffix') mb_phase
+             start_phase = fromMaybe (RealPhase (startPhase suffix')) mb_phase
 
-             isHaskell (Unlit _) = True
-             isHaskell (Cpp   _) = True
-             isHaskell (HsPp  _) = True
-             isHaskell (Hsc   _) = True
-             isHaskell _         = False
+             isHaskell (RealPhase (Unlit _)) = True
+             isHaskell (RealPhase (Cpp   _)) = True
+             isHaskell (RealPhase (HsPp  _)) = True
+             isHaskell (RealPhase (Hsc   _)) = True
+             isHaskell (HscOut {})           = True
+             isHaskell _                     = False
 
              isHaskellishFile = isHaskell start_phase
 
@@ -568,10 +564,13 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- before B in a normal compilation pipeline.
 
          let happensBefore' = happensBefore dflags
-         when (not (start_phase `happensBefore'` stop_phase)) $
-               throwGhcExceptionIO (UsageError
-                           ("cannot compile this file to desired target: "
-                              ++ input_fn))
+         case start_phase of
+             RealPhase start_phase' ->
+                 when (not (start_phase' `happensBefore'` stop_phase)) $
+                       throwGhcExceptionIO (UsageError
+                                   ("cannot compile this file to desired target: "
+                                      ++ input_fn))
+             HscOut {} -> return ()
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
          r <- runPipeline' start_phase hsc_env env input_fn
@@ -592,7 +591,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          return r
 
 runPipeline'
-  :: Phase                      -- ^ When to start
+  :: PhasePlus                  -- ^ When to start
   -> HscEnv                     -- ^ Compilation environment
   -> PipeEnv
   -> FilePath                   -- ^ Input filename
@@ -605,7 +604,7 @@ runPipeline' start_phase hsc_env env input_fn
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
 
-  evalP (pipeLoop (RealPhase start_phase) input_fn) env state
+  evalP (pipeLoop start_phase input_fn) env state
 
 -- -----------------------------------------------------------------------------
 -- The pipeline uses a monad to carry around various bits of information
@@ -722,12 +721,12 @@ pipeLoop phase input_fn = do
                                   (ptext (sLit "Running phase") <+> ppr phase)
            (next_phase, output_fn) <- runPhase phase input_fn dflags
            r <- pipeLoop next_phase output_fn
-           case next_phase of
+           case phase of
                HscOut {} ->
                    whenGeneratingDynamicToo dflags $ do
                        setDynFlags $ doDynamicToo dflags
                        -- TODO shouldn't ignore result:
-                       _ <- pipeLoop next_phase output_fn
+                       _ <- pipeLoop phase input_fn
                        return ()
                _ ->
                    return ()
@@ -960,8 +959,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
         let o_file = ml_obj_file location -- The real object file
 
-        setModLocation location
-
   -- Figure out if the source has changed, for recompilation avoidance.
   --
   -- Setting source_unchanged to True means that M.o seems
@@ -986,9 +983,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                   then return SourceUnmodified
                                   else return SourceModified
 
-        let dflags' = dflags { extCoreName = basename ++ ".hcr" }
+        let extCore_filename = basename ++ ".hcr"
 
-        setDynFlags dflags'
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
@@ -1008,7 +1004,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                         ms_srcimps      = src_imps }
 
   -- run the compiler!
-        result <- liftIO $ hscCompileOneShot hsc_env'
+        result <- liftIO $ hscCompileOneShot hsc_env' extCore_filename
                                mod_summary source_unchanged
 
         return (HscOut src_flavour mod_name result,
@@ -1016,6 +1012,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
 runPhase (HscOut src_flavour mod_name result) _ dflags = do
         location <- getLocation src_flavour mod_name
+        setModLocation location
+
         let o_file = ml_obj_file location -- The real object file
             hsc_lang = hscTarget dflags
             next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
@@ -1038,11 +1036,9 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
             HscRecomp cgguts mod_summary
               -> do output_fn <- phaseOutputFilename next_phase
 
-                    let dflags' = dflags { hscOutName = output_fn }
-                    setDynFlags dflags'
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary
+                    (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary output_fn
                     case mStub of
                         Nothing -> return ()
                         Just stub_c ->
@@ -1063,20 +1059,15 @@ runPhase (RealPhase CmmCpp) input_fn dflags
 
 runPhase (RealPhase Cmm) input_fn dflags
   = do
-        PipeEnv{src_basename} <- getPipeEnv
         let hsc_lang = hscTarget dflags
 
         let next_phase = hscPostBackendPhase dflags HsSrcFile hsc_lang
 
         output_fn <- phaseOutputFilename next_phase
 
-        let dflags' = dflags { hscOutName = output_fn,
-                               extCoreName = src_basename ++ ".hcr" }
-
-        setDynFlags dflags'
         PipeState{hsc_env} <- getPipeState
 
-        liftIO $ hscCompileCmmFile hsc_env input_fn
+        liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
 
         return (RealPhase next_phase, output_fn)
 
@@ -1828,7 +1819,13 @@ linkBinary dflags o_files dep_packages = do
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_packages
 
-    pkg_link_opts <- getPackageLinkOpts dflags dep_packages
+    pkg_link_opts <- if platformBinariesAreStaticLibs platform
+                     then -- If building an executable really means
+                          -- making a static library (e.g. iOS), then
+                          -- we don't want the options (like -lm)
+                          -- that getPackageLinkOpts gives us. #7720
+                          return []
+                     else getPackageLinkOpts dflags dep_packages
 
     pkg_framework_path_opts <-
         if platformUsesFrameworks platform

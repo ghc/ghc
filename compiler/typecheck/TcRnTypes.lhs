@@ -988,7 +988,7 @@ see dropDerivedWC.  For example,
  * If we have kind-incompatible (a::* ~ Int#::#) equality, we 
    don't want to complain about the kind error twice.  
 
-Arguably, for *some* derived contraints we might want to report errors. 
+Arguably, for *some* derived constraints we might want to report errors. 
 Notably, functional dependencies.  If we have  
     class C a b | a -> b
 and we have

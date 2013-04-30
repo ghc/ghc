@@ -623,7 +623,7 @@ mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
 mkGenRCo = mk_simple_deriv tcName "CoRep_"
 
--- data T = MkT ... deriving( Data ) needs defintions for 
+-- data T = MkT ... deriving( Data ) needs definitions for 
 --	$tT   :: Data.Generics.Basics.DataType
 --	$cMkT :: Data.Generics.Basics.Constr
 mkDataTOcc = mk_simple_deriv varName  "$t"

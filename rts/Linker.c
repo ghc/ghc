@@ -4978,6 +4978,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                // Generate veneer
                SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info), S+imm+4, 1, is_target_thm);
                offset = (StgWord32) &extra->jumpIsland - P - 4;
+               sign = offset >> 31;
                to_thm = 1;
             } else if (!is_target_thm && ELF_R_TYPE(info) == R_ARM_THM_CALL) {
                offset &= ~0x3;

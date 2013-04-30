@@ -68,10 +68,14 @@ DTRACEPROBES_H = rts/dist/build/RtsProbes.h
 rts_H_FILES += $(DTRACEPROBES_H)
 endif
 
-# collect the -l flags that we need to link the rts dyn lib.
+# collect the -l and -L flags that we need to link the rts dyn lib.
+# Note that, as sed on OS X doesn't handle \+, we use [^ ][^ ]* rather
+# than [^ ]\+
 rts/libs.depend : $$(ghc-pkg_INPLACE)
-	"$(ghc-pkg_INPLACE)" field rts extra-libraries \
-	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z0-9]*\)[ ]*/-l\1 /g' > $@
+	"$(ghc-pkg_INPLACE)" --simple-output field rts extra-libraries \
+	  | sed -e 's/\([^ ][^ ]*\)/-l\1/g' > $@
+	"$(ghc-pkg_INPLACE)" --simple-output field rts library-dirs \
+	  | sed -e 's/\([^ ][^ ]*\)/-L\1/g' >> $@
 
 
 # ----------------------------------------------------------------------------
@@ -186,7 +190,7 @@ else
 ifneq "$$(UseSystemLibFFI)" "YES"
 LIBFFI_LIBS = -Lrts/dist/build -lffi 
 ifeq "$$(TargetElf)" "YES"
-LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN'
+LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN' -optl-Wl,-z -optl-Wl,origin
 endif
 
 else

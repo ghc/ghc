@@ -150,7 +150,7 @@ data IfaceConDecl
         ifConInfix   :: Bool,                   -- True <=> declared infix
         ifConUnivTvs :: [IfaceTvBndr],          -- Universal tyvars
         ifConExTvs   :: [IfaceTvBndr],          -- Existential tyvars
-        ifConEqSpec  :: [(OccName,IfaceType)],  -- Equality contraints
+        ifConEqSpec  :: [(OccName,IfaceType)],  -- Equality constraints
         ifConCtxt    :: IfaceContext,           -- Non-stupid context
         ifConArgTys  :: [IfaceType],            -- Arg types
         ifConFields  :: [OccName],              -- ...ditto... (field labels)
@@ -177,11 +177,11 @@ data IfaceClsInst
 -- match types, one per branch... but each "rough match types" is itself
 -- a list of Maybe IfaceTyCon. So, we get [[Maybe IfaceTyCon]].
 data IfaceFamInst
-  = IfaceFamInst { ifFamInstFam   :: IfExtName            -- Family name
-                 , ifFamInstGroup :: Bool                 -- Is this a group?
-                 , ifFamInstTys   :: [[Maybe IfaceTyCon]] -- See above
-                 , ifFamInstAxiom :: IfExtName            -- The axiom
-                 , ifFamInstOrph  :: Maybe OccName        -- Just like IfaceClsInst
+  = IfaceFamInst { ifFamInstFam      :: IfExtName            -- Family name
+                 , ifFamInstBranched :: Bool                 -- Is this branched?
+                 , ifFamInstTys      :: [[Maybe IfaceTyCon]] -- See above
+                 , ifFamInstAxiom    :: IfExtName            -- The axiom
+                 , ifFamInstOrph     :: Maybe OccName        -- Just like IfaceClsInst
                  }
 
 data IfaceRule
@@ -767,7 +767,7 @@ instance Outputable IfaceUnfolding where
                                         pprParendIfaceExpr e]
   ppr (IfLclWrapper a wkr) = ptext (sLit "Worker(lcl):") <+> ppr wkr
                              <+> parens (ptext (sLit "arity") <+> int a)
-  ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext0:") <+> ppr wkr
+  ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext):") <+> ppr wkr
                              <+> parens (ptext (sLit "arity") <+> int a)
   ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:")
                              <+> brackets (pprWithCommas ppr ns)

@@ -377,7 +377,7 @@ seems that (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~ False) and that al
 OK. But, all is not OK: we want to use the first branch of the axiom in this case,
 not the second. The problem is that the parameters of the first branch can unify with
 the supplied coercions, thus meaning that the first branch should be taken. See also
-Note [Instance checking within groups] in types/FamInstEnv.lhs.
+Note [Branched instance checking] in types/FamInstEnv.lhs.
 
 \begin{code}
 -- | Check to make sure that an AxInstCo is internally consistent.

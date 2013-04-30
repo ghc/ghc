@@ -222,7 +222,8 @@ reportWanteds ctxt wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = im
 
 reportFlats :: ReportErrCtxt -> Cts -> TcM ()
 reportFlats ctxt flats    -- Here 'flats' includes insolble goals
-  = traceTc "reportFlats" (ppr flats) >>
+  = traceTc "reportFlats" (vcat [ ptext (sLit "Flats =") <+> ppr flats
+                                , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)]) >>
     tryReporters 
       [ -- First deal with things that are utterly wrong
         -- Like Int ~ Bool (incl nullary TyCons)
@@ -322,6 +323,7 @@ mkGroupReporter mk_err ctxt (ct1 : rest)
        ; maybeReportError ctxt err
        ; mapM_ (maybeAddDeferredBinding ctxt err) first_group
                -- Add deferred bindings for all
+               -- But see Note [Always warn with -fdefer-type-errors]
        ; mkGroupReporter mk_err ctxt others }
   where
    loc               = cc_loc ct1
@@ -335,8 +337,7 @@ mkGroupReporter mk_err ctxt (ct1 : rest)
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
-  | cec_defer ctxt  -- We have -fdefer-type-errors
-                    -- so warn about all, even if cec_suppress is on
+  | cec_defer ctxt  -- See Note [Always warn with -fdefer-type-errors]
   = reportWarning (makeIntoWarning err)
   | cec_suppress ctxt
   = return ()
@@ -423,6 +424,22 @@ getUserGivens (CEC {cec_encl = ctxt})
     | Implic {ic_given = givens, ic_env = env, ic_info = info } <- ctxt
     , not (null givens) ]
 \end{code}
+
+Note [Always warn with -fdefer-type-errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When -fdefer-type-errors is on we warn about *all* type errors, even
+if cec_suppress is on.  This can lead to a lot more warnings than you
+would get errors without -fdefer-type-errors, but if we suppress any of
+them you might get a runtime error that wasn't warned about at compile
+time. 
+
+This is an easy design choice to change; just flip the order of the
+first two equations for maybeReportError
+
+To be consistent, we should also report multiple warnings from a single
+location in mkGroupReporter, when -fdefer-type-errors is on.  But that 
+is perhaps a bit *over*-consistent! Again, an easy choice to change.
+
 
 Note [Do not report derived but soluble errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

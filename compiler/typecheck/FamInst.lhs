@@ -56,13 +56,13 @@ import qualified Data.Map as Map
 newFamInst :: FamFlavor -> Bool -> CoAxiom br -> TcRnIf gbl lcl(FamInst br)
 -- Freshen the type variables of the FamInst branches
 -- Called from the vectoriser monad too, hence the rather general type
-newFamInst flavor is_group axiom@(CoAxiom { co_ax_tc       = fam_tc
-                                          , co_ax_branches = ax_branches })
+newFamInst flavor is_branched axiom@(CoAxiom { co_ax_tc       = fam_tc
+                                             , co_ax_branches = ax_branches })
   = do { fam_branches <- go ax_branches
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_branches = fam_branches
-                         , fi_group    = is_group
+                         , fi_branched = is_branched
                          , fi_axiom    = axiom }) }
   where
     go :: BranchList CoAxBranch br -> TcRnIf gbl lcl (BranchList FamInstBranch br)
@@ -347,8 +347,8 @@ environments (one for the EPS and one for the HPT).
 \begin{code}
 checkForConflicts :: FamInstEnvs -> FamInst Branched -> TcM Bool
 checkForConflicts inst_envs fam_inst@(FamInst { fi_branches = branches
-                                              , fi_group = group })
-  = do { let conflicts = brListMap (lookupFamInstEnvConflicts inst_envs group fam_tc) branches
+                                              , fi_branched = branched })
+  = do { let conflicts = brListMap (lookupFamInstEnvConflicts inst_envs branched fam_tc) branches
              no_conflicts = all null conflicts
        ; traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
        ; unless no_conflicts $

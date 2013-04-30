@@ -356,11 +356,25 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 %*                                                                      *
 %************************************************************************
 
+Note [Apartness]
+~~~~~~~~~~~~~~~~
+
+Definition: Two types t1 and t2 are /apart/ when, for all well-kinded
+substitutions Q, there exists no safe coercion witnessing the equality
+between Q(t1) and Q(t2).
+
+- Every two types that unify are not apart.
+
+- A type family application (i.e. TyConApp F tys) might or might not be
+  apart from any given type; it depends on the instances available. Because
+  we can't know what instances are available (as they might be included in
+  another module), we conclude that a type family application is *maybe apart*
+  from any other type.
+
 Note [Unification and apartness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The workhorse function behind unification actually is testing for apartness,
-not unification. Here, two types are apart if it is never possible to unify
-them or any types they are safely coercible to.(* see below) There are three
+not unification. (See [Apartness], above.) There are three
 possibilities here:
 
  - two types might be NotApart, which means a substitution can be found between

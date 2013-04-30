@@ -159,8 +159,6 @@ main' postLoadMode dflags0 args flagWarnings = do
       dflags2 = dflags1{ ghcMode   = mode,
                          hscTarget = lang,
                          ghcLink   = link,
-                         -- leave out hscOutName for now
-                         hscOutName = panic "Main.main:hscOutName not set",
                          verbosity = case postLoadMode of
                                          DoEval _ -> 0
                                          _other   -> 1
