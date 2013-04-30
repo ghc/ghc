@@ -395,7 +395,7 @@ tc_hs_type hs_ty@(HsForAllTy _ hs_tvs context ty) exp_kind
                    tc_lhs_type ty exp_kind    -- Why exp_kind?  See Note [Body kind of forall]
                 else     
                    -- If there is a context, then this forall is really a
-                   -- *function*, so the kind of the result really is *
+                   -- _function_, so the kind of the result really is *
                    -- The body kind (result of the function can be * or #, hence ekOpen
                    do { checkExpectedKind hs_ty liftedTypeKind exp_kind
                       ; tc_lhs_type ty ekOpen }
