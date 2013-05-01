@@ -110,7 +110,14 @@ rnExpr (HsVar v)
                                        -- OverloadedLists works correctly
               -> rnExpr (ExplicitList placeHolderType Nothing [])
               | otherwise
-              -> finishHsVar name } }
+              -> do { mb_bind_lvl <- lookupLocalOccThLvl_maybe v
+                    ; case mb_bind_lvl of
+                        { Nothing -> return ()
+                        ; Just bind_lvl
+                            | isExternalName name -> return ()
+                            | otherwise -> checkThLocalName name bind_lvl
+                        }
+                    ; finishHsVar name }}}
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
