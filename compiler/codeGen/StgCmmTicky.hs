@@ -65,8 +65,9 @@ the code generator as well as the RTS because:
 
 module StgCmmTicky (
   withNewTickyCounterFun,
-  withNewTickyCounterThunk,
   withNewTickyCounterLNE,
+  withNewTickyCounterThunk,
+  withNewTickyCounterStdThunk,
 
   tickyDynAlloc,
   tickyAllocHeap,
@@ -87,7 +88,8 @@ module StgCmmTicky (
   tickyEnterViaNode,
 
   tickyEnterFun,
-  tickyEnterThunk,
+  tickyEnterThunk, tickyEnterStdThunk,        -- dynamic non-value
+                                              -- thunks only
   tickyEnterLNE,
 
   tickyUpdateBhCaf,
@@ -141,22 +143,25 @@ import Control.Monad ( when )
 
 data TickyClosureType = TickyFun | TickyThunk | TickyLNE
 
-withNewTickyCounterFun, withNewTickyCounterLNE :: Name -> [NonVoid Id] -> FCode () -> FCode ()
+withNewTickyCounterFun, withNewTickyCounterLNE :: Name -> [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterFun = withNewTickyCounter TickyFun
 
 withNewTickyCounterLNE nm args code = do
   b <- tickyLNEIsOn
   if not b then code else withNewTickyCounter TickyLNE nm args code
 
-withNewTickyCounterThunk :: ClosureInfo -> FCode () -> FCode ()
-withNewTickyCounterThunk cl_info code
-  | isStaticClosure cl_info = code -- static thunks are uninteresting
-  | otherwise = do
+withNewTickyCounterThunk,withNewTickyCounterStdThunk ::
+  Bool -> Name -> FCode a -> FCode a
+withNewTickyCounterThunk isStatic name code = do
     b <- tickyDynThunkIsOn
-    if not b then code else withNewTickyCounter TickyThunk (closureName cl_info) [] code
+    if isStatic || not b -- ignore static thunks
+      then code
+      else withNewTickyCounter TickyThunk name [] code
+
+withNewTickyCounterStdThunk = withNewTickyCounterThunk
 
 -- args does not include the void arguments
-withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode () -> FCode ()
+withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounter cloType name args m = do
   lbl <- emitTickyCounter cloType name args
   setTickyCtrLabel lbl m
@@ -222,22 +227,27 @@ tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (fsLit "UPDF_OMITTED_ctr")
 -- -----------------------------------------------------------------------------
 -- Ticky entries
 
-tickyEnterDynCon, tickyEnterStaticCon,
-    tickyEnterStaticThunk, tickyEnterViaNode :: FCode ()
+-- NB the name-specific entries are only available for names that have
+-- dedicated Cmm code. As far as I know, this just rules out
+-- constructor thunks. For them, there is no CMM code block to put the
+-- bump of name-specific ticky counter into. On the other hand, we can
+-- still track allocation their allocation.
+
+tickyEnterDynCon, tickyEnterStaticCon, tickyEnterViaNode :: FCode ()
 tickyEnterDynCon      = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_CON_ctr")
 tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (fsLit "ENT_STATIC_CON_ctr")
-tickyEnterStaticThunk = ifTicky $ bumpTickyCounter (fsLit "ENT_STATIC_THK_ctr")
 tickyEnterViaNode     = ifTicky $ bumpTickyCounter (fsLit "ENT_VIA_NODE_ctr")
 
-tickyEnterThunk :: ClosureInfo -> FCode ()
-tickyEnterThunk cl_info
-  | isStaticClosure cl_info = tickyEnterStaticThunk
-  | otherwise               = ifTicky $ do
+tickyEnterThunk :: FCode ()
+tickyEnterThunk = ifTicky $ do
  bumpTickyCounter (fsLit "ENT_DYN_THK_ctr")
  ifTickyDynThunk $ do
    ticky_ctr_lbl <- getTickyCtrLabel
    registerTickyCtrAtEntryDyn ticky_ctr_lbl
    bumpTickyEntryCount ticky_ctr_lbl
+
+tickyEnterStdThunk :: FCode ()
+tickyEnterStdThunk = tickyEnterThunk
 
 tickyBlackHole :: Bool{-updatable-} -> FCode ()
 tickyBlackHole updatable
@@ -390,20 +400,21 @@ bad for both space and time).
 -- -----------------------------------------------------------------------------
 -- Ticky allocation
 
-tickyDynAlloc :: Maybe CLabel -> SMRep -> LambdaFormInfo -> FCode ()
+tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo -> FCode ()
 -- Called when doing a dynamic heap allocation; the LambdaFormInfo
 -- used to distinguish between closure types
 --
 -- TODO what else to count while we're here?
-tickyDynAlloc mb_ctr_lbl rep lf = ifTicky $ getDynFlags >>= \dflags ->
+tickyDynAlloc mb_id rep lf = ifTicky $ getDynFlags >>= \dflags ->
   let bytes = wORD_SIZE dflags * heapClosureSize dflags rep
 
       countGlobal tot ctr = do
         bumpTickyCounterBy tot bytes
         bumpTickyCounter   ctr
-      countSpecific = ifTickyAllocd $ case mb_ctr_lbl of
+      countSpecific = ifTickyAllocd $ case mb_id of
         Nothing -> return ()
-        Just ctr_lbl -> do
+        Just id -> do
+          let ctr_lbl = mkRednCountsLabel (idName id)
           registerTickyCtr ctr_lbl
           bumpTickyAllocd ctr_lbl bytes
 
@@ -414,6 +425,7 @@ tickyDynAlloc mb_ctr_lbl rep lf = ifTicky $ getDynFlags >>= \dflags ->
 
   in case () of
     _ | isConRep rep   ->
+          ifTickyDynThunk countSpecific >>
           countGlobal (fsLit "ALLOC_CON_gds") (fsLit "ALLOC_CON_ctr")
       | isThunkRep rep ->
           ifTickyDynThunk countSpecific >>
