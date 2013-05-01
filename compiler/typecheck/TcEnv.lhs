@@ -328,7 +328,9 @@ getInLocalScope = do { lcl_env <- getLclTypeEnv
 \begin{code}
 tcExtendTcTyThingEnv :: [(Name, TcTyThing)] -> TcM r -> TcM r
 tcExtendTcTyThingEnv things thing_inside
-  = updLclEnv (extend_local_env things) thing_inside
+  = do { stage <- getStage
+       ; updLclEnv (extend_local_env (thLevel stage) things) thing_inside
+       }
 
 tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
 tcExtendKindEnv name_kind_prs
@@ -342,10 +344,11 @@ tcExtendTyVarEnv tvs thing_inside
 
 tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside 
-  = tc_extend_local_env [(name, ATyVar name tv) | (name, tv) <- binds] $
-    do { env <- getLclEnv
-       ; let env' = env { tcl_tidy = add_tidy_tvs (tcl_tidy env) }
-       ; setLclEnv env' thing_inside }
+  = do { stage <- getStage
+       ; tc_extend_local_env (thLevel stage) [(name, ATyVar name tv) | (name, tv) <- binds] $
+         do { env <- getLclEnv
+            ; let env' = env { tcl_tidy = add_tidy_tvs (tcl_tidy env) }
+            ; setLclEnv env' thing_inside }}
   where
     add_tidy_tvs env = foldl add env binds
 
@@ -371,7 +374,8 @@ getScopedTyVarBinds
 tcExtendLetEnv :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
 tcExtendLetEnv closed ids thing_inside 
   = do  { stage <- getStage
-        ; tc_extend_local_env [ (idName id, ATcId { tct_id = id 
+        ; tc_extend_local_env (thLevel stage)
+                              [ (idName id, ATcId { tct_id = id 
                                                   , tct_closed = closed
                                                   , tct_level = thLevel stage })
                                  | id <- ids]
@@ -389,7 +393,8 @@ tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 -- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
 tcExtendIdEnv2 names_w_ids thing_inside
   = do  { stage <- getStage
-        ; tc_extend_local_env [ (name, ATcId { tct_id = id 
+        ; tc_extend_local_env (thLevel stage)
+                              [ (name, ATcId { tct_id = id 
                                              , tct_closed = NotTopLevel
                                              , tct_level = thLevel stage })
                                  | (name,id) <- names_w_ids]
@@ -404,7 +409,8 @@ tcExtendGhciEnv :: [TcId] -> TcM a -> TcM a
 --  * Closedness flag is TopLevel.  The thing's type is closed
 
 tcExtendGhciEnv ids thing_inside
-  = tc_extend_local_env [ (idName id, ATcId { tct_id     = id 
+  = tc_extend_local_env impLevel
+                        [ (idName id, ATcId { tct_id     = id 
                                             , tct_closed = is_top id
                                             , tct_level  = impLevel })
                         | id <- ids]
@@ -414,7 +420,7 @@ tcExtendGhciEnv ids thing_inside
               | otherwise                                = NotTopLevel
 
 
-tc_extend_local_env :: [(Name, TcTyThing)] -> TcM a -> TcM a
+tc_extend_local_env :: ThLevel -> [(Name, TcTyThing)] -> TcM a -> TcM a
 -- This is the guy who does the work
 -- Invariant: the TcIds are fully zonked. Reasons:
 --      (a) The kinds of the forall'd type variables are defaulted
@@ -423,10 +429,10 @@ tc_extend_local_env :: [(Name, TcTyThing)] -> TcM a -> TcM a
 --          in the types, because instantiation does not look through such things
 --      (c) The call to tyVarsOfTypes is ok without looking through refs
 
-tc_extend_local_env extra_env thing_inside
+tc_extend_local_env thlvl extra_env thing_inside
   = do  { traceTc "env2" (ppr extra_env)
         ; env1 <- getLclEnv
-        ; let env2 = extend_local_env extra_env env1
+        ; let env2 = extend_local_env thlvl extra_env env1
         ; env3 <- extend_gtvs env2
         ; setLclEnv env3 thing_inside }
   where
@@ -461,10 +467,10 @@ tc_extend_local_env extra_env thing_inside
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
-extend_local_env :: [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
+extend_local_env :: ThLevel -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
 -- Extend the local TcTypeEnv *and* the local LocalRdrEnv simultaneously
-extend_local_env pairs env@(TcLclEnv { tcl_rdr = rdr_env, tcl_env = type_env })
-  = env { tcl_rdr = extendLocalRdrEnvList rdr_env (map fst pairs)
+extend_local_env thlvl pairs env@(TcLclEnv { tcl_rdr = rdr_env, tcl_env = type_env })
+  = env { tcl_rdr = extendLocalRdrEnvList rdr_env thlvl (map fst pairs)
         , tcl_env = extendNameEnvList type_env pairs }
 
 tcExtendGlobalTyVars :: IORef VarSet -> VarSet -> TcM (IORef VarSet)

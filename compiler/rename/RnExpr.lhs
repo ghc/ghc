@@ -98,8 +98,15 @@ finishHsVar name
                 ; return (e, unitFV name) } }
 
 rnExpr (HsVar v)
-  = do name <- lookupOccRn v
-       finishHsVar name
+  = do { name <- lookupOccRn v
+       ; mb_bind_lvl <- lookupLocalOccThLvl_maybe v
+       ; case mb_bind_lvl of
+           { Nothing -> return ()
+           ; Just bind_lvl
+               | isExternalName name -> return ()
+               | otherwise -> checkThLocalName name bind_lvl
+           }
+       ; finishHsVar name }
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)

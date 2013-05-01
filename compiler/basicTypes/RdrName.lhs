@@ -46,7 +46,8 @@ module RdrName (
 
 	-- * Local mapping of 'RdrName' to 'Name.Name'
 	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
-	lookupLocalRdrEnv, lookupLocalRdrOcc, elemLocalRdrEnv, inLocalRdrEnvScope, 
+	lookupLocalRdrEnv, lookupLocalRdrThLvl, lookupLocalRdrOcc,
+        elemLocalRdrEnv, inLocalRdrEnvScope, 
         localRdrEnvElts, delLocalRdrEnvList,
 
 	-- * Global mapping of 'RdrName' to 'GlobalRdrElt's
@@ -331,40 +332,51 @@ instance Ord RdrName where
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
 -- Reason: see Note [Splicing Exact Names] in RnEnv
-type LocalRdrEnv = (OccEnv Name, NameSet) 
+type ThLevel = Int
+type LocalRdrEnv = (OccEnv Name, OccEnv ThLevel, NameSet) 
 
 emptyLocalRdrEnv :: LocalRdrEnv
-emptyLocalRdrEnv = (emptyOccEnv, emptyNameSet)
+emptyLocalRdrEnv = (emptyOccEnv, emptyOccEnv, emptyNameSet)
 
-extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
-extendLocalRdrEnv (env, ns) name
-  = (extendOccEnv env (nameOccName name) name, addOneToNameSet ns name)
+extendLocalRdrEnv :: LocalRdrEnv -> ThLevel -> Name -> LocalRdrEnv
+extendLocalRdrEnv (env, thenv, ns) thlvl name
+  = ( extendOccEnv env (nameOccName name) name
+    , extendOccEnv thenv (nameOccName name) thlvl
+    , addOneToNameSet ns name
+    )
 
-extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
-extendLocalRdrEnvList (env, ns) names
-  = (extendOccEnvList env [(nameOccName n, n) | n <- names], addListToNameSet ns names)
+extendLocalRdrEnvList :: LocalRdrEnv -> ThLevel -> [Name] -> LocalRdrEnv
+extendLocalRdrEnvList (env, thenv, ns) thlvl names
+  = ( extendOccEnvList env [(nameOccName n, n) | n <- names]
+    , extendOccEnvList thenv [(nameOccName n, thlvl) | n <- names]
+    , addListToNameSet ns names
+    )
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
-lookupLocalRdrEnv (env, _) (Unqual occ) = lookupOccEnv env occ
-lookupLocalRdrEnv _        _            = Nothing
+lookupLocalRdrEnv (env, _, _) (Unqual occ) = lookupOccEnv env occ
+lookupLocalRdrEnv _           _            = Nothing
+
+lookupLocalRdrThLvl :: LocalRdrEnv -> RdrName -> Maybe ThLevel
+lookupLocalRdrThLvl (_, thenv, _) (Unqual occ) = lookupOccEnv thenv occ
+lookupLocalRdrThLvl _             _            = Nothing
 
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
-lookupLocalRdrOcc (env, _) occ = lookupOccEnv env occ
+lookupLocalRdrOcc (env, _, _) occ = lookupOccEnv env occ
 
 elemLocalRdrEnv :: RdrName -> LocalRdrEnv -> Bool
-elemLocalRdrEnv rdr_name (env, _)
+elemLocalRdrEnv rdr_name (env, _, _)
   | isUnqual rdr_name = rdrNameOcc rdr_name `elemOccEnv` env
   | otherwise	      = False
 
 localRdrEnvElts :: LocalRdrEnv -> [Name]
-localRdrEnvElts (env, _) = occEnvElts env
+localRdrEnvElts (env, _, _) = occEnvElts env
 
 inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 -- This is the point of the NameSet
-inLocalRdrEnvScope name (_, ns) = name `elemNameSet` ns
+inLocalRdrEnvScope name (_, _, ns) = name `elemNameSet` ns
 
 delLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
-delLocalRdrEnvList (env, ns) occs = (delListFromOccEnv env occs, ns)
+delLocalRdrEnvList (env, thenv, ns) occs = (delListFromOccEnv env occs, delListFromOccEnv thenv occs, ns)
 \end{code}
 
 %************************************************************************

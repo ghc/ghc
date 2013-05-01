@@ -9,6 +9,7 @@ module RnEnv (
         lookupLocatedTopBndrRn, lookupTopBndrRn,
         lookupLocatedOccRn, lookupOccRn,
         lookupLocalOccRn_maybe,
+        lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
@@ -535,6 +536,12 @@ lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupLocalOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
        ; return (lookupLocalRdrEnv local_env rdr_name) }
+
+lookupLocalOccThLvl_maybe :: RdrName -> RnM (Maybe ThLevel)
+-- Just look in the local environment
+lookupLocalOccThLvl_maybe rdr_name
+  = do { local_env <- getLocalRdrEnv
+       ; return (lookupLocalRdrThLvl local_env rdr_name) }
 
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnM Name
@@ -1236,13 +1243,15 @@ bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope
   = do { name_env <- getLocalRdrEnv
-       ; setLocalRdrEnv (extendLocalRdrEnvList name_env names)
+       ; stage <- getStage
+       ; setLocalRdrEnv (extendLocalRdrEnvList name_env (thLevel stage) names)
                         enclosed_scope }
 
 bindLocalName :: Name -> RnM a -> RnM a
 bindLocalName name enclosed_scope
   = do { name_env <- getLocalRdrEnv
-       ; setLocalRdrEnv (extendLocalRdrEnv name_env name)
+       ; stage <- getStage
+       ; setLocalRdrEnv (extendLocalRdrEnv name_env (thLevel stage) name)
                         enclosed_scope }
 
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
