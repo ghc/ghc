@@ -960,8 +960,7 @@ scheduleResumeBlockedOnForeignCall(Capability *cap USED_IF_THREADS)
     //Safely work
     ACQUIRE_LOCK (&cap->lock);
     incall = cap->suspended_ccalls_hd;
-    if (rtsFalse && //XXX KC: disabled! causes an IOError (Bad address) on
-                    //sieve-TMVar.hs. Should be fixed!
+    if (rtsFalse &&
         incall && //incall is not NULL
         incall->uls_stat == UserLevelSchedulerBlocked) {
 
@@ -2462,7 +2461,6 @@ resumeThread (void *task_)
     dirty_TSO(cap,tso);
     dirty_STACK(cap,tso->stackobj);
     IF_DEBUG(sanity, checkTSO(tso));
-    tso->saved_errno = errno;
 
 #if defined(THREADED_RTS)
     //Check whether a worker has resumed our scheduler
@@ -2470,9 +2468,13 @@ resumeThread (void *task_)
         //Evaluate the unblock action on the upcall thread
         debugTrace (DEBUG_sched, "cap %d: resumeThread: ULS for thread %d already resumed. errno=%d.",
                     (int)cap->no, tso->id, errno);
-        pushUpcallReturning (cap, getResumeThreadUpcall (cap, tso));
+
         tso->why_blocked = Yielded;
+        tso->saved_errno = saved_errno;
+        pushUpcallReturning (cap, getResumeThreadUpcall (cap, tso));
+
         tso = prepareUpcallThread (cap, (StgTSO*)END_TSO_QUEUE);
+        saved_errno = tso->saved_errno;
     }
 #endif
 
@@ -2480,7 +2482,7 @@ resumeThread (void *task_)
 
     cap->r.rCurrentTSO = tso;
     cap->in_haskell = rtsTrue;
-    errno = tso->saved_errno;
+    errno = saved_errno;
 #if mingw32_HOST_OS
     SetLastError(saved_winerror);
 #endif
