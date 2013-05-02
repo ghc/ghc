@@ -51,9 +51,9 @@ module TcMType (
   -- Zonking
   zonkTcPredType, 
   skolemiseSigTv, skolemiseUnboundMetaTyVar,
-  zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, 
+  zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, zonkTcTypeAndFV,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
-  zonkTcType, zonkTcTypes, zonkTcThetaType,
+  zonkTcType, zonkTcTypes, zonkTcThetaType, 
 
   zonkTcKind, defaultKindVarToStar,
   zonkEvVar, zonkWC, zonkId, zonkCt, zonkCts, zonkSkolemInfo,
@@ -504,6 +504,15 @@ tcGetGlobalTyVars
 -----------------  Type variables
 
 \begin{code}
+zonkTcTypeAndFV :: TcType -> TcM TyVarSet
+-- Zonk a type and take its free variables
+-- With kind polymorphism it can be essential to zonk *first*
+-- so that we find the right set of free variables.  Eg
+--    forall k1. forall (a:k2). a
+-- where k2:=k1 is in the substitution.  We don't want
+-- k2 to look free in this type!
+zonkTcTypeAndFV ty = do { ty <- zonkTcType ty; return (tyVarsOfType ty) }
+
 zonkTyVar :: TyVar -> TcM TcType
 -- Works on TyVars and TcTyVars
 zonkTyVar tv | isTcTyVar tv = zonkTcTyVar tv

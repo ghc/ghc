@@ -1024,19 +1024,17 @@ extract_lty (L _ ty) acc
 extract_hs_tv_bndrs :: LHsTyVarBndrs RdrName -> FreeKiTyVars
                     -> FreeKiTyVars -> FreeKiTyVars
 extract_hs_tv_bndrs (HsQTvs { hsq_tvs = tvs }) 
-                    acc@(acc_kvs, acc_tvs)   -- Note accumulator comes first
+                    (acc_kvs, acc_tvs)   -- Note accumulator comes first
                     (body_kvs, body_tvs)
   | null tvs
   = (body_kvs ++ acc_kvs, body_tvs ++ acc_tvs)
   | otherwise
-  = (outer_kvs ++ body_kvs,
-     outer_tvs ++ filterOut (`elem` local_tvs) body_tvs)
+  = (acc_kvs ++ filterOut (`elem` local_kvs) body_kvs,
+     acc_tvs ++ filterOut (`elem` local_tvs) body_tvs)
   where
     local_tvs = map hsLTyVarName tvs
-        -- Currently we don't have a syntax to explicitly bind 
-        -- kind variables, so these are all type variables
-
-    (outer_kvs, outer_tvs) = foldr extract_lkind acc [k | L _ (KindedTyVar _ k) <- tvs]
+    (_, local_kvs) = foldr extract_lty ([], []) [k | L _ (KindedTyVar _ k) <- tvs]
+       -- These kind variables are bound here if not bound further out
 
 extract_tv :: RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc

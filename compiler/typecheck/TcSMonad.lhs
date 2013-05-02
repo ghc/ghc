@@ -896,18 +896,19 @@ lookupFlatEqn fam_ty
 lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet
 lookupInInerts pty
-  = do { IS { inert_solved_dicts = solved, inert_cans = ics } <- getTcSInerts
-       ; case lookupSolvedDict solved pty of
+  = do { inerts <- getTcSInerts
+       ; case lookupSolvedDict inerts pty of
            Just ctev -> return (Just ctev)
-           Nothing   -> return (lookupInInertCans ics pty) }
+           Nothing   -> return (lookupInInertCans inerts pty) }
 
-lookupSolvedDict :: PredMap CtEvidence -> TcPredType -> Maybe CtEvidence
+lookupSolvedDict :: InertSet -> TcPredType -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
-lookupSolvedDict tm pty = lookupTM pty $ unPredMap tm
+lookupSolvedDict (IS { inert_solved_dicts = solved }) pty 
+  = lookupTM pty (unPredMap solved)
 
-lookupInInertCans :: InertCans -> TcPredType -> Maybe CtEvidence
+lookupInInertCans :: InertSet -> TcPredType -> Maybe CtEvidence
 -- Returns Just if exactly this pred type exists in the inert canonicals
-lookupInInertCans ics pty
+lookupInInertCans (IS { inert_cans = ics }) pty
   = case (classifyPredType pty) of
       ClassPred cls _ 
          -> lookupCCanMap cls (\ct -> ctEvPred ct `eqType` pty) (inert_dicts ics)
@@ -1160,6 +1161,7 @@ getTcSInertsRef = TcS (return . tcs_inerts)
 
 getTcSWorkListRef :: TcS (IORef WorkList) 
 getTcSWorkListRef = TcS (return . tcs_worklist) 
+
 getTcSInerts :: TcS InertSet 
 getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef) 
 

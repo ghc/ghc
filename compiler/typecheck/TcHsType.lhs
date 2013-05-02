@@ -195,7 +195,8 @@ tcHsInstHead :: UserTypeCtxt -> LHsType Name -> TcM ([TyVar], ThetaType, Class, 
 tcHsInstHead user_ctxt lhs_ty@(L loc hs_ty)
   = setSrcSpan loc $    -- The "In the type..." context comes from the caller
     do { inst_ty <- tc_inst_head hs_ty
-       ; kvs     <- kindGeneralize (tyVarsOfType inst_ty) []
+       ; kvs     <- zonkTcTypeAndFV inst_ty
+       ; kvs     <- kindGeneralize kvs []
        ; inst_ty <- zonkTcType (mkForAllTys kvs inst_ty)
        ; checkValidInstance user_ctxt lhs_ty inst_ty }
 
@@ -304,7 +305,10 @@ tcCheckHsTypeAndGen :: HsType Name -> Kind -> TcM Type
 -- The result is not necessarily zonked, and has not been checked for validity
 tcCheckHsTypeAndGen hs_ty kind
   = do { ty  <- tc_hs_type hs_ty (EK kind expectedKindMsg)
-       ; kvs <- kindGeneralize (tyVarsOfType ty) []
+       ; traceTc "tcCheckHsTypeAndGen" (ppr hs_ty)
+       ; traceTc "tcCheckHsTypeAndGen" (ppr ty)
+       ; kvs <- zonkTcTypeAndFV ty 
+       ; kvs <- kindGeneralize kvs []
        ; return (mkForAllTys kvs ty) }
 \end{code}
 
@@ -895,22 +899,25 @@ kcHsTyVarBndrs full_kind_sig (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thin
                Just thing       -> pprPanic "check_in_scope" (ppr thing)
            ; return (n, kind) }
 
-tcScopedKindVars :: [Name] -> TcM a -> TcM a
--- Given some tyvar binders like [a (b :: k -> *) (c :: k)]
--- bind each scoped kind variable (k in this case) to a fresh
--- kind skolem variable
-tcScopedKindVars kv_ns thing_inside 
-  = tcExtendTyVarEnv (map mkKindSigVar kv_ns) thing_inside
-
 tcHsTyVarBndrs :: LHsTyVarBndrs Name 
 	       -> ([TcTyVar] -> TcM r)
 	       -> TcM r
--- Bind the type variables to skolems, each with a meta-kind variable kind
-tcHsTyVarBndrs (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
-  = tcScopedKindVars kvs $
-    do { tvs <- mapM tcHsTyVarBndr hs_tvs
-       ; traceTc "tcHsTyVarBndrs" (ppr hs_tvs $$ ppr tvs)
-       ; tcExtendTyVarEnv tvs (thing_inside tvs) }
+-- Bind the kind variables to fresh skolem variables
+-- and type variables to skolems, each with a meta-kind variable kind
+tcHsTyVarBndrs (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
+  = do { let kvs = map mkKindSigVar kv_ns
+       ; tcExtendTyVarEnv kvs $ do 
+       { tvs <- mapM tcHsTyVarBndr hs_tvs
+       ; traceTc "tcHsTyVarBndrs {" (vcat [ text "Hs kind vars:" <+> ppr kv_ns
+                                        , text "Hs type vars:" <+> ppr hs_tvs
+                                        , text "Kind vars:" <+> ppr kvs
+                                        , text "Type vars:" <+> ppr tvs ])
+       ; res <- tcExtendTyVarEnv tvs (thing_inside (kvs ++ tvs))
+       ; traceTc "tcHsTyVarBndrs }" (vcat [ text "Hs kind vars:" <+> ppr kv_ns
+                                        , text "Hs type vars:" <+> ppr hs_tvs
+                                        , text "Kind vars:" <+> ppr kvs
+                                        , text "Type vars:" <+> ppr tvs ])
+       ; return res  } }
 
 tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TcTyVar
 -- Return a type variable 

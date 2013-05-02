@@ -1397,7 +1397,7 @@ doTopReact inerts workItem
        ; case workItem of
       	   CDictCan { cc_ev = fl, cc_class = cls, cc_tyargs = xis
       	            , cc_loc = d }
-      	      -> doTopReactDict inerts workItem fl cls xis d
+      	      -> doTopReactDict inerts fl cls xis d
 
       	   CFunEqCan { cc_ev = fl, cc_fun = tc, cc_tyargs = args
       	             , cc_rhs = xi, cc_loc = d }
@@ -1407,35 +1407,36 @@ doTopReact inerts workItem
       	         return NoTopInt  }
 
 --------------------
-doTopReactDict :: InertSet -> WorkItem -> CtEvidence -> Class -> [Xi]
+doTopReactDict :: InertSet -> CtEvidence -> Class -> [Xi]
                -> CtLoc -> TcS TopInteractResult
-doTopReactDict inerts workItem fl cls xis loc
-  = do { instEnvs <- getInstEnvs 
+doTopReactDict inerts fl cls xis loc
+  = do {    -- Try functional dependencies with the instance environment
+         instEnvs <- getInstEnvs 
        ; let pred = mkClassPred cls xis
              fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
-             
        ; fd_work <- rewriteWithFunDeps fd_eqns loc
-       ; if not (null fd_work) then
-            do { updWorkListTcS (extendWorkListEqs fd_work)
-               ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
-                                   , tir_new_item = ContinueWith workItem } }
-         else if not (isWanted fl) then 
+       ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
+       
+       ; if not (isWanted fl) then 
             return NoTopInt
-         else do
+         else 
 
-       { solved_dicts <- getTcSInerts >>= (return . inert_solved_dicts)
-       ; case lookupSolvedDict solved_dicts pred of {
+            -- Even if there *were* some functional dependencies against the
+            -- instance environment, there might be a unique match, and if 
+            -- so we should get on and solve it. See Note [Wierd fundeps]
+
+         case lookupSolvedDict inerts pred of {
             Just ev -> do { setEvBind dict_id (ctEvTerm ev); 
                           ; return $ 
                             SomeTopInt { tir_rule = "Dict/Top (cached)" 
                                        , tir_new_item = Stop } } ;
             Nothing -> do
 
-      { lkup_inst_res  <- matchClassInst inerts cls xis loc
+      { lkup_inst_res <- matchClassInst inerts cls xis loc
       ; case lkup_inst_res of
            GenInst wtvs ev_term -> do { addSolvedDict fl 
                                       ; doSolveFromInstance wtvs ev_term }
-           NoInstance -> return NoTopInt } } } }
+           NoInstance -> return NoTopInt } } }
    where 
      arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
@@ -1591,6 +1592,25 @@ and now we need improvement between that derived superclass an the Given (L a b)
 
 Test typecheck/should_fail/FDsFromGivens also shows why it's a good idea to 
 emit Derived FDs for givens as well. 
+
+Note [Weird fundeps]
+~~~~~~~~~~~~~~~~~~~~
+Consider   class Het a b | a -> b where
+              het :: m (f c) -> a -> m b
+
+	   class GHet (a :: * -> *) (b :: * -> *) | a -> b
+	   instance            GHet (K a) (K [a])
+	   instance Het a b => GHet (K a) (K b)
+
+The two instances don't actually conflict on their fundeps,
+although it's pretty strange.  So they are both accepted. Now
+try   [W] GHet (K Int) (K Bool)
+This triggers fudeps from both instance decls; but it also 
+matches a *unique* instance decl, and we should go ahead and
+pick that one right now.  Otherwise, if we don't, it ends up 
+unsolved in the inert set and is reported as an error.
+
+Trac #7875 is a case in point.
 
 Note [Overriding implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

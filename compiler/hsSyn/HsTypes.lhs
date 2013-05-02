@@ -152,8 +152,8 @@ hsQTvBndrs :: LHsTyVarBndrs name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
 
 data HsWithBndrs thing
-  = HsWB { hswb_cts :: thing           -- Main payload (type or list of types)
-         , hswb_kvs :: [Name]         -- Kind vars
+  = HsWB { hswb_cts :: thing         -- Main payload (type or list of types)
+         , hswb_kvs :: [Name]        -- Kind vars
          , hswb_tvs :: [Name]        -- Type vars
     }                  
   deriving (Data, Typeable)
@@ -280,7 +280,7 @@ Note [HsForAllTy tyvar binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 After parsing:
   * Implicit => empty
-    Explicit => the varibles the user wrote
+    Explicit => the variables the user wrote
 
 After renaming
   * Implicit => the *type* variables free in the type
