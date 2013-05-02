@@ -5679,23 +5679,49 @@ Note that the datatype <literal>Proxy</literal> has kind
 
 <para>
 Generally speaking, with <option>-XPolyKinds</option>, GHC will infer a polymorphic
-kind for un-decorated whenever possible.  For example:
+kind for un-decorated declarations, whenever possible.  For example:
 <programlisting>
 data T m a = MkT (m a)
 -- GHC infers kind   T :: forall k. (k -> *) -> k -> *
 </programlisting>
-Just as in the world of terms, you can restrict polymorphism using a signature
+Just as in the world of terms, you can restrict polymorphism using a 
+kind signature (sometimes called a kind annotation)
 (<option>-XPolyKinds</option> implies <option>-XKindSignatures</option>):
 <programlisting>
 data T m (a :: *) = MkT (m a)
 -- GHC now infers kind   T :: (* -> *) -> * -> *
 </programlisting>
-There is no "forall" for kind variables.  Instead, you can simply mention a kind
-variable in a kind signature, thus:
+There is no "forall" for kind variables.  Instead, when binding a type variable, 
+you can simply mention a kind
+variable in a kind annotation for that type-variable binding, thus:
 <programlisting>
 data T (m :: k -> *) a = MkT (m a)
 -- GHC now infers kind   T :: forall k. (k -> *) -> k -> *
 </programlisting>
+The kind "forall" is placed
+just outside the outermost type-variable binding whose kind annotation mentions
+the kind variable. For example
+<programlisting>
+f1 :: (forall a m. m a -> Int) -> Int   
+         -- f1 :: forall (k:BOX). 
+         --       (forall (a:k) (m:k->*). m a -> Int) 
+         --       -> Int
+
+f2 :: (forall (a::k) m. m a -> Int) -> Int   
+         -- f2 :: (forall (k:BOX) (a:k) (m:k->*). m a -> Int) 
+         --       -> Int
+</programlisting>
+Here in <literal>f1</literal> there is no kind annotation mentioning the polymorphic 
+kind variable, so <literal>k</literal> is generalised at the top 
+level of the signature for <literal>f1</literal>,
+making the signature for <literal>f1</literal> is as polymorphic as possible. 
+But in the case of of <literal>f2</literal> we give a kind annotation in the <literal>forall (a:k)</literal>
+binding, and GHC therefore puts the kind <literal>forall</literal> right there too.
+</para>
+<para>
+(Note: These rules are a bit indirect and clumsy.  Perhaps GHC should allow explicit kind quantification.
+But the implicit quantification (e.g. in the declaration for data type T above) is certainly
+very convenient, and it is not clear what the syntax for explicit quantification should be.)
 </para>
 </sect2>
 
