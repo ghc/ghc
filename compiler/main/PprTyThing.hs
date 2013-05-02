@@ -177,8 +177,8 @@ pprTyCon pefas ss tyCon
       SynFamilyTyCon {} -> pprTyConHdr pefas tyCon <+> dcolon <+> 
                            pprTypeForUser pefas (GHC.synTyConResKind tyCon)
       SynonymTyCon rhs_ty -> hang (pprTyConHdr pefas tyCon <+> equals) 
-                                2 (pprTypeForUser pefas rhs_ty)
-
+                                2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
+                                                 -- e.g. type T = forall a. a->a
   | Just cls <- GHC.tyConClass_maybe tyCon
   = pprClass pefas ss cls
   | otherwise
