@@ -20,7 +20,7 @@ $(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html $(INPLACE_LIB)/la
 
 $(INPLACE_LIB)/html:
 	$(call removeTrees,$@)
-	"$(CP)" -R utils/haddock/resources/html $@
+	"$(CP)" -RL utils/haddock/resources/html $@
 
 $(INPLACE_LIB)/latex:
 	$(call removeTrees,$@)
