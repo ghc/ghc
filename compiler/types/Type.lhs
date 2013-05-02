@@ -846,9 +846,25 @@ noParenPred :: PredType -> Bool
 noParenPred p = not (isIPPred p) && isClassPred p || isEqPred p
 
 isPredTy :: Type -> Bool
-isPredTy ty
-  | isSuperKind ty = False
-  | otherwise = isConstraintKind (typeKind ty)
+  -- NB: isPredTy is used when printing types, which can happen in debug printing
+  --     during type checking of not-fully-zonked types.  So it's not cool to say
+  --     isConstraintKind (typeKind ty) because absent zonking the type might 
+  --     be ill-kinded, and typeKind crashes
+  --     Hence the rather tiresome story here
+isPredTy ty = go ty []
+  where
+    go :: Type -> [KindOrType] -> Bool
+    go (AppTy ty1 ty2)   args = go ty1 (ty2 : args)
+    go (TyConApp tc tys) args = go_k (tyConKind tc) (tys ++ args)
+    go (TyVarTy tv)      args = go_k (tyVarKind tv) args
+    go _                 _    = False
+
+    go_k :: Kind -> [KindOrType] -> Bool
+    -- True <=> kind is k1 -> .. -> kn -> Constraint
+    go_k k                [] = isConstraintKind k
+    go_k (FunTy _ k1)     (_ :args) = go_k k1 args
+    go_k (ForAllTy kv k1) (k2:args) = go_k (substKiWith [kv] [k2] k1) args
+    go_k _ _ = False                  -- Typeable * Int :: Constraint
 
 isKindTy :: Type -> Bool
 isKindTy = isSuperKind . typeKind
