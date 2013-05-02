@@ -37,7 +37,7 @@ module TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..), 
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
+  isSigTyVar, isOverlappableTyVar,  isTyConableTyVar, isFlatSkolTyVar,
   isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar, 
@@ -613,7 +613,7 @@ isImmutableTyVar tv
   | otherwise    = True
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar :: TcTyVar -> Bool 
+  isMetaTyVar, isAmbiguousTyVar, isFlatSkolTyVar :: TcTyVar -> Bool 
 
 isTyConableTyVar tv	
 	-- True of a meta-type variable that can be filled in 
@@ -624,6 +624,12 @@ isTyConableTyVar tv
 	MetaTv { mtv_info = SigTv } -> False
 	_                           -> True
 	
+isFlatSkolTyVar tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+        FlatSkol {} -> True
+        _           -> False
+
 isSkolemTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of

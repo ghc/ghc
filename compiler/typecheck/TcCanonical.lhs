@@ -1015,8 +1015,9 @@ reOrient (FunCls {}) _      = False             -- Fun/Other on rhs
 reOrient (VarCls {})   (FunCls {})           = True 
 reOrient (VarCls {})   (OtherCls {})         = False
 reOrient (VarCls tv1)  (VarCls tv2)  
-  | isMetaTyVar tv2 && not (isMetaTyVar tv1) = True 
-  | otherwise                                = False 
+  | isMetaTyVar     tv2 && not (isMetaTyVar tv1)      = True 
+  | isFlatSkolTyVar tv2 && not (isFlatSkolTyVar tv1)  = True  -- Note [Eliminate flat-skols]
+  | otherwise                                         = False 
   -- Just for efficiency, see CTyEqCan invariants 
 
 ------------------
@@ -1183,6 +1184,24 @@ mkHdEqPred :: Type -> TcCoercion -> TcCoercion -> TcCoercion
 mkHdEqPred t2 co1 co2 = mkTcTyConAppCo eqTyCon [mkTcReflCo (defaultKind (typeKind t2)), co1, co2]
    -- Why defaultKind? Same reason as the comment on TcType/mkTcEqPred. I truly hate this (DV)
 \end{code}
+
+Note [Eliminate flat-skols]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have  [G] Num (F [a])
+then we flatten to
+     [G] Num fsk
+     [G] F [a] ~ fsk
+where fsk is a flatten-skolem (FlatSkol). Suppose we have
+      type instance F [a] = a
+then we'll reduce the second constraint to
+     [G] a ~ fsk
+and then replace all uses of 'a' with fsk.  That's bad because
+in error messages intead of saying 'a' we'll say (F [a]).  In all
+places, including those where the programmer wrote 'a' in the first
+place.  Very confusing!  See Trac #7862.
+
+Solution: re-orient a~fsk to fsk~a, so that we preferentially eliminate
+the fsk.
 
 Note [Equalities with incompatible kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
