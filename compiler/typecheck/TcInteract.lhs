@@ -1410,40 +1410,28 @@ doTopReact inerts workItem
 doTopReactDict :: InertSet -> CtEvidence -> Class -> [Xi]
                -> CtLoc -> TcS TopInteractResult
 doTopReactDict inerts fl cls xis loc
-  = do {    -- Try functional dependencies with the instance environment
-         instEnvs <- getInstEnvs 
-       ; let pred = mkClassPred cls xis
-             fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
-       ; fd_work <- rewriteWithFunDeps fd_eqns loc
-       ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
-       
-       ; if not (isWanted fl) then 
-            return NoTopInt
-         else 
+  | not (isWanted fl)
+  = try_fundeps_and_return
 
-            -- Even if there *were* some functional dependencies against the
-            -- instance environment, there might be a unique match, and if 
-            -- so we should get on and solve it. See Note [Wierd fundeps]
+  | Just ev <- lookupSolvedDict inerts pred   -- Cached
+  = do { setEvBind dict_id (ctEvTerm ev); 
+       ; return $ SomeTopInt { tir_rule = "Dict/Top (cached)" 
+                             , tir_new_item = Stop } } 
 
-         case lookupSolvedDict inerts pred of {
-            Just ev -> do { setEvBind dict_id (ctEvTerm ev); 
-                          ; return $ 
-                            SomeTopInt { tir_rule = "Dict/Top (cached)" 
-                                       , tir_new_item = Stop } } ;
-            Nothing -> do
-
-      { lkup_inst_res <- matchClassInst inerts cls xis loc
-      ; case lkup_inst_res of
-           GenInst wtvs ev_term -> do { addSolvedDict fl 
-                                      ; doSolveFromInstance wtvs ev_term }
-           NoInstance -> return NoTopInt } } }
+  | otherwise  -- Not cached
+   = do { lkup_inst_res <- matchClassInst inerts cls xis loc
+         ; case lkup_inst_res of
+               GenInst wtvs ev_term -> do { addSolvedDict fl 
+                                          ; solve_from_instance wtvs ev_term }
+               NoInstance -> try_fundeps_and_return }
    where 
      arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
-     
-     doSolveFromInstance :: [CtEvidence] -> EvTerm -> TcS TopInteractResult
+     pred = mkClassPred cls xis
+                       
+     solve_from_instance :: [CtEvidence] -> EvTerm -> TcS TopInteractResult
       -- Precondition: evidence term matches the predicate workItem
-     doSolveFromInstance evs ev_term 
+     solve_from_instance evs ev_term 
         | null evs
         = do { traceTcS "doTopReact/found nullary instance for" $
                ppr dict_id
@@ -1463,6 +1451,18 @@ doTopReactDict inerts fl cls xis loc
                SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
                           , tir_new_item = Stop } }
 
+     -- We didn't solve it; so try functional dependencies with 
+     -- the instance environment, and return
+     -- NB: even if there *are* some functional dependencies against the
+     -- instance environment, there might be a unique match, and if 
+     -- so we make sure we get on and solve it first. See Note [Weird fundeps]
+     try_fundeps_and_return
+       = do { instEnvs <- getInstEnvs 
+            ; let fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
+            ; fd_work <- rewriteWithFunDeps fd_eqns loc
+            ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
+            ; return NoTopInt }
+       
 --------------------
 doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
                 -> CtLoc -> TcS TopInteractResult
