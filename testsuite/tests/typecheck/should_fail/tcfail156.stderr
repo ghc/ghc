@@ -1,6 +1,6 @@
 
 tcfail156.hs:7:26:
-    A newtype constructor cannot have an existential context,
-      but ‛Foo’ does
+    A newtype constructor cannot have existential type variables
+    Foo :: forall a. a -> Foo
     In the definition of data constructor ‛Foo’
     In the newtype declaration for ‛Foo’
