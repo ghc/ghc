@@ -567,8 +567,8 @@ getIdFromTrivialExpr e = go e
 \end{code}
 
 exprIsBottom is a very cheap and cheerful function; it may return
-False for bottoming expressions, but it never costs much to ask.
-See also CoreArity.exprBotStrictness_maybe, but that's a bit more
+False for bottoming expressions, but it never costs much to ask.  See
+also CoreArity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 
 \begin{code}

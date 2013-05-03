@@ -1030,9 +1030,9 @@ pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
   = hcat [ptext (sLit "stg_sel_"), text (show offset),
-                ptext (if upd_reqd
-                        then (sLit "_upd_info")
-                        else (sLit "_noupd_info"))
+          ptext (if upd_reqd
+                 then (sLit "_upd_info")
+                 else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))

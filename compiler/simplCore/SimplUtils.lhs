@@ -1126,6 +1126,7 @@ because the latter is not well-kinded.
 \begin{code}
 tryEtaExpand :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
+-- and Note [Eta expansion to manifest arity]
 tryEtaExpand env bndr rhs
   = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
