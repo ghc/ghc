@@ -2,6 +2,10 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T7865:
+	$(RM) -f T7865.o T7865.hi 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dsuppress-uniques -O2 -c -ddump-simpl T7865.hs | grep expensive
+
 T3055:
 	$(RM) -f T3055.o T3055.hi T3055.simpl
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T3055.hs -ddump-simpl > T3055.simpl
