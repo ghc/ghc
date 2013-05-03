@@ -901,8 +901,10 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(top_ct)                           \
                                                         \
       SymI_HasProto(ENT_VIA_NODE_ctr)                   \
-      SymI_HasProto(ENT_STATIC_THK_ctr)                 \
-      SymI_HasProto(ENT_DYN_THK_ctr)                    \
+      SymI_HasProto(ENT_STATIC_THK_SINGLE_ctr)          \
+      SymI_HasProto(ENT_STATIC_THK_MANY_ctr)            \
+      SymI_HasProto(ENT_DYN_THK_SINGLE_ctr)             \
+      SymI_HasProto(ENT_DYN_THK_MANY_ctr)               \
       SymI_HasProto(ENT_STATIC_FUN_DIRECT_ctr)          \
       SymI_HasProto(ENT_DYN_FUN_DIRECT_ctr)             \
       SymI_HasProto(ENT_STATIC_CON_ctr)                 \
@@ -970,8 +972,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(UPD_NEW_PERM_IND_ctr)               \
       SymI_HasProto(UPD_OLD_IND_ctr)                    \
       SymI_HasProto(UPD_OLD_PERM_IND_ctr)               \
-      SymI_HasProto(UPD_BH_UPDATABLE_ctr)               \
-      SymI_HasProto(UPD_BH_SINGLE_ENTRY_ctr)            \
       SymI_HasProto(UPD_CAF_BH_UPDATABLE_ctr)           \
       SymI_HasProto(UPD_CAF_BH_SINGLE_ENTRY_ctr)        \
       SymI_HasProto(GC_SEL_ABANDONED_ctr)               \

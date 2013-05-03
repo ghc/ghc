@@ -58,7 +58,8 @@ module OccName (
 
 	-- ** Derived 'OccName's
         isDerivedOccName,
-	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
+	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, 
+        mkGenDefMethodOcc, 
 	mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassDataConOcc, mkDictOcc, mkIPOcc, 
@@ -574,8 +575,8 @@ isDerivedOccName occ =
 \end{code}
 
 \begin{code}
-mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
-  	mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
+mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, 
+        mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
  	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
  	mkGenD, mkGenR, mkGen1R, mkGenRCo,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,

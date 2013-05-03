@@ -345,12 +345,13 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
         -> UniqSM (CorePrepEnv, Floats)
 cpeBind top_lvl env (NonRec bndr rhs)
   = do { (_, bndr1) <- cpCloneBndr env bndr
-       ; let is_strict   = isStrictDmd (idDemandInfo bndr)
+       ; let dmd         = idDemandInfo bndr
              is_unlifted = isUnLiftedType (idType bndr)
        ; (floats, bndr2, rhs2) <- cpePair top_lvl NonRecursive
-                                          (is_strict || is_unlifted)
+                                          dmd 
+                                          is_unlifted
                                           env bndr1 rhs
-       ; let new_float = mkFloat is_strict is_unlifted bndr2 rhs2
+       ; let new_float = mkFloat dmd is_unlifted bndr2 rhs2
 
         -- We want bndr'' in the envt, because it records
         -- the evaluated-ness of the binder
@@ -360,7 +361,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
 cpeBind top_lvl env (Rec pairs)
   = do { let (bndrs,rhss) = unzip pairs
        ; (env', bndrs1) <- cpCloneBndrs env (map fst pairs)
-       ; stuff <- zipWithM (cpePair top_lvl Recursive False env') bndrs1 rhss
+       ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd False env') bndrs1 rhss
 
        ; let (floats_s, bndrs2, rhss2) = unzip3 stuff
              all_pairs = foldrOL add_float (bndrs2 `zip` rhss2)
@@ -375,11 +376,11 @@ cpeBind top_lvl env (Rec pairs)
     add_float b                       _    = pprPanic "cpeBind" (ppr b)
 
 ---------------
-cpePair :: TopLevelFlag -> RecFlag -> RhsDemand
+cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
         -> CorePrepEnv -> Id -> CoreExpr
         -> UniqSM (Floats, Id, CpeRhs)
 -- Used for all bindings
-cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
+cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
   = do { (floats1, rhs1) <- cpeRhsE env rhs
 
        -- See if we are allowed to float this stuff out of the RHS
@@ -392,7 +393,7 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
                else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
                                -- Note [Silly extra arguments]
                     (do { v <- newVar (idType bndr)
-                        ; let float = mkFloat False False v rhs2
+                        ; let float = mkFloat topDmd False v rhs2
                         ; return ( addFloat floats2 float
                                  , cpeEtaExpand arity (Var v)) })
 
@@ -406,6 +407,8 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 
        ; return (floats3, bndr', rhs') }
   where
+    is_strict_or_unlifted = (isStrictDmd dmd) || is_unlifted
+
     platform = targetPlatform (cpe_dynFlags env)
 
     arity = idArity bndr        -- We must match this arity
@@ -650,9 +653,8 @@ cpeApp env expr
                                    []                        -> (topDmd, [])
               (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
                                  splitFunTy_maybe fun_ty
-              is_strict = isStrictDmd ss1
 
-           ; (fs, arg') <- cpeArg env is_strict arg arg_ty
+           ; (fs, arg') <- cpeArg env ss1 arg arg_ty
            ; return (App fun' arg', hd, res_ty, fs `appendFloats` floats, ss_rest) }
 
     collect_args (Var v) depth
@@ -682,8 +684,8 @@ cpeApp env expr
 
         -- N-variable fun, better let-bind it
     collect_args fun depth
-      = do { (fun_floats, fun') <- cpeArg env True fun ty
-                          -- The True says that it's sure to be evaluated,
+      = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
+                          -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
            ; return (fun', (fun', depth), ty, fun_floats, []) }
         where
@@ -694,9 +696,9 @@ cpeApp env expr
 -- ---------------------------------------------------------------------------
 
 -- This is where we arrange that a non-trivial argument is let-bound
-cpeArg :: CorePrepEnv -> RhsDemand 
+cpeArg :: CorePrepEnv -> Demand 
        -> CoreArg -> Type -> UniqSM (Floats, CpeTriv)
-cpeArg env is_strict arg arg_ty
+cpeArg env dmd arg arg_ty
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; (floats2, arg2) <- if want_float floats1 arg1
                             then return (floats1, arg1)
@@ -710,11 +712,12 @@ cpeArg env is_strict arg arg_ty
          else do
        { v <- newVar arg_ty
        ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
-             arg_float = mkFloat is_strict is_unlifted v arg3
+             arg_float = mkFloat dmd is_unlifted v arg3
        ; return (addFloat floats2 arg_float, varToCoreExpr v) } }
   where
     is_unlifted = isUnLiftedType arg_ty
-    want_float = wantFloatNested NonRecursive (is_strict || is_unlifted)
+    is_strict   = isStrictDmd dmd
+    want_float  = wantFloatNested NonRecursive (is_strict || is_unlifted)
 \end{code}
 
 Note [Floating unlifted arguments]
@@ -909,19 +912,15 @@ tryEtaReducePrep _ _ = Nothing
 \end{code}
 
 
--- -----------------------------------------------------------------------------
--- Demands
--- -----------------------------------------------------------------------------
-
-\begin{code}
-type RhsDemand = Bool  -- True => used strictly; hence not top-level, non-recursive
-\end{code}
-
 %************************************************************************
 %*                                                                      *
                 Floats
 %*                                                                      *
 %************************************************************************
+
+Note [Pin demand info on floats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We pin demand info on floated lets so that we can see the one-shot thunks.
 
 \begin{code}
 data FloatingBind
@@ -957,12 +956,16 @@ data OkToSpec
                         -- ok-to-speculate unlifted bindings
    | NotOkToSpec        -- Some not-ok-to-speculate unlifted bindings
 
-mkFloat :: Bool -> Bool -> Id -> CpeRhs -> FloatingBind
-mkFloat is_strict is_unlifted bndr rhs
+mkFloat :: Demand -> Bool -> Id -> CpeRhs -> FloatingBind
+mkFloat dmd is_unlifted bndr rhs
   | use_case  = FloatCase bndr rhs (exprOkForSpeculation rhs)
-  | otherwise = FloatLet (NonRec bndr rhs)
+  | is_hnf    = FloatLet (NonRec bndr                       rhs)
+  | otherwise = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
+                   -- See Note [Pin demand info on floats]
   where
-    use_case = is_unlifted || is_strict && not (exprIsHNF rhs)
+    is_hnf    = exprIsHNF rhs
+    is_strict = isStrictDmd dmd
+    use_case  = is_unlifted || is_strict && not is_hnf
                 -- Don't make a case for a value binding,
                 -- even if it's strict.  Otherwise we get
                 --      case (\x -> e) of ...!

@@ -321,9 +321,9 @@ mkDictSelId dflags no_unf name clas
 
     strict_sig = mkStrictSig (mkTopDmdType [arg_dmd] topRes)
     arg_dmd | new_tycon = evalDmd
-            | otherwise = mkProdDmd [ if the_arg_id == id then evalDmd else absDmd
+            | otherwise = mkManyUsedDmd $
+                          mkProdDmd [ if the_arg_id == id then evalDmd else absDmd
                                     | id <- arg_ids ]
-
 
     tycon      	   = classTyCon clas
     new_tycon  	   = isNewTyCon tycon

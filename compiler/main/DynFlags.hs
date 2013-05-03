@@ -273,6 +273,8 @@ data GeneralFlag
 
    -- optimisation opts
    | Opt_Strictness
+   | Opt_KillAbsence
+   | Opt_KillOneShot
    | Opt_FullLaziness
    | Opt_FloatIn
    | Opt_Specialise
@@ -2534,7 +2536,9 @@ fFlags = [
   ( "hpc",                              Opt_Hpc, nop ),
   ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
   ( "flat-cache",                       Opt_FlatCache, nop ),
-  ( "use-rpaths",                       Opt_RPath, nop )
+  ( "use-rpaths",                       Opt_RPath, nop ),
+  ( "kill-absence",                     Opt_KillAbsence, nop),
+  ( "kill-one-shot",                    Opt_KillOneShot, nop)
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

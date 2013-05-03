@@ -1005,8 +1005,7 @@ stmtMacros = listToUFM [
                                         tickyAllocPAP goods slop ),
   ( fsLit "TICK_ALLOC_UP_THK",     \[goods,slop] ->
                                         tickyAllocThunk goods slop ),
-  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode False reg ),
-  ( fsLit "UPD_BH_SINGLE_ENTRY",   \[reg] -> emitBlackHoleCode True  reg )
+  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode reg )
  ]
 
 emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()
