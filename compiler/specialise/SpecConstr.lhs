@@ -621,6 +621,48 @@ specConstrProgram guts
 %*                                                                      *
 %************************************************************************
 
+Note [Work-free values only in environment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The sc_vals field keeps track of in-scope value bindings, so 
+that if we come across (case x of Just y ->...) we can reduce the
+case from knowing that x is bound to a pair.
+
+But only *work-free* values are ok here. For example if the envt had
+    x -> Just (expensive v)
+then we do NOT want to expand to
+     let y = expensive v in ...
+because the x-binding still exists and we've now duplicated (expensive v).
+
+This seldom happens because let-bound constructor applications are 
+ANF-ised, but it can happen as a result of on-the-fly transformations in
+SpecConstr itself.  Here is Trac #7865:
+
+        let {
+          a'_shr =
+            case xs_af8 of _ {
+              [] -> acc_af6;
+              : ds_dgt [Dmd=<L,A>] ds_dgu [Dmd=<L,A>] ->
+                (expensive x_af7, x_af7
+            } } in
+        let {
+          ds_sht =
+            case a'_shr of _ { (p'_afd, q'_afe) ->
+            TSpecConstr_DoubleInline.recursive
+              (GHC.Types.: @ GHC.Types.Int x_af7 wild_X6) (q'_afe, p'_afd)
+            } } in
+
+When processed knowing that xs_af8 was bound to a cons, we simplify to 
+   a'_shr = (expensive x_af7, x_af7)
+and we do NOT want to inline that at the occurrence of a'_shr in ds_sht.
+(There are other occurrences of a'_shr.)  No no no.
+
+It would be possible to do some on-the-fly ANF-ising, so that a'_shr turned
+into a work-free value again, thus
+   a1 = expensive x_af7
+   a'_shr = (a1, x_af7)
+but that's more work, so until its shown to be important I'm going to 
+leave it for now.
+
 \begin{code}
 data ScEnv = SCE { sc_dflags    :: DynFlags,
                    sc_size      :: Maybe Int,   -- Size threshold
@@ -643,6 +685,10 @@ data ScEnv = SCE { sc_dflags    :: DynFlags,
                    sc_vals      :: ValueEnv,
                         -- Domain is OutIds (*after* applying the substitution)
                         -- Used even for top-level bindings (but not imported ones)
+                        -- The range of the ValueEnv is *work-free* values
+                        -- such as (\x. blah), or (Just v)
+                        -- but NOT (Just (expensive v))
+                        -- See Note [Work-free values only in environment]
 
                    sc_annotations :: UniqFM SpecConstrAnnotation
              }
@@ -753,7 +799,10 @@ extendBndr  env bndr  = (env { sc_subst = subst' }, bndr')
 
 extendValEnv :: ScEnv -> Id -> Maybe Value -> ScEnv
 extendValEnv env _  Nothing   = env
-extendValEnv env id (Just cv) = env { sc_vals = extendVarEnv (sc_vals env) id cv }
+extendValEnv env id (Just cv) 
+ | valueIsWorkFree cv      -- Don't duplicate work!!  Trac #7865
+ = env { sc_vals = extendVarEnv (sc_vals env) id cv }
+extendValEnv env _ _ = env
 
 extendCaseBndrs :: ScEnv -> OutExpr -> OutId -> AltCon -> [Var] -> (ScEnv, [Var])
 -- When we encounter
@@ -1747,10 +1796,10 @@ isValue _env (Lit lit)
   | otherwise       = Just (ConVal (LitAlt lit) [])
 
 isValue env (Var v)
-  | Just stuff <- lookupVarEnv env v
-  = Just stuff  -- You might think we could look in the idUnfolding here
-                -- but that doesn't take account of which branch of a
-                -- case we are in, which is the whole point
+  | Just cval <- lookupVarEnv env v
+  = Just cval  -- You might think we could look in the idUnfolding here
+               -- but that doesn't take account of which branch of a
+               -- case we are in, which is the whole point
 
   | not (isLocalId v) && isCheapUnfolding unf
   = isValue env (unfoldingTemplate unf)
@@ -1781,6 +1830,10 @@ isValue _env expr       -- Maybe it's a constructor application
         _other -> Nothing
 
 isValue _env _expr = Nothing
+
+valueIsWorkFree :: Value -> Bool
+valueIsWorkFree LambdaVal       = True
+valueIsWorkFree (ConVal _ args) = all exprIsWorkFree args
 
 samePat :: CallPat -> CallPat -> Bool
 samePat (vs1, as1) (vs2, as2)
