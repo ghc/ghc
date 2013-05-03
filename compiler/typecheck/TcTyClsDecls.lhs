@@ -1375,16 +1375,26 @@ checkNewDataCon :: DataCon -> TcM ()
 checkNewDataCon con
   = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
                 -- One argument
-        ; checkTc (null eq_spec) (newtypePredError con)
+
+        ; check_con (null eq_spec) $
+          ptext (sLit "A newtype constructor must have a return type of form T a1 ... an")
                 -- Return type is (T a b c)
-        ; checkTc (null ex_tvs && null theta) (newtypeExError con)
+
+        ; check_con (null theta) $
+          ptext (sLit "A newtype constructor cannot have a context in its type")
+
+        ; check_con (null ex_tvs) $
+          ptext (sLit "A newtype constructor cannot have existential type variables")
                 -- No existentials
+
         ; checkTc (not (any isBanged (dataConStrictMarks con)))
                   (newtypeStrictError con)
                 -- No strictness
     }
   where
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig con
+    check_con what msg 
+       = checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConUserType con))
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -1802,20 +1812,10 @@ newtypeConError tycon n
   = sep [ptext (sLit "A newtype must have exactly one constructor,"),
          nest 2 $ ptext (sLit "but") <+> quotes (ppr tycon) <+> ptext (sLit "has") <+> speakN n ]
 
-newtypeExError :: DataCon -> SDoc
-newtypeExError con
-  = sep [ptext (sLit "A newtype constructor cannot have an existential context,"),
-         nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
-
 newtypeStrictError :: DataCon -> SDoc
 newtypeStrictError con
   = sep [ptext (sLit "A newtype constructor cannot have a strictness annotation,"),
          nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
-
-newtypePredError :: DataCon -> SDoc
-newtypePredError con
-  = sep [ptext (sLit "A newtype constructor must have a return type of form T a1 ... an"),
-         nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does not")]
 
 newtypeFieldErr :: DataCon -> Int -> SDoc
 newtypeFieldErr con_name n_flds
