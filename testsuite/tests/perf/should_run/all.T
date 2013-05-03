@@ -163,30 +163,27 @@ test('T5549',
 
 test('T4474a',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 1879095912, 5),
-                    # expected value: 1879095912 (i386/OSX)
-                       (wordsize(64), 3766493912, 5)]),
-                    # expected value: 3766493912 (amd64/Linux)
+                      [(wordsize(32), 2405242767, 5),
+                       (wordsize(64), 4831890304, 5)]),
+                    # expected value: 4831890304 (amd64/OSX)
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
 test('T4474b',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 1879095912, 5),
-                    # expected value: 1879095912 (i386/OSX)
-                       (wordsize(64), 3766493912, 5)]),
-                    # expected value: 3766493912 (amd64/Linux)
+                      [(wordsize(32), 2405242767, 5),
+                       (wordsize(64), 4831890304, 5)]),
+                    # expected value: 4831890304 (amd64/OSX)
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
 test('T4474c',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 1879095912, 5),
-                    # expected value: 1879095912 (i386/OSX)
-                       (wordsize(64), 3766493912, 5)]),
-                    # expected value: 3766493912 (amd64/Linux)
+                      [(wordsize(32), 2405242767, 5),
+                       (wordsize(64), 4831890304, 5)]),
+                    # expected value: 4831890304 (amd64/OSX)
       only_ways(['normal'])
       ],
      compile_and_run,

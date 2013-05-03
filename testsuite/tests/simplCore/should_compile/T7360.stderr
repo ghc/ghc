@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 36, types: 28, coercions: 0}
+Result size of Tidy Core = {terms: 36, types: 29, coercions: 0}
 
 T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
 [GblId[DataConWrapper],
@@ -10,11 +10,11 @@ T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
-         Tmpl= \ (dt [Occ=Once] :: GHC.Types.Int) ->
-                 case dt of dt { __DEFAULT -> T7360.Foo3 dt }}]
+         Tmpl= \ (dt [Occ=Once!] :: GHC.Types.Int) ->
+                 case dt of _ { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }}]
 T7360.$WFoo3 =
-  \ (dt [Occ=Once] :: GHC.Types.Int) ->
-    case dt of dt { __DEFAULT -> T7360.Foo3 dt }
+  \ (dt [Occ=Once!] :: GHC.Types.Int) ->
+    case dt of _ { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }
 
 T7360.fun1 [InlPrag=NOINLINE] :: T7360.Foo -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,U>]
