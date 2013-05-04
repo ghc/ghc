@@ -587,6 +587,7 @@ again: MAYBE_GC(again);
    */
   W_ frame_type, frame, trec, outer, valid, limit, q, next_invariant;
   W_ cap;
+  I32 tmpReleaseULS;
 
   #if defined(DEBUG) || defined (TRACING)
 
@@ -678,8 +679,10 @@ again: MAYBE_GC(again);
     if (valid != 0) {
       /* Transaction was valid: commit succeeded */
 
-      //XXX KC -- operating on CurrentTSO is unsafe since the transaction has
+      //KC -- operating on CurrentTSO is unsafe since the transaction has
       //been committed and mucking with CurrentTSO info violates atomicity.
+
+      //XXX KC -- Start unsafe section
 
       if (CurrentTSO != tso) {
         ASSERT (StgTSO_why_blocked(tso) != NotBlocked::I16); //Thread is blocked
@@ -711,6 +714,19 @@ again: MAYBE_GC(again);
       StgTSO_trec(CurrentTSO) = NO_TREC;
       StgStack_sp(StgTSO_stackobj(CurrentTSO)) = Sp;
 
+			/* Swap release ULS flag: If the current thread needs to give up the
+			 * scheduler, we make sure that the target thread (thread being switched
+			 * to), inherits that flag. When we enter the RTS schedule loop at the
+			 * end of this block, scheduleHandleThreadSwitch takes care of releasing
+			 * the scheduler. Swapping the flag to ensure that the requests are not
+			 * lost in case both threads need to lose thier schedulers (Unlikely?).
+			 */
+			tmpReleaseULS = StgTSO_release_ULS(CurrentTSO);
+			StgTSO_release_ULS(CurrentTSO) = StgTSO_release_ULS(tso);
+			StgTSO_release_ULS(tso) = tmpReleaseULS;
+
+      //XXX KC -- End unsafe section
+
       CurrentTSO = tso;
       StgTSO_why_blocked(CurrentTSO) = NotBlocked::I16;
       ("ptr" limit)  = ccall tso_SpLim (tso "ptr");
@@ -722,7 +738,8 @@ again: MAYBE_GC(again);
       //    need to pass capability to correct task
       //  - task might have returned from a safe foreign call
 			//	- Pending upcalls
-			//	- and more..
+      //  - Pending messages
+			//	- and more?
       jump stg_switch_noregs [];
     } else {
       /* Transaction was not valid: try again */

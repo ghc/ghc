@@ -33,7 +33,11 @@ void scheduleThread (Capability *cap, StgTSO *tso);
 // the desired Capability).
 void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
 
+#if defined(THREADED_RTS)
 void scheduleThreadOnFreeCap (Capability *cap, StgTSO *tso);
+#else
+void scheduleThreadOnFreeCap (Capability *cap, StgTSO *tso) __attribute__ ((noreturn));
+#endif
 
 /* wakeUpRts()
  *

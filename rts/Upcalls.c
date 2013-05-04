@@ -71,8 +71,6 @@ getSwitchToNextThreadUpcall (Capability* cap, StgTSO* t)
   ASSERT (t->yield_control_action != (StgClosure*)defaultUpcall_closure);
 
   if (t->release_ULS) {
-    debugTrace (DEBUG_sched, "cap %d: returning dummy switch to next thread upcall",
-                cap->no);
     p = (StgClosure*)defaultUpcall_closure;
     t->release_ULS = rtsFalse;
   }
@@ -81,8 +79,8 @@ getSwitchToNextThreadUpcall (Capability* cap, StgTSO* t)
                   rts_mkSCont (cap, t));
   }
 
-  debugTrace (DEBUG_sched, "cap %d: getSwitchToNextThreadupcall(%p) for thread %d",
-              cap->no, (void*)p, t->id);
+  debugTrace (DEBUG_sched, "cap %d: getSwitchToNextThreadupcall(%p) for thread %d%s",
+              cap->no, (void*)p, t->id, (p == (Upcall)defaultUpcall_closure)?" (DUMMY)":"");
   return p;
 }
 

@@ -151,7 +151,7 @@ static rtsBool scheduleHandleHeapOverflow( Capability *cap, StgTSO *t );
 static rtsBool scheduleHandleYield( Capability *cap, StgTSO *t,
                                     nat prev_what_next );
 static void scheduleHandleThreadBlocked( Capability* cap, StgTSO *t );
-static void scheduleHandleThreadSwitch( Capability* cap, StgTSO *t );
+static rtsBool scheduleHandleThreadSwitch( Capability* cap, StgTSO *t );
 static rtsBool scheduleHandleThreadFinished( Capability *cap, Task *task,
                                              StgTSO *t );
 static rtsBool scheduleNeedHeapProfile(rtsBool ready_to_gc);
@@ -603,8 +603,9 @@ run_thread:
                 break;
 
             case ThreadSwitch:
-                scheduleHandleThreadSwitch (cap, t);
-                goto more_upcalls;
+                if (scheduleHandleThreadSwitch (cap, t)) {
+                  goto more_upcalls;
+                }
                 break;
 
             default:
@@ -1352,10 +1353,16 @@ scheduleHandleThreadBlocked(Capability *cap, StgTSO *t)
  * Handle a thread that returned to the scheduler with ThreadSwitch
  * -------------------------------------------------------------------------- */
 
-static void
-scheduleHandleThreadSwitch( Capability* cap STG_UNUSED,
-                            StgTSO *t STG_UNUSED)
+static rtsBool
+scheduleHandleThreadSwitch(Capability* cap, StgTSO *t)
 {
+  if (t->release_ULS) {
+    pushUpcallReturning (cap, getResumeThreadUpcall (cap, t));
+    t->why_blocked = Yielded;
+    t->release_ULS = rtsFalse;
+    return rtsFalse;
+  }
+  return rtsTrue;
 }
 
 

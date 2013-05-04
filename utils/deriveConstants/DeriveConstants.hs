@@ -404,6 +404,7 @@ wanteds = concat
           ,closureField  C    "StgTSO"      "tls"
           ,closureField  C    "StgTSO"      "is_sleeping"
           ,closureField  C    "StgTSO"      "is_upcall_thread"
+          ,closureField  C    "StgTSO"      "release_ULS"
 
           ,closureField       Both "StgStack" "sp"
           ,closureFieldOffset Both "StgStack" "stack"
