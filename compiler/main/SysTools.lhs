@@ -24,6 +24,8 @@ module SysTools (
         figureLlvmVersion,
         readElfSection,
 
+        getLinkerInfo,
+
         linkDynLib,
 
         askCc,
@@ -596,13 +598,122 @@ figureLlvmVersion dflags = do
                           text "Make sure you have installed LLVM"]
                 return Nothing)
   return ver
-  
+
+
+{- Note [Run-time linker info]
+
+See also: Trac #5240, Trac #6063
+
+Before 'runLink', we need to be sure to get the relevant information
+about the linker we're using at runtime to see if we need any extra
+options. For example, GNU ld requires '--reduce-memory-overheads' and
+'--hash-size=31' in order to use reasonable amounts of memory (see
+trac #5240.) But this isn't supported in GNU gold.
+
+Generally, the linker changing from what was detected at ./configure
+time has always been possible using -pgml, but on Linux it can happen
+'transparently' by installing packages like binutils-gold, which
+change what /usr/bin/ld actually points to.
+
+Clang vs GCC notes:
+
+For gcc, 'gcc -Wl,--version' gives a bunch of output about how to
+invoke the linker before the version information string. For 'clang',
+the version information for 'ld' is all that's output. For this
+reason, we typically need to slurp up all of the standard error output
+and look through it.
+
+Other notes:
+
+We cache the LinkerInfo inside DynFlags, since clients may link
+multiple times. The definition of LinkerInfo is there to avoid a
+circular dependency.
+
+-}
+
+
+neededLinkArgs :: LinkerInfo -> [Option]
+neededLinkArgs (GnuLD o)     = o
+neededLinkArgs (GnuGold o)   = o
+neededLinkArgs (DarwinLD o)  = o
+neededLinkArgs UnknownLD     = []
+
+-- Grab linker info and cache it in DynFlags.
+getLinkerInfo :: DynFlags -> IO LinkerInfo
+getLinkerInfo dflags = do
+  info <- readIORef (rtldFlags dflags)
+  case info of
+    Just v  -> return v
+    Nothing -> do
+      v <- getLinkerInfo' dflags
+      writeIORef (rtldFlags dflags) (Just v)
+      return v
+
+-- See Note [Run-time linker info].
+getLinkerInfo' :: DynFlags -> IO LinkerInfo
+getLinkerInfo' dflags = do
+  let platform = targetPlatform dflags
+      os = platformOS platform
+      (pgm,_) = pgm_l dflags
+
+      -- Try to grab the info from the process output.
+      parseLinkerInfo stdo _stde _exitc
+        | any ("GNU ld" `isPrefixOf`) stdo =
+          -- GNU ld specifically needs to use less memory. This especially
+          -- hurts on small object files. Trac #5240.
+          return (GnuLD $ map Option ["-Wl,--hash-size=31",
+                                      "-Wl,--reduce-memory-overheads"])
+
+        | any ("GNU gold" `isPrefixOf`) stdo =
+          -- GNU gold does not require any special arguments.
+          return (GnuGold [])
+
+         -- Unknown linker.
+        | otherwise = fail "invalid --version output, or linker is unsupported"
+
+  -- Process the executable call
+  info <- catchIO (do
+             case os of
+               OSDarwin ->
+                 -- Darwin has neither GNU Gold or GNU LD, but a strange linker
+                 -- that doesn't support --version. We can just assume that's
+                 -- what we're using.
+                 return $ DarwinLD []
+               OSMinGW32 ->
+                 -- GHC doesn't support anything but GNU ld on Windows anyway.
+                 -- Process creation is also fairly expensive on win32, so
+                 -- we short-circuit here.
+                 return $ GnuLD $ map Option ["-Wl,--hash-size=31",
+                                              "-Wl,--reduce-memory-overheads"]
+               _ -> do
+                 -- In practice, we use the compiler as the linker here. Pass
+                 -- -Wl,--version to get linker version info.
+                 (exitc, stdo, stde) <- readProcessWithExitCode pgm
+                                        ["-Wl,--version"] ""
+                 -- Split the output by lines to make certain kinds
+                 -- of processing easier. In particular, 'clang' and 'gcc'
+                 -- have slightly different outputs for '-Wl,--version', but
+                 -- it's still easy to figure out.
+                 parseLinkerInfo (lines stdo) (lines stde) exitc
+            )
+            (\err -> do
+                debugTraceMsg dflags 2
+                    (text "Error (figuring out linker information):" <+>
+                     text (show err))
+                errorMsg dflags $ hang (text "Warning:") 9 $
+                  text "Couldn't figure out linker information!" $$
+                  text "Make sure you're using GNU ld, GNU gold" <+>
+                  text "or the built in OS X linker, etc."
+                return UnknownLD)
+  return info
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do
+  -- See Note [Run-time linker info]
+  linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let (p,args0) = pgm_l dflags
-      args1 = map Option (getOpts dflags opt_l)
-      args2 = args0 ++ args1 ++ args
+      args1     = map Option (getOpts dflags opt_l)
+      args2     = args0 ++ args1 ++ args ++ linkargs
   mb_env <- getGccEnv args2
   runSomethingFiltered dflags id "Linker" p args2 mb_env
 
