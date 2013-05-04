@@ -35,6 +35,9 @@ pushUpcallReturning (Capability* cap, Upcall uc)
 void
 pushUpcallNonReturning (Capability* cap, Upcall uc)
 {
+  if ((StgClosure*)uc == (StgClosure*)defaultUpcall_closure)
+    return; //See getSwitchToNextThreadUpcall
+
   if (!pushWSDeque (cap->upcall_queue_non_returning, uc))
     barf ("pushUpcall overflow!!");
   debugTrace (DEBUG_sched, "Adding new non returning upcall %p (queue size = %d)",
@@ -67,8 +70,16 @@ getSwitchToNextThreadUpcall (Capability* cap, StgTSO* t)
   ASSERT (!t->is_upcall_thread);
   ASSERT (t->yield_control_action != (StgClosure*)defaultUpcall_closure);
 
-  p = rts_apply (cap, (StgClosure*)yieldControlActionRts_closure,
-                 rts_mkSCont (cap, t));
+  if (t->release_ULS) {
+    debugTrace (DEBUG_sched, "cap %d: returning dummy switch to next thread upcall",
+                cap->no);
+    p = (StgClosure*)defaultUpcall_closure;
+    t->release_ULS = rtsFalse;
+  }
+  else {
+   p = rts_apply (cap, (StgClosure*)yieldControlActionRts_closure,
+                  rts_mkSCont (cap, t));
+  }
 
   debugTrace (DEBUG_sched, "cap %d: getSwitchToNextThreadupcall(%p) for thread %d",
               cap->no, (void*)p, t->id);

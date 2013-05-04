@@ -110,6 +110,7 @@ createThread(Capability *cap, W_ size)
   tso->dirty = 1;
   tso->is_upcall_thread = 0;
   tso->is_sleeping = rtsFalse;
+  tso->release_ULS = rtsFalse;
   tso->_link = END_TSO_QUEUE;
 
   tso->saved_errno = 0;

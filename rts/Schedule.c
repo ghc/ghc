@@ -960,8 +960,7 @@ scheduleResumeBlockedOnForeignCall(Capability *cap USED_IF_THREADS)
     //Safely work
     ACQUIRE_LOCK (&cap->lock);
     incall = cap->suspended_ccalls_hd;
-    if (rtsFalse &&
-        incall && //incall is not NULL
+    if (incall && //incall is not NULL
         incall->uls_stat == UserLevelSchedulerBlocked) {
 
         debugTrace (DEBUG_sched, "resuming scheduler associated with task %p"
@@ -1177,11 +1176,12 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
             debugTrace(DEBUG_sched | DEBUG_stm,
                        "trec %p found wasting its time", t);
 
-            // strip the stack back to the ATOMICALLY_FRAME, aborting the (nested)
-            // transaction, and saving the stack of any partially-evaluated thunks on
-            // the heap.
-            //XXX KC -- We do not need to add an upcall since t is the current running
-            //thread.
+            // strip the stack back to the ATOMICALLY_FRAME, aborting the
+            // (nested) transaction, and saving the stack of any
+            // partially-evaluated thunks on the heap.
+
+            //XXX KC -- We do not need to add an upcall since t is the current
+            //running thread.
             throwToSingleThreaded_(cap, t, NULL, rtsTrue);
             //            ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
         }
@@ -1316,9 +1316,9 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     if (cap->context_switch != 0) {
         cap->context_switch = 0;
         if (hasHaskellScheduler (t)) {
-            pushUpcallNonReturning (cap, getSwitchToNextThreadUpcall (cap, t));
-            pushUpcallReturning (cap, getResumeThreadUpcall (cap, t));
-            t->why_blocked = Yielded;
+          pushUpcallNonReturning (cap, getSwitchToNextThreadUpcall (cap, t));
+          pushUpcallReturning (cap, getResumeThreadUpcall (cap, t));
+          t->why_blocked = Yielded;
         }
         else
             appendToRunQueue(cap,t);
@@ -2457,10 +2457,6 @@ resumeThread (void *task_)
         }
     }
 
-    /* We might have GC'd, mark the TSO dirty again */
-    dirty_TSO(cap,tso);
-    dirty_STACK(cap,tso->stackobj);
-    IF_DEBUG(sanity, checkTSO(tso));
 
 #if defined(THREADED_RTS)
     //Check whether a worker has resumed our scheduler
@@ -2468,15 +2464,16 @@ resumeThread (void *task_)
         //Evaluate the unblock action on the upcall thread
         debugTrace (DEBUG_sched, "cap %d: resumeThread: ULS for thread %d already resumed. errno=%d.",
                     (int)cap->no, tso->id, errno);
-
-        tso->why_blocked = Yielded;
-        tso->saved_errno = saved_errno;
-        pushUpcallReturning (cap, getResumeThreadUpcall (cap, tso));
-
-        tso = prepareUpcallThread (cap, (StgTSO*)END_TSO_QUEUE);
-        saved_errno = tso->saved_errno;
+        //Mark this task to release the scheduler
+        tso->release_ULS = rtsTrue;
+        cap->context_switch = 1;
     }
 #endif
+
+    /* We might have GC'd, mark the TSO dirty again */
+    dirty_TSO(cap,tso);
+    dirty_STACK(cap,tso->stackobj);
+    IF_DEBUG(sanity, checkTSO(tso));
 
     traceEventRunThread(cap, tso);
 

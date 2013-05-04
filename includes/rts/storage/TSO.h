@@ -131,6 +131,7 @@ typedef struct StgTSO_ {
     StgWord32               dirty;          /* non-zero => dirty */
     StgWord32               is_sleeping;
     StgWord32               is_upcall_thread;
+    StgWord32               release_ULS;
     struct InCall_*         bound;
     struct Capability_*     cap;
 
