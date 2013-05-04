@@ -5,6 +5,7 @@
 # overall build type, and then tweak the options in the relevant section
 # below.
 
+# -------- Build profiles -----------------------------------------------------
 # Uncomment one of these to select a build profile below:
 
 # Full build with max optimisation and everything enabled (very slow build)
@@ -33,13 +34,24 @@
 # A development build, working on the stage 2 compiler:
 #BuildFlavour = devel2
 
+# -------- Miscellaneous variables --------------------------------------------
+
+# Set to V = 0 to get prettier build output.
+# Please use V = 1 when reporting GHC bugs.
+V = 1
+
+# After stage 1 and the libraries have been built, you can uncomment this line:
+
+#stage=2
+
+# Then stage 1 will not be touched by the build system, until
+# you comment the line again.  This is a useful trick for when you're
+# working on stage 2 and want to freeze stage 1 and the libraries for
+# a while.
+
 GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
 
-# Uncomment this to get prettier build output.
-# Please use V = 1 when reporting GHC bugs.
-# V = 0
-
-# -------- 1. A Performance/Distribution build--------------------------------
+# ----------- A Performance/Distribution build --------------------------------
 
 ifeq "$(BuildFlavour)" "perf"
 
@@ -58,7 +70,7 @@ endif
 
 endif
 
-# ---------------- Perf build using LLVM -------------------------------------
+# ---------------- Perf build using LLVM --------------------------------------
 
 ifeq "$(BuildFlavour)" "perf-llvm"
 
@@ -75,7 +87,7 @@ endif
 
 endif
 
-# -------- A Fast build ------------------------------------------------------
+# -------- A Fast build -------------------------------------------------------
 
 ifeq "$(BuildFlavour)" "quickest"
 
@@ -91,7 +103,7 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
-# -------- A Fast build with optimised libs ----------------------------------
+# -------- A Fast build with optimised libs -----------------------------------
 
 ifeq "$(BuildFlavour)" "quick"
 
@@ -107,7 +119,7 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
-# -------- A Fast build with optimised libs using LLVM -----------------------
+# -------- A Fast build with optimised libs using LLVM ------------------------
 
 ifeq "$(BuildFlavour)" "quick-llvm"
 
@@ -123,7 +135,7 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
-# -------- Profile the stage2 compiler ---------------------------------------
+# -------- Profile the stage2 compiler ----------------------------------------
 
 ifeq "$(BuildFlavour)" "prof"
 
@@ -143,8 +155,7 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
-
-# -------- A Development build (stage 1) -------------------------------------
+# -------- A Development build (stage 1) --------------------------------------
 
 ifeq "$(BuildFlavour)" "devel1"
 
@@ -161,7 +172,7 @@ LAX_DEPENDENCIES   = YES
 
 endif
 
-# -------- A Development build (stage 2) -------------------------------------
+# -------- A Development build (stage 2) --------------------------------------
 
 ifeq "$(BuildFlavour)" "devel2"
 
@@ -175,15 +186,6 @@ BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 LAX_DEPENDENCIES   = YES
-
-# After stage 1 and the libraries have been built, you can uncomment this line:
-
-# stage=2
-
-# Then stage 1 will not be touched by the build system, until
-# you comment the line again.  This is a useful trick for when you're
-# working on stage 2 and want to freeze stage 1 and the libraries for
-# a while.
 
 endif
 
