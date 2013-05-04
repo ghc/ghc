@@ -247,9 +247,8 @@ pass = do dflags &lt;- getDynFlags
 {-# LANGUAGE DeriveDataTypeable #-}
 module SayAnnNames.Plugin (plugin, SomeAnn) where
 import GhcPlugins
-import Control.Monad (when)
+import Control.Monad (unless)
 import Data.Data
-import Data.Typeable
 
 data SomeAnn = SomeAnn deriving (Data, Typeable)
 
@@ -264,13 +263,15 @@ install _ todo = do
   return (CoreDoPluginPass "Say name" pass : todo)
 
 pass :: ModGuts -> CoreM ModGuts
-pass g = mapM_ (printAnn g) (mg_binds g) >> return g
-  where printAnn :: ModGuts -> CoreBind -> CoreM CoreBind
-        printAnn guts bndr@(NonRec b _) = do
+pass g = do
+          dflags &lt;- getDynFlags
+          mapM_ (printAnn dflags g) (mg_binds g) >> return g
+  where printAnn :: DynFlags -> ModGuts -> CoreBind -> CoreM CoreBind
+        printAnn dflags guts bndr@(NonRec b _) = do
           anns &lt;- annotationsOn guts b :: CoreM [SomeAnn]
-          when (not $ null anns) $ putMsgS $ "Annotated binding found: " ++  showSDoc (ppr b)
+          unless (null anns) $ putMsgS $ "Annotated binding found: " ++  showSDoc dflags (ppr b)
           return bndr
-        printAnn _ bndr = return bndr
+        printAnn _ _ bndr = return bndr
 
 annotationsOn :: Data a => ModGuts -> CoreBndr -> CoreM [a]
 annotationsOn guts bndr = do
