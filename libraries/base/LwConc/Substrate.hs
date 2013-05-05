@@ -109,6 +109,7 @@ module LwConc.Substrate
 
 , getNumCapabilities       -- IO Int
 , getCurrentCapability     -- PTM Int
+, getCurrentCapabilityIO	 -- IO Int
 
 , setSContCapability       -- SCont -> Int -> IO ()
 , getSContCapability       -- SCont -> PTM Int

@@ -570,6 +570,16 @@ run_thread:
 #if defined(PROFILING)
         cap->r.rCCCS = CCS_SYSTEM;
 #endif
+        //If the user-level thread has migrated, update thread's capabilities
+        //XXX KC -- stealing in ULS doesn't seem to perform well. Needs to be
+        //investigated before building schedulers with stealing.
+        if (hasHaskellScheduler (t) && t->cap != cap) {
+          debugTrace (DEBUG_sched, "cap %d: thread %d migrated from cap %d",
+                      cap->no, t->id, t->cap->no);
+          t->cap = cap;
+          if (t->bound) { t->bound->task->cap = cap; }
+        }
+
 
         schedulePostRunThread(cap,t);
 
@@ -835,9 +845,16 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                 t->_link = END_TSO_QUEUE;
                 if (t->bound == task->incall // don't move my bound thread
                     || t->is_upcall_thread // don't move upcall thread
-                    // XXX the following is inplace to avoid a hard to debug
-                    // deadlock that occurs in sieve-lwc. Should be fixed!
+
+                    //XXX KC. It is safe to allow threads running user-level
+                    //schedulers to migrate. However, if the user-level
+                    //scheduler in Haskell land does not account for the fact
+                    //that threads can migrate capabilities, then the program
+                    //might get stuck. In general, it is wise not to migrate
+                    //the user-level schedulers, since we don't want to end up
+                    //with more than one ULS on a capability.
                     || hasHaskellScheduler(t) //don't move user-level schedulers
+
                     || tsoLocked(t)) {  // don't move a locked thread
                     setTSOLink(cap, prev, t);
                     setTSOPrev(cap, t, prev);
