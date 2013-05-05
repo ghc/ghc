@@ -159,7 +159,6 @@ import GHC.Base
 import GHC.Prim
 import GHC.IO
 import Control.Monad    ( when )
-import GHC.IO.Handle.Internals
 #endif
 
 import System.IO
@@ -167,7 +166,11 @@ import GHC.Conc (yield, childHandler, getNumCapabilities)
 import Data.Typeable
 import Data.Dynamic
 import Foreign.StablePtr
+
 import Foreign.C.Types
+import Foreign.Safe
+import Foreign.C
+import System.Posix.Internals hiding (FD)
 
 #include "Typeable.h"
 
@@ -435,7 +438,8 @@ getYieldControlAction = do
 {-# INLINE yieldControlActionRts #-}
 yieldControlActionRts :: SCont -> IO () -- used by RTS
 yieldControlActionRts sc = Exception.catch (atomically $ do
-  -- mySC is the upcall thread. Set its status to Completed.
+	-- mySC is the upcall thread. Set its status to Completed. We will try to
+	-- reuse this upcall thread. See prepareUpcallThread* in rts/Upcalls.c
   mySC <- getSCont
   setSContSwitchReason mySC Completed
   stat <- getSContStatus sc
@@ -507,6 +511,15 @@ defaultExceptionHandler e = do
     yca <- getYieldControlAction
     yca
 
+
+-----------------------------------------------------------------------------------
+-- debugging
+-----------------------------------------------------------------------------------
+
+debugPrint :: String -> IO ()
+debugPrint s = do _ <- withCStringLen (s ++ "\n") $
+                     \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
+                  return ()
 
 ----------------------------------------------------------------------------
 -- Bound threads

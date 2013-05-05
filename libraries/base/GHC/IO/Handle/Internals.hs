@@ -52,7 +52,6 @@ module GHC.IO.Handle.Internals (
   HandleFinalizer, handleFinalizer,
 
   debugIO,
-  debugPrint,
  ) where
 
 import GHC.IO
@@ -805,10 +804,6 @@ debugIO s
          return ()
  | otherwise = return ()
 
-debugPrint :: String -> IO ()
-debugPrint s = do _ <- withCStringLen (s ++ "\n") $
-                     \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
-                  return ()
 
 -- ----------------------------------------------------------------------------
 -- Text input/output

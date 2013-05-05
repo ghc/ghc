@@ -3,7 +3,7 @@ TARGET := sieve-vanilla.bin sieve-lwc.bin sieve-TMVar.bin sieve-vanilla-TMVar.bi
 include ../../config.mk
 
 TOP := ../../../
-GHC_OPTS_EXTRA=-O2 -threaded -XBangPatterns -XCPP -XGeneralizedNewtypeDeriving -funbox-strict-fields -eventlog -optc-O3 -debug
+GHC_OPTS_EXTRA=-O2 -threaded -XBangPatterns -XCPP -XGeneralizedNewtypeDeriving -funbox-strict-fields -optc-O3 -debug
 
 PROFILE_FLAGS := -DPROFILE_ENABLED -prof -auto-all -fprof-auto
 

@@ -12,7 +12,7 @@ generate mOut = mapM_ (putMVar mOut) [2..]
 primeFilter :: MVar Int -> MVar Int -> Int -> IO ()
 primeFilter mIn mOut prime = do
   tid <- myThreadId
-  labelThread tid $ "ThrPrime:" ++ show prime
+  -- labelThread tid $ "ThrPrime:" ++ show prime
   forever $ do
     i <- takeMVar mIn
     when (i `mod` prime /= 0) (putMVar mOut i)
