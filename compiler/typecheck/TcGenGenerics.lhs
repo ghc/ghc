@@ -49,10 +49,9 @@ import Bag
 import VarSet (elemVarSet)
 import Outputable 
 import FastString
-import UniqSupply
 import Util
 
-import Control.Monad (mplus)
+import Control.Monad (mplus,forM)
 import qualified State as S
 
 #include "HsVersions.h"
@@ -80,31 +79,17 @@ gen_Generic_binds gk tc metaTyCons mod = do
 
 genGenericMetaTyCons :: TyCon -> Module -> TcM (MetaTyCons, BagDerivStuff)
 genGenericMetaTyCons tc mod =
-  do  uniqS <- newUniqueSupply
+  do  loc <- getSrcSpanM
       let
-        -- Uniques for everyone
-        (uniqD:uniqs) = uniqsFromSupply uniqS
-        (uniqsC,us) = splitAt (length tc_cons) uniqs
-        uniqsS :: [[Unique]] -- Unique supply for the S datatypes
-        uniqsS = mkUniqsS tc_arits us
-        mkUniqsS []    _  = []
-        mkUniqsS (n:t) us = case splitAt n us of
-                              (us1,us2) -> us1 : mkUniqsS t us2
-
         tc_name   = tyConName tc
         tc_cons   = tyConDataCons tc
         tc_arits  = map dataConSourceArity tc_cons
-        
+
         tc_occ    = nameOccName tc_name
         d_occ     = mkGenD tc_occ
         c_occ m   = mkGenC tc_occ m
         s_occ m n = mkGenS tc_occ m n
-        d_name    = mkExternalName uniqD mod d_occ wiredInSrcSpan
-        c_names   = [ mkExternalName u mod (c_occ m) wiredInSrcSpan
-                      | (u,m) <- zip uniqsC [0..] ]
-        s_names   = [ [ mkExternalName u mod (s_occ m n) wiredInSrcSpan 
-                        | (u,n) <- zip us [0..] ] | (us,m) <- zip uniqsS [0..] ]
-        
+
         mkTyCon name = ASSERT( isExternalName name )
                        buildAlgTyCon name [] Nothing [] distinctAbstractTyConRhs
                                           NonRecursive 
@@ -112,10 +97,15 @@ genGenericMetaTyCons tc mod =
                                           False          -- Not GADT syntax
                                           NoParentTyCon
 
+      d_name  <- newGlobalBinder mod d_occ loc
+      c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
+                    newGlobalBinder mod (c_occ m) loc
+      s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
+                    newGlobalBinder mod (s_occ m n) loc
+
       let metaDTyCon  = mkTyCon d_name
           metaCTyCons = map mkTyCon c_names
-          metaSTyCons =  [ [ mkTyCon s_name | s_name <- s_namesC ] 
-                         | s_namesC <- s_names ]
+          metaSTyCons = map (map mkTyCon) s_names
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
 
