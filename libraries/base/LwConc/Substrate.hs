@@ -648,16 +648,12 @@ getSContCapabilityIO (SCont sc) = IO $
   \s -> case getSContCapability# sc s of
              (# s, n #) -> (# s, I# n #)
 
-
--- We must own the capability (i.e, scont->cap == MyCapability ()). Otherwise,
--- will throw a runtime error.
+-- Updates tso->cap to given cap
 setSContCapability :: SCont -> Int -> IO ()
 setSContCapability (SCont sc) (I# i) = do
   cc <- getCurrentCapabilityIO
   scc <- getSContCapabilityIO $ SCont sc
-  if cc == scc
-    then IO $ \s -> case setSContCapability# sc i s of s -> (# s, () #)
-    else error "setSContCapability: SCont must belong to the current capability"
+  IO $ \s -> case setSContCapability# sc i s of s -> (# s, () #)
 
 sleepCapability :: PTM a
 sleepCapability = PTM $ \s -> sleepCapability# s

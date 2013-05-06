@@ -15,7 +15,7 @@
 -----------------------------------------------------------------------------
 
 
-module ConcurrentList
+module ConcurrentListStealing
 (
   Sched
 , SCont
