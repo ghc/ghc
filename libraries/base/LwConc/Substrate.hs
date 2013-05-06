@@ -438,8 +438,8 @@ getYieldControlAction = do
 {-# INLINE yieldControlActionRts #-}
 yieldControlActionRts :: SCont -> IO () -- used by RTS
 yieldControlActionRts sc = Exception.catch (atomically $ do
-	-- mySC is the upcall thread. Set its status to Completed. We will try to
-	-- reuse this upcall thread. See prepareUpcallThread* in rts/Upcalls.c
+  -- mySC is the upcall thread. Set its status to Completed. We will try to
+  -- reuse this upcall thread. See prepareUpcallThread* in rts/Upcalls.c
   mySC <- getSCont
   setSContSwitchReason mySC Completed
   stat <- getSContStatus sc
