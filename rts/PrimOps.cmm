@@ -679,14 +679,36 @@ again: MAYBE_GC(again);
     if (valid != 0) {
       /* Transaction was valid: commit succeeded */
 
-      //KC -- operating on CurrentTSO is unsafe since the transaction has
-      //been committed and mucking with CurrentTSO info violates atomicity.
+			/* Spin wait till target tso is completely blocked. This is needed to
+			 * protect entry into the critical section on CurrentTSO that follows. At
+			 * the end of the critical section, target tso's state will be changed
+			 * from NotBlocked to something else. */
+			if (CurrentTSO != tso) {
+			  retry:
+			  if (StgTSO_why_blocked (tso) == NotBlocked::I16) {
+					IF_DEBUG (scheduler, ccall debugBelch ("stg_atomicSwitch: spinning\n"));
+					goto retry;
+				}
+        ASSERT (StgTSO_why_blocked(tso) != NotBlocked::I16); //Thread is blocked
+			}
 
-      //XXX KC -- Start unsafe section
+			/* --- Begin critical section on CurrentTSO --- */
+
+			StgTSO_trec(CurrentTSO) = NO_TREC;
+      StgStack_sp(StgTSO_stackobj(CurrentTSO)) = Sp;
+
+			/* Swap release ULS flag: If the current thread needs to give up the
+			 * scheduler, we make sure that the target thread (thread being switched
+			 * to), inherits that flag. When we enter the RTS schedule loop at the
+			 * end of this block, scheduleHandleThreadSwitch takes care of releasing
+			 * the scheduler. Swapping the flag to ensure that the requests are not
+			 * lost in case both threads need to lose thier schedulers (Unlikely?).
+			 */
+			tmpReleaseULS = StgTSO_release_ULS(CurrentTSO);
+			StgTSO_release_ULS(CurrentTSO) = StgTSO_release_ULS(tso);
+			StgTSO_release_ULS(tso) = tmpReleaseULS;
 
       if (CurrentTSO != tso) {
-        ASSERT (StgTSO_why_blocked(tso) != NotBlocked::I16); //Thread is blocked
-
         //Set the current thread status
         if (switch_reason == 1) {
           StgTSO_why_blocked(CurrentTSO) = Yielded::I16;
@@ -711,27 +733,14 @@ again: MAYBE_GC(again);
           }
         }
       }
-      StgTSO_trec(CurrentTSO) = NO_TREC;
-      StgStack_sp(StgTSO_stackobj(CurrentTSO)) = Sp;
 
-			/* Swap release ULS flag: If the current thread needs to give up the
-			 * scheduler, we make sure that the target thread (thread being switched
-			 * to), inherits that flag. When we enter the RTS schedule loop at the
-			 * end of this block, scheduleHandleThreadSwitch takes care of releasing
-			 * the scheduler. Swapping the flag to ensure that the requests are not
-			 * lost in case both threads need to lose thier schedulers (Unlikely?).
-			 */
-			tmpReleaseULS = StgTSO_release_ULS(CurrentTSO);
-			StgTSO_release_ULS(CurrentTSO) = StgTSO_release_ULS(tso);
-			StgTSO_release_ULS(tso) = tmpReleaseULS;
-
-      //XXX KC -- End unsafe section
+			/* --- End critical section on CurrentTSO --- */
 
       CurrentTSO = tso;
-      StgTSO_why_blocked(CurrentTSO) = NotBlocked::I16;
+      StgTSO_why_blocked(tso) = NotBlocked::I16;
       ("ptr" limit)  = ccall tso_SpLim (tso "ptr");
       SpLim = limit;
-      Sp = StgStack_sp(StgTSO_stackobj(CurrentTSO));
+      Sp = StgStack_sp(StgTSO_stackobj(tso));
 
       //Enter the scheduler. This is necessary for several reasons:
       //  - tso might be bound, or current task might be bound in which case we
@@ -872,10 +881,6 @@ stg_newSContzh ( gcptr closure )
 				RtsFlags_GcFlags_initialStkSize(RtsFlags),
 				closure "ptr");
   StgTSO_why_blocked (threadid) = Yielded::I16;
-
-  // context switch soon, but not immediately: we don't want every
-  // newSCont to force a context-switch.
-  // Capability_context_switch(MyCapability()) = 1 :: CInt;
 
   return (threadid);
 }

@@ -42,6 +42,6 @@ main = do
 linkFilter :: MVar Int -> MVar Int -> IO (MVar Int)
 linkFilter mIn mOut = do
   prime <- takeMVar mIn
-  debugPrint $ show prime
+  putStrLn $ show prime
   forkIO $ primeFilter mIn mOut prime
   return mOut

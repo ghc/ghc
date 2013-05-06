@@ -334,7 +334,10 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         goto unblock2;
 
     case ThreadMigrating:
-      goto unblock2;
+      if (hasHaskellScheduler (tso))
+        goto unblock1;
+      else
+        goto unblock2;
 
     case BlockedInHaskell:
     case Yielded:
@@ -348,6 +351,7 @@ unblock1:
   /* XXX KC -- upcall threads needs to be appended to the run queue and would
    * not have an attached upcall, which would make getResumeThreadUpcall fail.
    * But is this correct? */
+    barf ("This branch is not expected to be taken?");
     goto unblock2;
   }
   tso->why_blocked = Yielded;
