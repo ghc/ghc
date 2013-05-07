@@ -54,7 +54,6 @@ module LwConc.Substrate
 , newSCont                -- IO () -> IO SCont
 , getSCont                -- PTM SCont
 , getSContIO              -- IO SCont
-, getSContId              -- SCont -> PTM Int
 
 ------------------------------------------------------------------------------
 -- Switch
@@ -87,7 +86,9 @@ module LwConc.Substrate
 
 #ifdef __GLASGOW_HASKELL__
 , newBoundSCont           -- IO () -> IO SCont
-, isCurrentThreadBound    -- IO Bool
+, isCurrentSContBound     -- IO Bool
+, isSContBound            -- SCont -> IO Bool
+, isSContBoundPTM         -- SCont -> PTM Bool
 , rtsSupportsBoundThreads -- Bool
 #endif
 
@@ -158,6 +159,7 @@ import GHC.Exception
 import GHC.Base
 import GHC.Prim
 import GHC.IO
+import qualified GHC.Foreign
 import Control.Monad    ( when )
 #endif
 
@@ -356,6 +358,37 @@ initSContStatus = SContSwitched Yielded
 
 data SCont = SCont SCont#
 
+{-
+instance Show SCont where
+   showsPrec d t =
+        showString "SCont " .
+        showsPrec d (getSContId (id2SCont t))
+
+foreign import ccall unsafe "rts_getThreadId" getSContId :: SCont# -> CInt
+
+id2SCont :: SCont -> SCont#
+id2SCont (SCont t) = t
+
+foreign import ccall unsafe "cmp_thread" cmp_scont :: SCont# -> SCont# -> CInt
+-- Returns -1, 0, 1
+
+cmpSCont :: SCont -> SCont -> Ordering
+cmpSCont t1 t2 =
+   case cmp_scont (id2SCont t1) (id2SCont t2) of
+      -1 -> LT
+      0  -> EQ
+      _  -> GT -- must be 1
+
+instance Eq SCont where
+   t1 == t2 =
+      case t1 `cmpSCont` t2 of
+         EQ -> True
+         _  -> False
+
+instance Ord SCont where
+   compare = cmpSCont
+-}
+
 {-# INLINE newSCont #-}
 newSCont :: IO () -> IO SCont
 newSCont x = do
@@ -395,11 +428,6 @@ switch arg = atomically $ do
   targetSCont <- arg currentSCont
   -- At this point we expect currentSCont status to not be Running
   switchTo targetSCont
-
-{-# INLINE getSContId #-}
-getSContId :: SCont -> PTM Int
-getSContId (SCont sc) = PTM $ \s ->
-  case getSContId# sc s of (# s, i #) -> (# s, (I# i) #)
 
 -----------------------------------------------------------------------------------
 -- SCont-local Storage (SLS)
@@ -526,7 +554,7 @@ debugPrint s = do _ <- withCStringLen (s ++ "\n") $
 ----------------------------------------------------------------------------
 
 -- | 'True' if bound threads are supported.
--- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentThreadBound'
+-- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentSContBound'
 -- will always return 'False' and both 'forkOS' and 'runInBoundThread' will
 -- fail.
 foreign import ccall rtsSupportsBoundThreads :: Bool
@@ -534,19 +562,19 @@ foreign import ccall rtsSupportsBoundThreads :: Bool
 -- | Returns 'True' if the calling thread is /bound/, that is, if it is
 -- safe to use foreign libraries that rely on thread-local state from the
 -- calling thread.
-isCurrentThreadBound :: IO Bool
-isCurrentThreadBound = IO $ \ s# ->
+isCurrentSContBound :: IO Bool
+isCurrentSContBound = IO $ \ s# ->
     case isCurrentThreadBound# s# of
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 
-isThreadBound :: SCont -> IO Bool
-isThreadBound (SCont sc) = IO $ \ s# ->
+isSContBound :: SCont -> IO Bool
+isSContBound (SCont sc) = IO $ \ s# ->
     case isThreadBound# sc s# of
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 
 
-isThreadBoundPTM :: SCont -> PTM Bool
-isThreadBoundPTM (SCont sc) = PTM $ \ s# ->
+isSContBoundPTM :: SCont -> PTM Bool
+isSContBoundPTM (SCont sc) = PTM $ \ s# ->
     case isThreadBound# sc s# of
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 
@@ -585,7 +613,7 @@ newBoundSCont action0
         when (err /= 0) $ fail "Cannot create OS thread."
         -- Wait for initialization
         let wait = do {
-          r <- isThreadBound s;
+          r <- isSContBound s;
           if r
              then
                return ()
@@ -612,7 +640,7 @@ newBoundSCont action0
 
 
 ----------------------------------------------------------------------------
--- Spinning up more schedulers (Experimental)
+-- Spinning up more capabilities (Experimental)
 
 -- Given a bound thread, assigns it a free capability. If there are no free
 -- capabilities, this call will never return!

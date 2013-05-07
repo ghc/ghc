@@ -46,21 +46,21 @@ newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> PTM ()
 yieldControlAction !(Sched pa) = do
-  cc <- getCurrentCapability
+  myCap <- getCurrentCapability
   let (_,end) = bounds pa
-	-- Try to pick work for local queue first. If the queue is empty, check other
-	-- queues. If every queue is empty, put the capability to sleep.
-  let l::[Int] = cc:(filter (\i -> i /= cc) [0..end])
-  res <- foldM maybeSkip Nothing l
+  -- Try to pick work for local queue first. If the queue is empty, check other
+  -- queues. If every queue is empty, put the capability to sleep.
+  let l::[Int] = myCap:(filter (\i -> i /= myCap) [0..end])
+  res <- foldM (maybeSkip myCap) Nothing l
   case res of
     Nothing -> sleepCapability
     Just x -> switchTo x
   where
-    maybeSkip mx cc = case mx of
-                        Nothing -> checkQ cc
+    maybeSkip myCap mx cc = case mx of
+                        Nothing -> checkQ cc myCap
                         Just x -> return $ Just x
 
-    checkQ cc = do
+    checkQ cc myCap = do
       let !(frontRef, backRef)= pa ! cc
       front <- readPVar frontRef
       case front of

@@ -654,7 +654,7 @@ threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName PtrRep
 
 %************************************************************************
 %*									*
-\subsection[TysPrim-HEC]{The ``HEC'' type}
+\subsection[TysPrim-SCont]{The ``SCont'' type}
 %*									*
 %************************************************************************
 
