@@ -278,7 +278,7 @@ listTc :: TyCon
 listTc = typeRepTyCon (typeOf [()])
 
 funTc :: TyCon
-funTc = mkTyCon3 "ghc-prim" "GHC.Types" "->"
+funTc = typeRepTyCon (typeRep (Proxy :: Proxy (->)))
 
 -------------------------------------------------------------
 --
@@ -292,18 +292,7 @@ INSTANCE_TYPEABLE0((),unitTc,"()")
 INSTANCE_TYPEABLE1([],listTc,"[]")
 INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
 INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
-#if defined(__GLASGOW_HASKELL__)
-{-
-TODO: Deriving this instance fails with:
-libraries/base/Data/Typeable.hs:589:1:
-    Can't make a derived instance of `Typeable2 (->)':
-      The last argument of the instance must be a data or newtype application
-    In the stand-alone deriving instance for `Typeable2 (->)'
--}
-instance Typeable (->) where { typeRep _ = mkTyConApp funTc [] }
-#else
 INSTANCE_TYPEABLE2((->),funTc,"->")
-#endif
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
@@ -371,15 +360,5 @@ INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 #ifdef __GLASGOW_HASKELL__
-{-
-TODO: This can't be derived currently:
-libraries/base/Data/Typeable.hs:674:1:
-    Can't make a derived instance of `Typeable RealWorld':
-      The last argument of the instance must be a data or newtype application
-    In the stand-alone deriving instance for `Typeable RealWorld'
--}
-realWorldTc :: TyCon; \
-realWorldTc = mkTyCon3 "ghc-prim" "GHC.Types" "RealWorld"; \
-instance Typeable RealWorld where { typeRep _ = mkTyConApp realWorldTc [] }
-
+deriving instance Typeable RealWorld
 #endif
