@@ -683,7 +683,8 @@ mkEqnHelp :: CtOrigin -> [TyVar] -> Class -> [Type] -> Type
 
 mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
-  , isAlgTyCon tycon    -- Check for functions, primitive types etc
+  , className cls == typeableClassName || isAlgTyCon tycon
+  -- Avoid functions, primitive types, etc, unless it's Typeable
   = mk_alg_eqn tycon tc_args
   | otherwise
   = failWithTc (derivingThingErr False cls cls_tys tc_app
