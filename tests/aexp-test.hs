@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-import LwConc.Concurrent
+import LwConc.RunQueue
 import LwConc.MVar
 import Data.Typeable
 import qualified Control.Exception as Exception

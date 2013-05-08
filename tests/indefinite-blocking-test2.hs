@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import LwConc.Concurrent
+import LwConc.RunQueue
 import LwConc.MVar
 import System.Environment
 import Control.Exception

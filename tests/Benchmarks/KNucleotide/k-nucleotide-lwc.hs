@@ -11,7 +11,7 @@ import qualified Data.ByteString.Char8 as S
 import Control.Applicative
 import Control.Monad
 import LwConc.Substrate
-import LwConc.ConcurrentList
+import LwConc.RunQueue
 import LwConc.MVar
 import Foreign.Storable
 import Foreign.Marshal.Alloc

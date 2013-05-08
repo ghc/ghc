@@ -1,7 +1,7 @@
 {-# Language ScopedTypeVariables #-}
 module Main where
 
-import LwConc.Concurrent
+import LwConc.RunQueue
 import PChan
 import LwConc.MVar
 import LwConc.Substrate

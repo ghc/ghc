@@ -2,7 +2,7 @@ import System.Environment
 import System.IO
 import Foreign
 import Foreign.Marshal.Array
-import LwConc.Concurrent
+import LwConc.RunQueue
 import LwConc.Substrate
 import LwConc.MVar
 import Control.Monad

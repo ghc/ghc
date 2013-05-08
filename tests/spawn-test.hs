@@ -1,4 +1,4 @@
-import LwConc.Concurrent
+import LwConc.RunQueue
 import LwConc.Substrate
 import System.Environment
 
