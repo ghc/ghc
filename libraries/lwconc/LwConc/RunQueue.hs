@@ -47,8 +47,8 @@ import Data.Dynamic
 newtype Sched = Sched (Array Int(PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
-yieldControlAction :: Sched -> PTM ()
-yieldControlAction (Sched pa) = do
+yieldControlAction :: Sched -> SCont -> PTM ()
+yieldControlAction (Sched pa) _ = do
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
   let (frontRef, backRef)= pa ! cc
@@ -118,12 +118,12 @@ newCapability = do
  }
  -- Create and initialize new task
  s <- newSCont initTask
- atomically $ do {
-   yca <- getYieldControlAction;
-   setYieldControlAction s yca;
-   ssa <- getScheduleSContAction;
+ atomically $ do
+   mySC <- getSCont
+   yca <- getYieldControlActionSCont mySC
+   setYieldControlAction s yca
+   ssa <- getScheduleSContActionSCont mySC
    setScheduleSContAction s ssa
- }
  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound
@@ -150,25 +150,24 @@ fork task on kind = do
   let token::PVar Int = case fromDynamic tls of
                           Nothing -> error "TLS"
                           Just x -> x
-  t <- atomically $ do {
+  t <- atomically $ do
+    mySC <- getSCont
     -- Initialize scheduler actions
-    yca <- getYieldControlAction;
-    setYieldControlAction newSC yca;
-    ssa <- getScheduleSContAction;
-    setScheduleSContAction newSC ssa;
-    t <- readPVar token;
-    writePVar token $ (t+1) `mod` nc;
+    yca <- getYieldControlActionSCont mySC
+    setYieldControlAction newSC yca
+    ssa <- getScheduleSContActionSCont mySC
+    setScheduleSContAction newSC ssa
+    t <- readPVar token
+    writePVar token $ (t+1) `mod` nc
     return t
-  }
   -- Set SCont Affinity
   case on of
     Nothing -> setSContCapability newSC t
     Just t' -> setSContCapability newSC $ t' `mod` nc
   -- Schedule new Scont
-  atomically $ do {
-    ssa <- getScheduleSContAction;
+  atomically $ do
+    ssa <- getScheduleSContActionSCont newSC
     ssa newSC
-  }
   return newSC
 
 _INL_(forkIO)
@@ -190,8 +189,7 @@ yield = atomically $ do
   s <- getSCont
   setSContSwitchReason s Yielded
   -- Append current SCont to scheduler
-  ssa <- getScheduleSContAction
-  let append = ssa s
+  append <- getScheduleSContAction
   append
   -- Switch to next SCont from Scheduler
   switchToNext <- getYieldControlAction

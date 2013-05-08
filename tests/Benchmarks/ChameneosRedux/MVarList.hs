@@ -128,7 +128,7 @@ putMVarPTM (MVar ref) x token = do
          blockAct <- getYieldControlAction
          sc <- getSCont
          unblockAct <- getScheduleSContAction
-         let !wakeup = unblockAct sc
+         let !wakeup = unblockAct
          writePVar ref $! Full x' $! enque ts (x, wakeup)
          setSContSwitchReason sc $! BlockedInHaskell token
          blockAct
@@ -147,7 +147,7 @@ takeMVarWithHole (MVar ref) hole token = do
         blockAct <- getYieldControlAction
         sc <- getSCont
         unblockAct <- getScheduleSContAction
-        let !wakeup = unblockAct sc
+        let !wakeup = unblockAct
         writePVar ref $! Empty $! enque ts (hole, wakeup)
         setSContSwitchReason sc $! BlockedInHaskell token
         blockAct

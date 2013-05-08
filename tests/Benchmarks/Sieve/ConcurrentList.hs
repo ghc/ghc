@@ -43,8 +43,10 @@ import Data.Dynamic
 newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
-yieldControlAction :: Sched -> PTM ()
-yieldControlAction !(Sched pa) = do
+yieldControlAction :: Sched -> SCont -> PTM ()
+yieldControlAction !(Sched pa) !sc = do
+  stat <- getSContStatus sc
+  unsafeIOToPTM $ debugPrint $ "yca: " ++ show sc ++ " " ++ show stat
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
   let !(frontRef, backRef)= pa ! cc
@@ -65,6 +67,8 @@ yieldControlAction !(Sched pa) = do
 _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction !(Sched pa) !sc = do
+  stat <- getSContStatus sc
+  unsafeIOToPTM $ debugPrint $ "ssa: " ++ show sc ++ " " ++ show stat
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
@@ -114,9 +118,10 @@ newCapability = do
  -- Create and initialize new task
  s <- newSCont initTask
  atomically $ do
-   yca <- getYieldControlAction
+   mySC <- getSCont
+   yca <- getYieldControlActionSCont mySC
    setYieldControlAction s yca
-   ssa <- getScheduleSContAction
+   ssa <- getScheduleSContActionSCont mySC
    setScheduleSContAction s ssa
  scheduleSContOnFreeCap s
 
@@ -144,25 +149,24 @@ fork task on kind = do
   let token::PVar Int = case fromDynamic tls of
                           Nothing -> error "TLS"
                           Just x -> x
-  t <- atomically $ do {
+  t <- atomically $ do
+    mySC <- getSCont
     -- Initialize scheduler actions
-    yca <- getYieldControlAction;
-    setYieldControlAction newSC yca;
-    ssa <- getScheduleSContAction;
-    setScheduleSContAction newSC ssa;
-    t <- readPVar token;
-    writePVar token $ (t+1) `mod` nc;
+    yca <- getYieldControlActionSCont mySC
+    setYieldControlAction newSC yca
+    ssa <- getScheduleSContActionSCont mySC
+    setScheduleSContAction newSC ssa
+    t <- readPVar token
+    writePVar token $ (t+1) `mod` nc
     return t
-  }
   -- Set SCont Affinity
   case on of
     Nothing -> setSContCapability newSC t
     Just t' -> setSContCapability newSC $ t' `mod` nc
   -- Schedule new Scont
-  atomically $ do {
-    ssa <- getScheduleSContAction;
+  atomically $ do
+    ssa <- getScheduleSContActionSCont newSC
     ssa newSC
-  }
   return newSC
 
 _INL_(forkIO)
@@ -181,11 +185,11 @@ forkOn on task = fork task (Just on) Unbound
 _INL_(yield)
 yield :: IO ()
 yield = atomically $ do
+  -- Update SCont status to Yielded
   s <- getSCont
   setSContSwitchReason s Yielded
   -- Append current SCont to scheduler
-  ssa <- getScheduleSContAction
-  let append = ssa s
+  append <- getScheduleSContAction
   append
   -- Switch to next SCont from Scheduler
   switchToNext <- getYieldControlAction

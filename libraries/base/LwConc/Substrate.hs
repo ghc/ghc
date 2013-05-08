@@ -6,6 +6,7 @@
            , ScopedTypeVariables
            , DeriveDataTypeable
            , StandaloneDeriving
+					 , UnliftedFFITypes
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports -w -XBangPatterns #-}
 
@@ -96,13 +97,15 @@ module LwConc.Substrate
 -- Upcall actions
 ------------------------------------------------------------------------------
 
-, setScheduleSContAction  -- SCont -> (SCont -> PTM ()) -> PTM ()
-, getScheduleSContAction  -- PTM (SCont -> PTM ())
+, setScheduleSContAction  			-- SCont -> (SCont -> PTM ()) -> PTM ()
+, getScheduleSContActionSCont   -- SCont -> PTM (SCont -> PTM ())
+, getScheduleSContAction  			-- PTM (PTM ())
 
-, setYieldControlAction   -- SCont -> PTM () -> PTM ()
-, getYieldControlAction   -- PTM (PTM ())
+, setYieldControlAction   			-- SCont -> (SCont -> PTM ()) -> PTM ()
+, getYieldControlActionSCont   	-- SCont -> PTM (SCont -> PTM ())
+, getYieldControlAction   			-- PTM (PTM ())
 
-, setFinalizer            -- SCont -> IO () -> IO ()
+, setFinalizer            			-- SCont -> IO () -> IO ()
 
 ------------------------------------------------------------------------------
 -- Capability Management
@@ -364,9 +367,8 @@ initSContStatus = SContSwitched Yielded
 -- One-shot continuations (SCont)
 -----------------------------------------------------------------------------------
 
-data SCont = SCont SCont#
+data SCont = SCont SCont# deriving( Typeable )
 
-{-
 instance Show SCont where
    showsPrec d t =
         showString "SCont " .
@@ -395,7 +397,6 @@ instance Eq SCont where
 
 instance Ord SCont where
    compare = cmpSCont
--}
 
 {-# INLINE newSCont #-}
 newSCont :: IO () -> IO SCont
@@ -455,12 +456,12 @@ getSLS (SCont sc) = PTM $ \s -> getSLS# sc s
 -----------------------------------------------------------------------------------
 
 {-# INLINE setYieldControlAction #-}
-setYieldControlAction :: SCont -> PTM () -> PTM ()
+setYieldControlAction :: SCont -> (SCont -> PTM ()) -> PTM ()
 setYieldControlAction (SCont sc) b = PTM $ \s ->
   case (setYieldControlAction# sc b s) of s -> (# s, () #)
 
 {-# INLINE getYieldControlActionSCont #-}
-getYieldControlActionSCont :: SCont -> PTM (PTM ())
+getYieldControlActionSCont :: SCont -> PTM (SCont -> PTM ())
 getYieldControlActionSCont (SCont sc) =
   PTM $ \s -> getYieldControlAction# sc s
 
@@ -469,7 +470,7 @@ getYieldControlAction :: PTM (PTM ())
 getYieldControlAction = do
   currentSCont <- getSCont
   s <- getYieldControlActionSCont currentSCont
-  return s
+  return $ s currentSCont
 
 {-# INLINE yieldControlActionRts #-}
 yieldControlActionRts :: SCont -> IO () -- used by RTS
@@ -496,7 +497,7 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
 
       otherwise -> error "yieldControlAction: Impossible status"
   switch <- getYieldControlActionSCont sc
-  switch) (\e -> do {
+  switch sc) (\e -> do {
                       hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
                       error "LwConc.Substrate.yieldControlActionRTS"
                       })
@@ -516,11 +517,11 @@ getScheduleSContActionSCont (SCont sc) =
   PTM $ \s -> getScheduleSContAction# sc s
 
 {-# INLINE getScheduleSContAction #-}
-getScheduleSContAction :: PTM (SCont -> PTM ())
+getScheduleSContAction :: PTM (PTM ())
 getScheduleSContAction = do
   currentSCont <- getSCont
   u <- getScheduleSContActionSCont currentSCont
-  return u
+  return $ u currentSCont
 
 {-# INLINE scheduleSContActionRts #-}
 scheduleSContActionRts :: SCont -> IO () -- used by RTS

@@ -43,10 +43,12 @@ import Data.Dynamic
 newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
-yieldControlAction :: Sched -> PTM ()
-yieldControlAction !(Sched pa) = do
+yieldControlAction :: Sched -> SCont -> PTM ()
+yieldControlAction !(Sched pa) sc = do
+  stat <- getSContStatus sc
+  unsafeIOToPTM $ debugPrint $ "YCA: " ++ show sc ++ " " ++ show stat
   -- Fetch current capability's scheduler
-  cc <- getCurrentCapability
+  cc <- getSContCapability sc
   let !(frontRef, backRef) = pa ! cc
   front <- readPVar frontRef
   case front of
@@ -66,6 +68,7 @@ _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction !(Sched pa) !sc = do
   stat <- getSContStatus sc
+  unsafeIOToPTM $ debugPrint $ "SSA: " ++ show sc ++ " " ++ show stat
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
@@ -81,36 +84,38 @@ scheduleSContAction !(Sched pa) !sc = do
 
 
 _INL_(newSched)
-newSched:: IO (Sched)
+newSched :: IO (Sched)
 newSched = do
   -- This token will be used to spawn in a round-robin fashion on different
   -- capabilities.
   token <- newPVarIO (0::Int)
-  -- Save the token in the Thread-local State (SLS)
+  -- Save the token in the Thread-local State (TLS)
   s <- getSContIO
   setSLS s $ toDyn token
   -- Create the scheduler data structure
   nc <- getNumCapabilities
   rl <- createPVarList nc []
-  let !sched = Sched (listArray (0, nc-1) rl)
+  let sched = Sched (listArray (0, nc-1) rl)
   -- Initialize scheduler actions
-  atomically $ do
-    setYieldControlAction s $! yieldControlAction sched
-    setScheduleSContAction s $! scheduleSContAction sched
+  atomically $ do {
+  setYieldControlAction s $ yieldControlAction sched;
+  setScheduleSContAction s $ scheduleSContAction sched
+  }
   -- return scheduler
   return sched
   where
     createPVarList 0 l = return l
-    createPVarList n l = do
-      frontRef <- newPVarIO []
-      backRef <- newPVarIO []
-      createPVarList (n-1) $! (frontRef,backRef):l
+    createPVarList n l = do {
+      frontRef <- newPVarIO [];
+      backRef <- newPVarIO [];
+      createPVarList (n-1) $ (frontRef,backRef):l
+    }
 
 _INL_(newCapability)
 newCapability :: IO ()
 newCapability = do
  -- Initial task body
- let !initTask = atomically $ do {
+ let initTask = atomically $ do {
   s <- getSCont;
   yca <- getYieldControlAction;
   setSContSwitchReason s Completed;
@@ -119,9 +124,10 @@ newCapability = do
  -- Create and initialize new task
  s <- newSCont initTask
  atomically $ do
-   yca <- getYieldControlAction
+   mySC <- getSCont
+   yca <- getYieldControlActionSCont mySC
    setYieldControlAction s yca
-   ssa <- getScheduleSContAction
+   ssa <- getScheduleSContActionSCont mySC
    setScheduleSContAction s ssa
  scheduleSContOnFreeCap s
 
@@ -129,45 +135,44 @@ data SContKind = Bound | Unbound
 
 _INL_(fork)
 fork :: IO () -> Maybe Int -> SContKind -> IO SCont
-fork !task !on !kind = do
+fork task on kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
   -- epilogue: Switch to next thread after completion
-  let !epilogue = atomically $ do {
+  let epilogue = atomically $ do {
     sc <- getSCont;
     setSContSwitchReason sc Completed;
     switchToNext <- getYieldControlAction;
     switchToNext
   }
-  let !makeSCont = case kind of
+  let makeSCont = case kind of
                     Bound -> newBoundSCont
                     Unbound -> newSCont
   newSC <- makeSCont (task >> epilogue)
-  -- Initialize SLS
-  sls <- atomically $ getSLS currentSC
-  setSLS newSC $ sls
-  let token::PVar Int = case fromDynamic sls of
-                          Nothing -> error "SLS"
+  -- Initialize TLS
+  tls <- atomically $ getSLS currentSC
+  setSLS newSC $ tls
+  let token::PVar Int = case fromDynamic tls of
+                          Nothing -> error "TLS"
                           Just x -> x
-  t <- atomically $ do {
+  t <- atomically $ do
+    mySC <- getSCont
     -- Initialize scheduler actions
-    yca <- getYieldControlAction;
-    setYieldControlAction newSC yca;
-    ssa <- getScheduleSContAction;
-    setScheduleSContAction newSC ssa;
-    t <- readPVar token;
-    writePVar token $ (t+1) `mod` nc;
+    yca <- getYieldControlActionSCont mySC
+    setYieldControlAction newSC yca
+    ssa <- getScheduleSContActionSCont mySC
+    setScheduleSContAction newSC ssa
+    t <- readPVar token
+    writePVar token $ (t+1) `mod` nc
     return t
-  }
   -- Set SCont Affinity
   case on of
     Nothing -> setSContCapability newSC t
-    Just t' -> setSContCapability newSC (t' `mod` nc)
+    Just t' -> setSContCapability newSC $ t' `mod` nc
   -- Schedule new Scont
-  atomically $ do {
-    ssa <- getScheduleSContAction;
+  atomically $ do
+    ssa <- getScheduleSContActionSCont newSC
     ssa newSC
-  }
   return newSC
 
 _INL_(forkIO)
@@ -186,10 +191,11 @@ forkOn on task = fork task (Just on) Unbound
 _INL_(yield)
 yield :: IO ()
 yield = atomically $ do
+  -- Update SCont status to Yielded
   s <- getSCont
+  setSContSwitchReason s Yielded
   -- Append current SCont to scheduler
-  ssa <- getScheduleSContAction
-  let !append = ssa s
+  append <- getScheduleSContAction
   append
   -- Switch to next SCont from Scheduler
   switchToNext <- getYieldControlAction

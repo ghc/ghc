@@ -87,7 +87,6 @@ readMVar (MVar ref) = do
     case st of
          Empty ts -> do
            blockAct <- getYieldControlAction
-           sc <- getSCont
            unblockAct <- getScheduleSContAction
            token <- newResumeToken
            let wakeup = do {
@@ -97,11 +96,12 @@ readMVar (MVar ref) = do
              -- Should I resume?
              v <- isResumeTokenValid token;
              if v then
-               unblockAct sc
+               unblockAct
              else
                return ()
            }
            writePVar ref $ Empty $ enque ts (hole, wakeup)
+           sc <- getSCont
            setSContSwitchReason sc $ BlockedInHaskell token
            blockAct
          Full x _ -> unsafeIOToPTM $ writeIORef hole x
@@ -116,7 +116,6 @@ swapMVar (MVar ref) newValue = do
     case st of
       Empty ts -> do
         blockAct <- getYieldControlAction
-        sc <- getSCont
         unblockAct <- getScheduleSContAction
         token <- newResumeToken
         let wakeup = do {
@@ -127,11 +126,12 @@ swapMVar (MVar ref) newValue = do
           -- Should I resume?
           v <- isResumeTokenValid token;
           if v then
-            unblockAct sc
+            unblockAct
           else
             return ()
         }
         writePVar ref $ Empty $ enque ts (hole, wakeup)
+        sc <- getSCont
         setSContSwitchReason sc $ BlockedInHaskell token
         blockAct
       Full x ts -> do
@@ -184,17 +184,17 @@ putMVarPTM (MVar ref) x = do
              wakeup
        Full x' ts -> do
          blockAct <- getYieldControlAction
-         sc <- getSCont
          unblockAct <- getScheduleSContAction
          token <- newResumeToken
          let wakeup = do {
            v <- isResumeTokenValid token;
            if v then
-             unblockAct sc
+             unblockAct
            else
              return ()
          }
          writePVar ref $ Full x' $ enque ts (x, wakeup)
+         sc <- getSCont
          setSContSwitchReason sc $ BlockedInHaskell token
          blockAct
 
@@ -210,17 +210,17 @@ takeMVarWithHole (MVar ref) hole = do
     case st of
       Empty ts -> do
         blockAct <- getYieldControlAction
-        sc <- getSCont
         unblockAct <- getScheduleSContAction
         token <- newResumeToken
         let wakeup = do {
           v <- isResumeTokenValid token;
           if v then
-            unblockAct sc
+            unblockAct
           else
             return ()
         }
         writePVar ref $ Empty $ enque ts (hole, wakeup)
+        sc <- getSCont
         setSContSwitchReason sc $ BlockedInHaskell token
         blockAct
       Full x ts -> do

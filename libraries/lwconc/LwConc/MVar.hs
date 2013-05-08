@@ -79,7 +79,7 @@ readMVar (MVar ref) = do
              -- Should I resume?
              v <- isResumeTokenValid token;
              if v then
-               unblockAct sc
+               unblockAct
              else
                return ()
            }
@@ -109,7 +109,7 @@ swapMVar (MVar ref) newValue = do
              -- Should I resume?
              v <- isResumeTokenValid token;
              if v then
-               unblockAct sc
+               unblockAct
              else
                return ()
            }
@@ -166,7 +166,7 @@ putMVarPTM (MVar ref) x = do
          let wakeup = do {
            v <- isResumeTokenValid token;
            if v then
-             unblockAct sc
+             unblockAct
            else
              return ()
          }
@@ -192,7 +192,7 @@ takeMVarWithHole (MVar ref) hole = do
            let wakeup = do {
              v <- isResumeTokenValid token;
              if v then
-               unblockAct sc
+               unblockAct
              else
                return ()
            }
