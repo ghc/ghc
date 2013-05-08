@@ -1,8 +1,7 @@
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LwConc.Schedulers.ConcurrentList
+-- Module      :  LwConc.RunQueueStealing
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
@@ -10,12 +9,17 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
 --
--- A concurrent round-robin scheduler.
+-- A round-robin scheduler with one runqueue per capability. New threads are
+-- spawned in a round-robin fashion on each capability. If a capability's run
+-- queue is empty, then look for work from other schedulers. Stealing algorithm
+-- is Naive - SConts bounce needlessly between capabilities.
+--
+-- XXX KC -- The performance is strictly poorer than LwConc.RunQueue
 --
 -----------------------------------------------------------------------------
 
 
-module LwConc.ConcurrentList
+module LwConc.RunQueueStealing
 (
   Sched
 , SCont
@@ -35,44 +39,57 @@ module LwConc.ConcurrentList
 import LwConc.Substrate
 import Data.Array.IArray
 import Data.Dynamic
+import Control.Monad
 
 #define _INL_(x) {-# INLINE x #-}
 
 -- The scheduler data structure has one (PVar [SCont], PVar [SCont]) for every
 -- capability.
-newtype Sched = Sched (Array Int(PVar [SCont], PVar [SCont]))
+newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> PTM ()
 yieldControlAction (Sched pa) = do
-  -- Fetch current capability's scheduler
-  cc <- getCurrentCapability
-  let (frontRef, backRef)= pa ! cc
-  front <- readPVar frontRef
-  case front of
-    [] -> do
-      back <- readPVar backRef
-      case reverse back of
-        [] -> sleepCapability
+  myCap <- getCurrentCapability
+  let (_,end) = bounds pa
+  -- Try to pick work for local queue first. If the queue is empty, check other
+  -- queues. If every queue is empty, put the capability to sleep.
+  let l::[Int] = myCap:(filter (\i -> i /= myCap) [0..end])
+  res <- foldM maybeSkip Nothing l
+  case res of
+    Nothing -> sleepCapability
+    Just x -> switchTo x
+  where
+    maybeSkip mx cc = case mx of
+                        Nothing -> checkQ cc
+                        Just x -> return $ Just x
+
+    checkQ cc = do
+      let (frontRef, backRef)= pa ! cc
+      front <- readPVar frontRef
+      case front of
+        [] -> do
+          back <- readPVar backRef
+          case reverse back of
+            [] -> return Nothing
+            x:tl -> do
+              writePVar frontRef tl
+              writePVar backRef []
+              return $ Just x
         x:tl -> do
-          writePVar frontRef tl
-          writePVar backRef []
-          switchTo x
-    x:tl -> do
-      writePVar frontRef $ tl
-      switchTo x
+          writePVar frontRef $ tl
+          return $ Just x
 
 _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction (Sched pa) sc = do
-  stat <- getSContStatus sc
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
   cap <- getSContCapability sc
   let (_,backRef) = pa ! cap
   back <- readPVar backRef
-  writePVar backRef $ sc:back
+  writePVar backRef $! sc:back
 
 
 _INL_(newSched)
@@ -115,12 +132,11 @@ newCapability = do
  }
  -- Create and initialize new task
  s <- newSCont initTask
- atomically $ do {
-   yca <- getYieldControlAction;
-   setYieldControlAction s yca;
-   ssa <- getScheduleSContAction;
+ atomically $ do
+   yca <- getYieldControlAction
+   setYieldControlAction s yca
+   ssa <- getScheduleSContAction
    setScheduleSContAction s ssa
- }
  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound
@@ -185,6 +201,7 @@ _INL_(yield)
 yield :: IO ()
 yield = atomically $ do
   s <- getSCont
+  setSContSwitchReason s Yielded
   -- Append current SCont to scheduler
   ssa <- getScheduleSContAction
   let append = ssa s

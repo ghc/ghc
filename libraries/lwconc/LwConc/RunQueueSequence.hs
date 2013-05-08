@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LwConc.Schedulers.ConcurrentList
+-- Module      :  LwConc.RunQueueSequence
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
@@ -10,12 +10,16 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
 --
--- A concurrent round-robin scheduler.
+-- A round-robin scheduler with one runqueue per capability. New threads are
+-- spawned in a round-robin fashion on each capability. Uses Data.Sequence for
+-- representing the run queues.
+--
+-- XXX KC -- The performance is strictly poorer than LwConc.RunQueue
 --
 -----------------------------------------------------------------------------
 
 
-module ConcurrentList
+module LwConc.RunQueueSequence
 (
   Sched
 , SCont
@@ -24,7 +28,6 @@ module ConcurrentList
 , newCapability      -- IO ()
 , forkIO             -- IO () -> IO SCont
 , forkOS             -- IO () -> IO SCont
-, forkOn             -- Int -> IO () -> IO SCont
 , yield              -- IO ()
 
 , throwTo            -- Exception e => SCont -> e -> IO ()
@@ -33,45 +36,43 @@ module ConcurrentList
 ) where
 
 import LwConc.Substrate
+import Data.Sequence
 import Data.Array.IArray
 import Data.Dynamic
 
-#include "profile.h"
+#define _INL_(x) {-# INLINE x #-}
 
--- The scheduler data structure has one (PVar [SCont], PVar [SCont]) for every
--- capability.
-newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
+-- The scheduler data structure has one (PVar (Seq SCont)) for every capability.
+newtype Sched = Sched (Array Int (PVar (Seq SCont)))
 
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> PTM ()
-yieldControlAction !(Sched pa) = do
+yieldControlAction (Sched pa) = do
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
-  let !(frontRef, backRef)= pa ! cc
-  front <- readPVar frontRef
-  case front of
-    [] -> do
-      back <- readPVar backRef
-      case reverse back of
-        [] -> sleepCapability
-        x:tl -> do
-          writePVar frontRef tl
-          writePVar backRef []
-          switchTo x
-    x:tl -> do
-      writePVar frontRef $ tl
+  let ref = pa ! cc
+  contents <- readPVar ref
+  -- If there are no runnable tasks, sleep. Otherwise, switch to the runnable
+  -- task from the head of the sequence.
+  case contents of
+    (viewl -> EmptyL) -> do
+      sleepCapability
+    (viewl -> x :< tl) -> do
+      writePVar ref tl
       switchTo x
 
 _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
-scheduleSContAction !(Sched pa) !sc = do
+scheduleSContAction (Sched pa) sc = do
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
-  !cap <- getSContCapability sc
-  let (_,backRef) = pa ! cap
-  !back <- readPVar backRef
-  writePVar backRef $! sc:back
+  cap <- getSContCapability sc
+  let ref = pa ! cap
+  contents <- readPVar ref
+  -- Append the given task to the tail.
+  writePVar ref $ contents |> sc
+
 
 _INL_(newSched)
 newSched :: IO (Sched)
@@ -96,9 +97,8 @@ newSched = do
   where
     createPVarList 0 l = return l
     createPVarList n l = do {
-      frontRef <- newPVarIO [];
-      backRef <- newPVarIO [];
-      createPVarList (n-1) $ (frontRef,backRef):l
+      ref <- newPVarIO empty;
+      createPVarList (n-1) $ ref:l
     }
 
 _INL_(newCapability)
@@ -113,18 +113,19 @@ newCapability = do
  }
  -- Create and initialize new task
  s <- newSCont initTask
- atomically $ do
-   yca <- getYieldControlAction
-   setYieldControlAction s yca
-   ssa <- getScheduleSContAction
+ atomically $ do {
+   yca <- getYieldControlAction;
+   setYieldControlAction s yca;
+   ssa <- getScheduleSContAction;
    setScheduleSContAction s ssa
+ }
  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound
 
 _INL_(fork)
-fork :: IO () -> Maybe Int -> SContKind -> IO SCont
-fork task on kind = do
+fork :: IO () -> SContKind -> IO SCont
+fork task kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
   -- epilogue: Switch to next thread after completion
@@ -155,9 +156,7 @@ fork task on kind = do
     return t
   }
   -- Set SCont Affinity
-  case on of
-    Nothing -> setSContCapability newSC t
-    Just t' -> setSContCapability newSC $ t' `mod` nc
+  setSContCapability newSC t
   -- Schedule new Scont
   atomically $ do {
     ssa <- getScheduleSContAction;
@@ -167,16 +166,11 @@ fork task on kind = do
 
 _INL_(forkIO)
 forkIO :: IO () -> IO SCont
-forkIO task = fork task Nothing Unbound
+forkIO task = fork task Unbound
 
 _INL_(forkOS)
 forkOS :: IO () -> IO SCont
-forkOS task = fork task Nothing Bound
-
-_INL_(forkOn)
-forkOn :: Int -> IO () -> IO SCont
-forkOn on task = fork task (Just on) Unbound
-
+forkOS task = fork task Bound
 
 _INL_(yield)
 yield :: IO ()

@@ -20,7 +20,6 @@ primeFilter :: MVar Int -> MVar Int -> Int -> IO ()
 primeFilter mIn mOut prime = do
   forever $ do
     i <- takeMVar mIn
-    yield
     when (i `mod` prime /= 0) (putMVar mOut i)
 
 -- Take the first commandline argument and call it numArg.

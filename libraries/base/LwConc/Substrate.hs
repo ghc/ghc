@@ -295,6 +295,12 @@ writePVar (PVar tvar#) val = PTM $ \s1# ->
 
 newtype ResumeToken = ResumeToken (PVar Bool)
 
+instance Show ResumeToken where
+  show _ = "rt"
+
+instance Eq ResumeToken where
+  (==) (ResumeToken a) (ResumeToken b) = a == b
+
 {-# INLINE newResumeToken #-}
 newResumeToken :: PTM ResumeToken
 newResumeToken = do
@@ -315,11 +321,13 @@ isResumeTokenValid (ResumeToken t) = do
 data SContStatus = SContRunning |
                    SContKilled |
                    SContSwitched SContSwitchReason
+                   deriving (Eq, Show)
 
 data SContSwitchReason = Yielded |
                          BlockedInHaskell ResumeToken |
                          BlockedInRTS |
                          Completed
+                         deriving (Eq, Show)
 
 getIntFromStatus x = case x of
                           SContRunning -> 0
@@ -472,8 +480,20 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
   setSContSwitchReason mySC Completed
   stat <- getSContStatus sc
   case stat of
-      SContRunning -> setSContStatus sc $ SContSwitched BlockedInRTS -- Hasn't been unblocked yet
-      SContSwitched Yielded -> return () -- Has been unblocked and put on the run queue
+
+      -- SCont hasn't been unblocked yet. This occurs if the SCont is blocked
+      -- on a blackhole, throwTo, RTS MVar, safe foreign call etc,. In such
+      -- cases, we are likely to perform yieldControlAction (and give up
+      -- control of the scheduler) before the scheduleSContAction is performed.
+      -- This blocked thread might be unblocked eventually.
+      SContRunning -> setSContStatus sc $ SContSwitched BlockedInRTS
+
+      -- SCont has been unblocked and put on the run queue. This occurs if the
+      -- current thread has yielded on a timer interrupt. In this case, we
+      -- would have evaluated this thread's scheduleSContAction already, which
+      -- sets the SCont status to Yielded.
+      SContSwitched Yielded -> return ()
+
       otherwise -> error "yieldControlAction: Impossible status"
   switch <- getYieldControlActionSCont sc
   switch) (\e -> do {
@@ -509,7 +529,6 @@ scheduleSContActionRts sc = Exception.catch (atomically $ do
   case stat of
     SContSwitched (BlockedInHaskell (ResumeToken t)) -> writePVar t False
     otherwise -> return ()
-  -- setSContStatus sc $ SContSwitched Yielded
   unblock <- getScheduleSContActionSCont sc
   unblock sc) (\e -> do {
                       hPutStrLn stderr ("ERROR:" ++ show (e::IOException));

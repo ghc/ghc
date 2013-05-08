@@ -152,7 +152,7 @@ createThread(Capability *cap, W_ size)
  * instances of Eq/Ord for ThreadIds.
  * ------------------------------------------------------------------------ */
 
-  int
+int
 cmp_thread(StgPtr tso1, StgPtr tso2)
 {
   StgThreadID id1 = ((StgTSO *)tso1)->id;
@@ -168,7 +168,7 @@ cmp_thread(StgPtr tso1, StgPtr tso2)
  *
  * This is used in the implementation of Show for ThreadIds.
  * ------------------------------------------------------------------------ */
-  int
+int
 rts_getThreadId(StgPtr tso)
 {
   return ((StgTSO *)tso)->id;

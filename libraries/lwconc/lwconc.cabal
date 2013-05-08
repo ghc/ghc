@@ -15,8 +15,9 @@ source-repository head
 
 Library
     exposed-modules:
-      LwConc.ConcurrentSequence
-      LwConc.ConcurrentList
+      LwConc.RunQueueSequence
+      LwConc.RunQueue
+      LwConc.RunQueueStealing
       LwConc.MVarList
       LwConc.MVar
       LwConc.PTM
