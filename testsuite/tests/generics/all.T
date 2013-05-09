@@ -25,3 +25,8 @@ test('GenCannotDoRep1_5', normal, compile_fail, [''])
 test('GenCannotDoRep1_6', normal, compile_fail, [''])
 test('GenCannotDoRep1_7', normal, compile_fail, [''])
 test('GenCannotDoRep1_8', normal, compile_fail, [''])
+
+test('T7878', extra_clean(['T7878A.o'     ,'T7878A.hi'
+                          ,'T7878A.o-boot','T7878A.hi-boot'
+                          ,'T7878B.o'     ,'T7878B.hi']), 
+              multimod_compile, ['T7878', '-v0'])
