@@ -255,7 +255,7 @@ tickyEnterThunk cl_info
         | otherwise = if updatable then fsLit "ENT_DYN_THK_SINGLE_ctr"
                                    else fsLit "ENT_DYN_THK_MANY_ctr"
 
-tickyEnterStdThunk :: FCode ()
+tickyEnterStdThunk :: ClosureInfo -> FCode ()
 tickyEnterStdThunk = tickyEnterThunk
 
 tickyBlackHole :: Bool{-updatable-} -> FCode ()
