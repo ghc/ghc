@@ -589,7 +589,7 @@ stmt    :: { CmmParse () }
                 { pushStackFrame $3 $5 }
 
 foreignLabel     :: { CmmParse CmmExpr }
-        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction))) }
+        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }
 
 opt_never_returns :: { CmmReturnInfo }
         :                               { CmmMayReturn }
