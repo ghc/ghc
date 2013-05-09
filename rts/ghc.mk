@@ -484,9 +484,12 @@ endif
 rts_WAYS_DASHED = $(subst $(space),,$(patsubst %,-%,$(strip $(rts_WAYS))))
 rts_dist_depfile_base = rts/dist/build/.depend$(rts_WAYS_DASHED)
 
-rts_dist_C_SRCS  = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
-rts_dist_S_SRCS =  $(rts_S_SRCS)
-rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
+rts_dist_C_SRCS    = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
+rts_dist_S_SRCS    = $(rts_S_SRCS)
+rts_dist_CMM_SRCS  = $(rts_CMM_SRCS)
+rts_dist_C_FILES   = $(rts_dist_C_SRCS)
+rts_dist_S_FILES   = $(rts_dist_S_SRCS)
+rts_dist_CMM_FILES = $(rts_dist_CMM_SRCS)
 
 # Hack: we define every way-related option here, so that we get (hopefully)
 # a superset of the dependencies.  To do this properly, we should generate
