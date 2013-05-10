@@ -180,7 +180,7 @@ endif
 $(eval $(call clean-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM)))
 
-$(eval $(call all-target,includes,,\
+$(eval $(call all-target,includes,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \
