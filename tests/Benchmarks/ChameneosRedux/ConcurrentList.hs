@@ -1,5 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  LwConc.Schedulers.ConcurrentList
@@ -32,9 +33,12 @@ module ConcurrentList
 , blockedIndefinitelyOnConcDS
 ) where
 
+import System.Time
 import LwConc.Substrate
 import Data.Array.IArray
 import Data.Dynamic
+import Control.Monad
+import Data.Maybe
 
 #include "profile.h"
 
@@ -42,11 +46,47 @@ import Data.Dynamic
 -- capability.
 newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
+newtype State = State (PVar Int, PVar ClockTime, PVar Int)
+                deriving (Typeable)
+
+-- |Returns the time difference in microseconds (potentially returning maxBound <= the real difference)
+timeDiffToMicroSec :: TimeDiff -> Int
+timeDiffToMicroSec (TimeDiff _ _ _ _ _ sec picosec) =
+    if realTime > fromIntegral (maxBound :: Int)
+        then maxBound
+  else fromIntegral realTime
+  where
+  realTime :: Integer
+  realTime = (fromIntegral sec) * (10^6) + fromIntegral (picosec `div` (10^6))
+
+startClock :: SCont -> PTM ()
+startClock sc = do
+  sls <- getSLS sc
+  let State (_,st,_) = fromJust $ fromDynamic sls
+  time <- unsafeIOToPTM $ getClockTime
+  writePVar st $ time
+
+stopClock :: SCont -> PTM ()
+stopClock sc = do
+  sls <- getSLS sc
+  let State (_,st,acc) = fromJust $ fromDynamic sls
+  startTime <- readPVar st
+  endTime <- unsafeIOToPTM $ getClockTime
+  sum <- readPVar acc
+  let newSum = sum + timeDiffToMicroSec (diffClockTimes endTime startTime)
+  writePVar acc newSum
+  where
+
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> SCont -> PTM ()
-yieldControlAction !(Sched pa) sc = do
+yieldControlAction !(Sched pa) !sc = do
+  stopClock sc
   stat <- getSContStatus sc
-  -- unsafeIOToPTM $ debugPrint $ "YCA: " ++ show sc ++ " " ++ show stat
+  when (stat == SContSwitched Completed) (do
+    sls <- getSLS sc
+    let State (_,_,diff) = fromJust $ fromDynamic sls
+    diff <- readPVar diff
+    unsafeIOToPTM $ debugPrint $ show sc ++ " " ++ show diff)
   -- Fetch current capability's scheduler
   cc <- getSContCapability sc
   let !(frontRef, backRef) = pa ! cc
@@ -57,10 +97,12 @@ yieldControlAction !(Sched pa) sc = do
       case reverse back of
         [] -> sleepCapability
         x:tl -> do
+          startClock x
           writePVar frontRef $! tl
           writePVar backRef []
           switchTo x
     x:tl -> do
+      startClock x
       writePVar frontRef $! tl
       switchTo x
 
@@ -68,7 +110,6 @@ _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction !(Sched pa) !sc = do
   stat <- getSContStatus sc
-  -- unsafeIOToPTM $ debugPrint $ "SSA: " ++ show sc ++ " " ++ show stat
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
@@ -82,20 +123,26 @@ scheduleSContAction !(Sched pa) !sc = do
       back <- readPVar backRef
       writePVar backRef $! sc:back
 
-
 _INL_(newSched)
 newSched :: IO (Sched)
 newSched = do
+
   -- This token will be used to spawn in a round-robin fashion on different
   -- capabilities.
   token <- newPVarIO (0::Int)
+  -- Start time
+  startTime <- getClockTime >>= newPVarIO
+  -- Time diff
+  timeDiff <- newPVarIO (0::Int)
   -- Save the token in the Thread-local State (TLS)
   s <- getSContIO
-  setSLS s $ toDyn token
+  setSLS s $ toDyn $ State (token, startTime, timeDiff)
+
   -- Create the scheduler data structure
   nc <- getNumCapabilities
   rl <- createPVarList nc []
   let sched = Sched (listArray (0, nc-1) rl)
+
   -- Initialize scheduler actions
   atomically $ do {
   setYieldControlAction s $ yieldControlAction sched;
@@ -103,6 +150,7 @@ newSched = do
   }
   -- return scheduler
   return sched
+
   where
     createPVarList 0 l = return l
     createPVarList n l = do {
@@ -114,22 +162,30 @@ newSched = do
 _INL_(newCapability)
 newCapability :: IO ()
 newCapability = do
- -- Initial task body
- let initTask = atomically $ do {
-  s <- getSCont;
-  yca <- getYieldControlAction;
-  setSContSwitchReason s Completed;
-  yca
- }
- -- Create and initialize new task
- s <- newSCont initTask
- atomically $ do
-   mySC <- getSCont
-   yca <- getYieldControlActionSCont mySC
-   setYieldControlAction s yca
-   ssa <- getScheduleSContActionSCont mySC
-   setScheduleSContAction s ssa
- scheduleSContOnFreeCap s
+  -- Initial task body
+  let initTask = atomically $ do {
+    s <- getSCont;
+    yca <- getYieldControlAction;
+    setSContSwitchReason s Completed;
+    yca
+  }
+  -- Create and initialize new task
+  s <- newSCont initTask
+
+  -- SLS
+  token <- newPVarIO (0::Int)
+  startTime <- getClockTime >>= newPVarIO
+  timeDiff <- newPVarIO (0::Int)
+  let state = State (token, startTime, timeDiff)
+  setSLS s $ toDyn state
+
+  atomically $ do
+    mySC <- getSCont
+    yca <- getYieldControlActionSCont mySC
+    setYieldControlAction s yca
+    ssa <- getScheduleSContActionSCont mySC
+    setScheduleSContAction s ssa
+  scheduleSContOnFreeCap s
 
 data SContKind = Bound | Unbound
 
@@ -138,6 +194,7 @@ fork :: IO () -> Maybe Int -> SContKind -> IO SCont
 fork task on kind = do
   currentSC <- getSContIO
   nc <- getNumCapabilities
+
   -- epilogue: Switch to next thread after completion
   let epilogue = atomically $ do {
     sc <- getSCont;
@@ -149,12 +206,16 @@ fork task on kind = do
                     Bound -> newBoundSCont
                     Unbound -> newSCont
   newSC <- makeSCont (task >> epilogue)
+
   -- Initialize TLS
   tls <- atomically $ getSLS currentSC
-  setSLS newSC $ tls
-  let token::PVar Int = case fromDynamic tls of
-                          Nothing -> error "TLS"
-                          Just x -> x
+  let State (token, _, _) = fromJust $ fromDynamic tls
+  -- Start time
+  startTime <- getClockTime >>= newPVarIO
+  -- Time diff
+  timeDiff <- newPVarIO (0::Int)
+  setSLS newSC $ toDyn $ State (token, startTime, timeDiff)
+
   t <- atomically $ do
     mySC <- getSCont
     -- Initialize scheduler actions
@@ -165,10 +226,12 @@ fork task on kind = do
     t <- readPVar token
     writePVar token $ (t+1) `mod` nc
     return t
+
   -- Set SCont Affinity
   case on of
     Nothing -> setSContCapability newSC t
     Just t' -> setSContCapability newSC $ t' `mod` nc
+
   -- Schedule new Scont
   atomically $ do
     ssa <- getScheduleSContActionSCont newSC

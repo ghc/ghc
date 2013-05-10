@@ -6,7 +6,7 @@
            , ScopedTypeVariables
            , DeriveDataTypeable
            , StandaloneDeriving
-					 , UnliftedFFITypes
+           , UnliftedFFITypes
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports -w -XBangPatterns #-}
 
@@ -97,15 +97,15 @@ module LwConc.Substrate
 -- Upcall actions
 ------------------------------------------------------------------------------
 
-, setScheduleSContAction  			-- SCont -> (SCont -> PTM ()) -> PTM ()
+, setScheduleSContAction        -- SCont -> (SCont -> PTM ()) -> PTM ()
 , getScheduleSContActionSCont   -- SCont -> PTM (SCont -> PTM ())
-, getScheduleSContAction  			-- PTM (PTM ())
+, getScheduleSContAction        -- PTM (PTM ())
 
-, setYieldControlAction   			-- SCont -> (SCont -> PTM ()) -> PTM ()
-, getYieldControlActionSCont   	-- SCont -> PTM (SCont -> PTM ())
-, getYieldControlAction   			-- PTM (PTM ())
+, setYieldControlAction         -- SCont -> (SCont -> PTM ()) -> PTM ()
+, getYieldControlActionSCont    -- SCont -> PTM (SCont -> PTM ())
+, getYieldControlAction         -- PTM (PTM ())
 
-, setFinalizer            			-- SCont -> IO () -> IO ()
+, setFinalizer                  -- SCont -> IO () -> IO ()
 
 ------------------------------------------------------------------------------
 -- Capability Management
@@ -401,8 +401,9 @@ instance Ord SCont where
 {-# INLINE newSCont #-}
 newSCont :: IO () -> IO SCont
 newSCont x = do
-  IO $ \s ->
-   case (newSCont# x s) of (# s1, scont #) -> (# s1, SCont scont #)
+  sc <- IO $ \s -> case (newSCont# x s) of (# s1, scont #) -> (# s1, SCont scont #)
+  setSLS sc $ toDyn ()
+  return sc
 
 {-# INLINE switchTo #-}
 switchTo :: SCont -> PTM ()
@@ -551,10 +552,10 @@ defaultUpcall = IO $ \s-> (# defaultUpcallError# s, () #)
 
 defaultExceptionHandler :: Exception.SomeException -> IO ()
 defaultExceptionHandler e = do
-  debugPrint ("defaultExceptionHandler: " ++ show (e::Exception.SomeException))
+  s <- getSContIO
+  debugPrint ("defaultExceptionHandler: " ++ show s ++ " " ++ show (e::Exception.SomeException))
   defaultUpcall
   atomically $ do
-    s <- getSCont
     setSContStatus s SContKilled
     yca <- getYieldControlAction
     yca
