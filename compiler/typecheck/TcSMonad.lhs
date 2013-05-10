@@ -135,7 +135,6 @@ import TcRnTypes
 import Unique 
 import UniqFM
 import Maybes ( orElse, catMaybes, firstJust )
-import StaticFlags( opt_NoFlatCache )
 
 import Control.Monad( unless, when, zipWithM )
 import Data.IORef
@@ -1382,8 +1381,9 @@ newFlattenSkolem Given fam_ty
        ; let rhs_ty = mkTyVarTy tv
              ctev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
                             , ctev_evtm = EvCoercion (mkTcReflCo fam_ty) }
+       ; dflags <- getDynFlags
        ; updInertTcS $ \ is@(IS { inert_fsks = fsks }) -> 
-            extendFlatCache fam_ty ctev rhs_ty
+            extendFlatCache dflags fam_ty ctev rhs_ty
             is { inert_fsks       = tv : fsks }
 
        ; return (ctev, rhs_ty) }
@@ -1393,12 +1393,14 @@ newFlattenSkolem _ fam_ty  -- Wanted or Derived: make new unification variable
        ; ctev <- newWantedEvVarNC (mkTcEqPred fam_ty rhs_ty)
                                    -- NC (no-cache) version because we've already
                                    -- looked in the solved goals an inerts (lookupFlatEqn)
-       ; updInertTcS $ extendFlatCache fam_ty ctev rhs_ty
+       ; dflags <- getDynFlags
+       ; updInertTcS $ extendFlatCache dflags fam_ty ctev rhs_ty
        ; return (ctev, rhs_ty) }
 
-extendFlatCache :: TcType -> CtEvidence -> TcType -> InertSet -> InertSet
-extendFlatCache 
-  | opt_NoFlatCache
+extendFlatCache :: DynFlags -> TcType -> CtEvidence -> TcType
+                -> InertSet -> InertSet
+extendFlatCache dflags
+  | not (gopt Opt_FlatCache dflags)
   = \ _ _ _ is -> is
   | otherwise
   = \ fam_ty ctev rhs_ty is@(IS { inert_flat_cache = fc }) -> 

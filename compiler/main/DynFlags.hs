@@ -349,6 +349,7 @@ data GeneralFlag
    | Opt_RPath
    | Opt_RelativeDynlibPaths
    | Opt_Hpc
+   | Opt_FlatCache
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -2500,6 +2501,7 @@ fFlags = [
   ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
   ( "hpc",                              Opt_Hpc, nop ),
   ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
+  ( "flat-cache",                       Opt_FlatCache, nop ),
   ( "use-rpaths",                       Opt_RPath, nop )
   ]
 
@@ -2690,6 +2692,7 @@ defaultFlags settings
       Opt_HelpfulErrors,
       Opt_ProfCountEntries,
       Opt_SimplPreInlining,
+      Opt_FlatCache,
       Opt_RPath
     ]
 

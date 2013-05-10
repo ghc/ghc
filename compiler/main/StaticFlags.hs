@@ -30,7 +30,6 @@ module StaticFlags (
         opt_NoStateHack,
         opt_CprOff,
         opt_NoOptCoercion,
-        opt_NoFlatCache,
 
         -- For the parser
         addOpt, removeOpt, v_opt_C_ready,
@@ -146,7 +145,6 @@ isStaticFlag f =
     "fdicts-strict",
     "fno-state-hack",
     "fno-opt-coercion",
-    "fno-flat-cache",
     "fcpr-off"
     ]
 
@@ -197,9 +195,6 @@ opt_CprOff         = lookUp  (fsLit "-fcpr-off")
 
 opt_NoOptCoercion  :: Bool
 opt_NoOptCoercion  = lookUp  (fsLit "-fno-opt-coercion")
-
-opt_NoFlatCache    :: Bool
-opt_NoFlatCache     = lookUp  (fsLit "-fno-flat-cache")
 
 
 -----------------------------------------------------------------------------
