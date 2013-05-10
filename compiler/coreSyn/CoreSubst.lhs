@@ -919,10 +919,8 @@ type OutExpr = CoreExpr
 -- In these functions the substitution maps InVar -> OutExpr
 
 ----------------------
-simple_opt_expr, simple_opt_expr' :: Subst -> InExpr -> OutExpr
-simple_opt_expr s e = simple_opt_expr' s e
-
-simple_opt_expr' subst expr
+simple_opt_expr :: Subst -> InExpr -> OutExpr
+simple_opt_expr subst expr
   = go expr
   where
     go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
