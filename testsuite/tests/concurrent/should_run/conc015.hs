@@ -12,7 +12,7 @@ import Control.Exception
 
 main = do
   main_thread <- myThreadId
-  print =<< blocked -- False
+  print =<< getMaskingState -- False
   m <- newEmptyMVar
   m2 <- newEmptyMVar
   forkIO (do takeMVar m
@@ -21,19 +21,18 @@ main = do
 	     putMVar m2 ()
 	 )
   ( do
-    block (do
+    mask $ \restore -> do
 	putMVar m ()
-        print =<< blocked -- True
+        print =<< getMaskingState -- True
 	sum [1..1] `seq` -- give 'foo' a chance to be raised
-  	  (unblock $ myDelay 500000)
+          (restore $ myDelay 500000)
 		`Control.Exception.catch` 
                     \e -> putStrLn ("caught1: " ++ show (e::SomeException))
-     )
     threadDelay 10000
     takeMVar m2
    )
     `Control.Exception.catch`
-       \e -> do print =<< blocked
+       \e -> do print =<< getMaskingState
                 putStrLn ("caught2: " ++ show (e::SomeException))
 
 -- compensate for the fact that threadDelay is non-interruptible

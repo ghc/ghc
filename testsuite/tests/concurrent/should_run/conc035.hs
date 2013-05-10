@@ -5,7 +5,7 @@ import qualified Control.Exception as E
 
 trapHandler :: MVar Int -> MVar () -> IO ()
 trapHandler inVar caughtVar =
-  (do E.block $ do
+  (do E.mask_ $ do
           trapMsg <- takeMVar inVar
           putStrLn ("Handler got: " ++ show trapMsg)
       trapHandler inVar caughtVar

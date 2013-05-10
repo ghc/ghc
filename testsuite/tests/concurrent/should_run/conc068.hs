@@ -6,7 +6,7 @@ import GHC.Conc
 main = do
   main_thread <- myThreadId
   m <- newEmptyMVar
-  sub_thread <- block $ forkIO $
+  sub_thread <- mask_ $ forkIO $
 	    	      sum [1..100000] `seq` 
                           throwTo main_thread (ErrorCall "foo")
   killThread sub_thread

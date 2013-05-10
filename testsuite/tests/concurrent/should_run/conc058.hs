@@ -6,7 +6,7 @@ import Control.Exception
 -- not interruptible.
 main = do
   m <- newEmptyMVar
-  t <- forkIO (block $ threadDelay 1000000)
+  t <- forkIO (mask_ $ threadDelay 1000000)
   threadDelay 100000
   throwTo t (ErrorCall "I'm Interruptible")
   threadDelay 100000
