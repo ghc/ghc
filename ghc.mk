@@ -167,7 +167,7 @@ include rules/clean-target.mk
 # -----------------------------------------------------------------------------
 # The inplace tree
 
-$(eval $(call clean-target,inplace,,inplace/bin inplace/lib))
+$(eval $(call clean-target,root,inplace,inplace/bin inplace/lib))
 
 # -----------------------------------------------------------------------------
 # Whether to build dependencies or not
@@ -707,7 +707,7 @@ $(shell echo "[]" >$(BOOTSTRAPPING_CONF))
 endif
 endif
 
-$(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))
+$(eval $(call clean-target,root,bootstrapping_conf,$(BOOTSTRAPPING_CONF)))
 
 # register the boot packages in strict sequence, because running
 # multiple ghc-pkgs in parallel doesn't work (registrations may get
