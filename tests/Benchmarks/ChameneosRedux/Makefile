@@ -3,7 +3,8 @@ TARGET := chameneos-redux-vanilla.bin chameneos-redux-lwc.bin chameneos-redux-TM
 include ../../config.mk
 
 TOP := ../../../
-GHC_OPTS_EXTRA=-O2 -threaded -XBangPatterns -XCPP -XGeneralizedNewtypeDeriving -funbox-strict-fields -optc-O3
+EXTRA_LIBS=/scratch/chandras/install
+GHC_OPTS_EXTRA=-O2 -threaded -XDeriveDataTypeable -XBangPatterns -XCPP -XGeneralizedNewtypeDeriving -funbox-strict-fields -optc-O3 -ipqueue-1.2.1 -debug
 
 PROFILE_FLAGS := -DPROFILE_ENABLED -prof -fprof-auto -auto -auto-all
 

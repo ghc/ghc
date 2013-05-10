@@ -10,7 +10,7 @@
 
 import LwConc.Substrate
 import LwConc.PTM.TMVar
-import ConcurrentList
+import LwConc.RunQueue
 import Control.Monad
 import Data.Char
 import System.Environment

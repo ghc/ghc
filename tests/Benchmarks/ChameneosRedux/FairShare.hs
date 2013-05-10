@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LwConc.Schedulers.ConcurrentList
+-- Module      :  FairShare
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
@@ -16,7 +16,7 @@
 -----------------------------------------------------------------------------
 
 
-module ConcurrentList
+module FairShare
 (
   Sched
 , SCont
@@ -39,17 +39,19 @@ import Data.Array.IArray
 import Data.Dynamic
 import Control.Monad
 import Data.Maybe
+import qualified Data.PQueue.Min as PQ
 
 #include "profile.h"
-
--- The scheduler data structure has one (PVar [SCont], PVar [SCont]) for every
--- capability.
-newtype Sched = Sched (Array Int (PVar [SCont], PVar [SCont]))
 
 newtype State = State (PVar Int, PVar ClockTime, PVar Int)
                 deriving (Typeable)
 
--- |Returns the time difference in microseconds (potentially returning maxBound <= the real difference)
+-------------------------------------------------------------------------------
+-- SCont Accounting
+-------------------------------------------------------------------------------
+
+-- |Returns the time difference in microseconds (potentially returning maxBound
+-- <= the real difference)
 timeDiffToMicroSec :: TimeDiff -> Int
 timeDiffToMicroSec (TimeDiff _ _ _ _ _ sec picosec) =
     if realTime > fromIntegral (maxBound :: Int)
@@ -59,6 +61,7 @@ timeDiffToMicroSec (TimeDiff _ _ _ _ _ sec picosec) =
   realTime :: Integer
   realTime = (fromIntegral sec) * (10^6) + fromIntegral (picosec `div` (10^6))
 
+_INL_(startClock)
 startClock :: SCont -> PTM ()
 startClock sc = do
   sls <- getSLS sc
@@ -66,6 +69,7 @@ startClock sc = do
   time <- unsafeIOToPTM $ getClockTime
   writePVar st $ time
 
+_INL_(stopClock)
 stopClock :: SCont -> PTM ()
 stopClock sc = do
   sls <- getSLS sc
@@ -77,51 +81,76 @@ stopClock sc = do
   writePVar acc newSum
   where
 
+-------------------------------------------------------------------------------
+-- Scheduler
+-------------------------------------------------------------------------------
+
+data Elem = Elem SCont Int deriving Eq
+
+instance Ord Elem where
+  compare (Elem _ a) (Elem _ b) = compare a b
+
+newtype Sched = Sched (Array Int (PVar (PQ.MinQueue Elem)))
+
+emptyScheduler :: Int -> IO Sched
+emptyScheduler numCaps = do
+  l <- replicateM numCaps $ newPVarIO PQ.empty
+  return $ Sched $ listArray (0, numCaps-1) l
+
+_INL_(deque)
+deque :: Sched -> SCont -> PTM (Maybe SCont)
+deque !(Sched pa) !sc = do
+  cc <- getSContCapability sc
+  pq <- readPVar $! pa ! cc
+  case PQ.getMin pq of
+    Nothing -> return $ Nothing
+    Just (Elem x _) -> do
+      writePVar (pa ! cc) (PQ.deleteMin pq)
+      return $ Just x
+
+_INL_(enque)
+enque :: Sched -> SCont -> PTM ()
+enque !(Sched pa) !sc = do
+  cc <- getSContCapability sc
+  pq <- readPVar $! pa ! cc
+  acc <- readAcc sc
+  let newPq = PQ.insert (Elem sc acc) pq
+  writePVar (pa ! cc) newPq
+  where
+    readAcc sc = do
+      sls <- getSLS sc
+      let State (_,_,acc) = fromJust $ fromDynamic sls
+      readPVar acc
+
+
+
+-------------------------------------------------------------------------------
+-- Scheduler Activations
+-------------------------------------------------------------------------------
+
 _INL_(yieldControlAction)
 yieldControlAction :: Sched -> SCont -> PTM ()
-yieldControlAction !(Sched pa) !sc = do
+yieldControlAction !sched !sc = do
+  -- Accounting
   stopClock sc
-  stat <- getSContStatus sc
-  when (stat == SContSwitched Completed) (do
-    sls <- getSLS sc
-    let State (_,_,diff) = fromJust $ fromDynamic sls
-    diff <- readPVar diff
-    unsafeIOToPTM $ debugPrint $ show sc ++ " " ++ show diff)
-  -- Fetch current capability's scheduler
-  cc <- getSContCapability sc
-  let !(frontRef, backRef) = pa ! cc
-  front <- readPVar frontRef
-  case front of
-    [] -> do
-      back <- readPVar backRef
-      case reverse back of
-        [] -> sleepCapability
-        x:tl -> do
-          startClock x
-          writePVar frontRef $! tl
-          writePVar backRef []
-          switchTo x
-    x:tl -> do
-      startClock x
-      writePVar frontRef $! tl
-      switchTo x
+  -- Switch to next thread
+  maybeSC <- deque sched sc
+  case maybeSC of
+    Nothing -> sleepCapability
+    Just x -> startClock x >> switchTo x
+
 
 _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
-scheduleSContAction !(Sched pa) !sc = do
-  stat <- getSContStatus sc
-  -- Since we are making the given scont runnable, update its status to Yielded.
+scheduleSContAction !sched !sc = do
+  -- Since we are making the given scont runnable, update its status to
+  -- Yielded.
   setSContSwitchReason sc Yielded
-  -- Fetch the given SCont's scheduler.
-  cap <- getSContCapability sc
-  let !(frontRef,backRef) = pa ! cap
-  case stat of
-    SContSwitched (BlockedInHaskell _) -> do
-      front <- readPVar frontRef
-      writePVar frontRef $! sc:front
-    _ -> do
-      back <- readPVar backRef
-      writePVar backRef $! sc:back
+  enque sched sc
+
+-------------------------------------------------------------------------------
+-- External scheduler interface
+-------------------------------------------------------------------------------
 
 _INL_(newSched)
 newSched :: IO (Sched)
@@ -140,8 +169,7 @@ newSched = do
 
   -- Create the scheduler data structure
   nc <- getNumCapabilities
-  rl <- createPVarList nc []
-  let sched = Sched (listArray (0, nc-1) rl)
+  sched <- emptyScheduler nc
 
   -- Initialize scheduler actions
   atomically $ do {
@@ -151,13 +179,6 @@ newSched = do
   -- return scheduler
   return sched
 
-  where
-    createPVarList 0 l = return l
-    createPVarList n l = do {
-      frontRef <- newPVarIO [];
-      backRef <- newPVarIO [];
-      createPVarList (n-1) $ (frontRef,backRef):l
-    }
 
 _INL_(newCapability)
 newCapability :: IO ()
