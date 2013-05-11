@@ -416,7 +416,7 @@ switchTo targetSCont = do
   let (I# intStatus) = getIntFromStatus status
   let SCont targetSCont# = targetSCont
   PTM $ \s ->
-    case (atomicSwitch# targetSCont# intStatus s) of s1 -> (# s1, () #)
+    case (atomicSwitch# targetSCont# intStatus s) of s1 -> (# s1, undefined #)
 
 {-# INLINE getSCont #-}
 getSCont :: PTM SCont
@@ -482,7 +482,6 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
   setSContSwitchReason mySC Completed
   stat <- getSContStatus sc
   case stat of
-
       -- SCont hasn't been unblocked yet. This occurs if the SCont is blocked
       -- on a blackhole, throwTo, RTS MVar, safe foreign call etc,. In such
       -- cases, we are likely to perform yieldControlAction (and give up
@@ -496,10 +495,18 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
       -- sets the SCont status to Yielded.
       SContSwitched Yielded -> return ()
 
-      otherwise -> error "yieldControlAction: Impossible status"
+			-- This is a corner case, but is very well possible. Consider that the
+			-- Scont (sc), was blocked on a foreign call, while its scheduler was
+			-- resumed (See rts/Schedule.c:resumeThread). When sc wakes up it has to
+			-- voluntarily give up control. But sc runs to completion and marks the
+			-- thread it is switching to that is should give up the scheduler (See
+			-- rts/PrimOps.cmm:stg_atomicSwitch). Now, the status of sc is set to
+			-- "SContSwitched Completed". Hence, this branch.
+      otherwise -> return ()
+
   switch <- getYieldControlActionSCont sc
   switch sc) (\e -> do {
-                      hPutStrLn stderr ("ERROR:" ++ show (e::IOException));
+                      debugPrint $ "ERROR:" ++ show (e::IOException);
                       error "LwConc.Substrate.yieldControlActionRTS"
                       })
 
@@ -554,7 +561,6 @@ defaultExceptionHandler :: Exception.SomeException -> IO ()
 defaultExceptionHandler e = do
   s <- getSContIO
   debugPrint ("defaultExceptionHandler: " ++ show s ++ " " ++ show (e::Exception.SomeException))
-  defaultUpcall
   atomically $ do
     setSContStatus s SContKilled
     yca <- getYieldControlAction

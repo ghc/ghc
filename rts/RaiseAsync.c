@@ -188,7 +188,7 @@ findLastUpdateFrame (StgTSO* tso) {
  * RETURN:
  *
  *  - rtsTrue       if blackhole owner is on current capability and we
- *                  successfully suspended.
+ *                  successfully suspended, or the blackhole has been updated.
  *  - rtsFalse      otherwise
  *---------------------------------------------------------------------------- */
 
@@ -200,9 +200,13 @@ suspendAllComputation (Capability *cap, StgClosure* bh) {
     bh = UNTAG_CLOSURE (bh);
     owner = blackHoleOwner (bh);
 
+    if (owner == NULL)
+      return rtsTrue;
+
     if (owner->cap != cap)
         return rtsFalse;
-    ASSERT (owner->why_blocked != NotBlocked);
+    ASSERT (cap->r.rCurrentTSO->is_upcall_thread ||
+            owner->why_blocked != NotBlocked);
 
     stop_here = findLastUpdateFrame (owner);
     ASSERT (stop_here);
@@ -210,9 +214,9 @@ suspendAllComputation (Capability *cap, StgClosure* bh) {
         barf ("suspendAllComputation: cannot find update frame\n");
     }
 
-    suspendComputationIncluding (cap, owner, stop_here);
     debugTrace (DEBUG_sched, "cap %d: thread %d inheriting work from thread %d",
                 cap->no, cap->r.rCurrentTSO->id, owner->id);
+    suspendComputationIncluding (cap, owner, stop_here);
     return rtsTrue;
 }
 
