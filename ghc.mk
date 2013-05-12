@@ -204,6 +204,15 @@ GHCI_WAY = v
 HADDOCK_WAY = v
 endif
 
+WINDOWS_DYN_PROG_RTS := rts
+ifeq "$(GhcThreaded)" "YES"
+WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_thr
+endif
+ifeq "$(GhcDebugged)" "YES"
+WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_debug
+endif
+WINDOWS_DYN_PROG_RTS := $(WINDOWS_DYN_PROG_RTS)_dyn_LIB_NAME
+
 # -----------------------------------------------------------------------------
 # Compilation Flags
 
