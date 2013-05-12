@@ -59,9 +59,6 @@ import Util
 -- XXX
 thenM :: Monad a => a b -> (b -> a c) -> a c
 thenM = (>>=)
-
-returnM :: Monad m => a -> m a
-returnM = return
 \end{code}
 
 
@@ -246,7 +243,7 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env id
   = zonkTcTypeToType env (idType id)    `thenM` \ ty' ->
-    returnM (Id.setIdType id ty')
+    return (Id.setIdType id ty')
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
 zonkIdBndrs env ids = mapM (zonkIdBndr env) ids
@@ -352,12 +349,12 @@ zonkLocalBinds env (HsIPBinds (IPBinds binds dict_binds))
         env1 = extendIdZonkEnv env [ n | L _ (IPBind (Right n) _) <- new_binds]
     in
     zonkTcEvBinds env1 dict_binds       `thenM` \ (env2, new_dict_binds) ->
-    returnM (env2, HsIPBinds (IPBinds new_binds new_dict_binds))
+    return (env2, HsIPBinds (IPBinds new_binds new_dict_binds))
   where
     zonk_ip_bind (IPBind n e)
         = mapIPNameTc (zonkIdBndr env) n        `thenM` \ n' ->
           zonkLExpr env e                       `thenM` \ e' ->
-          returnM (IPBind n' e')
+          return (IPBind n' e')
 
 ---------------------------------------------
 zonkRecMonoBinds :: ZonkEnv -> SigWarn -> LHsBinds TcId -> TcM (ZonkEnv, LHsBinds Id)
@@ -461,8 +458,8 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
         = zonkIdBndr env poly_id                `thenM` \ new_poly_id ->
           zonkCoFn env wrap                     `thenM` \ (_, new_wrap) ->
           zonkSpecPrags env prags               `thenM` \ new_prags ->
-          returnM (ABE{ abe_wrap = new_wrap, abe_poly = new_poly_id
-                      , abe_mono = zonkIdOcc env mono_id, abe_prags = new_prags })
+          return (ABE{ abe_wrap = new_wrap, abe_poly = new_poly_id
+                     , abe_mono = zonkIdOcc env mono_id, abe_prags = new_prags })
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod
@@ -513,10 +510,10 @@ zonkGRHSs env zBody (GRHSs grhss binds)
         zonk_grhs (GRHS guarded rhs)
           = zonkStmts new_env zonkLExpr guarded `thenM` \ (env2, new_guarded) ->
             zBody env2 rhs                      `thenM` \ new_rhs ->
-            returnM (GRHS new_guarded new_rhs)
+            return (GRHS new_guarded new_rhs)
     in
     mapM (wrapLocM zonk_grhs) grhss    `thenM` \ new_grhss ->
-    returnM (GRHSs new_grhss new_binds)
+    return (GRHSs new_grhss new_binds)
 \end{code}
 
 %************************************************************************
@@ -534,17 +531,17 @@ zonkLExprs env exprs = mapM (zonkLExpr env) exprs
 zonkLExpr  env expr  = wrapLocM (zonkExpr env) expr
 
 zonkExpr env (HsVar id)
-  = returnM (HsVar (zonkIdOcc env id))
+  = return (HsVar (zonkIdOcc env id))
 
 zonkExpr _ (HsIPVar id)
-  = returnM (HsIPVar id)
+  = return (HsIPVar id)
 
 zonkExpr env (HsLit (HsRat f ty))
   = zonkTcTypeToType env ty        `thenM` \ new_ty  ->
-    returnM (HsLit (HsRat f new_ty))
+    return (HsLit (HsRat f new_ty))
 
 zonkExpr _ (HsLit lit)
-  = returnM (HsLit lit)
+  = return (HsLit lit)
 
 zonkExpr env (HsOverLit lit)
   = do  { lit' <- zonkOverLit env lit
@@ -552,52 +549,52 @@ zonkExpr env (HsOverLit lit)
 
 zonkExpr env (HsLam matches)
   = zonkMatchGroup env zonkLExpr matches        `thenM` \ new_matches ->
-    returnM (HsLam new_matches)
+    return (HsLam new_matches)
 
 zonkExpr env (HsLamCase arg matches)
   = zonkTcTypeToType env arg                    `thenM` \ new_arg ->
     zonkMatchGroup env zonkLExpr matches        `thenM` \ new_matches ->
-    returnM (HsLamCase new_arg new_matches)
+    return (HsLamCase new_arg new_matches)
 
 zonkExpr env (HsApp e1 e2)
   = zonkLExpr env e1    `thenM` \ new_e1 ->
     zonkLExpr env e2    `thenM` \ new_e2 ->
-    returnM (HsApp new_e1 new_e2)
+    return (HsApp new_e1 new_e2)
 
 zonkExpr env (HsBracketOut body bs)
   = mapM zonk_b bs     `thenM` \ bs' ->
-    returnM (HsBracketOut body bs')
+    return (HsBracketOut body bs')
   where
     zonk_b (n,e) = zonkLExpr env e      `thenM` \ e' ->
-                   returnM (n,e')
+                   return (n,e')
 
 zonkExpr _ (HsSpliceE s) = WARN( True, ppr s ) -- Should not happen
-                           returnM (HsSpliceE s)
+                           return (HsSpliceE s)
 
 zonkExpr env (OpApp e1 op fixity e2)
   = zonkLExpr env e1    `thenM` \ new_e1 ->
     zonkLExpr env op    `thenM` \ new_op ->
     zonkLExpr env e2    `thenM` \ new_e2 ->
-    returnM (OpApp new_e1 new_op fixity new_e2)
+    return (OpApp new_e1 new_op fixity new_e2)
 
 zonkExpr env (NegApp expr op)
   = zonkLExpr env expr  `thenM` \ new_expr ->
     zonkExpr env op     `thenM` \ new_op ->
-    returnM (NegApp new_expr new_op)
+    return (NegApp new_expr new_op)
 
 zonkExpr env (HsPar e)
   = zonkLExpr env e     `thenM` \new_e ->
-    returnM (HsPar new_e)
+    return (HsPar new_e)
 
 zonkExpr env (SectionL expr op)
   = zonkLExpr env expr  `thenM` \ new_expr ->
     zonkLExpr env op    `thenM` \ new_op ->
-    returnM (SectionL new_expr new_op)
+    return (SectionL new_expr new_op)
 
 zonkExpr env (SectionR op expr)
   = zonkLExpr env op            `thenM` \ new_op ->
     zonkLExpr env expr          `thenM` \ new_expr ->
-    returnM (SectionR new_op new_expr)
+    return (SectionR new_op new_expr)
 
 zonkExpr env (ExplicitTuple tup_args boxed)
   = do { new_tup_args <- mapM zonk_tup_arg tup_args
@@ -609,47 +606,47 @@ zonkExpr env (ExplicitTuple tup_args boxed)
 zonkExpr env (HsCase expr ms)
   = zonkLExpr env expr                  `thenM` \ new_expr ->
     zonkMatchGroup env zonkLExpr ms     `thenM` \ new_ms ->
-    returnM (HsCase new_expr new_ms)
+    return (HsCase new_expr new_ms)
 
 zonkExpr env (HsIf e0 e1 e2 e3)
   = do { new_e0 <- fmapMaybeM (zonkExpr env) e0
        ; new_e1 <- zonkLExpr env e1
        ; new_e2 <- zonkLExpr env e2
        ; new_e3 <- zonkLExpr env e3
-       ; returnM (HsIf new_e0 new_e1 new_e2 new_e3) }
+       ; return (HsIf new_e0 new_e1 new_e2 new_e3) }
 
 zonkExpr env (HsMultiIf ty alts)
   = do { alts' <- mapM (wrapLocM zonk_alt) alts
        ; ty'   <- zonkTcTypeToType env ty
-       ; returnM $ HsMultiIf ty' alts' }
+       ; return $ HsMultiIf ty' alts' }
   where zonk_alt (GRHS guard expr)
           = do { (env', guard') <- zonkStmts env zonkLExpr guard
                ; expr'          <- zonkLExpr env' expr
-               ; returnM $ GRHS guard' expr' }
+               ; return $ GRHS guard' expr' }
 
 zonkExpr env (HsLet binds expr)
   = zonkLocalBinds env binds    `thenM` \ (new_env, new_binds) ->
     zonkLExpr new_env expr      `thenM` \ new_expr ->
-    returnM (HsLet new_binds new_expr)
+    return (HsLet new_binds new_expr)
 
 zonkExpr env (HsDo do_or_lc stmts ty)
   = zonkStmts env zonkLExpr stmts       `thenM` \ (_, new_stmts) ->
     zonkTcTypeToType env ty             `thenM` \ new_ty   ->
-    returnM (HsDo do_or_lc new_stmts new_ty)
+    return (HsDo do_or_lc new_stmts new_ty)
 
 zonkExpr env (ExplicitList ty wit exprs)
   = zonkTcTypeToType env ty     `thenM` \ new_ty ->
     zonkWit env wit             `thenM` \ new_wit ->
     zonkLExprs env exprs        `thenM` \ new_exprs ->
-    returnM (ExplicitList new_ty new_wit new_exprs)
-   where zonkWit _ Nothing = returnM Nothing
+    return (ExplicitList new_ty new_wit new_exprs)
+   where zonkWit _ Nothing = return Nothing
          zonkWit env (Just fln) = zonkExpr env fln `thenM` \ new_fln ->
-                                  returnM (Just new_fln)
+                                  return (Just new_fln)
 
 zonkExpr env (ExplicitPArr ty exprs)
   = zonkTcTypeToType env ty     `thenM` \ new_ty ->
     zonkLExprs env exprs        `thenM` \ new_exprs ->
-    returnM (ExplicitPArr new_ty new_exprs)
+    return (ExplicitPArr new_ty new_exprs)
 
 zonkExpr env (RecordCon data_con con_expr rbinds)
   = do  { new_con_expr <- zonkExpr env con_expr
@@ -673,28 +670,28 @@ zonkExpr env (ArithSeq expr wit info)
   = zonkExpr env expr           `thenM` \ new_expr ->
     zonkWit env wit             `thenM` \ new_wit  ->
     zonkArithSeq env info       `thenM` \ new_info ->
-    returnM (ArithSeq new_expr new_wit new_info)
-   where zonkWit _ Nothing = returnM Nothing
+    return (ArithSeq new_expr new_wit new_info)
+   where zonkWit _ Nothing = return Nothing
          zonkWit env (Just fln) = zonkExpr env fln `thenM` \ new_fln ->
-                                  returnM (Just new_fln)
+                                  return (Just new_fln)
 
 zonkExpr env (PArrSeq expr info)
   = zonkExpr env expr           `thenM` \ new_expr ->
     zonkArithSeq env info       `thenM` \ new_info ->
-    returnM (PArrSeq new_expr new_info)
+    return (PArrSeq new_expr new_info)
 
 zonkExpr env (HsSCC lbl expr)
   = zonkLExpr env expr  `thenM` \ new_expr ->
-    returnM (HsSCC lbl new_expr)
+    return (HsSCC lbl new_expr)
 
 zonkExpr env (HsTickPragma info expr)
   = zonkLExpr env expr  `thenM` \ new_expr ->
-    returnM (HsTickPragma info new_expr)
+    return (HsTickPragma info new_expr)
 
 -- hdaume: core annotations
 zonkExpr env (HsCoreAnn lbl expr)
   = zonkLExpr env expr   `thenM` \ new_expr ->
-    returnM (HsCoreAnn lbl new_expr)
+    return (HsCoreAnn lbl new_expr)
 
 -- arrow notation extensions
 zonkExpr env (HsProc pat body)
@@ -727,47 +724,47 @@ zonkCmd env (HsCmdArrApp e1 e2 ty ho rl)
   = zonkLExpr env e1                    `thenM` \ new_e1 ->
     zonkLExpr env e2                    `thenM` \ new_e2 ->
     zonkTcTypeToType env ty             `thenM` \ new_ty ->
-    returnM (HsCmdArrApp new_e1 new_e2 new_ty ho rl)
+    return (HsCmdArrApp new_e1 new_e2 new_ty ho rl)
 
 zonkCmd env (HsCmdArrForm op fixity args)
   = zonkLExpr env op                    `thenM` \ new_op ->
     mapM (zonkCmdTop env) args          `thenM` \ new_args ->
-    returnM (HsCmdArrForm new_op fixity new_args)
+    return (HsCmdArrForm new_op fixity new_args)
 
 zonkCmd env (HsCmdApp c e)
   = zonkLCmd env c                      `thenM` \ new_c ->
     zonkLExpr env e                     `thenM` \ new_e ->
-    returnM (HsCmdApp new_c new_e)
+    return (HsCmdApp new_c new_e)
 
 zonkCmd env (HsCmdLam matches)
   = zonkMatchGroup env zonkLCmd matches `thenM` \ new_matches ->
-    returnM (HsCmdLam new_matches)
+    return (HsCmdLam new_matches)
 
 zonkCmd env (HsCmdPar c)
   = zonkLCmd env c                      `thenM` \new_c ->
-    returnM (HsCmdPar new_c)
+    return (HsCmdPar new_c)
 
 zonkCmd env (HsCmdCase expr ms)
   = zonkLExpr env expr                  `thenM` \ new_expr ->
     zonkMatchGroup env zonkLCmd ms      `thenM` \ new_ms ->
-    returnM (HsCmdCase new_expr new_ms)
+    return (HsCmdCase new_expr new_ms)
 
 zonkCmd env (HsCmdIf eCond ePred cThen cElse)
   = do { new_eCond <- fmapMaybeM (zonkExpr env) eCond
        ; new_ePred <- zonkLExpr env ePred
        ; new_cThen <- zonkLCmd env cThen
        ; new_cElse <- zonkLCmd env cElse
-       ; returnM (HsCmdIf new_eCond new_ePred new_cThen new_cElse) }
+       ; return (HsCmdIf new_eCond new_ePred new_cThen new_cElse) }
 
 zonkCmd env (HsCmdLet binds cmd)
   = zonkLocalBinds env binds            `thenM` \ (new_env, new_binds) ->
     zonkLCmd new_env cmd                `thenM` \ new_cmd ->
-    returnM (HsCmdLet new_binds new_cmd)
+    return (HsCmdLet new_binds new_cmd)
 
 zonkCmd env (HsCmdDo stmts ty)
   = zonkStmts env zonkLCmd stmts        `thenM` \ (_, new_stmts) ->
     zonkTcTypeToType env ty             `thenM` \ new_ty   ->
-    returnM (HsCmdDo new_stmts new_ty)
+    return (HsCmdDo new_stmts new_ty)
 
 
 
@@ -782,7 +779,7 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
     zonkTcTypeToType env stack_tys      `thenM` \ new_stack_tys ->
     zonkTcTypeToType env ty             `thenM` \ new_ty ->
     mapSndM (zonkExpr env) ids          `thenM` \ new_ids ->
-    returnM (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
+    return (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
@@ -816,23 +813,23 @@ zonkArithSeq :: ZonkEnv -> ArithSeqInfo TcId -> TcM (ArithSeqInfo Id)
 
 zonkArithSeq env (From e)
   = zonkLExpr env e             `thenM` \ new_e ->
-    returnM (From new_e)
+    return (From new_e)
 
 zonkArithSeq env (FromThen e1 e2)
   = zonkLExpr env e1    `thenM` \ new_e1 ->
     zonkLExpr env e2    `thenM` \ new_e2 ->
-    returnM (FromThen new_e1 new_e2)
+    return (FromThen new_e1 new_e2)
 
 zonkArithSeq env (FromTo e1 e2)
   = zonkLExpr env e1    `thenM` \ new_e1 ->
     zonkLExpr env e2    `thenM` \ new_e2 ->
-    returnM (FromTo new_e1 new_e2)
+    return (FromTo new_e1 new_e2)
 
 zonkArithSeq env (FromThenTo e1 e2 e3)
   = zonkLExpr env e1    `thenM` \ new_e1 ->
     zonkLExpr env e2    `thenM` \ new_e2 ->
     zonkLExpr env e3    `thenM` \ new_e3 ->
-    returnM (FromThenTo new_e1 new_e2 new_e3)
+    return (FromThenTo new_e1 new_e2 new_e3)
 
 
 -------------------------------------------------------------------------
@@ -888,12 +885,12 @@ zonkStmt env zBody (BodyStmt body then_op guard_op ty)
     zonkExpr env then_op        `thenM` \ new_then ->
     zonkExpr env guard_op       `thenM` \ new_guard ->
     zonkTcTypeToType env ty     `thenM` \ new_ty ->
-    returnM (env, BodyStmt new_body new_then new_guard new_ty)
+    return (env, BodyStmt new_body new_then new_guard new_ty)
 
 zonkStmt env zBody (LastStmt body ret_op)
   = zBody env body              `thenM` \ new_body ->
     zonkExpr env ret_op         `thenM` \ new_ret ->
-    returnM (env, LastStmt new_body new_ret)
+    return (env, LastStmt new_body new_ret)
 
 zonkStmt env _ (TransStmt { trS_stmts = stmts, trS_bndrs = binderMap
                               , trS_by = by, trS_form = form, trS_using = using
@@ -917,7 +914,7 @@ zonkStmt env _ (TransStmt { trS_stmts = stmts, trS_bndrs = binderMap
 
 zonkStmt env _ (LetStmt binds)
   = zonkLocalBinds env binds    `thenM` \ (env1, new_binds) ->
-    returnM (env1, LetStmt new_binds)
+    return (env1, LetStmt new_binds)
 
 zonkStmt env zBody (BindStmt pat body bind_op fail_op)
   = do  { new_body <- zBody env body
@@ -939,8 +936,8 @@ zonkRecFields env (HsRecFields flds dd)
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> Either HsIPName a -> TcM (Either HsIPName b)
-mapIPNameTc _ (Left x)  = returnM (Left x)
-mapIPNameTc f (Right x) = f x  `thenM` \ r -> returnM (Right r)
+mapIPNameTc _ (Left x)  = return (Left x)
+mapIPNameTc f (Right x) = f x  `thenM` \ r -> return (Right r)
 \end{code}
 
 
@@ -1023,11 +1020,11 @@ zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
         ; (env1, new_evs) <- zonkEvBndrsX env0 evs
         ; (env2, new_binds) <- zonkTcEvBinds env1 binds
         ; (env', new_args) <- zonkConStuff env2 args
-        ; returnM (env', p { pat_ty = new_ty,
-                             pat_tvs = new_tyvars,
-                             pat_dicts = new_evs,
-                             pat_binds = new_binds,
-                             pat_args = new_args }) }
+        ; return (env', p { pat_ty = new_ty,
+                            pat_tvs = new_tyvars,
+                            pat_dicts = new_evs,
+                            pat_binds = new_binds,
+                            pat_args = new_args }) }
 
 zonk_pat env (LitPat lit) = return (env, LitPat lit)
 
@@ -1074,7 +1071,7 @@ zonkConStuff env (InfixCon p1 p2)
 zonkConStuff env (RecCon (HsRecFields rpats dd))
   = do  { (env', pats') <- zonkPats env (map hsRecFieldArg rpats)
         ; let rpats' = zipWith (\rp p' -> rp { hsRecFieldArg = p' }) rpats pats'
-        ; returnM (env', RecCon (HsRecFields rpats' dd)) }
+        ; return (env', RecCon (HsRecFields rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------
@@ -1098,9 +1095,9 @@ zonkForeignExports env ls = mapM (wrapLocM (zonkForeignExport env)) ls
 
 zonkForeignExport :: ZonkEnv -> ForeignDecl TcId -> TcM (ForeignDecl Id)
 zonkForeignExport env (ForeignExport i _hs_ty co spec) =
-   returnM (ForeignExport (fmap (zonkIdOcc env) i) undefined co spec)
+   return (ForeignExport (fmap (zonkIdOcc env) i) undefined co spec)
 zonkForeignExport _ for_imp
-  = returnM for_imp     -- Foreign imports don't need zonking
+  = return for_imp     -- Foreign imports don't need zonking
 \end{code}
 
 \begin{code}
