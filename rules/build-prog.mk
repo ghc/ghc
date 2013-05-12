@@ -204,8 +204,27 @@ $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
             $$(error Bad build stage)))),\
         $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
 
+$1_$2_PROG_NEEDS_C_WRAPPER = NO
 ifeq "$$(Windows_Host) $$($1_$2_PROGRAM_WAY)" "YES dyn"
-$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG).c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
+ifneq "$$($1_$2_HS_SRCS)" ""
+$1_$2_PROG_NEEDS_C_WRAPPER = YES
+endif
+endif
+
+ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
+
+$1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	echo '#include <Windows.h>' >> $$@
+	echo 'LPTSTR path_dirs[] = {' >> $$@
+	$$(foreach d,$$($1_$2_DEP_LIB_REL_DIRS),$$(call make-command,echo '    TEXT("$$d")$$(comma)' >> $$@))
+	echo '    TEXT("$1/$2/build/tmp/"),' >> $$@
+	echo '    NULL};' >> $$@
+	echo 'LPTSTR progDll = TEXT("../../$1/$2/build/tmp/$$($1_$2_PROG).dll");' >> $$@
+	echo 'LPTSTR rtsDll = TEXT("$$($$(WINDOWS_DYN_PROG_RTS))");' >> $$@
+	cat driver/utils/dynwrapper.c >> $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) -no-hs-main -optc-g -optc-O0 $$< -o $$@
 
 $1/$2/build/tmp/$$($1_$2_PROG).dll : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
