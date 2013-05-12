@@ -557,24 +557,6 @@ endif
 endif
 
 # ----------------------------------------
-# Special magic for the packages which link to the RTS
-# This is a rather ugly hack to fix dynamically linked GHC on Windows.
-# If GHC is linked with -threaded, then it links against libHSrts_thr.
-# But if base is linked against libHSrts, then both end up getting
-# loaded, and things go wrong. We therefore link the libraries that
-# link against the RTS with the same RTS flags that we link GHC with.
-ifeq "$(GhcThreaded)" "YES"
-libraries/ghc-prim_dist-install_MORE_HC_OPTS    += -threaded
-libraries/integer-gmp_dist-install_MORE_HC_OPTS += -threaded
-libraries/base_dist-install_MORE_HC_OPTS        += -threaded
-endif
-ifeq "$(GhcDebugged)" "YES"
-libraries/ghc-prim_dist-install_MORE_HC_OPTS    += -debug
-libraries/integer-gmp_dist-install_MORE_HC_OPTS += -debug
-libraries/base_dist-install_MORE_HC_OPTS        += -debug
-endif
-
-# ----------------------------------------
 # Workarounds for problems building DLLs on Windows
 
 ifeq "$(TargetOS_CPP)" "mingw32"
