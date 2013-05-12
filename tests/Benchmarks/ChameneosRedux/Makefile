@@ -4,7 +4,7 @@ include ../../config.mk
 
 TOP := ../../../
 EXTRA_LIBS=/scratch/chandras/install
-GHC_OPTS_EXTRA=-O2 -threaded -XDeriveDataTypeable -XBangPatterns -XCPP -XGeneralizedNewtypeDeriving -funbox-strict-fields -optc-O3 -ipqueue-1.2.1 -debug
+GHC_OPTS_EXTRA=-O2 -threaded -XDeriveDataTypeable -XBangPatterns -XCPP -XGeneralizedNewtypeDeriving -funbox-strict-fields -ipqueue-1.2.1 -optc-O3
 
 PROFILE_FLAGS := -DPROFILE_ENABLED -prof -fprof-auto -auto -auto-all
 

@@ -221,7 +221,8 @@ fork task on kind = do
     sc <- getSCont;
     setSContSwitchReason sc Completed;
     switchToNext <- getYieldControlAction;
-    switchToNext
+    switchToNext;
+    return ()
   }
   let makeSCont = case kind of
                     Bound -> newBoundSCont
