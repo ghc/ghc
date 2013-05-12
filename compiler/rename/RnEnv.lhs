@@ -72,12 +72,6 @@ import qualified Data.Set as Set
 import Constants        ( mAX_TUPLE_SIZE )
 \end{code}
 
-\begin{code}
--- XXX
-thenM :: Monad a => a b -> (b -> a c) -> a c
-thenM = (>>=)
-\end{code}
-
 %*********************************************************
 %*                                                      *
                 Source-code binders
@@ -530,8 +524,8 @@ we'll miss the fact that the qualified import is redundant.
 \begin{code}
 getLookupOccRn :: RnM (Name -> Maybe Name)
 getLookupOccRn
-  = getLocalRdrEnv                      `thenM` \ local_env ->
-    return (lookupLocalRdrOcc local_env . nameOccName)
+  = do local_env <- getLocalRdrEnv
+       return (lookupLocalRdrOcc local_env . nameOccName)
 
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
@@ -814,15 +808,15 @@ lookupQualifiedName rdr_name
   | Just (mod,occ) <- isQual_maybe rdr_name
    -- Note: we want to behave as we would for a source file import here,
    -- and respect hiddenness of modules/packages, hence loadSrcInterface.
-   = loadSrcInterface doc mod False Nothing     `thenM` \ iface ->
+   = do iface <- loadSrcInterface doc mod False Nothing
 
-   case  [ name
-         | avail <- mi_exports iface,
-           name  <- availNames avail,
-           nameOccName name == occ ] of
-      (n:ns) -> ASSERT (null ns) return (Just n)
-      _ -> do { traceRn (text "lookupQualified" <+> ppr rdr_name)
-              ; return Nothing }
+        case  [ name
+              | avail <- mi_exports iface,
+                name  <- availNames avail,
+                nameOccName name == occ ] of
+           (n:ns) -> ASSERT (null ns) return (Just n)
+           _ -> do { traceRn (text "lookupQualified" <+> ppr rdr_name)
+                   ; return Nothing }
 
   | otherwise
   = pprPanic "RnEnv.lookupQualifiedName" (ppr rdr_name)
@@ -1089,9 +1083,9 @@ lookupFixity is a bit strange.
 
 \begin{code}
 lookupFixityRn :: Name -> RnM Fixity
-lookupFixityRn name
-  = getModule                           `thenM` \ this_mod ->
-    if nameIsLocalOrFrom this_mod name
+lookupFixityRn name = do
+  this_mod <- getModule
+  if nameIsLocalOrFrom this_mod name
     then do     -- It's defined in this module
       local_fix_env <- getFixityEnv
       traceRn (text "lookupFixityRn: looking up name in local environment:" <+>
@@ -1114,11 +1108,10 @@ lookupFixityRn name
       --
       -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
-        loadInterfaceForName doc name   `thenM` \ iface -> do {
-          traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+>
-                   vcat [ppr name, ppr $ mi_fix_fn iface (nameOccName name)]);
+        do iface <- loadInterfaceForName doc name
+           traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+>
+                    vcat [ppr name, ppr $ mi_fix_fn iface (nameOccName name)])
            return (mi_fix_fn iface (nameOccName name))
-                                                           }
   where
     doc = ptext (sLit "Checking fixity for") <+> ppr name
 
@@ -1262,8 +1255,8 @@ bindLocatedLocalsFV :: [Located RdrName]
                     -> ([Name] -> RnM (a,FreeVars)) -> RnM (a, FreeVars)
 bindLocatedLocalsFV rdr_names enclosed_scope
   = bindLocatedLocalsRn rdr_names       $ \ names ->
-    enclosed_scope names                `thenM` \ (thing, fvs) ->
-    return (thing, delFVs names fvs)
+    do (thing, fvs) <- enclosed_scope names
+       return (thing, delFVs names fvs)
 
 -------------------------------------
 
