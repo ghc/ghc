@@ -495,13 +495,13 @@ yieldControlActionRts sc = Exception.catch (atomically $ do
       -- sets the SCont status to Yielded.
       SContSwitched Yielded -> return ()
 
-			-- This is a corner case, but is very well possible. Consider that the
-			-- Scont (sc), was blocked on a foreign call, while its scheduler was
-			-- resumed (See rts/Schedule.c:resumeThread). When sc wakes up it has to
-			-- voluntarily give up control. But sc runs to completion and marks the
-			-- thread it is switching to that is should give up the scheduler (See
-			-- rts/PrimOps.cmm:stg_atomicSwitch). Now, the status of sc is set to
-			-- "SContSwitched Completed". Hence, this branch.
+      -- This is a corner case, but is very well possible. Consider that the
+      -- Scont (sc), was blocked on a foreign call, while its scheduler was
+      -- resumed (See rts/Schedule.c:resumeThread). When sc wakes up it has to
+      -- voluntarily give up control. But sc runs to completion and marks the
+      -- thread it is switching to that is should give up the scheduler (See
+      -- rts/PrimOps.cmm:stg_atomicSwitch). Now, the status of sc is set to
+      -- "SContSwitched Completed". Hence, this branch.
       otherwise -> return ()
 
   switch <- getYieldControlActionSCont sc
