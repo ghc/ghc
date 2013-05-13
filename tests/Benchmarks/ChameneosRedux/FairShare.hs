@@ -43,12 +43,19 @@ import qualified Data.PQueue.Min as PQ
 
 #include "profile.h"
 
+
 newtype State = State (PVar Int, PVar ClockTime, PVar Int)
                 deriving (Typeable)
 
 -------------------------------------------------------------------------------
 -- SCont Accounting
 -------------------------------------------------------------------------------
+
+#define ACCOUNT_COUNT
+
+#ifdef ACCOUNT_COUNT
+#undef ACCOUNT_TIME
+#endif
 
 -- |Returns the time difference in microseconds (potentially returning maxBound
 -- <= the real difference)
@@ -64,20 +71,29 @@ timeDiffToMicroSec (TimeDiff _ _ _ _ _ sec picosec) =
 _INL_(startClock)
 startClock :: SCont -> PTM ()
 startClock sc = do
+#ifdef ACCOUNT_TIME
   sls <- getSLS sc
   let State (_,st,_) = fromJust $ fromDynamic sls
   time <- unsafeIOToPTM $ getClockTime
   writePVar st $ time
+#else
+  return ()
+#endif
 
 _INL_(stopClock)
 stopClock :: SCont -> PTM ()
 stopClock sc = do
   sls <- getSLS sc
   let State (_,st,acc) = fromJust $ fromDynamic sls
+#ifdef ACCOUNT_TIME
   startTime <- readPVar st
   endTime <- unsafeIOToPTM $ getClockTime
+  let diff = timeDiffToMicroSec (diffClockTimes endTime startTime)
+#else
+  let diff = 1
+#endif
   sum <- readPVar acc
-  let newSum = sum + timeDiffToMicroSec (diffClockTimes endTime startTime)
+  let newSum = sum + diff
   writePVar acc newSum
   where
 
