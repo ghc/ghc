@@ -1324,7 +1324,7 @@ myCoreToStg :: DynFlags -> Module -> CoreProgram
 myCoreToStg dflags this_mod prepd_binds = do
     stg_binds
         <- {-# SCC "Core2Stg" #-}
-           coreToStg dflags prepd_binds
+           coreToStg dflags this_mod prepd_binds
 
     (stg_binds2, cost_centre_info)
         <- {-# SCC "Stg2Stg" #-}

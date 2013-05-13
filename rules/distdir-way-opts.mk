@@ -124,6 +124,14 @@ $1_$2_$3_ALL_HC_OPTS = \
  $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too))
 
 ifeq "$3" "dyn"
+ifeq "$$(HostOS_CPP)" "mingw32"
+ifneq "$$($1_$2_dll0_MODULES)" ""
+$1_$2_$3_ALL_HC_OPTS += -dll-split $1/$2/dll-split
+endif
+endif
+endif
+
+ifeq "$3" "dyn"
 ifneq "$4" "0"
 ifeq "$$(TargetElf)" "YES"
 $1_$2_$3_GHC_LD_OPTS += \

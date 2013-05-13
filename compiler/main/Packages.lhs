@@ -1039,13 +1039,24 @@ missingDependencyMsg (Just parent)
 -- -----------------------------------------------------------------------------
 
 -- | Will the 'Name' come from a dynamically linked library?
-isDllName :: DynFlags -> PackageId -> Name -> Bool
+isDllName :: DynFlags -> PackageId -> Module -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the synbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName dflags this_pkg name
+isDllName dflags this_pkg this_mod name
   | gopt Opt_Static dflags = False
-  | Just mod <- nameModule_maybe name = modulePackageId mod /= this_pkg
+  | Just mod <- nameModule_maybe name
+    = if modulePackageId mod /= this_pkg
+      then True
+      else case dllSplit dflags of
+           Nothing -> False
+           Just ss ->
+               let findMod m = let modStr = moduleNameString (moduleName m)
+                               in case find (modStr `Set.member`) ss of
+                                  Just i -> i
+                                  Nothing -> panic ("Can't find " ++ modStr ++ "in DLL split")
+               in findMod mod /= findMod this_mod
+       
   | otherwise = False  -- no, it is not even an external name
 
 -- -----------------------------------------------------------------------------

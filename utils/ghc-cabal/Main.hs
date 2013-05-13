@@ -50,8 +50,8 @@ main = do hSetBuffering stdout LineBuffering
                   doRegister dir distDir ghc ghcpkg topdir
                              myDestDir myPrefix myLibdir myDocdir
                              relocatableBuild args'
-              "configure" : dir : distDir : config_args ->
-                  generate dir distDir config_args
+              "configure" : dir : distDir : dll0Modules : config_args ->
+                  generate dir distDir dll0Modules config_args
               "sdist" : dir : distDir : [] ->
                   doSdist dir distDir
               ["--version"] ->
@@ -298,8 +298,8 @@ mangleLbi "compiler" "stage2" lbi
                       _                  -> False
 mangleLbi _ _ lbi = lbi
 
-generate :: FilePath -> FilePath -> [String] -> IO ()
-generate directory distdir config_args
+generate :: FilePath -> FilePath -> String -> [String] -> IO ()
+generate directory distdir dll0Modules config_args
  = withCurrentDirectory directory
  $ do let verbosity = normal
       -- XXX We shouldn't just configure with the default flags
@@ -403,9 +403,12 @@ generate directory distdir config_args
       wrappedLibraryDirs <- wrap libraryDirs
 
       let variablePrefix = directory ++ '_':distdir
+          mods      = map display modules
+          otherMods = map display (otherModules bi)
+          allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
-                variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
-                variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords (map display (otherModules bi)),
+                variablePrefix ++ "_MODULES = " ++ unwords mods,
+                variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
@@ -449,6 +452,11 @@ generate directory distdir config_args
       writeFile (distdir ++ "/haddock-prologue.txt") $
           if null (description pd) then synopsis pd
                                    else description pd
+      unless (null dll0Modules) $
+          do let dll0Mods = words dll0Modules
+                 dllMods = allMods \\ dll0Mods
+                 dllModSets = map unwords [dll0Mods, dllMods]
+             writeFile (distdir ++ "/dll-split") $ unlines dllModSets
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1

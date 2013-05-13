@@ -65,9 +65,10 @@ cgTopRhsCon id con args
 
    gen_code =
      do { dflags <- getDynFlags
+        ; this_mod <- getModuleName
         ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
-              ASSERT( not (isDllConApp dflags con args) ) return ()
+              ASSERT( not (isDllConApp dflags this_mod con args) ) return ()
         ; ASSERT( args `lengthIs` dataConRepRepArity con ) return ()
 
         -- LAY IT OUT
