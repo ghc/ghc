@@ -97,7 +97,7 @@ data ReferenceKind
         deriving(Eq)
 
 
-cmmMakeDynamicReference, cmmMakeDynamicReference'
+cmmMakeDynamicReference
   :: Monad m => DynFlags
              -> (CLabel -> m ())  -- a monad & a function
                                   -- used for recording imported symbols
@@ -105,9 +105,7 @@ cmmMakeDynamicReference, cmmMakeDynamicReference'
              -> CLabel            -- the label
              -> m CmmExpr
 
-cmmMakeDynamicReference = cmmMakeDynamicReference'
-
-cmmMakeDynamicReference' dflags addImport referenceKind lbl
+cmmMakeDynamicReference dflags addImport referenceKind lbl
   | Just _ <- dynamicLinkerLabelInfo lbl
   = return $ CmmLit $ CmmLabel lbl   -- already processed it, pass through
 
