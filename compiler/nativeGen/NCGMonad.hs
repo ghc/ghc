@@ -89,30 +89,25 @@ mapAccumLNat f b (x:xs)
        return (b__3, x__2:xs__2)
 
 getUniqueNat :: NatM Unique
-getUniqueNat = NatM $ \ (NatM_State us delta imports pic dflags) ->
-    case takeUniqFromSupply us of
-         (uniq, us') -> (uniq, (NatM_State us' delta imports pic dflags))
+getUniqueNat = NatM $ \ st ->
+    case takeUniqFromSupply $ natm_us st of
+    (uniq, us') -> (uniq, st {natm_us = us'})
 
 instance HasDynFlags NatM where
-    getDynFlags = NatM $ \ (NatM_State us delta imports pic dflags) ->
-                             (dflags, (NatM_State us delta imports pic dflags))
+    getDynFlags = NatM $ \ st -> (natm_dflags st, st)
 
 
 getDeltaNat :: NatM Int
-getDeltaNat
-        = NatM $ \ st -> (natm_delta st, st)
+getDeltaNat = NatM $ \ st -> (natm_delta st, st)
 
 
 setDeltaNat :: Int -> NatM ()
-setDeltaNat delta
-        = NatM $ \ (NatM_State us _ imports pic dflags) ->
-                   ((), NatM_State us delta imports pic dflags)
+setDeltaNat delta = NatM $ \ st -> ((), st {natm_delta = delta})
 
 
 addImportNat :: CLabel -> NatM ()
 addImportNat imp
-        = NatM $ \ (NatM_State us delta imports pic dflags) ->
-                   ((), NatM_State us delta (imp:imports) pic dflags)
+        = NatM $ \ st -> ((), st {natm_imports = imp : natm_imports st})
 
 
 getBlockIdNat :: NatM BlockId
