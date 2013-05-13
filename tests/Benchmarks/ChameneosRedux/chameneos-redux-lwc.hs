@@ -15,9 +15,9 @@
    -}
 
 import LwConc.Substrate
-import FairShare
+-- import FairShare
 -- import LwConc.RunQueue
--- import ConcurrentList
+import ConcurrentList
 import MVarList
 import Control.Monad
 import Data.Char
