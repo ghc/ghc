@@ -75,7 +75,7 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
         ; showPass dflags "CodeOutput"
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
-             HscAsm         -> outputAsm dflags filenm linted_cmm_stream;
+             HscAsm         -> outputAsm dflags this_mod filenm linted_cmm_stream;
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
              HscInterpreted -> panic "codeOutput: HscInterpreted";
@@ -140,8 +140,8 @@ outputC dflags filenm cmm_stream packages
 %************************************************************************
 
 \begin{code}
-outputAsm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
-outputAsm dflags filenm cmm_stream
+outputAsm :: DynFlags -> Module -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputAsm dflags this_mod filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
@@ -149,7 +149,7 @@ outputAsm dflags filenm cmm_stream
 
        _ <- {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}
-                 nativeCodeGen dflags h ncg_uniqs cmm_stream
+                 nativeCodeGen dflags this_mod h ncg_uniqs cmm_stream
        return ()
 
  | otherwise

@@ -16,6 +16,7 @@ module NCGMonad (
         mapAccumLNat,
         setDeltaNat,
         getDeltaNat,
+        getThisModuleNat,
         getBlockIdNat,
         getNewLabelNat,
         getNewRegNat,
@@ -38,14 +39,16 @@ import CLabel           ( CLabel, mkAsmTempLabel )
 import UniqSupply
 import Unique           ( Unique )
 import DynFlags
+import Module
 
 data NatM_State
         = NatM_State {
-                natm_us      :: UniqSupply,
-                natm_delta   :: Int,
-                natm_imports :: [(CLabel)],
-                natm_pic     :: Maybe Reg,
-                natm_dflags  :: DynFlags
+                natm_us          :: UniqSupply,
+                natm_delta       :: Int,
+                natm_imports     :: [(CLabel)],
+                natm_pic         :: Maybe Reg,
+                natm_dflags      :: DynFlags,
+                natm_this_module :: Module
         }
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
@@ -53,9 +56,9 @@ newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> DynFlags -> NatM_State
-mkNatM_State us delta dflags
-        = NatM_State us delta [] Nothing dflags
+mkNatM_State :: UniqSupply -> Int -> DynFlags -> Module -> NatM_State
+mkNatM_State us delta dflags this_mod
+        = NatM_State us delta [] Nothing dflags this_mod
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
@@ -103,6 +106,10 @@ getDeltaNat = NatM $ \ st -> (natm_delta st, st)
 
 setDeltaNat :: Int -> NatM ()
 setDeltaNat delta = NatM $ \ st -> ((), st {natm_delta = delta})
+
+
+getThisModuleNat :: NatM Module
+getThisModuleNat = NatM $ \ st -> (natm_this_module st, st)
 
 
 addImportNat :: CLabel -> NatM ()

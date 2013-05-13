@@ -837,8 +837,8 @@ idInfoLabelType info =
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
 
-labelDynamic :: DynFlags -> PackageId -> CLabel -> Bool
-labelDynamic dflags this_pkg lbl =
+labelDynamic :: DynFlags -> PackageId -> Module -> CLabel -> Bool
+labelDynamic dflags this_pkg _this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _           -> not (gopt Opt_Static dflags) && (this_pkg /= rtsPackageId)
