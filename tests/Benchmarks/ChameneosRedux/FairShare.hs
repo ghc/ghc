@@ -11,7 +11,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
 --
--- A concurrent round-robin scheduler.
+-- A Fair-share scheduler.
 --
 -----------------------------------------------------------------------------
 
@@ -121,8 +121,6 @@ enque !(Sched pa) !sc = do
       sls <- getSLS sc
       let State (_,_,acc) = fromJust $ fromDynamic sls
       readPVar acc
-
-
 
 -------------------------------------------------------------------------------
 -- Scheduler Activations

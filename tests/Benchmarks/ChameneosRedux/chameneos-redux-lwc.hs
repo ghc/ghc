@@ -5,18 +5,19 @@
    Modified by Péter Diviánszky, 19 May 2010
    Modified by Louis Wasserman, 14 June 2010
 
-	 Should be compiled with -O2 -threaded -fvia-c -optc-O3 and run with +RTS
-	 -N<number of cores>.
+   Should be compiled with -O2 -threaded -fvia-c -optc-O3 and run with +RTS
+   -N<number of cores>.
 
-	 XXX KC: The user of withArrayLen is unsafe. We obtain pointers to
-	 addresses inside the array but not the byte array itself. This is a
-	 recipie for disaster. See
-	 http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
+   XXX KC: The user of withArrayLen is unsafe. We obtain pointers to
+   addresses inside the array but not the byte array itself. This is a
+   recipie for disaster. See
+   http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
    -}
 
 import LwConc.Substrate
 import FairShare
 -- import LwConc.RunQueue
+-- import ConcurrentList
 import MVarList
 import Control.Monad
 import Data.Char
