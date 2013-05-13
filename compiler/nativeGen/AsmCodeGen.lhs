@@ -875,6 +875,9 @@ instance Monad CmmOptM where
                     case g x of
                       CmmOptM g' -> g' (imports', dflags)
 
+instance CmmMakeDynamicReferenceM CmmOptM where
+    addImport = addImportCmmOpt
+
 addImportCmmOpt :: CLabel -> CmmOptM ()
 addImportCmmOpt lbl = CmmOptM $ \(imports, _dflags) -> (# (), lbl:imports #)
 
@@ -986,10 +989,10 @@ cmmExprNative referenceKind expr = do
 
         CmmLit (CmmLabel lbl)
            -> do
-                cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
+                cmmMakeDynamicReference dflags referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
            -> do
-                 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
+                 dynRef <- cmmMakeDynamicReference dflags referenceKind lbl
                  -- need to optimize here, since it's late
                  return $ cmmMachOpFold dflags (MO_Add (wordWidth dflags)) [
                      dynRef,

@@ -35,6 +35,7 @@
 
 module PIC (
         cmmMakeDynamicReference,
+        CmmMakeDynamicReferenceM(..),
         ReferenceKind(..),
         needImportedSymbols,
         pprImportedSymbol,
@@ -96,16 +97,20 @@ data ReferenceKind
         | JumpReference
         deriving(Eq)
 
+class Monad m => CmmMakeDynamicReferenceM m where
+    addImport :: CLabel -> m ()
+
+instance CmmMakeDynamicReferenceM NatM where
+    addImport = addImportNat
 
 cmmMakeDynamicReference
-  :: Monad m => DynFlags
-             -> (CLabel -> m ())  -- a monad & a function
-                                  -- used for recording imported symbols
-             -> ReferenceKind     -- whether this is the target of a jump
-             -> CLabel            -- the label
-             -> m CmmExpr
+  :: CmmMakeDynamicReferenceM m
+  => DynFlags
+  -> ReferenceKind     -- whether this is the target of a jump
+  -> CLabel            -- the label
+  -> m CmmExpr
 
-cmmMakeDynamicReference dflags addImport referenceKind lbl
+cmmMakeDynamicReference dflags referenceKind lbl
   | Just _ <- dynamicLinkerLabelInfo lbl
   = return $ CmmLit $ CmmLabel lbl   -- already processed it, pass through
 

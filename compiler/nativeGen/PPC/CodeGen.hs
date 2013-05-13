@@ -561,7 +561,7 @@ getRegister' _ (CmmLit (CmmInt i rep))
 getRegister' _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
     dflags <- getDynFlags
-    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+    dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let size = floatSize frep
         code dst =
@@ -1107,7 +1107,7 @@ genCCall' dflags gcp target dest_regs args0
         outOfLineMachOp mop =
             do
                 dflags <- getDynFlags
-                mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
+                mopExpr <- cmmMakeDynamicReference dflags CallReference $
                               mkForeignLabel functionName Nothing ForeignLabelInThisPackage IsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
@@ -1179,7 +1179,7 @@ genSwitch dflags expr ids
         tmp <- getNewRegNat II32
         lbl <- getNewLabelNat
         dflags <- getDynFlags
-        dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let code = e_code `appOL` t_code `appOL` toOL [
                             SLW tmp reg (RIImm (ImmInt 2)),
@@ -1382,7 +1382,7 @@ coerceInt2FP fromRep toRep x = do
     itmp <- getNewRegNat II32
     ftmp <- getNewRegNat FF64
     dflags <- getDynFlags
-    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+    dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [

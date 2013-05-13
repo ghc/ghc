@@ -588,7 +588,7 @@ outOfLineMachOp mop
                 = outOfLineMachOp_table mop
 
         dflags  <- getDynFlags
-        mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference
+        mopExpr <- cmmMakeDynamicReference dflags CallReference
                 $  mkForeignLabel functionName Nothing ForeignLabelInExternalPackage IsFunction
 
         let mopLabelOrExpr
