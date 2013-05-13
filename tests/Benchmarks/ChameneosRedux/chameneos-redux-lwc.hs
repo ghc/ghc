@@ -15,16 +15,30 @@
    -}
 
 import LwConc.Substrate
-import FairShare
+
+-------------------------------------------------------------------------------
+-- Schedulers
+-------------------------------------------------------------------------------
+-- import FairShare
 -- import LwConc.RunQueue
--- import ConcurrentList
+import ConcurrentList
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- MVars
+-------------------------------------------------------------------------------
 import MVarList
+-- import LwConc.MVarList
+-- import LwConc.MVar
+-------------------------------------------------------------------------------
+
+
 import Control.Monad
 import Data.Char
 import Data.IORef
 import System.Environment
 import System.IO
--- import GHC.Conc
 import Foreign hiding (complement)
 
 newtype Color = C Int deriving (Storable,Enum)

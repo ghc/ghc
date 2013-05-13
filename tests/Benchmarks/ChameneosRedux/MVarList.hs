@@ -39,24 +39,35 @@ import GHC.IORef
 
 #include "profile.h"
 
--- data Queue a = Queue ![a] ![a]
--- 
--- _INL_(emptyQueue)
--- emptyQueue :: Queue a
--- emptyQueue = Queue [] []
--- 
--- _INL_(enque)
--- enque :: Queue a -> a -> Queue a
--- enque (Queue front back) e = Queue front $ e:back
--- 
--- _INL_(deque)
--- deque :: Queue a -> (Queue a, Maybe a)
--- deque (Queue !front !back) =
---   case front of
---     [] -> (case reverse back of
---             [] -> (emptyQueue, Nothing)
---             x:tl -> (Queue tl [], Just x))
---     x:tl -> (Queue tl back, Just x)
+#define ONE_LIST_Q
+-- #define TWO_LIST_Q
+
+#ifdef ONE_LIST_Q
+#undef TWO_LIST_Q
+#endif
+
+#ifdef TWO_LIST_Q
+
+data Queue a = Queue ![a] ![a]
+
+_INL_(emptyQueue)
+emptyQueue :: Queue a
+emptyQueue = Queue [] []
+
+_INL_(enque)
+enque :: Queue a -> a -> Queue a
+enque (Queue front back) e = Queue front $ e:back
+
+_INL_(deque)
+deque :: Queue a -> (Queue a, Maybe a)
+deque (Queue !front !back) =
+  case front of
+    [] -> (case reverse back of
+            [] -> (emptyQueue, Nothing)
+            x:tl -> (Queue tl [], Just x))
+    x:tl -> (Queue tl back, Just x)
+
+#else
 
 -- NOTE KC: Even a list seems to work just as well as a queue.
 data Queue a = Queue [a]
@@ -72,13 +83,15 @@ enque (Queue q) e = Queue $! e:q
 _INL_(deque)
 deque :: Queue a -> (Queue a, Maybe a)
 deque (Queue q) =
-  case q of
-    [] -> (emptyQueue, Nothing)
-    x:tl -> (Queue tl, Just x)
+   case q of
+     [] -> (emptyQueue, Nothing)
+     x:tl -> (Queue tl, Just x)
+
+#endif
 
 newtype MVar a = MVar (PVar (MVPState a)) deriving (Eq)
-data MVPState a = Full !a (Queue (a, PTM()))
-                | Empty (Queue (IORef a, PTM()))
+data MVPState a = Full !a {-# UNPACK #-} !(Queue (a, PTM()))
+                | Empty {-# UNPACK #-} !(Queue (IORef a, PTM()))
 
 
 _INL_(newMVar)
