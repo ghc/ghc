@@ -339,12 +339,6 @@ more_upcalls:
          */
         if (!emptyUpcallQueue(cap)) {
             t = prepareUpcallThread (cap, t);
-            //If there are other runnable threads, append the upcall thread to
-            //the scheduler.
-            if (!emptyRunQueue (cap)) {
-              appendToRunQueue (cap, t);
-              continue;
-            }
         }
         else {
             t = restoreCurrentThreadIfNecessary (cap, t);
