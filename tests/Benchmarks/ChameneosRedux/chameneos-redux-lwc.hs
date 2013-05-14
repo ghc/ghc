@@ -5,14 +5,14 @@
    Modified by Péter Diviánszky, 19 May 2010
    Modified by Louis Wasserman, 14 June 2010
 
-   Should be compiled with -O2 -threaded -fvia-c -optc-O3 and run with +RTS
-   -N<number of cores>.
+	 Should be compiled with -O2 -threaded -fvia-c -optc-O3 and run with +RTS
+	 -N<number of cores>. Disable thread migration <+RTS -qm> for predictable
+	 performance.
 
-   XXX KC: The user of withArrayLen is unsafe. We obtain pointers to
-   addresses inside the array but not the byte array itself. This is a
-   recipie for disaster. See
-   http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
-   -}
+	 XXX KC: The user of withArrayLen is unsafe. We obtain pointers to addresses
+	 inside the array but not the byte array itself. This is a recipe for
+	 disaster. See http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
+-}
 
 import LwConc.Substrate
 
@@ -28,9 +28,10 @@ import ConcurrentList
 -------------------------------------------------------------------------------
 -- MVars
 -------------------------------------------------------------------------------
-import MVarList
--- import LwConc.MVarList
+-- import MVarList
+import LwConc.MVarList
 -- import LwConc.MVar
+-- import Control.Concurrent (MVar, newEmptyMVar, newMVar, takeMVar, putMVar)
 -------------------------------------------------------------------------------
 
 
@@ -67,27 +68,24 @@ arrive :: MVar MP -> MVar (Int, Int) -> Chameneous -> IO ()
 arrive !mpv !finish !ch = do
     sc <- getSContIO
     !waker <- newEmptyMVar
-    !hole1 <- newIORef undefined
-    !hole2 <- newIORef undefined
-    !tk <- atomically $ newResumeToken
     let inc x = (fromEnum (ch == x) +)
         go !t !b = do
             -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-            w <- takeMVarWithHole mpv hole1 tk
+            w <- takeMVar mpv
             -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
             case w of
                 Nobody 0 -> do
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-                    putMVar mpv w tk
+                    putMVar mpv w
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-                    putMVar finish (t, b) tk
+                    putMVar finish (t, b)
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
                     return ()
                 Nobody q -> do
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-                    putMVar mpv (Somebody q ch waker) tk
+                    putMVar mpv (Somebody q ch waker)
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-                    ch' <- takeMVarWithHole waker hole2 tk
+                    ch' <- takeMVar waker
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
                     go (t+1) $ inc ch' b
                 Somebody q ch' waker' -> do
@@ -104,9 +102,9 @@ arrive !mpv !finish !ch = do
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
                     let !q' = q-1
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-                    putMVar waker' ch tk
+                    putMVar waker' ch
                     -- peek ch >>= debugPrint . (\s -> show sc ++ " " ++ show s ++ " " ++ show ch)
-                    putMVar mpv (Nobody q') tk
+                    putMVar mpv (Nobody q')
                     go (t+1) $ inc ch' b
     go 0 0
 
@@ -118,13 +116,11 @@ run :: Int -> Int -> [Color] -> IO (IO ())
 run n cpu cs = do
   fs    <- replicateM (length cs) newEmptyMVar
   mpv   <- newMVar (Nobody n)
-  hole  <- newIORef undefined
-  tk    <- atomically $ newResumeToken
   withArrayLen cs $ \ n cols -> do
     zipWithM_ ((forkOn cpu .) . arrive mpv) fs (take n (iterate (`advancePtr` 1) cols))
     return $ do
       putStrLn . map toLower . unwords . ([]:) . map show $ cs
-      ns    <- mapM (\m -> takeMVarWithHole m hole tk) fs
+      ns    <- mapM (\m -> takeMVar m) fs
       putStr . map toLower . unlines $ [unwords [show n, showN b] | (n, b) <- ns]
       putStrLn . (" "++) . showN . sum . map fst $ ns
       putStrLn ""

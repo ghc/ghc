@@ -796,6 +796,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
         cap0 = &capabilities[i];
         if (cap != cap0 && !cap0->disabled && tryGrabCapability(cap0,task)) {
             if (!emptyRunQueue(cap0)
+                || !emptyUpcallQueue(cap0)
                 || cap0->returning_tasks_hd != NULL
                 || cap0->inbox != (Message*)END_TSO_QUEUE) {
                 // it already has some work, we just grabbed it at
