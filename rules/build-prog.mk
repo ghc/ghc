@@ -213,15 +213,32 @@ endif
 
 ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
 
+$1_$2_RTS_OPTS_FLAG = $$(lastword $$(filter -rtsopts -rtsopts=all -rtsopts=some -rtsopts=none -no-rtsopts,$$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS)))
+ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts"
+$1_$2_RTS_OPTS = RtsOptsAll
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=all"
+$1_$2_RTS_OPTS = RtsOptsAll
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=some"
+$1_$2_RTS_OPTS = RtsOptsSafeOnly
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=none"
+$1_$2_RTS_OPTS = RtsOptsNone
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-no-rtsopts"
+$1_$2_RTS_OPTS = RtsOptsNone
+else
+$1_$2_RTS_OPTS = RtsOptsSafeOnly
+endif
+
 $1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	echo '#include <Windows.h>' >> $$@
+	echo '#include "Rts.h"' >> $$@
 	echo 'LPTSTR path_dirs[] = {' >> $$@
 	$$(foreach d,$$($1_$2_DEP_LIB_REL_DIRS),$$(call make-command,echo '    TEXT("$$d")$$(comma)' >> $$@))
 	echo '    TEXT("$1/$2/build/tmp/"),' >> $$@
 	echo '    NULL};' >> $$@
 	echo 'LPTSTR progDll = TEXT("../../$1/$2/build/tmp/$$($1_$2_PROG).dll");' >> $$@
 	echo 'LPTSTR rtsDll = TEXT("$$($$(WINDOWS_DYN_PROG_RTS))");' >> $$@
+	echo 'int rtsOpts = $$($1_$2_RTS_OPTS);' >> $$@
 	cat driver/utils/dynwrapper.c >> $$@
 
 $1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.

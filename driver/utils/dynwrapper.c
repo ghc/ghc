@@ -4,6 +4,7 @@ Need to concatenate this file with something that defines:
 LPTSTR path_dirs[];
 LPTSTR progDll;
 LPTSTR rtsDll;
+int rtsOpts;
 */
 
 #include <stdarg.h>
@@ -161,7 +162,7 @@ int main(int argc, char *argv[]) {
     LPTSTR oldPath;
 
     StgClosure *main_p;
-    RtsConfig *rts_config_p;
+    RtsConfig rts_config;
     hs_main_t hs_main_p;
 
     // MSDN says: An environment variable has a maximum size limit of
@@ -189,9 +190,10 @@ int main(int argc, char *argv[]) {
     hRtsDll = GetNonNullModuleHandle(rtsDll);
 
     hs_main_p    = GetNonNullProcAddress(hRtsDll,  "hs_main");
-    rts_config_p = GetNonNullProcAddress(hRtsDll,  "defaultRtsConfig");
     main_p       = GetNonNullProcAddress(hProgDll, "ZCMain_main_closure");
+    rts_config.rts_opts_enabled = rtsOpts;
+    rts_config.rts_opts = NULL;
 
-    return hs_main_p(argc, argv, main_p, *rts_config_p);
+    return hs_main_p(argc, argv, main_p, rts_config);
 }
 
