@@ -1195,7 +1195,7 @@ locateLib dflags is_hs dirs lib
      mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
-     mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
+     mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
      mk_dyn_lib_path dir = dir </> so_name

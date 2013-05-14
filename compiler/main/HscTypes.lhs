@@ -37,7 +37,7 @@ module HscTypes (
 
         PackageInstEnv, PackageRuleBase,
 
-        mkSOName, soExt,
+        mkSOName, mkHsSOName, soExt,
 
         -- * Annotations
         prepareAnnotations,
@@ -1795,6 +1795,9 @@ mkSOName platform root
       OSDarwin  -> ("lib" ++ root) <.> "dylib"
       OSMinGW32 ->           root  <.> "dll"
       _         -> ("lib" ++ root) <.> "so"
+
+mkHsSOName :: Platform -> FilePath -> FilePath
+mkHsSOName platform root = ("lib" ++ root) <.> soExt platform
 
 soExt :: Platform -> FilePath
 soExt platform
