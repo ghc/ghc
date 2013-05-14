@@ -107,7 +107,7 @@ ifneq "$$($1_NO_CHECK)" "YES"
 	"$$(ghc-cabal_INPLACE)" check $1
 endif
 endif
-	"$$(ghc-cabal_INPLACE)" configure --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS) -- $2 $1
+	"$$(ghc-cabal_INPLACE)" configure $1 $2 --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS)
 ifeq "$$($1_$2_PROG)" ""
 ifneq "$$($1_$2_REGISTER_PACKAGE)" "NO"
 	$$(call cmd,$1_$2_GHC_PKG) update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config

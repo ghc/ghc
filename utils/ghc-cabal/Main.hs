@@ -34,26 +34,24 @@ main :: IO ()
 main = do hSetBuffering stdout LineBuffering
           args <- getArgs
           case args of
-              "hscolour" : distDir : dir : args' ->
-                  runHsColour distDir dir args'
+              "hscolour" : dir : distDir : args' ->
+                  runHsColour dir distDir args'
               "check" : dir : [] ->
                   doCheck dir
-              "copy" : strip : directory : distDir
-                     : myDestDir : myPrefix : myLibdir : myDocdir
+              "copy" : dir : distDir
+                     : strip : myDestDir : myPrefix : myLibdir : myDocdir
                      : args' ->
-                  doCopy strip directory distDir
-                         myDestDir myPrefix myLibdir myDocdir
+                  doCopy dir distDir
+                         strip myDestDir myPrefix myLibdir myDocdir
                          args'
-              "register" : ghc : ghcpkg : topdir : directory : distDir
+              "register" : dir : distDir : ghc : ghcpkg : topdir
                          : myDestDir : myPrefix : myLibdir : myDocdir
                          : relocatableBuild : args' ->
-                  doRegister ghc ghcpkg topdir directory distDir
+                  doRegister dir distDir ghc ghcpkg topdir
                              myDestDir myPrefix myLibdir myDocdir
                              relocatableBuild args'
-              "configure" : args' -> case break (== "--") args' of
-                   (config_args, "--" : distdir : directories) ->
-                       mapM_ (generate config_args distdir) directories
-                   _ -> die syntax_error
+              "configure" : dir : distDir : config_args ->
+                  generate dir distDir config_args
               "sdist" : dir : distDir : [] ->
                   doSdist dir distDir
               ["--version"] ->
@@ -124,7 +122,7 @@ doCheck directory
           isFailure _ = True
 
 runHsColour :: FilePath -> FilePath -> [String] -> IO ()
-runHsColour distdir directory args
+runHsColour directory distdir args
  = withCurrentDirectory directory
  $ defaultMainArgs ("hscolour" : "--builddir" : distdir : args)
 
@@ -132,9 +130,9 @@ doCopy :: FilePath -> FilePath
        -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
        -> [String]
        -> IO ()
-doCopy strip directory distDir
-          myDestDir myPrefix myLibdir myDocdir
-          args
+doCopy directory distDir
+       strip myDestDir myPrefix myLibdir myDocdir
+       args
  = withCurrentDirectory directory $ do
      let copyArgs = ["copy", "--builddir", distDir]
                  ++ (if null myDestDir
@@ -182,7 +180,7 @@ doRegister :: FilePath -> FilePath -> FilePath -> FilePath
            -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
            -> String -> [String]
            -> IO ()
-doRegister ghc ghcpkg topdir directory distDir
+doRegister directory distDir ghc ghcpkg topdir
            myDestDir myPrefix myLibdir myDocdir
            relocatableBuildStr args
  = withCurrentDirectory directory $ do
@@ -300,8 +298,8 @@ mangleLbi "compiler" "stage2" lbi
                       _                  -> False
 mangleLbi _ _ lbi = lbi
 
-generate :: [String] -> FilePath -> FilePath -> IO ()
-generate config_args distdir directory
+generate :: FilePath -> FilePath -> [String] -> IO ()
+generate directory distdir config_args
  = withCurrentDirectory directory
  $ do let verbosity = normal
       -- XXX We shouldn't just configure with the default flags
