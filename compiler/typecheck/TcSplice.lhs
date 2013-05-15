@@ -1010,37 +1010,27 @@ reifyInstances :: TH.Name -> [TH.Type] -> TcM [TH.Dec]
 reifyInstances th_nm th_tys
    = addErrCtxt (ptext (sLit "In the argument of reifyInstances:")
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
-     do { thing <- getThing th_nm
-        ; case thing of
-            AGlobal (ATyCon tc)
-              | Just cls <- tyConClass_maybe tc
-              -> do { tys <- tc_types (classTyCon cls) th_tys
-                    ; inst_envs <- tcGetInstEnvs
-                    ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
-                    ; mapM reifyClassInstance (map fst matches ++ unifies) }
-              | otherwise
-              -> do { tys <- tc_types tc th_tys
-                    ; inst_envs <- tcGetFamInstEnvs
-                    ; let matches = lookupFamInstEnv inst_envs tc tys
-                    ; mapM (reifyFamilyInstance . fim_instance) matches }
-            _ -> bale_out (ppr_th th_nm <+> ptext (sLit "is not a class or type constructor"))
-        }
+     do { loc <- getSrcSpanM
+        ; rdr_ty <- cvt loc (mkThAppTs (TH.ConT th_nm) th_tys)
+        ; (rn_ty, _fvs) <- checkNoErrs $ rnLHsType doc rdr_ty   -- Rename  to HsType Name
+                         -- checkNoErrs: see Note [Renamer errors]
+        ; (ty, _kind)  <- tcLHsType rn_ty
+
+        ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
+            Just (tc, tys)                 -- See Trac #7910
+               | Just cls <- tyConClass_maybe tc
+               -> do { inst_envs <- tcGetInstEnvs
+                     ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
+                     ; mapM reifyClassInstance (map fst matches ++ unifies) }
+               | isFamilyTyCon tc
+               -> do { inst_envs <- tcGetFamInstEnvs
+                     ; let matches = lookupFamInstEnv inst_envs tc tys
+                     ; mapM (reifyFamilyInstance . fim_instance) matches }
+            _  -> bale_out (hang (ptext (sLit "reifyInstances:") <+> quotes (ppr ty)) 
+                               2 (ptext (sLit "is not a class constraint or type family application"))) }
   where
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
-
-    tc_types :: TyCon -> [TH.Type] -> TcM [Type]
-    tc_types tc th_tys
-      = do { let tc_arity = tyConArity tc
-           ; when (length th_tys /= tc_arity)
-                  (bale_out (ptext (sLit "Wrong number of types (expected")
-                             <+> int tc_arity <> rparen))
-           ; loc <- getSrcSpanM
-           ; rdr_tys <- mapM (cvt loc) th_tys    -- Convert to HsType RdrName
-           ; (rn_tys, _fvs) <- checkNoErrs $ rnLHsTypes doc rdr_tys   -- Rename  to HsType Name
-                         -- checkNoErrs: see Note [Renamer errors]
-           ; (tys, _res_k)  <- tcInferApps tc (tyConKind tc) rn_tys
-           ; return tys }
 
     cvt :: SrcSpan -> TH.Type -> TcM (LHsType RdrName)
     cvt loc th_ty = case convertToHsType loc th_ty of
@@ -1305,7 +1295,7 @@ reifyClassInstance :: ClsInst -> TcM TH.Dec
 reifyClassInstance i
   = do { cxt <- reifyCxt (drop n_silent theta)
        ; thtypes <- reifyTypes types
-       ; let head_ty = foldl TH.AppT (TH.ConT (reifyName cls)) thtypes
+       ; let head_ty = mkThAppTs (TH.ConT (reifyName cls)) thtypes
        ; return $ (TH.InstanceD cxt head_ty []) }
   where
      (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
@@ -1386,7 +1376,7 @@ reifyKind  ki
 
 reify_kc_app :: TyCon -> [TypeRep.Kind] -> TcM TH.Kind
 reify_kc_app kc kis
-  = fmap (foldl TH.AppT r_kc) (mapM reifyKind kis)
+  = fmap (mkThAppTs r_kc) (mapM reifyKind kis)
   where
     r_kc | Just tc <- isPromotedTyCon_maybe kc
          , isTupleTyCon tc          = TH.TupleT (tyConArity kc)
@@ -1418,7 +1408,7 @@ reifyTyVars = mapM reifyTyVar . filter isTypeVar
 reify_tc_app :: TyCon -> [TypeRep.Type] -> TcM TH.Type
 reify_tc_app tc tys
   = do { tys' <- reifyTypes (removeKinds (tyConKind tc) tys)
-       ; return (foldl TH.AppT r_tc tys') }
+       ; return (mkThAppTs r_tc tys') }
   where
     arity = tyConArity tc
     r_tc | isTupleTyCon tc            = if isPromotedDataCon tc
@@ -1495,6 +1485,9 @@ reifyStrict HsStrict                      = TH.IsStrict
 reifyStrict (HsUnpack {})                 = TH.Unpacked
 
 ------------------------------
+mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
+mkThAppTs fun_ty arg_tys = foldl TH.AppT fun_ty arg_tys
+
 noTH :: LitString -> SDoc -> TcM a
 noTH s d = failWithTc (hsep [ptext (sLit "Can't represent") <+> ptext s <+>
                                 ptext (sLit "in Template Haskell:"),
