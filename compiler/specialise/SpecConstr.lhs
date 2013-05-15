@@ -132,7 +132,7 @@ because now t is allocated by the caller, then r and s are passed to the
 recursive call, which allocates the (r,s) pair again.
 
 This happens if
-  (a) the argument p is used in other than a case-scrutinsation way.
+  (a) the argument p is used in other than a case-scrutinisation way.
   (b) the argument to the call is not a 'fresh' tuple; you have to
         look into its unfolding to see that it's a tuple
 
@@ -394,6 +394,22 @@ use the calls in the un-specialised RHS as seeds.  We call these
 "boring call patterns", and callsToPats reports if it finds any of these.
 
 
+Note [Top-level recursive groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If all the bindings in a top-level recursive group are not exported,
+all the calls are in the rest of the top-level bindings.
+This means we can specialise with those call patterns instead of with the RHSs
+of the recursive group.
+
+To get the call usage information, we work backwards through the top-level bindings
+so we see the usage before we get to the binding of the function.
+Before we can collect the usage though, we go through all the bindings and add them
+to the environment. This is necessary because usage is only tracked for functions
+in the environment.
+
+The actual seeding of the specialisation is very similar to Note [Local recursive group].
+
+
 Note [Do not specialise diverging functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Specialising a function that just diverges is a waste of code.
@@ -402,7 +418,7 @@ Furthermore, it broke GHC (simpl014) thus:
    f = \x. case x of (a,b) -> f x
 If we specialise f we get
    f = \x. case x of (a,b) -> fspec a b
-But fspec doesn't have decent strictnes info.  As it happened,
+But fspec doesn't have decent strictness info.  As it happened,
 (f x) :: IO t, so the state hack applied and we eta expanded fspec,
 and hence f.  But now f's strictness is less than its arity, which
 breaks an invariant.
@@ -451,7 +467,7 @@ foldl_loop. Note that
 This is all quite ugly; we ought to come up with a better design.
 
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
-sc_force to True when calling specLoop. This flag does three things:
+sc_force to True when calling specLoop. This flag does four things:
   * Ignore specConstrThreshold, to specialise functions of arbitrary size
         (see scTopBind)
   * Ignore specConstrCount, to make arbitrary numbers of specialisations
@@ -459,7 +475,7 @@ sc_force to True when calling specLoop. This flag does three things:
   * Specialise even for arguments that are not scrutinised in the loop
         (see argToPat; Trac #4488)
   * Only specialise on recursive types a finite number of times
-        (see is_too_recursive; Trac #5550)
+        (see is_too_recursive; Trac #5550; Note [Limit recursive specialisation])
 
 This flag is inherited for nested non-recursive bindings (which are likely to
 be join points and hence should be fully specialised) but reset for nested
@@ -506,6 +522,39 @@ we may end up with calls like
 Without the SPEC, if 'loop' were strict, the case would move out
 and we'd see loop applied to a pair. But if 'loop' isn't strict
 this doesn't look like a specialisable call.
+
+Note [Limit recursive specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is possible for ForceSpecConstr to cause an infinite loop of specialisation.
+Because there is no limit on the number of specialisations, a recursive call with
+a recursive constructor as an argument (for example, list cons) will generate
+a specialisation for that constructor. If the resulting specialisation also
+contains a recursive call with the constructor, this could proceed indefinitely.
+
+For example, if ForceSpecConstr is on:
+  loop :: [Int] -> [Int] -> [Int]
+  loop z []         = z
+  loop z (x:xs)     = loop (x:z) xs
+this example will create a specialisation for the pattern
+  loop (a:b) c      = loop' a b c
+
+  loop' a b []      = (a:b)
+  loop' a b (x:xs)  = loop (x:(a:b)) xs
+and a new pattern is found:
+  loop (a:(b:c)) d  = loop'' a b c d
+which can continue indefinitely.
+
+Roman's suggestion to fix this was to stop after a couple of times on recursive types,
+but still specialising on non-recursive types as much as possible.
+
+To implement this, we count the number of recursive constructors in each
+function argument. If the maximum is greater than the specConstrRecursive limit,
+do not specialise on that pattern.
+
+This is only necessary when ForceSpecConstr is on: otherwise the specConstrCount
+will force termination anyway.
+
+See Trac #5550.
 
 Note [NoSpecConstr]
 ~~~~~~~~~~~~~~~~~~~
@@ -605,13 +654,22 @@ specConstrProgram guts
       dflags <- getDynFlags
       us     <- getUniqueSupplyM
       annos  <- getFirstAnnotations deserializeWithData guts
-      let binds' = fst $ initUs us (go (initScEnv dflags annos) (mg_binds guts))
+      let binds' = reverse $ fst $ initUs us $ do
+                    -- Note [Top-level recursive groups]
+                    (env, binds) <- goEnv (initScEnv dflags annos) (mg_binds guts)
+                    go env nullUsage (reverse binds)
+
       return (guts { mg_binds = binds' })
   where
-    go _   []           = return []
-    go env (bind:binds) = do (env', bind') <- scTopBind env bind
-                             binds' <- go env' binds
-                             return (bind' : binds')
+    goEnv env []            = return (env, [])
+    goEnv env (bind:binds)  = do (env', bind')   <- scTopBindEnv env bind
+                                 (env'', binds') <- goEnv env' binds
+                                 return (env'', bind' : binds')
+
+    go _   _   []           = return []
+    go env usg (bind:binds) = do (usg', bind') <- scTopBind env usg bind
+                                 binds' <- go env usg' binds
+                                 return (bind' : binds')
 \end{code}
 
 
@@ -912,7 +970,7 @@ Note [Avoiding exponential blowup]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The sc_count field of the ScEnv says how many times we are prepared to
 duplicate a single function.  But we must take care with recursive
-specialiations.  Consider
+specialisations.  Consider
 
         let $j1 = let $j2 = let $j3 = ...
                             in
@@ -1225,38 +1283,62 @@ mkVarUsage env fn args
             | otherwise = evalScrutOcc
 
 ----------------------
-scTopBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, CoreBind)
-scTopBind env (Rec prs)
+scTopBindEnv :: ScEnv -> CoreBind -> UniqSM (ScEnv, CoreBind)
+scTopBindEnv env (Rec prs)
+  = do  { let (rhs_env1,bndrs') = extendRecBndrs env bndrs
+              rhs_env2          = extendHowBound rhs_env1 bndrs RecFun
+
+              prs'              = zip bndrs' rhss
+        ; return (rhs_env2, Rec prs') }
+  where
+    (bndrs,rhss) = unzip prs
+
+scTopBindEnv env (NonRec bndr rhs)
+  = do  { let (env1, bndr') = extendBndr env bndr
+              env2          = extendValEnv env1 bndr' (isValue (sc_vals env) rhs)
+        ; return (env2, NonRec bndr' rhs) }
+
+----------------------
+scTopBind :: ScEnv -> ScUsage -> CoreBind -> UniqSM (ScUsage, CoreBind)
+
+{-
+scTopBind _ usage _
+  | pprTrace "scTopBind_usage" (ppr (scu_calls usage)) False
+  = error "false"
+-}
+ 
+scTopBind env usage (Rec prs)
   | Just threshold <- sc_size env
   , not force_spec
   , not (all (couldBeSmallEnoughToInline (sc_dflags env) threshold) rhss)
                 -- No specialisation
-  = do  { let (rhs_env,bndrs') = extendRecBndrs env bndrs
-        ; (_, rhss') <- mapAndUnzipM (scExpr rhs_env) rhss
-        ; return (rhs_env, Rec (bndrs' `zip` rhss')) }
+  = do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
+        ; return (usage `combineUsage` (combineUsages rhs_usgs), Rec (bndrs `zip` rhss')) }
   | otherwise   -- Do specialisation
-  = do  { let (rhs_env1,bndrs') = extendRecBndrs env bndrs
-              rhs_env2          = extendHowBound rhs_env1 bndrs' RecFun
+  = do  { (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs env) (bndrs `zip` rhss)
+        -- ; pprTrace "scTopBind" (ppr bndrs $$ ppr (map (lookupVarEnv (scu_calls usage)) bndrs)) (return ())
 
-        ; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
-        ; let rhs_usg = combineUsages rhs_usgs
+        -- Note [Top-level recursive groups]
+        ; let (usg,rest) = if   all (not . isExportedId) bndrs
+                           then -- pprTrace "scTopBind-T" (ppr bndrs $$ ppr (map (fmap (map snd) . lookupVarEnv (scu_calls usage)) bndrs))
+                                ( usage
+                                , [SI [] 0 (Just us) | us <- rhs_usgs] )
+                           else ( combineUsages rhs_usgs
+                                , [SI [] 0 Nothing   | _  <- rhs_usgs] )
 
-        ; (_, specs) <- specLoop (scForce rhs_env2 force_spec)
-                                 (scu_calls rhs_usg) rhs_infos nullUsage
-                                 [SI [] 0 Nothing | _ <- bndrs]
+        ; (usage', specs) <- specLoop (scForce env force_spec)
+                                 (scu_calls usg) rhs_infos nullUsage rest
 
-        ; return (rhs_env1,  -- For the body of the letrec, delete the RecFun business
+        ; return (usage `combineUsage` usage',
                   Rec (concat (zipWith specInfoBinds rhs_infos specs))) }
   where
     (bndrs,rhss) = unzip prs
     force_spec   = any (forceSpecBndr env) bndrs
       -- Note [Forcing specialisation]
 
-scTopBind env (NonRec bndr rhs)
-  = do  { (_, rhs') <- scExpr env rhs
-        ; let (env1, bndr') = extendBndr env bndr
-              env2          = extendValEnv env1 bndr' (isValue (sc_vals env) rhs')
-        ; return (env2, NonRec bndr' rhs') }
+scTopBind env usage (NonRec bndr rhs)
+  = do  { (rhs_usg', rhs') <- scExpr env rhs
+        ; return (usage `combineUsage` rhs_usg', NonRec bndr rhs') }
 
 ----------------------
 scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (ScUsage, RhsInfo)
@@ -1282,6 +1364,7 @@ specInfoBinds (RI fn new_rhs _ _ _) (SI specs _ _)
               -- And now the original binding
   where
     rules = [r | OS _ r _ _ <- specs]
+
 \end{code}
 
 
@@ -1589,6 +1672,7 @@ is_too_recursive :: ScEnv -> (CallPat, ValueEnv) -> Bool
     -- filter out if there are more than the maximum.
     -- This is only necessary if ForceSpecConstr is in effect:
     -- otherwise specConstrCount will cause specialisation to terminate.
+    -- See Note [Limit recursive specialisation]
 is_too_recursive env ((_,exprs), val_env)
  = sc_force env && maximum (map go exprs) > sc_recursive env
  where
@@ -1617,7 +1701,7 @@ callToPats env bndr_occs (con_env, args)
         ; let pat_fvs       = varSetElems (exprsFreeVars pats)
               in_scope_vars = getInScopeVars in_scope
               qvars         = filterOut (`elemVarSet` in_scope_vars) pat_fvs
-                -- Quantify over variables that are not in sccpe
+                -- Quantify over variables that are not in scope
                 -- at the call site
                 -- See Note [Free type variables of the qvar types]
                 -- See Note [Shadowing] at the top
