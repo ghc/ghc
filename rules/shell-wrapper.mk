@@ -89,6 +89,7 @@ install_$1_$2_wrapper:
 endif
 
 ifeq "$$($1_$2_WANT_BINDIST_WRAPPER)" "YES"
+ifneq "$$(TargetOS_CPP)" "mingw32"
 
 $1_$2_BINDIST_WRAPPER = $1/$2/build/tmp/$$($1_$2_PROGNAME)-bindist
 
@@ -105,6 +106,7 @@ endif
 	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@
 	$$(EXECUTABLE_FILE)                                                   $$@
 
+endif
 endif
 
 $(call profEnd, shell-wrapper($1,$2))
