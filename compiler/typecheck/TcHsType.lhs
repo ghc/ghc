@@ -387,6 +387,9 @@ tc_hs_type hs_ty@(HsAppTy ty1 ty2) exp_kind
        ; arg_tys' <- tcCheckApps hs_ty fun_ty fun_kind arg_tys exp_kind
        ; return (mkNakedAppTys fun_ty' arg_tys') }
          -- mkNakedAppTys: see Note [Zonking inside the knot]
+         -- This looks fragile; how do we *know* that fun_ty isn't 
+         -- a TyConApp, say (which is never supposed to appear in the
+         -- function position of an AppTy)?
   where
     (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
 
