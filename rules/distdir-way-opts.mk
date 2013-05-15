@@ -140,18 +140,6 @@ $1_$2_$3_GHC_LD_OPTS += \
 else ifeq "$$(TargetOS_CPP)" "darwin"
 $1_$2_$3_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
 endif
-
-# This is a rather ugly hack to fix dynamically linked GHC on Windows.
-# If GHC is linked with -threaded, then it links against libHSrts_thr.
-# But if base is linked against libHSrts, then both end up getting
-# loaded, and things go wrong. We therefore link the libraries with the
-# same RTS flags that we link GHC with.
-ifeq "$$(GhcThreaded)" "YES"
-$1_$2_$3_GHC_LD_OPTS += -threaded
-endif
-ifeq "$$(GhcDebugged)" "YES"
-$1_$2_$3_GHC_LD_OPTS += -debug
-endif
 endif
 endif
 

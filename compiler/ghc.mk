@@ -117,6 +117,22 @@ ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 else
 	@echo 'cDYNAMIC_GHC_PROGRAMS = False'                               >> $@
 endif
+# Note that GhcThreaded just reflects the Makefile variable setting.
+# In particular, the stage1 compiler is never actually compiled with
+# -threaded, but it will nevertheless have cGhcThreaded = True.
+# The "+RTS --info" output will show what RTS GHC is really using.
+	@echo 'cGhcThreaded :: Bool'                                        >> $@
+ifeq "$(GhcThreaded)" "YES"
+	@echo 'cGhcThreaded = True'                                         >> $@
+else
+	@echo 'cGhcThreaded = False'                                        >> $@
+endif
+	@echo 'cGhcDebugged :: Bool'                                        >> $@
+ifeq "$(GhcDebugged)" "YES"
+	@echo 'cGhcDebugged = True'                                         >> $@
+else
+	@echo 'cGhcDebugged = False'                                        >> $@
+endif
 	@echo done.
 
 # -----------------------------------------------------------------------------

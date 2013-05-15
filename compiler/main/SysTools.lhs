@@ -1051,10 +1051,22 @@ linesPlatform xs =
 #endif
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
-linkDynLib dflags o_files dep_packages
+linkDynLib dflags0 o_files dep_packages
  = do
-    let verbFlags = getVerbFlags dflags
-    let o_file = outputFile dflags
+    let -- This is a rather ugly hack to fix dynamically linked
+        -- GHC on Windows. If GHC is linked with -threaded, then
+        -- it links against libHSrts_thr. But if base is linked
+        -- against libHSrts, then both end up getting loaded,
+        -- and things go wrong. We therefore link the libraries
+        -- with the same RTS flags that we link GHC with.
+        dflags1 = if cGhcThreaded then addWay' WayThreaded dflags0
+                                  else                     dflags0
+        dflags2 = if cGhcDebugged then addWay' WayDebug dflags1
+                                  else                  dflags1
+        dflags = updateWays dflags2
+
+        verbFlags = getVerbFlags dflags
+        o_file = outputFile dflags
 
     pkgs <- getPreloadPackagesAnd dflags dep_packages
 
