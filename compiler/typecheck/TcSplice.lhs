@@ -326,8 +326,8 @@ runAnnotation   _ q = pprPanic "Cant do runAnnotation without GHCi" (ppr q)
 tcBracket brack ps res_ty
   = addErrCtxt (hang (ptext (sLit "In the Template Haskell quotation"))
                    2 (ppr brack)) $
-    do {        -- Check for nested brackets
-         cur_stage <- getStage
+    do { cur_stage <- getStage
+         -- Check for nested brackets
        ; case cur_stage of
            { Splice True  -> checkTc (isTypedBracket brack) illegalUntypedBracket
            ; Splice False -> checkTc (not (isTypedBracket brack)) illegalTypedBracket
@@ -335,48 +335,56 @@ tcBracket brack ps res_ty
            ; Brack {}     -> failWithTc illegalBracket
            }
 
-        -- Brackets are desugared to code that mentions the TH package
+       -- Brackets are desugared to code that mentions the TH package
        ; recordThUse
 
-        -- Typecheck expr to make sure it is valid,
-        -- but throw away the results.  We'll type check
-        -- it again when we actually use it.
+       -- Typecheck expr to make sure it is valid,
+       -- but throw away the results.  We'll type check
+       -- it again when we actually use it.
        ; ps_ref <- newMutVar []
        ; lie_var <- getConstraintVar
-       ; meta_ty <-
-           if isTypedBracket brack
-           then do { let brack_stage = Brack True cur_stage ps_ref lie_var
-                      -- We want to check that there aren't any constraints that
-                      -- can't be satisfied (e.g. Show Foo, where Foo has no Show
-                      -- instance), but we aren't otherwise interested in the
-                      -- results. Nor do we care about ambiguous dictionaries etc.
-                      -- We will type check this bracket again at its usage site.
-                      --
-                      -- We build a single implication constraint with a BracketSkol;
-                      -- that in turn tells simplifyTop to report only definite
-                      -- errors
-                   ; ((_binds1, meta_ty), lie) <- captureConstraints $
-                                      newImplication BracketSkol [] [] $
-                                      setStage brack_stage $
-                                      tc_bracket brack
+       ; let brack_stage = Brack (isTypedBracket brack) cur_stage ps_ref lie_var
+       ; setStage brack_stage $
+         tc_bracket brack ps_ref
+       }
+  where
+    tcUntypedBracket :: HsBracket Name -> TcM TcType
+    tcUntypedBracket (VarBr _ _) = -- Result type is Var (not Q-monadic)
+                                   tcMetaTy nameTyConName
+    tcUntypedBracket (ExpBr _)   = -- Result type is ExpQ (= Q Exp)
+                                   tcMetaTy expQTyConName
+    tcUntypedBracket (TypBr _)   = -- Result type is Type (= Q Typ)
+                                   tcMetaTy typeQTyConName
+    tcUntypedBracket (DecBrG _)  = -- Result type is Q [Dec]
+                                   tcMetaTy decsQTyConName 
+    tcUntypedBracket (PatBr _)   = -- Result type is PatQ (= Q Pat)
+                                   tcMetaTy patQTyConName
+    tcUntypedBracket (DecBrL _)  = panic "tcUntypedBracket: Unexpected DecBrL"
+    tcUntypedBracket (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
 
-                      -- It's best to simplify the constraint now, even though in
-                      -- principle some later unification might be useful for it,
-                      -- because we don't want these essentially-junk TH implication
-                      -- contraints floating around nested inside other constraints
-                      -- See for example Trac #4949
-                   ; _binds2 <- simplifyTop lie
-                   ; return meta_ty }
-           else do { let brack_stage = Brack False cur_stage ps_ref lie_var
-                   ; setStage brack_stage $
-                         mapM_ tcPendingSplice ps
-                   ; tc_bracket brack
-                   }
+    tc_bracket :: HsBracket Name -> TcRef [PendingSplice] -> TcM (HsExpr TcId)
+    tc_bracket brack ps_ref
+      | not (isTypedBracket brack)
+      = do { mapM_ tcPendingSplice ps
+           ; meta_ty <- tcUntypedBracket brack
+           ; ps' <- readMutVar ps_ref
+           ; co <- unifyType meta_ty res_ty
+           ; return (mkHsWrapCo co (HsBracketOut brack ps'))
+           }
 
-        -- Return the original expression, not the type-decorated one
-       ; ps' <- readMutVar ps_ref
-       ; co <- unifyType meta_ty res_ty
-       ; return (mkHsWrapCo co (HsBracketOut brack ps')) }
+    tc_bracket (TExpBr expr) ps_ref
+      = do { any_ty <- newFlexiTyVarTy openTypeKind
+             -- NC for no context; tcBracket does that
+           ; _ <- tcMonoExprNC expr any_ty
+           ; meta_ty <- tcTExpTy any_ty
+           ; ps' <- readMutVar ps_ref
+           ; co <- unifyType meta_ty res_ty
+           ; d <- tcLookupDataCon tExpDataConName
+           ; return (mkHsWrapCo co (unLoc (mkHsConApp d [any_ty] [HsBracketOut brack ps'])))
+           }
+
+    tc_bracket _ _
+      = panic "tc_bracket: Expected untyped splice"
 
 tcPendingSplice :: PendingSplice -> TcM ()
 tcPendingSplice (PendingRnExpSplice n expr) 
@@ -398,36 +406,6 @@ tcPendingSplice (PendingRnTypeSplice n expr)
 
 tcPendingSplice (PendingTcSplice _ expr) 
   = pprPanic "tcPendingSplice: PendingTcSplice" (ppr expr)
-
-tc_bracket :: HsBracket Name -> TcM TcType
-tc_bracket (VarBr _ _)     -- Note [Quoting names]
-  = tcMetaTy nameTyConName
-    -- Result type is Var (not Q-monadic)
-
-tc_bracket (ExpBr _)
-  = tcMetaTy expQTyConName
-    -- Result type is ExpQ (= Q Exp)
-
-tc_bracket (TypBr _)
-  = tcMetaTy typeQTyConName
-    -- Result type is Type (= Q Typ)
-
-tc_bracket (DecBrG _)
-  = tcMetaTy decsQTyConName 
-    -- Result type is Q [Dec]
-
-tc_bracket (PatBr _)
-  = tcMetaTy patQTyConName
-    -- Result type is PatQ (= Q Pat)
-
-tc_bracket (DecBrL _)
-  = panic "tc_bracket: Unexpected DecBrL"
-
-tc_bracket (TExpBr expr)
-  = do  { any_ty <- newFlexiTyVarTy openTypeKind
-        ; _ <- tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
-        ; tcTExpTy any_ty }
-        -- Result type is TExp tau
 
 tcTExpTy :: TcType -> TcM TcType
 tcTExpTy tau = do
@@ -453,33 +431,47 @@ tcSpliceExpr splice@(HsSplice isTypedSplice name expr) res_ty
         ; Comp      -> tcTopSplice expr res_ty
         ; Brack isTypedBrack pop_stage ps_var lie_var -> do
 
-        -- See Note [How brackets and nested splices are handled]
-        -- A splice inside brackets
-        -- NB: ignore res_ty, apart from zapping it to a mono-type
-        -- e.g.   [| reverse $(h 4) |]
-        -- Here (h 4) :: Q Exp
-        -- but $(h 4) :: forall a.a     i.e. anything!
-
      { when (isTypedBrack && not isTypedSplice) $
            failWithTc illegalUntypedSplice
      ; when (not isTypedBrack && isTypedSplice) $
            failWithTc illegalTypedSplice
-     ; meta_exp_ty <- if isTypedSplice
-                      then do { any_ty <- newFlexiTyVarTy openTypeKind
-                              ; tcTExpTy any_ty
-                              }
-                      else tcMetaTy expQTyConName
 
-     ; expr' <- setStage pop_stage $
-                setConstraintVar lie_var    $
-                tcMonoExpr expr meta_exp_ty
+     ; tc_splice_expr isTypedSplice pop_stage ps_var lie_var
 
-        -- Write the pending splice into the bucket
-     ; ps <- readMutVar ps_var
-     ; writeMutVar ps_var (PendingTcSplice name expr' : ps)
-
-     ; return (panic "tcSpliceExpr")    -- The returned expression is ignored
+       -- The returned expression is ignored
+     ; return (panic "tcSpliceExpr")    
      }}}
+  where
+    tc_splice_expr :: Bool
+                   -> ThStage -> TcRef [PendingSplice] -> TcRef WantedConstraints
+                   -> TcM ()
+    -- See Note [How brackets and nested splices are handled]
+    -- A splice inside brackets
+    -- NB: ignore res_ty, apart from zapping it to a mono-type
+    -- e.g.   [| reverse $(h 4) |]
+    -- Here (h 4) :: Q Exp
+    -- but $(h 4) :: forall a.a     i.e. anything!
+    tc_splice_expr False pop_stage ps_var lie_var
+      = do { meta_exp_ty <- tcMetaTy expQTyConName
+           ; expr' <- setStage pop_stage $
+                      setConstraintVar lie_var $
+                      tcMonoExpr expr meta_exp_ty
+           ; ps <- readMutVar ps_var
+           ; writeMutVar ps_var (PendingTcSplice name expr' : ps)
+           ; return ()
+           }
+
+    tc_splice_expr True pop_stage ps_var lie_var
+      = do { meta_exp_ty <- tcTExpTy res_ty
+           ; expr' <- setStage pop_stage $
+                      setConstraintVar lie_var $
+                      tcMonoExpr expr meta_exp_ty
+           ; unt <- tcLookupId unTypeName
+           ; let expr'' = mkHsApp (nlHsTyApp unt [res_ty]) expr'
+           ; ps <- readMutVar ps_var
+           ; writeMutVar ps_var (PendingTcSplice name expr'' : ps)
+           ; return ()
+           }
 
 tcTopSplice :: LHsExpr Name -> TcRhoType -> TcM (HsExpr Id)
 tcTopSplice expr res_ty
