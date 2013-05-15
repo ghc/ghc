@@ -90,12 +90,14 @@ test('T3294',
              #            14593500 (Windows)
              # 2013-02-10 20651576 (x86/Windows)
              # 2013-02-10 20772984 (x86/OSX)
-           (wordsize(64), 44894544, 15)]),
+           (wordsize(64), 36904752, 15)]),
         # prev:           25753192 (amd64/Linux)
         # 29/08/2012:     37724352 (amd64/Linux)
         #  (increase due to new codegen, see #7198)
         # 13/13/2012:     44894544 (amd64/Linux)
         #  (reason for increase unknown)
+        # 15/5/2013:      36904752  (amd64/Linux)
+        #  (reason for decrease unknown)
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 1373514844, 5),
            # previous:     815479800  (x86/Linux)
@@ -257,10 +259,12 @@ test('T5321Fun',
              # prev:       300000000
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
-            (wordsize(64), 713385808, 10)])
+            (wordsize(64), 628341952, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808
              #  (increase due to new codegen)
+             # 15/05/2013: 628341952 
+             #  (reason for decrease unknown)
       ],
       compile,[''])
 
@@ -271,10 +275,12 @@ test('T5321FD',
             # prev:       213380256
             # 2012-10-08: 240302920 (x86/Linux)
             #  (increase due to new codegen)
-           (wordsize(64), 492905640, 10)])
+           (wordsize(64), 406039584, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
+            # 15/05/2013: 406039584 
+            #  (reason for decrease unknown)
       ],
       compile,[''])
 
