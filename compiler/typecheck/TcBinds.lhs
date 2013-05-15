@@ -325,9 +325,10 @@ tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
        ; return ( [(NonRecursive, binds1)], thing) }
 
 tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
-  =     -- To maximise polymorphism (assumes -XRelaxedPolyRec), we do a new 
+  =     -- To maximise polymorphism, we do a new 
         -- strongly-connected-component analysis, this time omitting 
         -- any references to variables with type signatures.
+        -- (This used to be optional, but isn't now.)
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
         ; (binds1, _ids, thing) <- go sccs
              -- Here is where we should do bindInstsOfLocalFuns
@@ -1006,7 +1007,12 @@ type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = matches })
   | Just sig <- sig_fn name
-  = do  { mono_id <- newSigLetBndr no_gen name sig
+  = ASSERT2( case no_gen of { LetLclBndr -> True; LetGblBndr {} -> False }
+           , ppr name )  -- { f :: ty; f x = e } is always done via CheckGen
+                         -- which gives rise to LetLclBndr.  It wouldn't make
+                         -- sense to have a *polymorphic* function Id at this point
+    do  { mono_name <- newLocalName name
+        ; let mono_id = mkLocalId mono_name (sig_tau sig)
         ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
   | otherwise
   = do  { mono_ty <- newFlexiTyVarTy openTypeKind
@@ -1097,17 +1103,6 @@ However, we do *not* support this
   - For pattern bindings e.g
         f :: forall a. a->a
         (f,g) = e
-
-  - For multiple function bindings, unless Opt_RelaxedPolyRec is on
-        f :: forall a. a -> a
-        f = g
-        g :: forall b. b -> b
-        g = ...f...
-    Reason: we use mutable variables for 'a' and 'b', since they may
-    unify to each other, and that means the scoped type variable would
-    not stand for a completely rigid variable.
-
-    Currently, we simply make Opt_ScopedTypeVariables imply Opt_RelaxedPolyRec
 
 Note [More instantiated than scoped]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

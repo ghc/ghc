@@ -447,6 +447,7 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvBndrs qtvs)
 \begin{code}
 splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)
+splitHsAppTys (L _ (HsParTy f))   as = splitHsAppTys f as
 splitHsAppTys f                   as = (f,as)
 
 mkHsAppTys :: OutputableBndr n => LHsType n -> [LHsType n] -> HsType n

@@ -15,7 +15,7 @@ TcPat: Typechecking patterns
 
 module TcPat ( tcLetPat, TcSigFun, TcSigInfo(..), TcPragFun 
              , LetBndrSpec(..), addInlinePrags, warnPrags
-             , tcPat, tcPats, newNoSigLetBndr, newSigLetBndr
+             , tcPat, tcPats, newNoSigLetBndr
 	     , addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
@@ -112,8 +112,8 @@ data PatCtxt
   = LamPat   -- Used for lambdas, case etc
        (HsMatchContext Name) 
 
-  | LetPat   -- Used only for let(rec) bindings
-    	     -- See Note [Let binders]
+  | LetPat   -- Used only for let(rec) pattern bindings
+    	     -- See Note [Typing patterns in pattern bindings]
        TcSigFun        -- Tells type sig if any
        LetBndrSpec     -- True <=> no generalisation of this let
 
@@ -121,8 +121,10 @@ data LetBndrSpec
   = LetLclBndr		  -- The binder is just a local one;
     			  -- an AbsBinds will provide the global version
 
-  | LetGblBndr TcPragFun  -- There isn't going to be an AbsBinds;
-    	       		  -- here is the inline-pragma information
+  | LetGblBndr TcPragFun  -- Genrealisation plan is NoGen, so there isn't going 
+                          -- to be an AbsBinds; So we must bind the global version
+                          -- of the binder right away.  
+    	       		  -- Oh, and dhhere is the inline-pragma information
 
 makeLazy :: PatEnv -> PatEnv
 makeLazy penv = penv { pe_lazy = True }
@@ -177,15 +179,6 @@ if the original function had a signature like
 But that's ok: tcMatchesFun (called by tcRhs) can deal with that
 It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
 
-Note [Let binders]
-~~~~~~~~~~~~~~~~~~
-eg   x :: Int
-     y :: Bool
-     (x,y) = e
-
-...more notes to add here..
-
-
 Note [Existential check]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Lazy patterns can't bind existentials.  They arise in two ways:
@@ -215,13 +208,17 @@ tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (TcCoercion, TcId)
 -- Then coi : pat_ty ~ typeof(xp)
 --
 tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
-  | Just sig <- lookup_sig bndr_name
-  = do { bndr_id <- newSigLetBndr no_gen bndr_name sig
+          -- See Note [Typing patterns in pattern bindings]
+  | LetGblBndr prags <- no_gen
+  , Just sig <- lookup_sig bndr_name
+  = do { bndr_id <- addInlinePrags (sig_id sig) (prags bndr_name)
+       ; traceTc "tcPatBndr(gbl,sig)" (ppr bndr_id $$ ppr (idType bndr_id)) 
        ; co <- unifyPatType (idType bndr_id) pat_ty
        ; return (co, bndr_id) }
       
-  | otherwise
+  | otherwise 
   = do { bndr_id <- newNoSigLetBndr no_gen bndr_name pat_ty
+       ; traceTc "tcPatBndr(no-sig)" (ppr bndr_id $$ ppr (idType bndr_id))
        ; return (mkTcReflCo pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
@@ -229,20 +226,12 @@ tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
        ; return (mkTcReflCo pat_ty, bndr) }
 
 ------------
-newSigLetBndr :: LetBndrSpec -> Name -> TcSigInfo -> TcM TcId
-newSigLetBndr LetLclBndr name sig
-  = do { mono_name <- newLocalName name
-       ; mkLocalBinder mono_name (sig_tau sig) }
-newSigLetBndr (LetGblBndr prags) name sig
-  = addInlinePrags (sig_id sig) (prags name)
-
-------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
--- In the polymorphic case (no_gen = False), generate a "monomorphic version" 
+-- In the polymorphic case (no_gen = LetLclBndr), generate a "monomorphic version" 
 --    of the Id; the original name will be bound to the polymorphic version
 --    by the AbsBinds
--- In the monomorphic case there is no AbsBinds, and we use the original
---    name directly
+-- In the monomorphic case (no_gen = LetBglBndr) there is no AbsBinds, and we 
+--    use the original name directly
 newNoSigLetBndr LetLclBndr name ty 
   =do  { mono_name <- newLocalName name
        ; mkLocalBinder mono_name ty }
@@ -280,16 +269,34 @@ mkLocalBinder name ty
   = return (Id.mkLocalId name ty)
 \end{code}
 
-Note [Polymorphism and pattern bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When is_mono holds we are not generalising
-But the signature can still be polymorphic!
-     data T = MkT (forall a. a->a)
+Note [Typing patterns in pattern bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are typing a pattern binding
+    pat = rhs
+Then the PatCtxt will be (LetPat sig_fn let_bndr_spec).
+
+There can still be signatures for the binders:
+     data T = MkT (forall a. a->a) Int
      x :: forall a. a->a
-     MkT x = <rhs>
-So the no_gen flag decides whether the pattern-bound variables should
-have exactly the type in the type signature (when not generalising) or
-the instantiated version (when generalising)
+     y :: Int
+     MkT x y = <rhs>
+
+Two cases, dealt with by the LetPat case of tcPatBndr
+
+ * If we are generalising (generalisation plan is InferGen or
+   CheckGen), then the let_bndr_spec will be LetLclBndr.  In that case
+   we want to bind a cloned, local version of the variable, with the
+   type given by the pattern context, *not* by the signature (even if
+   there is one; see Trac #7268). The mkExport part of the
+   generalisation step will do the checking and impedence matching
+   against the signature.
+
+ * If for some some reason we are not generalising (plan = NoGen), the
+   LetBndrSpec will be LetGblBndr.  In that case we must bind the
+   global version of the Id, and do so with precisely the type given
+   in the signature.  (Then we unify with the type from the pattern
+   context type.
+
 
 %************************************************************************
 %*									*
