@@ -5,9 +5,7 @@
 module ShouldSucceed where
 import GHC.Base
 
-f :: ((->) Int#) Int#
-f x = x
-
+type T = (->) Int#
 
 -- Here's the comment from TypeRep:
 --
