@@ -615,7 +615,7 @@ hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
 hsSigDoc (GenericSig {})        = ptext (sLit "default type signature")
 hsSigDoc (IdSig {})             = ptext (sLit "id signature")
 hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
-hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
+hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> ptext (sLit "pragma")
 hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
 hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
 \end{code}
