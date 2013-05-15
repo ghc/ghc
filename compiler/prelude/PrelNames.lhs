@@ -798,10 +798,6 @@ stringTyConName         = tcQual  gHC_BASE (fsLit "String") stringTyConKey
 inlineIdName :: Name
 inlineIdName            = varQual gHC_MAGIC (fsLit "inline") inlineIdKey
 
--- The 'undefined' function. Used by supercompilation.
-undefinedName :: Name
-undefinedName = varQual gHC_ERR (fsLit "undefined") undefinedKey
-
 -- Base classes (Eq, Ord, Functor)
 fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
 eqClassName       = clsQual  gHC_CLASSES (fsLit "Eq")      eqClassKey
@@ -1689,7 +1685,6 @@ checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 154
 
 undefinedKey :: Unique
 undefinedKey                  = mkPreludeMiscIdUnique 155
-
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
