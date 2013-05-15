@@ -122,4 +122,6 @@ test('qsem001', normal, compile_and_run, [''])
 test('qsemn001', normal, compile_and_run, [''])
 
 test('T7457', normal, compile_and_run, [''])
-test('T7773', normal, compile_and_run, [''])
+
+test('T7773', when(opsys('mingw32'), skip), compile_and_run, [''])
+# Andreas says that T7773 will not (and should not) work on Windows
