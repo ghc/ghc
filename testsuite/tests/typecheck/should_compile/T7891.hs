@@ -9,7 +9,7 @@ tf :: T
 tf = T id
 
 -- Can't write this type signature:
--- f :: t -> t
+f :: t -> t
 T f = tf
 
 -- But with an indirection we can:
