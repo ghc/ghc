@@ -668,6 +668,7 @@ checkAPat msg loc e0 = do
    RecordCon c _ (HsRecFields fs dd)
                       -> do fs <- mapM (checkPatField msg) fs
                             return (ConPatIn c (RecCon (HsRecFields fs dd)))
+   HsSpliceE s        -> return (SplicePat s)
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
    _                  -> patFail msg loc e0
 

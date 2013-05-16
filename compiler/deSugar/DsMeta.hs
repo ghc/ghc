@@ -1324,6 +1324,8 @@ repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
         --      repPsig :: Core TH.PatQ -> Core TH.TypeQ -> DsM (Core TH.PatQ)
         --      repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 
+repP (SplicePat splice) = repSplice splice
+
 repP other = notHandled "Exotic pattern" (ppr other)
 
 ----------------------------------------------------------

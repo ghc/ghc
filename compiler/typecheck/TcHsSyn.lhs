@@ -563,6 +563,9 @@ zonkExpr env (HsBracketOut body bs)
     zonk_b (PendingRnExpSplice _ e)
       = pprPanic "zonkExpr: PendingRnExpSplice" (ppr e)
 
+    zonk_b (PendingRnPatSplice _ e)
+      = pprPanic "zonkExpr: PendingRnPatSplice" (ppr e)
+
     zonk_b (PendingRnCrossStageSplice n)
       = pprPanic "zonkExpr: PendingRnCrossStageSplice" (ppr n)
 

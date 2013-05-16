@@ -1,6 +1,6 @@
 \begin{code}
 module RnSplice (
-        rnSpliceType, rnSpliceExpr,
+        rnSpliceType, rnSpliceExpr, rnSplicePat,
         rnBracket, checkTH,
         checkThLocalName
   ) where
@@ -16,7 +16,7 @@ import TcRnMonad
 #ifdef GHCI
 import Control.Monad    ( unless, when )
 import DynFlags
-import DsMeta           ( expQTyConName, typeQTyConName )
+import DsMeta           ( expQTyConName, patQTyConName, typeQTyConName )
 import LoadIface        ( loadInterfaceForName )
 import Module
 import RnEnv
@@ -28,7 +28,7 @@ import TcEnv            ( checkWellStaged, tcLookup, tcMetaTy, thTopLevelId )
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
-import {-# SOURCE #-} TcSplice ( runMetaE, runMetaT, tcTopSpliceExpr )
+import {-# SOURCE #-} TcSplice ( runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 #endif
 \end{code}
 
@@ -42,6 +42,9 @@ rnSpliceType e _ = failTH e "splice"
 
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
 rnSpliceExpr e = failTH e "splice"
+
+rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
+rnSplicePat e = failTH e "splice"
 
 failTH :: Outputable a => a -> String -> RnM b
 failTH e what  -- Raise an error in a stage-1 compiler
@@ -207,6 +210,53 @@ rnSpliceExpr splice@(HsSplice isTypedSplice _ expr)
                               rnLExpr expr2
            ; return (unLoc lexpr3, fvs)
            }
+\end{code}
+
+\begin{code}
+rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
+rnSplicePat (HsSplice True _ _)
+  = panic "rnSplicePat: encountered typed pattern splice"
+
+rnSplicePat splice@(HsSplice False _ expr)
+  = addErrCtxt (exprCtxt (HsSpliceE splice)) $
+    setSrcSpan (getLoc expr) $ do
+    { stage <- getStage
+     ; case stage of
+         { Brack isTypedBrack pop_stage ps_var _ ->
+             do { checkTc (not isTypedBrack) illegalUntypedSplice
+
+                ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
+                                                            rnSplice splice
+
+                ; ps <- readMutVar ps_var
+                ; writeMutVar ps_var (PendingRnPatSplice name expr' : ps)
+
+                ; return (SplicePat splice', fvs)
+                }
+         ; _ -> 
+             do { (HsSplice _ _ expr', fvs) <- addErrCtxt (spliceResultDoc expr) $
+                                               setStage (Splice False) $
+                                               rnSplice splice
+
+                  -- The splice must have type Pat
+                ; meta_exp_ty <- tcMetaTy patQTyConName
+
+                  -- Typecheck the expression
+                ; zonked_q_expr <- tcTopSpliceExpr False $
+                                   tcMonoExpr expr' meta_exp_ty
+
+                  -- Run the expression
+                ; pat <- runMetaP zonked_q_expr
+                ; showSplice "pattern" expr' (ppr pat)
+
+                ; (pat', _) <- addErrCtxt (spliceResultDoc expr) $
+                               checkNoErrs $
+                               rnPat ThPatSplice pat $ \pat' -> return (pat', emptyFVs)
+
+                ; return (unLoc pat', fvs)
+                }
+         }
+     }
 \end{code}
 
 %************************************************************************

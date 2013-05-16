@@ -90,6 +90,7 @@ matchCheck_really dflags ctx@(DsMatchContext hs_ctx _) vars ty qs
 
     incomplete_flag RecUpd        = wopt Opt_WarnIncompletePatternsRecUpd dflags
 
+    incomplete_flag ThPatSplice   = False
     incomplete_flag ThPatQuote    = False
     incomplete_flag (StmtCtxt {}) = False  -- Don't warn about incomplete patterns
                                            -- in list comprehensions, pattern guards

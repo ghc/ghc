@@ -18,7 +18,7 @@ free variables.
 
 {-# LANGUAGE ScopedTypeVariables #-}
 module RnPat (-- main entry points
-              rnPat, rnPats, rnBindPat,
+              rnPat, rnPats, rnBindPat, rnPatAndThen,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
@@ -26,8 +26,11 @@ module RnPat (-- main entry points
 
               rnHsRecFields1, HsRecFieldContext(..),
 
+              -- CpsRn monad
+              CpsRn, liftCps,
+
               -- Literals
-              rnLit, rnOverLit,     
+              rnLit, rnOverLit,
 
              -- Pattern Error messages that are also used elsewhere
              checkTupSize, patSigErr
@@ -37,6 +40,7 @@ module RnPat (-- main entry points
 
 import {-# SOURCE #-} RnExpr ( rnLExpr )
 #ifdef GHCI
+import {-# SOURCE #-} RnSplice ( rnSplicePat )
 import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
 #endif  /* GHCI */
 
@@ -418,9 +422,15 @@ rnPatAndThen mk (TuplePat pats boxed _)
        ; return (TuplePat pats' boxed placeHolderType) }
 
 #ifndef GHCI
+rnPatAndThen _ p@(SplicePat {})
+  = pprPanic "Can't do SplicePat without GHCi" (ppr p)
 rnPatAndThen _ p@(QuasiQuotePat {}) 
   = pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
 #else
+rnPatAndThen _ (SplicePat splice)
+  = do { -- XXX How to deal with free variables?
+         (pat, _) <- liftCps $ rnSplicePat splice
+       ; return pat }
 rnPatAndThen mk (QuasiQuotePat qq)
   = do { pat <- liftCps $ runQuasiQuotePat qq
          -- Wrap the result of the quasi-quoter in parens so that we don't
