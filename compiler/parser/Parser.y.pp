@@ -1484,14 +1484,14 @@ aexp2   :: { LHsExpr RdrName }
         | '_'                           { L1 EWildPat }
         
         -- Template Haskell Extension
-        | TH_ID_SPLICE          { L1 $ HsSpliceE (mkHsSplice 
+        | TH_ID_SPLICE          { L1 $ mkHsSpliceE 
                                         (L1 $ HsVar (mkUnqual varName 
-                                                        (getTH_ID_SPLICE $1)))) } 
-        | '$(' exp ')'          { LL $ HsSpliceE (mkHsSplice $2) }               
-        | TH_ID_TY_SPLICE       { L1 $ HsSpliceE (mkHsTExpSplice 
+                                                        (getTH_ID_SPLICE $1))) } 
+        | '$(' exp ')'          { LL $ mkHsSpliceE $2 }               
+        | TH_ID_TY_SPLICE       { L1 $ mkHsSpliceTE 
                                         (L1 $ HsVar (mkUnqual varName 
-                                                        (getTH_ID_TY_SPLICE $1)))) } 
-        | '$$(' exp ')'         { LL $ HsSpliceE (mkHsTExpSplice $2) }               
+                                                        (getTH_ID_TY_SPLICE $1))) } 
+        | '$$(' exp ')'         { LL $ mkHsSpliceTE $2 }               
 
 
         | SIMPLEQUOTE  qvar     { LL $ HsBracket (VarBr True  (unLoc $2)) }

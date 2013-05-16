@@ -55,7 +55,7 @@ module HsUtils(
   emptyRecStmt, mkRecStmt, 
 
   -- Template Haskell
-  unqualSplice, mkHsSpliceTy, mkHsSplice, mkHsTExpSplice, mkHsQuasiQuote, unqualQuasiQuote,
+  unqualSplice, mkHsSpliceTy, mkHsSpliceE, mkHsSpliceTE, mkHsQuasiQuote, unqualQuasiQuote,
 
   -- Flags
   noRebindableInfo, 
@@ -243,14 +243,17 @@ mkRecStmt stmts = emptyRecStmt { recS_stmts = stmts }
 mkHsOpApp :: LHsExpr id -> id -> LHsExpr id -> HsExpr id
 mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 
-mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
-mkHsSplice e = HsSplice False unqualSplice e
+mkHsSplice :: Bool -> LHsExpr RdrName -> HsSplice RdrName
+mkHsSplice isTyped e = HsSplice isTyped unqualSplice e
 
-mkHsTExpSplice :: LHsExpr RdrName -> HsSplice RdrName
-mkHsTExpSplice e = HsSplice True unqualSplice e
+mkHsSpliceE :: LHsExpr RdrName -> HsExpr RdrName
+mkHsSpliceE e = HsSpliceE (mkHsSplice False e)
+
+mkHsSpliceTE :: LHsExpr RdrName -> HsExpr RdrName
+mkHsSpliceTE e = HsSpliceE (mkHsSplice True e)
 
 mkHsSpliceTy :: LHsExpr RdrName -> HsType RdrName
-mkHsSpliceTy e = HsSpliceTy (mkHsSplice e) emptyFVs placeHolderKind
+mkHsSpliceTy e = HsSpliceTy (mkHsSplice False e) emptyFVs placeHolderKind
 
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
