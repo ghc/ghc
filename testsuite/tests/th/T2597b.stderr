@@ -3,4 +3,3 @@ T2597b.hs:8:8:
     Empty stmt list in do-block
     When splicing a TH expression: do
     In the expression: $mkBug2
-    In an equation for ‛bug2’: bug2 = $mkBug2

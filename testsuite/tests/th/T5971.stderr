@@ -8,4 +8,3 @@ T5971.hs:6:7:
       $(newName "x" >>= varE)
     To see what the splice expanded to, use -ddump-splices
     In the expression: $(newName "x" >>= varE)
-    In a pattern binding: _ = $(newName "x" >>= varE)
