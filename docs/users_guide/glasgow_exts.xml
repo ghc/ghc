@@ -3071,12 +3071,11 @@ selectors.
 Here is the example of that section, in GADT-style syntax:
 <programlisting>
 data Counter a where
-    NewCounter { _this    :: self
-               , _inc     :: self -> self
-               , _display :: self -> IO ()
-               , tag      :: a
-               }
-        :: Counter a
+    NewCounter :: { _this    :: self
+                  , _inc     :: self -> self
+                  , _display :: self -> IO ()
+                  , tag      :: a
+                  } -> Counter a
 </programlisting>
 As before, only one selector function is generated here, that for <literal>tag</literal>.
 Nevertheless, you can still use all the field names in pattern matching and record construction.
@@ -3188,17 +3187,17 @@ As mentioned in <xref linkend="gadt-style"/>, record syntax is supported.
 For example:
 <programlisting>
   data Term a where
-      Lit    { val  :: Int }      :: Term Int
-      Succ   { num  :: Term Int } :: Term Int
-      Pred   { num  :: Term Int } :: Term Int
-      IsZero { arg  :: Term Int } :: Term Bool
-      Pair   { arg1 :: Term a
-             , arg2 :: Term b
-             }                    :: Term (a,b)
-      If     { cnd  :: Term Bool
-             , tru  :: Term a
-             , fls  :: Term a
-             }                    :: Term a
+      Lit    :: { val  :: Int }      -> Term Int
+      Succ   :: { num  :: Term Int } -> Term Int
+      Pred   :: { num  :: Term Int } -> Term Int
+      IsZero :: { arg  :: Term Int } -> Term Bool
+      Pair   :: { arg1 :: Term a
+                , arg2 :: Term b
+                }                    -> Term (a,b)
+      If     :: { cnd  :: Term Bool
+                , tru  :: Term a
+                , fls  :: Term a
+                }                    -> Term a
 </programlisting>
 However, for GADTs there is the following additional constraint:
 every constructor that has a field <literal>f</literal> must have
