@@ -10,6 +10,8 @@ instance C Int
 
 type D a = C a
 
+$(return [])
+
 main = print $(
   do isCInst <- isInstance ''C [ConT ''Int]
      isDInst <- isInstance ''D [ConT ''Int]

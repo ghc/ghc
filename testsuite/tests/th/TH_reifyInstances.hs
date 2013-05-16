@@ -28,6 +28,8 @@ data family D2 a
 data instance D2 Int = DInt | DInt2
 data instance D2 Bool = DBool
 
+$(return [])
+
 test :: ()
 test = $(let
           display :: Name -> Q ()

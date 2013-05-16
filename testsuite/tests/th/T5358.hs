@@ -9,6 +9,8 @@ t2 x = x
 
 prop_x1 x = t1 x == t2 x
 
+$(return [])
+
 runTests = $( do VarI _ t _ _ <- reify (mkName "prop_x1")
                  error $ ("runTest called error: " ++ pprint t)
             )

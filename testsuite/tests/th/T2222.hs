@@ -7,11 +7,15 @@ import System.IO
 
 a = 1
 
+$(return [])
+
 b = $(do VarI _ t _ _ <- reify 'a
          runIO $ putStrLn ("inside b: " ++ pprint t)
          [| undefined |]) 
 
 c = $([| True |])
+
+$(return [])
 
 d = $(do VarI _ t _ _ <- reify 'c
          runIO $ putStrLn ("inside d: " ++ pprint t)
@@ -22,6 +26,8 @@ $(do VarI _ t _ _ <- reify 'c
      return [] )
 
 e = $([| True |])
+
+$(return [])
 
 f = $(do VarI _ t _ _ <- reify 'e
          runIO $ putStrLn ("inside f: " ++ pprint t)

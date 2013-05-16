@@ -60,6 +60,8 @@ data family DF1 a
 data family DF2 a
 data instance DF2 Bool = DBool
 
+$(return [])
+
 test :: ()
 test = $(let 
 	  display :: Name -> Q ()

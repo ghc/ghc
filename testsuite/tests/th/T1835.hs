@@ -24,6 +24,8 @@ instance Ord a => MyClass (Quux2 a)
 class MyClass2 a b
 instance MyClass2 Int Bool
 
+$(return [])
+
 main = do
     putStrLn $(do { info <- reify ''MyClass; lift (pprint info) })
     print $(isInstance ''Eq [ConT ''Foo] >>= lift)
