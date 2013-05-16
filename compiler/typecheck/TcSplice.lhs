@@ -324,8 +324,7 @@ runAnnotation   _ q = pprPanic "Cant do runAnnotation without GHCi" (ppr q)
 \begin{code}
 -- See Note [How brackets and nested splices are handled]
 tcBracket brack ps res_ty
-  = addErrCtxt (hang (ptext (sLit "In the Template Haskell quotation"))
-                   2 (ppr brack)) $
+  = addErrCtxt (quotationCtxtDoc brack) $
     do { cur_stage <- getStage
          -- Check for nested brackets
        ; case cur_stage of
@@ -422,7 +421,8 @@ tcTExpTy tau = do
 
 \begin{code}
 tcSpliceExpr splice@(HsSplice isTypedSplice name expr) res_ty
-  = setSrcSpan (getLoc expr)    $ do
+  = addErrCtxt (spliceCtxtDoc splice) $
+    setSrcSpan (getLoc expr)    $ do
     { stage <- getStage
     ; case stage of
         { Splice {} | not isTypedSplice -> pprPanic "tcSpliceExpr: encountered unexpanded top-level untyped splice" (ppr splice)
@@ -491,6 +491,16 @@ tcTopSplice expr res_ty
                          -- checkNoErrs: see Note [Renamer errors]
        ; exp4 <- tcMonoExpr exp3 res_ty
        ; return (unLoc exp4) } }
+
+quotationCtxtDoc :: HsBracket Name -> SDoc
+quotationCtxtDoc br_body
+  = hang (ptext (sLit "In the Template Haskell quotation"))
+         2 (ppr br_body)
+
+spliceCtxtDoc :: HsSplice Name -> SDoc
+spliceCtxtDoc splice
+  = hang (ptext (sLit "In the Template Haskell splice"))
+         2 (ppr splice)
 
 spliceResultDoc :: LHsExpr Name -> SDoc
 spliceResultDoc expr
