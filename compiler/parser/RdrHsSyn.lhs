@@ -7,7 +7,7 @@ Functions over HsSyn specialised to RdrName.
 module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
-        mkHsDo, mkHsSplice, mkTopSpliceDecl,
+        mkHsDo, mkTopSpliceDecl,
         mkRoleAnnotDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
