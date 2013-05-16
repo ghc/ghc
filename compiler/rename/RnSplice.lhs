@@ -218,8 +218,7 @@ rnSpliceExpr splice@(HsSplice isTypedSplice _ expr)
 \begin{code}
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e br_body
-  = addErrCtxt (hang (ptext (sLit "In the Template Haskell quotation"))
-                   2 (ppr br_body)) $
+  = addErrCtxt (quotationCtxtDoc br_body) $
     do { -- Check that Template Haskell is enabled and available
          thEnabled <- xoptM Opt_TemplateHaskell
        ; unless thEnabled $
@@ -368,6 +367,11 @@ quotedNameStageErr :: HsBracket RdrName -> SDoc
 quotedNameStageErr br
   = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr br
         , ptext (sLit "must be used at the same stage at which is is bound")]
+
+quotationCtxtDoc :: HsBracket RdrName -> SDoc
+quotationCtxtDoc br_body
+  = hang (ptext (sLit "In the Template Haskell quotation"))
+         2 (ppr br_body)
 
 spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
 spliceResultDoc expr
