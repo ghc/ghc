@@ -82,7 +82,7 @@ void setPath(void) {
     n = s - exePath;
 
     for (dir = path_dirs; *dir != NULL; dir++) {
-        len += n + 7/* /../../ */ + lstrlen(*dir) + 1/* semicolon */;
+        len += n + lstrlen(*dir) + 1/* semicolon */;
     }
     len++; // NUL
 
@@ -94,8 +94,6 @@ void setPath(void) {
     for (dir = path_dirs; *dir != NULL; dir++) {
         StrCpy(s, exePath);
         s += n;
-        StrCpy(s, "/../../");
-        s += 7;
         StrCpy(s, *dir);
         s += lstrlen(*dir);
         s[0] = ';';
