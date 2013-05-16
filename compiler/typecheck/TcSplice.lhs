@@ -13,7 +13,7 @@ module TcSplice( tcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  runQuasiQuoteExpr, runQuasiQuotePat,
                  runQuasiQuoteDecl, runQuasiQuoteType,
                  runAnnotation,
-                 runMetaE,runMetaT, runMetaD ) where
+                 runMetaE, runMetaP, runMetaT, runMetaD ) where
 
 #include "HsVersions.h"
 
@@ -286,6 +286,7 @@ The predicate we use is TcEnv.thTopLevelId.
 tcBracket     :: HsBracket Name -> [PendingSplice] -> TcRhoType -> TcM (HsExpr TcId)
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceExpr  :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
+tcSplicePat   :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
 tcSpliceType  :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
         -- None of these functions add constraints to the LIE
 
@@ -301,6 +302,7 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 #ifndef GHCI
 tcBracket     x _ _ = pprPanic "Cant do tcBracket without GHCi"     (ppr x)
 tcSpliceExpr  e     = pprPanic "Cant do tcSpliceExpr without GHCi"  (ppr e)
+tcSplicePat   e     = pprPanic "Cant do tcSplicePat without GHCi"  (ppr e)
 tcSpliceDecls x     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr x)
 tcSpliceType  x fvs = pprPanic "Cant do kcSpliceType without GHCi"  (ppr x)
 
@@ -389,6 +391,12 @@ tcPendingSplice :: PendingSplice -> TcM ()
 tcPendingSplice (PendingRnExpSplice n expr) 
   = do { res_ty <- newFlexiTyVarTy openTypeKind
        ; _ <- tcSpliceExpr (HsSplice False n expr) res_ty
+       ; return ()
+       }
+
+tcPendingSplice (PendingRnPatSplice n expr) 
+  = do { res_ty <- newFlexiTyVarTy openTypeKind
+       ; _ <- tcSplicePat (HsSplice False n expr) res_ty
        ; return ()
        }
 
@@ -491,7 +499,49 @@ tcTopSplice expr res_ty
                          -- checkNoErrs: see Note [Renamer errors]
        ; exp4 <- tcMonoExpr exp3 res_ty
        ; return (unLoc exp4) } }
+\end{code}
 
+
+%************************************************************************
+%*                                                                      *
+\subsection{Splicing a pattern}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+tcSplicePat splice@(HsSplice True  _ _) _
+  = pprPanic "tcSplicePat: encountered typed pattern splice" (ppr splice)
+
+tcSplicePat splice@(HsSplice False name expr) _
+  = addErrCtxt (spliceCtxtDoc splice) $
+    setSrcSpan (getLoc expr)    $ do
+    { stage <- getStage
+    ; case stage of
+        { Splice {} -> pprPanic "tcSplicePat: encountered unexpanded top-level untyped splice" (ppr splice)
+        ; Comp      -> pprPanic "tcSplicePat: encountered unexpanded top-level untyped splice" (ppr splice)
+        ; Brack isTypedBrack pop_stage ps_var lie_var -> do
+
+     { checkTc (not isTypedBrack) illegalUntypedSplice
+
+     ; meta_exp_ty <- tcMetaTy patQTyConName
+     ; expr' <- setStage pop_stage $
+                setConstraintVar lie_var $
+                tcMonoExpr expr meta_exp_ty
+     ; ps <- readMutVar ps_var
+     ; writeMutVar ps_var (PendingTcSplice name expr' : ps)
+
+       -- The returned expression is ignored
+     ; return (panic "tcSplicePat")    
+     }}}
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Error messages}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
 quotationCtxtDoc :: HsBracket Name -> SDoc
 quotationCtxtDoc br_body
   = hang (ptext (sLit "In the Template Haskell quotation"))
@@ -817,6 +867,10 @@ runMetaQ (MT { mt_show = show_th, mt_cvt = cvt }) expr
 runMetaE :: LHsExpr Id          -- Of type (Q Exp)
          -> TcM (LHsExpr RdrName)
 runMetaE = runMetaQ exprMetaOps
+
+runMetaP :: LHsExpr Id          -- Of type (Q Pat)
+         -> TcM (LPat RdrName)
+runMetaP = runMetaQ patMetaOps
 
 runMetaT :: LHsExpr Id          -- Of type (Q Type)
          -> TcM (LHsType RdrName)

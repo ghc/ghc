@@ -581,6 +581,7 @@ collect_lpat (L _ pat) bndrs
  				  
     go (SigPatIn pat _)	 	  = collect_lpat pat bndrs
     go (SigPatOut pat _)	  = collect_lpat pat bndrs
+    go (SplicePat _)              = bndrs
     go (QuasiQuotePat _)          = bndrs
     go (CoPat _ pat _)            = go pat
 \end{code}

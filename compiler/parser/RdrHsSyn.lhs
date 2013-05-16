@@ -611,6 +611,7 @@ checkAPat dynflags loc e0 = case e0 of
    RecordCon c _ (HsRecFields fs dd)
                       -> do fs <- mapM checkPatField fs
                             return (ConPatIn c (RecCon (HsRecFields fs dd)))
+   HsSpliceE s        -> return (SplicePat s)
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
    _                  -> patFail loc e0
 

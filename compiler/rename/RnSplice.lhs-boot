@@ -13,6 +13,7 @@ rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 
 rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
+rnSplicePat  :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
 
 checkTH :: Outputable a => a -> String -> RnM ()
 \end{code}

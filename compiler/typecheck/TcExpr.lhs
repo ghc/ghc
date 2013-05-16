@@ -807,8 +807,7 @@ tcExpr (PArrSeq _ _) _
 #ifdef GHCI     /* Only if bootstrapped */
         -- Rename excludes these cases otherwise
 tcExpr (HsSpliceE splice) res_ty        = tcSpliceExpr splice res_ty
-tcExpr (HsRnBracketOut brack ps) res_ty = do   { e <- tcBracket brack ps res_ty
-                                               ; return (unLoc e) }
+tcExpr (HsRnBracketOut brack ps) res_ty = tcBracket brack ps res_ty
 tcExpr e@(HsBracketOut _ _) _ =
     pprPanic "Should never see HsBracketOut in type checker" (ppr e)
 tcExpr e@(HsQuasiQuoteE _) _ =
