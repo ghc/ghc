@@ -23,6 +23,7 @@
 module GHC.Integer.Type where
 
 import GHC.Prim
+import GHC.PrimWrappers
 import GHC.Classes
 import GHC.Types
 import GHC.Tuple ()
@@ -424,45 +425,61 @@ Naught     `compareInteger` Negative _ = GT
 Negative x `compareInteger` Negative y = y `comparePositive` x
 (!_)       `compareInteger` (!_)       = LT
 
-{-# NOINLINE eqInteger #-}
-eqInteger :: Integer -> Integer -> Bool
-x `eqInteger` y = case x `compareInteger` y of
-                  EQ -> True
-                  _ -> False
+{-# NOINLINE eqInteger# #-}
+eqInteger# :: Integer -> Integer -> Int#
+x `eqInteger#` y = case x `compareInteger` y of
+                        EQ -> 1#
+                        _  -> 0#
 
-{-# NOINLINE neqInteger #-}
-neqInteger :: Integer -> Integer -> Bool
-x `neqInteger` y = case x `compareInteger` y of
-                   EQ -> False
-                   _ -> True
+{-# NOINLINE neqInteger# #-}
+neqInteger# :: Integer -> Integer -> Int#
+x `neqInteger#` y = case x `compareInteger` y of
+                         EQ -> 0#
+                         _  -> 1#
+
+{-# INLINE eqInteger  #-}
+{-# INLINE neqInteger #-}
+eqInteger, neqInteger :: Integer -> Integer -> Bool
+eqInteger  a b = tagToEnum# (a `eqInteger#`  b)
+neqInteger a b = tagToEnum# (a `neqInteger#` b)
 
 instance  Eq Integer  where
     (==) = eqInteger
     (/=) = neqInteger
 
-{-# NOINLINE ltInteger #-}
-ltInteger :: Integer -> Integer -> Bool
-x `ltInteger` y = case x `compareInteger` y of
-                  LT -> True
-                  _ -> False
+{-# NOINLINE ltInteger# #-}
+ltInteger# :: Integer -> Integer -> Int#
+x `ltInteger#` y = case x `compareInteger` y of
+                        LT -> 1#
+                        _  -> 0#
 
-{-# NOINLINE gtInteger #-}
-gtInteger :: Integer -> Integer -> Bool
-x `gtInteger` y = case x `compareInteger` y of
-                  GT -> True
-                  _ -> False
+{-# NOINLINE gtInteger# #-}
+gtInteger# :: Integer -> Integer -> Int#
+x `gtInteger#` y = case x `compareInteger` y of
+                        GT -> 1#
+                        _  -> 0#
 
-{-# NOINLINE leInteger #-}
-leInteger :: Integer -> Integer -> Bool
-x `leInteger` y = case x `compareInteger` y of
-                  GT -> False
-                  _ -> True
+{-# NOINLINE leInteger# #-}
+leInteger# :: Integer -> Integer -> Int#
+x `leInteger#` y = case x `compareInteger` y of
+                        GT -> 0#
+                        _  -> 1#
 
-{-# NOINLINE geInteger #-}
-geInteger :: Integer -> Integer -> Bool
-x `geInteger` y = case x `compareInteger` y of
-                  LT -> False
-                  _ -> True
+{-# NOINLINE geInteger# #-}
+geInteger# :: Integer -> Integer -> Int#
+x `geInteger#` y = case x `compareInteger` y of
+                        LT -> 0#
+                        _  -> 1#
+
+{-# INLINE leInteger #-}
+{-# INLINE ltInteger #-}
+{-# INLINE geInteger #-}
+{-# INLINE gtInteger #-}
+leInteger, gtInteger, ltInteger, geInteger :: Integer -> Integer -> Bool
+leInteger a b = tagToEnum# (a `leInteger#` b)
+gtInteger a b = tagToEnum# (a `gtInteger#` b)
+ltInteger a b = tagToEnum# (a `ltInteger#` b)
+geInteger a b = tagToEnum# (a `geInteger#` b)
 
 instance Ord Integer where
     (<=) = leInteger
