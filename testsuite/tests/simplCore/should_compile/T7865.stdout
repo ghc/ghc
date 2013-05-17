@@ -1,4 +1,4 @@
 T7865.expensive [InlPrag=NOINLINE]
 T7865.expensive =
-        case T7865.expensive sc3 of _ { GHC.Types.I# x ->
+        case T7865.expensive sc1 of _ { GHC.Types.I# x ->
                 (case T7865.expensive x of _ { GHC.Types.I# x1 ->
