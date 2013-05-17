@@ -625,14 +625,12 @@ def test_common_work (name, opts, func, args):
                     skiptest (name,way)
 
         if getTestOpts().cleanup != '' and (config.clean_only or do_ways != []):
+            pretest_cleanup(name)
             clean(map (lambda suff: name + suff,
                       ['', '.exe', '.exe.manifest', '.genscript',
                        '.stderr.normalised',        '.stdout.normalised',
-                       '.run.stderr',               '.run.stdout',
                        '.run.stderr.normalised',    '.run.stdout.normalised',
-                       '.comp.stderr',              '.comp.stdout',
                        '.comp.stderr.normalised',   '.comp.stdout.normalised',
-                       '.interp.stderr',            '.interp.stdout',
                        '.interp.stderr.normalised', '.interp.stdout.normalised',
                        '.stats', '.comp.stats',
                        '.hi', '.o', '.prof', '.exe.prof', '.hc',
@@ -2080,10 +2078,14 @@ def pretest_cleanup(name):
            pass
        os.mkdir(odir)
 
+   rm_no_fail(qualify(name,'interp.stderr'))
+   rm_no_fail(qualify(name,'interp.stdout'))
    rm_no_fail(qualify(name,'comp.stderr'))
+   rm_no_fail(qualify(name,'comp.stdout'))
    rm_no_fail(qualify(name,'run.stderr'))
    rm_no_fail(qualify(name,'run.stdout'))
-   rm_no_fail(qualify(name,'tix'))  # remove the old tix file
+   rm_no_fail(qualify(name,'tix'))
+   rm_no_fail(qualify(name,'exe.tix'))
    # simple_build zaps the following:
    # rm_nofail(qualify("o"))
    # rm_nofail(qualify(""))
