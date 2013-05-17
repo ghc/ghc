@@ -99,6 +99,7 @@ Library
 
     c-sources:
         ghci/keepCAFsForGHCi.c
+        cbits/genSym.c
 
     hs-source-dirs:
         basicTypes

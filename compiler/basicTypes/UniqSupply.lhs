@@ -81,7 +81,7 @@ mkSplitUniqSupply c
         -- This is one of the most hammered bits in the whole compiler
         mk_supply
           = unsafeDupableInterleaveIO (
-                genSymZh    >>= \ u_ -> case iUnbox u_ of { u -> (
+                genSym      >>= \ u_ -> case iUnbox u_ of { u -> (
                 mk_supply   >>= \ s1 ->
                 mk_supply   >>= \ s2 ->
                 return (MkSplitUniqSupply (mask `bitOrFastInt` u) s1 s2)
@@ -89,7 +89,7 @@ mkSplitUniqSupply c
        in
        mk_supply
 
-foreign import ccall unsafe "genSymZh" genSymZh :: IO Int
+foreign import ccall unsafe "genSym" genSym :: IO Int
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
