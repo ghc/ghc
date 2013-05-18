@@ -800,7 +800,7 @@ instance Outputable PhasePlus where
 -- what the rest of the phases will be until part-way through the
 -- compilation: for example, an {-# OPTIONS -fasm #-} at the beginning
 -- of a source file can change the latter stages of the pipeline from
--- taking the via-C route to using the native code generator.
+-- taking the LLVM route to using the native code generator.
 --
 runPhase :: PhasePlus   -- ^ Run this phase
          -> FilePath    -- ^ name of the input file
