@@ -80,7 +80,7 @@ default : all
 ifeq      "$(MAKE_RESTARTS)" ""
 else ifeq "$(MAKE_RESTARTS)" "1"
 else
-$(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug?)
+$(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug? See http://hackage.haskell.org/trac/ghc/wiki/Building/Troubleshooting#Makehasrestarteditself3timesisthereamakefilebug for details)
 endif
 
 ifneq "$(CLEANING)" "YES"
