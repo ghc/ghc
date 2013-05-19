@@ -24,7 +24,7 @@ $(INPLACE_LIB)/html:
 
 $(INPLACE_LIB)/latex:
 	$(call removeTrees,$@)
-	"$(CP)" -R utils/haddock/resources/latex $@
+	"$(CP)" -RL utils/haddock/resources/latex $@
 
 endif
 
