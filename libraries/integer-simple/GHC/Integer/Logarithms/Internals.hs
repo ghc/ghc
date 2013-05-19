@@ -131,9 +131,9 @@ integerLog2IsPowerOf2# _ = (# negateInt# 1#, 1# #)
 -- This function should probably be improved.
 roundingMode# :: Integer -> Int# -> Int#
 roundingMode# m h =
-    case smallInteger 1# `shiftLInteger` h of
+    case oneInteger `shiftLInteger` h of
       c -> case m `andInteger`
-                ((c `plusInteger` c) `minusInteger` smallInteger 1#) of
+                ((c `plusInteger` c) `minusInteger` oneInteger) of
              r ->
                if c `ltInteger` r
                  then 2#
