@@ -469,7 +469,7 @@ exportlist :: { [LIE RdrName] }
         | exportlist1                           { $1 }
 
 exportlist1 :: { [LIE RdrName] }
-        : expdoclist export expdoclist ',' exportlist  { $1 ++ ($2 : $3) ++ $5 }
+        : expdoclist export expdoclist ',' exportlist1 { $1 ++ ($2 : $3) ++ $5 }
         | expdoclist export expdoclist                 { $1 ++ ($2 : $3) }
         | expdoclist                                   { $1 }
 
