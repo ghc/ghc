@@ -33,6 +33,7 @@ module Unsafe.Coerce (unsafeCoerce) where
 
 
 #if defined(__GLASGOW_HASKELL__)
+import GHC.Integer () -- for build ordering
 import GHC.Prim (unsafeCoerce#)
 
 local_id :: a -> a
