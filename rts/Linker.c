@@ -1067,7 +1067,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(addDLL)                                             \
       SymI_HasProto(__int_encodeDouble)                                 \
       SymI_HasProto(__word_encodeDouble)                                \
-      SymI_HasProto(__2Int_encodeDouble)                                \
       SymI_HasProto(__int_encodeFloat)                                  \
       SymI_HasProto(__word_encodeFloat)                                 \
       SymI_HasProto(stg_atomicallyzh)                                   \
