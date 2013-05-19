@@ -3,13 +3,15 @@
              NondecreasingIndentation, MagicHash #-}
 
 module GHC.IO.Encoding.CodePage(
-#if !defined(mingw32_HOST_OS)
- ) where
-#else
+#if defined(mingw32_HOST_OS)
                         codePageEncoding, mkCodePageEncoding,
                         localeEncoding, mkLocaleEncoding
+#endif
                             ) where
 
+#if !defined(mingw32_HOST_OS)
+import GHC.Base () -- Build ordering
+#else
 import GHC.Base
 import GHC.Show
 import GHC.Num
