@@ -36,7 +36,6 @@ import Name hiding (varName)
 import NameSet
 import NameEnv
 import Avail
-import PrelNames
 import IfaceEnv
 import TcEnv
 import TcRnMonad
@@ -986,8 +985,7 @@ tidyTopBinds :: HscEnv
              -> IO (TidyEnv, CoreProgram)
 
 tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
-  = do mkIntegerId <- liftM tyThingId
-                    $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+  = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
        return $ tidy mkIntegerId init_env binds
   where
     dflags = hsc_dflags hsc_env

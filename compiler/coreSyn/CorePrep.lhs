@@ -8,7 +8,8 @@ Core pass to saturate constructors and PrimOps
 {-# LANGUAGE BangPatterns #-}
 
 module CorePrep (
-      corePrepPgm, corePrepExpr, cvtLitInteger
+      corePrepPgm, corePrepExpr, cvtLitInteger,
+      lookupMkIntegerName,
   ) where
 
 #include "HsVersions.h"
@@ -40,6 +41,7 @@ import TysWiredIn
 import DataCon
 import PrimOp
 import BasicTypes
+import Module
 import UniqSupply
 import Maybes
 import OrdList
@@ -1107,10 +1109,16 @@ data CorePrepEnv = CPE {
                        cpe_mkIntegerId :: Id
                    }
 
+lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
+lookupMkIntegerName dflags hsc_env
+    = if thisPackage dflags == primPackageId
+      then return $ panic "Can't use Integer in ghc-prim"
+      else liftM tyThingId
+         $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+
 mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv
 mkInitialCorePrepEnv dflags hsc_env
-    = do mkIntegerId <- liftM tyThingId
-                      $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+    = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
          return $ CPE {
                       cpe_dynFlags = dflags,
                       cpe_env = emptyVarEnv,
