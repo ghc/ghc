@@ -318,8 +318,8 @@ shiftRInteger Naught         _ = Naught
 -- reimplementation of the default Data.Bits instance, so that we can
 -- implement the Integer interface
 testBitInteger :: Integer -> Int# -> Bool
-testBitInteger x i = (x `andInteger` (smallInteger 1# `shiftLInteger` i))
-        `neqInteger` smallInteger 0#
+testBitInteger x i = (x `andInteger` (oneInteger `shiftLInteger` i))
+        `neqInteger` Naught
 
 twosComplementPositive :: Positive -> DigitsOnes
 twosComplementPositive p = flipBits (p `minusPositive` onePositive)
