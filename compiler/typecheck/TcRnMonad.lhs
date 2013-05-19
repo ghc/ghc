@@ -44,12 +44,12 @@ import Outputable
 import UniqSupply
 import UniqFM
 import DynFlags
-import Maybes
 import StaticFlags
 import FastString
 import Panic
 import Util
 
+import Control.Exception
 import Data.IORef
 import qualified Data.Set as Set
 import Control.Monad
@@ -187,7 +187,11 @@ initTcPrintErrors       -- Used from the interactive loop only
 initTcPrintErrors env mod todo = initTc env HsSrcFile False mod todo
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
-initTcForLookup hsc_env = liftM (expectJust "initTcInteractive" . snd) . initTc hsc_env HsSrcFile False iNTERACTIVE
+initTcForLookup hsc_env tcm
+    = do (msgs, m) <- initTc hsc_env HsSrcFile False iNTERACTIVE tcm
+         case m of
+             Nothing -> throwIO $ mkSrcErr $ snd msgs
+             Just x -> return x
 \end{code}
 
 %************************************************************************
