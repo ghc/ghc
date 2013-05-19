@@ -492,6 +492,13 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
     case $$1 in
     i386-apple-darwin)
+        # Workaround for #7799
+        $2="$$2 -U__i686"
+        ;;
+    esac
+
+    case $$1 in
+    i386-apple-darwin)
         $2="$$2 -m32"
         $3="$$3 -m32"
         $4="$$4 -arch i386"
