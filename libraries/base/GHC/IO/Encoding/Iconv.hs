@@ -30,7 +30,9 @@ module GHC.IO.Encoding.Iconv (
 #include "MachDeps.h"
 #include "HsBaseConfig.h"
 
-#if !defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+import GHC.Base () -- For build ordering
+#else
 
 import Foreign.Safe
 import Foreign.C
