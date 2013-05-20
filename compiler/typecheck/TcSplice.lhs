@@ -286,7 +286,7 @@ The predicate we use is TcEnv.thTopLevelId.
 
 \begin{code}
 tcBracket     :: HsBracket Name -> [PendingSplice] -> TcRhoType -> TcM (HsExpr TcId)
-tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
+tcSpliceDecls :: HsSplice Name -> TcM [LHsDecl RdrName]
 tcSpliceExpr  :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
 tcSplicePat   :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
 tcSpliceType  :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
@@ -410,6 +410,11 @@ tcPendingSplice (PendingRnCrossStageSplice n)
 
 tcPendingSplice (PendingRnTypeSplice n expr) 
   = do { _ <- tcSpliceType (HsSplice False n expr) emptyFVs
+       ; return ()
+       }
+
+tcPendingSplice (PendingRnDeclSplice n expr) 
+  = do { _ <- tcSpliceDecls (HsSplice False n expr)
        ; return ()
        }
 
@@ -655,7 +660,10 @@ tcSpliceType splice@(HsSplice False name expr) _
 -- Always at top level
 -- Type sig at top of file:
 --      tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
-tcSpliceDecls expr
+tcSpliceDecls splice@(HsSplice True _ _)
+  = pprPanic "tcSpliceDecls: encountered a typed type splice" (ppr splice)
+
+tcSpliceDecls (HsSplice False _ expr)
   = do  { list_q <- tcMetaTy decsQTyConName     -- Q [Dec]
         ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr list_q)
 

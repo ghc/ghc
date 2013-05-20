@@ -1,6 +1,6 @@
 \begin{code}
 module RnSplice (
-        rnSpliceType, rnSpliceExpr, rnSplicePat,
+        rnSplice, rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
         rnBracket, checkTH,
         checkThLocalName
   ) where
@@ -37,6 +37,9 @@ import {-# SOURCE #-} TcSplice ( runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e _ = failTH e "bracket"
 
+rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
+rnSplice e = failTH e "splice"
+
 rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
 rnSpliceType e _ = failTH e "splice"
 
@@ -45,6 +48,9 @@ rnSpliceExpr e = failTH e "splice"
 
 rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
 rnSplicePat e = failTH e "splice"
+
+rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
+rnSpliceDecl e = failTH e "splice"
 
 failTH :: Outputable a => a -> String -> RnM b
 failTH e what  -- Raise an error in a stage-1 compiler
@@ -259,6 +265,33 @@ rnSplicePat splice@(HsSplice False _ expr)
      }
 \end{code}
 
+\begin{code}
+rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
+rnSpliceDecl (SpliceDecl (L _ (HsSplice True _ _)) _)
+  = panic "rnSpliceDecls: encountered typed declaration splice"
+
+rnSpliceDecl (SpliceDecl (L loc splice@(HsSplice False _ expr)) flg)
+  = addErrCtxt (exprCtxt (HsSpliceE splice)) $
+    setSrcSpan (getLoc expr) $ do
+    { stage <- getStage
+     ; case stage of
+         { Brack isTypedBrack pop_stage ps_var _ ->
+             do { checkTc (not isTypedBrack) illegalUntypedSplice
+
+                ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
+                                                            rnSplice splice
+
+                ; ps <- readMutVar ps_var
+                ; writeMutVar ps_var (PendingRnDeclSplice name expr' : ps)
+
+                ; return (SpliceDecl (L loc splice') flg, fvs)
+                }
+         ; _ -> 
+           pprPanic "rnSpliceDecls: should not have been called on top-level splice" (ppr expr)
+         }
+     }
+\end{code}
+
 %************************************************************************
 %*                                                                      *
         Template Haskell brackets
@@ -352,14 +385,7 @@ rn_bracket _ (TypBr t) = do { (t', fvs) <- rnLHsType TypBrCtx t
                             ; return (TypBr t', fvs) }
 
 rn_bracket _ (DecBrL decls)
-  = do { (group, mb_splice) <- findSplice decls
-       ; case mb_splice of
-           Nothing -> return ()
-           Just (SpliceDecl (L loc _) _, _)
-              -> setSrcSpan loc $
-                 addErr (ptext (sLit "Declaration splices are not permitted inside declaration brackets"))
-                -- Why not?  See Section 7.3 of the TH paper.
-
+  = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
                           -- The emptyDUs is so that we just collect uses for this
@@ -373,6 +399,18 @@ rn_bracket _ (DecBrL decls)
         ; traceRn (text "rn_bracket dec" <+> (ppr (tcg_dus tcg_env) $$
                    ppr (duUses (tcg_dus tcg_env))))
         ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
+  where
+    groupDecls :: [LHsDecl RdrName] -> RnM (HsGroup RdrName)
+    groupDecls decls
+      = do { (group, mb_splice) <- findSplice decls
+           ; case mb_splice of
+           { Nothing -> return group
+           ; Just (splice, rest) ->
+               do { group' <- groupDecls rest
+                  ; let group'' = appendGroups group group'
+                  ; return group'' { hs_splcds = noLoc splice : hs_splcds group' }
+                  }
+           }}
 
 rn_bracket _ (DecBrG _) = panic "rn_bracket: unexpected DecBrG"
 

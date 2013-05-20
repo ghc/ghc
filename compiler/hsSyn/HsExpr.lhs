@@ -350,6 +350,7 @@ data PendingSplice
   = PendingRnExpSplice Name (LHsExpr Name)
   | PendingRnPatSplice Name (LHsExpr Name)
   | PendingRnTypeSplice Name (LHsExpr Name)
+  | PendingRnDeclSplice Name (LHsExpr Name)
   | PendingRnCrossStageSplice Name
   | PendingTcSplice Name (LHsExpr Id)
   deriving (Data, Typeable)
@@ -1431,6 +1432,7 @@ instance Outputable PendingSplice where
   ppr (PendingRnExpSplice name expr)   = ppr (name, expr)
   ppr (PendingRnPatSplice name expr)   = ppr (name, expr)
   ppr (PendingRnTypeSplice name expr)  = ppr (name, expr)
+  ppr (PendingRnDeclSplice name expr)  = ppr (name, expr)
   ppr (PendingRnCrossStageSplice name) = ppr name
   ppr (PendingTcSplice name expr)      = ppr (name, expr)
 \end{code}
