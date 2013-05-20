@@ -18,6 +18,7 @@ module RnSource (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
+import {-# SOURCE #-} RnSplice ( rnSpliceDecl )
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
 #endif 	/* GHCI */
@@ -76,6 +77,7 @@ Checks the @(..)@ etc constraints in the export list.
 rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
+                                       hs_splcds  = splice_decls,
                                        hs_tyclds  = tycl_decls,
                                        hs_instds  = inst_decls,
                                        hs_derivds = deriv_decls,
@@ -163,14 +165,16 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    (rn_ann_decls,     src_fvs6) <- rnList rnAnnDecl       ann_decls ;
    (rn_default_decls, src_fvs7) <- rnList rnDefaultDecl   default_decls ;
    (rn_deriv_decls,   src_fvs8) <- rnList rnSrcDerivDecl  deriv_decls ;
+   (rn_splice_decls,  src_fvs9) <- rnList rnSpliceDecl    splice_decls ;
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
     last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
-   let {rn_group = HsGroup { hs_valds  	= rn_val_decls,
-			     hs_tyclds 	= rn_tycl_decls,
-			     hs_instds 	= rn_inst_decls,
+   let {rn_group = HsGroup { hs_valds   = rn_val_decls,
+                             hs_splcds  = rn_splice_decls,
+                             hs_tyclds  = rn_tycl_decls,
+                             hs_instds  = rn_inst_decls,
                              hs_derivds = rn_deriv_decls,
 			     hs_fixds   = rn_fix_decls,
 			     hs_warnds  = [], -- warns are returned in the tcg_env
@@ -184,10 +188,11 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
 
         tycl_bndrs = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
         ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
-	other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
-        other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
-			      src_fvs5, src_fvs6, src_fvs7, src_fvs8] ;
-		-- It is tiresome to gather the binders from type and class decls
+        other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
+        other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
+                              src_fvs5, src_fvs6, src_fvs7, src_fvs8,
+                              src_fvs9] ;
+                -- It is tiresome to gather the binders from type and class decls
 
 	src_dus = [other_def] `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
 		-- Instance decls may have occurrences of things bound in bind_dus

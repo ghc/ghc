@@ -33,8 +33,8 @@ module HsDecls (
   lvectDeclName, lvectInstDecl,
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
-  -- ** Top-level template haskell splice
-  SpliceDecl(..),
+  -- ** Template haskell declaration splice
+  SpliceDecl(..), LSpliceDecl,
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
   noForeignImportCoercionYet, noForeignExportCoercionYet,
@@ -55,7 +55,7 @@ module HsDecls (
     ) where
 
 -- friends:
-import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, pprExpr )
+import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr )
         -- Because Expr imports Decls via HsBracket
 
 import HsBinds
@@ -128,6 +128,7 @@ data HsDecl id
 data HsGroup id
   = HsGroup {
         hs_valds  :: HsValBinds id,
+        hs_splcds :: [LSpliceDecl id],
 
         hs_tyclds :: [[LTyClDecl id]],
                 -- A list of mutually-recursive groups
@@ -163,12 +164,14 @@ emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
+                       hs_splcds = [],
                        hs_docs = [] }
 
 appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
 appendGroups 
     HsGroup { 
         hs_valds  = val_groups1,
+        hs_splcds = spliceds1,
         hs_tyclds = tyclds1, 
         hs_instds = instds1,
         hs_derivds = derivds1,
@@ -182,6 +185,7 @@ appendGroups
   hs_docs   = docs1 }
     HsGroup { 
         hs_valds  = val_groups2,
+        hs_splcds = spliceds2,
         hs_tyclds = tyclds2, 
         hs_instds = instds2,
         hs_derivds = derivds2,
@@ -196,6 +200,7 @@ appendGroups
   = 
     HsGroup { 
         hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
+        hs_splcds = spliceds1 ++ spliceds2, 
         hs_tyclds = tyclds1 ++ tyclds2, 
         hs_instds = instds1 ++ instds2,
         hs_derivds = derivds1 ++ derivds2,
@@ -261,15 +266,16 @@ instance OutputableBndr name => Outputable (HsGroup name) where
           vcat_mb gap (Nothing : ds) = vcat_mb gap ds
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
+type LSpliceDecl name = Located (SpliceDecl name)
 data SpliceDecl id 
   = SpliceDecl                  -- Top level splice
-        (Located (HsExpr id))
+        (Located (HsSplice id))
         HsExplicitFlag          -- Explicit <=> $(f x y)
                                 -- Implicit <=> f x y,  i.e. a naked top level expression
     deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
-   ppr (SpliceDecl e _) = ptext (sLit "$") <> parens (pprExpr (unLoc e))
+   ppr (SpliceDecl e _) = ppr e
 \end{code}
 
 

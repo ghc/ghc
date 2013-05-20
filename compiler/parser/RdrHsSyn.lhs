@@ -7,7 +7,7 @@ Functions over HsSyn specialised to RdrName.
 module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
-        mkHsDo, mkHsSpliceE, mkTopSpliceDecl,
+        mkHsDo, mkHsSpliceE, mkSpliceDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
         mkTySynonym, mkFamInstSynonym,
@@ -197,16 +197,18 @@ mkTyFamily loc flavour lhs ksig
        ; tyvars <- checkTyVars lhs tparams
        ; return (L loc (TyFamily flavour tc tyvars ksig)) }
 
-mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
+mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- If the user wrote
 --      [pads| ... ]   then return a QuasiQuoteD
 --      $(e)           then return a SpliceD
 -- but if she wrote, say,
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
-mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))              = QuasiQuoteD qq
-mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ _ expr))) = SpliceD (SpliceDecl expr       Explicit)
-mkTopSpliceDecl other_expr                            = SpliceD (SpliceDecl other_expr Implicit)
+mkSpliceDecl (L _ (HsQuasiQuoteE qq))   = QuasiQuoteD qq
+mkSpliceDecl (L loc (HsSpliceE splice)) = SpliceD (SpliceDecl (L loc splice) Explicit)
+mkSpliceDecl other_expr                 = SpliceD (SpliceDecl (L (getLoc other_expr) splice) Implicit)
+  where
+    HsSpliceE splice = mkHsSpliceE other_expr
 
 
 mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)

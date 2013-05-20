@@ -586,6 +586,9 @@ zonkExpr env (HsBracketOut body bs)
     zonk_b (PendingRnTypeSplice _ e)
       = pprPanic "zonkExpr: PendingRnTypeSplice" (ppr e)
 
+    zonk_b (PendingRnDeclSplice _ e)
+      = pprPanic "zonkExpr: PendingRnDeclSplice" (ppr e)
+
     zonk_b (PendingTcSplice n e)
       = do e' <- zonkLExpr env e
            return (PendingTcSplice n e')
