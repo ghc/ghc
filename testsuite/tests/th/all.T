@@ -120,7 +120,7 @@ test('TH_dupdecl', normal, compile_fail, ['-v0'])
 test('TH_exn2', normal, compile_fail, ['-v0'])
 
 test('TH_recover', normal, compile_and_run, [''])
-test('TH_dataD1', normal, compile_fail, ['-v0'])
+test('TH_dataD1', normal, compile, ['-v0'])
 
 test('TH_ppr1', normal, compile_and_run, [''])
 

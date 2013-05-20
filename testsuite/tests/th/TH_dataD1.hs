@@ -5,6 +5,7 @@ import Language.Haskell.TH
 
 ds :: Q [Dec]
 ds = [d|
-          $(dataD [] (mkName "D") [] [normalC "K" []] [])
+          $(do { d <- dataD (cxt []) (mkName "D") [] [normalC (mkName "K") []] []
+               ; return [d]})
        |]
 
