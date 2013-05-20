@@ -399,20 +399,24 @@ data DocMarkup id a = Markup
 
 
 data HaddockModInfo name = HaddockModInfo
-  { hmi_description :: (Maybe (Doc name))
-  , hmi_portability :: (Maybe String)
-  , hmi_stability   :: (Maybe String)
-  , hmi_maintainer  :: (Maybe String)
-  , hmi_safety      :: (Maybe String)
+  { hmi_description :: Maybe (Doc name)
+  , hmi_copyright   :: Maybe String
+  , hmi_license     :: Maybe String
+  , hmi_maintainer  :: Maybe String
+  , hmi_stability   :: Maybe String
+  , hmi_portability :: Maybe String
+  , hmi_safety      :: Maybe String
   }
 
 
 emptyHaddockModInfo :: HaddockModInfo a
 emptyHaddockModInfo = HaddockModInfo
   { hmi_description = Nothing
-  , hmi_portability = Nothing
-  , hmi_stability   = Nothing
+  , hmi_copyright   = Nothing
+  , hmi_license     = Nothing
   , hmi_maintainer  = Nothing
+  , hmi_stability   = Nothing
+  , hmi_portability = Nothing
   , hmi_safety      = Nothing
   }
 

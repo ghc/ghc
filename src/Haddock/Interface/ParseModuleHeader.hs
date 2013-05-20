@@ -19,6 +19,7 @@ import RdrName
 import DynFlags
 
 import Data.Char
+import Control.Monad (mplus)
 
 -- -----------------------------------------------------------------------------
 -- Parsing module headers
@@ -36,9 +37,9 @@ parseModuleHeader dflags str0 =
 
       (_moduleOpt,str1) = getKey "Module" str0
       (descriptionOpt,str2) = getKey "Description" str1
-      (_copyrightOpt,str3) = getKey "Copyright" str2
-      (_licenseOpt,str4) = getKey "License" str3
-      (_licenceOpt,str5) = getKey "Licence" str4
+      (copyrightOpt,str3) = getKey "Copyright" str2
+      (licenseOpt,str4) = getKey "License" str3
+      (licenceOpt,str5) = getKey "Licence" str4
       (maintainerOpt,str6) = getKey "Maintainer" str5
       (stabilityOpt,str7) = getKey "Stability" str6
       (portabilityOpt,str8) = getKey "Portability" str7
@@ -58,9 +59,11 @@ parseModuleHeader dflags str0 =
            Nothing -> Left "Cannot parse header documentation paragraphs"
            Just doc -> Right (HaddockModInfo {
             hmi_description = docOpt,
-            hmi_portability = portabilityOpt,
-            hmi_stability = stabilityOpt,
+            hmi_copyright = copyrightOpt,
+            hmi_license = licenseOpt `mplus` licenceOpt,
             hmi_maintainer = maintainerOpt,
+            hmi_stability = stabilityOpt,
+            hmi_portability = portabilityOpt,
             hmi_safety = Nothing
             }, doc)
 

@@ -99,7 +99,7 @@ initBinMemSize = 1024*1024
 
 
 writeInterfaceFile :: FilePath -> InterfaceFile -> IO ()
-writeInterfaceFile filename iface = do 
+writeInterfaceFile filename iface = do
   bh0 <- openBinMem initBinMemSize
   put_ bh0 binaryInterfaceMagic
   put_ bh0 binaryInterfaceVersion
@@ -178,7 +178,7 @@ freshNameCache = ( create_fresh_nc , \_ -> return () )
        return (initNameCache u [])
 
 
--- | Read a Haddock (@.haddock@) interface file. Return either an 
+-- | Read a Haddock (@.haddock@) interface file. Return either an
 -- 'InterfaceFile' or an error message.
 --
 -- This function can be called in two ways.  Within a GHC session it will
@@ -206,7 +206,7 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
       | otherwise -> with_name_cache $ \update_nc -> do
 
       dict  <- get_dictionary bh0
-  
+
       -- read the symbol table so we are capable of reading the actual data
       bh1 <- do
           let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
@@ -564,18 +564,22 @@ instance (Binary id) => Binary (Doc id) where
 instance Binary name => Binary (HaddockModInfo name) where
   put_ bh hmi = do
     put_ bh (hmi_description hmi)
-    put_ bh (hmi_portability hmi)
-    put_ bh (hmi_stability   hmi)
+    put_ bh (hmi_copyright   hmi)
+    put_ bh (hmi_license     hmi)
     put_ bh (hmi_maintainer  hmi)
+    put_ bh (hmi_stability   hmi)
+    put_ bh (hmi_portability hmi)
     put_ bh (hmi_safety      hmi)
 
   get bh = do
     descr <- get bh
-    porta <- get bh
-    stabi <- get bh
+    copyr <- get bh
+    licen <- get bh
     maint <- get bh
+    stabi <- get bh
+    porta <- get bh
     safet <- get bh
-    return (HaddockModInfo descr porta stabi maint safet)
+    return (HaddockModInfo descr copyr licen maint stabi porta safet)
 
 
 instance Binary DocName where
@@ -598,4 +602,3 @@ instance Binary DocName where
         name <- get bh
         return (Undocumented name)
       _ -> error "get DocName: Bad h"
-

@@ -200,11 +200,13 @@ moduleInfo iface =
 
       entries :: [HtmlTable]
       entries = mapMaybe doOneEntry [
-         ("Portability",hmi_portability),
-         ("Stability",hmi_stability),
-         ("Maintainer",hmi_maintainer),
-         ("Safe Haskell",hmi_safety)
-         ]
+          ("Copyright",hmi_copyright),
+          ("License",hmi_copyright),
+          ("Maintainer",hmi_maintainer),
+          ("Stability",hmi_stability),
+          ("Portability",hmi_portability),
+          ("Safe Haskell",hmi_safety)
+          ]
    in
       case entries of
          [] -> noHtml
