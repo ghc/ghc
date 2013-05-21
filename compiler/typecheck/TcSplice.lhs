@@ -1051,6 +1051,37 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
     ref <- fmap tcg_dependent_files getGblEnv
     dep_files <- readTcRef ref
     writeTcRef ref (fp:dep_files)
+
+  qAddTopDecls thds = do
+      l <- getSrcSpanM
+      let either_hval = convertToHsDecls l thds
+      ds <- case either_hval of
+              Left exn -> pprPanic "qAddTopDecls: can't convert top-level declarations" exn
+              Right ds -> return ds
+      mapM_ (checkTopDecl . unLoc) ds
+      th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
+      updTcRef th_topdecls_var (\topds -> ds ++ topds)
+    where
+      checkTopDecl :: HsDecl RdrName -> TcM ()
+      checkTopDecl (ValD binds)
+        = mapM_ bindName (collectHsBindBinders binds)
+      checkTopDecl (SigD _)
+        = return ()
+      checkTopDecl (ForD (ForeignImport (L _ name) _ _ _))
+        = bindName name
+      checkTopDecl _
+        = addErr $ text "Only function, value, and foreign import declarations may be added with addTopDecl"
+      
+      bindName :: RdrName -> TcM ()
+      bindName (Exact n)
+        = do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
+             ; updTcRef th_topnames_var (\ns -> addOneToNameSet ns n)
+             }
+
+      bindName name =
+          addErr $
+          hang (ptext (sLit "The binder") <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
+             2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
 \end{code}
 
 
