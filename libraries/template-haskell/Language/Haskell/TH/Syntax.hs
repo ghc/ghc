@@ -62,6 +62,8 @@ class (Monad m, Applicative m) => Quasi m where
 
   qAddDependentFile :: FilePath -> m ()
 
+  qAddTopDecls :: [Dec] -> m ()
+
 -----------------------------------------------------
 --	The IO instance of Quasi
 --
@@ -88,6 +90,7 @@ instance Quasi IO where
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _ = badIO "addDependentFile"
+  qAddTopDecls _      = badIO "addTopDecls"
 
   qRunIO m = m
 
@@ -330,6 +333,11 @@ runIO m = Q (qRunIO m)
 addDependentFile :: FilePath -> Q ()
 addDependentFile fp = Q (qAddDependentFile fp)
 
+-- | Add additional top-level declarations. The added declarations will be type
+-- checked along with the current declaration group.
+addTopDecls :: [Dec] -> Q ()
+addTopDecls ds = Q (qAddTopDecls ds)
+
 instance Quasi Q where
   qNewName  	    = newName
   qReport   	    = report
@@ -341,6 +349,7 @@ instance Quasi Q where
   qLocation 	    = location
   qRunIO    	    = runIO
   qAddDependentFile = addDependentFile
+  qAddTopDecls      = addTopDecls
 
 
 ----------------------------------------------------
