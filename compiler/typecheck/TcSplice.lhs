@@ -398,8 +398,13 @@ tc_bracket _ (TypBr typ)
         -- Result type is Type (= Q Typ)
 
 tc_bracket _ (DecBrG decls)
-  = do  { _ <- tcTopSrcDecls emptyModDetails decls
-               -- Typecheck the declarations, dicarding the result
+  = do  { _ <- setXOptM Opt_ExistentialQuantification $
+                   -- This is an EGREGIOUS HACK to make T5737 work.  That test splices
+                   -- in a type in a data constructor arg type, and then we try to 
+                   -- check validity for the data type decl, which fails because of
+                   -- the pseudo-existential.  Stupid.  Will go away after the TH reorg
+               tcTopSrcDecls emptyModDetails decls
+               -- Typecheck the declarations, discarding the result
                -- We'll get all that stuff later, when we splice it in
 
                -- Top-level declarations in the bracket get unqualified names

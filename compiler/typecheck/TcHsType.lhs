@@ -196,7 +196,7 @@ tcHsInstHead user_ctxt lhs_ty@(L loc hs_ty)
   = setSrcSpan loc $    -- The "In the type..." context comes from the caller
     do { inst_ty <- tc_inst_head hs_ty
        ; kvs     <- zonkTcTypeAndFV inst_ty
-       ; kvs     <- kindGeneralize kvs []
+       ; kvs     <- kindGeneralize kvs
        ; inst_ty <- zonkTcType (mkForAllTys kvs inst_ty)
        ; checkValidInstance user_ctxt lhs_ty inst_ty }
 
@@ -308,7 +308,7 @@ tcCheckHsTypeAndGen hs_ty kind
        ; traceTc "tcCheckHsTypeAndGen" (ppr hs_ty)
        ; traceTc "tcCheckHsTypeAndGen" (ppr ty)
        ; kvs <- zonkTcTypeAndFV ty 
-       ; kvs <- kindGeneralize kvs []
+       ; kvs <- kindGeneralize kvs
        ; return (mkForAllTys kvs ty) }
 \end{code}
 
@@ -947,11 +947,10 @@ tcHsTyVarBndr (L _ hs_tv)
        ; return (mkTcTyVar name kind (SkolemTv False)) } } }
 
 ------------------
-kindGeneralize :: TyVarSet -> [Name] -> TcM [KindVar]
-kindGeneralize tkvs _names_to_avoid
+kindGeneralize :: TyVarSet -> TcM [KindVar]
+kindGeneralize tkvs
   = do { gbl_tvs <- tcGetGlobalTyVars -- Already zonked
-       ; tkvs    <- zonkTyVarsAndFV tkvs
-       ; let kvs_to_quantify = filter isKindVar (varSetElems (tkvs `minusVarSet` gbl_tvs))
+       ; quantifyTyVars gbl_tvs (filterVarSet isKindVar tkvs) }
                 -- ToDo: remove the (filter isKindVar)
                 -- Any type variables in tkvs will be in scope,
                 -- and hence in gbl_tvs, so after removing gbl_tvs
@@ -962,17 +961,6 @@ kindGeneralize tkvs _names_to_avoid
                 -- When typechecking the body of the bracket, we typecheck $t to a
                 -- unification variable 'alpha', with no biding forall.  We don't
                 -- want to kind-quantify it!
-
-       ; traceTc "kindGeneralise" (vcat [ppr kvs_to_quantify])
-       ; ASSERT2 (all isKindVar kvs_to_quantify, ppr kvs_to_quantify $$ ppr tkvs)
-             -- This assertion is obviosly true because of the filter isKindVar
-             -- but we'll remove that when reorganising TH, and then the assertion
-             -- will mean something
-
-             -- If we tidied the kind variables, which should all be mutable,
-             -- this 'zonkQuantifiedTyVars' update the original TyVar to point to
-             -- the tided and skolemised one
-         zonkQuantifiedTyVars kvs_to_quantify }
 \end{code}
 
 Note [Kind generalisation]

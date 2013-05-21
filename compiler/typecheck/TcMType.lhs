@@ -52,7 +52,7 @@ module TcMType (
   zonkTcPredType, 
   skolemiseSigTv, skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, zonkTcTypeAndFV,
-  zonkQuantifiedTyVar, zonkQuantifiedTyVars,
+  zonkQuantifiedTyVar, quantifyTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType, 
 
   zonkTcKind, defaultKindVarToStar,
@@ -482,7 +482,210 @@ tcInstTyVarX subst tyvar
 
 %************************************************************************
 %*									*
-\subsection{Zonking -- the exernal interfaces}
+             Quantification
+%*									*
+%************************************************************************
+
+Note [quantifyTyVars]
+~~~~~~~~~~~~~~~~~~~~~
+quantifyTyVars is give the free vars of a type that we
+are about to wrap in a forall.
+
+It takes these free type/kind variables and 
+  1. Zonks them and remove globals
+  2. Partitions into type and kind variables (kvs1, tvs)
+  3. Extends kvs1 with free kind vars in the kinds of tvs (removing globals)
+  4. Calls zonkQuantifiedTyVar on each
+
+Step (3) is often unimportant, because the kind variable is often
+also free in the type.  Eg
+     Typeable k (a::k)
+has free vars {k,a}.  But the type (see Trac #7916)
+    (f::k->*) (a::k)
+has free vars {f,a}, but we must add 'k' as well! Hence step (3).
+
+\begin{code}
+quantifyTyVars :: TcTyVarSet -> TcTyVarSet -> TcM [TcTyVar]
+-- See Note [quantifyTyVars]
+-- The input is a mixture of type and kind variables; a kind variable k 
+--   may occur *after* a tyvar mentioning k in its kind
+-- Can be given a mixture of TcTyVars and TyVars, in the case of
+--   associated type declarations
+
+quantifyTyVars gbl_tvs tkvs
+  = do { tkvs    <- zonkTyVarsAndFV tkvs
+       ; gbl_tvs <- zonkTyVarsAndFV gbl_tvs
+       ; let (kvs1, tvs) = partitionVarSet isKindVar (tkvs `minusVarSet` gbl_tvs)
+             kvs2 = varSetElems (foldVarSet add_kvs kvs1 tvs
+                                 `minusVarSet` gbl_tvs )
+             add_kvs tv kvs = tyVarsOfType (tyVarKind tv) `unionVarSet` kvs 
+                              -- NB kinds of tvs are zonked by zonkTyVarsAndFV
+             qtvs = varSetElems tvs                       
+
+             -- In the non-PolyKinds case, default the kind variables
+             -- to *, and zonk the tyvars as usual.  Notice that this
+             -- may make quantifyTyVars return a shorter list
+             -- than it was passed, but that's ok
+       ; poly_kinds <- xoptM Opt_PolyKinds
+       ; qkvs <- if poly_kinds 
+                 then return kvs2
+                 else do { let (meta_kvs, skolem_kvs) = partition is_meta kvs2
+                               is_meta kv = isTcTyVar kv && isMetaTyVar kv
+                         ; mapM_ defaultKindVarToStar meta_kvs
+                         ; WARN ( not (null skolem_kvs), ppr skolem_kvs )
+                           return skolem_kvs }  -- Should be empty
+
+       ; mapM zonk_quant (qkvs ++ qtvs) } 
+           -- Because of the order, any kind variables
+           -- mentioned in the kinds of the type variables refer to
+           -- the now-quantified versions
+  where
+    zonk_quant tkv
+      | isTcTyVar tkv = zonkQuantifiedTyVar tkv
+      | otherwise     = return tkv
+      -- For associated types, we have the class variables 
+      -- in scope, and they are TyVars not TcTyVars
+
+zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
+-- The quantified type variables often include meta type variables
+-- we want to freeze them into ordinary type variables, and
+-- default their kind (e.g. from OpenTypeKind to TypeKind)
+-- 			-- see notes with Kind.defaultKind
+-- The meta tyvar is updated to point to the new skolem TyVar.  Now any 
+-- bound occurences of the original type variable will get zonked to 
+-- the immutable version.
+--
+-- We leave skolem TyVars alone; they are immutable.
+--
+-- This function is called on both kind and type variables,
+-- but kind variables *only* if PolyKinds is on.
+zonkQuantifiedTyVar tv
+  = ASSERT2( isTcTyVar tv, ppr tv ) 
+    case tcTyVarDetails tv of
+      SkolemTv {} -> do { kind <- zonkTcKind (tyVarKind tv)
+                        ; return $ setTyVarKind tv kind }
+	-- It might be a skolem type variable, 
+	-- for example from a user type signature
+
+      MetaTv { mtv_ref = ref } ->
+          do when debugIsOn $ do
+                 -- [Sept 04] Check for non-empty.
+                 -- See note [Silly Type Synonym]
+                 cts <- readMutVar ref
+                 case cts of
+                     Flexi -> return ()
+                     Indirect ty -> WARN( True, ppr tv $$ ppr ty )
+                                    return ()
+             skolemiseUnboundMetaTyVar tv vanillaSkolemTv
+      _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
+
+defaultKindVarToStar :: TcTyVar -> TcM Kind
+-- We have a meta-kind: unify it with '*'
+defaultKindVarToStar kv 
+  = do { ASSERT ( isKindVar kv && isMetaTyVar kv )
+         writeMetaTyVar kv liftedTypeKind
+       ; return liftedTypeKind }
+
+skolemiseUnboundMetaTyVar :: TcTyVar -> TcTyVarDetails -> TcM TyVar
+-- We have a Meta tyvar with a ref-cell inside it
+-- Skolemise it, including giving it a new Name, so that
+--   we are totally out of Meta-tyvar-land
+-- We create a skolem TyVar, not a regular TyVar
+--   See Note [Zonking to Skolem]
+skolemiseUnboundMetaTyVar tv details
+  = ASSERT2( isMetaTyVar tv, ppr tv ) 
+    do  { span <- getSrcSpanM    -- Get the location from "here"
+                                 -- ie where we are generalising
+        ; uniq <- newUnique      -- Remove it from TcMetaTyVar unique land
+        ; kind <- zonkTcKind (tyVarKind tv)
+        ; let final_kind = defaultKind kind
+              final_name = mkInternalName uniq (getOccName tv) span
+              final_tv   = mkTcTyVar final_name final_kind details
+
+        ; writeMetaTyVar tv (mkTyVarTy final_tv)
+        ; return final_tv }
+
+skolemiseSigTv :: TcTyVar -> TcM TcTyVar
+-- In TcBinds we create SigTvs for type signatures
+-- but for singleton groups we want them to really be skolems
+-- which do not unify with each other
+skolemiseSigTv tv  
+  = ASSERT2( isSigTyVar tv, ppr tv )
+    do { writeMetaTyVarRef tv (metaTvRef tv) (mkTyVarTy skol_tv)
+       ; return skol_tv }
+  where
+    skol_tv = setTcTyVarDetails tv (SkolemTv False)
+\end{code}
+
+Note [Zonking to Skolem]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We used to zonk quantified type variables to regular TyVars.  However, this
+leads to problems.  Consider this program from the regression test suite:
+
+  eval :: Int -> String -> String -> String
+  eval 0 root actual = evalRHS 0 root actual
+
+  evalRHS :: Int -> a
+  evalRHS 0 root actual = eval 0 root actual
+
+It leads to the deferral of an equality (wrapped in an implication constraint)
+
+  forall a. () => ((String -> String -> String) ~ a)
+
+which is propagated up to the toplevel (see TcSimplify.tcSimplifyInferCheck).
+In the meantime `a' is zonked and quantified to form `evalRHS's signature.
+This has the *side effect* of also zonking the `a' in the deferred equality
+(which at this point is being handed around wrapped in an implication
+constraint).
+
+Finally, the equality (with the zonked `a') will be handed back to the
+simplifier by TcRnDriver.tcRnSrcDecls calling TcSimplify.tcSimplifyTop.
+If we zonk `a' with a regular type variable, we will have this regular type
+variable now floating around in the simplifier, which in many places assumes to
+only see proper TcTyVars.
+
+We can avoid this problem by zonking with a skolem.  The skolem is rigid
+(which we require for a quantified variable), but is still a TcTyVar that the
+simplifier knows how to deal with.
+
+Note [Silly Type Synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+	type C u a = u	-- Note 'a' unused
+
+	foo :: (forall a. C u a -> C u a) -> u
+	foo x = ...
+
+	bar :: Num u => u
+	bar = foo (\t -> t + t)
+
+* From the (\t -> t+t) we get type  {Num d} =>  d -> d
+  where d is fresh.
+
+* Now unify with type of foo's arg, and we get:
+	{Num (C d a)} =>  C d a -> C d a
+  where a is fresh.
+
+* Now abstract over the 'a', but float out the Num (C d a) constraint
+  because it does not 'really' mention a.  (see exactTyVarsOfType)
+  The arg to foo becomes
+	\/\a -> \t -> t+t
+
+* So we get a dict binding for Num (C d a), which is zonked to give
+	a = ()
+  [Note Sept 04: now that we are zonking quantified type variables
+  on construction, the 'a' will be frozen as a regular tyvar on
+  quantification, so the floated dict will still have type (C d a).
+  Which renders this whole note moot; happily!]
+
+* Then the \/\a abstraction has a zonked 'a' in it.
+
+All very silly.   I think its harmless to ignore the problem.  We'll end up with
+a \/\a in the final result but all the occurrences of a will be zonked to ()
+
+%************************************************************************
+%*									*
+              Zonking
 %*									*
 %************************************************************************
 
@@ -543,111 +746,7 @@ zonkTcPredType :: TcPredType -> TcM TcPredType
 zonkTcPredType = zonkTcType
 \end{code}
 
--------------------  These ...ToType, ...ToKind versions
-		     are used at the end of type checking
-
-\begin{code}
-defaultKindVarToStar :: TcTyVar -> TcM Kind
--- We have a meta-kind: unify it with '*'
-defaultKindVarToStar kv 
-  = do { ASSERT ( isKindVar kv && isMetaTyVar kv )
-         writeMetaTyVar kv liftedTypeKind
-       ; return liftedTypeKind }
-
-zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
--- A kind variable k may occur *after* a tyvar mentioning k in its kind
--- Can be given a mixture of TcTyVars and TyVars, in the case of
--- associated type declarations
-zonkQuantifiedTyVars tyvars
-  = do { let (kvs, tvs) = partition isKindVar tyvars
-             (meta_kvs, skolem_kvs) 
-                  = partition (\kv -> isTcTyVar kv && isMetaTyVar kv) kvs
-
-             -- In the non-PolyKinds case, default the kind variables
-             -- to *, and zonk the tyvars as usual.  Notice that this
-             -- may make zonkQuantifiedTyVars return a shorter list
-             -- than it was passed, but that's ok
-       ; poly_kinds <- xoptM Opt_PolyKinds
-       ; qkvs <- if poly_kinds 
-                 then return kvs
-                 else WARN ( not (null skolem_kvs), ppr skolem_kvs )
-                      do { mapM_ defaultKindVarToStar meta_kvs
-                         ; return skolem_kvs }  -- Should be empty
-
-       ; mapM zonk_quant (qkvs ++ tvs) }
-           -- Because of the order, any kind variables
-           -- mentioned in the kinds of the type variables refer to
-           -- the now-quantified versions
-  where
-    zonk_quant tkv
-      | isTcTyVar tkv = zonkQuantifiedTyVar tkv
-      | otherwise     = return tkv
-      -- For associated types, we have the class variables 
-      -- in scope, and they are TyVars not TcTyVars
-
-zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
--- The quantified type variables often include meta type variables
--- we want to freeze them into ordinary type variables, and
--- default their kind (e.g. from OpenTypeKind to TypeKind)
--- 			-- see notes with Kind.defaultKind
--- The meta tyvar is updated to point to the new skolem TyVar.  Now any 
--- bound occurences of the original type variable will get zonked to 
--- the immutable version.
---
--- We leave skolem TyVars alone; they are immutable.
---
--- This function is called on both kind and type variables,
--- but kind variables *only* if PolyKinds is on.
-zonkQuantifiedTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv ) 
-    case tcTyVarDetails tv of
-      SkolemTv {} -> do { kind <- zonkTcKind (tyVarKind tv)
-                        ; return $ setTyVarKind tv kind }
-	-- It might be a skolem type variable, 
-	-- for example from a user type signature
-
-      MetaTv { mtv_ref = ref } ->
-          do when debugIsOn $ do
-                 -- [Sept 04] Check for non-empty.
-                 -- See note [Silly Type Synonym]
-                 cts <- readMutVar ref
-                 case cts of
-                     Flexi -> return ()
-                     Indirect ty -> WARN( True, ppr tv $$ ppr ty )
-                                    return ()
-             skolemiseUnboundMetaTyVar tv vanillaSkolemTv
-      _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
-
-skolemiseUnboundMetaTyVar :: TcTyVar -> TcTyVarDetails -> TcM TyVar
--- We have a Meta tyvar with a ref-cell inside it
--- Skolemise it, including giving it a new Name, so that
---   we are totally out of Meta-tyvar-land
--- We create a skolem TyVar, not a regular TyVar
---   See Note [Zonking to Skolem]
-skolemiseUnboundMetaTyVar tv details
-  = ASSERT2( isMetaTyVar tv, ppr tv ) 
-    do  { span <- getSrcSpanM    -- Get the location from "here"
-                                 -- ie where we are generalising
-        ; uniq <- newUnique      -- Remove it from TcMetaTyVar unique land
-        ; kind <- zonkTcKind (tyVarKind tv)
-        ; let final_kind = defaultKind kind
-              final_name = mkInternalName uniq (getOccName tv) span
-              final_tv   = mkTcTyVar final_name final_kind details
-
-        ; writeMetaTyVar tv (mkTyVarTy final_tv)
-        ; return final_tv }
-
-skolemiseSigTv :: TcTyVar -> TcM TcTyVar
--- In TcBinds we create SigTvs for type signatures
--- but for singleton groups we want them to really be skolems
--- which do not unify with each other
-skolemiseSigTv tv  
-  = ASSERT2( isSigTyVar tv, ppr tv )
-    do { writeMetaTyVarRef tv (metaTvRef tv) (mkTyVarTy skol_tv)
-       ; return skol_tv }
-  where
-    skol_tv = setTcTyVarDetails tv (SkolemTv False)
-\end{code}
+---------------  Constraints
 
 \begin{code}
 zonkImplication :: Implication -> TcM (Bag Implication)
@@ -806,71 +905,6 @@ zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
 zonkSkolemInfo skol_info = return skol_info
 \end{code}
 
-Note [Silly Type Synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this:
-	type C u a = u	-- Note 'a' unused
-
-	foo :: (forall a. C u a -> C u a) -> u
-	foo x = ...
-
-	bar :: Num u => u
-	bar = foo (\t -> t + t)
-
-* From the (\t -> t+t) we get type  {Num d} =>  d -> d
-  where d is fresh.
-
-* Now unify with type of foo's arg, and we get:
-	{Num (C d a)} =>  C d a -> C d a
-  where a is fresh.
-
-* Now abstract over the 'a', but float out the Num (C d a) constraint
-  because it does not 'really' mention a.  (see exactTyVarsOfType)
-  The arg to foo becomes
-	\/\a -> \t -> t+t
-
-* So we get a dict binding for Num (C d a), which is zonked to give
-	a = ()
-  [Note Sept 04: now that we are zonking quantified type variables
-  on construction, the 'a' will be frozen as a regular tyvar on
-  quantification, so the floated dict will still have type (C d a).
-  Which renders this whole note moot; happily!]
-
-* Then the \/\a abstraction has a zonked 'a' in it.
-
-All very silly.   I think its harmless to ignore the problem.  We'll end up with
-a \/\a in the final result but all the occurrences of a will be zonked to ()
-
-Note [Zonking to Skolem]
-~~~~~~~~~~~~~~~~~~~~~~~~
-We used to zonk quantified type variables to regular TyVars.  However, this
-leads to problems.  Consider this program from the regression test suite:
-
-  eval :: Int -> String -> String -> String
-  eval 0 root actual = evalRHS 0 root actual
-
-  evalRHS :: Int -> a
-  evalRHS 0 root actual = eval 0 root actual
-
-It leads to the deferral of an equality (wrapped in an implication constraint)
-
-  forall a. () => ((String -> String -> String) ~ a)
-
-which is propagated up to the toplevel (see TcSimplify.tcSimplifyInferCheck).
-In the meantime `a' is zonked and quantified to form `evalRHS's signature.
-This has the *side effect* of also zonking the `a' in the deferred equality
-(which at this point is being handed around wrapped in an implication
-constraint).
-
-Finally, the equality (with the zonked `a') will be handed back to the
-simplifier by TcRnDriver.tcRnSrcDecls calling TcSimplify.tcSimplifyTop.
-If we zonk `a' with a regular type variable, we will have this regular type
-variable now floating around in the simplifier, which in many places assumes to
-only see proper TcTyVars.
-
-We can avoid this problem by zonking with a skolem.  The skolem is rigid
-(which we require for a quantified variable), but is still a TcTyVar that the
-simplifier knows how to deal with.
 
 
 %************************************************************************
