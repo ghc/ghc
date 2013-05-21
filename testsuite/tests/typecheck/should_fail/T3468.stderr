@@ -4,7 +4,7 @@ T3468.hs-boot:3:6:
     Main module: data Tool d
                      No C type associated
                      RecFlag Recursive, Promotable
-                     = F :: forall d a r. a -> Tool d Stricts: _
+                     = F :: forall d a. a -> Tool d Stricts: _
                      FamilyInstance: none
     Boot file:   abstract(False) Tool
                      No C type associated

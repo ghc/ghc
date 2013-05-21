@@ -88,7 +88,7 @@ RnFail055.hs-boot:25:6:
     Boot file:   data T7 a
                      No C type associated
                      RecFlag NonRecursive, Promotable
-                     = T7 :: forall a b. a -> T7 a Stricts: _
+                     = T7 :: forall a. a -> T7 a Stricts: _
                      FamilyInstance: none
 
 RnFail055.hs-boot:27:22:
