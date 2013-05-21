@@ -2149,8 +2149,8 @@ showCmd str = do
         ["languages"] -> showLanguages -- backwards compat
         ["language"]  -> showLanguages
         ["lang"]      -> showLanguages -- useful abbreviation
-        _ -> throwGhcException (CmdLineError ("syntax:  :show [ args | prog | prompt | prompt2 | editor | stop | modules | bindings\n"++
-                                     "               | breaks | context | packages | language ]"))
+        _ -> throwGhcException (CmdLineError ("syntax:  :show [ args | prog | prompt | prompt2 | editor | stop | modules\n"++
+                                     "               | bindings | breaks | context | packages | language ]"))
 
 showiCmd :: String -> GHCi ()
 showiCmd str = do
