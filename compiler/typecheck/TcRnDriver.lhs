@@ -466,53 +466,55 @@ tcRnSrcDecls boot_iface decls
    } }
 
 tc_rn_src_decls :: ModDetails
-                    -> [LHsDecl RdrName]
-                    -> TcM (TcGblEnv, TcLclEnv)
+                -> [LHsDecl RdrName]
+                -> TcM (TcGblEnv, TcLclEnv)
 -- Loops around dealing with each top level inter-splice group
 -- in turn, until it's dealt with the entire module
 tc_rn_src_decls boot_details ds
  = {-# SCC "tc_rn_src_decls" #-}
-   do { (first_group, group_tail) <- findSplice ds  ;
+   do { (first_group, group_tail) <- findSplice ds
                 -- If ds is [] we get ([], Nothing)
 
         -- The extra_deps are needed while renaming type and class declarations
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
-        let { extra_deps = map tyConName (typeEnvTyCons (md_types boot_details)) } ;
+      ; let { extra_deps = map tyConName (typeEnvTyCons (md_types boot_details)) }
         -- Deal with decls up to, but not including, the first splice
-        (tcg_env, rn_decls) <- rnTopSrcDecls extra_deps first_group ;
+      ; (tcg_env, rn_decls) <- rnTopSrcDecls extra_deps first_group
                 -- rnTopSrcDecls fails if there are any errors
 
-        (tcg_env, tcl_env) <- setGblEnv tcg_env $
-                              tcTopSrcDecls boot_details rn_decls ;
+      ; (tcg_env, tcl_env) <- setGblEnv tcg_env $
+                              tcTopSrcDecls boot_details rn_decls
 
         -- If there is no splice, we're nearly done
-        setEnvs (tcg_env, tcl_env) $
-        case group_tail of {
-           Nothing -> do { tcg_env <- checkMain ;       -- Check for `main'
-                           return (tcg_env, tcl_env)
-                      } ;
+      ; setEnvs (tcg_env, tcl_env) $
+        case group_tail of
+          { Nothing -> do { tcg_env <- checkMain       -- Check for `main'
+                          ; return (tcg_env, tcl_env)
+                          }
 
 #ifndef GHCI
-        -- There shouldn't be a splice
-           Just (SpliceDecl {}, _) -> do {
-        failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
+            -- There shouldn't be a splice
+          ; Just (SpliceDecl {}, _) ->
+            failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
+          }
 #else
-        -- If there's a splice, we must carry on
-           Just (SpliceDecl (L _ splice) _, rest_ds) -> do {
+            -- If there's a splice, we must carry on
+          ; Just (SpliceDecl (L _ splice) _, rest_ds) ->
+            do { -- Rename the splice expression, and get its supporting decls
+                 (rn_splice, splice_fvs) <- checkNoErrs (rnSplice splice)
+                 -- checkNoErrs: don't typecheck if renaming failed
+               ; rnDump (ppr rn_splice)
 
-        -- Rename the splice expression, and get its supporting decls
-        (rn_splice, splice_fvs) <- checkNoErrs (rnSplice splice) ;
-                -- checkNoErrs: don't typecheck if renaming failed
-        rnDump (ppr rn_splice) ;
+                 -- Execute the splice
+               ; spliced_decls <- tcSpliceDecls rn_splice
 
-        -- Execute the splice
-        spliced_decls <- tcSpliceDecls rn_splice ;
-
-        -- Glue them on the front of the remaining decls and loop
-        setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
-        tc_rn_src_decls boot_details (spliced_decls ++ rest_ds)
+                 -- Glue them on the front of the remaining decls and loop
+               ; setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
+                 tc_rn_src_decls boot_details (spliced_decls ++ rest_ds)
+               }
+          }
 #endif /* GHCI */
-    } } }
+      }
 \end{code}
 
 %************************************************************************
