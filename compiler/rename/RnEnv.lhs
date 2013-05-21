@@ -256,9 +256,18 @@ lookupExactOcc name
        ; case gres of
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
-                       ; unless (name `inLocalRdrEnvScope` lcl_env)
-                                (addErr exact_nm_err)
-                       ; return name }
+                       ; unless (name `inLocalRdrEnvScope` lcl_env) $
+#ifdef GHCI
+                         do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
+                            ; th_topnames <- readTcRef th_topnames_var
+                            ; unless (name `elemNameSet` th_topnames)
+                                     (addErr exact_nm_err)
+                            }
+#else /* !GHCI */
+                         addErr exact_nm_err
+#endif /* !GHCI */
+                       ; return name
+                       }
 
            [gre] -> return (gre_name gre)
            _     -> pprPanic "lookupExactOcc" (ppr name $$ ppr gres) }

@@ -482,6 +482,38 @@ tc_rn_src_decls boot_details ds
       ; (tcg_env, rn_decls) <- rnTopSrcDecls extra_deps first_group
                 -- rnTopSrcDecls fails if there are any errors
 
+#ifdef GHCI
+        -- Get TH-generated top-level declarations and make sure they don't
+        -- contain any splices since we don't handle that at the moment
+      ; th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
+      ; th_ds <- readTcRef th_topdecls_var
+      ; writeTcRef th_topdecls_var []
+
+      ; (tcg_env, rn_decls) <-
+            if null th_ds
+            then return (tcg_env, rn_decls)
+            else do { (th_group, th_group_tail) <- findSplice th_ds
+                    ; case th_group_tail of
+                        { Nothing -> return () ;
+                        ; Just (SpliceDecl (L loc _) _, _)
+                            -> setSrcSpan loc $
+                               addErr (ptext (sLit "Declaration splices are not permitted inside top-level declarations added with addTopDecls"))
+                        } ;
+                                         
+                    -- Rename TH-generated top-level declarations
+                    ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env $
+                      rnTopSrcDecls extra_deps th_group
+
+                    -- Dump generated top-level declarations
+                    ; loc <- getSrcSpanM
+                    ; traceSplice (vcat [ppr loc <> colon <+> text "Splicing top-level declarations added with addTopDecls ",
+                                   nest 2 (nest 2 (ppr th_rn_decls))])
+
+                    ; return (tcg_env, appendGroups rn_decls th_rn_decls)
+                    }
+#endif /* GHCI */
+
+      -- Type check all declarations
       ; (tcg_env, tcl_env) <- setGblEnv tcg_env $
                               tcTopSrcDecls boot_details rn_decls
 

@@ -297,6 +297,14 @@ data TcGblEnv
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
 
+#ifdef GHCI
+        tcg_th_topdecls :: TcRef [LHsDecl RdrName],
+        -- ^ Top-level declarations from addTopDecls
+
+        tcg_th_topnames :: TcRef NameSet,
+        -- ^ Exact names bound in top-level declarations in tcg_th_topdecls
+#endif /* GHCI */
+
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
         tcg_binds     :: LHsBinds Id,       -- Value bindings in this module
         tcg_sigs      :: NameSet,           -- ...Top-level names that *lack* a signature
