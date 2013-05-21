@@ -39,3 +39,4 @@ test('T1133A',
      extra_clean(['T1133A.o-boot', 'T1133A.hi-boot']),
      run_command,
      ['$MAKE --no-print-directory -s T1133A'])
+test('T5863a', normal, compile_fail, [''])
