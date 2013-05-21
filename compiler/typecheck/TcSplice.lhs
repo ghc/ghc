@@ -380,8 +380,8 @@ tcBracket brack ps res_ty
            ; meta_ty <- tcTExpTy any_ty
            ; ps' <- readMutVar ps_ref
            ; co <- unifyType meta_ty res_ty
-           ; d <- tcLookupDataCon tExpDataConName
-           ; return (mkHsWrapCo co (unLoc (mkHsConApp d [any_ty] [HsBracketOut brack ps'])))
+           ; texpco <- tcLookupId unsafeTExpCoerceName
+           ; return (mkHsWrapCo co (unLoc (mkHsApp (nlHsTyApp texpco [any_ty]) (noLoc (HsBracketOut brack ps')))))
            }
 
     tc_bracket _ _
@@ -419,10 +419,12 @@ tcPendingSplice (PendingRnDeclSplice n expr)
 tcPendingSplice (PendingTcSplice _ expr) 
   = pprPanic "tcPendingSplice: PendingTcSplice" (ppr expr)
 
+-- Takes a type tau and returns the type Q (TExp tau)
 tcTExpTy :: TcType -> TcM TcType
 tcTExpTy tau = do
-    t <- tcLookupTyCon tExpTyConName
-    return (mkTyConApp t [tau])
+    q <- tcLookupTyCon qTyConName
+    texp <- tcLookupTyCon tExpTyConName
+    return (mkTyConApp q [mkTyConApp texp [tau]])
 \end{code}
 
 
@@ -479,8 +481,8 @@ tcSpliceExpr splice@(HsSplice isTypedSplice name expr) res_ty
            ; expr' <- setStage pop_stage $
                       setConstraintVar lie_var $
                       tcMonoExpr expr meta_exp_ty
-           ; unt <- tcLookupId unTypeName
-           ; let expr'' = mkHsApp (nlHsTyApp unt [res_ty]) expr'
+           ; untypeq <- tcLookupId unTypeQName
+           ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
            ; ps <- readMutVar ps_var
            ; writeMutVar ps_var (PendingTcSplice name expr'' : ps)
            ; return ()

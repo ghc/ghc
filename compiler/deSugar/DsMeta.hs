@@ -19,7 +19,8 @@ module DsMeta( dsBracket,
                decQTyConName, decsQTyConName, typeQTyConName,
                decTyConName, typeTyConName, mkNameG_dName, mkNameG_vName, mkNameG_tcName,
                quoteExpName, quotePatName, quoteDecName, quoteTypeName,
-               tExpTyConName, tExpDataConName, unTypeName
+               tExpTyConName, tExpDataConName, unTypeName, unTypeQName,
+               unsafeTExpCoerceName
                 ) where
 
 #include "HsVersions.h"
@@ -1909,6 +1910,8 @@ templateHaskellNames = [
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
     liftStringName,
     unTypeName,
+    unTypeQName,
+    unsafeTExpCoerceName,
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
@@ -2040,7 +2043,8 @@ tExpTyConName     = thTc (fsLit "TExp")         tExpTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
-    mkNameLName, liftStringName, unTypeName :: Name
+    mkNameLName, liftStringName, unTypeName, unTypeQName,
+    unsafeTExpCoerceName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -2053,6 +2057,8 @@ mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
 mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
+unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
+unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
 
 
 -------------------- TH.Lib -----------------------
@@ -2376,7 +2382,7 @@ tExpTyConKey            = mkPreludeTyConUnique 228
 
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
-    mkNameLIdKey, unTypeIdKey :: Unique
+    mkNameLIdKey, unTypeIdKey, unTypeQIdKey, unsafeTExpCoerceIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -2388,6 +2394,8 @@ mkNameG_dIdKey       = mkPreludeMiscIdUnique 207
 mkNameG_tcIdKey      = mkPreludeMiscIdUnique 208
 mkNameLIdKey         = mkPreludeMiscIdUnique 209
 unTypeIdKey          = mkPreludeMiscIdUnique 210
+unTypeQIdKey         = mkPreludeMiscIdUnique 211
+unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 212
 
 
 -- data Lit = ...
