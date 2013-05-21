@@ -606,9 +606,13 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
 
                 -- Typeable is special
         ; if className cls == typeableClassName
-          then mkEqnHelp DerivOrigin
-                  tvs cls cls_tys
-                  (mkTyConApp tc (kindVarsOnly tc_args)) Nothing
+          then do {
+        ; dflags <- getDynFlags
+        ; case checkTypeableConditions (dflags, tc, tc_args) of
+               Just err -> failWithTc (derivingThingErr False cls cls_tys
+                                         (mkTyConApp tc tc_args) err)
+               Nothing  -> mkEqnHelp DerivOrigin tvs cls cls_tys
+                             (mkTyConApp tc (kindVarsOnly tc_args)) Nothing }
           else do {
 
         -- Given data T a b c = ... deriving( C d ),
@@ -715,10 +719,8 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
                Nothing  -> mkOldTypeableEqn orig tvs cls tycon tc_args mtheta }
 
       | className cls == typeableClassName
-      = do { dflags <- getDynFlags
-           ; case checkTypeableConditions (dflags, tycon, tc_args) of
-               Just err -> bale_out err
-               Nothing  -> mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta }
+      -- We checked for errors before, so we don't need to do that again
+      = mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta
 
       | isDataFamilyTyCon tycon
       , length tc_args /= tyConArity tycon
@@ -985,7 +987,7 @@ checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args
     ty_args_why = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
 
 checkTypeableConditions, checkOldTypeableConditions :: Condition
-checkTypeableConditions    = checkFlag Opt_DeriveDataTypeable
+checkTypeableConditions    = checkFlag Opt_DeriveDataTypeable `andCond` cond_TypeableOK
 checkOldTypeableConditions = checkFlag Opt_DeriveDataTypeable `andCond` cond_oldTypeableOK
 
 nonStdErr :: Class -> SDoc
@@ -1129,6 +1131,20 @@ cond_oldTypeableOK (_, tc, _)
                ptext (sLit "must have 7 or fewer arguments")
     bad_kind = quotes (pprSourceTyCon tc) <+>
                ptext (sLit "must only have arguments of kind `*'")
+
+cond_TypeableOK :: Condition
+-- Only not ok if it's a data instance
+cond_TypeableOK (_, tc, tc_args)
+  | isDataFamilyTyCon tc && not (null tc_args)
+  = Just no_families
+
+  | otherwise
+  = Nothing
+  where
+    no_families = sep [ ptext (sLit "Deriving Typeable is not allowed for family instances;")
+                      , ptext (sLit "derive Typeable for")
+                          <+> quotes (pprSourceTyCon tc)
+                          <+> ptext (sLit "alone") ]
 
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]

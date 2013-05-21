@@ -3377,6 +3377,9 @@ type class. Instances for datatypes can be derived by attaching a
 <literal>deriving Typeable</literal> clause to the datatype declaration, or by
 using standalone deriving (see <xref linkend="stand-alone-deriving"/>).
 Instances for type classes can only be derived using standalone deriving.
+For data families, <literal>Typeable</literal> should only be derived for the
+uninstantiated family type; each instance will then automatically have a
+<literal>Typeable</literal> instance too.
 See also <xref linkend="auto-derive-typeable"/>.
 </para>
 <para>
