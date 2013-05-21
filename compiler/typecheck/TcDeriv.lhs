@@ -475,7 +475,7 @@ makeDerivSpecs :: Bool
                -> [LDerivDecl Name]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
-  = do  { eqns1 <- concatMapM (recoverM (return []) . deriveTyDecl) tycl_decls
+  = do  { eqns1 <- concatMapM (recoverM (return []) . deriveTyDecl)   tycl_decls
         ; eqns2 <- concatMapM (recoverM (return []) . deriveInstDecl) inst_decls
         ; eqns3 <- mapAndRecoverM deriveStandalone deriv_decls
         ; let eqns = eqns1 ++ eqns2 ++ eqns3
@@ -514,13 +514,27 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 
 ------------------------------------------------------------------
 deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
-deriveTyDecl (L _ decl@(DataDecl { tcdLName = L _ tc_name
-                                 , tcdDataDefn = HsDataDefn { dd_derivs = Just preds } }))
+deriveTyDecl (L _ decl@(DataDecl { tcdLName = L loc tc_name
+                                 , tcdDataDefn = HsDataDefn { dd_derivs = preds } }))
   = tcAddDeclCtxt decl $
     do { tc <- tcLookupTyCon tc_name
-       ; let tvs = tyConTyVars tc
-             tys = mkTyVarTys tvs
-       ; mapM (deriveTyData tvs tc tys) preds }
+       ; let tvs  = tyConTyVars tc
+             tys  = mkTyVarTys tvs
+             pdcs :: [LDerivDecl Name]
+             pdcs = [ L loc (DerivDecl (L loc (HsAppTy (noLoc (HsTyVar typeableClassName))
+                                       (L loc (HsTyVar (tyConName pdc))))))
+                    | Just pdc <- map promoteDataCon_maybe (tyConDataCons tc) ]
+        -- If AutoDeriveTypeable and DataKinds is set, we add Typeable instances
+        -- for every promoted data constructor of datatypes in this module
+       ; isAutoTypeable <- xoptM Opt_AutoDeriveTypeable
+       ; isDataKinds    <- xoptM Opt_DataKinds
+       ; prom_dcs_Typeable_instances <- if isAutoTypeable && isDataKinds
+                                        then mapM deriveStandalone pdcs
+                                        else return []
+       ; other_instances <- case preds of
+                              Just preds' -> mapM (deriveTyData tvs tc tys) preds'
+                              Nothing     -> return []
+       ; return (prom_dcs_Typeable_instances ++ other_instances) }
 
 deriveTyDecl _ = return []
 

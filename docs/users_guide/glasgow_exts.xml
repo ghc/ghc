@@ -3418,7 +3418,9 @@ can be mentioned in the <literal>deriving</literal> clause.
 <para>
 The flag <option>-XAutoDeriveTypeable</option> triggers the generation
 of derived <literal>Typeable</literal> instances for every datatype and type
-class declaration in the module it is used. This flag implies
+class declaration in the module it is used. It will also generate
+<literal>Typeable</literal> instances for any promoted data constructors
+(<xref linkend="promotion"/>). This flag implies
 <option>-XDeriveDataTypeable</option> (<xref linkend="deriving-typeable"/>).
 </para>
 
