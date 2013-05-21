@@ -80,7 +80,7 @@ typedef struct {
 typedef struct StgClosure_ {
     StgHeader   header;
     struct StgClosure_ *payload[FLEXIBLE_ARRAY];
-} *StgClosurePtr; // StgClosure defined in Rts.h
+} *StgClosurePtr; // StgClosure defined in rts/Types.h
 
 typedef struct {
     StgThunkHeader  header;
