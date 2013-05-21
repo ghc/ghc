@@ -370,7 +370,7 @@ linkingNeeded dflags linkables pkg_deps = do
     Left _  -> return True
     Right t -> do
         -- first check object files and extra_ld_inputs
-        let extra_ld_inputs = ldInputs dflags
+        let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
         e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
         let (errs,extra_times) = splitEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
@@ -820,9 +820,7 @@ runPhase (RealPhase (Unlit sf)) input_fn dflags
   = do
        output_fn <- phaseOutputFilename (Cpp sf)
 
-       let unlit_flags = getOpts dflags opt_L
-           flags = map SysTools.Option unlit_flags ++
-                   [ -- The -h option passes the file name for unlit to
+       let flags = [ -- The -h option passes the file name for unlit to
                      -- put in a #line directive
                      SysTools.Option     "-h"
                    , SysTools.Option $ escape $ normalise input_fn
@@ -869,7 +867,7 @@ runPhase (RealPhase (Cpp sf)) input_fn dflags0
            return (RealPhase (HsPp sf), input_fn)
         else do
             output_fn <- phaseOutputFilename (HsPp sf)
-            liftIO $ doCpp dflags1 True{-raw-} False{-no CC opts-}
+            liftIO $ doCpp dflags1 True{-raw-}
                            input_fn output_fn
             -- re-read the pragmas now that we've preprocessed the file
             -- See #2464,#3457
@@ -895,7 +893,6 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
            -- to the next phase of the pipeline.
           return (RealPhase (Hsc sf), input_fn)
         else do
-            let hspp_opts = getOpts dflags opt_F
             PipeEnv{src_basename, src_suffix} <- getPipeEnv
             let orig_fn = src_basename <.> src_suffix
             output_fn <- phaseOutputFilename (Hsc sf)
@@ -903,8 +900,7 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
                            ( [ SysTools.Option     orig_fn
                              , SysTools.Option     input_fn
                              , SysTools.FileOption "" output_fn
-                             ] ++
-                             map SysTools.Option hspp_opts
+                             ]
                            )
 
             -- re-read pragmas now that we've parsed the file (see #3674)
@@ -1053,7 +1049,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 runPhase (RealPhase CmmCpp) input_fn dflags
   = do
        output_fn <- phaseOutputFilename Cmm
-       liftIO $ doCpp dflags False{-not raw-} True{-include CC opts-}
+       liftIO $ doCpp dflags False{-not raw-}
                       input_fn output_fn
        return (RealPhase Cmm, output_fn)
 
@@ -1081,7 +1077,6 @@ runPhase (RealPhase cc_phase) input_fn dflags
    | any (cc_phase `eqPhase`) [Cc, Ccpp, HCc, Cobjc, Cobjcpp]
    = do
         let platform = targetPlatform dflags
-            cc_opts = getOpts dflags opt_c
             hcc = cc_phase `eqPhase` HCc
 
         let cmdline_include_paths = includePaths dflags
@@ -1195,7 +1190,6 @@ runPhase (RealPhase cc_phase) input_fn dflags
                        ++ [ "-S", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
                        ++ framework_paths
-                       ++ cc_opts
                        ++ split_opt
                        ++ include_paths
                        ++ pkg_extra_cc_opts
@@ -1254,8 +1248,7 @@ runPhase (RealPhase As) input_fn dflags
                         | otherwise = return SysTools.runAs
 
         as_prog <- whichAsProg
-        let as_opts = getOpts dflags opt_a
-            cmdline_include_paths = includePaths dflags
+        let cmdline_include_paths = includePaths dflags
 
         next_phase <- maybeMergeStub
         output_fn <- phaseOutputFilename next_phase
@@ -1266,8 +1259,7 @@ runPhase (RealPhase As) input_fn dflags
 
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
-                       (map SysTools.Option as_opts
-                       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
+                       ([ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
 
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
@@ -1313,8 +1305,6 @@ runPhase (RealPhase SplitAs) _input_fn dflags
         liftIO $ mapM_ removeFile $
                 map (split_odir </>) $ filter (osuf `isSuffixOf`) fs
 
-        let as_opts = getOpts dflags opt_a
-
         let (split_s_prefix, n) = case splitInfo dflags of
                                   Nothing -> panic "No split info"
                                   Just x -> x
@@ -1326,8 +1316,7 @@ runPhase (RealPhase SplitAs) _input_fn dflags
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
         let assemble_file n
-              = SysTools.runAs dflags
-                         (map SysTools.Option as_opts ++
+              = SysTools.runAs dflags (
 
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
@@ -1383,13 +1372,12 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
   = do
     ver <- liftIO $ readIORef (llvmVersion dflags)
 
-    let lo_opts  = getOpts dflags opt_lo
-        opt_lvl  = max 0 (min 2 $ optLevel dflags)
+    let opt_lvl  = max 0 (min 2 $ optLevel dflags)
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
         -- passes only, so if the user is passing us extra options we assume
         -- they know what they are doing and don't get in the way.
-        optFlag  = if null lo_opts
+        optFlag  = if null (getOpts dflags opt_lo)
                        then [SysTools.Option (llvmOpts !! opt_lvl)]
                        else []
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
@@ -1404,8 +1392,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
                     SysTools.Option "-o",
                     SysTools.FileOption "" output_fn]
                 ++ optFlag
-                ++ [SysTools.Option tbaa]
-                ++ map SysTools.Option lo_opts)
+                ++ [SysTools.Option tbaa])
 
     return (RealPhase LlvmLlc, output_fn)
   where 
@@ -1420,8 +1407,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
   = do
     ver <- liftIO $ readIORef (llvmVersion dflags)
 
-    let lc_opts = getOpts dflags opt_lc
-        opt_lvl = max 0 (min 2 $ optLevel dflags)
+    let opt_lvl = max 0 (min 2 $ optLevel dflags)
         -- iOS requires external references to be loaded indirectly from the
         -- DATA segment or dyld traps at runtime writing into TEXT: see #7722
         rmodel | platformOS (targetPlatform dflags) == OSiOS = "dynamic-no-pic"
@@ -1445,7 +1431,6 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                     SysTools.Option $ "-relocation-model=" ++ rmodel,
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
-                ++ map SysTools.Option lc_opts
                 ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option fpOpts
                 ++ map SysTools.Option abiOpts
@@ -1598,7 +1583,6 @@ mkExtraObj dflags extn xs
                        FileOption "" cFile,
                        Option        "-o",
                        FileOption "" oFile]
-                      ++ map SysTools.Option (getOpts dflags opt_c) -- see #5528
                       ++ map (FileOption "-I") (includeDirs rtsDetails))
       return oFile
 
@@ -1685,7 +1669,7 @@ getLinkInfo dflags dep_packages = do
                    rtsOpts dflags,
                    rtsOptsEnabled dflags,
                    gopt Opt_NoHsMain dflags,
-                   extra_ld_inputs,
+                   map showOpt extra_ld_inputs,
                    getOpts dflags opt_l)
    --
    return (show link_info)
@@ -1857,9 +1841,6 @@ linkBinary dflags o_files dep_packages = do
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
 
-        -- opts from -optl-<blah> (including -l<blah> options)
-    let extra_ld_opts = getOpts dflags opt_l
-
     -- Here are some libs that need to be linked at the *end* of
     -- the command line, because they contain symbols that are referred to
     -- by the RTS.  We can't therefore use the ordinary way opts for these.
@@ -1923,10 +1904,10 @@ linkBinary dflags o_files dep_packages = do
                           else [])
 
                       ++ o_files
+                      ++ lib_path_opts)
                       ++ extra_ld_inputs
-                      ++ lib_path_opts
-                      ++ extra_ld_opts
-                      ++ rc_objs
+                      ++ map SysTools.Option (
+                         rc_objs
                       ++ framework_path_opts
                       ++ framework_opts
                       ++ pkg_lib_path_opts
@@ -1997,12 +1978,10 @@ maybeCreateManifest dflags exe_filename
                -- show is a bit hackish above, but we need to escape the
                -- backslashes in the path.
 
-         let wr_opts = getOpts dflags opt_windres
          runWindres dflags $ map SysTools.Option $
                ["--input="++rc_filename,
                 "--output="++rc_obj_filename,
                 "--output-format=coff"]
-               ++ wr_opts
                -- no FileOptions here: windres doesn't like seeing
                -- backslashes, apparently
 
@@ -2025,9 +2004,9 @@ linkDynLibCheck dflags o_files dep_packages
 -- -----------------------------------------------------------------------------
 -- Running CPP
 
-doCpp :: DynFlags -> Bool -> Bool -> FilePath -> FilePath -> IO ()
-doCpp dflags raw include_cc_opts input_fn output_fn = do
-    let hscpp_opts = getOpts dflags opt_P ++ picPOpts dflags
+doCpp :: DynFlags -> Bool -> FilePath -> FilePath -> IO ()
+doCpp dflags raw input_fn output_fn = do
+    let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = includePaths dflags
 
     pkg_include_dirs <- getPackageIncludePath dflags []
@@ -2035,10 +2014,6 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
                           (cmdline_include_paths ++ pkg_include_dirs)
 
     let verbFlags = getVerbFlags dflags
-
-    let cc_opts
-          | include_cc_opts = getOpts dflags opt_c
-          | otherwise       = []
 
     let cpp_prog args | raw       = SysTools.runCpp dflags args
                       | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
@@ -2066,7 +2041,6 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
                     ++ map SysTools.Option target_defs
                     ++ map SysTools.Option backend_defs
                     ++ map SysTools.Option hscpp_opts
-                    ++ map SysTools.Option cc_opts
                     ++ map SysTools.Option sse_defs
                     ++ [ SysTools.Option     "-x"
                        , SysTools.Option     "c"

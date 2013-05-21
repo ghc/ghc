@@ -371,30 +371,35 @@ findTopDir Nothing
 \begin{code}
 runUnlit :: DynFlags -> [Option] -> IO ()
 runUnlit dflags args = do
-  let p = pgm_L dflags
-  runSomething dflags "Literate pre-processor" p args
+  let prog = pgm_L dflags
+      opts = getOpts dflags opt_L
+  runSomething dflags "Literate pre-processor" prog
+               (map Option opts ++ args)
 
 runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do
   let (p,args0) = pgm_P dflags
-      args1 = args0 ++ args
+      args1 = map Option (getOpts dflags opt_P)
       args2 = if gopt Opt_WarnIsError dflags
-              then Option "-Werror" : args1
-              else                    args1
+                 then [Option "-Werror"]
+                 else []
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags id  "C pre-processor" p args2 mb_env
+  runSomethingFiltered dflags id  "C pre-processor" p
+                       (args0 ++ args1 ++ args2 ++ args) mb_env
 
 runPp :: DynFlags -> [Option] -> IO ()
 runPp dflags args =   do
-  let p = pgm_F dflags
-  runSomething dflags "Haskell pre-processor" p args
+  let prog = pgm_F dflags
+      opts = map Option (getOpts dflags opt_F)
+  runSomething dflags "Haskell pre-processor" prog (opts ++ args)
 
 runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do
   let (p,args0) = pgm_c dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv args1
-  runSomethingFiltered dflags cc_filter "C Compiler" p args1 mb_env
+      args1 = map Option (getOpts dflags opt_c)
+      args2 = args0 ++ args1 ++ args
+  mb_env <- getGccEnv args2
+  runSomethingFiltered dflags cc_filter "C Compiler" p args2 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
   cc_filter = unlines . doFilter . lines
@@ -452,9 +457,10 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 askCc :: DynFlags -> [Option] -> IO String
 askCc dflags args = do
   let (p,args0) = pgm_c dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv args1
-  runSomethingWith dflags "gcc" p args1 $ \real_args ->
+      args1 = map Option (getOpts dflags opt_c)
+      args2 = args0 ++ args1 ++ args
+  mb_env <- getGccEnv args2
+  runSomethingWith dflags "gcc" p args2 $ \real_args ->
     readCreateProcess (proc p real_args){ env = mb_env }
 
 -- Version of System.Process.readProcessWithExitCode that takes an environment
@@ -507,21 +513,24 @@ runSplit dflags args = do
 runAs :: DynFlags -> [Option] -> IO ()
 runAs dflags args = do
   let (p,args0) = pgm_a dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv args1
-  runSomethingFiltered dflags id "Assembler" p args1 mb_env
+      args1 = map Option (getOpts dflags opt_a)
+      args2 = args0 ++ args1 ++ args
+  mb_env <- getGccEnv args2
+  runSomethingFiltered dflags id "Assembler" p args2 mb_env
 
 -- | Run the LLVM Optimiser
 runLlvmOpt :: DynFlags -> [Option] -> IO ()
 runLlvmOpt dflags args = do
   let (p,args0) = pgm_lo dflags
-  runSomething dflags "LLVM Optimiser" p (args0++args)
+      args1 = map Option (getOpts dflags opt_lo)
+  runSomething dflags "LLVM Optimiser" p (args0 ++ args1 ++ args)
 
 -- | Run the LLVM Compiler
 runLlvmLlc :: DynFlags -> [Option] -> IO ()
 runLlvmLlc dflags args = do
   let (p,args0) = pgm_lc dflags
-  runSomething dflags "LLVM Compiler" p (args0++args)
+      args1 = map Option (getOpts dflags opt_lc)
+  runSomething dflags "LLVM Compiler" p (args0 ++ args1 ++ args)
 
 -- | Run the clang compiler (used as an assembler for the LLVM
 -- backend on OS X as LLVM doesn't support the OS X system
@@ -533,10 +542,11 @@ runClang dflags args = do
       -- be careful what options we call clang with
       -- see #5903 and #7617 for bugs caused by this.
       (_,args0) = pgm_a dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv args1
+      args1 = map Option (getOpts dflags opt_a)
+      args2 = args0 ++ args1 ++ args
+  mb_env <- getGccEnv args2
   Exception.catch (do
-        runSomethingFiltered dflags id "Clang (Assembler)" clang args1 mb_env
+        runSomethingFiltered dflags id "Clang (Assembler)" clang args2 mb_env
     )
     (\(err :: SomeException) -> do
         errorMsg dflags $
@@ -591,9 +601,10 @@ figureLlvmVersion dflags = do
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do
   let (p,args0) = pgm_l dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv args1
-  runSomethingFiltered dflags id "Linker" p args1 mb_env
+      args1 = map Option (getOpts dflags opt_l)
+      args2 = args0 ++ args1 ++ args
+  mb_env <- getGccEnv args2
+  runSomethingFiltered dflags id "Linker" p args2 mb_env
 
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
@@ -606,6 +617,7 @@ runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
   let (gcc, gcc_args) = pgm_c dflags
       windres = pgm_windres dflags
+      opts = map Option (getOpts dflags opt_windres)
       quote x = "\"" ++ x ++ "\""
       args' = -- If windres.exe and gcc.exe are in a directory containing
               -- spaces then windres fails to run gcc. We therefore need
@@ -613,6 +625,7 @@ runWindres dflags args = do
               Option ("--preprocessor=" ++
                       unwords (map quote (gcc :
                                           map showOpt gcc_args ++
+                                          map showOpt opts ++
                                           ["-E", "-xc", "-DRC_INVOKED"])))
               -- ...but if we do that then if windres calls popen then
               -- it can't understand the quoting, so we have to use
@@ -1101,8 +1114,6 @@ linkDynLib dflags0 o_files dep_packages
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
 
-    let extra_ld_opts = getOpts dflags opt_l
-
     case os of
         OSMinGW32 -> do
             -------------------------------------------------------------
@@ -1122,15 +1133,14 @@ linkDynLib dflags0 o_files dep_packages
                     | gopt Opt_SharedImplib dflags
                     ]
                  ++ map (FileOption "") o_files
-                 ++ map Option (
 
                  -- Permit the linker to auto link _symbol to _imp_symbol
                  -- This lets us link against DLLs without needing an "import library"
-                    ["-Wl,--enable-auto-import"]
+                 ++ [Option "-Wl,--enable-auto-import"]
 
                  ++ extra_ld_inputs
-                 ++ lib_path_opts
-                 ++ extra_ld_opts
+                 ++ map Option (
+                    lib_path_opts
                  ++ pkg_lib_path_opts
                  ++ pkg_link_opts
                 ))
@@ -1181,19 +1191,19 @@ linkDynLib dflags0 o_files dep_packages
                     , Option "-o"
                     , FileOption "" output_fn
                     ]
-                 ++ map Option (
-                    o_files
-                 ++ [ "-undefined", "dynamic_lookup", "-single_module" ]
+                 ++ map Option o_files
+                 ++ [ Option "-undefined",
+                      Option "dynamic_lookup",
+                      Option "-single_module" ]
                  ++ (if platformArch platform == ArchX86_64
                      then [ ]
-                     else [ "-Wl,-read_only_relocs,suppress" ])
-                 ++ [ "-install_name", instName ]
+                     else [ Option "-Wl,-read_only_relocs,suppress" ])
+                 ++ [ Option "-install_name", Option instName ]
+                 ++ map Option lib_path_opts
                  ++ extra_ld_inputs
-                 ++ lib_path_opts
-                 ++ extra_ld_opts
-                 ++ pkg_lib_path_opts
-                 ++ pkg_link_opts
-                ))
+                 ++ map Option pkg_lib_path_opts
+                 ++ map Option pkg_link_opts
+              )
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO
@@ -1214,18 +1224,15 @@ linkDynLib dflags0 o_files dep_packages
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
-                 ++ map Option (
-                    o_files
-                 ++ [ "-shared" ]
-                 ++ bsymbolicFlag
+                 ++ map Option o_files
+                 ++ [ Option "-shared" ]
+                 ++ map Option bsymbolicFlag
                     -- Set the library soname. We use -h rather than -soname as
                     -- Solaris 10 doesn't support the latter:
-                 ++ [ "-Wl,-h," ++ takeFileName output_fn ]
+                 ++ [ Option ("-Wl,-h," ++ takeFileName output_fn) ]
+                 ++ map Option lib_path_opts
                  ++ extra_ld_inputs
-                 ++ lib_path_opts
-                 ++ extra_ld_opts
-                 ++ pkg_lib_path_opts
-                 ++ pkg_link_opts
-                ))
-
+                 ++ map Option pkg_lib_path_opts
+                 ++ map Option pkg_link_opts
+              )
 \end{code}

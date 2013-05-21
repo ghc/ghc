@@ -198,7 +198,8 @@ main' postLoadMode dflags0 args flagWarnings = do
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-    dflags5 = dflags4 { ldInputs = objs ++ ldInputs dflags4 }
+    dflags5 = dflags4 { ldInputs = map (FileOption "") objs
+                                   ++ ldInputs dflags4 }
 
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
@@ -638,7 +639,8 @@ doMake srcs  = do
     o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
-    let dflags' = dflags { ldInputs = o_files ++ ldInputs dflags }
+    let dflags' = dflags { ldInputs = map (FileOption "") o_files
+                                      ++ ldInputs dflags }
     _ <- GHC.setSessionDynFlags dflags'
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs

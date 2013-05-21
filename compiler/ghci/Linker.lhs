@@ -291,15 +291,14 @@ reallyInitDynLinker dflags =
         ; pls <- linkPackages' dflags (preloadPackages (pkgState dflags)) pls0
 
           -- (c) Link libraries from the command-line
-        ; let optl = getOpts dflags opt_l
-        ; let minus_ls = [ lib | '-':'l':lib <- optl ]
+        ; let cmdline_ld_inputs = ldInputs dflags
+        ; let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
         ; let lib_paths = libraryPaths dflags
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
-        ; let cmdline_ld_inputs = ldInputs dflags
-
-        ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
+        ; classified_ld_inputs <- mapM (classifyLdInput dflags)
+                                    [ f | FileOption _ f <- cmdline_ld_inputs ]
 
           -- (e) Link any MacOS frameworks
         ; let platform = targetPlatform dflags
