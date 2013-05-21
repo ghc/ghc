@@ -145,7 +145,15 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
-newtype TExp a = TExp { unType :: Q Exp }
+newtype TExp a = TExp { unType :: Exp }
+
+unTypeQ :: Q (TExp a) -> Q Exp
+unTypeQ m = do { TExp e <- m
+               ; return e }
+
+unsafeTExpCoerce :: Q Exp -> Q (TExp a)
+unsafeTExpCoerce m = do { e <- m
+                        ; return (TExp e) }
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
