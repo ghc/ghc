@@ -1876,18 +1876,18 @@ setCmd ""   = showOptions False
 setCmd "-a" = showOptions True
 setCmd str
   = case getCmd str of
-    Right ("args",   rest) ->
+    Right ("args",    rest) ->
         case toArgs rest of
             Left err -> liftIO (hPutStrLn stderr err)
             Right args -> setArgs args
-    Right ("prog",   rest) ->
+    Right ("prog",    rest) ->
         case toArgs rest of
             Right [prog] -> setProg prog
             _ -> liftIO (hPutStrLn stderr "syntax: :set prog <progname>")
-    Right ("prompt", rest) -> setPrompt $ dropWhile isSpace rest
+    Right ("prompt",  rest) -> setPrompt  $ dropWhile isSpace rest
     Right ("prompt2", rest) -> setPrompt2 $ dropWhile isSpace rest
-    Right ("editor", rest) -> setEditor $ dropWhile isSpace rest
-    Right ("stop",   rest) -> setStop   $ dropWhile isSpace rest
+    Right ("editor",  rest) -> setEditor  $ dropWhile isSpace rest
+    Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     _ -> case toArgs str of
          Left err -> liftIO (hPutStrLn stderr err)
          Right wds -> setOptions wds
@@ -2067,12 +2067,12 @@ unsetOptions str
          (other_opts, rest3) = partition (`elem` map fst defaulters) rest2
 
          defaulters =
-           [ ("args"  , setArgs default_args)
-           , ("prog"  , setProg default_progname)
-           , ("prompt", setPrompt default_prompt)
+           [ ("args"   , setArgs default_args)
+           , ("prog"   , setProg default_progname)
+           , ("prompt" , setPrompt default_prompt)
            , ("prompt2", setPrompt2 default_prompt2)
-           , ("editor", liftIO findEditor >>= setEditor)
-           , ("stop"  , setStop default_stop)
+           , ("editor" , liftIO findEditor >>= setEditor)
+           , ("stop"   , setStop default_stop)
            ]
 
          no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
