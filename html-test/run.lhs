@@ -71,7 +71,7 @@ test = do
 
   -- TODO: maybe do something more clever here using haddock.cabal
   ghcPath <- fmap init $ rawSystemStdout normal haddockPath ["--print-ghc-path"]
-  (_, conf) <- configure normal (Just ghcPath) Nothing defaultProgramConfiguration
+  (_, _, conf) <- configure normal (Just ghcPath) Nothing defaultProgramConfiguration
   pkgIndex <- getInstalledPackages normal [GlobalPackageDB] conf
   let mkDep pkgName =
         fromMaybe (error "Couldn't find test dependencies") $ do
