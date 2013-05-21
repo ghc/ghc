@@ -180,7 +180,7 @@ todo_block_full (nat size, gen_workspace *ws)
     // the limit.
     if (!looksEmptyWSDeque(ws->todo_q) || 
         (ws->todo_free - bd->u.scan < WORK_UNIT_WORDS / 2)) {
-        if (ws->todo_free + size < bd->start + bd->blocks * BLOCK_SIZE_W) {
+        if (ws->todo_free + size <= bd->start + bd->blocks * BLOCK_SIZE_W) {
             ws->todo_lim = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
                                    ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
             debugTrace(DEBUG_gc, "increasing limit for %p to %p", bd->start, ws->todo_lim);
@@ -201,12 +201,19 @@ todo_block_full (nat size, gen_workspace *ws)
     {
         // If this block does not have enough space to allocate the
         // current object, but it also doesn't have any work to push, then 
-        // push it on to the scanned list.  It cannot be empty, because
-        // then there would be enough room to copy the current object.
+        // push it on to the scanned list.
         if (bd->u.scan == bd->free)
         {
-            ASSERT(bd->free != bd->start);
-            push_scanned_block(bd, ws);
+            if (bd->free == bd->start) {
+                // Normally the block would not be empty, because then
+                // there would be enough room to copy the current
+                // object.  However, if the object we're copying is
+                // larger than a block, then we might have an empty
+                // block here.
+                freeGroup(bd);
+            } else {
+                push_scanned_block(bd, ws);
+            }
         }
         // Otherwise, push this block out to the global list.
         else 
