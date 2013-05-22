@@ -476,7 +476,7 @@ getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
                       -> RnM ((TcGblEnv, TcLclEnv), NameSet)
 -- Get all the top-level binders bound the group *except*
 -- for value bindings, which are treated separately
--- Specificaly we return AvailInfo for
+-- Specifically we return AvailInfo for
 --      type decls (incl constructors and record selectors)
 --      class decls (including class ops)
 --      associated types
