@@ -69,10 +69,10 @@ fingerprintString str = unsafeDupablePerformIO $
 
 data MD5Context
 
-foreign import ccall unsafe "MD5Init"
+foreign import ccall unsafe "__hsbase_MD5Init"
    c_MD5Init   :: Ptr MD5Context -> IO ()
-foreign import ccall unsafe "MD5Update"
+foreign import ccall unsafe "__hsbase_MD5Update"
    c_MD5Update :: Ptr MD5Context -> Ptr Word8 -> CInt -> IO ()
-foreign import ccall unsafe "MD5Final"
+foreign import ccall unsafe "__hsbase_MD5Final"
    c_MD5Final  :: Ptr Word8 -> Ptr MD5Context -> IO ()
 
