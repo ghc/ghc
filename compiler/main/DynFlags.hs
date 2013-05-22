@@ -1188,7 +1188,12 @@ doDynamicToo dflags0 = let dflags1 = addWay' WayDyn dflags0
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- refCanGenerateDynamicToo <- newIORef True
+ let -- We can't build with dynamic-too on Windows, as labels before
+     -- the fork point are different depending on whether we are
+     -- building dynamically or not.
+     platformCanGenerateDynamicToo
+         = platformOS (targetPlatform dflags) /= OSMinGW32
+ refCanGenerateDynamicToo <- newIORef platformCanGenerateDynamicToo
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refFilesToNotIntermediateClean <- newIORef []
