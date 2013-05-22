@@ -200,6 +200,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; qtkvs <- quantifyTyVars gbl_tvs (tyVarsOfTypes (map snd name_taus))
+       ; traceTc "simplifyInfer: emtpy WC" (ppr name_taus $$ ppr qtkvs) 
        ; return (qtkvs, [], False, emptyTcEvBinds) }
 
   | otherwise
