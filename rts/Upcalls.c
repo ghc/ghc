@@ -142,10 +142,11 @@ prepareUpcallThread (Capability* cap, StgTSO* current_thread)
 
   //Finally, insert an upcall picked up from the upcall queue
   StgClosure* upcall = popUpcallQueue (cap);
-  //XXX KC Save the upcall in the finalzer slot of the upcall thread so that
-  //it can be retrieved quickly if the upcall happens to block on a black
-  //hole.
+
+  //Save the upcall in the finalzer slot of the upcall thread so that it can be
+  //retrieved quickly if the upcall happens to block on a black hole.
   upcall_thread->finalizer = upcall;
+
   pushCallToClosure (cap, upcall_thread, upcall);
 
   return upcall_thread;

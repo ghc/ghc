@@ -536,21 +536,10 @@ run_thread:
         }
 
         //Handle upcall thread return
-        if (isUpcallThread (t)) {
-            /* The programs seem to work correctly under certain conditions
-             * when the upcall thread may have been killed. Hence, commented it
-             * out. Why and where it happens is still a mystery?
-             */
-            if (t->what_next == ThreadKilled && sched_state != SCHED_SHUTTING_DOWN) {
-                debugTrace (DEBUG_sched, "Schedule: Upcall thread %d on capability %d killed",
-                            (int)t->id, (int)t->cap->no);
-            }
-
-            if (ret == ThreadFinished) {
-                t->what_next = ThreadComplete;
-                t->why_blocked = NotBlocked;
-                ret = ThreadSwitch;
-            }
+        if (isUpcallThread (t) && ret == ThreadFinished) {
+            t->what_next = ThreadComplete;
+            t->why_blocked = NotBlocked;
+            ret = ThreadSwitch;
         }
 
 #ifdef DEBUG
@@ -1375,9 +1364,16 @@ static rtsBool
 scheduleHandleThreadSwitch(Capability* cap, StgTSO *t)
 {
   if (t->release_ULS) {
+
+    //Control would never ThreadSwitch to an upcall thread
+    ASSERT (!isUpcallThread(t));
+
+    //Relinquish the ability to run user-level thread. There exists another TSO
+    //on the Capability's run queue which will resume this user-level thread.
     pushUpcallReturning (cap, getResumeThreadUpcall (cap, t));
     t->why_blocked = Yielded;
     t->release_ULS = rtsFalse;
+
     return rtsFalse;
   }
   return rtsTrue;
