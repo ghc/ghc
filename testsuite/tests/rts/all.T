@@ -173,3 +173,9 @@ test('T7815', [ multi_cpu_race,
 # ignore_output because it contains a unique:
 #   ffishutdown: Main_dul: interrupted
 test('ffishutdown', [ ignore_output, only_ways(['threaded1','threaded2']) ], compile_and_run, [''])
+
+test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
+                            'T7919A.dyn_o','T7919A.dyn_hi']),
+               when(fast(),skip) ],
+             compile_and_run, [''])
+
