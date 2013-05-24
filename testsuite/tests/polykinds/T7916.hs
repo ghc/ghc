@@ -7,3 +7,9 @@ f = id
 
 -- g :: forall (m :: k -> *) (a :: k). m a -> m a
 g x = f x
+
+data M f = M (f Int)
+
+-- Test that g :: forall (m :: k -> *) (a :: k). m a -> m a
+g1 = g :: [Int] -> [Int]
+g2 = g :: M [] -> M []
