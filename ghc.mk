@@ -110,6 +110,14 @@ comma=,
 show:
 	@echo '$(VALUE)="$($(VALUE))"'
 
+# echo is used by the nightly builders to query the build system for
+# information.
+# Using printf means that we don't get a trailing newline. We escape
+# backslashes and double quotes in the string to protect them from the
+# shell, and percent signs to protect them from printf.
+echo:
+	@printf "$(subst %,%%,$(subst ",\",$(subst \,\\\\,$($(VALUE)))))"
+
 # -----------------------------------------------------------------------------
 # Include subsidiary build-system bits
 

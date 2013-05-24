@@ -45,7 +45,7 @@ endif
 include mk/custom-settings.mk
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help test fulltest,$(MAKECMDGOALS))
+REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show echo help test fulltest,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -93,7 +93,7 @@ clean distclean maintainer-clean:
 $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
 
-bootstrapping-files show:
+bootstrapping-files show echo:
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 ifeq "$(darwin_TARGET_OS)" "1"
