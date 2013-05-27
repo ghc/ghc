@@ -61,6 +61,12 @@ import Data.List        ( (\\) )
 \begin{code}
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
 checkAmbiguity ctxt ty
+  | GhciCtxt <- ctxt    -- Allow ambiguous types in GHCi's :kind command
+  = return ()           -- E.g.   type family T a :: *  -- T :: forall k. k -> *
+                        -- Then :k T should work in GHCi, not complain that
+                        -- (T k) is ambiguous!
+
+  | otherwise
   = do { allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
        ; unless allow_ambiguous $ 
     do {(subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
