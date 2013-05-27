@@ -902,7 +902,8 @@ gen_Read_binds get_fixity loc tycon
     read_prec = mkHsVarBind loc readPrec_RDR
                               (nlHsApp (nlHsVar parens_RDR) read_cons)
 
-    read_cons             = foldr1 mk_alt (read_nullary_cons ++ read_non_nullary_cons)
+    read_cons | null data_cons = error_Expr "Derived Read on empty data type" -- Trac #7931
+              | otherwise      = foldr1 mk_alt (read_nullary_cons ++ read_non_nullary_cons)
     read_non_nullary_cons = map read_non_nullary_con non_nullary_cons
 
     read_nullary_cons
