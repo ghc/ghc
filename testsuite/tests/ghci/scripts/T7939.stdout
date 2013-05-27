@@ -1,0 +1,4 @@
+class Foo (k :: BOX) (a :: k) where
+  type family Bar (k :: BOX) (k :: BOX) (a :: k) :: k
+  	-- Defined at T7939.hs:6:9
+Bar :: k1 -> k
