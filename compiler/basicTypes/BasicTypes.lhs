@@ -37,7 +37,7 @@ module BasicTypes(
 	WarningTxt(..),
 
 	Fixity(..), FixityDirection(..),
-	defaultFixity, maxPrecedence, 
+	defaultFixity, maxPrecedence, minPrecedence,
 	negateFixity, funTyFixity,
 	compareFixity,
 
@@ -251,8 +251,10 @@ instance Outputable FixityDirection where
     ppr InfixN = ptext (sLit "infix")
 
 ------------------------
-maxPrecedence :: Int
+maxPrecedence, minPrecedence :: Int
 maxPrecedence = 9
+minPrecedence = 0
+
 defaultFixity :: Fixity
 defaultFixity = Fixity maxPrecedence InfixL
 
