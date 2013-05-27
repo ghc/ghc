@@ -32,6 +32,7 @@ import TyCon
 import Coercion( pprCoAxiom )
 import HscTypes( tyThingParent_maybe )
 import Type( tidyTopType, tidyOpenType )
+import TypeRep( pprTvBndrs )
 import TcType
 import Name
 import VarEnv( emptyTidyEnv )
@@ -106,6 +107,7 @@ ppr_ty_thing pefas _  (AnId id)          = pprId         pefas id
 ppr_ty_thing pefas _  (ADataCon dataCon) = pprDataConSig pefas dataCon
 ppr_ty_thing pefas ss (ATyCon tyCon)   	 = pprTyCon      pefas ss tyCon
 ppr_ty_thing _     _  (ACoAxiom ax)    	 = pprCoAxiom    ax
+
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr pefas tyCon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
@@ -113,7 +115,7 @@ pprTyConHdr pefas tyCon
   | Just cls <- tyConClass_maybe tyCon
   = pprClassHdr pefas cls
   | otherwise
-  = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
+  = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> pprTvBndrs vars
   where
     vars | GHC.isPrimTyCon tyCon ||
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
@@ -138,10 +140,9 @@ pprDataConSig pefas dataCon
 pprClassHdr :: PrintExplicitForalls -> GHC.Class -> SDoc
 pprClassHdr _ cls
   = ptext (sLit "class") <+>
-    GHC.pprThetaArrowTy (GHC.classSCTheta cls) <+>
-    ppr_bndr cls <+>
-    hsep (map ppr tyVars) <+>
-    GHC.pprFundeps funDeps
+    sep [ GHC.pprThetaArrowTy (GHC.classSCTheta cls)
+        , ppr_bndr cls <+> pprTvBndrs tyVars
+        , GHC.pprFundeps funDeps ]
   where
      (tyVars, funDeps) = GHC.classTvsFds cls
 
