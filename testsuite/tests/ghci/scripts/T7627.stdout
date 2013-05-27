@@ -18,7 +18,8 @@ instance Functor ((,) a) -- Defined in ‛GHC.Base’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‛GHC.Classes’
 instance (Read a, Read b) => Read (a, b) -- Defined in ‛GHC.Read’
 instance (Show a, Show b) => Show (a, b) -- Defined in ‛GHC.Show’
-data (#,#) a b = (#,#) a b 	-- Defined in ‛GHC.Prim’
+data (#,#) (a :: OpenKind) (b :: OpenKind) = (#,#) a b
+  	-- Defined in ‛GHC.Prim’
 (,) :: a -> b -> (a, b)
 (#,#) :: a -> b -> (# a, b #)
 (  ,  ) :: a -> b -> (a, b)

@@ -14,7 +14,7 @@ c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a1. a1 -> b
 c4 :: C a b => forall a1. a1 -> b
 -- imported via Control.Monad
-class Monad m => MonadPlus m where
+class Monad m => MonadPlus (m :: * -> *) where
   mzero :: m a
   mplus :: m a -> m a -> m a
 mplus :: MonadPlus m => forall a. m a -> m a -> m a
@@ -25,7 +25,7 @@ mzero :: MonadPlus m => forall a. m a
 fail :: Monad m => forall a. GHC.Base.String -> m a
 return :: Monad m => forall a. a -> m a
 -- imported via Control.Monad, Prelude, T
-class Monad m where
+class Monad (m :: * -> *) where
   (>>=) :: m a -> (a -> m b) -> m b
   (>>) :: m a -> m b -> m b
   return :: a -> m a
