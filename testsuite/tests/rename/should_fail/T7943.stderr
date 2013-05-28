@@ -1,0 +1,2 @@
+
+T7943.hs:4:22: Record syntax is illegal here: {bar :: String}
