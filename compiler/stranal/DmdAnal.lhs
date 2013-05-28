@@ -28,9 +28,9 @@ import Id
 import CoreUtils	( exprIsHNF, exprType, exprIsTrivial )
 import PprCore	
 import TyCon
-import Pair
-import Type		( eqType, tyConAppTyCon_maybe )
-import Coercion         ( coercionKind )
+import Type		( eqType )
+-- import Pair
+-- import Coercion         ( coercionKind )
 import Util
 import Maybes		( isJust, orElse )
 import TysWiredIn	( unboxedPairDataCon )
@@ -131,7 +131,9 @@ dmdAnal env dmd (Var var)
 dmdAnal env dmd (Cast e co)
   = (dmd_ty, Cast e' co)
   where
-    (dmd_ty, e') = dmdAnal env dmd' e
+    (dmd_ty, e') = dmdAnal env dmd e
+
+{-       ----- I don't get this, so commenting out -------
     to_co        = pSnd (coercionKind co)
     dmd'
       | Just tc <- tyConAppTyCon_maybe to_co
@@ -142,6 +144,7 @@ dmdAnal env dmd (Cast e co)
 	-- for exactly the same reason that we don't look
 	-- inside recursive products -- we might not reach
 	-- a fixpoint.  So revert to a vanilla Eval demand
+-}
 
 dmdAnal env dmd (Tick t e)
   = (dmd_ty, Tick t e')
@@ -200,9 +203,10 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isProductTyCon tycon 
-  , not (isRecursiveTyCon tycon)
+  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-	env_alt	              = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
+        env_w_tc              = env { ae_rec_tc = rec_tc' }
+	env_alt	              = extendAnalEnv NotTopLevel env_w_tc case_bndr case_bndr_sig
 	(alt_ty, alt')	      = dmdAnalAlt env_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
@@ -957,8 +961,11 @@ forget that fact, otherwise we might make 'x' absent when it isn't.
 data AnalEnv
   = AE { ae_dflags :: DynFlags
        , ae_sigs   :: SigEnv
-       , ae_virgin :: Bool }  -- True on first iteration only
+       , ae_virgin :: Bool    -- True on first iteration only
 		              -- See Note [Initialising strictness]
+       , ae_rec_tc :: RecTcChecker
+ } 
+
 	-- We use the se_env to tell us whether to
 	-- record info about a variable in the DmdEnv
 	-- We do so if it's a LocalId, but not top-level
@@ -975,7 +982,8 @@ instance Outputable AnalEnv where
          , ptext (sLit "ae_sigs =") <+> ppr env ])
 
 emptyAnalEnv :: DynFlags -> AnalEnv
-emptyAnalEnv dflags = AE { ae_dflags = dflags, ae_sigs = emptySigEnv, ae_virgin = True }
+emptyAnalEnv dflags = AE { ae_dflags = dflags, ae_sigs = emptySigEnv
+                         , ae_virgin = True, ae_rec_tc = initRecTc }
 
 emptySigEnv :: SigEnv
 emptySigEnv = emptyVarEnv
