@@ -243,8 +243,9 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
         
 	scrut_dmd1 = mkProdDmd [idDemandInfo b | b <- bndrs', isId b]
         scrut_dmd2 = strictenDmd (idDemandInfo case_bndr')
+        scrut_dmd  = scrut_dmd1 `bothCleanDmd` scrut_dmd2
 
-	(scrut_ty, scrut') = dmdAnal env (scrut_dmd1 `bothCleanDmd` scrut_dmd2) scrut
+	(scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
         res_ty             = alt_ty1 `bothDmdType` scrut_ty
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
@@ -486,7 +487,8 @@ dmdTransform env var dmd
 
   | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
   , let fn_ty = dmdTransformSig sig dmd
-  = if isTopLevel top_lvl           
+  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr dmd, ppr fn_ty]) $
+    if isTopLevel top_lvl           
     then fn_ty   -- Don't record top level things
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
 
@@ -577,6 +579,11 @@ dmdAnalRhs :: TopLevelFlag
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 dmdAnalRhs top_lvl rec_flag env id rhs
+  | Just fn <- unpackTrivial rhs   -- See Note [Trivial right-hand sides]
+  , let fn_str = getStrictness env fn
+  = (fn_str, emptyDmdEnv, set_idStrictness env id fn_str, rhs)
+
+  | otherwise
   = (sig_ty, lazy_fv, id', mkLams bndrs' body')
   where
     (bndrs, body)        = collectBinders rhs
@@ -617,7 +624,27 @@ dmdAnalRhs top_lvl rec_flag env id rhs
        || isJust rec_flag     -- get their demandInfo set at all
        || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
           -- See Note [Optimistic CPR in the "virgin" case]
+
+unpackTrivial :: CoreExpr -> Maybe Id
+-- Returns (Just v) if the arg is really equal to v, modulo
+-- casts, type applications etc 
+-- See Note [Trivial right-hand sides]
+unpackTrivial (Var v)                 = Just v
+unpackTrivial (Cast e _)              = unpackTrivial e
+unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
+unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
+unpackTrivial _                       = Nothing
 \end{code}
+
+Note [Trivial right-hand sides]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	foo = plusInt |> co
+where plusInt is an arity-2 function with known strictness.  Clearly
+we want plusInt's strictness to propagate to foo!  But because it has
+no manifest lambdas, it won't do so automatically.  So we have a 
+special case for right-hand sides that are "trivial", namely variables,
+casts, type applications, and the like. 
 
 Note [Product demands for function body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1003,6 +1030,12 @@ extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+
+getStrictness :: AnalEnv -> Id -> StrictSig
+getStrictness env fn
+  | isGlobalId fn                        = idStrictness fn
+  | Just (sig, _) <- lookupSigEnv env fn = sig
+  | otherwise                            = topSig
 
 addInitialSigs :: TopLevelFlag -> AnalEnv -> [Id] -> AnalEnv
 -- See Note [Initialising strictness]
