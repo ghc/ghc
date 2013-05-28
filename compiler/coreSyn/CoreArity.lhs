@@ -30,7 +30,7 @@ import Var
 import VarEnv
 import Id
 import Type
-import TyCon	( isRecursiveTyCon, isClassTyCon )
+import TyCon	( initRecTc, checkRecTc )
 import Coercion
 import BasicTypes
 import Unique
@@ -88,7 +88,7 @@ exprArity e = go e
     go (Lam x e) | isId x    	   = go e + 1
     		 | otherwise 	   = go e
     go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e co)                 = go e `min` length (typeArity (pSnd (coercionKind co)))
+    go (Cast e co)                 = trim_arity (go e) (pSnd (coercionKind co))
                                         -- Note [exprArity invariant]
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
@@ -97,6 +97,8 @@ exprArity e = go e
 
     go _		       	   = 0
 
+    trim_arity :: Arity -> Type -> Arity
+    trim_arity arity ty = arity `min` length (typeArity ty)
 
 ---------------
 typeArity :: Type -> [OneShot]
@@ -104,24 +106,32 @@ typeArity :: Type -> [OneShot]
 -- We look through foralls, and newtypes
 -- See Note [exprArity invariant]
 typeArity ty 
-  | Just (_, ty')  <- splitForAllTy_maybe ty 
-  = typeArity ty'
+  = go initRecTc ty
+  where
+    go rec_nts ty 
+      | Just (_, ty')  <- splitForAllTy_maybe ty 
+      = go rec_nts ty'
 
-  | Just (arg,res) <- splitFunTy_maybe ty    
-  = isStateHackType arg : typeArity res
+      | Just (arg,res) <- splitFunTy_maybe ty    
+      = isStateHackType arg : go rec_nts res
 
-  | Just (tc,tys) <- splitTyConApp_maybe ty 
-  , Just (ty', _) <- instNewTyCon_maybe tc tys
-  , not (isRecursiveTyCon tc)
-  , not (isClassTyCon tc)	-- Do not eta-expand through newtype classes
-    		      		-- See Note [Newtype classes and eta expansion]
-  = typeArity ty'
+      | Just (tc,tys) <- splitTyConApp_maybe ty 
+      , Just (ty', _) <- instNewTyCon_maybe tc tys
+      , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]
+                                                -- in TyCon
+--   , not (isClassTyCon tc)	-- Do not eta-expand through newtype classes
+--    		      		-- See Note [Newtype classes and eta expansion]
+--                              (no longer required)
+      = go rec_nts' ty'
   	-- Important to look through non-recursive newtypes, so that, eg 
   	--	(f x)   where f has arity 2, f :: Int -> IO ()
   	-- Here we want to get arity 1 for the result!
+        --
+        -- AND through a layer of recursive newtypes
+        -- e.g. newtype Stream m a b = Stream (m (Either b (a, Stream m a b)))
 
-  | otherwise
-  = []
+      | otherwise
+      = []
 
 ---------------
 exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
@@ -168,6 +178,11 @@ in exprArity.  That is a less local change, so I'm going to leave it for today!
 
 Note [Newtype classes and eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    NB: this nasty special case is no longer required, becuase
+    for newtype classes we don't use the class-op rule mechanism
+    at all.  See Note [Single-method classes] in TcInstDcls. SLPJ May 2013
+
+-------- Old out of date comments, just for interest -----------
 We have to be careful when eta-expanding through newtypes.  In general
 it's a good idea, but annoyingly it interacts badly with the class-op 
 rule mechanism.  Consider
@@ -207,6 +222,7 @@ exprIsConApp_maybe won't hold of the argument to op.  I considered
 trying to *make* it hold, but it's tricky and I gave up.
 
 The test simplCore/should_compile/T3722 is an excellent example.
+-------- End of old out of date comments, just for interest -----------
 
 
 Note [exprArity for applications]
@@ -542,7 +558,7 @@ PAPSs
 	f = g d  ==>  f = \x. g d x
 because that might in turn make g inline (if it has an inline pragma), 
 which we might not want.  After all, INLINE pragmas say "inline only
-when saturate" so we don't want to be too gung-ho about saturating!
+when saturated" so we don't want to be too gung-ho about saturating!
 
 \begin{code}
 arityLam :: Id -> ArityType -> ArityType
@@ -726,7 +742,7 @@ The biggest reason for doing this is for cases like
 		    True  -> \y -> e1
 		    False -> \y -> e2
 
-Here we want to get the lambdas together.  A good exmaple is the nofib
+Here we want to get the lambdas together.  A good example is the nofib
 program fibheaps, which gets 25% more allocation if you don't do this
 eta-expansion.
 

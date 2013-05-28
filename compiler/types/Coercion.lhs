@@ -96,7 +96,6 @@ import VarEnv
 import VarSet
 import Maybes   ( orElse )
 import Name	( Name, NamedThing(..), nameUnique, nameModule, getSrcSpan )
-import NameSet
 import OccName 	( parenSymOcc )
 import Util
 import BasicTypes
@@ -884,25 +883,21 @@ splitNewTypeRepCo_maybe _
 
 topNormaliseNewType :: Type -> Maybe (Type, Coercion)
 topNormaliseNewType ty
-  = case topNormaliseNewTypeX emptyNameSet ty of
+  = case topNormaliseNewTypeX initRecTc ty of
       Just (_, co, ty) -> Just (ty, co)
       Nothing          -> Nothing
 
-topNormaliseNewTypeX :: NameSet -> Type -> Maybe (NameSet, Coercion, Type)
+topNormaliseNewTypeX :: RecTcChecker -> Type -> Maybe (RecTcChecker, Coercion, Type)
 topNormaliseNewTypeX rec_nts ty
   | Just ty' <- coreView ty         -- Expand predicates and synonyms
   = topNormaliseNewTypeX rec_nts ty'
 
 topNormaliseNewTypeX rec_nts (TyConApp tc tys)
-  | Just (rep_ty, co) <- instNewTyCon_maybe tc tys
-  , not (tc_name `elemNameSet` rec_nts)  -- See Note [Expanding newtypes] in Type
+  | Just rec_nts'     <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes] in TyCon
+  , Just (rep_ty, co) <- instNewTyCon_maybe tc tys
   = case topNormaliseNewTypeX rec_nts' rep_ty of
        Nothing                       -> Just (rec_nts', co,                 rep_ty)
        Just (rec_nts', co', rep_ty') -> Just (rec_nts', co `mkTransCo` co', rep_ty')
-  where
-    tc_name = tyConName tc
-    rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
-             | otherwise	   = rec_nts
 
 topNormaliseNewTypeX _ _ = Nothing
 \end{code}

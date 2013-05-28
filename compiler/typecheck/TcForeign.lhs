@@ -74,9 +74,9 @@ normaliseFfiType ty
          normaliseFfiType' fam_envs ty
 
 normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
-normaliseFfiType' env ty0 = go [] ty0
+normaliseFfiType' env ty0 = go initRecTc ty0
   where
-    go :: [TyCon] -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
+    go :: RecTcChecker -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
     go rec_nts ty | Just ty' <- coreView ty     -- Expand synonyms
         = go rec_nts ty'
 
@@ -87,8 +87,15 @@ normaliseFfiType' env ty0 = go [] ty0
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes
+        , Just rec_nts' <- checkRecTc rec_nts tc
+                   -- See Note [Expanding newtypes] in TyCon.lhs
+                   -- We can't just use isRecursiveTyCon; sometimes recursion is ok:
+                   --     newtype T = T (Ptr T)
+                   --   Here, we don't reject the type for being recursive.
+                   -- If this is a recursive newtype then it will normally
+                   -- be rejected later as not being a valid FFI type.
         = do { rdr_env <- getGlobalRdrEnv 
-             ; case checkNewtypeFFI rdr_env rec_nts tc of
+             ; case checkNewtypeFFI rdr_env tc of
                  Nothing  -> children_only
                  Just gre -> do { (co', ty', gres) <- go rec_nts' nt_rhs
                                 ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
@@ -110,9 +117,6 @@ normaliseFfiType' env ty0 = go [] ty0
           nt_co  = mkUnbranchedAxInstCo (newTyConCo tc) tys
           nt_rhs = newTyConInstRhs tc tys
 
-          rec_nts' | isRecursiveTyCon tc = tc:rec_nts
-                   | otherwise           = rec_nts
-
     go rec_nts (AppTy ty1 ty2)
       = do (coi1, nty1, gres1) <- go rec_nts ty1
            (coi2, nty2, gres2) <- go rec_nts ty2
@@ -131,16 +135,9 @@ normaliseFfiType' env ty0 = go [] ty0
     go _ ty@(LitTy {})   = return (Refl ty, ty, emptyBag)
 
 
-checkNewtypeFFI :: GlobalRdrEnv -> [TyCon] -> TyCon -> Maybe GlobalRdrElt
-checkNewtypeFFI rdr_env rec_nts tc 
-  | not (tc `elem` rec_nts) 
-      -- See Note [Expanding newtypes] in Type.lhs
-      -- We can't just use isRecursiveTyCon; sometimes recursion is ok:
-      --     newtype T = T (Ptr T)
-      --   Here, we don't reject the type for being recursive.
-      -- If this is a recursive newtype then it will normally
-      -- be rejected later as not being a valid FFI type.
-  , Just con <- tyConSingleDataCon_maybe tc
+checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
+checkNewtypeFFI rdr_env tc 
+  | Just con <- tyConSingleDataCon_maybe tc
   , [gre] <- lookupGRE_Name rdr_env (dataConName con)
   = Just gre    -- See Note [Newtype constructor usage in foreign declarations]
   | otherwise

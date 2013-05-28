@@ -81,7 +81,10 @@ module TyCon(
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
         tyConPrimRep,
-        primRepSizeW, primElemRepSizeB
+        primRepSizeW, primElemRepSizeB,
+
+        -- * Recursion breaking
+        RecTcChecker, initRecTc, checkRecTc
 ) where
 
 #include "HsVersions.h"
@@ -95,6 +98,7 @@ import BasicTypes
 import DynFlags
 import ForeignCall
 import Name
+import NameSet
 import CoAxiom
 import PrelNames
 import Maybes
@@ -1548,4 +1552,56 @@ instance Data.Data TyCon where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "TyCon"
 
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+           Walking over recursive TyCons
+%*                                                                      *
+%************************************************************************
+
+Note [Expanding newtypes and products]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When expanding a type to expose a data-type constructor, we need to be
+careful about newtypes, lest we fall into an infinite loop. Here are
+the key examples:
+
+  newtype Id  x = MkId x
+  newtype Fix f = MkFix (f (Fix f))
+  newtype T     = MkT (T -> T)
+
+  Type           Expansion
+ --------------------------
+  T              T -> T
+  Fix Maybe      Maybe (Fix Maybe)
+  Id (Id Int)    Int
+  Fix Id         NO NO NO
+
+Notice that we can expand T, even though it's recursive.
+And we can expand Id (Id Int), even though the Id shows up
+twice at the outer level.
+
+So, when expanding, we keep track of when we've seen a recursive
+newtype at outermost level; and bale out if we see it again.
+
+We sometimes want to do the same for product types, so that the 
+strictness analyser doesn't unbox infinitely deeply.
+
+The function that manages this is checkRecTc.
+
+\begin{code}
+newtype RecTcChecker = RC NameSet
+
+initRecTc :: RecTcChecker 
+initRecTc = RC emptyNameSet
+
+checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
+-- Nothing      => Recursion detected
+-- Just rec_tcs => Keep going
+checkRecTc (RC rec_nts) tc
+  | not (isRecursiveTyCon tc)     = Just (RC rec_nts)
+  | tc_name `elemNameSet` rec_nts = Nothing
+  | otherwise                     = Just (RC (addOneToNameSet rec_nts tc_name))
+  where
+    tc_name = tyConName tc
 \end{code}

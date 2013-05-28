@@ -166,7 +166,6 @@ import CoAxiom
 -- others
 import Unique           ( Unique, hasKey )
 import BasicTypes       ( Arity, RepArity )
-import NameSet
 import StaticFlags
 import Util
 import Outputable
@@ -590,31 +589,6 @@ The reason is that we then get better (shorter) type signatures in
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 
-Note [Expanding newtypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-When expanding a type to expose a data-type constructor, we need to be
-careful about newtypes, lest we fall into an infinite loop. Here are
-the key examples:
-
-  newtype Id  x = MkId x
-  newtype Fix f = MkFix (f (Fix f))
-  newtype T     = MkT (T -> T)
-
-  Type           Expansion
- --------------------------
-  T              T -> T
-  Fix Maybe      Maybe (Fix Maybe)
-  Id (Id Int)    Int
-  Fix Id         NO NO NO
-
-Notice that we can expand T, even though it's recursive.
-And we can expand Id (Id Int), even though the Id shows up
-twice at the outer level.
-
-So, when expanding, we keep track of when we've seen a recursive
-newtype at outermost level; and bale out if we see it again.
-
-
                 Representation types
                 ~~~~~~~~~~~~~~~~~~~~
 
@@ -649,9 +623,9 @@ flattenRepType (UnaryRep ty)     = [ty]
 -- It's useful in the back end of the compiler.
 repType :: Type -> RepType
 repType ty
-  = go emptyNameSet ty
+  = go initRecTc ty
   where
-    go :: NameSet -> Type -> RepType
+    go :: RecTcChecker -> Type -> RepType
     go rec_nts ty                       -- Expand predicates and synonyms
       | Just ty' <- coreView ty
       = go rec_nts ty'
@@ -662,10 +636,7 @@ repType ty
     go rec_nts (TyConApp tc tys)        -- Expand newtypes
       | isNewTyCon tc
       , tys `lengthAtLeast` tyConArity tc
-      , let tc_name = tyConName tc
-            rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
-                     | otherwise           = rec_nts
-      , not (tc_name `elemNameSet` rec_nts)  -- See Note [Expanding newtypes]
+      , Just rec_nts' <- checkRecTc rec_nts tc   -- See Note [Expanding newtypes] in TyCon
       = go rec_nts' (newTyConInstRhs tc tys)
 
       | isUnboxedTupleTyCon tc

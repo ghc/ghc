@@ -832,9 +832,9 @@ topNormaliseType :: FamInstEnvs
 -- Its a bit like Type.repType, but handles type families too
 
 topNormaliseType env ty
-  = go emptyNameSet ty
+  = go initRecTc ty
   where
-    go :: NameSet -> Type -> Maybe (Coercion, Type)
+    go :: RecTcChecker -> Type -> Maybe (Coercion, Type)
     go rec_nts ty 
         | Just ty' <- coreView ty     -- Expand synonyms
         = go rec_nts ty'
