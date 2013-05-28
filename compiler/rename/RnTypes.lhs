@@ -187,9 +187,10 @@ rnHsTyKi isType doc (HsBangTy b ty)
     do { (ty', fvs) <- rnLHsType doc ty
        ; return (HsBangTy b ty', fvs) }
 
-rnHsTyKi isType doc (HsRecTy flds)
-  = ASSERT ( isType ) 
-    do { (flds', fvs) <- rnConDeclFields doc flds
+rnHsTyKi _ doc ty@(HsRecTy flds)
+  = do { addErr (hang (ptext (sLit "Record syntax is illegal here:"))
+                    2 (ppr ty))
+       ; (flds', fvs) <- rnConDeclFields doc flds
        ; return (HsRecTy flds', fvs) }
 
 rnHsTyKi isType doc (HsFunTy ty1 ty2)
