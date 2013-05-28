@@ -33,7 +33,6 @@ import CoreUtils
 import qualified CoreSubst
 import CoreArity
 import Rules            ( lookupRule, getRules )
-import BasicTypes       ( Arity )
 import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )
@@ -537,6 +536,11 @@ These strange casts can happen as a result of case-of-case
 
 
 \begin{code}
+makeTrivialArg :: SimplEnv -> ArgSpec -> SimplM (SimplEnv, ArgSpec)
+makeTrivialArg env (ValArg e)  = do { (env', e') <- makeTrivial NotTopLevel env e
+                                    ; return (env', ValArg e') }
+makeTrivialArg env (CastBy co) = return (env, CastBy co)
+
 makeTrivial :: TopLevelFlag -> SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Binds the expression to a variable, if it's not trivial, returning the variable
 makeTrivial top_lvl env expr = makeTrivialWithInfo top_lvl env vanillaIdInfo expr
@@ -1394,12 +1398,6 @@ completeCall env var cont
   = do  {   ------------- Try inlining ----------------
           dflags <- getDynFlags
         ; let  (lone_variable, arg_infos, call_cont) = contArgs cont
-                -- The args are OutExprs, obtained by *lazily* substituting
-                -- in the args found in cont.  These args are only examined
-                -- to limited depth (unless a rule fires).  But we must do
-                -- the substitution; rule matching on un-simplified args would
-                -- be bogus
-
                n_val_args = length arg_infos
                interesting_cont = interestingCallContext call_cont
                unfolding    = activeUnfolding env var
@@ -1448,8 +1446,11 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
   = return (env, castBottomExpr res cont_ty)  -- contination to discard, else we do it
   where                                       -- again and again!
-    res     = mkApps (Var fun) (reverse rev_args)
+    res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
+
+rebuildCall env info (CoerceIt co cont) 
+  = rebuildCall env (addCastTo info co) cont
 
 rebuildCall env info (ApplyTo dup_flag (Type arg_ty) se cont)
   = do { arg_ty' <- if isSimplified dup_flag then return arg_ty
@@ -1482,17 +1483,21 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         | otherwise              = BoringCtxt          -- Nothing interesting
 
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+  | null rules
+  = rebuild env (argInfoExpr fun rev_args) cont      -- No rules, common case
+
+  | otherwise
   = do {  -- We've accumulated a simplified call in <fun,rev_args>
           -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
           -- See also Note [Rules for recursive functions]
-        ; let args = reverse rev_args
-              env' = zapSubstEnv env
-        ; mb_rule <- tryRules env rules fun args cont
+        ; let env' = zapSubstEnv env
+              (args, cont') = argInfoValArgs env' rev_args cont
+        ; mb_rule <- tryRules env' rules fun args cont'
         ; case mb_rule of {
-             Just (n_args, rule_rhs) -> simplExprF env' rule_rhs $
-                                        pushSimplifiedArgs env' (drop n_args args) cont ;
-                 -- n_args says how many args the rule consumed
-           ; Nothing -> rebuild env (mkApps (Var fun) args) cont      -- No rules
+             Just (rule_rhs, cont'') -> simplExprF env' rule_rhs cont''
+
+                 -- Rules don't match
+           ; Nothing -> rebuild env (argInfoExpr fun rev_args) cont      -- No rules
     } }
 \end{code}
 
@@ -1552,8 +1557,9 @@ all this at once is TOO HARD!
 \begin{code}
 tryRules :: SimplEnv -> [CoreRule]
          -> Id -> [OutExpr] -> SimplCont
-         -> SimplM (Maybe (Arity, CoreExpr)) -- The arity is the number of
-                                             -- args consumed by the rule
+         -> SimplM (Maybe (CoreExpr, SimplCont)) 
+-- The SimplEnv already has zapSubstEnv applied to it
+
 tryRules env rules fn args call_cont
   | null rules
   = return Nothing
@@ -1563,11 +1569,13 @@ tryRules env rules fn args call_cont
                          fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
-
              do { checkedTick (RuleFired (ru_name rule))
-                ; dflags <- getDynFlags
                 ; dump dflags rule rule_rhs
-                ; return (Just (ruleArity rule, rule_rhs)) }}}
+                ; let cont' = pushSimplifiedArgs env
+                                                 (drop (ruleArity rule) args) 
+                                                 call_cont
+                      -- (ruleArity rule) says how many args the rule consumed
+                ; return (Just (rule_rhs, cont')) }}}
   where
     dump dflags rule rule_rhs
       | dopt Opt_D_dump_rule_rewrites dflags
@@ -1586,7 +1594,6 @@ tryRules env rules fn args call_cont
 
     log_rule dflags flag hdr details = liftIO . dumpSDoc dflags flag "" $
       sep [text hdr, nest 4 details]
-
 \end{code}
 
 Note [Rules for recursive functions]
@@ -1858,17 +1865,16 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
 rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
   = do { let rhs' = substExpr (text "rebuild-case") env rhs
+             env' = zapSubstEnv env
              out_args = [Type (substTy env (idType case_bndr)),
                          Type (exprType rhs'), scrut, rhs']
                       -- Lazily evaluated, so we don't do most of this
 
        ; rule_base <- getSimplRules
-       ; mb_rule <- tryRules env (getRules rule_base seqId) seqId out_args cont
+       ; mb_rule <- tryRules env' (getRules rule_base seqId) seqId out_args cont
        ; case mb_rule of
-           Just (n_args, res) -> simplExprF (zapSubstEnv env)
-                                            (mkApps res (drop n_args out_args))
-                                            cont
-           Nothing -> reallyRebuildCase env scrut case_bndr alts cont }
+           Just (rule_rhs, cont') -> simplExprF env' rule_rhs cont'
+           Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
 
 rebuildCase env scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
@@ -2315,7 +2321,7 @@ mkDupableCont env cont@(StrictBind {})
 mkDupableCont env (StrictArg info cci cont)
         -- See Note [Duplicating StrictArg]
   = do { (env', dup, nodup) <- mkDupableCont env cont
-       ; (env'', args')     <- mapAccumLM (makeTrivial NotTopLevel) env' (ai_args info)
+       ; (env'', args')     <- mapAccumLM makeTrivialArg env' (ai_args info)
        ; return (env'', StrictArg (info { ai_args = args' }) cci dup, nodup) }
 
 mkDupableCont env (ApplyTo _ arg se cont)
