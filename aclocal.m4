@@ -693,8 +693,6 @@ AC_ARG_WITH($2,
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
 #
 # Note: NeXTStep thinks diff'ing a file against itself is "trouble".
-#
-# Used by ghc, glafp-utils/ltx, and glafp-utils/runstdtest.
 AC_DEFUN([FP_PROG_CONTEXT_DIFF],
 [AC_CACHE_CHECK([for a working context diff], [fp_cv_context_diff],
 [echo foo > conftest1
