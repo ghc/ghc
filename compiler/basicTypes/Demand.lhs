@@ -722,7 +722,8 @@ lubCPR _ _                     = NoCPR
 
 bothCPR :: CPRResult -> CPRResult -> CPRResult
 -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
-bothCPR r _ = r
+bothCPR _ BotCPR = BotCPR   -- If either diverges, we diverge
+bothCPR r _      = r
 
 instance Outputable DmdResult where
   ppr RetProd    = char 'm' 
