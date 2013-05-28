@@ -482,18 +482,12 @@ isValOcc (OccName DataName _) = True
 isValOcc _                    = False
 
 isDataOcc (OccName DataName _) = True
-isDataOcc (OccName VarName s)  
-  | isLexCon s = pprPanic "isDataOcc: check me" (ppr s)
-		-- Jan06: I don't think this should happen
 isDataOcc _                    = False
 
 -- | Test if the 'OccName' is a data constructor that starts with
 -- a symbol (e.g. @:@, or @[]@)
 isDataSymOcc :: OccName -> Bool
 isDataSymOcc (OccName DataName s) = isLexConSym s
-isDataSymOcc (OccName VarName s)  
-  | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
-		-- Jan06: I don't think this should happen
 isDataSymOcc _                    = False
 -- Pretty inefficient!
 
