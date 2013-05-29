@@ -317,8 +317,10 @@ llvmWidthInBits _      (LMFloat80)     = 80
 llvmWidthInBits _      (LMFloat128)    = 128
 -- Could return either a pointer width here or the width of what
 -- it points to. We will go with the former for now.
+-- PMW: At least judging by the way LLVM outputs constants, pointers
+--      should use the former, but arrays the latter.
 llvmWidthInBits dflags (LMPointer _)   = llvmWidthInBits dflags (llvmWord dflags)
-llvmWidthInBits dflags (LMArray _ _)   = llvmWidthInBits dflags (llvmWord dflags)
+llvmWidthInBits dflags (LMArray n t)   = n * llvmWidthInBits dflags t
 llvmWidthInBits dflags (LMVector n ty) = n * llvmWidthInBits dflags ty
 llvmWidthInBits _      LMLabel         = 0
 llvmWidthInBits _      LMVoid          = 0
