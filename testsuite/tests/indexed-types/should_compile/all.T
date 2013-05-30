@@ -46,7 +46,7 @@ test('ATLoop',
      ['ATLoop.hs','-v0'])
 
 test('Deriving', normal, compile, [''])
-test('DerivingNewType', expect_fail, compile, [''])
+test('DerivingNewType', normal, compile, [''])
 test('Records', normal, compile, [''])
 
 # The point about this test is that it compiles NewTyCo1 and NewTyCo2
