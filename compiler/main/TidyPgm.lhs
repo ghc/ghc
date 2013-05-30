@@ -822,7 +822,8 @@ dffvLetBndr vanilla_unfold id
             -- but I've seen cases where we had a wrapper id $w but a
             -- rhs where $w had been inlined; see Trac #3922
 
-    go_unf (DFunUnfolding _ _ args) = mapM_ dffvExpr (dfunArgExprs args)
+    go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args }) 
+             = extendScopeList bndrs $ mapM_ dffvExpr args
     go_unf _ = return ()
 
     go_rule (BuiltinRule {}) = return ()

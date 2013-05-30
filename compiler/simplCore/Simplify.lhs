@@ -723,10 +723,10 @@ simplUnfolding :: SimplEnv-> TopLevelFlag
                -> OutExpr
                -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplUnfolding env _ _ _ (DFunUnfolding ar con ops)
-  = return (DFunUnfolding ar con ops')
-  where
-    ops' = map (fmap (substExpr (text "simplUnfolding") env)) ops
+simplUnfolding env _ _ _ df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = do { (env', bndrs') <- simplBinders env bndrs
+       ; args' <- mapM (simplExpr env') args
+       ; return (df { df_bndrs = bndrs', df_args  = args' }) }
 
 simplUnfolding env top_lvl id _
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
@@ -1559,8 +1559,8 @@ tryRules env rules fn args call_cont
   = return Nothing
   | otherwise
   = do { dflags <- getDynFlags
-       ; case lookupRule dflags (activeRule env) (getUnfoldingInRuleMatch env)
-                         (getInScope env) fn args rules of {
+       ; case lookupRule dflags (getUnfoldingInRuleMatch env) (activeRule env) 
+                         fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
 

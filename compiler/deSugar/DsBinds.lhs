@@ -447,24 +447,24 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   = putSrcSpanDs loc $ 
     do { uniq <- newUnique
        ; let poly_name = idName poly_id
-             spec_name = mkClonedInternalName uniq poly_name
+             spec_occ  = mkSpecOcc (getOccName poly_name)
+             spec_name = mkInternalName uniq spec_occ (getSrcSpan poly_name)
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
        ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
        ; case decomposeRuleLhs bndrs ds_lhs of {
            Left msg -> do { warnDs msg; return Nothing } ;
-           Right (final_bndrs, _fn, args) -> do
+           Right (rule_bndrs, _fn, args) -> do
 
-       { (spec_unf, unf_pairs) <- specUnfolding spec_co spec_ty (realIdUnfolding poly_id)
-
-       ; dflags <- getDynFlags
-       ; let spec_id  = mkLocalId spec_name spec_ty 
+       { dflags <- getDynFlags
+       ; let spec_unf = specUnfolding bndrs args (realIdUnfolding poly_id)
+             spec_id  = mkLocalId spec_name spec_ty 
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
              rule =  mkRule False {- Not auto -} is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
        			rule_act poly_name
-       		        final_bndrs args
+       		        rule_bndrs args
        			(mkVarApps (Var spec_id) bndrs)
 
        ; spec_rhs <- dsHsWrapper spec_co poly_rhs
@@ -472,7 +472,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
               (warnDs (specOnInline poly_name))
-       ; return (Just (spec_pair `consOL` unf_pairs, rule))
+       ; return (Just (unitOL spec_pair, rule))
        } } }
   where
     is_local_id = isJust mb_poly_rhs
@@ -509,18 +509,15 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise   = spec_prag_act                   -- Specified by user
 
 
-specUnfolding :: HsWrapper -> Type 
-              -> Unfolding -> DsM (Unfolding, OrdList (Id,CoreExpr))
-{-   [Dec 10: TEMPORARILY commented out, until we can straighten out how to
-              generate unfoldings for specialised DFuns
+specUnfolding :: [Var] -> [CoreExpr] -> Unfolding -> Unfolding
+specUnfolding new_bndrs new_args df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = ASSERT2( equalLength new_args bndrs, ppr df $$ ppr new_args $$ ppr new_bndrs )
+    df { df_bndrs = new_bndrs, df_args = map (substExpr (text "specUnfolding") subst) args }
+  where
+    subst = mkOpenSubst (mkInScopeSet fvs) (bndrs `zip` new_args)
+    fvs = (exprsFreeVars args `delVarSetList` bndrs) `extendVarSetList` new_bndrs
 
-specUnfolding wrap_fn spec_ty (DFunUnfolding _ _ ops)
-  = do { let spec_rhss = map wrap_fn ops
-       ; spec_ids <- mapM (mkSysLocalM (fsLit "spec") . exprType) spec_rhss
-       ; return (mkDFunUnfolding spec_ty (map Var spec_ids), toOL (spec_ids `zip` spec_rhss)) }
--}
-specUnfolding _ _ _
-  = return (noUnfolding, nilOL)
+specUnfolding _ _ _ = noUnfolding
 
 specOnInline :: Name -> MsgDoc
 specOnInline f = ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:") 
@@ -598,8 +595,8 @@ decomposeRuleLhs bndrs lhs
    opt_lhs = simpleOptExpr lhs
 
    check_bndrs fn args
-     | null (dead_bndrs) = Right (extra_dict_bndrs ++ bndrs, fn, args)
-     | otherwise         = Left (vcat (map dead_msg dead_bndrs))
+     | null dead_bndrs = Right (extra_dict_bndrs ++ bndrs, fn, args)
+     | otherwise       = Left (vcat (map dead_msg dead_bndrs))
      where
        arg_fvs = exprsFreeVars args
 

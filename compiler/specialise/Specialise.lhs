@@ -1044,7 +1044,8 @@ specCalls env rules_for_me calls_for_me fn rhs
        ; return (spec_rules, spec_defns, plusUDList spec_uds) }
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
-  = WARN( notNull calls_for_me, ptext (sLit "Missed specialisation opportunity for")
+  = WARN( not (exprIsTrivial rhs) && notNull calls_for_me, 
+          ptext (sLit "Missed specialisation opportunity for")
                                  <+> ppr fn $$ _trace_doc )
           -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
@@ -1077,8 +1078,9 @@ specCalls env rules_for_me calls_for_me fn rhs
 
     already_covered :: DynFlags -> [CoreExpr] -> Bool
     already_covered dflags args      -- Note [Specialisations already covered]
-       = isJust (lookupRule dflags (const True) realIdUnfolding
-                            (CoreSubst.substInScope (se_subst env))
+       = isJust (lookupRule dflags 
+                            (CoreSubst.substInScope (se_subst env), realIdUnfolding)
+                            (const True) 
                             fn args rules_for_me)
 
     mk_ty_args :: [Maybe Type] -> [TyVar] -> [CoreExpr]
@@ -1428,6 +1430,18 @@ It's a silly exapmle, but we get
         choose = /\a. g `cast` co
 where choose doesn't have any dict arguments.  Thus far I have not
 tried to fix this (wait till there's a real example).
+
+Mind you, then 'choose' will be inlined (since RHS is trivial) so 
+it doesn't matter.  This comes up with single-method classes
+
+   class C a where { op :: a -> a }
+   instance C a => C [a] where ....
+==>
+   $fCList :: C a => C [a]
+   $fCList = $copList |> (...coercion>...)
+   ....(uses of $fCList at particular types)...
+
+So we suppress the WARN if the rhs is trivial.
 
 Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

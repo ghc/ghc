@@ -49,7 +49,6 @@ module CoreSyn (
 
         -- * Unfolding data types
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
-        DFunArg(..), dfunArgExprs,
 
 	-- ** Constructing 'Unfolding's
 	noUnfolding, evaldUnfolding, mkOtherCon,
@@ -78,7 +77,7 @@ module CoreSyn (
 
 	-- * Core rule data types
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
-	RuleName, IdUnfoldingFun,
+	RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
 	
 	-- ** Operations on 'CoreRule's 
 	seqRules, ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -92,6 +91,7 @@ module CoreSyn (
 #include "HsVersions.h"
 
 import CostCentre
+import VarEnv( InScopeSet )
 import Var
 import Type
 import Coercion
@@ -577,12 +577,15 @@ data CoreRule
 	ru_fn    :: Name,       -- ^ As above
 	ru_nargs :: Int,	-- ^ Number of arguments that 'ru_try' consumes,
 				-- if it fires, including type arguments
-	ru_try  :: DynFlags -> Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+	ru_try   :: RuleFun
 		-- ^ This function does the rewrite.  It given too many
 		-- arguments, it simply discards them; the returned 'CoreExpr'
 		-- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
 		-- See Note [Extra args in rule matching] in Rules.lhs
+
+type RuleFun = DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
+type InScopeEnv = (InScopeSet, IdUnfoldingFun)
 
 type IdUnfoldingFun = Id -> Unfolding
 -- A function that embodies how to unfold an Id if you need
@@ -663,17 +666,15 @@ data Unfolding
 		       --
 		       -- Here, @f@ gets an @OtherCon []@ unfolding.
 
-  | DFunUnfolding       -- The Unfolding of a DFunId  
+  | DFunUnfolding {     -- The Unfolding of a DFunId  
     			-- See Note [DFun unfoldings]
-      		  	--     df = /\a1..am. \d1..dn. MkD (op1 a1..am d1..dn)
+      		  	--     df = /\a1..am. \d1..dn. MkD t1 .. tk
+                        --                                 (op1 a1..am d1..dn)
      		      	--     	    	      	       	   (op2 a1..am d1..dn)
-
-        Arity 		-- Arity = m+n, the *total* number of args 
-			--   (unusually, both type and value) to the dfun
-
-        DataCon 	-- The dictionary data constructor (possibly a newtype datacon)
-
-        [DFunArg CoreExpr]  -- Specification of superclasses and methods, in positional order
+        df_bndrs :: [Var],      -- The bound variables [a1..m],[d1..dn]
+        df_con   :: DataCon,    -- The dictionary data constructor (never a newtype datacon)
+        df_args  :: [CoreExpr]  -- Args of the data con: types, superclasses and methods,
+    }                           -- in positional order
 
   | CoreUnfolding {		-- An unfolding for an Id with no pragma, 
                                 -- or perhaps a NOINLINE pragma
@@ -709,20 +710,6 @@ data Unfolding
   --     Basically this is a cached version of 'exprIsWorkFree'
   --
   --  uf_guidance:  Tells us about the /size/ of the unfolding template
-
-------------------------------------------------
-data DFunArg e   -- Given (df a b d1 d2 d3)
-  = DFunPolyArg  e      -- Arg is (e a b d1 d2 d3)
-  | DFunLamArg   Int    -- Arg is one of [a,b,d1,d2,d3], zero indexed
-  deriving( Functor )
-
-  -- 'e' is often CoreExpr, which are usually variables, but can
-  -- be trivial expressions instead (e.g. a type application).
-
-dfunArgExprs :: [DFunArg e] -> [e]
-dfunArgExprs []                    = []
-dfunArgExprs (DFunPolyArg  e : as) = e : dfunArgExprs as
-dfunArgExprs (DFunLamArg {}  : as) = dfunArgExprs as
 
 
 ------------------------------------------------

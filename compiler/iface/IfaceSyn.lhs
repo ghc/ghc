@@ -38,7 +38,6 @@ module IfaceSyn (
 
 import TyCon( SynTyConRhs(..) )
 import IfaceType
-import CoreSyn( DFunArg, dfunArgExprs )
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Annotations
@@ -255,7 +254,7 @@ data IfaceUnfolding
   | IfLclWrapper Arity IfLclName  --     because the worker can simplify to a function in
                                   --     another module.
 
-  | IfDFunUnfold [DFunArg IfaceExpr]
+  | IfDFunUnfold [IfaceBndr] [IfaceExpr]
 
 --------------------------------
 data IfaceExpr
@@ -769,8 +768,8 @@ instance Outputable IfaceUnfolding where
                              <+> parens (ptext (sLit "arity") <+> int a)
   ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext):") <+> ppr wkr
                              <+> parens (ptext (sLit "arity") <+> int a)
-  ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:")
-                             <+> brackets (pprWithCommas ppr ns)
+  ppr (IfDFunUnfold bs es) = hang (ptext (sLit "DFun:") <+> sep (map ppr bs) <> dot)
+                                2 (sep (map pprParendIfaceExpr es))
 
 -- -----------------------------------------------------------------------------
 -- | Finding the Names in IfaceSyn
@@ -899,7 +898,7 @@ freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfExtWrapper _ v)     = unitNameSet v
 freeNamesIfUnfold (IfLclWrapper {})      = emptyNameSet
-freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr (dfunArgExprs vs)
+freeNamesIfUnfold (IfDFunUnfold bs es)   = fnList freeNamesIfBndr bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)      = unitNameSet v

@@ -42,7 +42,6 @@ import TcEnv
 import TcHsType
 import TcUnify
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
-import CoreSyn    ( DFunArg(..) )
 import Type
 import TcEvidence
 import TyCon
@@ -54,7 +53,7 @@ import VarEnv
 import VarSet     ( mkVarSet, subVarSet, varSetElems )
 import Pair
 import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var), CoreExpr )
+import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
 import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, oldTypeableClassNames )
 
 import Bag
@@ -190,9 +189,9 @@ Instead we use a cunning trick.
    a suitable constructor application -- inlining df "on the fly" as it
    were.
 
- * We give the ClassOp 'op2' a BuiltinRule that extracts the right piece
-   iff its argument satisfies exprIsConApp_maybe.  This is done in
-   MkId mkDictSelId
+ * ClassOp rules: We give the ClassOp 'op2' a BuiltinRule that
+   extracts the right piece iff its argument satisfies
+   exprIsConApp_maybe.  This is done in MkId mkDictSelId
 
  * We make 'df' CONLIKE, so that shared uses still match; eg
       let d = df d1 d2
@@ -796,12 +795,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
        ; dfun_ev_vars <- newEvVars dfun_theta
 
-       ; (sc_binds, sc_ev_vars, sc_dfun_args) 
-            <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
+       ; (sc_binds, sc_ev_vars) <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]
-       ; spec_inst_info <- tcSpecInstPrags dfun_id ibinds
+       ; spec_inst_info@(spec_inst_prags,_) <- tcSpecInstPrags dfun_id ibinds
 
         -- Typecheck the methods
        ; (meth_ids, meth_binds)
@@ -831,11 +829,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              con_app_tys  = wrapId (mkWpTyApps inst_tys)
                                    (dataConWrapId dict_constr)
              con_app_scs  = mkHsWrap (mkWpEvApps (map EvId sc_ev_vars)) con_app_tys
-             con_app_args = foldl mk_app con_app_scs $
-                            map (wrapId arg_wrapper) meth_ids
+             con_app_args = foldl app_to_meth con_app_scs meth_ids
 
-             mk_app :: HsExpr Id -> HsExpr Id -> HsExpr Id
-             mk_app fun arg = HsApp (L loc fun) (L loc arg)
+             app_to_meth :: HsExpr Id -> Id -> HsExpr Id
+             app_to_meth fun meth_id = L loc fun `HsApp` L loc (wrapId arg_wrapper meth_id)
 
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
@@ -843,19 +840,26 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 -- Do not inline the dfun; instead give it a magic DFunFunfolding
                 -- See Note [ClassOp/DFun selection]
                 -- See also note [Single-method classes]
-             dfun_id_w_fun
+             (dfun_id_w_fun, dfun_spec_prags)
                 | isNewTyCon class_tc
-                = dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+                = ( dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+                  , SpecPrags [] )   -- Newtype dfuns just inline unconditionally,
+                                     -- so don't attempt to specialise them
                 | otherwise
-                = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_ty dfun_args
-                          `setInlinePragma` dfunInlinePragma
+                = ( dfun_id `setIdUnfolding`  mkDFunUnfolding (inst_tyvars ++ dfun_ev_vars)
+                                                              dict_constr dfun_args
+                            `setInlinePragma` dfunInlinePragma
+                  , SpecPrags spec_inst_prags )
 
-             dfun_args :: [DFunArg CoreExpr]
-             dfun_args = sc_dfun_args ++ map (DFunPolyArg . Var) meth_ids
+             dfun_args :: [CoreExpr]
+             dfun_args = map Type inst_tys        ++
+                         map Var  sc_ev_vars      ++ 
+                         map mk_meth_app meth_ids
+             mk_meth_app meth_id = Var meth_id `mkTyApps` inst_tv_tys `mkVarApps` dfun_ev_vars 
 
              export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id_w_fun
-                          , abe_mono = self_dict, abe_prags = noSpecPrags }
-                          -- NB: noSpecPrags, see Note [SPECIALISE instance pragmas]
+                          , abe_mono = self_dict, abe_prags = dfun_spec_prags }
+                          -- NB: see Note [SPECIALISE instance pragmas]
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
@@ -866,13 +870,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                  listToBag meth_binds)
        }
  where
-   dfun_ty   = idType dfun_id
-   dfun_id   = instanceDFunId ispec
-   loc       = getSrcSpan dfun_id
+   dfun_id = instanceDFunId ispec
+   loc     = getSrcSpan dfun_id
 
 ------------------------------
 tcSuperClasses :: DFunId -> [TcTyVar] -> [EvVar] -> TcThetaType
-               -> TcM (TcEvBinds, [EvVar], [DFunArg CoreExpr])
+               -> TcM (TcEvBinds, [EvVar])
 -- See Note [Silent superclass arguments]
 tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta
   = do {   -- Check that all superclasses can be deduced from
@@ -881,19 +884,18 @@ tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta
                                emitWanteds ScOrigin sc_theta
 
        ; if null inst_tyvars && null dfun_ev_vars 
-         then return (sc_binds,       sc_evs,      map (DFunPolyArg . Var) sc_evs)
-         else return (emptyTcEvBinds, sc_lam_args, sc_dfun_args) }
+         then return (sc_binds,       sc_evs)
+         else return (emptyTcEvBinds, sc_lam_args) }
   where
     n_silent     = dfunNSilent dfun_id
-    n_tv_args    = length inst_tyvars
     orig_ev_vars = drop n_silent dfun_ev_vars
 
-    (sc_lam_args, sc_dfun_args) = unzip (map (find n_tv_args dfun_ev_vars) sc_theta)
-    find _ [] pred 
+    sc_lam_args = map (find dfun_ev_vars) sc_theta
+    find [] pred 
       = pprPanic "tcInstDecl2" (ppr dfun_id $$ ppr (idType dfun_id) $$ ppr pred)
-    find i (ev:evs) pred 
-      | pred `eqPred` evVarPred ev = (ev, DFunLamArg i)
-      | otherwise                  = find (i+1) evs pred
+    find (ev:evs) pred 
+      | pred `eqPred` evVarPred ev = ev
+      | otherwise                  = find evs pred
 
 ----------------------
 mkMethIds :: HsSigFun -> Class -> [TcTyVar] -> [EvVar] 
@@ -1056,35 +1058,56 @@ Consider
      {-# SPECIALISE instance Ix (Int,Int) #-}
      range (x,y) = ...
 
-We do *not* want to make a specialised version of the dictionary
-function.  Rather, we want specialised versions of each *method*.
-Thus we should generate something like this:
+We make a specialised version of the dictionary function, AND
+specialised versions of each *method*.  Thus we should generate
+something like this:
 
   $dfIxPair :: (Ix a, Ix b) => Ix (a,b)
-  {- DFUN [$crangePair, ...] -}
+  {-# DFUN [$crangePair, ...] #-}
+  {-# SPECIALISE $dfIxPair :: Ix (Int,Int) #-}
   $dfIxPair da db = Ix ($crangePair da db) (...other methods...)
 
   $crange :: (Ix a, Ix b) -> ((a,b),(a,b)) -> [(a,b)]
   {-# SPECIALISE $crange :: ((Int,Int),(Int,Int)) -> [(Int,Int)] #-}
   $crange da db = <blah>
 
-  {-# RULE  range ($dfIx da db) = $crange da db #-}
+The SPECIALISE pragmas are acted upon by the desugarer, which generate
 
+  dii :: Ix Int
+  dii = ...
+
+  $s$dfIxPair :: Ix ((Int,Int),(Int,Int))
+  {-# DFUN [$crangePair di di, ...] #-}
+  $s$dfIxPair = Ix ($crangePair di di) (...)
+
+  {-# RULE forall (d1,d2:Ix Int). $dfIxPair Int Int d1 d2 = $s$dfIxPair #-}
+
+  $s$crangePair :: ((Int,Int),(Int,Int)) -> [(Int,Int)]
+  $c$crangePair = ...specialised RHS of $crangePair...
+
+  {-# RULE forall (d1,d2:Ix Int). $crangePair Int Int d1 d2 = $s$crangePair #-}
+ 
 Note that
 
-  * The RULE is unaffected by the specialisation.  We don't want to
-    specialise $dfIx, because then it would need a specialised RULE
-    which is a pain.  The single RULE works fine at all specialisations.
-    See Note [How instance declarations are translated] above
+  * The specialised dictionary $s$dfIxPair is very much needed, in case we
+    call a function that takes a dictionary, but in a context where the 
+    specialised dictionary can be used.  See Trac #7797.
 
-  * Instead, we want to specialise the *method*, $crange
+  * The ClassOp rule for 'range' works equally well on $s$dfIxPair, because
+    it still has a DFunUnfolding.  See Note [ClassOp/DFun selection]
 
-In practice, rather than faking up a SPECIALISE pragama for each
-method (which is painful, since we'd have to figure out its
-specialised type), we call tcSpecPrag *as if* were going to specialise
-$dfIx -- you can see that in the call to tcSpecInst.  That generates a
-SpecPrag which, as it turns out, can be used unchanged for each method.
-The "it turns out" bit is delicate, but it works fine!
+  * A call (range ($dfIxPair Int Int d1 d2)) might simplify two ways:
+       --> {ClassOp rule for range}     $crangePair Int Int d1 d2
+       --> {SPEC rule for $crangePair}  $s$crangePair
+    or thus:
+       --> {SPEC rule for $dfIxPair}    range $s$dfIxPair
+       --> {ClassOpRule for range}      $s$crangePair
+    It doesn't matter which way.
+
+  * We want to specialise the RHS of both $dfIxPair and $crangePair,
+    but the SAME HsWrapper will do for both!  We can call tcSpecPrag
+    just once, and pass the result (in spec_inst_info) to tcInstanceMethods.
+
 
 \begin{code}
 tcSpecInst :: Id -> Sig Name -> TcM TcSpecPrag
@@ -1436,7 +1459,6 @@ That is, just as if you'd written
     op1 b x = op2 (not b) x
 
 So for the above example we generate:
-
 
   {-# INLINE $dmop1 #-}
   -- $dmop1 has an InlineCompulsory unfolding

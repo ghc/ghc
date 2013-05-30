@@ -512,10 +512,10 @@ mkBasicRule op_name n_args rm
   = BuiltinRule { ru_name = occNameFS (nameOccName op_name),
                   ru_fn = op_name,
                   ru_nargs = n_args,
-                  ru_try = \dflags _ -> runRuleM rm dflags }
+                  ru_try = \ dflags in_scope _ -> runRuleM rm dflags in_scope }
 
 newtype RuleM r = RuleM
-  { runRuleM :: DynFlags -> IdUnfoldingFun -> [CoreExpr] -> Maybe r }
+  { runRuleM :: DynFlags -> InScopeEnv -> [CoreExpr] -> Maybe r }
 
 instance Monad RuleM where
   return x = RuleM $ \_ _ _ -> Just x
@@ -557,8 +557,8 @@ removeOp32 = mzero
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ _ args -> Just args
 
-getIdUnfoldingFun :: RuleM IdUnfoldingFun
-getIdUnfoldingFun = RuleM $ \_ iu _ -> Just iu
+getInScopeEnv :: RuleM InScopeEnv
+getInScopeEnv = RuleM $ \_ iu _ -> Just iu
 
 -- return the n-th argument of this rule, if it is a literal
 -- argument indices start from 0
@@ -745,8 +745,8 @@ dataToTagRule = a `mplus` b
     b = do
       dflags <- getDynFlags
       [_, val_arg] <- getArgs
-      id_unf <- getIdUnfoldingFun
-      (dc,_,_) <- liftMaybe $ exprIsConApp_maybe id_unf val_arg
+      in_scope <- getInScopeEnv
+      (dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
       return $ mkIntVal dflags (toInteger (dataConTag dc - fIRST_TAG))
 \end{code}
@@ -812,11 +812,11 @@ builtinRules :: [CoreRule]
 builtinRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = \_ _ -> match_append_lit },
+                   ru_nargs = 4, ru_try = \_ _ _ -> match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
-                   ru_nargs = 2, ru_try = \_ _ -> match_eq_string },
+                   ru_nargs = 2, ru_try = \_ _ _ -> match_eq_string },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
-                   ru_nargs = 2, ru_try = \_ _ -> match_inline }]
+                   ru_nargs = 2, ru_try = \_ _ _ -> match_inline }]
  ++ builtinIntegerRules
 
 builtinIntegerRules :: [CoreRule]
@@ -929,8 +929,8 @@ builtinIntegerRules =
 --      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
 --      =  unpackFoldrCString# "foobaz" c n
 
-match_append_lit :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_append_lit _ [Type ty1,
+match_append_lit :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_append_lit [Type ty1,
                     Lit (MachStr s1),
                     c1,
                     Var unpk `App` Type ty2
@@ -946,20 +946,20 @@ match_append_lit _ [Type ty1,
                    `App` c1
                    `App` n)
 
-match_append_lit _ _ = Nothing
+match_append_lit _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
-match_eq_string :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_eq_string _ [Var unpk1 `App` Lit (MachStr s1),
+match_eq_string :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_eq_string [Var unpk1 `App` Lit (MachStr s1),
                    Var unpk2 `App` Lit (MachStr s2)]
   | unpk1 `hasKey` unpackCStringIdKey,
     unpk2 `hasKey` unpackCStringIdKey
   = Just (if s1 == s2 then trueVal else falseVal)
 
-match_eq_string _ _ = Nothing
+match_eq_string _ = Nothing
 
 
 ---------------------------------------------------
@@ -975,14 +975,14 @@ match_eq_string _ _ = Nothing
 --     programmer can't avoid
 --
 -- Also, don't forget about 'inline's type argument!
-match_inline :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_inline _ (Type _ : e : _)
+match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_inline (Type _ : e : _)
   | (Var f, args1) <- collectArgs e,
     Just unf <- maybeUnfoldingTemplate (realIdUnfolding f)
              -- Ignore the IdUnfoldingFun here!
   = Just (mkApps unf args1)
 
-match_inline _ _ = Nothing
+match_inline _ = Nothing
 
 -------------------------------------------------
 -- Integer rules
@@ -990,26 +990,18 @@ match_inline _ _ = Nothing
 --   wordToInteger (79::Word#) = 79::Integer   
 -- Similarly Int64, Word64
 
-match_IntToInteger :: DynFlags
-                   -> Id
-                   -> IdUnfoldingFun
-                   -> [Expr CoreBndr]
-                   -> Maybe (Expr CoreBndr)
-match_IntToInteger _ id id_unf [xl]
+match_IntToInteger :: RuleFun
+match_IntToInteger _ id_unf fn [xl]
   | Just (MachInt x) <- exprIsLiteral_maybe id_unf xl
-  = case idType id of
+  = case idType fn of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
     _ ->
         panic "match_IntToInteger: Id has the wrong type"
 match_IntToInteger _ _ _ _ = Nothing
 
-match_WordToInteger :: DynFlags
-                    -> Id
-                    -> IdUnfoldingFun
-                    -> [Expr CoreBndr]
-                    -> Maybe (Expr CoreBndr)
-match_WordToInteger _ id id_unf [xl]
+match_WordToInteger :: RuleFun
+match_WordToInteger _ id_unf id [xl]
   | Just (MachWord x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
@@ -1018,12 +1010,8 @@ match_WordToInteger _ id id_unf [xl]
         panic "match_WordToInteger: Id has the wrong type"
 match_WordToInteger _ _ _ _ = Nothing
 
-match_Int64ToInteger :: DynFlags
-                     -> Id
-                     -> IdUnfoldingFun
-                     -> [Expr CoreBndr]
-                     -> Maybe (Expr CoreBndr)
-match_Int64ToInteger _ id id_unf [xl]
+match_Int64ToInteger :: RuleFun
+match_Int64ToInteger _ id_unf id [xl]
   | Just (MachInt64 x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
@@ -1032,12 +1020,8 @@ match_Int64ToInteger _ id id_unf [xl]
         panic "match_Int64ToInteger: Id has the wrong type"
 match_Int64ToInteger _ _ _ _ = Nothing
 
-match_Word64ToInteger :: DynFlags
-                      -> Id
-                      -> IdUnfoldingFun
-                      -> [Expr CoreBndr]
-                      -> Maybe (Expr CoreBndr)
-match_Word64ToInteger _ id id_unf [xl]
+match_Word64ToInteger :: RuleFun
+match_Word64ToInteger _ id_unf id [xl]
   | Just (MachWord64 x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
@@ -1049,47 +1033,29 @@ match_Word64ToInteger _ _ _ _ = Nothing
 -------------------------------------------------
 match_Integer_convert :: Num a
                       => (DynFlags -> a -> Expr CoreBndr)
-                      -> DynFlags
-                      -> Id
-                      -> IdUnfoldingFun
-                      -> [Expr CoreBndr]
-                      -> Maybe (Expr CoreBndr)
-match_Integer_convert convert dflags _ id_unf [xl]
+                      -> RuleFun
+match_Integer_convert convert dflags id_unf _ [xl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   = Just (convert dflags (fromInteger x))
 match_Integer_convert _ _ _ _ _ = Nothing
 
-match_Integer_unop :: (Integer -> Integer)
-                   -> DynFlags
-                   -> Id
-                   -> IdUnfoldingFun
-                   -> [Expr CoreBndr]
-                   -> Maybe (Expr CoreBndr)
-match_Integer_unop unop _ _ id_unf [xl]
+match_Integer_unop :: (Integer -> Integer) -> RuleFun
+match_Integer_unop unop _ id_unf _ [xl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   = Just (Lit (LitInteger (unop x) i))
 match_Integer_unop _ _ _ _ _ = Nothing
 
-match_Integer_binop :: (Integer -> Integer -> Integer)
-                    -> DynFlags
-                    -> Id
-                    -> IdUnfoldingFun
-                    -> [Expr CoreBndr]
-                    -> Maybe (Expr CoreBndr)
-match_Integer_binop binop _ _ id_unf [xl,yl]
+match_Integer_binop :: (Integer -> Integer -> Integer) -> RuleFun
+match_Integer_binop binop _ id_unf _ [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just (Lit (LitInteger (x `binop` y) i))
 match_Integer_binop _ _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
-match_Integer_divop_both :: (Integer -> Integer -> (Integer, Integer))
-                         -> DynFlags
-                         -> Id
-                         -> IdUnfoldingFun
-                         -> [Expr CoreBndr]
-                         -> Maybe (Expr CoreBndr)
-match_Integer_divop_both divop _ _ id_unf [xl,yl]
+match_Integer_divop_both 
+   :: (Integer -> Integer -> (Integer, Integer)) -> RuleFun
+match_Integer_divop_both divop _ id_unf _ [xl,yl]
   | Just (LitInteger x t) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
@@ -1102,50 +1068,30 @@ match_Integer_divop_both divop _ _ id_unf [xl,yl]
 match_Integer_divop_both _ _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
-match_Integer_divop_one :: (Integer -> Integer -> Integer)
-                        -> DynFlags
-                        -> Id
-                        -> IdUnfoldingFun
-                        -> [Expr CoreBndr]
-                        -> Maybe (Expr CoreBndr)
-match_Integer_divop_one divop _ _ id_unf [xl,yl]
+match_Integer_divop_one :: (Integer -> Integer -> Integer) -> RuleFun
+match_Integer_divop_one divop _ id_unf _ [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   = Just (Lit (LitInteger (x `divop` y) i))
 match_Integer_divop_one _ _ _ _ _ = Nothing
 
-match_Integer_Int_binop :: (Integer -> Int -> Integer)
-                        -> DynFlags
-                        -> Id
-                        -> IdUnfoldingFun
-                        -> [Expr CoreBndr]
-                        -> Maybe (Expr CoreBndr)
-match_Integer_Int_binop binop _ _ id_unf [xl,yl]
+match_Integer_Int_binop :: (Integer -> Int -> Integer) -> RuleFun
+match_Integer_Int_binop binop _ id_unf _ [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
   = Just (Lit (LitInteger (x `binop` fromIntegral y) i))
 match_Integer_Int_binop _ _ _ _ _ = Nothing
 
-match_Integer_binop_Bool :: (Integer -> Integer -> Bool)
-                         -> DynFlags
-                         -> Id
-                         -> IdUnfoldingFun
-                         -> [Expr CoreBndr]
-                         -> Maybe (Expr CoreBndr)
-match_Integer_binop_Bool binop _ _ id_unf [xl, yl]
+match_Integer_binop_Bool :: (Integer -> Integer -> Bool) -> RuleFun
+match_Integer_binop_Bool binop _ id_unf _ [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just (if x `binop` y then trueVal else falseVal)
 match_Integer_binop_Bool _ _ _ _ _ = Nothing
 
-match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering)
-                             -> DynFlags
-                             -> Id
-                             -> IdUnfoldingFun
-                             -> [Expr CoreBndr]
-                             -> Maybe (Expr CoreBndr)
-match_Integer_binop_Ordering binop _ _ id_unf [xl, yl]
+match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
+match_Integer_binop_Ordering binop _ id_unf _ [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just $ case x `binop` y of
@@ -1156,12 +1102,8 @@ match_Integer_binop_Ordering _ _ _ _ _ = Nothing
 
 match_Integer_Int_encodeFloat :: RealFloat a
                               => (a -> Expr CoreBndr)
-                              -> DynFlags
-                              -> Id
-                              -> IdUnfoldingFun
-                              -> [Expr CoreBndr]
-                              -> Maybe (Expr CoreBndr)
-match_Integer_Int_encodeFloat mkLit _ _ id_unf [xl,yl]
+                              -> RuleFun
+match_Integer_Int_encodeFloat mkLit _ id_unf _ [xl,yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
   = Just (mkLit $ encodeFloat x (fromInteger y))
@@ -1179,24 +1121,16 @@ match_Integer_Int_encodeFloat _ _ _ _ _ = Nothing
 -- NaN or +-Inf
 match_rationalTo :: RealFloat a
                  => (a -> Expr CoreBndr)
-                 -> DynFlags
-                 -> Id
-                 -> IdUnfoldingFun
-                 -> [Expr CoreBndr]
-                 -> Maybe (Expr CoreBndr)
-match_rationalTo mkLit _ _ id_unf [xl, yl]
+                 -> RuleFun
+match_rationalTo mkLit _ id_unf _ [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   = Just (mkLit (fromRational (x % y)))
 match_rationalTo _ _ _ _ _ = Nothing
 
-match_decodeDouble :: DynFlags
-                   -> Id
-                   -> IdUnfoldingFun
-                   -> [Expr CoreBndr]
-                   -> Maybe (Expr CoreBndr)
-match_decodeDouble _ fn id_unf [xl]
+match_decodeDouble :: RuleFun
+match_decodeDouble _ id_unf fn [xl]
   | Just (MachDouble x) <- exprIsLiteral_maybe id_unf xl
   = case idType fn of
     FunTy _ (TyConApp _ [integerTy, intHashTy]) ->
@@ -1211,23 +1145,13 @@ match_decodeDouble _ fn id_unf [xl]
         panic "match_decodeDouble: Id has the wrong type"
 match_decodeDouble _ _ _ _ = Nothing
 
-match_XToIntegerToX :: Name
-                    -> DynFlags
-                    -> Id
-                    -> IdUnfoldingFun
-                    -> [Expr CoreBndr]
-                    -> Maybe (Expr CoreBndr)
+match_XToIntegerToX :: Name -> RuleFun
 match_XToIntegerToX n _ _ _ [App (Var x) y]
   | idName x == n
   = Just y
 match_XToIntegerToX _ _ _ _ _ = Nothing
 
-match_smallIntegerTo :: PrimOp
-                     -> DynFlags
-                     -> Id
-                     -> IdUnfoldingFun
-                     -> [Expr CoreBndr]
-                     -> Maybe (Expr CoreBndr)
+match_smallIntegerTo :: PrimOp -> RuleFun
 match_smallIntegerTo primOp _ _ _ [App (Var x) y]
   | idName x == smallIntegerName
   = Just $ App (Var (mkPrimOpId primOp)) y

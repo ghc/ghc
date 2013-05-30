@@ -1244,15 +1244,15 @@ tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
                                                  (UnfWhen unsat_ok boring_ok))
     }
 
-tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
-  = do { mb_ops1 <- forkM_maybe doc $ mapM tc_arg ops
+tcUnfolding name dfun_ty _ (IfDFunUnfold bs ops)
+  = bindIfaceBndrs bs $ \ bs' ->
+    do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
        ; return (case mb_ops1 of
                     Nothing   -> noUnfolding
-                    Just ops1 -> mkDFunUnfolding dfun_ty ops1) }
+                    Just ops1 -> mkDFunUnfolding bs' (classDataCon cls) ops1) }
   where
     doc = text "Class ops for dfun" <+> ppr name
-    tc_arg (DFunPolyArg  e) = do { e' <- tcIfaceExpr e; return (DFunPolyArg e') }
-    tc_arg (DFunLamArg i)   = return (DFunLamArg i)
+    (_, _, cls, _) = tcSplitDFunTy dfun_ty
 
 tcUnfolding name ty info (IfExtWrapper arity wkr)
   = tcIfaceWrapper name ty info arity (tcIfaceExtId wkr)

@@ -104,8 +104,17 @@ type InterestingVarFun = Var -> Bool
 
 \begin{code}
 type FV = InterestingVarFun
-        -> VarSet               -- In scope
+        -> VarSet               -- Locally bound
         -> VarSet               -- Free vars
+ -- Return the vars that are both (a) interesting 
+ --                           and (b) not locally bound
+ -- See function keep_it
+
+keep_it :: InterestingVarFun -> VarSet -> Var -> Bool
+keep_it fv_cand in_scope var
+  | var `elemVarSet` in_scope = False
+  | fv_cand var               = True
+  | otherwise                 = False
 
 union :: FV -> FV -> FV
 union fv1 fv2 fv_cand in_scope = fv1 fv_cand in_scope `unionVarSet` fv2 fv_cand in_scope
@@ -151,13 +160,6 @@ oneVar var fv_cand in_scope
 someVars :: VarSet -> FV
 someVars vars fv_cand in_scope
   = filterVarSet (keep_it fv_cand in_scope) vars
-
-keep_it :: InterestingVarFun -> VarSet -> Var -> Bool
-keep_it fv_cand in_scope var
-  | var `elemVarSet` in_scope = False
-  | fv_cand var               = True
-  | otherwise                 = False
-
 
 addBndr :: CoreBndr -> FV -> FV
 addBndr bndr fv fv_cand in_scope
@@ -434,15 +436,18 @@ idUnfoldingVars :: Id -> VarSet
 -- and we'll get exponential behaviour if we look at both unf and rhs!
 -- But do look at the *real* unfolding, even for loop breakers, else
 -- we might get out-of-scope variables
-idUnfoldingVars id = stableUnfoldingVars isLocalId (realIdUnfolding id) `orElse` emptyVarSet
+idUnfoldingVars id = stableUnfoldingVars (realIdUnfolding id) `orElse` emptyVarSet
 
-stableUnfoldingVars :: InterestingVarFun -> Unfolding -> Maybe VarSet
-stableUnfoldingVars fv_cand unf
+stableUnfoldingVars :: Unfolding -> Maybe VarSet
+stableUnfoldingVars unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-         | isStableSource src -> Just (exprSomeFreeVars fv_cand rhs)
-      DFunUnfolding _ _ args  -> Just (exprsSomeFreeVars fv_cand (dfunArgExprs args))
-      _other                  -> Nothing
+         | isStableSource src          
+         -> Just (exprFreeVars rhs)
+      DFunUnfolding { df_bndrs = bndrs, df_args = args } 
+         -> Just (exprs_fvs args isLocalVar (mkVarSet bndrs))
+            -- DFuns are top level, so no fvs from types of bndrs
+      _other -> Nothing
 \end{code}
 
 

@@ -641,19 +641,21 @@ activeUnfolding env
   where
     mode = getMode env
 
-getUnfoldingInRuleMatch :: SimplEnv -> IdUnfoldingFun
+getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
 -- When matching in RULE, we want to "look through" an unfolding
 -- (to see a constructor) if *rules* are on, even if *inlinings*
 -- are not.  A notable example is DFuns, which really we want to
 -- match in rules like (op dfun) in gentle mode. Another example
 -- is 'otherwise' which we want exprIsConApp_maybe to be able to
 -- see very early on
-getUnfoldingInRuleMatch env id
-  | unf_is_active = idUnfolding id
-  | otherwise     = NoUnfolding
+getUnfoldingInRuleMatch env
+  = (in_scope, id_unf)
   where
+    in_scope = seInScope env
     mode = getMode env
-    unf_is_active
+    id_unf id | unf_is_active id = idUnfolding id
+              | otherwise        = NoUnfolding
+    unf_is_active id
      | not (sm_rules mode) = active_unfolding_minimal id
      | otherwise           = isActive (sm_phase mode) (idInlineActivation id)
 

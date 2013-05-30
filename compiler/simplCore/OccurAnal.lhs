@@ -692,7 +692,7 @@ makeNode env imp_rules_edges bndr_set (bndr, rhs)
 
     -- Finding the free variables of the INLINE pragma (if any)
     unf        = realIdUnfolding bndr     -- Ignore any current loop-breaker flag
-    mb_unf_fvs = stableUnfoldingVars isLocalId unf
+    mb_unf_fvs = stableUnfoldingVars unf
 
     -- Find the "nd_inl" free vars; for the loop-breaker phase
     inl_fvs = case mb_unf_fvs of

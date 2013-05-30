@@ -1746,8 +1746,8 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
   where
     if_rhs = toIfaceExpr rhs
 
-toIfUnfolding lb (DFunUnfolding _ar _con ops)
-  = Just (HsUnfold lb (IfDFunUnfold (map (fmap toIfaceExpr) ops)))
+toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = Just (HsUnfold lb (IfDFunUnfold (map toIfaceBndr bndrs) (map toIfaceExpr args)))
       -- No need to serialise the data constructor; 
       -- we can recover it from the type of the dfun
 

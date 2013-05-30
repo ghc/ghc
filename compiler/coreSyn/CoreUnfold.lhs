@@ -48,7 +48,6 @@ module CoreUnfold (
 import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
-import TcType           ( tcSplitDFunTy )
 import OccurAnal        ( occurAnalyseExpr )
 import CoreSubst hiding( substTy )
 import CoreArity       ( manifestArity, exprBotStrictness_maybe )
@@ -98,13 +97,9 @@ mkImplicitUnfolding dflags expr
 mkSimpleUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkSimpleUnfolding dflags = mkUnfolding dflags InlineRhs False False
 
-mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
-mkDFunUnfolding dfun_ty ops 
-  = DFunUnfolding dfun_nargs data_con ops
-  where
-    (tvs, theta, cls, _) = tcSplitDFunTy dfun_ty
-    dfun_nargs = length tvs + length theta
-    data_con   = classDataCon cls
+mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
+mkDFunUnfolding bndrs con ops 
+  = DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = ops }
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
 mkWwInlineRule id expr arity

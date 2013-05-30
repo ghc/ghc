@@ -24,7 +24,6 @@ import TyCon
 import DataCon    (dataConName, dataConWorkId, dataConTyCon)
 import PrelInfo   (wiredInThings, basicKnownKeyNames)
 import Id         (idName, isDataConWorkId_maybe)
-import CoreSyn    (DFunArg(..))
 import Coercion   (LeftOrRight(..))
 import TysWiredIn
 import IfaceEnv
@@ -1110,14 +1109,6 @@ instance Binary IfaceIdDetails where
             1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
             _ -> do { n <- get bh; return (IfDFunId n) }
 
-instance Binary (DFunArg IfaceExpr) where
-    put_ bh (DFunPolyArg  e) = putByte bh 0 >> put_ bh e
-    put_ bh (DFunLamArg i)   = putByte bh 1 >> put_ bh i
-    get bh = do { h <- getByte bh
-                ; case h of
-                    0 -> do { a <- get bh; return (DFunPolyArg a) }
-                    _ -> do { a <- get bh; return (DFunLamArg a) } }
-
 instance Binary IfaceIdInfo where
     put_ bh NoInfo      = putByte bh 0
     put_ bh (HasInfo i) = putByte bh 1 >> lazyPut bh i -- NB lazyPut
@@ -1164,9 +1155,10 @@ instance Binary IfaceUnfolding where
         putByte bh 3
         put_ bh a
         put_ bh n
-    put_ bh (IfDFunUnfold as) = do
+    put_ bh (IfDFunUnfold as bs) = do
         putByte bh 4
         put_ bh as
+        put_ bh bs
     put_ bh (IfCompulsory e) = do
         putByte bh 5
         put_ bh e
@@ -1188,7 +1180,8 @@ instance Binary IfaceUnfolding where
                     n <- get bh
                     return (IfExtWrapper a n)
             4 -> do as <- get bh
-                    return (IfDFunUnfold as)
+                    bs <- get bh
+                    return (IfDFunUnfold as bs)
             _ -> do e <- get bh
                     return (IfCompulsory e)
 
