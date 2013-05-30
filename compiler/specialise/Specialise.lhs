@@ -10,7 +10,7 @@ module Specialise ( specProgram ) where
 
 import Id
 import TcType hiding( substTy, extendTvSubstList )
-import Type( TyVar, isDictTy, mkPiTypes )
+import Type( TyVar, isDictTy, mkPiTypes, classifyPredType, PredTree(..), isIPClass )
 import Coercion( Coercion )
 import CoreMonad
 import qualified CoreSubst
@@ -1597,7 +1597,9 @@ mkCallUDs :: SpecEnv -> Id -> [CoreExpr] -> UsageDetails
 mkCallUDs env f args
   | not (want_calls_for f)  -- Imported from elsewhere
   || null theta             -- Not overloaded
-  || not (all type_determines_value theta)
+  = emptyUDs
+
+  |  not (all type_determines_value theta)
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
   || not (any (interestingDict env) dicts)    -- Note [Interesting dictionary arguments]
@@ -1625,13 +1627,35 @@ mkCallUDs env f args
 
     want_calls_for f = isLocalId f || isInlinablePragma (idInlinePragma f)
 
-    type_determines_value pred = isClassPred pred && not (isIPPred pred)
-        -- Only specialise if all overloading is on non-IP *class* params,
-        -- because these are the ones whose *type* determines their *value*.
-        -- In ptic, with implicit params, the type args
-        --  *don't* say what the value of the implicit param is!
-        -- See Trac #7101
+    type_determines_value pred    -- See Note [Type determines value]
+        = case classifyPredType pred of
+            ClassPred cls _ -> not (isIPClass cls)
+            TuplePred ps    -> all type_determines_value ps
+            EqPred {}       -> True
+            IrredPred {}    -> True   -- Things like (D []) where D is a
+                                      -- Constraint-ranged family; Trac #7785
 \end{code}
+
+Note [Type determines value]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only specialise if all overloading is on non-IP *class* params,
+because these are the ones whose *type* determines their *value*.  In
+parrticular, with implicit params, the type args *don't* say what the
+value of the implicit param is!  See Trac #7101
+
+However, consider
+         type family D (v::*->*) :: Constraint
+         type instance D [] = ()
+         f :: D v => v Char -> Int
+If we see a call (f "foo"), we'll pass a "dictionary"
+  () |> (g :: () ~ D [])
+and it's good to specialise f at this dictionary.
+
+So the question is: can an implicit parameter "hide inside" a
+type-family constraint like (D a).  Well, no.  We don't allow
+        type instance D Maybe = ?x:Int
+Hence the IrredPred case in type_determines_value.
+See Trac #7785.
 
 Note [Interesting dictionary arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
