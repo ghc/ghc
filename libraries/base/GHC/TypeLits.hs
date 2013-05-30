@@ -9,7 +9,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}  -- for <=
-{-# LANGUAGE RankNTypes #-}             -- for SingI magic
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -20,8 +19,8 @@ module GHC.TypeLits
     Nat, Symbol
 
     -- * Linking type and value level
-  , Sing, SingI, SingE, SingRep, sing, singByProxy, fromSing
-  , SomeSing(..), ToSing(..), SomeNat, SomeSymbol
+  , Sing, SingI, SingE, SingRep, sing, fromSing
+  , unsafeSingNat, unsafeSingSymbol
 
     -- * Working with singletons
   , withSing, singThat
@@ -44,28 +43,27 @@ module GHC.TypeLits
   , Nat1(..), FromNat1
 
     -- * Kind parameters
-  , KindIs(..), Demote, DemoteRep
+  , OfKind(..), Demote, DemoteRep
   , KindOf
   ) where
 
-import GHC.Base(Eq((==)), Ord((>=)), Bool(..), ($), otherwise, (.), seq, asTypeOf)
+import GHC.Base(Eq((==)), Bool(..), ($), otherwise, (.))
 import GHC.Num(Integer, (-))
 import GHC.Base(String)
 import GHC.Read(Read(..))
 import GHC.Show(Show(..))
-import GHC.Prim(magicSingI)
 import Unsafe.Coerce(unsafeCoerce)
 -- import Data.Bits(testBit,shiftR)
 import Data.Maybe(Maybe(..))
 import Data.List((++))
 
 -- | (Kind) A kind useful for passing kinds as parameters.
-data KindIs (a :: *) = KindParam
+data OfKind (a :: *) = KindParam
 
 {- | A shortcut for naming the kind parameter corresponding to the
-kind of a some type.  For example, @KindOf Int ~ (KindParam :: KindIs *)@,
-but @KindOf 2 ~ (KindParam :: KindIs Nat)@. -}
-type KindOf (a :: k) = (KindParam :: KindIs k)
+kind of a some type.  For example, @KindOf Int ~ (KindParam :: OfKind *)@,
+but @KindOf 2 ~ (KindParam :: OfKind Nat)@. -}
+type KindOf (a :: k) = (KindParam :: OfKind k)
 
 
 -- | (Kind) This is the kind of type-level natural numbers.
@@ -82,6 +80,12 @@ newtype instance Sing (n :: Nat)    = SNat Integer
 
 newtype instance Sing (n :: Symbol) = SSym String
 
+unsafeSingNat :: Integer -> Sing (n :: Nat)
+unsafeSingNat = SNat
+
+unsafeSingSymbol :: String -> Sing (n :: Symbol)
+unsafeSingSymbol = SSym
+
 --------------------------------------------------------------------------------
 
 -- | The class 'SingI' provides a \"smart\" constructor for singleton types.
@@ -92,12 +96,6 @@ class SingI a where
 
   -- | The only value of type @Sing a@
   sing :: Sing a
-
--- | A convenience function to create a singleton value, when
--- we have a proxy argument in scope.
-singByProxy :: SingI n => proxy n -> Sing n
-singByProxy _ = sing
-
 
 --------------------------------------------------------------------------------
 -- | Comparison of type-level naturals.
@@ -131,16 +129,16 @@ and not their type---all types of a given kind are processed by the
 same instances.
 -}
 
-class (kparam ~ KindParam) => SingE (kparam :: KindIs k) where
+class (kparam ~ KindParam) => SingE (kparam :: OfKind k) where
   type DemoteRep kparam :: *
   fromSing :: Sing (a :: k) -> DemoteRep kparam
 
-instance SingE (KindParam :: KindIs Nat) where
-  type DemoteRep (KindParam :: KindIs Nat) = Integer
+instance SingE (KindParam :: OfKind Nat) where
+  type DemoteRep (KindParam :: OfKind Nat) = Integer
   fromSing (SNat n) = n
 
-instance SingE (KindParam :: KindIs Symbol) where
-  type DemoteRep (KindParam :: KindIs Symbol) = String
+instance SingE (KindParam :: OfKind Symbol) where
+  type DemoteRep (KindParam :: OfKind Symbol) = String
   fromSing (SSym s) = s
 
 {- | A convenient name for the type used to representing the values
@@ -155,78 +153,6 @@ class    (SingI a, SingE (KindOf a)) => SingRep (a :: k)
 instance (SingI a, SingE (KindOf a)) => SingRep (a :: k)
 
 
--- The type of an unknown singletons of a given kind.
--- Note that the "type" parameter on this type is really
--- a *kind* parameter (this is simillar to the trick used in `SingE`).
-data SomeSing :: KindIs k -> * where
-  SomeSing :: SingI (n::k) => proxy n -> SomeSing (kp :: KindIs k)
-
--- | A definition of natural numbers in terms of singletons.
-type SomeNat    = SomeSing (KindParam :: KindIs Nat)
-
--- | A definition of strings in tterms of singletons.
-type SomeSymbol = SomeSing (KindParam :: KindIs Symbol)
-
--- | The class of function that can promote a representation value
--- into a singleton.  Like `SingE`, this class overloads based
--- on a *kind*.
--- The method returns `Maybe` because sometimes
--- the representation type contains more values than are supported
--- by the singletons.
-class (kp ~ KindParam) => ToSing (kp :: KindIs k) where
-  toSing :: DemoteRep kp -> Maybe (SomeSing kp)
-
-instance ToSing (KindParam :: KindIs Nat) where
-  toSing n
-    | n >= 0        = Just (incoherentForgetSing (SNat n))
-    | otherwise     = Nothing
-
-instance ToSing (KindParam :: KindIs Symbol) where
-  toSing n          = Just (incoherentForgetSing (SSym n))
-
-
-
-{- PRIVATE:
-WARNING: This function has the scary name because,
-in general, it could lead to incoherent behavior of the `sing` method.
-
-The reason is that it converts the provided `Sing n` value,
-into the the evidence for the `SingI` class hidden in `SomeSing`.
-
-Now, for proper singleton types this should not happen,
-because if there is only one value of type `Sing n`,
-then the parameter must be the same as the value of `sing`.
-However, we have no guarantees about the definition of `Sing a`,
-or, indeed, the instance of `Sing`.
-
-We use the function in the instances for `ToSing` for
-kind `Nat` and `Symbol`, where the use is guarantted to be safe.
-
-NOTE: The implementation is a bit of a hack at present,
-hence all the very special annotation.
--}
-incoherentForgetSing :: forall (n :: k) (kp :: KindIs k). Sing n -> SomeSing kp
-incoherentForgetSing x = seq x (magic1 SomeSing (LocalProxy :: LocalProxy n))
-  where
-  -- The signature ensures that we instantiate things in the right order
-  magic1 :: (SingI n => LocalProxy n -> SomeSing kp) -> LocalProxy n -> SomeSing kp
-  magic1 = magic
-
-  -- For a description of the `magicSingI` stuff in this
-  -- take a look at Note [magicSingI magic] in MkId in GHC's source.
-  -- The NOINLINE and the type signature ensure that the
-  -- definitional rule fires.
-  {-# NOINLINE magic #-}
-  magic :: (SingI n => b) -> b
-  magic = magicSingI x (\f -> f `asTypeOf` ())
-
--- PRIVATE
-data LocalProxy n = LocalProxy
-
-
-
-
-
 {- | A convenience function useful when we need to name a singleton value
 multiple times.  Without this function, each use of 'sing' could potentially
 refer to a different singleton, and one has to use type signatures to
@@ -234,7 +160,6 @@ ensure that they are the same. -}
 
 withSing :: SingI a => (Sing a -> b) -> b
 withSing f = f sing
-
 
 
 {- | A convenience function that names a singleton satisfying a certain
@@ -313,6 +238,11 @@ instance Show (a :~: b) where
 
 {- | Check if two type-natural singletons of potentially different types
 are indeed the same, by comparing their runtime representations.
+
+WARNING: in combination with `unsafeSingNat` this may lead to unsoundness:
+
+> eqSingNat (sing :: Sing 1) (unsafeSingNat 1 :: Sing 2)
+> == Just (Refl :: 1 :~: 2)
 -}
 
 eqSingNat :: Sing (m :: Nat) -> Sing (n :: Nat) -> Maybe (m :~: n)
@@ -323,6 +253,8 @@ eqSingNat x y
 
 {- | Check if two symbol singletons of potentially different types
 are indeed the same, by comparing their runtime representations.
+WARNING: in combination with `unsafeSingSymbol` this may lead to unsoundness
+(see `eqSingNat` for an example).
 -}
 
 eqSingSym:: Sing (m :: Symbol) -> Sing (n :: Symbol) -> Maybe (m :~: n)
