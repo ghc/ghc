@@ -49,6 +49,17 @@ do
     shift
 done
 
+check_packages () {
+    echo "== Start $1 package check"
+    if [ "$bindistdir" = "" ]
+    then
+        inplace/bin/ghc-pkg check -v
+    else
+        "$bindistdir"/bin/ghc-pkg check -v
+    fi
+    echo "== End $1 package check"
+}
+
 if ! [ -d testsuite ]
 then
     echo 'You need the testsuite to validate' >&2
@@ -97,6 +108,8 @@ echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 $make -j$threads
 # For a "debug make", add "--debug=b --debug=m"
 
+check_packages post-build
+
 # -----------------------------------------------------------------------------
 # Build and test a binary distribution (not --fast)
 
@@ -112,7 +125,11 @@ if [ $speed != "FAST" ]; then
     #
     bindistdir="bindisttest/install   dir"
 
+    check_packages post-install
+
     $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
+
+    check_packages post-xhtml
 fi
 
 fi # testsuite-only
@@ -146,6 +163,8 @@ FAST)
 esac
 
 $make $MAKE_TEST_TARGET stage=2 $BINDIST THREADS=$threads 2>&1 | tee testlog
+
+check_packages post-testsuite
 
 if [ "$hpc" = YES ]
 then
