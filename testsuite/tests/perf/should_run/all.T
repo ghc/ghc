@@ -261,3 +261,16 @@ test('T7436',
       ],
      compile_and_run,
      ['-O'])
+
+test('T7797',
+      [stats_num_field('bytes allocated', 
+                      [(wordsize(32), 360940756, 5),
+                    # expected value: 2685858140 (x86/OS X)
+                          # expected: 360940756 (x86/Linux)
+                       (wordsize(64), 480050944, 5)]),
+                          # expected: 480050944 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
