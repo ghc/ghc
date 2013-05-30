@@ -22,7 +22,7 @@ module Type (
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe,
 
-        mkAppTy, mkAppTys, mkNakedAppTys, splitAppTy, splitAppTys,
+        mkAppTy, mkAppTys, splitAppTy, splitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe,
 
         mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe,
@@ -349,11 +349,6 @@ mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1                []   = ty1
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
 mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
-
-mkNakedAppTys :: Type -> [Type] -> Type
-mkNakedAppTys ty1                []   = ty1
-mkNakedAppTys (TyConApp tc tys1) tys2 = mkNakedTyConApp tc (tys1 ++ tys2)
-mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)

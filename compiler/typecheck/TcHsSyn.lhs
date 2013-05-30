@@ -1324,7 +1324,9 @@ zonkTcTypeToType env ty
   = go ty
   where
     go (TyConApp tc tys) = do tys' <- mapM go tys
-                              return (TyConApp tc tys')
+                              return (mkTyConApp tc tys')
+                -- Establish Type invariants
+                -- See Note [Zonking inside the knot] in TcHsType
 
     go (LitTy n)         = return (LitTy n)
 

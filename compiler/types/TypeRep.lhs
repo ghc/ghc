@@ -33,7 +33,7 @@ module TypeRep (
         PredType, ThetaType,      -- Synonyms
 
         -- Functions over types
-        mkNakedTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
+        mkTyConTy, mkTyVarTy, mkTyVarTys,
         isLiftedTypeKind, isSuperKind, isTypeVar, isKindVar,
         
         -- Pretty-printing
@@ -279,14 +279,6 @@ mkTyVarTy  = TyVarTy
 
 mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
-
-mkNakedTyConApp :: TyCon -> [Type] -> Type
--- Builds a TyConApp 
---   * without being strict in TyCon,
---   * the TyCon should never be a saturated FunTyCon 
--- Type.mkTyConApp is the usual one
-mkNakedTyConApp tc tys
-  = TyConApp (ASSERT( not (isFunTyCon tc && length tys == 2) ) tc) tys
 
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type

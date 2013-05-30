@@ -53,7 +53,7 @@ module TcMType (
   skolemiseSigTv, skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, zonkTcTypeAndFV,
   zonkQuantifiedTyVar, quantifyTyVars,
-  zonkTcType, zonkTcTypes, zonkTcThetaType, 
+  zonkTcTyVarBndr, zonkTcType, zonkTcTypes, zonkTcThetaType, 
 
   zonkTcKind, defaultKindVarToStar,
   zonkEvVar, zonkWC, zonkId, zonkCt, zonkCts, zonkSkolemInfo,
@@ -932,6 +932,9 @@ zonkTcType ty
   where
     go (TyConApp tc tys) = do tys' <- mapM go tys
                               return (TyConApp tc tys')
+                -- Do NOT establish Type invariants, because
+                -- doing so is strict in the TyCOn.
+                -- See Note [Zonking inside the knot] in TcHsType
 
     go (LitTy n)         = return (LitTy n)
 
@@ -945,6 +948,9 @@ zonkTcType ty
 		-- NB the mkAppTy; we might have instantiated a
 		-- type variable to a type constructor, so we need
 		-- to pull the TyConApp to the top.
+                -- OK to do this because only strict in the structure
+                -- not in the TyCon.
+                -- See Note [Zonking inside the knot] in TcHsType
 
 	-- The two interesting cases!
     go (TyVarTy tyvar) | isTcTyVar tyvar = zonkTcTyVar tyvar
