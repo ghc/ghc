@@ -17,6 +17,7 @@ test('PolyKinds07', normal, compile_fail, [''])
 
 test('PolyKinds12', normal, compile, [''])
 
+test('CatPairs', normal, compile, [''])
 test('Freeman', normal, compile_and_run, [''])
 test('MonoidsTF', normal, compile_and_run, [''])
 test('MonoidsFD', normal, compile_and_run, [''])
