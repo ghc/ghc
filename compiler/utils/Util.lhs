@@ -18,7 +18,7 @@ module Util (
 
         unzipWith,
 
-        mapFst, mapSnd,
+        mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith, splitEithers,
 
@@ -259,6 +259,13 @@ splitEithers (e : es) = case e of
                         Left x -> (x:xs, ys)
                         Right y -> (xs, y:ys)
     where (xs,ys) = splitEithers es
+
+chkAppend :: [a] -> [a] -> [a]
+-- Checks for the second arguemnt being empty
+-- Used in situations where that situation is common
+chkAppend xs ys 
+  | null ys   = xs
+  | otherwise = xs ++ ys
 \end{code}
 
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists

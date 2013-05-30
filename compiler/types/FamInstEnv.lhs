@@ -754,13 +754,11 @@ find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_branched = 
               where 
                 match = FamInstMatch { fim_instance = inst
                                      , fim_index    = ind
-                                     , fim_tys      = substTyVars subst tvs `add_on` match_tys2}
+                                     , fim_tys      = substTyVars subst tvs `chkAppend` match_tys2}
       where
         -- Deal with over-saturation
         -- See Note [Over-saturated matches]
         (match_tys1, match_tys2) = splitAtList mb_tcs match_tys
-        add_on tys1 []   = tys1  -- The wildly common case
-        add_on tys1 tys2 = tys1 ++ tys2
 
 lookup_fam_inst_env           -- The worker, local to this module
     :: MatchFun
