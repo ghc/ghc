@@ -612,7 +612,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
               pkgs <- parseMultiPackageConf verbosity path
               mkPackageDB pkgs
          Right fs
-           | not use_cache -> ignore_cache
+           | not use_cache -> ignore_cache (const $ return ())
            | otherwise -> do
               let cache = path </> cachefilename
               tdir     <- getModificationTime path
@@ -621,24 +621,42 @@ readParseDatabase verbosity mb_user_conf use_cache path
                 Left ex -> do
                      when (verbosity > Normal) $
                         warn ("warning: cannot read cache file " ++ cache ++ ": " ++ show ex)
-                     ignore_cache
-                Right tcache
-                  | tcache >= tdir -> do
-                     when (verbosity > Normal) $
-                        infoLn ("using cache: " ++ cache)
-                     pkgs <- myReadBinPackageDB cache
-                     let pkgs' = map convertPackageInfoIn pkgs
-                     mkPackageDB pkgs'
-                  | otherwise -> do
-                     when (verbosity >= Normal) $ do
-                        warn ("WARNING: cache is out of date: " ++ cache)
-                        warn "  use 'ghc-pkg recache' to fix."
-                     ignore_cache
+                     ignore_cache (const $ return ())
+                Right tcache -> do
+                  let compareTimestampToCache file =
+                          when (verbosity >= Verbose) $ do
+                              tFile <- getModificationTime file
+                              compareTimestampToCache' file tFile
+                      compareTimestampToCache' file tFile = do
+                          let rel = case tcache `compare` tFile of
+                                    LT -> " (NEWER than cache)"
+                                    GT -> " (older than cache)"
+                                    EQ -> " (same as cache)"
+                          warn ("Timestamp " ++ show tFile
+                             ++ " for " ++ file ++ rel)
+                  when (verbosity >= Verbose) $ do
+                      warn ("Timestamp " ++ show tcache ++ " for " ++ cache)
+                      compareTimestampToCache' path tdir
+                  if tcache >= tdir
+                      then do
+                          when (verbosity > Normal) $
+                             infoLn ("using cache: " ++ cache)
+                          pkgs <- myReadBinPackageDB cache
+                          let pkgs' = map convertPackageInfoIn pkgs
+                          mkPackageDB pkgs'
+                      else do
+                          when (verbosity >= Normal) $ do
+                              warn ("WARNING: cache is out of date: "
+                                 ++ cache)
+                              warn "Use 'ghc-pkg recache' to fix."
+                          ignore_cache compareTimestampToCache
             where
-                 ignore_cache = do
+                 ignore_cache :: (FilePath -> IO ()) -> IO PackageDB
+                 ignore_cache checkTime = do
                      let confs = filter (".conf" `isSuffixOf`) fs
-                     pkgs <- mapM (parseSingletonPackageConf verbosity) $
-                                   map (path </>) confs
+                         doFile f = do checkTime f
+                                       parseSingletonPackageConf verbosity f
+                     pkgs <- mapM doFile $ map (path </>) confs
                      mkPackageDB pkgs
   where
     mkPackageDB pkgs = do
