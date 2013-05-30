@@ -20,17 +20,18 @@ module PrelRules ( primOpRules, builtinRules ) where
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import {-# SOURCE #-} MkId ( mkPrimOpId )
+import {-# SOURCE #-} MkId ( mkPrimOpId, magicSingIId )
 
 import CoreSyn
 import MkCore
 import Id
+import Var         (setVarType)
 import Literal
 import CoreSubst   ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
-import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
+import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon, unwrapNewTyCon_maybe )
 import DataCon     ( dataConTag, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
@@ -46,6 +47,7 @@ import BasicTypes
 import DynFlags
 import Platform
 import Util
+import Coercion     (mkUnbranchedAxInstCo)
 
 import Control.Monad
 import Data.Bits as Bits
@@ -816,7 +818,10 @@ builtinRules
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_eq_string },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
-                   ru_nargs = 2, ru_try = \_ _ _ -> match_inline }]
+                   ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
+     BuiltinRule { ru_name = fsLit "MagicSingI", ru_fn = idName magicSingIId,
+                   ru_nargs = 3, ru_try = \_ _ _ -> match_magicSingI }
+     ]
  ++ builtinIntegerRules
 
 builtinIntegerRules :: [CoreRule]
@@ -983,6 +988,20 @@ match_inline (Type _ : e : _)
   = Just (mkApps unf args1)
 
 match_inline _ = Nothing
+
+
+-- See Note [magicSingIId magic] in `basicTypes/MkId.lhs`
+-- for a description of what is going on here.
+match_magicSingI :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_magicSingI (Type t : e : Lam b _ : _)
+  | ([_,_,fu],_)     <- splitFunTys t
+  , (sI_type,_)      <- splitFunTy fu
+  , Just (sI_tc,xs)  <- splitTyConApp_maybe sI_type
+  , Just (_,_,co)    <- unwrapNewTyCon_maybe sI_tc
+  = Just $ let f = setVarType b fu
+           in Lam f $ Var f `App` Cast e (mkUnbranchedAxInstCo co xs)
+
+match_magicSingI _ = Nothing
 
 -------------------------------------------------
 -- Integer rules

@@ -1686,6 +1686,9 @@ checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 154
 
 undefinedKey :: Unique
 undefinedKey                  = mkPreludeMiscIdUnique 155
+
+magicSingIKey :: Unique
+magicSingIKey              = mkPreludeMiscIdUnique 156
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
