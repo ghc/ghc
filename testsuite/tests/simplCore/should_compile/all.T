@@ -166,3 +166,4 @@ test('T7796',
      ['$MAKE -s --no-print-directory T7796'])
 test('T5550', normal, compile, [''])
 test('T7865', normal, run_command, ['$MAKE -s --no-print-directory T7865'])
+test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
