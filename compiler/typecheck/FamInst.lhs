@@ -11,7 +11,7 @@ The @FamInst@ type: family instance heads
 
 module FamInst ( 
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
-	tcLookupFamInst, tcLookupDataFamInst,
+	tcLookupFamInst, 
         tcGetFamInstEnvs,
         newFamInst
     ) where
@@ -231,54 +231,7 @@ tcLookupFamInst tycon tys
 	   (match:_) 
               -> return $ Just match
        }
-
-tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
--- Find the instance of a data family
--- Note [Looking up family instances for deriving]
-tcLookupDataFamInst tycon tys
-  | not (isFamilyTyCon tycon)
-  = return (tycon, tys)
-  | otherwise
-  = ASSERT( isAlgTyCon tycon )
-    do { maybeFamInst <- tcLookupFamInst tycon tys
-       ; case maybeFamInst of
-           Nothing             -> famInstNotFound tycon tys
-           Just (FamInstMatch { fim_instance = famInst
-                              , fim_index    = index
-                              , fim_tys      = tys })
-             -> ASSERT( index == 0 )
-                let tycon' = dataFamInstRepTyCon famInst
-                in return (tycon', tys) }
-
-famInstNotFound :: TyCon -> [Type] -> TcM a
-famInstNotFound tycon tys 
-  = failWithTc (ptext (sLit "No family instance for")
-			<+> quotes (pprTypeApp tycon tys))
 \end{code}
-
-Note [Looking up family instances for deriving]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-tcLookupFamInstExact is an auxiliary lookup wrapper which requires
-that looked-up family instances exist.  If called with a vanilla
-tycon, the old type application is simply returned.
-
-If we have
-  data instance F () = ... deriving Eq
-  data instance F () = ... deriving Eq
-then tcLookupFamInstExact will be confused by the two matches;
-but that can't happen because tcInstDecls1 doesn't call tcDeriving
-if there are any overlaps.
-
-There are two other things that might go wrong with the lookup.
-First, we might see a standalone deriving clause
-	deriving Eq (F ())
-when there is no data instance F () in scope. 
-
-Note that it's OK to have
-  data instance F [a] = ...
-  deriving Eq (F [(a,b)])
-where the match is not exact; the same holds for ordinary data types
-with standalone deriving declrations.
 
 
 %************************************************************************

@@ -133,10 +133,14 @@ data FamInstBranch
                                  -- Like ClsInsts, these variables are always
                                  -- fresh. See Note [Template tyvars are fresh]
                                  -- in InstEnv
-    , fib_lhs    :: [Type]       -- type patterns
+
+    , fib_lhs    :: [Type]       -- Type patterns
+
     , fib_rhs    :: Type         -- RHS of family instance
                                  -- See Note [Why we need fib_rhs]
-    , fib_tcs    :: [Maybe Name] -- used for "rough matching" during typechecking
+
+    , fib_tcs    :: [Maybe Name] -- Used for "rough matching" during typechecking
+                                 -- In 1-1 correspondence with fib_lhs
                                  -- see Note [Rough-match field] in InstEnv
     }
 
@@ -316,7 +320,7 @@ mkImportedFamInst fam branched roughs axiom
 %************************************************************************
 
 Note [FamInstEnv]
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 A FamInstEnv maps a family name to the list of known instances for that family.
 
 The same FamInstEnv includes both 'data family' and 'type family' instances.
@@ -333,6 +337,25 @@ Neverthless it is still useful to have data families in the FamInstEnv:
 
  - In standalone deriving instance Eq (T [Int]) we need to find the
    representation type for T [Int]
+
+Note [Varying number of patterns for data family axioms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For data families, the number of patterns may vary between instances.
+For example
+   data family T a b
+   data instance T Int a = T1 a | T2
+   data instance T Bool [a] = T3 a
+
+Then we get a data type for each instance, and an axiom:
+   data TInt a = T1 a | T2
+   data TBoolList a = T3 a
+
+   axiom ax7   :: T Int ~ TInt   -- Eta-reduced
+   axiom ax8 a :: T Bool [a] ~ TBoolList a
+
+These two axioms for T, one with one pattern, one with two.  The reason
+for this eta-reduction is decribed in TcInstDcls
+   Note [Eta reduction for data family axioms]
 
 \begin{code}
 type FamInstEnv = UniqFM FamilyInstEnv  -- Maps a family to its instances
@@ -701,21 +724,8 @@ lookup_fam_inst_env'          -- The worker, local to this module
 lookup_fam_inst_env' match_fun _one_sided ie fam tys
   | isFamilyTyCon fam
   , Just (FamIE insts) <- lookupUFM ie fam
-  = ASSERT2( n_tys >= arity, ppr fam <+> ppr tys ) 
-    if arity < n_tys then    -- Family type applications must be saturated
-                             -- See Note [Over-saturated matches]
-        map wrap_extra_tys (find match_fun (take arity tys) insts)
-    else
-        find match_fun tys insts    -- The common case
-
+  = find match_fun tys insts    -- The common case
   | otherwise = []
-  where
-    arity = tyConArity fam
-    n_tys = length tys
-    extra_tys = drop arity tys
-    wrap_extra_tys fim@(FamInstMatch { fim_tys = match_tys })
-      = fim { fim_tys = match_tys ++ extra_tys }
-
 
 find :: MatchFun -> [Type] -> [FamInst Branched] -> [FamInstMatch]
 find _         _         [] = []
@@ -737,14 +747,20 @@ find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_branched = 
       | instanceCantMatch rough_tcs mb_tcs
       = findBranch seen rest (ind+1) -- branch won't unify later; no need to add to 'seen'
       | otherwise
-      = case match_fun seen branch is_branched match_tys of
+      = case match_fun seen branch is_branched match_tys1 of
           (Nothing, KeepSearching) -> findBranch (branch : seen) rest (ind+1)
           (Nothing, StopSearching) -> (Nothing, StopSearching)
           (Just subst, cont)       -> (Just match, cont)
               where 
                 match = FamInstMatch { fim_instance = inst
                                      , fim_index    = ind
-                                     , fim_tys      = substTyVars subst tvs }
+                                     , fim_tys      = substTyVars subst tvs `add_on` match_tys2}
+      where
+        -- Deal with over-saturation
+        -- See Note [Over-saturated matches]
+        (match_tys1, match_tys2) = splitAtList mb_tcs match_tys
+        add_on tys1 []   = tys1  -- The wildly common case
+        add_on tys1 tys2 = tys1 ++ tys2
 
 lookup_fam_inst_env           -- The worker, local to this module
     :: MatchFun
@@ -851,7 +867,6 @@ topNormaliseType env ty
 normaliseTcApp :: FamInstEnvs -> TyCon -> [Type] -> (Coercion, Type)
 normaliseTcApp env tc tys
   | isFamilyTyCon tc
-  , tyConArity tc <= length tys    -- Unsaturated data families are possible
   , [FamInstMatch { fim_instance = fam_inst
                   , fim_index    = fam_ind
                   , fim_tys      = inst_tys }] <- lookupFamInstEnv env tc ntys 

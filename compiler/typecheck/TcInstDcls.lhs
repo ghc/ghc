@@ -50,7 +50,7 @@ import DataCon
 import Class
 import Var
 import VarEnv
-import VarSet     ( mkVarSet, subVarSet, varSetElems )
+import VarSet 
 import Pair
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
@@ -712,8 +712,9 @@ tcDataFamInstDecl mb_clsinfo
                      NewType  -> ASSERT( not (null data_cons) )
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
               -- freshen tyvars
-              ; let axiom    = mkSingleCoAxiom axiom_name tvs' fam_tc pats' 
-                                               (mkTyConApp rep_tc (mkTyVarTys tvs'))
+              ; let (eta_tvs, eta_pats) = eta_reduce tvs' pats'
+                    axiom    = mkSingleCoAxiom axiom_name eta_tvs fam_tc eta_pats 
+                                               (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent   = FamInstTyCon axiom fam_tc pats'
                     rep_tc   = buildAlgTyCon rep_tc_name tvs' cType stupid_theta tc_rhs 
                                              Recursive 
@@ -730,7 +731,43 @@ tcDataFamInstDecl mb_clsinfo
          -- Remember to check validity; no recursion to worry about here
        ; checkValidTyCon rep_tc
        ; return fam_inst } }
+  where
+    -- See Note [Eta reduction for data family axioms]
+    --  [a,b,c,d].T [a] c Int c d  ==>  [a,b,c]. T [a] c Int c
+    eta_reduce tvs pats = go (reverse tvs) (reverse pats)
+    go (tv:tvs) (pat:pats)
+      | Just tv' <- getTyVar_maybe pat
+      , tv == tv'
+      , not (tv `elemVarSet` tyVarsOfTypes pats)
+      = go tvs pats
+    go tvs pats = (reverse tvs, reverse pats)
 \end{code}
+
+Note [Eta reduction for data family axioms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+   data family T a b :: *
+   newtype instance T Int a = MkT (IO a) deriving( Monad )
+We'd like this to work.  From the 'newtype instance' you might
+think we'd get:
+   newtype TInt a = MkT (IO a)
+   axiom ax1 a :: T Int a ~ TInt a   -- The type-instance part
+   axiom ax2 a :: TInt a ~ IO a      -- The newtype part
+
+But now what can we do?  We have this problem
+   Given:   d  :: Monad IO
+   Wanted:  d' :: Monad (T Int) = d |> ????
+What coercion can we use for the ???
+
+Solution: eta-reduce both axioms, thus:
+   axiom ax1 :: T Int ~ TInt
+   axiom ax2 :: TInt ~ IO
+Now
+   d' = d |> Monad (sym (ax2 ; ax1))
+
+See Note [Newtype eta] in TyCon.
+
+
 
 %************************************************************************
 %*                                                                      *
