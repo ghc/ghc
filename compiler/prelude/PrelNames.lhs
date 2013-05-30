@@ -617,11 +617,12 @@ punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
 ident_RDR               = dataQual_RDR lEX (fsLit "Ident")
 symbol_RDR              = dataQual_RDR lEX (fsLit "Symbol")
 
-step_RDR, alt_RDR, reset_RDR, prec_RDR :: RdrName
+step_RDR, alt_RDR, reset_RDR, prec_RDR, pfail_RDR :: RdrName
 step_RDR                = varQual_RDR  rEAD_PREC (fsLit "step")
 alt_RDR                 = varQual_RDR  rEAD_PREC (fsLit "+++")
 reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
 prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
+pfail_RDR               = varQual_RDR  rEAD_PREC (fsLit "pfail")
 
 showList_RDR, showList___RDR, showsPrec_RDR, showString_RDR,
     showSpace_RDR, showParen_RDR :: RdrName
