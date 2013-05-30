@@ -1,5 +1,5 @@
 
 DerivUnsatFam.hs:8:1:
     Can't make a derived instance of ‛Functor T’:
-      Unsaturated data family application
+      No family instance for ‛T’
     In the stand-alone deriving instance for ‛Functor T’
