@@ -175,6 +175,18 @@ instance Foldable [] where
     foldr1 = Prelude.foldr1
     foldl1 = Prelude.foldl1
 
+instance Foldable (Either a) where
+    foldMap _ (Left _) = mempty
+    foldMap f (Right y) = f y
+
+    foldr _ z (Left _) = z
+    foldr f z (Right y) = f y z
+
+instance Foldable ((,) a) where
+    foldMap f (_, y) = f y
+
+    foldr f z (_, y) = f y z
+
 instance Ix i => Foldable (Array i) where
     foldr f z = Prelude.foldr f z . elems
     foldl f z = Prelude.foldl f z . elems

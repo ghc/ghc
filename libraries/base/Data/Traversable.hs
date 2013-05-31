@@ -182,6 +182,13 @@ instance Traversable [] where
 
     mapM = Prelude.mapM
 
+instance Traversable (Either a) where
+    traverse _ (Left x) = pure (Left x)
+    traverse f (Right y) = Right <$> f y
+
+instance Traversable ((,) a) where
+    traverse f (x, y) = (,) x <$> f y
+
 instance Ix i => Traversable (Array i) where
     traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
 
