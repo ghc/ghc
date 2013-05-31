@@ -85,6 +85,9 @@ ifeq "$(PlatformSupportsSharedLibs)" "YES"
 GhcLibWays += dyn
 endif
 
+DYNAMIC_BY_DEFAULT   = NO
+DYNAMIC_GHC_PROGRAMS = NO
+
 endif
 
 # -------- A Fast build -------------------------------------------------------
@@ -132,6 +135,9 @@ HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
+
+DYNAMIC_BY_DEFAULT   = NO
+DYNAMIC_GHC_PROGRAMS = NO
 
 endif
 
