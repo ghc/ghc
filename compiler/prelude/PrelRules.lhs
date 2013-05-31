@@ -47,7 +47,7 @@ import BasicTypes
 import DynFlags
 import Platform
 import Util
-import Coercion     (mkUnbranchedAxInstCo)
+import Coercion     (mkUnbranchedAxInstCo,mkSymCo)
 
 import Control.Monad
 import Data.Bits as Bits
@@ -994,12 +994,12 @@ match_inline _ = Nothing
 -- for a description of what is going on here.
 match_magicSingI :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicSingI (Type t : e : Lam b _ : _)
-  | ([_,_,fu],_)     <- splitFunTys t
-  , (sI_type,_)      <- splitFunTy fu
-  , Just (sI_tc,xs)  <- splitTyConApp_maybe sI_type
-  , Just (_,_,co)    <- unwrapNewTyCon_maybe sI_tc
+  | ((_ : _ : fu : _),_)  <- splitFunTys t
+  , (sI_type,_)           <- splitFunTy fu
+  , Just (sI_tc,xs)       <- splitTyConApp_maybe sI_type
+  , Just (_,_,co)         <- unwrapNewTyCon_maybe sI_tc
   = Just $ let f = setVarType b fu
-           in Lam f $ Var f `App` Cast e (mkUnbranchedAxInstCo co xs)
+           in Lam f $ Var f `App` Cast e (mkSymCo (mkUnbranchedAxInstCo co xs))
 
 match_magicSingI _ = Nothing
 
