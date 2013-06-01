@@ -49,6 +49,10 @@ endif
 #    within the build tree. On Windows this causes a problem as they look
 #    like bad rules, due to the two colons, so we filter them out.
 	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@.tmp2
+# Insert the calls to hi-rule. Basically, we look for the
+#     Foo.dyn_o Foo.o : Foo.hs
+# lines, and create corresponding hi-rule lines
+#     $(eval $(call hi-rule,Foo.dyn_hi Foo.hi : %hi: %o Foo.hs))
 	sed '/hs$$$$/ p                                      ; \
 	     /hs$$$$/ s/o /hi /g                             ; \
 	     /hs$$$$/ s/:/ : %hi: %o /                       ; \
