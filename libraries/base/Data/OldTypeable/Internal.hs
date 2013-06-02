@@ -75,11 +75,7 @@ import GHC.Arr          ( Array, STArray )
 import Data.Int
 
 import GHC.Fingerprint.Type
-import {-# SOURCE #-} GHC.Fingerprint
-   -- loop: GHC.Fingerprint -> Foreign.Ptr -> Data.Typeable
-   -- Better to break the loop here, because we want non-SOURCE imports
-   -- of Data.Typeable as much as possible so we can optimise the derived
-   -- instances.
+import GHC.Fingerprint
 
 -- | A concrete representation of a (monomorphic) type.  'TypeRep'
 -- supports reasonably efficient equality.
