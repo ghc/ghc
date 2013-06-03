@@ -580,6 +580,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
               , text "cls:" <+> ppr cls
               , text "tys:" <+> ppr inst_tys ]
                 -- C.f. TcInstDcls.tcLocalInstDecl1
+       ; checkTc (not (null inst_tys)) derivingNullaryErr
 
        ; let cls_tys = take (length inst_tys - 1) inst_tys
              inst_ty = last inst_tys
@@ -618,7 +619,9 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
         -- Given data T a b c = ... deriving( C d ),
         -- we want to drop type variables from T so that (C d (T a)) is well-kinded
         ; let cls_tyvars     = classTyVars cls
-              kind           = tyVarKind (last cls_tyvars)
+        ; checkTc (not (null cls_tyvars)) derivingNullaryErr
+
+        ; let kind           = tyVarKind (last cls_tyvars)
               (arg_kinds, _) = splitKindFunTys kind
               n_args_to_drop = length arg_kinds
               n_args_to_keep = tyConArity tc - n_args_to_drop
@@ -1874,6 +1877,9 @@ genDerivStuff loc fix_env clas name tycon comaux_maybe
 %************************************************************************
 
 \begin{code}
+derivingNullaryErr :: MsgDoc
+derivingNullaryErr = ptext (sLit "Cannot derive instances for nullary classes")
+
 derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> MsgDoc
 derivingKindErr tc cls cls_tys cls_kind
   = hang (ptext (sLit "Cannot derive well-kinded instance of form")
