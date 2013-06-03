@@ -40,3 +40,4 @@ test('T1133A',
      run_command,
      ['$MAKE --no-print-directory -s T1133A'])
 test('T5863a', normal, compile_fail, [''])
+test('T7959', normal, compile_fail, [''])
