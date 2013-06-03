@@ -5,22 +5,15 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC, 
-                tcInferRho, tcInferRhoNC, 
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
+                tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcCheckId,
                 addExprErrCtxt) where
-                
+
 #include "HsVersions.h"
 
-#ifdef GHCI 	/* Only if bootstrapped */
-import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
+#ifdef GHCI     /* Only if bootstrapped */
+import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcBracket )
 import qualified DsMeta
 #endif
 
@@ -68,37 +61,37 @@ import Class(classTyCon)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Main wrappers}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tcPolyExpr, tcPolyExprNC
-	 :: LHsExpr Name	-- Expression to type check
-       	 -> TcSigmaType		-- Expected type (could be a polytpye)
-       	 -> TcM (LHsExpr TcId)	-- Generalised expr with expected type
+         :: LHsExpr Name        -- Expression to type check
+         -> TcSigmaType         -- Expected type (could be a polytpye)
+         -> TcM (LHsExpr TcId)  -- Generalised expr with expected type
 
 -- tcPolyExpr is a convenient place (frequent but not too frequent)
 -- place to add context information.
 -- The NC version does not do so, usually because the caller wants
 -- to do so himself.
 
-tcPolyExpr expr res_ty 	
+tcPolyExpr expr res_ty
   = addExprErrCtxt expr $
     do { traceTc "tcPolyExpr" (ppr res_ty); tcPolyExprNC expr res_ty }
 
 tcPolyExprNC expr res_ty
   = do { traceTc "tcPolyExprNC" (ppr res_ty)
        ; (gen_fn, expr') <- tcGen GenSigCtxt res_ty $ \ _ rho ->
-			    tcMonoExprNC expr rho
+                            tcMonoExprNC expr rho
        ; return (mkLHsWrap gen_fn expr') }
 
 ---------------
-tcMonoExpr, tcMonoExprNC 
+tcMonoExpr, tcMonoExprNC
     :: LHsExpr Name      -- Expression to type check
     -> TcRhoType         -- Expected type (could be a type variable)
-			 -- Definitely no foralls at the top
+                         -- Definitely no foralls at the top
     -> TcM (LHsExpr TcId)
 
 tcMonoExpr expr res_ty
@@ -108,8 +101,8 @@ tcMonoExpr expr res_ty
 tcMonoExprNC (L loc expr) res_ty
   = ASSERT( not (isSigmaTy res_ty) )
     setSrcSpan loc $
-    do	{ expr' <- tcExpr expr res_ty
-	; return (L loc expr') }
+    do  { expr' <- tcExpr expr res_ty
+        ; return (L loc expr') }
 
 ---------------
 tcInferRho, tcInferRhoNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
@@ -118,7 +111,7 @@ tcInferRho, tcInferRhoNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
 --     f :: Int -> (forall a. a -> a) -> Int
 -- then we can infer
 --     f 3 :: (forall a. a -> a) -> Int
--- And that in turn is useful 
+-- And that in turn is useful
 --  (a) for the function part of any application (see tcApp)
 --  (b) for the special rule for '$'
 tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
@@ -129,14 +122,14 @@ tcInferRhoNC (L loc expr)
        ; return (L loc expr', rho) }
 
 tcInfExpr :: HsExpr Name -> TcM (HsExpr TcId, TcRhoType)
-tcInfExpr (HsVar f) 	= tcInferId f
-tcInfExpr (HsPar e) 	= do { (e', ty) <- tcInferRhoNC e
+tcInfExpr (HsVar f)     = tcInferId f
+tcInfExpr (HsPar e)     = do { (e', ty) <- tcInferRhoNC e
                              ; return (HsPar e', ty) }
-tcInfExpr (HsApp e1 e2) = tcInferApp e1 [e2]                                  
+tcInfExpr (HsApp e1 e2) = tcInferApp e1 [e2]
 tcInfExpr e             = tcInfer (tcExpr e)
 
 tcHole :: OccName -> TcRhoType -> TcM (HsExpr TcId)
-tcHole occ res_ty 
+tcHole occ res_ty
  = do { ty <- newFlexiTyVarTy liftedTypeKind
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
@@ -148,47 +141,47 @@ tcHole occ res_ty
 
 
 %************************************************************************
-%*									*
-	tcExpr: the main expression typechecker
-%*									*
+%*                                                                      *
+        tcExpr: the main expression typechecker
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tcExpr :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId)
 tcExpr e res_ty | debugIsOn && isSigmaTy res_ty     -- Sanity check
-       	        = pprPanic "tcExpr: sigma" (ppr res_ty $$ ppr e)
+                = pprPanic "tcExpr: sigma" (ppr res_ty $$ ppr e)
 
 tcExpr (HsVar name)  res_ty = tcCheckId name res_ty
 
 tcExpr (HsApp e1 e2) res_ty = tcApp e1 [e2] res_ty
 
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
-		     	         ; tcWrapResult (HsLit lit) lit_ty res_ty }
+                                 ; tcWrapResult (HsLit lit) lit_ty res_ty }
 
 tcExpr (HsPar expr)  res_ty = do { expr' <- tcMonoExprNC expr res_ty
-				 ; return (HsPar expr') }
+                                 ; return (HsPar expr') }
 
-tcExpr (HsSCC lbl expr) res_ty 
+tcExpr (HsSCC lbl expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsSCC lbl expr') }
 
-tcExpr (HsTickPragma info expr) res_ty 
+tcExpr (HsTickPragma info expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsTickPragma info expr') }
 
 tcExpr (HsCoreAnn lbl expr) res_ty
-  = do	{ expr' <- tcMonoExpr expr res_ty
-	; return (HsCoreAnn lbl expr') }
+  = do  { expr' <- tcMonoExpr expr res_ty
+        ; return (HsCoreAnn lbl expr') }
 
-tcExpr (HsOverLit lit) res_ty  
-  = do 	{ lit' <- newOverloadedLit (LiteralOrigin lit) lit res_ty
-	; return (HsOverLit lit') }
+tcExpr (HsOverLit lit) res_ty
+  = do  { lit' <- newOverloadedLit (LiteralOrigin lit) lit res_ty
+        ; return (HsOverLit lit') }
 
 tcExpr (NegApp expr neg_expr) res_ty
-  = do	{ neg_expr' <- tcSyntaxOp NegateOrigin neg_expr
-				  (mkFunTy res_ty res_ty)
-	; expr' <- tcMonoExpr expr res_ty
-	; return (NegApp expr' neg_expr') }
+  = do  { neg_expr' <- tcSyntaxOp NegateOrigin neg_expr
+                                  (mkFunTy res_ty res_ty)
+        ; expr' <- tcMonoExpr expr res_ty
+        ; return (NegApp expr' neg_expr') }
 
 tcExpr (HsIPVar x) res_ty
   = do { let origin = IPOccOrigin x
@@ -209,13 +202,13 @@ tcExpr (HsIPVar x) res_ty
       Nothing       -> panic "The dictionary for `IP` is not a newtype?"
 
 tcExpr (HsLam match) res_ty
-  = do	{ (co_fn, match') <- tcMatchLambda match res_ty
-	; return (mkHsWrap co_fn (HsLam match')) }
+  = do  { (co_fn, match') <- tcMatchLambda match res_ty
+        ; return (mkHsWrap co_fn (HsLam match')) }
 
 tcExpr e@(HsLamCase _ matches) res_ty
-  = do	{ (co_fn, [arg_ty], body_ty) <- matchExpectedFunTys msg 1 res_ty
-	; matches' <- tcMatchesCase match_ctxt arg_ty matches body_ty
-	; return $ mkHsWrapCo co_fn $ HsLamCase arg_ty matches' }
+  = do  { (co_fn, [arg_ty], body_ty) <- matchExpectedFunTys msg 1 res_ty
+        ; matches' <- tcMatchesCase match_ctxt arg_ty matches body_ty
+        ; return $ mkHsWrapCo co_fn $ HsLamCase arg_ty matches' }
   where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
@@ -224,11 +217,11 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
  = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
 
       -- Remember to extend the lexical type-variable environment
-      ; (gen_fn, expr') 
+      ; (gen_fn, expr')
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
-      	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` skol_tvs) $
-	             	       	-- See Note [More instantiated than scoped] in TcBinds
-      	       tcMonoExprNC expr res_ty
+               tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` skol_tvs) $
+                                -- See Note [More instantiated than scoped] in TcBinds
+               tcMonoExprNC expr res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
@@ -237,28 +230,28 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
 
 tcExpr (HsType ty) _
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
-	-- This is the syntax for type applications that I was planning
-	-- but there are difficulties (e.g. what order for type args)
-	-- so it's not enabled yet.
-	-- Can't eliminate it altogether from the parser, because the
-	-- same parser parses *patterns*.
+        -- This is the syntax for type applications that I was planning
+        -- but there are difficulties (e.g. what order for type args)
+        -- so it's not enabled yet.
+        -- Can't eliminate it altogether from the parser, because the
+        -- same parser parses *patterns*.
 tcExpr (HsUnboundVar v) res_ty
   = tcHole (rdrNameOcc v) res_ty
 \end{code}
 
 
 %************************************************************************
-%*									*
-		Infix operators and sections
-%*									*
+%*                                                                      *
+                Infix operators and sections
+%*                                                                      *
 %************************************************************************
 
 Note [Left sections]
 ~~~~~~~~~~~~~~~~~~~~
 Left sections, like (4 *), are equivalent to
-	\ x -> (*) 4 x,
+        \ x -> (*) 4 x,
 or, if PostfixOperators is enabled, just
-	(*) 4
+        (*) 4
 With PostfixOperators we don't actually require the function to take
 two arguments at all.  For example, (x `not`) means (not x); you get
 postfix operators!  Not Haskell 98, but it's less work and kind of
@@ -266,14 +259,14 @@ useful.
 
 Note [Typing rule for ($)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-People write 
+People write
    runST $ blah
-so much, where 
+so much, where
    runST :: (forall s. ST s a) -> a
 that I have finally given in and written a special type-checking
-rule just for saturated appliations of ($).  
+rule just for saturated appliations of ($).
   * Infer the type of the first argument
-  * Decompose it; should be of form (arg2_ty -> res_ty), 
+  * Decompose it; should be of form (arg2_ty -> res_ty),
        where arg2_ty might be a polytype
   * Use arg2_ty to typecheck arg2
 
@@ -282,26 +275,26 @@ Note [Typing rule for seq]
 We want to allow
        x `seq` (# p,q #)
 which suggests this type for seq:
-   seq :: forall (a:*) (b:??). a -> b -> b, 
+   seq :: forall (a:*) (b:??). a -> b -> b,
 with (b:??) meaning that be can be instantiated with an unboxed tuple.
 But that's ill-kinded!  Function arguments can't be unboxed tuples.
 And indeed, you could not expect to do this with a partially-applied
 'seq'; it's only going to work when it's fully applied.  so it turns
-into 
+into
     case x of _ -> (# p,q #)
 
 For a while I slid by by giving 'seq' an ill-kinded type, but then
-the simplifier eta-reduced an application of seq and Lint blew up 
+the simplifier eta-reduced an application of seq and Lint blew up
 with a kind error.  It seems more uniform to treat 'seq' as it it
-was a language construct.  
+was a language construct.
 
-See Note [seqId magic] in MkId, and 
+See Note [seqId magic] in MkId, and
 
 
 \begin{code}
 tcExpr (OpApp arg1 op fix arg2) res_ty
   | (L loc (HsVar op_name)) <- op
-  , op_name `hasKey` seqIdKey		-- Note [Typing rule for seq]
+  , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
   = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
        ; let arg2_ty = res_ty
        ; arg1' <- tcArg op (arg1, arg1_ty, 1)
@@ -311,14 +304,14 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; return $ OpApp arg1' op' fix arg2' }
 
   | (L loc (HsVar op_name)) <- op
-  , op_name `hasKey` dollarIdKey	-- Note [Typing rule for ($)]
+  , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
        ; (arg1', arg1_ty) <- tcInferRho arg1
 
        ; let doc = ptext (sLit "The first argument of ($) takes")
        ; (co_arg1, [arg2_ty], op_res_ty) <- matchExpectedFunTys doc 1 arg1_ty
          -- arg1_ty = arg2_ty -> op_res_ty
-       	 -- And arg2_ty maybe polymorphic; that's the point
+         -- And arg2_ty maybe polymorphic; that's the point
 
        -- Make sure that the argument and result types have kind '*'
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
@@ -339,8 +332,8 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; let op' = L loc (HsWrap (mkWpTyApps [a_ty, b_ty]) (HsVar op_id))
        ; return $ mkHsWrapCo (co_res) $
          OpApp (mkLHsWrapCo (mkTcFunCo co_a co_b) $
-                mkLHsWrapCo co_arg1 arg1') 
-               op' fix 
+                mkLHsWrapCo co_arg1 arg1')
+               op' fix
                (mkLHsWrapCo co_a arg2') }
 
   | otherwise
@@ -353,19 +346,19 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
          OpApp arg1' (mkLHsWrapCo co_fn op') fix arg2' }
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
---	\ x -> op x expr
- 
+--      \ x -> op x expr
+
 tcExpr (SectionR op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; (co_fn, [arg1_ty, arg2_ty], op_res_ty) <- unifyOpFunTysWrap op 2 op_ty
        ; co_res <- unifyType (mkFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
        ; return $ mkHsWrapCo co_res $
-         SectionR (mkLHsWrapCo co_fn op') arg2' } 
+         SectionR (mkLHsWrapCo co_fn op') arg2' }
 
 tcExpr (SectionL arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
-       ; dflags <- getDynFlags	    -- Note [Left sections]
+       ; dflags <- getDynFlags      -- Note [Left sections]
        ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
                          | otherwise                        = 2
 
@@ -381,12 +374,12 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
        ; tup_args1 <- tcTupArgs tup_args arg_tys
        ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
-    
+
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections)
     do { let kind = case boxity of { Boxed   -> liftedTypeKind
                                    ; Unboxed -> openTypeKind }
-             arity = length tup_args 
+             arity = length tup_args
              tup_tc = tupleTyCon (boxityNormalTupleSort boxity) arity
 
        ; arg_tys <- newFlexiTyVarTys (tyConArity tup_tc) kind
@@ -398,13 +391,13 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
 
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
-       
+
        ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
 
-tcExpr (ExplicitList _ witness exprs) res_ty   
+tcExpr (ExplicitList _ witness exprs) res_ty
   = case witness of
       Nothing   -> do  { (coi, elt_ty) <- matchExpectedListTy res_ty
-                       ; exprs' <- mapM (tc_elt elt_ty) exprs                       
+                       ; exprs' <- mapM (tc_elt elt_ty) exprs
                        ; return $ mkHsWrapCo coi (ExplicitList elt_ty Nothing exprs') }
 
       Just fln -> do  { list_ty <- newFlexiTyVarTy liftedTypeKind
@@ -412,48 +405,48 @@ tcExpr (ExplicitList _ witness exprs) res_ty
                      ; (coi, elt_ty) <- matchExpectedListTy list_ty
                      ; exprs' <- mapM (tc_elt elt_ty) exprs
                      ; return $ mkHsWrapCo coi (ExplicitList elt_ty (Just fln') exprs') }
-     where tc_elt elt_ty expr = tcPolyExpr expr elt_ty          
+     where tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
-tcExpr (ExplicitPArr _ exprs) res_ty	-- maybe empty
-  = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
-    	; exprs' <- mapM (tc_elt elt_ty) exprs	
-	; return $ mkHsWrapCo coi (ExplicitPArr elt_ty exprs') }
+tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
+  = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
+        ; exprs' <- mapM (tc_elt elt_ty) exprs
+        ; return $ mkHsWrapCo coi (ExplicitPArr elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 \end{code}
 
 %************************************************************************
-%*									*
-		Let, case, if, do
-%*									*
+%*                                                                      *
+                Let, case, if, do
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tcExpr (HsLet binds expr) res_ty
-  = do	{ (binds', expr') <- tcLocalBinds binds $
-			     tcMonoExpr expr res_ty   
-	; return (HsLet binds' expr') }
+  = do  { (binds', expr') <- tcLocalBinds binds $
+                             tcMonoExpr expr res_ty
+        ; return (HsLet binds' expr') }
 
 tcExpr (HsCase scrut matches) exp_ty
-  = do	{  -- We used to typecheck the case alternatives first.
-	   -- The case patterns tend to give good type info to use
-	   -- when typechecking the scrutinee.  For example
-	   --	case (map f) of
-	   --	  (x:xs) -> ...
-	   -- will report that map is applied to too few arguments
-	   --
-	   -- But now, in the GADT world, we need to typecheck the scrutinee
-	   -- first, to get type info that may be refined in the case alternatives
-	  (scrut', scrut_ty) <- tcInferRho scrut
+  = do  {  -- We used to typecheck the case alternatives first.
+           -- The case patterns tend to give good type info to use
+           -- when typechecking the scrutinee.  For example
+           --   case (map f) of
+           --     (x:xs) -> ...
+           -- will report that map is applied to too few arguments
+           --
+           -- But now, in the GADT world, we need to typecheck the scrutinee
+           -- first, to get type info that may be refined in the case alternatives
+          (scrut', scrut_ty) <- tcInferRho scrut
 
-	; traceTc "HsCase" (ppr scrut_ty)
-	; matches' <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
-	; return (HsCase scrut' matches') }
+        ; traceTc "HsCase" (ppr scrut_ty)
+        ; matches' <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
+        ; return (HsCase scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
-		      mc_body = tcBody }
+                      mc_body = tcBody }
 
-tcExpr (HsIf Nothing pred b1 b2) res_ty	   -- Ordinary 'if'
+tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
   = do { pred' <- tcMonoExpr pred boolTy
        ; b1' <- tcMonoExpr b1 res_ty
        ; b2' <- tcMonoExpr b2 res_ty
@@ -484,8 +477,8 @@ tcExpr (HsDo do_or_lc stmts _) res_ty
   = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc pat cmd) res_ty
-  = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty
-	; return $ mkHsWrapCo coi (HsProc pat' cmd') }
+  = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
+        ; return $ mkHsWrapCo coi (HsProc pat' cmd') }
 \end{code}
 
 Note [Rebindable syntax for if]
@@ -505,27 +498,27 @@ to support expressions like this:
 
 
 %************************************************************************
-%*									*
-		Record construction and update
-%*									*
+%*                                                                      *
+                Record construction and update
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
-  = do	{ data_con <- tcLookupDataCon con_name
+  = do  { data_con <- tcLookupDataCon con_name
 
- 	-- Check for missing fields
-	; checkMissingFields data_con rbinds
+        -- Check for missing fields
+        ; checkMissingFields data_con rbinds
 
-	; (con_expr, con_tau) <- tcInferId con_name
-	; let arity = dataConSourceArity data_con
-	      (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
-	      con_id = dataConWrapId data_con
+        ; (con_expr, con_tau) <- tcInferId con_name
+        ; let arity = dataConSourceArity data_con
+              (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
+              con_id = dataConWrapId data_con
 
         ; co_res <- unifyType actual_res_ty res_ty
         ; rbinds' <- tcRecordBinds data_con arg_tys rbinds
-	; return $ mkHsWrapCo co_res $ 
-          RecordCon (L loc con_id) con_expr rbinds' } 
+        ; return $ mkHsWrapCo co_res $
+          RecordCon (L loc con_id) con_expr rbinds' }
 \end{code}
 
 Note [Type of a record update]
@@ -533,12 +526,12 @@ Note [Type of a record update]
 The main complication with RecordUpd is that we need to explicitly
 handle the *non-updated* fields.  Consider:
 
-	data T a b c = MkT1 { fa :: a, fb :: (b,c) }
-		     | MkT2 { fa :: a, fb :: (b,c), fc :: c -> c }
-		     | MkT3 { fd :: a }
-	
-	upd :: T a b c -> (b',c) -> T a b' c
-	upd t x = t { fb = x}
+        data T a b c = MkT1 { fa :: a, fb :: (b,c) }
+                     | MkT2 { fa :: a, fb :: (b,c), fc :: c -> c }
+                     | MkT3 { fd :: a }
+
+        upd :: T a b c -> (b',c) -> T a b' c
+        upd t x = t { fb = x}
 
 The result type should be (T a b' c)
 not (T a b c),   because 'b' *is not* mentioned in a non-updated field
@@ -547,10 +540,10 @@ NB that it's not good enough to look at just one constructor; we must
 look at them all; cf Trac #3219
 
 After all, upd should be equivalent to:
-	upd t x = case t of 
-			MkT1 p q -> MkT1 p x
-			MkT2 a b -> MkT2 p b
-			MkT3 d   -> error ...
+        upd t x = case t of
+                        MkT1 p q -> MkT1 p x
+                        MkT2 a b -> MkT2 p b
+                        MkT3 d   -> error ...
 
 So we need to give a completely fresh type to the result record,
 and then constrain it by the fields that are *not* updated ("p" above).
@@ -563,17 +556,17 @@ Hence the use of 'relevant_cont'.
 Note [Implict type sharing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We also take into account any "implicit" non-update fields.  For example
-	data T a b where { MkT { f::a } :: T a a; ... }
+        data T a b where { MkT { f::a } :: T a a; ... }
 So the "real" type of MkT is: forall ab. (a~b) => a -> T a b
 
 Then consider
-	upd t x = t { f=x }
+        upd t x = t { f=x }
 We infer the type
-	upd :: T a b -> a -> T a b
-	upd (t::T a b) (x::a)
-	   = case t of { MkT (co:a~b) (_:a) -> MkT co x }
+        upd :: T a b -> a -> T a b
+        upd (t::T a b) (x::a)
+           = case t of { MkT (co:a~b) (_:a) -> MkT co x }
 We can't give it the more general type
-	upd :: T a b -> c -> T c b
+        upd :: T a b -> c -> T c b
 
 Note [Criteria for update]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -590,7 +583,7 @@ The criterion we use is this:
   of the data constructor
 
 NB: this is not (quite) the same as being a "naughty" record selector
-(See Note [Naughty record selectors]) in TcTyClsDecls), at least 
+(See Note [Naughty record selectors]) in TcTyClsDecls), at least
 in the case of GADTs. Consider
    data T a where { MkT :: { f :: a } :: T [a] }
 Then f is not "naughty" because it has a well-typed record selector.
@@ -614,9 +607,9 @@ Suppose r :: T (t1,t2), e :: t3
 Then  r { x=e } :: T (t3,t1)
   --->
       case r |> co1 of
-	MkT x y -> MkT e y |> co2
+        MkT x y -> MkT e y |> co2
       where co1 :: T (t1,t2) ~ :TP t1 t2
-	    co2 :: :TP t3 t2 ~ T (t3,t2)
+            co2 :: :TP t3 t2 ~ T (t3,t2)
 The wrapping with co2 is done by the constructor wrapper for MkT
 
 Outgoing invariants
@@ -626,111 +619,111 @@ In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
   * cons are the data constructors to be updated
 
   * in_inst_tys, out_inst_tys have same length, and instantiate the
-	*representation* tycon of the data cons.  In Note [Data 
-	family example], in_inst_tys = [t1,t2], out_inst_tys = [t3,t2]
-	
+        *representation* tycon of the data cons.  In Note [Data
+        family example], in_inst_tys = [t1,t2], out_inst_tys = [t3,t2]
+
 \begin{code}
 tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
   = ASSERT( notNull upd_fld_names )
-    do	{
-	-- STEP 0
-	-- Check that the field names are really field names
-	; sel_ids <- mapM tcLookupField upd_fld_names
-			-- The renamer has already checked that
-			-- selectors are all in scope
-	; let bad_guys = [ setSrcSpan loc $ addErrTc (notSelector fld_name) 
-		       	 | (fld, sel_id) <- rec_flds rbinds `zip` sel_ids,
-		       	   not (isRecordSelector sel_id), 	-- Excludes class ops
-		       	   let L loc fld_name = hsRecFieldId fld ]
-	; unless (null bad_guys) (sequence bad_guys >> failM)
-    
-	-- STEP 1
-	-- Figure out the tycon and data cons from the first field name
-	; let	-- It's OK to use the non-tc splitters here (for a selector)
-	      sel_id : _  = sel_ids
-	      (tycon, _)  = recordSelectorFieldLabel sel_id	-- We've failed already if
-	      data_cons   = tyConDataCons tycon			-- it's not a field label
-	      	-- NB: for a data type family, the tycon is the instance tycon
+    do  {
+        -- STEP 0
+        -- Check that the field names are really field names
+        ; sel_ids <- mapM tcLookupField upd_fld_names
+                        -- The renamer has already checked that
+                        -- selectors are all in scope
+        ; let bad_guys = [ setSrcSpan loc $ addErrTc (notSelector fld_name)
+                         | (fld, sel_id) <- rec_flds rbinds `zip` sel_ids,
+                           not (isRecordSelector sel_id),       -- Excludes class ops
+                           let L loc fld_name = hsRecFieldId fld ]
+        ; unless (null bad_guys) (sequence bad_guys >> failM)
 
-	      relevant_cons   = filter is_relevant data_cons
-	      is_relevant con = all (`elem` dataConFieldLabels con) upd_fld_names
-		-- A constructor is only relevant to this process if
-		-- it contains *all* the fields that are being updated
-		-- Other ones will cause a runtime error if they occur
+        -- STEP 1
+        -- Figure out the tycon and data cons from the first field name
+        ; let   -- It's OK to use the non-tc splitters here (for a selector)
+              sel_id : _  = sel_ids
+              (tycon, _)  = recordSelectorFieldLabel sel_id     -- We've failed already if
+              data_cons   = tyConDataCons tycon                 -- it's not a field label
+                -- NB: for a data type family, the tycon is the instance tycon
 
-		-- Take apart a representative constructor
-	      con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-	      (con1_tvs, _, _, _, con1_arg_tys, _) = dataConFullSig con1
-	      con1_flds = dataConFieldLabels con1
-	      con1_res_ty = mkFamilyTyConApp tycon (mkTyVarTys con1_tvs)
-   	      
-	-- Step 2
-	-- Check that at least one constructor has all the named fields
-	-- i.e. has an empty set of bad fields returned by badFields
-	; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds)
+              relevant_cons   = filter is_relevant data_cons
+              is_relevant con = all (`elem` dataConFieldLabels con) upd_fld_names
+                -- A constructor is only relevant to this process if
+                -- it contains *all* the fields that are being updated
+                -- Other ones will cause a runtime error if they occur
 
-	-- STEP 3    Note [Criteria for update]
-	-- Check that each updated field is polymorphic; that is, its type
-	-- mentions only the universally-quantified variables of the data con
-	; let flds1_w_tys = zipEqual "tcExpr:RecConUpd" con1_flds con1_arg_tys
-	      upd_flds1_w_tys = filter is_updated flds1_w_tys
-	      is_updated (fld,_) = fld `elem` upd_fld_names
+                -- Take apart a representative constructor
+              con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
+              (con1_tvs, _, _, _, con1_arg_tys, _) = dataConFullSig con1
+              con1_flds = dataConFieldLabels con1
+              con1_res_ty = mkFamilyTyConApp tycon (mkTyVarTys con1_tvs)
 
-	      bad_upd_flds = filter bad_fld upd_flds1_w_tys
-	      con1_tv_set = mkVarSet con1_tvs
-	      bad_fld (fld, ty) = fld `elem` upd_fld_names &&
-				      not (tyVarsOfType ty `subVarSet` con1_tv_set)
-	; checkTc (null bad_upd_flds) (badFieldTypes bad_upd_flds)
+        -- Step 2
+        -- Check that at least one constructor has all the named fields
+        -- i.e. has an empty set of bad fields returned by badFields
+        ; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds)
 
-	-- STEP 4  Note [Type of a record update]
-	-- Figure out types for the scrutinee and result
-	-- Both are of form (T a b c), with fresh type variables, but with
-	-- common variables where the scrutinee and result must have the same type
-	-- These are variables that appear in *any* arg of *any* of the
-	-- relevant constructors *except* in the updated fields
-	-- 
-	; let fixed_tvs = getFixedTyVars con1_tvs relevant_cons
-	      is_fixed_tv tv = tv `elemVarSet` fixed_tvs
+        -- STEP 3    Note [Criteria for update]
+        -- Check that each updated field is polymorphic; that is, its type
+        -- mentions only the universally-quantified variables of the data con
+        ; let flds1_w_tys = zipEqual "tcExpr:RecConUpd" con1_flds con1_arg_tys
+              upd_flds1_w_tys = filter is_updated flds1_w_tys
+              is_updated (fld,_) = fld `elem` upd_fld_names
+
+              bad_upd_flds = filter bad_fld upd_flds1_w_tys
+              con1_tv_set = mkVarSet con1_tvs
+              bad_fld (fld, ty) = fld `elem` upd_fld_names &&
+                                      not (tyVarsOfType ty `subVarSet` con1_tv_set)
+        ; checkTc (null bad_upd_flds) (badFieldTypes bad_upd_flds)
+
+        -- STEP 4  Note [Type of a record update]
+        -- Figure out types for the scrutinee and result
+        -- Both are of form (T a b c), with fresh type variables, but with
+        -- common variables where the scrutinee and result must have the same type
+        -- These are variables that appear in *any* arg of *any* of the
+        -- relevant constructors *except* in the updated fields
+        --
+        ; let fixed_tvs = getFixedTyVars con1_tvs relevant_cons
+              is_fixed_tv tv = tv `elemVarSet` fixed_tvs
 
               mk_inst_ty :: TvSubst -> (TKVar, TcType) -> TcM (TvSubst, TcType)
               -- Deals with instantiation of kind variables
               --   c.f. TcMType.tcInstTyVarsX
-	      mk_inst_ty subst (tv, result_inst_ty)
-	        | is_fixed_tv tv   -- Same as result type
+              mk_inst_ty subst (tv, result_inst_ty)
+                | is_fixed_tv tv   -- Same as result type
                 = return (extendTvSubst subst tv result_inst_ty, result_inst_ty)
-	        | otherwise        -- Fresh type, of correct kind
+                | otherwise        -- Fresh type, of correct kind
                 = do { new_ty <- newFlexiTyVarTy (TcType.substTy subst (tyVarKind tv))
                      ; return (extendTvSubst subst tv new_ty, new_ty) }
 
-	; (_, result_inst_tys, result_subst) <- tcInstTyVars con1_tvs
+        ; (_, result_inst_tys, result_subst) <- tcInstTyVars con1_tvs
 
-        ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty emptyTvSubst 
-                                                      (con1_tvs `zip` result_inst_tys) 
+        ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty emptyTvSubst
+                                                      (con1_tvs `zip` result_inst_tys)
 
-	; let rec_res_ty    = TcType.substTy result_subst con1_res_ty
-	      scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
-	      con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
+        ; let rec_res_ty    = TcType.substTy result_subst con1_res_ty
+              scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
+              con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
         ; co_res <- unifyType rec_res_ty res_ty
 
-	-- STEP 5
-	-- Typecheck the thing to be updated, and the bindings
-	; record_expr' <- tcMonoExpr record_expr scrut_ty
-	; rbinds'      <- tcRecordBinds con1 con1_arg_tys' rbinds
-	
-	-- STEP 6: Deal with the stupid theta
-	; let theta' = substTheta scrut_subst (dataConStupidTheta con1)
-	; instStupidTheta RecordUpdOrigin theta'
+        -- STEP 5
+        -- Typecheck the thing to be updated, and the bindings
+        ; record_expr' <- tcMonoExpr record_expr scrut_ty
+        ; rbinds'      <- tcRecordBinds con1 con1_arg_tys' rbinds
 
-	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
-	; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
-		       = WpCast (mkTcUnbranchedAxInstCo co_con scrut_inst_tys)
-		       | otherwise
-		       = idHsWrapper
-	-- Phew!
+        -- STEP 6: Deal with the stupid theta
+        ; let theta' = substTheta scrut_subst (dataConStupidTheta con1)
+        ; instStupidTheta RecordUpdOrigin theta'
+
+        -- Step 7: make a cast for the scrutinee, in the case that it's from a type family
+        ; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon
+                       = WpCast (mkTcUnbranchedAxInstCo co_con scrut_inst_tys)
+                       | otherwise
+                       = idHsWrapper
+        -- Phew!
         ; return $ mkHsWrapCo co_res $
           RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
-			           relevant_cons scrut_inst_tys result_inst_tys  }
+                                   relevant_cons scrut_inst_tys result_inst_tys  }
   where
     upd_fld_names = hsRecFields rbinds
 
@@ -738,28 +731,28 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
     -- These tyvars must not change across the updates
     getFixedTyVars tvs1 cons
       = mkVarSet [tv1 | con <- cons
-    		      , let (tvs, theta, arg_tys, _) = dataConSig con
-		      	    flds = dataConFieldLabels con
-    			    fixed_tvs = exactTyVarsOfTypes fixed_tys
-			    	    -- fixed_tys: See Note [Type of a record update]
-			    	        `unionVarSet` tyVarsOfTypes theta 
-				    -- Universally-quantified tyvars that
-				    -- appear in any of the *implicit*
-				    -- arguments to the constructor are fixed
-			    	    -- See Note [Implict type sharing]
-			    	        
-		            fixed_tys = [ty | (fld,ty) <- zip flds arg_tys
+                      , let (tvs, theta, arg_tys, _) = dataConSig con
+                            flds = dataConFieldLabels con
+                            fixed_tvs = exactTyVarsOfTypes fixed_tys
+                                    -- fixed_tys: See Note [Type of a record update]
+                                        `unionVarSet` tyVarsOfTypes theta
+                                    -- Universally-quantified tyvars that
+                                    -- appear in any of the *implicit*
+                                    -- arguments to the constructor are fixed
+                                    -- See Note [Implict type sharing]
+
+                            fixed_tys = [ty | (fld,ty) <- zip flds arg_tys
                                             , not (fld `elem` upd_fld_names)]
-                      , (tv1,tv) <- tvs1 `zip` tvs	-- Discards existentials in tvs
-        	      , tv `elemVarSet` fixed_tvs ]
+                      , (tv1,tv) <- tvs1 `zip` tvs      -- Discards existentials in tvs
+                      , tv `elemVarSet` fixed_tvs ]
 \end{code}
 
 %************************************************************************
-%*									*
-	Arithmetic sequences			e.g. [a,b..]
-	and their parallel-array counterparts	e.g. [: a,b.. :]
-		
-%*									*
+%*                                                                      *
+        Arithmetic sequences                    e.g. [a,b..]
+        and their parallel-array counterparts   e.g. [: a,b.. :]
+
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -767,27 +760,27 @@ tcExpr (ArithSeq _ witness seq) res_ty
   = tcArithSeq witness seq res_ty
 
 tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
-	; expr1' <- tcPolyExpr expr1 elt_ty
-	; expr2' <- tcPolyExpr expr2 elt_ty
-	; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
-	; enum_from_to <- newMethodFromName (PArrSeqOrigin seq) 
-				 (idName enumFromToP) elt_ty
-	; return $ mkHsWrapCo coi 
+  = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
+        ; expr1' <- tcPolyExpr expr1 elt_ty
+        ; expr2' <- tcPolyExpr expr2 elt_ty
+        ; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
+        ; enum_from_to <- newMethodFromName (PArrSeqOrigin seq)
+                                 (idName enumFromToP) elt_ty
+        ; return $ mkHsWrapCo coi
                      (PArrSeq enum_from_to (FromTo expr1' expr2')) }
 
 tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
-	; expr1' <- tcPolyExpr expr1 elt_ty
-	; expr2' <- tcPolyExpr expr2 elt_ty
-	; expr3' <- tcPolyExpr expr3 elt_ty
-	; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
-	; eft <- newMethodFromName (PArrSeqOrigin seq)
-		      (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
-	; return $ mkHsWrapCo coi 
+  = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
+        ; expr1' <- tcPolyExpr expr1 elt_ty
+        ; expr2' <- tcPolyExpr expr2 elt_ty
+        ; expr3' <- tcPolyExpr expr3 elt_ty
+        ; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
+        ; eft <- newMethodFromName (PArrSeqOrigin seq)
+                      (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
+        ; return $ mkHsWrapCo coi
                      (PArrSeq eft (FromThenTo expr1' expr2' expr3')) }
 
-tcExpr (PArrSeq _ _) _ 
+tcExpr (PArrSeq _ _) _
   = panic "TcExpr.tcExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer shouldn't have
     -- let it through
@@ -795,14 +788,14 @@ tcExpr (PArrSeq _ _) _
 
 
 %************************************************************************
-%*									*
-		Template Haskell
-%*									*
+%*                                                                      *
+                Template Haskell
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-#ifdef GHCI	/* Only if bootstrapped */
-	-- Rename excludes these cases otherwise
+#ifdef GHCI     /* Only if bootstrapped */
+        -- Rename excludes these cases otherwise
 tcExpr (HsSpliceE splice) res_ty = tcSpliceExpr splice res_ty
 tcExpr (HsBracket brack)  res_ty = tcBracket brack res_ty
 tcExpr e@(HsQuasiQuoteE _) _ =
@@ -812,9 +805,9 @@ tcExpr e@(HsQuasiQuoteE _) _ =
 
 
 %************************************************************************
-%*									*
-		Catch-all
-%*									*
+%*                                                                      *
+                Catch-all
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -824,9 +817,9 @@ tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
 
 
 %************************************************************************
-%*									*
-		Arithmetic sequences [a..b] etc
-%*									*
+%*                                                                      *
+                Arithmetic sequences [a..b] etc
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -836,24 +829,24 @@ tcArithSeq :: Maybe (SyntaxExpr Name) -> ArithSeqInfo Name -> TcRhoType
 tcArithSeq witness seq@(From expr) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr' <- tcPolyExpr expr elt_ty
-       ; enum_from <- newMethodFromName (ArithSeqOrigin seq) 
-			      enumFromName elt_ty 
+       ; enum_from <- newMethodFromName (ArithSeqOrigin seq)
+                              enumFromName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from wit' (From expr')) }
-     
+
 tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcPolyExpr expr1 elt_ty
        ; expr2' <- tcPolyExpr expr2 elt_ty
-       ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq) 
-			      enumFromThenName elt_ty 
+       ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq)
+                              enumFromThenName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from_then wit' (FromThen expr1' expr2')) }
-     
+
 tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
   = do { (coi, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcPolyExpr expr1 elt_ty
        ; expr2' <- tcPolyExpr expr2 elt_ty
-       ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq) 
-			      enumFromToName elt_ty 
+       ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq)
+                              enumFromToName elt_ty
        ; return $ mkHsWrapCo coi (ArithSeq enum_from_to wit' (FromTo expr1' expr2')) }
 
 tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
@@ -861,12 +854,12 @@ tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
         ; expr1' <- tcPolyExpr expr1 elt_ty
         ; expr2' <- tcPolyExpr expr2 elt_ty
         ; expr3' <- tcPolyExpr expr3 elt_ty
-        ; eft <- newMethodFromName (ArithSeqOrigin seq) 
-			      enumFromThenToName elt_ty
+        ; eft <- newMethodFromName (ArithSeqOrigin seq)
+                              enumFromThenToName elt_ty
         ; return $ mkHsWrapCo coi (ArithSeq eft wit' (FromThenTo expr1' expr2' expr3')) }
 
 -----------------
-arithSeqEltType :: Maybe (SyntaxExpr Name) -> TcRhoType 
+arithSeqEltType :: Maybe (SyntaxExpr Name) -> TcRhoType
               -> TcM (TcCoercion, TcType, Maybe (SyntaxExpr Id))
 arithSeqEltType Nothing res_ty
   = do { (coi, elt_ty) <- matchExpectedListTy res_ty
@@ -879,9 +872,9 @@ arithSeqEltType (Just fl) res_ty
 \end{code}
 
 %************************************************************************
-%*									*
-		Applications
-%*									*
+%*                                                                      *
+                Applications
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -892,7 +885,7 @@ tcApp (L _ (HsPar e)) args res_ty
   = tcApp e args res_ty
 
 tcApp (L _ (HsApp e1 e2)) args res_ty
-  = tcApp e1 (e2:args) res_ty	-- Accumulate the arguments
+  = tcApp e1 (e2:args) res_ty   -- Accumulate the arguments
 
 tcApp (L loc (HsVar fun)) args res_ty
   | fun `hasKey` tagToEnumKey
@@ -904,24 +897,24 @@ tcApp (L loc (HsVar fun)) args res_ty
   = tcSeq loc fun arg1 arg2 res_ty
 
 tcApp fun args res_ty
-  = do	{   -- Type-check the function
-	; (fun1, fun_tau) <- tcInferFun fun
+  = do  {   -- Type-check the function
+        ; (fun1, fun_tau) <- tcInferFun fun
 
-	    -- Extract its argument types
-	; (co_fun, expected_arg_tys, actual_res_ty)
-	      <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_tau
+            -- Extract its argument types
+        ; (co_fun, expected_arg_tys, actual_res_ty)
+              <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_tau
 
-	-- Typecheck the result, thereby propagating 
+        -- Typecheck the result, thereby propagating
         -- info (if any) from result into the argument types
         -- Both actual_res_ty and res_ty are deeply skolemised
         ; co_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
                     unifyType actual_res_ty res_ty
 
-	-- Typecheck the arguments
-	; args1 <- tcArgs fun args expected_arg_tys
+        -- Typecheck the arguments
+        ; args1 <- tcArgs fun args expected_arg_tys
 
         -- Assemble the result
-	; let fun2 = mkLHsWrapCo co_fun fun1
+        ; let fun2 = mkLHsWrapCo co_fun fun1
               app  = mkLHsWrapCo co_res (foldl mkHsApp fun2 args1)
 
         ; return (unLoc app) }
@@ -940,60 +933,60 @@ tcInferApp (L _ (HsApp e1 e2)) args = tcInferApp e1 (e2:args)
 tcInferApp fun args
   = -- Very like the tcApp version, except that there is
     -- no expected result type passed in
-    do	{ (fun1, fun_tau) <- tcInferFun fun
-	; (co_fun, expected_arg_tys, actual_res_ty)
-	      <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_tau
-	; args1 <- tcArgs fun args expected_arg_tys
-	; let fun2 = mkLHsWrapCo co_fun fun1
+    do  { (fun1, fun_tau) <- tcInferFun fun
+        ; (co_fun, expected_arg_tys, actual_res_ty)
+              <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_tau
+        ; args1 <- tcArgs fun args expected_arg_tys
+        ; let fun2 = mkLHsWrapCo co_fun fun1
               app  = foldl mkHsApp fun2 args1
         ; return (unLoc app, actual_res_ty) }
 
 ----------------
 tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
 -- Infer and instantiate the type of a function
-tcInferFun (L loc (HsVar name)) 
+tcInferFun (L loc (HsVar name))
   = do { (fun, ty) <- setSrcSpan loc (tcInferId name)
-       	       -- Don't wrap a context around a plain Id
+               -- Don't wrap a context around a plain Id
        ; return (L loc fun, ty) }
 
 tcInferFun fun
   = do { (fun, fun_ty) <- tcInfer (tcMonoExpr fun)
 
          -- Zonk the function type carefully, to expose any polymorphism
-	 -- E.g. (( \(x::forall a. a->a). blah ) e)
-	 -- We can see the rank-2 type of the lambda in time to genrealise e
+         -- E.g. (( \(x::forall a. a->a). blah ) e)
+         -- We can see the rank-2 type of the lambda in time to genrealise e
        ; fun_ty' <- zonkTcType fun_ty
 
        ; (wrap, rho) <- deeplyInstantiate AppOrigin fun_ty'
        ; return (mkLHsWrap wrap fun, rho) }
 
 ----------------
-tcArgs :: LHsExpr Name				-- The function (for error messages)
-       -> [LHsExpr Name] -> [TcSigmaType]	-- Actual arguments and expected arg types
-       -> TcM [LHsExpr TcId]			-- Resulting args
+tcArgs :: LHsExpr Name                          -- The function (for error messages)
+       -> [LHsExpr Name] -> [TcSigmaType]       -- Actual arguments and expected arg types
+       -> TcM [LHsExpr TcId]                    -- Resulting args
 
 tcArgs fun args expected_arg_tys
   = mapM (tcArg fun) (zip3 args expected_arg_tys [1..])
 
 ----------------
-tcArg :: LHsExpr Name				-- The function (for error messages)
-       -> (LHsExpr Name, TcSigmaType, Int)	-- Actual argument and expected arg type
-       -> TcM (LHsExpr TcId)			-- Resulting argument
+tcArg :: LHsExpr Name                           -- The function (for error messages)
+       -> (LHsExpr Name, TcSigmaType, Int)      -- Actual argument and expected arg type
+       -> TcM (LHsExpr TcId)                    -- Resulting argument
 tcArg fun (arg, ty, arg_no) = addErrCtxt (funAppCtxt fun arg arg_no)
-				 	 (tcPolyExprNC arg ty)
+                                         (tcPolyExprNC arg ty)
 
 ----------------
 tcTupArgs :: [HsTupArg Name] -> [TcSigmaType] -> TcM [HsTupArg TcId]
-tcTupArgs args tys 
+tcTupArgs args tys
   = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
   where
     go (Missing {},   arg_ty) = return (Missing arg_ty)
     go (Present expr, arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
-			           ; return (Present expr') }
+                                   ; return (Present expr') }
 
 ----------------
 unifyOpFunTysWrap :: LHsExpr Name -> Arity -> TcRhoType
-                  -> TcM (TcCoercion, [TcSigmaType], TcRhoType)	 		
+                  -> TcM (TcCoercion, [TcSigmaType], TcRhoType)
 -- A wrapper for matchExpectedFunTys
 unifyOpFunTysWrap op arity ty = matchExpectedFunTys herald arity ty
   where
@@ -1006,7 +999,7 @@ tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
 -- This version assumes res_ty is a monotype
 tcSyntaxOp orig (HsVar op) res_ty = do { (expr, rho) <- tcInferIdWithOrig orig op
                                        ; tcWrapResult expr rho res_ty }
-tcSyntaxOp _ other 	   _      = pprPanic "tcSyntaxOp" (ppr other) 
+tcSyntaxOp _ other         _      = pprPanic "tcSyntaxOp" (ppr other)
 \end{code}
 
 
@@ -1015,8 +1008,8 @@ Note [Push result type in]
 Unify with expected result before type-checking the args so that the
 info from res_ty percolates to args.  This is when we might detect a
 too-few args situation.  (One can think of cases when the opposite
-order would give a better error message.) 
-experimenting with putting this first.  
+order would give a better error message.)
+experimenting with putting this first.
 
 Here's an example where it actually makes a real difference
 
@@ -1036,14 +1029,14 @@ in the other order, the extra signature in f2 is reqd.
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                  tcInferId
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tcCheckId :: Name -> TcRhoType -> TcM (HsExpr TcId)
-tcCheckId name res_ty 
+tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; addErrCtxtM (funResCtxt False (HsVar name) actual_res_ty res_ty) $
          tcWrapResult expr actual_res_ty res_ty }
@@ -1064,29 +1057,29 @@ tcInferIdWithOrig orig id_name
        ; return (mkHsWrap wrap id_expr, rho) }
   where
     lookup_id :: TcM TcId
-    lookup_id 
+    lookup_id
        = do { thing <- tcLookup id_name
-	    ; case thing of
-    	    	 ATcId { tct_id = id, tct_level = lvl }
-	           -> do { check_naughty id        -- Note [Local record selectors]
+            ; case thing of
+                 ATcId { tct_id = id, tct_level = lvl }
+                   -> do { check_naughty id        -- Note [Local record selectors]
                          ; checkThLocalId id lvl
                          ; return id }
 
-    	    	 AGlobal (AnId id) 
+                 AGlobal (AnId id)
                    -> do { check_naughty id; return id }
-	    	 	-- A global cannot possibly be ill-staged
-	    	 	-- nor does it need the 'lifting' treatment
+                        -- A global cannot possibly be ill-staged
+                        -- nor does it need the 'lifting' treatment
                         -- hence no checkTh stuff here
 
-    	    	 AGlobal (ADataCon con) -> return (dataConWrapId con)
+                 AGlobal (ADataCon con) -> return (dataConWrapId con)
 
-    	    	 other -> failWithTc (bad_lookup other) }
+                 other -> failWithTc (bad_lookup other) }
 
     bad_lookup thing = ppr thing <+> ptext (sLit "used where a value identifer was expected")
 
-    check_naughty id 
+    check_naughty id
       | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel id)
-      | otherwise		   = return ()
+      | otherwise                  = return ()
 
 ------------------------
 instantiateOuter :: CtOrigin -> TcId -> TcM (HsExpr TcId, TcSigmaType)
@@ -1115,20 +1108,20 @@ Note [Multiple instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We are careful never to make a MethodInst that has, as its meth_id, another MethodInst.
 For example, consider
-	f :: forall a. Eq a => forall b. Ord b => a -> b
-At a call to f, at say [Int, Bool], it's tempting to translate the call to 
+        f :: forall a. Eq a => forall b. Ord b => a -> b
+At a call to f, at say [Int, Bool], it's tempting to translate the call to
 
-	f_m1
+        f_m1
   where
-	f_m1 :: forall b. Ord b => Int -> b
-	f_m1 = f Int dEqInt
+        f_m1 :: forall b. Ord b => Int -> b
+        f_m1 = f Int dEqInt
 
-	f_m2 :: Int -> Bool
-	f_m2 = f_m1 Bool dOrdBool
+        f_m2 :: Int -> Bool
+        f_m2 = f_m1 Bool dOrdBool
 
 But notice that f_m2 has f_m1 as its meth_id.  Now the danger is that if we do
 a tcSimplCheck with a Given f_mx :: f Int dEqInt, we may make a binding
-	f_m1 = f_mx
+        f_m1 = f_mx
 But it's entirely possible that f_m2 will continue to float out, because it
 mentions no type variables.  Result, f_m1 isn't in scope.
 
@@ -1146,8 +1139,8 @@ application, not for the iterated ones.  A horribly subtle point.
 
 \begin{code}
 doStupidChecks :: TcId
-	       -> [TcType]
-	       -> TcM ()
+               -> [TcType]
+               -> TcM ()
 -- Check two tiresome and ad-hoc cases
 -- (a) the "stupid theta" for a data con; add the constraints
 --     from the "stupid theta" of a data constructor (sigh)
@@ -1158,7 +1151,7 @@ doStupidChecks fun_id tys
 
   | fun_id `hasKey` tagToEnumKey           -- (b)
   = failWithTc (ptext (sLit "tagToEnum# must appear applied to one argument"))
-  
+
   | otherwise
   = return () -- The common case
 \end{code}
@@ -1170,33 +1163,33 @@ enumeration TyCon.  Unification may refine the type later, but this
 check won't see that, alas.  It's crude, because it relies on our
 knowing *now* that the type is ok, which in turn relies on the
 eager-unification part of the type checker pushing enough information
-here.  In theory the Right Thing to do is to have a new form of 
+here.  In theory the Right Thing to do is to have a new form of
 constraint but I definitely cannot face that!  And it works ok as-is.
 
 Here's are two cases that should fail
- 	f :: forall a. a
-	f = tagToEnum# 0	-- Can't do tagToEnum# at a type variable
+        f :: forall a. a
+        f = tagToEnum# 0        -- Can't do tagToEnum# at a type variable
 
-	g :: Int
-	g = tagToEnum# 0	-- Int is not an enumeration
+        g :: Int
+        g = tagToEnum# 0        -- Int is not an enumeration
 
 When data type families are involved it's a bit more complicated.
      data family F a
      data instance F [Int] = A | B | C
 Then we want to generate something like
      tagToEnum# R:FListInt 3# |> co :: R:FListInt ~ F [Int]
-Usually that coercion is hidden inside the wrappers for 
+Usually that coercion is hidden inside the wrappers for
 constructors of F [Int] but here we have to do it explicitly.
 
 It's all grotesquely complicated.
 
 \begin{code}
-tcSeq :: SrcSpan -> Name -> LHsExpr Name -> LHsExpr Name 
+tcSeq :: SrcSpan -> Name -> LHsExpr Name -> LHsExpr Name
       -> TcRhoType -> TcM (HsExpr TcId)
 -- (seq e1 e2) :: res_ty
 -- We need a special typing rule because res_ty can be unboxed
 tcSeq loc fun_name arg1 arg2 res_ty
-  = do	{ fun <- tcLookupId fun_name
+  = do  { fun <- tcLookupId fun_name
         ; (arg1', arg1_ty) <- tcInfer (tcMonoExpr arg1)
         ; arg2' <- tcMonoExpr arg2 res_ty
         ; let fun'    = L loc (HsWrap ty_args (HsVar fun))
@@ -1207,43 +1200,43 @@ tcTagToEnum :: SrcSpan -> Name -> LHsExpr Name -> TcRhoType -> TcM (HsExpr TcId)
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
 tcTagToEnum loc fun_name arg res_ty
-  = do	{ fun <- tcLookupId fun_name
+  = do  { fun <- tcLookupId fun_name
         ; ty' <- zonkTcType res_ty
 
-	-- Check that the type is algebraic
+        -- Check that the type is algebraic
         ; let mb_tc_app = tcSplitTyConApp_maybe ty'
               Just (tc, tc_args) = mb_tc_app
-	; checkTc (isJust mb_tc_app)
+        ; checkTc (isJust mb_tc_app)
                   (tagToEnumError ty' doc1)
 
-	-- Look through any type family
+        -- Look through any type family
         ; (coi, rep_tc, rep_args) <- get_rep_ty ty' tc tc_args
 
-	; checkTc (isEnumerationTyCon rep_tc) 
+        ; checkTc (isEnumerationTyCon rep_tc)
                   (tagToEnumError ty' doc2)
 
         ; arg' <- tcMonoExpr arg intPrimTy
         ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
               rep_ty = mkTyConApp rep_tc rep_args
 
-	; return (mkHsWrapCo coi $ HsApp fun' arg') }
+        ; return (mkHsWrapCo coi $ HsApp fun' arg') }
   where
     doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")
-		, ptext (sLit "e.g. (tagToEnum# x) :: Bool") ]
+                , ptext (sLit "e.g. (tagToEnum# x) :: Bool") ]
     doc2 = ptext (sLit "Result type must be an enumeration type")
     doc3 = ptext (sLit "No family instance for this type")
 
     get_rep_ty :: TcType -> TyCon -> [TcType]
                -> TcM (TcCoercion, TyCon, [TcType])
-    	-- Converts a family type (eg F [a]) to its rep type (eg FList a)
-	-- and returns a coercion between the two
+        -- Converts a family type (eg F [a]) to its rep type (eg FList a)
+        -- and returns a coercion between the two
     get_rep_ty ty tc tc_args
-      | not (isFamilyTyCon tc) 
+      | not (isFamilyTyCon tc)
       = return (mkTcReflCo ty, tc, tc_args)
-      | otherwise 
+      | otherwise
       = do { mb_fam <- tcLookupFamInst tc tc_args
-           ; case mb_fam of 
-	       Nothing -> failWithTc (tagToEnumError ty doc3)
+           ; case mb_fam of
+               Nothing -> failWithTc (tagToEnumError ty doc3)
                Just (FamInstMatch { fim_instance = rep_fam
                                   , fim_index    = index
                                   , fim_tys      = rep_args })
@@ -1255,16 +1248,16 @@ tcTagToEnum loc fun_name arg res_ty
 
 tagToEnumError :: TcType -> SDoc -> SDoc
 tagToEnumError ty what
-  = hang (ptext (sLit "Bad call to tagToEnum#") 
-           <+> ptext (sLit "at type") <+> ppr ty) 
-	 2 what
+  = hang (ptext (sLit "Bad call to tagToEnum#")
+           <+> ptext (sLit "at type") <+> ppr ty)
+         2 what
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                  Template Haskell checks
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1275,73 +1268,73 @@ checkThLocalId :: Id -> ThLevel -> TcM ()
 checkThLocalId _id _bind_lvl
   = return ()
 
-#else	      /* GHCI and TH is on */
-checkThLocalId id bind_lvl 
-  = do	{ use_stage <- getStage	-- TH case
-	; let use_lvl = thLevel use_stage
-	; checkWellStaged (quotes (ppr id)) bind_lvl use_lvl
-	; traceTc "thLocalId" (ppr id <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
-	; when (use_lvl > bind_lvl) $
+#else         /* GHCI and TH is on */
+checkThLocalId id bind_lvl
+  = do  { use_stage <- getStage -- TH case
+        ; let use_lvl = thLevel use_stage
+        ; checkWellStaged (quotes (ppr id)) bind_lvl use_lvl
+        ; traceTc "thLocalId" (ppr id <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
+        ; when (use_lvl > bind_lvl) $
           checkCrossStageLifting id bind_lvl use_stage }
 
 --------------------------------------
 checkCrossStageLifting :: Id -> ThLevel -> ThStage -> TcM ()
 -- We are inside brackets, and (use_lvl > bind_lvl)
 -- Now we must check whether there's a cross-stage lift to do
--- Examples   \x -> [| x |]  
+-- Examples   \x -> [| x |]
 --            [| map |]
 
 checkCrossStageLifting _ _ Comp   = return ()
 checkCrossStageLifting _ _ Splice = return ()
 
-checkCrossStageLifting id _ (Brack _ ps_var lie_var) 
+checkCrossStageLifting id _ (Brack _ ps_var lie_var)
   | thTopLevelId id
-  =	-- Top-level identifiers in this module,
-	-- (which have External Names)
-	-- are just like the imported case:
-	-- no need for the 'lifting' treatment
-	-- E.g.  this is fine:
-	--   f x = x
-	--   g y = [| f 3 |]
-	-- But we do need to put f into the keep-alive
-	-- set, because after desugaring the code will
-	-- only mention f's *name*, not f itself.
+  =     -- Top-level identifiers in this module,
+        -- (which have External Names)
+        -- are just like the imported case:
+        -- no need for the 'lifting' treatment
+        -- E.g.  this is fine:
+        --   f x = x
+        --   g y = [| f 3 |]
+        -- But we do need to put f into the keep-alive
+        -- set, because after desugaring the code will
+        -- only mention f's *name*, not f itself.
     keepAliveTc id
 
-  | otherwise	-- bind_lvl = outerLevel presumably,
-		-- but the Id is not bound at top level
-  = 	-- Nested identifiers, such as 'x' in
-	-- E.g. \x -> [| h x |]
-	-- We must behave as if the reference to x was
-	--	h $(lift x)	
-	-- We use 'x' itself as the splice proxy, used by 
-	-- the desugarer to stitch it all back together.
-	-- If 'x' occurs many times we may get many identical
-	-- bindings of the same splice proxy, but that doesn't
-	-- matter, although it's a mite untidy.
-    do 	{ let id_ty = idType id
+  | otherwise   -- bind_lvl = outerLevel presumably,
+                -- but the Id is not bound at top level
+  =     -- Nested identifiers, such as 'x' in
+        -- E.g. \x -> [| h x |]
+        -- We must behave as if the reference to x was
+        --      h $(lift x)
+        -- We use 'x' itself as the splice proxy, used by
+        -- the desugarer to stitch it all back together.
+        -- If 'x' occurs many times we may get many identical
+        -- bindings of the same splice proxy, but that doesn't
+        -- matter, although it's a mite untidy.
+    do  { let id_ty = idType id
         ; checkTc (isTauTy id_ty) (polySpliceErr id)
-	       -- If x is polymorphic, its occurrence sites might
-	       -- have different instantiations, so we can't use plain
-	       -- 'x' as the splice proxy name.  I don't know how to 
-	       -- solve this, and it's probably unimportant, so I'm
-	       -- just going to flag an error for now
-   
-	; lift <- if isStringTy id_ty then
-	       	     do { sid <- tcLookupId DsMeta.liftStringName
-		     		     -- See Note [Lifting strings]
-                        ; return (HsVar sid) }
-	          else
-                     setConstraintVar lie_var	$ do  
-		          -- Put the 'lift' constraint into the right LIE
-                     newMethodFromName (OccurrenceOf (idName id)) 
-                                       DsMeta.liftName id_ty
-	   
-		   -- Update the pending splices
-	; ps <- readMutVar ps_var
-	; writeMutVar ps_var ((idName id, nlHsApp (noLoc lift) (nlHsVar id)) : ps)
+               -- If x is polymorphic, its occurrence sites might
+               -- have different instantiations, so we can't use plain
+               -- 'x' as the splice proxy name.  I don't know how to
+               -- solve this, and it's probably unimportant, so I'm
+               -- just going to flag an error for now
 
-	; return () }
+        ; lift <- if isStringTy id_ty then
+                     do { sid <- tcLookupId DsMeta.liftStringName
+                                     -- See Note [Lifting strings]
+                        ; return (HsVar sid) }
+                  else
+                     setConstraintVar lie_var   $ do
+                          -- Put the 'lift' constraint into the right LIE
+                     newMethodFromName (OccurrenceOf (idName id))
+                                       DsMeta.liftName id_ty
+
+                   -- Update the pending splices
+        ; ps <- readMutVar ps_var
+        ; writeMutVar ps_var ((idName id, nlHsApp (noLoc lift) (nlHsVar id)) : ps)
+
+        ; return () }
 #endif /* GHCI */
 \end{code}
 
@@ -1352,10 +1345,10 @@ generate a mass of Cons (CharL 'x') (Cons (CharL 'y') ...)) etc.
 So this conditional short-circuits the lifting mechanism to generate
 (liftString "xy") in that case.  I didn't want to use overlapping instances
 for the Lift class in TH.Syntax, because that can lead to overlapping-instance
-errors in a polymorphic situation.  
+errors in a polymorphic situation.
 
 If this check fails (which isn't impossible) we get another chance; see
-Note [Converting strings] in Convert.lhs 
+Note [Converting strings] in Convert.lhs
 
 Local record selectors
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1365,9 +1358,9 @@ naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Record bindings}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Game plan for record bindings
@@ -1381,84 +1374,84 @@ For each binding field = value
 3. Instantiate the field type (from the field label) using the type
    envt from step 2.
 
-4  Type check the value using tcArg, passing the field type as 
+4  Type check the value using tcArg, passing the field type as
    the expected argument type.
 
 This extends OK when the field types are universally quantified.
 
-	
+
 \begin{code}
 tcRecordBinds
-	:: DataCon
-	-> [TcType]	-- Expected type for each field
-	-> HsRecordBinds Name
-	-> TcM (HsRecordBinds TcId)
+        :: DataCon
+        -> [TcType]     -- Expected type for each field
+        -> HsRecordBinds Name
+        -> TcM (HsRecordBinds TcId)
 
 tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
-  = do	{ mb_binds <- mapM do_bind rbinds
-	; return (HsRecFields (catMaybes mb_binds) dd) }
+  = do  { mb_binds <- mapM do_bind rbinds
+        ; return (HsRecFields (catMaybes mb_binds) dd) }
   where
     flds_w_tys = zipEqual "tcRecordBinds" (dataConFieldLabels data_con) arg_tys
     do_bind fld@(HsRecField { hsRecFieldId = L loc field_lbl, hsRecFieldArg = rhs })
       | Just field_ty <- assocMaybe flds_w_tys field_lbl
-      = addErrCtxt (fieldCtxt field_lbl)	$
-	do { rhs' <- tcPolyExprNC rhs field_ty
-	   ; let field_id = mkUserLocal (nameOccName field_lbl)
-				        (nameUnique field_lbl)
-					field_ty loc 
-		-- Yuk: the field_id has the *unique* of the selector Id
-		-- 	    (so we can find it easily)
-		--      but is a LocalId with the appropriate type of the RHS
-		--	    (so the desugarer knows the type of local binder to make)
-	   ; return (Just (fld { hsRecFieldId = L loc field_id, hsRecFieldArg = rhs' })) }
+      = addErrCtxt (fieldCtxt field_lbl)        $
+        do { rhs' <- tcPolyExprNC rhs field_ty
+           ; let field_id = mkUserLocal (nameOccName field_lbl)
+                                        (nameUnique field_lbl)
+                                        field_ty loc
+                -- Yuk: the field_id has the *unique* of the selector Id
+                --          (so we can find it easily)
+                --      but is a LocalId with the appropriate type of the RHS
+                --          (so the desugarer knows the type of local binder to make)
+           ; return (Just (fld { hsRecFieldId = L loc field_id, hsRecFieldArg = rhs' })) }
       | otherwise
       = do { addErrTc (badFieldCon data_con field_lbl)
-	   ; return Nothing }
+           ; return Nothing }
 
 checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
-  | null field_labels 	-- Not declared as a record;
-			-- But C{} is still valid if no strict fields
+  | null field_labels   -- Not declared as a record;
+                        -- But C{} is still valid if no strict fields
   = if any isBanged field_strs then
-	-- Illegal if any arg is strict
-	addErrTc (missingStrictFields data_con [])
+        -- Illegal if any arg is strict
+        addErrTc (missingStrictFields data_con [])
     else
-	return ()
-			
-  | otherwise = do		-- A record
+        return ()
+
+  | otherwise = do              -- A record
     unless (null missing_s_fields)
-	   (addErrTc (missingStrictFields data_con missing_s_fields))
+           (addErrTc (missingStrictFields data_con missing_s_fields))
 
     warn <- woptM Opt_WarnMissingFields
     unless (not (warn && notNull missing_ns_fields))
-	   (warnTc True (missingFields data_con missing_ns_fields))
+           (warnTc True (missingFields data_con missing_ns_fields))
 
   where
     missing_s_fields
-	= [ fl | (fl, str) <- field_info,
-	  	 isBanged str,
-	  	 not (fl `elem` field_names_used)
-	  ]
+        = [ fl | (fl, str) <- field_info,
+                 isBanged str,
+                 not (fl `elem` field_names_used)
+          ]
     missing_ns_fields
-	= [ fl | (fl, str) <- field_info,
-	  	 not (isBanged str),
-	  	 not (fl `elem` field_names_used)
-	  ]
+        = [ fl | (fl, str) <- field_info,
+                 not (isBanged str),
+                 not (fl `elem` field_names_used)
+          ]
 
     field_names_used = hsRecFields rbinds
     field_labels     = dataConFieldLabels data_con
 
     field_info = zipEqual "missingFields"
-			  field_labels
-	  		  field_strs
+                          field_labels
+                          field_strs
 
     field_strs = dataConStrictMarks data_con
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Errors and contexts}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Boring and alphabetical:
@@ -1476,17 +1469,17 @@ fieldCtxt field_name
 
 funAppCtxt :: LHsExpr Name -> LHsExpr Name -> Int -> SDoc
 funAppCtxt fun arg arg_no
-  = hang (hsep [ ptext (sLit "In the"), speakNth arg_no, ptext (sLit "argument of"), 
-		    quotes (ppr fun) <> text ", namely"])
+  = hang (hsep [ ptext (sLit "In the"), speakNth arg_no, ptext (sLit "argument of"),
+                    quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
 
 funResCtxt :: Bool  -- There is at least one argument
-           -> HsExpr Name -> TcType -> TcType 
+           -> HsExpr Name -> TcType -> TcType
            -> TidyEnv -> TcM (TidyEnv, MsgDoc)
 -- When we have a mis-match in the return type of a function
 -- try to give a helpful message about too many/few arguments
 --
--- Used for naked variables too; but with has_args = False 
+-- Used for naked variables too; but with has_args = False
 funResCtxt has_args fun fun_res_ty env_ty tidy_env
   = do { fun_res' <- zonkTcType fun_res_ty
        ; env'     <- zonkTcType env_ty
@@ -1505,7 +1498,7 @@ funResCtxt has_args fun fun_res_ty env_ty tidy_env
                                              -- applied to too many args!
        ; return (tidy_env, info) }
   where
-    not_fun ty   -- ty is definitely not an arrow type, 
+    not_fun ty   -- ty is definitely not an arrow type,
                  -- and cannot conceivably become one
       = case tcSplitTyConApp_maybe ty of
           Just (tc, _) -> isAlgTyCon tc
@@ -1514,7 +1507,7 @@ funResCtxt has_args fun fun_res_ty env_ty tidy_env
 badFieldTypes :: [(Name,TcType)] -> SDoc
 badFieldTypes prs
   = hang (ptext (sLit "Record update for insufficiently polymorphic field")
-			 <> plural prs <> colon)
+                         <> plural prs <> colon)
        2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
 
 badFieldsUpd :: HsRecFields Name a -> SDoc
@@ -1524,8 +1517,8 @@ badFieldsUpd rbinds
 
 naughtyRecordSel :: TcId -> SDoc
 naughtyRecordSel sel_id
-  = ptext (sLit "Cannot use record selector") <+> quotes (ppr sel_id) <+> 
-    ptext (sLit "as a function due to escaped type variables") $$ 
+  = ptext (sLit "Cannot use record selector") <+> quotes (ppr sel_id) <+>
+    ptext (sLit "as a function due to escaped type variables") $$
     ptext (sLit "Probable fix: use pattern-matching syntax instead")
 
 notSelector :: Name -> SDoc
@@ -1536,17 +1529,17 @@ missingStrictFields :: DataCon -> [FieldLabel] -> SDoc
 missingStrictFields con fields
   = header <> rest
   where
-    rest | null fields = empty	-- Happens for non-record constructors 
-				-- with strict fields
-	 | otherwise   = colon <+> pprWithCommas ppr fields
+    rest | null fields = empty  -- Happens for non-record constructors
+                                -- with strict fields
+         | otherwise   = colon <+> pprWithCommas ppr fields
 
-    header = ptext (sLit "Constructor") <+> quotes (ppr con) <+> 
-	     ptext (sLit "does not have the required strict field(s)") 
-	  
+    header = ptext (sLit "Constructor") <+> quotes (ppr con) <+>
+             ptext (sLit "does not have the required strict field(s)")
+
 missingFields :: DataCon -> [FieldLabel] -> SDoc
 missingFields con fields
-  = ptext (sLit "Fields of") <+> quotes (ppr con) <+> ptext (sLit "not initialised:") 
-	<+> pprWithCommas ppr fields
+  = ptext (sLit "Fields of") <+> quotes (ppr con) <+> ptext (sLit "not initialised:")
+        <+> pprWithCommas ppr fields
 
 -- callCtxt fun args = ptext (sLit "In the call") <+> parens (ppr (foldl mkHsApp fun args))
 
