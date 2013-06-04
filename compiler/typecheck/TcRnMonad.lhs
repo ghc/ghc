@@ -53,6 +53,10 @@ import Util
 import Data.IORef
 import qualified Data.Set as Set
 import Control.Monad
+
+#ifdef GHCI
+import qualified Data.Map as Map
+#endif
 \end{code}
 
 
@@ -95,6 +99,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         th_topdecls_var      <- newIORef [] ;
         th_topnames_var      <- newIORef emptyNameSet ;
         th_modfinalizers_var <- newIORef [] ;
+        th_state_var         <- newIORef Map.empty ;
 #endif /* GHCI */
         let {
              maybe_rn_syntax :: forall a. a -> Maybe a ;
@@ -107,6 +112,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_th_topdecls      = th_topdecls_var,
                 tcg_th_topnames      = th_topnames_var,
                 tcg_th_modfinalizers = th_modfinalizers_var,
+                tcg_th_state         = th_state_var,
 #endif /* GHCI */
 
                 tcg_mod            = mod,

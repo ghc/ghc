@@ -118,6 +118,10 @@ import Util
 import Data.Set (Set)
 
 #ifdef GHCI
+import Data.Map      ( Map )
+import Data.Dynamic  ( Dynamic )
+import Data.Typeable ( TypeRep )
+
 import qualified Language.Haskell.TH as TH
 #endif
 \end{code}
@@ -309,6 +313,9 @@ data TcGblEnv
 
         tcg_th_modfinalizers :: TcRef [TH.Q ()],
         -- ^ Template Haskell module finalizers
+
+        tcg_th_state :: TcRef (Map TypeRep Dynamic),
+        -- ^ Template Haskell state
 #endif /* GHCI */
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
