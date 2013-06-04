@@ -66,6 +66,10 @@ class (Monad m, Applicative m) => Quasi m where
 
   qAddModFinalizer :: Q () -> m ()
 
+  qGetQ :: Typeable a => m (Maybe a)
+
+  qPutQ :: Typeable a => a -> m ()
+
 -----------------------------------------------------
 --	The IO instance of Quasi
 --
@@ -94,6 +98,8 @@ instance Quasi IO where
   qAddDependentFile _ = badIO "addDependentFile"
   qAddTopDecls _      = badIO "addTopDecls"
   qAddModFinalizer _  = badIO "addModFinalizer"
+  qGetQ               = badIO "getQ"
+  qPutQ _             = badIO "putQ"
 
   qRunIO m = m
 
@@ -354,6 +360,14 @@ addTopDecls ds = Q (qAddTopDecls ds)
 addModFinalizer :: Q () -> Q ()
 addModFinalizer act = Q (qAddModFinalizer (unQ act))
 
+-- | Get state from the Q monad.
+getQ :: Typeable a => Q (Maybe a)
+getQ = Q qGetQ
+
+-- | Replace the state in the Q monad.
+putQ :: Typeable a => a -> Q ()
+putQ x = Q (qPutQ x)
+
 instance Quasi Q where
   qNewName  	    = newName
   qReport   	    = report
@@ -367,6 +381,8 @@ instance Quasi Q where
   qAddDependentFile = addDependentFile
   qAddTopDecls      = addTopDecls
   qAddModFinalizer  = addModFinalizer
+  qGetQ             = getQ
+  qPutQ             = putQ
 
 
 ----------------------------------------------------
