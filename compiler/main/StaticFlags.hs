@@ -35,7 +35,10 @@ module StaticFlags (
         addOpt, removeOpt, v_opt_C_ready,
 
         -- Saving/restoring globals
-        saveStaticFlagGlobals, restoreStaticFlagGlobals
+        saveStaticFlagGlobals, restoreStaticFlagGlobals,
+
+        -- For options autocompletion
+        flagsStatic, flagsStaticNames
   ) where
 
 #include "HsVersions.h"
@@ -139,9 +142,13 @@ flagsStatic = [
   ]
 
 
+
 isStaticFlag :: String -> Bool
-isStaticFlag f =
-  f `elem` [
+isStaticFlag f = f `elem` flagsStaticNames
+
+
+flagsStaticNames :: [String]
+flagsStaticNames = [
     "fdicts-strict",
     "fno-state-hack",
     "fno-opt-coercion",
