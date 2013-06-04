@@ -35,6 +35,7 @@ runQuasiQuoteType :: HsQuasiQuote RdrName -> TcM (LHsType RdrName)
 runQuasiQuotePat  :: HsQuasiQuote RdrName -> TcM (LPat RdrName)
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 
+runQuasi :: TH.Q a -> TcM a
 runMetaE :: LHsExpr Id -> TcM (LHsExpr RdrName)
 runMetaP :: LHsExpr Id -> TcM (LPat RdrName)
 runMetaT :: LHsExpr Id  -> TcM (LHsType RdrName)
