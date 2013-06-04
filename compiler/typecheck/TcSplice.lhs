@@ -14,7 +14,7 @@ module TcSplice( tcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  runQuasiQuoteExpr, runQuasiQuotePat,
                  runQuasiQuoteDecl, runQuasiQuoteType,
                  runAnnotation,
-                 runMetaE, runMetaP, runMetaT, runMetaD ) where
+                 runQuasi, runMetaE, runMetaP, runMetaT, runMetaD ) where
 
 #include "HsVersions.h"
 
@@ -836,6 +836,12 @@ deprecatedDollar quoter
 %*                                                                      *
 %************************************************************************
 
+
+\begin{code}
+runQuasi :: TH.Q a -> TcM a
+runQuasi act = TH.runQ act
+\end{code}
+
 \begin{code}
 data MetaOps th_syn hs_syn
   = MT { mt_desc :: String             -- Type of beast (expression, type etc)
@@ -1084,6 +1090,10 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
           addErr $
           hang (ptext (sLit "The binder") <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
              2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
+
+  qAddModFinalizer fin = do
+      th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
+      updTcRef th_modfinalizers_var (\fins -> fin:fins)
 \end{code}
 
 

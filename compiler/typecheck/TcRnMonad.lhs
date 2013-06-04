@@ -91,8 +91,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 
         dependent_files_var <- newIORef [] ;
 #ifdef GHCI
-        th_topdecls_var     <- newIORef [] ;
-        th_topnames_var     <- newIORef emptyNameSet ;
+        th_topdecls_var      <- newIORef [] ;
+        th_topnames_var      <- newIORef emptyNameSet ;
+        th_modfinalizers_var <- newIORef [] ;
 #endif /* GHCI */
         let {
              maybe_rn_syntax :: forall a. a -> Maybe a ;
@@ -102,8 +103,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 
              gbl_env = TcGblEnv {
 #ifdef GHCI
-                tcg_th_topdecls    = th_topdecls_var,
-                tcg_th_topnames    = th_topnames_var,
+                tcg_th_topdecls      = th_topdecls_var,
+                tcg_th_topnames      = th_topnames_var,
+                tcg_th_modfinalizers = th_modfinalizers_var,
 #endif /* GHCI */
 
                 tcg_mod            = mod,

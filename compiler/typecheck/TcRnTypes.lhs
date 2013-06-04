@@ -114,6 +114,10 @@ import ListSetOps
 import FastString
 
 import Data.Set (Set)
+
+#ifdef GHCI
+import qualified Language.Haskell.TH as TH
+#endif
 \end{code}
 
 
@@ -296,6 +300,9 @@ data TcGblEnv
 
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls
+
+        tcg_th_modfinalizers :: TcRef [TH.Q ()],
+        -- ^ Template Haskell module finalizers
 #endif /* GHCI */
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
