@@ -168,8 +168,7 @@ test('T5550', normal, compile, [''])
 test('T7865', normal, run_command, ['$MAKE -s --no-print-directory T7865'])
 test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T7702', 
-     [when(compiler_lt('ghc', '7.2.1'), skip), 
-      pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702'), 
+     [pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702'), 
       clean_cmd('$MAKE -s --no-print-directory -C T7702plugin clean.T7702'), 
       # we say 18mb peak allocated +/- 70% because other compiler flags have 
       # a large effect on allocation which is hard to separate from the 
