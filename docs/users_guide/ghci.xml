@@ -2709,6 +2709,16 @@ bar
 
       <varlistentry>
 	<term>
+           <literal>:set</literal> <literal>prompt2</literal> <replaceable>prompt</replaceable>
+        </term>
+	<listitem>
+	  <para>Sets the string to be used as the continuation prompt
+      (used when using the <literal>:{</literal> command) in GHCi.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
            <literal>:set</literal> <literal>stop</literal>
           [<replaceable>num</replaceable>] <replaceable>cmd</replaceable>
         </term>
