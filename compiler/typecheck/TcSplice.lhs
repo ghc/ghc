@@ -7,6 +7,7 @@ TcSplice: Template Haskell splices
 
 
 \begin{code}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module TcSplice( tcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  tcTopSpliceExpr,
@@ -86,6 +87,10 @@ import qualified Language.Haskell.TH.Syntax as TH
 #ifdef GHCI
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
 import GHC.Desugar      ( AnnotationWrapper(..) )
+
+import qualified Data.Map as Map
+import Data.Dynamic  ( fromDynamic, toDyn )
+import Data.Typeable ( typeOf )
 #endif
 
 import GHC.Exts         ( unsafeCoerce# )
@@ -1094,6 +1099,16 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
   qAddModFinalizer fin = do
       th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
       updTcRef th_modfinalizers_var (\fins -> fin:fins)
+
+  qGetQ = do
+      th_state_var <- fmap tcg_th_state getGblEnv
+      th_state <- readTcRef th_state_var
+      let x = Map.lookup (typeOf x) th_state >>= fromDynamic
+      return x
+
+  qPutQ x = do
+      th_state_var <- fmap tcg_th_state getGblEnv
+      updTcRef th_state_var (\m -> Map.insert (typeOf x) (toDyn x) m)
 \end{code}
 
 
