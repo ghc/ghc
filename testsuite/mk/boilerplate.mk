@@ -91,6 +91,10 @@ ifeq "$(GHC_PKG)" ""
 GHC_PKG := $(BIN_ROOT)/ghc-pkg
 endif
 
+ifeq "$(RUNGHC)" ""
+RUNGHC := $(BIN_ROOT)/runghc
+endif
+
 ifeq "$(HSC2HS)" ""
 HSC2HS := $(BIN_ROOT)/hsc2hs
 endif
