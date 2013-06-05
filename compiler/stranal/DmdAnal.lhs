@@ -250,7 +250,6 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
---                                   , text "alt_dmd" <+> ppr alt_dmd
 --                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
 --                                   , text "scrut_dmd" <+> ppr scrut_dmd
 --                                   , text "scrut_ty" <+> ppr scrut_ty
@@ -262,11 +261,12 @@ dmdAnal env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
 	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
 	(scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
-	(alt_ty, case_bndr') = annotateBndr env(foldr lubDmdType botDmdType alt_tys) case_bndr
+	(alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
         res_ty               = alt_ty `bothDmdType` scrut_ty
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
+--                                   , text "alt_tys" <+> ppr alt_tys
 --                                   , text "alt_ty" <+> ppr alt_ty
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
@@ -482,7 +482,7 @@ dmdTransform env var dmd
 
   | isGlobalId var	                         -- Imported function
   = let res = dmdTransformSig (idStrictness var) dmd in
-    -- pprTrace "dmdTransform" (vcat [ppr var, ppr dmd, ppr res]) 
+--    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res]) 
     res
 
   | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
@@ -762,11 +762,11 @@ annotateLamIdBndr :: AnalEnv
 		  -> (DmdType, 	-- Demand type of lambda
 		      Id)	-- and binder annotated with demand	
 
-annotateLamIdBndr env (DmdType fv ds res) one_shot id
+annotateLamIdBndr env _dmd_ty@(DmdType fv ds res) one_shot id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty]) $
+    -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
     (final_ty, setOneShotness one_shot (set_idDemandInfo env id dmd))
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
