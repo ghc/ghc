@@ -33,6 +33,7 @@ import Data.Maybe
 import GHC.IntWord64
 #endif
 
+-- import {-# SOURCE #-} GHC.Exception
 import GHC.Base
 import GHC.Enum
 import GHC.Num
@@ -40,7 +41,6 @@ import GHC.Real
 import GHC.Read
 import GHC.Arr
 import GHC.Show
-import GHC.Err
 import GHC.Float ()     -- for RealFrac methods
 
 ------------------------------------------------------------------------

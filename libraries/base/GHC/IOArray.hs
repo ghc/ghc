@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -27,6 +27,7 @@ module GHC.IOArray (
 import GHC.Base
 import GHC.IO
 import GHC.Arr
+import Data.Typeable.Internal
 
 -- ---------------------------------------------------------------------------
 -- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.
@@ -38,7 +39,7 @@ import GHC.Arr
 --
 --
 
-newtype IOArray i e = IOArray (STArray RealWorld i e)
+newtype IOArray i e = IOArray (STArray RealWorld i e) deriving( Typeable )
 
 -- explicit instance because Haddock can't figure out a derived one
 instance Eq (IOArray i e) where

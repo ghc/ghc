@@ -1,0 +1,19 @@
+\begin{code}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
+---------------------------------------------------------------------------
+--                  Ghc.Exception.hs-boot
+---------------------------------------------------------------------------
+
+module GHC.Exception ( SomeException, errorCallException,
+                       divZeroException, overflowException, ratioZeroDenomException  
+    ) where 
+import GHC.Types( Char )
+
+-- These exports are nice, well-behaved, non-bottom values
+
+data SomeException
+divZeroException, overflowException, ratioZeroDenomException  :: SomeException
+errorCallException :: [Char] -> SomeException
+\end{code}

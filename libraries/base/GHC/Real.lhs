@@ -26,7 +26,7 @@ import GHC.Num
 import GHC.List
 import GHC.Enum
 import GHC.Show
-import GHC.Err
+import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException, ratioZeroDenomException )
 
 #ifdef OPTIMISE_INTEGER_GCD_LCM
 import GHC.Integer.GMP.Internals
@@ -40,6 +40,29 @@ default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
 \end{code}
 
+
+%*********************************************************
+%*                                                      *
+       Divide by zero and arithmetic overflow
+%*                                                      *
+%*********************************************************
+
+We put them here because they are needed relatively early
+in the libraries before the Exception type has been defined yet.
+
+\begin{code}
+{-# NOINLINE divZeroError #-}
+divZeroError :: a
+divZeroError = raise# divZeroException
+
+{-# NOINLINE ratioZeroDenominatorError #-}
+ratioZeroDenominatorError :: a
+ratioZeroDenominatorError = raise# ratioZeroDenomException
+
+{-# NOINLINE overflowError #-}
+overflowError :: a
+overflowError = raise# overflowException
+\end{code}
 
 %*********************************************************
 %*                                                      *

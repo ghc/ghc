@@ -83,9 +83,7 @@ import Data.Typeable.Internal hiding (mkTyCon)
 
 import Unsafe.Coerce
 import Data.Maybe
-
 import GHC.Base
-import GHC.Err          (undefined)
 
 -------------------------------------------------------------
 --
@@ -100,14 +98,12 @@ cast x = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
            else Nothing
 
 -- | A flexible variation parameterised in a type constructor
-gcast :: (Typeable (a :: *), Typeable b) => c a -> Maybe (c b)
+gcast :: forall a b c. (Typeable (a :: *), Typeable b) => c a -> Maybe (c b)
 gcast x = r
  where
-  r = if typeRep (getArg x) == typeRep (getArg (fromJust r))
+  r = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
         then Just $ unsafeCoerce x
         else Nothing
-  getArg :: c x -> Proxy x 
-  getArg = undefined
 
 -- | Cast for * -> *
 gcast1 :: forall c t t' a. (Typeable (t :: * -> *), Typeable t')

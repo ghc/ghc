@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples,
-             StandaloneDeriving #-}
+             StandaloneDeriving, DeriveDataTypeable #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -38,10 +38,10 @@ import GHC.Num
 import GHC.Real
 import GHC.Read
 import GHC.Arr
-import GHC.Err
 import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
 import GHC.Float ()     -- for RealFrac methods
+import Data.Typeable
 
 
 ------------------------------------------------------------------------
@@ -51,7 +51,7 @@ import GHC.Float ()     -- for RealFrac methods
 -- Int8 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Eq, Ord, Typeable)
 -- ^ 8-bit signed integer type
 
 instance Show Int8 where
@@ -210,7 +210,7 @@ instance FiniteBits Int8 where
 -- Int16 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Eq, Ord, Typeable)
 -- ^ 16-bit signed integer type
 
 instance Show Int16 where
@@ -374,7 +374,7 @@ instance FiniteBits Int16 where
 -- from its logical range.
 #endif
 
-data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Eq, Ord, Typeable)
 -- ^ 32-bit signed integer type
 
 instance Show Int32 where
@@ -549,7 +549,7 @@ instance Ix Int32 where
 
 #if WORD_SIZE_IN_BITS < 64
 
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64# deriving( Typeable )
 -- ^ 64-bit signed integer type
 
 instance Eq Int64 where
@@ -724,7 +724,7 @@ a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Eq, Ord, Typeable)
 -- ^ 64-bit signed integer type
 
 instance Show Int64 where

@@ -47,7 +47,7 @@ import GHC.Num
 import GHC.ST
 import GHC.Base
 import GHC.List
-import GHC.Real
+import GHC.Real( fromIntegral )
 import GHC.Show
 
 infixl 9  !, //
@@ -185,7 +185,7 @@ can do better, so we override the default method for index.
 -- Abstract these errors from the relevant index functions so that
 -- the guts of the function will be small enough to inline.
 
-{-# NOINLINE indexError #-}
+{- # NOINLINE indexError #-}
 indexError :: Show a => (a,a) -> a -> String -> b
 indexError rng i tp
   = error (showString "Ix{" . showString tp . showString "}.index: Index " .

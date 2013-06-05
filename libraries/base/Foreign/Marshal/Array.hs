@@ -72,7 +72,6 @@ import Foreign.Marshal.Utils (copyBytes, moveBytes)
 #ifdef __GLASGOW_HASKELL__
 import GHC.Num
 import GHC.List
-import GHC.Err
 import GHC.Base
 #else
 import Control.Monad (zipWithM_)

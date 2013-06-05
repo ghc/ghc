@@ -101,8 +101,8 @@ module GHC.Base
         module GHC.CString,
         module GHC.Magic,
         module GHC.Types,
-        module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
-        module GHC.Err          -- of people having to import it explicitly
+        module GHC.Prim,    -- Re-export GHC.Prim and [boot] GHC.Err, to avoid lots
+        module GHC.Err      -- of people having to import it explicitly
   )
         where
 
@@ -111,7 +111,7 @@ import GHC.Classes
 import GHC.CString
 import GHC.Magic
 import GHC.Prim
-import {-# SOURCE #-} GHC.Err
+import GHC.Err
 import {-# SOURCE #-} GHC.IO (failIO)
 
 -- This is not strictly speaking required by this module, but is an

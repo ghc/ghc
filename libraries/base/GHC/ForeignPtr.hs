@@ -56,7 +56,6 @@ import GHC.Base
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
-import GHC.Err
 
 #include "Typeable.h"
 

@@ -74,7 +74,6 @@ import Foreign.ForeignPtr       ( FinalizerPtr )
 import GHC.IO.Exception
 import GHC.Real
 import GHC.Ptr
-import GHC.Err
 import GHC.Base
 #else
 import Control.Exception.Base   ( bracket )

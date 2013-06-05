@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Unsafe, DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -32,8 +32,9 @@ module GHC.MVar (
 
 import GHC.Base
 import Data.Maybe
+import Data.Typeable
 
-data MVar a = MVar (MVar# RealWorld a)
+data MVar a = MVar (MVar# RealWorld a) deriving( Typeable )
 {- ^
 An 'MVar' (pronounced \"em-var\") is a synchronising variable, used
 for communication between concurrent threads.  It can be thought of
