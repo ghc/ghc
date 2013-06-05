@@ -947,6 +947,8 @@ tryUnfolding dflags id lone_variable
   where
     n_val_args = length arg_infos
     saturated  = n_val_args >= uf_arity
+    cont_info' | n_val_args > uf_arity = ValAppCtxt
+               | otherwise             = cont_info
 
     result | yes_or_no = Just unf_template
            | otherwise = Nothing
@@ -964,12 +966,11 @@ tryUnfolding dflags id lone_variable
     some_benefit 
        | not saturated = interesting_args	-- Under-saturated
     	   	      		     	-- Note [Unsaturated applications]
-       | n_val_args > uf_arity = True	-- Over-saturated
-       | otherwise = interesting_args	-- Saturated
-                  || interesting_saturated_call 
+       | otherwise = interesting_args	-- Saturated or over-saturated
+                  || interesting_call
 
-    interesting_saturated_call 
-      = case cont_info of
+    interesting_call 
+      = case cont_info' of
           BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
           CaseCtxt   -> not (lone_variable && is_wf)      -- Note [Lone variables]
           ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
@@ -991,7 +992,7 @@ tryUnfolding dflags id lone_variable
     	       discounted_size = size - discount
     	       small_enough = discounted_size <= ufUseThreshold dflags
     	       discount = computeDiscount dflags uf_arity arg_discounts 
-    	         		          res_discount arg_infos cont_info
+    	         		          res_discount arg_infos cont_info'
 \end{code}
 
 Note [RHS of lets]
