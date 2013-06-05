@@ -199,21 +199,25 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
     do { ty <- lintCoreExpr rhs	
        ; lintBinder binder -- Check match to RHS type
        ; binder_ty <- applySubstTy binder_ty
-       ; checkTys binder_ty ty (mkRhsMsg binder ty)
+       ; checkTys binder_ty ty (mkRhsMsg binder (ptext (sLit "RHS")) ty)
+
         -- Check (not isUnLiftedType) (also checks for bogus unboxed tuples)
        ; checkL (not (isUnLiftedType binder_ty)
             || (isNonRec rec_flag && exprOkForSpeculation rhs))
  	   (mkRhsPrimMsg binder rhs)
+
         -- Check that if the binder is top-level or recursive, it's not demanded
        ; checkL (not (isStrictId binder)
             || (isNonRec rec_flag && not (isTopLevel top_lvl_flag)))
            (mkStrictMsg binder)
+
         -- Check that if the binder is local, it is not marked as exported
        ; checkL (not (isExportedId binder) || isTopLevel top_lvl_flag)
            (mkNonTopExportedMsg binder)
         -- Check that if the binder is local, it does not have an external name
        ; checkL (not (isExternalName (Var.varName binder)) || isTopLevel top_lvl_flag)
            (mkNonTopExternalNameMsg binder)
+
         -- Check whether binder's specialisations contain any out-of-scope variables
        ; mapM_ (checkBndrIdInScope binder) bndr_vars 
 
@@ -225,7 +229,9 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
       -- already happened)
        ; checkL (case dmdTy of
                   StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
-           (mkArityMsg binder) }
+           (mkArityMsg binder)
+
+       ; lintIdUnfolding binder binder_ty (idUnfolding binder) }
 	  
 	-- We should check the unfolding, if any, but this is tricky because
  	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
@@ -238,6 +244,14 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
     -- See Note [GHC Formalism]
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
 	           | otherwise = return ()
+
+lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
+lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
+  | isStableSource src
+  = do { ty <- lintCoreExpr rhs
+       ; checkTys bndr_ty ty (mkRhsMsg bndr (ptext (sLit "unfolding")) ty) }
+lintIdUnfolding  _ _ _
+  = return ()       -- We could check more
 \end{code}
 
 %************************************************************************
@@ -1263,10 +1277,10 @@ mkTyAppMsg ty arg_ty
 	      hang (ptext (sLit "Arg type:"))   
 	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-mkRhsMsg :: Id -> Type -> MsgDoc
-mkRhsMsg binder ty
+mkRhsMsg :: Id -> SDoc -> Type -> MsgDoc
+mkRhsMsg binder what ty
   = vcat
-    [hsep [ptext (sLit "The type of this binder doesn't match the type of its RHS:"),
+    [hsep [ptext (sLit "The type of this binder doesn't match the type of its") <+> what <> colon,
 	    ppr binder],
      hsep [ptext (sLit "Binder's type:"), ppr (idType binder)],
      hsep [ptext (sLit "Rhs type:"), ppr ty]]
