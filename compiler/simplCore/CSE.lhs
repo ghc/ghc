@@ -8,23 +8,6 @@ module CSE (cseProgram) where
 
 #include "HsVersions.h"
 
--- Note [Keep old CSEnv rep]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~
--- Temporarily retain code for the old representation for CSEnv
--- Keeping it only so that we can switch back if a bug shows up
--- or we want to do some performance comparisions
---
--- NB: when you remove this, also delete hashExpr from CoreUtils
-#ifdef OLD_CSENV_REP
-import CoreUtils        ( exprIsBig, hashExpr, eqExpr )
-import StaticFlags      ( opt_PprStyle_Debug )
-import Util             ( lengthExceeds )
-import UniqFM
-import FastString
-#else
-import TrieMap
-#endif
-
 import CoreSubst
 import Var              ( Var )
 import Id               ( Id, idType, idInlineActivation, zapIdOccInfo )
@@ -34,6 +17,7 @@ import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
 import BasicTypes       ( isAlwaysActive )
+import TrieMap
 
 import Data.List
 \end{code}
@@ -290,59 +274,6 @@ type OutExpr  = CoreExpr        -- Post-cloning
 type OutBndr  = CoreBndr
 type OutAlt   = CoreAlt
 
--- See Note [Keep old CsEnv rep]
-#ifdef OLD_CSENV_REP
-data CSEnv  = CS { cs_map    :: CSEMap
-                 , cs_subst  :: Subst }
-
-type CSEMap = UniqFM [(OutExpr, OutExpr)]       -- This is the reverse mapping
-        -- It maps the hash-code of an expression e to list of (e,e') pairs
-        -- This means that it's good to replace e by e'
-        -- INVARIANT: The expr in the range has already been CSE'd
-
-emptyCSEnv :: CSEnv
-emptyCSEnv = CS { cs_map = emptyUFM, cs_subst = emptySubst }
-
-lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
-lookupCSEnv (CS { cs_map = oldmap, cs_subst = sub}) expr
-  = case lookupUFM oldmap (hashExpr expr) of
-                Nothing -> Nothing
-                Just pairs -> lookup_list pairs
-  where
-    in_scope = substInScope sub
-
-  -- In this lookup we use full expression equality
-  -- Reason: when expressions differ we generally find out quickly
-  --         but I found that cheapEqExpr was saying (\x.x) /= (\y.y),
-  --         and this kind of thing happened in real programs
-    lookup_list :: [(OutExpr,OutExpr)] -> Maybe OutExpr
-    lookup_list ((e,e'):es)
-      | eqExpr in_scope e expr = Just e'
-      | otherwise                        = lookup_list es
-    lookup_list []                       = Nothing
-
-addCSEnvItem :: CSEnv -> OutExpr -> OutExpr -> CSEnv
-addCSEnvItem env expr expr' | exprIsBig expr = env
-                            | otherwise      = extendCSEnv env expr expr'
-   -- We don't try to CSE big expressions, because they are expensive to compare
-   -- (and are unlikely to be the same anyway)
-
-extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
-extendCSEnv cse@(CS { cs_map = oldmap }) expr expr'
-  = cse { cs_map = addToUFM_C combine oldmap hash [(expr, expr')] }
-  where
-    hash = hashExpr expr
-    combine old new
-        = WARN( result `lengthExceeds` 4, short_msg $$ nest 2 long_msg ) result
-        where
-          result = new ++ old
-          short_msg = ptext (sLit "extendCSEnv: long list, length") <+> int (length result)
-          long_msg | opt_PprStyle_Debug = (text "hash code" <+> text (show hash)) $$ ppr result
-                   | otherwise          = empty
-
-#else
------------- NEW ----------------
-
 data CSEnv  = CS { cs_map    :: CoreMap (OutExpr, OutExpr)   -- Key, value
                  , cs_subst  :: Subst }
 
@@ -366,7 +297,6 @@ addCSEnvItem = extendCSEnv
 extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
 extendCSEnv cse expr expr'
   = cse { cs_map = extendCoreMap (cs_map cse) expr (expr,expr') }
-#endif
 
 csEnvSubst :: CSEnv -> Subst
 csEnvSubst = cs_subst
