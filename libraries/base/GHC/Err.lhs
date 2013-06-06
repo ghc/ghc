@@ -26,6 +26,9 @@
 module GHC.Err( absentErr, error, undefined ) where
 import GHC.Types
 import GHC.Prim
+import GHC.Integer ()   -- Make sure Integer is compiled first
+                        -- because GHC depends on it in a wired-in way
+                        -- so the build system doesn't see the dependency
 import {-# SOURCE #-} GHC.Exception( errorCallException )
 \end{code}
 
