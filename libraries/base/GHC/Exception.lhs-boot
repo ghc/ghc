@@ -1,3 +1,24 @@
+This SOURCE-imported hs-boot module cuts a big dependency loop:
+
+         GHC.Exception
+imports  Data.Maybe
+imports  GHC.Base
+imports  GHC.Err
+imports  {-# SOURCE #-} GHC.Exception
+
+More dramatically
+
+         GHC.Exception
+imports  Data.Typeable
+imports  Data.Typeable.Internals
+imports  GHC.Arr (fingerprint representation etc)
+imports  GHC.Real
+imports  {-# SOURCE #-} GHC.Exception
+
+However, GHC.Exceptions loop-breaking exports are all nice,
+well-behaved, non-bottom values.  The clients use 'raise#'
+to get a visibly-bottom value.
+
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -10,8 +31,6 @@ module GHC.Exception ( SomeException, errorCallException,
                        divZeroException, overflowException, ratioZeroDenomException  
     ) where 
 import GHC.Types( Char )
-
--- These exports are nice, well-behaved, non-bottom values
 
 data SomeException
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException
