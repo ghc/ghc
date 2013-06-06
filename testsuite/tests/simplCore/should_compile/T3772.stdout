@@ -14,7 +14,7 @@ xs =
 end Rec }
 
 T3772.foo [InlPrag=NOINLINE] :: GHC.Types.Int -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,U(U)>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
 T3772.foo =
   \ (n :: GHC.Types.Int) ->
     case n of _ { GHC.Types.I# n# ->
