@@ -17,6 +17,9 @@ boot:
 all:
 	$(MAKE) -C $(TOP)/tests all
 
+fast:
+	$(MAKE) -C $(TOP)/tests fast
+
 endif
 endif
 endif
