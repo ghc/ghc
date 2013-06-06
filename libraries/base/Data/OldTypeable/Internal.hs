@@ -59,7 +59,6 @@ module Data.OldTypeable.Internal {-# DEPRECATED "Use Data.Typeable.Internal inst
 import GHC.Base
 import GHC.Word
 import GHC.Show
-import GHC.Err          (undefined)
 import Data.Maybe
 import Data.List
 import GHC.Num

@@ -46,7 +46,6 @@ import GHC.Num
 import GHC.Int
 import GHC.Word
 import GHC.Ptr
-import GHC.Exception
 import GHC.Base
 import GHC.Fingerprint.Type
 import Data.Bits

@@ -55,7 +55,6 @@ import Foreign.Marshal.Alloc
 import Foreign.ForeignPtr
 
 import GHC.Debug
-import GHC.Err (undefined)
 import GHC.List
 import GHC.Num
 import GHC.Base

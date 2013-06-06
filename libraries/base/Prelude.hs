@@ -156,7 +156,6 @@ import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.Show
-import GHC.Err   ( undefined )
 #endif
 
 #ifdef __HUGS__
