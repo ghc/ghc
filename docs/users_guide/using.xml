@@ -473,6 +473,18 @@ module X where
       <varlistentry>
         <term>
           <cmdsynopsis>
+            <command>ghc --show-options</command>
+          </cmdsynopsis>
+          <indexterm><primary><option>&ndash;&ndash;show-options</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Print the supported command line options. This flag can be used for autocompletion in a shell.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <cmdsynopsis>
             <command>ghc --info</command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;info</option></primary></indexterm>

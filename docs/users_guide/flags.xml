@@ -60,6 +60,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>&ndash;&ndash;show-options</option></entry>
+            <entry>display the supported command line options</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>&ndash;&ndash;info</option></entry>
             <entry>display information about the compiler</entry>
             <entry>mode</entry>

@@ -700,7 +700,7 @@ showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
 showOptions :: IO ()
 showOptions = putStr (unlines availableOptions)
     where
-      availableOptions     = map ((:) '-') . filter ((>2) . length) $
+      availableOptions     = map ((:) '-') $
                              getFlagNames mode_flags   ++
                              getFlagNames flagsDynamic ++
                              (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
