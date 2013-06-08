@@ -3,7 +3,6 @@
            , CPP
            , ExistentialQuantification
            , NoImplicitPrelude
-           , RecordWildCards
            , TypeSynonymInstances
            , FlexibleInstances
   #-}
@@ -174,10 +173,10 @@ finished :: TimerManager -> IO Bool
 finished mgr = (== Finished) `liftM` readIORef (emState mgr)
 
 cleanup :: TimerManager -> IO ()
-cleanup TimerManager{..} = do
-  writeIORef emState Finished
-  I.delete emBackend
-  closeControl emControl
+cleanup mgr = do
+  writeIORef (emState mgr) Finished
+  I.delete (emBackend mgr)
+  closeControl (emControl mgr)
 
 ------------------------------------------------------------------------
 -- Event loop
@@ -188,8 +187,8 @@ cleanup TimerManager{..} = do
 -- /Note/: This loop can only be run once per 'TimerManager', as it
 -- closes all of its control resources when it finishes.
 loop :: TimerManager -> IO ()
-loop mgr@TimerManager{..} = do
-  state <- atomicModifyIORef emState $ \s -> case s of
+loop mgr = do
+  state <- atomicModifyIORef (emState mgr) $ \s -> case s of
     Created -> (Running, s)
     _       -> (s, s)
   case state of
@@ -203,10 +202,10 @@ loop mgr@TimerManager{..} = do
             when running $ go q'
 
 step :: TimerManager -> TimeoutQueue -> IO (Bool, TimeoutQueue)
-step mgr@TimerManager{..} tq = do
+step mgr tq = do
   (timeout, q') <- mkTimeout tq
-  _ <- I.poll emBackend (Just timeout) (handleControlEvent mgr)
-  state <- readIORef emState
+  _ <- I.poll (emBackend mgr) (Just timeout) (handleControlEvent mgr)
+  state <- readIORef (emState mgr)
   state `seq` return (state == Running, q')
  where
 
@@ -215,7 +214,7 @@ step mgr@TimerManager{..} tq = do
   mkTimeout :: TimeoutQueue -> IO (Timeout, TimeoutQueue)
   mkTimeout q = do
       now <- getMonotonicTime
-      applyEdits <- atomicModifyIORef emTimeouts $ \f -> (id, f)
+      applyEdits <- atomicModifyIORef (emTimeouts mgr) $ \f -> (id, f)
       let (expired, q'') = let q' = applyEdits q in q' `seq` Q.atMost now q'
       sequence_ $ map Q.value expired
       let timeout = case Q.minView q'' of
