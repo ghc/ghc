@@ -39,7 +39,7 @@ module GHC.Event.TimerManager
 
 import Control.Exception (finally)
 import Control.Monad ((=<<), liftM, sequence_, when)
-import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
+import Data.IORef (IORef, atomicModifyIORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
@@ -114,7 +114,7 @@ type TimeoutEdit = TimeoutQueue -> TimeoutQueue
 -- | The event manager state.
 data TimerManager = TimerManager
     { emBackend      :: !Backend
-    , emTimeouts     :: {-# UNPACK #-} !(IORef TimeoutEdit)
+    , emTimeouts     :: {-# UNPACK #-} !(IORef TimeoutQueue)
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
@@ -144,7 +144,7 @@ new = newWith =<< newDefaultBackend
 
 newWith :: Backend -> IO TimerManager
 newWith be = do
-  timeouts <- newIORef id
+  timeouts <- newIORef Q.empty
   ctrl <- newControl True
   state <- newIORef Created
   us <- newSource
@@ -192,38 +192,39 @@ loop mgr = do
     Created -> (Running, s)
     _       -> (s, s)
   case state of
-    Created -> go Q.empty `finally` cleanup mgr
+    Created -> go `finally` cleanup mgr
     Dying   -> cleanup mgr
     _       -> do cleanup mgr
                   error $ "GHC.Event.Manager.loop: state is already " ++
                       show state
  where
-  go q = do (running, q') <- step mgr q
-            when running $ go q'
+  go = do running <- step mgr
+          when running go
 
-step :: TimerManager -> TimeoutQueue -> IO (Bool, TimeoutQueue)
-step mgr tq = do
-  (timeout, q') <- mkTimeout tq
+step :: TimerManager -> IO Bool
+step mgr = do
+  timeout <- mkTimeout
   _ <- I.poll (emBackend mgr) (Just timeout) (handleControlEvent mgr)
   state <- readIORef (emState mgr)
-  state `seq` return (state == Running, q')
+  state `seq` return (state == Running)
  where
 
   -- | Call all expired timer callbacks and return the time to the
   -- next timeout.
-  mkTimeout :: TimeoutQueue -> IO (Timeout, TimeoutQueue)
-  mkTimeout q = do
+  mkTimeout :: IO Timeout
+  mkTimeout = do
       now <- getMonotonicTime
-      applyEdits <- atomicModifyIORef (emTimeouts mgr) $ \f -> (id, f)
-      let (expired, q'') = let q' = applyEdits q in q' `seq` Q.atMost now q'
+      (expired, timeout) <- atomicModifyIORef (emTimeouts mgr) $ \tq ->
+           let (expired, tq') = Q.atMost now tq
+               timeout = case Q.minView tq' of
+                 Nothing             -> Forever
+                 Just (Q.E _ t _, _) ->
+                     -- This value will always be positive since the call
+                     -- to 'atMost' above removed any timeouts <= 'now'
+                     let t' = t - now in t' `seq` Timeout t'
+           in (tq', (expired, timeout))
       sequence_ $ map Q.value expired
-      let timeout = case Q.minView q'' of
-            Nothing             -> Forever
-            Just (Q.E _ t _, _) ->
-                -- This value will always be positive since the call
-                -- to 'atMost' above removed any timeouts <= 'now'
-                let t' = t - now in t' `seq` Timeout t'
-      return (timeout, q'')
+      return timeout
 
 -- | Wake up the event manager.
 wakeManager :: TimerManager -> IO ()
@@ -244,21 +245,14 @@ registerTimeout mgr us cb = do
       now <- getMonotonicTime
       let expTime = fromIntegral us / 1000000.0 + now
 
-      -- We intentionally do not evaluate the modified map to WHNF here.
-      -- Instead, we leave a thunk inside the IORef and defer its
-      -- evaluation until mkTimeout in the event loop.  This is a
-      -- workaround for a nasty IORef contention problem that causes the
-      -- thread-delay benchmark to take 20 seconds instead of 0.2.
-      atomicModifyIORef (emTimeouts mgr) $ \f ->
-          let f' = (Q.insert key expTime cb) . f in (f', ())
+      editTimeouts mgr (Q.insert key expTime cb)
       wakeManager mgr
   return $ TK key
 
 -- | Unregister an active timeout.
 unregisterTimeout :: TimerManager -> TimeoutKey -> IO ()
 unregisterTimeout mgr (TK key) = do
-  atomicModifyIORef (emTimeouts mgr) $ \f ->
-      let f' = (Q.delete key) . f in (f', ())
+  editTimeouts mgr (Q.delete key)
   wakeManager mgr
 
 -- | Update an active timeout to fire in the given number of
@@ -268,6 +262,9 @@ updateTimeout mgr (TK key) us = do
   now <- getMonotonicTime
   let expTime = fromIntegral us / 1000000.0 + now
 
-  atomicModifyIORef (emTimeouts mgr) $ \f ->
-      let f' = (Q.adjust (const expTime) key) . f in (f', ())
+  editTimeouts mgr (Q.adjust (const expTime) key)
   wakeManager mgr
+
+editTimeouts :: TimerManager -> TimeoutEdit -> IO ()
+editTimeouts mgr g = atomicModifyIORef' (emTimeouts mgr) $ \tq -> (g tq, ())
+
