@@ -3,9 +3,9 @@
   <title>Release notes for version 7.8.1</title>
 
   <para>
-    The significant changes to the various parts of the compiler are
-    listed in the following sections. There have also been numerous bug
-    fixes and performance improvements over the 7.6 branch.
+      The significant changes to the various parts of the compiler are listed
+      in the following sections. There have also been numerous bug fixes and
+      performance improvements over the 7.6 branch.
   </para>
 
   <sect2>
@@ -16,18 +16,479 @@
     </para>
 
     <itemizedlist>
-      <listitem>
-          <para>
-              TODO: Format these nicely and expand:
-              - type holes
-              - rebindable list syntax
-              - major changes to the type inference engine
-              - type level naturals
-              - overlapping type families
-              - new codegen
-          </para>
-      </listitem>
+        <listitem>
+            <para>
+                GHC now supports "type holes" with the
+                <literal>TypeHoles</literal> extension. When enabled, the
+                unbound literal <literal>_</literal> may be used during
+                development in place of a regular identifier, and GHC will
+                respond with the type necessary to "fill in the hole."
+
+                TODO FIXME: reference.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                GHC now supports overloading list literals using the new
+                <literal>OverloadedLists</literal> extension.
+
+                TODO FIXME: reference.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                GHC now supports overlapping type family instances when
+                <literal>TypeFamilies</literal> are enabled.
+
+                TODO FIXME: reference.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                There has been significant overhaul of the type inference engine and
+                constraint solver.
+
+                TODO FIXME: reference.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                By default, GHC will now unbox all "small" strict fields in a
+                data type. A "small" data type is one whose size is equivalent
+                to or smaller than the native word size of the machine. This
+                means you no longer have to specify <literal>UNPACK</literal>
+                pragmas for e.g.  <literal>Int</literal> fields. This also
+                applies to floating-point values.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                GHC now has a brand-new I/O manager that scales significantly
+                better for larger workloads compared to the previous one. It
+                should scale linearly up to approximately 32 cores.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                The LLVM backend now supports 128bit SIMD operations.  This is
+                now exploited in both the <literal>vector</literal> and
+                <literal>dph</literal> packages, exposing a high level
+                interface.
+
+                TODO FIXME: reference.
+           </para>
+            <para>
+                This is only available with the LLVM backend.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                The new code generator, after significant work by many
+                individuals over the past several years, is now enabled by
+                default. This is a complete rewrite of the STG to Cmm
+                transformation. In general, your programs may get slightly
+                faster.
+           </para>
+
+            <para>
+                The old code generator has been removed completely.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                TODO: mention dynamic changes
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                TODO: mention new <literal>Typeable</literal> and
+                <literal>AutoDeriveTypeable</literal>
+           </para>
+       </listitem>
+   </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Full details</title>
+    <sect3>
+        <title>Language</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO FIXME
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Compiler</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC now supports a <literal>--show-options</literal> flag,
+                    which will dump all of the flags it supports to standard out.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>GHCi</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO FIXME
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Template Haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO FIXME
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Runtime system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    The performance of <literal>StablePtr</literal>s and
+                    <literal>StableName</literal>s has been improved.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Build system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC >= 7.4 is now required for bootstrapping.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+
+    <para>
+        There have been some changes that have effected multiple
+        libraries:
+    </para>
+
+     <itemizedlist>
+         <listitem>
+             <para>
+                 TODO FIXME
+            </para>
+        </listitem>
     </itemizedlist>
+
+    <para>
+        The following libraries have been removed from the GHC tree:
+    </para>
+
+     <itemizedlist>
+         <listitem>
+             <para>TODO FIXME</para>
+        </listitem>
+    </itemizedlist>
+
+    <para>
+        The following libraries have been added to the GHC tree:
+    </para>
+
+     <itemizedlist>
+         <listitem>
+             <para>TODO FIXME</para>
+        </listitem>
+    </itemizedlist>
+
+    <sect3>
+        <title>array</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 4.7.0.0 (was 4.6.0.1)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    The <literal>Control.Category</literal> module now has the
+                    <literal>PolyKinds</literal> extension enabled, meaning
+                    that instances of <literal>Category</literal> no longer
+                    need be of kind <literal>* -> * -> *</literal>
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    There are now <literal>Foldable</literal> and <literal>Traversable</literal>
+                    instances for <literal>Either a</literal> and <literal>(,) a</literal>
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bin-package-db</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bytestring</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+              </para>
+          </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>containers</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>deepseq</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>directory</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>filepath</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-prim</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell98</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell2010</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hoopl</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hpc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>integer-gmp</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-locale</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>process</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>template-haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>unix</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Win32</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
   </sect2>
 </sect1>
-
