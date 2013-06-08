@@ -39,7 +39,7 @@ module GHC.Event.TimerManager
 
 import Control.Exception (finally)
 import Control.Monad ((=<<), liftM, sequence_, when)
-import Data.IORef (IORef, atomicModifyIORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
+import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
@@ -149,7 +149,7 @@ newWith be = do
   state <- newIORef Created
   us <- newSource
   _ <- mkWeakIORef state $ do
-               st <- atomicModifyIORef state $ \s -> (Finished, s)
+               st <- atomicModifyIORef' state $ \s -> (Finished, s)
                when (st /= Finished) $ do
                  I.delete be
                  closeControl ctrl
@@ -166,7 +166,7 @@ newWith be = do
 -- | Asynchronously shuts down the event manager, if running.
 shutdown :: TimerManager -> IO ()
 shutdown mgr = do
-  state <- atomicModifyIORef (emState mgr) $ \s -> (Dying, s)
+  state <- atomicModifyIORef' (emState mgr) $ \s -> (Dying, s)
   when (state == Running) $ sendDie (emControl mgr)
 
 finished :: TimerManager -> IO Bool
@@ -188,7 +188,7 @@ cleanup mgr = do
 -- closes all of its control resources when it finishes.
 loop :: TimerManager -> IO ()
 loop mgr = do
-  state <- atomicModifyIORef (emState mgr) $ \s -> case s of
+  state <- atomicModifyIORef' (emState mgr) $ \s -> case s of
     Created -> (Running, s)
     _       -> (s, s)
   case state of
@@ -214,7 +214,7 @@ step mgr = do
   mkTimeout :: IO Timeout
   mkTimeout = do
       now <- getMonotonicTime
-      (expired, timeout) <- atomicModifyIORef (emTimeouts mgr) $ \tq ->
+      (expired, timeout) <- atomicModifyIORef' (emTimeouts mgr) $ \tq ->
            let (expired, tq') = Q.atMost now tq
                timeout = case Q.minView tq' of
                  Nothing             -> Forever
