@@ -53,7 +53,7 @@ import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar, putMVar,
 import Control.Exception (onException)
 import Control.Monad ((=<<), forM_, liftM, when, replicateM, void)
 import Data.Bits ((.&.))
-import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
+import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mappend, mconcat, mempty)
@@ -176,7 +176,7 @@ newWith oneShot be = do
   state <- newIORef Created
   us <- newSource
   _ <- mkWeakIORef state $ do
-               st <- atomicModifyIORef state $ \s -> (Finished, s)
+               st <- atomicModifyIORef' state $ \s -> (Finished, s)
                when (st /= Finished) $ do
                  I.delete be
                  closeControl ctrl
@@ -209,14 +209,14 @@ registerControlFd mgr fd evs =
 -- | Asynchronously shuts down the event manager, if running.
 shutdown :: EventManager -> IO ()
 shutdown mgr = do
-  state <- atomicModifyIORef (emState mgr) $ \s -> (Dying, s)
+  state <- atomicModifyIORef' (emState mgr) $ \s -> (Dying, s)
   when (state == Running) $ sendDie (emControl mgr)
 
 -- | Asynchronously tell the thread executing the event
 -- manager loop to exit.
 release :: EventManager -> IO ()
 release EventManager{..} = do
-  state <- atomicModifyIORef emState $ \s -> (Releasing, s)
+  state <- atomicModifyIORef' emState $ \s -> (Releasing, s)
   when (state == Running) $ sendWakeup emControl
 
 finished :: EventManager -> IO Bool
@@ -240,7 +240,7 @@ cleanup EventManager{..} = do
 loop :: EventManager -> IO ()
 loop mgr@EventManager{..} = do
   void $ takeMVar emLock
-  state <- atomicModifyIORef emState $ \s -> case s of
+  state <- atomicModifyIORef' emState $ \s -> case s of
     Created -> (Running, s)
     Releasing -> (Running, s)
     _       -> (s, s)
