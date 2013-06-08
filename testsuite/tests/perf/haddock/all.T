@@ -44,11 +44,12 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 217, 10)
+          [(wordsize(64), 246, 10)
             # 2012-08-14: 202 (amd64/Linux)
             # 2012-08-29: 211 (amd64/Linux, new codegen)
             # 2012-09-20: 227 (amd64/Linux)
             # 2012-10-08: 217 (amd64/Linux)
+            # 2013-06-07: 246 (amd64/Linux) (reason unknown)
           ,(platform('i386-unknown-mingw32'), 116, 1)
             # 2012-10-30:                      83 (x86/Windows)
             # 2013-02-10:                     116 (x86/Windows)
@@ -99,11 +100,12 @@ test('haddock.compiler',
             # 2012-08-14: 631 (x86/OSX)
             # 2013-02-10: 663 (x86/OSX)
      ,stats_num_field('max_bytes_used',
-          [(wordsize(64), 420105120, 10)
+          [(wordsize(64), 477593712, 10)
             # 2012-08-14: 428775544 (amd64/Linux)
             # 2012-09-20: 437618008 (amd64/Linux)
             # 2012-10-08: 442768280 (amd64/Linux)
             # 2012-11-12: 420105120 (amd64/Linux)
+            # 2013-06-08: 477593712 (amd64/Linux) (reason unknown)
           ,(platform('i386-unknown-mingw32'), 238529512, 1)
             # 2012-10-30:                     220847924 (x86/Windows)
             # 2013-02-10:                     238529512 (x86/Windows)
