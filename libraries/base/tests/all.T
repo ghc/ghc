@@ -129,3 +129,5 @@ test('T7773', when(opsys('mingw32'), skip), compile_and_run, [''])
 # Tests for kind-polymorphic Category
 test('CatPairs', normal, compile, [''])
 test('CatEntail', normal, compile, [''])
+
+test('T7653', normal, compile_and_run, [''])
