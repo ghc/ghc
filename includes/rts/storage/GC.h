@@ -154,8 +154,11 @@ StgPtr  allocate        ( Capability *cap, W_ n );
 StgPtr  allocatePinned  ( Capability *cap, W_ n );
 
 /* memory allocator for executable memory */
-void * allocateExec(W_ len, void **exec_addr);
-void   freeExec (void *p);
+typedef void* AdjustorWritable;
+typedef void* AdjustorExecutable;
+
+AdjustorWritable allocateExec(W_ len, AdjustorExecutable *exec_addr);
+void             freeExec (AdjustorExecutable p);
 
 // Used by GC checks in external .cmm code:
 extern W_ large_alloc_lim;

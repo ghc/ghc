@@ -29,6 +29,9 @@
 #include "Trace.h"
 #include "GC.h"
 #include "Evac.h"
+#if defined(ios_HOST_OS)
+#include "Hash.h"
+#endif
 
 #include <string.h>
 
@@ -1094,7 +1097,7 @@ calcNeeded (rtsBool force_major, memcount *blocks_needed)
 // because it knows how to work around the restrictions put in place
 // by SELinux.
 
-void *allocateExec (W_ bytes, void **exec_ret)
+AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
 {
     void **ret, **exec;
     ACQUIRE_SM_LOCK;
@@ -1107,18 +1110,65 @@ void *allocateExec (W_ bytes, void **exec_ret)
 }
 
 // freeExec gets passed the executable address, not the writable address. 
-void freeExec (void *addr)
+void freeExec (AdjustorExecutable addr)
 {
-    void *writable;
+    AdjustorWritable writable;
     writable = *((void**)addr - 1);
     ACQUIRE_SM_LOCK;
     ffi_closure_free (writable);
     RELEASE_SM_LOCK
 }
 
+#elif defined(ios_HOST_OS)
+
+static HashTable* allocatedExecs;
+
+AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
+{
+    AdjustorWritable writ;
+    ffi_closure* cl;
+    if (bytes != sizeof(ffi_closure)) {
+        barf("allocateExec: for ffi_closure only");
+    }
+    ACQUIRE_SM_LOCK;
+    cl = writ = ffi_closure_alloc((size_t)bytes, exec_ret);
+    if (cl != NULL) {
+        if (allocatedExecs == NULL) {
+            allocatedExecs = allocHashTable();
+        }
+        insertHashTable(allocatedExecs, (StgWord)*exec_ret, writ);
+    }
+    RELEASE_SM_LOCK;
+    return writ;
+}
+
+AdjustorWritable execToWritable(AdjustorExecutable exec)
+{
+    AdjustorWritable writ;
+    ACQUIRE_SM_LOCK;
+    if (allocatedExecs == NULL ||
+       (writ = lookupHashTable(allocatedExecs, (StgWord)exec)) == NULL) {
+        RELEASE_SM_LOCK;
+        barf("execToWritable: not found");
+    }
+    RELEASE_SM_LOCK;
+    return writ;
+}
+
+void freeExec(AdjustorExecutable exec)
+{
+    AdjustorWritable writ;
+    ffi_closure* cl;
+    cl = writ = execToWritable(exec);
+    ACQUIRE_SM_LOCK;
+    removeHashTable(allocatedExecs, (StgWord)exec, writ);
+    ffi_closure_free(cl);
+    RELEASE_SM_LOCK
+}
+
 #else
 
-void *allocateExec (W_ bytes, void **exec_ret)
+AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
 {
     void *ret;
     W_ n;
