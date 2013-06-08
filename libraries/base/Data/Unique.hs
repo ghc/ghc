@@ -55,8 +55,8 @@ uniqSource = unsafePerformIO (newIORef 0)
 -- times 'newUnique' may be called.
 newUnique :: IO Unique
 newUnique = do
-  r <- atomicModifyIORef uniqSource $ \x -> let z = x+1 in (z,z)
-  r `seq` return (Unique r)
+  r <- atomicModifyIORef' uniqSource $ \x -> let z = x+1 in (z,z)
+  return (Unique r)
 
 -- SDM (18/3/2010): changed from MVar to STM.  This fixes
 --  1. there was no async exception protection
@@ -72,6 +72,10 @@ newUnique = do
 --     because if the transaction retries then we just get a new
 --     Unique.
 --  3. IORef version is very slightly faster.
+
+-- IGL (08/06/2013): changed to using atomicModifyIORef' instead.
+--  This feels a little safer, from the point of view of not leaking
+--  memory, but the resulting core is identical.
 
 -- | Hashes a 'Unique' into an 'Int'.  Two 'Unique's may hash to the
 -- same value, although in practice this is unlikely.  The 'Int'
