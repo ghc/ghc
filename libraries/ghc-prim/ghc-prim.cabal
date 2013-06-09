@@ -40,6 +40,7 @@ Library {
         cbits/debug.c
         cbits/longlong.c
         cbits/popcnt.c
+        cbits/bswap.c
         cbits/word2float.c
     extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes,
                 UnboxedTuples, EmptyDataDecls, NoImplicitPrelude
