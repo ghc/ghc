@@ -159,7 +159,6 @@ _darcs/
 /mk/install.mk
 /mk/project.mk
 /mk/project.mk.old
-/mk/stamp-h
 /mk/validate.mk
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
