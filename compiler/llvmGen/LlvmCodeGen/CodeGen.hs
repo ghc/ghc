@@ -398,6 +398,9 @@ genCallSimpleCast env w t [dst] args = do
                 s1 `appOL` toOL [stmts5] `snocOL` s2
     return (env3, stmts, top1 ++ top2 ++ top3)
 
+genCallSimpleCast _ _ _ dsts _ =
+    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
+
 -- | Create a function pointer from a target.
 getFunPtr :: LlvmEnv -> (LMString -> LlvmType) -> ForeignTarget
           -> UniqSM ExprData
