@@ -1289,9 +1289,7 @@ stg_tryTakeMVarzh ( P_ mvar /* :: MVar a */ )
     info = GET_INFO(mvar);
 #endif
 
-    /* If the MVar is empty, put ourselves on its blocking queue,
-     * and wait until we're woken up.
-     */
+    /* If the MVar is empty, return 0. */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
         unlockClosure(mvar, info);
