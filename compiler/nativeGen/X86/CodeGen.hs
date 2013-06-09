@@ -1658,6 +1658,19 @@ genCCall _ (PrimTarget MO_Touch) _ _ = return nilOL
 
 genCCall _ (PrimTarget MO_Prefetch_Data) _ _ = return nilOL
 
+genCCall _ (PrimTarget (MO_BSwap width)) [dst] [src] = do
+    dflags <- getDynFlags
+    let platform = targetPlatform dflags
+    let dst_r = getRegisterReg platform False (CmmLocal dst)
+    code_src <- getAnyReg src
+    case width of
+        W16 -> return $ code_src dst_r `appOL`
+                        unitOL (BSWAP II32 dst_r) `appOL`
+                        unitOL (SHR II32 (OpImm $ ImmInt 16) (OpReg dst_r))
+        _   -> return $ code_src dst_r `appOL` unitOL (BSWAP size dst_r)
+  where
+    size = intSize width
+
 genCCall is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
          args@[src] = do
     sse4_2 <- sse4_2Enabled
@@ -2325,6 +2338,7 @@ outOfLineCmmOp mop res args
               MO_Memmove   -> fsLit "memmove"
 
               MO_PopCnt _  -> fsLit "popcnt"
+              MO_BSwap _   -> fsLit "bswap"
 
               MO_UF_Conv _ -> unsupported
 
