@@ -23,7 +23,10 @@
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
     uncheckedShiftL64#,
-    uncheckedShiftRL64#
+    uncheckedShiftRL64#,
+    byteSwap16,
+    byteSwap32,
+    byteSwap64
     ) where
 
 import Data.Bits
@@ -300,6 +303,9 @@ instance Bits Word16 where
 instance FiniteBits Word16 where
     finiteBitSize _ = 16
 
+byteSwap16 :: Word16 -> Word16
+byteSwap16 (W16# w#) = W16# (byteSwap16# w#)
+
 {-# RULES
 "fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# x#
 "fromIntegral/Word16->Word16"  fromIntegral = id :: Word16 -> Word16
@@ -523,6 +529,9 @@ instance Read Word32 where
 #else
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 #endif
+
+byteSwap32 :: Word32 -> Word32
+byteSwap32 (W32# w#) = W32# (byteSwap32# w#)
 
 ------------------------------------------------------------------------
 -- type Word64
@@ -772,3 +781,10 @@ instance Ix Word64 where
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
+#if WORD_SIZE_IN_BITS < 64
+byteSwap64 :: Word64 -> Word64
+byteSwap64 (W64# w#) = W64# (byteSwap64# w#)
+#else
+byteSwap64 :: Word64 -> Word64
+byteSwap64 (W64# w#) = W64# (byteSwap# w#)
+#endif
