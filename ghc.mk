@@ -1067,7 +1067,7 @@ SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-    ghc.spec.in ghc.spec settings.in VERSION \
+    settings.in VERSION \
     boot packages ghc.mk
 
 VERSION :
@@ -1222,7 +1222,6 @@ distclean : clean
 maintainer-clean : distclean
 	$(call removeFiles,configure mk/config.h.in)
 	$(call removeTrees,autom4te.cache $(wildcard libraries/*/autom4te.cache))
-	$(call removeFiles,ghc.spec)
 	$(call removeFiles,$(patsubst %, libraries/%/GNUmakefile, \
 	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 	$(call removeFiles,$(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
