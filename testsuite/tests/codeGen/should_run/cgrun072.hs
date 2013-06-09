@@ -8,21 +8,19 @@ import GHC.Word
 
 #include "MachDeps.h"
 
-main = putStr
-       (test_bSwap16 ++ "\n"
-        ++ test_bSwap32 ++ "\n"
-        ++ test_bSwap64 ++ "\n"
-        ++ "\n"
-       )
+main :: IO ()
+main = do putStrLn test_bSwap16
+          putStrLn test_bSwap32
+          putStrLn test_bSwap64
 
 bswap16 :: Word16 -> Word16
-bswap16 (W16# w#) = W16# (bSwap16# w#)
+bswap16 (W16# w#) = W16# (byteSwap16# w#)
 
 bswap32 :: Word32 -> Word32
-bswap32 (W32# w#) = W32# (bSwap32# w#)
+bswap32 (W32# w#) = W32# (byteSwap32# w#)
 
 bswap64 :: Word64 -> Word64
-bswap64 (W64# w#) = W64# (bSwap64# w#)
+bswap64 (W64# w#) = W64# (byteSwap64# w#)
 
 slowBswap64 :: Word64 -> Word64
 slowBswap64 w =
