@@ -6,7 +6,7 @@
 Type - public interface
 
 \begin{code}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -w #-}
 
 -- | Main functions for manipulating types and type-related things
 module Type (
@@ -159,8 +159,8 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
-import PrelNames ( eqTyConKey, ipClassNameKey,
-                   constraintKindTyConKey, liftedTypeKindTyConKey )
+import PrelNames ( eqTyConKey, ipClassNameKey, openTypeKindTyConKey,
+                   constraintKindTyConKey, liftedTypeKindTyConKey, unliftedTypeKindTyConKey )
 import CoAxiom
 
 -- others
@@ -1257,13 +1257,33 @@ cmpTypesX _   _         []        = GT
 cmpTc :: TyCon -> TyCon -> Ordering
 -- Here we treat * and Constraint as equal
 -- See Note [Kind Constraint and kind *] in Kinds.lhs
-cmpTc tc1 tc2 = nu1 `compare` nu2
+--
+-- Also we treat OpenTypeKind as equal to either * or #
+-- See Note [Comparison with OpenTypeKind]
+cmpTc tc1 tc2 
+--  | u1 == openTypeKindTyConKey, is_type nu2 = EQ
+--  | u2 == openTypeKindTyConKey, is_type nu1 = EQ
+  | otherwise                               = nu1 `compare` nu2
   where
     u1  = tyConUnique tc1
     nu1 = if u1==constraintKindTyConKey then liftedTypeKindTyConKey else u1
     u2  = tyConUnique tc2
     nu2 = if u2==constraintKindTyConKey then liftedTypeKindTyConKey else u2
+
+    is_type u = u == liftedTypeKindTyConKey || u == unliftedTypeKindTyConKey
 \end{code}
+
+Note [Comparison with OpenTypeKind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In PrimOpWrappers we have things like
+   PrimOpWrappers.mkWeak# = /\ a b c. Prim.mkWeak# a b c
+where
+   Prim.mkWeak# :: forall (a:Open) b c. a -> b -> c 
+                                     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+Now, eta reduction will turn the definition into
+     PrimOpWrappers.mkWeak# = Prim.mkWeak#
+which is kind-of OK, but now the types aren't really equal.  So HACK HACK
+we pretend (in Core) that Open is equal to * or #.  I hate this.
 
 Note [cmpTypeX]
 ~~~~~~~~~~~~~~~

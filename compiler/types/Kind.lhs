@@ -43,7 +43,7 @@ module Kind (
         isSubOpenTypeKind, 
         isSubKind, isSubKindCon, 
         tcIsSubKind, tcIsSubKindCon,
-        defaultKind,
+        defaultKind, defaultKind_maybe,
 
         -- ** Functions on variables
         kiVarsOfKind, kiVarsOfKinds
@@ -60,6 +60,7 @@ import TyCon
 import VarSet
 import PrelNames
 import Outputable
+import Maybes( orElse )
 import Util
 \end{code}
 
@@ -271,7 +272,8 @@ tcIsSubKindCon kc1 kc2
   | otherwise               = isSubKindCon kc1 kc2
 
 -------------------------
-defaultKind :: Kind -> Kind
+defaultKind       :: Kind -> Kind
+defaultKind_maybe :: Kind -> Maybe Kind
 -- ^ Used when generalising: default OpenKind and ArgKind to *.
 -- See "Type#kind_subtyping" for more information on what that means
 
@@ -289,9 +291,11 @@ defaultKind :: Kind -> Kind
 -- This defaulting is done in TcMType.zonkTcTyVarBndr.
 --
 -- The test is really whether the kind is strictly above '*'
-defaultKind (TyConApp kc _args)
-  | isOpenTypeKindCon kc = ASSERT( null _args ) liftedTypeKind
-defaultKind k = k
+defaultKind_maybe (TyConApp kc _args)
+  | isOpenTypeKindCon kc = ASSERT( null _args ) Just liftedTypeKind
+defaultKind_maybe _      = Nothing
+
+defaultKind k = defaultKind_maybe k `orElse` k
 
 -- Returns the free kind variables in a kind
 kiVarsOfKind :: Kind -> VarSet

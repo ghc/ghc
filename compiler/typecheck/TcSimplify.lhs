@@ -23,6 +23,7 @@ import TcMType as TcM
 import TcType 
 import TcSMonad as TcS
 import TcInteract 
+import Kind     ( defaultKind_maybe )
 import Inst
 import FunDeps  ( growThetaTyVars )
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
@@ -782,7 +783,7 @@ defaultTyVar :: TcTyVar -> TcS TcTyVar
 -- Precondition: MetaTyVars only
 -- See Note [DefaultTyVar]
 defaultTyVar the_tv
-  | not (k `eqKind` default_k)
+  | Just default_k <- defaultKind_maybe (tyVarKind the_tv)
   = do { tv' <- TcS.cloneMetaTyVar the_tv
        ; let new_tv = setTyVarKind tv' default_k
        ; traceTcS "defaultTyVar" (ppr the_tv <+> ppr new_tv)
@@ -793,9 +794,6 @@ defaultTyVar the_tv
              -- We keep the same Untouchables on tv'
 
   | otherwise = return the_tv	 -- The common case
-  where
-    k = tyVarKind the_tv
-    default_k = defaultKind k
 
 approximateWC :: WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts 
