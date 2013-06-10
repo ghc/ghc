@@ -992,42 +992,42 @@ consUseH98Syntax _                                             = True
 -----------------------------------
 tcConDecls :: NewOrData -> TyCon -> ([TyVar], Type)
            -> [LConDecl Name] -> TcM [DataCon]
-tcConDecls new_or_data rep_tycon res_tmpl cons
-  = mapM (addLocM (tcConDecl new_or_data rep_tycon res_tmpl)) cons
+tcConDecls new_or_data rep_tycon (tmpl_tvs, res_tmpl) cons
+  = mapM (addLocM  $ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl) cons
 
 tcConDecl :: NewOrData
-          -> TyCon            -- Representation tycon
-          -> ([TyVar], Type)  -- Return type template (with its template tyvars)
-                              --    (tvs, T tys), where T is the family TyCon
+          -> TyCon             -- Representation tycon
+          -> [TyVar] -> Type   -- Return type template (with its template tyvars)
+                               --    (tvs, T tys), where T is the family TyCon
           -> ConDecl Name
           -> TcM DataCon
 
-tcConDecl new_or_data rep_tycon res_tmpl        -- Data types
+tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
           (ConDecl { con_name = name
                    , con_qvars = hs_tvs, con_cxt = hs_ctxt
                    , con_details = hs_details, con_res = hs_res_ty })
   = addErrCtxt (dataConCtxt name) $
     do { traceTc "tcConDecl 1" (ppr name)
-       ; (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts)
-           <- tcHsTyVarBndrs hs_tvs $ \ tvs ->
+       ; (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts)
+           <- tcHsTyVarBndrs hs_tvs $ \ _ ->
               do { ctxt    <- tcHsContext hs_ctxt
                  ; details <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
                  ; let (is_infix, field_lbls, btys) = details
                        (arg_tys, stricts)           = unzip btys
-                 ; return (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
+                 ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
 
              -- Generalise the kind variables (returning quantifed TcKindVars)
              -- and quantify the type variables (substituting their kinds)
-             -- REMEMBER: 'tvs' and 'tkvs' are:
+             -- REMEMBER: 'tkvs' are:
              --    ResTyH98:  the *existential* type variables only
              --    ResTyGADT: *all* the quantified type variables
              -- c.f. the comment on con_qvars in HsDecls
-       ; tkvs <- case (res_ty, res_tmpl) of 
-                   (ResTyH98, (tvs, _)) -> quantifyTyVars (mkVarSet tvs) (tyVarsOfTypes arg_tys)
-                   (ResTyGADT ty, _)    -> quantifyTyVars emptyVarSet (tyVarsOfTypes (ty:arg_tys))
+       ; tkvs <- case res_ty of 
+                   ResTyH98         -> quantifyTyVars (mkVarSet tmpl_tvs) (tyVarsOfTypes (ctxt++arg_tys))
+                   ResTyGADT res_ty -> quantifyTyVars emptyVarSet (tyVarsOfTypes (res_ty:ctxt++arg_tys))
                    
-       ; traceTc "tcConDecl" (ppr name $$ ppr arg_tys $$ ppr tvs $$ ppr tkvs)
+       ; traceTc "tcConDecl" (ppr name $$ ppr arg_tys $$ ppr tkvs)
 
              -- Zonk to Types
        ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv tkvs
@@ -1037,9 +1037,8 @@ tcConDecl new_or_data rep_tycon res_tmpl        -- Data types
                       ResTyH98     -> return ResTyH98
                       ResTyGADT ty -> ResTyGADT <$> zonkTcTypeToType ze ty
 
-       ; let (univ_tvs, ex_tvs, eq_preds, res_ty') = rejigConRes res_tmpl qtkvs res_ty
+       ; let (univ_tvs, ex_tvs, eq_preds, res_ty') = rejigConRes tmpl_tvs res_tmpl qtkvs res_ty
 
-       ; traceTc "tcConDecl 3" (vcat [ppr name, ppr tkvs, ppr qtkvs, ppr univ_tvs, ppr ex_tvs])
        ; fam_envs <- tcGetFamInstEnvs
        ; buildDataCon fam_envs (unLoc name) is_infix
                       stricts field_lbls
@@ -1086,7 +1085,7 @@ tcConRes (ResTyGADT res_ty) = do { res_ty' <- tcHsLiftedType res_ty
 --      TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
 -- In this case orig_res_ty = T (e,e)
 
-rejigConRes :: ([TyVar], Type)  -- Template for result type; e.g.
+rejigConRes :: [TyVar] -> Type  -- Template for result type; e.g.
                                 -- data instance T [a] b c = ...
                                 --      gives template ([a,b,c], T [a] b c)
              -> [TyVar]         -- where MkT :: forall x y z. ...
@@ -1099,13 +1098,13 @@ rejigConRes :: ([TyVar], Type)  -- Template for result type; e.g.
         -- the same as the parent tycon, because we are in the middle
         -- of a recursive knot; so it's postponed until checkValidDataCon
 
-rejigConRes (tmpl_tvs, res_ty) dc_tvs ResTyH98
+rejigConRes tmpl_tvs res_ty dc_tvs ResTyH98
   = (tmpl_tvs, dc_tvs, [], res_ty)
         -- In H98 syntax the dc_tvs are the existential ones
         --      data T a b c = forall d e. MkT ...
         -- The {a,b,c} are tc_tvs, and {d,e} are dc_tvs
 
-rejigConRes (tmpl_tvs, res_tmpl) dc_tvs (ResTyGADT res_ty)
+rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT res_ty)
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
         -- Then we generate
