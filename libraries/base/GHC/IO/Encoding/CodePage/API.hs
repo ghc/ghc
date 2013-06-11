@@ -14,7 +14,6 @@ import Data.Either
 import Data.Word
 
 import GHC.Base
-import GHC.Err
 import GHC.List
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Failure
