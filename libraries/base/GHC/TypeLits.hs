@@ -165,7 +165,7 @@ data SomeSing :: KindIs k -> * where
 -- | A definition of natural numbers in terms of singletons.
 type SomeNat    = SomeSing (KindParam :: KindIs Nat)
 
--- | A definition of strings in tterms of singletons.
+-- | A definition of strings in terms of singletons.
 type SomeSymbol = SomeSing (KindParam :: KindIs Symbol)
 
 -- | The class of function that can promote a representation value
@@ -201,7 +201,7 @@ However, we have no guarantees about the definition of `Sing a`,
 or, indeed, the instance of `Sing`.
 
 We use the function in the instances for `ToSing` for
-kind `Nat` and `Symbol`, where the use is guarantted to be safe.
+kind `Nat` and `Symbol`, where the use is guaranteed to be safe.
 
 NOTE: The implementation is a bit of a hack at present,
 hence all the very special annotation.
