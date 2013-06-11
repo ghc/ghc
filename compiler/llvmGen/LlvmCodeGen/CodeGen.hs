@@ -387,8 +387,8 @@ genCall env target res args = do
                                 `appOL` retStmt, top1 ++ top2 ++ top3)
 
 
-genCallSimpleCast _ _ _ dsts _ =
-    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
+-- genCallSimpleCast _ _ _ dsts _ =
+--    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
 
 -- | Create a function pointer from a target.
 getFunPtr :: LlvmEnv -> (LMString -> LlvmType) -> ForeignTarget
