@@ -6,7 +6,7 @@
 Type - public interface
 
 \begin{code}
-{-# OPTIONS_GHC -fno-warn-orphans -w #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
 module Type (
@@ -160,7 +160,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, ipClassNameKey, openTypeKindTyConKey,
-                   constraintKindTyConKey, liftedTypeKindTyConKey, unliftedTypeKindTyConKey )
+                   constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
 
 -- others
@@ -1216,7 +1216,7 @@ cmpTypeX env t1 t2 | Just t1' <- coreView t1 = cmpTypeX env t1' t2
 -- So the RHS has a data type
 
 cmpTypeX env (TyVarTy tv1)       (TyVarTy tv2)       = rnOccL env tv1 `compare` rnOccR env tv2
-cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv1)
+cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv2)
                                                        `thenCmp` cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
@@ -1261,16 +1261,14 @@ cmpTc :: TyCon -> TyCon -> Ordering
 -- Also we treat OpenTypeKind as equal to either * or #
 -- See Note [Comparison with OpenTypeKind]
 cmpTc tc1 tc2 
---  | u1 == openTypeKindTyConKey, is_type nu2 = EQ
---  | u2 == openTypeKindTyConKey, is_type nu1 = EQ
-  | otherwise                               = nu1 `compare` nu2
+  | u1 == openTypeKindTyConKey, isSubOpenTypeKindKey u2 = EQ
+  | u2 == openTypeKindTyConKey, isSubOpenTypeKindKey u1 = EQ
+  | otherwise = nu1 `compare` nu2
   where
     u1  = tyConUnique tc1
     nu1 = if u1==constraintKindTyConKey then liftedTypeKindTyConKey else u1
     u2  = tyConUnique tc2
     nu2 = if u2==constraintKindTyConKey then liftedTypeKindTyConKey else u2
-
-    is_type u = u == liftedTypeKindTyConKey || u == unliftedTypeKindTyConKey
 \end{code}
 
 Note [Comparison with OpenTypeKind]

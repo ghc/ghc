@@ -40,7 +40,7 @@ module Kind (
         isAnyKind, isAnyKindCon,
         okArrowArgKind, okArrowResultKind,
 
-        isSubOpenTypeKind, 
+        isSubOpenTypeKind, isSubOpenTypeKindKey,
         isSubKind, isSubKindCon, 
         tcIsSubKind, tcIsSubKindCon,
         defaultKind, defaultKind_maybe,
@@ -173,13 +173,8 @@ returnsConstraintKind _               = False
 --     arg -> res
 
 okArrowArgKindCon, okArrowResultKindCon :: TyCon -> Bool
-okArrowArgKindCon kc
-  | isLiftedTypeKindCon   kc = True
-  | isUnliftedTypeKindCon kc = True
-  | isConstraintKindCon   kc = True
-  | otherwise                = False
-
-okArrowResultKindCon = okArrowArgKindCon
+okArrowArgKindCon    = isSubOpenTypeKindCon
+okArrowResultKindCon = isSubOpenTypeKindCon
 
 okArrowArgKind, okArrowResultKind :: Kind -> Bool
 okArrowArgKind    (TyConApp kc []) = okArrowArgKindCon kc
@@ -199,14 +194,17 @@ isSubOpenTypeKind :: Kind -> Bool
 isSubOpenTypeKind (TyConApp kc []) = isSubOpenTypeKindCon kc
 isSubOpenTypeKind _                = False
 
-isSubOpenTypeKindCon kc
-  =  isOpenTypeKindCon   kc
-  || isUnliftedTypeKindCon kc
-  || isLiftedTypeKindCon   kc  
-  || isConstraintKindCon kc   -- Needed for error (Num a) "blah"
-                              -- and so that (Ord a -> Eq a) is well-kinded
-                              -- and so that (# Eq a, Ord b #) is well-kinded
-                              -- See Note [Kind Constraint and kind *]
+isSubOpenTypeKindCon kc = isSubOpenTypeKindKey (tyConUnique kc)
+
+isSubOpenTypeKindKey :: Unique -> Bool
+isSubOpenTypeKindKey uniq
+  =  uniq == openTypeKindTyConKey
+  || uniq == unliftedTypeKindTyConKey
+  || uniq == liftedTypeKindTyConKey
+  || uniq == constraintKindTyConKey  -- Needed for error (Num a) "blah"
+                                     -- and so that (Ord a -> Eq a) is well-kinded
+                                     -- and so that (# Eq a, Ord b #) is well-kinded
+                              	     -- See Note [Kind Constraint and kind *]
 
 -- | Is this a kind (i.e. a type-of-types)?
 isKind :: Kind -> Bool
