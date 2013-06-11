@@ -140,7 +140,7 @@ data Type
 	Var         -- Type or kind variable
 	Type	        -- ^ A polymorphic type
 
-  | LitTy TyLit     -- ^ Type literals are simillar to type constructors.
+  | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
   deriving (Data.Data, Data.Typeable)
 
