@@ -220,11 +220,30 @@ genCall env t@(PrimTarget MO_Prefetch_Data) [] args = do
                 `appOL` trashStmts (getDflags env) `snocOL` call
     return (env2, stmts, top1 ++ top2)
 
--- Handle PopCnt and BSwap that need to only convert arg and return types
-genCall env t@(PrimTarget (MO_PopCnt w)) dsts args =
-    genCallSimpleCast env w t dsts args
-genCall env t@(PrimTarget (MO_BSwap w)) dsts args =
-    genCallSimpleCast env w t dsts args
+-- Handle popcnt function specifically since GHC only really has i32 and i64
+-- types and things like Word8 are backed by an i32 and just present a logical
+-- i8 range. So we must handle conversions from i32 to i8 explicitly as LLVM
+-- is strict about types.
+genCall env t@(PrimTarget (MO_PopCnt w)) [dst] args = do
+    let dflags = getDflags env
+        width = widthToLlvmInt w
+        dstTy = cmmToLlvmType $ localRegType dst
+        funTy = \n -> LMFunction $ LlvmFunctionDecl n ExternallyVisible
+                          CC_Ccc width FixedArgs (tysToParams [width]) Nothing
+        (env1, dstV, stmts1, top1) = getCmmReg env (CmmLocal dst)
+
+    let (_, arg_hints) = foreignTargetHints t
+    let args_hints = zip args arg_hints
+    (env2, argsV, stmts2, top2) <- arg_vars env1 args_hints ([], nilOL, [])
+    (env3, fptr, stmts3, top3)  <- getFunPtr env2 funTy t
+    (argsV', stmts4)            <- castVars dflags $ zip argsV [width]
+    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
+    ([retV'], stmts5)           <- castVars dflags [(retV,dstTy)]
+    let s2                       = Store retV' dstV
+
+    let stmts = stmts1 `appOL` stmts2 `appOL` stmts3 `appOL` stmts4 `snocOL`
+                s1 `appOL` stmts5 `snocOL` s2
+    return (env3, stmts, top1 ++ top2 ++ top3)
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
@@ -367,36 +386,6 @@ genCall env target res args = do
                     return (env3, allStmts `snocOL` s2 `snocOL` s3
                                 `appOL` retStmt, top1 ++ top2 ++ top3)
 
--- Handle simple function call that only need simple type casting, of the form:
---   truncate arg >>= \a -> call(a) >>= zext
---
--- since GHC only really has i32 and i64 types and things like Word8 are backed
--- by an i32 and just present a logical i8 range. So we must handle conversions
--- from i32 to i8 explicitly as LLVM is strict about types.
-genCallSimpleCast :: LlvmEnv -> Width -> ForeignTarget -> [CmmFormal] -> [CmmActual]
-              -> UniqSM StmtData
-genCallSimpleCast env w t [dst] args = do
-    let dflags = getDflags env
-        width = widthToLlvmInt w
-        dstTy = cmmToLlvmType $ localRegType dst
-        funTy = \n -> LMFunction $ LlvmFunctionDecl n ExternallyVisible
-                          CC_Ccc width FixedArgs (tysToParams [width]) Nothing
-        (env1, dstV, stmts1, top1) = getCmmReg env (CmmLocal dst)
-
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
-    (env2, argsV, stmts2, top2) <- arg_vars env1 args_hints ([], nilOL, [])
-    (env3, fptr, stmts3, top3)  <- getFunPtr env2 funTy t
-    (argsV', stmts4)            <- castVars dflags $ zip argsV [width]
-    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    (retV', stmts5)             <- if getVarType retV == dstTy
-                                        then return (retV, Nop)
-                                        else doExpr dstTy $ Cast LM_Zext retV dstTy
-    let s2                       = Store retV' dstV
-
-    let stmts = stmts1 `appOL` stmts2 `appOL` stmts3 `appOL` stmts4 `snocOL`
-                s1 `appOL` toOL [stmts5] `snocOL` s2
-    return (env3, stmts, top1 ++ top2 ++ top3)
 
 genCallSimpleCast _ _ _ dsts _ =
     panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
@@ -553,7 +542,6 @@ cmmPrimOpFunctions env mop
     MO_Memset     -> fsLit $ "llvm.memset."  ++ intrinTy2
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
-    (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ show (widthToLlvmInt w)
 
     MO_Prefetch_Data -> fsLit "llvm.prefetch"
 

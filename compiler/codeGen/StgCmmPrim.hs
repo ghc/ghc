@@ -541,11 +541,6 @@ emitPrimOp _      [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
 emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
 
-emitPrimOp _      [res] BSwap16Op [w] = emitBSwapCall res w W16
-emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
-emitPrimOp _      [res] BSwap64Op [w] = emitBSwapCall res w W64
-emitPrimOp dflags [res] BSwapOp   [w] = emitBSwapCall res w (wordWidth dflags)
-
 -- Population count
 emitPrimOp _      [res] PopCnt8Op  [w] = emitPopCntCall res w W8
 emitPrimOp _      [res] PopCnt16Op [w] = emitPopCntCall res w W16
@@ -1572,13 +1567,6 @@ emitAllocateCall res cap n = do
   where
     allocate = CmmLit (CmmLabel (mkForeignLabel (fsLit "allocate") Nothing
                                  ForeignLabelInExternalPackage IsFunction))
-
-emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
-emitBSwapCall res x width = do
-    emitPrimCall
-        [ res ]
-        (MO_BSwap width)
-        [ x ]
 
 emitPopCntCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitPopCntCall res x width = do
