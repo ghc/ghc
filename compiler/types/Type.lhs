@@ -159,7 +159,7 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
-import PrelNames ( eqTyConKey, ipClassNameKey,
+import PrelNames ( eqTyConKey, ipClassNameKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
 
@@ -1216,7 +1216,7 @@ cmpTypeX env t1 t2 | Just t1' <- coreView t1 = cmpTypeX env t1' t2
 -- So the RHS has a data type
 
 cmpTypeX env (TyVarTy tv1)       (TyVarTy tv2)       = rnOccL env tv1 `compare` rnOccR env tv2
-cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv1)
+cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv2)
                                                        `thenCmp` cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
@@ -1257,13 +1257,31 @@ cmpTypesX _   _         []        = GT
 cmpTc :: TyCon -> TyCon -> Ordering
 -- Here we treat * and Constraint as equal
 -- See Note [Kind Constraint and kind *] in Kinds.lhs
-cmpTc tc1 tc2 = nu1 `compare` nu2
+--
+-- Also we treat OpenTypeKind as equal to either * or #
+-- See Note [Comparison with OpenTypeKind]
+cmpTc tc1 tc2 
+  | u1 == openTypeKindTyConKey, isSubOpenTypeKindKey u2 = EQ
+  | u2 == openTypeKindTyConKey, isSubOpenTypeKindKey u1 = EQ
+  | otherwise = nu1 `compare` nu2
   where
     u1  = tyConUnique tc1
     nu1 = if u1==constraintKindTyConKey then liftedTypeKindTyConKey else u1
     u2  = tyConUnique tc2
     nu2 = if u2==constraintKindTyConKey then liftedTypeKindTyConKey else u2
 \end{code}
+
+Note [Comparison with OpenTypeKind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In PrimOpWrappers we have things like
+   PrimOpWrappers.mkWeak# = /\ a b c. Prim.mkWeak# a b c
+where
+   Prim.mkWeak# :: forall (a:Open) b c. a -> b -> c 
+                                     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+Now, eta reduction will turn the definition into
+     PrimOpWrappers.mkWeak# = Prim.mkWeak#
+which is kind-of OK, but now the types aren't really equal.  So HACK HACK
+we pretend (in Core) that Open is equal to * or #.  I hate this.
 
 Note [cmpTypeX]
 ~~~~~~~~~~~~~~~

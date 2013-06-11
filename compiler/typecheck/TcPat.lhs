@@ -685,6 +685,7 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
               
 	      arg_tys' = substTys tenv arg_tys
 
+        ; traceTc "tcConPat" (ppr con_name $$ ppr ex_tvs' $$ ppr pat_ty' $$ ppr arg_tys')
 	; if null ex_tvs && null eq_spec && null theta
 	  then do { -- The common case; no class bindings etc 
                     -- (see Note [Arrows and patterns])
