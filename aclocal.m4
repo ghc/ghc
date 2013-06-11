@@ -1551,7 +1551,7 @@ if test "$RELEASE" = "NO"; then
         AC_MSG_RESULT(given $PACKAGE_VERSION)
     else
         AC_MSG_WARN([cannot determine snapshot version: no .git directory and no VERSION file])
-        dnl We'd really rather this case didn't happenm but it might
+        dnl We'd really rather this case didn't happen, but it might
         dnl do (in particular, people using lndir trees may find that
         dnl the build system can't find any other date). If it does
         dnl happen, then we use the current date.
