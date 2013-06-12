@@ -117,19 +117,19 @@ cmmProcLlvmGens :: DynFlags -> BufHandle -> UniqSupply -> LlvmEnv -> [RawCmmDecl
       -> [[LlvmVar]] -- ^ info tables that need to be marked as 'used'
       -> IO ()
 
-cmmProcLlvmGens _ _ _ _ [] _ []
-  = return ()
-
 cmmProcLlvmGens dflags h _ _ [] _ ivars
-  = let ivars' = concat ivars
-        cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
-        ty     = (LMArray (length ivars') i8Ptr)
-        usedArray = LMStaticArray (map cast ivars') ty
-        lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
-                  (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
-    in Prt.bufLeftRender h $ {-# SCC "llvm_used_ppr" #-}
-                             withPprStyleDoc dflags (mkCodeStyle CStyle) $
-                             pprLlvmData ([lmUsed], [])
+    | null ivars' = return ()
+    | otherwise   = Prt.bufLeftRender h $
+                        {-# SCC "llvm_used_ppr" #-}
+                        withPprStyleDoc dflags (mkCodeStyle CStyle) $
+                        pprLlvmData ([lmUsed], [])
+  where
+    ivars' = concat ivars
+    cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
+    ty     = (LMArray (length ivars') i8Ptr)
+    usedArray = LMStaticArray (map cast ivars') ty
+    lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
+              (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
 
 cmmProcLlvmGens dflags h us env ((CmmData _ _) : cmms) count ivars
  = cmmProcLlvmGens dflags h us env cmms count ivars
