@@ -1027,8 +1027,6 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
                    ResTyH98         -> quantifyTyVars (mkVarSet tmpl_tvs) (tyVarsOfTypes (ctxt++arg_tys))
                    ResTyGADT res_ty -> quantifyTyVars emptyVarSet (tyVarsOfTypes (res_ty:ctxt++arg_tys))
                    
-       ; traceTc "tcConDecl" (ppr name $$ ppr arg_tys $$ ppr tkvs)
-
              -- Zonk to Types
        ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv tkvs
        ; arg_tys <- zonkTcTypeToTypes ze arg_tys
