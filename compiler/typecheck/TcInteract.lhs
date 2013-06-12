@@ -243,9 +243,14 @@ spontaneousSolveStage workItem
   = do { mb_solved <- trySpontaneousSolve workItem
        ; case mb_solved of
            SPCantSolve
-              | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
+              | CTyEqCan { cc_tyvar = tv, cc_rhs = rhs, cc_ev = fl } <- workItem
               -- Unsolved equality
-              -> do { n_kicked <- kickOutRewritable (ctEvFlavour fl) tv
+              -> do { untch <- getUntouchables
+                    ; traceTcS "Can't solve tyvar equality" 
+                          (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+                                , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
+                                , text "Untouchables =" <+> ppr untch ])
+                    ; n_kicked <- kickOutRewritable (ctEvFlavour fl) tv
                     ; traceFireTcS workItem $
                       ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked <> colon 
                       <+> ppr workItem
@@ -404,7 +409,8 @@ trySpontaneousSolve :: WorkItem -> TcS SPSolveResult
 trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
                                        , cc_tyvar = tv1, cc_rhs = xi, cc_loc = d })
   | isGiven gw
-  = return SPCantSolve
+  = do { traceTcS "No spontaneous solve for given" (ppr workItem)
+       ; return SPCantSolve }
   | Just tv2 <- tcGetTyVar_maybe xi
   = do { tch1 <- isTouchableMetaTyVarTcS tv1
        ; tch2 <- isTouchableMetaTyVarTcS tv2
@@ -412,21 +418,17 @@ trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
            (True,  True)  -> trySpontaneousEqTwoWay d gw tv1 tv2
            (True,  False) -> trySpontaneousEqOneWay d gw tv1 xi
            (False, True)  -> trySpontaneousEqOneWay d gw tv2 (mkTyVarTy tv1)
-	   _ -> return SPCantSolve }
+	   _              -> return SPCantSolve }
   | otherwise
   = do { tch1 <- isTouchableMetaTyVarTcS tv1
        ; if tch1 then trySpontaneousEqOneWay d gw tv1 xi
-                 else do { untch <- getUntouchables
-                         ; traceTcS "Untouchable LHS, can't spontaneously solve workitem" $
-                           vcat [text "Untouchables =" <+> ppr untch
-                                , text "Workitem =" <+> ppr workItem ]
-                         ; return SPCantSolve }
-       }
+                 else return SPCantSolve }
 
   -- No need for 
   --      trySpontaneousSolve (CFunEqCan ...) = ...
   -- See Note [No touchables as FunEq RHS] in TcSMonad
-trySpontaneousSolve _ = return SPCantSolve
+trySpontaneousSolve item = do { traceTcS "Spont: no tyvar on lhs" (ppr item)
+                              ; return SPCantSolve }
 
 ----------------
 trySpontaneousEqOneWay :: CtLoc -> CtEvidence 
@@ -457,57 +459,6 @@ trySpontaneousEqTwoWay d gw tv1 tv2
     nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
 \end{code}
 
-Note [Kind errors] 
-~~~~~~~~~~~~~~~~~~
-Consider the wanted problem: 
-      alpha ~ (# Int, Int #) 
-where alpha :: ArgKind and (# Int, Int #) :: (#). We can't spontaneously solve this constraint, 
-but we should rather reject the program that give rise to it. If 'trySpontaneousEqTwoWay' 
-simply returns @CantSolve@ then that wanted constraint is going to propagate all the way and 
-get quantified over in inference mode. That's bad because we do know at this point that the 
-constraint is insoluble. Instead, we call 'recKindErrorTcS' here, which will fail later on.
-
-The same applies in canonicalization code in case of kind errors in the givens. 
-
-However, when we canonicalize givens we only check for compatibility (@compatKind@). 
-If there were a kind error in the givens, this means some form of inconsistency or dead code.
-
-You may think that when we spontaneously solve wanteds we may have to look through the 
-bindings to determine the right kind of the RHS type. E.g one may be worried that xi is 
-@alpha@ where alpha :: ? and a previous spontaneous solving has set (alpha := f) with (f :: *).
-But we orient our constraints so that spontaneously solved ones can rewrite all other constraint
-so this situation can't happen. 
-
-Note [Spontaneous solving and kind compatibility] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Note that our canonical constraints insist that *all* equalities (tv ~
-xi) or (F xis ~ rhs) require the LHS and the RHS to have *compatible*
-the same kinds.  ("compatible" means one is a subKind of the other.)
-
-  - It can't be *equal* kinds, because
-     b) wanted constraints don't necessarily have identical kinds
-               eg   alpha::? ~ Int
-     b) a solved wanted constraint becomes a given
-
-  - SPJ thinks that *given* constraints (tv ~ tau) always have that
-    tau has a sub-kind of tv; and when solving wanted constraints
-    in trySpontaneousEqTwoWay we re-orient to achieve this.
-
-  - Note that the kind invariant is maintained by rewriting.
-    Eg wanted1 rewrites wanted2; if both were compatible kinds before,
-       wanted2 will be afterwards.  Similarly givens.
-
-Caveat:
-  - Givens from higher-rank, such as: 
-          type family T b :: * -> * -> * 
-          type instance T Bool = (->) 
-
-          f :: forall a. ((T a ~ (->)) => ...) -> a -> ... 
-          flop = f (...) True 
-     Whereas we would be able to apply the type instance, we would not be able to 
-     use the given (T Bool ~ (->)) in the body of 'flop' 
-
-
 Note [Avoid double unifications] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The spontaneous solver has to return a given which mentions the unified unification
@@ -527,8 +478,6 @@ double unifications is the main reason we disallow touchable
 unification variables as RHS of type family equations: F xis ~ alpha.
 
 \begin{code}
-----------------
-
 solveWithIdentity :: CtLoc -> CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
 -- Solve with the identity coercion 
 -- Precondition: kind(xi) is a sub-kind of kind(tv)

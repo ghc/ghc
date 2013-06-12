@@ -77,34 +77,53 @@ simplifyTop wanteds
     simpl_top :: WantedConstraints -> TcS WantedConstraints
     simpl_top wanteds
       = do { wc_first_go <- nestTcS (solve_wanteds_and_drop wanteds)
-           ; free_tvs <- TcS.zonkTyVarsAndFV (tyVarsOfWC wc_first_go) 
-           ; let meta_tvs = filterVarSet isMetaTyVar free_tvs
+                            -- This is where the main work happens
+           ; try_tyvar_defaulting wc_first_go }
+
+    try_tyvar_defaulting :: WantedConstraints -> TcS WantedConstraints
+    try_tyvar_defaulting wc
+      | isEmptyWC wc 
+      = return wc
+      | otherwise
+      = do { free_tvs <- TcS.zonkTyVarsAndFV (tyVarsOfWC wc) 
+           ; let meta_tvs = varSetElems (filterVarSet isMetaTyVar free_tvs)
                    -- zonkTyVarsAndFV: the wc_first_go is not yet zonked
                    -- filter isMetaTyVar: we might have runtime-skolems in GHCi, 
                    -- and we definitely don't want to try to assign to those!
 
-           ; mapM_ defaultTyVar (varSetElems meta_tvs)   -- Has unification side effects
-           ; simpl_top_loop wc_first_go }
+           ; meta_tvs' <- mapM defaultTyVar meta_tvs   -- Has unification side effects
+           ; if meta_tvs' == meta_tvs   -- No defaulting took place;
+                                        -- (defaulting returns fresh vars)
+             then try_class_defaulting wc
+             else do { wc_residual <- nestTcS (solve_wanteds_and_drop wc)
+                            -- See Note [Must simplify after defaulting]
+                     ; try_class_defaulting wc_residual } }
     
-    simpl_top_loop wc
+    try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
+    try_class_defaulting wc
       | isEmptyWC wc || insolubleWC wc
-             -- Don't do type-class defaulting if there are insolubles
-             -- Doing so is not going to solve the insolubles
-      = return wc
+      = return wc  -- Don't do type-class defaulting if there are insolubles
+                   -- Doing so is not going to solve the insolubles
       | otherwise
-      = do { wc_residual <- nestTcS (solve_wanteds_and_drop wc)
-           ; let wc_flat_approximate = approximateWC wc_residual
-           ; something_happened <- applyDefaultingRules wc_flat_approximate
-                                        -- See Note [Top-level Defaulting Plan]
-           ; if something_happened then 
-               simpl_top_loop wc_residual 
-             else 
-               return wc_residual }
+      = do { something_happened <- applyDefaultingRules (approximateWC wc)
+                                   -- See Note [Top-level Defaulting Plan]
+           ; if something_happened 
+             then do { wc_residual <- nestTcS (solve_wanteds_and_drop wc)
+                     ; try_class_defaulting wc_residual }
+             else return wc }
 \end{code}
+
+Note [Must simplify after defaulting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We may have a deeply buried constraint
+    (t:*) ~ (a:Open)
+which we couldn't solve because of the kind incompatibility, and 'a' is free.
+Then when we default 'a' we can solve the constraint.  And we want to do
+that before starting in on type classes.  We MUST do it before reporting
+errors, because it isn't an error!  Trac #7967 was due to this.
 
 Note [Top-level Defaulting Plan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We have considered two design choices for where/when to apply defaulting.   
    (i) Do it in SimplCheck mode only /whenever/ you try to solve some 
        flat constraints, maybe deep inside the context of implications.

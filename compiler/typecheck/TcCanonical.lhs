@@ -27,7 +27,7 @@ import OccName( OccName )
 import Outputable
 import Control.Monad    ( when )
 import TysWiredIn ( eqTyCon )
-
+import DynFlags( DynFlags )
 import VarSet
 import TcSMonad
 import FastString
@@ -180,7 +180,7 @@ canonicalize (CTyEqCan { cc_loc  = d
                        , cc_tyvar  = tv
                        , cc_rhs    = xi })
   = {-# SCC "canEqLeafTyVarEq" #-}
-    canEqLeafTyVarEq d ev tv xi
+    canEqLeafTyVar d ev tv xi
 
 canonicalize (CFunEqCan { cc_loc = d
                         , cc_ev = ev
@@ -188,7 +188,7 @@ canonicalize (CFunEqCan { cc_loc = d
                         , cc_tyargs = xis1
                         , cc_rhs    = xi2 })
   = {-# SCC "canEqLeafFunEq" #-}
-    canEqLeafFunEq d ev fn xis1 xi2
+    canEqLeafFun d ev fn xis1 xi2
 
 canonicalize (CIrredEvCan { cc_ev = ev
                           , cc_loc = d })
@@ -544,20 +544,20 @@ flatten loc f ctxt (TyConApp tc tys)
                              -- cache as well when we interact an equality with the inert. 
                              -- The design choice is: do we keep the flat cache rewritten or not?
                              -- For now I say we don't keep it fully rewritten.
-                            do { traceTcS "flatten/flat-cache hit" $ ppr ctev
-                               ; (rhs_xi,co) <- flatten loc f flav rhs_ty
+                            do { (rhs_xi,co) <- flatten loc f flav rhs_ty
                                ; let final_co = evTermCoercion (ctEvTerm ctev)
                                                 `mkTcTransCo` mkTcSymCo co
+                               ; traceTcS "flatten/flat-cache hit" $ (ppr ctev $$ ppr rhs_xi $$ ppr final_co)
                                ; return (final_co, rhs_xi) }
                           
-                        _ -> do { traceTcS "flatten/flat-cache miss" $ ppr fam_ty
-                                ; (ctev, rhs_xi) <- newFlattenSkolem ctxt fam_ty
+                        _ -> do { (ctev, rhs_xi) <- newFlattenSkolem ctxt fam_ty
                                 ; let ct = CFunEqCan { cc_ev     = ctev
                                                      , cc_fun    = tc
                                                      , cc_tyargs = xi_args
                                                      , cc_rhs    = rhs_xi
                                                      , cc_loc    = loc }
                                 ; updWorkListTcS $ extendWorkListFunEq ct
+                                ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr rhs_xi $$ ppr ctev)
                                 ; return (evTermCoercion (ctEvTerm ctev), rhs_xi) }
                     }
                   -- Emit the flat constraints
@@ -609,13 +609,15 @@ flattenTyVar loc f ctxt tv
   | otherwise
   = do { mb_ty <- isFilledMetaTyVar_maybe tv
        ; case mb_ty of {
-           Just ty -> flatten loc f ctxt ty ;
+           Just ty -> do { traceTcS "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
+                         ; flatten loc f ctxt ty } ;
            Nothing -> 
 
     -- Try in ty_binds
     do { ty_binds <- getTcSTyBindsMap
        ; case lookupVarEnv ty_binds tv of {
-           Just (_tv,ty) -> flatten loc f ctxt ty ;
+           Just (_tv,ty) -> do { traceTcS "Following bound tyvar" (ppr tv <+> equals <+> ppr ty)
+                               ; flatten loc f ctxt ty } ;
                  -- NB: ty_binds coercions are all ReflCo,
                  -- so no need to transitively compose co' with another coercion,
                  -- unlike in 'flatten_from_inerts'
@@ -626,7 +628,8 @@ flattenTyVar loc f ctxt tv
        ; let mco = tv_eq_subst ieqs tv  -- co : v ~ ty
        ; case mco of { 
            Just (co,ty) -> 
-             do { (ty_final,co') <- flatten loc f ctxt ty
+             do { traceTcS "Following inert tyvar" (ppr tv <+> equals <+> ppr ty)
+                ; (ty_final,co') <- flatten loc f ctxt ty
                 ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } ;
        -- NB recursive call. 
        -- Why? Because inert subst. non-idempotent, Note [Detailed InertCans Invariants]
@@ -1015,9 +1018,14 @@ reOrient (FunCls {}) _      = False             -- Fun/Other on rhs
 reOrient (VarCls {})   (FunCls {})           = True 
 reOrient (VarCls {})   (OtherCls {})         = False
 reOrient (VarCls tv1)  (VarCls tv2)  
-  | isMetaTyVar     tv2 && not (isMetaTyVar tv1)      = True 
-  | isFlatSkolTyVar tv2 && not (isFlatSkolTyVar tv1)  = True  -- Note [Eliminate flat-skols]
-  | otherwise                                         = False 
+  | not (k2 `isSubKind` k1),   k1 `isSubKind` k2   = True  -- Note [Kind orientation for CTyEqCan]
+                                                           -- in TcRnTypes
+  | not (isMetaTyVar tv1),     isMetaTyVar     tv2 = True 
+  | not (isFlatSkolTyVar tv1), isFlatSkolTyVar tv2 = True  -- Note [Eliminate flat-skols]
+  | otherwise                                      = False 
+  where
+    k1 = tyVarKind tv1
+    k2 = tyVarKind tv2
   -- Just for efficiency, see CTyEqCan invariants 
 
 ------------------
@@ -1060,18 +1068,14 @@ canEqLeaf loc ev s1 s2
 canEqLeafOriented :: CtLoc -> CtEvidence
                   -> TypeClassifier -> TcType -> TcS StopOrContinue
 -- By now s1 will either be a variable or a type family application
--- Precondition: the LHS and RHS have `compatKind` kinds
---               so we can safely generate a CTyEqCan or CFunEqCan
-canEqLeafOriented loc ev (FunCls fn tys1) s2 = canEqLeafFunEq loc ev fn tys1 s2
-canEqLeafOriented loc ev (VarCls tv)      s2 = canEqLeafTyVarEq loc ev tv s2
+canEqLeafOriented loc ev (FunCls fn tys1) s2 = canEqLeafFun loc ev fn tys1 s2
+canEqLeafOriented loc ev (VarCls tv)      s2 = canEqLeafTyVar loc ev tv s2
 canEqLeafOriented _   ev (OtherCls {})    _  = pprPanic "canEqLeafOriented" (ppr (ctEvPred ev))
 
-canEqLeafFunEq :: CtLoc -> CtEvidence
-               -> TyCon -> [TcType] -> TcType -> TcS StopOrContinue
--- Precondition: LHS and RHS have compatible kinds 
---               (guaranteed by canEqLeaf0
-canEqLeafFunEq loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
-  = do { traceTcS "canEqLeafFunEq" $ pprEq (mkTyConApp fn tys1) ty2
+canEqLeafFun :: CtLoc -> CtEvidence
+             -> TyCon -> [TcType] -> TcType -> TcS StopOrContinue
+canEqLeafFun loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
+  = do { traceTcS "canEqLeafFun" $ pprEq (mkTyConApp fn tys1) ty2
        ; let flav = ctEvFlavour ev
 
             -- Flatten type function arguments
@@ -1085,95 +1089,102 @@ canEqLeafFunEq loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
        ; let fam_head = mkTyConApp fn xis1
              xco = mkHdEqPred ty2 (mkTcTyConAppCo fn cos1) co2
              -- xco :: (F xis1 ~ xi2) ~ (F tys1 ~ ty2)
-             
-       ; checkKind loc ev fam_head xi2 xco $ \new_ev -> 
-         continueWith (CFunEqCan { cc_ev = new_ev, cc_loc = loc
-                                 , cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 }) }
 
-canEqLeafTyVarEq :: CtLoc -> CtEvidence
-                   -> TcTyVar -> TcType -> TcS StopOrContinue
--- Precondition: LHS and RHS have compatible kinds 
---               (guaranteed by canEqLeaf0
-canEqLeafTyVarEq loc ev tv s2              -- ev :: tv ~ s2
-  = do { traceTcS "canEqLeafTyVarEq" $ pprEq (mkTyVarTy tv) s2
+       ; mb <- rewriteCtFlavor ev (mkTcEqPred fam_head xi2) xco
+       ; case mb of 
+            Nothing     -> return Stop 
+            Just new_ev | typeKind fam_head `isSubKind` typeKind xi2
+                        -- Establish CFunEqCan kind invariant
+                        -> continueWith (CFunEqCan { cc_ev = new_ev, cc_loc = loc
+                                                   , cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 })
+                        | otherwise
+                        -> checkKind loc new_ev fam_head xi2 }
+
+canEqLeafTyVar :: CtLoc -> CtEvidence
+               -> TcTyVar -> TcType -> TcS StopOrContinue
+canEqLeafTyVar loc ev tv s2              -- ev :: tv ~ s2
+  = do { traceTcS "canEqLeafTyVar 1" $ pprEq (mkTyVarTy tv) s2
        ; let flav = ctEvFlavour ev
        ; (xi1,co1) <- flattenTyVar loc FMFullFlatten flav tv -- co1 :: xi1 ~ tv
        ; (xi2,co2) <- flatten      loc FMFullFlatten flav s2 -- co2 :: xi2 ~ s2 
        ; let co = mkHdEqPred s2 co1 co2
              -- co :: (xi1 ~ xi2) ~ (tv ~ s2)
        
-       ; traceTcS "canEqLeafTyVarEq2" $ vcat [ppr xi1, ppr xi1]
-       ; case (getTyVar_maybe xi1, getTyVar_maybe xi2) of {
+       ; traceTcS "canEqLeafTyVar 2" $ vcat [ppr xi1, ppr xi2]
+       ; case (getTyVar_maybe xi1, getTyVar_maybe xi2) of
            (Nothing,  _) -> -- Rewriting the LHS did not yield a type variable
                             -- so go around again to canEq
                             do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2) co
                                ; case mb of
                                    Nothing     -> return Stop
-                                   Just new_ev -> canEqNC loc new_ev xi1 xi2 } ;
+                                   Just new_ev -> canEqNC loc new_ev xi1 xi2 }
 
            (Just tv1, Just tv2) | tv1 == tv2
               -> do { when (isWanted ev) $
                       setEvBind (ctev_evar ev) (mkEvCast (EvCoercion (mkTcReflCo xi1)) co)
-                    ; return Stop } ;
+                    ; return Stop } 
 
-           (Just tv1, _) ->
+           (Just tv1, _) -> do { dflags <- getDynFlags
+                               ; canEqLeafTyVar2 dflags loc ev tv1 xi2 co } }
 
-         -- LHS rewrote to a type variable, RHS to something else
-    do { dflags <- getDynFlags
-       ; case occurCheckExpand dflags tv1 xi2 of
-           OC_OK xi2' -> -- No occurs check, so we can continue; but make sure
-                         -- that the new goal has enough type synonyms expanded by 
-                         -- by the occurCheckExpand
-                         checkKind loc ev xi1 xi2' co $ \new_ev -> 
-                         continueWith (CTyEqCan { cc_ev = new_ev, cc_loc = loc
-                                                , cc_tyvar  = tv1, cc_rhs = xi2' })
+canEqLeafTyVar2 :: DynFlags -> CtLoc -> CtEvidence
+                -> TyVar -> Type -> TcCoercion 
+                -> TcS StopOrContinue
+-- LHS rewrote to a type variable, 
+-- RHS to something else (possibly a tyvar, but not the *same* tyvar)
+canEqLeafTyVar2 dflags loc ev tv1 xi2 co
+  | OC_OK xi2' <- occurCheckExpand dflags tv1 xi2  -- No occurs check
+  = do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2') co
+                -- Ensure that the new goal has enough type synonyms 
+                -- expanded by the occurCheckExpand; hence using xi2' here
 
-           _bad ->  -- Occurs check error
-                    do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2) co
-                       ; case mb of
-                              Nothing     -> return Stop
-                              Just new_ev -> canEqFailure loc new_ev xi1 xi2 }
-    } } }
+       ; case mb of 
+            Nothing     -> return Stop 
+            Just new_ev | typeKind xi2' `isSubKind` tyVarKind tv1
+                        -- Establish CTyEqCan kind invariant
+                        -- Reorientation has done its best, but the kinds might
+                        -- simply be incompatible
+                        -> continueWith (CTyEqCan { cc_ev = new_ev, cc_loc = loc
+                                                  , cc_tyvar  = tv1, cc_rhs = xi2' })
+                        | otherwise
+                        -> checkKind loc new_ev xi1 xi2' }
+
+  | otherwise  -- Occurs check error
+  = do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2) co
+       ; case mb of
+           Nothing     -> return Stop
+           Just new_ev -> canEqFailure loc new_ev xi1 xi2 }
+  where
+    xi1 = mkTyVarTy tv1
 
 checkKind :: CtLoc 
           -> CtEvidence          -- t1~t2
           -> TcType -> TcType    -- s1~s2, flattened and zonked
-          -> TcCoercion          -- (s1~s2) ~ (t2~t2)
-          -> (CtEvidence -> TcS StopOrContinue)  -- Do this if kinds are OK
           -> TcS StopOrContinue
--- Do the rewrite, test for incompatible kinds, and continue
--- 
--- See Note [Equalities with incompatible kinds]
--- If there are incompatible kinds, emit an "irreducible" constraint 
+-- LHS and RHS have incompatible kinds, so emit an "irreducible" constraint 
 --       CIrredEvCan (NOT CTyEqCan or CFunEqCan)
 -- for the type equality; and continue with the kind equality constraint.
 -- When the latter is solved, it'll kick out the irreducible equality for 
 -- a second attempt at solving
+-- See Note [Equalities with incompatible kinds]
 
-checkKind loc ev s1 s2 co normal_kont
-  = do { mb <- rewriteCtFlavor ev (mkTcEqPred s1 s2) co
-       ; case mb of {
-            Nothing                          -> return Stop ;
-            Just new_ev | k1 `compatKind` k2 -> normal_kont new_ev
-                        | otherwise          ->
-
-    ASSERT( isKind k1 && isKind k2 )
+checkKind loc new_ev s1 s2
+  = ASSERT( isKind k1 && isKind k2 )
     do {  -- See Note [Equalities with incompatible kinds]
-         traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr s1 <+> dcolon <+> ppr k1,
-                                                         ppr s2 <+> dcolon <+> ppr k2])
+         traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
        ; updWorkListTcS $ extendWorkListNonEq $ 
          CIrredEvCan { cc_ev = new_ev, cc_loc = loc }
        ; mw <- newDerived (mkEqPred k1 k2) 
        ; case mw of
            Nothing  -> return Stop
-           Just kev -> canEqNC kind_co_loc kev k1 k2 } } }
-  where
-    k1 = typeKind s1
-    k2 = typeKind s2
+           Just kev -> canEqNC kind_co_loc kev k1 k2 }
 
          -- Always create a Wanted kind equality even if 
          -- you are decomposing a given constraint.
          -- NB: DV finds this reasonable for now. Maybe we have to revisit.
+  where
+    k1 = typeKind s1
+    k2 = typeKind s2
     kind_co_loc = setCtLocOrigin loc (KindEqOrigin s1 s2 (ctLocOrigin loc))
 
 
@@ -1206,8 +1217,10 @@ the fsk.
 Note [Equalities with incompatible kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 canEqLeaf is about to make a CTyEqCan or CFunEqCan; but both have the
-invariant that LHS and RHS have `compatKind` kinds.  What if we try
-to unify two things with incompatible kinds?
+invariant that LHS and RHS satisfy the kind invariants for CTyEqCan,
+CFunEqCan.  What if we try to unify two things with incompatible
+kinds?
+
 eg    a ~ b  where a::*, b::*->*
 or    a ~ b  where a::*, b::k, k is a kind variable
 
@@ -1226,6 +1239,9 @@ NB: it is important that the types s1,s2 are flattened and zonked
     set, which in turn will kick out the irreducible equality
     E.g. it is WRONG to make an irred (a:k1)~(b:k2)
          if we already have a substitution k1:=k2
+
+See also Note [Kind orientation for CTyEqCan] and
+         Note [Kind orientation for CFunEqCan] in TcRnTypes
 
 Note [Type synonyms and canonicalization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
