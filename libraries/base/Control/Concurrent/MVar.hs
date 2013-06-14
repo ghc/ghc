@@ -142,6 +142,7 @@ module Control.Concurrent.MVar
         , modifyMVarMasked_
         , modifyMVarMasked
 #ifndef __HUGS__
+        , atomicReadMVar
         , mkWeakMVar
         , addMVarFinalizer
 #endif
@@ -155,7 +156,7 @@ import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,
-                  tryTakeMVar, tryPutMVar, isEmptyMVar
+                  tryTakeMVar, tryPutMVar, isEmptyMVar, atomicReadMVar
                 )
 import qualified GHC.MVar
 import GHC.Weak

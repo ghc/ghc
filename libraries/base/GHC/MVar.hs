@@ -23,6 +23,7 @@ module GHC.MVar (
         , newMVar
         , newEmptyMVar
         , takeMVar
+        , atomicReadMVar
         , putMVar
         , tryTakeMVar
         , tryPutMVar
@@ -87,6 +88,15 @@ newMVar value =
 --
 takeMVar :: MVar a -> IO a
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
+
+-- |Atomically read the contents of an 'MVar'.  If the 'MVar' is
+-- currently empty, 'atomicReadMVar' will wait until its full.
+-- 'atomicReadMVar' is guaranteed to receive the next 'putMVar'.
+--
+-- 'atomicReadMVar' is multiple-wakeup, so when multiple readers are
+-- blocked on an 'MVar', all of them are woken up at the same time.
+atomicReadMVar :: MVar a -> IO a
+atomicReadMVar (MVar mvar#) = IO $ \ s# -> atomicReadMVar# mvar# s#
 
 -- |Put a value into an 'MVar'.  If the 'MVar' is currently full,
 -- 'putMVar' will wait until it becomes empty.
