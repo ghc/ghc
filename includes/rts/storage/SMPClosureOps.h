@@ -13,7 +13,7 @@
 
 #define unlockClosure(ptr,info)                 \
     prim_write_barrier;                         \
-    StgHeader_info(ptr) = info;    
+    StgHeader_info(ptr) = info;
 
 #else
 
@@ -35,12 +35,12 @@ EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)
 {
     StgWord info;
     do {
-	nat i = 0;
-	do {
-	    info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
-	    if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
-	} while (++i < SPIN_COUNT);
-	yieldThread();
+        nat i = 0;
+        do {
+            info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
+            if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
+        } while (++i < SPIN_COUNT);
+        yieldThread();
     } while (1);
 }
 
