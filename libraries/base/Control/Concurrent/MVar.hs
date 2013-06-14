@@ -171,7 +171,8 @@ import Control.Exception.Base
   This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
   from the 'MVar', puts it back, and also returns it.  This function
   is atomic only if there are no other producers (i.e. threads calling
-  'putMVar') for this 'MVar'.
+  'putMVar') for this 'MVar'.  Note: a 'tryTakeMVar' may temporarily
+  see the 'MVar' as empty while a read is occurring.
 -}
 readMVar :: MVar a -> IO a
 readMVar m =
