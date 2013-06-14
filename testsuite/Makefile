@@ -26,4 +26,8 @@ endif
 
 clean distclean maintainer-clean:
 	$(MAKE) -C $(TOP)/timeout $@
-	$(RM) -f mk/*.o mk/*.hi mk/ghc-config mk/ghc-config.exe mk/ghcconfig*.mk
+	$(RM) -f mk/*.o
+	$(RM) -f mk/*.hi
+	$(RM) -f mk/ghcconfig*.mk
+	$(RM) -f mk/ghc-config mk/ghc-config.exe
+	$(RM) -f driver/*.pyc

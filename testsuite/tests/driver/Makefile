@@ -495,7 +495,7 @@ T706:
 T5584:
 	$(RM) -rf T5584_out
 	mkdir T5584_out
-	"$(TEST_HC)" -odir T5584_out -c T5584/A.hs-boot
+	"$(TEST_HC)" -odir T5584_out -c T5584_in/A.hs-boot
 
 .PHONY: T5198
 T5198:
