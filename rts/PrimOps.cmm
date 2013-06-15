@@ -1197,14 +1197,13 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
-
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
      */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
 
         // We want to put the heap check down here in the slow path,
         // but be careful to unlock the closure before returning to
@@ -1243,7 +1242,9 @@ loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further putMVars, MVar is now empty */
         StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-        unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        // If the MVar is not already dirty, then we don't need to make
+        // it dirty, as it is empty with nothing blocking on it.
+        unlockClosure(mvar, info);
         return (val);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1253,6 +1254,10 @@ loop:
     }
 
     // There are putMVar(s) waiting... wake up the first thread on the queue
+
+    if (info == stg_MVAR_CLEAN_info) {
+        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+    }
 
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
@@ -1300,10 +1305,6 @@ stg_tryTakeMVarzh ( P_ mvar /* :: MVar a */ )
         return (0, stg_NO_FINALIZER_closure);
     }
 
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
-
     /* we got the value... */
     val = StgMVar_value(mvar);
 
@@ -1312,9 +1313,10 @@ loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further putMVars, MVar is now empty */
         StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-        unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        unlockClosure(mvar, info);
         return (1, val);
     }
+
     if (StgHeader_info(q) == stg_IND_info ||
         StgHeader_info(q) == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
@@ -1322,6 +1324,10 @@ loop:
     }
 
     // There are putMVar(s) waiting... wake up the first thread on the queue
+
+    if (info == stg_MVAR_CLEAN_info) {
+        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+    }
 
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
@@ -1359,11 +1365,11 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
-
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
+
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
 
         // We want to put the heap check down here in the slow path,
         // but be careful to unlock the closure before returning to
@@ -1398,6 +1404,9 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
         StgMVar_value(mvar) = val;
         unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return ();
@@ -1433,7 +1442,7 @@ loop:
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
-    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    unlockClosure(mvar, info);
     return ();
 }
 
@@ -1456,14 +1465,14 @@ stg_tryPutMVarzh ( P_ mvar, /* :: MVar a */
         return (0);
     }
 
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
-
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
+
         StgMVar_value(mvar) = val;
         unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return (1);
@@ -1499,7 +1508,7 @@ loop:
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
-    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    unlockClosure(mvar, info);
     return (1);
 }
 
