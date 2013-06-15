@@ -1193,7 +1193,12 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
     W_ val, info, tso, q;
 
 #if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
+    if (CInt[n_capabilities] == 1 :: CInt) {
+        info = GET_INFO(mvar);
+    }
+    else {
+        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
+    }
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1290,7 +1295,12 @@ stg_tryTakeMVarzh ( P_ mvar /* :: MVar a */ )
     W_ val, info, tso, q;
 
 #if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
+    if (CInt[n_capabilities] == 1 :: CInt) {
+        info = GET_INFO(mvar);
+    }
+    else {
+        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
+    }
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1361,7 +1371,12 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
     W_ info, tso, q;
 
 #if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
+    if (CInt[n_capabilities] == 1 :: CInt) {
+        info = GET_INFO(mvar);
+    }
+    else {
+        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
+    }
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1454,7 +1469,12 @@ stg_tryPutMVarzh ( P_ mvar, /* :: MVar a */
     W_ info, tso, q;
 
 #if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
+    if (CInt[n_capabilities] == 1 :: CInt) {
+        info = GET_INFO(mvar);
+    }
+    else {
+        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
+    }
 #else
     info = GET_INFO(mvar);
 #endif

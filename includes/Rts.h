@@ -203,6 +203,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/SpinLock.h"
 
 #include "rts/Messages.h"
+#include "rts/Threads.h"
 
 /* Storage format definitions */
 #include "rts/storage/FunTypes.h"
@@ -230,7 +231,6 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/Globals.h"
 #include "rts/IOManager.h"
 #include "rts/Linker.h"
-#include "rts/Threads.h"
 #include "rts/Ticky.h"
 #include "rts/Timer.h"
 #include "rts/Stable.h"

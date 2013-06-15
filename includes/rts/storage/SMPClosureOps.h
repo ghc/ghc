@@ -18,6 +18,7 @@
 #else
 
 EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p);
+EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p);
 EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p);
 EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
@@ -31,7 +32,7 @@ EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
 // We want a callable copy of lockClosure() so that we can refer to it
 // from .cmm files compiled using the native codegen.
-EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)
+EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p)
 {
     StgWord info;
     do {
@@ -44,14 +45,29 @@ EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)
     } while (1);
 }
 
+EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)
+{
+    if (n_capabilities == 1) {
+        return (StgInfoTable *)p->header.info;
+    }
+    else {
+        return reallyLockClosure(p);
+    }
+}
+
 EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p)
 {
     StgWord info;
-    info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
-    if (info != (W_)&stg_WHITEHOLE_info) {
-        return (StgInfoTable *)info;
-    } else {
-        return NULL;
+    if (n_capabilities == 1) {
+        return (StgInfoTable *)p->header.info;
+    }
+    else {
+        info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
+        if (info != (W_)&stg_WHITEHOLE_info) {
+            return (StgInfoTable *)info;
+        } else {
+            return NULL;
+        }
     }
 }
 
