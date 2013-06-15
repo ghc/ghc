@@ -587,6 +587,11 @@ fileLoop hdl = do
    l <- liftIO $ tryIO $ hGetLine hdl
    case l of
         Left e | isEOFError e              -> return Nothing
+               | -- as we share stdin with the program, the program
+                 -- might have already closed it, so we might get a
+                 -- handle-closed exception. We therefore catch that
+                 -- too.
+                 isIllegalOperation e      -> return Nothing
                | InvalidArgument <- etype  -> return Nothing
                | otherwise                 -> liftIO $ ioError e
                 where etype = ioeGetErrorType e
