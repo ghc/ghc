@@ -918,18 +918,19 @@ compact(StgClosure *static_objects)
 
     // the weak pointer lists...
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        if (generations[g].weak_ptr_list != NULL)
+        if (generations[g].weak_ptr_list != NULL) {
             thread((void *)&generations[g].weak_ptr_list);
+        }
     }
 
     if (dead_weak_ptr_list != NULL) {
-	thread((void *)&dead_weak_ptr_list); // tmp
+        thread((void *)&dead_weak_ptr_list); // tmp
     }
 
     // mutable lists
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-	bdescr *bd;
-	StgPtr p;
+        bdescr *bd;
+        StgPtr p;
         for (n = 0; n < n_capabilities; n++) {
             for (bd = capabilities[n].mut_lists[g]; 
                  bd != NULL; bd = bd->link) {
