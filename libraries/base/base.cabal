@@ -228,6 +228,7 @@ Library {
         cbits/inputReady.c
         cbits/primFloat.c
         cbits/md5.c
+        cbits/SetEnv.c
         cbits/sysconf.c
     include-dirs: include
     includes:    HsBase.h
