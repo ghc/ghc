@@ -404,6 +404,14 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
 {
   W_ c, info;
 
+  ("ptr" info) = ccall lockClosure(w "ptr");
+
+  if (info == stg_DEAD_WEAK_info) {
+    // Already dead.
+    unlockClosure(w, info);
+    return (0);
+  }
+
   ALLOC_PRIM (SIZEOF_StgCFinalizerList)
 
   c = Hp - SIZEOF_StgCFinalizerList + WDS(1);
@@ -413,14 +421,6 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
   StgCFinalizerList_ptr(c) = ptr;
   StgCFinalizerList_eptr(c) = eptr;
   StgCFinalizerList_flag(c) = flag;
-
-  ("ptr" info) = ccall lockClosure(w "ptr");
-
-  if (info == stg_DEAD_WEAK_info) {
-    // Already dead.
-    unlockClosure(w, info);
-    return (0);
-  }
 
   StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
   StgWeak_cfinalizers(w) = c;
