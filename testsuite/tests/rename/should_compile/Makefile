@@ -46,3 +46,8 @@ T7963:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7963a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7963.hs -ddump-minimal-imports
 	cat T7963.imports
+
+T7969:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7969a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7969.hs -ddump-minimal-imports
+	cat T7969.imports

@@ -209,3 +209,8 @@ test('T7963',
                    'T7963.imports'])],
      run_command,
      ['$MAKE -s --no-print-directory T7963'])
+test('T7969',
+     [extra_clean(['T7969a.hi', 'T7969a.o',
+                   'T7969.imports'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T7969'])
