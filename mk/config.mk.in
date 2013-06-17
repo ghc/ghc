@@ -616,7 +616,12 @@ CPP			= @CPP@ @CPPFLAGS@
 # RAWCPP_FLAGS are the flags to give to cpp (viz, gcc -E) to persuade it to
 # behave plausibly on Haskell sources.
 #
+# Clang in particular is a bit more annoying, so we suppress some warnings.
 RAWCPP_FLAGS            = -undef -traditional
+ifeq "$(CC_CLANG_BACKEND)" "1"
+RAWCPP_FLAGS           += -Wno-invalid-pp-token
+endif
+
 FIND			= @FindCmd@
 
 #

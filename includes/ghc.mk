@@ -85,6 +85,11 @@ ifeq "$(CC_LLVM_BACKEND)" "1"
 	@echo "#define llvm_CC_FLAVOR 1" >> $@
 endif
 #
+ifeq "$(CC_CLANG_BACKEND)" "1"
+	@echo >> $@
+	@echo "#define clang_CC_FLAVOR 1" >> $@
+endif
+#
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
 	@echo "Done."
 
