@@ -704,10 +704,22 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
            -- For standalone deriving (mtheta /= Nothing),
            -- check that all the data constructors are in scope.
            ; rdr_env <- getGlobalRdrEnv
-           ; let hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
+           ; let data_con_names = map dataConName (tyConDataCons rep_tc)
+                 hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
                                     (isAbstractTyCon rep_tc ||
-                                     any not_in_scope (tyConDataCons rep_tc))
-                 not_in_scope dc  = null (lookupGRE_Name rdr_env (dataConName dc))
+                                     any not_in_scope data_con_names)
+                 not_in_scope dc  = null (lookupGRE_Name rdr_env dc)
+
+                 -- Make a Qual RdrName that will do for each DataCon
+                 -- so we can report it as used (Trac #7969)
+                 data_con_rdrs = [ mkRdrQual (is_as (is_decl imp_spec)) occ
+                                 | dc_name <- data_con_names
+                                 , let occ  = nameOccName dc_name
+                                       gres = lookupGRE_Name rdr_env dc_name
+                                 , not (null gres)
+                                 , Imported (imp_spec:_) <- [gre_prov (head gres)] ]
+
+           ; addUsedRdrNames data_con_rdrs
            ; unless (isNothing mtheta || not hidden_data_cons)
                     (bale_out (derivingHiddenErr tycon))
 
