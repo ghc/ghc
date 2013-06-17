@@ -139,6 +139,12 @@
                     which will dump all of the flags it supports to standard out.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    It's now possible to switch the system linker on Linux
+                    (between GNU gold and GNU ld) at runtime without problem.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
