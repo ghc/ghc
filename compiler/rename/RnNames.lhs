@@ -1318,12 +1318,9 @@ warnUnusedImportDecls gbl_env
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
-    explicit_import (L _ decl) = unLoc (ideclName decl) /= pRELUDE_NAME
+    explicit_import (L _ decl) = not (ideclImplicit decl)
         -- Filter out the implicit Prelude import
         -- which we do not want to bleat about
-        -- This also filters out an *explicit* Prelude import
-        -- but solving that problem involves more plumbing, and
-        -- it just doesn't seem worth it
 \end{code}
 
 
