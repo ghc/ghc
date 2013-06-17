@@ -42,3 +42,7 @@ T4240:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T4240.hs -ddump-minimal-imports
 	cat T4240.imports
 
+T7963:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7963a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7963.hs -ddump-minimal-imports
+	cat T7963.imports

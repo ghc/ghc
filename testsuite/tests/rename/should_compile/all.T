@@ -204,3 +204,8 @@ test('T7167', normal, compile, [''])
 test('T7336', normal, compile, ['-Wall'])
 
 test('T2435', normal, multimod_compile, ['T2435','-v0'])
+test('T7963',
+     [extra_clean(['T7963a.hi', 'T7963a.o',
+                   'T7963.imports'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T7963'])
