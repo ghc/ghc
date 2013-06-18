@@ -115,14 +115,14 @@ dataConInfoPtrToName x = do
    -- Warning: this code assumes that the string is well formed.
    parse :: [Word8] -> ([Word8], [Word8], [Word8])
    parse input 
-      = ASSERT (all (>0) (map length [pkg, mod, occ])) (pkg, mod, occ)
+      = ASSERT(all (>0) (map length [pkg, mod, occ])) (pkg, mod, occ)
       where
       dot = fromIntegral (ord '.')
       (pkg, rest1) = break (== fromIntegral (ord ':')) input 
       (mod, occ) 
          = (concat $ intersperse [dot] $ reverse modWords, occWord)
          where
-         (modWords, occWord) = ASSERT (length rest1 > 0) (parseModOcc [] (tail rest1))
+         (modWords, occWord) = ASSERT(length rest1 > 0) (parseModOcc [] (tail rest1))
       parseModOcc :: [[Word8]] -> [Word8] -> ([[Word8]], [Word8])
       -- We only look for dots if str could start with a module name,
       -- i.e. if it starts with an upper case character.

@@ -532,7 +532,7 @@ quantifyTyVars gbl_tvs tkvs
                  else do { let (meta_kvs, skolem_kvs) = partition is_meta kvs2
                                is_meta kv = isTcTyVar kv && isMetaTyVar kv
                          ; mapM_ defaultKindVarToStar meta_kvs
-                         ; WARN ( not (null skolem_kvs), ppr skolem_kvs )
+                         ; WARN( not (null skolem_kvs), ppr skolem_kvs )
                            return skolem_kvs }  -- Should be empty
 
        ; mapM zonk_quant (qkvs ++ qtvs) } 
@@ -582,7 +582,7 @@ zonkQuantifiedTyVar tv
 defaultKindVarToStar :: TcTyVar -> TcM Kind
 -- We have a meta-kind: unify it with '*'
 defaultKindVarToStar kv 
-  = do { ASSERT ( isKindVar kv && isMetaTyVar kv )
+  = do { ASSERT( isKindVar kv && isMetaTyVar kv )
          writeMetaTyVar kv liftedTypeKind
        ; return liftedTypeKind }
 

@@ -932,7 +932,7 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
   = return []
 
   | cls `hasKey` gen1ClassKey   -- Gen1 needs Functor
-  = ASSERT (length rep_tc_tvs > 0)   -- See Note [Getting base classes]
+  = ASSERT(length rep_tc_tvs > 0)   -- See Note [Getting base classes]
     do { functorClass <- tcLookupClass functorClassName
        ; return (con_arg_constraints functorClass (get_gen1_constrained_tys last_tv)) }
 

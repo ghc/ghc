@@ -636,7 +636,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                         return lnk
 
             adjust_ul new_osuf (DotO file) = do
-                MASSERT (osuf `isSuffixOf` file)
+                MASSERT(osuf `isSuffixOf` file)
                 let file_base = reverse (drop (length osuf + 1) (reverse file))
                     new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file
@@ -895,7 +895,7 @@ linkSomeBCOs dflags toplevs_only ie ce_in ul_bcos
                                                else ce_all_additions
             ce_out = -- make sure we're not inserting duplicate names into the
                      -- closure environment, which leads to trouble.
-                     ASSERT (all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
+                     ASSERT(all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
                      extendClosureEnv ce_in ce_additions
         return (ce_out, hvals)
 

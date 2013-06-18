@@ -888,9 +888,9 @@ dataConInstArgTys :: DataCon	-- ^ A datacon with no existentials or equality con
 	      	  -> [Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs, dcEqSpec = eq_spec,
 			      dcExTyVars = ex_tvs}) inst_tys
- = ASSERT2 ( length univ_tvs == length inst_tys 
-           , ptext (sLit "dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
-   ASSERT2 ( null ex_tvs && null eq_spec, ppr dc )        
+ = ASSERT2( length univ_tvs == length inst_tys
+          , ptext (sLit "dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
+   ASSERT2( null ex_tvs && null eq_spec, ppr dc )
    map (substTyWith univ_tvs inst_tys) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',

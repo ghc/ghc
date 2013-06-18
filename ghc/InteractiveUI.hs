@@ -2466,7 +2466,7 @@ enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
 enclosingTickSpan md (RealSrcSpan src) = do
   ticks <- getTickArray md
   let line = srcSpanStartLine src
-  ASSERT (inRange (bounds ticks) line) do
+  ASSERT(inRange (bounds ticks) line) do
   let toRealSrcSpan (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
       toRealSrcSpan (RealSrcSpan s) = s
       enclosing_spans = [ pan | (_,pan) <- ticks ! line

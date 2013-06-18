@@ -913,7 +913,7 @@ genCCall' _ _ (PrimTarget MO_Touch) _ _
  = return $ nilOL
 
 genCCall' dflags gcp target dest_regs args0
-  = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
+  = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments

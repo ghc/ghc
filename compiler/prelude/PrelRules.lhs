@@ -721,7 +721,7 @@ tagToEnumRule = do
       let tag = fromInteger i
           correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
       (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
-      ASSERT (null rest) return ()
+      ASSERT(null rest) return ()
       return $ mkTyApps (Var (dataConWorkId dc)) tc_args
 
     -- See Note [tagToEnum#]

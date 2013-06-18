@@ -169,7 +169,7 @@ compileOne' m_tc_result mHscMessage
    case e of
        Left iface ->
            do details <- genModDetails hsc_env iface
-              MASSERT (isJust maybe_old_linkable)
+              MASSERT(isJust maybe_old_linkable)
               return (HomeModInfo{ hm_details  = details,
                                    hm_iface    = iface,
                                    hm_linkable = maybe_old_linkable })

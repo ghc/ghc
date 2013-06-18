@@ -1115,7 +1115,7 @@ plusFVInfo :: (Var, HowBound, StgBinderInfo)
            -> (Var, HowBound, StgBinderInfo)
            -> (Var, HowBound, StgBinderInfo)
 plusFVInfo (id1,hb1,info1) (id2,hb2,info2)
-  = ASSERT (id1 == id2 && hb1 `check_eq_how_bound` hb2)
+  = ASSERT(id1 == id2 && hb1 `check_eq_how_bound` hb2)
     (id1, hb1, combineStgBinderInfo info1 info2)
 
 -- The HowBound info for a variable in the FVInfo should be consistent

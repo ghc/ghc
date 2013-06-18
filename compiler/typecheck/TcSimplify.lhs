@@ -1167,7 +1167,7 @@ disambigGroup (default_ty:default_tys) group
                              -- discard all side effects from the attempt
                     do { setWantedTyBind the_tv default_ty
                        ; implics_from_defaulting <- solveInteract wanteds
-                       ; MASSERT (isEmptyBag implics_from_defaulting)
+                       ; MASSERT(isEmptyBag implics_from_defaulting)
                            -- I am not certain if any implications can be generated
                            -- but I am letting this fail aggressively if this ever happens.
                                      

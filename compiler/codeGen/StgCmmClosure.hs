@@ -519,7 +519,7 @@ getCallMethod _ _name _ (LFUnknown True) _n_args
   = SlowCall -- might be a function
 
 getCallMethod _ name _ (LFUnknown False) n_args
-  = ASSERT2 ( n_args == 0, ppr name <+> ppr n_args ) 
+  = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
     EnterIt -- Not a function
 
 getCallMethod _ _name _ LFBlackHole _n_args

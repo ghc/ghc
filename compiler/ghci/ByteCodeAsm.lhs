@@ -156,7 +156,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
   (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm dflags long_jumps env asm
 
   -- precomputed size should be equal to final size
-  ASSERT (n_insns == sizeSS final_insns) return ()
+  ASSERT(n_insns == sizeSS final_insns) return ()
 
   let asm_insns = ssElts final_insns
       barr a = case a of UArray _lo _hi _n b -> b

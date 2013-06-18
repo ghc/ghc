@@ -117,7 +117,7 @@ rnHsKind = rnHsTyKi False
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
 rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
-  = ASSERT ( isType ) do
+  = ASSERT( isType ) do
         -- Implicit quantifiction in source code (no kinds on tyvars)
         -- Given the signature  C => T  we universally quantify
         -- over FV(T) \ {in-scope-tyvars}
@@ -140,7 +140,7 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
     rnForAll doc Implicit forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
 
 rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars lctxt@(L _ ctxt) tau)
-  = ASSERT ( isType ) do {      -- Explicit quantification.
+  = ASSERT( isType ) do {      -- Explicit quantification.
          -- Check that the forall'd tyvars are actually
          -- mentioned in the type, and produce a warning if not
          let (kvs, mentioned) = extractHsTysRdrTyVars (tau:ctxt)
@@ -157,7 +157,7 @@ rnHsTyKi isType _ (HsTyVar rdr_name)
 -- a sensible error message, but we don't want to complain about the dot too
 -- Hence the jiggery pokery with ty1
 rnHsTyKi isType doc ty@(HsOpTy ty1 (wrapper, L loc op) ty2)
-  = ASSERT ( isType ) setSrcSpan loc $
+  = ASSERT( isType ) setSrcSpan loc $
     do  { ops_ok <- xoptM Opt_TypeOperators
         ; op' <- if ops_ok
                  then rnTyVar isType op
@@ -176,7 +176,7 @@ rnHsTyKi isType doc (HsParTy ty)
        ; return (HsParTy ty', fvs) }
 
 rnHsTyKi isType doc (HsBangTy b ty)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
        ; return (HsBangTy b ty', fvs) }
 
@@ -206,7 +206,7 @@ rnHsTyKi isType doc listTy@(HsListTy ty)
        ; return (HsListTy ty', fvs) }
 
 rnHsTyKi isType doc (HsKindSig ty k)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     do { kind_sigs_ok <- xoptM Opt_KindSignatures
        ; unless kind_sigs_ok (badSigErr False doc ty)
        ; (ty', fvs1) <- rnLHsType doc ty
@@ -214,7 +214,7 @@ rnHsTyKi isType doc (HsKindSig ty k)
        ; return (HsKindSig ty' k', fvs1 `plusFV` fvs2) }
 
 rnHsTyKi isType doc (HsPArrTy ty)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
        ; return (HsPArrTy ty', fvs) }
 
@@ -250,12 +250,12 @@ rnHsTyKi isType doc (HsEqTy ty1 ty2)
        ; return (HsEqTy ty1' ty2', fvs1 `plusFV` fvs2) }
 
 rnHsTyKi isType _ (HsSpliceTy sp _ k)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     do { (sp', fvs) <- rnSplice sp      -- ToDo: deal with fvs
        ; return (HsSpliceTy sp' fvs k, fvs) }
 
 rnHsTyKi isType doc (HsDocTy ty haddock_doc)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
        ; haddock_doc' <- rnLHsDoc haddock_doc
        ; return (HsDocTy ty' haddock_doc', fvs) }
@@ -264,13 +264,13 @@ rnHsTyKi isType doc (HsDocTy ty haddock_doc)
 rnHsTyKi _ _ ty@(HsQuasiQuoteTy _) = pprPanic "Can't do quasiquotation without GHCi" (ppr ty)
 #else
 rnHsTyKi isType doc (HsQuasiQuoteTy qq)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     do { ty <- runQuasiQuoteType qq
        ; rnHsType doc (unLoc ty) }
 #endif
 
 rnHsTyKi isType _ (HsCoreTy ty)
-  = ASSERT ( isType )
+  = ASSERT( isType )
     return (HsCoreTy ty, emptyFVs)
     -- The emptyFVs probably isn't quite right
     -- but I don't think it matters

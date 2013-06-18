@@ -1264,7 +1264,7 @@ unlessM condM acc = condM >>= \c -> unless c acc
 -- Strict application of f at index i
 appArr :: Ix i => (e -> a) -> Array i e -> Int -> a
 appArr f a@(Array _ _ _ ptrs#) i@(I# i#)
- = ASSERT2 (i < length(elems a), ppr(length$ elems a, i))
+ = ASSERT2(i < length(elems a), ppr(length$ elems a, i))
    case indexArray# ptrs# i# of
        (# e #) -> f e
 

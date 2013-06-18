@@ -1162,7 +1162,7 @@ unifyKindEq (FunTy a1 r1) (FunTy a2 r2)
   
 unifyKindEq (TyConApp kc1 k1s) (TyConApp kc2 k2s)
   | kc1 == kc2
-  = ASSERT (length k1s == length k2s)
+  = ASSERT(length k1s == length k2s)
        -- Should succeed since the kind constructors are the same, 
        -- and the kinds are sort-checked, thus fully applied
     do { mb_eqs <- zipWithM unifyKindEq k1s k2s

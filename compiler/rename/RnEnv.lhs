@@ -815,7 +815,7 @@ lookupQualifiedName rdr_name
               | avail <- mi_exports iface,
                 name  <- availNames avail,
                 nameOccName name == occ ] of
-           (n:ns) -> ASSERT (null ns) return (Just n)
+           (n:ns) -> ASSERT(null ns) return (Just n)
            _ -> do { traceRn (text "lookupQualified" <+> ppr rdr_name)
                    ; return Nothing }
 

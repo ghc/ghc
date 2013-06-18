@@ -637,7 +637,7 @@ splitForAllCo_maybe _                = Nothing
 coVarKind :: CoVar -> (Type,Type) 
 coVarKind cv
  | Just (tc, [_kind,ty1,ty2]) <- splitTyConApp_maybe (varType cv)
- = ASSERT (tc `hasKey` eqPrimTyConKey)
+ = ASSERT(tc `hasKey` eqPrimTyConKey)
    (ty1,ty2)
  | otherwise = panic "coVarKind, non coercion variable"
 
@@ -747,7 +747,7 @@ mkFunCo co1 co2 = mkTyConAppCo funTyCon [co1, co2]
 mkForAllCo :: Var -> Coercion -> Coercion
 -- note that a TyVar should be used here, not a CoVar (nor a TcTyVar)
 mkForAllCo tv (Refl ty) = ASSERT( isTyVar tv ) Refl (mkForAllTy tv ty)
-mkForAllCo tv  co       = ASSERT ( isTyVar tv ) ForAllCo tv co
+mkForAllCo tv  co       = ASSERT( isTyVar tv ) ForAllCo tv co
 
 -------------------------------
 

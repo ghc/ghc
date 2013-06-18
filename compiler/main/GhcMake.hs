@@ -332,8 +332,7 @@ load how_much = do
           liftIO $ intermediateCleanTempFiles dflags mods_to_keep hsc_env1
 
           -- there should be no Nothings where linkables should be, now
-          ASSERT(all (isJust.hm_linkable) 
-                    (eltsUFM (hsc_HPT hsc_env))) do
+          ASSERT(all (isJust.hm_linkable) (eltsUFM (hsc_HPT hsc_env))) do
     
           -- Link everything together
           linkresult <- liftIO $ link (ghcLink dflags) dflags False hpt4

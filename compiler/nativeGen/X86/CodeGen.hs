@@ -1834,7 +1834,7 @@ genCCall32' dflags target dest_regs args = do
         use_sse2 <- sse2Enabled
         push_codes <- mapM (push_arg use_sse2) (reverse prom_args)
         delta <- getDeltaNat
-        MASSERT (delta == delta0 - tot_arg_size)
+        MASSERT(delta == delta0 - tot_arg_size)
 
         -- deal with static vs dynamic call targets
         (callinsns,cconv) <-

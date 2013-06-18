@@ -1416,7 +1416,7 @@ doTopReactDict inerts fl cls xis loc
 doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
                 -> CtLoc -> TcS TopInteractResult
 doTopReactFunEq _ct fl fun_tc args xi loc
-  = ASSERT (isSynFamilyTyCon fun_tc) -- No associated data families have 
+  = ASSERT(isSynFamilyTyCon fun_tc) -- No associated data families have
                                      -- reached this far 
     -- Look in the cache of solved funeqs
     do { fun_eq_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
