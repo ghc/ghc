@@ -619,7 +619,7 @@ CPP			= @CPP@ @CPPFLAGS@
 # Clang in particular is a bit more annoying, so we suppress some warnings.
 RAWCPP_FLAGS            = -undef -traditional
 ifeq "$(CC_CLANG_BACKEND)" "1"
-RAWCPP_FLAGS           += -Wno-invalid-pp-token
+RAWCPP_FLAGS           += -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs
 endif
 
 FIND			= @FindCmd@
