@@ -274,3 +274,12 @@ test('T7797',
      compile_and_run,
      ['-O'])
 
+test('T7954',
+      [stats_num_field('bytes allocated', 
+                      [(wordsize(32),  880051408, 10),
+                       (wordsize(64), 1680051408, 10)]),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
