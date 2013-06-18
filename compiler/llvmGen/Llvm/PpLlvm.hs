@@ -24,6 +24,7 @@ module Llvm.PpLlvm (
 #include "HsVersions.h"
 
 import Llvm.AbsSyn
+import Llvm.MetaData
 import Llvm.Types
 
 import Data.List ( intersperse )
@@ -91,28 +92,27 @@ ppLlvmAlias (name, ty)
 
 
 -- | Print out a list of LLVM metadata.
-ppLlvmMetas :: [LlvmMeta] -> SDoc
+ppLlvmMetas :: [MetaDecl] -> SDoc
 ppLlvmMetas metas = vcat $ map ppLlvmMeta metas
 
 -- | Print out an LLVM metadata definition.
-ppLlvmMeta :: LlvmMeta -> SDoc
-ppLlvmMeta (MetaUnamed (LMMetaUnamed u) metas)
-  = exclamation <> int u <> text " = metadata !{" <>
-    hcat (intersperse comma $ map ppLlvmMetaVal metas) <> text "}"
+ppLlvmMeta :: MetaDecl -> SDoc
+ppLlvmMeta (MetaUnamed n m)
+  = exclamation <> int n <> text " = metadata !" <> braces (ppLlvmMetaExpr m)
 
-ppLlvmMeta (MetaNamed n metas)
-  = exclamation <> ftext n <> text " = !{" <>
-    hcat (intersperse comma $ map pprNode munq) <> text "}"
+ppLlvmMeta (MetaNamed n m)
+  = exclamation <> ftext n <> text " = !" <> braces nodes
   where
-    munq = map (\(LMMetaUnamed u) -> u) metas
+    nodes = hcat $ intersperse comma $ map pprNode m
     pprNode n = exclamation <> int n
 
 -- | Print out an LLVM metadata value.
-ppLlvmMetaVal :: LlvmMetaVal -> SDoc
-ppLlvmMetaVal (MetaStr  s) = text "metadata !" <> doubleQuotes (ftext s)
-ppLlvmMetaVal (MetaVar  v) = texts v
-ppLlvmMetaVal (MetaNode (LMMetaUnamed u))
-  = text "metadata !" <> int u
+ppLlvmMetaExpr :: MetaExpr -> SDoc
+ppLlvmMetaExpr (MetaStr  s ) = text "metadata !" <> doubleQuotes (ftext s)
+ppLlvmMetaExpr (MetaNode n ) = text "metadata !" <> int n
+ppLlvmMetaExpr (MetaVar  v ) = texts v
+ppLlvmMetaExpr (MetaExpr es) =
+    hcat $ intersperse (text ", ") $ map ppLlvmMetaExpr es
 
 
 -- | Print out a list of function definitions.
@@ -237,7 +237,7 @@ ppLlvmExpression expr
         Malloc     tp amount        -> ppMalloc tp amount
         Phi        tp precessors    -> ppPhi tp precessors
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
-        MetaExpr   meta expr        -> ppMetaExpr meta expr
+        MExpr      meta expr        -> ppMetaExpr meta expr
 
 
 --------------------------------------------------------------------------------
@@ -417,18 +417,20 @@ ppInsert vec elt idx =
     <+> texts (getVarType elt) <+> text (getName elt) <> comma
     <+> texts idx
 
+
 ppMetaStatement :: [MetaData] -> LlvmStatement -> SDoc
 ppMetaStatement meta stmt = ppLlvmStatement stmt <> ppMetas meta
-
 
 ppMetaExpr :: [MetaData] -> LlvmExpression -> SDoc
 ppMetaExpr meta expr = ppLlvmExpression expr <> ppMetas meta
 
-
 ppMetas :: [MetaData] -> SDoc
 ppMetas meta = hcat $ map ppMeta meta
   where
-    ppMeta (name, (LMMetaUnamed n))
+    ppMeta (name, MetaValExpr e)
+        = comma <+> exclamation <> ftext name <+> text "!" <>
+            braces (ppLlvmMetaExpr e)
+    ppMeta (name, MetaValNode n)
         = comma <+> exclamation <> ftext name <+> exclamation <> int n
 
 

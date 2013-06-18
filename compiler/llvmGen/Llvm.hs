@@ -38,7 +38,7 @@ module Llvm (
         i64, i32, i16, i8, i1, i8Ptr, llvmWord, llvmWordPtr,
 
         -- ** Metadata types
-        LlvmMetaVal(..), LlvmMetaUnamed(..), LlvmMeta(..), MetaData,
+        MetaExpr(..), MetaVal(..), MetaData, MetaDecl(..),
 
         -- ** Operations on the type system.
         isGlobal, getLitType, getLit, getName, getPlainName, getVarType,
@@ -53,6 +53,7 @@ module Llvm (
     ) where
 
 import Llvm.AbsSyn
+import Llvm.MetaData
 import Llvm.PpLlvm
 import Llvm.Types
 

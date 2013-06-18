@@ -1320,7 +1320,7 @@ genLoad_fast env e r n ty =
                 case grt == ty' of
                      -- were fine
                      True -> do
-                         (var, s3) <- doExpr ty' (MetaExpr meta $ Load ptr)
+                         (var, s3) <- doExpr ty' (MExpr meta $ Load ptr)
                          return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3,
                                      [])
 
@@ -1328,7 +1328,7 @@ genLoad_fast env e r n ty =
                      False -> do
                          let pty = pLift ty'
                          (ptr', s3) <- doExpr pty $ Cast LM_Bitcast ptr pty
-                         (var, s4) <- doExpr ty' (MetaExpr meta $ Load ptr')
+                         (var, s4) <- doExpr ty' (MExpr meta $ Load ptr')
                          return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3
                                     `snocOL` s4, [])
 
@@ -1345,14 +1345,14 @@ genLoad_slow env e ty meta = do
     case getVarType iptr of
          LMPointer _ -> do
                     (dvar, load) <- doExpr (cmmToLlvmType ty)
-                                           (MetaExpr meta $ Load iptr)
+                                           (MExpr meta $ Load iptr)
                     return (env', dvar, stmts `snocOL` load, tops)
 
          i@(LMInt _) | i == llvmWord dflags -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     (ptr, cast)  <- doExpr pty $ Cast LM_Inttoptr iptr pty
                     (dvar, load) <- doExpr (cmmToLlvmType ty)
-                                           (MetaExpr meta $ Load ptr)
+                                           (MExpr meta $ Load ptr)
                     return (env', dvar, stmts `snocOL` cast `snocOL` load, tops)
 
          other -> pprPanic "exprToVar: CmmLoad expression is not right type!"

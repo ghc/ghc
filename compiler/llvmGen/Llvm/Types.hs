@@ -76,43 +76,6 @@ instance Show LlvmType where
 
   show (LMAlias (s,_)) = "%" ++ unpackFS s
 
--- | LLVM metadata values. Used for representing debug and optimization
--- information.
-data LlvmMetaVal
-  -- | Metadata string
-  = MetaStr LMString
-  -- | Metadata node
-  | MetaNode LlvmMetaUnamed
-  -- | Normal value type as metadata
-  | MetaVar LlvmVar
-  deriving (Eq)
-
--- | LLVM metadata nodes.
-data LlvmMeta
-  -- | Unamed metadata
-  = MetaUnamed LlvmMetaUnamed [LlvmMetaVal]
-  -- | Named metadata
-  | MetaNamed LMString [LlvmMetaUnamed]
-  deriving (Eq)
-
--- | Unamed metadata variable.
-newtype LlvmMetaUnamed = LMMetaUnamed Int
-
-instance Eq LlvmMetaUnamed where
-  (==) (LMMetaUnamed n) (LMMetaUnamed m) = n == m
-
-instance Show LlvmMetaVal where
-  show (MetaStr  s) = "metadata !\"" ++ unpackFS s ++ "\""
-  show (MetaNode n) = "metadata " ++ show n
-  show (MetaVar  v) = show v
-
-instance Show LlvmMetaUnamed where
-  show (LMMetaUnamed u) = "!" ++ show u
-
-instance Show LlvmMeta where
-  show (MetaUnamed m _) = show m
-  show (MetaNamed  m _) = "!" ++ unpackFS m
-
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
 type LMAlign = Maybe Int
