@@ -4,6 +4,7 @@
 
 module Llvm.AbsSyn where
 
+import Llvm.MetaData
 import Llvm.Types
 
 import Unique
@@ -32,7 +33,7 @@ data LlvmModule = LlvmModule  {
     modAliases   :: [LlvmAlias],
 
     -- | LLVM meta data.
-    modMeta      :: [LlvmMeta],
+    modMeta      :: [MetaDecl],
 
     -- | Global variables to include in the module.
     modGlobals   :: [LMGlobal],
@@ -169,8 +170,6 @@ data LlvmStatement
 
   deriving (Show, Eq)
 
-type MetaData = (LMString, LlvmMetaUnamed)
-
 
 -- | Llvm Expressions
 data LlvmExpression
@@ -278,7 +277,7 @@ data LlvmExpression
   {- |
     A LLVM expression with metadata attached to it.
   -}
-  | MetaExpr [MetaData] LlvmExpression
+  | MExpr [MetaData] LlvmExpression
 
   deriving (Show, Eq)
 
