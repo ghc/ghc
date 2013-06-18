@@ -76,7 +76,6 @@ import Outputable
 import Control.Monad
 import Data.List
 import Prelude hiding( sequence, succ )
-import qualified Prelude( sequence )
 
 infixr 9 `thenC`        -- Right-associative!
 infixr 9 `thenFC`
