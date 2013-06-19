@@ -12,7 +12,7 @@
  * ---------------------------------------------------------------------------*/
 
 #ifndef SM_MARKSTACK_H
-#define SM_MARKSTACk_H
+#define SM_MARKSTACK_H
 
 #include "BeginPrivate.h"
 
