@@ -25,7 +25,7 @@ module Llvm (
 
         -- * Call Handling
         LlvmCallConvention(..), LlvmCallType(..), LlvmParameterListType(..),
-        LlvmLinkageType(..), LlvmFuncAttr(..),
+        LlvmLinkageType(..), LlvmFuncAttr(..), MetaArgs(..),
 
         -- * Operations and Comparisons
         LlvmCmpOp(..), LlvmMachOp(..), LlvmCastOp(..),

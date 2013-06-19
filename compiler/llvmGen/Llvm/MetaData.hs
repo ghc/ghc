@@ -73,6 +73,16 @@ data MetaVal
     | MetaValNode Int
     deriving (Eq)
 
+instance Show MetaExpr where
+  show (MetaStr  s ) = "metadata !\"" ++ unpackFS s ++ "\""
+  show (MetaNode n ) = "metadata !" ++ show n
+  show (MetaVar  v ) = show v
+  show (MetaExpr es) = intercalate ", " $ map show es
+
+instance Show MetaVal where
+  show (MetaValExpr  e) = "!{ " ++ show e ++ "}"
+  show (MetaValNode  n) = "!" ++ show n
+
 -- | Associated some metadata with a specific label for attaching to an
 -- instruction.
 type MetaData = (LMString, MetaVal)
@@ -86,15 +96,15 @@ data MetaDecl
     -- ('!0 = metadata !{ <metadata expression> }' form).
     | MetaUnamed Int MetaExpr
 
-instance Show MetaExpr where
-  show (MetaStr  s ) = "metadata !\"" ++ unpackFS s ++ "\""
-  show (MetaNode n ) = "metadata !" ++ show n
-  show (MetaVar  v ) = show v
-  show (MetaExpr es) = intercalate ", " $ map show es
+-- | LLVM function call arguments.
+data MetaArgs
+    = ArgVar  LlvmVar  -- ^ Regular LLVM variable as argument.
+    | ArgMeta MetaExpr -- ^ Metadata as argument.
+    deriving (Eq)
 
-instance Show MetaVal where
-  show (MetaValExpr  e) = "!{ " ++ show e ++ "}"
-  show (MetaValNode  n) = "!" ++ show n
+instance Show MetaArgs where
+  show (ArgVar  v) = show v
+  show (ArgMeta m) = show m
 
 {-
    Note: Metadata encoding

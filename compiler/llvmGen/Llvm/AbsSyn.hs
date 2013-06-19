@@ -65,6 +65,16 @@ data LlvmFunction = LlvmFunction {
 
 type LlvmFunctions = [LlvmFunction]
 
+-- | LLVM function call arguments.
+data MetaArgs
+    = ArgVar  LlvmVar  -- ^ Regular LLVM variable as argument.
+    | ArgMeta MetaExpr -- ^ Metadata as argument.
+    deriving (Eq)
+
+instance Show MetaArgs where
+  show (ArgVar  v) = show v
+  show (ArgMeta m) = show m
+
 -- | LLVM ordering types for synchronization purposes. (Introduced in LLVM
 -- 3.0). Please see the LLVM documentation for a better description.
 data LlvmSyncOrdering
@@ -250,6 +260,17 @@ data LlvmExpression
                    NoUnwind, ReadOnly and ReadNone are valid here.
   -}
   | Call LlvmCallType LlvmVar [LlvmVar] [LlvmFuncAttr]
+
+  {- |
+    Call a function as above but potentially taking metadata as arguments.
+      * tailJumps: CallType to signal if the function should be tail called
+      * fnptrval:  An LLVM value containing a pointer to a function to be
+                   invoked. Can be indirect. Should be LMFunction type.
+      * args:      Arguments that may include metadata.
+      * attrs:     A list of function attributes for the call. Only NoReturn,
+                   NoUnwind, ReadOnly and ReadNone are valid here.
+  -}
+  | CallM LlvmCallType LlvmVar [MetaArgs] [LlvmFuncAttr]
 
   {- |
     Merge variables from different basic blocks which are predecessors of this

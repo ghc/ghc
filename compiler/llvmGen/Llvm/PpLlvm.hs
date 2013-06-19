@@ -228,6 +228,7 @@ ppLlvmExpression expr
         Alloca     tp amount        -> ppAlloca tp amount
         LlvmOp     op left right    -> ppMachOp op left right
         Call       tp fp args attrs -> ppCall tp fp args attrs
+        CallM      tp fp args attrs -> ppCall tp fp args attrs
         Cast       op from to       -> ppCast op from to
         Compare    op left right    -> ppCmpOp op left right
         Extract    vec idx          -> ppExtract vec idx
@@ -246,8 +247,8 @@ ppLlvmExpression expr
 
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.
-ppCall :: LlvmCallType -> LlvmVar -> [LlvmVar] -> [LlvmFuncAttr] -> SDoc
-ppCall ct fptr vals attrs = case fptr of
+ppCall :: (Show a) => LlvmCallType -> LlvmVar -> [a] -> [LlvmFuncAttr] -> SDoc
+ppCall ct fptr args attrs = case fptr of
                            --
     -- if local var function pointer, unwrap
     LMLocalVar _ (LMPointer (LMFunction d)) -> ppCall' d
@@ -263,7 +264,7 @@ ppCall ct fptr vals attrs = case fptr of
     where
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
-                ppValues = ppCommaJoin vals
+                ppValues = ppCommaJoin args
                 ppParams = map (texts . fst) params
                 ppArgTy  = (hcat $ intersperse comma ppParams) <>
                            (case argTy of
