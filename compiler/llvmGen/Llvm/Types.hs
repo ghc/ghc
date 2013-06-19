@@ -47,6 +47,7 @@ data LlvmType
   | LMVoid                -- ^ Void type
   | LMStruct [LlvmType]   -- ^ Structure type
   | LMAlias LlvmAlias     -- ^ A type alias
+  | LMMetadata            -- ^ LLVM Metadata
 
   -- | Function type, used to create pointers to functions
   | LMFunction LlvmFunctionDecl
@@ -64,6 +65,8 @@ instance Show LlvmType where
   show (LMLabel        ) = "label"
   show (LMVoid         ) = "void"
   show (LMStruct tys   ) = "<{" ++ (commaCat tys) ++ "}>"
+  show (LMAlias (s,_)  ) = "%" ++ unpackFS s
+  show (LMMetadata     ) = "metadata"
 
   show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
     = let varg' = case varg of
@@ -74,7 +77,6 @@ instance Show LlvmType where
           args = intercalate ", " $ map (show . fst) p
       in show r ++ " (" ++ args ++ varg' ++ ")"
 
-  show (LMAlias (s,_)) = "%" ++ unpackFS s
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
@@ -252,9 +254,10 @@ getLink _                         = Internal
 -- | Add a pointer indirection to the supplied type. 'LMLabel' and 'LMVoid'
 -- cannot be lifted.
 pLift :: LlvmType -> LlvmType
-pLift (LMLabel) = error "Labels are unliftable"
-pLift (LMVoid)  = error "Voids are unliftable"
-pLift x         = LMPointer x
+pLift LMLabel    = error "Labels are unliftable"
+pLift LMVoid     = error "Voids are unliftable"
+pLift LMMetadata = error "Metadatas are unliftable"
+pLift x          = LMPointer x
 
 -- | Lower a variable of 'LMPointer' type.
 pVarLift :: LlvmVar -> LlvmVar
