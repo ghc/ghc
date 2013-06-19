@@ -3,12 +3,12 @@
 #include "ghcconfig.h"
 #include "rts/Config.h"
 
-name:		rts
-version:	1.0
+name:           rts
+version:        1.0
 id:             builtin_rts
-license:	BSD3
-maintainer:	glasgow-haskell-users@haskell.org
-exposed:	True
+license:        BSD3
+maintainer:     glasgow-haskell-users@haskell.org
+exposed:        True
 
 exposed-modules:
 hidden-modules:
@@ -16,36 +16,36 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		LIB_DIR"/rts-1.0" PAPI_LIB_DIR FFI_LIB_DIR
+library-dirs:           LIB_DIR"/rts-1.0" PAPI_LIB_DIR FFI_LIB_DIR
 #else /* !INSTALLING */
-library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR FFI_LIB_DIR
+library-dirs:           TOP"/rts/dist/build" PAPI_LIB_DIR FFI_LIB_DIR
 #endif
 
 hs-libraries:   "HSrts" FFI_LIB
 
 extra-libraries:
 #ifdef HAVE_LIBM
-                		"m"		/* for ldexp() */
+                                "m"             /* for ldexp() */
 #endif
 #ifdef HAVE_LIBRT
-			      , "rt"
+                              , "rt"
 #endif
 #ifdef HAVE_LIBDL
-			      , "dl"
+                              , "dl"
 #endif
 #ifdef HAVE_LIBFFI
                               , "ffi"
 #endif
 #ifdef mingw32_HOST_OS
-			      ,"wsock32"    /* for the linker */
-			      ,"gdi32"      /* for the linker */
-			      ,"winmm"      /* for the linker */
+                              ,"wsock32"    /* for the linker */
+                              ,"gdi32"      /* for the linker */
+                              ,"winmm"      /* for the linker */
 #endif
 #ifdef freebsd_HOST_OS
-			      , "pthread" /* for pthread_getthreadid_np() */
+                              , "pthread" /* for pthread_getthreadid_np() */
 #endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
-			      ,"bfd", "iberty"	/* for debugging */
+                              ,"bfd", "iberty"  /* for debugging */
 #endif
 #ifdef HAVE_LIBMINGWEX
 # ifndef INSTALLING                             /* Bundled Mingw is behind */
@@ -53,16 +53,16 @@ extra-libraries:
 # endif
 #endif
 #if USE_PAPI
-			     , "papi"
+                             , "papi"
 #endif
 
 #ifdef INSTALLING
-include-dirs:		INCLUDE_DIR PAPI_INCLUDE_DIR
+include-dirs:           INCLUDE_DIR PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-derivedconstants/header"
 #endif
 
-includes:		Stg.h
+includes:               Stg.h
 hugs-options:
 cc-options:
 
@@ -103,10 +103,10 @@ ld-options:
          , "-Wl,-u", "_base_GHCziTopHandler_flushStdHandles_closure"
          , "-Wl,-u", "_base_GHCziTopHandler_runIO_closure"
          , "-Wl,-u", "_base_GHCziTopHandler_runNonIO_closure"
-	 , "-Wl,-u", "_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-Wl,-u", "_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
          , "-Wl,-u", "_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
-	 , "-Wl,-u", "_base_GHCziConcziSync_runSparks_closure"
-	 , "-Wl,-u", "_base_GHCziConcziSignal_runHandlers_closure"
+         , "-Wl,-u", "_base_GHCziConcziSync_runSparks_closure"
+         , "-Wl,-u", "_base_GHCziConcziSignal_runHandlers_closure"
 #else
            "-Wl,-u", "ghczmprim_GHCziTypes_Izh_static_info"
          , "-Wl,-u", "ghczmprim_GHCziTypes_Czh_static_info"
@@ -143,10 +143,10 @@ ld-options:
          , "-Wl,-u", "base_GHCziTopHandler_flushStdHandles_closure"
          , "-Wl,-u", "base_GHCziTopHandler_runIO_closure"
          , "-Wl,-u", "base_GHCziTopHandler_runNonIO_closure"
-	 , "-Wl,-u", "base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-Wl,-u", "base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
          , "-Wl,-u", "base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
-	 , "-Wl,-u", "base_GHCziConcziSync_runSparks_closure"
-	 , "-Wl,-u", "base_GHCziConcziSignal_runHandlers_closure"
+         , "-Wl,-u", "base_GHCziConcziSync_runSparks_closure"
+         , "-Wl,-u", "base_GHCziConcziSignal_runHandlers_closure"
 #endif
 
 /*  Pick up static libraries in preference over dynamic if in earlier search
@@ -154,7 +154,7 @@ ld-options:
  *  The used option is specific to the Darwin linker.
  */
 #ifdef darwin_HOST_OS
-	 , "-Wl,-search_paths_first"
+         , "-Wl,-search_paths_first"
 #endif
 
 #if defined(darwin_HOST_OS) && !defined(x86_64_HOST_ARCH)
