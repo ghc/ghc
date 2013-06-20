@@ -197,6 +197,13 @@
                     GHC >= 7.4 is now required for bootstrapping.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    GHC can now be built with Clang, and use Clang as the
+                    preprocessor for Haskell code. Only Clang version 3.4svn is
+                    reliably supported.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
   </sect2>
