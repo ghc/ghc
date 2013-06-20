@@ -1,5 +1,5 @@
 
-module B001 where
+module B where
 
 b :: Char
 b = 'c'
