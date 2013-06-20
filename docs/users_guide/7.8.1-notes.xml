@@ -145,6 +145,13 @@
                     (between GNU gold and GNU ld) at runtime without problem.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    The <literal>-fwarn-dodgy-imports</literal> flag now warns
+                    in the case an <literal>import</literal> statement hides an
+                    entity which is not exported.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
