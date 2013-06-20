@@ -26,6 +26,7 @@ main = do
   getGhcFieldOrDefault fields "GhcDynamicByDefault" "Dynamic by default" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
+  getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
 
   let pkgdb_flag = case lookup "Project version" fields of
         Just v

@@ -118,7 +118,12 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
-ifneq "$(shell $(SHELL) -c 'llc --version | grep version' 2> /dev/null)" ""
+ifeq "$(LLC)" ""
+RUNTEST_OPTS += -e ghc_with_llvm=0
+else ifneq "$(LLC)" "llc"
+# If we have a real detected value for LLVM, then it really ought to work
+RUNTEST_OPTS += -e ghc_with_llvm=1
+else ifneq "$(shell $(SHELL) -c 'llc --version | grep version' 2> /dev/null)" ""
 RUNTEST_OPTS += -e ghc_with_llvm=1
 else
 RUNTEST_OPTS += -e ghc_with_llvm=0
