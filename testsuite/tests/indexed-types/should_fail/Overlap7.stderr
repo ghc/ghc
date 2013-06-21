@@ -1,10 +1,4 @@
 
-Overlap7.hs:7:3:
-    Conflicting family instance declarations:
-      F Int a -- Defined at Overlap7.hs:7:3
-      F a Int -- Defined at Overlap7.hs:9:15
-
-Overlap7.hs:8:3:
-    Conflicting family instance declarations:
-      F a b -- Defined at Overlap7.hs:8:3
-      F a Int -- Defined at Overlap7.hs:9:15
+Overlap7.hs:8:1:
+    Illegal instance for closed family ‛F’
+    In the type instance declaration for ‛F’

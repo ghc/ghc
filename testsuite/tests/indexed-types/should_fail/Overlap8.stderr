@@ -1,5 +1,0 @@
-
-Overlap8.hs:6:15:
-    Conflicting family instance declarations:
-      F a Int -- Defined at Overlap8.hs:6:15
-      F Int a -- Defined at Overlap8.hs:8:3

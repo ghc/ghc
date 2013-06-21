@@ -2,8 +2,7 @@
 
 module Overlap2 where
 
-type family F a b
-type instance where
+type family F a b where
   F a a = Int
   F a b = Bool
 

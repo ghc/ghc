@@ -1,8 +1,8 @@
 
-T5481.hs:6:10:
+T5481.hs:6:5:
     The RHS of an associated type declaration mentions type variable ‛b’
       All such variables must be bound on the LHS
 
-T5481.hs:8:10:
+T5481.hs:8:5:
     The RHS of an associated type declaration mentions type variable ‛a’
       All such variables must be bound on the LHS

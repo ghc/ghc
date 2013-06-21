@@ -50,8 +50,7 @@ buryUnder (ps `Snoc` p) post acc = (ps `buryUnder` post) acc `Snoc` (p `under` p
 type key `KeyNotIn` inv = Intersect (More Empty key) inv ~ Empty
 type (lhs `UnderDisjoint` post) rhs = Intersect ((lhs `BuriedUnder` post) Empty) rhs ~ Empty
 
-type family Intersect (l :: Inventory a) (r :: Inventory a) :: Inventory a
-type instance where
+type family Intersect (l :: Inventory a) (r :: Inventory a) :: Inventory a where
   Intersect Empty r = Empty
   Intersect l Empty = Empty
   Intersect (More ls l) r = InterAppend (Intersect ls r) r l
@@ -59,8 +58,7 @@ type instance where
 type family InterAppend (l :: Inventory a) 
                         (r :: Inventory a) 
                         (one :: a) 
-            :: Inventory a
-type instance where
+            :: Inventory a where
   InterAppend acc Empty one = acc
   InterAppend acc (More rs one) one = More acc one
   InterAppend acc (More rs r) one = InterAppend acc rs one
@@ -68,8 +66,7 @@ type instance where
 type family BuriedUnder (sub :: Inventory [KeySegment]) 
                         (post :: [KeySegment]) 
                         (inv :: Inventory [KeySegment]) 
-            :: Inventory [KeySegment]
-type instance where
+            :: Inventory [KeySegment] where
   BuriedUnder Empty post inv = inv
   BuriedUnder (More ps p) post inv = More ((ps `BuriedUnder` post) inv) (p `Under` post)
 

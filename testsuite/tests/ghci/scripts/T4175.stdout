@@ -1,17 +1,17 @@
 type family A a b :: * 	-- Defined at T4175.hs:4:13
-type instance A (Maybe a) a -- Defined at T4175.hs:6:15
-type instance A Int Int -- Defined at T4175.hs:5:15
+type instance A (Maybe a) a -- Defined at T4175.hs:6:1
+type instance A Int Int -- Defined at T4175.hs:5:1
 data family B a 	-- Defined at T4175.hs:8:13
 data instance B () -- Defined at T4175.hs:9:15
 class C a where
   type family D a b :: *
   	-- Defined at T4175.hs:12:10
-type D () () -- Defined at T4175.hs:18:10
-type D Int () -- Defined at T4175.hs:15:10
-type family E a :: * 	-- Defined at T4175.hs:20:13
-type instance where
-  E () -- Defined at T4175.hs:23:5
-  E Int -- Defined at T4175.hs:24:5
+type D () () -- Defined at T4175.hs:18:5
+type D Int () -- Defined at T4175.hs:15:5
+type family E a :: * where
+    E () = Bool
+    E Int = String
+  	-- Defined at T4175.hs:20:13
 data () = () 	-- Defined in ‛GHC.Tuple’
 instance C () -- Defined at T4175.hs:17:10
 instance Bounded () -- Defined in ‛GHC.Enum’
@@ -20,11 +20,8 @@ instance Eq () -- Defined in ‛GHC.Classes’
 instance Ord () -- Defined in ‛GHC.Classes’
 instance Read () -- Defined in ‛GHC.Read’
 instance Show () -- Defined in ‛GHC.Show’
-type instance where
-  E () -- Defined at T4175.hs:23:5
-  E Int -- Defined at T4175.hs:24:5
-type D () () -- Defined at T4175.hs:18:10
-type D Int () -- Defined at T4175.hs:15:10
+type D () () -- Defined at T4175.hs:18:5
+type D Int () -- Defined at T4175.hs:15:5
 data instance B () -- Defined at T4175.hs:9:15
 data Maybe a = Nothing | Just a 	-- Defined in ‛Data.Maybe’
 instance Eq a => Eq (Maybe a) -- Defined in ‛Data.Maybe’
@@ -33,7 +30,7 @@ instance Functor Maybe -- Defined in ‛Data.Maybe’
 instance Ord a => Ord (Maybe a) -- Defined in ‛Data.Maybe’
 instance Read a => Read (Maybe a) -- Defined in ‛GHC.Read’
 instance Show a => Show (Maybe a) -- Defined in ‛GHC.Show’
-type instance A (Maybe a) a -- Defined at T4175.hs:6:15
+type instance A (Maybe a) a -- Defined at T4175.hs:6:1
 data Int = GHC.Types.I# GHC.Prim.Int# 	-- Defined in ‛GHC.Types’
 instance C Int -- Defined at T4175.hs:14:10
 instance Bounded Int -- Defined in ‛GHC.Enum’
@@ -45,8 +42,5 @@ instance Ord Int -- Defined in ‛GHC.Classes’
 instance Read Int -- Defined in ‛GHC.Read’
 instance Real Int -- Defined in ‛GHC.Real’
 instance Show Int -- Defined in ‛GHC.Show’
-type instance where
-  E () -- Defined at T4175.hs:23:5
-  E Int -- Defined at T4175.hs:24:5
-type D Int () -- Defined at T4175.hs:15:10
-type instance A Int Int -- Defined at T4175.hs:5:15
+type D Int () -- Defined at T4175.hs:15:5
+type instance A Int Int -- Defined at T4175.hs:5:1

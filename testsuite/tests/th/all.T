@@ -261,8 +261,6 @@ test('T7276a', combined_output, ghci_script, ['T7276a.script'])
 
 test('TH_TyInstWhere1', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_TyInstWhere2', normal, compile, ['-v0'])
-test('TH_TyInstWhere3', normal, compile, ['-v0'])
-test('TH_TyInstWhere4', normal, compile, ['-v0'])
 
 test('T7445', extra_clean(['T7445a.hi', 'T7445a.o']),
 	      run_command,
@@ -275,3 +273,6 @@ test('T2222', normal, compile, ['-v0'])
 test('T1849', normal, ghci_script, ['T1849.script'])
 test('T7681', normal, compile, ['-v0'])
 test('T7910', normal, compile_and_run, ['-v0'])
+
+test('ClosedFam1', normal, compile, ['-dsuppress-uniques -v0'])
+test('ClosedFam2', normal, compile, ['-v0'])

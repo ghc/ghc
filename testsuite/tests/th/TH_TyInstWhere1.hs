@@ -2,9 +2,7 @@
 
 module TH_TyInstWhere1 where
 
-type family F (a :: k) (b :: k) :: Bool
-
-$([d| type instance where
+$([d| type family F (a :: k) (b :: k) :: Bool where
         F a a = True
         F a b = False |])
 

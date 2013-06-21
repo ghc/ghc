@@ -17,8 +17,6 @@ instance C Int where
 instance C () where
     type D () () = Bool
 
-type family E a
-
-type instance where
+type family E a where
     E ()  = Bool
     E Int = String

@@ -82,7 +82,6 @@ test('Overlap4', normal, compile_fail, [''])
 test('Overlap5', normal, compile_fail, [''])
 test('Overlap6', normal, compile_fail, [''])
 test('Overlap7', normal, compile_fail, [''])
-test('Overlap8', normal, compile_fail, [''])
 test('Overlap9', normal, compile_fail, [''])
 test('Overlap10', normal, compile_fail, [''])
 test('Overlap11', normal, compile_fail, [''])
@@ -94,8 +93,10 @@ test('T7354a',
      ['$MAKE -s --no-print-directory T7354a'])
 test('T7536', normal, compile_fail, [''])
 
-test('T7560', normal, compile_fail, [''])
 test('T7729', normal, compile_fail, [''])
 test('T7729a', normal, compile_fail, [''])
 test('T7786', normal, compile_fail, [''])
+
+test('NoGood', normal, compile_fail, [''])
 test('T7967', normal, compile_fail, [''])
+

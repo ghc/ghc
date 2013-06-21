@@ -1,0 +1,6 @@
+
+ClosedFam1.hs:7:3: Warning:
+    type family Foo_0 a_1 (b_2 :: k_3) where
+    Foo_0 GHC.Types.Int GHC.Types.Bool = GHC.Types.Int
+    Foo_0 a_4 Data.Maybe.Maybe = GHC.Types.Bool
+    Foo_0 b_5 (x_6 :: GHC.Types.Bool) = GHC.Types.Char

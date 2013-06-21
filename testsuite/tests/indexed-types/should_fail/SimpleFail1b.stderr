@@ -1,4 +1,4 @@
 
 SimpleFail1b.hs:4:1:
-    Number of parameters must match family declaration; expected 2
+    Number of parameters must match family declaration; expected no more than 2
     In the data instance declaration for ‛T1’

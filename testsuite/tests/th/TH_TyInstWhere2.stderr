@@ -1,5 +1,5 @@
 
-TH_TyInstWhere2.hs:9:4: Warning:
-    type instance where
-    TH_TyInstWhere2.F a_0 a_0 = 'GHC.Types.True
-    TH_TyInstWhere2.F a_1 b_2 = 'GHC.Types.False
+TH_TyInstWhere2.hs:7:4: Warning:
+    type family F_0 (a_1 :: k_2) (b_3 :: k_2) :: GHC.Types.Bool where
+    F_0 a_4 a_4 = 'GHC.Types.True
+    F_0 a_5 b_6 = 'GHC.Types.False

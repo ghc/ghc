@@ -1,3 +1,0 @@
-
-TH_TyInstWhere3.hs:9:4: Warning:
-    type instance TH_TyInstWhere3.F GHC.Types.Int = GHC.Types.Int

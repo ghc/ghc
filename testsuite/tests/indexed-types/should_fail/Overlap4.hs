@@ -2,15 +2,7 @@
 
 module Overlap4 where
 
-type family F a b
-type instance F Char Char = Int
-type instance where
-  F a a = Int
-  F a b = Bool
+type family F a b where
+  F Int Int = Bool
+  F Bool = Maybe
 
-
-g :: F Char Double
-g = False
-
-h :: F Double Double
-h = -2

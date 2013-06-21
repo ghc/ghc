@@ -2,8 +2,7 @@
 
 module Overlap6 where
 
-type family And (a :: Bool) (b :: Bool) :: Bool
-type instance where
+type family And (a :: Bool) (b :: Bool) :: Bool where
   And False x = False
   And True x = False -- this is wrong!
   And x False = False

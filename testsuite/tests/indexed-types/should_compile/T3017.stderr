@@ -19,6 +19,6 @@ COERCION AXIOMS
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11
 FAMILY INSTANCES
-  type Elem (ListColl a) -- Defined at T3017.hs:13:9
+  type Elem (ListColl a) -- Defined at T3017.hs:13:4
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]
