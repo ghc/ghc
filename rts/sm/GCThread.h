@@ -122,7 +122,7 @@ typedef struct gc_thread_ {
     OSThreadId id;                 // The OS thread that this struct belongs to
     SpinLock   gc_spin;
     SpinLock   mut_spin;
-    volatile rtsBool wakeup;
+    volatile StgWord8 wakeup;
 #endif
     nat thread_index;              // a zero based index identifying the thread
     rtsBool idle;                  // sitting out of this GC cycle
