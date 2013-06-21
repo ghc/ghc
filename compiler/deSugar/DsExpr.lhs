@@ -760,8 +760,7 @@ dsDo stmts
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
                     , recS_rec_rets = rec_rets, recS_ret_ty = body_ty }) stmts
-      = ASSERT( length rec_ids > 0 )
-        goL (new_bind_stmt : stmts)
+      = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
         new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTup later_pats)
                                          mfix_app bind_op 

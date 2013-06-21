@@ -755,7 +755,13 @@ rnStmt _ _ (L loc (LetStmt binds)) thing_inside
         ; return (([L loc (LetStmt binds')], thing), fvs) }  }
 
 rnStmt ctxt rnBody (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
-  = do  {
+  = do  { (return_op, fvs1)  <- lookupStmtName ctxt returnMName
+        ; (mfix_op,   fvs2)  <- lookupStmtName ctxt mfixName
+        ; (bind_op,   fvs3)  <- lookupStmtName ctxt bindMName
+        ; let empty_rec_stmt = emptyRecStmt { recS_ret_fn  = return_op
+                                            , recS_mfix_fn = mfix_op
+                                            , recS_bind_fn = bind_op }
+
         -- Step1: Bring all the binders of the mdo into scope
         -- (Remember that this also removes the binders from the
         -- finally-returned free-vars.)
@@ -766,35 +772,10 @@ rnStmt ctxt rnBody (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
         -- (This set may not be empty, because we're in a recursive
         -- context.)
         ; rnRecStmtsAndThen rnBody rec_stmts   $ \ segs -> do
-
         { let bndrs = nameSetToList $ foldr (unionNameSets . (\(ds,_,_,_) -> ds))
                                             emptyNameSet segs
         ; (thing, fvs_later) <- thing_inside bndrs
-        ; (return_op, fvs1)  <- lookupStmtName ctxt returnMName
-        ; (mfix_op,   fvs2)  <- lookupStmtName ctxt mfixName
-        ; (bind_op,   fvs3)  <- lookupStmtName ctxt bindMName
-        ; let
-                -- Step 2: Fill in the fwd refs.
-                --         The segments are all singletons, but their fwd-ref
-                --         field mentions all the things used by the segment
-                --         that are bound after their use
-            segs_w_fwd_refs          = addFwdRefs segs
-
-                -- Step 3: Group together the segments to make bigger segments
-                --         Invariant: in the result, no segment uses a variable
-                --                    bound in a later segment
-            grouped_segs = glomSegments ctxt segs_w_fwd_refs
-
-                -- Step 4: Turn the segments into Stmts
-                --         Use RecStmt when and only when there are fwd refs
-                --         Also gather up the uses from the end towards the
-                --         start, so we can tell the RecStmt which things are
-                --         used 'after' the RecStmt
-            empty_rec_stmt = emptyRecStmt { recS_ret_fn  = return_op
-                                          , recS_mfix_fn = mfix_op
-                                          , recS_bind_fn = bind_op }
-            (rec_stmts', fvs) = segsToStmts empty_rec_stmt grouped_segs fvs_later
-
+        ; let (rec_stmts', fvs) = segmentRecStmts ctxt empty_rec_stmt segs fvs_later
         ; return ((rec_stmts', thing), fvs `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) } }
 
 rnStmt ctxt _ (L loc (ParStmt segs _ _)) thing_inside
@@ -1091,13 +1072,51 @@ rn_rec_stmts rnBody bndrs stmts =
     return (concat segs_s)
 
 ---------------------------------------------
+segmentRecStmts :: HsStmtContext Name 
+                -> Stmt Name body
+                -> [Segment (LStmt Name body)] -> FreeVars
+                -> ([LStmt Name body], FreeVars)
+
+segmentRecStmts ctxt empty_rec_stmt segs fvs_later
+  | MDoExpr <- ctxt
+  = segsToStmts empty_rec_stmt grouped_segs fvs_later
+                -- Step 4: Turn the segments into Stmts
+                --         Use RecStmt when and only when there are fwd refs
+                --         Also gather up the uses from the end towards the
+                --         start, so we can tell the RecStmt which things are
+                --         used 'after' the RecStmt
+
+  | otherwise
+  = ([ L (getLoc (head ss)) $
+       empty_rec_stmt { recS_stmts = ss
+                      , recS_later_ids = nameSetToList (defs `intersectNameSet` fvs_later)
+                      , recS_rec_ids   = nameSetToList (defs `intersectNameSet` uses) }]
+    , uses `plusFV` fvs_later)
+
+  where
+    (defs_s, uses_s, _, ss) = unzip4 segs
+    defs = plusFVs defs_s
+    uses = plusFVs uses_s
+
+                -- Step 2: Fill in the fwd refs.
+                --         The segments are all singletons, but their fwd-ref
+                --         field mentions all the things used by the segment
+                --         that are bound after their use
+    segs_w_fwd_refs = addFwdRefs segs
+
+                -- Step 3: Group together the segments to make bigger segments
+                --         Invariant: in the result, no segment uses a variable
+                --                    bound in a later segment
+    grouped_segs = glomSegments ctxt segs_w_fwd_refs
+
+----------------------------
 addFwdRefs :: [Segment a] -> [Segment a]
 -- So far the segments only have forward refs *within* the Stmt
 --      (which happens for bind:  x <- ...x...)
 -- This function adds the cross-seg fwd ref info
 
-addFwdRefs pairs
-  = fst (foldr mk_seg ([], emptyNameSet) pairs)
+addFwdRefs segs
+  = fst (foldr mk_seg ([], emptyNameSet) segs)
   where
     mk_seg (defs, uses, fwds, stmts) (segs, later_defs)
         = (new_seg : segs, all_defs)
@@ -1106,48 +1125,53 @@ addFwdRefs pairs
           all_defs = later_defs `unionNameSets` defs
           new_fwds = fwds `unionNameSets` (uses `intersectNameSet` later_defs)
                 -- Add the downstream fwd refs here
+\end{code}
 
-----------------------------------------------------
---      Glomming the singleton segments of an mdo into
---      minimal recursive groups.
---
--- At first I thought this was just strongly connected components, but
--- there's an important constraint: the order of the stmts must not change.
---
--- Consider
---      mdo { x <- ...y...
---            p <- z
---            y <- ...x...
---            q <- x
---            z <- y
---            r <- x }
---
--- Here, the first stmt mention 'y', which is bound in the third.
--- But that means that the innocent second stmt (p <- z) gets caught
--- up in the recursion.  And that in turn means that the binding for
--- 'z' has to be included... and so on.
---
--- Start at the tail { r <- x }
--- Now add the next one { z <- y ; r <- x }
--- Now add one more     { q <- x ; z <- y ; r <- x }
--- Now one more... but this time we have to group a bunch into rec
---      { rec { y <- ...x... ; q <- x ; z <- y } ; r <- x }
--- Now one more, which we can add on without a rec
---      { p <- z ;
---        rec { y <- ...x... ; q <- x ; z <- y } ;
---        r <- x }
--- Finally we add the last one; since it mentions y we have to
--- glom it togeher with the first two groups
---      { rec { x <- ...y...; p <- z ; y <- ...x... ;
---              q <- x ; z <- y } ;
---        r <- x }
---
--- NB. June 7 2012: We only glom segments that appear in
--- an explicit mdo; and leave those found in "do rec"'s intact.
--- See http://hackage.haskell.org/trac/ghc/ticket/4148 for
--- the discussion leading to this design choice.
+Note [Segmenting mdo]
+~~~~~~~~~~~~~~~~~~~~~
+NB. June 7 2012: We only glom segments that appear in an explicit mdo;
+and leave those found in "do rec"'s intact.  See
+http://hackage.haskell.org/trac/ghc/ticket/4148 for the discussion
+leading to this design choice.  Hence the test in segmentRecStmts.
 
+Note [Glomming segments]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Glomming the singleton segments of an mdo into minimal recursive groups.
+
+At first I thought this was just strongly connected components, but
+there's an important constraint: the order of the stmts must not change.
+
+Consider
+     mdo { x <- ...y...
+           p <- z
+           y <- ...x...
+           q <- x
+           z <- y
+           r <- x }
+
+Here, the first stmt mention 'y', which is bound in the third.
+But that means that the innocent second stmt (p <- z) gets caught
+up in the recursion.  And that in turn means that the binding for
+'z' has to be included... and so on.
+
+Start at the tail { r <- x }
+Now add the next one { z <- y ; r <- x }
+Now add one more     { q <- x ; z <- y ; r <- x }
+Now one more... but this time we have to group a bunch into rec
+     { rec { y <- ...x... ; q <- x ; z <- y } ; r <- x }
+Now one more, which we can add on without a rec
+     { p <- z ;
+       rec { y <- ...x... ; q <- x ; z <- y } ;
+       r <- x }
+Finally we add the last one; since it mentions y we have to
+glom it together with the first two groups
+     { rec { x <- ...y...; p <- z ; y <- ...x... ;
+             q <- x ; z <- y } ;
+       r <- x }
+
+\begin{code}
 glomSegments :: HsStmtContext Name -> [Segment (LStmt Name body)] -> [Segment [LStmt Name body]]
+-- See Note [Glomming segments]
 
 glomSegments _ [] = []
 glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
@@ -1172,10 +1196,7 @@ glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
         = (reverse yeses, reverse noes)
         where
           (noes, yeses)           = span not_needed (reverse dus)
-          not_needed (defs,_,_,_) = case ctxt of
-                                      MDoExpr -> not (intersectsNameSet defs uses)
-                                      _       -> False  -- unless we're in mdo, we *need* everything
-
+          not_needed (defs,_,_,_) = not (intersectsNameSet defs uses)
 
 ----------------------------------------------------
 segsToStmts :: Stmt Name body                   -- A RecStmt with the SyntaxOps filled in
