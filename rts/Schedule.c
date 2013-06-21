@@ -1437,7 +1437,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     rtsBool heap_census;
     nat collect_gen;
 #ifdef THREADED_RTS
-    rtsBool gc_type;
+    StgWord8 gc_type;
     nat i, sync;
     StgTSO *tso;
 #endif
