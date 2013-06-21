@@ -862,7 +862,8 @@ data Info
   | TyConI 
         Dec
 
-  -- | A type or data family, with a list of its visible instances
+  -- | A type or data family, with a list of its visible instances. A closed
+  -- type family is returned with 0 instances.
   | FamilyI 
         Dec
         [InstanceDec]
@@ -1170,18 +1171,16 @@ data Dec
   | NewtypeInstD Cxt Name [Type]
          Con [Name]               -- ^ @{ newtype instance Cxt x => T [x] = A (B x)
                                   --       deriving (Z,W)}@
-  | TySynInstD Name [TySynEqn]    -- ^
-                                  -- @
-                                  -- { type instance where { T ... = ... 
-                                  --                       ; T ... = ... } }
-                                  -- @
-                                  --
-                                  --  @type instance T ... = ...@ is used when
-                                  --  the list has length 1
+  | TySynInstD Name TySynEqn      -- ^ @{ type instance ... }@
+
+  | ClosedTypeFamilyD Name
+      [TyVarBndr] (Maybe Kind)
+      [TySynEqn]                  -- ^ @{ type family F a b :: * where ... }@
   deriving( Show, Eq, Data, Typeable )
 
--- | One equation of a (branched) type family instance. The arguments are the
--- left-hand-side type patterns and the right-hand-side result.
+-- | One equation of a type family instance or closed type family. The
+-- arguments are the left-hand-side type patterns and the right-hand-side
+-- result.
 data TySynEqn = TySynEqn [Type] Type
   deriving( Show, Eq, Data, Typeable )
 

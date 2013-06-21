@@ -275,17 +275,21 @@ ppr_dec isTop (NewtypeInstD ctxt tc tys c decs)
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec isTop (TySynInstD tc eqns)
-  | [TySynEqn tys rhs] <- eqns
+ppr_dec isTop (TySynInstD tc (TySynEqn tys rhs))
   = ppr_tySyn maybeInst tc (sep (map pprParendType tys)) rhs
-  | otherwise
-  = hang (text "type instance where")
-         nestDepth (vcat (map ppr_eqn eqns))
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
+ppr_dec _ (ClosedTypeFamilyD tc tvs mkind eqns)
+  = hang (hsep [ text "type family", ppr tc, hsep (map ppr tvs), maybeKind
+               , text "where" ])
+      nestDepth (vcat (map ppr_eqn eqns))
+  where
+    maybeKind | (Just k') <- mkind = text "::" <+> ppr k'
+              | otherwise          = empty
     ppr_eqn (TySynEqn lhs rhs)
       = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
+
 
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs

@@ -424,11 +424,23 @@ newtypeInstD ctxt tc tys con derivs =
     con1  <- con
     return (NewtypeInstD ctxt1 tc tys1 con1 derivs)
 
-tySynInstD :: Name -> [TySynEqnQ] -> DecQ
-tySynInstD tc eqns = 
+tySynInstD :: Name -> TySynEqnQ -> DecQ
+tySynInstD tc eqn = 
   do 
+    eqn1 <- eqn
+    return (TySynInstD tc eqn1)
+
+closedTypeFamilyNoKindD :: Name -> [TyVarBndr] -> [TySynEqnQ] -> DecQ
+closedTypeFamilyNoKindD tc tvs eqns =
+  do
     eqns1 <- sequence eqns
-    return (TySynInstD tc eqns1)
+    return (ClosedTypeFamilyD tc tvs Nothing eqns1)
+
+closedTypeFamilyKindD :: Name -> [TyVarBndr] -> Kind -> [TySynEqnQ] -> DecQ
+closedTypeFamilyKindD tc tvs kind eqns =
+  do
+    eqns1 <- sequence eqns
+    return (ClosedTypeFamilyD tc tvs (Just kind) eqns1)
 
 tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
 tySynEqn lhs rhs =
