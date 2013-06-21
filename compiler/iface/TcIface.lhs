@@ -490,9 +490,12 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
-     tc_syn_rhs (SynFamilyTyCon a b) = return (SynFamilyTyCon a b)
-     tc_syn_rhs (SynonymTyCon ty)    = do { rhs_ty <- tcIfaceType ty
-                                          ; return (SynonymTyCon rhs_ty) }
+     tc_syn_rhs IfaceOpenSynFamilyTyCon   = return OpenSynFamilyTyCon
+     tc_syn_rhs (IfaceClosedSynFamilyTyCon ax_name)
+       = do { ax <- tcIfaceCoAxiom ax_name
+            ; return (ClosedSynFamilyTyCon ax) }
+     tc_syn_rhs (IfaceSynonymTyCon ty)    = do { rhs_ty <- tcIfaceType ty
+                                               ; return (SynonymTyCon rhs_ty) }
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,
@@ -535,7 +538,7 @@ tc_iface_decl _parent ignore_prags
 
    tc_at cls (IfaceAT tc_decl defs_decls)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- mapM tc_ax_branch defs_decls
+          defs <- foldlM tc_ax_branches [] defs_decls
           return (tc, defs)
 
    mk_op_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
@@ -552,23 +555,28 @@ tc_iface_decl _ _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
 tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = branches})
   = do { tc_name     <- lookupIfaceTop ax_occ
        ; tc_tycon    <- tcIfaceTyCon tc
-       ; tc_branches <- mapM tc_ax_branch branches
-       ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
+       ; tc_branches <- foldlM tc_ax_branches [] branches
+       ; let axiom = computeAxiomIncomps $
+                     CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
                              , co_ax_branches = toBranchList tc_branches
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
 
-tc_ax_branch :: IfaceAxBranch -> IfL CoAxBranch
-tc_ax_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs })
+tc_ax_branches :: [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
+tc_ax_branches prev_branches
+               (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs
+                              , ifaxbIncomps = incomps })
   = bindIfaceTyVars tv_bndrs $ \ tvs -> do  -- Variables will all be fresh
     { tc_lhs <- mapM tcIfaceType lhs
     ; tc_rhs <- tcIfaceType rhs
-    ; return (CoAxBranch { cab_loc = noSrcSpan
-                         , cab_tvs = tvs
-                         , cab_lhs = tc_lhs
-                         , cab_rhs = tc_rhs } ) }
+    ; let br = CoAxBranch { cab_loc = noSrcSpan
+                          , cab_tvs = tvs
+                          , cab_lhs = tc_lhs
+                          , cab_rhs = tc_rhs
+                          , cab_incomps = map (prev_branches !!) incomps }
+    ; return (prev_branches ++ [br]) }
 
 tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon _ if_cons
@@ -664,13 +672,15 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun oflag) }
 
-tcIfaceFamInst :: IfaceFamInst -> IfL (FamInst Branched)
-tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcss
-                             , ifFamInstBranched = branched, ifFamInstAxiom = axiom_name } )
+tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
+tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
+                             , ifFamInstAxiom = axiom_name } )
     = do { axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
                      tcIfaceCoAxiom axiom_name
-         ; let mb_tcss' = map (map (fmap ifaceTyConName)) mb_tcss
-         ; return (mkImportedFamInst fam branched mb_tcss' axiom') }
+             -- will panic if branched, but that's OK
+         ; let axiom'' = toUnbranchedAxiom axiom'
+               mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+         ; return (mkImportedFamInst fam mb_tcs' axiom'') }
 \end{code}
 
 

@@ -90,7 +90,7 @@ newtype IfaceTyCon = IfaceTc { ifaceTyConName :: IfExtName }
 
   -- Coercion constructors
 data IfaceCoCon
-  = IfaceCoAx IfExtName Int -- Int is 0-indexed branch number
+  = IfaceCoAx IfExtName BranchIndex -- BranchIndex is 0-indexed branch number
   | IfaceReflCo    | IfaceUnsafeCo  | IfaceSymCo
   | IfaceTransCo   | IfaceInstCo
   | IfaceNthCo Int | IfaceLRCo LeftOrRight

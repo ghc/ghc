@@ -460,6 +460,7 @@ tcRnSrcDecls boot_iface decls
                                    tcg_fords    = fords' } } ;
 
         setGlobalTypeEnv tcg_env' final_type_env
+       
    } }
 
 tc_rn_src_decls :: ModDetails
@@ -487,7 +488,7 @@ tc_rn_src_decls boot_details ds
         case group_tail of {
            Nothing -> do { tcg_env <- checkMain ;       -- Check for `main'
                            traceTc "returning from tc_rn_src_decls: " $
-                             ppr $ nameEnvElts $ tcg_type_env tcg_env ; -- RAE
+                             ppr $ nameEnvElts $ tcg_type_env tcg_env ;
                            return (tcg_env, tcl_env)
                       } ;
 
@@ -769,8 +770,9 @@ checkBootTyCon tc1 tc2
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    let eqSynRhs (SynFamilyTyCon o1 i1) (SynFamilyTyCon o2 i2)
-            = o1==o2 && i1==i2
+    let eqSynRhs OpenSynFamilyTyCon OpenSynFamilyTyCon = True
+        eqSynRhs (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
+            = ax1 == ax2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
@@ -956,7 +958,6 @@ tcTopSrcDecls boot_details
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
         addUsedRdrNames fo_rdr_names ;
-        traceTc "Tc8: type_env: " (ppr $ nameEnvElts $ tcg_type_env tcg_env') ; -- RAE
         return (tcg_env', tcl_env)
     }}}}}}
   where
@@ -1654,13 +1655,8 @@ tcRnDeclsi hsc_env ictxt local_decls =
                              tcg_vects     = vects',
                              tcg_fords     = fords' }
 
-    tcg_env'' <- setGlobalTypeEnv tcg_env' final_type_env
-
-    traceTc "returning from tcRnDeclsi: " $ ppr $ nameEnvElts $ tcg_type_env tcg_env'' -- RAE
-
-    return tcg_env''
-
-
+    setGlobalTypeEnv tcg_env' final_type_env
+    
 #endif /* GHCi */
 \end{code}
 
@@ -1738,7 +1734,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst Branched]))
+            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
 
 -- Used to implement :info in GHCi
 --
@@ -1763,13 +1759,13 @@ tcRnGetInfo hsc_env name
     (cls_insts, fam_insts) <- lookupInsts thing
     return (thing, fixity, cls_insts, fam_insts)
 
-lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst Branched])
+lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
   | Just cls <- tyConClass_maybe tc
   = do  { inst_envs <- tcGetInstEnvs
         ; return (classInstances inst_envs cls, []) }
 
-  | isFamilyTyCon tc || isTyConAssoc tc
+  | isOpenFamilyTyCon tc || isTyConAssoc tc
   = do  { inst_envs <- tcGetFamInstEnvs
         ; return ([], familyInstances inst_envs tc) }
 
@@ -1901,7 +1897,7 @@ ppr_types insts type_env
         -- that the type checker has invented.  Top-level user-defined things
         -- have External names.
 
-ppr_tycons :: [FamInst br] -> TypeEnv -> SDoc
+ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env
   = vcat [ text "TYPE CONSTRUCTORS"
          ,   nest 2 (ppr_tydecls tycons)
@@ -1919,7 +1915,7 @@ ppr_insts :: [ClsInst] -> SDoc
 ppr_insts []     = empty
 ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
 
-ppr_fam_insts :: [FamInst br] -> SDoc
+ppr_fam_insts :: [FamInst] -> SDoc
 ppr_fam_insts []        = empty
 ppr_fam_insts fam_insts =
   text "FAMILY INSTANCES" $$ nest 2 (pprFamInsts fam_insts)

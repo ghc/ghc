@@ -46,7 +46,6 @@ import RdrName
 import Name
 import NameSet
 import TyCon
-import CoAxiom
 import TcType
 import Var
 import VarSet
@@ -355,7 +354,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
                    -> Bag TyCon                 -- ^ Empty data constructors
-                   -> Bag (FamInst Unbranched)  -- ^ Rep type family instances
+                   -> Bag (FamInst)             -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
@@ -370,12 +369,11 @@ tcDeriving tycl_decls inst_decls deriv_decls
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
 -- Prints the representable type family instance
-pprRepTy :: FamInst Unbranched -> SDoc
-pprRepTy fi@(FamInst { fi_branches = FirstBranch (FamInstBranch { fib_lhs = lhs
-                                                                , fib_rhs = rhs }) })
+pprRepTy :: FamInst -> SDoc
+pprRepTy fi@(FamInst { fi_tys = lhs })
   = ptext (sLit "type") <+> ppr (mkTyConApp (famInstTyCon fi) lhs) <+>
-      equals <+> ppr rhs 
-
+      equals <+> ppr rhs
+  where rhs = famInstRHS fi
 
 -- As of 24 April 2012, this only shares MetaTyCons between derivations of
 -- Generic and Generic1; thus the types and logic are quite simple.
@@ -552,8 +550,9 @@ deriveFamInst decl@(DataFamInstDecl { dfid_tycon = L _ tc_name, dfid_pats = pats
                                     , dfid_defn = HsDataDefn { dd_derivs = Just preds } })
   = tcAddDataFamInstCtxt decl $
     do { fam_tc <- tcLookupTyCon tc_name
-       ; tcFamTyPats fam_tc pats (\_ -> return ()) $ \ tvs' pats' _ ->
-         mapM (deriveTyData tvs' fam_tc pats') preds }
+       ; tcFamTyPats tc_name (tyConKind fam_tc) pats (\_ -> return ()) $
+         \ tvs' pats' _ ->
+           mapM (deriveTyData tvs' fam_tc pats') preds }
         -- Tiresomely we must figure out the "lhs", which is awkward for type families
         -- E.g.   data T a b = .. deriving( Eq )
         --          Here, the lhs is (T a b)
@@ -744,10 +743,8 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
                 Nothing -> bale_out (ptext (sLit "No family instance for")
                                      <+> quotes (pprTypeApp tycon tys))
                 Just (FamInstMatch { fim_instance = famInst
-                                   , fim_index    = index
                                    , fim_tys      = tys })
-                  -> ASSERT( index == 0 )
-                     let tycon' = dataFamInstRepTyCon famInst
+                  -> let tycon' = dataFamInstRepTyCon famInst
                      in return (tycon', tys) }
 \end{code}
 

@@ -1238,9 +1238,8 @@ tcTagToEnum loc fun_name arg res_ty
            ; case mb_fam of
                Nothing -> failWithTc (tagToEnumError ty doc3)
                Just (FamInstMatch { fim_instance = rep_fam
-                                  , fim_index    = index
                                   , fim_tys      = rep_args })
-                   -> return ( mkTcSymCo (mkTcAxInstCo co_tc index rep_args)
+                   -> return ( mkTcSymCo (mkTcUnbranchedAxInstCo co_tc rep_args)
                              , rep_tc, rep_args )
                  where
                    co_tc  = famInstAxiom rep_fam

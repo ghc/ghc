@@ -117,7 +117,7 @@ LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{types/Co
 
 C :: 'CoAxiom_' ::= {{ com Axioms, \coderef{types/TyCon.lhs}{CoAxiom} }}
   | T </ axBranchi // ; // i />    ::   :: CoAxiom  {{ com Axiom }}
-  | ( C )                              :: M :: Parens   {{ com Parentheses }}
+  | ( C )                          :: M :: Parens   {{ com Parentheses }}
 
 axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{types/TyCon.lhs}{CoAxBranch} }}
   | forall </ ni // i /> . ( </ tj // j /> ~> s )  ::   :: CoAxBranch  {{ com Axiom branch }}
@@ -229,6 +229,7 @@ terminals :: 'terminals_' ::=
   | Constraint   ::   :: Constraint       {{ tex \textsf{Constraint} }}
   | no_conflict  ::   :: no_conflict      {{ tex \textsf{no\_conflict} }}
   | apart        ::   :: apart            {{ tex \textsf{apart} }}
+  | unify        ::   :: unify            {{ tex \textsf{unify} }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -270,6 +271,7 @@ formula :: 'formula_' ::=
   | axBranch1 = axBranch2              ::   :: branch_rewrite
   | C1 = C2                            ::   :: axiom_rewrite
   | apart ( </ ti // i /> , </ sj // j /> ) :: :: apart
+  | unify ( </ ti // i /> , </ sj // j /> ) = subst :: :: unify
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

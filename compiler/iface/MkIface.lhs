@@ -311,7 +311,6 @@ mkIface_ hsc_env maybe_old_fingerprint
                         mi_warn_fn     = mkIfaceWarnCache warns,
                         mi_fix_fn      = mkIfaceFixCache fixities }
                 }
-
         ; (new_iface, no_change_at_all) 
                 <- {-# SCC "versioninfo" #-}
                          addFingerprints hsc_env maybe_old_fingerprint
@@ -1445,16 +1444,33 @@ coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
 coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches })
  = IfaceAxiom { ifName       = name
               , ifTyCon      = toIfaceTyCon tycon
-              , ifAxBranches = brListMap (coAxBranchToIfaceBranch emptyTidyEnv) branches }
+              , ifAxBranches = brListMap (coAxBranchToIfaceBranch
+                                            emptyTidyEnv
+                                            (brListMap coAxBranchLHS branches)) branches }
  where
    name = getOccName ax
 
+-- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
+-- to incompatible indices
+-- See [Storing compatibility] in CoAxiom
+coAxBranchToIfaceBranch :: TidyEnv -> [[Type]] -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch env0 lhs_s
+                        branch@(CoAxBranch { cab_incomps = incomps })
+  = (coAxBranchToIfaceBranch' env0 branch) { ifaxbIncomps = iface_incomps }
+  where
+    iface_incomps = map (expectJust "iface_incomps"
+                        . (flip findIndex lhs_s
+                          . eqTypes)
+                        . coAxBranchLHS) incomps
 
-coAxBranchToIfaceBranch :: TidyEnv -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch env0 (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
+-- use this one for standalone branches without incompatibles
+coAxBranchToIfaceBranch' :: TidyEnv -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch' env0
+                        (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
   = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
                   , ifaxbLHS    = map (tidyToIfaceType env1) lhs
-                  , ifaxbRHS    = tidyToIfaceType env1 rhs }
+                  , ifaxbRHS    = tidyToIfaceType env1 rhs
+                  , ifaxbIncomps = [] }
   where
     (env1, tv_bndrs) = tidyTyVarBndrs env0 tvs
 
@@ -1491,8 +1507,9 @@ tyConToIfaceDecl env tycon
   where
     (env1, tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
 
-    to_ifsyn_rhs (SynFamilyTyCon a b) = SynFamilyTyCon a b
-    to_ifsyn_rhs (SynonymTyCon ty)    = SynonymTyCon (tidyToIfaceType env1 ty)
+    to_ifsyn_rhs OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
+    to_ifsyn_rhs (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon (coAxiomName ax)
+    to_ifsyn_rhs (SynonymTyCon ty)         = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
 
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
@@ -1550,7 +1567,7 @@ classToIfaceDecl env clas
     
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (tc, defs)
-      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch env1) defs)
+      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch' env1) defs)
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)
@@ -1638,19 +1655,15 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                         (n : _) -> Just (nameOccName n)
 
 --------------------------
-famInstToIfaceFamInst :: FamInst br -> IfaceFamInst
+famInstToIfaceFamInst :: FamInst -> IfaceFamInst
 famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
-                                 fi_branched = branched,
                                  fi_fam      = fam,
-                                 fi_branches = branches })
+                                 fi_tcs      = roughs })
   = IfaceFamInst { ifFamInstAxiom    = coAxiomName axiom
                  , ifFamInstFam      = fam
-                 , ifFamInstBranched = branched
-                 , ifFamInstTys      = map (map do_rough) roughs
+                 , ifFamInstTys      = map do_rough roughs
                  , ifFamInstOrph     = orph }
   where
-    roughs = brListMap famInstBranchRoughMatch branches
-
     do_rough Nothing  = Nothing
     do_rough (Just n) = Just (toIfaceTyCon_name n)
 

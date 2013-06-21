@@ -381,27 +381,28 @@ Note [Branched instance checking] in types/FamInstEnv.lhs.
 
 \begin{code}
 -- | Check to make sure that an AxInstCo is internally consistent.
--- Returns the number of the conflicting branch, if it exists
+-- Returns the conflicting branch, if it exists
 -- See Note [Conflict checking with AxiomInstCo]
-checkAxInstCo :: Coercion -> Maybe Int
+checkAxInstCo :: Coercion -> Maybe CoAxBranch
 -- defined here to avoid dependencies in Coercion
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in CoreLint
 checkAxInstCo (AxiomInstCo ax ind cos)
   = let branch = coAxiomNthBranch ax ind
         tvs = coAxBranchTyVars branch
+        incomps = coAxBranchIncomps branch
         tys = map (pFst . coercionKind) cos 
         subst = zipOpenTvSubst tvs tys
         lhs' = Type.substTys subst (coAxBranchLHS branch) in
-    check_no_conflict lhs' (ind-1)
+    check_no_conflict lhs' incomps
   where
-    check_no_conflict :: [Type] -> Int -> Maybe Int
-    check_no_conflict _ (-1) = Nothing
-    check_no_conflict lhs' j
-      | SurelyApart <- tcApartTys instanceBindFun lhs' lhsj
-      = check_no_conflict lhs' (j-1)
+    check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
+    check_no_conflict _    [] = Nothing
+    check_no_conflict lhs' (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
+      | SurelyApart <- tcApartTys instanceBindFun lhs' lhs_incomp
+      = check_no_conflict lhs' rest
       | otherwise
-      = Just j
-      where
-        (CoAxBranch { cab_lhs = lhsj }) = coAxiomNthBranch ax j
+      = Just b
 checkAxInstCo _ = Nothing
 
 -----------

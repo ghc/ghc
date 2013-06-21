@@ -5,6 +5,7 @@ TARGET    = core-spec
 
 $(TARGET).pdf: $(TARGET).tex $(OTT_TEX)
 	latex -output-format=pdf $<
+	latex -output-format=pdf $<
 
 $(TARGET).tex: $(TARGET).mng $(OTT_FILES)
 	ott $(OTT_OPTS) -tex_filter $< $@ $(OTT_FILES)

@@ -939,7 +939,7 @@ lintCoercion co@(AxiomInstCo con ind cos)
        ; let lhs' = Type.substTys subst_l lhs
              rhs' = Type.substTy subst_r rhs
        ; case checkAxInstCo co of
-           Just bad_index -> bad_ax $ ptext (sLit "inconsistent with") <+> (ppr bad_index)
+           Just bad_branch -> bad_ax $ ptext (sLit "inconsistent with") <+> (pprCoAxBranch (coAxiomTyCon con) bad_branch)
            Nothing -> return ()
        ; return (typeKind rhs', mkTyConApp (coAxiomTyCon con) lhs', rhs') }
   where

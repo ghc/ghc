@@ -229,7 +229,7 @@ forall </ ni // i />. (</ s1j // j /> ~> t1) = (</ axBranchkk // kk />)[ind]
 </ substi @ // i /> = inits(</ [ ni |-> s'i ] // i />)
 </ ni = zi_ki // i />
 </ k'i <: substi(ki) // i />
-no_conflict(C, </ s2j // j />, ind-1)
+no_conflict(C, </ s2j // j />, ind, ind-1)
 </ s2j = s1j </ [ni |-> s'i] // i/> // j />
 t2 = t1 </ [ni |-> t'i] // i />
 G |-ty t2 : k
@@ -403,16 +403,32 @@ Constraint <: *
 ------------------ :: LiftedConstraint
 * <: Constraint
 
-defn no_conflict ( C , </ sj // j /> , ind ) ::  :: check_no_conflict :: 'NoConflict_'
-  {{ com Branched axiom conflict checking, \coderef{coreSyn/CoreLint.lhs}{lintCoercion\#check\_no\_conflict} }}
+defn no_conflict ( C , </ sj // j /> , ind1 , ind2 ) ::  :: check_no_conflict :: 'NoConflict_'
+  {{ com \parbox{5in}{Branched axiom conflict checking, \coderef{types/OptCoercion.lhs}{checkAxInstCo} \\ and \coderef{types/FamInstEnv.lhs}{compatibleBranches} } }}
 by
 
 ------------------------------------------------ :: NoBranch
-no_conflict(C, </ si // i/>, -1)
+no_conflict(C, </ si // i/>, ind, -1)
 
 C = T </ axBranchkk // kk />
-forall </ ni // i />. (</ tj // j /> ~> t') = (</ axBranchkk // kk />)[ind]
+forall </ ni // i />. (</ tj // j /> ~> t') = (</ axBranchkk // kk />)[ind2]
 apart(</ sj // j />, </ tj // j />)
-no_conflict(C, </ sj // j />, ind-1)
------------------------------------------------- :: Branch
-no_conflict(C, </ sj // j />, ind)
+no_conflict(C, </ sj // j />, ind1, ind2-1)
+------------------------------------------------ :: Incompat
+no_conflict(C, </ sj // j />, ind1, ind2)
+
+C = T </ axBranchkk // kk />
+forall </ ni // i />. (</ tj // j /> ~> s) = (</ axBranchkk // kk />)[ind1]
+forall </ n'i // i />. (</ t'j // j /> ~> s') = (</ axBranchkk // kk />)[ind2]
+apart(</ tj // j />, </ t'j // j />)
+no_conflict(C, </ sj // j />, ind1, ind2-1)
+------------------------------------------- :: CompatApart
+no_conflict(C, </ sj // j />, ind1, ind2)
+
+C = T </ axBranchkk // kk />
+forall </ ni // i />. (</ tj // j /> ~> s) = (</ axBranchkk // kk />)[ind1]
+forall </ n'i // i />. (</ t'j // j /> ~> s') = (</ axBranchkk // kk />)[ind2]
+unify(</ tj // j />, </ t'j // j />) = subst
+subst(s) = subst(s')
+----------------------------------------- :: CompatCoincident
+no_conflict(C, </ sj // j />, ind1, ind2)

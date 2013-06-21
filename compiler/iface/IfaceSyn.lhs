@@ -14,7 +14,7 @@
 module IfaceSyn (
         module IfaceType,
 
-        IfaceDecl(..), IfaceClassOp(..), IfaceAT(..), 
+        IfaceDecl(..), IfaceSynTyConRhs(..), IfaceClassOp(..), IfaceAT(..), 
         IfaceConDecl(..), IfaceConDecls(..),
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
@@ -36,13 +36,13 @@ module IfaceSyn (
 
 #include "HsVersions.h"
 
-import TyCon( SynTyConRhs(..) )
 import IfaceType
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Annotations
 import Class
 import NameSet
+import CoAxiom ( BranchIndex )
 import Name
 import CostCentre
 import Literal
@@ -91,7 +91,7 @@ data IfaceDecl
   | IfaceSyn  { ifName    :: OccName,           -- Type constructor
                 ifTyVars  :: [IfaceTvBndr],     -- Type variables
                 ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of the tycon)
-                ifSynRhs  :: SynTyConRhs IfaceType }
+                ifSynRhs  :: IfaceSynTyConRhs }
 
   | IfaceClass { ifCtxt    :: IfaceContext,     -- Context...
                  ifName    :: OccName,          -- Name of the class TyCon
@@ -112,6 +112,11 @@ data IfaceDecl
                                                 -- beyond .NET
                    ifExtName :: Maybe FastString }
 
+data IfaceSynTyConRhs
+  = IfaceOpenSynFamilyTyCon
+  | IfaceClosedSynFamilyTyCon IfExtName  -- name of associated axiom
+  | IfaceSynonymTyCon IfaceType
+
 data IfaceClassOp = IfaceClassOp OccName DefMethSpec IfaceType
         -- Nothing    => no default method
         -- Just False => ordinary polymorphic default method
@@ -122,13 +127,35 @@ data IfaceAT = IfaceAT IfaceDecl [IfaceAxBranch]
         -- Just ds => default associated type instance from these templates
 
 instance Outputable IfaceAxBranch where
-   ppr (IfaceAxBranch { ifaxbTyVars = tvs, ifaxbLHS = pat_tys, ifaxbRHS = ty }) 
-      = ppr tvs <+> hsep (map ppr pat_tys) <+> char '=' <+> ppr ty
+  ppr = pprAxBranch Nothing
+
+pprAxBranch :: Maybe IfaceTyCon -> IfaceAxBranch -> SDoc
+pprAxBranch mtycon (IfaceAxBranch { ifaxbTyVars = tvs
+                                  , ifaxbLHS = pat_tys
+                                  , ifaxbRHS = ty
+                                  , ifaxbIncomps = incomps })
+  = ppr tvs <+> ppr_lhs <+> char '=' <+> ppr ty $+$
+    nest 4 maybe_incomps
+      where
+        ppr_lhs
+          | Just tycon <- mtycon
+          = ppr (IfaceTyConApp tycon pat_tys)
+          | otherwise
+          = hsep (map ppr pat_tys)
+
+        maybe_incomps
+          | [] <- incomps
+          = empty
+
+          | otherwise
+          = parens (ptext (sLit "incompatible indices:") <+> ppr incomps)
 
 -- this is just like CoAxBranch
-data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars :: [IfaceTvBndr]
-                                   , ifaxbLHS    :: [IfaceType]
-                                   , ifaxbRHS    :: IfaceType }
+data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars  :: [IfaceTvBndr]
+                                   , ifaxbLHS     :: [IfaceType]
+                                   , ifaxbRHS     :: IfaceType
+                                   , ifaxbIncomps :: [BranchIndex] }
+                                     -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
   = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
@@ -173,12 +200,10 @@ data IfaceClsInst
         -- and if the head does not change it won't be used if it wasn't before
 
 -- The ifFamInstTys field of IfaceFamInst contains a list of the rough
--- match types, one per branch... but each "rough match types" is itself
--- a list of Maybe IfaceTyCon. So, we get [[Maybe IfaceTyCon]].
+-- match types
 data IfaceFamInst
   = IfaceFamInst { ifFamInstFam      :: IfExtName            -- Family name
-                 , ifFamInstBranched :: Bool                 -- Is this branched?
-                 , ifFamInstTys      :: [[Maybe IfaceTyCon]] -- See above
+                 , ifFamInstTys      :: [Maybe IfaceTyCon]   -- See above
                  , ifFamInstAxiom    :: IfExtName            -- The axiom
                  , ifFamInstOrph     :: Maybe OccName        -- Just like IfaceClsInst
                  }
@@ -497,13 +522,18 @@ pprIfaceDecl (IfaceForeign {ifName = tycon})
 
 pprIfaceDecl (IfaceSyn {ifName = tycon,
                         ifTyVars = tyvars,
-                        ifSynRhs = SynonymTyCon mono_ty})
+                        ifSynRhs = IfaceSynonymTyCon mono_ty})
   = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (vcat [equals <+> ppr mono_ty])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
-                        ifSynRhs = SynFamilyTyCon {}, ifSynKind = kind })
+                        ifSynRhs = IfaceOpenSynFamilyTyCon, ifSynKind = kind })
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
+       4 (dcolon <+> ppr kind)
+
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
+                        ifSynRhs = IfaceClosedSynFamilyTyCon {}, ifSynKind = kind })
+  = hang (ptext (sLit "closed type family") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (dcolon <+> ppr kind)
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
@@ -535,10 +565,7 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 
 pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branches })
   = hang (ptext (sLit "axiom") <+> ppr name <> colon)
-       2 (vcat $ map ppr_branch branches)
-  where
-     ppr_branch (IfaceAxBranch { ifaxbTyVars = tyvars, ifaxbLHS = lhs, ifaxbRHS = rhs })
-        = pprIfaceTvBndrs tyvars <> dot <+> ppr (IfaceTyConApp tycon lhs) <+> text "~#" <+> ppr rhs
+       2 (vcat $ map (pprAxBranch $ Just tycon) branches)
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing = ptext (sLit "No C type associated")
@@ -623,10 +650,10 @@ instance Outputable IfaceClsInst where
          2 (equals <+> ppr dfun_id)
 
 instance Outputable IfaceFamInst where
-  ppr (IfaceFamInst {ifFamInstFam = fam, ifFamInstTys = mb_tcss,
+  ppr (IfaceFamInst {ifFamInstFam = fam, ifFamInstTys = mb_tcs,
                      ifFamInstAxiom = tycon_ax})
     = hang (ptext (sLit "family instance") <+>
-            ppr fam <+> pprWithCommas (brackets . pprWithCommas ppr_rough) mb_tcss)
+            ppr fam <+> pprWithCommas (brackets . ppr_rough) mb_tcs)
          2 (equals <+> ppr tycon_ax)
 
 ppr_rough :: Maybe IfaceTyCon -> SDoc
@@ -820,9 +847,10 @@ freeNamesIfIdDetails (IfRecSelId tc _) = freeNamesIfTc tc
 freeNamesIfIdDetails _                 = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
-freeNamesIfSynRhs :: SynTyConRhs IfaceType -> NameSet
-freeNamesIfSynRhs (SynonymTyCon ty) = freeNamesIfType ty
-freeNamesIfSynRhs _                 = emptyNameSet
+freeNamesIfSynRhs :: IfaceSynTyConRhs -> NameSet
+freeNamesIfSynRhs (IfaceSynonymTyCon ty)         = freeNamesIfType ty
+freeNamesIfSynRhs IfaceOpenSynFamilyTyCon        = emptyNameSet
+freeNamesIfSynRhs (IfaceClosedSynFamilyTyCon ax) = unitNameSet ax
 
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType

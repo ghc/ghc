@@ -4,7 +4,7 @@
 
 \begin{code}
 
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -13,17 +13,18 @@ module CoAxiom (
        Branched, Unbranched, BranchIndex, BranchList(..),
        toBranchList, fromBranchList,
        toBranchedList, toUnbranchedList,
-       brListLength, brListNth, brListMap, brListFoldr,
-       brListZipWith, brListIndices,
+       brListLength, brListNth, brListMap, brListFoldr, brListMapM,
+       brListFoldlM_, brListZipWith,
 
        CoAxiom(..), CoAxBranch(..), 
 
        toBranchedAxiom, toUnbranchedAxiom,
        coAxiomName, coAxiomArity, coAxiomBranches,
-       coAxiomTyCon, isImplicitCoAxiom,
+       coAxiomTyCon, isImplicitCoAxiom, coAxiomNumPats,
        coAxiomNthBranch, coAxiomSingleBranch_maybe,
        coAxiomSingleBranch, coAxBranchTyVars, coAxBranchLHS,
-       coAxBranchRHS, coAxBranchSpan
+       coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
+       placeHolderIncomps
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
@@ -99,10 +100,10 @@ that code to deal with branched axioms, especially when the code can be sure
 of the fact that an axiom is indeed a singleton. At the same time, it seems
 dangerous to assume singlehood in various places through GHC.
 
-The solution to this is to label a CoAxiom (and FamInst) with a phantom
-type variable declaring whether it is known to be a singleton or not. The
-list of branches is stored using a special form of list, declared below,
-that ensures that the type variable is accurate.
+The solution to this is to label a CoAxiom with a phantom type variable
+declaring whether it is known to be a singleton or not. The list of branches
+is stored using a special form of list, declared below, that ensures that the
+type variable is accurate.
 
 As of this writing (Dec 2012), it would not be appropriate to use a promoted
 type as the phantom type, so we use empty datatypes. We wish to have GHC
@@ -154,14 +155,6 @@ brListLength :: BranchList a br -> Int
 brListLength (FirstBranch _) = 1
 brListLength (NextBranch _ t) = 1 + brListLength t
 
--- Indices
-brListIndices :: BranchList a br -> [BranchIndex]
-brListIndices bs = go 0 bs 
- where
-   go :: BranchIndex -> BranchList a br -> [BranchIndex]
-   go n (NextBranch _ t) = n : go (n+1) t
-   go n (FirstBranch {}) = [n]
-
 -- lookup
 brListNth :: BranchList a br -> BranchIndex -> a
 brListNth (FirstBranch b) 0 = b
@@ -177,6 +170,21 @@ brListMap f (NextBranch h t) = f h : (brListMap f t)
 brListFoldr :: (a -> b -> b) -> b -> BranchList a br -> b
 brListFoldr f x (FirstBranch b) = f b x
 brListFoldr f x (NextBranch h t) = f h (brListFoldr f x t)
+
+brListMapM :: Monad m => (a -> m b) -> BranchList a br -> m [b]
+brListMapM f (FirstBranch b) = f b >>= \fb -> return [fb]
+brListMapM f (NextBranch h t) = do { fh <- f h
+                                   ; ft <- brListMapM f t
+                                   ; return (fh : ft) }
+
+brListFoldlM_ :: forall a b m br. Monad m
+              => (a -> b -> m a) -> a -> BranchList b br -> m ()
+brListFoldlM_ f z brs = do { _ <- go z brs
+                           ; return () }
+  where go :: forall br'. Monad m => a -> BranchList b br' -> m a
+        go acc (FirstBranch b)  = f acc b
+        go acc (NextBranch h t) = do { fh <- f acc h
+                                     ; go fh t }
 
 -- zipWith
 brListZipWith :: (a -> b -> c) -> BranchList a br1 -> BranchList b br2 -> [c]
@@ -196,6 +204,25 @@ instance Outputable a => Outputable (BranchList a br) where
                     Coercion axioms
 %*                                                                      *
 %************************************************************************
+
+Note [Storing compatibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During axiom application, we need to be aware of which branches are compatible
+with which others. The full explanation is in Note [Compatibility] in
+FamInstEnv. (The code is placed there to avoid a dependency from CoAxiom on
+the unification algorithm.) Although we could theoretically compute
+compatibility on the fly, this is silly, so we store it in a CoAxiom.
+
+Specifically, each branch refers to all other branches with which it is
+incompatible. This list might well be empty, and it will always be for the
+first branch of any axiom.
+
+CoAxBranches that do not (yet) belong to a CoAxiom should have a panic thunk
+stored in cab_incomps. The incompatibilities are properly a property of the
+axiom as a whole, and they are computed only when the final axiom is built.
+
+During serialization, the list is converted into a list of the indices
+of the branches.
 
 \begin{code}
 -- | A 'CoAxiom' is a \"coercion constructor\", i.e. a named equality axiom.
@@ -217,12 +244,14 @@ data CoAxiom br
 
 data CoAxBranch
   = CoAxBranch
-    { cab_loc      :: SrcSpan      -- Location of the defining equation
-                                   -- See Note [CoAxiom locations]
-    , cab_tvs      :: [TyVar]      -- Bound type variables; not necessarily fresh
-                                   -- See Note [CoAxBranch type variables]
-    , cab_lhs      :: [Type]       -- Type patterns to match against
-    , cab_rhs      :: Type         -- Right-hand side of the equality
+    { cab_loc      :: SrcSpan       -- Location of the defining equation
+                                    -- See Note [CoAxiom locations]
+    , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
+                                    -- See Note [CoAxBranch type variables]
+    , cab_lhs      :: [Type]        -- Type patterns to match against
+    , cab_rhs      :: Type          -- Right-hand side of the equality
+    , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
+                                    -- See Note [Storing compatibility]
     }
   deriving Typeable
 
@@ -233,6 +262,9 @@ toBranchedAxiom (CoAxiom unique name tc branches implicit)
 toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
 toUnbranchedAxiom (CoAxiom unique name tc branches implicit)
   = CoAxiom unique name tc (toUnbranchedList branches) implicit
+
+coAxiomNumPats :: CoAxiom br -> Int
+coAxiomNumPats = length . coAxBranchLHS . (flip coAxiomNthBranch 0)
 
 coAxiomNthBranch :: CoAxiom br -> BranchIndex -> CoAxBranch
 coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
@@ -275,6 +307,12 @@ coAxBranchSpan = cab_loc
 
 isImplicitCoAxiom :: CoAxiom br -> Bool
 isImplicitCoAxiom = co_ax_implicit
+
+coAxBranchIncomps :: CoAxBranch -> [CoAxBranch]
+coAxBranchIncomps = cab_incomps
+
+placeHolderIncomps :: [CoAxBranch]
+placeHolderIncomps = panic "placeHolderIncomps"
 
 \end{code}
 

@@ -24,7 +24,7 @@ module HsDecls (
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, NewOrData(..), FamilyFlavour(..),
+  InstDecl(..), LInstDecl, NewOrData(..), FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
   DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour,
   TyFamInstEqn(..), LTyFamInstEqn,
@@ -470,16 +470,17 @@ data TyClDecl name
 
 type LFamilyDecl name = Located (FamilyDecl name)
 data FamilyDecl name = FamilyDecl
-  { fdFlavour :: FamilyFlavour              -- type or data
+  { fdInfo    :: FamilyInfo name            -- type or data, closed or open
   , fdLName   :: Located name               -- type constructor
   , fdTyVars  :: LHsTyVarBndrs name         -- type variables
   , fdKindSig :: Maybe (LHsKind name) }     -- result kind
   deriving( Data, Typeable )
 
-data FamilyFlavour
-  = TypeFamily
-  | DataFamily
-  deriving( Data, Typeable, Eq )
+data FamilyInfo name
+  = DataFamily
+  | OpenTypeFamily
+  | ClosedTypeFamily [LTyFamInstEqn name]
+  deriving( Data, Typeable )
 
 \end{code}
 
@@ -510,12 +511,15 @@ isFamilyDecl _other        = False
 
 -- | type family declaration
 isTypeFamilyDecl :: TyClDecl name -> Bool
-isTypeFamilyDecl (FamDecl d) = fdFlavour d == TypeFamily
-isTypeFamilyDecl _other      = False
+isTypeFamilyDecl (FamDecl (FamilyDecl { fdInfo = info })) = case info of
+  OpenTypeFamily      -> True
+  ClosedTypeFamily {} -> True
+  _                   -> False
+isTypeFamilyDecl _ = False
 
 -- | data family declaration
 isDataFamilyDecl :: TyClDecl name -> Bool
-isDataFamilyDecl (FamDecl d) = fdFlavour d == DataFamily
+isDataFamilyDecl (FamDecl (FamilyDecl { fdInfo = DataFamily })) = True
 isDataFamilyDecl _other      = False
 \end{code}
 
@@ -528,11 +532,9 @@ tyFamInstDeclName = unLoc . tyFamInstDeclLName
 
 tyFamInstDeclLName :: OutputableBndr name
                    => TyFamInstDecl name -> Located name
-tyFamInstDeclLName (TyFamInstDecl { tfid_eqns =
-                     (L _ (TyFamInstEqn { tfie_tycon = ln })) : _ })
-  -- there may be more than one equation, but grab the name from the first
+tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
+                     (L _ (TyFamInstEqn { tfie_tycon = ln })) })
   = ln
-tyFamInstDeclLName decl = pprPanic "tyFamInstDeclLName" (ppr decl)
 
 tyClDeclLName :: TyClDecl name -> Located name
 tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
@@ -598,17 +600,26 @@ instance OutputableBndr name
                      <+> pprFundeps (map unLoc fds)
 
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
-  ppr (FamilyDecl { fdFlavour = flavour, fdLName = ltycon, 
+  ppr (FamilyDecl { fdInfo = info, fdLName = ltycon, 
                     fdTyVars = tyvars, fdKindSig = mb_kind})
-      = ppr flavour <+> pp_vanilla_decl_head ltycon tyvars [] <+> pp_kind
+      = vcat [ pprFlavour info <+> pp_vanilla_decl_head ltycon tyvars [] <+> pp_kind <+> pp_where
+             , nest 2 $ pp_eqns ]
         where
           pp_kind = case mb_kind of
                       Nothing   -> empty
                       Just kind -> dcolon <+> ppr kind
+          (pp_where, pp_eqns) = case info of
+            ClosedTypeFamily eqns -> ( ptext (sLit "where")
+                                     , vcat $ map ppr eqns )
+            _                     -> (empty, empty)
 
-instance Outputable FamilyFlavour where
-  ppr TypeFamily = ptext (sLit "type family")
-  ppr DataFamily = ptext (sLit "data family")
+pprFlavour :: FamilyInfo name -> SDoc
+pprFlavour DataFamily            = ptext (sLit "data family")
+pprFlavour OpenTypeFamily        = ptext (sLit "type family")
+pprFlavour (ClosedTypeFamily {}) = ptext (sLit "type family")
+
+instance Outputable (FamilyInfo name) where
+  ppr = pprFlavour
 
 pp_vanilla_decl_head :: OutputableBndr name
    => Located name
@@ -838,10 +849,9 @@ pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {
 \begin{code}
 ----------------- Type synonym family instances -------------
 
--- See note [Family instance equation groups]
 type LTyFamInstEqn name = Located (TyFamInstEqn name)
 
--- | One equation in a family instance declaration
+-- | One equation in a type family instance declaration
 data TyFamInstEqn name   
   = TyFamInstEqn
        { tfie_tycon :: Located name
@@ -854,14 +864,9 @@ data TyFamInstEqn name
 type LTyFamInstDecl name = Located (TyFamInstDecl name)
 data TyFamInstDecl name 
   = TyFamInstDecl
-       { tfid_eqns  :: [LTyFamInstEqn name] -- ^ list of (possibly-overlapping) eqns 
-                                            -- Always non-empty
-       , tfid_group :: Bool                 -- Was this declared with the "where" syntax?
-       , tfid_fvs   :: NameSet }            -- The group is type-checked as one,
-                                            --   so one NameSet will do
-       -- INVARIANT: tfid_group == False --> length tfid_eqns == 1
+       { tfid_eqn  :: LTyFamInstEqn name 
+       , tfid_fvs  :: NameSet }
   deriving( Typeable, Data )
-
 
 ----------------- Data family instances -------------
 
@@ -925,24 +930,13 @@ tvs are fv(pat_tys), *including* ones that are already in scope
    so that we can compare the type patter in the 'instance' decl and
    in the associated 'type' decl
 
-Note [Family instance equation groups]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A TyFamInstDecl contains a list of FamInstEqn's, one for each
-equation defined in the instance group. For a standalone
-instance declaration, this list contains exactly one element.
-It is not possible for this list to have 0 elements --
-'type instance where' without anything else is not allowed.
-
 \begin{code}
 instance (OutputableBndr name) => Outputable (TyFamInstDecl name) where
   ppr = pprTyFamInstDecl TopLevel
 
 pprTyFamInstDecl :: OutputableBndr name => TopLevelFlag -> TyFamInstDecl name -> SDoc
-pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_group = False, tfid_eqns = [eqn] })
+pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_eqn = eqn })
    = ptext (sLit "type") <+> ppr_instance_keyword top_lvl <+> (ppr eqn)
-pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_eqns = eqns })
-   = hang (ptext (sLit "type") <+> ppr_instance_keyword top_lvl <+> ptext (sLit "where"))
-        2 (vcat (map ppr eqns))
 
 ppr_instance_keyword :: TopLevelFlag -> SDoc
 ppr_instance_keyword TopLevel    = ptext (sLit "instance")

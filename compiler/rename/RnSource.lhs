@@ -542,10 +542,9 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
 rnTyFamInstDecl :: Maybe (Name, [Name])
                 -> TyFamInstDecl RdrName
                 -> RnM (TyFamInstDecl Name, FreeVars)
-rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqns = eqns, tfid_group = group })
-  = do { (eqns', fvs) <- rnList (rnTyFamInstEqn mb_cls) eqns
-       ; return (TyFamInstDecl { tfid_eqns = eqns'
-                               , tfid_group = group
+rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = L loc eqn })
+  = do { (eqn', fvs) <- rnTyFamInstEqn mb_cls eqn
+       ; return (TyFamInstDecl { tfid_eqn = L loc eqn'
                                , tfid_fvs = fvs }, fvs) }
 
 rnTyFamInstEqn :: Maybe (Name, [Name])
@@ -1044,16 +1043,27 @@ rnFamDecl :: Maybe Name
           -> FamilyDecl RdrName
           -> RnM (FamilyDecl Name, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
-                             , fdFlavour = flav, fdKindSig = kind })
-  = bindHsTyVars fmly_doc mb_cls kvs tyvars $ \tyvars' ->
-    do { tycon' <- lookupLocatedTopBndrRn tycon
-       ; (kind', fv_kind) <- rnLHsMaybeKind fmly_doc kind
+                             , fdInfo = info, fdKindSig = kind })
+  = do { ((tycon', tyvars', kind'), fv1) <-
+           bindHsTyVars fmly_doc mb_cls kvs tyvars $ \tyvars' ->
+           do { tycon' <- lookupLocatedTopBndrRn tycon
+              ; (kind', fv_kind) <- rnLHsMaybeKind fmly_doc kind
+              ; return ((tycon', tyvars', kind'), fv_kind) }
+       ; (info', fv2) <- rn_info info
        ; return (FamilyDecl { fdLName = tycon', fdTyVars = tyvars'
-                            , fdFlavour = flav, fdKindSig = kind' }
-                , fv_kind ) }
+                            , fdInfo = info', fdKindSig = kind' }
+                , fv1 `plusFV` fv2) }
   where 
      fmly_doc = TyFamilyCtx tycon
      kvs = extractRdrKindSigVars kind
+
+     rn_info (ClosedTypeFamily eqns)
+       = do { (eqns', fvs) <- rnList (rnTyFamInstEqn Nothing) eqns
+                                                    -- no class context,
+            ; return (ClosedTypeFamily eqns', fvs) }
+     rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
+     rn_info DataFamily     = return (DataFamily, emptyFVs)
+     
 \end{code}
 
 Note [Stupid theta]

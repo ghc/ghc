@@ -29,7 +29,8 @@ import GHC ( TyThing(..) )
 import DataCon
 import Id
 import TyCon
-import Coercion( pprCoAxiom )
+import Coercion( pprCoAxiom, pprCoAxBranch )
+import CoAxiom( CoAxiom(..), brListMap )
 import HscTypes( tyThingParent_maybe )
 import Type( tidyTopType, tidyOpenType )
 import TypeRep( pprTvBndrs )
@@ -175,10 +176,14 @@ pprTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprTyCon pefas ss tyCon
   | Just syn_rhs <- GHC.synTyConRhs_maybe tyCon
   = case syn_rhs of
-      SynFamilyTyCon {} -> pprTyConHdr pefas tyCon <+> dcolon <+> 
-                           pprTypeForUser pefas (GHC.synTyConResKind tyCon)
+      OpenSynFamilyTyCon -> pprTyConHdr pefas tyCon <+> dcolon <+> 
+                                 pprTypeForUser pefas (GHC.synTyConResKind tyCon)
+      ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
+        hang (pprTyConHdr pefas tyCon <+> dcolon <+>
+              pprTypeForUser pefas (GHC.synTyConResKind tyCon) <+> ptext (sLit "where"))
+           2 (vcat (brListMap (pprCoAxBranch tyCon) branches))
       SynonymTyCon rhs_ty -> hang (pprTyConHdr pefas tyCon <+> equals) 
-                                2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
+                                     2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
                                                  -- e.g. type T = forall a. a->a
   | Just cls <- GHC.tyConClass_maybe tyCon
   = pprClass pefas ss cls

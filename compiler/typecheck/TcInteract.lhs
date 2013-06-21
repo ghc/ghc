@@ -20,7 +20,6 @@ import VarSet
 import Type
 import Unify
 import FamInstEnv
-import Coercion( mkAxInstRHS )
 
 import Var
 import TcType
@@ -1431,17 +1430,13 @@ doTopReactFunEq _ct fl fun_tc args xi loc
     do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
            Nothing -> return NoTopInt ;
-           Just (FamInstMatch { fim_instance = famInst
-                              , fim_index    = index
-                              , fim_tys      = rep_tys }) -> 
+           Just (co, ty) ->
 
     -- Found a top-level instance
     do {    -- Add it to the solved goals
          unless (isDerived fl) (addSolvedFunEq fam_ty fl xi)
 
-       ; let coe_ax = famInstAxiom famInst 
-       ; succeed_with "Fun/Top" (mkTcAxInstCo coe_ax index rep_tys)
-                      (mkAxInstRHS coe_ax index rep_tys) } } } } }
+       ; succeed_with "Fun/Top" co ty } } } } }
   where
     fam_ty = mkTyConApp fun_tc args
 
@@ -1709,17 +1704,17 @@ matchClassInst _ clas [ k, ty ] _
     case unwrapNewTyCon_maybe (classTyCon clas) of
       Just (_,dictRep, axDict)
         | Just tcSing <- tyConAppTyCon_maybe dictRep ->
-           do mbInst <- matchFam tcSing [k,ty]
+           do mbInst <- matchOpenFam tcSing [k,ty]
               case mbInst of
                 Just FamInstMatch
                   { fim_instance = FamInst { fi_axiom  = axDataFam
                                            , fi_flavor = DataFamilyInst tcon
                                            }
-                  , fim_index = ix, fim_tys = tys
+                  , fim_tys = tys
                   } | Just (_,_,axSing) <- unwrapNewTyCon_maybe tcon ->
 
                   do let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axSing tys
-                         co2 = mkTcSymCo $ mkTcAxInstCo axDataFam ix tys
+                         co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDataFam tys
                          co3 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [k,ty]
                      return $ GenInst [] $ EvCast (EvLit evLit) $
                         mkTcTransCo co1 $ mkTcTransCo co2 co3

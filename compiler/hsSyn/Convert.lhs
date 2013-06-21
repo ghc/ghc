@@ -215,7 +215,7 @@ cvtDec (FamilyD flav tc tvs kind)
        ; kind' <- cvtMaybeKind kind
        ; returnL $ TyClD (FamDecl (FamilyDecl (cvtFamFlavour flav) tc' tvs' kind')) }
   where
-    cvtFamFlavour TypeFam = TypeFamily
+    cvtFamFlavour TypeFam = OpenTypeFamily
     cvtFamFlavour DataFam = DataFamily
 
 cvtDec (DataInstD ctxt tc tys constrs derivs)
@@ -243,13 +243,18 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn, dfid_fvs = placeHolderNames } }}
 
-cvtDec (TySynInstD tc eqns)
+cvtDec (TySynInstD tc eqn)
   = do  { tc' <- tconNameL tc
-        ; eqns' <- mapM (cvtTySynEqn tc') eqns
+        ; eqn' <- cvtTySynEqn tc' eqn
         ; returnL $ InstD $ TyFamInstD
-            { tfid_inst = TyFamInstDecl { tfid_eqns = eqns'
-                                        , tfid_group = (length eqns' /= 1)
+            { tfid_inst = TyFamInstDecl { tfid_eqn = eqn'
                                         , tfid_fvs = placeHolderNames } } }
+
+cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
+  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
+       ; mkind' <- cvtMaybeKind mkind
+       ; eqns' <- mapM (cvtTySynEqn tc') eqns
+       ; returnL $ TyClD (FamDecl (FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind')) }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)

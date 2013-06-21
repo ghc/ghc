@@ -731,6 +731,7 @@ anyTyCon = mkLiftedPrimTyCon anyTyConName kind 1 PtrRep
   where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
 
 {-   Can't do this yet without messing up kind proxies
+-- RAE: I think you can now.
 anyTyCon :: TyCon
 anyTyCon = mkSynTyCon anyTyConName kind [kKiVar] 
                       syn_rhs

@@ -18,7 +18,7 @@ module TcHsType (
 	UserTypeCtxt(..), 
 
                 -- Type checking type and class decls
-	kcTyClTyVars, tcTyClTyVars,
+	kcLookupKind, kcTyClTyVars, tcTyClTyVars,
         tcHsConArgType, tcDataKindSig, 
         tcClassSigType, 
 

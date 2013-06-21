@@ -150,6 +150,12 @@ Axioms:
 \ottaxBranch
 }
 
+The definition for $[[axBranch]]$ above does not include the list of
+incompatible branches (field \texttt{cab\_incomps} of \texttt{CoAxBranch}),
+as that would unduly clutter this presentation. Instead, as the list
+of incompatible branches can be computed at any time, it is checked for
+in the judgment $[[no_conflict]]$. See Section~\ref{sec:no_conflict}.
+
 \subsection{Type constructors}
 
 Type constructors in GHC contain \emph{lots} of information. We leave most of it out
@@ -306,10 +312,14 @@ There are two very similar checks for names, one declared as a local function:
 \ottdefnisSubKind{}
 
 \subsection{Branched axiom conflict checking}
+\label{sec:no_conflict}
 
 The following judgment is used within \ottdrulename{Co\_AxiomInstCo} to make
 sure that a type family application cannot unify with any previous branch
-in the axiom.
+in the axiom. The actual code scans through only those branches that are
+flagged as incompatible. These branches are stored directly in the
+$[[axBranch]]$. However, it is cleaner in this presentation to simply
+check for compatibility here.
 
 \ottdefncheckXXnoXXconflict{}
 
@@ -317,5 +327,8 @@ The judgment $[[apart]]$ checks to see whether two lists of types are surely apa
 It checks to see if \coderef{types/Unify.lhs}{tcApartTys} returns \texttt{SurelyApart}.
 Two types are apart if neither type is a type family application and if they do not
 unify.
+
+The algorithm $[[unify]]$ is implemented in \coderef{types/Unify.lhs}{tcUnifyTys}.
+It performs a standard unification, returning a substitution upon success.
 
 \end{document}

@@ -86,7 +86,7 @@ module TcSMonad (
 
     getDefaultInfo, getDynFlags,
 
-    matchClass, matchFam, MatchInstResult (..), 
+    matchClass, matchFam, matchOpenFam, MatchInstResult (..), 
     checkWellStagedDFun, 
     pprEq                                    -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the 
@@ -132,6 +132,7 @@ import TcRnTypes
 import Unique 
 import UniqFM
 import Maybes ( orElse, catMaybes, firstJust )
+import Pair ( pSnd )
 
 import Control.Monad( unless, when, zipWithM )
 import Data.IORef
@@ -1674,8 +1675,30 @@ matchClass clas tys
 	}
         }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
-matchFam tycon args = wrapTcS $ tcLookupFamInst tycon args
+matchOpenFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
+matchOpenFam tycon args = wrapTcS $ tcLookupFamInst tycon args
+
+matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+matchFam tycon args
+  | isOpenSynFamilyTyCon tycon
+  = do { maybe_match <- matchOpenFam tycon args
+       ; case maybe_match of
+           Nothing -> return Nothing
+           Just (FamInstMatch { fim_instance = famInst
+                              , fim_tys      = inst_tys })
+             -> let co = mkTcUnbranchedAxInstCo (famInstAxiom famInst) inst_tys
+                    ty = pSnd $ tcCoercionKind co
+                in return $ Just (co, ty) }
+
+  | Just ax <- isClosedSynFamilyTyCon_maybe tycon
+  , Just (ind, inst_tys) <- chooseBranch ax args
+  = let co = mkTcAxInstCo ax ind inst_tys
+        ty = pSnd (tcCoercionKind co)
+    in return $ Just (co, ty)
+
+  | otherwise
+  = return Nothing
+       
 \end{code}
 
 \begin{code}

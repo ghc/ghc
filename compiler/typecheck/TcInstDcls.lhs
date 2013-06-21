@@ -31,7 +31,6 @@ import TcRnMonad
 import TcValidity
 import TcMType
 import TcType
-import Coercion( mkSingleCoAxiom, mkBranchedCoAxiom, pprCoAxBranch )
 import BuildTyCl
 import Inst
 import InstEnv
@@ -455,7 +454,7 @@ addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
-addFamInsts :: [FamInst Branched] -> TcM a -> TcM a
+addFamInsts :: [FamInst] -> TcM a -> TcM a
 -- Extend (a) the family instance envt
 --        (b) the type envt with stuff from data type decls
 addFamInsts fam_insts thing_inside
@@ -465,7 +464,7 @@ addFamInsts fam_insts thing_inside
        ; tcg_env <- tcAddImplicits things
        ; setGblEnv tcg_env thing_inside }
   where
-    axioms = map famInstAxiom fam_insts
+    axioms = map (toBranchedAxiom . famInstAxiom) fam_insts
     tycons = famInstsRepTyCons fam_insts
     things = map ATyCon tycons ++ map ACoAxiom axioms 
 \end{code}
@@ -489,7 +488,7 @@ the brutal solution will do.
 
 \begin{code}
 tcLocalInstDecl :: LInstDecl Name
-                -> TcM ([InstInfo Name], [FamInst Branched])
+                -> TcM ([InstInfo Name], [FamInst])
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
@@ -500,13 +499,13 @@ tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
   = do { fam_inst <- tcDataFamInstDecl Nothing (L loc decl)
-       ; return ([], [toBranchedFamInst fam_inst]) }
+       ; return ([], [fam_inst]) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts) <- tcClsInstDecl (L loc decl)
-       ; return (insts, map toBranchedFamInst fam_insts) }
+       ; return (insts, fam_insts) }
 
-tcClsInstDecl :: LClsInstDecl Name -> TcM ([InstInfo Name], [FamInst Unbranched])
+tcClsInstDecl :: LClsInstDecl Name -> TcM ([InstInfo Name], [FamInst])
 tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_datafam_insts = adts }))
@@ -533,7 +532,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; let defined_ats = mkNameSet $ map (tyFamInstDeclName . unLoc) ats
               defined_adts = mkNameSet $ map (unLoc . dfid_tycon . unLoc) adts
 
-              mk_deflt_at_instances :: ClassATItem -> TcM [FamInst Unbranched]
+              mk_deflt_at_instances :: ClassATItem -> TcM [FamInst]
               mk_deflt_at_instances (fam_tc, defs)
                  -- User supplied instances ==> everything is OK
                 | tyConName fam_tc `elemNameSet` defined_ats
@@ -558,7 +557,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                      ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
                      ; let axiom = mkSingleCoAxiom rep_tc_name tvs' fam_tc pat_tys' rhs'
                      ; ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' ) 
-                       newFamInst SynFamilyInst False {- group -} axiom }
+                       newFamInst SynFamilyInst axiom }
 
         ; tyfam_insts1 <- mapM mk_deflt_at_instances (classATItems clas)
         
@@ -581,10 +580,10 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 tcAssocTyDecl :: Class                   -- Class of associated type
               -> VarEnv Type             -- Instantiation of class TyVars
               -> LTyFamInstDecl Name     
-              -> TcM (FamInst Unbranched)
+              -> TcM (FamInst)
 tcAssocTyDecl clas mini_env ldecl
   = do { fam_inst <- tcTyFamInstDecl (Just (clas, mini_env)) ldecl
-       ; return $ toUnbranchedFamInst fam_inst }
+       ; return fam_inst }
 \end{code}
 
 %************************************************************************
@@ -620,14 +619,12 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
        ; return fam_tc }
 
 tcTyFamInstDecl :: Maybe (Class, VarEnv Type) -- the class & mini_env if applicable
-                -> LTyFamInstDecl Name -> TcM (FamInst Branched)
+                -> LTyFamInstDecl Name -> TcM FamInst
   -- "type instance"
-tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_group = group
-                                                      , tfid_eqns = eqns }))
+tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpan loc           $
     tcAddTyFamInstCtxt decl  $
-    do { let (eqn1:_) = eqns
-             fam_lname = tfie_tycon (unLoc eqn1)
+    do { let fam_lname = tfie_tycon (unLoc eqn)
        ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
 
          -- (0) Check it's an open type family
@@ -637,36 +634,20 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_group = group
                  (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
-       ; co_ax_branches <- tcSynFamInstDecl fam_tc decl
+       ; co_ax_branch <- tcSynFamInstDecl fam_tc decl
 
-         -- (2) check for validity and inaccessibility
-       ; foldlM_ (check_valid_branch fam_tc) [] co_ax_branches
+         -- (2) check for validity
+       ; checkValidTyFamInst mb_clsinfo fam_tc co_ax_branch
 
          -- (3) construct coercion axiom
        ; rep_tc_name <- newFamInstAxiomName loc
                                             (tyFamInstDeclName decl)
-                                            (map cab_lhs co_ax_branches)
-       ; let axiom = mkBranchedCoAxiom rep_tc_name fam_tc co_ax_branches
-       ; newFamInst SynFamilyInst group axiom }
-    where 
-      check_valid_branch :: TyCon
-                         -> [CoAxBranch]     -- previous
-                         -> CoAxBranch       -- current
-                         -> TcM [CoAxBranch] -- current : previous
-      check_valid_branch fam_tc prev_branches cur_branch
-        = do { -- Check the well-formedness of the instance
-               checkValidTyFamInst mb_clsinfo fam_tc cur_branch
-
-               -- Check whether the branch is dominated by earlier
-               -- ones and hence is inaccessible
-             ; when (cur_branch `isDominatedBy` prev_branches) $
-               setSrcSpan (coAxBranchSpan cur_branch) $
-               addErrTc $ inaccessibleCoAxBranch fam_tc cur_branch
-
-             ; return $ cur_branch : prev_branches }
+                                            [co_ax_branch]
+       ; let axiom = mkUnbranchedCoAxiom rep_tc_name fam_tc co_ax_branch
+       ; newFamInst SynFamilyInst axiom }
 
 tcDataFamInstDecl :: Maybe (Class, VarEnv Type)
-                  -> LDataFamInstDecl Name -> TcM (FamInst Unbranched)
+                  -> LDataFamInstDecl Name -> TcM FamInst
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo 
     (L loc decl@(DataFamInstDecl
@@ -683,7 +664,7 @@ tcDataFamInstDecl mb_clsinfo
        ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns
-       ; tcFamTyPats fam_tc pats (kcDataDefn defn) $ 
+       ; tcFamTyPats (unLoc fam_tc_name) (tyConKind fam_tc) pats (kcDataDefn defn) $ 
            \tvs' pats' res_kind -> do
 
        { -- Check that left-hand side contains no type family applications
@@ -725,7 +706,7 @@ tcDataFamInstDecl mb_clsinfo
                  -- further instance might not introduce a new recursive
                  -- dependency.  (2) They are always valid loop breakers as
                  -- they involve a coercion.
-              ; fam_inst <- newFamInst (DataFamilyInst rep_tc) False axiom
+              ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
               ; return (rep_tc, fam_inst) }
 
          -- Remember to check validity; no recursion to worry about here
@@ -764,6 +745,8 @@ Solution: eta-reduce both axioms, thus:
    axiom ax2 :: TInt ~ IO
 Now
    d' = d |> Monad (sym (ax2 ; ax1))
+
+This eta reduction happens both for data instances and newtype instances.
 
 See Note [Newtype eta] in TyCon.
 
@@ -1575,11 +1558,6 @@ badFamInstDecl tc_name
   = vcat [ ptext (sLit "Illegal family instance for") <+>
            quotes (ppr tc_name)
          , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
-
-inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-inaccessibleCoAxBranch tc fi
-  = ptext (sLit "Inaccessible family instance equation:") $$
-      (pprCoAxBranch tc fi)
 
 notOpenFamily :: TyCon -> SDoc
 notOpenFamily tc

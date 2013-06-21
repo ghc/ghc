@@ -734,8 +734,9 @@ newGlobalBinder.
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
 
-newFamInstAxiomName :: SrcSpan -> Name -> [[Type]] -> TcM Name
-newFamInstAxiomName = mk_fam_inst_name mkInstTyCoOcc
+newFamInstAxiomName :: SrcSpan -> Name -> [CoAxBranch] -> TcM Name
+newFamInstAxiomName loc name branches
+  = mk_fam_inst_name mkInstTyCoOcc loc name (map coAxBranchLHS branches)
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss

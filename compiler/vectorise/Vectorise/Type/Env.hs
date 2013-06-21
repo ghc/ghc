@@ -162,7 +162,7 @@ vectTypeEnv :: [TyCon]                   -- Type constructors defined in this mo
             -> [CoreVect]                -- All 'VECTORISE [SCALAR] type' declarations in this module
             -> [CoreVect]                -- All 'VECTORISE class' declarations in this module
             -> VM ( [TyCon]              -- old TyCons ++ new TyCons
-                  , [FamInst Unbranched] -- New type family instances.
+                  , [FamInst]            -- New type family instances.
                   , [(Var, CoreExpr)])   -- New top level bindings.
 vectTypeEnv tycons vectTypeDecls vectClassDecls
   = do { traceVt "** vectTypeEnv" $ ppr tycons
