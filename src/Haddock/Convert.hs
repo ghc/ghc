@@ -33,6 +33,7 @@ import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
 import PrelNames (ipClassName)
 import Bag ( emptyBag )
+import Unique ( getUnique )
 import SrcLoc ( Located, noLoc, unLoc )
 import Data.List( partition )
 
@@ -81,15 +82,11 @@ tyThingToLHsDecl t = noLoc $ case t of
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
-  ACoAxiom ax -> InstD (TyFamInstD { tfid_inst = synifyAxiom ax })
+  ACoAxiom ax -> synifyAxiom ax
 
   -- a data-constructor alone just gets rendered as a function:
   ADataCon dc -> SigD (TypeSig [synifyName dc]
     (synifyType ImplicitizeForAll (dataConUserType dc)))
-
-synifyATDefault :: TyCon -> LTyFamInstDecl Name
-synifyATDefault tc = noLoc (synifyAxiom ax)
-  where Just ax = tyConFamilyCoercion_maybe tc
 
 synifyAxBranch :: TyCon -> CoAxBranch -> TyFamInstEqn Name
 synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
@@ -103,12 +100,19 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
                                         , hswb_tvs = map tyVarName tvs }
                     , tfie_rhs   = hs_rhs }
 
-synifyAxiom :: CoAxiom br -> TyFamInstDecl Name
-synifyAxiom (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = let eqns = brListMap (noLoc . synifyAxBranch tc) branches
-    in TyFamInstDecl { tfid_eqns  = eqns
-                     , tfid_group = (brListLength branches /= 1)
-                     , tfid_fvs   = placeHolderNames }
+synifyAxiom :: CoAxiom br -> HsDecl Name
+synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
+  | isOpenSynFamilyTyCon tc
+  , Just branch <- coAxiomSingleBranch_maybe ax
+  = InstD (TyFamInstD (TyFamInstDecl { tfid_eqn = noLoc $ synifyAxBranch tc branch
+                                     , tfid_fvs = placeHolderNames }))
+
+  | Just ax' <- isClosedSynFamilyTyCon_maybe tc
+  , getUnique ax' == getUnique ax   -- without the getUniques, type error
+  = TyClD (synifyTyCon tc)
+
+  | otherwise
+  = error "synifyAxiom: closed/open family confusion"
 
 synifyTyCon :: TyCon -> TyClDecl Name
 synifyTyCon tc
@@ -132,12 +136,21 @@ synifyTyCon tc
                                       , dd_cons = []  -- No constructors
                                       , dd_derivs = Nothing }
            , tcdFVs = placeHolderNames }
+
   | isSynFamilyTyCon tc 
   = case synTyConRhs_maybe tc of
-        Just (SynFamilyTyCon {}) ->
-          FamDecl (FamilyDecl TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
-                              (Just (synifyKindSig (synTyConResKind tc))))
-        _ -> error "synifyTyCon: impossible open type synonym?"
+      Just rhs ->
+        let info = case rhs of
+                     OpenSynFamilyTyCon -> OpenTypeFamily
+                     ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
+                       ClosedTypeFamily (brListMap (noLoc . synifyAxBranch tc) branches)
+                     _ -> error "synifyTyCon: type/data family confusion"
+        in FamDecl (FamilyDecl { fdInfo = info
+                               , fdLName = synifyName tc
+                               , fdTyVars = synifyTyVars (tyConTyVars tc)
+                               , fdKindSig = Just (synifyKindSig (synTyConResKind tc)) })
+      Nothing -> error "synifyTyCon: impossible open type synonym?"
+
   | isDataFamilyTyCon tc 
   = --(why no "isOpenAlgTyCon"?)
     case algTyConRhs tc of

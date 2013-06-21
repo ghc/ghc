@@ -145,23 +145,25 @@ ppTyName name
 
 
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName -> Bool -> Qualification -> Html
-ppTyFamHeader summary associated d@(FamilyDecl { fdFlavour = flav
+ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
                                                , fdKindSig = mkind }) unicode qual =
-  (case flav of
-     TypeFamily
+  (case info of
+     OpenTypeFamily
        | associated -> keyword "type"
        | otherwise  -> keyword "type family"
      DataFamily
        | associated -> keyword "data"
        | otherwise  -> keyword "data family"
+     ClosedTypeFamily _
+                    -> keyword "type family"
   ) <+>
 
   ppFamDeclBinderWithVars summary d <+>
 
-  case mkind of
+  (case mkind of
     Just kind -> dcolon unicode  <+> ppLKind unicode qual kind
     Nothing   -> noHtml
-
+  )
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Documentation DocName ->
               FamilyDecl DocName -> Bool -> Qualification -> Html
@@ -175,7 +177,13 @@ ppTyFam summary associated links loc doc decl unicode qual
 
     header_ = topDeclElem links loc [docname] (ppTyFamHeader summary associated decl unicode qual)
 
-    instancesBit = ppInstances instances docname unicode qual
+    instancesBit
+      | FamilyDecl { fdInfo = ClosedTypeFamily _eqns } <- decl
+      , not summary
+      = noHtml -- TODO: print eqns
+
+      | otherwise
+      = ppInstances instances docname unicode qual
 
     -- TODO: get the instances
     instances = []

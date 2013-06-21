@@ -379,13 +379,21 @@ renameTyClD d = case d of
     renameLSig (L loc sig) = return . L loc =<< renameSig sig
 
 renameFamilyDecl :: FamilyDecl Name -> RnM (FamilyDecl DocName)
-renameFamilyDecl (FamilyDecl { fdFlavour = flav, fdLName = lname
+renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
                              , fdTyVars = ltyvars, fdKindSig = tckind }) = do
+    info'    <- renameFamilyInfo info
     lname'   <- renameL lname
     ltyvars' <- renameLTyVarBndrs ltyvars
     tckind'  <- renameMaybeLKind tckind
-    return (FamilyDecl { fdFlavour = flav, fdLName = lname'
+    return (FamilyDecl { fdInfo = info', fdLName = lname'
                        , fdTyVars = ltyvars', fdKindSig = tckind' })
+
+renameFamilyInfo :: FamilyInfo Name -> RnM (FamilyInfo DocName)
+renameFamilyInfo DataFamily     = return DataFamily
+renameFamilyInfo OpenTypeFamily = return OpenTypeFamily
+renameFamilyInfo (ClosedTypeFamily eqns)
+  = do { eqns' <- mapM (renameLThing renameTyFamInstEqn) eqns
+       ; return $ ClosedTypeFamily eqns' }
 
 renameDataDefn :: HsDataDefn Name -> RnM (HsDataDefn DocName)
 renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
@@ -471,10 +479,9 @@ renameClsInstD (ClsInstDecl { cid_poly_ty =ltype, cid_tyfam_insts = lATs, cid_da
 
 
 renameTyFamInstD :: TyFamInstDecl Name -> RnM (TyFamInstDecl DocName)
-renameTyFamInstD (TyFamInstDecl { tfid_eqns = eqns , tfid_group = eqn_group })
-  = do { eqns' <- mapM (renameLThing renameTyFamInstEqn) eqns
-       ; return (TyFamInstDecl { tfid_eqns = eqns'
-                               , tfid_group = eqn_group
+renameTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
+  = do { eqn' <- renameLThing renameTyFamInstEqn eqn
+       ; return (TyFamInstDecl { tfid_eqn = eqn'
                                , tfid_fvs = placeHolderNames }) }
 
 renameTyFamInstEqn :: TyFamInstEqn Name -> RnM (TyFamInstEqn DocName)

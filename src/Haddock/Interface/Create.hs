@@ -385,16 +385,19 @@ warnAboutFilteredDecls :: DynFlags -> Module -> [LHsDecl Name] -> ErrMsgM ()
 warnAboutFilteredDecls dflags mdl decls = do
   let modStr = moduleString mdl
   let typeInstances =
-        nub (concat [[ unLoc (tfie_tycon eqn)
-                     | L _ (InstD (TyFamInstD (TyFamInstDecl { tfid_eqns = eqns }))) <- decls
-                     , L _ eqn <- eqns ],
+        nub (concat [[ unLoc (tfie_tycon (unLoc eqn))
+                     | L _ (InstD (TyFamInstD (TyFamInstDecl { tfid_eqn = eqn }))) <- decls ],
                      [ unLoc (dfid_tycon d)
-                     | L _ (InstD (DataFamInstD { dfid_inst = d })) <- decls ]])
+                     | L _ (InstD (DataFamInstD { dfid_inst = d })) <- decls ],
+                     [ unLoc tc
+                     | L _ (TyClD (FamDecl (FamilyDecl { fdInfo = ClosedTypeFamily _
+                                                       , fdLName = tc }))) <- decls ]])
 
   unless (null typeInstances) $
     tell [
       "Warning: " ++ modStr ++ ": Instances of type and data "
-      ++ "families are not yet supported. Instances of the following families "
+      ++ "families and equations of closed type families are not yet supported."
+      ++ "Instances of the following families "
       ++ "will be filtered out:\n  " ++ (intercalate ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
