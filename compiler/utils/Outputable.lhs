@@ -421,7 +421,10 @@ rational :: Rational   -> SDoc
 
 empty       = docToSDoc $ Pretty.empty
 char c      = docToSDoc $ Pretty.char c
+
 text s      = docToSDoc $ Pretty.text s
+{-# INLINE text #-}   -- Inline so that the RULE Pretty.text will fire
+
 ftext s     = docToSDoc $ Pretty.ftext s
 ptext s     = docToSDoc $ Pretty.ptext s
 ztext s     = docToSDoc $ Pretty.ztext s
