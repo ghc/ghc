@@ -526,7 +526,6 @@ tc_iface_decl _parent ignore_prags
         --       data T a
         -- Here the associated type T is knot-tied with the class, and
         -- so we must not pull on T too eagerly.  See Trac #5970
-   mk_sc_doc pred = ptext (sLit "Superclass") <+> ppr pred
 
    tc_sig (IfaceClassOp occ dm rdr_ty)
      = do { op_name <- lookupIfaceTop occ
@@ -538,9 +537,15 @@ tc_iface_decl _parent ignore_prags
 
    tc_at cls (IfaceAT tc_decl defs_decls)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- foldlM tc_ax_branches [] defs_decls
+          defs <- forkM (mk_at_doc tc) $
+                  foldlM tc_ax_branches [] defs_decls
+                  -- Must be done lazily in case the RHS of the defaults mention
+                  -- the type constructor being defined here
+                  -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
           return (tc, defs)
 
+   mk_sc_doc pred = ptext (sLit "Superclass") <+> ppr pred
+   mk_at_doc tc = ptext (sLit "Associated type") <+> ppr tc
    mk_op_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
 
    tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
