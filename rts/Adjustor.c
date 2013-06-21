@@ -335,7 +335,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
               )
 {
   void *adjustor = NULL;
-  void *code;
+  void *code = NULL;
 
   switch (cconv)
   {
