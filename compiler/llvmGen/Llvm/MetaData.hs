@@ -58,34 +58,23 @@ import Llvm.Types
 
 import FastString
 
--- | LLVM metadata expressions ('metadata ...' form).
+-- | LLVM metadata expressions
 data MetaExpr = MetaStr LMString
               | MetaNode Int
               | MetaVar LlvmVar
-              | MetaExpr [MetaExpr]
+              | MetaStruct [MetaExpr]
               deriving (Eq)
 
--- | LLVM metadata nodes. See [Note: Metadata encoding].
-data MetaVal
-    -- | A literal expression as a metadata value ('!{ ..}' form).
-    = MetaValExpr MetaExpr
-    -- | A metadata node as a metadata value ('!10' form).
-    | MetaValNode Int
-    deriving (Eq)
-
 instance Show MetaExpr where
-  show (MetaStr  s ) = "metadata !\"" ++ unpackFS s ++ "\""
-  show (MetaNode n ) = "metadata !" ++ show n
-  show (MetaVar  v ) = show v
-  show (MetaExpr es) = intercalate ", " $ map show es
+  show (MetaStr    s ) = "metadata !\"" ++ unpackFS s ++ "\""
+  show (MetaNode   n ) = "metadata !" ++ show n
+  show (MetaVar    v ) = show v
+  show (MetaStruct es) = "metadata !{ " ++ intercalate ", " (map show es) ++ "}"
 
-instance Show MetaVal where
-  show (MetaValExpr  e) = "!{ " ++ show e ++ "}"
-  show (MetaValNode  n) = "!" ++ show n
-
--- | Associated some metadata with a specific label for attaching to an
+-- | Associates some metadata with a specific label for attaching to an
 -- instruction.
-type MetaData = (LMString, MetaVal)
+data MetaAnnot = MetaAnnot LMString MetaExpr
+               deriving (Eq)
 
 -- | Metadata declarations. Metadata can only be declared in global scope.
 data MetaDecl
@@ -95,33 +84,3 @@ data MetaDecl
     -- | Metadata node declaration.
     -- ('!0 = metadata !{ <metadata expression> }' form).
     | MetaUnamed Int MetaExpr
-
--- | LLVM function call arguments.
-data MetaArgs
-    = ArgVar  LlvmVar  -- ^ Regular LLVM variable as argument.
-    | ArgMeta MetaExpr -- ^ Metadata as argument.
-    deriving (Eq)
-
-instance Show MetaArgs where
-  show (ArgVar  v) = show v
-  show (ArgMeta m) = show m
-
-{-
-   Note: Metadata encoding
-   ~~~~~~~~~~~~~~~~~~~~~~~
-   The encoding use today has some redundancy in the form of 'MetaValNode'.
-   Instead of the current encoding where MetaExpr is an independent recursive
-   type, the encoding below could be used where MetaExpr and MetaVal are
-   co-recursive. The current encoding was chosen instead as it appears easier
-   to work with and cleaner to separate the two types.
-
-   -- metadata ...
-   data MetaExpr = MetaStr String
-                 | MetaVar LlvmVar
-                 | MetaVal [MetaVal]
-
-   -- !{ .. } | !10
-   data MetaVal = MetaExpr MetaExpr
-                | MetaNode Int
- -}
-

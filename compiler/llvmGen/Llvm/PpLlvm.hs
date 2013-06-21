@@ -108,11 +108,11 @@ ppLlvmMeta (MetaNamed n m)
 
 -- | Print out an LLVM metadata value.
 ppLlvmMetaExpr :: MetaExpr -> SDoc
-ppLlvmMetaExpr (MetaStr  s ) = text "metadata !" <> doubleQuotes (ftext s)
-ppLlvmMetaExpr (MetaNode n ) = text "metadata !" <> int n
-ppLlvmMetaExpr (MetaVar  v ) = texts v
-ppLlvmMetaExpr (MetaExpr es) =
-    hcat $ intersperse (text ", ") $ map ppLlvmMetaExpr es
+ppLlvmMetaExpr (MetaStr    s ) = text "metadata !" <> doubleQuotes (ftext s)
+ppLlvmMetaExpr (MetaNode   n ) = text "metadata !" <> int n
+ppLlvmMetaExpr (MetaVar    v ) = texts v
+ppLlvmMetaExpr (MetaStruct es) =
+    text "metadata !{" <> hsep (punctuate comma (map ppLlvmMetaExpr es)) <> char '}'
 
 
 -- | Print out a list of function definitions.
@@ -419,20 +419,21 @@ ppInsert vec elt idx =
     <+> texts idx
 
 
-ppMetaStatement :: [MetaData] -> LlvmStatement -> SDoc
-ppMetaStatement meta stmt = ppLlvmStatement stmt <> ppMetas meta
+ppMetaStatement :: [MetaAnnot] -> LlvmStatement -> SDoc
+ppMetaStatement meta stmt = ppLlvmStatement stmt <> ppMetaAnnots meta
 
-ppMetaExpr :: [MetaData] -> LlvmExpression -> SDoc
-ppMetaExpr meta expr = ppLlvmExpression expr <> ppMetas meta
+ppMetaExpr :: [MetaAnnot] -> LlvmExpression -> SDoc
+ppMetaExpr meta expr = ppLlvmExpression expr <> ppMetaAnnots meta
 
-ppMetas :: [MetaData] -> SDoc
-ppMetas meta = hcat $ map ppMeta meta
+ppMetaAnnots :: [MetaAnnot] -> SDoc
+ppMetaAnnots meta = hcat $ map ppMeta meta
   where
-    ppMeta (name, MetaValExpr e)
-        = comma <+> exclamation <> ftext name <+> text "!" <>
-            braces (ppLlvmMetaExpr e)
-    ppMeta (name, MetaValNode n)
-        = comma <+> exclamation <> ftext name <+> exclamation <> int n
+    ppMeta (MetaAnnot name e)
+        = comma <+> exclamation <> ftext name <+>
+          case e of
+            MetaNode n    -> exclamation <> int n
+            MetaStruct ms -> exclamation <> braces (ppCommaJoin ms)
+            other         -> exclamation <> braces (texts other) -- possible?
 
 
 --------------------------------------------------------------------------------

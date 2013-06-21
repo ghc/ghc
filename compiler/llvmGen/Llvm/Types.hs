@@ -324,6 +324,7 @@ llvmWidthInBits _      LMVoid          = 0
 llvmWidthInBits dflags (LMStruct tys)  = sum $ map (llvmWidthInBits dflags) tys
 llvmWidthInBits _      (LMFunction  _) = 0
 llvmWidthInBits dflags (LMAlias (_,t)) = llvmWidthInBits dflags t
+llvmWidthInBits _      LMMetadata      = panic "llvmWidthInBits: Meta-data has no runtime representation!"
 
 
 -- -----------------------------------------------------------------------------

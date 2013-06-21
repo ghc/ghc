@@ -80,15 +80,15 @@ alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 stgTBAA :: [MetaDecl]
 stgTBAA
   = [ MetaUnamed topN   $ MetaStr (fsLit "top")
-    , MetaUnamed stackN $ MetaExpr [MetaStr (fsLit "stack"), MetaNode topN]
-    , MetaUnamed heapN  $ MetaExpr [MetaStr (fsLit "heap"),  MetaNode topN]
-    , MetaUnamed rxN    $ MetaExpr [MetaStr (fsLit "rx"),    MetaNode heapN]
-    , MetaUnamed baseN  $ MetaExpr [MetaStr (fsLit "base"),  MetaNode topN]
+    , MetaUnamed stackN $ MetaStruct [MetaStr (fsLit "stack"), MetaNode topN]
+    , MetaUnamed heapN  $ MetaStruct [MetaStr (fsLit "heap"),  MetaNode topN]
+    , MetaUnamed rxN    $ MetaStruct [MetaStr (fsLit "rx"),    MetaNode heapN]
+    , MetaUnamed baseN  $ MetaStruct [MetaStr (fsLit "base"),  MetaNode topN]
     -- FIX: Not 100% sure about 'others' place. Might need to be under 'heap'.
     -- OR I think the big thing is Sp is never aliased, so might want
     -- to change the hieracy to have Sp on its own branch that is never
     -- aliased (e.g never use top as a TBAA node).
-    , MetaUnamed otherN $ MetaExpr [MetaStr (fsLit "other"), MetaNode topN]
+    , MetaUnamed otherN $ MetaStruct [MetaStr (fsLit "other"), MetaNode topN]
     ]
 
 -- | Id values
@@ -101,20 +101,20 @@ baseN  = 4
 otherN = 5
 
 -- | The various TBAA types
-top, heap, stack, rx, base, other :: MetaData
-top   = (tbaa, MetaValNode topN)
-heap  = (tbaa, MetaValNode heapN)
-stack = (tbaa, MetaValNode stackN)
-rx    = (tbaa, MetaValNode rxN)
-base  = (tbaa, MetaValNode baseN)
-other = (tbaa, MetaValNode otherN)
+top, heap, stack, rx, base, other :: MetaAnnot
+top   = MetaAnnot tbaa (MetaNode topN)
+heap  = MetaAnnot tbaa (MetaNode heapN)
+stack = MetaAnnot tbaa (MetaNode stackN)
+rx    = MetaAnnot tbaa (MetaNode rxN)
+base  = MetaAnnot tbaa (MetaNode baseN)
+other = MetaAnnot tbaa (MetaNode otherN)
 
 -- | The TBAA metadata identifier
 tbaa :: LMString
 tbaa = fsLit "tbaa"
 
 -- | Get the correct TBAA metadata information for this register type
-getTBAA :: GlobalReg -> MetaData
+getTBAA :: GlobalReg -> MetaAnnot
 getTBAA BaseReg          = base
 getTBAA Sp               = stack
 getTBAA Hp               = heap

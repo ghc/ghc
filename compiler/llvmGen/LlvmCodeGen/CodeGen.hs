@@ -691,7 +691,7 @@ genStore_fast env addr r n val
 
 -- | CmmStore operation
 -- Generic case. Uses casts and pointer arithmetic if needed.
-genStore_slow :: LlvmEnv -> CmmExpr -> CmmExpr -> [MetaData] -> UniqSM StmtData
+genStore_slow :: LlvmEnv -> CmmExpr -> CmmExpr -> [MetaAnnot] -> UniqSM StmtData
 genStore_slow env addr val meta = do
     (env1, vaddr, stmts1, top1) <- exprToVar env addr
     (env2, vval,  stmts2, top2) <- exprToVar env1 val
@@ -1339,7 +1339,7 @@ genLoad_fast env e r n ty =
 
 -- | Handle Cmm load expression.
 -- Generic case. Uses casts and pointer arithmetic if needed.
-genLoad_slow :: LlvmEnv -> CmmExpr -> CmmType -> [MetaData] -> UniqSM ExprData
+genLoad_slow :: LlvmEnv -> CmmExpr -> CmmType -> [MetaAnnot] -> UniqSM ExprData
 genLoad_slow env e ty meta = do
     (env', iptr, stmts, tops) <- exprToVar env e
     case getVarType iptr of
