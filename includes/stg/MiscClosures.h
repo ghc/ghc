@@ -98,6 +98,7 @@ RTS_FUN(stg_BCO);
 RTS_ENTRY(stg_EVACUATED);
 RTS_ENTRY(stg_WEAK);
 RTS_ENTRY(stg_DEAD_WEAK);
+RTS_ENTRY(stg_C_FINALIZER_LIST);
 RTS_ENTRY(stg_STABLE_NAME);
 RTS_ENTRY(stg_MVAR_CLEAN);
 RTS_ENTRY(stg_MVAR_DIRTY);
@@ -482,6 +483,9 @@ extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
 extern StgWord      CCS_SYSTEM[];
 extern unsigned int RTS_VAR(CC_ID);            /* global ids */
 extern unsigned int RTS_VAR(CCS_ID);
+
+// Capability.c
+extern unsigned int n_capabilities;
 
 #endif
 
