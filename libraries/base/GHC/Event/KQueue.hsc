@@ -41,7 +41,6 @@ import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
 import GHC.Enum (toEnum)
-import GHC.Err (undefined)
 import GHC.Num (Num(..))
 import GHC.Real (ceiling, floor, fromIntegral)
 import GHC.Show (Show(show))
