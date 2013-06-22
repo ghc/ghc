@@ -138,7 +138,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd gmpbuild && \
-	    CC=$(CC_STAGE1) NM=$(NM) AR=$(AR_STAGE1) $(SHELL) configure \
+	    CC=$(CC_STAGE1) NM=$(NM) AR=$(AR_STAGE1) $(SHELL) ./configure \
 	          --enable-shared=no \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
@@ -158,7 +158,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 #	    PATH=`pwd`:$$PATH; \
 #	    export PATH; \
 #	    cd gmpbuild-shared && \
-#	    CC=$(CC_STAGE1) $(SHELL) configure \
+#	    CC=$(CC_STAGE1) $(SHELL) ./configure \
 #	          --enable-shared=yes --disable-static \
 #	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 #	"$(TOUCH_CMD)" $@
