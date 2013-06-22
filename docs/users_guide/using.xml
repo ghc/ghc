@@ -183,7 +183,7 @@ module X where
       <varlistentry>
         <term>Mode flags</term>
         <listitem>
-          <para>For example, <option>&ndash;&ndash;make</option> or <option>-E</option>.
+          <para>For example, <option>--make</option> or <option>-E</option>.
             There may only be a single mode flag on the command line.  The
             available modes are listed in <xref linkend="modes"/>.</para>
         </listitem>
@@ -341,10 +341,10 @@ module X where
 
       <varlistentry>
         <term>
-          <cmdsynopsis><command>ghc &ndash;&ndash;make</command>
+          <cmdsynopsis><command>ghc --make</command>
           </cmdsynopsis>
           <indexterm><primary>make mode</primary></indexterm>
-          <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
+          <indexterm><primary><option>--make</option></primary></indexterm>
         </term>
         <listitem>
           <para>In this mode, GHC will build a multi-module Haskell
@@ -357,7 +357,7 @@ module X where
           <para>
             This mode is the default if there are any Haskell
             source files mentioned on the command line, and in this case
-            the <option>&ndash;&ndash;make</option> option can be omitted.
+            the <option>--make</option> option can be omitted.
           </para>
         </listitem>
       </varlistentry>
@@ -435,7 +435,7 @@ module X where
           <cmdsynopsis>
           <command>ghc --help</command> <command>ghc -?</command>
             </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
+          <indexterm><primary><option>--help</option></primary></indexterm>
         </term>
         <listitem>
           <para>Cause GHC to spew a long usage message to standard
@@ -448,7 +448,7 @@ module X where
           <cmdsynopsis>
             <command>ghc --show-iface <replaceable>file</replaceable></command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;show-iface</option></primary></indexterm>
+          <indexterm><primary><option>--show-iface</option></primary></indexterm>
         </term>
         <listitem>
               <para>Read the interface in
@@ -463,7 +463,7 @@ module X where
             <command>ghc --supported-extensions</command>
             <command>ghc --supported-languages</command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;supported-extensions</option></primary><primary><option>&ndash;&ndash;supported-languages</option></primary></indexterm>
+          <indexterm><primary><option>--supported-extensions</option></primary><primary><option>--supported-languages</option></primary></indexterm>
         </term>
         <listitem>
           <para>Print the supported language extensions.</para>
@@ -475,7 +475,7 @@ module X where
           <cmdsynopsis>
             <command>ghc --show-options</command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;show-options</option></primary></indexterm>
+          <indexterm><primary><option>--show-options</option></primary></indexterm>
         </term>
         <listitem>
           <para>Print the supported command line options. This flag can be used for autocompletion in a shell.</para>
@@ -487,7 +487,7 @@ module X where
           <cmdsynopsis>
             <command>ghc --info</command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;info</option></primary></indexterm>
+          <indexterm><primary><option>--info</option></primary></indexterm>
         </term>
         <listitem>
           <para>Print information about the compiler.</para>
@@ -501,7 +501,7 @@ module X where
             <command>ghc -V</command>
           </cmdsynopsis>
           <indexterm><primary><option>-V</option></primary></indexterm>
-          <indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
+          <indexterm><primary><option>--version</option></primary></indexterm>
         </term>
         <listitem>
           <para>Print a one-line string including GHC's version number.</para>
@@ -513,7 +513,7 @@ module X where
           <cmdsynopsis>
             <command>ghc --numeric-version</command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
+          <indexterm><primary><option>--numeric-version</option></primary></indexterm>
         </term>
         <listitem>
           <para>Print GHC's numeric version number only.</para>
@@ -525,7 +525,7 @@ module X where
           <cmdsynopsis>
             <command>ghc --print-libdir</command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
+          <indexterm><primary><option>--print-libdir</option></primary></indexterm>
         </term>
         <listitem>
           <para>Print the path to GHC's library directory.  This is
@@ -542,8 +542,8 @@ module X where
     </variablelist>
 
     <sect2 id="make-mode">
-      <title>Using <command>ghc</command> <option>&ndash;&ndash;make</option></title>
-      <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
+      <title>Using <command>ghc</command> <option>--make</option></title>
+      <indexterm><primary><option>--make</option></primary></indexterm>
       <indexterm><primary>separate compilation</primary></indexterm>
 
       <para>In this mode, GHC will build a multi-module Haskell program by following
@@ -554,7 +554,7 @@ module X where
       program like this:</para>
 
 <screen>
-ghc &ndash;&ndash;make Main.hs
+ghc --make Main.hs
 </screen>
 
       <para>
@@ -575,7 +575,7 @@ ghc Main.hs
       program will also be linked into an executable.</para>
 
       <para>The main advantages to using <literal>ghc
-      &ndash;&ndash;make</literal> over traditional
+      --make</literal> over traditional
       <literal>Makefile</literal>s are:</para>
 
       <itemizedlist>
@@ -583,7 +583,7 @@ ghc Main.hs
           <para>GHC doesn't have to be restarted for each compilation,
           which means it can cache information between compilations.
           Compiling a multi-module program with <literal>ghc
-          &ndash;&ndash;make</literal> can be up to twice as fast as
+          --make</literal> can be up to twice as fast as
           running <literal>ghc</literal> individually on each source
           file.</para>
         </listitem>
@@ -600,7 +600,7 @@ ghc Main.hs
 
       <para>Any of the command-line options described in the rest of
       this chapter can be used with
-      <option>&ndash;&ndash;make</option>, but note that any options
+      <option>--make</option>, but note that any options
       you give on the command line will apply to all the source files
       compiled, so if you want any options to apply to a single source
       file only, you'll need to use an <literal>OPTIONS_GHC</literal>
@@ -840,8 +840,8 @@ ghc -c Foo.hs
               <listitem>
                 <para>Minimal verbosity: print one line per
                 compilation (this is the default when
-                <option>&ndash;&ndash;make</option> or
-                <option>&ndash;&ndash;interactive</option> is on).</para>
+                <option>--make</option> or
+                <option>--interactive</option> is on).</para>
               </listitem>
             </varlistentry>
 

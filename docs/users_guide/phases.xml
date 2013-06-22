@@ -693,7 +693,7 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Omits the link step.  This option can be used with
-            <option>&ndash;&ndash;make</option> to avoid the automatic linking
+            <option>--make</option> to avoid the automatic linking
             that takes place if the program contains a <literal>Main</literal>
             module.</para>
         </listitem>

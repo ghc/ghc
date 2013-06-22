@@ -1037,7 +1037,7 @@ M.o : X.hi-boot
 	locate any imported modules that come from packages.  The
 	package modules won't be included in the dependencies
 	generated, though (but see the
-	<option>&ndash;&ndash;include-pkg-deps</option> option below).</para>
+	<option>--include-pkg-deps</option> option below).</para>
 
 	<para>The dependency generation phase of GHC can take some
         additional options, which you may find useful.
@@ -1104,7 +1104,7 @@ M.o : X.hi-boot
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>&ndash;&ndash;exclude-module=&lt;file&gt;</option></term>
+	    <term><option>--exclude-module=&lt;file&gt;</option></term>
 	    <listitem>
 	      <para>Regard <filename>&lt;file&gt;</filename> as
               "stable"; i.e., exclude it from having dependencies on
@@ -1113,7 +1113,7 @@ M.o : X.hi-boot
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>&ndash;&ndash;include-pkg-deps</option></term>
+	    <term><option>--include-pkg-deps</option></term>
 	    <listitem>
 	      <para>Regard modules imported from packages as unstable,
               i.e., generate dependencies on any imported package modules

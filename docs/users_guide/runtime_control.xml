@@ -100,7 +100,7 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
         <para>
           If you absolutely positively want all the rest of the options
           in a command line to go to the program (and not the RTS), use a
-          <option>&ndash;&ndash;RTS</option><indexterm><primary><option>--RTS</option></primary></indexterm>.
+          <option>--RTS</option><indexterm><primary><option>--RTS</option></primary></indexterm>.
         </para>
 
         <para>

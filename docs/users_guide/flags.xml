@@ -54,37 +54,37 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>&ndash;&ndash;supported-extensions</option> or <option>&ndash;&ndash;supported-languages</option></entry>
+            <entry><option>--supported-extensions</option> or <option>--supported-languages</option></entry>
             <entry>display the supported languages and language extensions</entry>
             <entry>mode</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>&ndash;&ndash;show-options</option></entry>
+            <entry><option>--show-options</option></entry>
             <entry>display the supported command line options</entry>
             <entry>mode</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>&ndash;&ndash;info</option></entry>
+            <entry><option>--info</option></entry>
             <entry>display information about the compiler</entry>
             <entry>mode</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>&ndash;&ndash;version</option></entry>
+            <entry><option>--version</option></entry>
             <entry>display GHC version</entry>
             <entry>mode</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>&ndash;&ndash;numeric-version</option></entry>
+            <entry><option>--numeric-version</option></entry>
             <entry>display GHC version (numeric only)</entry>
             <entry>mode</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>&ndash;&ndash;print-libdir</option></entry>
+            <entry><option>--print-libdir</option></entry>
             <entry>display GHC library directory</entry>
             <entry>mode</entry>
             <entry>-</entry>

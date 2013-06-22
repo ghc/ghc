@@ -161,7 +161,7 @@ Ok, modules loaded: Main.
       <para>or it can be set using the <literal>:set</literal> command
       from within GHCi (see <xref
       linkend="ghci-cmd-line-options"/>)<footnote><para>Note that in
-      GHCi, and <option>&ndash;&ndash;make</option> mode, the <option>-i</option>
+      GHCi, and <option>--make</option> mode, the <option>-i</option>
       option is used to specify the search path for
       <emphasis>source</emphasis> files, whereas in standard
       batch-compilation mode the <option>-i</option> option is used to
@@ -338,7 +338,7 @@ Compiling A                ( A.hs, interpreted )
     <para>HINT: since GHCi will only use a compiled object file if it
     can be sure that the compiled version is up-to-date, a good technique
     when working on a large program is to occasionally run
-    <literal>ghc &ndash;&ndash;make</literal> to compile the whole project (say
+    <literal>ghc --make</literal> to compile the whole project (say
     before you go for lunch :-), then continue working in the
     interpreter.  As you modify code, the changed modules will be
     interpreted, but the rest of the project will remain
@@ -1715,7 +1715,7 @@ a :: a
       <para>The history is only available when
         using <literal>:trace</literal>; the reason for this is we found that
         logging each breakpoint in the history cuts performance by a factor of
-        2 or more.  By default, GHCi remembers the last 50 steps in the history, but this can be changed with the <option>-fghci-hist-size=<replaceable>n</replaceable></option><indexterm><primary><option>&ndash;fghci-hist-size</option></primary></indexterm> option).</para>
+        2 or more.  By default, GHCi remembers the last 50 steps in the history, but this can be changed with the <option>-fghci-hist-size=<replaceable>n</replaceable></option><indexterm><primary><option>-fghci-hist-size</option></primary></indexterm> option).</para>
     </sect2>
 
     <sect2 id="ghci-debugger-exceptions">
@@ -1910,10 +1910,10 @@ Just 20
   <sect1 id="ghci-invocation">
     <title>Invoking GHCi</title>
     <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
-    <indexterm><primary><option>&ndash;&ndash;interactive</option></primary></indexterm>
+    <indexterm><primary><option>--interactive</option></primary></indexterm>
 
     <para>GHCi is invoked with the command <literal>ghci</literal> or
-    <literal>ghc &ndash;&ndash;interactive</literal>.  One or more modules or
+    <literal>ghc --interactive</literal>.  One or more modules or
     filenames can also be specified on the command line; this
     instructs GHCi to load the specified modules or filenames (and all
     the modules they depend on), just as if you had said
@@ -2255,11 +2255,11 @@ Prelude> :mycd ..
 </screen>
 
 	  <para>Or I could define a simple way to invoke
-	  &ldquo;<literal>ghc &ndash;&ndash;make Main</literal>&rdquo; in the
+	  &ldquo;<literal>ghc --make Main</literal>&rdquo; in the
 	  current directory:</para>
 
 <screen>
-Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
+Prelude> :def make (\_ -> return ":! ghc --make Main")
 </screen>
 
           <para>We can define a command that reads GHCi input from a
