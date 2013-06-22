@@ -209,7 +209,7 @@ cgRhs id (StgRhsCon cc con args)
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag _srt args body)
   | null fvs   -- See Note [Nested constant closures]
-  = do { (info, fcode) <- cgTopRhsClosure Recursive name cc bi upd_flag args body 
+  = do { (info, fcode) <- cgTopRhsClosure Recursive name dontCareCCS bi upd_flag args body 
        ; return (info, fcode >> return mkNop) }
   | otherwise 
   = do dflags <- getDynFlags
@@ -234,7 +234,12 @@ False, which is fair enough.)
 
 Simple solution: compile the RHS as if it was top level.  Then
 everything works.  A minor benefit is eliminating the allocation code
-too.  -}
+too.
+
+GBM: when we compile the RHS as if it were top level, the cost centre stack in
+the StgRhsClosure is no longer valid. For now we replace the cost centre stack
+with dontCareCCS.
+-}
 
 ------------------------------------------------------------------------
 --              Non-constructor right hand sides
