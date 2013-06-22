@@ -67,7 +67,11 @@
     unlifted types (#10868)
 
   * Keep `shift{L,R}` on `Integer` with negative shift-arguments from
-	segfaulting (#10571)
+    segfaulting (#10571)
+
+  * Add `forkOSWithUnmask` to `Control.Concurrent`, which is like
+    `forkIOWithUnmask`, but the child is run in a bound thread.
+
 
 ## 4.8.1.0  *Jul 2015*
 

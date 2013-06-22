@@ -3,6 +3,7 @@
            , MagicHash
            , UnboxedTuples
            , ScopedTypeVariables
+           , RankNTypes
   #-}
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
 -- kludge for the Control.Concurrent.QSem, Control.Concurrent.QSemN
@@ -73,6 +74,7 @@ module Control.Concurrent (
         -- $boundthreads
         rtsSupportsBoundThreads,
         forkOS,
+        forkOSWithUnmask,
         isCurrentThreadBound,
         runInBoundThread,
         runInUnboundThread,
@@ -180,7 +182,7 @@ attribute will block all other threads.
 
 -}
 
--- | fork a thread and call the supplied function when the thread is about
+-- | Fork a thread and call the supplied function when the thread is about
 -- to terminate, with an exception or a returned value.  The function is
 -- called with asynchronous exceptions masked.
 --
@@ -315,6 +317,11 @@ forkOS action0
         freeStablePtr entry
         return tid
     | otherwise = failNonThreaded
+
+-- | Like 'forkIOWithUnmask', but the child thread is a bound thread,
+-- as with 'forkOS'.
+forkOSWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
+forkOSWithUnmask io = forkOS (io unsafeUnmask)
 
 -- | Returns 'True' if the calling thread is /bound/, that is, if it is
 -- safe to use foreign libraries that rely on thread-local state from the
