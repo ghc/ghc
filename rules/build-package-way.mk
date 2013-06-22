@@ -91,6 +91,7 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) $$(addprefix -L,$$($1_$2_EXTRA_LIBDIRS)) \
          -no-auto-link-packages \
          -o $$@
+	$(call relative-dynlib-references,$1,$2,$4)
 endif
 else
 # Build the ordinary .a library
