@@ -448,7 +448,7 @@ module X where
           <cmdsynopsis>
             <command>ghc --show-iface <replaceable>file</replaceable></command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;--show-iface</option></primary></indexterm>
+          <indexterm><primary><option>&ndash;&ndash;show-iface</option></primary></indexterm>
         </term>
         <listitem>
               <para>Read the interface in
