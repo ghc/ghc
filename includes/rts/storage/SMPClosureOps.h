@@ -74,6 +74,10 @@ EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p)
 #else /* !THREADED_RTS */
 
 EXTERN_INLINE StgInfoTable *
+reallyLockClosure(StgClosure *p)
+{ return (StgInfoTable *)p->header.info; }
+
+EXTERN_INLINE StgInfoTable *
 lockClosure(StgClosure *p)
 { return (StgInfoTable *)p->header.info; }
 
