@@ -270,6 +270,7 @@ endif
 # Use relative paths for the RTS. Rather than try to work out which RTS
 # way is being linked, we just change it for all ways
 	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../rts-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
+	install_name_tool -change $$(TOP)/$$(wildcard libffi/build/inst/lib/libffi.*.dylib) @loader_path/../rts-$$(rts_VERSION)/libffi.dylib $$@
 endif
 endif
 endif
