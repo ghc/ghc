@@ -922,14 +922,14 @@ As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [-1,
     to the underlying monadic value-recursion operator <literal>mfix</literal>, belonging to the
     <literal>MonadFix</literal> class. Here is an example:
 <programlisting>
-rec { b &lt;- f a c     ===>    (b,c) &lt;- mfix (\~(b,c) -> do { b &lt;- f a c
-    ; c &lt;- f b a }                                        ; c &lt;- f b a
-                                                          ; return (b,c) })
+rec { b &lt;- f a c     ===>    (b,c) &lt;- mfix (\ ~(b,c) -> do { b &lt;- f a c
+    ; c &lt;- f b a }                                         ; c &lt;- f b a
+                                                           ; return (b,c) })
 </programlisting>
    As usual, the meta-variables <literal>b</literal>, <literal>c</literal> etc., can be arbitrary patterns.
    In general, the statement <literal>rec <replaceable>ss</replaceable></literal> is desugared to the statement
 <programlisting>
-<replaceable>vs</replaceable> &lt;- mfix (\~<replaceable>vs</replaceable> -&gt; do { <replaceable>ss</replaceable>; return <replaceable>vs</replaceable> })
+<replaceable>vs</replaceable> &lt;- mfix (\ ~<replaceable>vs</replaceable> -&gt; do { <replaceable>ss</replaceable>; return <replaceable>vs</replaceable> })
 </programlisting>
   where <replaceable>vs</replaceable> is a tuple of the variables bound by <replaceable>ss</replaceable>.
 </para>
