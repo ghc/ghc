@@ -30,7 +30,7 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-help</option></entry>
+            <entry><option>--help</option></entry>
             <entry>help</entry>
             <entry>mode</entry>
             <entry>-</entry>
