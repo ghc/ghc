@@ -1383,16 +1383,17 @@ defaultFatalMessager = hPutStrLn stderr
 defaultLogAction :: LogAction
 defaultLogAction dflags severity srcSpan style msg
     = case severity of
-      SevOutput -> printSDoc msg style
-      SevDump   -> printSDoc (msg $$ blankLine) style
+      SevOutput      -> printSDoc msg style
+      SevDump        -> printSDoc (msg $$ blankLine) style
       SevInteractive -> putStrSDoc msg style
-      SevInfo   -> printErrs msg style
-      SevFatal  -> printErrs msg style
-      _         -> do hPutChar stderr '\n'
-                      printErrs (mkLocMessage severity srcSpan msg) style
-                      -- careful (#2302): printErrs prints in UTF-8, whereas
-                      -- converting to string first and using hPutStr would
-                      -- just emit the low 8 bits of each unicode char.
+      SevInfo        -> printErrs msg style
+      SevFatal       -> printErrs msg style
+      _              -> do hPutChar stderr '\n'
+                           printErrs (mkLocMessage severity srcSpan msg) style
+                           -- careful (#2302): printErrs prints in UTF-8,
+                           -- whereas converting to string first and using
+                           -- hPutStr would just emit the low 8 bits of
+                           -- each unicode char.
     where printSDoc  = defaultLogActionHPrintDoc  dflags stdout
           printErrs  = defaultLogActionHPrintDoc  dflags stderr
           putStrSDoc = defaultLogActionHPutStrDoc dflags stdout
