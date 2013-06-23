@@ -1271,12 +1271,13 @@ findFile mk_file_path (dir : dirs)
 
 \begin{code}
 maybePutStr :: DynFlags -> String -> IO ()
-maybePutStr dflags s | verbosity dflags > 0 = putStr s
-                     | otherwise            = return ()
+maybePutStr dflags s
+    = when (verbosity dflags > 0) $
+          do let act = log_action dflags
+             act dflags SevInteractive noSrcSpan defaultUserStyle (text s)
 
 maybePutStrLn :: DynFlags -> String -> IO ()
-maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
-                       | otherwise            = return ()
+maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
 \end{code}
 
 %************************************************************************

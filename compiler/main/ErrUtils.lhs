@@ -78,6 +78,7 @@ type MsgDoc = SDoc
 data Severity
   = SevOutput
   | SevDump
+  | SevInteractive
   | SevInfo
   | SevWarning
   | SevError
