@@ -103,3 +103,8 @@ T7796:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O1 -c T7796.hs -ddump-prep > T7796.prep
 	(grep -q '$$w$$sgo' T7796.prep || echo 'could not find $$w$$sgo; compilation was not as expected')
 	-grep -c ' $$sgo' T7796.prep
+
+T7995:
+	$(RM) -f T7995.hi T7995.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package ghc -ddump-rule-firings -c -O T7995.hs | grep 'text/str'
+

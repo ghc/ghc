@@ -179,3 +179,8 @@ test('T7702',
      compile, 
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.ghci_way_flags])
 
+test('T7995',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T7995'])
+
