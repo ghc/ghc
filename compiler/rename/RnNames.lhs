@@ -646,10 +646,16 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
             (name, AvailTC name subs, Just parent)
         combine x y = pprPanic "filterImports/combine" (ppr x $$ ppr y)
 
+    lookup_name :: RdrName -> IELookupM (Name, AvailInfo, Maybe Name)
+    lookup_name rdr | isQual rdr              = failLookupWith (QualImportError rdr)
+                    | Just succ <- mb_success = return succ
+                    | otherwise               = failLookupWith BadImport
+      where
+        mb_success = lookupOccEnv occ_env (rdrNameOcc rdr)
+
     lookup_lie :: Bool -> LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
     lookup_lie opt_typeFamilies (L loc ieRdr)
-        = do
-             (stuff, warns) <- setSrcSpan loc .
+        = do (stuff, warns) <- setSrcSpan loc .
                 liftM (fromMaybe ([],[])) $
                 run_lookup (lookup_ie opt_typeFamilies ieRdr)
              mapM_ emit_warning warns
@@ -688,13 +694,6 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
         -- different parents).  See the discussion at occ_env.
     lookup_ie :: Bool -> IE RdrName -> IELookupM ([(IE Name, AvailInfo)], [IELookupWarning])
     lookup_ie opt_typeFamilies ie = handle_bad_import $ do
-      let lookup_name rdr
-            | isQual rdr
-            = failLookupWith (QualImportError rdr)
-            | Just nm <- lookupOccEnv occ_env (rdrNameOcc rdr)
-            = return nm
-            | otherwise
-            = failLookupWith BadImport
       case ie of
         IEVar n -> do
             (name, avail, _) <- lookup_name n
@@ -734,9 +733,11 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
 
         IEThingWith tc ns -> do
            (name, AvailTC _ subnames, mb_parent) <- lookup_name tc
-           let
-             env         = mkOccEnv [(nameOccName s, s) | s <- subnames]
-             mb_children = map (lookupOccEnv env . rdrNameOcc) ns
+
+           -- Look up the children in the sub-names of the parent
+           let kid_env     = mkFsEnv [(occNameFS (nameOccName n), n) | n <- subnames]
+               mb_children = map (lookupFsEnv kid_env . occNameFS . rdrNameOcc) ns
+
            children <- if any isNothing mb_children
                        then failLookupWith BadImport
                        else return (catMaybes mb_children)

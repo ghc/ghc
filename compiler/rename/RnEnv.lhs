@@ -25,7 +25,7 @@ module RnEnv (
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalName, bindLocalNames, bindLocalNamesFV,
-        MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
+        MiniFixityEnv, 
         addLocalFixities,
         bindLocatedLocalsFV, bindLocatedLocalsRn,
         extendTyVarEnvFVRn,
@@ -36,7 +36,10 @@ module RnEnv (
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg,
-        HsDocContext(..), docOfHsDocContext
+        HsDocContext(..), docOfHsDocContext, 
+
+        -- FsEnv
+        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
 #include "HsVersions.h"
@@ -1035,10 +1038,12 @@ type FastStringEnv a = UniqFM a         -- Keyed by FastString
 emptyFsEnv  :: FastStringEnv a
 lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
 extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
 
 emptyFsEnv  = emptyUFM
 lookupFsEnv = lookupUFM
 extendFsEnv = addToUFM
+mkFsEnv     = listToUFM
 
 --------------------------------
 type MiniFixityEnv = FastStringEnv (Located Fixity)
