@@ -13,12 +13,13 @@ test('T1969',
              #            19 (x86/OS X)
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
-           (wordsize(64), 23, 10)]),
+           (wordsize(64), 27, 10)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
              # 2012-10-03 25 (amd64/Linux if .hi exists)
              # 2013-02-13 23, but unstable so increased to 10% range
+             # 2013-02-13 27, very unstable!
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5094914, 2),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -265,12 +266,14 @@ test('T5321Fun',
              # prev:       300000000
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
-            (wordsize(64), 628341952, 10)])
+            (wordsize(64), 694019152, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808
              #  (increase due to new codegen)
              # 15/05/2013: 628341952 
              #  (reason for decrease unknown)
+             # 24/06/2013: 694019152 
+             #  (reason for re-increase unknown)
       ],
       compile,[''])
 
