@@ -901,6 +901,10 @@ updateDBCache verbosity db = do
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
+#ifndef mingw32_HOST_OS
+  status <- getFileStatus filename
+  setFileTimes (location db) (accessTime status) (modificationTime status)
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
