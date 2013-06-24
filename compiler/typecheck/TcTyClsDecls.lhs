@@ -357,14 +357,11 @@ getInitialKind :: TopLevelFlag -> TyClDecl Name -> TcM [(Name, TcTyThing)]
 --
 -- No family instances are passed to getInitialKinds
 
-getInitialKind top_lvl (FamDecl { tcdFam = decl }) = getFamDeclInitialKind top_lvl decl
 getInitialKind _ (ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = kcHsTyVarBndrs False ktvs $ \ arg_kinds ->
     do { inner_prs <- getFamDeclInitialKinds ats
        ; let main_pr = (name, AThing (mkArrowKinds arg_kinds constraintKind))
        ; return (main_pr : inner_prs) }
-
-getInitialKind _top_lvl decl@(SynDecl {}) = pprPanic "getInitialKind" (ppr decl)
 
 getInitialKind top_lvl (DataDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdDataDefn = defn })
   | HsDataDefn { dd_kindSig = Just ksig, dd_cons = cons } <- defn
@@ -386,9 +383,16 @@ getInitialKind top_lvl (DataDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdDat
              -- See Note [Recusion and promoting data constructors]
        ; return (main_pr : inner_prs) }
 
+getInitialKind top_lvl (FamDecl { tcdFam = decl }) 
+  = getFamDeclInitialKind top_lvl decl
+
 getInitialKind _ (ForeignType { tcdLName = L _ name })
   = return [(name, AThing liftedTypeKind)]
 
+getInitialKind _top_lvl decl@(SynDecl {}) 
+  = pprPanic "getInitialKind" (ppr decl)
+
+---------------------------------
 getFamDeclInitialKinds :: [LFamilyDecl Name] -> TcM [(Name, TcTyThing)]
 getFamDeclInitialKinds decls
   = tcExtendTcTyThingEnv [ (n, APromotionErr TyConPE)
