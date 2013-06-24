@@ -214,3 +214,8 @@ test('T7804', normal, compile, [''])
 test('T7837', normal, compile, ['-O -ddump-rule-firings'])
 test('T4185', normal, compile, [''])
 
+# Cuased infinite loop in the compiler
+test('T8002',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T8002'])
