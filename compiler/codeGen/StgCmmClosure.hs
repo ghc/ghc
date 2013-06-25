@@ -174,12 +174,12 @@ data LambdaFormInfo
 
 data StandardFormInfo
   = NonStandardThunk
-	-- Not of of the standard forms
+	-- The usual case: not of of the standard forms
 
   | SelectorThunk
 	-- A SelectorThunk is of form
 	--      case x of
-	--	       con a1,..,an -> ak
+	--	   con a1,..,an -> ak
 	-- and the constructor is from a single-constr type.
        WordOff         	-- 0-origin offset of ak within the "goods" of 
 			-- constructor (Recall that the a1,...,an may be laid
@@ -375,17 +375,33 @@ thunkClosureType _                   = Thunk
 -----------------------------------------------------------------------------
 
 nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
-nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
-  = not no_fvs ||   -- Certainly if it has fvs we need to point to it
-    isNotTopLevel top
-		    -- If it is not top level we will point to it
-		    --   We can have a \r closure with no_fvs which
-		    --   is not top level as special case cgRhsClosure
-		    --   has been dissabled in favour of let floating
+-- If nodeMustPointToIt is true, then the entry convention for
+-- this closure has R1 (the "Node" register) pointing to the 
+-- closure itself --- the "self" argument
 
-		-- For lex_profiling we also access the cost centre for a
-		-- non-inherited function i.e. not top level
-		-- the  not top  case above ensures this is ok.
+nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
+  =  not no_fvs          -- Certainly if it has fvs we need to point to it
+  || isNotTopLevel top   -- See Note [GC recovery]
+	-- For lex_profiling we also access the cost centre for a
+	-- non-inherited (i.e. non-top-level) function.
+	-- The isNotTopLevel test above ensures this is ok.
+
+nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
+  =  not no_fvs            -- Self parameter
+  || isNotTopLevel top     -- Note [GC recovery]
+  || updatable             -- Need to push update frame
+  || gopt Opt_SccProfilingOn dflags
+	  -- For the non-updatable (single-entry case):
+	  --
+	  -- True if has fvs (in which case we need access to them, and we
+	  --		    should black-hole it)
+	  -- or profiling (in which case we need to recover the cost centre
+	  --		 from inside it)  ToDo: do we need this even for
+          --                                    top-level thunks? If not,
+          --                                    isNotTopLevel subsumes this
+
+nodeMustPointToIt _ (LFThunk {})	-- Node must point to a standard-form thunk
+  = True 
 
 nodeMustPointToIt _ (LFCon _) = True
 
@@ -400,22 +416,27 @@ nodeMustPointToIt _ (LFCon _) = True
 	-- having Node point to the result of an update.  SLPJ
 	-- 27/11/92.
 
-nodeMustPointToIt dflags (LFThunk _ no_fvs updatable NonStandardThunk _)
-  = updatable || not no_fvs || gopt Opt_SccProfilingOn dflags
-	  -- For the non-updatable (single-entry case):
-	  --
-	  -- True if has fvs (in which case we need access to them, and we
-	  --		    should black-hole it)
-	  -- or profiling (in which case we need to recover the cost centre
-	  --		 from inside it)
-
-nodeMustPointToIt _ (LFThunk {})	-- Node must point to a standard-form thunk
-  = True 
-
 nodeMustPointToIt _ (LFUnknown _)   = True
 nodeMustPointToIt _ LFUnLifted      = False
 nodeMustPointToIt _ LFBlackHole     = True    -- BH entry may require Node to point
 nodeMustPointToIt _ LFLetNoEscape   = False 
+
+{- Note [GC recovery]
+~~~~~~~~~~~~~~~~~~~~~
+If we a have a local let-binding (function or thunk)
+   let f = <body> in ...
+AND <body> allocates, then the heap-overflow check needs to know how
+to re-start the evaluation.  It uses the "self" pointer to do this.
+So even if there are no free variables in <body>, we still make 
+nodeMustPointToIt be True for non-top-level bindings.
+
+Why do any such bindings exist?  After all, let-floating should have
+floated them out.  Well, a clever optimiser might leave one there to
+avoid a space leak, deliberately recomputing a thunk.  Also (and this
+really does happen occasionally) let-floating may make a function f smaller
+so it can be inlined, so now (f True) may generate a local no-fv closure.
+This actually happened during bootsrapping GHC itself, with f=mkRdrFunBind 
+in TcGenDeriv.) -}
 
 -----------------------------------------------------------------------------
 --		getCallMethod
