@@ -1519,9 +1519,10 @@ badFieldsUpd
 badFieldsUpd rbinds data_cons
   = hang (ptext (sLit "No constructor has all these fields:"))
        2 (pprQuotedList conflictingFields)
+          -- See Note [Finding the conflicting fields]
   where
     -- A (preferably small) set of fields such that no constructor contains
-    -- all of them.
+    -- all of them.  See Note [Finding the conflicting fields]
     conflictingFields = case nonMembers of
         -- nonMember belongs to a different type.
         (nonMember, _) : _ -> [aMember, nonMember]
@@ -1560,7 +1561,32 @@ badFieldsUpd rbinds data_cons
       map (\ item@(_, membershipRow) -> (countTrue membershipRow, item))
 
     countTrue = length . filter id
+\end{code}
 
+Note [Finding the conflicting fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  data A = A {a0, a1 :: Int}
+         | B {b0, b1 :: Int}
+and we see a record update
+  x { a0 = 3, a1 = 2, b0 = 4, b1 = 5 }
+Then we'd like to find the smallest subset of fields that no
+constructor has all of.  Here, say, {a0,b0}, or {a0,b1}, etc.
+We don't really want to report that no constructor has all of
+{a0,a1,b0,b1}, because when there are hundreds of fields it's 
+hard to see what was really wrong.
+
+We may need more than two fields, though; eg
+  data T = A { x,y :: Int, v::Int } 
+          | B { y,z :: Int, v::Int } 
+          | C { z,x :: Int, v::Int }
+with update
+   r { x=e1, y=e2, z=e3 }, we
+
+Finding the smallest subset is hard, so the code here makes
+a decent stab, no more.  See Trac #7989. 
+
+\begin{code}
 naughtyRecordSel :: TcId -> SDoc
 naughtyRecordSel sel_id
   = ptext (sLit "Cannot use record selector") <+> quotes (ppr sel_id) <+>
