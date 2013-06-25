@@ -31,3 +31,8 @@ T8002:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8002b.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8002a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8002.hs
+
+T8011:
+	$(RM) T8011a.o T8011a.hi T8011.o T8011.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8011a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8011.hs

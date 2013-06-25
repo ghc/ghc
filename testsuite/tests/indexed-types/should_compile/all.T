@@ -219,3 +219,9 @@ test('T8002',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T8002'])
+
+# Import and export of associated types
+test('T8011',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T8011'])
