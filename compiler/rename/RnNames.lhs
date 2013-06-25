@@ -596,8 +596,7 @@ filterImports iface decl_spec Nothing
 
 filterImports iface decl_spec (Just (want_hiding, import_items))
   = do  -- check for errors, convert RdrNames to Names
-        opt_typeFamilies <- xoptM Opt_TypeFamilies
-        items1 <- mapM (lookup_lie opt_typeFamilies) import_items
+        items1 <- mapM lookup_lie import_items
 
         let items2 :: [(LIE Name, AvailInfo)]
             items2 = concat items1
@@ -653,11 +652,11 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
       where
         mb_success = lookupOccEnv occ_env (rdrNameOcc rdr)
 
-    lookup_lie :: Bool -> LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
-    lookup_lie opt_typeFamilies (L loc ieRdr)
-        = do (stuff, warns) <- setSrcSpan loc .
-                liftM (fromMaybe ([],[])) $
-                run_lookup (lookup_ie opt_typeFamilies ieRdr)
+    lookup_lie :: LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
+    lookup_lie (L loc ieRdr)
+        = do (stuff, warns) <- setSrcSpan loc $
+                               liftM (fromMaybe ([],[])) $
+                               run_lookup (lookup_ie ieRdr)
              mapM_ emit_warning warns
              return [ (L loc ie, avail) | (ie,avail) <- stuff ]
         where
@@ -678,9 +677,6 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
               BadImport -> badImportItemErr iface decl_spec ieRdr all_avails
               IllegalImport -> illegalImportItemErr
               QualImportError rdr -> qualImportItemErr rdr
-              TypeItemError children -> typeItemErr
-                                        (head . filter isTyConName $ children)
-                                        (text "in import list")
 
         -- For each import item, we convert its RdrNames to Names,
         -- and at the same time construct an AvailInfo corresponding
@@ -692,8 +688,8 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
         -- data constructors of an associated family, we need separate
         -- AvailInfos for the data constructors and the family (as they have
         -- different parents).  See the discussion at occ_env.
-    lookup_ie :: Bool -> IE RdrName -> IELookupM ([(IE Name, AvailInfo)], [IELookupWarning])
-    lookup_ie opt_typeFamilies ie = handle_bad_import $ do
+    lookup_ie :: IE RdrName -> IELookupM ([(IE Name, AvailInfo)], [IELookupWarning])
+    lookup_ie ie = handle_bad_import $ do
       case ie of
         IEVar n -> do
             (name, avail, _) <- lookup_name n
@@ -701,13 +697,9 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
 
         IEThingAll tc -> do
             (name, avail@(AvailTC name2 subs), mb_parent) <- lookup_name tc
-            let warns
-                  | null (drop 1 subs)
-                  = [DodgyImport tc]
-                  | not (is_qual decl_spec)
-                  = [MissingImportList]
-                  | otherwise
-                  = []
+            let warns | null (drop 1 subs)      = [DodgyImport tc]
+                      | not (is_qual decl_spec) = [MissingImportList]
+                      | otherwise               = []
             case mb_parent of
               -- non-associated ty/cls
               Nothing     -> return ([(IEThingAll name, avail)], warns)
@@ -735,15 +727,12 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
            (name, AvailTC _ subnames, mb_parent) <- lookup_name tc
 
            -- Look up the children in the sub-names of the parent
-           let kid_env     = mkFsEnv [(occNameFS (nameOccName n), n) | n <- subnames]
-               mb_children = map (lookupFsEnv kid_env . occNameFS . rdrNameOcc) ns
+           let mb_children = lookupChildren subnames ns
 
            children <- if any isNothing mb_children
                        then failLookupWith BadImport
                        else return (catMaybes mb_children)
-           -- check for proper import of type families
-           when (not opt_typeFamilies && any isTyConName children) $
-             failLookupWith (TypeItemError children)
+
            case mb_parent of
              -- non-associated ty/cls
              Nothing     -> return ([(IEThingWith name children,
@@ -780,7 +769,6 @@ data IELookupError
   = QualImportError RdrName
   | BadImport
   | IllegalImport
-  | TypeItemError [Name]
 
 failLookupWith :: IELookupError -> IELookupM a
 failLookupWith err = Failed err
@@ -865,6 +853,19 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 findChildren :: NameEnv [Name] -> Name -> [Name]
 findChildren env n = lookupNameEnv env n `orElse` []
 
+lookupChildren :: [Name] -> [RdrName] -> [Maybe Name]
+-- (lookupChildren all_kids rdr_items) maps each rdr_item to its
+-- corresponding Name all_kids, if the former exists
+-- The matching is done by FastString, not OccName, so that
+--    Cls( meth, AssocTy ) 
+-- will correctly find AssocTy among the all_kids of Cls, even though
+-- the RdrName for AssocTy may have a (bogus) DataName namespace
+-- (Really the rdr_items should be FastStrings in the first place.)
+lookupChildren all_kids rdr_items
+  = map (lookupFsEnv kid_env . occNameFS . rdrNameOcc) rdr_items
+  where
+    kid_env = mkFsEnv [(occNameFS (nameOccName n), n) | n <- all_kids]
+               
 -- | Combines 'AvailInfo's from the same family
 -- 'avails' may have several items with the same availName
 -- E.g  import Ix( Ix(..), index )
@@ -1104,20 +1105,12 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
              if isUnboundName name
                 then return (IEThingWith name [], AvailTC name [name])
                 else do
-             let env = mkOccEnv [ (nameOccName s, s)
-                                | s <- findChildren kids_env name ]
-                 mb_names = map (lookupOccEnv env . rdrNameOcc) sub_rdrs
+             let mb_names = lookupChildren (findChildren kids_env name) sub_rdrs
              if any isNothing mb_names
                 then do addErr (exportItemErr ie)
                         return (IEThingWith name [], AvailTC name [name])
                 else do let names = catMaybes mb_names
                         addUsedKids rdr names
-                        optTyFam <- xoptM Opt_TypeFamilies
-                        when (not optTyFam && any isTyConName names) $
-                          addErr (typeItemErr ( head
-                                              . filter isTyConName
-                                              $ names )
-                                              (text "in export list"))
                         return (IEThingWith name names, AvailTC name (name:names))
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
@@ -1618,11 +1611,6 @@ exportItemErr :: IE RdrName -> SDoc
 exportItemErr export_item
   = sep [ ptext (sLit "The export item") <+> quotes (ppr export_item),
           ptext (sLit "attempts to export constructors or class methods that are not visible here") ]
-
-typeItemErr :: Name -> SDoc -> SDoc
-typeItemErr name wherestr
-  = sep [ ptext (sLit "Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
-          ptext (sLit "Use -XTypeFamilies to enable this extension") ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
                -> MsgDoc
