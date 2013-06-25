@@ -18,6 +18,7 @@ module HsDecls (
   TyClDecl(..), LTyClDecl, TyClGroup,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
+  isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
@@ -517,10 +518,21 @@ isTypeFamilyDecl (FamDecl (FamilyDecl { fdInfo = info })) = case info of
   _                   -> False
 isTypeFamilyDecl _ = False
 
+-- | open type family info
+isOpenTypeFamilyInfo :: FamilyInfo name -> Bool
+isOpenTypeFamilyInfo OpenTypeFamily = True
+isOpenTypeFamilyInfo _              = False
+
+-- | closed type family info
+isClosedTypeFamilyInfo :: FamilyInfo name -> Bool
+isClosedTypeFamilyInfo (ClosedTypeFamily {}) = True
+isClosedTypeFamilyInfo _                     = False
+
 -- | data family declaration
 isDataFamilyDecl :: TyClDecl name -> Bool
 isDataFamilyDecl (FamDecl (FamilyDecl { fdInfo = DataFamily })) = True
 isDataFamilyDecl _other      = False
+
 \end{code}
 
 Dealing with names

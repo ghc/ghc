@@ -25,7 +25,7 @@ module TcMType (
   newFlexiTyVarTy,		-- Kind -> TcM TcType
   newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
   newPolyFlexiTyVarTy,
-  newMetaKindVar, newMetaKindVars, mkKindSigVar,
+  newMetaKindVar, newMetaKindVars,
   mkTcTyVarName, cloneMetaTyVar, 
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
@@ -112,10 +112,6 @@ newMetaKindVar = do { uniq <- newUnique
 
 newMetaKindVars :: Int -> TcM [TcKind]
 newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
-
-mkKindSigVar :: Name -> KindVar
--- Use the specified name; don't clone it
-mkKindSigVar n = mkTcTyVar n superKind (SkolemTv False)
 \end{code}
 
 
@@ -527,13 +523,12 @@ quantifyTyVars gbl_tvs tkvs
              -- may make quantifyTyVars return a shorter list
              -- than it was passed, but that's ok
        ; poly_kinds <- xoptM Opt_PolyKinds
-       ; qkvs <- if poly_kinds 
+       ; qkvs <- if poly_kinds
                  then return kvs2
                  else do { let (meta_kvs, skolem_kvs) = partition is_meta kvs2
                                is_meta kv = isTcTyVar kv && isMetaTyVar kv
                          ; mapM_ defaultKindVarToStar meta_kvs
-                         ; WARN( not (null skolem_kvs), ppr skolem_kvs )
-                           return skolem_kvs }  -- Should be empty
+                         ; return skolem_kvs }  -- should be empty
 
        ; mapM zonk_quant (qkvs ++ qtvs) } 
            -- Because of the order, any kind variables

@@ -199,9 +199,9 @@ Note [Kind checking for type and class decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Kind checking is done thus:
 
-   1. Make up a kind variable for each parameter of the *data* type,
-      and class, decls, and extend the kind environment (which is in
-      the TcLclEnv)
+   1. Make up a kind variable for each parameter of the *data* type, class,
+      and closed type family decls, and extend the kind environment (which is
+      in the TcLclEnv)
 
    2. Dependency-analyse the type *synonyms* (which must be non-recursive),
       and kind-check them in dependency order.  Extend the kind envt.
@@ -236,18 +236,17 @@ So we must infer their kinds from their right-hand sides *first* and then
 use them, whereas for the mutually recursive data types D we bring into
 scope kind bindings D -> k, where k is a kind variable, and do inference.
 
-Type families
-~~~~~~~~~~~~~
+Open type families
+~~~~~~~~~~~~~~~~~~
 This treatment of type synonyms only applies to Haskell 98-style synonyms.
 General type functions can be recursive, and hence, appear in `alg_decls'.
 
-The kind of a type family is solely determinded by its kind signature;
+The kind of an open type family is solely determinded by its kind signature;
 hence, only kind signatures participate in the construction of the initial
-kind environment (as constructed by `getInitialKind').  In fact, we ignore
-instances of families altogether in the following.  However, we need to
-include the kinds of *associated* families into the construction of the
-initial kind environment.  (This is handled by `allDecls').
-
+kind environment (as constructed by `getInitialKind'). In fact, we ignore
+instances of families altogether in the following. However, we need to include
+the kinds of *associated* families into the construction of the initial kind
+environment. (This is handled by `allDecls').
 
 \begin{code}
 kcTyClGroup :: TyClGroup Name -> TcM [(Name,Kind)]
@@ -267,7 +266,7 @@ kcTyClGroup decls
 
           -- Step 1: Bind kind variables for non-synonyms
         ; let (syn_decls, non_syn_decls) = partition (isSynDecl . unLoc) decls
-        ; initial_kinds <- getInitialKinds TopLevel non_syn_decls
+        ; initial_kinds <- getInitialKinds non_syn_decls
         ; traceTc "kcTyClGroup: initial kinds" (ppr initial_kinds)
 
         -- Step 2: Set initial envt, kind-check the synonyms
@@ -314,7 +313,6 @@ kcTyClGroup decls
       = pprPanic "generaliseTCD" (ppr decl)
 
       | otherwise
-      -- Note: tcdTyVars is safe here because we've eliminated FamDecl and ForeignType
       = do { res <- generalise kind_env (tcdName decl)
            ; return [res] }
 
@@ -334,12 +332,13 @@ mk_thing_env (decl : decls)
   = (tcdName (unLoc decl), APromotionErr TyConPE) :
     (mk_thing_env decls)
 
-getInitialKinds :: TopLevelFlag -> [LTyClDecl Name] -> TcM [(Name, TcTyThing)]
-getInitialKinds top_lvl decls
+getInitialKinds :: [LTyClDecl Name] -> TcM [(Name, TcTyThing)]
+getInitialKinds decls
   = tcExtendTcTyThingEnv (mk_thing_env decls) $
-    concatMapM (addLocM (getInitialKind top_lvl)) decls
+    concatMapM (addLocM getInitialKind) decls
 
-getInitialKind :: TopLevelFlag -> TyClDecl Name -> TcM [(Name, TcTyThing)]
+-- See Note [Kind-checking strategies] in TcHsType
+getInitialKind :: TyClDecl Name -> TcM [(Name, TcTyThing)]
 -- Allocate a fresh kind variable for each TyCon and Class
 -- For each tycon, return   (tc, AThing k)
 --                 where k is the kind of tc, derived from the LHS
@@ -357,39 +356,36 @@ getInitialKind :: TopLevelFlag -> TyClDecl Name -> TcM [(Name, TcTyThing)]
 --
 -- No family instances are passed to getInitialKinds
 
-getInitialKind _ (ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
-  = kcHsTyVarBndrs False ktvs $ \ arg_kinds ->
-    do { inner_prs <- getFamDeclInitialKinds ats
-       ; let main_pr = (name, AThing (mkArrowKinds arg_kinds constraintKind))
+getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
+  = do { (cl_kind, inner_prs) <-
+           kcHsTyVarBndrs (kcStrategy decl) ktvs $
+           do { inner_prs <- getFamDeclInitialKinds ats
+              ; return (constraintKind, inner_prs) }
+       ; let main_pr = (name, AThing cl_kind)
        ; return (main_pr : inner_prs) }
 
-getInitialKind top_lvl (DataDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdDataDefn = defn })
-  | HsDataDefn { dd_kindSig = Just ksig, dd_cons = cons } <- defn
-  = ASSERT( isTopLevel top_lvl )
-    kcHsTyVarBndrs True ktvs $ \ arg_kinds ->
-    do { res_k <- tcLHsKind ksig
-       ; let body_kind = mkArrowKinds arg_kinds res_k
-             kvs       = varSetElems (tyVarsOfType body_kind)
-             main_pr   = (name, AThing (mkForAllTys kvs body_kind))
-             inner_prs = [(unLoc (con_name con), APromotionErr RecDataConPE) | L _ con <- cons ]
-             -- See Note [Recusion and promoting data constructors]
-       ; return (main_pr : inner_prs) }
-
-  | HsDataDefn { dd_cons = cons } <- defn
-  = kcHsTyVarBndrs False ktvs $ \ arg_kinds ->
-    do { let main_pr   = (name, AThing (mkArrowKinds arg_kinds liftedTypeKind))
+getInitialKind decl@(DataDecl { tcdLName = L _ name
+                                , tcdTyVars = ktvs
+                                , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                                           , dd_cons = cons } })
+  = do { (decl_kind, _) <-
+           kcHsTyVarBndrs (kcStrategy decl) ktvs $
+           do { res_k <- case m_sig of
+                           Just ksig -> tcLHsKind ksig
+                           Nothing   -> return liftedTypeKind
+              ; return (res_k, ()) }
+       ; let main_pr = (name, AThing decl_kind)
              inner_prs = [ (unLoc (con_name con), APromotionErr RecDataConPE)
                          | L _ con <- cons ]
-             -- See Note [Recusion and promoting data constructors]
        ; return (main_pr : inner_prs) }
 
-getInitialKind top_lvl (FamDecl { tcdFam = decl }) 
-  = getFamDeclInitialKind top_lvl decl
+getInitialKind (FamDecl { tcdFam = decl }) 
+  = getFamDeclInitialKind decl
 
-getInitialKind _ (ForeignType { tcdLName = L _ name })
+getInitialKind (ForeignType { tcdLName = L _ name })
   = return [(name, AThing liftedTypeKind)]
 
-getInitialKind _top_lvl decl@(SynDecl {}) 
+getInitialKind decl@(SynDecl {}) 
   = pprPanic "getInitialKind" (ppr decl)
 
 ---------------------------------
@@ -397,29 +393,25 @@ getFamDeclInitialKinds :: [LFamilyDecl Name] -> TcM [(Name, TcTyThing)]
 getFamDeclInitialKinds decls
   = tcExtendTcTyThingEnv [ (n, APromotionErr TyConPE)
                          | L _ (FamilyDecl { fdLName = L _ n }) <- decls] $
-    concatMapM (addLocM (getFamDeclInitialKind NotTopLevel)) decls
+    concatMapM (addLocM getFamDeclInitialKind) decls
 
-getFamDeclInitialKind :: TopLevelFlag
-                      -> FamilyDecl Name
+getFamDeclInitialKind :: FamilyDecl Name
                       -> TcM [(Name, TcTyThing)]
-getFamDeclInitialKind top_lvl (FamilyDecl { fdLName = L _ name
-                                          , fdTyVars = ktvs
-                                          , fdKindSig = ksig })
-  | isTopLevel top_lvl
-  = kcHsTyVarBndrs True ktvs $ \ arg_kinds ->
-    do { res_k <- case ksig of
-                    Just k  -> tcLHsKind k
-                    Nothing -> return liftedTypeKind
-       ; let body_kind = mkArrowKinds arg_kinds res_k
-             kvs       = varSetElems (tyVarsOfType body_kind)
-       ; return [ (name, AThing (mkForAllTys kvs body_kind)) ] }
-
-  | otherwise
-  = kcHsTyVarBndrs False ktvs $ \ arg_kinds ->
-    do { res_k <- case ksig of
-                    Just k  -> tcLHsKind k
-                    Nothing -> newMetaKindVar
-       ; return [ (name, AThing (mkArrowKinds arg_kinds res_k)) ] }
+getFamDeclInitialKind decl@(FamilyDecl { fdLName = L _ name
+                                       , fdInfo = info
+                                       , fdTyVars = ktvs
+                                       , fdKindSig = ksig })
+  = do { (fam_kind, _) <-
+           kcHsTyVarBndrs (kcStrategyFamDecl decl) ktvs $
+           do { res_k <- case ksig of
+                           Just k  -> tcLHsKind k
+                           Nothing
+                             | defaultResToStar -> return liftedTypeKind
+                             | otherwise        -> newMetaKindVar
+              ; return (res_k, ()) }
+       ; return [ (name, AThing fam_kind) ] }
+  where
+    defaultResToStar  = not $ isClosedTypeFamilyInfo info
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)] -> TcM TcLclEnv    -- Kind bindings
@@ -440,13 +432,13 @@ kcSynDecl decl@(SynDecl { tcdTyVars = hs_tvs, tcdLName = L _ name
                        , tcdRhs = rhs })
   -- Returns a possibly-unzonked kind
   = tcAddDeclCtxt decl $
-    kcHsTyVarBndrs False hs_tvs $ \ ks ->
-    do { traceTc "kcd1" (ppr name <+> brackets (ppr hs_tvs)
-                         <+> brackets (ppr ks))
-       ; (_, rhs_kind) <- tcLHsType rhs
-       ; traceTc "kcd2" (ppr name)
-       ; let tc_kind = mkArrowKinds ks rhs_kind
-       ; return (name, tc_kind) }
+    do { (syn_kind, _) <-
+           kcHsTyVarBndrs (kcStrategy decl) hs_tvs $
+           do { traceTc "kcd1" (ppr name <+> brackets (ppr hs_tvs))
+              ; (_, rhs_kind) <- tcLHsType rhs
+              ; traceTc "kcd2" (ppr name)
+              ; return (rhs_kind, ()) }
+       ; return (name, syn_kind) }
 kcSynDecl decl = pprPanic "kcSynDecl" (ppr decl)
 
 ------------------------------------------------------------------------
@@ -485,6 +477,13 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
     kc_sig _                    = return ()
 
 kcTyClDecl (ForeignType {}) = return ()
+
+-- closed type families look at their equations, but other families don't
+-- do anything here
+kcTyClDecl (FamDecl (FamilyDecl { fdLName = L _ fam_tc_name
+                                , fdInfo = ClosedTypeFamily eqns }))
+  = do { k <- kcLookupKind fam_tc_name
+       ; mapM_ (kcTyFamInstEqn fam_tc_name k) eqns }
 kcTyClDecl (FamDecl {})    = return ()
 
 -------------------
@@ -492,10 +491,11 @@ kcConDecl :: ConDecl Name -> TcM ()
 kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
                    , con_cxt = ex_ctxt, con_details = details, con_res = res })
   = addErrCtxt (dataConCtxt name) $
-    kcHsTyVarBndrs False ex_tvs $ \ _ ->
-    do { _ <- tcHsContext ex_ctxt
-       ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
-       ; _ <- tcConRes res
+    do { _ <- kcHsTyVarBndrs ParametricKinds ex_tvs $
+              do { _ <- tcHsContext ex_ctxt
+                 ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
+                 ; _ <- tcConRes res
+                 ; return (panic "kcConDecl", ()) }
        ; return () }
 \end{code}
 
@@ -845,6 +845,13 @@ tcSynFamInstNames (L _ first) names
       = setSrcSpan loc $
         failWithTc (msg_fun name)
 
+kcTyFamInstEqn :: Name -> Kind -> LTyFamInstEqn Name -> TcM ()
+kcTyFamInstEqn fam_tc_name kind
+    (L loc (TyFamInstEqn { tfie_pats = pats, tfie_rhs = hs_ty }))
+  = setSrcSpan loc $
+    discardResult $
+    tc_fam_ty_pats fam_tc_name kind pats (discardResult . (tcCheckLHsType hs_ty))
+
 tcTyFamInstEqn :: Name -> Kind -> LTyFamInstEqn Name -> TcM CoAxBranch
 tcTyFamInstEqn fam_tc_name kind
     (L loc (TyFamInstEqn { tfie_pats = pats, tfie_rhs = hs_ty }))
@@ -873,26 +880,36 @@ kcResultKind Nothing res_k
 kcResultKind (Just k) res_k
   = do { k' <- tcLHsKind k
        ; checkKind  k' res_k }
+\end{code}
 
--------------------------
--- Kind check type patterns and kind annotate the embedded type variables.
---     type instance F [a] = rhs
---
--- * Here we check that a type instance matches its kind signature, but we do
---   not check whether there is a pattern for each type index; the latter
---   check is only required for type synonym instances.
+Kind check type patterns and kind annotate the embedded type variables.
+     type instance F [a] = rhs
 
+ * Here we check that a type instance matches its kind signature, but we do
+   not check whether there is a pattern for each type index; the latter
+   check is only required for type synonym instances.
+
+Note [tc_fam_ty_pats vs tcFamTyPats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tc_fam_ty_pats does the type checking of the patterns, but it doesn't
+zonk or generate any desugaring. It is used when kind-checking closed
+type families.
+
+tcFamTyPats type checks the patterns, zonks, and then calls thing_inside
+to generate a desugaring. It is used during type-checking (not kind-checking).
+
+\begin{code}
 -----------------
 -- Note that we can't use the family TyCon, because this is sometimes called
 -- from within a type-checking knot. So, we ask our callers to do a little more
 -- work.
-tcFamTyPats :: Name -- of the family TyCon
-            -> Kind -- of the family TyCon
-            -> HsWithBndrs [LHsType Name] -- Patterns
-            -> (TcKind -> TcM ())       -- Kind checker for RHS
-                                        -- result is ignored
-            -> ([TKVar] -> [TcType] -> Kind -> TcM a)
-            -> TcM a
+-- See Note [tc_fam_ty_pats vs tcFamTyPats]
+tc_fam_ty_pats :: Name -- of the family TyCon
+               -> Kind -- of the family TyCon
+               -> HsWithBndrs [LHsType Name] -- Patterns
+               -> (TcKind -> TcM ())       -- Kind checker for RHS
+                                           -- result is ignored
+               -> TcM ([Kind], [Type], Kind)
 -- Check the type patterns of a type or data family instance
 --     type instance F <pat1> <pat2> = <type>
 -- The 'tyvars' are the free type variables of pats
@@ -904,9 +921,9 @@ tcFamTyPats :: Name -- of the family TyCon
 -- In that case, the type variable 'a' will *already be in scope*
 -- (and, if C is poly-kinded, so will its kind parameter).
 
-tcFamTyPats fam_tc_name kind
-            (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tvars })
-            kind_checker thing_inside
+tc_fam_ty_pats fam_tc_name kind
+               (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tvars })
+               kind_checker
   = do { let (fam_kvs, fam_body) = splitForAllTys kind
 
          -- We wish to check that the pattern has the right number of arguments
@@ -934,6 +951,19 @@ tcFamTyPats fam_tc_name kind
        ; typats <- tcHsTyVarBndrs hs_tvs $ \ _ ->
                    do { kind_checker res_kind
                       ; tcHsArgTys (quotes (ppr fam_tc_name)) arg_pats arg_kinds }
+
+       ; return (fam_arg_kinds, typats, res_kind) }
+
+-- See Note [tc_fam_ty_pats vs tcFamTyPats]
+tcFamTyPats :: Name -- of the family ToCon
+            -> Kind -- of the family TyCon
+            -> HsWithBndrs [LHsType Name] -- patterns
+            -> (TcKind -> TcM ())         -- kind-checker for RHS
+            -> ([TKVar] -> [TcType] -> Kind -> TcM a)
+            -> TcM a
+tcFamTyPats fam_tc_name kind pats kind_checker thing_inside
+  = do { (fam_arg_kinds, typats, res_kind)
+            <- tc_fam_ty_pats fam_tc_name kind pats kind_checker
        ; let all_args = fam_arg_kinds ++ typats
 
             -- Find free variables (after zonking) and turn

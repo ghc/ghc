@@ -24,7 +24,8 @@ module TcHsType (
 
 		-- Kind-checking types
                 -- No kind generalisation, no checkValidType
-	kcHsTyVarBndrs, tcHsTyVarBndrs, 
+	KindCheckingStrategy(..), kcStrategy, kcStrategyFamDecl,
+        kcHsTyVarBndrs, tcHsTyVarBndrs, 
         tcHsLiftedType, tcHsOpenType,
 	tcLHsType, tcCheckLHsType, 
         tcHsContext, tcInferApps, tcHsArgTys,
@@ -922,7 +923,191 @@ then we'd also need
   k is a   UserKiVar   -> kind variable (they don't need annotation,
                           since we only have BOX for a super kind)
 
+Note [Kind-checking strategies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are three main declarations that we have to kind check carefully in the
+presence of -XPolyKinds: classes, datatypes, and data/type families. They each
+have a different kind-checking strategy (labeled in the parentheses above each
+section). This should potentially be cleaned up in the future, but this is how
+it stands now (June 2013).
+
+Classes (ParametricKinds):
+  - kind-polymorphic by default
+  - each un-annotated type variable is given a fresh meta kind variable
+  - every explicit kind variable becomes a SigTv during inference
+  - no generalisation is done while kind-checking the recursive group
+
+  Taken together, this means that classes cannot participate in polymorphic
+  recursion. Thus, the following is not definable:
+
+  class Fugly (a :: k) where
+    foo :: forall (b :: k -> *). Fugly b => b a
+
+  But, because explicit kind variables are SigTvs, it is OK for the kind to
+  be forced to be the same kind that is used in a separate declaration. See
+  test case polykinds/T7020.hs.
+
+Datatypes:
+  Here we have two cases, whether or not a Full Kind Signature is provided.
+  A Full Kind Signature means that there is a top-level :: in the definition
+  of the datatype. For example:
+
+  data T1 :: k -> Bool -> * where ...         -- YES
+  data T2 (a :: k) :: Bool -> * where ...     -- YES
+  data T3 (a :: k) (b :: Bool) :: * where ... -- YES
+  data T4 (a :: k) (b :: Bool) where ...      -- NO
+
+  Kind signatures are not allowed on datatypes declared in the H98 style,
+  so those always have no Full Kind Signature.
+
+  Full Kind Signature (FullKindSignature):
+    - each un-annotated type variable defaults to *
+    - every explicit kind variable becomes a skolem during type inference
+    - these kind variables are generalised *before* kind-checking the group
+
+    With these rules, polymorphic recursion is possible. This is essentially
+    because of the generalisation step before kind-checking the group -- it
+    gives the kind-checker enough flexibility to supply the right kind arguments
+    to support polymorphic recursion.
+
+  no Full Kind Signature (ParametricKinds):
+    - kind-polymorphic by default
+    - each un-annotated type variable is given a fresh meta kind variable
+    - every explicit kind variable becomes a SigTv during inference
+    - no generalisation is done while kind-checking the recursive group
+
+    Thus, no polymorphic recursion in this case. See also Trac #6093 & #6049.
+
+Type families:
+  Here we have three cases: open top-level families, closed top-level families,
+  and open associated types. (There are no closed associated types, for good
+  reason.)
+
+  Open top-level families (FullKindSignature):
+    - All open top-level families are considered to have a Full Kind Signature
+    - All arguments and the result default to *
+    - All kind variables are skolems
+    - All kind variables are generalised before kind-checking the group
+
+    This behaviour supports kind-indexed type and data families, because we
+    need to have generalised before kind-checking for this to work. For example:
+
+    type family F (a :: k)
+    type instance F Int = Bool
+    type instance F Maybe = Char
+    type instance F (x :: * -> * -> *) = Double
+
+  Closed top-level families (NonParametricKinds):
+    - kind-monomorphic by default
+    - each un-annotated type variable is given a fresh meta kind variable
+    - every explicit kind variable becomes a skolem during inference
+    - all such skolems are generalised before kind-checking; other kind
+      variables are not generalised
+    - all unconstrained meta kind variables are defaulted to * at the
+      end of kind checking
+
+    This behaviour is to allow kind inference to occur in closed families, but
+    without becoming too polymorphic. For example:
+
+    type family F a where
+      F Int = Bool
+      F Bool = Char
+
+    We would want F to have kind * -> * from this definition, although something
+    like k1 -> k2 would be perfectly sound. The reason we want this restriction is
+    that it is better to have (F Maybe) be a kind error than simply stuck.
+
+    The kind inference gives us also
+
+    type family Not b where
+      Not False = True
+      Not True  = False
+
+    With an open family, the above would need kind annotations in its header.
+
+    The tricky case is
+
+    type family G a (b :: k) where
+      G Int Int    = False
+      G Bool Maybe = True
+
+    We want this to work. But, we also want (G Maybe Maybe) to be a kind error
+    (in the first argument). So, we need to generalise the skolem "k" but not
+    the meta kind variable associated with "a".
+
+  Associated families (FullKindSignature):
+    - Kind-monomorphic by default
+    - Result kind defaults to *
+    - Each type variable is either in the class header or not:
+      - Type variables in the class header are given the kind inherited from
+        the class header (and checked against an annotation, if any)
+      - Un-annotated type variables default to *
+    - Each kind variable mentioned in the class header becomes a SigTv during
+      kind inference.
+    - Each kind variable not mentioned in the class header becomes a skolem during
+      kind inference.
+    - Only the skolem kind variables are generalised before kind checking.
+
+    Here are some examples:
+    
+    class Foo1 a b where
+      type Bar1 (a :: k) (b :: k)
+
+    The kind of Foo1 will be k -> k -> Constraint. Kind annotations on associated
+    type declarations propagate to the header because the type variables in Bar1's
+    declaration inherit the (meta) kinds of the class header.
+
+    class Foo2 a where
+      type Bar2 a
+
+    The kind of Bar2 will be k -> *.
+
+    class Foo3 a where
+      type Bar3 a (b :: k)
+      meth :: Bar3 a Maybe -> ()
+
+    The kind of Bar3 will be k1 -> k2 -> *. This only kind-checks because the kind
+    of b is generalised before kind-checking.
+
+    class Foo4 a where
+      type Bar4 a b
+
+    Here, the kind of Bar4 will be k -> * -> *, because b is not mentioned in the
+    class header, so it defaults to *.
+
 \begin{code}
+data KindCheckingStrategy   -- See Note [Kind-checking strategies]
+  = ParametricKinds
+  | NonParametricKinds
+  | FullKindSignature
+
+-- determine the appropriate strategy for a decl
+kcStrategy :: TyClDecl Name -> KindCheckingStrategy
+kcStrategy d@(ForeignType {}) = pprPanic "kcStrategy" (ppr d)
+kcStrategy (FamDecl fam_decl)
+  = kcStrategyFamDecl fam_decl
+kcStrategy (SynDecl {})       = ParametricKinds
+kcStrategy (DataDecl { tcdDataDefn = HsDataDefn { dd_kindSig = m_ksig }})
+  | Just _ <- m_ksig            = FullKindSignature
+  | otherwise                   = ParametricKinds
+kcStrategy (ClassDecl {})     = ParametricKinds
+
+kcStrategyFamDecl :: FamilyDecl Name -> KindCheckingStrategy
+kcStrategyFamDecl (FamilyDecl { fdInfo = info })
+  | isClosedTypeFamilyInfo info = NonParametricKinds
+  | otherwise                   = FullKindSignature
+
+mkKindSigVar :: Name -> TcM KindVar
+-- Use the specified name; don't clone it
+mkKindSigVar n 
+  = do { mb_thing <- tcLookupLcl_maybe n
+       ; case mb_thing of
+           Just (AThing k)
+             | Just kvar <- getTyVar_maybe k
+             -> return kvar
+           _ -> return $ mkTcTyVar n superKind (SkolemTv False) }
+
 kcScopedKindVars :: [Name] -> TcM a -> TcM a
 -- Given some tyvar binders like [a (b :: k -> *) (c :: k)]
 -- bind each scoped kind variable (k in this case) to a fresh
@@ -932,28 +1117,39 @@ kcScopedKindVars kv_ns thing_inside
                      -- NB: use mutable signature variables
        ; tcExtendTyVarEnv2 (kv_ns `zip` kvs) thing_inside } 
 
-kcHsTyVarBndrs :: Bool    -- True <=> full kind signature provided
-                          -- Default UserTyVar to *
-                          -- and use KindVars not meta kind vars
+kcHsTyVarBndrs :: KindCheckingStrategy
                -> LHsTyVarBndrs Name 
-	       -> ([TcKind] -> TcM r)
-	       -> TcM r
+	       -> TcM (Kind, r)   -- the result kind, possibly with other info
+	       -> TcM (Kind, r)
 -- Used in getInitialKind
-kcHsTyVarBndrs full_kind_sig (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
-  = do { kvs <- if full_kind_sig 
-                then return (map mkKindSigVar kv_ns)
+kcHsTyVarBndrs strat (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
+  = do { kvs <- if skolem_kvs
+                then mapM mkKindSigVar kv_ns
                 else mapM (\n -> newSigTyVar n superKind) kv_ns
        ; tcExtendTyVarEnv2 (kv_ns `zip` kvs) $
     do { nks <- mapM (kc_hs_tv . unLoc) hs_tvs
-       ; tcExtendKindEnv nks (thing_inside (map snd nks)) } }
+       ; (res_kind, stuff) <- tcExtendKindEnv nks thing_inside
+       ; let full_kind = mkArrowKinds (map snd nks) res_kind
+             kvs       = filter (not . isMetaTyVar) $
+                         varSetElems $ tyVarsOfType full_kind
+             gen_kind  = if generalise
+                         then mkForAllTys kvs full_kind
+                         else full_kind
+       ; return (gen_kind, stuff) } }
   where
+    -- See Note [Kind-checking strategies]
+    (skolem_kvs, default_to_star, generalise) = case strat of
+          ParametricKinds    -> (False, False, False)
+          NonParametricKinds -> (True,  False, True)
+          FullKindSignature  -> (True,  True,  True)
+
     kc_hs_tv :: HsTyVarBndr Name -> TcM (Name, TcKind)
     kc_hs_tv (UserTyVar n)     
       = do { mb_thing <- tcLookupLcl_maybe n
            ; kind <- case mb_thing of
-               	       Just (AThing k)   -> return k
-               	       _ | full_kind_sig -> return liftedTypeKind
-               	         | otherwise     -> newMetaKindVar
+               	       Just (AThing k)     -> return k
+               	       _ | default_to_star -> return liftedTypeKind
+               	         | otherwise       -> newMetaKindVar
            ; return (n, kind) }
     kc_hs_tv (KindedTyVar n k) 
       = do { kind <- tcLHsKind k
@@ -973,7 +1169,7 @@ tcHsTyVarBndrs :: LHsTyVarBndrs Name
 -- Bind the kind variables to fresh skolem variables
 -- and type variables to skolems, each with a meta-kind variable kind
 tcHsTyVarBndrs (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
-  = do { let kvs = map mkKindSigVar kv_ns
+  = do { kvs <- mapM mkKindSigVar kv_ns
        ; tcExtendTyVarEnv kvs $ do 
        { tvs <- mapM tcHsTyVarBndr hs_tvs
        ; traceTc "tcHsTyVarBndrs {" (vcat [ text "Hs kind vars:" <+> ppr kv_ns
