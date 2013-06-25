@@ -156,7 +156,7 @@ data LambdaFormInfo
 			--	For a function, the entry code is the fast entry point
 
   | LFUnLifted		-- A value of unboxed type; 
-			-- always a value, neeeds evaluation
+			-- always a value, needs evaluation
 
   | LFLetNoEscape	-- See LetNoEscape module for precise description 
 
@@ -174,7 +174,7 @@ data LambdaFormInfo
 
 data StandardFormInfo
   = NonStandardThunk
-	-- The usual case: not of of the standard forms
+	-- The usual case: not of the standard forms
 
   | SelectorThunk
 	-- A SelectorThunk is of form
