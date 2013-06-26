@@ -158,7 +158,7 @@ instance (SingI a, SingE (KindOf a)) => SingRep (a :: k)
 
 -- The type of an unknown singletons of a given kind.
 -- Note that the "type" parameter on this type is really
--- a *kind* parameter (this is simillar to the trick used in `SingE`).
+-- a *kind* parameter (this is similar to the trick used in `SingE`).
 data SomeSing :: KindIs k -> * where
   SomeSing :: SingI (n::k) => proxy n -> SomeSing (kp :: KindIs k)
 
@@ -212,7 +212,7 @@ incoherentForgetSing x = withSingI x it LocalProxy
   it :: SingI n => LocalProxy n -> SomeSing kp
   it = SomeSing
 
-{-# LANGUAGE NOINLINE withSingI #-}
+{-# NOINLINE withSingI #-}
 withSingI :: Sing n -> (SingI n => a) -> a
 withSingI x = magicSingI x ((\f -> f) :: () -> ())
 
