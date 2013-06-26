@@ -261,7 +261,7 @@ genCmmLabelRef env = genStringLabelRef (getDflags env) . strCLabel_llvm env
 genStringLabelRef :: DynFlags -> LMString -> LMGlobal
 genStringLabelRef dflags cl
   = let ty = LMPointer $ LMArray 0 (llvmWord dflags)
-    in (LMGlobalVar cl ty External Nothing Nothing False, Nothing)
+    in LMGlobal (LMGlobalVar cl ty External Nothing Nothing Global) Nothing
 
 -- ----------------------------------------------------------------------------
 -- * Misc

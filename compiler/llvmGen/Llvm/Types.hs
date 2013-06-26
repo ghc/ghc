@@ -27,7 +27,11 @@ import GHC.Float
 --
 
 -- | A global mutable variable. Maybe defined or external
-type LMGlobal = (LlvmVar, Maybe LlvmStatic)
+data LMGlobal = LMGlobal {
+  getGlobalVar :: LlvmVar,          -- ^ Returns the variable of the 'LMGlobal'
+  getGlobalValue :: Maybe LlvmStatic -- ^ Return the value of the 'LMGlobal'
+  }
+
 -- | A String in LLVM
 type LMString = FastString
 
@@ -86,7 +90,11 @@ ppParams varg p
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
 type LMAlign = Maybe Int
-type LMConst = Bool -- ^ is a variable constant or not
+
+data LMConst = Global      -- ^ Mutable global variable
+             | Constant    -- ^ Constant global variable
+             | Alias       -- ^ Alias of another variable
+             deriving (Eq)
 
 -- | LLVM Variables
 data LlvmVar
@@ -238,14 +246,6 @@ getStatType (LMPtoI        _ t) = t
 getStatType (LMAdd         t _) = getStatType t
 getStatType (LMSub         t _) = getStatType t
 getStatType (LMComment       _) = error "Can't call getStatType on LMComment!"
-
--- | Return the 'LlvmType' of the 'LMGlobal'
-getGlobalType :: LMGlobal -> LlvmType
-getGlobalType (v, _) = getVarType v
-
--- | Return the 'LlvmVar' part of a 'LMGlobal'
-getGlobalVar :: LMGlobal -> LlvmVar
-getGlobalVar (v, _) = v
 
 -- | Return the 'LlvmLinkageType' for a 'LlvmVar'
 getLink :: LlvmVar -> LlvmLinkageType
@@ -634,7 +634,7 @@ instance Outputable LlvmLinkageType where
   -- in Llvm.
   ppr ExternallyVisible = empty
   ppr External          = text "external"
-
+  ppr Private           = text "private"
 
 -- -----------------------------------------------------------------------------
 -- * LLVM Operations

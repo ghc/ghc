@@ -61,7 +61,7 @@ ppLlvmGlobals ls = vcat $ map ppLlvmGlobal ls
 
 -- | Print out a global mutable variable definition
 ppLlvmGlobal :: LMGlobal -> SDoc
-ppLlvmGlobal (var@(LMGlobalVar _ _ link x a c), dat) =
+ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
     let sect = case x of
             Just x' -> text ", section" <+> doubleQuotes (ftext x')
             Nothing -> empty
@@ -74,12 +74,16 @@ ppLlvmGlobal (var@(LMGlobalVar _ _ link x a c), dat) =
             Just stat -> ppr stat
             Nothing   -> ppr (pLower $ getVarType var)
 
-        const' = if c then text "constant" else text "global"
+        -- Position of linkage is different for aliases.
+        const_link = case c of
+          Global   -> ppr link <+> text "global"
+          Constant -> ppr link <+> text "constant"
+          Alias    -> text "alias" <+> ppr link
 
-    in ppAssignment var $ ppr link <+> const' <+> rhs <> sect <> align
+    in ppAssignment var $ const_link <+> rhs <> sect <> align
        $+$ newLine
 
-ppLlvmGlobal (var, val) = sdocWithDynFlags $ \dflags ->
+ppLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
   error $ "Non Global var ppr as global! "
           ++ showSDoc dflags (ppr var) ++ " " ++ showSDoc dflags (ppr val)
 

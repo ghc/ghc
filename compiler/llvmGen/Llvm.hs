@@ -32,7 +32,8 @@ module Llvm (
 
         -- * Variables and Type System
         LlvmVar(..), LlvmStatic(..), LlvmLit(..), LlvmType(..),
-        LlvmAlias, LMGlobal, LMString, LMSection, LMAlign,
+        LlvmAlias, LMGlobal(..), LMString, LMSection, LMAlign,
+        LMConst(..),
 
         -- ** Some basic types
         i64, i32, i16, i8, i1, i8Ptr, llvmWord, llvmWordPtr,
@@ -42,7 +43,7 @@ module Llvm (
 
         -- ** Operations on the type system.
         isGlobal, getLitType, getVarType,
-        getLink, getStatType, getGlobalVar, getGlobalType, pVarLift, pVarLower,
+        getLink, getStatType, pVarLift, pVarLower,
         pLift, pLower, isInt, isFloat, isPointer, isVector, llvmWidthInBits,
 
         -- * Pretty Printing

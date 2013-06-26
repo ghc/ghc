@@ -128,8 +128,9 @@ cmmProcLlvmGens dflags h _ _ [] _ ivars
     cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
     ty     = (LMArray (length ivars') i8Ptr)
     usedArray = LMStaticArray (map cast ivars') ty
-    lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
-              (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
+    lmUsedVar = LMGlobalVar (fsLit "llvm.used") ty Appending
+                  (Just $ fsLit "llvm.metadata") Nothing Global
+    lmUsed    = LMGlobal lmUsedVar (Just usedArray)
 
 cmmProcLlvmGens dflags h us env ((CmmData _ _) : cmms) count ivars
  = cmmProcLlvmGens dflags h us env cmms count ivars

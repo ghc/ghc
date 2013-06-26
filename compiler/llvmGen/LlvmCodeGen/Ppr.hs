@@ -75,8 +75,8 @@ moduleLayout = sdocWithPlatform $ \platform ->
 -- | Pretty print LLVM data code
 pprLlvmData :: LlvmData -> SDoc
 pprLlvmData (globals, types) =
-    let tryConst (v, Just s )   = ppLlvmGlobal (v, Just s)
-        tryConst g@(_, Nothing) = ppLlvmGlobal g
+    let tryConst (LMGlobal v (Just s))  = ppLlvmGlobal (LMGlobal v $ Just s)
+        tryConst g@(LMGlobal _ Nothing) = ppLlvmGlobal g
 
         ppLlvmTys (LMAlias    a) = ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
@@ -119,13 +119,13 @@ pprInfoTable env count info_lbl stat
         unres = genLlvmData env (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
-        setSection ((LMGlobalVar _ ty l _ _ c), d)
+        setSection (LMGlobal (LMGlobalVar _ ty l _ _ c) d)
             = let sec = mkLayoutSection count
                   ilabel = strCLabel_llvm env info_lbl
                               `appendFS` fsLit iTableSuf
                   gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
                   v = if l == Internal then [gv] else []
-              in ((gv, d), v)
+              in (LMGlobal gv d, v)
         setSection v = (v,[])
 
         (ldata', llvmUsed) = setSection (last ldata)

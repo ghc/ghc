@@ -156,7 +156,7 @@ oldBarrier env = do
                     FixedArgs (tysToParams [i1, i1, i1, i1, i1]) (llvmFunAlign dflags)
     let fty = LMFunction funSig
 
-    let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing False
+    let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing Global
     let tops = case funLookup fname env of
                     Just _  -> []
                     Nothing -> [CmmData Data [([],[fty])]]
@@ -417,14 +417,14 @@ getFunPtr env funTy targ = case targ of
                 Just ty'@(LMFunction sig) -> do
                     -- Function in module in right form
                     let fun = LMGlobalVar name ty' (funcLinkage sig)
-                                    Nothing Nothing False
+                                    Nothing Nothing Global
                     return (env, fun, nilOL, [])
 
                 Just ty' -> do
                     -- label in module but not function pointer, convert
                     let fty@(LMFunction sig) = funTy name
                         fun = LMGlobalVar name (pLift ty') (funcLinkage sig)
-                                    Nothing Nothing False
+                                    Nothing Nothing Global
                     (v1, s1) <- doExpr (pLift fty)
                                     $ Cast LM_Bitcast fun (pLift fty)
                     return  (env, v1, unitOL s1, [])
@@ -433,7 +433,7 @@ getFunPtr env funTy targ = case targ of
                     -- label not in module, create external reference
                     let fty@(LMFunction sig) = funTy name
                         fun = LMGlobalVar name fty (funcLinkage sig)
-                                    Nothing Nothing False
+                                    Nothing Nothing Global
                         top = [CmmData Data [([],[fty])]]
                         env' = funInsert name fty env
                     return (env', fun, nilOL, top)
@@ -1427,7 +1427,7 @@ genLit _ env cmm@(CmmLabel l)
     in case ty of
             -- Make generic external label definition and then pointer to it
             Nothing -> do
-                let glob@(var, _) = genStringLabelRef dflags label
+                let glob@(LMGlobal var _) = genStringLabelRef dflags label
                 let ldata = [CmmData Data [([glob], [])]]
                 let env' = funInsert label (pLower $ getVarType var) env
                 (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var (llvmWord dflags)
@@ -1437,7 +1437,7 @@ genLit _ env cmm@(CmmLabel l)
             -- pointer to it.
             Just ty' -> do
                 let var = LMGlobalVar label (LMPointer ty')
-                            ExternallyVisible Nothing Nothing False
+                            ExternallyVisible Nothing Nothing Global
                 (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var (llvmWord dflags)
                 return (env, v1, unitOL s1, [])
 
@@ -1557,13 +1557,13 @@ getHsFunc env live lbl
     in case ty of
         -- Function in module in right form
         Just ty'@(LMFunction sig) -> do
-            let fun = LMGlobalVar fn ty' (funcLinkage sig) Nothing Nothing False
+            let fun = LMGlobalVar fn ty' (funcLinkage sig) Nothing Nothing Global
             return (env, fun, nilOL, [])
 
         -- label in module but not function pointer, convert
         Just ty' -> do
             let fun = LMGlobalVar fn (pLift ty') ExternallyVisible
-                            Nothing Nothing False
+                            Nothing Nothing Global
             (v1, s1) <- doExpr (pLift (llvmFunTy dflags live)) $
                             Cast LM_Bitcast fun (pLift (llvmFunTy dflags live))
             return (env, v1, unitOL s1, [])
@@ -1571,7 +1571,7 @@ getHsFunc env live lbl
         -- label not in module, create external reference
         Nothing  -> do
             let ty' = LMFunction $ llvmFunSig env live lbl ExternallyVisible
-            let fun = LMGlobalVar fn ty' ExternallyVisible Nothing Nothing False
+            let fun = LMGlobalVar fn ty' ExternallyVisible Nothing Nothing Global
             let top = CmmData Data [([],[ty'])]
             let env' = funInsert fn ty' env
             return (env', fun, nilOL, [top])

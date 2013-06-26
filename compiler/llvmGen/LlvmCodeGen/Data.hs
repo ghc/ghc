@@ -66,9 +66,9 @@ resolveLlvmData env (lbl, sec, alias, unres) =
         label          = strCLabel_llvm env lbl
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
-        const          = isSecConstant sec
+        const          = if isSecConstant sec then Constant else Global
         glob           = LMGlobalVar label alias link Nothing Nothing const
-    in (env', ((glob,struct):refs, [alias]))
+    in (env', ((LMGlobal glob struct):refs, [alias]))
 
 -- | Should a data in this section be considered constant
 isSecConstant :: Section -> Bool
@@ -114,7 +114,7 @@ resData env (Left cmm@(CmmLabel l)) =
     in case ty of
             -- Make generic external label defenition and then pointer to it
             Nothing ->
-                let glob@(var, _) = genStringLabelRef dflags label
+                let glob@(LMGlobal var _) = genStringLabelRef dflags label
                     env' =  funInsert label (pLower $ getVarType var) env
                     ptr  = LMStaticPointer var
                 in  (env', LMPtoI ptr lmty, [glob])
@@ -122,7 +122,7 @@ resData env (Left cmm@(CmmLabel l)) =
             -- pointer to it.
             Just ty' ->
                 let var = LMGlobalVar label (LMPointer ty')
-                            ExternallyVisible Nothing Nothing False
+                            ExternallyVisible Nothing Nothing Global
                     ptr  = LMStaticPointer var
                 in (env, LMPtoI ptr lmty, [])
 
