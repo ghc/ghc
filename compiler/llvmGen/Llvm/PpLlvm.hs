@@ -186,19 +186,14 @@ ppLlvmBlocks blocks = vcat $ map ppLlvmBlock blocks
 -- | Print out an LLVM block.
 -- It must be part of a function definition.
 ppLlvmBlock :: LlvmBlock -> SDoc
-ppLlvmBlock (LlvmBlock blockId stmts)
-  = go blockId stmts
-  where
-    lbreak acc []              = (Nothing, reverse acc, [])
-    lbreak acc (MkLabel id:xs) = (Just id, reverse acc, xs)
-    lbreak acc (x:xs)          = lbreak (x:acc) xs
-
-    go id code =
-        let (id2, block, rest) = lbreak [] code
-            ppRest = case id2 of
-                         Just id2' -> go id2' rest
-                         Nothing   -> empty
-        in ppLlvmBlockLabel id
+ppLlvmBlock (LlvmBlock blockId stmts) =
+  let isLabel (MkLabel _) = True
+      isLabel _           = False
+      (block, rest)       = break isLabel stmts
+      ppRest = case rest of
+        MkLabel id:xs -> ppLlvmBlock (LlvmBlock id xs)
+        _             -> empty
+  in ppLlvmBlockLabel blockId
            $+$ (vcat $ map ppLlvmStatement block)
            $+$ newLine
            $+$ ppRest
