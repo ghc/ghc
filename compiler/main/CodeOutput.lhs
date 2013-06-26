@@ -168,13 +168,9 @@ outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
-       -- ToDo: make the LLVM backend consume the C-- incrementally,
-       -- by pushing the cmm_stream inside (c.f. nativeCodeGen)
-       rawcmms <- Stream.collect cmm_stream
-
        {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f ncg_uniqs rawcmms
+                 llvmCodeGen dflags f ncg_uniqs cmm_stream
 \end{code}
 
 

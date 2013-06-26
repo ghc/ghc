@@ -623,6 +623,8 @@ data LlvmLinkageType
   -- | Alias for 'ExternallyVisible' but with explicit textual form in LLVM
   --  assembly.
   | External
+  -- | Symbol is private to the module and should not appear in the symbol table
+  | Private
   deriving (Eq)
 
 instance Outputable LlvmLinkageType where
