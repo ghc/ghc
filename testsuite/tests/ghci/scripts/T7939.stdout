@@ -1,4 +1,23 @@
 class Foo (k :: BOX) (a :: k) where
-  type family Bar (k :: BOX) (k :: BOX) (a :: k) :: k
+  type family Bar (k :: BOX) (a :: k) b :: *
   	-- Defined at T7939.hs:6:9
-Bar :: k1 -> k
+Bar :: k -> * -> *
+type family F a :: * 	-- Defined at T7939.hs:8:13
+type instance F Int -- Defined at T7939.hs:9:1
+F :: * -> *
+type family G a :: * where G Int = Bool
+  	-- Defined at T7939.hs:11:13
+G :: * -> *
+type family H (a :: Bool) :: Bool where H 'False = 'True
+  	-- Defined at T7939.hs:14:13
+H :: Bool -> Bool
+type family J (k :: BOX) (a :: [k]) :: Bool where
+    J k ('[] k) = 'False
+    J k ((':) k h t) = 'True
+  	-- Defined at T7939.hs:17:13
+J :: [k] -> Bool
+type family K (k :: BOX) (a :: [k]) :: Maybe k where
+    K k ('[] k) = 'Nothing k
+    K k ((':) k h t) = 'Just k h
+  	-- Defined at T7939.hs:21:13
+K :: [k] -> Maybe k

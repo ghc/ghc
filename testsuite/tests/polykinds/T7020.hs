@@ -10,7 +10,7 @@ data family Sing (a :: k)
 class SingKind (Any :: k) => SingI (s :: k) where
    sing :: Sing s
 
-data SingInstance :: k -> * where
+data SingInstance (a :: k) where
    SingInstance :: SingI a => SingInstance a
 
 class (b ~ Any) => SingKind (b :: k) where

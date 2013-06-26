@@ -11,7 +11,7 @@ data SList :: [Bool] -> * where
   SNil :: SList '[]
   SCons :: SBool h -> SList t -> SList (h ': t)
 
-type family (a :: k) :==: (b :: k) :: Bool where
+type family (a :: [k]) :==: (b :: [k]) :: Bool where
   '[] :==: '[] = True
   (h1 ': t1) :==: (h2 ': t2) = True
   a :==: b = False
