@@ -43,7 +43,6 @@ import Maybes
 import Util
 import FastString
 import Outputable
-import UniqSupply
 
 import Control.Monad (when,void)
 
@@ -70,8 +69,8 @@ cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
 
 cgExpr (StgLet binds expr)             = do { cgBind binds;     cgExpr expr }
 cgExpr (StgLetNoEscape _ _ binds expr) =
-  do { us <- newUniqSupply
-     ; let join_id = mkBlockId (uniqFromSupply us)
+  do { u <- newUnique
+     ; let join_id = mkBlockId u
      ; cgLneBinds join_id binds
      ; r <- cgExpr expr
      ; emitLabel join_id

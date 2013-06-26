@@ -145,8 +145,8 @@ instance MonadUnique SimplM where
                                 (us1, us2) -> return (us1, us2, sc))
 
     getUniqueM
-       = SM (\_st_env us sc -> case splitUniqSupply us of
-                                (us1, us2) -> return (uniqFromSupply us1, us2, sc))
+       = SM (\_st_env us sc -> case takeUniqFromSupply us of
+                                (u, us') -> return (u, us', sc))
 
     getUniquesM
         = SM (\_st_env us sc -> case splitUniqSupply us of

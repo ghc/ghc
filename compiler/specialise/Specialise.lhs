@@ -1882,6 +1882,12 @@ instance MonadUnique SpecM where
                      put $ st { spec_uniq_supply = us2 }
                      return us1
 
+    getUniqueM
+        = SpecM $ do st <- get
+                     let (u,us') = takeUniqFromSupply $ spec_uniq_supply st
+                     put $ st { spec_uniq_supply = us' }
+                     return u
+
 instance HasDynFlags SpecM where
     getDynFlags = SpecM $ liftM spec_dflags get
 

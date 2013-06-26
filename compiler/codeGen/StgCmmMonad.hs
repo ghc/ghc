@@ -446,8 +446,10 @@ newUniqSupply = do
 
 newUnique :: FCode Unique
 newUnique = do
-        us <- newUniqSupply
-        return (uniqFromSupply us)
+        state <- getState
+        let (u,us') = takeUniqFromSupply (cgs_uniqs state)
+        setState $ state { cgs_uniqs = us' }
+        return u
 
 ------------------
 getInfoDown :: FCode CgInfoDownwards

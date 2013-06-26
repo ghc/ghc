@@ -176,6 +176,10 @@ class Monad m => MonadUnique m where
     -- | Get an infinite list of new unique identifiers
     getUniquesM :: m [Unique]
 
+    -- This default definition of getUniqueM, while correct, is not as
+    -- efficient as it could be since it needlessly generates and throws away
+    -- an extra Unique. For your instances consider providing an explicit
+    -- definition for 'getUniqueM' which uses 'takeUniqFromSupply' directly.
     getUniqueM  = liftM uniqFromSupply  getUniqueSupplyM
     getUniquesM = liftM uniqsFromSupply getUniqueSupplyM
 
@@ -185,8 +189,8 @@ instance MonadUnique UniqSM where
     getUniquesM = getUniquesUs
 
 getUniqueUs :: UniqSM Unique
-getUniqueUs = USM (\us -> case splitUniqSupply us of
-                          (us1,us2) -> (# uniqFromSupply us1, us2 #))
+getUniqueUs = USM (\us -> case takeUniqFromSupply us of
+                          (u,us') -> (# u, us' #))
 
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us -> case splitUniqSupply us of

@@ -783,6 +783,12 @@ instance MonadUnique CoreM where
         modifyS (\s -> s { cs_uniq_supply = us2 })
         return us1
 
+    getUniqueM = do
+        us <- getS cs_uniq_supply
+        let (u,us') = takeUniqFromSupply us
+        modifyS (\s -> s { cs_uniq_supply = us' })
+        return u
+
 runCoreM :: HscEnv
          -> RuleBase
          -> UniqSupply
