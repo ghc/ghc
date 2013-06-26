@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 --------------------------------------------------------------------------------
 -- | The LLVM Type System.
 --
@@ -8,12 +10,11 @@ module Llvm.Types where
 
 import Data.Char
 import Data.Int
-import Data.List (intercalate)
 import Numeric
 
 import DynFlags
 import FastString
-import Outputable (panic)
+import Outputable
 import Unique
 
 -- from NCG
@@ -53,30 +54,34 @@ data LlvmType
   | LMFunction LlvmFunctionDecl
   deriving (Eq)
 
-instance Show LlvmType where
-  show (LMInt size     ) = "i" ++ show size
-  show (LMFloat        ) = "float"
-  show (LMDouble       ) = "double"
-  show (LMFloat80      ) = "x86_fp80"
-  show (LMFloat128     ) = "fp128"
-  show (LMPointer x    ) = show x ++ "*"
-  show (LMArray nr tp  ) = "[" ++ show nr ++ " x " ++ show tp ++ "]"
-  show (LMVector nr tp ) = "<" ++ show nr ++ " x " ++ show tp ++ ">"
-  show (LMLabel        ) = "label"
-  show (LMVoid         ) = "void"
-  show (LMStruct tys   ) = "<{" ++ (commaCat tys) ++ "}>"
-  show (LMAlias (s,_)  ) = "%" ++ unpackFS s
-  show (LMMetadata     ) = "metadata"
+instance Outputable LlvmType where
+  ppr (LMInt size     ) = char 'i' <> ppr size
+  ppr (LMFloat        ) = text "float"
+  ppr (LMDouble       ) = text "double"
+  ppr (LMFloat80      ) = text "x86_fp80"
+  ppr (LMFloat128     ) = text "fp128"
+  ppr (LMPointer x    ) = ppr x <> char '*'
+  ppr (LMArray nr tp  ) = char '[' <> ppr nr <> text " x " <> ppr tp <> char ']'
+  ppr (LMVector nr tp ) = char '<' <> ppr nr <> text " x " <> ppr tp <> char '>'
+  ppr (LMLabel        ) = text "label"
+  ppr (LMVoid         ) = text "void"
+  ppr (LMStruct tys   ) = text "<{" <> ppCommaJoin tys <> text "}>"
+  ppr (LMMetadata     ) = text "metadata"
 
-  show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
-    = let varg' = case varg of
-                        VarArgs | null args -> "..."
-                                | otherwise -> ", ..."
-                        _otherwise          -> ""
-          -- by default we don't print param attributes
-          args = intercalate ", " $ map (show . fst) p
-      in show r ++ " (" ++ args ++ varg' ++ ")"
+  ppr (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
+    = ppr r <+> lparen <> ppParams varg p <> rparen
 
+  ppr (LMAlias (s,_)) = char '%' <> ftext s
+
+ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc
+ppParams varg p
+  = let varg' = case varg of
+          VarArgs | null args -> sLit "..."
+                  | otherwise -> sLit ", ..."
+          _otherwise          -> sLit ""
+        -- by default we don't print param attributes
+        args = map fst p
+    in ppCommaJoin args <> ptext varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
@@ -96,9 +101,9 @@ data LlvmVar
   | LMLitVar LlvmLit
   deriving (Eq)
 
-instance Show LlvmVar where
-  show (LMLitVar x) = show x
-  show (x         ) = show (getVarType x) ++ " " ++ getName x
+instance Outputable LlvmVar where
+  ppr (LMLitVar x)  = ppr x
+  ppr (x         )  = ppr (getVarType x) <+> ppName x
 
 
 -- | Llvm Literal Data.
@@ -117,9 +122,9 @@ data LlvmLit
   | LMUndefLit LlvmType
   deriving (Eq)
 
-instance Show LlvmLit where
-  show l@(LMVectorLit {}) = getLit l
-  show l                  = show (getLitType l) ++ " " ++ getLit l
+instance Outputable LlvmLit where
+  ppr l@(LMVectorLit {}) = ppLit l
+  ppr l                  = ppr (getLitType l) <+> ppLit l
 
 
 -- | Llvm Static Data.
@@ -142,37 +147,33 @@ data LlvmStatic
   | LMAdd LlvmStatic LlvmStatic        -- ^ Constant addition operation
   | LMSub LlvmStatic LlvmStatic        -- ^ Constant subtraction operation
 
-instance Show LlvmStatic where
-  show (LMComment       s) = "; " ++ unpackFS s
-  show (LMStaticLit   l  ) = show l
-  show (LMUninitType    t) = show t ++ " undef"
-  show (LMStaticStr   s t) = show t ++ " c\"" ++ unpackFS s ++ "\\00\""
-  show (LMStaticArray d t) = show t ++ " [" ++ commaCat d ++ "]"
-  show (LMStaticStruc d t) = show t ++ "<{" ++ commaCat d ++ "}>"
-  show (LMStaticPointer v) = show v
-  show (LMBitc v t)
-      = show t ++ " bitcast (" ++ show v ++ " to " ++ show t ++ ")"
-  show (LMPtoI v t)
-      = show t ++ " ptrtoint (" ++ show v ++ " to " ++ show t ++ ")"
-  show (LMAdd s1 s2)
-      = let ty1 = getStatType s1
-            op  = if isFloat ty1 then " fadd (" else " add ("
-        in if ty1 == getStatType s2
-                then show ty1 ++ op ++ show s1 ++ "," ++ show s2 ++ ")"
-                else error $ "LMAdd with different types! s1: "
-                        ++ show s1 ++ ", s2: " ++ show s2
-  show (LMSub s1 s2)
-      = let ty1 = getStatType s1
-            op  = if isFloat ty1 then " fsub (" else " sub ("
-        in if ty1 == getStatType s2
-                then show ty1 ++ op ++ show s1 ++ "," ++ show s2 ++ ")"
-                else error $ "LMSub with different types! s1: "
-                        ++ show s1 ++ ", s2: " ++ show s2
+instance Outputable LlvmStatic where
+  ppr (LMComment       s) = text "; " <> ftext s
+  ppr (LMStaticLit   l  ) = ppr l
+  ppr (LMUninitType    t) = ppr t <> text " undef"
+  ppr (LMStaticStr   s t) = ppr t <> text " c\"" <> ftext s <> text "\\00\""
+  ppr (LMStaticArray d t) = ppr t <> text " [" <> ppCommaJoin d <> char ']'
+  ppr (LMStaticStruc d t) = ppr t <> text "<{" <> ppCommaJoin d <> text "}>"
+  ppr (LMStaticPointer v) = ppr v
+  ppr (LMBitc v t)
+      = ppr t <> text " bitcast (" <> ppr v <> text " to " <> ppr t <> char ')'
+  ppr (LMPtoI v t)
+      = ppr t <> text " ptrtoint (" <> ppr v <> text " to " <> ppr t <> char ')'
 
+  ppr (LMAdd s1 s2)
+      = pprStaticArith s1 s2 (sLit "add") (sLit "fadd") "LMAdd"
+  ppr (LMSub s1 s2)
+      = pprStaticArith s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
 
--- | Concatenate an array together, separated by commas
-commaCat :: Show a => [a] -> String
-commaCat xs = intercalate ", " $ map show xs
+pprStaticArith :: LlvmStatic -> LlvmStatic -> LitString -> LitString -> String -> SDoc
+pprStaticArith s1 s2 int_op float_op op_name =
+  let ty1 = getStatType s1
+      op  = if isFloat ty1 then float_op else int_op
+  in if ty1 == getStatType s2
+     then ppr ty1 <+> ptext op <+> lparen <> ppr s1 <> comma <> ppr s2 <> rparen
+     else sdocWithDynFlags $ \dflags ->
+            error $ op_name ++ " with different types! s1: "
+                    ++ showSDoc dflags (ppr s1) ++ ", s2: " ++ showSDoc dflags (ppr s2)
 
 -- -----------------------------------------------------------------------------
 -- ** Operations on LLVM Basic Types and Variables
@@ -180,33 +181,33 @@ commaCat xs = intercalate ", " $ map show xs
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
-getName :: LlvmVar -> String
-getName v@(LMGlobalVar _ _ _ _ _ _) = "@" ++ getPlainName v
-getName v@(LMLocalVar  _ _        ) = "%" ++ getPlainName v
-getName v@(LMNLocalVar _ _        ) = "%" ++ getPlainName v
-getName v@(LMLitVar    _          ) = getPlainName v
+ppName :: LlvmVar -> SDoc
+ppName v@(LMGlobalVar {}) = char '@' <> ppPlainName v
+ppName v@(LMLocalVar  {}) = char '%' <> ppPlainName v
+ppName v@(LMNLocalVar {}) = char '%' <> ppPlainName v
+ppName v@(LMLitVar    {}) =             ppPlainName v
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in a plain textual representation (e.g. @x@, @y@ or @42@).
-getPlainName :: LlvmVar -> String
-getPlainName (LMGlobalVar x _ _ _ _ _) = unpackFS x
-getPlainName (LMLocalVar  x LMLabel  ) = show x
-getPlainName (LMLocalVar  x _        ) = "l" ++ show x
-getPlainName (LMNLocalVar x _        ) = unpackFS x
-getPlainName (LMLitVar    x          ) = getLit x
+ppPlainName :: LlvmVar -> SDoc
+ppPlainName (LMGlobalVar x _ _ _ _ _) = ftext x
+ppPlainName (LMLocalVar  x LMLabel  ) = text (show x)
+ppPlainName (LMLocalVar  x _        ) = text ('l' : show x)
+ppPlainName (LMNLocalVar x _        ) = ftext x
+ppPlainName (LMLitVar    x          ) = ppLit x
 
 -- | Print a literal value. No type.
-getLit :: LlvmLit -> String
-getLit (LMIntLit i (LMInt 32)) = show (fromInteger i :: Int32)
-getLit (LMIntLit i (LMInt 64)) = show (fromInteger i :: Int64)
-getLit (LMIntLit i _         ) = show (fromInteger i :: Int)
--- See Note [LLVM Float Types].
-getLit (LMFloatLit r LMFloat ) = (dToStr . widenFp . narrowFp) r
-getLit (LMFloatLit r LMDouble) = dToStr r
-getLit f@(LMFloatLit _ _) = error $ "Can't print this float literal!" ++ show f
-getLit (LMVectorLit ls  ) = "< " ++ commaCat ls ++ " >"
-getLit (LMNullLit _     ) = "null"
-getLit (LMUndefLit _    ) = "undef"
+ppLit :: LlvmLit -> SDoc
+ppLit (LMIntLit i (LMInt 32))  = ppr (fromInteger i :: Int32)
+ppLit (LMIntLit i (LMInt 64))  = ppr (fromInteger i :: Int64)
+ppLit (LMIntLit   i _       )  = ppr ((fromInteger i)::Int)
+ppLit (LMFloatLit r LMFloat )  = ppFloat $ narrowFp r
+ppLit (LMFloatLit r LMDouble)  = ppDouble r
+ppLit f@(LMFloatLit _ _)       = sdocWithDynFlags (\dflags ->
+                                   error $ "Can't print this float literal!" ++ showSDoc dflags (ppr f))
+ppLit (LMVectorLit ls  )       = char '<' <+> ppCommaJoin ls <+> char '>'
+ppLit (LMNullLit _     )       = text "null"
+ppLit (LMUndefLit _    )       = text "undef"
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
@@ -217,12 +218,12 @@ getVarType (LMLitVar    l          ) = getLitType l
 
 -- | Return the 'LlvmType' of a 'LlvmLit'
 getLitType :: LlvmLit -> LlvmType
-getLitType (LMIntLit    _ t) = t
-getLitType (LMFloatLit  _ t) = t
+getLitType (LMIntLit   _ t) = t
+getLitType (LMFloatLit _ t) = t
 getLitType (LMVectorLit [])  = panic "getLitType"
 getLitType (LMVectorLit ls)  = LMVector (length ls) (getLitType (head ls))
-getLitType (LMNullLit     t) = t
-getLitType (LMUndefLit    t) = t
+getLitType (LMNullLit    t) = t
+getLitType (LMUndefLit   t) = t
 
 -- | Return the 'LlvmType' of the 'LlvmStatic'
 getStatType :: LlvmStatic -> LlvmType
@@ -270,7 +271,7 @@ pVarLift (LMLitVar    _          ) = error $ "Can't lower a literal type!"
 -- constructors can be lowered.
 pLower :: LlvmType -> LlvmType
 pLower (LMPointer x) = x
-pLower x  = error $ show x ++ " is a unlowerable type, need a pointer"
+pLower x  = error $ showSDoc undefined (ppr x) ++ " is a unlowerable type, need a pointer"
 
 -- | Lower a variable of 'LMPointer' type.
 pVarLower :: LlvmVar -> LlvmVar
@@ -368,19 +369,13 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
   }
   deriving (Eq)
 
-instance Show LlvmFunctionDecl where
-  show (LlvmFunctionDecl n l c r varg p a)
-    = let varg' = case varg of
-                        VarArgs | null args -> "..."
-                                | otherwise -> ", ..."
-                        _otherwise          -> ""
-          align = case a of
-                       Just a' -> " align " ++ show a'
-                       Nothing -> ""
-          -- by default we don't print param attributes
-          args = intercalate ", " $ map (show . fst) p
-      in show l ++ " " ++ show c ++ " " ++ show r ++ " @" ++ unpackFS n ++
-             "(" ++ args ++ varg' ++ ")" ++ align
+instance Outputable LlvmFunctionDecl where
+  ppr (LlvmFunctionDecl n l c r varg p a)
+    = let align = case a of
+                       Just a' -> text " align " <> ppr a'
+                       Nothing -> empty
+      in ppr l <+> ppr c <+> ppr r <+> char '@' <> ftext n <>
+             lparen <> ppParams varg p <> rparen <> align
 
 type LlvmFunctionDecls = [LlvmFunctionDecl]
 
@@ -421,15 +416,15 @@ data LlvmParamAttr
   | Nest
   deriving (Eq)
 
-instance Show LlvmParamAttr where
-  show ZeroExt   = "zeroext"
-  show SignExt   = "signext"
-  show InReg     = "inreg"
-  show ByVal     = "byval"
-  show SRet      = "sret"
-  show NoAlias   = "noalias"
-  show NoCapture = "nocapture"
-  show Nest      = "nest"
+instance Outputable LlvmParamAttr where
+  ppr ZeroExt   = text "zeroext"
+  ppr SignExt   = text "signext"
+  ppr InReg     = text "inreg"
+  ppr ByVal     = text "byval"
+  ppr SRet      = text "sret"
+  ppr NoAlias   = text "noalias"
+  ppr NoCapture = text "nocapture"
+  ppr Nest      = text "nest"
 
 -- | Llvm Function Attributes.
 --
@@ -509,20 +504,20 @@ data LlvmFuncAttr
   | Naked
   deriving (Eq)
 
-instance Show LlvmFuncAttr where
-  show AlwaysInline       = "alwaysinline"
-  show InlineHint         = "inlinehint"
-  show NoInline           = "noinline"
-  show OptSize            = "optsize"
-  show NoReturn           = "noreturn"
-  show NoUnwind           = "nounwind"
-  show ReadNone           = "readnon"
-  show ReadOnly           = "readonly"
-  show Ssp                = "ssp"
-  show SspReq             = "ssqreq"
-  show NoRedZone          = "noredzone"
-  show NoImplicitFloat    = "noimplicitfloat"
-  show Naked              = "naked"
+instance Outputable LlvmFuncAttr where
+  ppr AlwaysInline       = text "alwaysinline"
+  ppr InlineHint         = text "inlinehint"
+  ppr NoInline           = text "noinline"
+  ppr OptSize            = text "optsize"
+  ppr NoReturn           = text "noreturn"
+  ppr NoUnwind           = text "nounwind"
+  ppr ReadNone           = text "readnon"
+  ppr ReadOnly           = text "readonly"
+  ppr Ssp                = text "ssp"
+  ppr SspReq             = text "ssqreq"
+  ppr NoRedZone          = text "noredzone"
+  ppr NoImplicitFloat    = text "noimplicitfloat"
+  ppr Naked              = text "naked"
 
 
 -- | Different types to call a function.
@@ -567,12 +562,12 @@ data LlvmCallConvention
   | CC_X86_Stdcc
   deriving (Eq)
 
-instance Show LlvmCallConvention where
-  show CC_Ccc       = "ccc"
-  show CC_Fastcc    = "fastcc"
-  show CC_Coldcc    = "coldcc"
-  show (CC_Ncc i)   = "cc " ++ show i
-  show CC_X86_Stdcc = "x86_stdcallcc"
+instance Outputable LlvmCallConvention where
+  ppr CC_Ccc       = text "ccc"
+  ppr CC_Fastcc    = text "fastcc"
+  ppr CC_Coldcc    = text "coldcc"
+  ppr (CC_Ncc i)   = text "cc " <> ppr i
+  ppr CC_X86_Stdcc = text "x86_stdcallcc"
 
 
 -- | Functions can have a fixed amount of parameters, or a variable amount.
@@ -628,17 +623,17 @@ data LlvmLinkageType
   | External
   deriving (Eq)
 
-instance Show LlvmLinkageType where
-  show Internal          = "internal"
-  show LinkOnce          = "linkonce"
-  show Weak              = "weak"
-  show Appending         = "appending"
-  show ExternWeak        = "extern_weak"
+instance Outputable LlvmLinkageType where
+  ppr Internal          = text "internal"
+  ppr LinkOnce          = text "linkonce"
+  ppr Weak              = text "weak"
+  ppr Appending         = text "appending"
+  ppr ExternWeak        = text "extern_weak"
   -- ExternallyVisible does not have a textual representation, it is
   -- the linkage type a function resolves to if no other is specified
   -- in Llvm.
-  show ExternallyVisible = ""
-  show External          = "external"
+  ppr ExternallyVisible = empty
+  ppr External          = text "external"
 
 
 -- -----------------------------------------------------------------------------
@@ -676,25 +671,25 @@ data LlvmMachOp
   | LM_MO_Xor -- ^ XOR bitwise logical operation.
   deriving (Eq)
 
-instance Show LlvmMachOp where
-  show LM_MO_Add  = "add"
-  show LM_MO_Sub  = "sub"
-  show LM_MO_Mul  = "mul"
-  show LM_MO_UDiv = "udiv"
-  show LM_MO_SDiv = "sdiv"
-  show LM_MO_URem = "urem"
-  show LM_MO_SRem = "srem"
-  show LM_MO_FAdd = "fadd"
-  show LM_MO_FSub = "fsub"
-  show LM_MO_FMul = "fmul"
-  show LM_MO_FDiv = "fdiv"
-  show LM_MO_FRem = "frem"
-  show LM_MO_Shl  = "shl"
-  show LM_MO_LShr = "lshr"
-  show LM_MO_AShr = "ashr"
-  show LM_MO_And  = "and"
-  show LM_MO_Or   = "or"
-  show LM_MO_Xor  = "xor"
+instance Outputable LlvmMachOp where
+  ppr LM_MO_Add  = text "add"
+  ppr LM_MO_Sub  = text "sub"
+  ppr LM_MO_Mul  = text "mul"
+  ppr LM_MO_UDiv = text "udiv"
+  ppr LM_MO_SDiv = text "sdiv"
+  ppr LM_MO_URem = text "urem"
+  ppr LM_MO_SRem = text "srem"
+  ppr LM_MO_FAdd = text "fadd"
+  ppr LM_MO_FSub = text "fsub"
+  ppr LM_MO_FMul = text "fmul"
+  ppr LM_MO_FDiv = text "fdiv"
+  ppr LM_MO_FRem = text "frem"
+  ppr LM_MO_Shl  = text "shl"
+  ppr LM_MO_LShr = text "lshr"
+  ppr LM_MO_AShr = text "ashr"
+  ppr LM_MO_And  = text "and"
+  ppr LM_MO_Or   = text "or"
+  ppr LM_MO_Xor  = text "xor"
 
 
 -- | Llvm compare operations.
@@ -720,23 +715,23 @@ data LlvmCmpOp
   | LM_CMP_Fle -- ^ Float less than or equal
   deriving (Eq)
 
-instance Show LlvmCmpOp where
-  show LM_CMP_Eq  = "eq"
-  show LM_CMP_Ne  = "ne"
-  show LM_CMP_Ugt = "ugt"
-  show LM_CMP_Uge = "uge"
-  show LM_CMP_Ult = "ult"
-  show LM_CMP_Ule = "ule"
-  show LM_CMP_Sgt = "sgt"
-  show LM_CMP_Sge = "sge"
-  show LM_CMP_Slt = "slt"
-  show LM_CMP_Sle = "sle"
-  show LM_CMP_Feq = "oeq"
-  show LM_CMP_Fne = "une"
-  show LM_CMP_Fgt = "ogt"
-  show LM_CMP_Fge = "oge"
-  show LM_CMP_Flt = "olt"
-  show LM_CMP_Fle = "ole"
+instance Outputable LlvmCmpOp where
+  ppr LM_CMP_Eq  = text "eq"
+  ppr LM_CMP_Ne  = text "ne"
+  ppr LM_CMP_Ugt = text "ugt"
+  ppr LM_CMP_Uge = text "uge"
+  ppr LM_CMP_Ult = text "ult"
+  ppr LM_CMP_Ule = text "ule"
+  ppr LM_CMP_Sgt = text "sgt"
+  ppr LM_CMP_Sge = text "sge"
+  ppr LM_CMP_Slt = text "slt"
+  ppr LM_CMP_Sle = text "sle"
+  ppr LM_CMP_Feq = text "oeq"
+  ppr LM_CMP_Fne = text "une"
+  ppr LM_CMP_Fgt = text "ogt"
+  ppr LM_CMP_Fge = text "oge"
+  ppr LM_CMP_Flt = text "olt"
+  ppr LM_CMP_Fle = text "ole"
 
 
 -- | Llvm cast operations.
@@ -755,19 +750,19 @@ data LlvmCastOp
   | LM_Bitcast  -- ^ Cast between types where no bit manipulation is needed
   deriving (Eq)
 
-instance Show LlvmCastOp where
-  show LM_Trunc    = "trunc"
-  show LM_Zext     = "zext"
-  show LM_Sext     = "sext"
-  show LM_Fptrunc  = "fptrunc"
-  show LM_Fpext    = "fpext"
-  show LM_Fptoui   = "fptoui"
-  show LM_Fptosi   = "fptosi"
-  show LM_Uitofp   = "uitofp"
-  show LM_Sitofp   = "sitofp"
-  show LM_Ptrtoint = "ptrtoint"
-  show LM_Inttoptr = "inttoptr"
-  show LM_Bitcast  = "bitcast"
+instance Outputable LlvmCastOp where
+  ppr LM_Trunc    = text "trunc"
+  ppr LM_Zext     = text "zext"
+  ppr LM_Sext     = text "sext"
+  ppr LM_Fptrunc  = text "fptrunc"
+  ppr LM_Fpext    = text "fpext"
+  ppr LM_Fptoui   = text "fptoui"
+  ppr LM_Fptosi   = text "fptosi"
+  ppr LM_Uitofp   = text "uitofp"
+  ppr LM_Sitofp   = text "sitofp"
+  ppr LM_Ptrtoint = text "ptrtoint"
+  ppr LM_Inttoptr = text "inttoptr"
+  ppr LM_Bitcast  = text "bitcast"
 
 
 -- -----------------------------------------------------------------------------
@@ -779,8 +774,8 @@ instance Show LlvmCastOp where
 -- regardless of underlying architecture.
 --
 -- See Note [LLVM Float Types].
-dToStr :: Double -> String
-dToStr d
+ppDouble :: Double -> SDoc
+ppDouble d
   = let bs     = doubleToBytes d
         hex d' = case showHex d' "" of
                      []    -> error "dToStr: too few hex digits for float"
@@ -788,12 +783,12 @@ dToStr d
                      [x,y] -> [x,y]
                      _     -> error "dToStr: too many hex digits for float"
 
-        str  = map toUpper $ concat . fixEndian . (map hex) $ bs
-    in  "0x" ++ str
+        str  = map toUpper $ concat $ fixEndian $ map hex bs
+    in  text "0x" <> text str
 
 -- Note [LLVM Float Types]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
--- We use 'dToStr' for both printing Float and Double floating point types. This is
+-- We use 'ppDouble' for both printing Float and Double floating point types. This is
 -- as LLVM expects all floating point constants (single & double) to be in IEEE
 -- 754 Double precision format. However, for single precision numbers (Float)
 -- they should be *representable* in IEEE 754 Single precision format. So the
@@ -816,6 +811,9 @@ widenFp :: Float -> Double
 {-# NOINLINE widenFp #-}
 widenFp = float2Double
 
+ppFloat :: Float -> SDoc
+ppFloat = ppDouble . widenFp
+
 -- | Reverse or leave byte data alone to fix endianness on this target.
 fixEndian :: [a] -> [a]
 #ifdef WORDS_BIGENDIAN
@@ -824,3 +822,13 @@ fixEndian = id
 fixEndian = reverse
 #endif
 
+
+--------------------------------------------------------------------------------
+-- * Misc functions
+--------------------------------------------------------------------------------
+
+ppCommaJoin :: (Outputable a) => [a] -> SDoc
+ppCommaJoin strs = hsep $ punctuate comma (map ppr strs)
+
+ppSpaceJoin :: (Outputable a) => [a] -> SDoc
+ppSpaceJoin strs = hsep (map ppr strs)

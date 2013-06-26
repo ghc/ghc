@@ -115,7 +115,7 @@ mkLlvmFunc :: LlvmEnv -> LiveGlobalRegs -> CLabel -> LlvmLinkageType -> LMSectio
 mkLlvmFunc env live lbl link sec blks
   = let dflags = getDflags env
         funDec = llvmFunSig env live lbl link
-        funArgs = map (fsLit . getPlainName) (llvmFunArgs dflags live)
+        funArgs = map (fsLit . Outp.showSDoc dflags . ppPlainName) (llvmFunArgs dflags live)
     in LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
 
 -- | Alignment to use for functions

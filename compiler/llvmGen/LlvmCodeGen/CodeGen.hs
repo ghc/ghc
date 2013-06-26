@@ -404,7 +404,7 @@ getFunPtr env funTy targ = case targ of
                 ty | isInt ty     -> LM_Inttoptr
 
                 ty -> panic $ "genCall: Expr is of bad type for function"
-                              ++ " call! (" ++ show (ty) ++ ")"
+                              ++ " call! (" ++ showSDoc (getDflags env) (ppr ty) ++ ")"
 
         (v2,s1) <- doExpr (pLift fty) $ Cast cast v1 (pLift fty)
         return (env', v2, stmts `snocOL` s1, top)
@@ -455,7 +455,7 @@ arg_vars env ((e, AddrHint):rest) (vars, stmts, tops)
                ty | isInt ty     -> LM_Inttoptr
 
                a  -> panic $ "genCall: Can't cast llvmType to i8*! ("
-                           ++ show a ++ ")"
+                           ++ showSDoc (getDflags env) (ppr a) ++ ")"
 
        (v2, s1) <- doExpr i8Ptr $ Cast op v1 i8Ptr
        arg_vars env' rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
@@ -495,7 +495,7 @@ castVar dflags v t
                       (vt, _) | isVector vt && isVector t   -> LM_Bitcast
 
                       (vt, _) -> panic $ "castVars: Can't cast this type ("
-                                  ++ show vt ++ ") to (" ++ show t ++ ")"
+                                  ++ showSDoc dflags (ppr vt) ++ ") to (" ++ showSDoc dflags (ppr t) ++ ")"
               in doExpr t $ Cast op v t
 
 
@@ -541,7 +541,7 @@ cmmPrimOpFunctions env mop
     MO_Memmove    -> fsLit $ "llvm.memmove." ++ intrinTy1
     MO_Memset     -> fsLit $ "llvm.memset."  ++ intrinTy2
 
-    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
+    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
     MO_Prefetch_Data -> fsLit "llvm.prefetch"
 
@@ -557,9 +557,9 @@ cmmPrimOpFunctions env mop
     where
         dflags = getDflags env
         intrinTy1 = (if getLlvmVer env >= 28
-                       then "p0i8.p0i8." else "") ++ show (llvmWord dflags)
+                       then "p0i8.p0i8." else "") ++ showSDoc dflags (ppr $ llvmWord dflags)
         intrinTy2 = (if getLlvmVer env >= 28
-                       then "p0i8." else "") ++ show (llvmWord dflags)
+                       then "p0i8." else "") ++ showSDoc dflags (ppr $ llvmWord dflags)
         unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                           ++ " not supported here")
 
@@ -585,7 +585,7 @@ genJump env expr live = do
          ty | isInt ty     -> LM_Inttoptr
 
          ty -> panic $ "genJump: Expr is of bad type for function call! ("
-                     ++ show (ty) ++ ")"
+                     ++ showSDoc (getDflags env) (ppr ty) ++ ")"
 
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
     (stgRegs, stgStmts) <- funEpilogue env live
@@ -719,7 +719,7 @@ genStore_slow env addr val meta = do
                     (PprCmm.pprExpr addr <+> text (
                         "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
                         ", Size of var: " ++ show (llvmWidthInBits dflags other) ++
-                        ", Var: " ++ show vaddr))
+                        ", Var: " ++ showSDoc dflags (ppr vaddr)))
     where dflags = getDflags env
 
 
@@ -741,8 +741,9 @@ genCondBranch env cond idT idF = do
         then do
             let s1 = BranchIf vc labelT labelF
             return $ (env', stmts `snocOL` s1, top)
-        else
-            panic $ "genCondBranch: Cond expr not bool! (" ++ show vc ++ ")"
+        else do
+            let dflags = getDflags env
+            panic $ "genCondBranch: Cond expr not bool! (" ++ showSDoc dflags (ppr vc) ++ ")"
 
 {- Note [Literals and branch conditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1226,7 +1227,7 @@ genMachOp_slow env opt op [x, y] = case op of
                         return (env', v2, stmts `snocOL` s1, top)
                 else
                     panic $ "genBinComp: Compare returned type other then i1! "
-                        ++ (show $ getVarType v1)
+                        ++ (showSDoc dflags $ ppr $ getVarType v1)
 
         genBinMach op = binLlvmOp getVarType (LlvmOp op)
 
@@ -1263,7 +1264,7 @@ genMachOp_slow env opt op [x, y] = case op of
                         top1 ++ top2)
 
                 else
-                    panic $ "isSMulOK: Not bit type! (" ++ show word ++ ")"
+                    panic $ "isSMulOK: Not bit type! (" ++ showSDoc dflags (ppr word) ++ ")"
 
         panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encourntered"
                        ++ "with two arguments! (" ++ show op ++ ")"
@@ -1359,7 +1360,7 @@ genLoad_slow env e ty meta = do
                         (PprCmm.pprExpr e <+> text (
                             "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
                             ", Size of var: " ++ show (llvmWidthInBits dflags other) ++
-                            ", Var: " ++ show iptr))
+                            ", Var: " ++ showSDoc dflags (ppr iptr)))
     where dflags = getDflags env
 
 -- | Handle CmmReg expression

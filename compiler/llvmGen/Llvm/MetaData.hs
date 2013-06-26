@@ -52,11 +52,10 @@
 --
 module Llvm.MetaData where
 
-import Data.List (intercalate)
-
 import Llvm.Types
 
 import FastString
+import Outputable
 
 -- | LLVM metadata expressions
 data MetaExpr = MetaStr LMString
@@ -65,11 +64,11 @@ data MetaExpr = MetaStr LMString
               | MetaStruct [MetaExpr]
               deriving (Eq)
 
-instance Show MetaExpr where
-  show (MetaStr    s ) = "metadata !\"" ++ unpackFS s ++ "\""
-  show (MetaNode   n ) = "metadata !" ++ show n
-  show (MetaVar    v ) = show v
-  show (MetaStruct es) = "metadata !{ " ++ intercalate ", " (map show es) ++ "}"
+instance Outputable MetaExpr where
+  ppr (MetaStr    s ) = text "metadata !\"" <> ftext s <> char '"'
+  ppr (MetaNode   n ) = text "metadata !" <> int n
+  ppr (MetaVar    v ) = ppr v
+  ppr (MetaStruct es) = text "metadata !{ " <> ppCommaJoin es <> char '}'
 
 -- | Associates some metadata with a specific label for attaching to an
 -- instruction.
