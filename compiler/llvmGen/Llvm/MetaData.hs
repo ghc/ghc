@@ -54,7 +54,6 @@ module Llvm.MetaData where
 
 import Llvm.Types
 
-import FastString
 import Outputable
 
 -- | LLVM metadata expressions

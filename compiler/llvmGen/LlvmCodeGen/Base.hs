@@ -17,7 +17,7 @@ module LlvmCodeGen.Base (
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
-        renderLlvm, runUs, markUsedVar, getUsedVars,
+        dumpIfSetLlvm, renderLlvm, runUs, markUsedVar, getUsedVars,
         ghcInternalFunctions,
 
         getMetaUniqueId,
@@ -48,7 +48,6 @@ import qualified Pretty as Prt
 import Platform
 import UniqFM
 import Unique
-import MonadUtils ( MonadIO(..) )
 import BufWrite   ( BufHandle )
 import UniqSet
 import UniqSupply
@@ -190,19 +189,20 @@ maxSupportLlvmVersion = 33
 --
 
 data LlvmEnv = LlvmEnv
-  { envFunMap :: LlvmEnvMap
-  , envVarMap :: LlvmEnvMap
-  , envStackRegs :: [GlobalReg]
-  , envUsedVars :: [LlvmVar]
-  , envAliases :: UniqSet LMString
-  , envLabelMap :: [(CLabel, CLabel)]
-  , envVersion :: LlvmVersion
-  , envDynFlags :: DynFlags
-  , envOutput :: BufHandle
-  , envUniq :: UniqSupply
-  , envFreshMeta :: Int
-  , envUniqMeta :: UniqFM Int
-  , envNextSection :: Int
+  { envVersion :: LlvmVersion      -- ^ LLVM version
+  , envDynFlags :: DynFlags        -- ^ Dynamic flags
+  , envOutput :: BufHandle         -- ^ Output buffer
+  , envUniq :: UniqSupply          -- ^ Supply of unique values
+  , envNextSection :: Int          -- ^ Supply of fresh section IDs
+  , envFreshMeta :: Int            -- ^ Supply of fresh metadata IDs
+  , envUniqMeta :: UniqFM Int      -- ^ Global metadata nodes
+  , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
+  , envAliases :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
+  , envUsedVars :: [LlvmVar]       -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
+
+    -- the following get cleared for every function (see @withClearVars@)
+  , envVarMap :: LlvmEnvMap        -- ^ Local variables so far, with type
+  , envStackRegs :: [GlobalReg]    -- ^ Non-constant registers (alloca'd in the function prelude)
   }
 
 type LlvmEnvMap = UniqFM LlvmType
@@ -216,12 +216,14 @@ instance Monad LlvmM where
 instance Functor LlvmM where
     fmap f m = LlvmM $ \env -> do (x, env') <- runLlvmM m env
                                   return (f x, env')
-instance MonadIO LlvmM where
-    liftIO m = LlvmM $ \env -> do x <- m
-                                  return (x, env)
 
 instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
+
+-- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
+liftIO :: IO a -> LlvmM a
+liftIO m = LlvmM $ \env -> do x <- m
+                              return (x, env)
 
 -- | Get initial Llvm environment.
 runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM () -> IO ()
@@ -233,7 +235,6 @@ runLlvm dflags ver out us m = do
                       , envStackRegs = []
                       , envUsedVars = []
                       , envAliases = emptyUniqSet
-                      , envLabelMap = []
                       , envVersion = ver
                       , envDynFlags = dflags
                       , envOutput = out
@@ -299,17 +300,25 @@ getDynFlag f = getEnv (f . envDynFlags)
 getLlvmPlatform :: LlvmM Platform
 getLlvmPlatform = getDynFlag targetPlatform
 
+-- | Dumps the document if the corresponding flag has been set by the user
+dumpIfSetLlvm :: DumpFlag -> String -> Outp.SDoc -> LlvmM ()
+dumpIfSetLlvm flag hdr doc = do
+  dflags <- getDynFlags
+  liftIO $ dumpIfSet_dyn dflags flag hdr doc
+
 -- | Prints the given contents to the output handle
 renderLlvm :: Outp.SDoc -> LlvmM ()
-renderLlvm sdoc = LlvmM $ \env -> do
+renderLlvm sdoc = do
 
     -- Write to output
-    let doc = Outp.withPprStyleDoc (envDynFlags env) (Outp.mkCodeStyle Outp.CStyle) sdoc
-    Prt.bufLeftRender (envOutput env) doc
+    dflags <- getDynFlags
+    out <- getEnv envOutput
+    let doc = Outp.withPprStyleDoc dflags (Outp.mkCodeStyle Outp.CStyle) sdoc
+    liftIO $ Prt.bufLeftRender out doc
 
     -- Dump, if requested
-    dumpIfSet_dyn (envDynFlags env) Opt_D_dump_llvm "LLVM Code" sdoc
-    return ((), env)
+    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc
+    return ()
 
 -- | Run a @UniqSM@ action with our unique supply
 runUs :: UniqSM a -> LlvmM a
