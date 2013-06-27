@@ -35,7 +35,7 @@ import Maybes
 import TcMType
 import TcType
 import Name
-import VarSet -- RAE
+import VarSet
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map

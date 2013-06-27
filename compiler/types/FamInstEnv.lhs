@@ -784,8 +784,7 @@ findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = inc
       Just subst -- matching worked. now, check for apartness.
         |  all (isSurelyApart
                 . tcApartTys instanceBindFun target_tys
-                . coAxBranchLHS) $ -- RAE: This is horribly inefficient
-             incomps
+                . coAxBranchLHS) incomps
         -> -- matching worked & we're apart from all incompatible branches. success
            Just (ind, substTyVars subst tpl_tvs)
 
