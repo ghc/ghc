@@ -685,9 +685,15 @@ tcFamDecl1 parent
          -- just look it up.
        ; fam_tc <- tcLookupLocatedTyCon lname
 
-         -- create a CoAxiom, with the correct src location
+         -- create a CoAxiom, with the correct src location. It is Vitally
+         -- Important that we do not pass the branches into
+         -- newFamInstAxiomName. They have types that have been zonked inside
+         -- the knot and we will die if we look at them. This is OK here
+         -- because there will only be one axiom, so we don't need to
+         -- differentiate names.
+         -- See [Zonking inside the knot] in TcHsType
        ; loc <- getSrcSpanM
-       ; co_ax_name <- newFamInstAxiomName loc tc_name branches
+       ; co_ax_name <- newFamInstAxiomName loc tc_name [] 
        ; let co_ax = mkBranchedCoAxiom co_ax_name fam_tc branches
 
          -- now, finally, build the TyCon
@@ -860,7 +866,8 @@ tcTyFamInstEqn fam_tc_name kind
        \tvs' pats' res_kind ->
     do { rhs_ty <- tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
-       ; traceTc "tcSynFamInstEqn" (ppr fam_tc_name <+> (ppr tvs' $$ ppr pats' $$ ppr rhs_ty))
+       ; traceTc "tcTyFamInstEqn" (ppr fam_tc_name <+> ppr tvs')
+          -- don't print out the pats here, as they might be zonked inside the knot
        ; return (mkCoAxBranch tvs' pats' rhs_ty loc) }
 
 kcDataDefn :: HsDataDefn Name -> TcKind -> TcM ()
@@ -977,7 +984,8 @@ tcFamTyPats fam_tc_name kind pats kind_checker thing_inside
        ; all_args'    <- zonkTcTypeToTypes ze all_args
        ; res_kind'    <- zonkTcTypeToType  ze res_kind
 
-       ; traceTc "tcFamTyPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
+       ; traceTc "tcFamTyPats" (ppr fam_tc_name)
+            -- don't print out too much, as we might be in the knot
        ; tcExtendTyVarEnv qtkvs' $
          thing_inside qtkvs' all_args' res_kind' }
 \end{code}
