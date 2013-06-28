@@ -4,7 +4,7 @@
 
 module LlvmCodeGen.Regs (
         lmGlobalRegArg, lmGlobalRegVar, alwaysLive,
-        stgTBAA, top, base, stack, heap, rx, other, tbaa, getTBAA
+        stgTBAA, baseN, stackN, heapN, rxN, otherN, tbaa, getTBAA
     ) where
 
 #include "HsVersions.h"
@@ -15,6 +15,7 @@ import CmmExpr
 import DynFlags
 import FastString
 import Outputable ( panic )
+import Unique
 
 -- | Get the LlvmVar function variable storing the real register
 lmGlobalRegVar :: DynFlags -> GlobalReg -> LlvmVar
@@ -76,48 +77,38 @@ lmGlobalReg dflags suf reg
 alwaysLive :: [GlobalReg]
 alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 
--- | STG Type Based Alias Analysis metadata
-stgTBAA :: [LlvmMeta]
+-- | STG Type Based Alias Analysis hierarchy
+stgTBAA :: [(Unique, LMString, Maybe Unique)]
 stgTBAA
-  = [ MetaUnamed topN   [MetaStr (fsLit "top")]
-    , MetaUnamed stackN [MetaStr (fsLit "stack"), MetaNode topN]
-    , MetaUnamed heapN  [MetaStr (fsLit "heap"),  MetaNode topN]
-    , MetaUnamed rxN    [MetaStr (fsLit "rx"),    MetaNode heapN]
-    , MetaUnamed baseN  [MetaStr (fsLit "base"),  MetaNode topN]
+  = [ (topN,   fsLit "top",   Nothing)
+    , (stackN, fsLit "stack", Just topN)
+    , (heapN,  fsLit "heap",  Just topN)
+    , (rxN,    fsLit "rx",    Just heapN)
+    , (baseN,  fsLit "base",  Just topN)
     -- FIX: Not 100% sure about 'others' place. Might need to be under 'heap'.
     -- OR I think the big thing is Sp is never aliased, so might want
     -- to change the hieracy to have Sp on its own branch that is never
     -- aliased (e.g never use top as a TBAA node).
-    , MetaUnamed otherN [MetaStr (fsLit "other"), MetaNode topN]
+    , (otherN, fsLit "other", Just topN)
     ]
 
 -- | Id values
-topN, stackN, heapN, rxN, baseN, otherN:: LlvmMetaUnamed
-topN   = LMMetaUnamed 0
-stackN = LMMetaUnamed 1
-heapN  = LMMetaUnamed 2
-rxN    = LMMetaUnamed 3
-baseN  = LMMetaUnamed 4
-otherN = LMMetaUnamed 5
-
--- | The various TBAA types
-top, heap, stack, rx, base, other :: MetaData
-top   = (tbaa, topN)
-heap  = (tbaa, heapN)
-stack = (tbaa, stackN)
-rx    = (tbaa, rxN)
-base  = (tbaa, baseN)
-other = (tbaa, otherN)
+topN, stackN, heapN, rxN, baseN, otherN :: Unique
+topN   = getUnique (fsLit "LlvmCodeGen.Regs.topN")
+stackN = getUnique (fsLit "LlvmCodeGen.Regs.stackN")
+heapN  = getUnique (fsLit "LlvmCodeGen.Regs.heapN")
+rxN    = getUnique (fsLit "LlvmCodeGen.Regs.rxN")
+baseN  = getUnique (fsLit "LlvmCodeGen.Regs.baseN")
+otherN = getUnique (fsLit "LlvmCodeGen.Regs.otherN")
 
 -- | The TBAA metadata identifier
 tbaa :: LMString
 tbaa = fsLit "tbaa"
 
 -- | Get the correct TBAA metadata information for this register type
-getTBAA :: GlobalReg -> MetaData
-getTBAA BaseReg          = base
-getTBAA Sp               = stack
-getTBAA Hp               = heap
-getTBAA (VanillaReg _ _) = rx
-getTBAA _                = top
-
+getTBAA :: GlobalReg -> Unique
+getTBAA BaseReg          = baseN
+getTBAA Sp               = stackN
+getTBAA Hp               = heapN
+getTBAA (VanillaReg _ _) = rxN
+getTBAA _                = topN
