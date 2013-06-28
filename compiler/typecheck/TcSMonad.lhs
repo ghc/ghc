@@ -86,7 +86,7 @@ module TcSMonad (
 
     getDefaultInfo, getDynFlags,
 
-    matchClass, matchFam, matchOpenFam, MatchInstResult (..), 
+    matchFam, matchOpenFam, 
     checkWellStagedDFun, 
     pprEq                                    -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the 
@@ -1634,46 +1634,6 @@ rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_pred = old_pred }) new_pred c
             _          -> return Nothing }
 
 
-
--- Matching and looking up classes and family instances
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-data MatchInstResult mi
-  = MatchInstNo         -- No matching instance 
-  | MatchInstSingle mi  -- Single matching instance
-  | MatchInstMany       -- Multiple matching instances
-
-
-matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Maybe TcType])) 
--- Look up a class constraint in the instance environment
-matchClass clas tys
-  = do	{ let pred = mkClassPred clas tys 
-        ; instEnvs <- getInstEnvs
-        ; case lookupInstEnv instEnvs clas tys of {
-            ([], _unifs, _)               -- Nothing matches  
-                -> do { traceTcS "matchClass not matching" $ 
-                        vcat [ text "dict" <+> ppr pred
-                             {- , ppr instEnvs -} ]
-                        
-                      ; return MatchInstNo  
-                      } ;  
-	    ([(ispec, inst_tys)], [], _) -- A single match 
-		-> do	{ let dfun_id = is_dfun ispec
-			; traceTcS "matchClass success" $
-                          vcat [text "dict" <+> ppr pred, 
-                                text "witness" <+> ppr dfun_id
-                                               <+> ppr (idType dfun_id) ]
-				  -- Record that this dfun is needed
-                        ; return $ MatchInstSingle (dfun_id, inst_tys)
-                        } ;
-     	    (matches, _unifs, _)          -- More than one matches 
-		-> do	{ traceTcS "matchClass multiple matches, deferring choice" $
-                          vcat [text "dict" <+> ppr pred,
-                                text "matches" <+> ppr matches]
-                        ; return MatchInstMany 
-		        }
-	}
-        }
 
 matchOpenFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
 matchOpenFam tycon args = wrapTcS $ tcLookupFamInst tycon args
