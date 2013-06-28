@@ -529,15 +529,15 @@ reduceDoc p              = p
 
 -- | List version of '<>'.
 hcat :: [Doc] -> Doc
-hcat = reduceAB . foldr (beside_' False) empty
+hcat = reduceAB . foldr (\p q -> Beside p False q) empty
 
 -- | List version of '<+>'.
 hsep :: [Doc] -> Doc
-hsep = reduceAB . foldr (beside_' True)  empty
+hsep = reduceAB . foldr (\p q -> Beside p True q)  empty
 
 -- | List version of '$$'.
 vcat :: [Doc] -> Doc
-vcat = reduceAB . foldr (above_' False) empty
+vcat = reduceAB . foldr (\p q -> Above p False q) empty
 
 -- | Nest (or indent) a document by a given number of positions
 -- (which may also be negative).  'nest' satisfies the laws:
@@ -584,18 +584,33 @@ mkUnion :: Doc -> Doc -> Doc
 mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
 
-beside_' :: Bool -> Doc -> Doc -> Doc
-beside_' _ p Empty = p
-beside_' g p q     = Beside p g q
-
-above_' :: Bool -> Doc -> Doc -> Doc
-above_' _ p Empty = p
-above_' g p q     = Above p g q
-
 reduceAB :: Doc -> Doc
-reduceAB (Above  Empty _ q) = q
-reduceAB (Beside Empty _ q) = q
-reduceAB doc                = doc
+reduceAB = snd . reduceAB'
+
+data IsEmpty = IsEmpty | NotEmpty
+
+reduceAB' :: Doc -> (IsEmpty, Doc)
+reduceAB' (Above  p g q) = eliminateEmpty Above  (reduceAB p) g (reduceAB' q)
+reduceAB' (Beside p g q) = eliminateEmpty Beside (reduceAB p) g (reduceAB' q)
+reduceAB' doc            = (NotEmpty, doc)
+
+-- Left-arg-strict
+eliminateEmpty ::
+  (Doc -> Bool -> Doc -> Doc) ->
+  Doc -> Bool -> (IsEmpty, Doc) -> (IsEmpty, Doc)
+eliminateEmpty _    Empty _ q          = q
+eliminateEmpty cons p     g q          =
+  (NotEmpty,
+   -- We're not empty whether or not q is empty, so for laziness-sake,
+   -- after checking that p isn't empty, we put the NotEmpty result
+   -- outside independent of q. This allows reduceAB to immediately
+   -- return the appropriate constructor (Above or Beside) without
+   -- forcing the entire nested Doc. This allows the foldr in vcat,
+   -- hsep, and hcat to be lazy on its second argument, avoiding a
+   -- stack overflow.
+   case q of
+     (NotEmpty, q') -> cons p g q'
+     (IsEmpty, _) -> p)
 
 nilAbove_ :: RDoc -> RDoc
 nilAbove_ = NilAbove
