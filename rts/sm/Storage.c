@@ -181,7 +181,9 @@ initStorage (void)
 
 #ifdef THREADED_RTS
   initSpinLock(&gc_alloc_block_sync);
+#ifdef PROF_SPIN
   whitehole_spin = 0;
+#endif
 #endif
 
   N = 0;
