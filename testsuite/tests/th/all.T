@@ -276,3 +276,8 @@ test('T7910', normal, compile_and_run, ['-v0'])
 
 test('ClosedFam1', normal, compile, ['-dsuppress-uniques -v0'])
 test('ClosedFam2', normal, compile, ['-v0'])
+
+test('T8028',
+     extra_clean(['T8028a.hi', 'T8028a.o']),
+     multimod_compile_fail,
+     ['T8028', '-v0 ' + config.ghc_th_way_flags])
