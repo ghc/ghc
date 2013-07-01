@@ -529,15 +529,15 @@ reduceDoc p              = p
 
 -- | List version of '<>'.
 hcat :: [Doc] -> Doc
-hcat = reduceAB . foldr (\p q -> Beside p False q) empty
+hcat = snd . reduceHoriz . foldr (\p q -> Beside p False q) empty
 
 -- | List version of '<+>'.
 hsep :: [Doc] -> Doc
-hsep = reduceAB . foldr (\p q -> Beside p True q)  empty
+hsep = snd . reduceHoriz . foldr (\p q -> Beside p True q)  empty
 
 -- | List version of '$$'.
 vcat :: [Doc] -> Doc
-vcat = reduceAB . foldr (\p q -> Above p False q) empty
+vcat = snd . reduceVert . foldr (\p q -> Above p False q) empty
 
 -- | Nest (or indent) a document by a given number of positions
 -- (which may also be negative).  'nest' satisfies the laws:
@@ -584,17 +584,17 @@ mkUnion :: Doc -> Doc -> Doc
 mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
 
-reduceAB :: Doc -> Doc
-reduceAB = snd . reduceAB'
-
 data IsEmpty = IsEmpty | NotEmpty
 
-reduceAB' :: Doc -> (IsEmpty, Doc)
-reduceAB' (Above  p g q) = eliminateEmpty Above  (reduceAB p) g (reduceAB' q)
-reduceAB' (Beside p g q) = eliminateEmpty Beside (reduceAB p) g (reduceAB' q)
-reduceAB' doc            = (NotEmpty, doc)
+reduceHoriz :: Doc -> (IsEmpty, Doc)
+reduceHoriz (Beside p g q) = eliminateEmpty Beside (snd (reduceHoriz p)) g (reduceHoriz q)
+reduceHoriz doc            = (NotEmpty, doc)
 
--- Left-arg-strict
+reduceVert :: Doc -> (IsEmpty, Doc)
+reduceVert (Above  p g q) = eliminateEmpty Above  (snd (reduceVert p)) g (reduceVert q)
+reduceVert doc            = (NotEmpty, doc)
+
+{-# INLINE eliminateEmpty #-}
 eliminateEmpty ::
   (Doc -> Bool -> Doc -> Doc) ->
   Doc -> Bool -> (IsEmpty, Doc) -> (IsEmpty, Doc)
