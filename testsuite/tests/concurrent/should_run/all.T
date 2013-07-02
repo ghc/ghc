@@ -233,3 +233,5 @@ test('setnumcapabilities001',
        reqlib('parallel'),
        skip_if_not_smp ],
      compile_and_run, [''])
+
+test('T7970', normal, compile_and_run, [''])
