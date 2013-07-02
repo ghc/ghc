@@ -815,7 +815,7 @@ define installLibsTo
 		case $$i in \
 		  *.a) \
 		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
-		    $(RANLIB) $2/`basename $$i` ;; \
+		    $(RANLIB_CMD) $2/`basename $$i` ;; \
 		  *.dll) \
 		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
 		    $(STRIP_CMD) $2/`basename $$i` ;; \

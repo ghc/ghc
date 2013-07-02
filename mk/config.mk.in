@@ -636,7 +636,8 @@ LN_S			= @LN_S@
 MV			= mv
 PERL 			= @PerlCmd@
 PIC			= pic
-RANLIB			= @RANLIB@
+RANLIB_CMD = @RANLIB_CMD@
+REAL_RANLIB_CMD = @REAL_RANLIB_CMD@
 SED			= @SedCmd@
 SHELL			= /bin/sh
 
