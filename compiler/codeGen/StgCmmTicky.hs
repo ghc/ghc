@@ -570,14 +570,12 @@ bumpTickyLit lhs = bumpTickyLitBy lhs 1
 bumpTickyLitBy :: CmmLit -> Int -> FCode ()
 bumpTickyLitBy lhs n = do
   dflags <- getDynFlags
-  -- All the ticky-ticky counters are declared "unsigned long" in C
-  emit (addToMem (cLong dflags) (CmmLit lhs) n)
+  emit (addToMem (bWord dflags) (CmmLit lhs) n)
 
 bumpTickyLitByE :: CmmLit -> CmmExpr -> FCode ()
 bumpTickyLitByE lhs e = do
   dflags <- getDynFlags
-  -- All the ticky-ticky counters are declared "unsigned long" in C
-  emit (addToMemE (cLong dflags) (CmmLit lhs) e)
+  emit (addToMemE (bWord dflags) (CmmLit lhs) e)
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram _lbl _n
