@@ -81,10 +81,10 @@ StgWeak *dead_weak_ptr_list;
 // List of threads found to be unreachable
 StgTSO *resurrected_threads;
 
-static void collectDeadWeakPtrs (generation *gen);
+static void    collectDeadWeakPtrs (generation *gen);
 static rtsBool tidyWeakList (generation *gen);
-static void resurrectUnreachableThreads (generation *gen);
-static rtsBool tidyThreadList (generation *gen);
+static rtsBool resurrectUnreachableThreads (generation *gen);
+static void    tidyThreadList (generation *gen);
 
 void
 initWeakForGC(void)
@@ -97,7 +97,7 @@ initWeakForGC(void)
         gen->weak_ptr_list = NULL;
     }
 
-    weak_stage = WeakPtrs;
+    weak_stage = WeakThreads;
     dead_weak_ptr_list = NULL;
     resurrected_threads = END_TSO_QUEUE;
 }
@@ -112,10 +112,54 @@ traverseWeakPtrList(void)
   case WeakDone:
       return rtsFalse;
 
+  case WeakThreads:
+      /* Now deal with the gen->threads lists, which behave somewhat like
+       * the weak ptr list.  If we discover any threads that are about to
+       * become garbage, we wake them up and administer an exception.
+       */
+  {
+      nat g;
+	  
+      for (g = 0; g <= N; g++) {
+          tidyThreadList(&generations[g]);
+      }
+
+      // Use weak pointer relationships (value is reachable if
+      // key is reachable):
+      for (g = 0; g <= N; g++) {
+          if (tidyWeakList(&generations[g])) {
+              flag = rtsTrue;
+          }
+      }
+      
+      // if we evacuated anything new, we must scavenge thoroughly
+      // before we can determine which threads are unreachable.
+      if (flag) return rtsTrue;
+
+      // Resurrect any threads which were unreachable
+      for (g = 0; g <= N; g++) {
+          if (resurrectUnreachableThreads(&generations[g])) {
+              flag = rtsTrue;
+          }
+      }
+
+      // Next, move to the WeakPtrs stage after fully
+      // scavenging the finalizers we've just evacuated.
+      weak_stage = WeakPtrs;
+
+      // if we evacuated anything new, we must scavenge thoroughly
+      // before entering the WeakPtrs stage.
+      if (flag) return rtsTrue;
+
+      // otherwise, fall through...
+  }
+
   case WeakPtrs:
   {
       nat g;
 
+      // resurrecting threads might have made more weak pointers
+      // alive, so traverse those lists again:
       for (g = 0; g <= N; g++) {
           if (tidyWeakList(&generations[g])) {
               flag = rtsTrue;
@@ -131,52 +175,12 @@ traverseWeakPtrList(void)
               collectDeadWeakPtrs(&generations[g]);
           }
 
-	  // Next, move to the WeakThreads stage after fully
-	  // scavenging the finalizers we've just evacuated.
-	  weak_stage = WeakThreads;
+          weak_stage = WeakDone;  // *now* we're done,
       }
 
-      return rtsTrue;
-  }
-
-  case WeakThreads:
-      /* Now deal with the step->threads lists, which behave somewhat like
-       * the weak ptr list.  If we discover any threads that are about to
-       * become garbage, we wake them up and administer an exception.
-       */
-  {
-      nat g;
-	  
-      // Traverse thread lists for generations we collected...
-//      ToDo when we have one gen per capability:
-//      for (n = 0; n < n_capabilities; n++) {
-//          if (tidyThreadList(&nurseries[n])) {
-//              flag = rtsTrue;
-//          }
-//      }              
-      for (g = 0; g <= N; g++) {
-          if (tidyThreadList(&generations[g])) {
-              flag = rtsTrue;
-          }
-      }
-
-      /* If we evacuated any threads, we need to go back to the scavenger.
-       */
-      if (flag) return rtsTrue;
-
-      /* And resurrect any threads which were about to become garbage.
-       */
-      {
-          nat g;
-          for (g = 0; g <= N; g++) {
-              resurrectUnreachableThreads(&generations[g]);
-          }
-      }
-        
-      weak_stage = WeakDone;  // *now* we're done,
       return rtsTrue;         // but one more round of scavenging, please
   }
-      
+
   default:
       barf("traverse_weak_ptr_list");
       return rtsTrue;
@@ -194,9 +198,10 @@ static void collectDeadWeakPtrs (generation *gen)
     }
 }
 
-  static void resurrectUnreachableThreads (generation *gen)
+static rtsBool resurrectUnreachableThreads (generation *gen)
 {
     StgTSO *t, *tmp, *next;
+    rtsBool flag = rtsFalse;
 
     for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
         next = t->global_link;
@@ -214,8 +219,10 @@ static void collectDeadWeakPtrs (generation *gen)
             evacuate((StgClosure **)&tmp);
             tmp->global_link = resurrected_threads;
             resurrected_threads = tmp;
+            flag = rtsTrue;
         }
     }
+    return flag;
 }
 
 static rtsBool tidyWeakList(generation *gen)
@@ -292,10 +299,9 @@ static rtsBool tidyWeakList(generation *gen)
     return flag;
 }
 
-static rtsBool tidyThreadList (generation *gen)
+static void tidyThreadList (generation *gen)
 {
     StgTSO *t, *tmp, *next, **prev;
-    rtsBool flag = rtsFalse;
 
     prev = &gen->old_threads;
 
@@ -335,8 +341,6 @@ static rtsBool tidyThreadList (generation *gen)
             new_gen->threads  = t;
         }
     }
-
-    return flag;
 }
 
 /* -----------------------------------------------------------------------------
