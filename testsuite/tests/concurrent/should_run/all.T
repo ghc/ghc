@@ -141,7 +141,7 @@ test('conc030',
      [only_compiler_types(['ghc']), extra_run_opts('+RTS -K4M -RTS')],
 		compile_and_run, [''])
 
-test('conc031', normal, compile_and_run, [''])
+test('conc031', exit_code(1), compile_and_run, [''])
 
 test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc033', normal, compile_and_run, [''])
