@@ -107,6 +107,10 @@ module Control.Concurrent (
 
         -- $preemption
 
+        -- ** Deadlock
+
+        -- $deadlock
+
     ) where
 
 import Prelude
@@ -651,4 +655,32 @@ foreign import ccall safe "fdReady"
       lock is woken up, but haven't found it to be useful for anything
       other than this example :-)
 -}
+
+{- $deadlock
+
+GHC attempts to detect when threads are deadlocked using the garbage
+collector.  A thread that is not reachable (cannot be found by
+following pointers from live objects) must be deadlocked, and in this
+case the thread is sent an exception.  The exception is either
+'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM',
+'NonTermination', or 'Deadlock', depending on the way in which the
+thread is deadlocked.
+
+Note that this feature is intended for debugging, and should not be
+relied on for the correct operation of your program.  There is no
+guarantee that the garbage collector will be accurate enough to detect
+your deadlock, and no guarantee that the garbage collector will run in
+a timely enough manner.  Basically, the same caveats as for finalizers
+apply to deadlock detection.
+
+There is a subtle interaction between deadlock detection and
+finalizers (as created by 'Foreign.Concurrent.newForeignPtr' or the
+functions in "System.Mem.Weak"): if a thread is blocked waiting for a
+finalizer to run, then the thread will be considered deadlocked and
+sent an exception.  So preferably don't do this, but if you have no
+alternative then it is possible to prevent the thread from being
+considered deadlocked by making a 'StablePtr' pointing to it.  Don't
+forget to release the 'StablePtr' later with 'freeStablePtr'.
+-}
+
 #endif /* __GLASGOW_HASKELL__ */
