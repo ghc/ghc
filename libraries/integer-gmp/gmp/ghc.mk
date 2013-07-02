@@ -146,7 +146,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp/gmp/
 	$(MKDIRHIER) libraries/integer-gmp/gmp/objs
 	cd libraries/integer-gmp/gmp/objs && $(AR_STAGE1) x ../libgmp.a
-	$(RANLIB) libraries/integer-gmp/gmp/libgmp.a
+	$(RANLIB_CMD) libraries/integer-gmp/gmp/libgmp.a
 
 # XXX TODO:
 #stamp.gmp.shared:
