@@ -251,10 +251,13 @@ cvtDec (TySynInstD tc eqn)
                                         , tfid_fvs = placeHolderNames } } }
 
 cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
+  | not $ null eqns
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
        ; mkind' <- cvtMaybeKind mkind
        ; eqns' <- mapM (cvtTySynEqn tc') eqns
        ; returnL $ TyClD (FamDecl (FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind')) }
+  | otherwise
+  = failWith (ptext (sLit "Illegal empty closed type family"))
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
