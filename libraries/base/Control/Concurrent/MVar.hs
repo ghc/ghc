@@ -17,10 +17,12 @@
 -- 'takeMVar' which empties an 'MVar' if it is full and blocks
 -- otherwise.  They can be used in multiple different ways:
 --
---  1. As synchronized mutable variables,
---  2. As channels, with 'takeMVar' and 'putMVar' as receive and send, and
---  3. As a binary semaphore @'MVar' ()@, with 'takeMVar' and 'putMVar' as
---     wait and signal.
+--   1. As synchronized mutable variables,
+--
+--   2. As channels, with 'takeMVar' and 'putMVar' as receive and send, and
+--
+--   3. As a binary semaphore @'MVar' ()@, with 'takeMVar' and 'putMVar' as
+--      wait and signal.
 --
 -- They were introduced in the paper "Concurrent Haskell" by Simon
 -- Peyton Jones, Andrew Gordon and Sigbjorn Finne, though some details
