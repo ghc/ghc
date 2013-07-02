@@ -1378,7 +1378,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
         -- passes only, so if the user is passing us extra options we assume
         -- they know what they are doing and don't get in the way.
         optFlag  = if null (getOpts dflags opt_lo)
-                       then [SysTools.Option (llvmOpts !! opt_lvl)]
+                       then map SysTools.Option $ words (llvmOpts !! opt_lvl)
                        else []
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
              | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
@@ -1398,7 +1398,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
   where 
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        llvmOpts = ["-mem2reg", "-O1", "-O2"]
+        llvmOpts = ["-mem2reg -globalopt", "-O1", "-O2"]
 
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
