@@ -112,7 +112,8 @@ test('T2902',
      run_command,
      ['$MAKE -s --no-print-directory T2902'])
 test('T149',
-     [expect_broken(149),
+     [ # expect_broken(149),
+       # working (2 Jul 2013, x86-64/Linux)
       extra_clean(['T149_A',    'T149_B',
                    'T149_A.hi', 'T149_B.hi',
                    'T149_A.o',  'T149_B.o'])],
