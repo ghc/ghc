@@ -115,6 +115,7 @@ module Language.Haskell.TH(
     classD, instanceD, sigD,
     -- **** Type Family / Data Family
     familyNoKindD, familyKindD, dataInstD,
+    closedTypeFamilyNoKindD, closedTypeFamilyKindD,
     newtypeInstD, tySynInstD,
     typeFam, dataFam, tySynEqn,
     -- **** Foreign Function Interface (FFI)
