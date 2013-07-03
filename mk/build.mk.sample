@@ -81,10 +81,6 @@ GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
 GhcLibWays     += p
 
-ifeq "$(PlatformSupportsSharedLibs)" "YES"
-GhcLibWays += dyn
-endif
-
 DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
 
