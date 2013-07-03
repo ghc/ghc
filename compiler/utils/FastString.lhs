@@ -91,7 +91,10 @@ module FastString
         unpackLitString,
         
         -- ** Operations
-        lengthLS
+        lengthLS,
+
+        -- * Saving/restoring globals
+        saveFSTable, restoreFSTable, FastStringTable
        ) where
 
 #include "HsVersions.h"
@@ -573,4 +576,14 @@ fsLit x = mkFastString x
     forall x . sLit  (unpackCString# x) = mkLitString#  x #-}
 {-# RULES "fslit"
     forall x . fsLit (unpackCString# x) = mkFastString# x #-}
+
+
+--------------------
+-- for plugins; see Note [Initializing globals] in CoreMonad
+
+saveFSTable :: IO FastStringTable
+saveFSTable = readIORef string_table
+
+restoreFSTable :: FastStringTable -> IO ()
+restoreFSTable = writeIORef string_table
 \end{code}
