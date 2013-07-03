@@ -220,6 +220,7 @@ primOpRules nm DoubleNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp
                                                  , inversePrimOp DoubleNegOp ]
 
 -- Relational operators
+
 primOpRules nm IntEqOp    = mkRelOpRule nm (==) [ litEq True ]
 primOpRules nm IntNeOp    = mkRelOpRule nm (/=) [ litEq False ]
 primOpRules nm CharEqOp   = mkRelOpRule nm (==) [ litEq True ]
@@ -235,19 +236,19 @@ primOpRules nm CharGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
 primOpRules nm CharLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
 primOpRules nm CharLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
-primOpRules nm FloatGtOp  = mkRelOpRule nm (>)  []
-primOpRules nm FloatGeOp  = mkRelOpRule nm (>=) []
-primOpRules nm FloatLeOp  = mkRelOpRule nm (<=) []
-primOpRules nm FloatLtOp  = mkRelOpRule nm (<)  []
-primOpRules nm FloatEqOp  = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm FloatNeOp  = mkRelOpRule nm (/=) [ litEq False ]
+primOpRules nm FloatGtOp  = mkFloatingRelOpRule nm (>)  []
+primOpRules nm FloatGeOp  = mkFloatingRelOpRule nm (>=) []
+primOpRules nm FloatLeOp  = mkFloatingRelOpRule nm (<=) []
+primOpRules nm FloatLtOp  = mkFloatingRelOpRule nm (<)  []
+primOpRules nm FloatEqOp  = mkFloatingRelOpRule nm (==) [ litEq True ]
+primOpRules nm FloatNeOp  = mkFloatingRelOpRule nm (/=) [ litEq False ]
 
-primOpRules nm DoubleGtOp = mkRelOpRule nm (>)  []
-primOpRules nm DoubleGeOp = mkRelOpRule nm (>=) []
-primOpRules nm DoubleLeOp = mkRelOpRule nm (<=) []
-primOpRules nm DoubleLtOp = mkRelOpRule nm (<)  []
-primOpRules nm DoubleEqOp = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm DoubleNeOp = mkRelOpRule nm (/=) [ litEq False ]
+primOpRules nm DoubleGtOp = mkFloatingRelOpRule nm (>)  []
+primOpRules nm DoubleGeOp = mkFloatingRelOpRule nm (>=) []
+primOpRules nm DoubleLeOp = mkFloatingRelOpRule nm (<=) []
+primOpRules nm DoubleLtOp = mkFloatingRelOpRule nm (<)  []
+primOpRules nm DoubleEqOp = mkFloatingRelOpRule nm (==) [ litEq True ]
+primOpRules nm DoubleNeOp = mkFloatingRelOpRule nm (/=) [ litEq False ]
 
 primOpRules nm WordGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
 primOpRules nm WordGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
@@ -282,14 +283,27 @@ mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
 mkRelOpRule nm cmp extra
   = mkPrimOpRule nm 2 $ rules ++ extra
   where
-    rules = [ binaryLit (\_ -> cmpOp cmp)
-            , equalArgs >>
+    rules = [ binaryCmpLit cmp
+            , do equalArgs
               -- x `cmp` x does not depend on x, so
               -- compute it for the arbitrary value 'True'
               -- and use that result
-              return (if cmp True True
-                        then trueVal
-                        else falseVal) ]
+                 dflags <- getDynFlags
+                 return (if cmp True True
+                         then trueValInt  dflags
+                         else falseValInt dflags) ]
+
+-- Note [Rules for floating-point comparisons]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We need different rules for floating-point values because for floats
+-- it is not true that x = x. The special case when this does not occur
+-- are NaNs.
+
+mkFloatingRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
+                    -> [RuleM CoreExpr] -> Maybe CoreRule
+mkFloatingRelOpRule nm cmp extra -- See Note [Rules for floating-point comparisons]
+  = mkPrimOpRule nm 2 $ binaryCmpLit cmp : extra
 
 -- common constants
 zeroi, onei, zerow, onew :: DynFlags -> Literal
@@ -306,12 +320,12 @@ zerod = mkMachDouble 0.0
 oned  = mkMachDouble 1.0
 twod  = mkMachDouble 2.0
 
-cmpOp :: (forall a . Ord a => a -> a -> Bool)
+cmpOp :: DynFlags -> (forall a . Ord a => a -> a -> Bool)
       -> Literal -> Literal -> Maybe CoreExpr
-cmpOp cmp = go
+cmpOp dflags cmp = go
   where
-    done True  = Just trueVal
-    done False = Just falseVal
+    done True  = Just $ trueValInt  dflags
+    done False = Just $ falseValInt dflags
 
     -- These compares are at different types
     go (MachChar i1)   (MachChar i2)   = done (i1 `cmp` i2)
@@ -408,19 +422,22 @@ litEq :: Bool  -- True <=> equality, False <=> inequality
       -> RuleM CoreExpr
 litEq is_eq = msum
   [ do [Lit lit, expr] <- getArgs
-       do_lit_eq lit expr
+       dflags <- getDynFlags
+       do_lit_eq dflags lit expr
   , do [expr, Lit lit] <- getArgs
-       do_lit_eq lit expr ]
+       dflags <- getDynFlags
+       do_lit_eq dflags lit expr ]
   where
-    do_lit_eq lit expr = do
+    do_lit_eq dflags lit expr = do
       guard (not (litIsLifted lit))
-      return (mkWildCase expr (literalType lit) boolTy
+      return (mkWildCase expr (literalType lit) intPrimTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
-    val_if_eq  | is_eq     = trueVal
-               | otherwise = falseVal
-    val_if_neq | is_eq     = falseVal
-               | otherwise = trueVal
+      where
+        val_if_eq  | is_eq     = trueValInt  dflags
+                   | otherwise = falseValInt dflags
+        val_if_neq | is_eq     = falseValInt dflags
+                   | otherwise = trueValInt  dflags
 
 
 -- | Check if there is comparison with minBound or maxBound, that is
@@ -435,14 +452,14 @@ boundsCmp op = do
 data Comparison = Gt | Ge | Lt | Le
 
 mkRuleFn :: DynFlags -> Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
-mkRuleFn dflags Gt (Lit lit) _ | isMinBound dflags lit = Just falseVal
-mkRuleFn dflags Le (Lit lit) _ | isMinBound dflags lit = Just trueVal
-mkRuleFn dflags Ge _ (Lit lit) | isMinBound dflags lit = Just trueVal
-mkRuleFn dflags Lt _ (Lit lit) | isMinBound dflags lit = Just falseVal
-mkRuleFn dflags Ge (Lit lit) _ | isMaxBound dflags lit = Just trueVal
-mkRuleFn dflags Lt (Lit lit) _ | isMaxBound dflags lit = Just falseVal
-mkRuleFn dflags Gt _ (Lit lit) | isMaxBound dflags lit = Just falseVal
-mkRuleFn dflags Le _ (Lit lit) | isMaxBound dflags lit = Just trueVal
+mkRuleFn dflags Gt (Lit lit) _ | isMinBound dflags lit = Just $ falseValInt dflags
+mkRuleFn dflags Le (Lit lit) _ | isMinBound dflags lit = Just $ trueValInt  dflags
+mkRuleFn dflags Ge _ (Lit lit) | isMinBound dflags lit = Just $ trueValInt  dflags
+mkRuleFn dflags Lt _ (Lit lit) | isMinBound dflags lit = Just $ falseValInt dflags
+mkRuleFn dflags Ge (Lit lit) _ | isMaxBound dflags lit = Just $ trueValInt  dflags
+mkRuleFn dflags Lt (Lit lit) _ | isMaxBound dflags lit = Just $ falseValInt dflags
+mkRuleFn dflags Gt _ (Lit lit) | isMaxBound dflags lit = Just $ falseValInt dflags
+mkRuleFn dflags Le _ (Lit lit) | isMaxBound dflags lit = Just $ trueValInt  dflags
 mkRuleFn _ _ _ _                                       = Nothing
 
 isMinBound :: DynFlags -> Literal -> Bool
@@ -585,6 +602,11 @@ binaryLit op = do
   [Lit l1, Lit l2] <- getArgs
   liftMaybe $ op dflags (convFloating dflags l1) (convFloating dflags l2)
 
+binaryCmpLit :: (forall a . Ord a => a -> a -> Bool) -> RuleM CoreExpr
+binaryCmpLit op = do
+  dflags <- getDynFlags
+  binaryLit (\_ -> cmpOp dflags op)
+
 leftIdentity :: Literal -> RuleM CoreExpr
 leftIdentity id_lit = leftIdentityDynFlags (const id_lit)
 
@@ -679,9 +701,23 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 -- x * 2.0 into x + x addition, because addition costs less than multiplication.
 -- See #7116
 
-trueVal, falseVal :: Expr CoreBndr
-trueVal       = Var trueDataConId
-falseVal      = Var falseDataConId
+-- Note [What's true and false]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- trueValInt and falseValInt represent true and false values returned by
+-- comparison primops for Char, Int, Word, Integer, Double, Float and Addr.
+-- True is represented as an unboxed 1# literal, while false is represented
+-- as 0# literal.
+-- We still need Bool data constructors (True and False) to use in a rule
+-- for constant folding of equal Strings
+
+trueValInt, falseValInt :: DynFlags -> Expr CoreBndr
+trueValInt  dflags = Lit $ onei  dflags -- see Note [What's true and false]
+falseValInt dflags = Lit $ zeroi dflags
+
+trueValBool, falseValBool :: Expr CoreBndr
+trueValBool   = Var trueDataConId -- see Note [What's true and false]
+falseValBool  = Var falseDataConId
 
 ltVal, eqVal, gtVal :: Expr CoreBndr
 ltVal = Var ltDataConId
@@ -837,7 +873,7 @@ builtinRules
                    ru_fn = unpackCStringFoldrName,
                    ru_nargs = 4, ru_try = \_ _ _ -> match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
-                   ru_nargs = 2, ru_try = \_ _ _ -> match_eq_string },
+                   ru_nargs = 2, ru_try = \dflags _ _ -> match_eq_string dflags },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicSingI", ru_fn = idName magicSingIId,
@@ -859,19 +895,15 @@ builtinIntegerRules =
   rule_binop          "minusInteger"        minusIntegerName        (-),
   rule_binop          "timesInteger"        timesIntegerName        (*),
   rule_unop           "negateInteger"       negateIntegerName       negate,
-  rule_binop_Bool     "eqInteger"           eqIntegerName           (==),
-  rule_binop_Bool     "neqInteger"          neqIntegerName          (/=),
+  rule_binop_Prim     "eqInteger#"          eqIntegerPrimName       (==),
+  rule_binop_Prim     "neqInteger#"         neqIntegerPrimName      (/=),
   rule_unop           "absInteger"          absIntegerName          abs,
   rule_unop           "signumInteger"       signumIntegerName       signum,
-  rule_binop_Bool     "leInteger"           leIntegerName           (<=),
-  rule_binop_Bool     "gtInteger"           gtIntegerName           (>),
-  rule_binop_Bool     "ltInteger"           ltIntegerName           (<),
-  rule_binop_Bool     "geInteger"           geIntegerName           (>=),
+  rule_binop_Prim     "leInteger#"          leIntegerPrimName       (<=),
+  rule_binop_Prim     "gtInteger#"          gtIntegerPrimName       (>),
+  rule_binop_Prim     "ltInteger#"          ltIntegerPrimName       (<),
+  rule_binop_Prim     "geInteger#"          geIntegerPrimName       (>=),
   rule_binop_Ordering "compareInteger"      compareIntegerName      compare,
-  rule_divop_both     "divModInteger"       divModIntegerName       divMod,
-  rule_divop_both     "quotRemInteger"      quotRemIntegerName      quotRem,
-  rule_divop_one      "quotInteger"         quotIntegerName         quot,
-  rule_divop_one      "remInteger"          remIntegerName          rem,
   rule_encodeFloat    "encodeFloatInteger"  encodeFloatIntegerName  mkFloatLitFloat,
   rule_convert        "floatFromInteger"    floatFromIntegerName    (\_ -> mkFloatLitFloat),
   rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
@@ -887,6 +919,12 @@ builtinIntegerRules =
   rule_unop           "complementInteger"   complementIntegerName   complement,
   rule_Int_binop      "shiftLInteger"       shiftLIntegerName       shiftL,
   rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR,
+  rule_divop_one      "quotInteger"         quotIntegerName         quot,
+  rule_divop_one      "remInteger"          remIntegerName          rem,
+  rule_divop_one      "divInteger"          divIntegerName          div,
+  rule_divop_one      "modInteger"          modIntegerName          mod,
+  rule_divop_both     "divModInteger"       divModIntegerName       divMod,
+  rule_divop_both     "quotRemInteger"      quotRemIntegerName      quotRem,
   -- These rules below don't actually have to be built in, but if we
   -- put them in the Haskell source then we'd have to duplicate them
   -- between all Integer implementations
@@ -928,9 +966,9 @@ builtinIntegerRules =
           rule_Int_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_Int_binop op }
-          rule_binop_Bool str name op
+          rule_binop_Prim str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
-                           ru_try = match_Integer_binop_Bool op }
+                           ru_try = match_Integer_binop_Prim op }
           rule_binop_Ordering str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop_Ordering op }
@@ -978,14 +1016,14 @@ match_append_lit _ = Nothing
 -- The rule is this:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
-match_eq_string :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_eq_string [Var unpk1 `App` Lit (MachStr s1),
-                   Var unpk2 `App` Lit (MachStr s2)]
+match_eq_string :: DynFlags -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_eq_string _ [Var unpk1 `App` Lit (MachStr s1),
+                        Var unpk2 `App` Lit (MachStr s2)]
   | unpk1 `hasKey` unpackCStringIdKey,
     unpk2 `hasKey` unpackCStringIdKey
-  = Just (if s1 == s2 then trueVal else falseVal)
+  = Just (if s1 == s2 then trueValBool else falseValBool)
 
-match_eq_string _ = Nothing
+match_eq_string _ _ = Nothing
 
 
 ---------------------------------------------------
@@ -1107,7 +1145,7 @@ match_Integer_divop_both divop _ id_unf _ [xl,yl]
                      Lit (LitInteger s t)]
 match_Integer_divop_both _ _ _ _ _ = Nothing
 
--- This helper is used for the quotRem and divMod functions
+-- This helper is used for the quot and rem functions
 match_Integer_divop_one :: (Integer -> Integer -> Integer) -> RuleFun
 match_Integer_divop_one divop _ id_unf _ [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
@@ -1123,12 +1161,12 @@ match_Integer_Int_binop binop _ id_unf _ [xl,yl]
   = Just (Lit (LitInteger (x `binop` fromIntegral y) i))
 match_Integer_Int_binop _ _ _ _ _ = Nothing
 
-match_Integer_binop_Bool :: (Integer -> Integer -> Bool) -> RuleFun
-match_Integer_binop_Bool binop _ id_unf _ [xl, yl]
+match_Integer_binop_Prim :: (Integer -> Integer -> Bool) -> RuleFun
+match_Integer_binop_Prim binop dflags id_unf _ [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
-  = Just (if x `binop` y then trueVal else falseVal)
-match_Integer_binop_Bool _ _ _ _ _ = Nothing
+  = Just (if x `binop` y then trueValInt dflags else falseValInt dflags)
+match_Integer_binop_Prim _ _ _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
 match_Integer_binop_Ordering binop _ id_unf _ [xl, yl]

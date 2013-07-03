@@ -107,15 +107,6 @@ cgOpApp (StgPrimOp primop) args res_ty
        cgPrimOp regs primop args
        emitReturn (map (CmmReg . CmmLocal) regs)
 
-  | ReturnsAlg tycon <- result_info
-  , isEnumerationTyCon tycon
-        -- c.f. cgExpr (...TagToEnumOp...)
-  = do dflags <- getDynFlags
-       tag_reg <- newTemp (bWord dflags)
-       cgPrimOp [tag_reg] primop args
-       emitReturn [tagToClosure dflags tycon
-                                (CmmReg (CmmLocal tag_reg))]
-
   | otherwise = panic "cgPrimop"
   where
      result_info = getPrimOpResultInfo primop

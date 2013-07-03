@@ -110,6 +110,22 @@
 
         <listitem>
             <para>
+                PrimOps for comparing unboxed values now return
+                <literal>Int#</literal> instead of <literal>Bool</literal>.
+                New PrimOps' names end with <literal>$#</literal> for operators and
+                <literal>I#</literal> for ordinary names, e.g. <literal>==$#</literal>
+                compares <literal>Int#</literal>s for equality and
+                <literal>eqCharI#</literal> does the same for <literal>Char#</literal>s.
+                Old PrimOps have been removed and turned into wrappers. If your
+                code relied on removed PrimOps then importing
+                <literal>GHC.PrimWrappers</literal> will make it work again (no
+                need to add anything if your code already imports
+                <literal>GHC.Exts</literal>).
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
                 TODO: mention dynamic changes
            </para>
        </listitem>

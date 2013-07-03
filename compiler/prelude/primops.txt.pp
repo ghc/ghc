@@ -140,19 +140,19 @@ section "Char#"
 
 primtype Char#
 
-primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Bool
-primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Bool
+primop   CharGtOp  "gtCharI#"   Compare   Char# -> Char# -> Int#
+primop   CharGeOp  "geCharI#"   Compare   Char# -> Char# -> Int#
 
-primop   CharEqOp  "eqChar#"   Compare
-   Char# -> Char# -> Bool
+primop   CharEqOp  "eqCharI#"   Compare
+   Char# -> Char# -> Int#
    with commutable = True
 
-primop   CharNeOp  "neChar#"   Compare
-   Char# -> Char# -> Bool
+primop   CharNeOp  "neCharI#"   Compare
+   Char# -> Char# -> Int#
    with commutable = True
 
-primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> Bool
-primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Bool
+primop   CharLtOp  "ltCharI#"   Compare   Char# -> Char# -> Int#
+primop   CharLeOp  "leCharI#"   Compare   Char# -> Char# -> Int#
 
 primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
    with code_size = 0
@@ -239,26 +239,26 @@ primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
           second member is 0 iff no overflow occured.}
    with code_size = 2
 
-primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Bool
+primop   IntGtOp  ">$#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Bool
+primop   IntGeOp  ">=$#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntEqOp  "==#"   Compare
-   Int# -> Int# -> Bool
+primop   IntEqOp  "==$#"   Compare
+   Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntNeOp  "/=#"   Compare
-   Int# -> Int# -> Bool
+primop   IntNeOp  "/=$#"   Compare
+   Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Bool
+primop   IntLtOp  "<$#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Bool
+primop   IntLeOp  "<=$#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
 primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
@@ -345,12 +345,12 @@ primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
    with code_size = 0
 
-primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Bool
-primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Bool
-primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Bool
-primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Bool
-primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Bool
-primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Bool
+primop   WordGtOp   "gtWordI#"   Compare   Word# -> Word# -> Int#
+primop   WordGeOp   "geWordI#"   Compare   Word# -> Word# -> Int#
+primop   WordEqOp   "eqWordI#"   Compare   Word# -> Word# -> Int#
+primop   WordNeOp   "neWordI#"   Compare   Word# -> Word# -> Int#
+primop   WordLtOp   "ltWordI#"   Compare   Word# -> Word# -> Int#
+primop   WordLeOp   "leWordI#"   Compare   Word# -> Word# -> Int#
 
 primop   PopCnt8Op   "popCnt8#"   Monadic   Word# -> Word#
     {Count the number of set bits in the lower 8 bits of a word.}
@@ -435,26 +435,26 @@ section "Double#"
 
 primtype Double#
 
-primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Bool
+primop   DoubleGtOp ">$##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Bool
+primop   DoubleGeOp ">=$##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop DoubleEqOp "==##"   Compare
-   Double# -> Double# -> Bool
+primop DoubleEqOp "==$##"   Compare
+   Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop DoubleNeOp "/=##"   Compare
-   Double# -> Double# -> Bool
+primop DoubleNeOp "/=$##"   Compare
+   Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Bool
+primop   DoubleLtOp "<$##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Bool
+primop   DoubleLeOp "<=$##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   Dyadic
@@ -568,19 +568,19 @@ section "Float#"
 
 primtype Float#
 
-primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Bool
-primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Bool
+primop   FloatGtOp  "gtFloatI#"   Compare   Float# -> Float# -> Int#
+primop   FloatGeOp  "geFloatI#"   Compare   Float# -> Float# -> Int#
 
-primop   FloatEqOp  "eqFloat#"   Compare
-   Float# -> Float# -> Bool
+primop   FloatEqOp  "eqFloatI#"   Compare
+   Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatNeOp  "neFloat#"   Compare
-   Float# -> Float# -> Bool
+primop   FloatNeOp  "neFloatI#"   Compare
+   Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Bool
-primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Bool
+primop   FloatLtOp  "ltFloatI#"   Compare   Float# -> Float# -> Int#
+primop   FloatLeOp  "leFloatI#"   Compare   Float# -> Float# -> Int#
 
 primop   FloatAddOp   "plusFloat#"      Dyadic            
    Float# -> Float# -> Float#
@@ -698,7 +698,7 @@ primop  NewArrayOp "newArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
-   MutableArray# s a -> MutableArray# s a -> Bool
+   MutableArray# s a -> MutableArray# s a -> Int#
 
 primop  ReadArrayOp "readArray#" GenPrimOp
    MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
@@ -837,7 +837,7 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
    {Intended for use with pinned arrays; otherwise very unsafe!}
 
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> MutableByteArray# s -> Bool
+   MutableByteArray# s -> MutableByteArray# s -> Int#
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
@@ -1133,7 +1133,7 @@ primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
-   MutableArrayArray# s -> MutableArrayArray# s -> Bool
+   MutableArrayArray# s -> MutableArrayArray# s -> Int#
 
 primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
    MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
@@ -1244,12 +1244,12 @@ primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
    with code_size = 0
 #endif
 
-primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Bool
+primop   AddrGtOp  "gtAddrI#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrGeOp  "geAddrI#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrEqOp  "eqAddrI#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrNeOp  "neAddrI#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLtOp  "ltAddrI#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLeOp  "leAddrI#"   Compare   Addr# -> Addr# -> Int#
 
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
@@ -1510,7 +1510,7 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    can_fail         = True
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
-   MutVar# s a -> MutVar# s a -> Bool
+   MutVar# s a -> MutVar# s a -> Int#
 
 -- not really the right type, but we don't know about pairs here.  The
 -- correct type is
@@ -1689,7 +1689,7 @@ primop	WriteTVarOp "writeTVar#" GenPrimOp
    has_side_effects = True
 
 primop  SameTVarOp "sameTVar#" GenPrimOp
-   TVar# s a -> TVar# s a -> Bool
+   TVar# s a -> TVar# s a -> Int#
 
 
 ------------------------------------------------------------------------
@@ -1759,7 +1759,7 @@ primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    has_side_effects = True
 
 primop  SameMVarOp "sameMVar#" GenPrimOp
-   MVar# s a -> MVar# s a -> Bool
+   MVar# s a -> MVar# s a -> Int#
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int# #)

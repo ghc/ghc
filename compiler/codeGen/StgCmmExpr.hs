@@ -141,9 +141,9 @@ cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd _ args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc [] (StgConApp con args)
-        -- For a constructor RHS we want to generate a single chunk of 
-        -- code which can be jumped to from many places, which will 
-        -- return the constructor. It's easy; just behave as if it 
+        -- For a constructor RHS we want to generate a single chunk of
+        -- code which can be jumped to from many places, which will
+        -- return the constructor. It's easy; just behave as if it
         -- was an StgRhsClosure with a ConApp inside!
 
 -------------------------
@@ -193,9 +193,9 @@ heapcheck will take their worst case into account.
 In favour of omitting !Q!, !R!:
 
  - *May* save a heap overflow test,
-   if ...P... allocates anything.  
+   if ...P... allocates anything.
 
- - We can use relative addressing from a single Hp to 
+ - We can use relative addressing from a single Hp to
    get at all the closures so allocated.
 
  - No need to save volatile vars etc across heap checks
@@ -203,7 +203,7 @@ In favour of omitting !Q!, !R!:
 
 Against omitting !Q!, !R!
 
-  - May put a heap-check into the inner loop.  Suppose 
+  - May put a heap-check into the inner loop.  Suppose
         the main loop is P -> R -> P -> R...
         Q is the loop exit, and only it does allocation.
     This only hurts us if P does no allocation.  If P allocates,
@@ -212,7 +212,7 @@ Against omitting !Q!, !R!
   - May do more allocation than reqd.  This sometimes bites us
     badly.  For example, nfib (ha!) allocates about 30\% more space if the
     worst-casing is done, because many many calls to nfib are leaf calls
-    which don't need to allocate anything. 
+    which don't need to allocate anything.
 
     We can un-allocate, but that costs an instruction
 
@@ -248,7 +248,7 @@ Hence: two basic plans for
 
         ...save current cost centre...
 
-        ...code for e, 
+        ...code for e,
            with sequel (SetLocals r)
 
         ...restore current cost centre...
@@ -338,8 +338,12 @@ So we add a special case to generate
 
 and later optimisations will further improve this.
 
-We should really change all these primops to return Int# instead, that
-would make this special case go away.
+Now that #6135 has been resolved it should be possible to remove that
+special case. The idea behind this special case and pre-6135 implementation
+of Bool-returning primops was that tagToEnum# was added implicitly in the
+codegen and then optimized away. Now the call to tagToEnum# is explicit
+in the source code, which allows to optimize it away at the earlier stages
+of compilation (i.e. at the Core level).
 -}
 
 
@@ -498,7 +502,7 @@ cgAlts gc_plan bndr (PrimAlt _) alts
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
 
-              tagged_cmms' = [(lit,code) 
+              tagged_cmms' = [(lit,code)
                              | (LitAlt lit, code) <- tagged_cmms]
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
         ; return AssignedDirectly }
@@ -637,7 +641,7 @@ cgLneJump blk_id lne_regs args  -- Join point; discard sequel
         ; emitMultiAssign lne_regs cmm_args
         ; emit (mkBranch blk_id)
         ; return AssignedDirectly }
-    
+
 cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ReturnKind
 cgTailCall fun_id fun_info args = do
     dflags <- getDynFlags
@@ -645,7 +649,7 @@ cgTailCall fun_id fun_info args = do
 
             -- A value in WHNF, so we can just return it.
         ReturnIt -> emitReturn [fun]    -- ToDo: does ReturnIt guarantee tagged?
-    
+
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
 
@@ -653,7 +657,7 @@ cgTailCall fun_id fun_info args = do
                 { tickySlowCall lf_info args
                 ; emitComment $ mkFastString "slowCall"
                 ; slowCall fun args }
-    
+
         -- A direct function call (possibly with some left-over arguments)
         DirectEntry lbl arity -> do
                 { tickyDirectCall arity args

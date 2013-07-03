@@ -118,9 +118,8 @@ data PrimOpInfo
                 Type
   | Monadic     OccName         -- string :: T -> T
                 Type
-  | Compare     OccName         -- string :: T -> T -> Bool
+  | Compare     OccName         -- string :: T -> T -> Int#
                 Type
-
   | GenPrimOp   OccName         -- string :: \/a1..an . T1 -> .. -> Tk -> T
                 [TyVar]
                 [Type]
@@ -513,10 +512,10 @@ primOpSig op
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
       = case (primOpInfo op) of
-        Monadic   _occ ty                    -> ([],     [ty],    ty    )
-        Dyadic    _occ ty                    -> ([],     [ty,ty], ty    )
-        Compare   _occ ty                    -> ([],     [ty,ty], boolTy)
-        GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty)
+        Monadic   _occ ty                    -> ([],     [ty],    ty       )
+        Dyadic    _occ ty                    -> ([],     [ty,ty], ty       )
+        Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
+        GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 \end{code}
 
 \begin{code}
@@ -533,7 +532,7 @@ getPrimOpResultInfo op
   = case (primOpInfo op) of
       Dyadic  _ ty                        -> ReturnsPrim (typePrimRep ty)
       Monadic _ ty                        -> ReturnsPrim (typePrimRep ty)
-      Compare _ _                         -> ReturnsAlg boolTyCon
+      Compare _ _                         -> ReturnsPrim (tyConPrimRep intPrimTyCon)
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep tc)
                          | otherwise      -> ReturnsAlg tc
                          where
@@ -560,7 +559,7 @@ Utils:
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
 monadic_fun_ty ty = mkFunTy  ty ty
-compare_fun_ty ty = mkFunTys [ty, ty] boolTy
+compare_fun_ty ty = mkFunTys [ty, ty] intPrimTy
 \end{code}
 
 Output stuff:

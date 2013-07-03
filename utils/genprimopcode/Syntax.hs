@@ -114,7 +114,7 @@ sanityPrimOp def_names p
 
 sane_ty :: Category -> Ty -> Bool
 sane_ty Compare (TyF t1 (TyF t2 td)) 
-   | t1 == t2 && td == TyApp "Bool" []  = True
+   | t1 == t2 && td == TyApp "Int#" []  = True
 sane_ty Monadic (TyF t1 td) 
    | t1 == td  = True
 sane_ty Dyadic (TyF t1 (TyF t2 td))

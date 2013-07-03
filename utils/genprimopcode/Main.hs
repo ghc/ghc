@@ -138,8 +138,6 @@ gen_hs_source (Info defaults entries) =
         ++ unlines (map (("\t" ++) . hdr) entries)
         ++ ") where\n"
     ++ "\n"
-    ++ "import GHC.Types\n"
-    ++ "\n"
     ++ "{-\n"
         ++ unlines (map opt defaults)
     ++ "-}\n"
@@ -507,7 +505,6 @@ gen_wrappers (Info _ entries)
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
-     ++ "import GHC.Types (Bool)\n"
      ++ "import GHC.Tuple ()\n"
      ++ "import GHC.Prim (" ++ concat (intersperse ", " othertycons) ++ ")\n"
      ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"

@@ -404,7 +404,7 @@ renameDeriv is_boot inst_infos bagBinds
 
   | otherwise
   = discardWarnings $         -- Discard warnings about unused bindings etc
-    setXOptM Opt_EmptyCase $  -- Derived decls (for empty types) can have 
+    setXOptM Opt_EmptyCase $  -- Derived decls (for empty types) can have
                               --    case x of {}
     do  {
         -- Bring the extra deriving stuff into scope
@@ -764,7 +764,7 @@ if there are any overlaps.
 There are two other things that might go wrong with the lookup.
 First, we might see a standalone deriving clause
    deriving Eq (F ())
-when there is no data instance F () in scope. 
+when there is no data instance F () in scope.
 
 Note that it's OK to have
   data instance F [a] = ...
@@ -796,7 +796,7 @@ When type familes are involved it's trickier:
 
     instance Monad [] => Monad (T Int)  -- only if we can eta reduce???
        -- d1 :: Monad []
-       -- d2 :: Monad (T Int) = d1 |> Monad (sym (:Co:RT ; :coF:RT)) 
+       -- d2 :: Monad (T Int) = d1 |> Monad (sym (:Co:RT ; :coF:RT))
 
 Note the need for the eta-reduced rule axioms.  After all, we can
 write it out
@@ -912,7 +912,7 @@ mkPolyKindedTypeableEqn orig tvs cls _cls_tys tycon tc_args mtheta
                      , ds_tc = tycon, ds_tc_args = tc_args
                      , ds_theta = mtheta `orElse` []  -- Context is empty for polykinded Typeable
                      , ds_newtype = False })  }
-  where 
+  where
     is_kind_var tc_arg = case tcGetTyVar_maybe tc_arg of
                            Just v  -> isKindVar v
                            Nothing -> False
@@ -1002,16 +1002,10 @@ ghc-prim does not use Functor or Typeable implicitly via these lookups.
 Note [Deriving and unboxed types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We have some special hacks to support things like
-   data T = MkT Int# deriving( Ord, Show )
+   data T = MkT Int# deriving ( Show )
 
-Specifically
-  * For Show we use TcGenDeriv.box_if_necy to box the Int# into an Int
-    (which we know how to show)
-
-  * For Eq, Ord, we ust TcGenDeriv.primOrdOps to give Ord operations
-    on some primitive types
-
-It's all a bit ad hoc.
+Specifically, we use TcGenDeriv.box_if_necy to box the Int# into an Int
+(which we know how to show). It's a bit ad hoc.
 
 
 \begin{code}
@@ -1610,7 +1604,7 @@ extendLocalInstEnv dfuns thing_inside
 
 
 ***********************************************************************************
-*                                                                                 * 
+*                                                                                 *
 *            Simplify derived constraints
 *                                                                                 *
 ***********************************************************************************
@@ -1618,16 +1612,16 @@ extendLocalInstEnv dfuns thing_inside
 \begin{code}
 simplifyDeriv :: CtOrigin
               -> PredType
-              -> [TyVar]        
+              -> [TyVar]
               -> ThetaType              -- Wanted
               -> TcM ThetaType  -- Needed
--- Given  instance (wanted) => C inst_ty 
+-- Given  instance (wanted) => C inst_ty
 -- Simplify 'wanted' as much as possibles
 -- Fail if not possible
-simplifyDeriv orig pred tvs theta 
+simplifyDeriv orig pred tvs theta
   = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
-                -- The constraint solving machinery 
-                -- expects *TcTyVars* not TyVars.  
+                -- The constraint solving machinery
+                -- expects *TcTyVars* not TyVars.
                 -- We use *non-overlappable* (vanilla) skolems
                 -- See Note [Overlap and deriving]
 
@@ -1637,7 +1631,7 @@ simplifyDeriv orig pred tvs theta
 
        ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
 
-       ; traceTc "simplifyDeriv" $ 
+       ; traceTc "simplifyDeriv" $
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
        ; (residual_wanted, _ev_binds1)
              <- solveWantedsTcM (mkFlatWC wanted)
@@ -1646,8 +1640,8 @@ simplifyDeriv orig pred tvs theta
        ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
                          -- See Note [Exotic derived instance contexts]
              get_good :: Ct -> Either PredType Ct
-             get_good ct | validDerivPred skol_set p 
-                         , isWantedCt ct  = Left p 
+             get_good ct | validDerivPred skol_set p
+                         , isWantedCt ct  = Left p
                          -- NB: residual_wanted may contain unsolved
                          -- Derived and we stick them into the bad set
                          -- so that reportUnsolved may decide what to do with them
@@ -1684,7 +1678,7 @@ and we want to infer
    f :: Show [a] => a -> String
 
 BOTTOM LINE: use vanilla, non-overlappable skolems when inferring
-             the context for the derived instance. 
+             the context for the derived instance.
              Hence tcInstSkolTyVars not tcInstSuperSkolTyVars
 
 Note [Exotic derived instance contexts]
@@ -1699,13 +1693,13 @@ One could go further: consider
         data T a b c = MkT (Foo a b c) deriving( Eq )
         instance (C Int a, Eq b, Eq c) => Eq (Foo a b c)
 
-Notice that this instance (just) satisfies the Paterson termination 
+Notice that this instance (just) satisfies the Paterson termination
 conditions.  Then we *could* derive an instance decl like this:
 
-        instance (C Int a, Eq b, Eq c) => Eq (T a b c) 
+        instance (C Int a, Eq b, Eq c) => Eq (T a b c)
 even though there is no instance for (C Int a), because there just
 *might* be an instance for, say, (C Int Bool) at a site where we
-need the equality instance for T's.  
+need the equality instance for T's.
 
 However, this seems pretty exotic, and it's quite tricky to allow
 this, and yet give sensible error messages in the (much more common)
