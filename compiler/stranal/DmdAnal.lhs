@@ -26,7 +26,7 @@ import Data.List
 import DataCon
 import Id
 import CoreUtils	( exprIsHNF, exprType, exprIsTrivial )
-import PprCore	
+-- import PprCore	
 import TyCon
 import Type		( eqType )
 -- import Pair
@@ -535,13 +535,13 @@ dmdFix top_lvl env orig_pairs
 		-- is the result of processing the RHSs with the *previous* 
 		-- iteration of sigs.
 
-      | n >= 10  
-      = pprTrace "dmdFix loop" (ppr n <+> (vcat 
-			[ text "Sigs:" <+> ppr [ (id,lookupVarEnv (sigEnv env) id, 
-                                                     lookupVarEnv (sigEnv env') id) 
-                                               | (id,_) <- pairs],
-			  text "env:" <+> ppr env,
-			  text "binds:" <+> pprCoreBinding (Rec pairs)]))
+      | n >= 10
+      = -- pprTrace "dmdFix loop" (ppr n <+> (vcat 
+        --                 [ text "Sigs:" <+> ppr [ (id,lookupVarEnv (sigEnv env) id, 
+        --                                              lookupVarEnv (sigEnv env') id) 
+        --                                          | (id,_) <- pairs],
+        --                   text "env:" <+> ppr env,
+        --                   text "binds:" <+> pprCoreBinding (Rec pairs)]))
 	(env, lazy_fv, orig_pairs)	-- Safe output
 		-- The lazy_fv part is really important!  orig_pairs has no strictness
 		-- info, including nothing about free vars.  But if we have
