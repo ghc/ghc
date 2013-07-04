@@ -105,7 +105,7 @@ ppLlvmMetas metas = vcat $ map ppLlvmMeta metas
 -- | Print out an LLVM metadata definition.
 ppLlvmMeta :: MetaDecl -> SDoc
 ppLlvmMeta (MetaUnamed n m)
-  = exclamation <> int n <> text " = metadata !" <> braces (ppLlvmMetaExpr m)
+  = exclamation <> int n <> text " = " <> ppLlvmMetaExpr m
 
 ppLlvmMeta (MetaNamed n m)
   = exclamation <> ftext n <> text " = !" <> braces nodes
