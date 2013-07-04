@@ -201,7 +201,9 @@ genCall (PrimTarget (MO_UF_Conv _)) [_] args =
 
 -- Handle prefetching data
 genCall t@(PrimTarget MO_Prefetch_Data) [] args = do
-    let argTy = [i8Ptr, i32, i32, i32]
+    ver <- getLlvmVer
+    let argTy | ver <= 29  = [i8Ptr, i32, i32]
+              | otherwise  = [i8Ptr, i32, i32, i32]
         funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
 
@@ -212,8 +214,9 @@ genCall t@(PrimTarget MO_Prefetch_Data) [] args = do
     (argVars', stmts3)      <- castVars $ zip argVars argTy
 
     trash <- getTrashStmts
-    let arguments = argVars' ++ [mkIntLit i32 0, mkIntLit i32 3, mkIntLit i32 1]
-        call = Expr $ Call StdCall fptr arguments []
+    let argSuffix | ver <= 29  = [mkIntLit i32 0, mkIntLit i32 3]
+                  | otherwise  = [mkIntLit i32 0, mkIntLit i32 3, mkIntLit i32 1]
+        call = Expr $ Call StdCall fptr (argVars' ++ argSuffix) []
         stmts = stmts1 `appOL` stmts2 `appOL` stmts3
                 `appOL` trash `snocOL` call
     return (stmts, top1 ++ top2)
