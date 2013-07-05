@@ -311,7 +311,7 @@ addPluginPasses dflags builtin_passes
        ; foldM query_plug builtin_passes named_plugins }
   where
     query_plug todos (mod_nm, plug)
-       = installCoreToDos plug options todos
+       = bracketGlobals $ installCoreToDos plug options todos
        where
          options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
@@ -407,7 +407,7 @@ doCorePass _      CoreDoNothing                = return
 doCorePass _      (CoreDoPasses passes)        = runCorePasses passes
 
 #ifdef GHCI
-doCorePass _      (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+doCorePass _      (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} (bracketGlobals . pass)
 #endif
 
 doCorePass _      pass = pprPanic "doCorePass" (ppr pass)

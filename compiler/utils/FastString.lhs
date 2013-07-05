@@ -94,7 +94,7 @@ module FastString
         lengthLS,
 
         -- * Saving/restoring globals
-        saveFSTable, restoreFSTable, FastStringTable
+        saveFSTable, restoreFSTable, unsaveFSTable, FastStringTable
        ) where
 
 #include "HsVersions.h"
@@ -480,7 +480,7 @@ nilFS = mkFastString ""
 getFastStringTable :: IO [[FastString]]
 getFastStringTable = do
   tbl <- readIORef string_table
-  buckets <- mapM (lookupTbl tbl) [0 .. hASH_TBL_SIZE]
+  buckets <- mapM (lookupTbl tbl) [0 .. hASH_TBL_SIZE - 1]
   return buckets
 
 -- -----------------------------------------------------------------------------
@@ -581,9 +581,19 @@ fsLit x = mkFastString x
 --------------------
 -- for plugins; see Note [Initializing globals] in CoreMonad
 
+-- called by host compiler
 saveFSTable :: IO FastStringTable
 saveFSTable = readIORef string_table
 
+-- called by host compiler
+unsaveFSTable :: IO ()
+unsaveFSTable = do
+  tbl@(FastStringTable _ arr#) <- readIORef string_table
+  buckets <- mapM (lookupTbl tbl) [0 .. hASH_TBL_SIZE - 1]
+  let size = sum $ map length $ buckets
+  writeIORef string_table (FastStringTable size arr#)
+
+-- called by plugin
 restoreFSTable :: FastStringTable -> IO ()
 restoreFSTable = writeIORef string_table
 \end{code}

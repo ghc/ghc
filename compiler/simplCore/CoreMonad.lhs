@@ -44,7 +44,7 @@ module CoreMonad (
     liftIO1, liftIO2, liftIO3, liftIO4,
     
     -- ** Global initialization
-    reinitializeGlobals,
+    reinitializeGlobals, bracketGlobals,
     
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
@@ -947,6 +947,7 @@ domain of the GlobalRdrEnv is affected by the RdrName's OccName's FastString's
 unique.
 
 \begin{code}
+-- called by plugin
 reinitializeGlobals :: CoreM ()
 reinitializeGlobals = do
     (sf_globals, fs_table, linker_globals) <- read cr_globals
@@ -956,6 +957,16 @@ reinitializeGlobals = do
     liftIO $ restoreFSTable fs_table
     liftIO $ restoreLinkerGlobals linker_globals
     liftIO $ setUnsafeGlobalDynFlags dflags
+
+-- called by host compiler, assuming argument is code from a plugin
+bracketGlobals :: CoreM a -> CoreM a
+bracketGlobals (CoreM f) = do
+  tbl <- liftIO saveFSTable
+  let upd e = e {cr_globals=(x,tbl,z)}
+        where (x,_,z) = cr_globals e
+  x <- CoreM (\s -> updEnv upd (f s))
+  liftIO unsaveFSTable
+  return x
 \end{code}
 
 %************************************************************************
