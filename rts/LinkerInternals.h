@@ -9,7 +9,11 @@
 #ifndef LINKERINTERNALS_H
 #define LINKERINTERNALS_H
 
-typedef enum { OBJECT_LOADED, OBJECT_RESOLVED } OStatus;
+typedef enum {
+    OBJECT_LOADED,
+    OBJECT_RESOLVED,
+    OBJECT_UNLOADED
+} OStatus;
 
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
@@ -82,6 +86,9 @@ typedef struct _ObjectCode {
     /* ptr to malloc'd lump of memory holding the obj file */
     char*      image;
 
+    /* flag used when deciding whether to unload an object file */
+    int        referenced;
+
 #ifdef darwin_HOST_OS
     /* record by how much image has been deliberately misaligned
        after allocation, so that we can use realloc */
@@ -121,7 +128,10 @@ typedef struct _ObjectCode {
     )
 
 extern ObjectCode *objects;
+extern ObjectCode *unloaded_objects;
 
 void exitLinker( void );
+
+void freeObjectCode (ObjectCode *oc);
 
 #endif /* LINKERINTERNALS_H */
