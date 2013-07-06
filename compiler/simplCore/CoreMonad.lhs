@@ -44,7 +44,7 @@ module CoreMonad (
     liftIO1, liftIO2, liftIO3, liftIO4,
     
     -- ** Global initialization
-    reinitializeGlobals, bracketGlobals,
+    reinitializeGlobals,
     
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
@@ -722,12 +722,11 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
-        cr_globals :: (,,)    (Bool, [String]) -- from StaticFlags
-                              FastStringTable  -- from FastString
+        cr_globals :: ((Bool, [String]),
 #ifdef GHCI
-                              (MVar PersistentLinkerState, Bool) -- from Linker
+                       (MVar PersistentLinkerState, Bool))
 #else
-                              ()
+                       ())
 #endif
 }
 
@@ -796,7 +795,7 @@ runCoreM :: HscEnv
          -> CoreM a
          -> IO (a, SimplCount)
 runCoreM hsc_env rule_base us mod m = do
-        glbls <- liftM3 (,,) saveStaticFlagGlobals saveFSTable saveLinkerGlobals
+        glbls <- liftM2 (,) saveStaticFlagGlobals saveLinkerGlobals
         liftM extract $ runIOEnv (reader glbls) $ unCoreM m state
   where
     reader glbls = CoreReader {
@@ -898,8 +897,6 @@ getOrigNameCache = do
 %*									*
 %************************************************************************
 
-Note [Initializing globals]
-
 This is a rather annoying function. When a plugin is loaded, it currently
 gets linked against a *newly loaded* copy of the GHC package. This would
 not be a problem, except that the new copy has its own mutable state
@@ -930,49 +927,15 @@ I've threaded the cr_globals through CoreM rather than giving them as an
 argument to the plugin function so that we can turn this function into
 (return ()) without breaking any plugins when we eventually get 1. working.
 
------
-
-We include the FastString table in this mechanism, because we'd like
-FastStrings created by the plugin to have the same uniques as similar strings
-created by the host compiler itself.  For example, this allows plugins to
-lookup known names (eg `mkTcOcc "MySpecialType"`) in the GlobalRdrEnv or even
-re-invoke the parser.
-
-In particular, the following little sanity test was failing in a plugin
-prototyping safe newtype-coercions.
-
-   let rdrName = mkModuleName "GHC.NT.Type" `mkRdrQual` mkTcOcc "NT"
-   putMsgS $ showSDoc dflags $ ppr $ lookupGRE_RdrName rdrName $ mg_rdr_env guts
-
-`mkTcOcc` involves the lookup (or creation) of a FastString.  Since the
-plugin's FastString.string_table is empty, constructing the RdrName also
-allocates new uniques for the FastStrings "GHC.NT.Type" and "NT".  These
-uniques are almost certainly unequal to the ones that the host compiler
-originally assigned to those FastStrings.  Thus the lookup fails since the
-domain of the GlobalRdrEnv is affected by the RdrName's OccName's FastString's
-unique.
-
 \begin{code}
--- called by plugin
 reinitializeGlobals :: CoreM ()
 reinitializeGlobals = do
-    (sf_globals, fs_table, linker_globals) <- read cr_globals
+    (sf_globals, linker_globals) <- read cr_globals
     hsc_env <- getHscEnv
     let dflags = hsc_dflags hsc_env
     liftIO $ restoreStaticFlagGlobals sf_globals
-    liftIO $ restoreFSTable fs_table
     liftIO $ restoreLinkerGlobals linker_globals
     liftIO $ setUnsafeGlobalDynFlags dflags
-
--- called by host compiler, assuming argument is code from a plugin
-bracketGlobals :: CoreM a -> CoreM a
-bracketGlobals (CoreM f) = do
-  tbl <- liftIO saveFSTable
-  let upd e = e {cr_globals=(x,tbl,z)}
-        where (x,_,z) = cr_globals e
-  x <- CoreM (\s -> updEnv upd (f s))
-  liftIO unsaveFSTable
-  return x
 \end{code}
 
 %************************************************************************
