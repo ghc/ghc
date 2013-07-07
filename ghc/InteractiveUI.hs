@@ -90,6 +90,7 @@ import System.IO.Error
 import System.IO.Unsafe ( unsafePerformIO )
 import System.Process
 import Text.Printf
+import Text.Read ( readMaybe )
 
 #ifndef mingw32_HOST_OS
 import System.Posix hiding ( getEnv )
@@ -145,6 +146,7 @@ ghciCommands = [
   ("cd",        keepGoing' changeDirectory,     completeFilename),
   ("check",     keepGoing' checkModule,         completeHomeModule),
   ("continue",  keepGoing continueCmd,          noCompletion),
+  ("complete",  keepGoing completeCmd',         noCompletion),
   ("cmd",       keepGoing cmdCmd,               completeExpression),
   ("ctags",     keepGoing createCTagsWithLineNumbersCmd, completeFilename),
   ("ctags!",    keepGoing createCTagsWithRegExesCmd, completeFilename),
@@ -232,6 +234,7 @@ defFullHelpText =
   "                               (!: more details; *: all top-level names)\n" ++
   "   :cd <dir>                   change directory to <dir>\n" ++
   "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
+  "   :complete <dom> [<rng>] <s> list completions for partial input string\n" ++
   "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
   "                               (!: use regex instead of line number)\n" ++
   "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
@@ -2292,6 +2295,44 @@ showLanguages' show_all dflags =
 
 -- -----------------------------------------------------------------------------
 -- Completion
+
+completeCmd' :: String -> GHCi ()
+completeCmd' argLine0 = case parseLine argLine0 of
+    Just ("repl", resultRange, left) -> do
+        (unusedLine,compls) <- ghciCompleteWord (reverse left,"")
+        let compls' = takeRange resultRange compls
+        liftIO . putStrLn $ unwords [ show (length compls'), show (length compls), show (reverse unusedLine) ]
+        forM_ (takeRange resultRange compls) $ \(Completion r _ _) -> do
+            liftIO $ print r
+    _ -> throwGhcException (CmdLineError "Syntax: :complete repl [<range>] <quoted-string-to-complete>")
+  where
+    parseLine argLine
+        | null argLine = Nothing
+        | null rest1   = Nothing
+        | otherwise    = (,,) dom <$> resRange <*> s
+      where
+        (dom, rest1) = breakSpace argLine
+        (rng, rest2) = breakSpace rest1
+        resRange | head rest1 == '"' = parseRange ""
+                 | otherwise         = parseRange rng
+        s | head rest1 == '"' = readMaybe rest1 :: Maybe String
+          | otherwise         = readMaybe rest2
+        breakSpace = fmap (dropWhile isSpace) . break isSpace
+
+    takeRange (lb,ub) = maybe id (drop . pred) lb . maybe id take ub
+
+    -- syntax: [n-][m] with semantics "drop (n-1) . take m"
+    parseRange :: String -> Maybe (Maybe Int,Maybe Int)
+    parseRange s
+        | all isDigit s = Just (Nothing, bndRead s) -- upper limit only
+        | not (null n1), sep == '-', all isDigit n1, all isDigit n2 =
+            Just (bndRead n1, bndRead n2) -- lower limit and maybe upper limit
+        | otherwise     = Nothing
+      where
+        (n1,sep:n2) = span isDigit s
+        bndRead s = if null s then Nothing else Just (read s)
+
+
 
 completeCmd, completeMacro, completeIdentifier, completeModule,
     completeSetModule, completeSeti, completeShowiOptions,
