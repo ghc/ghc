@@ -179,3 +179,4 @@ test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
                when(fast(),skip) ],
              compile_and_run, [''])
 
+test('T8035', normal, compile_and_run, [''])
