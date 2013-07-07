@@ -268,7 +268,7 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
 --
 -- @f '<$>' 'ZipList' xs1 '<*>' ... '<*>' 'ZipList' xsn = 'ZipList' (zipWithn f xs1 ... xsn)@
 --
-newtype ZipList a = ZipList { getZipList :: [a] }
+newtype ZipList a = ZipList { getZipList :: [a] } deriving (Show, Eq, Ord, Read)
 
 instance Functor ZipList where
     fmap f (ZipList xs) = ZipList (map f xs)
