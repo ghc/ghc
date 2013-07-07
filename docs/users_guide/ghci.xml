@@ -2180,6 +2180,93 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 
       <varlistentry>
 	<term>
+          <literal>:complete</literal> <replaceable>type</replaceable>
+                                       <optional><replaceable>n</replaceable>-</optional><optional><replaceable>m</replaceable></optional>
+                                       <replaceable>string-literal</replaceable>
+          <indexterm><primary><literal>:complete</literal></primary></indexterm>
+        </term>
+	<listitem>
+          <para>This command allows to request command completions
+          from GHCi even when interacting over a pipe instead of a
+          proper terminal and is designed for integrating GHCi's
+          completion with text editors and IDEs.</para>
+
+          <para>When called, <literal>:complete</literal> prints the
+          <replaceable>n</replaceable><superscript>th</superscript> to
+          <replaceable>m</replaceable><superscript>th</superscript>
+          completion candidates for the partial input
+          <replaceable>string-literal</replaceable> for the completion
+          domain denoted by
+          <replaceable>type</replaceable>. Currently, only the
+          <literal>repl</literal> domain is supported which denotes
+          the kind of completion that would be provided interactively
+          by GHCi at the input prompt.</para>
+
+          <para>If omitted, <replaceable>n</replaceable> and
+          <replaceable>m</replaceable> default to the first or last
+          available completion candidate respectively. If there are
+          less candidates than requested via the range argument,
+          <replaceable>n</replaceable> and
+          <replaceable>m</replaceable> are implicitly capped to the
+          number of available completition candidates.</para>
+
+          <para>The output of <literal>:complete</literal> begins with
+          a header line containing three space-delimited fields: 
+
+          <itemizedlist>
+            <listitem>An integer denoting the number
+            <replaceable>l</replaceable> of printed
+            completions,</listitem>
+
+            <listitem>an integer denoting the total number of
+            completions available, and finally</listitem>
+
+            <listitem>a string literal denoting a common
+            prefix to be added to the returned completion
+            candidates.</listitem>
+          </itemizedlist>
+
+          The header line is followed by <replaceable>l</replaceable>
+          lines each containing one completion candidate encoded as
+          (quoted) string literal. Here are some example invocations
+          showing the various cases:</para>
+
+<screen>
+Prelude&gt; :complete repl 0 ""
+0 470 ""
+Prelude&gt; :complete repl 5 "import For"
+5 21 "import "
+"Foreign"
+"Foreign.C"
+"Foreign.C.Error"
+"Foreign.C.String"
+"Foreign.C.Types"
+Prelude&gt; :complete repl 5-10 "import For"
+6 21 "import "
+"Foreign.C.Types"
+"Foreign.Concurrent"
+"Foreign.ForeignPtr"
+"Foreign.ForeignPtr.Safe"
+"Foreign.ForeignPtr.Unsafe"
+"Foreign.Marshal"
+Prelude&gt; :complete repl 20- "import For"
+2 21 "import "
+"Foreign.StablePtr"
+"Foreign.Storable"
+Prelude&gt; :complete repl "map"
+3 3 ""
+"map"
+"mapM"
+"mapM_"
+Prelude&gt; :complete repl 5-10 "map"
+0 3 ""
+</screen>
+
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:continue</literal>
           <indexterm><primary><literal>:continue</literal></primary></indexterm>
         </term>
