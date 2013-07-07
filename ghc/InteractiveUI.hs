@@ -2323,14 +2323,17 @@ completeCmd argLine0 = case parseLine argLine0 of
 
     -- syntax: [n-][m] with semantics "drop (n-1) . take m"
     parseRange :: String -> Maybe (Maybe Int,Maybe Int)
-    parseRange s
-        | all isDigit s = Just (Nothing, bndRead s) -- upper limit only
-        | not (null n1), sep == '-', all isDigit n1, all isDigit n2 =
-            Just (bndRead n1, bndRead n2) -- lower limit and maybe upper limit
-        | otherwise     = Nothing
+    parseRange s = case span isDigit s of
+                   (_, "") ->
+                       -- upper limit only
+                       Just (Nothing, bndRead s)
+                   (s1, '-' : s2)
+                    | all isDigit s2 ->
+                       Just (bndRead s1, bndRead s2)
+                   _ ->
+                       Nothing
       where
-        (n1,sep:n2) = span isDigit s
-        bndRead s = if null s then Nothing else Just (read s)
+        bndRead x = if null x then Nothing else Just (read x)
 
 
 
