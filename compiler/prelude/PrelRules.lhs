@@ -197,7 +197,8 @@ primOpRules nm FloatAddOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
 primOpRules nm FloatSubOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (-))
                                                 , rightIdentity zerof ]
 primOpRules nm FloatMulOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
-                                                , identity onef ]
+                                                , identity onef
+                                                , strengthReduction twof FloatAddOp  ]
                          -- zeroElem zerof doesn't hold because of NaN
 primOpRules nm FloatDivOp   = mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
                                                 , rightIdentity onef ]
@@ -210,7 +211,8 @@ primOpRules nm DoubleAddOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
 primOpRules nm DoubleSubOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (-))
                                                  , rightIdentity zerod ]
 primOpRules nm DoubleMulOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
-                                                 , identity oned ]
+                                                 , identity oned
+                                                 , strengthReduction twod DoubleAddOp  ]
                           -- zeroElem zerod doesn't hold because of NaN
 primOpRules nm DoubleDivOp   = mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
                                                  , rightIdentity oned ]
@@ -296,11 +298,13 @@ onei  dflags = mkMachInt  dflags 1
 zerow dflags = mkMachWord dflags 0
 onew  dflags = mkMachWord dflags 1
 
-zerof, onef, zerod, oned :: Literal
+zerof, onef, twof, zerod, oned, twod :: Literal
 zerof = mkMachFloat 0.0
 onef  = mkMachFloat 1.0
+twof  = mkMachFloat 2.0
 zerod = mkMachDouble 0.0
 oned  = mkMachDouble 1.0
+twod  = mkMachDouble 2.0
 
 cmpOp :: (forall a . Ord a => a -> a -> Bool)
       -> Literal -> Literal -> Maybe CoreExpr
@@ -658,6 +662,23 @@ guardDoubleDiv = do
 -- is representable in Float/Double but not in (normalised)
 -- Rational. (#3676) Perhaps we should generate (0 :% (-1)) instead?
 
+strengthReduction :: Literal -> PrimOp -> RuleM CoreExpr
+strengthReduction two_lit add_op = do -- Note [Strength reduction]
+  arg <- msum [ do [arg, Lit mult_lit] <- getArgs
+                   guard (mult_lit == two_lit)
+                   return arg
+              , do [Lit mult_lit, arg] <- getArgs
+                   guard (mult_lit == two_lit)
+                   return arg ]
+  return $ Var (mkPrimOpId add_op) `App` arg `App` arg
+
+{- Note [Strength reduction]
+
+This rule turns multiplications of the form 2 * x and x * 2 into x + x addition
+because addition costs less than multiplication. See #7116
+
+-}
+
 trueVal, falseVal :: Expr CoreBndr
 trueVal       = Var trueDataConId
 falseVal      = Var falseDataConId
@@ -1005,8 +1026,8 @@ match_magicSingI _ = Nothing
 
 -------------------------------------------------
 -- Integer rules
---   smallInteger  (79::Int#)  = 79::Integer   
---   wordToInteger (79::Word#) = 79::Integer   
+--   smallInteger  (79::Int#)  = 79::Integer
+--   wordToInteger (79::Word#) = 79::Integer
 -- Similarly Int64, Word64
 
 match_IntToInteger :: RuleFun
@@ -1072,7 +1093,7 @@ match_Integer_binop binop _ id_unf _ [xl,yl]
 match_Integer_binop _ _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
-match_Integer_divop_both 
+match_Integer_divop_both
    :: (Integer -> Integer -> (Integer, Integer)) -> RuleFun
 match_Integer_divop_both divop _ id_unf _ [xl,yl]
   | Just (LitInteger x t) <- exprIsLiteral_maybe id_unf xl
