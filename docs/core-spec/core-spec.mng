@@ -29,10 +29,27 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large\today
+\Large 8 July, 2013
 \end{center}
 
 \section{Introduction}
+
+This document presents the typing system of System FC, very closely to how it is
+implemented in GHC. Care is taken to include only those checks that are actually
+written in the GHC code. It should be maintained along with any changes to this
+type system.
+
+Who will use this? Any implementer of GHC who wants to understand more about the
+type system can look here to see the relationships among constructors and the
+different types used in the implementation of the type system. Note that the
+type system here is quite different from that of Haskell---these are the details
+of the internal language, only.
+
+At the end of this document is a \emph{hypothetical} operational semantics for GHC.
+It is hypothetical because GHC does not strictly implement a concrete operational
+semantics anywhere in its code. While all the typing rules can be traced back to
+lines of real code, the operational semantics do not, in general, have as clear
+a provenance.
 
 There are a number of details elided from this presentation. The goal of the
 formalism is to aid in reasoning about type safety, and checks that do not
@@ -64,7 +81,6 @@ variables:
 \gram{
 \ottz
 }
-foo
 
 \gram{
 \ottn
@@ -185,7 +201,7 @@ the context sometimes requires creating a new, fresh variable name and then
 applying a substitution. We elide these details in this formalism, but
 see \coderef{types/Type.lhs}{substTyVarBndr} for details.
 
-\section{Judgments}
+\section{Typing judgments}
 
 The following functions are used from GHC. Their names are descriptive, and they
 are not formalized here: \coderef{types/TyCon.lhs}{tyConKind},
@@ -330,5 +346,60 @@ unify.
 
 The algorithm $[[unify]]$ is implemented in \coderef{types/Unify.lhs}{tcUnifyTys}.
 It performs a standard unification, returning a substitution upon success.
+
+\section{Operational semantics}
+
+\subsection{Disclaimer}
+GHC does not implement an operational semantics in any concrete form. Most
+of the rules below are implied by algorithms in, for example, the simplifier
+and optimizer. Yet, there is no one place in GHC that states these rules,
+analogously to \texttt{CoreLint.lhs}.
+Nevertheless, these rules are included in this document to help the reader
+understand System FC.
+
+\subsection{The context $[[S]]$}
+We use a context $[[S]]$ to keep track of the values of variables in a (mutually)
+recursive group. Its definition is as follows:
+\[
+[[S]] \quad ::= \quad [[ empty ]] \ |\ [[S]], [[ [n |-> e] ]]
+\]
+The presence of the context $[[S]]$ is solely to deal with recursion. If your
+use of FC does not require modeling recursion, you will not need to track $[[S]]$.
+
+\subsection{Operational semantics rules}
+
+\ottdefnstep{}
+
+\subsection{Notes}
+
+\begin{itemize}
+\item The \ottdrulename{S\_LetRec} and \ottdrulename{S\_LetRecReturn} rules
+implement recursion. \ottdrulename{S\_LetRec} adds to the context $[[S]]$ bindings
+for all of the mutually recursive equations. Then, after perhaps many steps,
+when the body of the $[[let]]\ [[rec]]$ contains no variables that are bound
+in the $[[let]]\ [[rec]]$, the context is popped.
+\item In the $[[case]]$ rules, a constructor $[[K]]$ is written taking three
+lists of arguments: two lists of types and a list of terms. The types passed
+in are the universally and, respectively, existentially quantified type variables
+to the constructor. The terms are the regular term arguments stored in an
+algebraic datatype. Coercions (say, in a GADT) are considered term arguments.
+\item The rule \ottdrulename{S\_CasePush} is the most complex rule.
+\begin{itemize}
+\item The logic in this rule is implemented in \coderef{coreSyn/CoreSubst.lhs}{exprIsConApp\_maybe}.
+\item The $[[coercionKind]]$ function (\coderef{types/Coercion.lhs}{coercionKind})
+extracts the two types (and their kind) from
+a coercion. It does not require a typing context, as it does not \emph{check} the
+coercion, just extracts its types.
+\item The $[[dataConRepType]]$ function (\coderef{basicTypes/DataCon.lhs}{dataConRepType}) extracts the full type of a data constructor. Following the notation for
+constructor expressions, the parameters to the constructor are broken into three
+groups: universally quantified types, existentially quantified types, and terms.
+\item The substitutions in the last premise to the rule are unusual: they replace
+\emph{type} variables with \emph{coercions}. This substitution is called lifting
+and is implemented in \coderef{types/Coercion.lhs}{liftCoSubst}. The notation is
+essentially a pun on the fact that types and coercions have such similar structure.
+\item Note that the types $[[ </ sbb // bb /> ]]$---the existentially quantified
+types---do not change during this step.
+\end{itemize}
+\end{itemize}
 
 \end{document}

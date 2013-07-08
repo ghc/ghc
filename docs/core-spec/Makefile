@@ -1,4 +1,4 @@
-OTT_FILES = CoreSyn.ott CoreLint.ott
+OTT_FILES = CoreSyn.ott CoreLint.ott OpSem.ott
 OTT_TEX   = CoreOtt.tex
 OTT_OPTS  = -tex_show_meta false
 TARGET    = core-spec
