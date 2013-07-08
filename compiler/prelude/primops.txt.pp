@@ -1717,6 +1717,15 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
+primop  AtomicReadMVarOp "atomicReadMVar#" GenPrimOp
+   MVar# s a -> State# s -> (# State# s, a #)
+   {If {\tt MVar\#} is empty, block until it becomes full.
+   Then read its contents without modifying the MVar, without possibility
+   of intervention from other threads.}
+   with
+   out_of_line      = True
+   has_side_effects = True
+
 primop  SameMVarOp "sameMVar#" GenPrimOp
    MVar# s a -> MVar# s a -> Bool
 

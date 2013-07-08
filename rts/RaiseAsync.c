@@ -294,6 +294,7 @@ check_target:
     }
 
     case BlockedOnMVar:
+    case BlockedOnMVarRead:
     {
 	/*
 	  To establish ownership of this TSO, we need to acquire a
@@ -318,7 +319,7 @@ check_target:
 
         // we have the MVar, let's check whether the thread
 	// is still blocked on the same MVar.
-	if (target->why_blocked != BlockedOnMVar
+	if ((target->why_blocked != BlockedOnMVar && target->why_blocked != BlockedOnMVarRead)
 	    || (StgMVar *)target->block_info.closure != mvar) {
 	    unlockClosure((StgClosure *)mvar, info);
 	    goto retry;
@@ -637,6 +638,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
     goto done;
 
   case BlockedOnMVar:
+  case BlockedOnMVarRead:
       removeFromMVarBlockedQueue(tso);
       goto done;
 

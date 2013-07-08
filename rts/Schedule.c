@@ -947,6 +947,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
 	    case BlockedOnBlackHole:
 	    case BlockedOnMsgThrowTo:
 	    case BlockedOnMVar:
+	    case BlockedOnMVarRead:
 		throwToSingleThreaded(cap, task->incall->tso, 
 				      (StgClosure *)nonTermination_closure);
 		return;
@@ -2843,6 +2844,7 @@ resurrectThreads (StgTSO *threads)
 	
 	switch (tso->why_blocked) {
 	case BlockedOnMVar:
+	case BlockedOnMVarRead:
 	    /* Called by GC - sched_mutex lock is currently held. */
 	    throwToSingleThreaded(cap, tso,
 				  (StgClosure *)blockedIndefinitelyOnMVar_closure);
