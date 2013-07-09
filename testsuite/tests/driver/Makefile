@@ -544,3 +544,9 @@ T6037:
 T2507:
 	-LC_ALL=C "$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -c T2507.hs
 
+.PHONY: T703
+T703:
+	$(RM) -rf T703
+	[ ! -d T703 ]
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make T703.hs -v0
+	! readelf -W -l T703 2>/dev/null | grep 'GNU_STACK' | grep -q 'RWE'
