@@ -1,12 +1,13 @@
 module Haddock.Doc (
   docAppend,
-  docParagraph
+  docParagraph,
+  combineStringNodes
   ) where
 
 
 import Haddock.Types
 import Data.Char (isSpace)
-
+import Control.Arrow ((***))
 
 -- used to make parsing easier; we group the list items later
 docAppend :: Doc id -> Doc id -> Doc id
@@ -63,3 +64,25 @@ docCodeBlock (DocString s)
 docCodeBlock (DocAppend l r)
   = DocAppend l (docCodeBlock r)
 docCodeBlock d = d
+
+-- | This is a hack that joins neighbouring 'DocString's into a single one.
+-- This is done to ease up the testing and doesn't change the final result
+-- as this would be done later anyway.
+combineStringNodes :: Doc id -> Doc id
+combineStringNodes (DocAppend (DocString x) (DocString y)) = DocString (x ++ y)
+combineStringNodes (DocAppend (DocString x) (DocAppend (DocString y) z)) =
+  tryjoin (DocAppend (DocString (x ++ y)) (combineStringNodes z))
+combineStringNodes (DocAppend x y) = tryjoin (DocAppend (combineStringNodes x) (combineStringNodes y))
+combineStringNodes (DocParagraph x) = DocParagraph (combineStringNodes x)
+combineStringNodes (DocWarning x) = DocWarning (combineStringNodes x)
+combineStringNodes (DocEmphasis x) = DocEmphasis (combineStringNodes x)
+combineStringNodes (DocMonospaced x) = DocMonospaced (combineStringNodes x)
+combineStringNodes (DocUnorderedList xs) = DocUnorderedList (map combineStringNodes xs)
+combineStringNodes (DocOrderedList x) = DocOrderedList (map combineStringNodes x)
+combineStringNodes (DocDefList xs) = DocDefList (map (combineStringNodes *** combineStringNodes) xs)
+combineStringNodes (DocCodeBlock x) = DocCodeBlock (combineStringNodes x)
+combineStringNodes x = x
+
+tryjoin :: Doc id -> Doc id
+tryjoin (DocAppend (DocString x) (DocString y)) = DocString (x ++ y)
+tryjoin x = x
