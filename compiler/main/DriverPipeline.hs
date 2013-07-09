@@ -1640,7 +1640,17 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
                                    text elfSectionNote,
                                    text "\n",
 
-          text "\t.ascii \"", info', text "\"\n" ]
+          text "\t.ascii \"", info', text "\"\n",
+
+          -- ALL generated assembly must have this section to disable
+          -- executable stacks.  See also
+          -- compiler/nativeGen/AsmCodeGen.lhs for another instance
+          -- where we need to do this.
+          (if platformHasGnuNonexecStack (targetPlatform dflags)
+           then text ".section .note.GNU-stack,\"\",@progbits\n"
+           else empty)
+
+           ]
           where
             info' = text $ escape info
 
