@@ -312,6 +312,7 @@ defFullHelpText =
   "   :show breaks                show the active breakpoints\n" ++
   "   :show context               show the breakpoint context\n" ++
   "   :show imports               show the current imports\n" ++
+  "   :show linker                show current linker state\n" ++
   "   :show modules               show the currently loaded modules\n" ++
   "   :show packages              show the currently active package flags\n" ++
   "   :show language              show the currently active language flags\n" ++
