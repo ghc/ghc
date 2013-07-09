@@ -74,7 +74,7 @@ executable haddock
   build-depends:
     base >= 4.3 && < 4.8
   if flag(in-ghc-tree)
-    hs-source-dirs: src
+    hs-source-dirs: src, vendor/attoparsec-0.10.4.0
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,
@@ -84,9 +84,20 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
-      ghc >= 7.7 && < 7.10
+      ghc >= 7.7 && < 7.10,
+      bytestring
+
     other-modules:
       Documentation.Haddock
+      Data.Attoparsec
+      Data.Attoparsec.ByteString
+      Data.Attoparsec.ByteString.Char8
+      Data.Attoparsec.Combinator
+      Data.Attoparsec.Number
+      Data.Attoparsec.ByteString.FastSet
+      Data.Attoparsec.ByteString.Internal
+      Data.Attoparsec.Internal
+      Data.Attoparsec.Internal.Types
       Haddock
       Haddock.Interface
       Haddock.Interface.Rename
@@ -118,15 +129,16 @@ executable haddock
       Haddock.Convert
   else
     build-depends:  haddock
-
-library
-  default-language:     Haskell2010
   -- In a GHC tree - in particular, in a source tarball - we don't
   -- require alex or happy
   if !flag(in-ghc-tree)
     build-tools: alex >= 3, happy >= 1.18
+library
+  default-language:     Haskell2010
+
   build-depends:
     base >= 4.3 && < 4.8,
+    bytestring,
     filepath,
     directory,
     containers,
@@ -134,14 +146,14 @@ library
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
-    ghc >= 7.4 && < 7.8
+    ghc >= 7.4 && < 7.10
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
   else
     build-depends: ghc-paths
 
-  hs-source-dirs:       src
+  hs-source-dirs:       src, vendor/attoparsec-0.10.4.0
   if flag(dev)
     ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
   else
@@ -151,6 +163,15 @@ library
     Documentation.Haddock
 
   other-modules:
+    Data.Attoparsec
+    Data.Attoparsec.ByteString
+    Data.Attoparsec.ByteString.Char8
+    Data.Attoparsec.Combinator
+    Data.Attoparsec.Number
+    Data.Attoparsec.ByteString.FastSet
+    Data.Attoparsec.ByteString.Internal
+    Data.Attoparsec.Internal
+    Data.Attoparsec.Internal.Types
     Haddock
     Haddock.Interface
     Haddock.Interface.Rename
@@ -200,24 +221,6 @@ test-suite latex-test
   build-depends:    base, directory, process, filepath, Cabal
 
 test-suite spec
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Spec.hs
-  hs-source-dirs:
-      test
-    , src
-
-  other-modules:
-      Haddock.ParseSpec
-
-  build-depends:
-      base
-    , ghc
-    , containers
-    , deepseq
-    , array
-    , hspec
-
   -- NOTE: As of this writing, Cabal does not properly handle alex/happy for
   -- test suites.  We work around this by adding dist/build to hs-source-dirs,
   -- so that the the generated lexer/parser from the library is used.  In
@@ -228,6 +231,26 @@ test-suite spec
   -- https://github.com/haskell/cabal/issues/943
   hs-source-dirs:
       dist/build
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Spec.hs
+  hs-source-dirs:
+      test
+    , src
+    , vendor/attoparsec-0.10.4.0
+
+  other-modules:
+      Haddock.ParseSpec
+
+  build-depends:
+      base
+    , bytestring
+    , ghc
+    , containers
+    , deepseq
+    , array
+    , hspec
+
   build-depends:
       haddock
 
