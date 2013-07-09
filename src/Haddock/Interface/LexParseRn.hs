@@ -19,8 +19,7 @@ module Haddock.Interface.LexParseRn
 
 
 import Haddock.Types
-import Haddock.Lex
-import Haddock.Parse
+import Haddock.Parser
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Doc
 
@@ -50,19 +49,19 @@ processDocStringParas = process parseParas
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
 processDocString = process parseString
 
-process :: ([LToken] -> Maybe (Doc RdrName))
+process :: (DynFlags -> String -> Maybe (Doc RdrName))
         -> DynFlags
         -> GlobalRdrEnv
         -> HsDocString
         -> ErrMsgM (Maybe (Doc Name))
 process parse dflags gre (HsDocString fs) = do
    let str = unpackFS fs
-   let toks = tokenise dflags str (0,0)  -- TODO: real position
-   case parse toks of
+   case parse dflags str of
      Nothing -> do
        tell [ "doc comment parse failed: " ++ str ]
        return Nothing
-     Just doc -> return (Just (rename dflags gre doc))
+     Just doc -> do
+       return (Just (rename dflags gre doc))
 
 
 processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString

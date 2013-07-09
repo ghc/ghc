@@ -69,8 +69,7 @@ executable haddock
     ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
   else
     ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
-  if !flag(in-ghc-tree)
-    build-tools: alex >= 3, happy >= 1.18
+
   build-depends:
     base >= 4.3 && < 4.8
   if flag(in-ghc-tree)
@@ -105,8 +104,8 @@ executable haddock
       Haddock.Interface.AttachInstances
       Haddock.Interface.LexParseRn
       Haddock.Interface.ParseModuleHeader
-      Haddock.Lex
-      Haddock.Parse
+      Haddock.Parser
+      Haddock.Utf8
       Haddock.Utils
       Haddock.Backends.Xhtml
       Haddock.Backends.Xhtml.Decl
@@ -129,10 +128,7 @@ executable haddock
       Haddock.Convert
   else
     build-depends:  haddock
-  -- In a GHC tree - in particular, in a source tarball - we don't
-  -- require alex or happy
-  if !flag(in-ghc-tree)
-    build-tools: alex >= 3, happy >= 1.18
+
 library
   default-language:     Haskell2010
 
@@ -179,8 +175,8 @@ library
     Haddock.Interface.AttachInstances
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
-    Haddock.Lex
-    Haddock.Parse
+    Haddock.Parser
+    Haddock.Utf8
     Haddock.Utils
     Haddock.Backends.Xhtml
     Haddock.Backends.Xhtml.Decl
@@ -221,16 +217,6 @@ test-suite latex-test
   build-depends:    base, directory, process, filepath, Cabal
 
 test-suite spec
-  -- NOTE: As of this writing, Cabal does not properly handle alex/happy for
-  -- test suites.  We work around this by adding dist/build to hs-source-dirs,
-  -- so that the the generated lexer/parser from the library is used.  In
-  -- addition we depend on 'haddock', so that the library is compiled before
-  -- the test suite.
-  --
-  -- The corresponding cabal ticket is here:
-  -- https://github.com/haskell/cabal/issues/943
-  hs-source-dirs:
-      dist/build
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          Spec.hs
@@ -250,6 +236,7 @@ test-suite spec
     , deepseq
     , array
     , hspec
+    , QuickCheck == 2.*
 
   build-depends:
       haddock

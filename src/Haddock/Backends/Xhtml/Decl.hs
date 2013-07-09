@@ -25,6 +25,7 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
+import Haddock.Doc (combineDocumentation)
 
 import           Data.List             ( intersperse )
 import qualified Data.Map as Map
@@ -115,7 +116,7 @@ ppFor _ _ _ _ _ _ _ = error "ppFor"
 ppTySyn :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool
         -> Qualification -> Html
 ppTySyn summary links loc doc (SynDecl { tcdLName = L _ name, tcdTyVars = ltyvars
-                                       , tcdRhs = ltype }) 
+                                       , tcdRhs = ltype })
         unicode qual
   = ppTypeOrFunSig summary links loc [name] (unLoc ltype) doc
                    (full, hdr, spaceHtml +++ equals) unicode qual
@@ -204,12 +205,12 @@ ppAssocType summ links doc (L loc decl) unicode qual =
 -- * TyClDecl helpers
 --------------------------------------------------------------------------------
 
--- | Print a type family and its variables 
+-- | Print a type family and its variables
 ppFamDeclBinderWithVars :: Bool -> FamilyDecl DocName -> Html
 ppFamDeclBinderWithVars summ (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
   ppAppDocNameNames summ (unLoc lname) (tyvarNames tvs)
 
--- | Print a newtype / data binder and its variables 
+-- | Print a newtype / data binder and its variables
 ppDataBinderWithVars :: Bool -> TyClDecl DocName -> Html
 ppDataBinderWithVars summ decl =
   ppAppDocNameNames summ (tcdName decl) (tyvarNames $ tcdTyVars decl)
@@ -226,7 +227,7 @@ ppAppNameTypes n ts unicode qual =
     ppTypeApp n ts (ppDocName qual) (ppParendType unicode qual)
 
 
--- | Print an application of a DocName and a list of Names 
+-- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
 ppAppDocNameNames summ n ns =
   ppTypeApp n ns (ppBinder summ . nameOccName . getName) ppTyName
@@ -305,7 +306,7 @@ ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
                  -> Html
 ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, tcdTyVars = tvs
                                           , tcdFDs = fds, tcdSigs = sigs, tcdATs = ats }) loc
-    subdocs unicode qual = 
+    subdocs unicode qual =
   if null sigs && null ats
     then (if summary then id else topDeclElem links loc [nm]) hdr
     else (if summary then id else topDeclElem links loc [nm]) (hdr <+> keyword "where")
@@ -580,7 +581,7 @@ ppShortField summary unicode qual (ConDeclField (L _ name) ltype _)
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: Bool -> TyClDecl DocName -> Bool -> Qualification -> Html
 ppDataHeader summary decl@(DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd
-                                                               , dd_ctxt = ctxt } }) 
+                                                               , dd_ctxt = ctxt } })
              unicode qual
   = -- newtype or data
     (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }) <+>
@@ -723,5 +724,3 @@ ppr_fun_ty ctxt_prec ty1 ty2 unicode qual
     in
     maybeParen ctxt_prec pREC_FUN $
     hsep [p1, arrow unicode <+> p2]
-
-

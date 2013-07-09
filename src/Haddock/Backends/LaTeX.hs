@@ -33,6 +33,9 @@ import Data.Char
 import Control.Monad
 import Data.Maybe
 import Data.List
+
+import Haddock.Doc (combineDocumentation)
+
 -- import Debug.Trace
 
 {- SAMPLE OUTPUT
@@ -278,11 +281,11 @@ ppDecl :: LHsDecl DocName
 
 ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs = case decl of
   TyClD d@(FamDecl {})          -> ppTyFam False loc doc d unicode
-  TyClD d@(DataDecl {})   
+  TyClD d@(DataDecl {})
                                 -> ppDataDecl instances subdocs loc doc d unicode
   TyClD d@(SynDecl {})          -> ppTySyn loc (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
---  TyClD d@(TySynonym {})         
+--  TyClD d@(TySynonym {})
 --    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
 -- Family instances happen via FamInst now
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc doc subdocs d unicode
@@ -465,7 +468,7 @@ ppClassDecl :: [DocInstance DocName] -> SrcSpan
             -> Documentation DocName -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> LaTeX
 ppClassDecl instances loc doc subdocs
-  (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, tcdTyVars = ltyvars, tcdFDs = lfds 
+  (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, tcdTyVars = ltyvars, tcdFDs = lfds
              , tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs }) unicode
   = declWithDoc classheader (if null body then Nothing else Just (vcat body)) $$
     instancesBit
@@ -504,7 +507,7 @@ ppDocInstances unicode (i : rest)
   | Just ihead <- isUndocdInstance i
   = declWithDoc (vcat (map (ppInstDecl unicode) (ihead:is))) Nothing $$
     ppDocInstances unicode rest'
-  | otherwise 
+  | otherwise
   = ppDocInstance unicode i $$ ppDocInstances unicode rest
   where
     (is, rest') = spanWith isUndocdInstance rest
@@ -650,9 +653,9 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
 
 -- {-
 -- ppHsFullConstr :: HsConDecl -> LaTeX
--- ppHsFullConstr (HsConDecl _ nm tvs ctxt typeList doc) = 
+-- ppHsFullConstr (HsConDecl _ nm tvs ctxt typeList doc) =
 --      declWithDoc False doc (
--- 	hsep ((ppHsConstrHdr tvs ctxt +++ 
+-- 	hsep ((ppHsConstrHdr tvs ctxt +++
 -- 		ppHsBinder False nm) : map ppHsBangType typeList)
 --       )
 -- ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
@@ -661,35 +664,35 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
 --        Nothing -> aboves [hdr, fields_html]
 --        Just _  -> aboves [hdr, constr_doc, fields_html]
 --    )
--- 
+--
 --   where hdr = declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm)
--- 
--- 	constr_doc	
+--
+-- 	constr_doc
 -- 	  | isJust doc = docBox (docToLaTeX (fromJust doc))
 -- 	  | otherwise  = LaTeX.emptyTable
--- 
--- 	fields_html = 
--- 	   td << 
+--
+-- 	fields_html =
+-- 	   td <<
 -- 	      table ! [width "100%", cellpadding 0, cellspacing 8] << (
 -- 		   aboves (map ppFullField (concat (map expandField fields)))
 -- 		)
 -- -}
--- 
+--
 -- ppShortField :: Bool -> Bool -> ConDeclField DocName -> LaTeX
 -- ppShortField summary unicode (ConDeclField (L _ name) ltype _)
 --   = tda [theclass "recfield"] << (
 --       ppBinder summary (docNameOcc name)
 --       <+> dcolon unicode <+> ppLType unicode ltype
 --     )
--- 
+--
 -- {-
 -- ppFullField :: HsFieldDecl -> LaTeX
--- ppFullField (HsFieldDecl [n] ty doc) 
+-- ppFullField (HsFieldDecl [n] ty doc)
 --   = declWithDoc False doc (
 -- 	ppHsBinder False n <+> dcolon <+> ppHsBangType ty
 --     )
 -- ppFullField _ = error "ppFullField"
--- 
+--
 -- expandField :: HsFieldDecl -> [HsFieldDecl]
 -- expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 -- -}
@@ -718,7 +721,7 @@ ppAppNameTypes :: DocName -> [HsType DocName] -> Bool -> LaTeX
 ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
 
 
--- | Print an application of a DocName and a list of Names 
+-- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> LaTeX
 ppAppDocNameNames _summ n ns =
   ppTypeApp n ns (ppBinder . nameOccName . getName) ppSymName
@@ -1002,7 +1005,7 @@ parLatexMarkup ppId = Markup {
   markupEmphasis             = \p v -> emph (p v),
   markupMonospaced           = \p _ -> tt (p Mono),
   markupUnorderedList        = \p v -> itemizedList (map ($v) p) $$ text "",
-  markupPic                  = \path _ -> parens (text "image: " <> text path),
+  markupPic                  = \p _ -> markupPic p,
   markupOrderedList          = \p v -> enumeratedList (map ($v) p) $$ text "",
   markupDefList              = \l v -> descriptionList (map (\(a,b) -> (a v, b v)) l),
   markupCodeBlock            = \p _ -> quote (verb (p Verb)) $$ text "",
@@ -1019,6 +1022,14 @@ parLatexMarkup ppId = Markup {
     markupLink (Hyperlink url mLabel) = case mLabel of
       Just label -> text "\\href" <> braces (text url) <> braces (text label)
       Nothing    -> text "\\url"  <> braces (text url)
+
+    -- Is there a better way of doing this? Just a space is an aribtrary choice.
+    markupPic (Picture uri title) = parens (imageText title)
+      where
+        imageText Nothing = beg
+        imageText (Just t) = beg <> text " " <> text t
+
+        beg = text "image: " <> text uri
 
     markupId ppId_ id v =
       case v of

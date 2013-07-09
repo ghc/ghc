@@ -12,8 +12,7 @@
 module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 
 import Haddock.Types
-import Haddock.Lex
-import Haddock.Parse
+import Haddock.Parser
 
 import RdrName
 import DynFlags
@@ -47,15 +46,13 @@ parseModuleHeader dflags str0 =
       description1 :: Either String (Maybe (Doc RdrName))
       description1 = case descriptionOpt of
          Nothing -> Right Nothing
-         -- TODO: pass real file position
-         Just description -> case parseString $ tokenise dflags description (0,0) of
+         Just description -> case parseString dflags description of
             Nothing -> Left ("Cannot parse Description: " ++ description)
             Just doc -> Right (Just doc)
    in
       case description1 of
          Left mess -> Left mess
-         -- TODO: pass real file position
-         Right docOpt -> case parseParas $ tokenise dflags str8 (0,0) of
+         Right docOpt -> case parseParas dflags str8 of
            Nothing -> Left "Cannot parse header documentation paragraphs"
            Just doc -> Right (HaddockModInfo {
             hmi_description = docOpt,

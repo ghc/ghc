@@ -23,8 +23,7 @@ import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Interface
-import Haddock.Lex
-import Haddock.Parse
+import Haddock.Parser
 import Haddock.Types
 import Haddock.Version
 import Haddock.InterfaceFile
@@ -447,8 +446,7 @@ getPrologue dflags flags =
     [] -> return Nothing
     [filename] -> do
       str <- readFile filename
-      case parseParas (tokenise dflags str
-                      (1,0) {- TODO: real position -}) of
+      case parseParas dflags str of
         Nothing -> throwE $ "failed to parse haddock prologue from file: " ++ filename
         Just doc -> return (Just doc)
     _otherwise -> throwE "multiple -p/--prologue options"

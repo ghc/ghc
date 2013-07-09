@@ -1,13 +1,26 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Haddock.Doc (
   docAppend,
   docParagraph,
-  combineStringNodes
+  combineStringNodes,
+  combineDocumentation
   ) where
 
-
+import Data.Maybe
+import Data.Monoid
 import Haddock.Types
 import Data.Char (isSpace)
 import Control.Arrow ((***))
+
+-- We put it here so that we can avoid a circular import
+-- anything relevant imports this module anyway
+instance Monoid (Doc id) where
+  mempty  = DocEmpty
+  mappend = docAppend
+
+combineDocumentation :: Documentation name -> Maybe (Doc name)
+combineDocumentation (Documentation Nothing Nothing) = Nothing
+combineDocumentation (Documentation mDoc mWarning)   = Just (fromMaybe mempty mWarning `mappend` fromMaybe mempty mDoc)
 
 -- used to make parsing easier; we group the list items later
 docAppend :: Doc id -> Doc id -> Doc id
@@ -85,4 +98,7 @@ combineStringNodes x = x
 
 tryjoin :: Doc id -> Doc id
 tryjoin (DocAppend (DocString x) (DocString y)) = DocString (x ++ y)
+tryjoin (DocAppend (DocString x) (DocAppend (DocString y) z)) = DocAppend (DocString (x ++ y)) z
+tryjoin (DocAppend (DocAppend x (DocString y)) (DocString z))
+  = tryjoin (DocAppend (combineStringNodes x) (DocString $ y ++ z))
 tryjoin x = x

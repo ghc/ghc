@@ -18,17 +18,18 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docElement, docSection, docSection_,
 ) where
 
+import Control.Applicative ((<$>))
 
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils
+import Haddock.Doc (combineDocumentation)
 
-import Text.XHtml hiding ( name, title, p, quote )
+import Text.XHtml hiding ( name, p, quote )
 import Data.Maybe (fromMaybe)
 
 import GHC
-
 
 parHtmlMarkup :: Qualification -> (a -> Html) -> DocMarkup a Html
 parHtmlMarkup qual ppId = Markup {
@@ -49,7 +50,7 @@ parHtmlMarkup qual ppId = Markup {
   markupCodeBlock            = pre,
   markupHyperlink            = \(Hyperlink url mLabel) -> anchor ! [href url] << fromMaybe url mLabel,
   markupAName                = \aname -> namedAnchor aname << "",
-  markupPic                  = \path -> image ! [src path],
+  markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
   markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml
   }
