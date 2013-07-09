@@ -2422,7 +2422,7 @@ completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
     where opts = ["args", "prog", "prompt", "prompt2", "editor", "stop",
                      "modules", "bindings", "linker", "breaks",
-                     "context", "packages", "language"]
+                     "context", "packages", "language", "imports"]
 
 completeShowiOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) ["language"])
