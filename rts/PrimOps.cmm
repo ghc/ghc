@@ -1527,14 +1527,14 @@ stg_atomicReadMVarzh ( P_ mvar, /* :: MVar a */ )
 
     LOCK_CLOSURE(mvar, info);
 
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
-
     /* If the MVar is empty, put ourselves on the blocked readers
      * list and wait until we're woken up.
      */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
 
         ALLOC_PRIM_WITH_CUSTOM_FAILURE
             (SIZEOF_StgMVarTSOQueue,
