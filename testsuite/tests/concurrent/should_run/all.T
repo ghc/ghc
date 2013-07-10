@@ -77,6 +77,7 @@ test('T5866', exit_code(1), compile_and_run, [''])
 test('atomicReadMVar1', normal, compile_and_run, [''])
 test('atomicReadMVar2', normal, compile_and_run, [''])
 test('atomicReadMVar3', normal, compile_and_run, [''])
+test('tryAtomicReadMVar1', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
