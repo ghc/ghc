@@ -1319,6 +1319,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_threadStatuszh)                                 \
       SymI_HasProto(stg_tryPutMVarzh)                                   \
       SymI_HasProto(stg_tryTakeMVarzh)                                  \
+      SymI_HasProto(stg_tryAtomicReadMVarzh)                            \
       SymI_HasProto(stg_unmaskAsyncExceptionszh)                        \
       SymI_HasProto(unloadObj)                                          \
       SymI_HasProto(stg_unsafeThawArrayzh)                              \

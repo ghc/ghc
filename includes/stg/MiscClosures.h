@@ -381,6 +381,7 @@ RTS_FUN_DECL(stg_putMVarzh);
 RTS_FUN_DECL(stg_atomicReadMVarzh);
 RTS_FUN_DECL(stg_tryTakeMVarzh);
 RTS_FUN_DECL(stg_tryPutMVarzh);
+RTS_FUN_DECL(stg_tryAtomicReadMVarzh);
 
 RTS_FUN_DECL(stg_waitReadzh);
 RTS_FUN_DECL(stg_waitWritezh);

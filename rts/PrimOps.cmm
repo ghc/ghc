@@ -1567,6 +1567,22 @@ stg_atomicReadMVarzh ( P_ mvar, /* :: MVar a */ )
     return (val);
 }
 
+stg_tryAtomicReadMVarzh ( P_ mvar, /* :: MVar a */ )
+{
+    W_ val, info, tso, q;
+
+    LOCK_CLOSURE(mvar, info);
+
+    if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+        return (0, stg_NO_FINALIZER_closure);
+    }
+
+    val = StgMVar_value(mvar);
+
+    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    return (1, val);
+}
+
 /* -----------------------------------------------------------------------------
    Stable pointer primitives
    -------------------------------------------------------------------------  */
