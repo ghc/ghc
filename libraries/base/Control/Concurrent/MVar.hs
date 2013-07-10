@@ -143,6 +143,7 @@ module Control.Concurrent.MVar
         , modifyMVarMasked
 #ifndef __HUGS__
         , atomicReadMVar
+        , tryAtomicReadMVar
         , mkWeakMVar
         , addMVarFinalizer
 #endif

@@ -27,6 +27,7 @@ module GHC.MVar (
         , putMVar
         , tryTakeMVar
         , tryPutMVar
+        , tryAtomicReadMVar
         , isEmptyMVar
         , addMVarFinalizer
     ) where
@@ -135,6 +136,15 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
     case tryPutMVar# mvar# x s# of
         (# s, 0# #) -> (# s, False #)
         (# s, _  #) -> (# s, True #)
+
+-- |A non-blocking version of 'atomicReadMVar'.  The 'tryAtomicReadMVar' function
+-- returns immediately, with 'Nothing' if the 'MVar' was empty, or
+-- @'Just' a@ if the 'MVar' was full with contents @a@.
+tryAtomicReadMVar :: MVar a -> IO (Maybe a)
+tryAtomicReadMVar (MVar m) = IO $ \ s ->
+    case tryAtomicReadMVar# m s of
+        (# s', 0#, _ #) -> (# s', Nothing #)      -- MVar is empty
+        (# s', _,  a #) -> (# s', Just a  #)      -- MVar is full
 
 -- |Check whether a given 'MVar' is empty.
 --
