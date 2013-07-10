@@ -120,6 +120,10 @@ import GHC.IO           ( IO(..) )
 
 import Foreign.Safe
 
+#if STAGE >= 2
+import GHC.Conc.Sync    (sharedCAF)
+#endif
+
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )
 #endif
@@ -225,14 +229,63 @@ data FastStringTable =
     {-# UNPACK #-} !Int
     (MutableArray# RealWorld [FastString])
 
-{-# NOINLINE string_table #-}
 string_table :: IORef FastStringTable
-string_table =
- unsafePerformIO $ do
-   tab <- IO $ \s1# -> case newArray# hASH_TBL_SIZE_UNBOXED [] s1# of
-                           (# s2#, arr# #) ->
-                               (# s2#, FastStringTable 0 arr# #)
-   newIORef tab
+{-# NOINLINE string_table #-}
+string_table = unsafePerformIO $ do
+  tab <- IO $ \s1# -> case newArray# hASH_TBL_SIZE_UNBOXED [] s1# of
+                          (# s2#, arr# #) ->
+                              (# s2#, FastStringTable 0 arr# #)
+  ref <- newIORef tab
+  -- use the support wired into the RTS to share this CAF among all images of
+  -- libHSghc
+#if STAGE < 2
+  return ref
+#else
+  sharedCAF ref getOrSetLibHSghcFastStringTable
+
+-- from the RTS; thus we cannot use this mechanism when STAGE<2; the previous
+-- RTS might not have this symbol
+foreign import ccall unsafe "getOrSetLibHSghcFastStringTable"
+  getOrSetLibHSghcFastStringTable :: Ptr a -> IO (Ptr a)
+#endif
+
+{-
+
+We include the FastString table in the `sharedCAF` mechanism because we'd like
+FastStrings created by a Core plugin to have the same uniques as corresponding
+strings created by the host compiler itself.  For example, this allows plugins
+to lookup known names (eg `mkTcOcc "MySpecialType"`) in the GlobalRdrEnv or
+even re-invoke the parser.
+
+In particular, the following little sanity test was failing in a plugin
+prototyping safe newtype-coercions: GHC.NT.Type.NT was imported, but could not
+be looked up /by the plugin/.
+
+   let rdrName = mkModuleName "GHC.NT.Type" `mkRdrQual` mkTcOcc "NT"
+   putMsgS $ showSDoc dflags $ ppr $ lookupGRE_RdrName rdrName $ mg_rdr_env guts
+
+`mkTcOcc` involves the lookup (or creation) of a FastString.  Since the
+plugin's FastString.string_table is empty, constructing the RdrName also
+allocates new uniques for the FastStrings "GHC.NT.Type" and "NT".  These
+uniques are almost certainly unequal to the ones that the host compiler
+originally assigned to those FastStrings.  Thus the lookup fails since the
+domain of the GlobalRdrEnv is affected by the RdrName's OccName's FastString's
+unique.
+
+The old `reinitializeGlobals` mechanism is enough to provide the plugin with
+read-access to the table, but it insufficient in the general case where the
+plugin may allocate FastStrings. This mutates the supply for the FastStrings'
+unique, and that needs to be propagated back to the compiler's instance of the
+global variable.  Such propagation is beyond the `reinitializeGlobals`
+mechanism.
+
+Maintaining synchronization of the two instances of this global is rather
+difficult because of the uses of `unsafePerformIO` in this module.  Not
+synchronizing them risks breaking the rather major invariant that two
+FastStrings with the same unique have the same string. Thus we use the
+lower-level `sharedCAF` mechanism that relies on Globals.c.
+
+-}
 
 lookupTbl :: FastStringTable -> Int -> IO [FastString]
 lookupTbl (FastStringTable _ arr#) (I# i#) =
