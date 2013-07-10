@@ -277,6 +277,16 @@
                     instances for <literal>Either a</literal> and <literal>(,) a</literal>
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    <literal>Control.Concurrent.MVar</literal> has two
+                    new functions, <literal>atomicReadMVar</literal> and
+                    <literal>tryAtomicReadMVar</literal>, which
+                    implement <literal>readMVar</literal> that cannot be
+                    affected by other threads. (XXXX we may change the implementation
+                    of <literal>readMVar</literal> to use this.)
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
