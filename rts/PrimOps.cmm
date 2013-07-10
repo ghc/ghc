@@ -404,7 +404,7 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
 {
   W_ c, info;
 
-  ("ptr" info) = ccall lockClosure(w "ptr");
+  LOCK_CLOSURE(w, info);
 
   if (info == stg_DEAD_WEAK_info) {
     // Already dead.
@@ -439,7 +439,7 @@ stg_finalizzeWeakzh ( gcptr w )
   gcptr f, list;
   W_ info;
 
-  ("ptr" info) = ccall lockClosure(w "ptr");
+  LOCK_CLOSURE(w, info);
 
   // already dead?
   if (info == stg_DEAD_WEAK_info) {
@@ -494,7 +494,7 @@ stg_deRefWeakzh ( gcptr w )
     // alive or not. We use lockClosure to wait for the info pointer to become
     // something other than stg_WHITEHOLE_info.
 
-    ("ptr" info) = ccall lockClosure(w "ptr");
+    LOCK_CLOSURE(w, info);
     unlockClosure(w, info);
   }
 
@@ -1192,16 +1192,7 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
 {
     W_ val, info, tso, q;
 
-#if defined(THREADED_RTS)
-    if (CInt[n_capabilities] == 1 :: CInt) {
-        info = GET_INFO(mvar);
-    }
-    else {
-        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
-    }
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
@@ -1294,16 +1285,7 @@ stg_tryTakeMVarzh ( P_ mvar /* :: MVar a */ )
 {
     W_ val, info, tso, q;
 
-#if defined(THREADED_RTS)
-    if (CInt[n_capabilities] == 1 :: CInt) {
-        info = GET_INFO(mvar);
-    }
-    else {
-        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
-    }
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
     /* If the MVar is empty, return 0. */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -1370,16 +1352,7 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
 {
     W_ info, tso, q;
 
-#if defined(THREADED_RTS)
-    if (CInt[n_capabilities] == 1 :: CInt) {
-        info = GET_INFO(mvar);
-    }
-    else {
-        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
-    }
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 
@@ -1480,16 +1453,7 @@ stg_tryPutMVarzh ( P_ mvar, /* :: MVar a */
 {
     W_ info, tso, q;
 
-#if defined(THREADED_RTS)
-    if (CInt[n_capabilities] == 1 :: CInt) {
-        info = GET_INFO(mvar);
-    }
-    else {
-        ("ptr" info) = ccall reallyLockClosure(mvar "ptr");
-    }
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
@@ -1561,11 +1525,7 @@ stg_atomicReadMVarzh ( P_ mvar, /* :: MVar a */ )
 {
     W_ val, info, tso, q;
 
-#if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
     if (info == stg_MVAR_CLEAN_info) {
         ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
