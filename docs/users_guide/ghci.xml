@@ -2787,8 +2787,10 @@ bar
 	  <para>Sets the string to be used as the prompt in GHCi.
 	  Inside <replaceable>prompt</replaceable>, the sequence
 	  <literal>%s</literal> is replaced by the names of the
-	  modules currently in scope, and <literal>%%</literal> is
-	  replaced by <literal>%</literal>. If <replaceable>prompt</replaceable>
+	  modules currently in scope, <literal>%l</literal> is replaced
+	  by the line number (as referenced in compiler messages) of the
+	  current prompt, and <literal>%%</literal> is replaced by
+	  <literal>%</literal>.  If <replaceable>prompt</replaceable>
       starts with &quot; then it is parsed as a Haskell String;
       otherwise it is treated as a literal string.</para>
         </listitem>

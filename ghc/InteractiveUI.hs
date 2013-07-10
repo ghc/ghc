@@ -609,6 +609,7 @@ fileLoop hdl = do
 
 mkPrompt :: GHCi String
 mkPrompt = do
+  st <- getGHCiState
   imports <- GHC.getContext
   resumes <- GHC.getResumeContext
 
@@ -639,12 +640,12 @@ mkPrompt = do
 
         deflt_prompt = dots <> context_bit <> modules_bit
 
+        f ('%':'l':xs) = ppr (1 + line_number st) <> f xs
         f ('%':'s':xs) = deflt_prompt <> f xs
         f ('%':'%':xs) = char '%' <> f xs
         f (x:xs) = char x <> f xs
         f [] = empty
 
-  st <- getGHCiState
   dflags <- getDynFlags
   return (showSDoc dflags (f (prompt st)))
 
