@@ -157,7 +157,8 @@ import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,
-                  tryTakeMVar, tryPutMVar, isEmptyMVar, atomicReadMVar
+                  tryTakeMVar, tryPutMVar, isEmptyMVar, atomicReadMVar,
+                  tryAtomicReadMVar
                 )
 import qualified GHC.MVar
 import GHC.Weak
