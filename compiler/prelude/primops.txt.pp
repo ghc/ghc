@@ -1729,7 +1729,7 @@ primop  AtomicReadMVarOp "atomicReadMVar#" GenPrimOp
 primop  TryAtomicReadMVarOp "tryAtomicReadMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int#, a #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
-   Otherwise, return wtih integer 1 and contents of {\tt MVar\#}.}
+   Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
    with
    out_of_line      = True
    has_side_effects = True
