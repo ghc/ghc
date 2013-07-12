@@ -780,7 +780,7 @@ checkInputForLayout stmt getStmt = do
      _other              -> do
        st1 <- lift getGHCiState
        let p = prompt st1
-       lift $ setGHCiState st1{ prompt = "%s| " }
+       lift $ setGHCiState st1{ prompt = prompt2 st1 }
        mb_stmt <- ghciHandle (\ex -> case fromException ex of
                             Just UserInterrupt -> return Nothing
                             _ -> case fromException ex of
