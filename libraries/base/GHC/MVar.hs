@@ -23,11 +23,11 @@ module GHC.MVar (
         , newMVar
         , newEmptyMVar
         , takeMVar
-        , atomicReadMVar
+        , readMVar
         , putMVar
         , tryTakeMVar
         , tryPutMVar
-        , tryAtomicReadMVar
+        , tryReadMVar
         , isEmptyMVar
         , addMVarFinalizer
     ) where
@@ -91,13 +91,29 @@ takeMVar :: MVar a -> IO a
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
 -- |Atomically read the contents of an 'MVar'.  If the 'MVar' is
--- currently empty, 'atomicReadMVar' will wait until its full.
--- 'atomicReadMVar' is guaranteed to receive the next 'putMVar'.
+-- currently empty, 'readMVar' will wait until its full.
+-- 'readMVar' is guaranteed to receive the next 'putMVar'.
 --
--- 'atomicReadMVar' is multiple-wakeup, so when multiple readers are
+-- 'readMVar' is multiple-wakeup, so when multiple readers are
 -- blocked on an 'MVar', all of them are woken up at the same time.
-atomicReadMVar :: MVar a -> IO a
-atomicReadMVar (MVar mvar#) = IO $ \ s# -> atomicReadMVar# mvar# s#
+--
+-- /Compatibility note:/ Prior to base 4.7, 'readMVar' was a combination
+-- of 'takeMVar' and 'putMVar'.  This mean that in the presence of
+-- other threads attempting to 'putMVar', 'readMVar' could block.
+-- Furthermore, 'readMVar' would not be serviced immediately if there
+-- were already pending thread blocked on 'takeMVar'.  The old behavior
+-- can be recovered by implementing 'readMVar as follows:
+--
+-- @
+--  readMVar :: MVar a -> IO a
+--  readMVar m =
+--    mask_ $ do
+--      a <- takeMVar m
+--      putMVar m a
+--      return a
+-- @
+readMVar :: MVar a -> IO a
+readMVar (MVar mvar#) = IO $ \ s# -> readMVar# mvar# s#
 
 -- |Put a value into an 'MVar'.  If the 'MVar' is currently full,
 -- 'putMVar' will wait until it becomes empty.
@@ -137,12 +153,12 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
         (# s, 0# #) -> (# s, False #)
         (# s, _  #) -> (# s, True #)
 
--- |A non-blocking version of 'atomicReadMVar'.  The 'tryAtomicReadMVar' function
+-- |A non-blocking version of 'readMVar'.  The 'tryReadMVar' function
 -- returns immediately, with 'Nothing' if the 'MVar' was empty, or
 -- @'Just' a@ if the 'MVar' was full with contents @a@.
-tryAtomicReadMVar :: MVar a -> IO (Maybe a)
-tryAtomicReadMVar (MVar m) = IO $ \ s ->
-    case tryAtomicReadMVar# m s of
+tryReadMVar :: MVar a -> IO (Maybe a)
+tryReadMVar (MVar m) = IO $ \ s ->
+    case tryReadMVar# m s of
         (# s', 0#, _ #) -> (# s', Nothing #)      -- MVar is empty
         (# s', _,  a #) -> (# s', Just a  #)      -- MVar is full
 

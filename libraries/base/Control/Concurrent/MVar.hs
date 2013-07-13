@@ -142,8 +142,7 @@ module Control.Concurrent.MVar
         , modifyMVarMasked_
         , modifyMVarMasked
 #ifndef __HUGS__
-        , atomicReadMVar
-        , tryAtomicReadMVar
+        , tryReadMVar
         , mkWeakMVar
         , addMVarFinalizer
 #endif
@@ -157,8 +156,8 @@ import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,
-                  tryTakeMVar, tryPutMVar, isEmptyMVar, atomicReadMVar,
-                  tryAtomicReadMVar
+                  tryTakeMVar, tryPutMVar, isEmptyMVar, readMVar,
+                  tryReadMVar
                 )
 import qualified GHC.MVar
 import GHC.Weak
@@ -171,20 +170,6 @@ import Prelude
 #endif
 
 import Control.Exception.Base
-
-{-|
-  This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
-  from the 'MVar', puts it back, and also returns it.  This function
-  is atomic only if there are no other producers (i.e. threads calling
-  'putMVar') for this 'MVar'.  Note: a 'tryTakeMVar' may temporarily
-  see the 'MVar' as empty while a read is occurring.
--}
-readMVar :: MVar a -> IO a
-readMVar m =
-  mask_ $ do
-    a <- takeMVar m
-    putMVar m a
-    return a
 
 {-|
   Take a value from an 'MVar', put a new value into the 'MVar' and
