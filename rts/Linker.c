@@ -1058,7 +1058,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_yield_to_interpreter)                           \
       SymI_HasProto(stg_block_noregs)                                   \
       SymI_HasProto(stg_block_takemvar)                                 \
-      SymI_HasProto(stg_block_atomicreadmvar)                           \
+      SymI_HasProto(stg_block_readmvar)                           \
       SymI_HasProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
       SymI_HasProto(MallocFailHook)                                     \
@@ -1315,11 +1315,11 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \
       SymI_HasProto(stg_takeMVarzh)                                     \
-      SymI_HasProto(stg_atomicReadMVarzh)                               \
+      SymI_HasProto(stg_readMVarzh)                               \
       SymI_HasProto(stg_threadStatuszh)                                 \
       SymI_HasProto(stg_tryPutMVarzh)                                   \
       SymI_HasProto(stg_tryTakeMVarzh)                                  \
-      SymI_HasProto(stg_tryAtomicReadMVarzh)                            \
+      SymI_HasProto(stg_tryReadMVarzh)                            \
       SymI_HasProto(stg_unmaskAsyncExceptionszh)                        \
       SymI_HasProto(unloadObj)                                          \
       SymI_HasProto(stg_unsafeThawArrayzh)                              \

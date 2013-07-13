@@ -1717,7 +1717,7 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
-primop  AtomicReadMVarOp "atomicReadMVar#" GenPrimOp
+primop  ReadMVarOp "readMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, a #)
    {If {\tt MVar\#} is empty, block until it becomes full.
    Then read its contents without modifying the MVar, without possibility
@@ -1726,7 +1726,7 @@ primop  AtomicReadMVarOp "atomicReadMVar#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
-primop  TryAtomicReadMVarOp "tryAtomicReadMVar#" GenPrimOp
+primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int#, a #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}.}

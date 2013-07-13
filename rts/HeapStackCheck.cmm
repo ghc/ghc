@@ -487,7 +487,7 @@ stg_block_noregs
 /* -----------------------------------------------------------------------------
  * takeMVar/putMVar-specific blocks
  *
- * Stack layout for a thread blocked in takeMVar/atomicReadMVar:
+ * Stack layout for a thread blocked in takeMVar/readMVar:
  *      
  *       ret. addr
  *       ptr to MVar   (R1)
@@ -531,14 +531,14 @@ stg_block_takemvar /* mvar passed in R1 */
     BLOCK_BUT_FIRST(stg_block_takemvar_finally);
 }
 
-INFO_TABLE_RET ( stg_block_atomicreadmvar, RET_SMALL, W_ info_ptr, P_ mvar )
+INFO_TABLE_RET ( stg_block_readmvar, RET_SMALL, W_ info_ptr, P_ mvar )
     return ()
 {
-    jump stg_atomicReadMVarzh(mvar);
+    jump stg_readMVarzh(mvar);
 }
 
 // code fragment executed just before we return to the scheduler
-stg_block_atomicreadmvar_finally
+stg_block_readmvar_finally
 {
     W_ r1, r3;
     r1 = R1;
@@ -549,13 +549,13 @@ stg_block_atomicreadmvar_finally
     jump StgReturn [R1];
 }
 
-stg_block_atomicreadmvar /* mvar passed in R1 */
+stg_block_readmvar /* mvar passed in R1 */
 {
     Sp_adj(-2);
     Sp(1) = R1;
-    Sp(0) = stg_block_atomicreadmvar_info;
-    R3 = R1; // mvar communicated to stg_block_atomicreadmvar_finally in R3
-    BLOCK_BUT_FIRST(stg_block_atomicreadmvar_finally);
+    Sp(0) = stg_block_readmvar_info;
+    R3 = R1; // mvar communicated to stg_block_readmvar_finally in R3
+    BLOCK_BUT_FIRST(stg_block_readmvar_finally);
 }
 
 INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, W_ info_ptr,

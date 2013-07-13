@@ -293,9 +293,9 @@ RTS_FUN_DECL(stg_block_noregs);
 RTS_FUN_DECL(stg_block_blackhole);
 RTS_FUN_DECL(stg_block_blackhole_finally);
 RTS_FUN_DECL(stg_block_takemvar);
-RTS_FUN_DECL(stg_block_atomicreadmvar);
+RTS_FUN_DECL(stg_block_readmvar);
 RTS_RET(stg_block_takemvar);
-RTS_RET(stg_block_atomicreadmvar);
+RTS_RET(stg_block_readmvar);
 RTS_FUN_DECL(stg_block_putmvar);
 RTS_RET(stg_block_putmvar);
 #ifdef mingw32_HOST_OS
@@ -378,10 +378,10 @@ RTS_FUN_DECL(stg_isEmptyMVarzh);
 RTS_FUN_DECL(stg_newMVarzh);
 RTS_FUN_DECL(stg_takeMVarzh);
 RTS_FUN_DECL(stg_putMVarzh);
-RTS_FUN_DECL(stg_atomicReadMVarzh);
+RTS_FUN_DECL(stg_readMVarzh);
 RTS_FUN_DECL(stg_tryTakeMVarzh);
 RTS_FUN_DECL(stg_tryPutMVarzh);
-RTS_FUN_DECL(stg_tryAtomicReadMVarzh);
+RTS_FUN_DECL(stg_tryReadMVarzh);
 
 RTS_FUN_DECL(stg_waitReadzh);
 RTS_FUN_DECL(stg_waitWritezh);
