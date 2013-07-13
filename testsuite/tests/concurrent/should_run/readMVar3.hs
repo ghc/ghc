@@ -1,6 +1,5 @@
 module Main where
 
-import GHC.MVar
 import Control.Concurrent
 
 -- example from
@@ -10,7 +9,7 @@ main = do
     m <- newMVar (0 :: Int)
     forkIO $ putMVar m 1
     yield
-    r1 <- atomicReadMVar m
+    r1 <- readMVar m
     r2 <- takeMVar m
     r3 <- takeMVar m
     return ()

@@ -1,6 +1,5 @@
 module Main where
 
-import GHC.MVar
 import Control.Concurrent
 
 main = do
@@ -8,7 +7,7 @@ main = do
     m <- newMVar (0 :: Int)
     let readloop 0 = return ()
         readloop i = do
-            atomicReadMVar m
+            readMVar m
             readloop (i-1)
         writeloop 0 = return ()
         writeloop i = do
