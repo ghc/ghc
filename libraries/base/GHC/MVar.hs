@@ -100,8 +100,8 @@ takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 -- /Compatibility note:/ Prior to base 4.7, 'readMVar' was a combination
 -- of 'takeMVar' and 'putMVar'.  This mean that in the presence of
 -- other threads attempting to 'putMVar', 'readMVar' could block.
--- Furthermore, 'readMVar' would not be serviced immediately if there
--- were already pending thread blocked on 'takeMVar'.  The old behavior
+-- Furthermore, 'readMVar' would not receive the next 'putMVar' if there
+-- was already a pending thread blocked on 'takeMVar'.  The old behavior
 -- can be recovered by implementing 'readMVar as follows:
 --
 -- @
