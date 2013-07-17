@@ -279,12 +279,16 @@
            </listitem>
             <listitem>
                 <para>
-                    <literal>Control.Concurrent.MVar</literal> has two
-                    new functions, <literal>atomicReadMVar</literal> and
-                    <literal>tryAtomicReadMVar</literal>, which
-                    implement <literal>readMVar</literal> that cannot be
-                    affected by other threads. (XXXX we may change the implementation
-                    of <literal>readMVar</literal> to use this.)
+                    <literal>Control.Concurrent.MVar</literal> has a new
+                    implementation of <literal>readMVar</literal>, which
+                    fixes a long-standing bug where
+                    <literal>readMVar</literal> is only atomic if there
+                    are no other threads running
+                    <literal>putMVar</literal>.
+                    <literal>readMVar</literal> now is atomic, and is
+                    guaranteed to return the value from the first
+                    <literal>putMVar</literal>.  There is also a new <literal>tryReadMVar</literal>
+                    which is a non-blocking version.
                </para>
            </listitem>
        </itemizedlist>
