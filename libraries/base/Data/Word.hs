@@ -22,6 +22,9 @@ module Data.Word
         Word,
         Word8, Word16, Word32, Word64,
 
+        -- * byte swapping
+        byteSwap16, byteSwap32, byteSwap64,
+
         -- * Notes
 
         -- $notes
@@ -33,6 +36,21 @@ import GHC.Word
 
 #ifdef __HUGS__
 import Hugs.Word
+
+byteSwap16 :: Word16 -> Word16
+byteSwap16 w = (w `shift` -8) .|. (w `shift` 8)
+
+byteSwap32 :: Word32 -> Word32
+byteSwap32 w =
+         (w `shift` -24)             .|. (w `shift` 24)
+    .|. ((w `shift` -8) .&. 0xff00) .|. ((w .&. 0xff00) `shift` 8)
+
+byteSwap64 :: Word64 -> Word64
+byteSwap64 w =
+        (w `shift` -56)                  .|. (w `shift` 56)
+    .|. ((w `shift` -40) .&. 0xff00)     .|. ((w .&. 0xff00) `shift` 40)
+    .|. ((w `shift` -24) .&. 0xff0000)   .|. ((w .&. 0xff0000) `shift` 24)
+    .|. ((w `shift` -8)  .&. 0xff000000) .|. ((w .&. 0xff000000) `shift` 8)
 #endif
 
 {- $notes
