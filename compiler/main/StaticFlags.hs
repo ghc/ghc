@@ -23,9 +23,6 @@ module StaticFlags (
         opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
-        -- language opts
-        opt_DictsStrict,
-
         -- optimisation opts
         opt_NoStateHack,
         opt_CprOff,
@@ -149,7 +146,6 @@ isStaticFlag f = f `elem` flagsStaticNames
 
 flagsStaticNames :: [String]
 flagsStaticNames = [
-    "fdicts-strict",
     "fno-state-hack",
     "fno-opt-coercion",
     "fcpr-off"
@@ -188,10 +184,6 @@ opt_PprStyle_Debug = lookUp  (fsLit "-dppr-debug")
 
 opt_NoDebugOutput  :: Bool
 opt_NoDebugOutput  = lookUp  (fsLit "-dno-debug-output")
-
--- language opts
-opt_DictsStrict    :: Bool
-opt_DictsStrict    = lookUp  (fsLit "-fdicts-strict")
 
 opt_NoStateHack    :: Bool
 opt_NoStateHack    = lookUp  (fsLit "-fno-state-hack")

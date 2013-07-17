@@ -180,6 +180,7 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
     (res_ty `bothDmdType` arg_ty, App fun' arg')
 
+-- this is an anonymous lambda, since @dmdAnalRhs@ uses @collectBinders@
 dmdAnal env dmd (Lam var body)
   | isTyVar var
   = let    
@@ -195,7 +196,7 @@ dmdAnal env dmd (Lam var body)
 
 	env'		 = extendSigsWithLam env var
 	(body_ty, body') = dmdAnal env' body_dmd body
-	(lam_ty, var')   = annotateLamIdBndr env body_ty one_shot var
+	(lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty one_shot var
     in
     (deferAndUse defer_me one_shot lam_ty, Lam var' body')
 
@@ -480,6 +481,10 @@ dmdTransform env var dmd
   = dmdTransformDataConSig 
        (idArity var) (idStrictness var) dmd
 
+  | gopt Opt_DmdTxDictSel (ae_dflags env),
+    Just _ <- isClassOpId_maybe var -- Dictionary component selector
+  = dmdTransformDictSelSig (idStrictness var) dmd
+
   | isGlobalId var	                         -- Imported function
   = let res = dmdTransformSig (idStrictness var) dmd in
 --    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res]) 
@@ -589,7 +594,7 @@ dmdAnalRhs top_lvl rec_flag env id rhs
     (bndrs, body)        = collectBinders rhs
     env_body             = foldl extendSigsWithLam env bndrs
     (body_dmd_ty, body') = dmdAnal env_body body_dmd body
-    (rhs_dmd_ty, bndrs') = annotateLamBndrs env body_dmd_ty bndrs
+    (rhs_dmd_ty, bndrs') = annotateLamBndrs env (isDFunId id) body_dmd_ty bndrs
     id'		         = set_idStrictness env id sig_ty
     sig_ty               = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
 	-- See Note [NOINLINE and strictness]
@@ -733,6 +738,13 @@ the safe result we also have absent demand set to Abs, which makes it
 possible to safely ignore non-mentioned variables (their joint demand
 is <L,A>).
 
+Note [do not strictify the argument dictionaries of a dfun]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The typechecker can tie recursive knots involving dfuns, so we do the
+conservative thing and refrain from strictifying a dfun's argument
+dictionaries.
+
 \begin{code}
 annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- The returned env has the var deleted
@@ -741,33 +753,41 @@ annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- No effect on the argument demands
 annotateBndr env dmd_ty@(DmdType fv ds res) var
   | isTyVar var = (dmd_ty, var)
-  | otherwise   = (DmdType fv' ds res, set_idDemandInfo env var dmd)
+  | otherwise   = (DmdType fv' ds res, set_idDemandInfo env var dmd')
   where
     (fv', dmd) = peelFV fv var res
+
+    dmd' | gopt Opt_DictsStrict (ae_dflags env)
+             -- We never want to strictify a recursive let. At the moment
+             -- annotateBndr is only call for non-recursive lets; if that
+             -- changes, we need a RecFlag parameter and another guard here.
+         = strictifyDictDmd (idType var) dmd
+         | otherwise = dmd
 
 annotateBndrs :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Var])
 annotateBndrs env = mapAccumR (annotateBndr env)
 
-annotateLamBndrs :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Var])
-annotateLamBndrs env ty bndrs = mapAccumR annotate ty bndrs
+annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
+annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
   where
     annotate dmd_ty bndr
-      | isId bndr = annotateLamIdBndr env dmd_ty Many bndr
+      | isId bndr = annotateLamIdBndr env args_of_dfun dmd_ty Many bndr
       | otherwise = (dmd_ty, bndr)
 
 annotateLamIdBndr :: AnalEnv
+                  -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType 	-- Demand type of body
                   -> Count      -- One-shot-ness of the lambda
 		  -> Id 	-- Lambda binder
 		  -> (DmdType, 	-- Demand type of lambda
 		      Id)	-- and binder annotated with demand	
 
-annotateLamIdBndr env _dmd_ty@(DmdType fv ds res) one_shot id
+annotateLamIdBndr env arg_of_dfun _dmd_ty@(DmdType fv ds res) one_shot id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
-    (final_ty, setOneShotness one_shot (set_idDemandInfo env id dmd))
+    (final_ty, setOneShotness one_shot (set_idDemandInfo env id dmd'))
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
@@ -779,6 +799,12 @@ annotateLamIdBndr env _dmd_ty@(DmdType fv ds res) one_shot id
     main_ty = DmdType fv' (dmd:ds) res
 
     (fv', dmd) = peelFV fv id res
+
+    dmd' | gopt Opt_DictsStrict (ae_dflags env),
+           -- see Note [do not strictify the argument dictionaries of a dfun]
+           not arg_of_dfun
+         = strictifyDictDmd (idType id) dmd
+         | otherwise = dmd
 
 deleteFVs :: DmdType -> [Var] -> DmdType
 deleteFVs (DmdType fvs dmds res) bndrs
@@ -985,13 +1011,18 @@ forget that fact, otherwise we might make 'x' absent when it isn't.
 %************************************************************************
 
 \begin{code}
+type DFunFlag = Bool  -- indicates if the lambda being considered is in the
+                      -- sequence of lambdas at the top of the RHS of a dfun
+notArgOfDfun :: DFunFlag
+notArgOfDfun = False
+
 data AnalEnv
   = AE { ae_dflags :: DynFlags
        , ae_sigs   :: SigEnv
        , ae_virgin :: Bool    -- True on first iteration only
 		              -- See Note [Initialising strictness]
        , ae_rec_tc :: RecTcChecker
- } 
+ }
 
 	-- We use the se_env to tell us whether to
 	-- record info about a variable in the DmdEnv

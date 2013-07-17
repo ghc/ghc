@@ -308,6 +308,8 @@ data GeneralFlag
    | Opt_OmitYields
    | Opt_SimpleListLiterals
    | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
+   | Opt_DictsStrict                     -- be strict in argument dictionaries
+   | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2590,7 +2592,9 @@ fFlags = [
   ( "flat-cache",                       Opt_FlatCache, nop ),
   ( "use-rpaths",                       Opt_RPath, nop ),
   ( "kill-absence",                     Opt_KillAbsence, nop),
-  ( "kill-one-shot",                    Opt_KillOneShot, nop)
+  ( "kill-one-shot",                    Opt_KillOneShot, nop),
+  ( "dicts-strict",                     Opt_DictsStrict, nop ),
+  ( "dmd-tx-dict-sel",                  Opt_DmdTxDictSel, nop )
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -2873,6 +2877,8 @@ optLevelFlags
     , ([0,1,2], Opt_LlvmTBAA)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CmmElimCommonBlocks)
+
+    , ([0,1,2],     Opt_DmdTxDictSel)
 
 --     , ([2],     Opt_StaticArgumentTransformation)
 -- Max writes: I think it's probably best not to enable SAT with -O2 for the

@@ -38,11 +38,14 @@ module Demand (
         deferDmd, deferType, deferAndUse, deferEnv, modifyEnv,
 
         splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
-        dmdTransformSig, dmdTransformDataConSig, argOneShots, argsOneShots,
+        dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
+        argOneShots, argsOneShots,
 
         isSingleUsed, useType, useEnv, zapDemand, zapStrictSig,
 
-        worthSplittingFun, worthSplittingThunk
+        worthSplittingFun, worthSplittingThunk,
+
+        strictifyDictDmd
 
      ) where
 
@@ -57,6 +60,10 @@ import Util
 import BasicTypes
 import Binary
 import Maybes           ( isJust, expectJust )
+
+import Type            ( Type )
+import TyCon           ( isNewTyCon, isClassTyCon )
+import DataCon         ( splitDataProductType_maybe )
 \end{code}
 
 %************************************************************************
@@ -1303,6 +1310,21 @@ dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
     go_abs 0 dmd            = Just (splitUseProdDmd arity dmd)
     go_abs n (UCall One u') = go_abs (n-1) u'
     go_abs _ _              = Nothing
+
+dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
+-- Like dmdTransformDataConSig, we have a special demand transformer
+-- for dictionary selectors.  If the selector is saturated (ie has one
+-- argument: the dictionary), we feed the demand on the result into
+-- the indicated dictionary component.
+dmdTransformDictSelSig (StrictSig (DmdType _ [dictJd] _)) cd
+  = case peelCallDmd cd of
+      (cd',False,_) -> case splitProdDmd_maybe dictJd of
+        Just jds -> DmdType emptyDmdEnv [mkManyUsedDmd $ mkProdDmd $ map enhance jds] topRes
+          where enhance old | isAbsDmd old = old
+                            | otherwise    = mkManyUsedDmd cd'
+        Nothing   -> panic "dmdTransformDictSelSig: split failed"
+      _ -> topDmdType
+dmdTransformDictSelSig _ _ = panic "dmdTransformDictSelSig: no args"
 \end{code}
 
 Note [Non-full application] 
@@ -1371,6 +1393,37 @@ zap_usg :: KillFlags -> UseDmd -> UseDmd
 zap_usg kfs (UCall c u) = UCall (zap_count kfs c) (zap_usg kfs u)
 zap_usg kfs (UProd us)  = UProd (map (zap_musg kfs) us)
 zap_usg _   u           = u
+\end{code}
+
+\begin{code}
+-- If the argument is a used non-newtype dictionary, give it strict
+-- demand. Also split the product type & demand and recur in order to
+-- similarly strictify the argument's contained used non-newtype
+-- superclass dictionaries. We use the demand as our recursive measure
+-- to guarantee termination.
+strictifyDictDmd :: Type -> Demand -> Demand
+strictifyDictDmd ty dmd = case absd dmd of
+  Use n _ |
+    Just (tycon, _arg_tys, _data_con, inst_con_arg_tys)
+      <- splitDataProductType_maybe ty,
+    not (isNewTyCon tycon), isClassTyCon tycon -- is a non-newtype dictionary
+    -> seqDmd `bothDmd` -- main idea: ensure it's strict
+       case splitProdDmd_maybe dmd of
+         -- superclass cycles should not be a problem, since the demand we are
+         -- consuming would also have to be infinite in order for us to diverge
+         Nothing -> dmd -- no components have interesting demand, so stop
+                        -- looking for superclass dicts
+         Just dmds
+           | all (not . isAbsDmd) dmds -> evalDmd
+             -- abstract to strict w/ arbitrary component use, since this
+             -- smells like reboxing; results in CBV boxed
+             --
+             -- TODO revisit this if we ever do boxity analysis
+           | otherwise -> case mkProdDmd $ zipWith strictifyDictDmd inst_con_arg_tys dmds of
+               CD {sd = s,ud = a} -> JD (Str s) (Use n a)
+             -- TODO could optimize with an aborting variant of zipWith since
+             -- the superclass dicts are always a prefix
+  _ -> dmd -- unused or not a dictionary
 \end{code}
 
 
@@ -1500,4 +1553,3 @@ instance Binary CPRResult where
               2 -> return NoCPR
               _ -> return BotCPR
 \end{code}
-

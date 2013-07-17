@@ -36,7 +36,9 @@ module DataCon (
 	dataConIsInfix,
 	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
 	dataConRepStrictness, dataConRepBangs, dataConBoxer,
-	
+
+	splitDataProductType_maybe,
+
 	-- ** Predicates on DataCons
 	isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
 	isVanillaDataCon, classDataCon, dataConCannotMatch,
@@ -1085,4 +1087,42 @@ promoteKind (TyConApp tc [])
   | tc `hasKey` liftedTypeKindTyConKey = superKind
 promoteKind (FunTy arg res) = FunTy (promoteKind arg) (promoteKind res)
 promoteKind k = pprPanic "promoteKind" (ppr k)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Splitting products}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | Extract the type constructor, type argument, data constructor and it's
+-- /representation/ argument types from a type if it is a product type.
+--
+-- Precisely, we return @Just@ for any type that is all of:
+--
+--  * Concrete (i.e. constructors visible)
+--
+--  * Single-constructor
+--
+--  * Not existentially quantified
+--
+-- Whether the type is a @data@ type or a @newtype@
+splitDataProductType_maybe
+	:: Type 			-- ^ A product type, perhaps
+	-> Maybe (TyCon, 		-- The type constructor
+		  [Type],		-- Type args of the tycon
+		  DataCon,		-- The data constructor
+		  [Type])		-- Its /representation/ arg types
+
+	-- Rejecing existentials is conservative.  Maybe some things
+	-- could be made to work with them, but I'm not going to sweat
+	-- it through till someone finds it's important.
+
+splitDataProductType_maybe ty
+  | Just (tycon, ty_args) <- splitTyConApp_maybe ty
+  , Just con <- isDataProductTyCon_maybe tycon
+  = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
+  | otherwise
+  = Nothing
 \end{code}
