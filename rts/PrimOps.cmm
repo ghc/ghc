@@ -1563,7 +1563,7 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
 
     val = StgMVar_value(mvar);
 
-    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    unlockClosure(mvar, info);
     return (val);
 }
 
@@ -1579,7 +1579,7 @@ stg_tryReadMVarzh ( P_ mvar, /* :: MVar a */ )
 
     val = StgMVar_value(mvar);
 
-    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    unlockClosure(mvar, info);
     return (1, val);
 }
 
