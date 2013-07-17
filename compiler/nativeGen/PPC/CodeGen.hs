@@ -1155,6 +1155,7 @@ genCCall' dflags gcp target dest_regs args0
                     MO_Memset    -> (fsLit "memset", False)
                     MO_Memmove   -> (fsLit "memmove", False)
 
+                    MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
 
                     MO_S_QuotRem {}  -> unsupported

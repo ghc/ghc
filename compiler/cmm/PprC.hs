@@ -738,6 +738,7 @@ pprCallishMachOp_for_C mop
         MO_Memcpy       -> ptext (sLit "memcpy")
         MO_Memset       -> ptext (sLit "memset")
         MO_Memmove      -> ptext (sLit "memmove")
+        (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
 

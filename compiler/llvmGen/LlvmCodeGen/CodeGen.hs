@@ -221,30 +221,11 @@ genCall t@(PrimTarget MO_Prefetch_Data) [] args = do
                 `appOL` trash `snocOL` call
     return (stmts, top1 ++ top2)
 
--- Handle popcnt function specifically since GHC only really has i32 and i64
--- types and things like Word8 are backed by an i32 and just present a logical
--- i8 range. So we must handle conversions from i32 to i8 explicitly as LLVM
--- is strict about types.
-genCall t@(PrimTarget op@(MO_PopCnt w)) [dst] args = do
-    let width = widthToLlvmInt w
-        dstTy = cmmToLlvmType $ localRegType dst
-
-    fname                       <- cmmPrimOpFunctions op
-    (fptr, _, top3)             <- getInstrinct fname width [width]
-
-    dstV                        <- getCmmReg (CmmLocal dst)
-
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
-    (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
-    (argsV', stmts4)            <- castVars $ zip argsV [width]
-    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    ([retV'], stmts5)           <- castVars [(retV,dstTy)]
-    let s2                       = Store retV' dstV
-
-    let stmts = stmts2 `appOL` stmts4 `snocOL`
-                s1 `appOL` stmts5 `snocOL` s2
-    return (stmts, top2 ++ top3)
+-- Handle PopCnt and BSwap that need to only convert arg and return types
+genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
+    genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_BSwap w)) dsts args =
+    genCallSimpleCast w t dsts args
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
@@ -390,9 +371,36 @@ genCall target res args = do
                     return (allStmts `snocOL` s2 `snocOL` s3
                                 `appOL` retStmt, top1 ++ top2)
 
+-- Handle simple function call that only need simple type casting, of the form:
+--   truncate arg >>= \a -> call(a) >>= zext
+--
+-- since GHC only really has i32 and i64 types and things like Word8 are backed
+-- by an i32 and just present a logical i8 range. So we must handle conversions
+-- from i32 to i8 explicitly as LLVM is strict about types.
+genCallSimpleCast :: Width -> ForeignTarget -> [CmmFormal] -> [CmmActual]
+              -> LlvmM StmtData
+genCallSimpleCast w t@(PrimTarget op) [dst] args = do
+    let width = widthToLlvmInt w
+        dstTy = cmmToLlvmType $ localRegType dst
 
--- genCallSimpleCast _ _ _ dsts _ =
---    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
+    fname                       <- cmmPrimOpFunctions op
+    (fptr, _, top3)             <- getInstrinct fname width [width]
+
+    dstV                        <- getCmmReg (CmmLocal dst)
+
+    let (_, arg_hints) = foreignTargetHints t
+    let args_hints = zip args arg_hints
+    (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
+    (argsV', stmts4)            <- castVars $ zip argsV [width]
+    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
+    ([retV'], stmts5)           <- castVars [(retV,dstTy)]
+    let s2                       = Store retV' dstV
+
+    let stmts = stmts2 `appOL` stmts4 `snocOL`
+                s1 `appOL` stmts5 `snocOL` s2
+    return (stmts, top2 ++ top3)
+genCallSimpleCast _ _ dsts _ =
+    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
 
 -- | Create a function pointer from a target.
 getFunPtr :: (LMString -> LlvmType) -> ForeignTarget
@@ -534,6 +542,7 @@ cmmPrimOpFunctions mop = do
     MO_Memset     -> fsLit $ "llvm.memset."  ++ intrinTy2
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
     MO_Prefetch_Data -> fsLit "llvm.prefetch"
 

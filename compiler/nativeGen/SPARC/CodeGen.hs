@@ -647,6 +647,7 @@ outOfLineMachOp_table mop
         MO_Memset    -> fsLit "memset"
         MO_Memmove   -> fsLit "memmove"
 
+        MO_BSwap w   -> fsLit $ bSwapLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
 
         MO_S_QuotRem {}  -> unsupported
