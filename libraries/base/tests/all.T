@@ -131,3 +131,4 @@ test('CatPairs', normal, compile, [''])
 test('CatEntail', normal, compile, [''])
 
 test('T7653', normal, compile_and_run, [''])
+test('T7787', normal, compile_and_run, [''])
