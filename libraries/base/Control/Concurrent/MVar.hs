@@ -225,7 +225,7 @@ modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
 modifyMVar m io =
   mask $ \restore -> do
     a      <- takeMVar m
-    (a',b) <- restore (io a) `onException` putMVar m a
+    (a',b) <- restore (io a >>= evaluate) `onException` putMVar m a
     putMVar m a'
     return b
 
@@ -250,7 +250,7 @@ modifyMVarMasked :: MVar a -> (a -> IO (a,b)) -> IO b
 modifyMVarMasked m io =
   mask_ $ do
     a      <- takeMVar m
-    (a',b) <- io a `onException` putMVar m a
+    (a',b) <- (io a >>= evaluate) `onException` putMVar m a
     putMVar m a'
     return b
 
