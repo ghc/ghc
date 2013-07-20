@@ -180,7 +180,9 @@ test('T7702',
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.ghci_way_flags])
 
 test('T7995',
-     normal,
+     # RULE doesn't seem to fire unless optimizations are turned on.
+     # This seems reasonable, so I've required it for the test. -- EZY 20130720
+     only_ways(['optasm']),
      run_command,
      ['$MAKE -s --no-print-directory T7995'])
 
