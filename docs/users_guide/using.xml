@@ -962,6 +962,8 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-warnings-deprecations</option>,
     <option>-fwarn-deprecated-flags</option>,
+    <option>-fwarn-unrecognised-pragmas</option>,
+    <option>-fwarn-pointless-pragmas</option>,
     <option>-fwarn-duplicate-constraints</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>,
@@ -969,10 +971,13 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-lazy-unlifted-bindings</option>,
     <option>-fwarn-wrong-do-bind</option>,
     <option>-fwarn-unsupported-calling-conventions</option>,
-    <option>-fwarn-dodgy-foreign-imports</option>, and
-    <option>-fwarn-typeable-instances</option>.  The following
-    flags are
-    simple ways to select standard &ldquo;packages&rdquo; of warnings:
+    <option>-fwarn-dodgy-foreign-imports</option>,
+    <option>-fwarn-typeable-instances</option>,
+    <option>-fwarn-inline-rule-shadowing</option>,
+    <option>-fwarn-alternative-layout-rule-transitional</option>, and
+    <option>-fwarn-unsupported-llvm-version</option>.
+    The following flags are simple ways to select standard
+    &ldquo;packages&rdquo; of warnings:
     </para>
 
     <variablelist>
