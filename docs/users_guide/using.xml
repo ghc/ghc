@@ -1094,6 +1094,20 @@ test.hs:(5,4)-(6,7):
       </varlistentry>
 
       <varlistentry>
+        <term><option>-fwarn-pointless-pragmas</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-pointless-pragmas</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+          <indexterm><primary>pragmas</primary></indexterm>
+          <para>Causes a warning to be emitted when GHC detects that a
+          module contains a pragma that has no effect.</para>
+
+          <para>This option is on by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-fwarn-warnings-deprecations</option>:</term>
         <listitem>
           <indexterm><primary><option>-fwarn-warnings-deprecations</option></primary>
