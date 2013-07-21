@@ -17,6 +17,8 @@
 -- 
 -----------------------------------------------------------------------------
 
+#include "MachDeps.h"
+
 -- #hide
 module GHC.Enum(
         Bounded(..), Enum(..),
@@ -640,8 +642,10 @@ instance Bounded Word where
     -- (fromInteger 0xffffffff :: Word).
 #if WORD_SIZE_IN_BITS == 32
     maxBound = W# (int2Word# 0xFFFFFFFF#)
-#else
+#elif WORD_SIZE_IN_BITS == 64
     maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
+#else
+#error Unhandled value for WORD_SIZE_IN_BITS
 #endif
 \end{code}
 
