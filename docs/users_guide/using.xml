@@ -973,8 +973,7 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-unsupported-calling-conventions</option>,
     <option>-fwarn-dodgy-foreign-imports</option>,
     <option>-fwarn-typeable-instances</option>,
-    <option>-fwarn-inline-rule-shadowing</option>,
-    <option>-fwarn-alternative-layout-rule-transitional</option>, and
+    <option>-fwarn-inline-rule-shadowing</option>, and
     <option>-fwarn-unsupported-llvm-version</option>.
     The following flags are simple ways to select standard
     &ldquo;packages&rdquo; of warnings:
