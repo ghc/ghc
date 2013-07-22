@@ -79,6 +79,8 @@ test('readMVar2', normal, compile_and_run, [''])
 test('readMVar3', normal, compile_and_run, [''])
 test('tryReadMVar1', normal, compile_and_run, [''])
 
+test('T7970', normal, compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
@@ -238,5 +240,3 @@ test('setnumcapabilities001',
        reqlib('parallel'),
        skip_if_not_smp ],
      compile_and_run, [''])
-
-test('T7970', normal, compile_and_run, [''])
