@@ -207,39 +207,10 @@ cgRhs id (StgRhsCon cc con args)
   = withNewTickyCounterThunk False (idName id) $ -- False for "not static"
     buildDynCon id True cc con args
 
+{- See Note [GC recovery] in compiler/codeGen/StgCmmClosure.hs -}
 cgRhs name (StgRhsClosure cc bi fvs upd_flag _srt args body)
-  | null fvs   -- See Note [Nested constant closures]
-  = do { (info, fcode) <- cgTopRhsClosure Recursive name dontCareCCS bi upd_flag args body 
-       ; return (info, fcode >> return mkNop) }
-  | otherwise 
   = do dflags <- getDynFlags
        mkRhsClosure dflags name cc bi (nonVoidIds fvs) upd_flag args body
-
-{- Note [Nested constant closures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have
-  f x = let funny = not True 
-        in ...
-then 'funny' is a nested closure (compiled with cgRhs) that has no free vars.
-This does not happen often, because let-floating takes them all to top 
-level; but it CAN happen.  (Reason: let-floating may make a function f smaller
-so it can be inlined, so now (f True) may generate a local no-fv closure.
-This actually happened during bootsrapping GHC itself, with f=mkRdrFunBind 
-in TcGenDeriv.)
-
-If we have one of these things, AND they allocate, the heap check will
-refer to the static funny_closure; but there isn't one! (Why does the
-heap check refer to the static closure? Becuase nodeMustPointToIt is
-False, which is fair enough.)
-
-Simple solution: compile the RHS as if it was top level.  Then
-everything works.  A minor benefit is eliminating the allocation code
-too.
-
-GBM: when we compile the RHS as if it were top level, the cost centre stack in
-the StgRhsClosure is no longer valid. For now we replace the cost centre stack
-with dontCareCCS.
--}
 
 ------------------------------------------------------------------------
 --              Non-constructor right hand sides
