@@ -339,7 +339,7 @@ ioManagerCapabilitiesChanged = do
 
               -- create new IO managers for the new caps:
               forM_ [old_n_caps..new_n_caps-1] $
-                startIOManagerThread eventManagerArray
+                startIOManagerThread new_eventManagerArray
 
               -- update the event manager array reference:
               writeIORef eventManager new_eventManagerArray
