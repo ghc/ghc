@@ -221,7 +221,7 @@ test('T4012',
      ['T4012', ''])
 
 test('T8083',
-     [extra_clean(['T8083_c.o'])],
+     [omit_ways(['ghci']), extra_clean(['T8083_c.o'])],
      compile_and_run,
      ['T8083_c.c'])
 
