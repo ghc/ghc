@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-typeable-instances #-}
 {-# LANGUAGE Unsafe    #-}
 
 -----------------------------------------------------------------------------
@@ -50,6 +49,7 @@ import GHC.Base
 import GHC.Word
 import GHC.Show
 import Data.Maybe
+import {-# SOURCE #-} Data.Proxy
 import GHC.Num
 import GHC.Real
 -- import GHC.IORef
@@ -193,9 +193,6 @@ class Typeable a where
   typeRep :: proxy a -> TypeRep
   -- ^ Takes a value of type @a@ and returns a concrete representation
   -- of that type.
-
--- | A concrete, poly-kinded proxy type
-data Proxy t = Proxy
 
 -- Keeping backwards-compatibility
 typeOf :: forall a. Typeable a => a -> TypeRep

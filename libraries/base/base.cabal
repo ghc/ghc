@@ -155,6 +155,7 @@ Library {
         Data.Maybe,
         Data.Monoid,
         Data.Ord,
+        Data.Proxy,
         Data.Ratio,
         Data.STRef
         Data.STRef.Lazy
@@ -166,6 +167,7 @@ Library {
         Data.Typeable.Internal,
         Data.OldTypeable,
         Data.OldTypeable.Internal,
+        Data.Type.Equality,
         Data.Unique,
         Data.Version,
         Data.Word,

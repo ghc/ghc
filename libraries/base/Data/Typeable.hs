@@ -5,7 +5,9 @@
            , ScopedTypeVariables
            , ForeignFunctionInterface
            , FlexibleInstances
+           , TypeOperators
            , PolyKinds
+           , GADTs
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -44,6 +46,9 @@ module Data.Typeable
         -- * The Typeable class
         Typeable( typeRep ),
 
+        -- * Propositional equality
+        (:=:)(Refl),
+
         -- * For backwards compatibility
         typeOf, typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7,
 
@@ -77,9 +82,13 @@ module Data.Typeable
         funResultTy,    -- :: TypeRep -> TypeRep   -> Maybe TypeRep
         typeRepTyCon,   -- :: TypeRep -> TyCon
         typeRepArgs,    -- :: TypeRep -> [TypeRep]
+
+        -- * Type-level reasoning with Typeable
+        -- eqTypeable, decideEqTypeable
   ) where
 
 import Data.Typeable.Internal hiding (mkTyCon)
+import {-# SOURCE #-} Data.Type.Equality
 
 import Unsafe.Coerce
 import Data.Maybe
@@ -97,24 +106,23 @@ cast x = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
            then Just $ unsafeCoerce x
            else Nothing
 
+-- | Extract a witness of equality of two types
+eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :=: b)
+eqT = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
+      then Just $ unsafeCoerce Refl
+      else Nothing
+
 -- | A flexible variation parameterised in a type constructor
-gcast :: forall a b c. (Typeable (a :: *), Typeable b) => c a -> Maybe (c b)
-gcast x = r
- where
-  r = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
-        then Just $ unsafeCoerce x
-        else Nothing
+gcast :: forall a b c. (Typeable a, Typeable b) => c a -> Maybe (c b)
+gcast x = fmap (\Refl -> x) (eqT :: Maybe (a :=: b))
 
--- | Cast for * -> *
-gcast1 :: forall c t t' a. (Typeable (t :: * -> *), Typeable t')
+-- | Cast over @k1 -> k2@
+gcast1 :: forall c t t' a. (Typeable t, Typeable t')
        => c (t a) -> Maybe (c (t' a)) 
-gcast1 x = if typeRep (Proxy :: Proxy t) == typeRep (Proxy :: Proxy t')
-             then Just $ unsafeCoerce x
-             else Nothing
+gcast1 x = fmap (\Refl -> x) (eqT :: Maybe (t :=: t'))
 
--- | Cast for * -> * -> *
-gcast2 :: forall c t t' a b. (Typeable (t :: * -> * -> *), Typeable t')
+-- | Cast over @k1 -> k2 -> k3@
+gcast2 :: forall c t t' a b. (Typeable t, Typeable t')
        => c (t a b) -> Maybe (c (t' a b)) 
-gcast2 x = if typeRep (Proxy :: Proxy t) == typeRep (Proxy :: Proxy t')
-             then Just $ unsafeCoerce x
-             else Nothing
+gcast2 x = fmap (\Refl -> x) (eqT :: Maybe (t :=: t'))
+

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables, PolyKinds #-}
 
 -----------------------------------------------------------------------------
 -- |
