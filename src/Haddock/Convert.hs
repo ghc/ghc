@@ -353,7 +353,7 @@ synifyTyLit (NumTyLit n) = HsNumTy n
 synifyTyLit (StrTyLit s) = HsStrTy s
 
 synifyKindSig :: Kind -> LHsKind Name
-synifyKindSig k = synifyType (error "synifyKind") k
+synifyKindSig k = synifyType WithinType k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
                   ([HsType Name], Name, [HsType Name])
