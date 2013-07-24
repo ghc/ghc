@@ -68,11 +68,9 @@ cpsTop hsc_env proc =
                                           , do_layout = do_layout }} = h
 
        ----------- Eliminate common blocks -------------------------------------
-       g <- if False -- temporarily disabled: See #8083
-            then {-# SCC "elimCommonBlocks" #-}
-                 condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
+       g <- {-# SCC "elimCommonBlocks" #-}
+            condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
                           Opt_D_dump_cmm_cbe "Post common block elimination"
-            else return g
 
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks

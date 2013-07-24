@@ -96,7 +96,7 @@ hash_block block =
         hash_node (CmmBranch _) = 23 -- NB. ignore the label
         hash_node (CmmCondBranch p _ _) = hash_e p
         hash_node (CmmCall e _ _ _ _ _) = hash_e e
-        hash_node (CmmForeignCall t _ _ _ _ _) = hash_tgt t
+        hash_node (CmmForeignCall t _ _ _ _ _ _) = hash_tgt t
         hash_node (CmmSwitch e _) = hash_e e
 
         hash_reg :: CmmReg -> Word32

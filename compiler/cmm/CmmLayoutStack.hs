@@ -264,7 +264,7 @@ collectContInfo blocks
         CmmCall { cml_cont = Just l, .. }
            -> (Just (l, cml_ret_args), cml_ret_off)
         CmmForeignCall { .. }
-           -> (Just (succ, 0), updfr) -- ??
+           -> (Just (succ, ret_args), ret_off)
         _other -> (Nothing, 0)
 
 
@@ -346,8 +346,8 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
        return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
 
     CmmForeignCall{ succ = cont_lbl, .. } -> do
-       return $ lastCall cont_lbl (wORD_SIZE dflags) (wORD_SIZE dflags) (sm_ret_off stack0)
-            -- one word each for args and results: the return address
+       return $ lastCall cont_lbl (wORD_SIZE dflags) ret_args ret_off
+            -- one word of args: the return address
 
     CmmBranch{..}     ->  handleBranches
     CmmCondBranch{..} ->  handleBranches
@@ -932,9 +932,10 @@ lowerSafeForeignCall dflags block
                   caller_load <*>
                   loadThreadState dflags load_tso load_stack
 
-        (ret_args, regs, copyout) = copyOutOflow dflags NativeReturn Jump (Young succ)
-                                           (map (CmmReg . CmmLocal) res)
-                                           updfr []
+        (_, regs, copyout) =
+             copyOutOflow dflags NativeReturn Jump (Young succ)
+                            (map (CmmReg . CmmLocal) res)
+                            ret_off []
 
         -- NB. after resumeThread returns, the top-of-stack probably contains
         -- the stack frame for succ, but it might not: if the current thread
@@ -947,7 +948,7 @@ lowerSafeForeignCall dflags block
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes (wordWidth dflags)
                        , cml_ret_args  = ret_args
-                       , cml_ret_off   = updfr }
+                       , cml_ret_off   = ret_off }
 
     graph' <- lgraphOfAGraph $ suspend <*>
                                midCall <*>

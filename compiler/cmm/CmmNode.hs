@@ -122,7 +122,8 @@ data CmmNode e x where
       res   :: [CmmFormal],     -- zero or more results
       args  :: [CmmActual],     -- zero or more arguments; see Note [Register parameter passing]
       succ  :: ULabel,          -- Label of continuation
-      updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
+      ret_args :: ByteOff,      -- same as cml_ret_args
+      ret_off :: ByteOff,       -- same as cml_ret_off
       intrbl:: Bool             -- whether or not the call is interruptible
   } -> CmmNode O C
 
@@ -367,7 +368,7 @@ mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi)               = CmmCondBranch (f e) ti fi
 mapExp f   (CmmSwitch e tbl)                     = CmmSwitch (f e) tbl
 mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
-mapExp f   (CmmForeignCall tgt fs as succ updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ updfr intrbl
+mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl
 
 mapExpDeep :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
 mapExpDeep f = mapExp $ wrapRecExp f
@@ -397,10 +398,10 @@ mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
         Nothing   -> (\xs -> CmmUnsafeForeignCall tgt fs xs) `fmap` mapListM f as
-mapExpM f (CmmForeignCall tgt fs as succ updfr intrbl)
+mapExpM f (CmmForeignCall tgt fs as succ ret_args updfr intrbl)
     = case mapForeignTargetM f tgt of
-        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ updfr intrbl)
-        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ updfr intrbl) `fmap` mapListM f as
+        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ ret_args updfr intrbl)
+        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ ret_args updfr intrbl) `fmap` mapListM f as
 
 -- share as much as possible
 mapListM :: (a -> Maybe a) -> [a] -> Maybe [a]

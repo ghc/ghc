@@ -178,7 +178,7 @@ lintCmmLast labels node = case node of
           _ <- lintCmmExpr target
           maybe (return ()) checkTarget cont
 
-  CmmForeignCall tgt _ args succ _ _ -> do
+  CmmForeignCall tgt _ args succ _ _ _ -> do
           lintTarget tgt
           mapM_ lintCmmExpr args
           checkTarget succ
