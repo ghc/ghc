@@ -121,9 +121,23 @@ poll p mtout f = do
                then c_pollLoop ptr len (fromIntegral (tout - maxPollTimeout))
                else return result
 
-    -- Timeout of c_poll is limited by max value of CInt
+    -- We need to account for 3 cases:
+    --     1. Int and CInt are of equal size.
+    --     2. Int is larger than CInt
+    --     3. Int is smaller than CInt
+    --
+    -- In case 1, the value of maxPollTimeout will be the maxBound of Int.
+    --
+    -- In case 2, the value of maxPollTimeout will be the maxBound of CInt,
+    -- which is the largest value accepted by c_poll. This will result in
+    -- c_pollLoop recursing if the provided timeout is larger.
+    --
+    -- In case 3, "fromIntegral (maxBound :: CInt) :: Int" wil result in a
+    -- negative Int, max will thus return maxBound :: Int. Since poll doesn't
+    -- accept values bigger than maxBound :: Int and CInt is larger than Int,
+    -- there is no problem converting Int to CInt for the c_poll call.
     maxPollTimeout :: Int
-    maxPollTimeout = fromIntegral (maxBound :: CInt)
+    maxPollTimeout = max maxBound (fromIntegral (maxBound :: CInt))
 
 fromTimeout :: E.Timeout -> Int
 fromTimeout E.Forever     = -1
