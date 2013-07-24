@@ -35,6 +35,7 @@ import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
 import GHC.Conc.Sync (withMVar)
+import GHC.Enum (maxBound)
 import GHC.Num (Num(..))
 import GHC.Real (ceiling, fromIntegral)
 import GHC.Show (Show)
@@ -90,7 +91,7 @@ poll p mtout f = do
     E.throwErrnoIfMinus1NoRetry "c_poll" $
     case mtout of
       Just tout ->
-        c_poll ptr (fromIntegral len) (fromIntegral (fromTimeout tout))
+        c_pollLoop ptr (fromIntegral len) (fromTimeout tout)
       Nothing   ->
         c_poll_unsafe ptr (fromIntegral len) 0
   unless (n == 0) $ do
@@ -102,6 +103,27 @@ poll p mtout f = do
                 return (i', i' == n)
         else return (i, True)
   return (fromIntegral n)
+  where
+    -- The poll timeout is specified as an Int, but c_poll takes a CInt. These
+    -- can't be safely coerced as on many systems (e.g. x86_64) CInt has a a
+    -- maxBound of (2^32 - 1), even though Int may have a significantly higher
+    -- bound.
+    --
+    -- This function deals with timeouts greater than maxBound :: CInt, by
+    -- looping until c_poll returns a non-zero value (0 indicates timeout
+    -- expired) OR the full timeout has passed.
+    c_pollLoop :: Ptr PollFd -> (#type nfds_t) -> Int -> IO CInt
+    c_pollLoop ptr len tout
+        | tout <= maxPollTimeout = c_poll ptr len (fromIntegral tout)
+        | otherwise = do
+            result <- c_poll ptr len (fromIntegral maxPollTimeout)
+            if result == 0
+               then c_pollLoop ptr len (fromIntegral (tout - maxPollTimeout))
+               else return result
+
+    -- Timeout of c_poll is limited by max value of CInt
+    maxPollTimeout :: Int
+    maxPollTimeout = fromIntegral (maxBound :: CInt)
 
 fromTimeout :: E.Timeout -> Int
 fromTimeout E.Forever     = -1
