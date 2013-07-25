@@ -10,7 +10,7 @@ annfail10.hs:9:1:
       instance (Data.Data.Data a, Data.Data.Data b, Data.Data.Data c) =>
                Data.Data.Data (a, b, c)
         -- Defined in ‛Data.Data’
-      ...plus 27 others
+      ...plus 29 others
     In the expression: 1
     In the annotation: {-# ANN f 1 #-}
 
