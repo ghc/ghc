@@ -27,8 +27,6 @@ import DsMonad
 import DsExpr
 import DsBinds
 import DsForeign
-import DsExpr           ()      -- Forces DsExpr to be compiled; DsBinds only
-                                -- depends on DsExpr.hi-boot.
 import Module
 import RdrName
 import NameSet
