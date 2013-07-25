@@ -49,7 +49,7 @@ import GHC.Base
 import GHC.Word
 import GHC.Show
 import Data.Maybe
-import {-# SOURCE #-} Data.Proxy
+import Data.Proxy
 import GHC.Num
 import GHC.Real
 -- import GHC.IORef
@@ -60,6 +60,7 @@ import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
 -- import GHC.Stable
 import GHC.Arr          ( Array, STArray )
+import Data.Type.Equality
 -- import Data.Int
 
 import GHC.Fingerprint.Type
@@ -360,4 +361,6 @@ INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 #ifdef __GLASGOW_HASKELL__
 deriving instance Typeable RealWorld
+deriving instance Typeable Proxy
+deriving instance Typeable (:=:)
 #endif

@@ -56,6 +56,7 @@ import qualified Prelude (mapM, foldr)
 import Control.Applicative
 import Data.Foldable (Foldable())
 import Data.Monoid (Monoid)
+import Data.Proxy
 
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Arr
@@ -191,6 +192,16 @@ instance Traversable ((,) a) where
 
 instance Ix i => Traversable (Array i) where
     traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
+
+instance Traversable Proxy where
+    traverse _ _ = pure Proxy
+    {-# INLINE traverse #-}
+    sequenceA _ = pure Proxy
+    {-# INLINE sequenceA #-}
+    mapM _ _ = return Proxy
+    {-# INLINE mapM #-}
+    sequence _ = return Proxy
+    {-# INLINE sequence #-}
 
 -- general functions
 

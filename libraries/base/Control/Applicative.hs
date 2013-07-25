@@ -54,6 +54,7 @@ import Control.Monad.ST.Safe (ST)
 import qualified Control.Monad.ST.Lazy.Safe as Lazy (ST)
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
+import Data.Proxy
 
 import Text.ParserCombinators.ReadP (ReadP)
 import Text.ParserCombinators.ReadPrec (ReadPrec)
@@ -276,6 +277,12 @@ instance Functor ZipList where
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
     ZipList fs <*> ZipList xs = ZipList (zipWith id fs xs)
+
+instance Applicative Proxy where
+    pure _ = Proxy
+    {-# INLINE pure #-}
+    _ <*> _ = Proxy
+    {-# INLINE (<*>) #-}
 
 -- extra functions
 

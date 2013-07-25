@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP #-}
 
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 706
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE PolyKinds, GADTs #-}
 #endif
 
 -----------------------------------------------------------------------------
@@ -20,6 +20,10 @@
 module Control.Category where
 
 import qualified Prelude
+
+#ifdef __GLASGOW_HASKELL__
+import Data.Type.Equality
+#endif
 
 infixr 9 .
 infixr 1 >>>, <<<
@@ -45,6 +49,12 @@ class Category cat where
 instance Category (->) where
     id = Prelude.id
     (.) = (Prelude..)
+
+#ifdef __GLASGOW_HASKELL__
+instance Category (:=:) where
+  id          = Refl
+  Refl . Refl = Refl
+#endif
 
 -- | Right-to-left composition
 (<<<) :: Category cat => cat b c -> cat a b -> cat a c

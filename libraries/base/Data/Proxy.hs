@@ -1,32 +1,45 @@
-{-# LANGUAGE PolyKinds, DeriveDataTypeable, NoImplicitPrelude,
-             DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE PolyKinds #-}
+#endif
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Proxy
+-- License     :  BSD-style (see the LICENSE file in the distribution)
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Definition of a Proxy type (poly-kinded in GHC)
+--
+-----------------------------------------------------------------------------
 
 module Data.Proxy
   (
-        Proxy(..), KProxy(..)
+        Proxy(..)
+#ifdef __GLASGOW_HASKELL__
+      , KProxy(..)
+#endif
   ) where
 
-import Data.Data
 import Data.Monoid
-import Data.Traversable
-import Data.Foldable
-
-import Control.Applicative
 
 import GHC.Base
 import GHC.Show
 import GHC.Read
 import GHC.Enum
 import GHC.Arr
-import qualified GHC.Generics as Generics
 
 -- | A concrete, poly-kinded proxy type
 data Proxy t = Proxy
-  deriving (Typeable, Generics.Generic)
 
+#ifdef __GLASGOW_HASKELL__
 -- | A concrete, promotable proxy type, for use at the kind level
 -- There are no instances for this because it is intended at the kind level only
 data KProxy (t :: *) = KProxy
+#endif
 
 instance Eq (Proxy s) where
   _ == _ = True
@@ -39,21 +52,6 @@ instance Show (Proxy s) where
 
 instance Read (Proxy s) where
   readsPrec d = readParen (d > 10) (\r -> [(Proxy, s) | ("Proxy",s) <- lex r ])
-
-proxyConstr :: Constr
-proxyConstr = mkConstr proxyDataType "Proxy" [] Prefix
-
-proxyDataType :: DataType
-proxyDataType = mkDataType "Data.Proxy.Proxy" [proxyConstr]
-
-instance (Data t) => Data (Proxy t) where
-  gfoldl _ z Proxy  = z Proxy
-  toConstr Proxy  = proxyConstr
-  gunfold _ z c = case constrIndex c of
-                    1 -> z Proxy
-                    _ -> error "Data.Data.gunfold(Proxy)"
-  dataTypeOf _ = proxyDataType
-  dataCast1 f  = gcast1 f
 
 instance Enum (Proxy s) where
     succ _               = error "Proxy.succ"
@@ -84,12 +82,6 @@ instance Functor Proxy where
     fmap _ _ = Proxy
     {-# INLINE fmap #-}
 
-instance Applicative Proxy where
-    pure _ = Proxy
-    {-# INLINE pure #-}
-    _ <*> _ = Proxy
-    {-# INLINE (<*>) #-}
-
 instance Monoid (Proxy s) where
     mempty = Proxy
     {-# INLINE mempty #-}
@@ -103,27 +95,3 @@ instance Monad Proxy where
     {-# INLINE return #-}
     _ >>= _ = Proxy
     {-# INLINE (>>=) #-}
-
-instance Foldable Proxy where
-    foldMap _ _ = mempty
-    {-# INLINE foldMap #-}
-    fold _ = mempty
-    {-# INLINE fold #-}
-    foldr _ z _ = z
-    {-# INLINE foldr #-}
-    foldl _ z _ = z
-    {-# INLINE foldl #-}
-    foldl1 _ _ = error "foldl1: Proxy"
-    {-# INLINE foldl1 #-}
-    foldr1 _ _ = error "foldr1: Proxy"
-    {-# INLINE foldr1 #-}
-
-instance Traversable Proxy where
-    traverse _ _ = pure Proxy
-    {-# INLINE traverse #-}
-    sequenceA _ = pure Proxy
-    {-# INLINE sequenceA #-}
-    mapM _ _ = return Proxy
-    {-# INLINE mapM #-}
-    sequence _ = return Proxy
-    {-# INLINE sequence #-}

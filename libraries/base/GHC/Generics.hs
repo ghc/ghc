@@ -53,6 +53,7 @@ import Data.Either ( Either(..) )
 import GHC.Classes ( Eq, Ord )
 import GHC.Read ( Read )
 import GHC.Show ( Show )
+import Data.Proxy
 
 --------------------------------------------------------------------------------
 -- Representation types
@@ -298,3 +299,5 @@ instance Generic Char where
   type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
+
+deriving instance Generic (Proxy t)

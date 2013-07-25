@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE TypeOperators      #-}
 {-# LANGUAGE GADTs              #-}
@@ -8,15 +7,29 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE PolyKinds          #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Type.Equality
+-- License     :  BSD-style (see the LICENSE file in the distribution)
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  not portable
+--
+-- Definition of propositional equality @(:=:)@. Pattern-matching on a variable
+-- of type @(a :=: b)@ produces a proof that @a ~ b@.
+--
+-----------------------------------------------------------------------------
+
+
+
 module Data.Type.Equality where
 
-import Data.Data
 import Data.Maybe
 import GHC.Enum
 import GHC.Show
 import GHC.Read
 import GHC.Base
-import Control.Category
 
 infix 4 :=:
 
@@ -67,15 +80,9 @@ lower Refl = Refl
 deriving instance Eq   (a :=: b)
 deriving instance Show (a :=: b)
 deriving instance Ord  (a :=: b)
-deriving instance Typeable (:=:)
-deriving instance (Typeable a, Data a) => Data (a :=: a)
 
 instance Read (a :=: a) where
   readsPrec d = readParen (d > 10) (\r -> [(Refl, s) | ("Refl",s) <- lex r ])
-
-instance Category (:=:) where
-  id          = Refl
-  Refl . Refl = Refl
 
 instance Enum (a :=: a) where
   toEnum 0 = Refl

@@ -88,7 +88,7 @@ module Data.Typeable
   ) where
 
 import Data.Typeable.Internal hiding (mkTyCon)
-import {-# SOURCE #-} Data.Type.Equality
+import Data.Type.Equality
 
 import Unsafe.Coerce
 import Data.Maybe

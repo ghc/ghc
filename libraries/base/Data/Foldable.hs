@@ -67,6 +67,7 @@ import Control.Applicative
 import Control.Monad (MonadPlus(..))
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Monoid
+import Data.Proxy
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
@@ -192,6 +193,20 @@ instance Ix i => Foldable (Array i) where
     foldl f z = Prelude.foldl f z . elems
     foldr1 f = Prelude.foldr1 f . elems
     foldl1 f = Prelude.foldl1 f . elems
+
+instance Foldable Proxy where
+    foldMap _ _ = mempty
+    {-# INLINE foldMap #-}
+    fold _ = mempty
+    {-# INLINE fold #-}
+    foldr _ z _ = z
+    {-# INLINE foldr #-}
+    foldl _ z _ = z
+    {-# INLINE foldl #-}
+    foldl1 _ _ = error "foldl1: Proxy"
+    {-# INLINE foldl1 #-}
+    foldr1 _ _ = error "foldr1: Proxy"
+    {-# INLINE foldr1 #-}
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
