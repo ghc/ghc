@@ -30,17 +30,22 @@
 
         <listitem>
             <para>
-                GHC now supports overloading list literals using the new
-                <literal>OverloadedLists</literal> extension.
+                It is now possible to declare a 'closed' <literal>type
+                family</literal> when using the
+                <literal>TypeFamilies</literal> extension. A closed
+                <literal>type family</literal> cannot have any
+                instances created other than the ones in its
+                definition.
 
                 TODO FIXME: reference.
            </para>
        </listitem>
 
+
         <listitem>
             <para>
-                GHC now supports overlapping type family instances when
-                <literal>TypeFamilies</literal> are enabled.
+                GHC now supports overloading list literals using the new
+                <literal>OverloadedLists</literal> extension.
 
                 TODO FIXME: reference.
            </para>
@@ -57,11 +62,12 @@
 
         <listitem>
             <para>
-                By default, GHC will now unbox all "small" strict fields in a
-                data type. A "small" data type is one whose size is equivalent
-                to or smaller than the native word size of the machine. This
-                means you no longer have to specify <literal>UNPACK</literal>
-                pragmas for e.g.  <literal>Int</literal> fields. This also
+                By default, GHC will now unbox all "small" strict
+                fields in a data type. A "small" data type is one
+                whose size is equivalent to or smaller than the native
+                word size of the machine. This means you no longer
+                have to specify <literal>UNPACK</literal> pragmas for
+                e.g. strict <literal>Int</literal> fields. This also
                 applies to floating-point values.
            </para>
        </listitem>
@@ -124,7 +130,12 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    There is a new extension,
+                    <literal>NullaryTypeClasses</literal>, which
+                    allows you to declare a type class without any
+                    parameters.
+
+                    TODO FIXME: example?
                </para>
            </listitem>
        </itemizedlist>
@@ -152,6 +163,13 @@
                     entity which is not exported.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    The LLVM backend was overhauled and rewritten, and
+                    should hopefully be easier to maintain and work on
+                    in the future.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -160,7 +178,11 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    GHCi now supports a <literal>prompt2</literal>
+                    setting, which allows you to customize the
+                    continuation prompt of multi-line input.
+
+                    TODO FIXME: reference.
                </para>
            </listitem>
        </itemizedlist>
@@ -289,6 +311,13 @@
                     guaranteed to return the value from the first
                     <literal>putMVar</literal>.  There is also a new <literal>tryReadMVar</literal>
                     which is a non-blocking version.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    There are now byte endian-swapping primitives
+                    available in <literal>Data.Word</literal>, which
+                    use optimized machine instructions when available.
                </para>
            </listitem>
        </itemizedlist>
