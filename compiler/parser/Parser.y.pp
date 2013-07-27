@@ -469,34 +469,34 @@ header_body2 :: { [LImportDecl RdrName] }
 -- The Export List
 
 maybeexports :: { Maybe [LIE RdrName] }
-        :  '(' exportlist ')'                   { Just $2 }
+        :  '(' exportlist ')'                   { Just (fromOL $2) }
         |  {- empty -}                          { Nothing }
 
-exportlist :: { [LIE RdrName] }
-        : expdoclist ',' expdoclist             { $1 ++ $3 }
+exportlist :: { OrdList (LIE RdrName) }
+        : expdoclist ',' expdoclist             { $1 `appOL` $3 }
         | exportlist1                           { $1 }
 
-exportlist1 :: { [LIE RdrName] }
-        : expdoclist export expdoclist ',' exportlist1 { $1 ++ ($2 : $3) ++ $5 }
-        | expdoclist export expdoclist                 { $1 ++ ($2 : $3) }
+exportlist1 :: { OrdList (LIE RdrName) }
+        : expdoclist export expdoclist ',' exportlist1 { $1 `appOL` $2 `appOL` $3 `appOL` $5 }
+        | expdoclist export expdoclist                 { $1 `appOL` $2 `appOL` $3 }
         | expdoclist                                   { $1 }
 
-expdoclist :: { [LIE RdrName] }
-        : exp_doc expdoclist                           { $1 : $2 }
-        | {- empty -}                                  { [] }
+expdoclist :: { OrdList (LIE RdrName) }
+        : exp_doc expdoclist                           { $1 `appOL` $2 }
+        | {- empty -}                                  { nilOL }
 
-exp_doc :: { LIE RdrName }                                                   
-        : docsection    { L1 (case (unLoc $1) of (n, doc) -> IEGroup n doc) }
-        | docnamed      { L1 (IEDocNamed ((fst . unLoc) $1)) } 
-        | docnext       { L1 (IEDoc (unLoc $1)) }       
+exp_doc :: { OrdList (LIE RdrName) }
+        : docsection    { unitOL (L1 (case (unLoc $1) of (n, doc) -> IEGroup n doc)) }
+        | docnamed      { unitOL (L1 (IEDocNamed ((fst . unLoc) $1))) }
+        | docnext       { unitOL (L1 (IEDoc (unLoc $1))) }
 
 
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
-export  :: { LIE RdrName }
-        : qcname_ext export_subspec     { LL (mkModuleImpExp (unLoc $1)
-                                                             (unLoc $2)) }
-        |  'module' modid               { LL (IEModuleContents (unLoc $2)) }
+export  :: { OrdList (LIE RdrName) }
+        : qcname_ext export_subspec     { unitOL (LL (mkModuleImpExp (unLoc $1)
+                                                                     (unLoc $2))) }
+        |  'module' modid               { unitOL (LL (IEModuleContents (unLoc $2))) }
 
 export_subspec :: { Located ImpExpSubSpec }
         : {- empty -}                   { L0 ImpExpAbs }
@@ -563,8 +563,8 @@ maybeimpspec :: { Located (Maybe (Bool, [LIE RdrName])) }
         | {- empty -}                           { noLoc Nothing }
 
 impspec :: { Located (Bool, [LIE RdrName]) }
-        :  '(' exportlist ')'                   { LL (False, $2) }
-        |  'hiding' '(' exportlist ')'          { LL (True,  $3) }
+        :  '(' exportlist ')'                   { LL (False, fromOL $2) }
+        |  'hiding' '(' exportlist ')'          { LL (True,  fromOL $3) }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
