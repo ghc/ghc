@@ -2,13 +2,6 @@
 -- (c) The University of Glasgow
 --
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Avail (
     Avails,
     AvailInfo(..),
@@ -32,24 +25,24 @@ import Util
 -- The AvailInfo type
 
 -- | Records what things are "available", i.e. in scope
-data AvailInfo = Avail Name	 -- ^ An ordinary identifier in scope
-	       | AvailTC Name
-			 [Name]  -- ^ A type or class in scope. Parameters:
-			         --
-				 --  1) The name of the type or class
-				 --  2) The available pieces of type or class.
-				 -- 
-				 -- The AvailTC Invariant:
+data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
+               | AvailTC Name
+                         [Name]  -- ^ A type or class in scope. Parameters:
+                                 --
+                                 --  1) The name of the type or class
+                                 --  2) The available pieces of type or class.
+                                 --
+                                 -- The AvailTC Invariant:
                                  --   * If the type or class is itself
-				 --     to be in scope, it must be
-				 --     *first* in this list.  Thus,
+                                 --     to be in scope, it must be
+                                 --     *first* in this list.  Thus,
                                  --     typically: @AvailTC Eq [Eq, ==, \/=]@
-		deriving( Eq )
+                deriving( Eq )
                         -- Equality used when deciding if the
                         -- interface has changed
 
 -- | A collection of 'AvailInfo' - several things that are \"available\"
-type Avails	  = [AvailInfo]
+type Avails = [AvailInfo]
 
 -- | Compare lexicographically
 stableAvailCmp :: AvailInfo -> AvailInfo -> Ordering
