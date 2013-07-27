@@ -56,6 +56,7 @@ import TysWiredIn ( eqTyConName )
 import Fingerprint
 import Binary
 
+import Control.Monad
 import System.IO.Unsafe
 
 infixl 3 &&&
@@ -312,10 +313,10 @@ instance Binary IfaceConDecls where
     get bh = do
         h <- getByte bh
         case h of
-            0 -> get bh >>= (return . IfAbstractTyCon)
+            0 -> liftM IfAbstractTyCon $ get bh
             1 -> return IfDataFamTyCon
-            2 -> get bh >>= (return . IfDataTyCon)
-            _ -> get bh >>= (return . IfNewTyCon)
+            2 -> liftM IfDataTyCon $ get bh
+            _ -> liftM IfNewTyCon $ get bh
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
@@ -512,7 +513,7 @@ instance Binary IfaceIdInfo where
         h <- getByte bh
         case h of
             0 -> return NoInfo
-            _ -> lazyGet bh >>= (return . HasInfo)     -- NB lazyGet
+            _ -> liftM HasInfo $ lazyGet bh    -- NB lazyGet
 
 -- Here's a tricky case:
 --   * Compile with -O module A, and B which imports A.f
@@ -541,12 +542,12 @@ instance Binary IfaceInfoItem where
     get bh = do
         h <- getByte bh
         case h of
-            0 -> get bh >>= (return . HsArity)
-            1 -> get bh >>= (return . HsStrictness)
+            0 -> liftM HsArity $ get bh
+            1 -> liftM HsStrictness $ get bh
             2 -> do lb <- get bh
                     ad <- get bh
                     return (HsUnfold lb ad)
-            3 -> get bh >>= (return . HsInline)
+            3 -> liftM HsInline $ get bh
             _ -> return HsNoCafRefs
 
 -- NB: Specialisations and rules come in separately and are
@@ -777,8 +778,8 @@ instance Binary IfaceConAlt where
         h <- getByte bh
         case h of
             0 -> return IfaceDefault
-            1 -> get bh >>= (return . IfaceDataAlt)
-            _ -> get bh >>= (return . IfaceLitAlt)
+            1 -> liftM IfaceDataAlt $ get bh
+            _ -> liftM IfaceLitAlt  $ get bh
 
 data IfaceBinding
   = IfaceNonRec IfaceLetBndr IfaceExpr

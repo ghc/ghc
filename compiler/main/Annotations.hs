@@ -24,6 +24,7 @@ import Serialized
 import UniqFM
 import Unique
 
+import Control.Monad
 import Data.Maybe
 import Data.Typeable
 import Data.Word        ( Word8 )
@@ -75,8 +76,8 @@ instance Binary name => Binary (AnnTarget name) where
     get bh = do
         h <- getByte bh
         case h of
-            0 -> get bh >>= (return . NamedTarget)
-            _ -> get bh >>= (return . ModuleTarget)
+            0 -> liftM NamedTarget  $ get bh
+            _ -> liftM ModuleTarget $ get bh
 
 instance Outputable Annotation where
     ppr ann = ppr (ann_target ann)
