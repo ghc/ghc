@@ -16,6 +16,7 @@ module Annotations (
         deserializeAnns
     ) where
 
+import Binary
 import Module           ( Module )
 import Name
 import Outputable
@@ -63,6 +64,19 @@ instance Uniquable name => Uniquable (AnnTarget name) where
 instance Outputable name => Outputable (AnnTarget name) where
     ppr (NamedTarget nm) = text "Named target" <+> ppr nm
     ppr (ModuleTarget mod) = text "Module target" <+> ppr mod
+
+instance Binary name => Binary (AnnTarget name) where
+    put_ bh (NamedTarget a) = do
+        putByte bh 0
+        put_ bh a
+    put_ bh (ModuleTarget a) = do
+        putByte bh 1
+        put_ bh a
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> get bh >>= (return . NamedTarget)
+            _ -> get bh >>= (return . ModuleTarget)
 
 instance Outputable Annotation where
     ppr ann = ppr (ann_target ann)

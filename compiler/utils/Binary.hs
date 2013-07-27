@@ -784,3 +784,144 @@ instance Binary FunctionOrData where
           1 -> return IsData
           _ -> panic "Binary FunctionOrData"
 
+instance Binary TupleSort where
+    put_ bh BoxedTuple      = putByte bh 0
+    put_ bh UnboxedTuple    = putByte bh 1
+    put_ bh ConstraintTuple = putByte bh 2
+    get bh = do
+      h <- getByte bh
+      case h of
+        0 -> do return BoxedTuple
+        1 -> do return UnboxedTuple
+        _ -> do return ConstraintTuple
+
+instance Binary Activation where
+    put_ bh NeverActive = do
+            putByte bh 0
+    put_ bh AlwaysActive = do
+            putByte bh 1
+    put_ bh (ActiveBefore aa) = do
+            putByte bh 2
+            put_ bh aa
+    put_ bh (ActiveAfter ab) = do
+            putByte bh 3
+            put_ bh ab
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do return NeverActive
+              1 -> do return AlwaysActive
+              2 -> do aa <- get bh
+                      return (ActiveBefore aa)
+              _ -> do ab <- get bh
+                      return (ActiveAfter ab)
+
+instance Binary InlinePragma where
+    put_ bh (InlinePragma a b c d) = do
+            put_ bh a
+            put_ bh b
+            put_ bh c
+            put_ bh d
+
+    get bh = do
+           a <- get bh
+           b <- get bh
+           c <- get bh
+           d <- get bh
+           return (InlinePragma a b c d)
+
+instance Binary RuleMatchInfo where
+    put_ bh FunLike = putByte bh 0
+    put_ bh ConLike = putByte bh 1
+    get bh = do
+            h <- getByte bh
+            if h == 1 then return ConLike
+                      else return FunLike
+
+instance Binary InlineSpec where
+    put_ bh EmptyInlineSpec = putByte bh 0
+    put_ bh Inline          = putByte bh 1
+    put_ bh Inlinable       = putByte bh 2
+    put_ bh NoInline        = putByte bh 3
+
+    get bh = do h <- getByte bh
+                case h of
+                  0 -> return EmptyInlineSpec
+                  1 -> return Inline
+                  2 -> return Inlinable
+                  _ -> return NoInline
+
+instance Binary DefMethSpec where
+    put_ bh NoDM      = putByte bh 0
+    put_ bh VanillaDM = putByte bh 1
+    put_ bh GenericDM = putByte bh 2
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return NoDM
+              1 -> return VanillaDM
+              _ -> return GenericDM
+
+instance Binary RecFlag where
+    put_ bh Recursive = do
+            putByte bh 0
+    put_ bh NonRecursive = do
+            putByte bh 1
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do return Recursive
+              _ -> do return NonRecursive
+
+instance Binary OverlapFlag where
+    put_ bh (NoOverlap  b) = putByte bh 0 >> put_ bh b
+    put_ bh (OverlapOk  b) = putByte bh 1 >> put_ bh b
+    put_ bh (Incoherent b) = putByte bh 2 >> put_ bh b
+    get bh = do
+        h <- getByte bh
+        b <- get bh
+        case h of
+            0 -> return $ NoOverlap b
+            1 -> return $ OverlapOk b
+            2 -> return $ Incoherent b
+            _ -> panic ("get OverlapFlag " ++ show h)
+
+instance Binary FixityDirection where
+    put_ bh InfixL = do
+            putByte bh 0
+    put_ bh InfixR = do
+            putByte bh 1
+    put_ bh InfixN = do
+            putByte bh 2
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do return InfixL
+              1 -> do return InfixR
+              _ -> do return InfixN
+
+instance Binary Fixity where
+    put_ bh (Fixity aa ab) = do
+            put_ bh aa
+            put_ bh ab
+    get bh = do
+          aa <- get bh
+          ab <- get bh
+          return (Fixity aa ab)
+
+instance Binary WarningTxt where
+    put_ bh (WarningTxt w) = do
+            putByte bh 0
+            put_ bh w
+    put_ bh (DeprecatedTxt d) = do
+            putByte bh 1
+            put_ bh d
+
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do w <- get bh
+                      return (WarningTxt w)
+              _ -> do d <- get bh
+                      return (DeprecatedTxt d)
+

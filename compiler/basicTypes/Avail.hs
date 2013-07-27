@@ -18,6 +18,7 @@ import NameEnv
 import NameSet
 import RdrName
 
+import Binary
 import Outputable
 import Util
 
@@ -104,4 +105,20 @@ pprAvail :: AvailInfo -> SDoc
 pprAvail (Avail n)      = ppr n
 pprAvail (AvailTC n ns) = ppr n <> braces (hsep (punctuate comma (map ppr ns)))
 
+instance Binary AvailInfo where
+    put_ bh (Avail aa) = do
+            putByte bh 0
+            put_ bh aa
+    put_ bh (AvailTC ab ac) = do
+            putByte bh 1
+            put_ bh ab
+            put_ bh ac
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do aa <- get bh
+                      return (Avail aa)
+              _ -> do ab <- get bh
+                      ac <- get bh
+                      return (AvailTC ab ac)
 

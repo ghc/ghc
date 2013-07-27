@@ -91,6 +91,7 @@ import CoAxiom
 import Var
 import VarEnv
 import VarSet
+import Binary
 import Maybes   ( orElse )
 import Name	( Name, NamedThing(..), nameUnique, nameModule, getSrcSpan )
 import OccName 	( parenSymOcc )
@@ -169,6 +170,15 @@ data Coercion
 -- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data LeftOrRight = CLeft | CRight 
                  deriving( Eq, Data.Data, Data.Typeable )
+
+instance Binary LeftOrRight where
+   put_ bh CLeft  = putByte bh 0
+   put_ bh CRight = putByte bh 1
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> return CLeft
+                   _ -> return CRight }
 
 pickLR :: LeftOrRight -> (a,a) -> a
 pickLR CLeft  (l,_) = l

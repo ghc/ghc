@@ -40,8 +40,11 @@ import TysPrim
 import PrelNames( funTyConKey )
 import Name
 import BasicTypes
+import Binary
 import Outputable
 import FastString
+
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -173,6 +176,21 @@ pprIfaceTvBndr (tv, kind) = parens (ppr tv <> dcolon <> ppr kind)
 
 pprIfaceTvBndrs :: [IfaceTvBndr] -> SDoc
 pprIfaceTvBndrs tyvars = sep (map pprIfaceTvBndr tyvars)
+
+instance Binary IfaceBndr where
+    put_ bh (IfaceIdBndr aa) = do
+            putByte bh 0
+            put_ bh aa
+    put_ bh (IfaceTvBndr ab) = do
+            putByte bh 1
+            put_ bh ab
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do aa <- get bh
+                      return (IfaceIdBndr aa)
+              _ -> do ab <- get bh
+                      return (IfaceTvBndr ab)
 \end{code}
 
 ----------------------------- Printing IfaceType ------------------------------------
@@ -264,6 +282,10 @@ ppr_tylit (IfaceStrTyLit n) = text (show n)
 instance Outputable IfaceTyCon where
   ppr = ppr . ifaceTyConName
 
+instance Binary IfaceTyCon where
+   put_ bh (IfaceTc ext) = put_ bh ext
+   get bh = liftM IfaceTc (get bh)
+
 instance Outputable IfaceCoCon where
   ppr (IfaceCoAx n i)  = ppr n <> brackets (ppr i)
   ppr IfaceReflCo      = ptext (sLit "Refl")
@@ -274,8 +296,44 @@ instance Outputable IfaceCoCon where
   ppr (IfaceNthCo d)   = ptext (sLit "Nth:") <> int d
   ppr (IfaceLRCo lr)   = ppr lr
 
+instance Binary IfaceCoCon where
+   put_ bh (IfaceCoAx n ind)   = do { putByte bh 0; put_ bh n; put_ bh ind }
+   put_ bh IfaceReflCo         = putByte bh 1
+   put_ bh IfaceUnsafeCo       = putByte bh 2
+   put_ bh IfaceSymCo          = putByte bh 3
+   put_ bh IfaceTransCo        = putByte bh 4
+   put_ bh IfaceInstCo         = putByte bh 5
+   put_ bh (IfaceNthCo d)      = do { putByte bh 6; put_ bh d }
+   put_ bh (IfaceLRCo lr)      = do { putByte bh 7; put_ bh lr }
+
+   get bh = do
+        h <- getByte bh
+        case h of
+          0 -> do { n <- get bh; ind <- get bh; return (IfaceCoAx n ind) }
+          1 -> return IfaceReflCo 
+          2 -> return IfaceUnsafeCo
+          3 -> return IfaceSymCo
+          4 -> return IfaceTransCo
+          5 -> return IfaceInstCo
+          6 -> do { d <- get bh; return (IfaceNthCo d) }
+          7 -> do { lr <- get bh; return (IfaceLRCo lr) }
+          _ -> panic ("get IfaceCoCon " ++ show h)
+
 instance Outputable IfaceTyLit where
   ppr = ppr_tylit
+
+instance Binary IfaceTyLit where
+  put_ bh (IfaceNumTyLit n)  = putByte bh 1 >> put_ bh n
+  put_ bh (IfaceStrTyLit n)  = putByte bh 2 >> put_ bh n
+
+  get bh =
+    do tag <- getByte bh
+       case tag of
+         1 -> do { n <- get bh
+                 ; return (IfaceNumTyLit n) }
+         2 -> do { n <- get bh
+                 ; return (IfaceStrTyLit n) }
+         _ -> panic ("get IfaceTyLit " ++ show tag)
 
 -------------------
 pprIfaceContext :: IfaceContext -> SDoc
@@ -286,6 +344,54 @@ pprIfaceContext theta = ppr_preds theta <+> darrow
 ppr_preds :: [IfacePredType] -> SDoc
 ppr_preds [pred] = ppr pred    -- No parens
 ppr_preds preds  = parens (sep (punctuate comma (map ppr preds)))
+
+instance Binary IfaceType where
+    put_ bh (IfaceForAllTy aa ab) = do
+            putByte bh 0
+            put_ bh aa
+            put_ bh ab
+    put_ bh (IfaceTyVar ad) = do
+            putByte bh 1
+            put_ bh ad
+    put_ bh (IfaceAppTy ae af) = do
+            putByte bh 2
+            put_ bh ae
+            put_ bh af
+    put_ bh (IfaceFunTy ag ah) = do
+            putByte bh 3
+            put_ bh ag
+            put_ bh ah
+    put_ bh (IfaceCoConApp cc tys)
+      = do { putByte bh 4; put_ bh cc; put_ bh tys }
+    put_ bh (IfaceTyConApp tc tys)
+      = do { putByte bh 5; put_ bh tc; put_ bh tys }
+
+    put_ bh (IfaceLitTy n)
+      = do { putByte bh 30; put_ bh n }
+
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do aa <- get bh
+                      ab <- get bh
+                      return (IfaceForAllTy aa ab)
+              1 -> do ad <- get bh
+                      return (IfaceTyVar ad)
+              2 -> do ae <- get bh
+                      af <- get bh
+                      return (IfaceAppTy ae af)
+              3 -> do ag <- get bh
+                      ah <- get bh
+                      return (IfaceFunTy ag ah)
+              4 -> do { cc <- get bh; tys <- get bh
+                      ; return (IfaceCoConApp cc tys) }
+              5 -> do { tc <- get bh; tys <- get bh
+                      ; return (IfaceTyConApp tc tys) }
+
+              30 -> do n <- get bh
+                       return (IfaceLitTy n)
+
+              _  -> panic ("get IfaceType " ++ show h)
 \end{code}
 
 %************************************************************************
