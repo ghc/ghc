@@ -270,6 +270,7 @@ test('T7797',
                           # expected: 360940756 (x86/Linux)
                        (wordsize(64), 480050944, 5)]),
                           # expected: 480050944 (amd64/Linux)
+      extra_clean(['T7797a.hi', 'T7797a.o']),
       only_ways(['normal'])
       ],
      compile_and_run,
