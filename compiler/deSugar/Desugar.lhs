@@ -92,12 +92,7 @@ deSugar hsc_env
         ; let export_set = availsToNameSet exports
         ; let target = hscTarget dflags
         ; let hpcInfo = emptyHpcInfo other_hpc_info
-        ; (msgs, mb_res)
-              <- case target of
-                   HscNothing ->
-                       return (emptyMessages,
-                               Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
-                   _        -> do
+        ; (msgs, mb_res) <- do
 
                      let want_ticks = gopt Opt_Hpc dflags
                                    || target == HscInterpreted
