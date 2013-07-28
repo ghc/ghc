@@ -1,10 +1,4 @@
 {-# LANGUAGE UnboxedTuples #-}
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
--- The -fno-warn-warnings-deprecations flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
--- for details
 
 -----------------------------------------------------------------------------
 -- |
