@@ -1071,21 +1071,26 @@ publish-docs:
 SRC_DIST_ROOT      = sdistprep
 SRC_DIST_BASE_NAME = ghc-$(ProjectVersion)
 
-SRC_DIST_GHC_NAME          = ghc-$(ProjectVersion)-src
-SRC_DIST_GHC_ROOT          = $(SRC_DIST_ROOT)/ghc
-SRC_DIST_GHC_DIR           = $(SRC_DIST_GHC_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_GHC_TARBALL       = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME).tar.bz2
+SRC_DIST_GHC_NAME                 = ghc-$(ProjectVersion)-src
+SRC_DIST_GHC_ROOT                 = $(SRC_DIST_ROOT)/ghc
+SRC_DIST_GHC_DIR                  = $(SRC_DIST_GHC_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_GHC_TARBALL              = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME).tar.bz2
 
-SRC_DIST_TESTSUITE_NAME    = ghc-$(ProjectVersion)-testsuite
-SRC_DIST_TESTSUITE_ROOT    = $(SRC_DIST_ROOT)/testsuite-ghc
-SRC_DIST_TESTSUITE_DIR     = $(SRC_DIST_TESTSUITE_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_TESTSUITE_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).tar.bz2
+SRC_DIST_WINDOWS_TARBALLS_NAME    = ghc-$(ProjectVersion)-windows-extra-src
+SRC_DIST_WINDOWS_TARBALLS_ROOT    = $(SRC_DIST_ROOT)/windows-tarballs
+SRC_DIST_WINDOWS_TARBALLS_DIR     = $(SRC_DIST_WINDOWS_TARBALLS_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_WINDOWS_TARBALLS_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_WINDOWS_TARBALLS_NAME).tar.bz2
+
+SRC_DIST_TESTSUITE_NAME           = ghc-$(ProjectVersion)-testsuite
+SRC_DIST_TESTSUITE_ROOT           = $(SRC_DIST_ROOT)/testsuite-ghc
+SRC_DIST_TESTSUITE_DIR            = $(SRC_DIST_TESTSUITE_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).tar.bz2
 
 #
 # Files to include in source distributions
 #
 SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
-    utils docs rts compiler ghc driver libraries ghc-tarballs
+    utils docs rts compiler ghc driver libraries libffi-tarballs
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
@@ -1132,6 +1137,17 @@ sdist-ghc-prep :
 	$(call sdist_ghc_file,utils/haddock,dist,src,Haddock,Parse,y)
 	cd $(SRC_DIST_GHC_DIR) && "$(FIND)" $(SRC_DIST_GHC_DIRS) \( -name .git -o -name "autom4te*" -o -name "*~" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
 
+.PHONY: sdist-windows-tarballs-prep
+sdist-windows-tarballs-prep :
+	$(call removeTrees,$(SRC_DIST_WINDOWS_TARBALLS_ROOT))
+	$(call removeFiles,$(SRC_DIST_WINDOWS_TARBALLS_TARBALL))
+	-mkdir $(SRC_DIST_ROOT)
+	mkdir $(SRC_DIST_WINDOWS_TARBALLS_ROOT)
+	mkdir $(SRC_DIST_WINDOWS_TARBALLS_DIR)
+	mkdir $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs
+	cd $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs && lndir $(TOP)/ghc-tarballs
+	$(call removeTrees,$(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs/.git)
+
 .PHONY: sdist-testsuite-prep
 sdist-testsuite-prep :
 	$(call removeTrees,$(SRC_DIST_TESTSUITE_ROOT))
@@ -1144,9 +1160,10 @@ sdist-testsuite-prep :
 	$(call removeTrees,$(SRC_DIST_TESTSUITE_DIR)/testsuite/.git)
 
 .PHONY: sdist
-sdist : sdist-ghc-prep sdist-testsuite-prep
-	cd $(SRC_DIST_GHC_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_GHC_TARBALL)
-	cd $(SRC_DIST_TESTSUITE_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
+sdist : sdist-ghc-prep sdist-windows-tarballs-prep sdist-testsuite-prep
+	cd $(SRC_DIST_GHC_ROOT)              && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log               | bzip2 > $(TOP)/$(SRC_DIST_GHC_TARBALL)
+	cd $(SRC_DIST_WINDOWS_TARBALLS_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> windows_extra_src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_WINDOWS_TARBALLS_TARBALL)
+	cd $(SRC_DIST_TESTSUITE_ROOT)        && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> testsuite_log             | bzip2 > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
 
 sdist-manifest : $(SRC_DIST_GHC_TARBALL)
 	tar tjf $(SRC_DIST_GHC_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
