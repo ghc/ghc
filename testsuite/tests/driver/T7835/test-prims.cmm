@@ -1,0 +1,10 @@
+#include "Cmm.h"
+
+test_prim_op (W_ int1, W_ int2)
+{
+    W_ r;
+
+    r = int1 + int2;
+
+    return (r);
+}
