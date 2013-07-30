@@ -2,6 +2,7 @@
 
 use strict;
 use Cwd;
+use English;
 
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
@@ -55,6 +56,8 @@ sub parsePackages {
             $line{"tag"}        = $2;
             $line{"remotepath"} = $3;
             push @packages, \%line;
+
+            $tags{$2} = 0;
         }
         elsif (! /^(#.*)?$/) {
             die "Bad content on line $lineNum of packages file: $_";
@@ -243,8 +246,6 @@ sub gitall {
     my ($repo_base, $checked_out_tree) = getrepo();
 
     my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
-
-    parsePackages;
 
     @args = ();
 
@@ -554,13 +555,17 @@ sub help
 {
         my $exit = shift;
 
+        my $tags = join ' ', sort (grep !/^-$/, keys %tags);
+
         # Get the built in help
         my $help = <<END;
 Usage:
 
 ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
-           [--nofib] [--extra] [--testsuite] [--no-dph] [--resume]
+           [--<tag>] [--no-<tag>] [--resume]
            cmd [git flags]
+
+    where <tag> is one of: $tags
 
 Applies the command "cmd" to each repository in the tree.
 
@@ -752,8 +757,13 @@ END
 
 sub main {
 
+    &parsePackages();
+
     $tags{"-"} = 1;
     $tags{"dph"} = 1;
+    if ($OSNAME =~ /^(MSWin32|Cygwin)$/) {
+        $tags{"windows"} = 1;
+    }
 
     while ($#_ ne -1) {
         my $arg = shift;
@@ -792,11 +802,14 @@ sub main {
         }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
-        elsif ($arg =~ m/^--no-(.*)$/) {
+        elsif ($arg =~ m/^--no-(.*)$/ && defined($tags{$1})) {
             $tags{$1} = 0;
         }
-        elsif ($arg =~ m/^--(.*)$/) {
+        elsif ($arg =~ m/^--(.*)$/ && defined($tags{$1})) {
             $tags{$1} = 1;
+        }
+        elsif ($arg =~ m/^-/) {
+            die "Unrecognised flag: $arg";
         }
         else {
             unshift @_, $arg;

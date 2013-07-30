@@ -42,7 +42,8 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #    localpath                tag           remotepath
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ghc-tarballs                    -           ghc-tarballs.git
+ghc-tarballs                    windows     ghc-tarballs.git
+libffi-tarballs                 -           libffi-tarballs.git
 utils/hsc2hs                    -           hsc2hs.git
 utils/haddock                   -           haddock.git
 libraries/array                 -           packages/array.git
