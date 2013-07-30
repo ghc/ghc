@@ -32,7 +32,7 @@ module DynFlags (
         lang_set,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
-        doDynamicToo,
+        dynamicTooMkDynamicDynFlags,
         DynFlags(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -1176,16 +1176,17 @@ generateDynamicTooConditional dflags canGen cannotGen notTryingToGen
               if b then canGen else cannotGen
       else notTryingToGen
 
-doDynamicToo :: DynFlags -> DynFlags
-doDynamicToo dflags0 = let dflags1 = addWay' WayDyn dflags0
-                           dflags2 = dflags1 {
-                                         outputFile = dynOutputFile dflags1,
-                                         hiSuf = dynHiSuf dflags1,
-                                         objectSuf = dynObjectSuf dflags1
-                                     }
-                           dflags3 = updateWays dflags2
-                           dflags4 = gopt_unset dflags3 Opt_BuildDynamicToo
-                       in dflags4
+dynamicTooMkDynamicDynFlags :: DynFlags -> DynFlags
+dynamicTooMkDynamicDynFlags dflags0
+    = let dflags1 = addWay' WayDyn dflags0
+          dflags2 = dflags1 {
+                        outputFile = dynOutputFile dflags1,
+                        hiSuf = dynHiSuf dflags1,
+                        objectSuf = dynObjectSuf dflags1
+                    }
+          dflags3 = updateWays dflags2
+          dflags4 = gopt_unset dflags3 Opt_BuildDynamicToo
+      in dflags4
 
 -----------------------------------------------------------------------------
 

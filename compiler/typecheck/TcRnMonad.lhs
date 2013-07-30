@@ -313,7 +313,7 @@ getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withDoDynamicToo m = do env <- getEnv
                         let dflags = extractDynFlags env
-                            dflags' = doDynamicToo dflags
+                            dflags' = dynamicTooMkDynamicDynFlags dflags
                             env' = replaceDynFlags env dflags'
                         setEnv env' m
 \end{code}

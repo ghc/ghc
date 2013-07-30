@@ -1135,7 +1135,7 @@ hscWriteIface dflags iface no_change mod_summary = do
         -- TODO: Should handle the dynamic hi filename properly
         let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
             dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
-            dynDflags = doDynamicToo dflags
+            dynDflags = dynamicTooMkDynamicDynFlags dflags
         writeIfaceFile dynDflags dynIfaceFile' iface
 
 -- | Compile to hard-code.

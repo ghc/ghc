@@ -583,7 +583,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
              debugTraceMsg dflags 4
                  (text "Running the pipeline again for -dynamic-too")
-             let dflags' = doDynamicToo dflags
+             let dflags' = dynamicTooMkDynamicDynFlags dflags
              hsc_env' <- newHscEnv dflags'
              _ <- runPipeline' start_phase hsc_env' env input_fn
                                maybe_loc maybe_stub_o
@@ -724,7 +724,7 @@ pipeLoop phase input_fn = do
            case phase of
                HscOut {} ->
                    whenGeneratingDynamicToo dflags $ do
-                       setDynFlags $ doDynamicToo dflags
+                       setDynFlags $ dynamicTooMkDynamicDynFlags dflags
                        -- TODO shouldn't ignore result:
                        _ <- pipeLoop phase input_fn
                        return ()
