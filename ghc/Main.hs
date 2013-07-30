@@ -33,8 +33,7 @@ import Config
 import Constants
 import HscTypes
 import Packages         ( dumpPackages )
-import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
-                          startPhase, isHaskellSrcFilename )
+import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
 import DynFlags
@@ -626,7 +625,7 @@ doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
         haskellish (f,Nothing) =
-          looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
+          looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
           phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
 
