@@ -111,7 +111,7 @@ Note [Overall plumbing for rules]
   from HscEnv.
 
   [NB: we are inconsistent here.  We should do the same for external
-  pacakges, but we don't.  Same for type-class instances.]
+  packages, but we don't.  Same for type-class instances.]
 
 * So in the outer simplifier loop, we combine (b-d) into a single
   RuleBase, reading

@@ -690,7 +690,7 @@ Flags given *after* the command are passed to git.
 
   --extra also clone some extra library packages
 
-  --no-dph avoids cloning the dph pacakges
+  --no-dph avoids cloning the dph packages
 
 
 ------------ Checking out a branch -------------
