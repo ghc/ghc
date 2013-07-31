@@ -440,6 +440,21 @@ Indeed, the bindings can even be recursive.
       </para>
    </sect2>
 
+    <sect2 id="negative-literals">
+      <title>Negative Literals</title>
+      <para>
+          The literal <literal>-123</literal> is, according to
+          Haskell98 and Haskell 2010, desugared as
+          <literal>negate (fromInteger 123)</literal>.
+      </para>
+
+      <para>
+         The language extension <option>-XNegativeLiterals</option>
+         means that it is instead desugared as
+         <literal>fromInteger (-123)</literal>.
+      </para>
+   </sect2>
+
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
 
 
