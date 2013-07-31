@@ -385,12 +385,16 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- when trying to be close to Haskell98
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
-  @decimal           { tok_num positive 0 0 decimal }
-  0[oO] @octal       { tok_num positive 2 2 octal }
-  0[xX] @hexadecimal { tok_num positive 2 2 hexadecimal }
+  @decimal                                                               { tok_num positive 0 0 decimal }
+  0[oO] @octal                                                           { tok_num positive 2 2 octal }
+  0[xX] @hexadecimal                                                     { tok_num positive 2 2 hexadecimal }
+  @negative @decimal           / { ifExtension negativeLiteralsEnabled } { tok_num negative 1 1 decimal }
+  @negative 0[oO] @octal       / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
+  @negative 0[xX] @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
-  @floating_point    { strtoken tok_float }
+  @floating_point                                                        { strtoken tok_float }
+  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { strtoken tok_float }
 }
 
 <0> {
@@ -1870,6 +1874,8 @@ explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
 lambdaCaseBit :: Int
 lambdaCaseBit = 30
+negativeLiteralsBit :: Int
+negativeLiteralsBit = 31
 
 
 always :: Int -> Bool
@@ -1925,6 +1931,8 @@ explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
 lambdaCaseEnabled :: Int -> Bool
 lambdaCaseEnabled flags = testBit flags lambdaCaseBit
+negativeLiteralsEnabled :: Int -> Bool
+negativeLiteralsEnabled flags = testBit flags negativeLiteralsBit
 
 -- PState for parsing options pragmas
 --
@@ -1988,6 +1996,7 @@ mkPState flags buf loc =
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. negativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

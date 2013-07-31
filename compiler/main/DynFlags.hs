@@ -558,6 +558,7 @@ data ExtensionFlag
    | Opt_LambdaCase
    | Opt_MultiWayIf
    | Opt_TypeHoles
+   | Opt_NegativeLiterals
    | Opt_EmptyCase
    deriving (Eq, Enum, Show)
 
@@ -2726,6 +2727,7 @@ xFlags = [
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
   ( "PackageImports",                   Opt_PackageImports, nop ),
   ( "TypeHoles",                        Opt_TypeHoles, nop ),
+  ( "NegativeLiterals",                 Opt_NegativeLiterals, nop ),
   ( "EmptyCase",                        Opt_EmptyCase, nop )
   ]
 

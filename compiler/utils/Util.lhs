@@ -1095,7 +1095,7 @@ charToC w =
 hashString :: String -> Int32
 hashString = foldl' f golden
    where f m c = fromIntegral (ord c) * magic + hashInt32 m
-         magic = 0xdeadbeef
+         magic = fromIntegral (0xdeadbeef :: Word32)
 
 golden :: Int32
 golden = 1013904242 -- = round ((sqrt 5 - 1) * 2^32) :: Int32
