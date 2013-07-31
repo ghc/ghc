@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, Trustworthy #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE PolyKinds #-}
 #endif
@@ -18,7 +18,7 @@
 
 module Data.Proxy
   (
-        Proxy(..)
+        Proxy(..), asProxyTypeOf
 #ifdef __GLASGOW_HASKELL__
       , KProxy(..)
 #endif
@@ -95,3 +95,11 @@ instance Monad Proxy where
     {-# INLINE return #-}
     _ >>= _ = Proxy
     {-# INLINE (>>=) #-}
+
+-- | 'asProxyTypeOf' is a type-restricted version of 'const'.
+-- It is usually used as an infix operator, and its typing forces its first
+-- argument (which is usually overloaded) to have the same type as the tag
+-- of the second.
+asProxyTypeOf :: a -> Proxy a -> a
+asProxyTypeOf = const
+{-# INLINE asProxyTypeOf #-}
