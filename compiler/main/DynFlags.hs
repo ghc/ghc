@@ -413,6 +413,7 @@ data WarningFlag =
    | Opt_WarnIncompletePatterns
    | Opt_WarnIncompleteUniPatterns
    | Opt_WarnIncompletePatternsRecUpd
+   | Opt_WarnOverflowedLiterals
    | Opt_WarnMissingFields
    | Opt_WarnMissingImportList
    | Opt_WarnMissingMethods
@@ -2432,6 +2433,7 @@ fWarningFlags = [
   ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, nop ),
   ( "warn-dodgy-exports",               Opt_WarnDodgyExports, nop ),
   ( "warn-dodgy-imports",               Opt_WarnDodgyImports, nop ),
+  ( "warn-overflowed-literals",         Opt_WarnOverflowedLiterals, nop ),
   ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, nop ),
   ( "warn-duplicate-constraints",       Opt_WarnDuplicateConstraints, nop ),
   ( "warn-hi-shadowing",                Opt_WarnHiShadows, nop ),
@@ -2861,6 +2863,7 @@ standardWarnings
         Opt_WarnPointlessPragmas,
         Opt_WarnDuplicateConstraints,
         Opt_WarnDuplicateExports,
+        Opt_WarnOverflowedLiterals,
         Opt_WarnMissingFields,
         Opt_WarnMissingMethods,
         Opt_WarnLazyUnliftedBindings,
