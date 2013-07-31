@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples,
-             StandaloneDeriving, DeriveDataTypeable #-}
+             StandaloneDeriving, DeriveDataTypeable, NegativeLiterals #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
