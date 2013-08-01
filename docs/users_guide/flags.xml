@@ -790,6 +790,12 @@
             <entry><option>-XNPlusKPatterns</option></entry>
           </row>
           <row>
+            <entry><option>-XNegativeLiterals</option></entry>
+            <entry>Enable support for negative literals</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoNegativeLiterals</option></entry>
+          </row>
+          <row>
             <entry><option>-XNoTraditionalRecordSyntax</option></entry>
             <entry>Disable support for traditional record syntax (as supported by Haskell 98) <literal>C {f = x}</literal></entry>
             <entry>dynamic</entry>
