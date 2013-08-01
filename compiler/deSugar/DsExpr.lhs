@@ -60,6 +60,7 @@ import FastString
 
 import Control.Monad
 import Data.Int
+import Data.Traversable (traverse)
 import Data.Typeable (typeOf)
 import Data.Word
 \end{code}
@@ -718,11 +719,24 @@ dsArithSeq :: PostTcExpr -> (ArithSeqInfo Id) -> DsM CoreExpr
 dsArithSeq expr (From from)
   = App <$> dsExpr expr <*> dsLExpr from
 dsArithSeq expr (FromTo from to)
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
+  = do expr' <- dsExpr expr
+       from' <- dsLExpr from
+       to'   <- dsLExpr to
+       warn_empty_enumerations <- woptM Opt_WarnEmptyEnumerations
+       when warn_empty_enumerations $
+           warnAboutEmptyEnumerations from' Nothing to'
+       return $ mkApps expr' [from', to']
 dsArithSeq expr (FromThen from thn)
   = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
 dsArithSeq expr (FromThenTo from thn to)
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
+  = do expr' <- dsExpr expr
+       from' <- dsLExpr from
+       thn'  <- dsLExpr thn
+       to'   <- dsLExpr to
+       warn_empty_enumerations <- woptM Opt_WarnEmptyEnumerations
+       when warn_empty_enumerations $
+           warnAboutEmptyEnumerations from' (Just thn') to'
+       return $ mkApps expr' [from', thn', to']
 \end{code}
 
 Desugar 'do' and 'mdo' expressions (NOT list comprehensions, they're
@@ -867,6 +881,45 @@ warnAboutOverflowedLiterals (App (App (App (Var f) (Type t)) _) (Lit (LitInteger
          else if t == word64TyConName then checkOverflow (undefined :: Word64)
          else return ()
 warnAboutOverflowedLiterals _ = return ()
+\end{code}
+
+\begin{code}
+warnAboutEmptyEnumerations :: CoreExpr -> Maybe CoreExpr -> CoreExpr -> DsM ()
+warnAboutEmptyEnumerations fromExpr mThnExpr toExpr
+ | Just from <- getVal fromExpr
+ , Just mThn <- traverse getVal mThnExpr
+ , Just to   <- getVal toExpr
+ , Just t    <- getType fromExpr
+    = let check proxy
+              = let enumeration
+                        = case mThn of
+                          Nothing  -> [(fromInteger from `asTypeOf` proxy) .. fromInteger to]
+                          Just thn -> [fromInteger from, fromInteger thn   .. fromInteger to]
+                in when (null enumeration) $
+                       warnDs (ptext (sLit "Enumeration is empty"))
+
+      in if t == intTyConName    then check (undefined :: Int)
+    else if t == int8TyConName   then check (undefined :: Int8)
+    else if t == int16TyConName  then check (undefined :: Int16)
+    else if t == int32TyConName  then check (undefined :: Int32)
+    else if t == int64TyConName  then check (undefined :: Int64)
+    else if t == wordTyConName   then check (undefined :: Word)
+    else if t == word8TyConName  then check (undefined :: Word8)
+    else if t == word16TyConName then check (undefined :: Word16)
+    else if t == word32TyConName then check (undefined :: Word32)
+    else if t == word64TyConName then check (undefined :: Word64)
+    else return ()
+
+    where getVal (App (App (App (Var f) (Type _)) _) (Lit (LitInteger i _)))
+           | idName f == fromIntegerName = Just i
+          getVal _ = Nothing
+
+          getType (App (App (App (Var f) (Type t)) _) (Lit (LitInteger _ _)))
+           | idName f == fromIntegerName,
+             Just tc <- tyConAppTyCon_maybe t = Just (tyConName tc)
+          getType _ = Nothing
+
+warnAboutEmptyEnumerations _ _ _ = return ()
 \end{code}
 
 %************************************************************************

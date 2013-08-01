@@ -967,6 +967,7 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-duplicate-constraints</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-overflowed-literals</option>,
+    <option>-fwarn-empty-enumerations</option>,
     <option>-fwarn-missing-fields</option>,
     <option>-fwarn-missing-methods</option>,
     <option>-fwarn-lazy-unlifted-bindings</option>,
@@ -1221,6 +1222,18 @@ foreign import "&amp;f" f :: FunPtr t
           <para>
               Causes a warning to be emitted if a literal will overflow,
               e.g. <literal>300 :: Word8</literal>.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-empty-enumerations</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-empty-enumerations</option></primary>
+          </indexterm>
+          <para>
+              Causes a warning to be emitted if an enumeration is
+              empty, e.g. <literal>[5 .. 3]</literal>.
           </para>
         </listitem>
       </varlistentry>
