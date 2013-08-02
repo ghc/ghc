@@ -59,7 +59,7 @@ module Language.Haskell.TH(
     -- ** Patterns
         Pat(..), FieldExp, FieldPat,
     -- ** Types
-        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred(..),
+        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred(..), Role(..),
 
     -- * Library functions
     -- ** Abbreviations

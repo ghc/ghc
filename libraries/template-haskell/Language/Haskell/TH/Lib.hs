@@ -566,6 +566,12 @@ plainTV = PlainTV
 kindedTV :: Name -> Kind -> TyVarBndr
 kindedTV = KindedTV
 
+roledTV :: Name -> Role -> TyVarBndr
+roledTV = RoledTV
+
+kindedRoledTV :: Name -> Kind -> Role -> TyVarBndr
+kindedRoledTV = KindedRoledTV
+
 varK :: Name -> Kind
 varK = VarT
 
@@ -589,6 +595,14 @@ starK = StarT
 
 constraintK :: Kind
 constraintK = ConstraintT
+
+-------------------------------------------------------------------------------
+-- *   Role
+
+nominal, representational, phantom :: Role
+nominal = Nominal
+representational = Representational
+phantom = Phantom
 
 -------------------------------------------------------------------------------
 -- *   Callconv

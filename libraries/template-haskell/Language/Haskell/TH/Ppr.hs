@@ -485,6 +485,14 @@ instance Ppr TyLit where
 instance Ppr TyVarBndr where
     ppr (PlainTV nm)    = ppr nm
     ppr (KindedTV nm k) = parens (ppr nm <+> text "::" <+> ppr k)
+    ppr (RoledTV nm r)  = ppr nm <> text "@" <> ppr r
+    ppr (KindedRoledTV nm k r)
+      = parens (ppr nm <+> text "::" <+> ppr k) <> text "@" <> ppr r
+
+instance Ppr Role where
+    ppr Nominal          = text "N"
+    ppr Representational = text "R"
+    ppr Phantom          = text "P"
 
 ------------------------------
 pprCxt :: Cxt -> Doc

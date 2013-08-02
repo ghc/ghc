@@ -1258,11 +1258,19 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@
                | KindedTV Name Kind       -- ^ @(a :: k)@
+               | RoledTV  Name Role       -- ^ @a\@R@
+               | KindedRoledTV Name Kind Role -- ^ @(a :: k)\@R@
       deriving( Show, Eq, Data, Typeable )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
            | StrTyLit String              -- ^ @"Hello"@
   deriving ( Show, Eq, Data, Typeable )
+
+-- | Role annotations
+data Role = Nominal            -- ^ @N@
+          | Representational   -- ^ @R@
+          | Phantom            -- ^ @P@
+  deriving( Show, Eq, Data, Typeable )
 
 -- | To avoid duplication between kinds and types, they
 -- are defined to be the same. Naturally, you would never
