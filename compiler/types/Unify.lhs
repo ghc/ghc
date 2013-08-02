@@ -25,7 +25,7 @@ module Unify (
         tcUnifyTys, BindFlag(..),
         niFixTvSubst, niSubstTvSet,
 
-        UnifyResultM(..), UnifyResult, tcApartTys
+        UnifyResultM(..), UnifyResult, tcUnifyTysFG
 
    ) where
 
@@ -356,102 +356,32 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 %*                                                                      *
 %************************************************************************
 
-Note [Apartness]
-~~~~~~~~~~~~~~~~
+Note [Fine-grained unification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do the types (x, x) and ([y], y) unify? The answer is seemingly "no" --
+no substitution to finite types makes these match. But, a substitution to
+*infinite* types can unify these two types: [x |-> [[[...]]], y |-> [[[...]]] ].
+Why do we care? Consider these two type family instances:
 
-Definition: Two types t1 and t2 are /apart/ when, for all well-kinded
-substitutions Q, there exists no safe coercion witnessing the equality
-between Q(t1) and Q(t2).
+type instance F x x   = Int
+type instance F [y] y = Bool
 
-- Every two types that unify are not apart.
+If we also have
 
-- A type family application (i.e. TyConApp F tys) might or might not be
-  apart from any given type; it depends on the instances available. Because
-  we can't know what instances are available (as they might be included in
-  another module), we conclude that a type family application is *maybe apart*
-  from any other type.
+type instance Looper = [Looper]
 
-Note [Unification and apartness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The workhorse function behind unification actually is testing for apartness,
-not unification. (See [Apartness], above.) There are three
-possibilities here:
+then the instances potentially overlap. The solution is to use unification
+over infinite terms. This is possible (see [1] for lots of gory details), but
+a full algorithm is a little more power than we need. Instead, we make a
+conservative approximation and just omit the occurs check.
 
- - two types might be Unifiable, which means a substitution can be found between
-   them,
+[1]: http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/axioms-extended.pdf
 
-   Example: (Either a Int) and (Either Bool b) are Unifiable, with
-   [a |-> Bool, b |-> Int]
+tcUnifyTys considers an occurs-check problem as the same as general unification
+failure.
 
- - they might be MaybeApart, which means that we're not sure, but a substitution
-   cannot be found
-
-   Example: Int and F a (for some type family F) are MaybeApart
-
- - they might be SurelyApart, in which case we can guarantee that they never
-   unify
-
-   Example: (Either Int a) and (Either Bool b) are SurelyApart
-
-In the Unifiable case, the apartness finding function also returns a
-substitution, which we can then use to unify the types. It is necessary for
-the unification algorithm to depend on the apartness algorithm, because
-apartness is finer-grained than unification.
-
-Note [Unifying with type families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We wish to separate out the case where unification fails on a type family
-from other unification failure. What does "fail on a type family" look like?
-According to the TyConApp invariant, a type family application must always
-be in a TyConApp. This TyConApp may not be buried within the left-hand-side
-of an AppTy.
-
-Furthermore, we wish to proceed with unification if we are unifying
-(F a b) with (F Int Bool). Here, unification should succeed with
-[a |-> Int, b |-> Bool]. So, here is what we do:
-
- - If we are unifying two TyConApps, check the heads for equality and
-   proceed iff they are equal.
-
- - Otherwise, if either (or both) type is a TyConApp headed by a type family,
-   we know they cannot fully unify. But, they might unify later, depending
-   on the type family. So, we return "maybeApart".
-
-Note that we never want to unify, say, (a Int) with (F Int), because doing so
-leads to an unsaturated type family. So, we don't have to worry about any
-unification between type families and AppTys.
-
-But wait! There is one more possibility. What about nullary type families?
-If G is a nullary type family, we *do* want to unify (a) with (G). This is
-handled in uVar, which is triggered before we look at TyConApps. Ah. All is
-well again.
-
-Note [Apartness with skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we discover that two types unify if and only if a skolem variable is
-substituted, we can't properly unify the types. But, that skolem variable
-may later be instantiated with a unifyable type. So, we return maybeApart
-in these cases.
-
-Note [Apartness and the occurs check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Are the types (x, x) and ([y], y) apart? The answer is "maybe". They clearly
-don't unify, but they also don't have a direct conflict. This is somewhere
-between unifiable and surely apart, so we use maybeApart.
-
-It turns out that this whole area is rather delicate, as regards soundness of
-type families. Specifically, we need to disallow the two instances
-
-  F x x   = Int
-  F [y] y = Bool
-
-because if we have
-
-  Looper = [Looper]
-
-then the instances potentially overlap. A simple unification doesn't eliminate
-the overlap, so we use an apartness check with this special handling of the
-occurs check.
+tcUnifyTysFG ("fine-grained") returns one of three results: success, occurs-check
+failure ("MaybeApart"), or general failure ("SurelyApart").
 
 Note [The substitution in MaybeApart]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -467,6 +397,12 @@ Int is SurelyApart from Bool, and therefore the types are apart. This has
 practical consequences for the ability for closed type family applications
 to reduce. See test case indexed-types/should_compile/Overlap14.
 
+Note [Unifying with skolems]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we discover that two types unify if and only if a skolem variable is
+substituted, we can't properly unify the types. But, that skolem variable
+may later be instantiated with a unifyable type. So, we return maybeApart
+in these cases.
 
 \begin{code}
 -- See Note [Unification and apartness]
@@ -477,7 +413,7 @@ tcUnifyTys :: (TyVar -> BindFlag)
 -- second call to tcUnifyTys in FunDeps.checkClsFD
 --
 tcUnifyTys bind_fn tys1 tys2
-  | Unifiable subst <- tcApartTys bind_fn tys1 tys2
+  | Unifiable subst <- tcUnifyTysFG bind_fn tys1 tys2
   = Just subst
   | otherwise
   = Nothing
@@ -491,10 +427,11 @@ data UnifyResultM a = Unifiable a        -- the subst that unifies the types
                                          -- See Note [The substitution in MaybeApart]
                     | SurelyApart
 
-tcApartTys :: (TyVar -> BindFlag)
-           -> [Type] -> [Type]
-           -> UnifyResult
-tcApartTys bind_fn tys1 tys2
+-- See Note [Fine-grained unification]
+tcUnifyTysFG :: (TyVar -> BindFlag)
+             -> [Type] -> [Type]
+             -> UnifyResult
+tcUnifyTysFG bind_fn tys1 tys2
   = initUM bind_fn $
     do { subst <- unifyList emptyTvSubstEnv tys1 tys2
 
@@ -566,14 +503,8 @@ unify subst ty1 ty2 | Just ty1' <- tcView ty1 = unify subst ty1' ty2
 unify subst ty1 ty2 | Just ty2' <- tcView ty2 = unify subst ty1 ty2'
 
 unify subst (TyConApp tyc1 tys1) (TyConApp tyc2 tys2) 
-  | tyc1 == tyc2                                   = unify_tys subst tys1 tys2
-  | isSynFamilyTyCon tyc1 || isSynFamilyTyCon tyc2 = maybeApart subst
-
--- See Note [Unifying with type families]
-unify subst (TyConApp tyc _) _
-  | isSynFamilyTyCon tyc = maybeApart subst
-unify subst _ (TyConApp tyc _)
-  | isSynFamilyTyCon tyc = maybeApart subst
+  | tyc1 == tyc2                                   
+  = unify_tys subst tys1 tys2
 
 unify subst (FunTy ty1a ty1b) (FunTy ty2a ty2b) 
   = do	{ subst' <- unify subst ty1a ty2a
@@ -661,14 +592,14 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
        ; b2 <- tvBindFlag tv2
        ; let ty1 = TyVarTy tv1
        ; case (b1, b2) of
-           (Skolem, Skolem) -> maybeApart subst' -- See Note [Apartness with skolems]
+           (Skolem, Skolem) -> maybeApart subst' -- See Note [Unification with skolems]
            (BindMe, _)      -> return (extendVarEnv subst' tv1 ty2)
            (_, BindMe)      -> return (extendVarEnv subst' tv2 ty1) }
 
 uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` niSubstTvSet subst (tyVarsOfType ty2')
   = maybeApart subst                    -- Occurs check
-                                        -- See Note [Apartness and the occurs check]
+                                        -- See Note [Fine-grained unification]
   | otherwise
   = do { subst' <- unify subst k1 k2
        ; bindTv subst' tv1 ty2 }	-- Bind tyvar to the synonym if poss
@@ -680,7 +611,7 @@ bindTv :: TvSubstEnv -> TyVar -> Type -> UM TvSubstEnv
 bindTv subst tv ty	-- ty is not a type variable
   = do  { b <- tvBindFlag tv
 	; case b of
-	    Skolem -> maybeApart subst -- See Note [Apartness with skolems]
+	    Skolem -> maybeApart subst -- See Note [Unification with skolems]
 	    BindMe -> return $ extendVarEnv subst tv ty
 	}
 \end{code}

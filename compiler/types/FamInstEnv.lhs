@@ -28,7 +28,10 @@ module FamInstEnv (
         isDominatedBy,
         
         -- Normalisation
-        chooseBranch, topNormaliseType, normaliseType, normaliseTcApp
+        chooseBranch, topNormaliseType, normaliseType, normaliseTcApp,
+
+        -- Flattening
+        flattenTys
     ) where
 
 #include "HsVersions.h"
@@ -47,7 +50,10 @@ import Name
 import UniqFM
 import Outputable
 import Maybes
+import TrieMap
+import Unique
 import Util
+import Var
 import Pair
 import SrcLoc
 import NameSet
@@ -378,6 +384,18 @@ identicalFamInst (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
 %*                                                                      *
 %************************************************************************
 
+Note [Apartness]
+~~~~~~~~~~~~~~~~
+In dealing with closed type families, we must be able to check that one type
+will never reduce to another. This check is called /apartness/. The check
+is always between a target (which may be an arbitrary type) and a pattern.
+Here is how we do it:
+
+apart(target, pattern) = not (unify(flatten(target), pattern))
+
+where flatten (implemented in flattenTys, below) converts all type-family
+applications into fresh variables. (See Note [Flattening].)
+
 Note [Compatibility]
 ~~~~~~~~~~~~~~~~~~~~
 Two patterns are /compatible/ if either of the following conditions hold:
@@ -402,7 +420,7 @@ only when we can be sure that 'a' is not Int.
 To achieve this, after finding a possible match within the equations, we have to
 go back to all previous equations and check that, under the
 substitution induced by the match, other branches are surely apart. (See
-[Apartness] in types/Unify.lhs.) This is similar to what happens with class
+[Apartness].) This is similar to what happens with class
 instance selection, when we need to guarantee that there is only a match and
 no unifiers. The exact algorithm is different here because the the
 potentially-overlapping group is closed.
@@ -433,7 +451,7 @@ b is instantiated with Int, but the RHSs coincide there, so it's all OK.
 So, the rule is this: when looking up a branch in a closed type family, we
 find a branch that matches the target, but then we make sure that the target
 is apart from every previous *incompatible* branch. We don't check the
-branches that are compatible with the matching branch, because they are eithe
+branches that are compatible with the matching branch, because they are either
 irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 
 \begin{code}
@@ -441,7 +459,7 @@ irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  = case tcApartTys instanceBindFun lhs1 lhs2 of
+  = case tcUnifyTysFG instanceBindFun lhs1 lhs2 of
       SurelyApart -> True
       Unifiable subst
         | Type.substTy subst rhs1 `eqType` Type.substTy subst rhs2
@@ -469,7 +487,7 @@ computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
 %************************************************************************
 %*                                                                      *
            Constructing axioms
-    These functions are here because tidyType / tcApartTys
+    These functions are here because tidyType / tcUnifyTysFG
     are not available in CoAxiom
 %*                                                                      *
 %************************************************************************
@@ -783,7 +801,7 @@ findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = inc
   = case tcMatchTys (mkVarSet tpl_tvs) tpl_lhs target_tys of
       Just subst -- matching worked. now, check for apartness.
         |  all (isSurelyApart
-                . tcApartTys instanceBindFun target_tys
+                . tcUnifyTysFG instanceBindFun flattened_target
                 . coAxBranchLHS) incomps
         -> -- matching worked & we're apart from all incompatible branches. success
            Just (ind, substTyVars subst tpl_tvs)
@@ -793,6 +811,10 @@ findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = inc
 
   where isSurelyApart SurelyApart = True
         isSurelyApart _           = False
+
+        flattened_target = flattenTys in_scope target_tys
+        in_scope = mkInScopeSet (unionVarSets $
+                                 map (tyVarsOfTypes . coAxBranchLHS) incomps)
 
 -- fail if no branches left
 findBranch [] _ _ = Nothing
@@ -900,4 +922,106 @@ normaliseType env (ForAllTy tyvar ty1)
     in  (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
 normaliseType _   ty@(TyVarTy _)
   = (Refl ty,ty)
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+              Flattening
+%*                                                                      *
+%************************************************************************
+
+Note [Flattening]
+~~~~~~~~~~~~~~~~~
+
+As described in
+http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/axioms-extended.pdf
+we sometimes need to flatten core types before unifying them. Flattening
+means replacing all top-level uses of type functions with fresh variables,
+taking care to preserve sharing. That is, the type (Either (F a b) (F a b)) should
+flatten to (Either c c), never (Either c d).
+
+Defined here because of module dependencies.
+
+\begin{code}
+
+type FlattenMap = TypeMap TyVar
+
+-- See Note [Flattening]
+flattenTys :: InScopeSet -> [Type] -> [Type]
+flattenTys in_scope tys = snd $ coreFlattenTys all_in_scope emptyTypeMap tys
+  where
+    -- when we hit a type function, we replace it with a fresh variable
+    -- but, we need to make sure that this fresh variable isn't mentioned
+    -- *anywhere* in the types we're flattening, even if locally-bound in
+    -- a forall. That way, we can ensure consistency both within and outside
+    -- of that forall.
+    all_in_scope = in_scope `extendInScopeSetSet` allTyVarsInTys tys 
+
+coreFlattenTys :: InScopeSet -> FlattenMap -> [Type] -> (FlattenMap, [Type])
+coreFlattenTys in_scope = go []
+  where
+    go rtys m []         = (m, reverse rtys)
+    go rtys m (ty : tys)
+      = let (m', ty') = coreFlattenTy in_scope m ty in
+        go (ty' : rtys) m' tys
+
+coreFlattenTy :: InScopeSet -> FlattenMap -> Type -> (FlattenMap, Type)
+coreFlattenTy in_scope = go
+  where
+    go m ty@(TyVarTy {}) = (m, ty)
+    go m (AppTy ty1 ty2) = let (m1, ty1') = go m  ty1
+                               (m2, ty2') = go m1 ty2 in
+                           (m2, AppTy ty1' ty2')
+    go m (TyConApp tc tys)
+      | isFamilyTyCon tc
+      = let (m', tv) = coreFlattenTyFamApp in_scope m tc tys in
+        (m', mkTyVarTy tv)
+
+      | otherwise
+      = let (m', tys') = coreFlattenTys in_scope m tys in
+        (m', mkTyConApp tc tys')
+
+    go m (FunTy ty1 ty2) = let (m1, ty1') = go m  ty1
+                               (m2, ty2') = go m1 ty2 in
+                           (m2, FunTy ty1' ty2')
+
+      -- Note to RAE: this will have to be changed with kind families
+    go m (ForAllTy tv ty) = let (m', ty') = go m ty in
+                            (m', ForAllTy tv ty')
+
+    go m ty@(LitTy {}) = (m, ty)
+
+coreFlattenTyFamApp :: InScopeSet -> FlattenMap
+                    -> TyCon         -- type family tycon
+                    -> [Type]        -- args
+                    -> (FlattenMap, TyVar)
+coreFlattenTyFamApp in_scope m fam_tc fam_args
+  = case lookupTypeMap m fam_ty of
+      Just tv -> (m, tv)
+              -- we need fresh variables here, but this is called far from
+              -- any good source of uniques. So, we generate one from thin
+              -- air, using the arbitrary prime number 71 as a seed
+      Nothing -> let tyvar_unique = deriveUnique (getUnique fam_tc) 71
+                     tyvar_name   = mkSysTvName tyvar_unique (fsLit "fl")
+                     tv = uniqAway in_scope $ mkTyVar tyvar_name (typeKind fam_ty)
+                     m' = extendTypeMap m fam_ty tv in
+                 (m', tv)
+  where fam_ty = TyConApp fam_tc fam_args
+
+allTyVarsInTys :: [Type] -> VarSet
+allTyVarsInTys []       = emptyVarSet
+allTyVarsInTys (ty:tys) = allTyVarsInTy ty `unionVarSet` allTyVarsInTys tys
+
+allTyVarsInTy :: Type -> VarSet
+allTyVarsInTy = go
+  where
+    go (TyVarTy tv)      = unitVarSet tv
+    go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
+    go (TyConApp _ tys)  = allTyVarsInTys tys
+    go (FunTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
+    go (ForAllTy tv ty)  = (go (tyVarKind tv)) `unionVarSet`
+                           unitVarSet tv `unionVarSet`
+                           (go ty) -- don't remove tv
+    go (LitTy {})        = emptyVarSet
+
 \end{code}

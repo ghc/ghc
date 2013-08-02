@@ -21,6 +21,7 @@ import TyCon
 import CoAxiom
 import Var
 import VarSet
+import FamInstEnv   ( flattenTys )
 import VarEnv
 import StaticFlags	( opt_NoOptCoercion )
 import Outputable
@@ -393,14 +394,18 @@ checkAxInstCo (AxiomInstCo ax ind cos)
         incomps = coAxBranchIncomps branch
         tys = map (pFst . coercionKind) cos 
         subst = zipOpenTvSubst tvs tys
-        lhs' = Type.substTys subst (coAxBranchLHS branch) in
-    check_no_conflict lhs' incomps
+        target = Type.substTys subst (coAxBranchLHS branch)
+        in_scope = mkInScopeSet $
+                   unionVarSets (map (tyVarsOfTypes . coAxBranchLHS) incomps)
+        flattened_target = flattenTys in_scope target in
+    check_no_conflict flattened_target incomps
   where
     check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
     check_no_conflict _    [] = Nothing
-    check_no_conflict lhs' (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
-      | SurelyApart <- tcApartTys instanceBindFun lhs' lhs_incomp
-      = check_no_conflict lhs' rest
+    check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
+         -- See Note [Apartness] in FamInstEnv
+      | SurelyApart <- tcUnifyTysFG instanceBindFun flat lhs_incomp
+      = check_no_conflict flat rest
       | otherwise
       = Just b
 checkAxInstCo _ = Nothing

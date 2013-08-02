@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module TrieMap(
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
-   TypeMap, foldTypeMap, -- lookupTypeMap_mod,
+   TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap, 
    CoercionMap, 
    MaybeMap, 
    ListMap,
@@ -587,6 +587,15 @@ instance Outputable a => Outputable (TypeMap a) where
 
 foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
 foldTypeMap k z m = fdT k m z
+
+emptyTypeMap :: TypeMap a
+emptyTypeMap = EmptyTM
+
+lookupTypeMap :: TypeMap a -> Type -> Maybe a
+lookupTypeMap cm t = lkT emptyCME t cm
+
+extendTypeMap :: TypeMap a -> Type -> a -> TypeMap a
+extendTypeMap m t v = xtT emptyCME t (\_ -> Just v) m
 
 wrapEmptyTypeMap :: TypeMap a
 wrapEmptyTypeMap = TM { tm_var  = emptyTM

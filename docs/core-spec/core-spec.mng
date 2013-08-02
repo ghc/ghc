@@ -29,7 +29,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 8 July, 2013
+\Large 2 August, 2013
 \end{center}
 
 \section{Introduction}
@@ -339,10 +339,14 @@ check for compatibility here.
 
 \ottdefncheckXXnoXXconflict{}
 
-The judgment $[[apart]]$ checks to see whether two lists of types are surely apart.
-It checks to see if \coderef{types/Unify.lhs}{tcApartTys} returns \texttt{SurelyApart}.
-Two types are apart if neither type is a type family application and if they do not
-unify.
+The judgment $[[apart]]$ checks to see whether two lists of types are surely
+apart. $[[apart( </ ti // i />, </ si // i /> )]]$, where $[[ </ ti // i />
+]]$ is a list of types and $[[ </ si // i /> ]]$ is a list of type
+\emph{patterns} (as in a type family equation), first flattens the $[[ </ ti
+    // i /> ]]$ using \coderef{types/FamInstEnv.lhs}{flattenTys} and then checks to
+see if \coderef{types/Unify.lhs}{tcUnifyTysFG} returns \texttt{SurelyApart}.
+Flattening takes all type family applications and replaces them with fresh variables,
+taking care to map identical type family applications to the same fresh variable.
 
 The algorithm $[[unify]]$ is implemented in \coderef{types/Unify.lhs}{tcUnifyTys}.
 It performs a standard unification, returning a substitution upon success.
