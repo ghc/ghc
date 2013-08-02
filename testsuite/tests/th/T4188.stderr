@@ -1,6 +1,6 @@
-data T4188.T1 a_0 = forall b_1 . T4188.MkT1 a_0 b_1
-data T4188.T2 a_0
+data T4188.T1 a_0@R = forall b_1 . T4188.MkT1 a_0 b_1
+data T4188.T2 a_0@R
     = forall b_1 . (T4188.C a_0, T4188.C b_1) => T4188.MkT2 a_0 b_1
-data T4188.T3 x_0
+data T4188.T3 x_0@N
     = forall x_1 y_2 . (x_0 ~ (x_1, y_2), T4188.C x_1, T4188.C y_2) =>
                        T4188.MkT3 x_1 y_2

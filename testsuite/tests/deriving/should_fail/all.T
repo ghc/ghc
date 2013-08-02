@@ -41,3 +41,18 @@ test('T1133A',
      ['$MAKE --no-print-directory -s T1133A'])
 test('T5863a', normal, compile_fail, [''])
 test('T7959', normal, compile_fail, [''])
+
+test('Roles5', normal, compile_fail, [''])
+test('Roles6', normal, compile_fail, [''])
+test('Roles7', normal, compile_fail, [''])
+test('Roles8', normal, compile_fail, [''])
+test('Roles9', normal, compile_fail, [''])
+test('Roles10', normal, compile_fail, [''])
+test('Roles11', normal, compile_fail, [''])
+test('Roles12',
+     extra_clean(['Roles12.o-boot', 'Roles12.hi-boot']),
+     run_command, ['$MAKE --no-print-directory -s Roles12'])
+test('T1496', normal, compile_fail, [''])
+test('T4846', normal, compile_fail, [''])
+test('T7148', normal, compile_fail, [''])
+test('T7148a', normal, compile_fail, [''])

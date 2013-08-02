@@ -1,6 +1,6 @@
 
-gadt11.hs:9:3:
-    Data constructor ‛B1’ returns type ‛X []’
-      instead of an instance of its parent type ‛B a’
-    In the definition of data constructor ‛B1’
-    In the data declaration for ‛B’
+gadt11.hs:12:3:
+    Data constructor ‛L2’ returns type ‛T1 Bool’
+      instead of an instance of its parent type ‛T2 a’
+    In the definition of data constructor ‛L2’
+    In the data declaration for ‛T2’

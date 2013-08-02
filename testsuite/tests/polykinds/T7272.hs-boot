@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE PolyKinds, RoleAnnotations #-}
 
 module T7272 where
 
-class C (a :: k)
+class C (a :: k)@P

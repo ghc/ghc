@@ -1,0 +1,5 @@
+
+TH_Roles1.hs:7:4:
+    Illegal role annotation
+    Perhaps you intended to use -XRoleAnnotations
+    In the data type declaration for ‛T’

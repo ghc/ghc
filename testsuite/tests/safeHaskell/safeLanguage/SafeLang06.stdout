@@ -1,2 +1,0 @@
-MinList Int :: MinList 1 [9,2,5,3,2,4]
-MinList Int :: MinList 1 [-3,-4,0,0,-1,-5,0]

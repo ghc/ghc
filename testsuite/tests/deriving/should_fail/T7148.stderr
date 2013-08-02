@@ -1,0 +1,7 @@
+
+T7148.hs:27:40:
+    Can't make a derived instance of ‛IsoUnit (Tagged a b)’
+      (even with cunning newtype deriving):
+      it is not type-safe to use GeneralizedNewtypeDeriving on this class;
+      the last parameter of ‛IsoUnit’ is at role N
+    In the newtype declaration for ‛Tagged’

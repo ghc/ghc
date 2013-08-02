@@ -14,10 +14,11 @@ test('SafeLang02', normal, compile, [''])
 test('SafeLang03', normal, compile, [''])
 test('SafeLang04', normal, compile_and_run, [''])
 test('SafeLang05', normal, compile_and_run, [''])
-test('SafeLang06',
-     extra_clean(['SafeLang06_A.o', 'SafeLang06_A.hi']),
-     compile_and_run,
-     [''])
+
+# SafeLang06 was a test involving GeneralizedNewtypeDeriving, but the code
+# fails to compile with roles; thus the test is no longer valid and has
+# been removed
+
 test('SafeLang07', normal, compile_fail, [''])
 test('SafeLang08', normal, compile_fail, [''])
 test('SafeLang09',

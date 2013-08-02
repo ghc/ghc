@@ -9,8 +9,8 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a T2431.:~: a
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
-         Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ <a>}]
-T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ <a>
+         Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N}]
+T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N
 
 T2431.absurd
   :: forall a. (GHC.Types.Int T2431.:~: GHC.Types.Bool) -> a

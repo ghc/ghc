@@ -1,0 +1,20 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 5, types: 9, coercions: 5}
+
+a :: Roles13.Wrap Roles13.Age -> Roles13.Wrap Roles13.Age
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
+a = \ (ds :: Roles13.Wrap Roles13.Age) -> ds
+
+Roles13.convert :: Roles13.Wrap Roles13.Age -> GHC.Types.Int
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
+Roles13.convert =
+  a
+  `cast` (<Roles13.Wrap Roles13.Age>_R
+          -> Roles13.NTCo:Wrap[0] Roles13.NTCo:Age[0]
+          :: (Roles13.Wrap Roles13.Age -> Roles13.Wrap Roles13.Age)
+               ~#
+             (Roles13.Wrap Roles13.Age -> GHC.Types.Int))
+
+
+
