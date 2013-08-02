@@ -309,29 +309,29 @@ make_var_qid dflags force_unqual = make_qid dflags force_unqual True
 make_con_qid :: DynFlags -> Name -> C.Qual C.Id
 make_con_qid dflags = make_qid dflags False False
 
-make_co :: DynFlags -> Coercion -> C.Ty
-make_co dflags (Refl ty)             = make_ty dflags ty
-make_co dflags (TyConAppCo tc cos)   = make_conAppCo dflags (qtc dflags tc) cos
-make_co dflags (AppCo c1 c2)         = C.Tapp (make_co dflags c1) (make_co dflags c2)
-make_co dflags (ForAllCo tv co)      = C.Tforall (make_tbind tv) (make_co dflags co)
-make_co _      (CoVarCo cv)          = C.Tvar (make_var_id (coVarName cv))
+make_co :: DynFlags -> Coercion -> C.Coercion
+make_co dflags (Refl r ty)           = C.ReflCoercion (make_role r) $ make_ty dflags ty
+make_co dflags (TyConAppCo r tc cos) = C.TyConAppCoercion (make_role r) (qtc dflags tc) (map (make_co dflags) cos)
+make_co dflags (AppCo c1 c2)         = C.AppCoercion (make_co dflags c1) (make_co dflags c2)
+make_co dflags (ForAllCo tv co)      = C.ForAllCoercion (make_tbind tv) (make_co dflags co)
+make_co _      (CoVarCo cv)          = C.CoVarCoercion (make_var_id (coVarName cv))
 make_co dflags (AxiomInstCo cc ind cos) = C.AxiomCoercion (qcc dflags cc) ind (map (make_co dflags) cos)
-make_co dflags (UnsafeCo t1 t2)      = C.UnsafeCoercion (make_ty dflags t1) (make_ty dflags t2)
+make_co dflags (UnivCo r t1 t2)      = C.UnivCoercion (make_role r) (make_ty dflags t1) (make_ty dflags t2)
 make_co dflags (SymCo co)            = C.SymCoercion (make_co dflags co)
 make_co dflags (TransCo c1 c2)       = C.TransCoercion (make_co dflags c1) (make_co dflags c2)
 make_co dflags (NthCo d co)          = C.NthCoercion d (make_co dflags co)
 make_co dflags (LRCo lr co)          = C.LRCoercion (make_lr lr) (make_co dflags co)
 make_co dflags (InstCo co ty)        = C.InstCoercion (make_co dflags co) (make_ty dflags ty)
+make_co dflags (SubCo co)            = C.SubCoercion (make_co dflags co)
 
 make_lr :: LeftOrRight -> C.LeftOrRight
 make_lr CLeft  = C.CLeft
 make_lr CRight = C.CRight
 
--- Used for both tycon app coercions and axiom instantiations.
-make_conAppCo :: DynFlags -> C.Qual C.Tcon -> [Coercion] -> C.Ty
-make_conAppCo dflags con cos =
-  foldl C.Tapp (C.Tcon con)
-            (map (make_co dflags) cos)
+make_role :: Role -> C.Role
+make_role Nominal          = C.Nominal
+make_role Representational = C.Representational
+make_role Phantom          = C.Phantom
 
 -------
 isALocal :: Name -> CoreM Bool

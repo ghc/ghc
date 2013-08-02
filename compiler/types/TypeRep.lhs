@@ -678,7 +678,7 @@ pprTcApp p pp tc tys
      sep (punctuate comma (map (pp TopPrec) ty_args)))
 
   | not opt_PprStyle_Debug
-  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey] 
+  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey, eqReprPrimTyConKey] 
                            -- We need to special case the type equality TyCons because
   , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
                            -- With -dppr-debug switch this off so we can see the kind

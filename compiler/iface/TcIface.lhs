@@ -437,7 +437,8 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
 
 tc_iface_decl parent _ (IfaceData {ifName = occ_name, 
                           ifCType = cType, 
-                          ifTyVars = tv_bndrs, 
+                          ifTyVars = tv_bndrs,
+                          ifRoles = roles,
                           ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
                           ifCons = rdr_cons, 
                           ifRec = is_rec, ifPromotable = is_prom, 
@@ -448,7 +449,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
             { stupid_theta <- tcIfaceCtxt ctxt
             ; parent' <- tc_parent tyvars mb_axiom_name
             ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
-            ; return (buildAlgTyCon tc_name tyvars cType stupid_theta 
+            ; return (buildAlgTyCon tc_name tyvars roles cType stupid_theta 
                                     cons is_rec is_prom gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
@@ -479,6 +480,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
            ; return (FamInstTyCon ax_unbr fam_tc lhs_tys) }
 
 tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
+                                  ifRoles = roles,
                                   ifSynRhs = mb_rhs_ty,
                                   ifSynKind = kind })
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
@@ -486,7 +488,7 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $ 
                    tc_syn_rhs mb_rhs_ty
-     ; tycon    <- buildSynTyCon tc_name tyvars rhs rhs_kind parent
+     ; tycon    <- buildSynTyCon tc_name tyvars roles rhs rhs_kind parent
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
@@ -499,7 +501,7 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,
-                         ifTyVars = tv_bndrs, ifFDs = rdr_fds, 
+                         ifTyVars = tv_bndrs, ifRoles = roles, ifFDs = rdr_fds, 
                          ifATs = rdr_ats, ifSigs = rdr_sigs, 
                          ifRec = tc_isrec })
 -- ToDo: in hs-boot files we should really treat abstract classes specially,
@@ -515,7 +517,7 @@ tc_iface_decl _parent ignore_prags
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_occ)
-              ; buildClass ignore_prags tc_name tyvars ctxt fds ats sigs tc_isrec }
+              ; buildClass ignore_prags tc_name tyvars roles ctxt fds ats sigs tc_isrec }
     ; return (ATyCon (classTyCon cls)) }
   where
    tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
@@ -555,9 +557,10 @@ tc_iface_decl _parent ignore_prags
 tc_iface_decl _ _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do  { name <- lookupIfaceTop rdr_name
         ; return (ATyCon (mkForeignTyCon name ext_name 
-                                         liftedTypeKind 0)) }
+                                         liftedTypeKind)) }
 
-tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = branches})
+tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
+                              , ifAxBranches = branches, ifRole = role })
   = do { tc_name     <- lookupIfaceTop ax_occ
        ; tc_tycon    <- tcIfaceTyCon tc
        ; tc_branches <- foldlM tc_ax_branches [] branches
@@ -565,6 +568,7 @@ tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = bra
                      CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
+                             , co_ax_role     = role
                              , co_ax_branches = toBranchList tc_branches
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
@@ -572,14 +576,15 @@ tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = bra
 tc_ax_branches :: [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
 tc_ax_branches prev_branches
                (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs
-                              , ifaxbIncomps = incomps })
+                              , ifaxbRoles = roles, ifaxbIncomps = incomps })
   = bindIfaceTyVars tv_bndrs $ \ tvs -> do  -- Variables will all be fresh
     { tc_lhs <- mapM tcIfaceType lhs
     ; tc_rhs <- tcIfaceType rhs
-    ; let br = CoAxBranch { cab_loc = noSrcSpan
-                          , cab_tvs = tvs
-                          , cab_lhs = tc_lhs
-                          , cab_rhs = tc_rhs
+    ; let br = CoAxBranch { cab_loc     = noSrcSpan
+                          , cab_tvs     = tvs
+                          , cab_lhs     = tc_lhs
+                          , cab_roles   = roles
+                          , cab_rhs     = tc_rhs
                           , cab_incomps = map (prev_branches !!) incomps }
     ; return (prev_branches ++ [br]) }
 
@@ -915,7 +920,6 @@ tcIfaceType (IfaceTyConApp tc tks) = do { tc' <- tcIfaceTyCon tc
                                         ; tks' <- tcIfaceTcArgs (tyConKind tc') tks 
                                         ; return (mkTyConApp tc' tks') }
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
-tcIfaceType t@(IfaceCoConApp {})  = pprPanic "tcIfaceType" (ppr t)
 
 tcIfaceTypes :: [IfaceType] -> IfL [Type]
 tcIfaceTypes tys = mapM tcIfaceType tys
@@ -983,28 +987,29 @@ This context business is why we need tcIfaceTcArgs.
 %************************************************************************
 
 \begin{code}
-tcIfaceCo :: IfaceType -> IfL Coercion
-tcIfaceCo (IfaceTyVar n)        = mkCoVarCo <$> tcIfaceCoVar n
-tcIfaceCo (IfaceAppTy t1 t2)    = mkAppCo <$> tcIfaceCo t1 <*> tcIfaceCo t2
-tcIfaceCo (IfaceFunTy t1 t2)    = mkFunCo <$> tcIfaceCo t1 <*> tcIfaceCo t2
-tcIfaceCo (IfaceTyConApp tc ts) = mkTyConAppCo <$> tcIfaceTyCon tc <*> mapM tcIfaceCo ts
-tcIfaceCo t@(IfaceLitTy _)      = mkReflCo <$> tcIfaceType t
-tcIfaceCo (IfaceCoConApp tc ts) = tcIfaceCoApp tc ts
-tcIfaceCo (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' ->
-                                  mkForAllCo tv' <$> tcIfaceCo t
-
-tcIfaceCoApp :: IfaceCoCon -> [IfaceType] -> IfL Coercion
-tcIfaceCoApp IfaceReflCo      [t]     = Refl         <$> tcIfaceType t
-tcIfaceCoApp (IfaceCoAx n i)  ts      = AxiomInstCo  <$> tcIfaceCoAxiom n
-                                                     <*> pure i
-                                                     <*> mapM tcIfaceCo ts
-tcIfaceCoApp IfaceUnsafeCo    [t1,t2] = UnsafeCo     <$> tcIfaceType t1 <*> tcIfaceType t2
-tcIfaceCoApp IfaceSymCo       [t]     = SymCo        <$> tcIfaceCo t
-tcIfaceCoApp IfaceTransCo     [t1,t2] = TransCo      <$> tcIfaceCo t1 <*> tcIfaceCo t2
-tcIfaceCoApp IfaceInstCo      [t1,t2] = InstCo       <$> tcIfaceCo t1 <*> tcIfaceType t2
-tcIfaceCoApp (IfaceNthCo d)   [t]     = NthCo d      <$> tcIfaceCo t
-tcIfaceCoApp (IfaceLRCo lr)   [t]     = LRCo lr      <$> tcIfaceCo t
-tcIfaceCoApp cc ts = pprPanic "toIfaceCoApp" (ppr cc <+> ppr ts)
+tcIfaceCo :: IfaceCoercion -> IfL Coercion
+tcIfaceCo (IfaceReflCo r t)         = mkReflCo r <$> tcIfaceType t
+tcIfaceCo (IfaceFunCo r c1 c2)      = mkFunCo r <$> tcIfaceCo c1 <*> tcIfaceCo c2
+tcIfaceCo (IfaceTyConAppCo r tc cs) = mkTyConAppCo r <$> tcIfaceTyCon tc
+                                                     <*> mapM tcIfaceCo cs
+tcIfaceCo (IfaceAppCo c1 c2)        = mkAppCo <$> tcIfaceCo c1
+                                              <*> tcIfaceCo c2
+tcIfaceCo (IfaceForAllCo tv c)      = bindIfaceTyVar tv $ \ tv' ->
+                                      mkForAllCo tv' <$> tcIfaceCo c
+tcIfaceCo (IfaceCoVarCo n)          = mkCoVarCo <$> tcIfaceCoVar n
+tcIfaceCo (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n
+                                                  <*> pure i
+                                                  <*> mapM tcIfaceCo cs
+tcIfaceCo (IfaceUnivCo r t1 t2)     = UnivCo r <$> tcIfaceType t1
+                                               <*> tcIfaceType t2
+tcIfaceCo (IfaceSymCo c)            = SymCo    <$> tcIfaceCo c
+tcIfaceCo (IfaceTransCo c1 c2)      = TransCo  <$> tcIfaceCo c1
+                                               <*> tcIfaceCo c2
+tcIfaceCo (IfaceInstCo c1 t2)       = InstCo   <$> tcIfaceCo c1
+                                               <*> tcIfaceType t2
+tcIfaceCo (IfaceNthCo d c)          = NthCo d  <$> tcIfaceCo c
+tcIfaceCo (IfaceLRCo lr c)          = LRCo lr  <$> tcIfaceCo c
+tcIfaceCo (IfaceSubCo c)            = SubCo    <$> tcIfaceCo c
 
 tcIfaceCoVar :: FastString -> IfL CoVar
 tcIfaceCoVar = tcIfaceLclId

@@ -1333,11 +1333,13 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     word32PrimTyConKey, word32TyConKey, word64PrimTyConKey, word64TyConKey,
     liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
-    funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey :: Unique
+    funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
+    eqReprPrimTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
 eqPrimTyConKey                          = mkPreludeTyConUnique 53
+eqReprPrimTyConKey                      = mkPreludeTyConUnique 54
 mutVarPrimTyConKey                      = mkPreludeTyConUnique 55
 ioTyConKey                              = mkPreludeTyConUnique 56
 wordPrimTyConKey                        = mkPreludeTyConUnique 58

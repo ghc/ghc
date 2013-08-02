@@ -62,6 +62,7 @@ vectTyConDecl tycon name'
                      False                      -- include unfoldings on dictionary selectors
                      name'                      -- new name: "V:Class"
                      (tyConTyVars tycon)        -- keep original type vars
+                     (map (const Nominal) (tyConRoles tycon)) -- all role are N for safety
                      theta'                     -- superclasses
                      (snd . classTvsFds $ cls)  -- keep the original functional dependencies
                      []                         -- no associated types (for the moment)
@@ -100,6 +101,7 @@ vectTyConDecl tycon name'
        ; return $ buildAlgTyCon 
                     name'                   -- new name
                     (tyConTyVars tycon)     -- keep original type vars
+                    (map (const Nominal) (tyConRoles tycon)) -- all roles are N for safety
                     Nothing
                     []                      -- no stupid theta
                     rhs'                    -- new constructor defs

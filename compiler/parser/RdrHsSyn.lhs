@@ -465,10 +465,14 @@ checkTyVars tycl_hdr tparms = do { tvs <- mapM chk tparms
                                  ; return (mkHsQTvs tvs) }
   where
         -- Check that the name space is correct!
+    chk (L l (HsRoleAnnot (L _ (HsKindSig (L _ (HsTyVar tv)) k)) r))
+        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv (Just k) (Just r)))
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar tv k))
+        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv (Just k) Nothing))
+    chk (L l (HsRoleAnnot (L _ (HsTyVar tv)) r))
+        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv Nothing (Just r)))
     chk (L l (HsTyVar tv))
-        | isRdrTyVar tv    = return (L l (UserTyVar tv))
+        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv Nothing Nothing))
     chk t@(L l _)
         = parseErrorSDoc l $
           vcat [ sep [ ptext (sLit "Unexpected type") <+> quotes (ppr t)

@@ -488,7 +488,7 @@ deepSplitProductType_maybe :: Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys)  |> co :: ty
 deepSplitProductType_maybe ty
-  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo ty)
+  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo Representational ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
@@ -496,7 +496,7 @@ deepSplitProductType_maybe _ = Nothing
 
 deepSplitCprType_maybe :: ConTag -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
 deepSplitCprType_maybe con_tag ty
-  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo ty)
+  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo Representational ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , isDataTyCon tc
   , let cons = tyConDataCons tc

@@ -52,6 +52,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
             pat_tys  = [mkTyConApp vect_tc tys']
             rep_tc   = buildAlgTyCon name'
                            tyvars'
+                           (map (const Nominal) tyvars')
                            Nothing
                            []          -- no stupid theta
                            rhs

@@ -42,7 +42,7 @@ import Demand
 import Annotations
 import Class
 import NameSet
-import CoAxiom ( BranchIndex )
+import CoAxiom ( BranchIndex, Role )
 import Name
 import CostCentre
 import Literal
@@ -79,6 +79,7 @@ data IfaceDecl
   | IfaceData { ifName       :: OccName,        -- Type constructor
                 ifCType      :: Maybe CType,    -- C type for CAPI FFI
                 ifTyVars     :: [IfaceTvBndr],  -- Type variables
+                ifRoles      :: [Role],         -- Roles
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
                 ifRec        :: RecFlag,        -- Recursive or not?
@@ -91,12 +92,14 @@ data IfaceDecl
 
   | IfaceSyn  { ifName    :: OccName,           -- Type constructor
                 ifTyVars  :: [IfaceTvBndr],     -- Type variables
+                ifRoles   :: [Role],            -- Roles
                 ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of the tycon)
                 ifSynRhs  :: IfaceSynTyConRhs }
 
   | IfaceClass { ifCtxt    :: IfaceContext,     -- Context...
                  ifName    :: OccName,          -- Name of the class TyCon
                  ifTyVars  :: [IfaceTvBndr],    -- Type variables
+                 ifRoles   :: [Role],           -- Roles
                  ifFDs     :: [FunDep FastString], -- Functional dependencies
                  ifATs     :: [IfaceAT],      -- Associated type families
                  ifSigs    :: [IfaceClassOp],   -- Method signatures
@@ -106,6 +109,7 @@ data IfaceDecl
 
   | IfaceAxiom { ifName       :: OccName,        -- Axiom name
                  ifTyCon      :: IfaceTyCon,     -- LHS TyCon
+                 ifRole       :: Role,           -- Role of axiom
                  ifAxBranches :: [IfaceAxBranch] -- Branches
     }
 
@@ -130,7 +134,7 @@ instance Binary IfaceDecl where
     put_ _ (IfaceForeign _ _) = 
         error "Binary.put_(IfaceDecl): IfaceForeign"
 
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
         putByte bh 2
         put_ bh (occNameFS a1)
         put_ bh a2
@@ -141,15 +145,17 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
+        put_ bh a10
 
-    put_ bh (IfaceSyn a1 a2 a3 a4) = do
+    put_ bh (IfaceSyn a1 a2 a3 a4 a5) = do
         putByte bh 3
         put_ bh (occNameFS a1)
         put_ bh a2
         put_ bh a3
         put_ bh a4
+        put_ bh a5
 
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8) = do
         putByte bh 4
         put_ bh a1
         put_ bh (occNameFS a2)
@@ -158,12 +164,14 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
         put_ bh a7
+        put_ bh a8
 
-    put_ bh (IfaceAxiom a1 a2 a3) = do
+    put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 5
         put_ bh (occNameFS a1)
         put_ bh a2
         put_ bh a3
+        put_ bh a4
 
     get bh = do
         h <- getByte bh
@@ -175,23 +183,25 @@ instance Binary IfaceDecl where
                     occ <- return $! mkOccNameFS varName name
                     return (IfaceId occ ty details idinfo)
             1 -> error "Binary.get(TyClDecl): ForeignType"
-            2 -> do a1 <- get bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    a5 <- get bh
-                    a6 <- get bh
-                    a7 <- get bh
-                    a8 <- get bh
-                    a9 <- get bh
+            2 -> do a1  <- get bh
+                    a2  <- get bh
+                    a3  <- get bh
+                    a4  <- get bh
+                    a5  <- get bh
+                    a6  <- get bh
+                    a7  <- get bh
+                    a8  <- get bh
+                    a9  <- get bh
+                    a10 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
-                    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8 a9)
+                    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8 a9 a10)
             3 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
+                    a5 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
-                    return (IfaceSyn occ a2 a3 a4)
+                    return (IfaceSyn occ a2 a3 a4 a5)
             4 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
@@ -199,13 +209,15 @@ instance Binary IfaceDecl where
                     a5 <- get bh
                     a6 <- get bh
                     a7 <- get bh
+                    a8 <- get bh
                     occ <- return $! mkOccNameFS clsName a2
-                    return (IfaceClass a1 occ a3 a4 a5 a6 a7)
+                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8)
             _ -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
+                    a4 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
-                    return (IfaceAxiom occ a2 a3)
+                    return (IfaceAxiom occ a2 a3 a4)
 
 data IfaceSynTyConRhs
   = IfaceOpenSynFamilyTyCon
@@ -282,22 +294,25 @@ pprAxBranch mtycon (IfaceAxBranch { ifaxbTyVars = tvs
 -- this is just like CoAxBranch
 data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars  :: [IfaceTvBndr]
                                    , ifaxbLHS     :: [IfaceType]
+                                   , ifaxbRoles   :: [Role]
                                    , ifaxbRHS     :: IfaceType
                                    , ifaxbIncomps :: [BranchIndex] }
                                      -- See Note [Storing compatibility] in CoAxiom
 
 instance Binary IfaceAxBranch where
-    put_ bh (IfaceAxBranch a1 a2 a3 a4) = do
+    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
+        put_ bh a5
     get bh = do
         a1 <- get bh
         a2 <- get bh
         a3 <- get bh
         a4 <- get bh
-        return (IfaceAxBranch a1 a2 a3 a4)
+        a5 <- get bh
+        return (IfaceAxBranch a1 a2 a3 a4 a5)
 
 data IfaceConDecls
   = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
@@ -625,7 +640,7 @@ data IfaceExpr
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
-  | IfaceCo     IfaceType		-- We re-use IfaceType for coercions
+  | IfaceCo     IfaceCoercion
   | IfaceTuple 	TupleSort [IfaceExpr]	-- Saturated; type arguments omitted
   | IfaceLam 	IfaceBndr IfaceExpr
   | IfaceApp 	IfaceExpr IfaceExpr
@@ -1010,26 +1025,27 @@ pprIfaceDecl (IfaceForeign {ifName = tycon})
 
 pprIfaceDecl (IfaceSyn {ifName = tycon,
                         ifTyVars = tyvars,
+                        ifRoles = roles,
                         ifSynRhs = IfaceSynonymTyCon mono_ty})
-  = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
+  = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars roles)
        4 (vcat [equals <+> ppr mono_ty])
 
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifRoles = roles,
                         ifSynRhs = IfaceOpenSynFamilyTyCon, ifSynKind = kind })
-  = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
+  = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars roles)
        4 (dcolon <+> ppr kind)
 
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifRoles = roles,
                         ifSynRhs = IfaceClosedSynFamilyTyCon {}, ifSynKind = kind })
-  = hang (ptext (sLit "closed type family") <+> pprIfaceDeclHead [] tycon tyvars)
+  = hang (ptext (sLit "closed type family") <+> pprIfaceDeclHead [] tycon tyvars roles)
        4 (dcolon <+> ppr kind)
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                          ifCtxt = context,
-                         ifTyVars = tyvars, ifCons = condecls,
+                         ifTyVars = tyvars, ifRoles = roles, ifCons = condecls,
                          ifRec = isrec, ifPromotable = is_prom,
                          ifAxiom = mbAxiom})
-  = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
+  = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars roles)
        4 (vcat [ pprCType cType
                , pprRec isrec <> comma <+> pp_prom 
                , pp_condecls tycon condecls
@@ -1044,9 +1060,9 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                 IfNewTyCon _        -> ptext (sLit "newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
-                          ifFDs = fds, ifATs = ats, ifSigs = sigs,
+                          ifRoles = roles, ifFDs = fds, ifATs = ats, ifSigs = sigs,
                           ifRec = isrec})
-  = hang (ptext (sLit "class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
+  = hang (ptext (sLit "class") <+> pprIfaceDeclHead context clas tyvars roles <+> pprFundeps fds)
        4 (vcat [pprRec isrec,
                 sep (map ppr ats),
                 sep (map ppr sigs)])
@@ -1072,10 +1088,10 @@ instance Outputable IfaceClassOp where
 instance Outputable IfaceAT where
    ppr (IfaceAT d defs) = hang (ppr d) 2 (vcat (map ppr defs))
 
-pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
-pprIfaceDeclHead context thing tyvars
+pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> [Role] -> SDoc
+pprIfaceDeclHead context thing tyvars roles
   = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing),
-          pprIfaceTvBndrs tyvars]
+          pprIfaceTvBndrsRoles tyvars roles]
 
 pp_condecls :: OccName -> IfaceConDecls -> SDoc
 pp_condecls _  (IfAbstractTyCon {}) = empty
@@ -1105,7 +1121,7 @@ pprIfaceConDecl tc
     ppr_bang IfNoBang = char '_'        -- Want to see these
     ppr_bang IfStrict = char '!'
     ppr_bang IfUnpack = ptext (sLit "!!")
-    ppr_bang (IfUnpackCo co) = ptext (sLit "!!") <> pprParendIfaceType co
+    ppr_bang (IfUnpackCo co) = ptext (sLit "!!") <> pprParendIfaceCoercion co
 
     main_payload = ppr name <+> dcolon <+>
                    pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) pp_tau
@@ -1170,7 +1186,7 @@ pprIfaceExpr _       (IfaceExt v)       = ppr v
 pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
-pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceType co
+pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceCoercion co
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
@@ -1203,7 +1219,7 @@ pprIfaceExpr add_par (IfaceCase scrut bndr alts)
 pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprParendIfaceExpr expr,
          nest 2 (ptext (sLit "`cast`")),
-         pprParendIfaceType co]
+         pprParendIfaceCoercion co]
 
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
   = add_par (sep [ptext (sLit "let {"),
@@ -1376,8 +1392,35 @@ freeNamesIfType (IfaceLitTy _)        = emptyNameSet
 freeNamesIfType (IfaceForAllTy tv t)  =
    freeNamesIfTvBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
-freeNamesIfType (IfaceCoConApp tc ts) = 
-   freeNamesIfCo tc &&& fnList freeNamesIfType ts
+
+freeNamesIfCoercion :: IfaceCoercion -> NameSet
+freeNamesIfCoercion (IfaceReflCo _ t) = freeNamesIfType t
+freeNamesIfCoercion (IfaceFunCo _ c1 c2)
+  = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
+freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
+  = freeNamesIfTc tc &&& fnList freeNamesIfCoercion cos
+freeNamesIfCoercion (IfaceAppCo c1 c2)
+  = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
+freeNamesIfCoercion (IfaceForAllCo tv co)
+  = freeNamesIfTvBndr tv &&& freeNamesIfCoercion co
+freeNamesIfCoercion (IfaceCoVarCo _)
+  = emptyNameSet
+freeNamesIfCoercion (IfaceAxiomInstCo ax _ cos)
+  = unitNameSet ax &&& fnList freeNamesIfCoercion cos
+freeNamesIfCoercion (IfaceUnivCo _ t1 t2)
+  = freeNamesIfType t1 &&& freeNamesIfType t2
+freeNamesIfCoercion (IfaceSymCo c)
+  = freeNamesIfCoercion c
+freeNamesIfCoercion (IfaceTransCo c1 c2)
+  = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
+freeNamesIfCoercion (IfaceNthCo _ co)
+  = freeNamesIfCoercion co
+freeNamesIfCoercion (IfaceLRCo _ co)
+  = freeNamesIfCoercion co
+freeNamesIfCoercion (IfaceInstCo co ty)
+  = freeNamesIfCoercion co &&& freeNamesIfType ty
+freeNamesIfCoercion (IfaceSubCo co)
+  = freeNamesIfCoercion co
 
 freeNamesIfTvBndrs :: [IfaceTvBndr] -> NameSet
 freeNamesIfTvBndrs = fnList freeNamesIfTvBndr
@@ -1420,11 +1463,11 @@ freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)      = unitNameSet v
 freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
 freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
-freeNamesIfExpr (IfaceCo co)      = freeNamesIfType co
+freeNamesIfExpr (IfaceCo co)      = freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTuple _ as) = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam b body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
-freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfType co
+freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick _ e)   = freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty) = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
@@ -1453,11 +1496,6 @@ freeNamesIfExpr _ = emptyNameSet
 freeNamesIfTc :: IfaceTyCon -> NameSet
 freeNamesIfTc (IfaceTc tc) = unitNameSet tc
 -- ToDo: shouldn't we include IfaceIntTc & co.?
-
-freeNamesIfCo :: IfaceCoCon -> NameSet
-freeNamesIfCo (IfaceCoAx tc _) = unitNameSet tc
--- ToDo: include IfaceIPCoAx? Probably not necessary.
-freeNamesIfCo _ = emptyNameSet
 
 freeNamesIfRule :: IfaceRule -> NameSet
 freeNamesIfRule (IfaceRule { ifRuleBndrs = bs, ifRuleHead = f

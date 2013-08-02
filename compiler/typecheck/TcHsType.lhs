@@ -20,7 +20,7 @@ module TcHsType (
                 -- Type checking type and class decls
 	kcLookupKind, kcTyClTyVars, tcTyClTyVars,
         tcHsConArgType, tcDataKindSig, 
-        tcClassSigType, 
+        tcClassSigType, illegalRoleAnnot,
 
 		-- Kind-checking types
                 -- No kind generalisation, no checkValidType
@@ -75,6 +75,7 @@ import UniqSupply
 import Outputable
 import FastString
 import Util
+import Maybes
 
 import Control.Monad ( unless, when, zipWithM )
 import PrelNames( ipClassName, funTyConKey )
@@ -505,6 +506,9 @@ tc_hs_type (HsKindSig ty sig_k) exp_kind
     msg_fn pkind = ptext (sLit "The signature specified kind") 
                    <+> quotes (pprKind pkind)
 
+tc_hs_type ty@(HsRoleAnnot {}) _
+  = pprPanic "tc_hs_type HsRoleAnnot" (ppr ty)
+
 tc_hs_type (HsCoreTy ty) exp_kind
   = do { checkExpectedKind ty (typeKind ty) exp_kind
        ; return ty }
@@ -908,21 +912,6 @@ addTypeCtxt (L _ ty) thing
 %*									*
 %************************************************************************
 
-Note [Kind-checking kind-polymorphic types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider:
-  f :: forall (f::k -> *) a. f a -> Int
-
-Here, the [LHsTyVarBndr Name] of the forall type will be [f,a], where
-  a is a  UserTyVar   -> type variable without kind annotation
-  f is a  KindedTyVar -> type variable with kind annotation
-
-If were were to allow binding sites for kind variables, thus
-  f :: forall @k (f :: k -> *) a. f a -> Int
-then we'd also need
-  k is a   UserKiVar   -> kind variable (they don't need annotation,
-                          since we only have BOX for a super kind)
-
 Note [Kind-checking strategies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1120,14 +1109,15 @@ kcScopedKindVars kv_ns thing_inside
 kcHsTyVarBndrs :: KindCheckingStrategy
                -> LHsTyVarBndrs Name 
 	       -> TcM (Kind, r)   -- the result kind, possibly with other info
-	       -> TcM (Kind, r)
+	       -> TcM (Kind, r, [Maybe Role])
+-- See Note [Role annotations] in TcTyClsDecls about the last return value
 -- Used in getInitialKind
 kcHsTyVarBndrs strat (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
   = do { kvs <- if skolem_kvs
                 then mapM mkKindSigVar kv_ns
                 else mapM (\n -> newSigTyVar n superKind) kv_ns
        ; tcExtendTyVarEnv2 (kv_ns `zip` kvs) $
-    do { nks <- mapM (kc_hs_tv . unLoc) hs_tvs
+    do { (nks, mroles) <- mapAndUnzipM (kc_hs_tv . unLoc) hs_tvs
        ; (res_kind, stuff) <- tcExtendKindEnv nks thing_inside
        ; let full_kind = mkArrowKinds (map snd nks) res_kind
              kvs       = filter (not . isMetaTyVar) $
@@ -1135,7 +1125,7 @@ kcHsTyVarBndrs strat (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
              gen_kind  = if generalise
                          then mkForAllTys kvs full_kind
                          else full_kind
-       ; return (gen_kind, stuff) } }
+       ; return (gen_kind, stuff, mroles) } }
   where
     -- See Note [Kind-checking strategies]
     (skolem_kvs, default_to_star, generalise) = case strat of
@@ -1143,25 +1133,22 @@ kcHsTyVarBndrs strat (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
           NonParametricKinds -> (True,  False, True)
           FullKindSignature  -> (True,  True,  True)
 
-    kc_hs_tv :: HsTyVarBndr Name -> TcM (Name, TcKind)
-    kc_hs_tv (UserTyVar n)     
+    kc_hs_tv :: HsTyVarBndr Name -> TcM ((Name, TcKind), Maybe Role)
+    kc_hs_tv (HsTyVarBndr n mk mr)
       = do { mb_thing <- tcLookupLcl_maybe n
-           ; kind <- case mb_thing of
-               	       Just (AThing k)     -> return k
-               	       _ | default_to_star -> return liftedTypeKind
-               	         | otherwise       -> newMetaKindVar
-           ; return (n, kind) }
-    kc_hs_tv (KindedTyVar n k) 
-      = do { kind <- tcLHsKind k
-               -- In an associated type decl, the type variable may already 
-               -- be in scope; in that case we want to make sure its kind
-               -- matches the one declared here
-           ; mb_thing <- tcLookupLcl_maybe n
-           ; case mb_thing of
-               Nothing          -> return ()
-               Just (AThing ks) -> checkKind kind ks
-               Just thing       -> pprPanic "check_in_scope" (ppr thing)
-           ; return (n, kind) }
+           ; kind <- case (mb_thing, mk) of
+               (Just (AThing k1), Just k2) -> do { k2' <- tcLHsKind k2
+                                                 ; checkKind k1 k2'
+                                                 ; return k1 }
+               (Just (AThing k),  Nothing) -> return k
+               (Nothing,          Just k)  -> tcLHsKind k
+               (_,                Nothing)
+                 | default_to_star         -> return liftedTypeKind
+                 | otherwise               -> newMetaKindVar
+               (Just thing,       Just _)  -> pprPanic "check_in_scope" (ppr thing)
+           ; is_boot <- tcIsHsBoot  -- in boot files, roles default to R
+           ; let default_role = if is_boot then Just Representational else Nothing
+           ; return ((n, kind), firstJust mr default_role) }
 
 tcHsTyVarBndrs :: LHsTyVarBndrs Name 
 	       -> ([TcTyVar] -> TcM r)
@@ -1186,9 +1173,8 @@ tcHsTyVarBndrs (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
 tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TcTyVar
 -- Return a type variable 
 -- initialised with a kind variable.
--- Typically the Kind inside the KindedTyVar will be a tyvar with a mutable kind 
--- in it. We aren't yet sure whether the binder is a *type* variable or a *kind*
--- variable. See Note [Kind-checking kind-polymorphic types]
+-- Typically the Kind inside the HsTyVarBndr will be a tyvar with a mutable kind 
+-- in it.
 --
 -- If the variable is already in scope return it, instead of introducing a new
 -- one. This can occur in 
@@ -1196,16 +1182,19 @@ tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TcTyVar
 --     type F (a,b) c = ...
 -- Here a,b will be in scope when processing the associated type instance for F.
 -- See Note [Associated type tyvar names] in Class
-tcHsTyVarBndr (L _ hs_tv)
-  = do { let name = hsTyVarName hs_tv
-       ; mb_tv <- tcLookupLcl_maybe name
+tcHsTyVarBndr (L _ (HsTyVarBndr name mkind Nothing))
+  = do { mb_tv <- tcLookupLcl_maybe name
        ; case mb_tv of {
            Just (ATyVar _ tv) -> return tv ;
            _ -> do
-       { kind <- case hs_tv of
-                   UserTyVar {}       -> newMetaKindVar
-                   KindedTyVar _ kind -> tcLHsKind kind
+       { kind <- case mkind of
+                   Nothing   -> newMetaKindVar
+                   Just kind -> tcLHsKind kind
        ; return (mkTcTyVar name kind (SkolemTv False)) } } }
+
+-- tcHsTyVarBndr is never called from a context where roles annotations are allowed
+tcHsTyVarBndr (L _ (HsTyVarBndr name _ _))
+  = addErrTc (illegalRoleAnnot name) >> failM
 
 ------------------
 kindGeneralize :: TyVarSet -> TcM [KindVar]
@@ -1291,12 +1280,11 @@ kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
     -- to match the kind variables they mention against the ones 
     -- we've freshly brought into scope
     kc_tv :: LHsTyVarBndr Name -> Kind -> TcM (Name, Kind)
-    kc_tv (L _ (UserTyVar n)) exp_k 
-      = return (n, exp_k)
-    kc_tv (L _ (KindedTyVar n hs_k)) exp_k
-      = do { k <- tcLHsKind hs_k
-           ; checkKind k exp_k
-           ; return (n, exp_k) }
+    kc_tv (L _ (HsTyVarBndr n mkind _)) exp_k
+      | Just hs_k <- mkind = do { k <- tcLHsKind hs_k
+                                ; checkKind k exp_k
+                                ; return (n, exp_k) }
+      | otherwise          = return (n, exp_k)
 
 -----------------------
 tcTyClTyVars :: Name -> LHsTyVarBndrs Name	-- LHS of the type or class decl
@@ -1328,10 +1316,10 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
        ; tvs <- zipWithM tc_hs_tv hs_tvs kinds
        ; tcExtendTyVarEnv tvs (thing_inside (kvs ++ tvs) res) }
   where
-    tc_hs_tv (L _ (UserTyVar n))        kind = return (mkTyVar n kind)
-    tc_hs_tv (L _ (KindedTyVar n hs_k)) kind = do { tc_kind <- tcLHsKind hs_k
-                                                  ; checkKind kind tc_kind
-                                                  ; return (mkTyVar n kind) }
+    tc_hs_tv (L _ (HsTyVarBndr n mkind _)) kind
+      = do { whenIsJust mkind $ \k -> do { tc_kind <- tcLHsKind k
+                                         ; checkKind kind tc_kind }
+           ; return $ mkTyVar n kind }
 
 -----------------------------------
 tcDataKindSig :: Kind -> TcM [TyVar]
@@ -1686,6 +1674,11 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
 
       ; traceTc "checkExpectedKind 1" (ppr ty $$ ppr tidy_act_kind $$ ppr tidy_exp_kind $$ ppr env1 $$ ppr env2)
       ; failWithTcM (env2, err) } } }
+
+illegalRoleAnnot :: Name -> SDoc
+illegalRoleAnnot var
+  = ptext (sLit "Illegal role annotation on variable") <+> ppr var <> semi $$
+    ptext (sLit "role annotations are not allowed here")
 \end{code}
 
 %************************************************************************

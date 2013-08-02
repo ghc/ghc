@@ -724,10 +724,11 @@ match_co :: RuleMatchEnv
          -> Maybe RuleSubst
 match_co renv subst (CoVarCo cv) co
   = match_var renv subst cv (Coercion co)
-match_co renv subst (Refl ty1) co
+match_co renv subst (Refl r1 ty1) co
   = case co of
-       Refl ty2 -> match_ty renv subst ty1 ty2
-       _        -> Nothing
+       Refl r2 ty2
+         | r1 == r2 -> match_ty renv subst ty1 ty2
+       _            -> Nothing
 match_co _ _ co1 _
   = pprTrace "match_co: needs more cases" (ppr co1) Nothing
     -- Currently just deals with CoVarCo and Refl

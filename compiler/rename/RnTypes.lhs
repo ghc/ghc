@@ -213,6 +213,9 @@ rnHsTyKi isType doc (HsKindSig ty k)
        ; (k', fvs2) <- rnLHsKind doc k
        ; return (HsKindSig ty' k', fvs1 `plusFV` fvs2) }
 
+rnHsTyKi _ doc (HsRoleAnnot ty _) 
+  = illegalRoleAnnotDoc doc ty >> failM
+
 rnHsTyKi isType doc (HsPArrTy ty)
   = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
@@ -360,7 +363,7 @@ bindHsTyVars :: HsDocContext
 bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { rdr_env <- getLocalRdrEnv
        ; let tvs = hsQTvBndrs tv_bndrs
-             kvs_from_tv_bndrs = [ kv | L _ (KindedTyVar _ kind) <- tvs
+             kvs_from_tv_bndrs = [ kv | L _ (HsTyVarBndr _ (Just kind) _) <- tvs
                                  , let (_, kvs) = extractHsTyRdrTyVars kind
                                  , kv <- kvs ]
              all_kvs = filterOut (`elemLocalRdrEnv` rdr_env) $
@@ -382,15 +385,19 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
     do { let tv_names_w_loc = hsLTyVarLocNames tv_bndrs
 
              rn_tv_bndr :: LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
-             rn_tv_bndr (L loc (UserTyVar rdr))
-               = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-                    ; return (L loc (UserTyVar nm), emptyFVs) }
-             rn_tv_bndr (L loc (KindedTyVar rdr kind))
-               = do { sig_ok <- xoptM Opt_KindSignatures
-                    ; unless sig_ok (badSigErr False doc kind)
-                    ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-                    ; (kind', fvs) <- rnLHsKind doc kind
-                    ; return (L loc (KindedTyVar nm kind'), fvs) }
+             rn_tv_bndr (L loc (HsTyVarBndr name mkind mrole))
+               = do { ksig_ok <- xoptM Opt_KindSignatures
+                    ; unless ksig_ok $
+                      whenIsJust mkind $ \k -> badSigErr False doc k
+                    ; rsig_ok <- xoptM Opt_RoleAnnotations
+                    ; unless rsig_ok $
+                      whenIsJust mrole $ \_ -> badRoleAnnotOpt loc doc
+                    ; nm <- newTyVarNameRn mb_assoc rdr_env loc name
+                    ; (mkind', fvs) <- case mkind of
+                                         Just k  -> do { (kind', fvs) <- rnLHsKind doc k
+                                                       ; return (Just kind', fvs) }
+                                         Nothing -> return (Nothing, emptyFVs)
+                    ; return (L loc (HsTyVarBndr nm mkind' mrole), fvs) }
 
        -- Check for duplicate or shadowed tyvar bindrs
        ; checkDupRdrNames tv_names_w_loc
@@ -465,6 +472,19 @@ dataKindsErr is_type thing
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
+
+badRoleAnnotOpt :: SrcSpan -> HsDocContext -> TcM ()
+badRoleAnnotOpt loc doc
+  = setSrcSpan loc $ addErr $
+    vcat [ ptext (sLit "Illegal role annotation")
+         , ptext (sLit "Perhaps you intended to use -XRoleAnnotations")
+         , docOfHsDocContext doc ]
+
+illegalRoleAnnotDoc :: HsDocContext -> LHsType RdrName -> TcM ()
+illegalRoleAnnotDoc doc (L loc ty)
+  = setSrcSpan loc $ addErr $
+    vcat [ ptext (sLit "Illegal role annotation on") <+> (ppr ty)
+         , docOfHsDocContext doc ]
 \end{code}
 
 Note [Renaming associated types]
@@ -1011,6 +1031,7 @@ extract_lty (L _ ty) acc
       HsTyLit _                 -> acc
       HsWrapTy _ _              -> panic "extract_lty"
       HsKindSig ty ki           -> extract_lty ty (extract_lkind ki acc)
+      HsRoleAnnot ty _          -> extract_lty ty acc
       HsForAllTy _ tvs cx ty    -> extract_hs_tv_bndrs tvs acc $
                                    extract_lctxt cx   $
                                    extract_lty ty ([],[])
@@ -1027,7 +1048,7 @@ extract_hs_tv_bndrs (HsQTvs { hsq_tvs = tvs })
      acc_tvs ++ filterOut (`elem` local_tvs) body_tvs)
   where
     local_tvs = map hsLTyVarName tvs
-    (_, local_kvs) = foldr extract_lty ([], []) [k | L _ (KindedTyVar _ k) <- tvs]
+    (_, local_kvs) = foldr extract_lty ([], []) [k | L _ (HsTyVarBndr _ (Just k) _) <- tvs]
        -- These kind variables are bound here if not bound further out
 
 extract_tv :: RdrName -> FreeKiTyVars -> FreeKiTyVars

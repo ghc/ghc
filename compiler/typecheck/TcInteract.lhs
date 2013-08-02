@@ -1713,7 +1713,8 @@ matchClassInst _ clas [ k, ty ] _
                                            }
                   , fim_tys = tys
                   } | Just (_,_,axSing) <- unwrapNewTyCon_maybe tcon ->
-
+                    -- co1 and co3 are at role R, while co2 is at role N.
+                    -- BUT, when desugaring to Coercions, the roles get fixed.
                   do let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axSing tys
                          co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDataFam tys
                          co3 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [k,ty]

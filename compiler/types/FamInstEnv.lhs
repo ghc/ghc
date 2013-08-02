@@ -499,16 +499,18 @@ We print out axioms and don't want to print stuff like
 Instead we must tidy those kind variables.  See Trac #7524.
 
 \begin{code}
+-- all axiom roles are Nominal, as this is only used with type families
 mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> [Type]  -- LHS patterns
              -> Type    -- RHS
              -> SrcSpan
              -> CoAxBranch
 mkCoAxBranch tvs lhs rhs loc
-  = CoAxBranch { cab_tvs = tvs1
-               , cab_lhs = tidyTypes env lhs
-               , cab_rhs = tidyType  env rhs
-               , cab_loc = loc
+  = CoAxBranch { cab_tvs     = tvs1
+               , cab_lhs     = tidyTypes env lhs
+               , cab_roles   = map (const Nominal) tvs1
+               , cab_rhs     = tidyType  env rhs
+               , cab_loc     = loc
                , cab_incomps = placeHolderIncomps }
   where
     (env, tvs1) = tidyTyVarBndrs emptyTidyEnv tvs
@@ -522,6 +524,7 @@ mkBranchedCoAxiom ax_name fam_tc branches
     CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
+            , co_ax_role     = Nominal
             , co_ax_implicit = False
             , co_ax_branches = toBranchList branches }
 
@@ -530,6 +533,7 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
   = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
+            , co_ax_role     = Nominal
             , co_ax_implicit = False
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
 
@@ -538,6 +542,7 @@ mkSingleCoAxiom ax_name tvs fam_tc lhs_tys rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
+            , co_ax_role     = Nominal
             , co_ax_implicit = False
             , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
   where
@@ -764,19 +769,20 @@ but we also need to handle closed ones when normalising a type:
 \begin{code}
 
 -- The TyCon can be oversaturated. This works on both open and closed families
-chooseAxiom :: FamInstEnvs -> TyCon -> [Type] -> Maybe (Coercion, Type)
-chooseAxiom envs tc tys
+chooseAxiom :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercion, Type)
+chooseAxiom envs role tc tys
   | isOpenFamilyTyCon tc
   , [FamInstMatch { fim_instance = fam_inst
                   , fim_tys =      inst_tys }] <- lookupFamInstEnv envs tc tys
-  = let co = mkUnbranchedAxInstCo (famInstAxiom fam_inst) inst_tys
-        ty = pSnd (coercionKind co)
+  = let ax     = famInstAxiom fam_inst
+        co     = mkUnbranchedAxInstCo role ax inst_tys
+        ty     = pSnd (coercionKind co)
     in Just (co, ty)
 
   | Just ax <- isClosedSynFamilyTyCon_maybe tc
   , Just (ind, inst_tys) <- chooseBranch ax tys
-  = let co = mkAxInstCo ax ind inst_tys
-        ty = pSnd (coercionKind co)
+  = let co     = mkAxInstCo role ax ind inst_tys
+        ty     = pSnd (coercionKind co)
     in Just (co, ty)
 
   | otherwise
@@ -843,6 +849,7 @@ topNormaliseType :: FamInstEnvs
 -- (F ty) is a redex.
 
 -- Its a bit like Type.repType, but handles type families too
+-- The coercion returned is always an R coercion
 
 topNormaliseType env ty
   = go initRecTc ty
@@ -857,7 +864,7 @@ topNormaliseType env ty
 
     go rec_nts (TyConApp tc tys) 
         | isFamilyTyCon tc              -- Expand family tycons
-        , (co, ty) <- normaliseTcApp env tc tys
+        , (co, ty) <- normaliseTcApp env Representational tc tys
                 -- Note that normaliseType fully normalises 'tys',
                 -- wrt type functions but *not* newtypes
                 -- It has do to so to be sure that nested calls like
@@ -875,13 +882,13 @@ topNormaliseType env ty
          
 
 ---------------
-normaliseTcApp :: FamInstEnvs -> TyCon -> [Type] -> (Coercion, Type)
-normaliseTcApp env tc tys
+normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
+normaliseTcApp env role tc tys
   | isFamilyTyCon tc
-  , Just (co, rhs) <- chooseAxiom env tc ntys
+  , Just (co, rhs) <- chooseAxiom env role tc ntys
   = let    -- A reduction is possible
         first_coi       = mkTransCo tycon_coi co
-        (rest_coi,nty)  = normaliseType env rhs
+        (rest_coi,nty)  = normaliseType env role rhs
         fix_coi         = mkTransCo first_coi rest_coi
     in 
     (fix_coi, nty)
@@ -893,35 +900,36 @@ normaliseTcApp env tc tys
   where
         -- Normalise the arg types so that they'll match 
         -- when we lookup in in the instance envt
-    (cois, ntys) = mapAndUnzip (normaliseType env) tys
-    tycon_coi    = mkTyConAppCo tc cois
+    (cois, ntys) = zipWithAndUnzip (normaliseType env) (tyConRolesX role tc) tys
+    tycon_coi    = mkTyConAppCo role tc cois
 
 ---------------
 normaliseType :: FamInstEnvs            -- environment with family instances
-              -> Type                           -- old type
+              -> Role                   -- desired role of output coercion
+              -> Type                   -- old type
               -> (Coercion, Type)       -- (coercion,new type), where
                                         -- co :: old-type ~ new_type
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- Returns with Refl if nothing happens
 
-normaliseType env ty 
-  | Just ty' <- coreView ty = normaliseType env ty' 
-normaliseType env (TyConApp tc tys)
-  = normaliseTcApp env tc tys
-normaliseType _env ty@(LitTy {}) = (Refl ty, ty)
-normaliseType env (AppTy ty1 ty2)
-  = let (coi1,nty1) = normaliseType env ty1
-        (coi2,nty2) = normaliseType env ty2
+normaliseType env role ty 
+  | Just ty' <- coreView ty = normaliseType env role ty' 
+normaliseType env role (TyConApp tc tys)
+  = normaliseTcApp env role tc tys
+normaliseType _env role ty@(LitTy {}) = (Refl role ty, ty)
+normaliseType env role (AppTy ty1 ty2)
+  = let (coi1,nty1) = normaliseType env role    ty1
+        (coi2,nty2) = normaliseType env Nominal ty2
     in  (mkAppCo coi1 coi2, mkAppTy nty1 nty2)
-normaliseType env (FunTy ty1 ty2)
-  = let (coi1,nty1) = normaliseType env ty1
-        (coi2,nty2) = normaliseType env ty2
-    in  (mkFunCo coi1 coi2, mkFunTy nty1 nty2)
-normaliseType env (ForAllTy tyvar ty1)
-  = let (coi,nty1) = normaliseType env ty1
+normaliseType env role (FunTy ty1 ty2)
+  = let (coi1,nty1) = normaliseType env role ty1
+        (coi2,nty2) = normaliseType env role ty2
+    in  (mkFunCo role coi1 coi2, mkFunTy nty1 nty2)
+normaliseType env role (ForAllTy tyvar ty1)
+  = let (coi,nty1) = normaliseType env role ty1
     in  (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
-normaliseType _   ty@(TyVarTy _)
-  = (Refl ty,ty)
+normaliseType _  role ty@(TyVarTy _)
+  = (Refl role ty,ty)
 \end{code}
 
 %************************************************************************

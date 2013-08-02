@@ -7,6 +7,7 @@
 \usepackage{xcolor}
 \usepackage{fullpage}
 \usepackage{multirow}
+\usepackage{url}
 
 \newcommand{\ghcfile}[1]{\textsl{#1}}
 \newcommand{\arraylabel}[1]{\multicolumn{2}{l}{\!\!\!\!\!\!\!\!\!\text{\underline{#1}:}}}
@@ -19,7 +20,7 @@
 \setlength{\parindent}{0in}
 \setlength{\parskip}{1ex}
 
-\newcommand{\gram}[1]{\ottgrammartabular{#1\ottinterrule}}
+\newcommand{\gram}[1]{\ottgrammartabular{#1\ottafterlastrule}}
 
 \begin{document}
 
@@ -148,12 +149,20 @@ a term-level literal, but we are ignoring this distinction here.
 
 Invariants on coercions:
 \begin{itemize}
-\item $[[<t1 t2>]]$ is used; never $[[<t1> <t2>]]$.
-\item If $[[<T>]]$ is applied to some coercions, at least one of which is not
-reflexive, use $[[T </ gi // i />]]$, never $[[<T> g1 g2]] \ldots$.
-\item The $[[T]]$ in $[[T </gi//i/>]]$ is never a type synonym, though it could
+\item $[[<t1 t2>_R]]$ is used; never $[[<t1>_R <t2>_Nom]]$.
+\item If $[[<T>_R]]$ is applied to some coercions, at least one of which is not
+reflexive, use $[[T_R </ gi // i />]]$, never $[[<T>_R g1 g2]] \ldots$.
+\item The $[[T]]$ in $[[T_R </gi//i/>]]$ is never a type synonym, though it could
 be a type function.
 \end{itemize}
+
+Roles label what equality relation a coercion is a witness of. Nominal equality
+means that two types are identical (have the same name); representational equality
+means that two types have the same representation (introduced by newtypes); and
+phantom equality includes all types. See \url{http://ghc.haskell.org/trac/ghc/wiki/Roles}
+for more background.
+
+\gram{\ottR}
 
 Is it a left projection or a right projection?
 
@@ -285,11 +294,21 @@ a dead id and for one-tuples. These checks are omitted here.
 
 \subsection{Coercion typing}
 
+In the coercion typing judgment, the $\#$ marks are left off the equality
+operators to reduce clutter. This is not actually inconsistent, because
+the GHC function that implements this check, \texttt{lintCoercion}, actually
+returns four separate values (the kind, the two types, and the role), not
+a type with head $[[(~#)]]$ or $[[(~R#)]]$. Note that the difference between
+these two forms of equality is interpreted in the rules \ottdrulename{Co\_CoVarCoNom}
+and \ottdrulename{Co\_CoVarCoRepr}.
+
 \ottdefnlintCoercion{}
 
 In \ottdrulename{Co\_AxiomInstCo}, the use of $[[inits]]$ creates substitutions from
 the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of 
 folding the substitution over the kinds for kind-checking.
+
+See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$.
 
 \subsection{Name consistency}
 
@@ -326,6 +345,31 @@ There are two very similar checks for names, one declared as a local function:
 \subsection{Sub-kinding}
 
 \ottdefnisSubKind{}
+
+\subsection{Roles}
+\label{sec:tyconroles}
+
+During type-checking, role inference is carried out, assigning roles to the
+arguments of every type constructor. The function $[[tyConRoles]]$ extracts these
+roles. Also used in other judgments is $[[tyConRolesX]]$, which is the same as
+$[[tyConRoles]]$, but with an arbitrary number of $[[Nom]]$ at the end, to account
+for potential oversaturation.
+
+The checks encoded in the following
+judgments are run from \coderef{typecheck/TcTyClsDecls.lhs}{checkValidTyCon}
+when \texttt{-dcore-lint} is set.
+
+\ottdefncheckValidRoles{}
+
+\ottdefncheckXXdcXXroles{}
+
+In the following judgment, the role $[[R]]$ is an \emph{input}, not an output.
+
+\ottdefncheckXXtyXXroles{}
+
+These judgments depend on a sub-role relation:
+
+\ottdefnltRole{}
 
 \subsection{Branched axiom conflict checking}
 \label{sec:no_conflict}

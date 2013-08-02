@@ -48,7 +48,7 @@ module Type (
         -- Pred types
         mkFamilyTyConApp,
         isDictLikeTy,
-        mkEqPred, mkPrimEqPred,
+        mkEqPred, mkPrimEqPred, mkReprPrimEqPred,
         mkClassPred,
         noParenPred, isClassPred, isEqPred,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
@@ -878,6 +878,13 @@ mkPrimEqPred :: Type -> Type -> Type
 mkPrimEqPred ty1  ty2
   = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
     TyConApp eqPrimTyCon [k, ty1, ty2]
+  where
+    k = typeKind ty1
+
+mkReprPrimEqPred :: Type -> Type -> Type
+mkReprPrimEqPred ty1  ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
+    TyConApp eqReprPrimTyCon [k, ty1, ty2]
   where
     k = typeKind ty1
 \end{code}

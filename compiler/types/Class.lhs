@@ -143,15 +143,15 @@ parent class. Thus
       type F b x a :: *
 We make F use the same Name for 'a' as C does, and similary 'b'.
 
-The only reason for this is when checking instances it's easier to match 
+The reason for this is when checking instances it's easier to match 
 them up, to ensure they match.  Eg
     instance C Int [d] where
       type F [d] x Int = ....
 we should make sure that the first and third args match the instance
 header.
 
-This is the reason we use the Name and TyVar from the parent declaration,
-in both class and instance decls: just to make this check easier.
+Having the same variables for class and tycon is also used in checkValidRoles
+(in TcTyClsDecls) when checking a class's roles.
 
 
 %************************************************************************

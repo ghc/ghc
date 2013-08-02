@@ -20,7 +20,7 @@ and ``addToUFM\_C'' and ``Data.IntMap.insertWith'' differ in the order
 of arguments of combining function.
 
 \begin{code}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveTraversable, GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS -Wall #-}
 module UniqFM (

@@ -41,8 +41,10 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 
 import Data.Array.MArray
-import Data.Array.Unboxed ( listArray )
+
+import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
+
 import Data.Array.Unsafe( castSTUArray )
 
 import Foreign
@@ -161,11 +163,11 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
   let asm_insns = ssElts final_insns
       barr a = case a of UArray _lo _hi _n b -> b
 
-      insns_arr = listArray (0, n_insns - 1) asm_insns
+      insns_arr = Array.listArray (0, n_insns - 1) asm_insns
       !insns_barr = barr insns_arr
 
       bitmap_arr = mkBitmapArray dflags bsize bitmap
-      !bitmap_barr = barr bitmap_arr
+      !bitmap_barr = toByteArray bitmap_arr
 
       ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
 
@@ -176,9 +178,15 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
+#if __GLASGOW_HASKELL__ > 706
+mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArrayStgWord Int
+mkBitmapArray dflags bsize bitmap
+  = SMRep.listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+#else
 mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArray Int StgWord
 mkBitmapArray dflags bsize bitmap
-  = listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+  = Array.listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+#endif
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,

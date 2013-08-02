@@ -83,7 +83,7 @@ S |- case e as n return t of </ alti // i /> --> u[n |-> e]
 
 T </ taa // aa /> ~#k T </ t'aa // aa /> = coercionKind g
 forall </ alphaaa_kaa // aa />. forall </ betabb_k'bb // bb />. </ t1cc // cc /> @-> T </ alphaaa_kaa // aa /> = dataConRepType K
-</ e'cc = ecc |> (t1cc @ </ [alphaaa_kaa |-> nth aa g] // aa /> </ [betabb_k'bb |-> <sbb>] // bb />) // cc />
+</ e'cc = ecc |> (t1cc @ </ [alphaaa_kaa |-> nth aa g] // aa /> </ [betabb_k'bb |-> <sbb>_Nom] // bb />) // cc />
 --------------------------- :: CasePush
 S |- case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
 

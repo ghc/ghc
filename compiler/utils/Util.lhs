@@ -14,7 +14,7 @@ module Util (
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
-        zipLazy, stretchZipWith,
+        zipLazy, stretchZipWith, zipWithAndUnzip,
 
         unzipWith,
 
@@ -350,6 +350,14 @@ mapAndUnzip3 f (x:xs)
         (rs1, rs2, rs3) = mapAndUnzip3 f xs
     in
     (r1:rs1, r2:rs2, r3:rs3)
+
+zipWithAndUnzip :: (a -> b -> (c,d)) -> [a] -> [b] -> ([c],[d])
+zipWithAndUnzip f (a:as) (b:bs)
+  = let (r1,  r2)  = f a b
+        (rs1, rs2) = zipWithAndUnzip f as bs
+    in
+    (r1:rs1, r2:rs2)
+zipWithAndUnzip _ _ _ = ([],[])
 
 mapAccumL2 :: (s1 -> s2 -> a -> (s1, s2, b)) -> s1 -> s2 -> [a] -> (s1, s2, [b])
 mapAccumL2 f s1 s2 xs = (s1', s2', ys)

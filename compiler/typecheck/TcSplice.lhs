@@ -76,7 +76,7 @@ import BasicTypes
 import DynFlags
 import Panic
 import FastString
-import Control.Monad    ( when )
+import Control.Monad    ( when, zipWithM )
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -1215,7 +1215,7 @@ reifyTyCon tc
        ; kind' <- if isLiftedTypeKind kind then return Nothing
                   else fmap Just (reifyKind kind)
 
-       ; tvs' <- reifyTyVars tvs
+       ; tvs' <- reifyTyVars tvs Nothing
        ; flav' <- reifyFamFlavour tc
        ; case flav' of
          { Left flav ->  -- open type/data family
@@ -1231,7 +1231,7 @@ reifyTyCon tc
 
   | Just (tvs, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
   = do { rhs' <- reifyType rhs
-       ; tvs' <- reifyTyVars tvs
+       ; tvs' <- reifyTyVars tvs (Just $ tyConRoles tc)
        ; return (TH.TyConI
                    (TH.TySynD (reifyName tc) tvs' rhs'))
        }
@@ -1240,7 +1240,7 @@ reifyTyCon tc
   = do  { cxt <- reifyCxt (tyConStupidTheta tc)
         ; let tvs = tyConTyVars tc
         ; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons tc)
-        ; r_tvs <- reifyTyVars tvs
+        ; r_tvs <- reifyTyVars tvs (Just $ tyConRoles tc)
         ; let name = reifyName tc
               deriv = []        -- Don't know about deriving
               decl | isNewTyCon tc = TH.NewtypeD cxt name r_tvs (head cons) deriv
@@ -1276,7 +1276,7 @@ reifyDataCon tys dc
              return main_con
          else do
          { cxt <- reifyCxt theta'
-         ; ex_tvs'' <- reifyTyVars ex_tvs'
+         ; ex_tvs'' <- reifyTyVars ex_tvs' Nothing
          ; return (TH.ForallC ex_tvs'' cxt main_con) } }
 
 ------------------------------
@@ -1286,7 +1286,7 @@ reifyClass cls
         ; inst_envs <- tcGetInstEnvs
         ; insts <- mapM reifyClassInstance (InstEnv.classInstances inst_envs cls)
         ; ops <- mapM reify_op op_stuff
-        ; tvs' <- reifyTyVars tvs
+        ; tvs' <- reifyTyVars tvs (Just $ tyConRoles (classTyCon cls))
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
         ; return (TH.ClassI dec insts ) }
   where
@@ -1344,7 +1344,7 @@ reify_for_all :: TypeRep.Type -> TcM TH.Type
 reify_for_all ty
   = do { cxt' <- reifyCxt cxt;
        ; tau' <- reifyType tau
-       ; tvs' <- reifyTyVars tvs
+       ; tvs' <- reifyTyVars tvs Nothing
        ; return (TH.ForallT tvs' cxt' tau') }
   where
     (tvs, cxt, tau) = tcSplitSigmaTy ty
@@ -1401,15 +1401,33 @@ reifyFamFlavour tc
   | otherwise
   = panic "TcSplice.reifyFamFlavour: not a type family"
 
-reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr]
-reifyTyVars = mapM reifyTyVar . filter isTypeVar
+reifyTyVars :: [TyVar] -> Maybe [Role]  -- use Nothing if role annot.s are not allowed
+            -> TcM [TH.TyVarBndr]
+reifyTyVars tvs Nothing = mapM reify_tv $ filter isTypeVar tvs
   where
-    reifyTyVar tv | isLiftedTypeKind kind = return (TH.PlainTV  name)
-                  | otherwise             = do kind' <- reifyKind kind
-                                               return (TH.KindedTV name kind')
+    reify_tv tv | isLiftedTypeKind kind = return (TH.PlainTV  name)
+                | otherwise             = do kind' <- reifyKind kind
+                                             return (TH.KindedTV name kind')
       where
         kind = tyVarKind tv
         name = reifyName tv
+
+reifyTyVars tvs (Just roles) = zipWithM reify_tv tvs' roles'
+  where
+    (kvs, tvs') = span isKindVar tvs
+    roles'      = dropList kvs roles
+
+    reify_tv tv role
+      | isLiftedTypeKind kind = return (TH.RoledTV name role')
+      | otherwise             = do kind' <- reifyKind kind
+                                   return (TH.KindedRoledTV name kind' role')
+      where
+        kind  = tyVarKind tv
+        name  = reifyName tv
+        role' = case role of
+                  CoAxiom.Nominal          -> TH.Nominal
+                  CoAxiom.Representational -> TH.Representational
+                  CoAxiom.Phantom          -> TH.Phantom
 
 reify_tc_app :: TyCon -> [TypeRep.Type] -> TcM TH.Type
 reify_tc_app tc tys

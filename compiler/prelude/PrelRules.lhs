@@ -47,7 +47,7 @@ import BasicTypes
 import DynFlags
 import Platform
 import Util
-import Coercion     (mkUnbranchedAxInstCo,mkSymCo)
+import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
 import Control.Monad
 import Data.Bits as Bits
@@ -1020,7 +1020,7 @@ match_magicSingI (Type t : e : Lam b _ : _)
   , Just (sI_tc,xs)       <- splitTyConApp_maybe sI_type
   , Just (_,_,co)         <- unwrapNewTyCon_maybe sI_tc
   = Just $ let f = setVarType b fu
-           in Lam f $ Var f `App` Cast e (mkSymCo (mkUnbranchedAxInstCo co xs))
+           in Lam f $ Var f `App` Cast e (mkSymCo (mkUnbranchedAxInstCo Representational co xs))
 
 match_magicSingI _ = Nothing
 

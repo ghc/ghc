@@ -758,6 +758,7 @@ checkBootTyCon tc1 tc2
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
          eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
     in
+       roles1 == roles2 &&
              -- Checks kind of class
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
@@ -777,11 +778,13 @@ checkBootTyCon tc1 tc2
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
     in
+    roles1 == roles2 &&
     eqSynRhs syn_rhs1 syn_rhs2
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
+    roles1 == roles2 &&
     eqListBy (eqPredX env) (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
@@ -791,6 +794,9 @@ checkBootTyCon tc1 tc2
 
   | otherwise = False
   where
+    roles1 = tyConRoles tc1
+    roles2 = tyConRoles tc2
+
     eqAlgRhs (AbstractTyCon dis1) rhs2
       | dis1      = isDistinctAlgRhs rhs2   --Check compatibility
       | otherwise = True
@@ -1499,7 +1505,7 @@ getGhciStepIO = do
 
         stepTy :: LHsType Name    -- Renamed, so needs all binders in place
         stepTy = noLoc $ HsForAllTy Implicit
-                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar a_tv)]
+                            (HsQTvs { hsq_tvs = [noLoc (HsTyVarBndr a_tv Nothing Nothing)]
                                     , hsq_kvs = [] })
                             (noLoc [])
                             (nlHsFunTy ghciM ioM)
@@ -1590,9 +1596,9 @@ tcRnType hsc_env ictxt normalise rdr_type
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
-                        ; return (snd (normaliseType fam_envs ty)) }
+                        ; return (snd (normaliseType fam_envs Nominal ty)) }
                         -- normaliseType returns a coercion
-                        -- which we discard
+                        -- which we discard, so the Role is irrelevant
                 else return ty ;
 
        ; return (ty', typeKind ty) }

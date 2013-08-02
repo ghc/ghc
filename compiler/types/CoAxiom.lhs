@@ -21,10 +21,12 @@ module CoAxiom (
        toBranchedAxiom, toUnbranchedAxiom,
        coAxiomName, coAxiomArity, coAxiomBranches,
        coAxiomTyCon, isImplicitCoAxiom, coAxiomNumPats,
-       coAxiomNthBranch, coAxiomSingleBranch_maybe,
-       coAxiomSingleBranch, coAxBranchTyVars, coAxBranchLHS,
-       coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
-       placeHolderIncomps
+       coAxiomNthBranch, coAxiomSingleBranch_maybe, coAxiomRole,
+       coAxiomSingleBranch, coAxBranchTyVars, coAxBranchRoles,
+       coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
+       placeHolderIncomps,
+
+       Role(..)
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
@@ -34,6 +36,7 @@ import Name
 import Unique
 import Var
 import Util
+import Binary
 import BasicTypes
 import Data.Typeable ( Typeable )
 import SrcLoc
@@ -233,6 +236,7 @@ data CoAxiom br
   = CoAxiom                   -- Type equality axiom.
     { co_ax_unique   :: Unique        -- unique identifier
     , co_ax_name     :: Name          -- name for pretty-printing
+    , co_ax_role     :: Role          -- role of the axiom's equality
     , co_ax_tc       :: TyCon         -- the head of the LHS patterns
     , co_ax_branches :: BranchList CoAxBranch br
                                       -- the branches that form this axiom
@@ -248,6 +252,7 @@ data CoAxBranch
                                     -- See Note [CoAxiom locations]
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
                                     -- See Note [CoAxBranch type variables]
+    , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
     , cab_lhs      :: [Type]        -- Type patterns to match against
     , cab_rhs      :: Type          -- Right-hand side of the equality
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
@@ -256,12 +261,12 @@ data CoAxBranch
   deriving Typeable
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
-toBranchedAxiom (CoAxiom unique name tc branches implicit)
-  = CoAxiom unique name tc (toBranchedList branches) implicit
+toBranchedAxiom (CoAxiom unique name role tc branches implicit)
+  = CoAxiom unique name role tc (toBranchedList branches) implicit
 
 toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
-toUnbranchedAxiom (CoAxiom unique name tc branches implicit)
-  = CoAxiom unique name tc (toUnbranchedList branches) implicit
+toUnbranchedAxiom (CoAxiom unique name role tc branches implicit)
+  = CoAxiom unique name role tc (toUnbranchedList branches) implicit
 
 coAxiomNumPats :: CoAxiom br -> Int
 coAxiomNumPats = length . coAxBranchLHS . (flip coAxiomNthBranch 0)
@@ -276,6 +281,9 @@ coAxiomArity ax index
 
 coAxiomName :: CoAxiom br -> Name
 coAxiomName = co_ax_name
+
+coAxiomRole :: CoAxiom br -> Role
+coAxiomRole = co_ax_role
 
 coAxiomBranches :: CoAxiom br -> BranchList CoAxBranch br
 coAxiomBranches = co_ax_branches
@@ -301,6 +309,9 @@ coAxBranchLHS = cab_lhs
 
 coAxBranchRHS :: CoAxBranch -> Type
 coAxBranchRHS = cab_rhs
+
+coAxBranchRoles :: CoAxBranch -> [Role]
+coAxBranchRoles = cab_roles
 
 coAxBranchSpan :: CoAxBranch -> SrcSpan
 coAxBranchSpan = cab_loc
@@ -337,6 +348,29 @@ class decl, we use the same 'b' to make the same check easy.
 
 So, unlike FamInsts, there is no expectation that the cab_tvs
 are fresh wrt each other, or any other CoAxBranch.
+
+Note [CoAxBranch roles]
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider this code:
+
+  newtype Age = MkAge Int
+  newtype Wrap a = MkWrap a
+
+  convert :: Wrap Age -> Int
+  convert (MkWrap (MkAge i)) = i
+
+We want this to compile to:
+
+  NTCo:Wrap :: forall a. Wrap a ~R a
+  NTCo:Age  :: Age ~R Int
+  convert = \x -> x |> (NTCo:Wrap[0] NTCo:Age[0])
+
+But, note that NTCo:Age is at role R. Thus, we need to be able to pass
+coercions at role R into axioms. However, we don't *always* want to be able to
+do this, as it would be disastrous with type families. The solution is to
+annotate the arguments to the axiom with roles, much like we annotate tycon
+tyvars. Where do these roles get set? Newtype axioms inherit their roles from
+the newtype tycon; family axioms are all at role N.
 
 Note [CoAxiom locations]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -391,3 +425,35 @@ instance Typeable br => Data.Data (CoAxiom br) where
     dataTypeOf _ = mkNoRepType "CoAxiom"
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+                    Roles
+%*                                                                      *
+%************************************************************************
+
+This is defined here to avoid circular dependencies.
+
+\begin{code}
+
+-- See Note [Roles] in Coercion
+-- defined here to avoid cyclic dependency with Coercion
+data Role = Nominal | Representational | Phantom
+  deriving (Eq, Data.Data, Data.Typeable)
+
+instance Outputable Role where
+  ppr Nominal          = char 'N'
+  ppr Representational = char 'R'
+  ppr Phantom          = char 'P'
+
+instance Binary Role where
+  put_ bh Nominal          = putByte bh 1
+  put_ bh Representational = putByte bh 2
+  put_ bh Phantom          = putByte bh 3
+
+  get bh = do tag <- getByte bh
+              case tag of 1 -> return Nominal
+                          2 -> return Representational
+                          3 -> return Phantom
+                          _ -> panic ("get Role " ++ show tag)
+
+\end{code}

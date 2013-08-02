@@ -1441,9 +1441,11 @@ idToIfaceDecl id
 coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
 -- We *do* tidy Axioms, because they are not (and cannot 
 -- conveniently be) built in tidy form
-coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches })
+coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
+                               , co_ax_role = role })
  = IfaceAxiom { ifName       = name
               , ifTyCon      = toIfaceTyCon tycon
+              , ifRole       = role
               , ifAxBranches = brListMap (coAxBranchToIfaceBranch
                                             emptyTidyEnv
                                             (brListMap coAxBranchLHS branches)) branches }
@@ -1466,9 +1468,11 @@ coAxBranchToIfaceBranch env0 lhs_s
 -- use this one for standalone branches without incompatibles
 coAxBranchToIfaceBranch' :: TidyEnv -> CoAxBranch -> IfaceAxBranch
 coAxBranchToIfaceBranch' env0
-                        (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
+                        (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
+                                    , cab_roles = roles, cab_rhs = rhs })
   = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
                   , ifaxbLHS    = map (tidyToIfaceType env1) lhs
+                  , ifaxbRoles  = roles
                   , ifaxbRHS    = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
@@ -1485,6 +1489,7 @@ tyConToIfaceDecl env tycon
   | Just syn_rhs <- synTyConRhs_maybe tycon
   = IfaceSyn {  ifName    = getOccName tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
+                ifRoles   = tyConRoles tycon,
                 ifSynRhs  = to_ifsyn_rhs syn_rhs,
                 ifSynKind = tidyToIfaceType env1 (synTyConResKind tycon) }
 
@@ -1492,6 +1497,7 @@ tyConToIfaceDecl env tycon
   = IfaceData { ifName    = getOccName tycon,
                 ifCType   = tyConCType tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
+                ifRoles   = tyConRoles tycon,
                 ifCtxt    = tidyToIfaceContext env1 (tyConStupidTheta tycon),
                 ifCons    = ifaceConDecls (algTyConRhs tycon),
                 ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
@@ -1545,7 +1551,7 @@ tyConToIfaceDecl env tycon
 toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
 toIfaceBang _    HsNoBang            = IfNoBang
 toIfaceBang _   (HsUnpack Nothing)   = IfUnpack
-toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (coToIfaceType (tidyCo env co))
+toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (toIfaceCoercion (tidyCo env co))
 toIfaceBang _   HsStrict             = IfStrict
 toIfaceBang _   (HsUserBang {})      = panic "toIfaceBang"
 
@@ -1554,6 +1560,7 @@ classToIfaceDecl env clas
   = IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
                  ifName   = getOccName (classTyCon clas),
                  ifTyVars = toIfaceTvBndrs clas_tyvars',
+                 ifRoles  = tyConRoles (classTyCon clas),
                  ifFDs    = map toIfaceFD clas_fds,
                  ifATs    = map toIfaceAT clas_ats,
                  ifSigs   = map toIfaceClassOp op_stuff,
@@ -1790,7 +1797,7 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
         -- construct the same ru_rough field as we have right now;
         -- see tcIfaceRule
     do_arg (Type ty)     = IfaceType (toIfaceType (deNoteType ty))
-    do_arg (Coercion co) = IfaceCo   (coToIfaceType co)
+    do_arg (Coercion co) = IfaceCo   (toIfaceCoercion co)
     do_arg arg           = toIfaceExpr arg
 
         -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
@@ -1813,14 +1820,14 @@ toIfaceExpr :: CoreExpr -> IfaceExpr
 toIfaceExpr (Var v)         = toIfaceVar v
 toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
-toIfaceExpr (Coercion co)   = IfaceCo   (coToIfaceType co)
+toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
 toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as) 
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
   | otherwise               = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (coToIfaceType co)
+toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
 toIfaceExpr (Tick t e)    = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
 
 ---------------------

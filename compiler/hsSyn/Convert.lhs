@@ -20,6 +20,7 @@ import qualified OccName
 import OccName
 import SrcLoc
 import Type
+import qualified Coercion ( Role(..) )
 import TysWiredIn
 import BasicTypes as Hs
 import ForeignCall
@@ -847,11 +848,25 @@ cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm)
   = do { nm' <- tName nm
-       ; returnL $ UserTyVar nm' }
+       ; returnL $ HsTyVarBndr nm' Nothing Nothing }
 cvt_tv (TH.KindedTV nm ki)
   = do { nm' <- tName nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar nm' ki' }
+       ; returnL $ HsTyVarBndr nm' (Just ki') Nothing }
+cvt_tv (TH.RoledTV nm r)
+  = do { nm' <- tName nm
+       ; r'  <- cvtRole r
+       ; returnL $ HsTyVarBndr nm' Nothing (Just r') }
+cvt_tv (TH.KindedRoledTV nm k r)
+  = do { nm' <- tName nm
+       ; k'  <- cvtKind k
+       ; r'  <- cvtRole r
+       ; returnL $ HsTyVarBndr nm' (Just k') (Just r') }
+
+cvtRole :: TH.Role -> CvtM Coercion.Role
+cvtRole TH.Nominal          = return Coercion.Nominal
+cvtRole TH.Representational = return Coercion.Representational
+cvtRole TH.Phantom          = return Coercion.Phantom
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }

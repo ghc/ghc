@@ -128,12 +128,12 @@ splitPrimTyCon ty
 
 -- Coercion Construction -----------------------------------------------------
 
--- |Make a coersion to some builtin type.
+-- |Make a representational coersion to some builtin type.
 --
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
 mkBuiltinCo get_tc
   = do { tc <- builtin get_tc
-       ; return $ mkTyConAppCo tc []
+       ; return $ mkTyConAppCo Representational tc []
        }
 
 

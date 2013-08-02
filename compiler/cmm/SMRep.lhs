@@ -16,6 +16,11 @@ module SMRep (
         WordOff, ByteOff,
         roundUpToWords,
 
+#if __GLASGOW_HASKELL__ > 706
+        -- ** Immutable arrays of StgWords
+        UArrayStgWord, listArray, toByteArray,
+#endif
+
         -- * Closure repesentation
         SMRep(..), -- CmmInfo sees the rep; no one else does
         IsStatic,
@@ -49,8 +54,13 @@ import DynFlags
 import Outputable
 import Platform
 import FastString
+import qualified Data.Array.Base as Array
 
-import Data.Array.Base
+#if __GLASGOW_HASKELL__ > 706
+import GHC.Base ( ByteArray# )
+import Data.Ix
+#endif
+
 import Data.Char( ord )
 import Data.Word
 import Data.Bits
@@ -80,7 +90,11 @@ newtype StgWord = StgWord Word64
 #if __GLASGOW_HASKELL__ < 706
               Num,
 #endif
-              Bits, IArray UArray)
+
+#if __GLASGOW_HASKELL__ <= 706
+              Array.IArray Array.UArray,
+#endif
+              Bits)
 
 fromStgWord :: StgWord -> Integer
 fromStgWord (StgWord i) = toInteger i
@@ -125,6 +139,30 @@ hALF_WORD_SIZE_IN_BITS :: DynFlags -> Int
 hALF_WORD_SIZE_IN_BITS dflags = platformWordSize (targetPlatform dflags) `shiftL` 2
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+                Immutable arrays of StgWords
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+
+#if __GLASGOW_HASKELL__ > 706
+-- TODO: Improve with newtype coercions!
+
+newtype UArrayStgWord i = UArrayStgWord (Array.UArray i Word64)
+
+listArray :: Ix i => (i, i) -> [StgWord] -> UArrayStgWord i
+listArray (i,j) words
+  = UArrayStgWord $ Array.listArray (i,j) (map unStgWord words)
+  where unStgWord (StgWord w64) = w64
+
+toByteArray :: UArrayStgWord i -> ByteArray#
+toByteArray (UArrayStgWord (Array.UArray _ _ _ b)) = b
+
+#endif
+
+\end{code}
 
 %************************************************************************
 %*                                                                      *

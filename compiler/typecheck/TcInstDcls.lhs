@@ -19,10 +19,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 import HsSyn
 import TcBinds
-import TcTyClsDecls( tcAddImplicits, tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
-                     tcSynFamInstDecl, 
-                     wrongKindOfFamily, tcFamTyPats, kcDataDefn, dataDeclChecks,
-                     tcConDecls, checkValidTyCon )
+import TcTyClsDecls
 import TcClassDcl( tcClassDecl2, 
                    HsSigFun, lookupHsSig, mkHsSigFun, emptyHsSigs,
                    findMethodBind, instantiateMethod, tcInstanceMethodBody )
@@ -65,6 +62,7 @@ import Id
 import MkId
 import Name
 import NameSet
+import NameEnv
 import Outputable
 import SrcLoc
 import Util
@@ -697,7 +695,8 @@ tcDataFamInstDecl mb_clsinfo
                     axiom    = mkSingleCoAxiom axiom_name eta_tvs fam_tc eta_pats 
                                                (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent   = FamInstTyCon axiom fam_tc pats'
-                    rep_tc   = buildAlgTyCon rep_tc_name tvs' cType stupid_theta tc_rhs 
+                    roles    = map (const Nominal) tvs'
+                    rep_tc   = buildAlgTyCon rep_tc_name tvs' roles cType stupid_theta tc_rhs 
                                              Recursive 
                                              False      -- No promotable to the kind level
                                              h98_syntax parent
@@ -710,7 +709,9 @@ tcDataFamInstDecl mb_clsinfo
               ; return (rep_tc, fam_inst) }
 
          -- Remember to check validity; no recursion to worry about here
-       ; checkValidTyCon rep_tc
+       ; let role_annots = unitNameEnv rep_tc_name (repeat Nothing)
+       ; checkValidTyConDataConsOnly rep_tc
+       ; checkValidTyCon rep_tc role_annots
        ; return fam_inst } }
   where
     -- See Note [Eta reduction for data family axioms]

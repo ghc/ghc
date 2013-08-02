@@ -458,27 +458,28 @@ fdA k m = foldTM k (am_deflt m)
 \begin{code}
 data CoercionMap a 
   = EmptyKM
-  | KM { km_refl :: TypeMap a
-       , km_tc_app :: NameEnv (ListMap CoercionMap a)
+  | KM { km_refl   :: RoleMap (TypeMap a)
+       , km_tc_app :: RoleMap (NameEnv (ListMap CoercionMap a))
        , km_app    :: CoercionMap (CoercionMap a)
        , km_forall :: CoercionMap (TypeMap a)
        , km_var    :: VarMap a
        , km_axiom  :: NameEnv (IntMap.IntMap (ListMap CoercionMap a))
-       , km_unsafe :: TypeMap (TypeMap a)
+       , km_univ   :: RoleMap (TypeMap (TypeMap a))
        , km_sym    :: CoercionMap a
        , km_trans  :: CoercionMap (CoercionMap a)
        , km_nth    :: IntMap.IntMap (CoercionMap a)
        , km_left   :: CoercionMap a
        , km_right  :: CoercionMap a
-       , km_inst   :: CoercionMap (TypeMap a) }
+       , km_inst   :: CoercionMap (TypeMap a) 
+       , km_sub    :: CoercionMap a }
 
 wrapEmptyKM :: CoercionMap a
-wrapEmptyKM = KM { km_refl = emptyTM, km_tc_app = emptyNameEnv
+wrapEmptyKM = KM { km_refl = emptyTM, km_tc_app = emptyTM
                  , km_app = emptyTM, km_forall = emptyTM
                  , km_var = emptyTM, km_axiom = emptyNameEnv
-                 , km_unsafe = emptyTM, km_sym = emptyTM, km_trans = emptyTM
+                 , km_univ = emptyTM, km_sym = emptyTM, km_trans = emptyTM
                  , km_nth = emptyTM, km_left = emptyTM, km_right = emptyTM
-                 , km_inst = emptyTM }
+                 , km_inst = emptyTM, km_sub = emptyTM }
 
 instance TrieMap CoercionMap where
    type Key CoercionMap = Coercion
@@ -493,34 +494,35 @@ mapC _ EmptyKM = EmptyKM
 mapC f (KM { km_refl = krefl, km_tc_app = ktc
            , km_app = kapp, km_forall = kforall
            , km_var = kvar, km_axiom = kax
-           , km_unsafe = kunsafe, km_sym = ksym, km_trans = ktrans
+           , km_univ   = kuniv  , km_sym = ksym, km_trans = ktrans
            , km_nth = knth, km_left = kml, km_right = kmr
-           , km_inst = kinst })
-  = KM { km_refl   = mapTM f krefl
-       , km_tc_app = mapNameEnv (mapTM f) ktc
+           , km_inst = kinst, km_sub = ksub })
+  = KM { km_refl   = mapTM (mapTM f) krefl
+       , km_tc_app = mapTM (mapNameEnv (mapTM f)) ktc
        , km_app    = mapTM (mapTM f) kapp
        , km_forall = mapTM (mapTM f) kforall
        , km_var    = mapTM f kvar
        , km_axiom  = mapNameEnv (IntMap.map (mapTM f)) kax
-       , km_unsafe = mapTM (mapTM f) kunsafe
+       , km_univ   = mapTM (mapTM (mapTM f)) kuniv  
        , km_sym    = mapTM f ksym
        , km_trans  = mapTM (mapTM f) ktrans
        , km_nth    = IntMap.map (mapTM f) knth
        , km_left   = mapTM f kml
        , km_right  = mapTM f kmr
-       , km_inst   = mapTM (mapTM f) kinst }
+       , km_inst   = mapTM (mapTM f) kinst
+       , km_sub    = mapTM f ksub }
 
 lkC :: CmEnv -> Coercion -> CoercionMap a -> Maybe a
 lkC env co m 
   | EmptyKM <- m = Nothing
   | otherwise    = go co m
   where
-    go (Refl ty)               = km_refl   >.> lkT env ty
-    go (TyConAppCo tc cs)      = km_tc_app >.> lkNamed tc >=> lkList (lkC env) cs
+    go (Refl r ty)             = km_refl   >.> lookupTM r >=> lkT env ty
+    go (TyConAppCo r tc cs)    = km_tc_app >.> lookupTM r >=> lkNamed tc >=> lkList (lkC env) cs
     go (AxiomInstCo ax ind cs) = km_axiom  >.> lkNamed ax >=> lookupTM ind >=> lkList (lkC env) cs
     go (AppCo c1 c2)           = km_app    >.> lkC env c1 >=> lkC env c2
     go (TransCo c1 c2)         = km_trans  >.> lkC env c1 >=> lkC env c2
-    go (UnsafeCo t1 t2)        = km_unsafe >.> lkT env t1 >=> lkT env t2
+    go (UnivCo r t1 t2)        = km_univ   >.> lookupTM r >=> lkT env t1 >=> lkT env t2
     go (InstCo c t)            = km_inst   >.> lkC env c  >=> lkT env t
     go (ForAllCo v c)          = km_forall >.> lkC (extendCME env v) c >=> lkBndr env v
     go (CoVarCo v)             = km_var    >.> lkVar env v
@@ -528,15 +530,16 @@ lkC env co m
     go (NthCo n c)             = km_nth    >.> lookupTM n >=> lkC env c
     go (LRCo CLeft  c)         = km_left   >.> lkC env c
     go (LRCo CRight c)         = km_right  >.> lkC env c
+    go (SubCo c)               = km_sub    >.> lkC env c
 
 xtC :: CmEnv -> Coercion -> XT a -> CoercionMap a -> CoercionMap a
 xtC env co f EmptyKM = xtC env co f wrapEmptyKM
-xtC env (Refl ty)               f m = m { km_refl   = km_refl m   |> xtT env ty f }
-xtC env (TyConAppCo tc cs)      f m = m { km_tc_app = km_tc_app m |> xtNamed tc |>> xtList (xtC env) cs f }
+xtC env (Refl r ty)             f m = m { km_refl   = km_refl m   |> xtR r |>> xtT env ty f }
+xtC env (TyConAppCo r tc cs)    f m = m { km_tc_app = km_tc_app m |> xtR r |>> xtNamed tc |>> xtList (xtC env) cs f }
 xtC env (AxiomInstCo ax ind cs) f m = m { km_axiom  = km_axiom m  |> xtNamed ax |>> xtInt ind |>> xtList (xtC env) cs f }
 xtC env (AppCo c1 c2)           f m = m { km_app    = km_app m    |> xtC env c1 |>> xtC env c2 f }
 xtC env (TransCo c1 c2)         f m = m { km_trans  = km_trans m  |> xtC env c1 |>> xtC env c2 f }
-xtC env (UnsafeCo t1 t2)        f m = m { km_unsafe = km_unsafe m |> xtT env t1 |>> xtT env t2 f }
+xtC env (UnivCo r t1 t2)        f m = m { km_univ   = km_univ   m |> xtR r |>> xtT env t1 |>> xtT env t2 f }
 xtC env (InstCo c t)            f m = m { km_inst   = km_inst m   |> xtC env c  |>> xtT env t  f }
 xtC env (ForAllCo v c)          f m = m { km_forall = km_forall m |> xtC (extendCME env v) c 
                                                       |>> xtBndr env v f }
@@ -544,23 +547,56 @@ xtC env (CoVarCo v)             f m = m { km_var    = km_var m |> xtVar env  v f
 xtC env (SymCo c)               f m = m { km_sym    = km_sym m |> xtC env    c f }
 xtC env (NthCo n c)             f m = m { km_nth    = km_nth m |> xtInt n |>> xtC env c f } 
 xtC env (LRCo CLeft  c)         f m = m { km_left   = km_left  m |> xtC env c f } 
-xtC env (LRCo CRight c)         f m = m { km_right  = km_right m |> xtC env c f } 
+xtC env (LRCo CRight c)         f m = m { km_right  = km_right m |> xtC env c f }
+xtC env (SubCo c)               f m = m { km_sub    = km_sub m |> xtC env c f } 
 
 fdC :: (a -> b -> b) -> CoercionMap a -> b -> b
 fdC _ EmptyKM = \z -> z
-fdC k m = foldTM k (km_refl m)
-        . foldTM (foldTM k) (km_tc_app m)
+fdC k m = foldTM (foldTM k) (km_refl m)
+        . foldTM (foldTM (foldTM k)) (km_tc_app m)
         . foldTM (foldTM k) (km_app m)
         . foldTM (foldTM k) (km_forall m)
         . foldTM k (km_var m)
         . foldTM (foldTM (foldTM k)) (km_axiom m)
-        . foldTM (foldTM k) (km_unsafe m)
+        . foldTM (foldTM (foldTM k)) (km_univ   m)
         . foldTM k (km_sym m)
         . foldTM (foldTM k) (km_trans m)
         . foldTM (foldTM k) (km_nth m)
         . foldTM k          (km_left m)
         . foldTM k          (km_right m)
         . foldTM (foldTM k) (km_inst m)
+        . foldTM k          (km_sub m)
+
+\end{code}
+
+\begin{code}
+
+newtype RoleMap a = RM { unRM :: (IntMap.IntMap a) }
+
+instance TrieMap RoleMap where
+  type Key RoleMap = Role
+  emptyTM = RM emptyTM
+  lookupTM = lkR
+  alterTM = xtR
+  foldTM = fdR
+  mapTM = mapR
+
+lkR :: Role -> RoleMap a -> Maybe a
+lkR Nominal          = lookupTM 1 . unRM
+lkR Representational = lookupTM 2 . unRM
+lkR Phantom          = lookupTM 3 . unRM
+
+xtR :: Role -> XT a -> RoleMap a -> RoleMap a
+xtR Nominal          f = RM . alterTM 1 f . unRM
+xtR Representational f = RM . alterTM 2 f . unRM
+xtR Phantom          f = RM . alterTM 3 f . unRM
+
+fdR :: (a -> b -> b) -> RoleMap a -> b -> b
+fdR f (RM m) = foldTM f m
+
+mapR :: (a -> b) -> RoleMap a -> RoleMap b
+mapR f = RM . mapTM f . unRM
+
 \end{code}
 
 

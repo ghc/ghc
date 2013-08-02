@@ -236,12 +236,15 @@ pcNonRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 -- Not an enumeration, not promotable
 pcNonRecDataTyCon = pcTyCon False NonRecursive False
 
+-- This function assumes that the types it creates have all parameters at
+-- Representational role!
 pcTyCon :: Bool -> RecFlag -> Bool -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon is_enum is_rec is_prom name cType tyvars cons
   = tycon
   where
     tycon = buildAlgTyCon name
                 tyvars
+                (map (const Representational) tyvars)
                 cType
                 []              -- No stupid theta
                 (DataTyCon cons is_enum)
@@ -425,6 +428,7 @@ eqTyCon :: TyCon
 eqTyCon = mkAlgTyCon eqTyConName
             (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
             [kv, a, b]
+            [Nominal, Nominal, Nominal]
             Nothing
             []      -- No stupid theta
             (DataTyCon [eqBoxDataCon] False)

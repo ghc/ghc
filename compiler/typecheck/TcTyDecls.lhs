@@ -18,7 +18,8 @@ files for imported data types.
 
 module TcTyDecls(
         calcRecFlags, RecTyInfo(..), 
-        calcSynCycles, calcClassCycles
+        calcSynCycles, calcClassCycles,
+        RoleAnnots
     ) where
 
 #include "HsVersions.h"
@@ -34,15 +35,20 @@ import DataCon
 import Var
 import Name
 import NameEnv
+import VarEnv
+import VarSet
 import NameSet
+import Coercion ( ltRole )
 import Avail
 import Digraph
 import BasicTypes
 import SrcLoc
+import Outputable
 import UniqSet
-import Maybes( mapCatMaybes, isJust )
-import Util ( lengthIs, isSingleton )
+import Util
+import Maybes
 import Data.List
+import Control.Monad
 \end{code}
 
 
@@ -351,13 +357,15 @@ compiled, plus the outer structure of directly-mentioned types.
 
 \begin{code}
 data RecTyInfo = RTI { rti_promotable :: Bool
+                     , rti_roles      :: Name -> [Role]
                      , rti_is_rec     :: Name -> RecFlag }
 
-calcRecFlags :: ModDetails -> [TyThing] -> RecTyInfo
+calcRecFlags :: ModDetails -> RoleAnnots -> [TyThing] -> RecTyInfo
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
-calcRecFlags boot_details tyclss
+calcRecFlags boot_details mrole_env tyclss
   = RTI { rti_promotable = is_promotable
+        , rti_roles      = roles
         , rti_is_rec     = is_rec }
   where
     rec_tycon_names = mkNameSet (map tyConName all_tycons)
@@ -366,6 +374,8 @@ calcRecFlags boot_details tyclss
                    -- the class TyCon, so tyclss includes the class tycons
 
     is_promotable = all (isPromotableTyCon rec_tycon_names) all_tycons
+
+    roles = inferRoles mrole_env all_tycons
 
     ----------------- Recursion calculation ----------------
     is_rec n | n `elemNameSet` rec_names = Recursive
@@ -518,6 +528,279 @@ isPromotableType rec_tcs con_arg_ty
     go _               	 = False
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+        Role inference
+%*                                                                      *
+%************************************************************************
+
+Note [Role inference]
+~~~~~~~~~~~~~~~~~~~~~
+The role inference algorithm uses class, datatype, and synonym definitions
+to infer the roles on the parameters. Although these roles are stored in the
+tycons, we can perform this algorithm on the built tycons, as long as we
+don't peek at an as-yet-unknown roles field! Ah, the magic of laziness.
+
+First, we choose appropriate initial roles. For families, roles (including
+initial roles) are N. For all other types, we start with the role in the
+role annotation (if any), or otherwise use Phantom. This is done in
+initialRoleEnv1.
+
+The function irGroup then propagates role information until it reaches a
+fixpoint, preferring N over R, P and R over P. To aid in this, we have a monad
+RoleM, which is a combination reader and state monad. In its state are the
+current RoleEnv, which gets updated by role propagation, and an update bit,
+which we use to know whether or not we've reached the fixpoint. The
+environment of RoleM contains the tycon whose parameters we are inferring, and
+a VarEnv from parameters to their positions, so we can update the RoleEnv.
+Between tycons, this reader information is missing; it is added by
+addRoleInferenceInfo.
+
+There are two kinds of tycons to consider: algebraic ones (including classes)
+and type synonyms. (Remember, families don't participate -- all their parameters
+are N.) An algebraic tycon processes each of its datacons, in turn. Note that
+a datacon's universally quantified parameters might be different from the parent
+tycon's parameters, so we use the datacon's univ parameters in the mapping from
+vars to positions. Note also that we don't want to infer roles for existentials
+(they're all at N, too), so we put them in the set of local variables. As an
+optimisation, we skip any tycons whose roles are already all Nominal, as there
+nowhere else for them to go. For synonyms, we just analyse their right-hand sides.
+
+irType walks through a type, looking for uses of a variable of interest and
+propagating role information. Because anything used under a phantom position
+is at phantom and anything used under a nominal position is at nominal, the
+irType function can assume that anything it sees is at representational. (The
+other possibilities are pruned when they're encountered.)
+
+The rest of the code is just plumbing.
+
+How do we know that this algorithm is correct? It should meet the following
+specification:
+
+Let Z be a role context -- a mapping from variables to roles. The following
+rules define the property (Z |- t : r), where t is a type and r is a role:
+
+Z(a) = r'        r' <= r
+------------------------- RCVar
+Z |- a : r
+
+---------- RCConst
+Z |- T : r               -- T is a type constructor
+
+Z |- t1 : r
+Z |- t2 : N
+-------------- RCApp
+Z |- t1 t2 : r
+
+forall i<=n. (r_i is R or N) implies Z |- t_i : r_i
+roles(T) = r_1 .. r_n
+---------------------------------------------------- RCDApp
+Z |- T t_1 .. t_n : R
+
+Z, a:N |- t : r
+---------------------- RCAll
+Z |- forall a:k.t : r
+
+
+We also have the following rules:
+
+For all datacon_i in type T, where a_1 .. a_n are universally quantified
+and b_1 .. b_m are existentially quantified, and the arguments are t_1 .. t_p,
+then if forall j<=p, a_1 : r_1 .. a_n : r_n, b_1 : N .. b_m : N |- t_j : R,
+then roles(T) = r_1 .. r_n
+
+roles(->) = R, R
+roles(~#) = N, N
+
+With -dcore-lint on, the output of this algorithm is checked in checkValidRoles,
+called from checkValidTycon.
+
+\begin{code}
+type RoleEnv    = NameEnv [Role]        -- from tycon names to roles
+type RoleAnnots = NameEnv [Maybe Role]  -- from tycon names to role annotations,
+                                        -- which may be left out
+
+-- This, and any of the functions it calls, must *not* look at the roles
+-- field of a tycon we are inferring roles about!
+-- See Note [Role inference]
+inferRoles :: RoleAnnots -> [TyCon] -> Name -> [Role]
+inferRoles annots tycons
+  = let role_env  = initialRoleEnv annots tycons
+        role_env' = irGroup role_env tycons in
+    \name -> case lookupNameEnv role_env' name of
+      Just roles -> roles
+      Nothing    -> pprPanic "inferRoles" (ppr name)
+
+initialRoleEnv :: RoleAnnots -> [TyCon] -> RoleEnv
+initialRoleEnv annots = extendNameEnvList emptyNameEnv .
+                        map (initialRoleEnv1 annots)
+
+initialRoleEnv1 :: RoleAnnots -> TyCon -> (Name, [Role])
+initialRoleEnv1 annots_env tc
+  | isFamilyTyCon tc = (name, map (const Nominal) tyvars)
+  |  isAlgTyCon tc
+  || isSynTyCon tc   = (name, default_roles)
+  | otherwise        = pprPanic "initialRoleEnv1" (ppr tc)
+  where name         = tyConName tc
+        tyvars       = tyConTyVars tc
+
+         -- whether are not there are annotations, we're guaranteed that
+         -- the length of role_annots is appropriate
+        role_annots  = case lookupNameEnv annots_env name of
+                          Just annots -> annots
+                          Nothing     -> pprPanic "initialRoleEnv1 annots" (ppr name)
+        default_roles = let kvs = takeWhile isKindVar tyvars in
+                        map (const Nominal) kvs ++
+                        zipWith orElse role_annots (repeat Phantom)
+
+irGroup :: RoleEnv -> [TyCon] -> RoleEnv
+irGroup env tcs
+  = let (env', update) = runRoleM env $ mapM_ irTyCon tcs in
+    if update
+    then irGroup env' tcs
+    else env'
+
+irTyCon :: TyCon -> RoleM ()
+irTyCon tc
+  | isAlgTyCon tc
+  = do { old_roles <- lookupRoles tc
+       ; unless (all (== Nominal) old_roles) $  -- also catches data families,
+                                                -- which don't want or need role inference
+    do { whenIsJust (tyConClass_maybe tc) (irClass tc_name)
+       ; mapM_ (irDataCon tc_name) (visibleDataCons $ algTyConRhs tc) }}
+
+  | Just (SynonymTyCon ty) <- synTyConRhs_maybe tc
+  = addRoleInferenceInfo tc_name (tyConTyVars tc) $
+    irType emptyVarSet ty
+
+  | otherwise
+  = return ()
+
+  where
+    tc_name = tyConName tc
+
+-- any type variable used in an associated type must be Nominal
+irClass :: Name -> Class -> RoleM ()
+irClass tc_name cls
+  = addRoleInferenceInfo tc_name cls_tvs $
+    mapM_ ir_at (classATs cls)
+  where
+    cls_tvs    = classTyVars cls
+    cls_tv_set = mkVarSet cls_tvs
+
+    ir_at at_tc
+      = mapM_ (updateRole Nominal) (varSetElems nvars)
+      where nvars = (mkVarSet $ tyConTyVars at_tc) `intersectVarSet` cls_tv_set
+
+-- See Note [Role inference]
+irDataCon :: Name -> DataCon -> RoleM ()
+irDataCon tc_name datacon
+  = addRoleInferenceInfo tc_name (dataConUnivTyVars datacon) $
+    let ex_var_set = mkVarSet $ dataConExTyVars datacon in
+    mapM_ (irType ex_var_set) (dataConRepArgTys datacon)
+
+irType :: VarSet -> Type -> RoleM ()
+irType = go
+  where
+    go lcls (TyVarTy tv) = unless (tv `elemVarSet` lcls) $
+                           updateRole Representational tv
+    go lcls (AppTy t1 t2) = go lcls t1 >> mark_nominal lcls t2
+    go lcls (TyConApp tc tys)
+      = do { roles <- lookupRolesX tc
+           ; zipWithM_ (go_app lcls) roles tys }
+    go lcls (FunTy t1 t2) = go lcls t1 >> go lcls t2
+    go lcls (ForAllTy tv ty) = go (extendVarSet lcls tv) ty
+    go _    (LitTy {}) = return ()
+
+    go_app _ Phantom _ = return ()                 -- nothing to do here
+    go_app lcls Nominal ty = mark_nominal lcls ty  -- all vars below here are N
+    go_app lcls Representational ty = go lcls ty
+
+    mark_nominal lcls ty = let nvars = tyVarsOfType ty `minusVarSet` lcls in
+                           mapM_ (updateRole Nominal) (varSetElems nvars)
+
+-- like lookupRoles, but with Nominal tags at the end for oversaturated TyConApps
+lookupRolesX :: TyCon -> RoleM [Role]
+lookupRolesX tc
+  = do { roles <- lookupRoles tc
+       ; return $ roles ++ repeat Nominal }
+
+-- gets the roles either from the environment or the tycon
+lookupRoles :: TyCon -> RoleM [Role]
+lookupRoles tc
+  = do { env <- getRoleEnv
+       ; case lookupNameEnv env (tyConName tc) of
+           Just roles -> return roles
+           Nothing    -> return $ tyConRoles tc }
+
+-- tries to update a role; won't even update a role "downwards"
+updateRole :: Role -> TyVar -> RoleM ()
+updateRole role tv
+  = do { var_ns <- getVarNs
+       ; case lookupVarEnv var_ns tv of
+       { Nothing -> pprPanic "updateRole" (ppr tv)
+       ; Just n  -> do
+       { name <- getTyConName
+       ; updateRoleEnv name n role }}}
+
+-- the state in the RoleM monad
+data RoleInferenceState = RIS { role_env  :: RoleEnv
+                              , update    :: Bool }
+
+-- the environment in the RoleM monad
+type VarPositions = VarEnv Int
+data RoleInferenceInfo = RII { var_ns :: VarPositions
+                             , name   :: Name }
+
+-- See [Role inference]
+newtype RoleM a = RM { unRM :: Maybe RoleInferenceInfo
+                            -> RoleInferenceState
+                            -> (a, RoleInferenceState) }
+instance Monad RoleM where
+  return x = RM $ \_ state -> (x, state)
+  a >>= f  = RM $ \m_info state -> let (a', state') = unRM a m_info state in
+                                   unRM (f a') m_info state'
+
+runRoleM :: RoleEnv -> RoleM () -> (RoleEnv, Bool)
+runRoleM env thing = (env', update)
+  where RIS { role_env = env', update = update } = snd $ unRM thing Nothing state 
+        state = RIS { role_env  = env, update    = False }
+
+addRoleInferenceInfo :: Name -> [TyVar] -> RoleM a -> RoleM a
+addRoleInferenceInfo name tvs thing
+  = RM $ \_nothing state -> ASSERT( isNothing _nothing )
+                            unRM thing (Just info) state
+  where info = RII { var_ns = mkVarEnv (zip tvs [0..]), name = name }
+
+getRoleEnv :: RoleM RoleEnv
+getRoleEnv = RM $ \_ state@(RIS { role_env = env }) -> (env, state)
+
+getVarNs :: RoleM VarPositions
+getVarNs = RM $ \m_info state ->
+                case m_info of
+                  Nothing -> panic "getVarNs"
+                  Just (RII { var_ns = var_ns }) -> (var_ns, state)
+
+getTyConName :: RoleM Name
+getTyConName = RM $ \m_info state ->
+                    case m_info of
+                      Nothing -> panic "getTyConName"
+                      Just (RII { name = name }) -> (name, state)
+
+
+updateRoleEnv :: Name -> Int -> Role -> RoleM ()
+updateRoleEnv name n role
+  = RM $ \_ state@(RIS { role_env = role_env }) -> ((),
+         case lookupNameEnv role_env name of
+           Nothing -> pprPanic "updateRoleEnv" (ppr name)
+           Just roles -> let (before, old_role : after) = splitAt n roles in
+                         if role `ltRole` old_role
+                         then let roles' = before ++ role : after
+                                  role_env' = extendNameEnv role_env name roles' in
+                              RIS { role_env = role_env', update = True }
+                         else state )
+
+\end{code}
 
 %************************************************************************
 %*                                                                      *

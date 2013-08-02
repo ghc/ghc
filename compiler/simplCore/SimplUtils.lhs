@@ -1100,7 +1100,7 @@ mkLam _env bndrs body
       | not (any bad bndrs)
         -- Note [Casts and lambdas]
       = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos bndrs co)) }
+           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars

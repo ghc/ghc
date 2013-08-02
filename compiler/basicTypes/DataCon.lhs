@@ -650,11 +650,12 @@ mkDataCon name declared_infix
       | isJust (promotableTyCon_maybe rep_tycon)
           -- The TyCon is promotable only if all its datacons
           -- are, so the promoteType for prom_kind should succeed
-      = Just (mkPromotedDataCon con name (getUnique name) prom_kind arity)
+      = Just (mkPromotedDataCon con name (getUnique name) prom_kind roles)
       | otherwise 
       = Nothing          
     prom_kind = promoteType (dataConUserType con)
-    arity     = dataConSourceArity con
+    roles = map (const Nominal)          (univ_tvs ++ ex_tvs) ++
+            map (const Representational) orig_arg_tys
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
@@ -996,6 +997,7 @@ dataConCannotMatch tys con
 \begin{code}
 buildAlgTyCon :: Name 
               -> [TyVar]               -- ^ Kind variables and type variables
+              -> [Role]
 	      -> Maybe CType
 	      -> ThetaType	       -- ^ Stupid theta
 	      -> AlgTyConRhs
@@ -1005,14 +1007,14 @@ buildAlgTyCon :: Name
               -> TyConParent
 	      -> TyCon
 
-buildAlgTyCon tc_name ktvs cType stupid_theta rhs 
+buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs 
               is_rec is_promotable gadt_syn parent
   = tc
   where 
     kind = mkPiKinds ktvs liftedTypeKind
 
     -- tc and mb_promoted_tc are mutually recursive
-    tc = mkAlgTyCon tc_name kind ktvs cType stupid_theta 
+    tc = mkAlgTyCon tc_name kind ktvs roles cType stupid_theta 
                     rhs parent is_rec gadt_syn 
                     mb_promoted_tc
 

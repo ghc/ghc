@@ -63,11 +63,30 @@ isForeignExport (L _ (ForeignExport _ _ _ _)) = True
 isForeignExport _                             = False
 \end{code}
 
+Note [Don't recur in normaliseFfiType']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+normaliseFfiType' is the workhorse for normalising a type used in a foreign
+declaration. If we have
+
+newtype Age = MkAge Int
+
+we want to see that Age -> IO () is the same as Int -> IO (). But, we don't
+need to recur on any type parameters, because no paramaterized types (with
+interesting parameters) are marshalable! The full list of marshalable types
+is in the body of boxedMarshalableTyCon in TcType. The only members of that
+list not at kind * are Ptr, FunPtr, and StablePtr, all of which get marshaled
+the same way regardless of type parameter. So, no need to recur into
+parameters.
+
+Similarly, we don't need to look in AppTy's, because nothing headed by
+an AppTy will be marshalable.
+
 \begin{code}
 -- normaliseFfiType takes the type from an FFI declaration, and
 -- evaluates any type synonyms, type functions, and newtypes. However,
 -- we are only allowed to look through newtypes if the constructor is
 -- in scope.  We return a bag of all the newtype constructors thus found.
+-- Always returns a Representational coercion
 normaliseFfiType :: Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
 normaliseFfiType ty
     = do fam_envs <- tcGetFamInstEnvs
@@ -80,10 +99,11 @@ normaliseFfiType' env ty0 = go initRecTc ty0
     go rec_nts ty | Just ty' <- coreView ty     -- Expand synonyms
         = go rec_nts ty'
 
-    go rec_nts (TyConApp tc tys)
+    go rec_nts ty@(TyConApp tc tys)
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
         | tc_key `elem` [ioTyConKey, funPtrTyConKey]
+                  -- Those *must* have R roles on their parameters!
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes
@@ -96,44 +116,42 @@ normaliseFfiType' env ty0 = go initRecTc ty0
                    -- be rejected later as not being a valid FFI type.
         = do { rdr_env <- getGlobalRdrEnv 
              ; case checkNewtypeFFI rdr_env tc of
-                 Nothing  -> children_only
+                 Nothing  -> nothing
                  Just gre -> do { (co', ty', gres) <- go rec_nts' nt_rhs
                                 ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
 
         | isFamilyTyCon tc              -- Expand open tycons
-        , (co, ty) <- normaliseTcApp env tc tys
+        , (co, ty) <- normaliseTcApp env Representational tc tys
         , not (isReflCo co)
         = do (co', ty', gres) <- go rec_nts ty
              return (mkTransCo co co', ty', gres)  
 
         | otherwise
-        = children_only
+        = nothing -- see Note [Don't recur in normaliseFfiType']
         where
           tc_key = getUnique tc
           children_only 
             = do xs <- mapM (go rec_nts) tys
                  let (cos, tys', gres) = unzip3 xs
-                 return (mkTyConAppCo tc cos, mkTyConApp tc tys', unionManyBags gres)
-          nt_co  = mkUnbranchedAxInstCo (newTyConCo tc) tys
+                 return ( mkTyConAppCo Representational tc cos
+                        , mkTyConApp tc tys', unionManyBags gres)
+          nt_co  = mkUnbranchedAxInstCo Representational (newTyConCo tc) tys
           nt_rhs = newTyConInstRhs tc tys
-
-    go rec_nts (AppTy ty1 ty2)
-      = do (coi1, nty1, gres1) <- go rec_nts ty1
-           (coi2, nty2, gres2) <- go rec_nts ty2
-           return (mkAppCo coi1 coi2, mkAppTy nty1 nty2, gres1 `unionBags` gres2)
+          nothing = return (Refl Representational ty, ty, emptyBag)
 
     go rec_nts (FunTy ty1 ty2)
       = do (coi1,nty1,gres1) <- go rec_nts ty1
            (coi2,nty2,gres2) <- go rec_nts ty2
-           return (mkFunCo coi1 coi2, mkFunTy nty1 nty2, gres1 `unionBags` gres2)
+           return (mkFunCo Representational coi1 coi2, mkFunTy nty1 nty2, gres1 `unionBags` gres2)
 
     go rec_nts (ForAllTy tyvar ty1)
       = do (coi,nty1,gres1) <- go rec_nts ty1
            return (mkForAllCo tyvar coi, ForAllTy tyvar nty1, gres1)
 
-    go _ ty@(TyVarTy {}) = return (Refl ty, ty, emptyBag)
-    go _ ty@(LitTy {})   = return (Refl ty, ty, emptyBag)
-
+    go _ ty@(TyVarTy {}) = return (Refl Representational ty, ty, emptyBag)
+    go _ ty@(LitTy {})   = return (Refl Representational ty, ty, emptyBag)
+    go _ ty@(AppTy {})   = return (Refl Representational ty, ty, emptyBag)
+         -- See Note [Don't recur in normaliseFfiType']
 
 checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
 checkNewtypeFFI rdr_env tc 

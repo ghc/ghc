@@ -3525,7 +3525,7 @@ dictionary, only slower!
 </para>
 
 
-<sect3> <title> Generalising the deriving clause </title>
+<sect3 id="generalized-newtype-deriving"> <title> Generalising the deriving clause </title>
 <para>
 GHC now permits such instances to be derived instead,
 using the flag <option>-XGeneralizedNewtypeDeriving</option>,
@@ -3646,6 +3646,8 @@ where
 		derive these classes for a newtype, but it happens in the usual way, not
 		via this new mechanism.
 </para></listitem>
+<listitem><para>
+  The role of the last parameter of each of the <literal>ci</literal> is <emphasis>not</emphasis> <literal>N</literal>. (See <xref linkend="roles"/>.)</para></listitem>
 </itemizedlist>
 Then, for each <literal>ci</literal>, the derived instance
 declaration is:
@@ -10707,7 +10709,214 @@ Jose Pedro Magalhaes, Atze Dijkstra, Johan Jeuring, and Andres Loeh.
 
 </sect1>
 
+<sect1 id="roles">
+<title>Roles
+<indexterm><primary>roles</primary></indexterm>
+</title>
 
+<para>
+Using <option>-XGeneralizedNewtypeDeriving</option> (<xref
+linkend="generalized-newtype-deriving" />), a programmer can take existing
+instances of classes and "lift" these into instances of that class for a
+newtype. However, this is not always safe. For example, consider the following:
+</para>
+
+<programlisting>
+  newtype Age = MkAge { unAge :: Int }
+
+  type family Inspect x
+  type instance Inspect Age = Int
+  type instance Inspect Int = Bool
+
+  class BadIdea a where
+    bad :: a -> Inspect a
+
+  instance BadIdea Int where
+    bad = (> 0)
+
+  deriving instance BadIdea Age    -- not allowed!
+</programlisting>
+
+<para>
+If the derived instance were allowed, what would the type of its method
+<literal>bad</literal> be? It would seem to be <literal>Age -> Inspect
+Age</literal>, which is equivalent to <literal>Age -> Int</literal>, according
+to the type family <literal>Inspect</literal>. Yet, if we simply adapt the
+implementation from the instance for <literal>Int</literal>, the implementation
+for <literal>bad</literal> produces a <literal>Bool</literal>, and we have trouble.
+</para>
+
+<para>
+The way to identify such situations is to have <emphasis>roles</emphasis> assigned
+to type variables of datatypes, classes, and type synonyms.</para>
+
+<para>
+Roles as implemented in GHC are a from a simplified version of the work
+described in <ulink
+url="http://www.seas.upenn.edu/~sweirich/papers/popl163af-weirich.pdf">Generative
+type abstraction and type-level computation</ulink>, published at POPL 2011.</para>
+
+<sect2>
+<title>Nominal, Representational, and Phantom</title>
+
+<para>The goal of the roles system is to track when two types have the same
+underlying representation. In the example above, <literal>Age</literal> and
+<literal>Int</literal> have the same representation. But, the corresponding
+instances of <literal>BadIdea</literal> would <emphasis>not</emphasis> have
+the same representation, because the types of the implementations of
+<literal>bad</literal> would be different.</para>
+
+<para>Suppose we have two uses of a type constructor, each applied to the same
+parameters except for one difference. (For example, <literal>T Age Bool
+c</literal> and <literal>T Int Bool c</literal> for some type
+<literal>T</literal>.) The role of a type parameter says what we need to
+know about the two differing type arguments in order to know that the two
+outer types have the same representation (in the example, what must be true
+about <literal>Age</literal> and <literal>Int</literal> in order to show that
+<literal>T Age Bool c</literal> has the same representation as <literal>
+T Int Bool c</literal>).</para>
+
+<para>GHC supports three different roles for type parameters: nominal,
+representational, and phantom. If a type parameter has a nominal (N) role,
+then the two types that differ must not actually differ at all: they must be
+identical (after type family reduction). If a type parameter has a
+representational (R) role, then the two types must have the same
+representation. (If <literal>T</literal>'s first parameter's role is R, then
+<literal>T Age Bool c</literal> and <literal>T Int Bool c</literal> would have
+the same representation, because <literal>Age</literal> and <literal>Int</literal>
+have the same representation.) If a type parameter has a phantom (P) role,
+then we need no further information.</para>
+
+<para>Here are some examples:</para>
+
+<programlisting>
+  data Simple a = MkSimple a          -- a has role R
+
+  type family F
+  type instance F Int = Bool
+  type instance F Age = Char
+
+  data Complex a = MkComplex (F a)    -- a has role N
+
+  data Phant a = MkPhant Bool         -- a has role P
+</programlisting>
+
+<para>The type <literal>Simple</literal> has its parameter at role R, which is
+generally the most common case. <literal>Simple Age</literal> would have the same
+representation as <literal>Simple Int</literal>. The type <literal>Complex</literal>,
+on the other hand, has its parameter at role N, because <literal>Simple Age</literal>
+and <literal>Simple Int</literal> are <emphasis>not</emphasis> the same. Lastly,
+<literal>Phant Age</literal> and <literal>Phant Bool</literal> have the same
+representation, even though <literal>Age</literal> and <literal>Bool</literal>
+are unrelated.</para>
+
+</sect2>
+
+<sect2>
+<title>Role inference</title>
+
+<para>
+What role should a given type parameter should have? GHC performs role
+inference to determine the correct role for every parameter. It starts with a
+few base facts: <literal>(->)</literal> has two R parameters;
+<literal>(~)</literal> has two N parameters; all type families' parameters are
+N; and all GADT-like parameters are N. Then, these facts are propagated to all
+places where these types are used. By defaulting parameters to role P, any
+parameters unused in the right-hand side (or used only in other types in P
+positions) will be P. Whenever a parameter is used in an R position (that is,
+used as a type argument to a constructor whose corresponding variable is at
+role R), we raise its role from P to R. Similarly, when a parameter is used in
+an N position, its role is upgraded to N. We never downgrade a role from N to
+P or R, or from R to P. In this way, we infer the most-general role for each
+parameter.
+</para>
+
+<para>There is one particularly tricky case that should be explained:</para>
+
+<programlisting>
+  data Tricky a b = MkTricky (a b)
+</programlisting>
+
+<para>What should <literal>Tricky</literal>'s roles be? At first blush, it would
+seem that both <literal>a</literal> and <literal>b</literal> should be at role R,
+since both are used in the right-hand side and neither is involved in a type family.
+However, this would be wrong, as the following example shows:</para>
+
+<programlisting>
+  data Nom a = MkNom (F a)   -- type family F from example above
+</programlisting>
+
+<para>Is <literal>Tricky Nom Age</literal> representationally equal to
+<literal>Tricky Nom Int</literal>? No! The former stores a <literal>Char</literal>
+and the latter stores a <literal>Bool</literal>. The solution to this is
+to require all parameters to type variables to have role N. Thus, GHC would
+infer role R for <literal>a</literal> but role N for <literal>b</literal>.</para>
+
+</sect2>
+
+<sect2>
+<title>Role annotations
+<indexterm><primary>-XRoleAnnotations</primary></indexterm>
+</title>
+
+<para>
+Sometimes the programmer wants to constrain the inference process. For
+example, the base library contains the following definition:
+</para>
+
+<programlisting>
+  data Ptr a = Ptr Addr#
+</programlisting>
+
+<para>
+The idea is that <literal>a</literal> should really be an R parameter, but
+role inference assigns it to P. This makes some level of sense: a pointer to
+an <literal>Int</literal> really is representationally the same as a pointer
+to a <literal>Bool</literal>. But, that's not at all how we want to use
+<literal>Ptr</literal>s! So, we want to be able to say</para>
+
+<programlisting>
+  data Ptr a@R = Ptr Addr#
+</programlisting>
+
+<para>
+The <literal>@R</literal> (enabled with <option>-XRoleAnnotations</option>) annotation forces the
+parameter a to be at role R, not role P. GHC then checks
+the user-supplied roles to make sure they don't break any promises. It would
+be bad, for example, if the user could make <literal>BadIdea</literal>'s role be R.
+</para>
+
+<para>The other place where role annotations may be necessary are in
+<literal>hs-boot</literal> files (<xref linkend="mutual-recursion"/>), where
+the right-hand sides of definitions can be omitted. As usual, the
+types/classes declared in an <literal>hs-boot</literal> file must match up
+with the definitions in the <literal>hs</literal> file, including down to the
+roles. The default role is R in <literal>hs-boot</literal> files,
+corresponding to the common use case.</para>
+
+<para>
+Role annotations are allowed on type variables in data, newtype, class,
+and type declarations. They are not allowed on type/data family
+declarations or in explicit foralls in function type signatures.
+The syntax for a role annotation is an <literal>@</literal> sign followed
+by one of <literal>N</literal>, <literal>R</literal>, or <literal>P</literal>,
+directly following a type variable. If the type variable has an explicit
+kind annotation, the role annotation goes after the kind annotation, outside
+the parentheses. Here are some examples:</para>
+
+<programlisting>
+  data T1 a b@P = MkT1 a     -- b is not used; annotation is fine but unnecessary
+  data T2 a b@P = MkT2 b     -- ERROR: b is used and cannot be P
+  data T3 a b@N = MkT3 a     -- OK: N is higher than necessary, but safe
+  data T4 (a :: * -> *)@N = MkT4 (a Int)    -- OK, but N is higher than necessary
+  class C a@R b where ...    -- OK
+  type X a@N = ...           -- OK
+  type family F a@R          -- ERROR: annotations not allowed on family declarations
+</programlisting>
+
+</sect2>
+
+</sect1>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

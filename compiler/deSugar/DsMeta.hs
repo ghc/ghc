@@ -305,7 +305,7 @@ mk_extra_tvs tc tvs defn
       = do { uniq <- newUnique
            ; let { occ = mkTyVarOccFS (fsLit "t")
                  ; nm = mkInternalName uniq occ loc
-                 ; hs_tv = L loc (KindedTyVar nm kind) }
+                 ; hs_tv = L loc (HsTyVarBndr nm (Just kind) Nothing) }
            ; hs_tvs <- go rest
            ; return (hs_tv : hs_tvs) }
 
@@ -731,10 +731,16 @@ addTyClTyVarBinds tvs m
 --
 repTyVarBndrWithKind :: LHsTyVarBndr Name
                      -> Core TH.Name -> DsM (Core TH.TyVarBndr)
-repTyVarBndrWithKind (L _ (UserTyVar {})) nm
+repTyVarBndrWithKind (L _ (HsTyVarBndr _ Nothing Nothing)) nm
   = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
+repTyVarBndrWithKind (L _ (HsTyVarBndr _ (Just ki) Nothing)) nm
   = repLKind ki >>= repKindedTV nm
+repTyVarBndrWithKind (L _ (HsTyVarBndr _ Nothing (Just r))) nm
+  = repRole r >>= repRoledTV nm
+repTyVarBndrWithKind (L _ (HsTyVarBndr _ (Just ki) (Just r))) nm
+  = do { ki' <- repLKind ki
+       ; r'  <- repRole r
+       ; repKindedRoledTV nm ki' r' }
 
 -- represent a type context
 --
@@ -877,6 +883,11 @@ repNonArrowKind (HsTupleTy _ ks)    = do  { ks' <- mapM repLKind ks
                                           ; repKApps kcon ks'
                                           }
 repNonArrowKind k                   = notHandled "Exotic form of kind" (ppr k)
+
+repRole :: Role -> DsM (Core TH.Role)
+repRole Nominal          = rep2 nominalName []
+repRole Representational = rep2 representationalName []
+repRole Phantom          = rep2 phantomName []
 
 -----------------------------------------------------------------------------
 --              Splices
@@ -1828,6 +1839,13 @@ repPlainTV (MkC nm) = rep2 plainTVName [nm]
 repKindedTV :: Core TH.Name -> Core TH.Kind -> DsM (Core TH.TyVarBndr)
 repKindedTV (MkC nm) (MkC ki) = rep2 kindedTVName [nm, ki]
 
+repRoledTV :: Core TH.Name -> Core TH.Role -> DsM (Core TH.TyVarBndr)
+repRoledTV (MkC nm) (MkC r) = rep2 roledTVName [nm, r]
+
+repKindedRoledTV :: Core TH.Name -> Core TH.Kind -> Core TH.Role
+                 -> DsM (Core TH.TyVarBndr)
+repKindedRoledTV (MkC nm) (MkC k) (MkC r) = rep2 kindedRoledTVName [nm, k, r]
+
 repKVar :: Core TH.Name -> DsM (Core TH.Kind)
 repKVar (MkC s) = rep2 varKName [s]
 
@@ -2041,7 +2059,9 @@ templateHaskellNames = [
     -- TyLit
     numTyLitName, strTyLitName,
     -- TyVarBndr
-    plainTVName, kindedTVName,
+    plainTVName, kindedTVName, roledTVName, kindedRoledTVName,
+    -- Role
+    nominalName, representationalName, phantomName,
     -- Kind
     varKName, conKName, tupleKName, arrowKName, listKName, appKName,
     starKName, constraintKName,
@@ -2319,9 +2339,17 @@ numTyLitName = libFun (fsLit "numTyLit") numTyLitIdKey
 strTyLitName = libFun (fsLit "strTyLit") strTyLitIdKey
 
 -- data TyVarBndr = ...
-plainTVName, kindedTVName :: Name
-plainTVName  = libFun (fsLit "plainTV")  plainTVIdKey
-kindedTVName = libFun (fsLit "kindedTV") kindedTVIdKey
+plainTVName, kindedTVName, roledTVName, kindedRoledTVName :: Name
+plainTVName       = libFun (fsLit "plainTV")       plainTVIdKey
+kindedTVName      = libFun (fsLit "kindedTV")      kindedTVIdKey
+roledTVName       = libFun (fsLit "roledTV")       roledTVIdKey
+kindedRoledTVName = libFun (fsLit "kindedRoledTV") kindedRoledTVIdKey
+
+-- data Role = ...
+nominalName, representationalName, phantomName :: Name
+nominalName          = libFun (fsLit "nominal")          nominalIdKey
+representationalName = libFun (fsLit "representational") representationalIdKey
+phantomName          = libFun (fsLit "phantom")          phantomIdKey
 
 -- data Kind = ...
 varKName, conKName, tupleKName, arrowKName, listKName, appKName,
@@ -2589,8 +2617,8 @@ forImpDIdKey                 = mkPreludeMiscIdUnique 338
 pragInlDIdKey                = mkPreludeMiscIdUnique 339
 pragSpecDIdKey               = mkPreludeMiscIdUnique 340
 pragSpecInlDIdKey            = mkPreludeMiscIdUnique 341
-pragSpecInstDIdKey           = mkPreludeMiscIdUnique 412
-pragRuleDIdKey               = mkPreludeMiscIdUnique 413
+pragSpecInstDIdKey           = mkPreludeMiscIdUnique 416
+pragRuleDIdKey               = mkPreludeMiscIdUnique 417
 familyNoKindDIdKey           = mkPreludeMiscIdUnique 342
 familyKindDIdKey             = mkPreludeMiscIdUnique 343
 dataInstDIdKey               = mkPreludeMiscIdUnique 344
@@ -2658,32 +2686,40 @@ numTyLitIdKey = mkPreludeMiscIdUnique 394
 strTyLitIdKey = mkPreludeMiscIdUnique 395
 
 -- data TyVarBndr = ...
-plainTVIdKey, kindedTVIdKey :: Unique
-plainTVIdKey      = mkPreludeMiscIdUnique 396
-kindedTVIdKey     = mkPreludeMiscIdUnique 397
+plainTVIdKey, kindedTVIdKey, roledTVIdKey, kindedRoledTVIdKey :: Unique
+plainTVIdKey       = mkPreludeMiscIdUnique 396
+kindedTVIdKey      = mkPreludeMiscIdUnique 397
+roledTVIdKey       = mkPreludeMiscIdUnique 398
+kindedRoledTVIdKey = mkPreludeMiscIdUnique 399
+
+-- data Role = ...
+nominalIdKey, representationalIdKey, phantomIdKey :: Unique
+nominalIdKey          = mkPreludeMiscIdUnique 400
+representationalIdKey = mkPreludeMiscIdUnique 401
+phantomIdKey          = mkPreludeMiscIdUnique 402
 
 -- data Kind = ...
 varKIdKey, conKIdKey, tupleKIdKey, arrowKIdKey, listKIdKey, appKIdKey,
   starKIdKey, constraintKIdKey :: Unique
-varKIdKey         = mkPreludeMiscIdUnique 398
-conKIdKey         = mkPreludeMiscIdUnique 399
-tupleKIdKey       = mkPreludeMiscIdUnique 400
-arrowKIdKey       = mkPreludeMiscIdUnique 401
-listKIdKey        = mkPreludeMiscIdUnique 402
-appKIdKey         = mkPreludeMiscIdUnique 403
-starKIdKey        = mkPreludeMiscIdUnique 404
-constraintKIdKey  = mkPreludeMiscIdUnique 405
+varKIdKey         = mkPreludeMiscIdUnique 403
+conKIdKey         = mkPreludeMiscIdUnique 404
+tupleKIdKey       = mkPreludeMiscIdUnique 405
+arrowKIdKey       = mkPreludeMiscIdUnique 406
+listKIdKey        = mkPreludeMiscIdUnique 407
+appKIdKey         = mkPreludeMiscIdUnique 408
+starKIdKey        = mkPreludeMiscIdUnique 409
+constraintKIdKey  = mkPreludeMiscIdUnique 410
 
 -- data Callconv = ...
 cCallIdKey, stdCallIdKey :: Unique
-cCallIdKey      = mkPreludeMiscIdUnique 406
-stdCallIdKey    = mkPreludeMiscIdUnique 407
+cCallIdKey      = mkPreludeMiscIdUnique 411
+stdCallIdKey    = mkPreludeMiscIdUnique 412
 
 -- data Safety = ...
 unsafeIdKey, safeIdKey, interruptibleIdKey :: Unique
-unsafeIdKey        = mkPreludeMiscIdUnique 408
-safeIdKey          = mkPreludeMiscIdUnique 409
-interruptibleIdKey = mkPreludeMiscIdUnique 411
+unsafeIdKey        = mkPreludeMiscIdUnique 413
+safeIdKey          = mkPreludeMiscIdUnique 414
+interruptibleIdKey = mkPreludeMiscIdUnique 415
 
 -- data Inline = ...
 noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
@@ -2704,25 +2740,25 @@ beforePhaseDataConKey = mkPreludeDataConUnique 47
 
 -- data FunDep = ...
 funDepIdKey :: Unique
-funDepIdKey = mkPreludeMiscIdUnique 414
+funDepIdKey = mkPreludeMiscIdUnique 418
 
 -- data FamFlavour = ...
 typeFamIdKey, dataFamIdKey :: Unique
-typeFamIdKey = mkPreludeMiscIdUnique 415
-dataFamIdKey = mkPreludeMiscIdUnique 416
+typeFamIdKey = mkPreludeMiscIdUnique 419
+dataFamIdKey = mkPreludeMiscIdUnique 420
 
 -- data TySynEqn = ...
 tySynEqnIdKey :: Unique
-tySynEqnIdKey = mkPreludeMiscIdUnique 417
+tySynEqnIdKey = mkPreludeMiscIdUnique 421
 
 -- quasiquoting
 quoteExpKey, quotePatKey, quoteDecKey, quoteTypeKey :: Unique
-quoteExpKey  = mkPreludeMiscIdUnique 418
-quotePatKey  = mkPreludeMiscIdUnique 419
-quoteDecKey  = mkPreludeMiscIdUnique 420
-quoteTypeKey = mkPreludeMiscIdUnique 421
+quoteExpKey  = mkPreludeMiscIdUnique 422
+quotePatKey  = mkPreludeMiscIdUnique 423
+quoteDecKey  = mkPreludeMiscIdUnique 424
+quoteTypeKey = mkPreludeMiscIdUnique 425
 
 -- data RuleBndr = ...
 ruleVarIdKey, typedRuleVarIdKey :: Unique
-ruleVarIdKey      = mkPreludeMiscIdUnique 422
-typedRuleVarIdKey = mkPreludeMiscIdUnique 423
+ruleVarIdKey      = mkPreludeMiscIdUnique 426
+typedRuleVarIdKey = mkPreludeMiscIdUnique 427

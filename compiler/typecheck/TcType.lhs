@@ -1330,18 +1330,19 @@ orphNamesOfDFunHead dfun_ty
 	(_, _, head_ty) -> orphNamesOfType head_ty
         
 orphNamesOfCo :: Coercion -> NameSet
-orphNamesOfCo (Refl ty)             = orphNamesOfType ty
-orphNamesOfCo (TyConAppCo tc cos)   = unitNameSet (getName tc) `unionNameSets` orphNamesOfCos cos
+orphNamesOfCo (Refl _ ty)           = orphNamesOfType ty
+orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSets` orphNamesOfCos cos
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ co)       = orphNamesOfCo co
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
 orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSets` orphNamesOfCos cos
-orphNamesOfCo (UnsafeCo ty1 ty2)    = orphNamesOfType ty1 `unionNameSets` orphNamesOfType ty2
+orphNamesOfCo (UnivCo _ ty1 ty2)    = orphNamesOfType ty1 `unionNameSets` orphNamesOfType ty2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
 orphNamesOfCo (NthCo _ co)          = orphNamesOfCo co
 orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co ty)        = orphNamesOfCo co `unionNameSets` orphNamesOfType ty
+orphNamesOfCo (SubCo co)            = orphNamesOfCo co
 
 orphNamesOfCos :: [Coercion] -> NameSet
 orphNamesOfCos = orphNamesOfThings orphNamesOfCo
