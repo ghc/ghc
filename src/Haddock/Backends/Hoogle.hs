@@ -195,7 +195,7 @@ ppCtor dflags dat subdocs con = lookupCon dflags subdocs (con_name con)
 
         resType = case con_res con of
             ResTyH98 -> apps $ map (reL . HsTyVar) $ 
-                        (tcdName dat) : [hsTyVarName v | L _ (v@UserTyVar {}) <- hsQTvBndrs $ tyClDeclTyVars dat]
+                        (tcdName dat) : [hsTyVarName v | L _ v@(HsTyVarBndr _ Nothing Nothing) <- hsQTvBndrs $ tyClDeclTyVars dat]
             ResTyGADT x -> x
 
 

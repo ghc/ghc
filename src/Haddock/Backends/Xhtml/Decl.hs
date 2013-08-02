@@ -676,6 +676,7 @@ ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u q =
     parens (ppr_mono_lty pREC_TOP ty u q <+> dcolon u <+> ppLKind u q kind)
+ppr_mono_ty _         (HsRoleAnnot {})    _ _ = error "ppr_mono_ty HsRoleAnnot"
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsIParamTy n ty)   u q = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q)
