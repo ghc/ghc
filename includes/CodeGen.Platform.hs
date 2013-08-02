@@ -381,7 +381,7 @@ activeStgRegs = [
 #ifdef REG_SpLim
     ,SpLim
 #endif
-#if MAX_REAL_SSE_REG != 0
+#if MAX_REAL_XMM_REG != 0
 #ifdef REG_F1
     ,FloatReg 1
 #endif
@@ -436,7 +436,7 @@ activeStgRegs = [
 #ifdef REG_XMM6
     ,XmmReg 6
 #endif
-#else /* MAX_REAL_SSE_REG == 0 */
+#else /* MAX_REAL_XMM_REG == 0 */
 #ifdef REG_F1
     ,FloatReg 1
 #endif
@@ -473,7 +473,7 @@ activeStgRegs = [
 #ifdef REG_D6
     ,DoubleReg 6
 #endif
-#endif /* MAX_REAL_SSE_REG == 0 */
+#endif /* MAX_REAL_XMM_REG == 0 */
     ]
 
 haveRegBase :: Bool
@@ -587,7 +587,7 @@ globalRegMaybe (DoubleReg 6)            =
                                           Just (RealRegSingle REG_D6)
 #  endif
 # endif
-#if MAX_REAL_SSE_REG != 0
+#if MAX_REAL_XMM_REG != 0
 globalRegMaybe (XmmReg 1)               = Just (RealRegSingle REG_XMM1)
 globalRegMaybe (XmmReg 2)               = Just (RealRegSingle REG_XMM2)
 globalRegMaybe (XmmReg 3)               = Just (RealRegSingle REG_XMM3)

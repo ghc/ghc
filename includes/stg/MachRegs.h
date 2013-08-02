@@ -107,7 +107,7 @@
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
 #define MAX_REAL_LONG_REG    0
-#define MAX_REAL_SSE_REG     0
+#define MAX_REAL_XMM_REG     0
 
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
@@ -212,7 +212,7 @@
 #define MAX_REAL_FLOAT_REG   6
 #define MAX_REAL_DOUBLE_REG  6
 #define MAX_REAL_LONG_REG    0
-#define MAX_REAL_SSE_REG     6
+#define MAX_REAL_XMM_REG     6
 
 /* -----------------------------------------------------------------------------
    The PowerPC register mapping
@@ -565,21 +565,21 @@
 #  endif
 #endif
 
-#ifndef MAX_REAL_SSE_REG
-#  if   defined(REG_SSE6)
-#  define MAX_REAL_SSE_REG 6
-#  elif defined(REG_SSE5)
-#  define MAX_REAL_SSE_REG 5
-#  elif defined(REG_SSE4)
-#  define MAX_REAL_SSE_REG 4
-#  elif defined(REG_SSE3)
-#  define MAX_REAL_SSE_REG 3
-#  elif defined(REG_SSE2)
-#  define MAX_REAL_SSE_REG 2
-#  elif defined(REG_SSE1)
-#  define MAX_REAL_SSE_REG 1
+#ifndef MAX_REAL_XMM_REG
+#  if   defined(REG_XMM6)
+#  define MAX_REAL_XMM_REG 6
+#  elif defined(REG_XMM5)
+#  define MAX_REAL_XMM_REG 5
+#  elif defined(REG_XMM4)
+#  define MAX_REAL_XMM_REG 4
+#  elif defined(REG_XMM3)
+#  define MAX_REAL_XMM_REG 3
+#  elif defined(REG_XMM2)
+#  define MAX_REAL_XMM_REG 2
+#  elif defined(REG_XMM1)
+#  define MAX_REAL_XMM_REG 1
 #  else
-#  define MAX_REAL_SSE_REG 0
+#  define MAX_REAL_XMM_REG 0
 #  endif
 #endif
 

@@ -70,10 +70,10 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (FloatReg s), (vs, fs, ds, ls, ss))
                         (W32, (vs, f:fs, ds, ls, ss))
-                            | not hasSseRegs          -> k (RegisterParam f, (vs, fs, ds, ls, ss))
+                            | not hasXmmRegs          -> k (RegisterParam f, (vs, fs, ds, ls, ss))
                         (W64, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ls, ss))
                         (W64, (vs, fs, d:ds, ls, ss))
-                            | not hasSseRegs          -> k (RegisterParam d, (vs, fs, ds, ls, ss))
+                            | not hasXmmRegs          -> k (RegisterParam d, (vs, fs, ds, ls, ss))
                         (W80, _) -> panic "F80 unsupported register type"
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
@@ -88,7 +88,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
               w  = typeWidth ty
               gcp | isGcPtrType ty = VGcPtr
                   | otherwise      = VNonGcPtr
-              hasSseRegs = mAX_Real_SSE_REG dflags /= 0
+              hasXmmRegs = mAX_Real_XMM_REG dflags /= 0
 
 
 assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
@@ -113,7 +113,7 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
                  , [GlobalReg]   -- floats
                  , [GlobalReg]   -- doubles
                  , [GlobalReg]   -- longs (int64 and word64)
-                 , [Int]         -- SSE (floats and doubles)
+                 , [Int]         -- XMM (floats and doubles)
                  )
 
 -- Vanilla registers can contain pointers, Ints, Chars.
@@ -128,7 +128,7 @@ getRegsWithoutNode dflags =
   , realFloatRegs dflags
   , realDoubleRegs dflags
   , realLongRegs dflags
-  , sseRegNos dflags)
+  , xmmRegNos dflags)
 
 -- getRegsWithNode uses R1/node even if it isn't a register
 getRegsWithNode dflags =
@@ -138,17 +138,17 @@ getRegsWithNode dflags =
   , realFloatRegs dflags
   , realDoubleRegs dflags
   , realLongRegs dflags
-  , sseRegNos dflags)
+  , xmmRegNos dflags)
 
 allFloatRegs, allDoubleRegs, allLongRegs :: DynFlags -> [GlobalReg]
 allVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
-allSseRegs :: DynFlags -> [Int]
+allXmmRegs :: DynFlags -> [Int]
 
 allVanillaRegs dflags = map VanillaReg $ regList (mAX_Vanilla_REG dflags)
 allFloatRegs   dflags = map FloatReg   $ regList (mAX_Float_REG   dflags)
 allDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Double_REG  dflags)
 allLongRegs    dflags = map LongReg    $ regList (mAX_Long_REG    dflags)
-allSseRegs     dflags =                  regList (mAX_SSE_REG     dflags)
+allXmmRegs     dflags =                  regList (mAX_XMM_REG     dflags)
 
 realFloatRegs, realDoubleRegs, realLongRegs :: DynFlags -> [GlobalReg]
 realVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
@@ -158,8 +158,8 @@ realFloatRegs   dflags = map FloatReg   $ regList (mAX_Real_Float_REG   dflags)
 realDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Real_Double_REG  dflags)
 realLongRegs    dflags = map LongReg    $ regList (mAX_Real_Long_REG    dflags)
 
-sseRegNos :: DynFlags -> [Int]
-sseRegNos dflags =regList (mAX_SSE_REG dflags)
+xmmRegNos :: DynFlags -> [Int]
+xmmRegNos dflags =regList (mAX_XMM_REG dflags)
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
@@ -169,7 +169,7 @@ allRegs dflags = (allVanillaRegs dflags,
                   allFloatRegs dflags,
                   allDoubleRegs dflags,
                   allLongRegs dflags,
-                  allSseRegs dflags)
+                  allXmmRegs dflags)
 
 nodeOnly :: AvailRegs
 nodeOnly = ([VanillaReg 1], [], [], [], [])
@@ -187,7 +187,7 @@ globalArgRegs dflags = map ($ VGcPtr) (allVanillaRegs dflags) ++
 -- only use this functionality in hand-written C-- code in the RTS.
 realArgRegsCover :: DynFlags -> [GlobalReg]
 realArgRegsCover dflags
-    | hasSseRegs = map ($VGcPtr) (realVanillaRegs dflags) ++
+    | hasXmmRegs = map ($VGcPtr) (realVanillaRegs dflags) ++
                    realDoubleRegs dflags ++
                    realLongRegs dflags
     | otherwise  = map ($VGcPtr) (realVanillaRegs dflags) ++
@@ -195,4 +195,4 @@ realArgRegsCover dflags
                    realDoubleRegs dflags ++
                    realLongRegs dflags
   where
-    hasSseRegs = mAX_Real_SSE_REG dflags /= 0
+    hasXmmRegs = mAX_Real_XMM_REG dflags /= 0
