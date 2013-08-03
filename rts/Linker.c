@@ -1147,6 +1147,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_casArrayzh)                                     \
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
+      SymI_HasProto(stg_casIntArrayzh)                                  \
       SymI_HasProto_redirect(newCAF, newDynCAF)                         \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \

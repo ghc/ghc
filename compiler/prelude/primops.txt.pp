@@ -1118,6 +1118,14 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Machine-level atomic compare and swap on a word within a ByteArray.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+
 ------------------------------------------------------------------------
 section "Arrays of arrays"
 	{Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}
