@@ -100,3 +100,4 @@ test('T7786', normal, compile_fail, [''])
 test('NoGood', normal, compile_fail, [''])
 test('T7967', normal, compile_fail, [''])
 
+test('T7938', normal, compile_fail, [''])
