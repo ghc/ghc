@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
     StgWord j;
 
     i = 0;
-    j = atomic_inc(&i);
+    j = atomic_inc(&i,1);
     CHECK(j == 1);
     CHECK(i == 1);
 
