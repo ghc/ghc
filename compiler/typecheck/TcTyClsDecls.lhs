@@ -14,7 +14,6 @@ module TcTyClsDecls (
         -- Functions used by TcInstDcls to check
         -- data/type family instance declarations
         kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
-        checkValidTyConDataConsOnly,
         tcSynFamInstDecl, tcFamTyPats,
         tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
         wrongKindOfFamily,
@@ -125,8 +124,9 @@ tcTyClGroup boot_details tyclds
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
             -- See also Note [Role annotations]
-         (names_w_poly_kinds, role_annots) <- kcTyClGroup tyclds
+         (names_w_poly_kinds, role_annots) <- checkNoErrs $ kcTyClGroup tyclds
        ; traceTc "tcTyAndCl generalized kinds" (ppr names_w_poly_kinds)
+            -- the checkNoErrs is necessary to fix #7175.
 
             -- Step 2: type-check all groups together, returning
             -- the final TyCons and Classes
@@ -147,25 +147,14 @@ tcTyClGroup boot_details tyclds
                  -- Kind and type check declarations for this group
              concatMapM (tcTyClDecl rec_flags) tyclds }
 
-           -- Step 3: Perform the validity chebck
+           -- Step 3: Perform the validity check
            -- We can do this now because we are done with the recursive knot
            -- Do it before Step 4 (adding implicit things) because the latter
            -- expects well-formed TyCons
        ; tcExtendGlobalEnv tyclss $ do
        { traceTc "Starting validity check" (ppr tyclss)
-       ; -- Step 3a: Check datacons only. Why? Because checking tycons in general
-         -- also checks for role consistency, which looks at types. But, a mal-formed
-         -- GADT return type means that a datacon has a panic in its types
-         -- (see rejigConRes). So, we check all datacons first, before doing other
-         -- checks.
-         checkNoErrs $
-         mapM_ (recoverM (return ()) . addLocM checkValidTyClDataConsOnly) tyclds
-           -- The checkNoErrs above fixes Trac #7175
-
-           -- Step 3b: do the rest of validity checking
        ; mapM_ (recoverM (return ()) . addLocM (checkValidTyCl role_annots)) tyclds
            -- We recover, which allows us to report multiple validity errors
-           -- but we then fail if any are wrong.
 
            -- Step 4: Add the implicit things;
            -- we want them in the environment because
@@ -494,14 +483,14 @@ kcTyClDecl :: TyClDecl Name -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = defn })
   | HsDataDefn { dd_cons = cons, dd_kindSig = Just _ } <- defn
-  = mapM_ (wrapLocM kcConDecl) cons
+  = mapM_ (wrapLocM (kcConDecl name)) cons
     -- hs_tvs and td_kindSig already dealt with in getInitialKind
     -- Ignore the dd_ctxt; heavily deprecated and inconvenient
 
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
   = kcTyClTyVars name hs_tvs $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kcConDecl) cons }
+        ; mapM_ (wrapLocM (kcConDecl name)) cons }
 
 kcTyClDecl decl@(SynDecl {}) = pprPanic "kcTyClDecl" (ppr decl)
 
@@ -526,14 +515,15 @@ kcTyClDecl (FamDecl (FamilyDecl { fdLName = L _ fam_tc_name
 kcTyClDecl (FamDecl {})    = return ()
 
 -------------------
-kcConDecl :: ConDecl Name -> TcM ()
-kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
-                   , con_cxt = ex_ctxt, con_details = details, con_res = res })
+kcConDecl :: Name -> ConDecl Name -> TcM ()
+kcConDecl tc_name (ConDecl { con_name = name, con_qvars = ex_tvs
+                           , con_cxt = ex_ctxt, con_details = details
+                           , con_res = res })
   = addErrCtxt (dataConCtxt name) $
     do { _ <- kcHsTyVarBndrs ParametricKinds ex_tvs $
               do { _ <- tcHsContext ex_ctxt
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
-                 ; _ <- tcConRes res
+                 ; _ <- tcConRes tc_name (unLoc name) res
                  ; return (panic "kcConDecl", ()) }
        ; return () }
 \end{code}
@@ -805,7 +795,8 @@ tcDataDefn rec_info tc_name tvs kind
 
        ; tycon <- fixM $ \ tycon -> do
              { let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
-             ; data_cons <- tcConDecls new_or_data tycon (final_tvs, res_ty) cons
+             ; data_cons <- tcConDecls new_or_data tc_name tycon
+                                       (final_tvs, res_ty) cons
              ; tc_rhs <-
                  if null cons && is_boot              -- In a hs-boot file, empty cons means
                  then return totallyAbstractTyConRhs  -- "don't know"; hence totally Abstract
@@ -919,12 +910,13 @@ tcTyFamInstEqn fam_tc_name kind
           -- don't print out the pats here, as they might be zonked inside the knot
        ; return (mkCoAxBranch tvs' pats' rhs_ty loc) }
 
-kcDataDefn :: HsDataDefn Name -> TcKind -> TcM ()
+kcDataDefn :: Name -> HsDataDefn Name -> TcKind -> TcM ()
 -- Used for 'data instance' only
 -- Ordinary 'data' is handled by kcTyClDec
-kcDataDefn (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
+kcDataDefn tc_name
+           (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
   = do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kcConDecl) cons
+        ; mapM_ (wrapLocM (kcConDecl tc_name)) cons
         ; kcResultKind mb_kind res_k }
 
 ------------------
@@ -1122,19 +1114,20 @@ consUseH98Syntax _                                             = True
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: NewOrData -> TyCon -> ([TyVar], Type)
+tcConDecls :: NewOrData -> Name -> TyCon -> ([TyVar], Type)
            -> [LConDecl Name] -> TcM [DataCon]
-tcConDecls new_or_data rep_tycon (tmpl_tvs, res_tmpl) cons
-  = mapM (addLocM  $ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl) cons
+tcConDecls new_or_data tc_name rep_tycon (tmpl_tvs, res_tmpl) cons
+  = mapM (addLocM  $ tcConDecl new_or_data tc_name rep_tycon tmpl_tvs res_tmpl) cons
 
 tcConDecl :: NewOrData
+          -> Name              -- of tycon
           -> TyCon             -- Representation tycon
           -> [TyVar] -> Type   -- Return type template (with its template tyvars)
                                --    (tvs, T tys), where T is the family TyCon
           -> ConDecl Name
           -> TcM DataCon
 
-tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
+tcConDecl new_or_data tc_name rep_tycon tmpl_tvs res_tmpl        -- Data types
           (ConDecl { con_name = name
                    , con_qvars = hs_tvs, con_cxt = hs_ctxt
                    , con_details = hs_details, con_res = hs_res_ty })
@@ -1144,7 +1137,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
            <- tcHsTyVarBndrs hs_tvs $ \ _ ->
               do { ctxt    <- tcHsContext hs_ctxt
                  ; details <- tcConArgs new_or_data hs_details
-                 ; res_ty  <- tcConRes hs_res_ty
+                 ; res_ty  <- tcConRes tc_name (unLoc name) hs_res_ty
                  ; let (is_infix, field_lbls, btys) = details
                        (arg_tys, stricts)           = unzip btys
                  ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
@@ -1201,10 +1194,49 @@ tcConArg new_or_data bty
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (arg_ty, getBangStrictness bty) }
 
-tcConRes :: ResType (LHsType Name) -> TcM (ResType Type)
-tcConRes ResTyH98           = return ResTyH98
-tcConRes (ResTyGADT res_ty) = do { res_ty' <- tcHsLiftedType res_ty
-                                 ; return (ResTyGADT res_ty') }
+tcConRes :: Name  -- of tycon   (for checking the validity of return type)
+         -> Name  -- of datacon (for error messages only)
+         -> ResType (LHsType Name) -> TcM (ResType Type)
+tcConRes _ _ ResTyH98           = return ResTyH98
+tcConRes tc_name dc_name (ResTyGADT res_ty)
+  = do { -- See Note [Checking GADT return types]
+         case hsTyGetAppHead_maybe res_ty of
+           Just (tc_name', _)
+             | tc_name' == tc_name -> return ()
+           _                       -> addErrTc (badDataConTyCon dc_name tc_name res_ty)
+       ; res_ty' <- tcHsLiftedType res_ty
+       ; return (ResTyGADT res_ty') }
+
+\end{code}
+
+Note [Checking GADT return types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There isn't really a good place to check that the return type of a GADT is
+well-formed (that is, its head is the datatype's TyCon). One might think that
+we can usefully do this in checkValidDataCon. But, the problem is that
+rejigConRes, which sorts out the proper fields for the DataCon, has to match
+the return type of the declaration with an appropriate template. If the return
+type is mal-formed, this match fails, and rejigConRes has nowhere to go.
+Before roles, rejigConRes just panicked in this scenario, because
+checkValidDataCon was always called before anyone looked at the type of the
+DataCon; laziness saved the day. However, role inference needs to look at the
+types of all the DataCons in a group. Furthermore, checkValidTyCon needs to
+make sure that the inferred roles are compatible with user-supplied role
+annotations, so checkValidTyCon must force the role inference. So, if we're
+not careful about all of this, role inference would force rejigConRes's panic,
+and nastiness would ensue.
+
+There are two ways out of this scenario:
+  1) Make sure we call checkValidDataCon on every DataCon in a group before
+     checking role annotations. This works fine, but it requires a change in 
+     plumbing all the way up to tcTyClGroup, which is a little painful.
+
+  2) Do the check in tcConRes. It's a little harder to do the check here,
+     because the check must be made on an HsType, instead of a Type. Why
+     can't we look at the result of tcHsLiftedType? Because eventually, we'll
+     need to look inside of a TyCon, and that's a no-no inside of the knot.
+
+\begin{code}
 
 -- Example
 --   data instance T (b,c) where
@@ -1225,8 +1257,7 @@ rejigConRes :: [TyVar] -> Type  -- Template for result type; e.g.
                  [(TyVar,Type)],        -- Equality predicates
                  Type)          -- Typechecked return type
         -- We don't check that the TyCon given in the ResTy is
-        -- the same as the parent tycon, because we are in the middle
-        -- of a recursive knot; so it's postponed until checkValidDataCon
+        -- the same as the parent tycon, because tcConRes has already done it
 
 rejigConRes tmpl_tvs res_ty dc_tvs ResTyH98
   = (tmpl_tvs, dc_tvs, [], res_ty)
@@ -1248,10 +1279,8 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT res_ty)
   where
     Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty
                 -- This 'Just' pattern is sure to match, because if not
-                -- checkValidDataCon will complain first. The 'subst'
-                -- should not be looked at until after checkValidDataCon
-                -- We can't check eagerly because we are in a "knot" in
-                -- which 'tycon' is not yet fully defined
+                -- tcConRes will complain first.
+               -- See Note [Checking GADT return types]
 
                 -- /Lazily/ figure out the univ_tvs etc
                 -- Each univ_tv is either a dc_tv or a tmpl_tv
@@ -1336,28 +1365,6 @@ checkValidDecl ctxt lname mroles
             _         -> panic "checkValidTyCl"
         ; traceTc "Done validity of" (ppr thing)
         }
-
-checkValidTyClDataConsOnly :: TyClDecl Name -> TcM ()
-checkValidTyClDataConsOnly decl
-  | DataDecl {} <- decl  = check_datacons_decl
-  | otherwise            = return ()
-  where
-    lname = tyClDeclLName decl
-    check_datacons_decl
-      = addErrCtxt (tcMkDeclCtxt decl) $
-        do { thing <- tcLookupLocatedGlobal lname
-           ; case thing of
-               ATyCon tc -> checkValidTyConDataConsOnly tc
-               _         -> pprPanic "checkValidTyClDataConsOnly" (ppr lname) }
-
-checkValidTyConDataConsOnly :: TyCon -> TcM ()
-checkValidTyConDataConsOnly tc
-  = do {      -- Check arg types of data constructors
-         dflags <- getDynFlags
-       ; existential_ok <- xoptM Opt_ExistentialQuantification
-       ; gadt_ok        <- xoptM Opt_GADTs
-       ; let ex_ok = existential_ok || gadt_ok  -- Data cons can have existential context
-       ; mapM_ (checkValidDataCon dflags ex_ok tc) (tyConDataCons tc) }
                           
 checkValidTyCl :: RoleAnnots -> TyClDecl Name -> TcM ()
 checkValidTyCl mroles decl
@@ -1406,11 +1413,17 @@ checkValidTyCon tc mroles
   | otherwise
   = do { unless (isFamilyTyCon tc) $ check_roles -- don't check data families!
 
--- Check the context on the data decl
+       -- Check the context on the data decl
        ; traceTc "cvtc1" (ppr tc)
        ; checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)
 
        ; traceTc "cvtc2" (ppr tc)
+
+       ; dflags          <- getDynFlags
+       ; existential_ok  <- xoptM Opt_ExistentialQuantification
+       ; gadt_ok         <- xoptM Opt_GADTs
+       ; let ex_ok = existential_ok || gadt_ok  -- Data cons can have existential context
+       ; mapM_ (checkValidDataCon dflags ex_ok tc) data_cons
 
         -- Check that fields with the same name share a type
        ; mapM_ check_fields groups }
@@ -1580,14 +1593,7 @@ checkValidDataCon dflags existential_ok tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))     $
     addErrCtxt (dataConCtxt con)                $
     do  { traceTc "Validity of data con" (ppr con)
-        ; let tc_tvs = tyConTyVars tc
-              res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
-              actual_res_ty = dataConOrigResTy con
-        ; traceTc "checkValidDataCon" (ppr con $$ ppr tc $$ ppr tc_tvs $$ ppr res_ty_tmpl)
-        ; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
-                                res_ty_tmpl
-                                actual_res_ty))
-                  (badDataConTyCon con res_ty_tmpl actual_res_ty)
+        ; traceTc "checkValidDataCon" (ppr con $$ ppr tc)
              -- IA0_TODO: we should also check that kind variables
              -- are only instantiated with kind variables
         ; checkValidMonoType (dataConOrigResTy con)
@@ -2046,11 +2052,11 @@ recClsErr cycles
   = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
                  nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
 
-badDataConTyCon :: DataCon -> Type -> Type -> SDoc
-badDataConTyCon data_con res_ty_tmpl actual_res_ty
+badDataConTyCon :: Name -> Name -> LHsType Name -> SDoc
+badDataConTyCon data_con tc actual_res_ty
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
                 ptext (sLit "returns type") <+> quotes (ppr actual_res_ty))
-       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes (ppr res_ty_tmpl))
+       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes (ppr tc))
 
 badGadtKindCon :: DataCon -> SDoc
 badGadtKindCon data_con

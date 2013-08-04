@@ -529,8 +529,7 @@ mkGadtCtxt :: [Name]            -- Tyvars of the data type
 mkGadtCtxt _ ResTyH98
   = return ([], [])
 mkGadtCtxt data_tvs (ResTyGADT res_ty)
-  | let (head_ty, tys) = splitHsAppTys res_ty []
-  , Just _ <- is_hs_tyvar head_ty
+  | Just (_, tys) <- hsTyGetAppHead_maybe res_ty
   , data_tvs `equalLength` tys
   = return (go [] [] (data_tvs `zip` tys))
 

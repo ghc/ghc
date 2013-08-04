@@ -32,7 +32,7 @@ module HsTypes (
         splitLHsInstDeclTy_maybe,
         splitHsClassTy_maybe, splitLHsClassTy_maybe,
         splitHsFunType,
-        splitHsAppTys, mkHsAppTys, mkHsOpTy,
+        splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
 
         -- Printing
         pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context,
@@ -447,6 +447,20 @@ splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)
 splitHsAppTys (L _ (HsParTy f))   as = splitHsAppTys f as
 splitHsAppTys f                   as = (f,as)
+
+-- retrieve the name of the "head" of a nested type application
+-- somewhat like splitHsAppTys, but a little more thorough
+-- used to examine the result of a GADT-like datacon, so it doesn't handle
+-- *all* cases (like lists, tuples, (~), etc.)
+hsTyGetAppHead_maybe :: LHsType n -> Maybe (n, [LHsType n])
+hsTyGetAppHead_maybe = go []
+  where
+    go tys (L _ (HsTyVar n))             = Just (n, tys)
+    go tys (L _ (HsAppTy l r))           = go (r : tys) l
+    go tys (L _ (HsOpTy l (_, L _ n) r)) = Just (n, l : r : tys)
+    go tys (L _ (HsParTy t))             = go tys t
+    go tys (L _ (HsKindSig t _))         = go tys t
+    go _   _                             = Nothing
 
 mkHsAppTys :: OutputableBndr n => LHsType n -> [LHsType n] -> HsType n
 mkHsAppTys fun_ty [] = pprPanic "mkHsAppTys" (ppr fun_ty)
