@@ -88,7 +88,7 @@ test('gadt-escape1', normal, compile_fail, [''])
 # test('Arith', normal, compile, [''])
 
 test('Session', normal, compile_and_run, [''])
-test('CasePrune', normal, compile_and_run, [''])
+test('CasePrune', normal, compile_fail, [''])
 
 test('T1999', normal, compile, [''])
 test('T1999a', normal, compile, [''])

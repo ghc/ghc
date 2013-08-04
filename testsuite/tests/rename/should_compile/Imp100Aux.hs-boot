@@ -1,11 +1,12 @@
+{-# LANGUAGE RoleAnnotations #-}
 module Imp100Aux where
-data T1 a 
-data T2 a b 
-data T3 a b c 
-data T4 a b c d 
-data T5 a b c d e 
-data T6 a 
-data T7 a b 
-data T8 a b c 
-data T9 a b c d 
-data T10 a b c d e 
+data T1 a@P
+data T2 a@P b@P
+data T3 a@P b@P c@P
+data T4 a@P b@P c@P d@P
+data T5 a@P b@P c@P d@P e@P 
+data T6 a@P 
+data T7 a@P b@P 
+data T8 a@P b@P c@P 
+data T9 a@P b@P c@P d@P 
+data T10 a@P b@P c@P d@P e@P 

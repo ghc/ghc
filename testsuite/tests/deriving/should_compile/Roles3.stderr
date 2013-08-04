@@ -1,0 +1,35 @@
+TYPE SIGNATURES
+TYPE CONSTRUCTORS
+  C1 :: * -> Constraint
+  class C1 a@R
+      RecFlag NonRecursive
+      meth1 :: a -> a
+  C2 :: * -> * -> Constraint
+  class C2 a@N b@N
+      RecFlag NonRecursive
+      meth2 :: (~) * a b -> a -> b
+  C3 :: * -> * -> Constraint
+  class C3 a@R b@N
+      RecFlag NonRecursive
+      type family F3 b@N :: *
+      meth3 :: a -> F3 b -> F3 b
+  C4 :: * -> * -> Constraint
+  class C4 a@R b@N
+      RecFlag NonRecursive
+      meth4 :: a -> F4 b -> F4 b
+  F4 :: * -> *
+  type family F4 a@N :: *
+  Syn1 :: * -> *
+  type Syn1 a@N = F4 a
+  Syn2 :: * -> *
+  type Syn2 a@R = [a]
+COERCION AXIOMS
+  axiom Roles3.NTCo:C1 :: C1 a = a -> a
+  axiom Roles3.NTCo:C2 :: C2 a b = a ~ b => a -> b
+  axiom Roles3.NTCo:C3 :: C3 a b = a -> F3 b -> F3 b
+  axiom Roles3.NTCo:C4 :: C4 a b = a -> F4 b -> F4 b
+Dependent modules: []
+Dependent packages: [base, ghc-prim, integer-gmp]
+
+==================== Typechecker ====================
+

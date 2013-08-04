@@ -180,18 +180,20 @@ test('T3064',
           [(wordsize(32), 111189536, 10),
          # expected value: 56380288 (x86/Linux) (28/6/2011)
          #                111189536 (x86/Windows) (30/10/12)
-           (wordsize(64), 224798696, 5)]),
+           (wordsize(64), 236404384, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
+            # (amd64/Linux) (02/08/2013): 236404384, increase from roles
 
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 9397488, 10)]),
+           (wordsize(64), 10742536, 10)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
             # (amd64/Linux)         (18/02/2013):  9397488
+            # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
        only_ways(['normal'])
       ],
      compile,
@@ -207,12 +209,14 @@ test('T5030',
           [(wordsize(32), 259547660, 10),
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
-           (wordsize(64), 538467496, 10)]),
+           (wordsize(64), 454498592, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
              # 2013-06-08 538467496  (x86_64/Linux)
              # ^ reason unknown
+             # 2013-08-02 454498592  (amd64/Linux)
+             # decrease from more aggressive coercion optimisations from roles
    
        only_ways(['normal'])
       ],

@@ -1,0 +1,4 @@
+
+Roles7.hs:5:8:
+    Illegal role annotation on Int
+    In the type signature for ‛bar’

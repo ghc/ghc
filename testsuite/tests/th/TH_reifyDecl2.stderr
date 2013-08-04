@@ -1,2 +1,2 @@
-data Data.Maybe.Maybe a_0 = Data.Maybe.Nothing
-                          | Data.Maybe.Just a_0
+data Data.Maybe.Maybe a_0@R
+    = Data.Maybe.Nothing | Data.Maybe.Just a_0

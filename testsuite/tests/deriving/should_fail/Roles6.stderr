@@ -1,0 +1,5 @@
+
+Roles6.hs:5:1:
+    Illegal role annotation on variable a;
+    role annotations are not allowed here
+    In the family declaration for ‛F’

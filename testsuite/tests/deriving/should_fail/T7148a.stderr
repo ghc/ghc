@@ -1,0 +1,7 @@
+
+T7148a.hs:19:50:
+    Can't make a derived instance of ‛Convert (IS_NO_LONGER a)’
+      (even with cunning newtype deriving):
+      it is not type-safe to use GeneralizedNewtypeDeriving on this class;
+      the last parameter of ‛Convert’ is at role N
+    In the newtype declaration for ‛IS_NO_LONGER’
