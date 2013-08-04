@@ -1125,6 +1125,13 @@ primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) 
+   {Machine-level word-sized fetch-and-add within a ByteArray.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
 
 ------------------------------------------------------------------------
 section "Arrays of arrays"

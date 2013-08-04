@@ -142,7 +142,6 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
 stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 /* MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
 {
-    W_ len;
     gcptr p,h;
 
     p = arr + SIZEOF_StgArrWords + WDS(ind);
@@ -150,6 +149,19 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 
     return(h);
 }
+
+
+stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
+/* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
+{
+    gcptr p, h;
+
+    p = arr + SIZEOF_StgArrWords + WDS(ind);
+    (h) = ccall atomic_inc_by(p, incr);
+
+    return(h);
+}
+
 
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
