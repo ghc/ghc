@@ -85,10 +85,10 @@ binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 706
 binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 707
-binaryInterfaceVersion = 22
+binaryInterfaceVersion = 23
 
 binaryInterfaceVersionCompatibility :: [Word16]
-binaryInterfaceVersionCompatibility = [21, 22]
+binaryInterfaceVersionCompatibility = [23]
 #else
 #error Unsupported GHC version
 #endif
