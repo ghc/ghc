@@ -919,7 +919,7 @@ static StgWord
 inc_running (void)
 {
     StgWord new;
-    new = atomic_inc(&gc_running_threads);
+    new = atomic_inc(&gc_running_threads, 1);
     ASSERT(new <= n_gc_threads);
     return new;
 }

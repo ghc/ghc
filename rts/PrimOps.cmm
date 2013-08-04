@@ -157,7 +157,7 @@ stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
     gcptr p, h;
 
     p = arr + SIZEOF_StgArrWords + WDS(ind);
-    (h) = ccall atomic_inc_by(p, incr);
+    (h) = ccall atomic_inc(p, incr);
 
     return(h);
 }
