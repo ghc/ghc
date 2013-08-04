@@ -1,6 +1,6 @@
 
 tcfail176.hs:7:21:
     Data constructor ‛Bug’ returns type ‛Maybe a’
-      instead of an instance of its parent type ‛Bug a’
+      instead of an instance of its parent type ‛Bug’
     In the definition of data constructor ‛Bug’
     In the newtype declaration for ‛Bug’

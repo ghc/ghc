@@ -1,6 +1,6 @@
 
 gadt11.hs:12:3:
     Data constructor ‛L2’ returns type ‛T1 Bool’
-      instead of an instance of its parent type ‛T2 a’
+      instead of an instance of its parent type ‛T2’
     In the definition of data constructor ‛L2’
     In the data declaration for ‛T2’
