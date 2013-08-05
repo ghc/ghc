@@ -1,6 +1,7 @@
 
 Roles12.hs:5:6:
-    Type constructor ‛T’ has conflicting definitions in the module and its hs-boot file
+    Type constructor ‛T’ has conflicting definitions in the module
+    and its hs-boot file
     Main module: data T a@P
                      No C type associated
                      RecFlag Recursive, Promotable
