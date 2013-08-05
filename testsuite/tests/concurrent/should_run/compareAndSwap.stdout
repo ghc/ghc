@@ -1,5 +1,8 @@
+Perform a CAS within an IORef
+  1st try should succeed: (True,44)
+  2nd should fail: (False,44)
 Perform a CAS within a MutableArray#
-  1st try should succeed: (True,33)
+  1st try should succeed: (True,44)
   2nd should fail: (False,44)
 Printing array:
   33  33  33  44  33
