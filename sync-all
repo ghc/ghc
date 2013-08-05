@@ -551,6 +551,18 @@ sub gitall {
     unlink "resume";
 }
 
+sub checkCurrentBranchIsMaster {
+    my $branch = `git symbolic-ref HEAD`;
+    $branch =~ s/refs\/heads\///;
+    $branch =~ s/\n//;
+
+    if ($branch !~ /master/) {
+        print "\nWarning: You trying to 'pull' while on branch '$branch'.\n"
+            . "Updates to this script will happen on the master branch which\n"
+            . "means the version on this branch may be out of date.\n\n";
+    }
+}
+
 sub help
 {
         my $exit = shift;
@@ -889,6 +901,9 @@ sub main {
 }
 
 BEGIN {
+    if ("pull" ~~ @ARGV) {
+        checkCurrentBranchIsMaster();
+    }
     $initial_working_directory = getcwd();
 }
 
