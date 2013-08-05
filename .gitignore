@@ -43,6 +43,7 @@ _darcs/
 # sub-repositories
 
 /ghc-tarballs/
+/libffi-tarballs/
 /libraries/array/
 /libraries/base/
 /libraries/deepseq/
