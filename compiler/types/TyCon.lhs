@@ -624,6 +624,10 @@ data SynTyConRhs
    -- | A closed type synonym family  e.g. @type family F x where { F Int = Bool }@
    | ClosedSynFamilyTyCon
        (CoAxiom Branched) -- The one axiom for this family
+
+   -- | A closed type synonym family declared in an hs-boot file with
+   -- type family F a where ..
+   | AbstractClosedSynFamilyTyCon
 \end{code}
 
 Note [Closed type families]
@@ -1200,9 +1204,10 @@ isEnumerationTyCon _                                                   = False
 
 -- | Is this a 'TyCon', synonym or otherwise, that defines a family?
 isFamilyTyCon :: TyCon -> Bool
-isFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon })      = True
-isFamilyTyCon (SynTyCon {synTcRhs = ClosedSynFamilyTyCon {} }) = True
-isFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}})       = True
+isFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon })              = True
+isFamilyTyCon (SynTyCon {synTcRhs = ClosedSynFamilyTyCon {} })         = True
+isFamilyTyCon (SynTyCon {synTcRhs = AbstractClosedSynFamilyTyCon {} }) = True
+isFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}})               = True
 isFamilyTyCon _ = False
 
 -- | Is this a 'TyCon', synonym or otherwise, that defines an family with
@@ -1214,14 +1219,16 @@ isOpenFamilyTyCon _ = False
 
 -- | Is this a synonym 'TyCon' that can have may have further instances appear?
 isSynFamilyTyCon :: TyCon -> Bool
-isSynFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon {}})   = True
-isSynFamilyTyCon (SynTyCon {synTcRhs = ClosedSynFamilyTyCon {}}) = True
+isSynFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon {}})           = True
+isSynFamilyTyCon (SynTyCon {synTcRhs = ClosedSynFamilyTyCon {}})         = True
+isSynFamilyTyCon (SynTyCon {synTcRhs = AbstractClosedSynFamilyTyCon {}}) = True
 isSynFamilyTyCon _ = False
 
 isOpenSynFamilyTyCon :: TyCon -> Bool
 isOpenSynFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon }) = True
 isOpenSynFamilyTyCon _ = False
 
+-- leave out abstract closed families here
 isClosedSynFamilyTyCon_maybe :: TyCon -> Maybe (CoAxiom Branched)
 isClosedSynFamilyTyCon_maybe
   (SynTyCon {synTcRhs = ClosedSynFamilyTyCon ax}) = Just ax

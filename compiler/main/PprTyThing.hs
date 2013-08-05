@@ -179,9 +179,9 @@ pprTyCon pefas ss tyCon
       OpenSynFamilyTyCon -> pprTyConHdr pefas tyCon <+> dcolon <+> 
                                  pprTypeForUser pefas (GHC.synTyConResKind tyCon)
       ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
-        hang (pprTyConHdr pefas tyCon <+> dcolon <+>
-              pprTypeForUser pefas (GHC.synTyConResKind tyCon) <+> ptext (sLit "where"))
+        hang closed_family_header
            2 (vcat (brListMap (pprCoAxBranch tyCon) branches))
+      AbstractClosedSynFamilyTyCon -> closed_family_header <+> ptext (sLit "..")
       SynonymTyCon rhs_ty -> hang (pprTyConHdr pefas tyCon <+> equals) 
                                      2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
                                                  -- e.g. type T = forall a. a->a
@@ -189,6 +189,11 @@ pprTyCon pefas ss tyCon
   = pprClass pefas ss cls
   | otherwise
   = pprAlgTyCon pefas ss tyCon
+
+  where
+    closed_family_header
+      = pprTyConHdr pefas tyCon <+> dcolon <+>
+        pprTypeForUser pefas (GHC.synTyConResKind tyCon) <+> ptext (sLit "where")
 
 pprAlgTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprAlgTyCon pefas ss tyCon

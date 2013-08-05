@@ -1513,9 +1513,12 @@ tyConToIfaceDecl env tycon
   where
     (env1, tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
 
-    to_ifsyn_rhs OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
-    to_ifsyn_rhs (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon (coAxiomName ax)
-    to_ifsyn_rhs (SynonymTyCon ty)         = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
+    to_ifsyn_rhs OpenSynFamilyTyCon           = IfaceOpenSynFamilyTyCon
+    to_ifsyn_rhs (ClosedSynFamilyTyCon ax)    
+      = IfaceClosedSynFamilyTyCon (coAxiomName ax)
+    to_ifsyn_rhs AbstractClosedSynFamilyTyCon = IfaceAbstractClosedSynFamilyTyCon
+    to_ifsyn_rhs (SynonymTyCon ty)            
+      = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
 
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)

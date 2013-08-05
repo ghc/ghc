@@ -836,7 +836,13 @@ values.  For example:
 </programlisting>
 </para></listitem>
 <listitem><para> Fixity declarations are exactly as in Haskell.</para></listitem>
-<listitem><para> Type synonym declarations are exactly as in Haskell.</para></listitem>
+<listitem><para> Vanilla type synonym declarations are exactly as in Haskell.</para></listitem>
+<listitem><para> Open type and data family declarations are exactly as in Haskell.</para></listitem>
+<listitem><para> A closed type family may optionally omit its equations, as in the following example:
+<programlisting>
+  type family ClosedFam a where ..
+</programlisting>
+The <literal>..</literal> is meant literally -- you should write two dots in your file. Note that the <literal>where</literal> clause is still necessary to distinguish closed families from open ones. If you give any equations of a closed family, you must give all of them, in the same order as they appear in the accompanying Haskell file.</para></listitem>
 <listitem><para> A data type declaration can either be given in full, exactly as in Haskell, or it
 can be given abstractly, by omitting the '=' sign and everything that follows.  For example:
 <programlisting>

@@ -222,18 +222,21 @@ instance Binary IfaceDecl where
 data IfaceSynTyConRhs
   = IfaceOpenSynFamilyTyCon
   | IfaceClosedSynFamilyTyCon IfExtName  -- name of associated axiom
+  | IfaceAbstractClosedSynFamilyTyCon
   | IfaceSynonymTyCon IfaceType
 
 instance Binary IfaceSynTyConRhs where
-    put_ bh IfaceOpenSynFamilyTyCon        = putByte bh 0
-    put_ bh (IfaceClosedSynFamilyTyCon ax) = putByte bh 1 >> put_ bh ax
-    put_ bh (IfaceSynonymTyCon ty)         = putByte bh 2 >> put_ bh ty
+    put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 0
+    put_ bh (IfaceClosedSynFamilyTyCon ax)    = putByte bh 1 >> put_ bh ax
+    put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 2
+    put_ bh (IfaceSynonymTyCon ty)            = putByte bh 3 >> put_ bh ty
 
     get bh = do { h <- getByte bh
                 ; case h of
-                    0 -> do { return IfaceOpenSynFamilyTyCon }
+                    0 -> return IfaceOpenSynFamilyTyCon
                     1 -> do { ax <- get bh
                             ; return (IfaceClosedSynFamilyTyCon ax) }
+                    2 -> return IfaceAbstractClosedSynFamilyTyCon
                     _ -> do { ty <- get bh
                             ; return (IfaceSynonymTyCon ty) } }
 
@@ -1035,8 +1038,9 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifRoles = roles,
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars roles)
        4 (dcolon <+> ppr kind)
 
+-- this case handles both abstract and instantiated closed family tycons
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifRoles = roles,
-                        ifSynRhs = IfaceClosedSynFamilyTyCon {}, ifSynKind = kind })
+                        ifSynRhs = _closedSynFamilyTyCon, ifSynKind = kind })
   = hang (ptext (sLit "closed type family") <+> pprIfaceDeclHead [] tycon tyvars roles)
        4 (dcolon <+> ppr kind)
 
@@ -1352,9 +1356,10 @@ freeNamesIfIdDetails _                 = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
 freeNamesIfSynRhs :: IfaceSynTyConRhs -> NameSet
-freeNamesIfSynRhs (IfaceSynonymTyCon ty)         = freeNamesIfType ty
-freeNamesIfSynRhs IfaceOpenSynFamilyTyCon        = emptyNameSet
-freeNamesIfSynRhs (IfaceClosedSynFamilyTyCon ax) = unitNameSet ax
+freeNamesIfSynRhs (IfaceSynonymTyCon ty)            = freeNamesIfType ty
+freeNamesIfSynRhs IfaceOpenSynFamilyTyCon           = emptyNameSet
+freeNamesIfSynRhs (IfaceClosedSynFamilyTyCon ax)    = unitNameSet ax
+freeNamesIfSynRhs IfaceAbstractClosedSynFamilyTyCon = emptyNameSet
 
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType

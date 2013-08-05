@@ -1070,6 +1070,7 @@ data KindCheckingStrategy   -- See Note [Kind-checking strategies]
   = ParametricKinds
   | NonParametricKinds
   | FullKindSignature
+  deriving (Eq)
 
 -- determine the appropriate strategy for a decl
 kcStrategy :: TyClDecl Name -> KindCheckingStrategy
@@ -1082,10 +1083,10 @@ kcStrategy (DataDecl { tcdDataDefn = HsDataDefn { dd_kindSig = m_ksig }})
   | otherwise                   = ParametricKinds
 kcStrategy (ClassDecl {})     = ParametricKinds
 
+-- if the ClosedTypeFamily has no equations, do the defaulting to *, etc.
 kcStrategyFamDecl :: FamilyDecl Name -> KindCheckingStrategy
-kcStrategyFamDecl (FamilyDecl { fdInfo = info })
-  | isClosedTypeFamilyInfo info = NonParametricKinds
-  | otherwise                   = FullKindSignature
+kcStrategyFamDecl (FamilyDecl { fdInfo = ClosedTypeFamily (_:_) }) = NonParametricKinds
+kcStrategyFamDecl _                                                = FullKindSignature
 
 mkKindSigVar :: Name -> TcM KindVar
 -- Use the specified name; don't clone it

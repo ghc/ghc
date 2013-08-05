@@ -34,7 +34,7 @@ import TcHsSyn
 import TcExpr
 import TcRnMonad
 import TcEvidence
-import Coercion( pprCoAxiom )
+import Coercion( pprCoAxiom, pprCoAxBranch )
 import FamInst
 import InstEnv
 import FamInstEnv
@@ -49,7 +49,6 @@ import TcInstDcls
 import TcIface
 import TcMType
 import MkIface
-import IfaceSyn
 import TcSimplify
 import TcTyClsDecls
 import LoadIface
@@ -75,7 +74,7 @@ import Outputable
 import DataCon
 import Type
 import Class
-import CoAxiom  ( CoAxBranch(..) )
+import CoAxiom
 import Inst     ( tcGetInstEnvs )
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
@@ -660,10 +659,7 @@ checkHiBootIface
         Just boot_thing <- mb_boot_thing
       = when (not (checkBootDecl boot_thing real_thing))
             $ addErrAt (nameSrcSpan (getName boot_thing))
-                       (let boot_decl = tyThingToIfaceDecl
-                                               (fromJust mb_boot_thing)
-                            real_decl = tyThingToIfaceDecl real_thing
-                        in bootMisMatch real_thing boot_decl real_decl)
+                       (bootMisMatch real_thing boot_thing)
 
       | otherwise
       = addErrTc (missingBootThing name "defined in")
@@ -772,8 +768,10 @@ checkBootTyCon tc1 tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
     let eqSynRhs OpenSynFamilyTyCon OpenSynFamilyTyCon = True
+        eqSynRhs AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {}) = True
+        eqSynRhs (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon = True
         eqSynRhs (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
-            = ax1 == ax2
+            = eqClosedFamilyAx ax1 ax2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
@@ -814,6 +812,19 @@ checkBootTyCon tc1 tc2
       && dataConFieldLabels c1 == dataConFieldLabels c2
       && eqType (dataConUserType c1) (dataConUserType c2)
 
+    eqClosedFamilyAx (CoAxiom { co_ax_branches = branches1 })
+                     (CoAxiom { co_ax_branches = branches2 })
+      =  brListLength branches1 == brListLength branches2
+      && (and $ brListZipWith eqClosedFamilyBranch branches1 branches2)
+
+    eqClosedFamilyBranch (CoAxBranch { cab_tvs = tvs1, cab_lhs = lhs1, cab_rhs = rhs1 })
+                         (CoAxBranch { cab_tvs = tvs2, cab_lhs = lhs2, cab_rhs = rhs2 })
+      | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
+      = eqListBy (eqTypeX env) lhs1 lhs2 &&
+        eqTypeX env rhs1 rhs2
+
+      | otherwise = False
+
 emptyRnEnv2 :: RnEnv2
 emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 
@@ -823,11 +834,25 @@ missingBootThing name what
   = ppr name <+> ptext (sLit "is exported by the hs-boot file, but not")
               <+> text what <+> ptext (sLit "the module")
 
-bootMisMatch :: TyThing -> IfaceDecl -> IfaceDecl -> SDoc
-bootMisMatch thing boot_decl real_decl
-  = vcat [ppr thing <+> ptext (sLit "has conflicting definitions in the module and its hs-boot file"),
-          ptext (sLit "Main module:") <+> ppr real_decl,
-          ptext (sLit "Boot file:  ") <+> ppr boot_decl]
+bootMisMatch :: TyThing -> TyThing -> SDoc
+bootMisMatch real_thing boot_thing
+  = vcat [ppr real_thing <+>
+          ptext (sLit "has conflicting definitions in the module"),
+          ptext (sLit "and its hs-boot file"),
+          ptext (sLit "Main module:") <+> ppr_mismatch real_thing,
+          ptext (sLit "Boot file:  ") <+> ppr_mismatch boot_thing]
+  where
+      -- closed type families need special treatment, because they might differ
+      -- in their equations, which are not stored in the corresponding IfaceDecl
+    ppr_mismatch thing
+      | ATyCon tc <- thing
+      , Just (ClosedSynFamilyTyCon ax) <- synTyConRhs_maybe tc
+      = hang (ppr iface_decl <+> ptext (sLit "where"))
+           2 (vcat $ brListMap (pprCoAxBranch tc) (coAxiomBranches ax))
+      
+      | otherwise
+      = ppr iface_decl
+      where iface_decl = tyThingToIfaceDecl thing
 
 instMisMatch :: ClsInst -> SDoc
 instMisMatch inst

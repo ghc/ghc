@@ -1394,6 +1394,8 @@ reifyFamFlavour tc
   | isOpenSynFamilyTyCon tc = return $ Left TH.TypeFam
   | isDataFamilyTyCon    tc = return $ Left TH.DataFam
 
+    -- this doesn't really handle abstract closed families, but let's not worry
+    -- about that now
   | Just ax <- isClosedSynFamilyTyCon_maybe tc
   = do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
        ; return $ Right eqns }

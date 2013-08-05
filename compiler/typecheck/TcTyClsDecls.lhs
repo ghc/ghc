@@ -422,7 +422,6 @@ getFamDeclInitialKinds decls
 getFamDeclInitialKind :: FamilyDecl Name
                       -> TcM [(Name, TcTyThing)]
 getFamDeclInitialKind decl@(FamilyDecl { fdLName = L _ name
-                                       , fdInfo = info
                                        , fdTyVars = ktvs
                                        , fdKindSig = ksig })
   = do { (fam_kind, _, _) <-
@@ -435,7 +434,7 @@ getFamDeclInitialKind decl@(FamilyDecl { fdLName = L _ name
               ; return (res_k, ()) }
        ; return [ (name, AThing fam_kind) ] }
   where
-    defaultResToStar  = not $ isClosedTypeFamilyInfo info
+    defaultResToStar = (kcStrategyFamDecl decl == FullKindSignature)
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)]
@@ -697,6 +696,7 @@ tcFamDecl1 parent
                         , fdLName = lname@(L _ tc_name), fdTyVars = tvs })
 -- Closed type families are a little tricky, because they contain the definition
 -- of both the type family and the equations for a CoAxiom.
+-- Note: eqns might be empty, in a hs-boot file!
   = do { traceTc "closed type family:" (ppr tc_name)
          -- the variables in the header have no scope:
        ; (tvs', kind) <- tcTyClTyVars tc_name tvs $ \ tvs' kind ->
@@ -727,14 +727,22 @@ tcFamDecl1 parent
          -- See [Zonking inside the knot] in TcHsType
        ; loc <- getSrcSpanM
        ; co_ax_name <- newFamInstAxiomName loc tc_name [] 
+
+         -- mkBranchedCoAxiom will fail on an empty list of branches, but
+         -- we'll never look at co_ax in this case
        ; let co_ax = mkBranchedCoAxiom co_ax_name fam_tc branches
 
          -- now, finally, build the TyCon
-       ; let syn_rhs = ClosedSynFamilyTyCon co_ax
+       ; let syn_rhs = if null eqns
+                       then AbstractClosedSynFamilyTyCon
+                       else ClosedSynFamilyTyCon co_ax
              roles   = map (const Nominal) tvs'
        ; tycon <- buildSynTyCon tc_name tvs' roles syn_rhs kind parent
 
-       ; return [ATyCon tycon, ACoAxiom co_ax] }
+       ; let result = if null eqns
+                      then [ATyCon tycon]
+                      else [ATyCon tycon, ACoAxiom co_ax]
+       ; return result }
 -- We check for instance validity later, when doing validity checking for
 -- the tycon
 
@@ -1404,9 +1412,14 @@ checkValidTyCon tc mroles
 
   | Just syn_rhs <- synTyConRhs_maybe tc
   = case syn_rhs of
-      ClosedSynFamilyTyCon ax -> checkValidClosedCoAxiom ax
-      OpenSynFamilyTyCon  -> return ()
-      SynonymTyCon ty     -> 
+      ClosedSynFamilyTyCon ax      -> checkValidClosedCoAxiom ax
+      AbstractClosedSynFamilyTyCon ->
+        do { hsBoot <- tcIsHsBoot
+           ; checkTc hsBoot $
+             ptext (sLit "You may omit the equations in a closed type family") $$
+             ptext (sLit "only in a .hs-boot file") }
+      OpenSynFamilyTyCon           -> return ()
+      SynonymTyCon ty              -> 
         do { check_roles
            ; checkValidType syn_ctxt ty }
 

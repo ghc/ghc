@@ -712,6 +712,8 @@ where_type_family :: { Located (FamilyInfo RdrName) }
 ty_fam_inst_eqn_list :: { Located [LTyFamInstEqn RdrName] }
         :     '{' ty_fam_inst_eqns '}'     { LL (unLoc $2) }
         | vocurly ty_fam_inst_eqns close   { $2 }
+        |     '{' '..' '}'                 { LL [] }
+        | vocurly '..' close               { let L loc _ = $2 in L loc [] }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn RdrName] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn   { LL ($3 : unLoc $1) }
