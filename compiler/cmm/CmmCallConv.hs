@@ -128,7 +128,7 @@ getRegsWithoutNode dflags =
   , realFloatRegs dflags
   , realDoubleRegs dflags
   , realLongRegs dflags
-  , xmmRegNos dflags)
+  , realXmmRegNos dflags)
 
 -- getRegsWithNode uses R1/node even if it isn't a register
 getRegsWithNode dflags =
@@ -138,7 +138,7 @@ getRegsWithNode dflags =
   , realFloatRegs dflags
   , realDoubleRegs dflags
   , realLongRegs dflags
-  , xmmRegNos dflags)
+  , realXmmRegNos dflags)
 
 allFloatRegs, allDoubleRegs, allLongRegs :: DynFlags -> [GlobalReg]
 allVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
@@ -152,14 +152,13 @@ allXmmRegs     dflags =                  regList (mAX_XMM_REG     dflags)
 
 realFloatRegs, realDoubleRegs, realLongRegs :: DynFlags -> [GlobalReg]
 realVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
+realXmmRegNos :: DynFlags -> [Int]
 
 realVanillaRegs dflags = map VanillaReg $ regList (mAX_Real_Vanilla_REG dflags)
 realFloatRegs   dflags = map FloatReg   $ regList (mAX_Real_Float_REG   dflags)
 realDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Real_Double_REG  dflags)
 realLongRegs    dflags = map LongReg    $ regList (mAX_Real_Long_REG    dflags)
-
-xmmRegNos :: DynFlags -> [Int]
-xmmRegNos dflags =regList (mAX_XMM_REG dflags)
+realXmmRegNos   dflags =                  regList (mAX_Real_XMM_REG     dflags)
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
