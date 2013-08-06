@@ -901,7 +901,8 @@ sub main {
 }
 
 BEGIN {
-    if ("pull" ~~ @ARGV) {
+    my %argvHash = map { $_, 1 } @ARGV;
+    if ($argvHash {"pull"}) {
         checkCurrentBranchIsMaster();
     }
     $initial_working_directory = getcwd();
