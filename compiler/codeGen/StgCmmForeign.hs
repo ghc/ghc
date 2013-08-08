@@ -18,7 +18,7 @@ module StgCmmForeign (
 #include "HsVersions.h"
 
 import StgSyn
-import StgCmmProf
+import StgCmmProf (storeCurCCS, ccsType, curCCS)
 import StgCmmEnv
 import StgCmmMonad
 import StgCmmUtils

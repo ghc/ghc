@@ -11,7 +11,7 @@ module StgCmm ( codeGen ) where
 #define FAST_STRING_NOT_NEEDED
 #include "HsVersions.h"
 
-import StgCmmProf
+import StgCmmProf (initCostCentres, ldvEnter)
 import StgCmmMonad
 import StgCmmEnv
 import StgCmmBind

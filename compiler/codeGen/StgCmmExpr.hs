@@ -17,7 +17,7 @@ import StgCmmMonad
 import StgCmmHeap
 import StgCmmEnv
 import StgCmmCon
-import StgCmmProf
+import StgCmmProf (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
 import StgCmmLayout
 import StgCmmPrim
 import StgCmmHpc

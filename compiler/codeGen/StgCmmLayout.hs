@@ -29,7 +29,7 @@ import StgCmmArgRep -- notably: ( slowCallPattern )
 import StgCmmTicky
 import StgCmmMonad
 import StgCmmUtils
-import StgCmmProf
+import StgCmmProf (curCCS)
 
 import MkGraph
 import SMRep

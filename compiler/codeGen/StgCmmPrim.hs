@@ -21,7 +21,7 @@ import StgCmmMonad
 import StgCmmUtils
 import StgCmmTicky
 import StgCmmHeap
-import StgCmmProf
+import StgCmmProf ( costCentreFrom, curCCS )
 
 import DynFlags
 import Platform

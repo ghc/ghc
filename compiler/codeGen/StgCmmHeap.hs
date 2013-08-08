@@ -28,7 +28,7 @@ import CLabel
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmMonad
-import StgCmmProf
+import StgCmmProf (profDynAlloc, dynProfHdr, staticProfHdr)
 import StgCmmTicky
 import StgCmmClosure
 import StgCmmEnv
