@@ -10,15 +10,11 @@ T7116.dl :: GHC.Types.Double -> GHC.Types.Double
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x_ae1 [Occ=Once!] :: GHC.Types.Double) ->
-                 case x_ae1 of _ { GHC.Types.D# y_afn ->
-                 GHC.Types.D# (GHC.Prim.+## y_afn y_afn)
-                 }}]
+         Tmpl= \ (x [Occ=Once!] :: GHC.Types.Double) ->
+                 case x of _ { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
 T7116.dl =
-  \ (x_ae1 :: GHC.Types.Double) ->
-    case x_ae1 of _ { GHC.Types.D# y_afn ->
-    GHC.Types.D# (GHC.Prim.+## y_afn y_afn)
-    }
+  \ (x :: GHC.Types.Double) ->
+    case x of _ { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }
 
 T7116.dr :: GHC.Types.Double -> GHC.Types.Double
 [GblId,
@@ -28,9 +24,9 @@ T7116.dr :: GHC.Types.Double -> GHC.Types.Double
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x_aem [Occ=Once!] :: GHC.Types.Double) ->
-                 case x_aem of _ { GHC.Types.D# x1_afj ->
-                 GHC.Types.D# (GHC.Prim.+## x1_afj x1_afj)
+         Tmpl= \ (x [Occ=Once!] :: GHC.Types.Double) ->
+                 case x of _ { GHC.Types.D# x1 ->
+                 GHC.Types.D# (GHC.Prim.+## x1 x1)
                  }}]
 T7116.dr = T7116.dl
 
@@ -42,14 +38,14 @@ T7116.fl :: GHC.Types.Float -> GHC.Types.Float
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x_aen [Occ=Once!] :: GHC.Types.Float) ->
-                 case x_aen of _ { GHC.Types.F# y_afx ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# y_afx y_afx)
+         Tmpl= \ (x [Occ=Once!] :: GHC.Types.Float) ->
+                 case x of _ { GHC.Types.F# y ->
+                 GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]
 T7116.fl =
-  \ (x_aen :: GHC.Types.Float) ->
-    case x_aen of _ { GHC.Types.F# y_afx ->
-    GHC.Types.F# (GHC.Prim.plusFloat# y_afx y_afx)
+  \ (x :: GHC.Types.Float) ->
+    case x of _ { GHC.Types.F# y ->
+    GHC.Types.F# (GHC.Prim.plusFloat# y y)
     }
 
 T7116.fr :: GHC.Types.Float -> GHC.Types.Float
@@ -60,9 +56,9 @@ T7116.fr :: GHC.Types.Float -> GHC.Types.Float
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x_aeo [Occ=Once!] :: GHC.Types.Float) ->
-                 case x_aeo of _ { GHC.Types.F# x1_aft ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# x1_aft x1_aft)
+         Tmpl= \ (x [Occ=Once!] :: GHC.Types.Float) ->
+                 case x of _ { GHC.Types.F# x1 ->
+                 GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
                  }}]
 T7116.fr = T7116.fl
 
