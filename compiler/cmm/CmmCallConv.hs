@@ -14,6 +14,7 @@ import Cmm (Convention(..))
 import PprCmm ()
 
 import DynFlags
+import Platform
 import Outputable
 
 -- Calculate the 'GlobalReg' or stack locations for function call
@@ -68,12 +69,14 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                       (W128, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
-                        (W32, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (FloatReg s), (vs, fs, ds, ls, ss))
+                        (W32, (vs, fs, ds, ls, s:ss))
+                            | passFloatInXmm          -> k (RegisterParam (FloatReg s), (vs, fs, ds, ls, ss))
                         (W32, (vs, f:fs, ds, ls, ss))
-                            | not hasXmmRegs          -> k (RegisterParam f, (vs, fs, ds, ls, ss))
-                        (W64, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ls, ss))
+                            | not passFloatInXmm      -> k (RegisterParam f, (vs, fs, ds, ls, ss))
+                        (W64, (vs, fs, ds, ls, s:ss))
+                            | passFloatInXmm          -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ls, ss))
                         (W64, (vs, fs, d:ds, ls, ss))
-                            | not hasXmmRegs          -> k (RegisterParam d, (vs, fs, ds, ls, ss))
+                            | not passFloatInXmm      -> k (RegisterParam d, (vs, fs, ds, ls, ss))
                         (W80, _) -> panic "F80 unsupported register type"
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
@@ -88,8 +91,12 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
               w  = typeWidth ty
               gcp | isGcPtrType ty = VGcPtr
                   | otherwise      = VNonGcPtr
-              hasXmmRegs = mAX_Real_XMM_REG dflags /= 0
+              passFloatInXmm = passFloatArgsInXmm dflags
 
+passFloatArgsInXmm :: DynFlags -> Bool
+passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
+                              ArchX86_64 -> True
+                              _          -> False
 
 assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
             -> (
@@ -158,7 +165,10 @@ realVanillaRegs dflags = map VanillaReg $ regList (mAX_Real_Vanilla_REG dflags)
 realFloatRegs   dflags = map FloatReg   $ regList (mAX_Real_Float_REG   dflags)
 realDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Real_Double_REG  dflags)
 realLongRegs    dflags = map LongReg    $ regList (mAX_Real_Long_REG    dflags)
-realXmmRegNos   dflags =                  regList (mAX_Real_XMM_REG     dflags)
+
+realXmmRegNos dflags
+    | isSse2Enabled dflags = regList (mAX_Real_XMM_REG     dflags)
+    | otherwise            = []
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
@@ -180,12 +190,11 @@ nodeOnly = ([VanillaReg 1], [], [], [], [])
 -- only use this functionality in hand-written C-- code in the RTS.
 realArgRegsCover :: DynFlags -> [GlobalReg]
 realArgRegsCover dflags
-    | hasXmmRegs = map ($VGcPtr) (realVanillaRegs dflags) ++
-                   realDoubleRegs dflags ++
-                   realLongRegs dflags
-    | otherwise  = map ($VGcPtr) (realVanillaRegs dflags) ++
-                   realFloatRegs dflags ++
-                   realDoubleRegs dflags ++
-                   realLongRegs dflags
-  where
-    hasXmmRegs = mAX_Real_XMM_REG dflags /= 0
+    | passFloatArgsInXmm dflags = map ($VGcPtr) (realVanillaRegs dflags) ++
+                                  realLongRegs dflags ++
+                                  map XmmReg (realXmmRegNos dflags)
+    | otherwise                 = map ($VGcPtr) (realVanillaRegs dflags) ++
+                                  realFloatRegs dflags ++
+                                  realDoubleRegs dflags ++
+                                  realLongRegs dflags ++
+                                  map XmmReg (realXmmRegNos dflags)
