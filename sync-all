@@ -455,7 +455,16 @@ sub gitall {
             my $rpath;
             $ignore_failure = 1;
             if ($remotepath eq '-') {
-                $rpath = "$repo_base/$localpath";
+                $rpath = "$localpath.git"; # N.B.: $localpath lacks the .git suffix
+                if ($localpath =~ /^libraries\//) {
+                    # FIXME: This is just a simple heuristic to
+                    # infer the remotepath for Git submodules. A
+                    # proper solution would require to parse the
+                    # .gitmodules file to obtain the actual
+                    # localpath<->remotepath mapping.
+                    $rpath =~ s/^libraries\//packages\//;
+                }
+                $rpath = "$repo_base/$rpath";
             } else {
                 $rpath = $path;
             }
