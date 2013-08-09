@@ -1,42 +1,42 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = http://darcs.haskell.org/libraries/binary.git/
+	url = http://darcs.haskell.org/packages/binary.git
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = http://darcs.haskell.org/libraries/bytestring.git/
+	url = http://darcs.haskell.org/packages/bytestring.git
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = http://darcs.haskell.org/libraries/Cabal.git/
+	url = http://darcs.haskell.org/packages/Cabal.git
 [submodule "libraries/containers"]
 	path = libraries/containers
-	url = http://darcs.haskell.org/libraries/containers.git/
+	url = http://darcs.haskell.org/packages/containers.git
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = http://darcs.haskell.org/libraries/haskeline.git/
+	url = http://darcs.haskell.org/packages/haskeline.git
 [submodule "libraries/pretty"]
 	path = libraries/pretty
-	url = http://darcs.haskell.org/libraries/pretty.git/
+	url = http://darcs.haskell.org/packages/pretty.git
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
-	url = http://darcs.haskell.org/libraries/terminfo.git/
+	url = http://darcs.haskell.org/packages/terminfo.git
 [submodule "libraries/transformers"]
 	path = libraries/transformers
-	url = http://darcs.haskell.org/libraries/transformers.git/
+	url = http://darcs.haskell.org/packages/transformers.git
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
-	url = http://darcs.haskell.org/libraries/xhtml.git/
+	url = http://darcs.haskell.org/packages/xhtml.git
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = http://darcs.haskell.org/libraries/Win32.git/
+	url = http://darcs.haskell.org/packages/Win32.git
 [submodule "libraries/primitive"]
 	path = libraries/primitive
-	url = http://darcs.haskell.org/libraries/primitive.git/
+	url = http://darcs.haskell.org/packages/primitive.git
 [submodule "libraries/vector"]
 	path = libraries/vector
-	url = http://darcs.haskell.org/libraries/vector.git/
+	url = http://darcs.haskell.org/packages/vector.git
 [submodule "libraries/time"]
 	path = libraries/time
-	url = http://darcs.haskell.org/libraries/time.git/
+	url = http://darcs.haskell.org/packages/time.git
 [submodule "libraries/random"]
 	path = libraries/random
-	url = http://darcs.haskell.org/libraries/random.git/
+	url = http://darcs.haskell.org/packages/random.git
