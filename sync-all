@@ -633,7 +633,7 @@ remote set-url [--push] <remote-name>
     repository location in each case appropriately. For example, to
     add a new remote pointing to the upstream repositories:
 
-    ./sync-all -r http://darcs.haskell.org/ remote add upstream
+    ./sync-all -r http://darcs.haskell.org remote add upstream
 
     The -r flag points to the root of the repository tree (see "which
     repos to use" below). For a repository on the local filesystem it
@@ -848,7 +848,7 @@ sub main {
     if ($bare_flag && ! $bare_found && ! $defaultrepo) {
         die "error: bare repository ghc.git not found.\n"
           . "       Either clone a bare ghc repo first or specify the repo location. E.g.:\n"
-          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://darcs.haskell.org/ get\n"
+          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://darcs.haskell.org get\n"
     }
     elsif ($bare_found) {
         $bare_flag = "--bare";
