@@ -274,8 +274,8 @@ test('T1849', normal, ghci_script, ['T1849.script'])
 test('T7681', normal, compile, ['-v0'])
 test('T7910', normal, compile_and_run, ['-v0'])
 
-test('ClosedFam1', normal, compile, ['-dsuppress-uniques -v0'])
-test('ClosedFam2', normal, compile, ['-v0'])
+test('ClosedFam1TH', normal, compile, ['-dsuppress-uniques -v0'])
+test('ClosedFam2TH', normal, compile, ['-v0'])
 
 test('T8028',
      extra_clean(['T8028a.hi', 'T8028a.o']),
