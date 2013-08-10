@@ -205,11 +205,9 @@ test-suite spec
   main-is:          Spec.hs
   hs-source-dirs:
       test
-    , test/nanospec
     , src
 
   other-modules:
-      Test.Hspec
       Haddock.ParseSpec
 
   build-depends:
@@ -218,6 +216,7 @@ test-suite spec
     , containers
     , deepseq
     , array
+    , hspec
 
   -- NOTE: As of this writing, Cabal does not properly handle alex/happy for
   -- test suites.  We work around this by adding dist/build to hs-source-dirs,

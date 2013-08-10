@@ -1,6 +1,0 @@
-A lightweight implementation of a subset of Hspec's API with minimal
-dependencies.
-
-http://hackage.haskell.org/package/nanospec
-
-This is a copy of version 0.1.0.
