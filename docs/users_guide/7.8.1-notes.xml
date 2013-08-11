@@ -551,9 +551,9 @@
            </listitem>
             <listitem>
                 <para>
-                    The functions <literal>getGroupEntryForID<literal>
+                    The functions <literal>getGroupEntryForID</literal>
                     and <literal>getUserEntryForID</literal> now fail
-                    with a <literal>isDoesNotExist<literal> error when
+                    with a <literal>isDoesNotExist</literal> error when
                     the specified ID cannot be found.
                </para>
            </listitem>
