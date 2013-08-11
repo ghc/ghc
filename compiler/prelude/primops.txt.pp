@@ -1611,9 +1611,24 @@ primop	AtomicallyOp "atomically#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+-- NB: retry#'s strictness information specifies it to return bottom.
+-- This lets the compiler perform some extra simplifications, since retry#
+-- will technically never return.
+--
+-- This allows the simplifier to replace things like:
+--
+--   case retry# s1
+--     (# s2, a #) -> e
+--
+-- with:
+--
+--   retry# s1
+--
+-- where 'e' would be unreachable anyway.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with 
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd] botRes) }
    out_of_line = True
    has_side_effects = True
 
