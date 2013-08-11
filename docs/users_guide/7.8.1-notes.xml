@@ -537,7 +537,24 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number XXXX (was XXXX)
+                    Version number 2.7.0.0 (was 2.6.0.0)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A crash in <literal>getGroupEntryForID</literal>
+                    (and related functions like
+                    <literal>getUserEntryForID</literal> and
+                    <literal>getUserEntryForName</literal>) in
+                    multi-threaded applications has been fixed.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    The functions <literal>getGroupEntryForID<literal>
+                    and <literal>getUserEntryForID</literal> now fail
+                    with a <literal>isDoesNotExist<literal> error when
+                    the specified ID cannot be found.
                </para>
            </listitem>
        </itemizedlist>
