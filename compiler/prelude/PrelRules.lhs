@@ -672,12 +672,12 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
                    return arg ]
   return $ Var (mkPrimOpId add_op) `App` arg `App` arg
 
-{- Note [Strength reduction]
-
-This rule turns multiplications of the form 2 * x and x * 2 into x + x addition
-because addition costs less than multiplication. See #7116
-
--}
+-- Note [Strength reduction]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- This rule turns floating point multiplications of the form 2.0 * x and
+-- x * 2.0 into x + x addition, because addition costs less than multiplication.
+-- See #7116
 
 trueVal, falseVal :: Expr CoreBndr
 trueVal       = Var trueDataConId
