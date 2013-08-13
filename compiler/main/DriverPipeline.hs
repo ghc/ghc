@@ -1938,15 +1938,16 @@ linkBinary dflags o_files dep_packages = do
 exeFileName :: DynFlags -> FilePath
 exeFileName dflags
   | Just s <- outputFile dflags =
-      if platformOS (targetPlatform dflags) == OSMinGW32
-      then if null (takeExtension s)
-           then s <.> "exe"
-           else s
-      else s
+      case platformOS (targetPlatform dflags) of 
+          OSMinGW32 -> s <?.> "exe"
+          OSiOS     -> s <?.> "a"
+          _         -> s
   | otherwise =
       if platformOS (targetPlatform dflags) == OSMinGW32
       then "main.exe"
       else "a.out"
+ where s <?.> ext | null (takeExtension s) = s <.> ext
+                  | otherwise              = s
 
 maybeCreateManifest
    :: DynFlags

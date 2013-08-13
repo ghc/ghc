@@ -125,11 +125,11 @@ BuildVendor_CPP                 = @BuildVendor_CPP@
 LeadingUnderscore=@LeadingUnderscore@
 
 # Pin a suffix on executables? If so, what (Windows only).
-exeext0=@exeext@
-exeext1=@exeext@
-exeext2=@exeext@
-exeext3=@exeext@
-soext=@soext@
+exeext0=@exeext_host@
+exeext1=@exeext_target@
+exeext2=@exeext_target@
+exeext3=@exeext_target@
+soext=@soext_target@
 
 # Windows_Host=YES if on a Windows platform
 ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32)" ""

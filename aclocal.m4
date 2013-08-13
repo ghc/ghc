@@ -4,6 +4,34 @@
 # ensure we don't clash with any pre-supplied autoconf ones.
 
 
+AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
+[
+    $2=''
+    $3='.so'
+    case $1 in
+    *-unknown-cygwin32)
+        AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
+        AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
+        exit 1
+        ;;
+    *-unknown-mingw32)
+        windows=YES
+        $2='.exe'
+        $3='.dll'
+        ;;
+    i386-apple-darwin|powerpc-apple-darwin)
+        $3='.dylib'
+        ;;
+    x86_64-apple-darwin)
+        $3='.dylib'
+        ;;
+    arm-apple-darwin10)
+        $2='.a'
+        $3='.dylib'
+        ;;
+    esac
+])
+
 # FPTOOLS_SET_PLATFORM_VARS
 # ----------------------------------
 # Set the platform variables
@@ -86,25 +114,12 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
+    GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
+    GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
     windows=NO
-    exeext=''
-    soext='.so'
     case $host in
-    *-unknown-cygwin32)
-        AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
-        AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
-        exit 1
-        ;;
     *-unknown-mingw32)
         windows=YES
-        exeext='.exe'
-        soext='.dll'
-        ;;
-    i386-apple-darwin|powerpc-apple-darwin)
-        soext='.dylib'
-        ;;
-    x86_64-apple-darwin)
-        soext='.dylib'
         ;;
     esac
 
@@ -149,8 +164,10 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     AC_SUBST(BuildVendor_CPP)
     AC_SUBST(TargetVendor_CPP)
 
-    AC_SUBST(exeext)
-    AC_SUBST(soext)
+    AC_SUBST(exeext_host)
+    AC_SUBST(exeext_target)
+    AC_SUBST(soext_host)
+    AC_SUBST(soext_target)
 ])
 
 
