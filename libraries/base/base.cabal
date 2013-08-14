@@ -242,11 +242,12 @@ Library {
         exposed-modules:
             GHC.Event
         other-modules:
+            GHC.Event.Arr
             GHC.Event.Array
             GHC.Event.Clock
             GHC.Event.Control
             GHC.Event.EPoll
-            GHC.Event.IntMap
+            GHC.Event.IntTable
             GHC.Event.Internal
             GHC.Event.KQueue
             GHC.Event.Manager
