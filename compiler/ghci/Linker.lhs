@@ -785,7 +785,7 @@ dynLinkObjs dflags pls objs = do
 
         if cDYNAMIC_GHC_PROGRAMS
             then do dynLoadObjs dflags wanted_objs
-                    return (pls, Succeeded)
+                    return (pls1, Succeeded)
             else do mapM_ loadObj wanted_objs
 
                     -- Link them all together
@@ -800,6 +800,7 @@ dynLinkObjs dflags pls objs = do
                             return (pls2, Failed)
 
 dynLoadObjs :: DynFlags -> [FilePath] -> IO ()
+dynLoadObjs _      []   = return ()
 dynLoadObjs dflags objs = do
     let platform = targetPlatform dflags
     soFile <- newTempName dflags (soExt platform)
@@ -967,6 +968,9 @@ unload_wkr _ linkables pls
     maybeUnload :: [Linkable] -> Linkable -> IO Bool
     maybeUnload keep_linkables lnk
       | linkableInSet lnk keep_linkables = return True
+      -- We don't do any cleanup when linking objects with the dynamic linker.
+      -- Doing so introduces extra complexity for not much benefit.
+      | cDYNAMIC_GHC_PROGRAMS = return False
       | otherwise
       = do mapM_ unloadObj [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
