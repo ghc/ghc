@@ -182,7 +182,7 @@ minSupportLlvmVersion :: LlvmVersion
 minSupportLlvmVersion = 28
 
 maxSupportLlvmVersion :: LlvmVersion
-maxSupportLlvmVersion = 33
+maxSupportLlvmVersion = 34
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
