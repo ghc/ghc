@@ -36,10 +36,8 @@ test('print032', normal, ghci_script, ['print032.script'])
 test('print033', normal, ghci_script, ['print033.script'])
 test('print034', normal, ghci_script, ['print034.script'])
 test('print035',
-     [when(ghci_dynamic(), expect_broken(7326)),
-      extra_clean(['../Unboxed.hi', '../Unboxed.o'])],
-     ghci_script,
-     ['print035.script'])
+     [extra_clean(['../Unboxed.hi', '../Unboxed.o'])],
+     ghci_script, ['print035.script'])
 
 test('break001', normal, ghci_script, ['break001.script'])
 test('break002', normal, ghci_script, ['break002.script'])
