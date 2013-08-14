@@ -1,6 +1,7 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
 module T5658b where
 import GHC.Prim
+import GHC.PrimWrappers
 
 foo :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 foo xs ys m n = go 0# 0#

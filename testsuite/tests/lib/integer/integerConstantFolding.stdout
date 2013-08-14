@@ -40,6 +40,8 @@ shiftLInteger: 1600976
 shiftRInteger: 6253
 quotInteger: 641
 remInteger: 68
+divInteger: 642
+modInteger: 90
 doubleFromInteger: 200131.0
 floatFromInteger: 200135.0
 decodeIntegerDouble: (6877651390169088,-36)

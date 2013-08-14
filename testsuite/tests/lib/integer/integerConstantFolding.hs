@@ -48,6 +48,8 @@ main = do p "plusInteger"        plusInteger
           p "shiftRInteger"     shiftRInteger
           p "quotInteger"       quotInteger
           p "remInteger"        remInteger
+          p "divInteger"        divInteger
+          p "modInteger"        modInteger
           p "doubleFromInteger" doubleFromInteger
           p "floatFromInteger"  floatFromInteger
           p "decodeIntegerDouble" decodeIntegerDouble
@@ -171,6 +173,12 @@ quotInteger = 100063 `quot` 156
 
 remInteger :: Integer
 remInteger = 100064 `rem` 156
+
+divInteger :: Integer
+divInteger = 100286 `div` 156
+
+modInteger :: Integer
+modInteger = 100086 `mod` 156
 
 -- For the conversion functions, we can't just check that e.g. 100065
 -- is in the resulting core, because it will be regardless of whether

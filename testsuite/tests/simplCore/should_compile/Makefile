@@ -72,7 +72,7 @@ simpl021:
 .PHONY: T5327
 T5327:
 	$(RM) -f T5327.hi T5327.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5327.hs -O -ddump-simpl | grep -c "GHC.Prim.># 34 "
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5327.hs -O -ddump-simpl | grep -c 'GHC.Prim.>$$# 34 '
 
 .PHONY: T5623
 T5623:
