@@ -29,44 +29,44 @@ import GHC.Prim
 import GHC.Types
 
 eqWord64# :: Word64# -> Word64# -> Bool
-eqWord64# a b = tagToEnum# (int64ToInt# (eqWord64## a b))
+eqWord64# a b = tagToEnum# (eqWord64## a b)
 neWord64# :: Word64# -> Word64# -> Bool
-neWord64# a b = tagToEnum# (int64ToInt# (neWord64## a b))
+neWord64# a b = tagToEnum# (neWord64## a b)
 ltWord64# :: Word64# -> Word64# -> Bool
-ltWord64# a b = tagToEnum# (int64ToInt# (ltWord64## a b))
+ltWord64# a b = tagToEnum# (ltWord64## a b)
 leWord64# :: Word64# -> Word64# -> Bool
-leWord64# a b = tagToEnum# (int64ToInt# (leWord64## a b))
+leWord64# a b = tagToEnum# (leWord64## a b)
 gtWord64# :: Word64# -> Word64# -> Bool
-gtWord64# a b = tagToEnum# (int64ToInt# (gtWord64## a b))
+gtWord64# a b = tagToEnum# (gtWord64## a b)
 geWord64# :: Word64# -> Word64# -> Bool
-geWord64# a b = tagToEnum# (int64ToInt# (geWord64## a b))
+geWord64# a b = tagToEnum# (geWord64## a b)
 
 eqInt64# :: Int64# -> Int64# -> Bool
-eqInt64# a b = tagToEnum# (int64ToInt# (eqInt64## a b))
+eqInt64# a b = tagToEnum# (eqInt64## a b)
 neInt64# :: Int64# -> Int64# -> Bool
-neInt64# a b = tagToEnum# (int64ToInt# (neInt64## a b))
+neInt64# a b = tagToEnum# (neInt64## a b)
 ltInt64# :: Int64# -> Int64# -> Bool
-ltInt64# a b = tagToEnum# (int64ToInt# (ltInt64## a b))
+ltInt64# a b = tagToEnum# (ltInt64## a b)
 leInt64# :: Int64# -> Int64# -> Bool
-leInt64# a b = tagToEnum# (int64ToInt# (leInt64## a b))
+leInt64# a b = tagToEnum# (leInt64## a b)
 gtInt64# :: Int64# -> Int64# -> Bool
-gtInt64# a b = tagToEnum# (int64ToInt# (gtInt64## a b))
+gtInt64# a b = tagToEnum# (gtInt64## a b)
 geInt64# :: Int64# -> Int64# -> Bool
-geInt64# a b = tagToEnum# (int64ToInt# (geInt64## a b))
+geInt64# a b = tagToEnum# (geInt64## a b)
 
-foreign import ccall unsafe "hs_eqWord64"    eqWord64##     :: Word64# -> Word64# -> Int64#
-foreign import ccall unsafe "hs_neWord64"    neWord64##     :: Word64# -> Word64# -> Int64#
-foreign import ccall unsafe "hs_ltWord64"    ltWord64##     :: Word64# -> Word64# -> Int64#
-foreign import ccall unsafe "hs_leWord64"    leWord64##     :: Word64# -> Word64# -> Int64#
-foreign import ccall unsafe "hs_gtWord64"    gtWord64##     :: Word64# -> Word64# -> Int64#
-foreign import ccall unsafe "hs_geWord64"    geWord64##     :: Word64# -> Word64# -> Int64#
+foreign import ccall unsafe "hs_eqWord64"    eqWord64##     :: Word64# -> Word64# -> Int#
+foreign import ccall unsafe "hs_neWord64"    neWord64##     :: Word64# -> Word64# -> Int#
+foreign import ccall unsafe "hs_ltWord64"    ltWord64##     :: Word64# -> Word64# -> Int#
+foreign import ccall unsafe "hs_leWord64"    leWord64##     :: Word64# -> Word64# -> Int#
+foreign import ccall unsafe "hs_gtWord64"    gtWord64##     :: Word64# -> Word64# -> Int#
+foreign import ccall unsafe "hs_geWord64"    geWord64##     :: Word64# -> Word64# -> Int#
 
-foreign import ccall unsafe "hs_eqInt64"     eqInt64##      :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_neInt64"     neInt64##      :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_ltInt64"     ltInt64##      :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_leInt64"     leInt64##      :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_gtInt64"     gtInt64##      :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_geInt64"     geInt64##      :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "hs_eqInt64"     eqInt64##      :: Int64# -> Int64# -> Int#
+foreign import ccall unsafe "hs_neInt64"     neInt64##      :: Int64# -> Int64# -> Int#
+foreign import ccall unsafe "hs_ltInt64"     ltInt64##      :: Int64# -> Int64# -> Int#
+foreign import ccall unsafe "hs_leInt64"     leInt64##      :: Int64# -> Int64# -> Int#
+foreign import ccall unsafe "hs_gtInt64"     gtInt64##      :: Int64# -> Int64# -> Int#
+foreign import ccall unsafe "hs_geInt64"     geInt64##      :: Int64# -> Int64# -> Int#
 foreign import ccall unsafe "hs_quotInt64"   quotInt64#     :: Int64# -> Int64# -> Int64#
 foreign import ccall unsafe "hs_remInt64"    remInt64#      :: Int64# -> Int64# -> Int64#
 
