@@ -401,7 +401,6 @@ lintCoreExpr (Type ty)
 
 lintCoreExpr (Coercion co)
   = do { (_kind, ty1, ty2, role) <- lintInCo co
-       ; checkRole co Nominal role
        ; return (mkCoercionType role ty1 ty2) }
 
 \end{code}

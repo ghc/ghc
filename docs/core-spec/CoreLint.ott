@@ -122,8 +122,12 @@ G |-ty t : k2
 G |-tm case e as z_s return t of </ alti // i /> : t
 
 G |-co g : t1 ~Nom k t2
--------------------- :: Coercion
+-------------------- :: CoercionNom
 G |-tm g : t1 ~#k t2
+
+G |-co g : t1 ~Rep k t2
+----------------------- :: CoercionRep
+G |-tm g : (~R#) k t1 t2
 
 defn G  |- name n ok ::  :: lintSingleBinding_lintBinder :: 'Name_'
   {{ com Name consistency check, \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding\#lintBinder} }}
