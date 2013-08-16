@@ -313,12 +313,19 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
 
 {-
 Note [case on bool]
-
+~~~~~~~~~~~~~~~~~~~
 This special case handles code like
 
   case a <# b of
     True ->
     False ->
+
+-->  case tagToEnum# (a <$# b) of
+        True -> .. ; False -> ...
+
+--> case (a <$# b) of r -> 
+    case tagToEnum# r of
+        True -> .. ; False -> ...
 
 If we let the ordinary case code handle it, we'll get something like
 
