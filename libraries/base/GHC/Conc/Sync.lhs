@@ -676,7 +676,7 @@ data TVar a = TVar (TVar# RealWorld a)
 INSTANCE_TYPEABLE1(TVar,tvarTc,"TVar")
 
 instance Eq (TVar a) where
-        (TVar tvar1#) == (TVar tvar2#) = tagToEnum# (sameTVar# tvar1# tvar2#)
+        (TVar tvar1#) == (TVar tvar2#) = sameTVar tvar1# tvar2#
 
 -- |Create a new TVar holding a value supplied
 newTVar :: a -> STM (TVar a)

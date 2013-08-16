@@ -411,7 +411,7 @@ data STArray s i e
 -- Just pointer equality on mutable arrays:
 instance Eq (STArray s i e) where
     STArray _ _ _ arr1# == STArray _ _ _ arr2# =
-        tagToEnum# (sameMutableArray# arr1# arr2#)
+        sameMutableArray arr1# arr2#
 \end{code}
 
 
