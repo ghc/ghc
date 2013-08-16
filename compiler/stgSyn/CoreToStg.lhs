@@ -48,8 +48,6 @@ import PrimOp           ( PrimCall(..) )
 %*                                                                      *
 %************************************************************************
 
-(There is other relevant documentation in codeGen/CgLetNoEscape.)
-
 The actual Stg datatype is decorated with {\em live variable}
 information, as well as {\em free variable} information.  The two are
 {\em not} the same.  Liveness is an operational property rather than a
