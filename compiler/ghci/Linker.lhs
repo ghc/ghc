@@ -637,7 +637,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
             adjust_ul new_osuf (DotO file) = do
                 MASSERT(osuf `isSuffixOf` file)
-                let file_base = reverse (drop (length osuf + 1) (reverse file))
+                let file_base = dropTail (length osuf + 1) file
                     new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file
                 if (not ok)

@@ -574,7 +574,15 @@ splitAtList (_:xs) (y:ys) = (y:ys', ys'')
 
 -- drop from the end of a list
 dropTail :: Int -> [a] -> [a]
-dropTail n = reverse . drop n . reverse
+-- Specification: dropTail n = reverse . drop n . reverse
+-- Better implemention due to Joachim Breitner
+-- http://www.joachim-breitner.de/blog/archives/600-On-taking-the-last-n-elements-of-a-list.html
+dropTail n xs
+  = go (drop n xs) xs
+  where
+    go (_:ys) (x:xs) = x : go ys xs 
+    go _      _      = []  -- Stop when ys runs out
+                           -- It'll always run out before xs does
 
 snocView :: [a] -> Maybe ([a],a)
         -- Split off the last element
