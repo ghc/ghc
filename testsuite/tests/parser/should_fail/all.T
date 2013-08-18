@@ -72,6 +72,7 @@ test('NondecreasingIndentationFail', normal, compile_fail, [''])
 test('readFailTraditionalRecords1', normal, compile_fail, [''])
 test('readFailTraditionalRecords2', normal, compile_fail, [''])
 test('readFailTraditionalRecords3', normal, compile_fail, [''])
+test('ParserNoForallUnicode', normal, compile_fail, [''])
 test('ParserNoLambdaCase', when(compiler_lt('ghc', '7.5'), skip), compile_fail, [''])
 test('ParserNoMultiWayIf', when(compiler_lt('ghc', '7.5'), skip), compile_fail, [''])
 

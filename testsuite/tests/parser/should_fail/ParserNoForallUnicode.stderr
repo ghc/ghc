@@ -1,0 +1,5 @@
+
+ParserNoForallUnicode.hs:5:8:
+    Illegal symbol '∀' in type
+    Perhaps you intended -XRankNTypes or similar flag
+    to enable explicit-forall syntax: ∀ <tvs>. <type>
