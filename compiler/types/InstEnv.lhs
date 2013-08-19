@@ -535,7 +535,7 @@ lookupInstEnv' ie cls tys
       = find ((item, map (lookup_tv subst) tpl_tvs) : ms) us rest
 
         -- Does not match, so next check whether the things unify
-        -- See Note [Overlapping instances] above
+        -- See Note [Overlapping instances] and Note [Incoherent Instances]
       | Incoherent _ <- oflag
       = find ms us rest
 
@@ -625,11 +625,18 @@ insert_overlapping new_item (item:items)
         -- Keep new one
   | old_beats_new = item : items
         -- Keep old one
+  | incoherent new_item = item : items -- note [Incoherent Instances]
+        -- Keep old one
+  | incoherent item = new_item : items
+        -- Keep new one
   | otherwise     = item : insert_overlapping new_item items
         -- Keep both
   where
     new_beats_old = new_item `beats` item
     old_beats_new = item `beats` new_item
+
+    incoherent (inst, _) = case is_flag inst of Incoherent _ -> True
+                                                _            -> False
 
     (instA, _) `beats` (instB, _)
           = overlap_ok && 
@@ -645,6 +652,37 @@ insert_overlapping new_item (item:items)
                               (NoOverlap _, NoOverlap _) -> False
                               _                          -> True
 \end{code}
+
+Note [Incoherent Instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The original motivation for incoherent instances was about the situation where
+an instance would unify, but not match. That would be an error, unless the
+unifying instances is marked as incoherent. Example:
+
+        class C a b c where foo :: (a,b,c)
+        instance C [a] b Int
+        instance [incoherent] [Int] b c
+        instance [incoherent] C a Int c
+
+Thanks to the incoherent flags,
+        foo :: ([a],b,Int)
+works: Only instance one matches, the others just unify, but are marked
+incoherent.
+
+So I can write
+        (foo :: ([a],b,Int)) :: ([Int], Int, Int).
+but if that works then I really want to be able to write
+        foo :: ([Int], Int, Int)
+as well. Now all three instances from above match. None is more specific than
+another, so none is ruled out by the normal overlapping rules. In order to
+allow this, we now (Aug 2013) liberarate the meaning of Incoherent instances to
+say: "An incoherent instances can be ignored if there is another matching
+instances." This subsumes the ignore-incoheren-unify-logic.
+
+The implementation is in insert_overlapping, where we remove incoherent
+instances if there are others.
+
 
 
 %************************************************************************

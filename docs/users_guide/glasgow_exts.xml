@@ -4542,7 +4542,9 @@ So GHC rejects the program.</para>
 <para>
 If, however, you add the flag <option>-XIncoherentInstances</option>,
 GHC will instead pick (C), without complaining about
-the problem of subsequent instantiations.
+the problem of subsequent instantiations. In general, the flag
+<option>-XIncoherentInstances</option> will cause GHC to ignore an instance if
+there is another instance that matches the constraint.
 </para>
 <para>
 Notice that we gave a type signature to <literal>f</literal>, so GHC had to

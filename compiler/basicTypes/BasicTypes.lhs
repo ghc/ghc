@@ -381,17 +381,17 @@ data OverlapFlag
   -- its ambiguous which to choose)
   | OverlapOk { isSafeOverlap :: Bool }
 
-  -- | Like OverlapOk, but also ignore this instance
-  -- if it doesn't match the constraint you are
-  -- trying to resolve, but could match if the type variables
-  -- in the constraint were instantiated
+  -- | Silently ignore this instance if you 
+  -- find any other that matches the constraing you
+  -- are trying to resolve, including when checking if there are instances that
+  -- do not match, but unify.
   --
   -- Example: constraint (Foo [b])
   --        instances  (Foo [Int])      Incoherent
   --                   (Foo [a])
   -- Without the Incoherent flag, we'd complain that
   -- instantiating 'b' would change which instance
-  -- was chosen
+  -- was chosen.
   | Incoherent { isSafeOverlap :: Bool }
   deriving (Eq, Data, Typeable)
 
