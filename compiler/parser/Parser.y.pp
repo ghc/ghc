@@ -1039,17 +1039,13 @@ sigtypes1 :: { [LHsType RdrName] }      -- Always HsForAllTys
 -----------------------------------------------------------------------------
 -- Types
 
-infixtype :: { LHsType RdrName }
-        : btype qtyconop type         { LL $ mkHsOpTy $1 $2 $3 }
-        | btype tyvarop  type    { LL $ mkHsOpTy $1 $2 $3 }
-
 strict_mark :: { Located HsBang }
         : '!'                           { L1 (HsUserBang Nothing      True) }
         | '{-# UNPACK' '#-}'            { LL (HsUserBang (Just True)  False) }
         | '{-# NOUNPACK' '#-}'          { LL (HsUserBang (Just False) True) }
         | '{-# UNPACK' '#-}' '!'        { LL (HsUserBang (Just True)  True) }
         | '{-# NOUNPACK' '#-}' '!'      { LL (HsUserBang (Just False) True) }
-        -- Although UNPAACK with no '!' is illegal, we get a
+        -- Although UNPACK with no '!' is illegal, we get a
         -- better error message if we parse it here
 
 -- A ctype is a for-all type
