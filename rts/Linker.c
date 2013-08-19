@@ -3753,7 +3753,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
        * => I suspect we've been incorrectly handling .bss sections in (relocatable)
        * object files up until now. This turned out to bite us with ghc-6.4.1's use
        * of gcc-3.4.x, which has started to emit initially-zeroed-out local 'static'
-       * variable decls into to the .bss section. (The specific function in Q which
+       * variable decls into the .bss section. (The specific function in Q which
        * triggered this is libraries/base/cbits/dirUtils.c:__hscore_getFolderPath())
        */
       if (sectab_i->VirtualSize == 0 && sectab_i->SizeOfRawData == 0) continue;

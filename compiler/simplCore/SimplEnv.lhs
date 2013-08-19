@@ -722,7 +722,7 @@ See Note [Loop breaking and RULES] in OccAnal.
 
 \begin{code}
 addBndrRules :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
--- Rules are added back in to to the bin
+-- Rules are added back into the bin
 addBndrRules env in_id out_id
   | isEmptySpecInfo old_rules = (env, out_id)
   | otherwise = (modifyInScope env final_id, final_id)

@@ -780,7 +780,7 @@ lookupImpDeprec iface gre
 
 Note [Used names with interface not loaded]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's (just) possible to to find a used
+It's (just) possible to find a used
 Name whose interface hasn't been loaded:
 
 a) It might be a WiredInName; in that case we may not load
