@@ -1,0 +1,23 @@
+
+T8142.hs:6:18:
+    Couldn't match type ‛Nu f0’ with ‛Nu f’
+    NB: ‛Nu’ is a type function, and may not be injective
+    The type variable ‛f0’ is ambiguous
+    Expected type: a -> Nu f
+      Actual type: a -> Nu f0
+    When checking that ‛h’
+      has the inferred type ‛forall (f :: * -> *) a. a -> Nu f’
+    Probable cause: the inferred type is ambiguous
+    In an equation for ‛tracer’:
+        tracer
+          = h
+          where
+              h = (\ (_, b) -> ((outI . fmap h) b)) . out
+
+T8142.hs:6:57:
+    Occurs check: cannot construct the infinite type: a ~ f1 a
+    Expected type: a -> (t0, f1 a)
+      Actual type: Nu ((,) t0) -> (t0, Nu ((,) t0))
+    Relevant bindings include h :: a -> Nu f1 (bound at T8142.hs:6:18)
+    In the second argument of ‛(.)’, namely ‛out’
+    In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
