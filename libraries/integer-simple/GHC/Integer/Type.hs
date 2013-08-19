@@ -3,6 +3,11 @@
              NoImplicitPrelude, BangPatterns, UnboxedTuples,
              UnliftedFFITypes #-}
 
+-- Commentary of Integer library is located on the wiki:
+-- http://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/Integer
+--
+-- It gives an in-depth description of implementation details and
+-- decisions.
 
 -----------------------------------------------------------------------------
 -- |
