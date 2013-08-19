@@ -1050,7 +1050,8 @@ strict_mark :: { Located HsBang }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }
-        : 'forall' tv_bndrs '.' ctype   { LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
+        : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
+                                            return (LL $ mkExplicitHsForAllTy $2 (noLoc []) $4) }
         | context '=>' ctype            { LL $ mkImplicitHsForAllTy   $1 $3 }
         -- A type of form (context => type) is an *implicit* HsForAllTy
         | ipvar '::' type               { LL (HsIParamTy (unLoc $1) $3) }
@@ -1068,7 +1069,8 @@ ctype   :: { LHsType RdrName }
 -- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
 
 ctypedoc :: { LHsType RdrName }
-        : 'forall' tv_bndrs '.' ctypedoc        { LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
+        : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
+                                            return (LL $ mkExplicitHsForAllTy $2 (noLoc []) $4) }
         | context '=>' ctypedoc         { LL $ mkImplicitHsForAllTy   $1 $3 }
         -- A type of form (context => type) is an *implicit* HsForAllTy
         | ipvar '::' type               { LL (HsIParamTy (unLoc $1) $3) }
@@ -2240,4 +2242,15 @@ hintMultiWayIf span = do
   mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need -XMultiWayIf turned on"
+
+-- Hint about explicit-forall, assuming UnicodeSyntax is on
+hintExplicitForall :: SrcSpan -> P ()
+hintExplicitForall span = do
+    forall      <- extension explicitForallEnabled
+    rulePrag    <- extension inRulePrag
+    unless (forall || rulePrag) $ parseErrorSDoc span $ vcat
+      [ text "Illegal symbol '∀' in type"
+      , text "Perhaps you intended -XRankNTypes or similar flag"
+      , text "to enable explicit-forall syntax: ∀ <tvs>. <type>"
+      ]
 }

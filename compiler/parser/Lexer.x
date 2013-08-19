@@ -57,6 +57,8 @@ module Lexer (
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
    typeLiteralsEnabled,
+   explicitForallEnabled,
+   inRulePrag,
    explicitNamespacesEnabled, sccProfilingOn, hpcEnabled,
    addWarning,
    lexTokenStream
@@ -711,8 +713,7 @@ reservedSymsFM = listToUFM $
 
        ,("∷",   ITdcolon, unicodeSyntaxEnabled)
        ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
-       ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i &&
-                                explicitForallEnabled i)
+       ,("∀",   ITforall, unicodeSyntaxEnabled)
        ,("→",   ITrarrow, unicodeSyntaxEnabled)
        ,("←",   ITlarrow, unicodeSyntaxEnabled)
 
@@ -1931,8 +1932,8 @@ datatypeContextsEnabled :: Int -> Bool
 datatypeContextsEnabled flags = testBit flags datatypeContextsBit
 qqEnabled :: Int -> Bool
 qqEnabled        flags = testBit flags qqBit
--- inRulePrag :: Int -> Bool
--- inRulePrag       flags = testBit flags inRulePragBit
+inRulePrag :: Int -> Bool
+inRulePrag       flags = testBit flags inRulePragBit
 rawTokenStreamEnabled :: Int -> Bool
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
 alternativeLayoutRule :: Int -> Bool
