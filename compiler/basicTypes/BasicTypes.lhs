@@ -362,6 +362,9 @@ instance Outputable RecFlag where
 %************************************************************************
 
 \begin{code}
+-- | The semantics allowed for overlapping instances for a particular
+-- instance. See Note [Safe Haskell isSafeOverlap] (in `InstEnv.lhs`) for a
+-- explanation of the `isSafeOverlap` field.
 data OverlapFlag
   -- | This instance must not overlap another
   = NoOverlap { isSafeOverlap :: Bool }

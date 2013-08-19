@@ -582,14 +582,16 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
         -- misleading (complaining of multiple matches when some should be
         -- overlapped away)
 
-    -- Safe Haskell: We restrict code compiled in 'Safe' mode from 
-    -- overriding code compiled in any other mode. The rational is
-    -- that code compiled in 'Safe' mode is code that is untrusted
-    -- by the ghc user. So we shouldn't let that code change the
-    -- behaviour of code the user didn't compile in 'Safe' mode
-    -- since that's the code they trust. So 'Safe' instances can only
-    -- overlap instances from the same module. A same instance origin
-    -- policy for safe compiled instances.
+    -- NOTE [Safe Haskell isSafeOverlap]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- We restrict code compiled in 'Safe' mode from overriding code
+    -- compiled in any other mode. The rational is that code compiled
+    -- in 'Safe' mode is code that is untrusted by the ghc user. So
+    -- we shouldn't let that code change the behaviour of code the
+    -- user didn't compile in 'Safe' mode since that's the code they
+    -- trust. So 'Safe' instances can only overlap instances from the
+    -- same module. A same instance origin policy for safe compiled
+    -- instances.
     check_safe match@(inst,_) others
         = case isSafeOverlap (is_flag inst) of
                 -- most specific isn't from a Safe module so OK
