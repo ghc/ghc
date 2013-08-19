@@ -667,7 +667,7 @@ reservedWordsFM = listToUFM $
          ( "capi",           ITcapiconv,      bit cApiFfiBit),
          ( "prim",           ITprimcallconv,  bit ffiBit),
 
-         ( "rec",            ITrec,           bit arrowsBit .|. 
+         ( "rec",            ITrec,           bit arrowsBit .|.
                                               bit recursiveDoBit),
          ( "proc",           ITproc,          bit arrowsBit)
      ]
