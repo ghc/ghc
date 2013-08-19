@@ -2,6 +2,12 @@
 {-# LANGUAGE BangPatterns, CPP, MagicHash, NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 
+-- Commentary of Integer library is located on the wiki:
+-- http://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/Integer
+--
+-- It gives an in-depth description of implementation details and
+-- decisions.
+
 #include "MachDeps.h"
 #if SIZEOF_HSWORD == 4
 #define INT_MINBOUND (-2147483648#)
