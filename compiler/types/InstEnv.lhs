@@ -625,7 +625,7 @@ insert_overlapping new_item (item:items)
         -- Keep new one
   | old_beats_new = item : items
         -- Keep old one
-  | incoherent new_item = item : items -- note [Incoherent Instances]
+  | incoherent new_item = item : items -- note [Incoherent instances]
         -- Keep old one
   | incoherent item = new_item : items
         -- Keep new one
@@ -653,18 +653,34 @@ insert_overlapping new_item (item:items)
                               _                          -> True
 \end{code}
 
-Note [Incoherent Instances]
+Note [Incoherent instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The original motivation for incoherent instances was about the situation where
-an instance would unify, but not match. That would be an error, unless the
-unifying instances is marked as incoherent. Example:
+For some classes, the choise of a particular instance does not matter, any one
+is good. E.g. consider
 
+        class D a b where { opD :: a -> b -> String }
+        instance D Int b where ...
+        instance D a Int where ...
+
+        g (x::Int) = opD x x
+
+For such classes this should work (without having to add an "instance D Int
+Int", and using -XOverlappingInstances, which would then work). This is what
+-XIncoherentInstances is for: Telling GHC "I don't care which instance you use;
+if you can use one, use it."
+
+
+Should this logic only work when all candidates have the incoherent flag, or
+even when all but one have it? The right choice is the latter, which can be
+justified by comparing the behaviour with how -XIncoherentInstances worked when
+it was only about the unify-check (note [Overlapping instances]):
+
+Example:
         class C a b c where foo :: (a,b,c)
         instance C [a] b Int
         instance [incoherent] [Int] b c
         instance [incoherent] C a Int c
-
 Thanks to the incoherent flags,
         foo :: ([a],b,Int)
 works: Only instance one matches, the others just unify, but are marked
@@ -675,13 +691,12 @@ So I can write
 but if that works then I really want to be able to write
         foo :: ([Int], Int, Int)
 as well. Now all three instances from above match. None is more specific than
-another, so none is ruled out by the normal overlapping rules. In order to
-allow this, we now (Aug 2013) liberarate the meaning of Incoherent instances to
-say: "An incoherent instances can be ignored if there is another matching
-instances." This subsumes the ignore-incoheren-unify-logic.
+another, so none is ruled out by the normal overlapping rules. One of them is
+not incoherent, but we still want this to compile. Hence the
+"all-but-one-logic".
 
-The implementation is in insert_overlapping, where we remove incoherent
-instances if there are others.
+The implementation is in insert_overlapping, where we remove matching
+incoherent instances as long as there are are others.
 
 
 
