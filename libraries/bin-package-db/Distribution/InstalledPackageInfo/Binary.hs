@@ -11,7 +11,7 @@
 -- Module      :  Distribution.InstalledPackageInfo.Binary
 -- Copyright   :  (c) The University of Glasgow 2009
 --
--- Maintainer  :  cvs-ghc@haskell.org
+-- Maintainer  :  ghc-devs@haskell.org
 -- Portability :  portable
 --
 

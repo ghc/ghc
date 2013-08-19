@@ -125,7 +125,7 @@ gen_hs_source (Info defaults entries) =
         ++ "-- |\n"
         ++ "-- Module      :  GHC.Prim\n"
         ++ "-- \n"
-        ++ "-- Maintainer  :  cvs-ghc@haskell.org\n"
+        ++ "-- Maintainer  :  ghc-devs@haskell.org\n"
         ++ "-- Stability   :  internal\n"
         ++ "-- Portability :  non-portable (GHC extensions)\n"
         ++ "--\n"

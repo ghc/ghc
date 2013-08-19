@@ -194,7 +194,7 @@ indexBuiltin fn f i bi
       text "' is not yet implemented."
     , text "This function does not appear in your source program, but it is needed"
     , text "to compile your code in the backend. This is a known, current limitation"
-    , text "of DPH. If you want it to work, you should send mail to cvs-ghc@haskell.org"
+    , text "of DPH. If you want it to work, you should send mail to ghc-commits@haskell.org"
     , text "and ask what you can do to help (it might involve some GHC hacking)."])
   where xs = f bi
 
@@ -213,5 +213,5 @@ lookupEnvBuiltin fn env n
       text "' is not yet implemented."
     , text "This function does not appear in your source program, but it is needed"
     , text "to compile your code in the backend. This is a known, current limitation"
-    , text "of DPH. If you want it to work, you should send mail to cvs-ghc@haskell.org"
+    , text "of DPH. If you want it to work, you should send mail to ghc-commits@haskell.org"
     , text "and ask what you can do to help (it might involve some GHC hacking)."])
