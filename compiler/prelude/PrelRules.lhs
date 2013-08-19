@@ -919,6 +919,7 @@ builtinIntegerRules =
   rule_unop           "complementInteger"   complementIntegerName   complement,
   rule_Int_binop      "shiftLInteger"       shiftLIntegerName       shiftL,
   rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR,
+  -- See Note [Integer division constant folding] in libraries/base/GHC/Real.lhs
   rule_divop_one      "quotInteger"         quotIntegerName         quot,
   rule_divop_one      "remInteger"          remIntegerName          rem,
   rule_divop_one      "divInteger"          divIntegerName          div,
