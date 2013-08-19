@@ -1626,7 +1626,7 @@ tryEtaReduce bndrs body
       , let result = mkCast fun co
       , not (any (`elemVarSet` exprFreeVars result) bndrs)
       = Just result   -- Check for any of the binders free in the result
-                      -- *including* the accumulated coercion
+                      -- including the accumulated coercion
 
     go (b : bs) (App fun arg) co
       | Just co' <- ok_arg b arg co
