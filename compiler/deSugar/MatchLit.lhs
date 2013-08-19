@@ -108,7 +108,7 @@ Note [Literal short cut]
 The type checker tries to do this short-cutting as early as possible, but
 because of unification etc, more information is available to the desugarer.
 And where it's possible to generate the correct literal right away, it's
-much better do do so.
+much better to do so.
 
 
 \begin{code}
