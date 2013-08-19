@@ -1616,15 +1616,11 @@ primop	AtomicallyOp "atomically#" GenPrimOp
 -- will technically never return.
 --
 -- This allows the simplifier to replace things like:
---
 --   case retry# s1
 --     (# s2, a #) -> e
---
 -- with:
---
 --   retry# s1
---
--- where 'e' would be unreachable anyway.
+-- where 'e' would be unreachable anyway.  See Trac #8091.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with 
