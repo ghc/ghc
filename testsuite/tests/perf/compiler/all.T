@@ -188,12 +188,14 @@ test('T3064',
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 10742536, 10)]),
+           (wordsize(64), 9211816, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
             # (amd64/Linux)         (18/02/2013):  9397488
             # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
+            # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
+            #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
        only_ways(['normal'])
       ],
      compile,
