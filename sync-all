@@ -193,11 +193,11 @@ sub getrepo {
         # Don't drop the last part of the path if specified with -r, as
         # it expects repos of the form:
         #
-        #   http://darcs.haskell.org
+        #   http://git.haskell.org
         #
         # rather than
         #
-        #   http://darcs.haskell.org/ghc
+        #   http://git.haskell.org/ghc
         #
         if (!$defaultrepo) {
             $repo_base =~ s#/[^/]+/?$##;
@@ -597,7 +597,7 @@ Applies the command "cmd" to each repository in the tree.
 A full repository tree is obtained by first cloning the ghc
 repository, then getting the subrepositories with "sync-all get":
 
-  \$ git clone http://darcs.haskell.org/ghc.git
+  \$ git clone http://git.haskell.org/ghc.git
   \$ cd ghc
   \$ ./sync-all get
 
@@ -637,7 +637,7 @@ remote set-url [--push] <remote-name>
     repository location in each case appropriately. For example, to
     add a new remote pointing to the upstream repositories:
 
-    ./sync-all -r http://darcs.haskell.org remote add upstream
+    ./sync-all -r http://git.haskell.org remote add upstream
 
     The -r flag points to the root of the repository tree (see "which
     repos to use" below). For a repository on the local filesystem it
@@ -745,7 +745,7 @@ otherwise sync-all works on repos of form:
   <repo_base>/<remote-path>
 
 This logic lets you say
-  both    sync-all -r http://darcs.haskell.org/ghc-6.12 remote add ghc-6.12
+  both    sync-all -r http://example.org/ghc-6.12 remote add ghc-6.12
   and     sync-all -r ../working remote add working
 The latter is called a "checked-out tree".
 
@@ -852,7 +852,7 @@ sub main {
     if ($bare_flag && ! $bare_found && ! $defaultrepo) {
         die "error: bare repository ghc.git not found.\n"
           . "       Either clone a bare ghc repo first or specify the repo location. E.g.:\n"
-          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://darcs.haskell.org get\n"
+          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://git.haskell.org get\n"
     }
     elsif ($bare_found) {
         $bare_flag = "--bare";
