@@ -59,3 +59,5 @@ test('T5997', normal, compile_and_run, [''])
 test('T7101', normal, compile_and_run, [''])
 test('T7924', exit_code(1), compile_and_run, [''])
 
+# Run this test *without* optimisation too
+test('T457', [ only_ways(['normal','optasm']), exit_code(1) ], compile_and_run, [''])
