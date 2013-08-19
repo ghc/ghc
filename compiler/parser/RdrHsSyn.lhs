@@ -45,7 +45,6 @@ module RdrHsSyn (
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkDoAndIfThenElse,
         checkRecordSyntax,
-        parseError,
         parseErrorSDoc,
 
         -- Help with processing exports
@@ -1086,9 +1085,6 @@ mkTypeImpExp name =
 -- Misc utils
 
 \begin{code}
-parseError :: SrcSpan -> String -> P a
-parseError span s = parseErrorSDoc span (text s)
-
 parseErrorSDoc :: SrcSpan -> SDoc -> P a
 parseErrorSDoc span s = failSpanMsgP span s
 \end{code}
