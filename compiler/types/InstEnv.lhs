@@ -585,7 +585,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     -- NOTE [Safe Haskell isSafeOverlap]
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     -- We restrict code compiled in 'Safe' mode from overriding code
-    -- compiled in any other mode. The rational is that code compiled
+    -- compiled in any other mode. The rationale is that code compiled
     -- in 'Safe' mode is code that is untrusted by the ghc user. So
     -- we shouldn't let that code change the behaviour of code the
     -- user didn't compile in 'Safe' mode since that's the code they
