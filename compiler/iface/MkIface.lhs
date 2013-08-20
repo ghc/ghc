@@ -252,104 +252,104 @@ mkIface_ hsc_env maybe_old_fingerprint
 --      put exactly the info into the TypeEnv that we want
 --      to expose in the interface
 
-  = do  { usages  <- mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
+  = do
+    usages  <- mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
 
-        ; let   { entities = typeEnvElts type_env ;
-                  decls  = [ tyThingToIfaceDecl entity
-                           | entity <- entities,
-                             let name = getName entity,
-                             not (isImplicitTyThing entity),
-                                -- No implicit Ids and class tycons in the interface file
-                             not (isWiredInName name),
-                                -- Nor wired-in things; the compiler knows about them anyhow
-                             nameIsLocalOrFrom this_mod name  ]
-                                -- Sigh: see Note [Root-main Id] in TcRnDriver
+    let entities = typeEnvElts type_env
+        decls  = [ tyThingToIfaceDecl entity
+                 | entity <- entities,
+                   let name = getName entity,
+                   not (isImplicitTyThing entity),
+                      -- No implicit Ids and class tycons in the interface file
+                   not (isWiredInName name),
+                      -- Nor wired-in things; the compiler knows about them anyhow
+                   nameIsLocalOrFrom this_mod name  ]
+                      -- Sigh: see Note [Root-main Id] in TcRnDriver
 
-                ; fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
-                ; warns       = src_warns
-                ; iface_rules = map (coreRuleToIfaceRule this_mod) rules
-                ; iface_insts = map instanceToIfaceInst insts
-                ; iface_fam_insts = map famInstToIfaceFamInst fam_insts
-                ; iface_vect_info = flattenVectInfo vect_info
-                ; trust_info  = setSafeMode safe_mode
+        fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
+        warns       = src_warns
+        iface_rules = map (coreRuleToIfaceRule this_mod) rules
+        iface_insts = map instanceToIfaceInst insts
+        iface_fam_insts = map famInstToIfaceFamInst fam_insts
+        iface_vect_info = flattenVectInfo vect_info
+        trust_info  = setSafeMode safe_mode
 
-                ; intermediate_iface = ModIface { 
-                        mi_module      = this_mod,
-                        mi_boot        = is_boot,
-                        mi_deps        = deps,
-                        mi_usages      = usages,
-                        mi_exports     = mkIfaceExports exports,
-        
-                        -- Sort these lexicographically, so that
-                        -- the result is stable across compilations
-                        mi_insts       = sortBy cmp_inst     iface_insts,
-                        mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
-                        mi_rules       = sortBy cmp_rule     iface_rules,
+        intermediate_iface = ModIface {
+              mi_module      = this_mod,
+              mi_boot        = is_boot,
+              mi_deps        = deps,
+              mi_usages      = usages,
+              mi_exports     = mkIfaceExports exports,
 
-                        mi_vect_info   = iface_vect_info,
+              -- Sort these lexicographically, so that
+              -- the result is stable across compilations
+              mi_insts       = sortBy cmp_inst     iface_insts,
+              mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
+              mi_rules       = sortBy cmp_rule     iface_rules,
 
-                        mi_fixities    = fixities,
-                        mi_warns       = warns,
-                        mi_anns        = mkIfaceAnnotations anns,
-                        mi_globals     = maybeGlobalRdrEnv rdr_env,
+              mi_vect_info   = iface_vect_info,
 
-                        -- Left out deliberately: filled in by addFingerprints
-                        mi_iface_hash  = fingerprint0,
-                        mi_mod_hash    = fingerprint0,
-                        mi_flag_hash   = fingerprint0,
-                        mi_exp_hash    = fingerprint0,
-                        mi_used_th     = used_th,
-                        mi_orphan_hash = fingerprint0,
-                        mi_orphan      = False, -- Always set by addFingerprints, but
-                                                -- it's a strict field, so we can't omit it.
-                        mi_finsts      = False, -- Ditto
-                        mi_decls       = deliberatelyOmitted "decls",
-                        mi_hash_fn     = deliberatelyOmitted "hash_fn",
-                        mi_hpc         = isHpcUsed hpc_info,
-                        mi_trust       = trust_info,
-                        mi_trust_pkg   = pkg_trust_req,
+              mi_fixities    = fixities,
+              mi_warns       = warns,
+              mi_anns        = mkIfaceAnnotations anns,
+              mi_globals     = maybeGlobalRdrEnv rdr_env,
 
-                        -- And build the cached values
-                        mi_warn_fn     = mkIfaceWarnCache warns,
-                        mi_fix_fn      = mkIfaceFixCache fixities }
-                }
-        ; (new_iface, no_change_at_all) 
-                <- {-# SCC "versioninfo" #-}
-                         addFingerprints hsc_env maybe_old_fingerprint
-                                         intermediate_iface decls
+              -- Left out deliberately: filled in by addFingerprints
+              mi_iface_hash  = fingerprint0,
+              mi_mod_hash    = fingerprint0,
+              mi_flag_hash   = fingerprint0,
+              mi_exp_hash    = fingerprint0,
+              mi_used_th     = used_th,
+              mi_orphan_hash = fingerprint0,
+              mi_orphan      = False, -- Always set by addFingerprints, but
+                                      -- it's a strict field, so we can't omit it.
+              mi_finsts      = False, -- Ditto
+              mi_decls       = deliberatelyOmitted "decls",
+              mi_hash_fn     = deliberatelyOmitted "hash_fn",
+              mi_hpc         = isHpcUsed hpc_info,
+              mi_trust       = trust_info,
+              mi_trust_pkg   = pkg_trust_req,
 
-                -- Warn about orphans
-        ; let warn_orphs      = wopt Opt_WarnOrphans dflags
-              warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
-              orph_warnings   --- Laziness means no work done unless -fwarn-orphans
-                | warn_orphs || warn_auto_orphs = rule_warns `unionBags` inst_warns
-                | otherwise                     = emptyBag
-              errs_and_warns = (orph_warnings, emptyBag)
-              unqual = mkPrintUnqualified dflags rdr_env
-              inst_warns = listToBag [ instOrphWarn dflags unqual d 
-                                     | (d,i) <- insts `zip` iface_insts
-                                     , isNothing (ifInstOrph i) ]
-              rule_warns = listToBag [ ruleOrphWarn dflags unqual this_mod r 
-                                     | r <- iface_rules
-                                     , isNothing (ifRuleOrph r)
-                                     , if ifRuleAuto r then warn_auto_orphs
-                                                       else warn_orphs ]
+              -- And build the cached values
+              mi_warn_fn     = mkIfaceWarnCache warns,
+              mi_fix_fn      = mkIfaceFixCache fixities }
 
-        ; if errorsFound dflags errs_and_warns
-            then return ( errs_and_warns, Nothing )
-            else do {
+    (new_iface, no_change_at_all)
+          <- {-# SCC "versioninfo" #-}
+                   addFingerprints hsc_env maybe_old_fingerprint
+                                   intermediate_iface decls
 
-                -- Debug printing
-        ; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
-                        (pprModIface new_iface)
+    -- Warn about orphans
+    let warn_orphs      = wopt Opt_WarnOrphans dflags
+        warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
+        orph_warnings   --- Laziness means no work done unless -fwarn-orphans
+          | warn_orphs || warn_auto_orphs = rule_warns `unionBags` inst_warns
+          | otherwise                     = emptyBag
+        errs_and_warns = (orph_warnings, emptyBag)
+        unqual = mkPrintUnqualified dflags rdr_env
+        inst_warns = listToBag [ instOrphWarn dflags unqual d
+                               | (d,i) <- insts `zip` iface_insts
+                               , isNothing (ifInstOrph i) ]
+        rule_warns = listToBag [ ruleOrphWarn dflags unqual this_mod r
+                               | r <- iface_rules
+                               , isNothing (ifRuleOrph r)
+                               , if ifRuleAuto r then warn_auto_orphs
+                                                 else warn_orphs ]
 
-                -- bug #1617: on reload we weren't updating the PrintUnqualified
-                -- correctly.  This stems from the fact that the interface had
-                -- not changed, so addFingerprints returns the old ModIface
-                -- with the old GlobalRdrEnv (mi_globals).
-        ; let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
+    if errorsFound dflags errs_and_warns
+      then return ( errs_and_warns, Nothing )
+      else do
+        -- Debug printing
+        dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
+                      (pprModIface new_iface)
 
-        ; return (errs_and_warns, Just (final_iface, no_change_at_all)) }}
+        -- bug #1617: on reload we weren't updating the PrintUnqualified
+        -- correctly.  This stems from the fact that the interface had
+        -- not changed, so addFingerprints returns the old ModIface
+        -- with the old GlobalRdrEnv (mi_globals).
+        let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
+
+        return (errs_and_warns, Just (final_iface, no_change_at_all))
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -813,8 +813,9 @@ lookupOccEnvL env k = lookupOccEnv env k `orElse` []
 -- fingerprints of external Names that it refers to.
 putNameLiterally :: BinHandle -> Name -> IO ()
 putNameLiterally bh name = ASSERT( isExternalName name ) 
-  do { put_ bh $! nameModule name
-     ; put_ bh $! nameOccName name }
+  do
+    put_ bh $! nameModule name
+    put_ bh $! nameOccName name
 
 {-
 -- for testing: use the md5sum command to generate fingerprints and
@@ -880,15 +881,16 @@ mkOrphMap get_key decls
 \begin{code}
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath] -> IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
-  = do  { eps <- hscEPS hsc_env
-    ; mtimes <- mapM getModificationUTCTime dependent_files
-        ; let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
-                                     dir_imp_mods used_names
-        ; let usages = mod_usages ++ map to_file_usage (zip dependent_files mtimes)
-        ; usages `seqList`  return usages }
-         -- seq the list of Usages returned: occasionally these
-         -- don't get evaluated for a while and we can end up hanging on to
-         -- the entire collection of Ifaces.
+  = do
+    eps <- hscEPS hsc_env
+    mtimes <- mapM getModificationUTCTime dependent_files
+    let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
+                                       dir_imp_mods used_names
+    let usages = mod_usages ++ map to_file_usage (zip dependent_files mtimes)
+    usages `seqList`  return usages
+    -- seq the list of Usages returned: occasionally these
+    -- don't get evaluated for a while and we can end up hanging on to
+    -- the entire collection of Ifaces.
    where
      to_file_usage (f, mtime) = UsageFile { usg_file_path = f, usg_mtime = mtime }
 
@@ -1324,19 +1326,21 @@ checkModUsage this_pkg UsageHomeModule{
 
         -- CHECK MODULE
     recompile <- checkModuleFingerprint reason old_mod_hash new_mod_hash
-    if not (recompileRequired recompile) then return UpToDate else do
+    if not (recompileRequired recompile)
+      then return UpToDate
+      else do
 
         -- CHECK EXPORT LIST
-    checkMaybeHash reason maybe_old_export_hash new_export_hash
-        (ptext (sLit "  Export list changed")) $ do
+        checkMaybeHash reason maybe_old_export_hash new_export_hash
+            (ptext (sLit "  Export list changed")) $ do
 
         -- CHECK ITEMS ONE BY ONE
-    recompile <- checkList [ checkEntityUsage reason new_decl_hash u
-                           | u <- old_decl_hash]
-    if recompileRequired recompile
-      then return recompile     -- This one failed, so just bail out now
-      else up_to_date (ptext (sLit "  Great!  The bits I use are up to date"))
- 
+        recompile <- checkList [ checkEntityUsage reason new_decl_hash u
+                               | u <- old_decl_hash]
+        if recompileRequired recompile
+          then return recompile     -- This one failed, so just bail out now
+          else up_to_date (ptext (sLit "  Great!  The bits I use are up to date"))
+
 
 checkModUsage _this_pkg UsageFile{ usg_file_path = file,
                                    usg_mtime = old_mtime } =
