@@ -423,7 +423,7 @@ mkClosureLFInfo dflags bndr top fvs upd_flag args
 
 
 ------------------------------------------------------------------------
---              The code for closures}
+--              The code for closures
 ------------------------------------------------------------------------
 
 closureCodeBody :: Bool            -- whether this is a top-level binding
