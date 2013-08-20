@@ -1347,7 +1347,7 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
          then return recomp
          else return UpToDate
  where
-   recomp = RecompBecause (file ++ " changed")
+   recomp = RecompBecause (file ++ " time stamp changed")
    handle =
 #ifdef DEBUG
        \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
