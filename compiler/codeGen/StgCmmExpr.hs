@@ -106,7 +106,7 @@ cgLneBinds join_id (StgNonRec bndr rhs)
                 -- See Note [Saving the current cost centre]
         ; (info, fcode) <- cgLetNoEscapeRhs join_id local_cc bndr rhs
         ; fcode
-        ; addBindC (cg_id info) info }
+        ; addBindC info }
 
 cgLneBinds join_id (StgRec pairs)
   = do  { local_cc <- saveCurrentCostCentre
@@ -676,9 +676,9 @@ cgTailCall fun_id fun_info args = do
 
   where
     fun_arg     = StgVarArg fun_id
-    fun_name    = idName            fun_id
-    fun         = idInfoToAmode     fun_info
-    lf_info     = cgIdInfoLF        fun_info
+    fun_name    = idName        fun_id
+    fun         = idInfoToAmode fun_info
+    lf_info     = cg_lf         fun_info
     node_points dflags = nodeMustPointToIt dflags lf_info
 
 

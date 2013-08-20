@@ -26,7 +26,7 @@ module StgCmmMonad (
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
         mkCall, mkCmmCall,
 
-        forkClosureBody, forkStatics, forkAlts, forkProc, codeOnly,
+        forkClosureBody, forkAlts, forkProc, codeOnly,
 
         ConTagZ,
 
@@ -48,7 +48,7 @@ module StgCmmMonad (
 
         -- more localised access to monad state
         CgIdInfo(..), CgLoc(..),
-        getBinds, setBinds, getStaticBinds,
+        getBinds, setBinds,
 
         -- out of general friendliness, we also export ...
         CgInfoDownwards(..), CgState(..)        -- non-abstract
@@ -171,7 +171,6 @@ data CgInfoDownwards        -- information only passed *downwards* by the monad
   = MkCgInfoDown {
         cgd_dflags     :: DynFlags,
         cgd_mod        :: Module,          -- Module being compiled
-        cgd_statics    :: CgBindings,          -- [Id -> info] : static environment
         cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
         cgd_ticky      :: CLabel,          -- Current destination for ticky counts
         cgd_sequel     :: Sequel          -- What to do at end of basic block
@@ -299,7 +298,6 @@ initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
   = MkCgInfoDown { cgd_dflags    = dflags
                  , cgd_mod       = mod
-                 , cgd_statics   = emptyVarEnv
                  , cgd_updfr_off = initUpdFrameOff dflags
                  , cgd_ticky     = mkTopTickyCtrLabel
                  , cgd_sequel    = initSequel }
@@ -428,11 +426,6 @@ setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
 
-getStaticBinds :: FCode CgBindings
-getStaticBinds = do
-        info  <- getInfoDown
-        return (cgd_statics info)
-
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state ->
   case fcode info_down newstate of
@@ -547,24 +540,6 @@ forkClosureBody body_code
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
               ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
-
-forkStatics :: FCode a -> FCode a
--- @forkStatics@ $fc$ compiles $fc$ in an environment whose *statics* come
--- from the current *local bindings*, but which is otherwise freshly initialised.
--- The Abstract~C returned is attached to the current state, but the
--- bindings and usage information is otherwise unchanged.
-forkStatics body_code
-  = do  { dflags <- getDynFlags
-        ; info   <- getInfoDown
-        ; us     <- newUniqSupply
-        ; state  <- getState
-        ; let   rhs_info_down = info { cgd_statics = cgs_binds state
-                                     , cgd_sequel  = initSequel
-                                     , cgd_updfr_off = initUpdFrameOff dflags }
-                (result, fork_state_out) = doFCode body_code rhs_info_down
-                                                   (initCgState us)
-        ; setState (state `addCodeBlocksFrom` fork_state_out)
-        ; return result }
 
 forkProc :: FCode a -> FCode a
 -- 'forkProc' takes a code and compiles it in the *current* environment,

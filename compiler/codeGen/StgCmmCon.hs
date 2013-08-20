@@ -50,22 +50,21 @@ import Data.Char
 --      Top-level constructors
 ---------------------------------------------------------------
 
-cgTopRhsCon :: Id               -- Name of thing bound to this RHS
+cgTopRhsCon :: DynFlags
+            -> Id               -- Name of thing bound to this RHS
             -> DataCon          -- Id
             -> [StgArg]         -- Args
-            -> FCode (CgIdInfo, FCode ())
-cgTopRhsCon id con args
-  = do dflags <- getDynFlags
-       let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
-       return ( id_info, gen_code )
+            -> (CgIdInfo, FCode ())
+cgTopRhsCon dflags id con args =
+    let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
+    in (id_info, gen_code)
   where
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
 
    gen_code =
-     do { dflags <- getDynFlags
-        ; this_mod <- getModuleName
+     do { this_mod <- getModuleName
         ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
               ASSERT( not (isDllConApp dflags this_mod con args) ) return ()

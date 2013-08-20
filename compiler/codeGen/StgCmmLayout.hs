@@ -39,8 +39,7 @@ import CmmInfo
 import CLabel
 import StgSyn
 import Id
-import Name
-import TyCon                ( PrimRep(..) )
+import TyCon             ( PrimRep(..) )
 import BasicTypes        ( RepArity )
 import DynFlags
 import Module
@@ -360,15 +359,14 @@ mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags False
 -- bring in ARG_P, ARG_N, etc.
 #include "../includes/rts/storage/FunTypes.h"
 
-mkArgDescr :: Name -> [Id] -> FCode ArgDescr
-mkArgDescr _nm args
-  = do dflags <- getDynFlags
-       let arg_bits = argBits dflags arg_reps
-           arg_reps = filter isNonV (map idArgRep args)
+mkArgDescr :: DynFlags -> [Id] -> ArgDescr
+mkArgDescr dflags args
+  = let arg_bits = argBits dflags arg_reps
+        arg_reps = filter isNonV (map idArgRep args)
            -- Getting rid of voids eases matching of standard patterns
-       case stdPattern arg_reps of
-           Just spec_id -> return (ArgSpec spec_id)
-           Nothing      -> return (ArgGen arg_bits)
+    in case stdPattern arg_reps of
+         Just spec_id -> ArgSpec spec_id
+         Nothing      -> ArgGen  arg_bits
 
 argBits :: DynFlags -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
 argBits _      []           = []
