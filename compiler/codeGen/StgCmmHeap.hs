@@ -30,7 +30,6 @@ import StgCmmUtils
 import StgCmmMonad
 import StgCmmProf
 import StgCmmTicky
-import StgCmmGran
 import StgCmmClosure
 import StgCmmEnv
 
@@ -135,8 +134,7 @@ emitSetDynHdr base info_ptr ccs
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs
-        -- ToDo: Gransim stuff
-        -- ToDo: Parallel stuff
+        -- ToDof: Parallel stuff
         -- No ticky header
 
 hpStore :: CmmExpr -> [CmmExpr] -> [VirtualHpOffset] -> FCode ()
@@ -207,16 +205,11 @@ mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
 mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
-  ++ variable_header_words
+  ++ staticProfHdr dflags ccs
   ++ concatMap (padLitToWord dflags) payload
   ++ padding
   ++ static_link_field
   ++ saved_info_field
-  where
-    variable_header_words
-        =  staticGranHdr
-        ++ staticParHdr
-        ++ staticProfHdr dflags ccs
 
 -- JD: Simon had ellided this padding, but without it the C back end asserts
 -- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
@@ -529,7 +522,6 @@ heapCheck checkStack checkYield do_gc code
                       | otherwise  = Nothing
         ; codeOnly $ do_checks stk_hwm checkYield mb_alloc_bytes do_gc
         ; tickyAllocHeap True hpHw
-        ; doGranAllocate hpHw
         ; setRealHp hpHw
         ; code }
 

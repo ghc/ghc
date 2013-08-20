@@ -208,7 +208,6 @@ Library
         StgCmmEnv
         StgCmmExpr
         StgCmmForeign
-        StgCmmGran
         StgCmmHeap
         StgCmmHpc
         StgCmmArgRep

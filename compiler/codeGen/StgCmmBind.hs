@@ -22,7 +22,6 @@ import StgCmmCon
 import StgCmmHeap
 import StgCmmProf
 import StgCmmTicky
-import StgCmmGran
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
@@ -477,7 +476,6 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; let node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
                 ; when node_points (ldvEnterClosure cl_info)
-                ; granYield arg_regs node_points
 
                 -- Main payload
                 ; entryHeapCheck cl_info node' arity arg_regs $ do
@@ -541,7 +539,6 @@ thunkCode cl_info fv_details _cc node arity body
        ; let node_points = nodeMustPointToIt dflags (closureLFInfo cl_info)
              node'       = if node_points then Just node else Nothing
         ; ldvEnterClosure cl_info -- NB: Node always points when profiling
-        ; granThunk node_points
 
         -- Heap overflow check
         ; entryHeapCheck cl_info node' arity [] $ do
