@@ -41,6 +41,17 @@
            </para>
        </listitem>
 
+       <listitem>
+           <para>
+                Use of the <literal>GeneralizedNewtypeDeriving</literal>
+                extension is now subject to <emphasis>role checking</emphasis>,
+                to ensure type safety of the derived instances. As this change
+                increases the type safety of GHC, it is possible that some code
+                that previously compiled will no longer work.
+
+                TODO FIXME: reference.
+           </para>
+       </listitem>
 
         <listitem>
             <para>
