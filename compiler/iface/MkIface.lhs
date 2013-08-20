@@ -47,8 +47,10 @@ Basic idea:
     of the external reference when computing the fingerprint of A.f.  So
     if anything that A.f depends on changes, then A.f's fingerprint will
     change.
-    Also record any dependent files added with addDependentFile.
-    In the future record any #include usages.
+    Also record any dependent files added with
+      * addDependentFile
+      * #include
+      * -optP-include
 
   * In checkOldIface we compare the mi_usages for the module with
     the actual fingerprint for all each thing recorded in mi_usages
