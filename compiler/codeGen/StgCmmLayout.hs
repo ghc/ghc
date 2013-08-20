@@ -6,23 +6,16 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module StgCmmLayout (
-	mkArgDescr, 
+        mkArgDescr,
         emitCall, emitReturn, adjustHpBackwards,
 
-	emitClosureProcAndInfoTable,
-	emitClosureAndInfoTable,
+        emitClosureProcAndInfoTable,
+        emitClosureAndInfoTable,
 
-	slowCall, directCall, 
+        slowCall, directCall,
 
-	mkVirtHeapOffsets, mkVirtConstrOffsets, getHpRelOffset, hpRel,
+        mkVirtHeapOffsets, mkVirtConstrOffsets, getHpRelOffset, hpRel,
 
         ArgRep(..), toArgRep, argRepSizeW -- re-exported from StgCmmArgRep
   ) where
@@ -47,8 +40,8 @@ import CLabel
 import StgSyn
 import Id
 import Name
-import TyCon		( PrimRep(..) )
-import BasicTypes	( RepArity )
+import TyCon                ( PrimRep(..) )
+import BasicTypes        ( RepArity )
 import DynFlags
 import Module
 
@@ -59,7 +52,7 @@ import FastString
 import Control.Monad
 
 ------------------------------------------------------------------------
---		Call and return sequences
+--                Call and return sequences
 ------------------------------------------------------------------------
 
 -- | Return multiple values to the sequel
@@ -108,10 +101,10 @@ emitCallWithExtraStack
    :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
    -> [CmmExpr] -> FCode ReturnKind
 emitCallWithExtraStack (callConv, retConv) fun args extra_stack
-  = do	{ dflags <- getDynFlags
+  = do  { dflags <- getDynFlags
         ; adjustHpBackwards
-	; sequel <- getSequel
-	; updfr_off <- getUpdFrameOff
+        ; sequel <- getSequel
+        ; updfr_off <- getUpdFrameOff
         ; case sequel of
             Return _ -> do
               emit $ mkJumpExtra dflags callConv fun args updfr_off extra_stack
@@ -129,33 +122,33 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
 
 adjustHpBackwards :: FCode ()
 -- This function adjusts and heap pointers just before a tail call or
--- return.  At a call or return, the virtual heap pointer may be less 
--- than the real Hp, because the latter was advanced to deal with 
--- the worst-case branch of the code, and we may be in a better-case 
--- branch.  In that case, move the real Hp *back* and retract some 
+-- return.  At a call or return, the virtual heap pointer may be less
+-- than the real Hp, because the latter was advanced to deal with
+-- the worst-case branch of the code, and we may be in a better-case
+-- branch.  In that case, move the real Hp *back* and retract some
 -- ticky allocation count.
 --
 -- It *does not* deal with high-water-mark adjustment.
 -- That's done by functions which allocate heap.
 adjustHpBackwards
-  = do	{ hp_usg <- getHpUsage
-	; let rHp = realHp hp_usg
-	      vHp = virtHp hp_usg
-	      adjust_words = vHp -rHp
-	; new_hp <- getHpRelOffset vHp
+  = do  { hp_usg <- getHpUsage
+        ; let rHp = realHp hp_usg
+              vHp = virtHp hp_usg
+              adjust_words = vHp -rHp
+        ; new_hp <- getHpRelOffset vHp
 
-	; emit (if adjust_words == 0
-		then mkNop
-		else mkAssign hpReg new_hp)	-- Generates nothing when vHp==rHp
+        ; emit (if adjust_words == 0
+                then mkNop
+                else mkAssign hpReg new_hp)        -- Generates nothing when vHp==rHp
 
-	; tickyAllocHeap False adjust_words		-- ...ditto
+        ; tickyAllocHeap False adjust_words                -- ...ditto
 
-	; setRealHp vHp
-	}
+        ; setRealHp vHp
+        }
 
 
 -------------------------------------------------------------------------
---	Making calls: directCall and slowCall
+--        Making calls: directCall and slowCall
 -------------------------------------------------------------------------
 
 -- General plan is:
@@ -183,7 +176,7 @@ directCall conv lbl arity stg_args
 
 slowCall :: CmmExpr -> [StgArg] -> FCode ReturnKind
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
-slowCall fun stg_args 
+slowCall fun stg_args
   = do  { dflags <- getDynFlags
         ; argsreps <- getArgRepsAmodes stg_args
         ; let (rts_fun, arity) = slowCallPattern (map fst argsreps)
@@ -299,13 +292,13 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
     save_cccs_lbl = mkCmmRetInfoLabel rtsPackageId (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------
-----	Laying out objects on the heap and stack
+----        Laying out objects on the heap and stack
 -------------------------------------------------------------------------
 
 -- The heap always grows upwards, so hpRel is easy
-hpRel :: VirtualHpOffset 	-- virtual offset of Hp
-      -> VirtualHpOffset 	-- virtual offset of The Thing
-      -> WordOff		-- integer word offset
+hpRel :: VirtualHpOffset         -- virtual offset of Hp
+      -> VirtualHpOffset         -- virtual offset of The Thing
+      -> WordOff                -- integer word offset
 hpRel hp off = off - hp
 
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
@@ -316,10 +309,10 @@ getHpRelOffset virtual_offset
 
 mkVirtHeapOffsets
   :: DynFlags
-  -> Bool		-- True <=> is a thunk
-  -> [(PrimRep,a)]	-- Things to make offsets for
-  -> (WordOff,		-- _Total_ number of words allocated
-      WordOff,		-- Number of words allocated for *pointers*
+  -> Bool                -- True <=> is a thunk
+  -> [(PrimRep,a)]        -- Things to make offsets for
+  -> (WordOff,                -- _Total_ number of words allocated
+      WordOff,                -- Number of words allocated for *pointers*
       [(NonVoid a, VirtualHpOffset)])
 
 -- Things with their offsets from start of object in order of
@@ -333,10 +326,10 @@ mkVirtHeapOffsets
 -- than the unboxed things
 
 mkVirtHeapOffsets dflags is_thunk things
-  = let non_void_things		      = filterOut (isVoidRep . fst)  things
-	(ptrs, non_ptrs)    	      = partition (isGcPtrRep . fst) non_void_things
-    	(wds_of_ptrs, ptrs_w_offsets) = mapAccumL computeOffset 0 ptrs
-	(tot_wds, non_ptrs_w_offsets) = mapAccumL computeOffset wds_of_ptrs non_ptrs
+  = let non_void_things               = filterOut (isVoidRep . fst)  things
+        (ptrs, non_ptrs)              = partition (isGcPtrRep . fst) non_void_things
+        (wds_of_ptrs, ptrs_w_offsets) = mapAccumL computeOffset 0 ptrs
+        (tot_wds, non_ptrs_w_offsets) = mapAccumL computeOffset wds_of_ptrs non_ptrs
     in
     (tot_wds, wds_of_ptrs, ptrs_w_offsets ++ non_ptrs_w_offsets)
   where
@@ -344,8 +337,8 @@ mkVirtHeapOffsets dflags is_thunk things
              | otherwise  = fixedHdrSize dflags
 
     computeOffset wds_so_far (rep, thing)
-      = (wds_so_far + argRepSizeW dflags (toArgRep rep), 
-	 (NonVoid thing, hdr_size + wds_so_far))
+      = (wds_so_far + argRepSizeW dflags (toArgRep rep),
+         (NonVoid thing, hdr_size + wds_so_far))
 
 mkVirtConstrOffsets :: DynFlags -> [(PrimRep,a)] -> (WordOff, WordOff, [(NonVoid a, VirtualHpOffset)])
 -- Just like mkVirtHeapOffsets, but for constructors
@@ -354,11 +347,11 @@ mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags False
 
 -------------------------------------------------------------------------
 --
---	Making argument descriptors
+--        Making argument descriptors
 --
 --  An argument descriptor describes the layout of args on the stack,
---  both for 	* GC (stack-layout) purposes, and 
---		* saving/restoring registers when a heap-check fails
+--  both for         * GC (stack-layout) purposes, and
+--                * saving/restoring registers when a heap-check fails
 --
 -- Void arguments aren't important, therefore (contrast constructSlowCall)
 --
@@ -377,7 +370,7 @@ mkArgDescr _nm args
            Just spec_id -> return (ArgSpec spec_id)
            Nothing      -> return (ArgGen arg_bits)
 
-argBits :: DynFlags -> [ArgRep] -> [Bool]	-- True for non-ptr, False for ptr
+argBits :: DynFlags -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
 argBits _      []           = []
 argBits dflags (P   : args) = False : argBits dflags args
 argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
@@ -387,37 +380,37 @@ argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
 stdPattern :: [ArgRep] -> Maybe Int
 stdPattern reps
   = case reps of
-	[]    -> Just ARG_NONE	-- just void args, probably
-	[N]   -> Just ARG_N
-	[P]   -> Just ARG_P
-	[F]   -> Just ARG_F
-	[D]   -> Just ARG_D
-	[L]   -> Just ARG_L
-	[V16] -> Just ARG_V16
+        []    -> Just ARG_NONE        -- just void args, probably
+        [N]   -> Just ARG_N
+        [P]   -> Just ARG_P
+        [F]   -> Just ARG_F
+        [D]   -> Just ARG_D
+        [L]   -> Just ARG_L
+        [V16] -> Just ARG_V16
 
-	[N,N] -> Just ARG_NN
-	[N,P] -> Just ARG_NP
-	[P,N] -> Just ARG_PN
-	[P,P] -> Just ARG_PP
+        [N,N] -> Just ARG_NN
+        [N,P] -> Just ARG_NP
+        [P,N] -> Just ARG_PN
+        [P,P] -> Just ARG_PP
 
-	[N,N,N] -> Just ARG_NNN
-	[N,N,P] -> Just ARG_NNP
-	[N,P,N] -> Just ARG_NPN
-	[N,P,P] -> Just ARG_NPP
-	[P,N,N] -> Just ARG_PNN
-	[P,N,P] -> Just ARG_PNP
-	[P,P,N] -> Just ARG_PPN
-	[P,P,P] -> Just ARG_PPP
+        [N,N,N] -> Just ARG_NNN
+        [N,N,P] -> Just ARG_NNP
+        [N,P,N] -> Just ARG_NPN
+        [N,P,P] -> Just ARG_NPP
+        [P,N,N] -> Just ARG_PNN
+        [P,N,P] -> Just ARG_PNP
+        [P,P,N] -> Just ARG_PPN
+        [P,P,P] -> Just ARG_PPP
 
-	[P,P,P,P]     -> Just ARG_PPPP
-	[P,P,P,P,P]   -> Just ARG_PPPPP
-	[P,P,P,P,P,P] -> Just ARG_PPPPPP
-	
-	_ -> Nothing
+        [P,P,P,P]     -> Just ARG_PPPP
+        [P,P,P,P,P]   -> Just ARG_PPPPP
+        [P,P,P,P,P,P] -> Just ARG_PPPPPP
+
+        _ -> Nothing
 
 -------------------------------------------------------------------------
 --
---	Generating the info table and code for a closure
+--        Generating the info table and code for a closure
 --
 -------------------------------------------------------------------------
 
@@ -427,7 +420,7 @@ stdPattern reps
 -- When loading the free variables, a function closure pointer may be tagged,
 -- so we must take it into account.
 
-emitClosureProcAndInfoTable :: Bool                    -- top-level? 
+emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> Id                      -- name of the closure
                             -> LambdaFormInfo
                             -> CmmInfoTable

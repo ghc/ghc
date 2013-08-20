@@ -235,7 +235,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
       use_cc      -- cost-centre to stick in the object
         | isCurrentCCS ccs = curCCS
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
-  
+
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 
 

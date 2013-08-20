@@ -50,12 +50,12 @@ import Control.Monad (when,void)
 import Util
 
 codeGen :: DynFlags
-         -> Module
-         -> [TyCon]
-         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
-         -> [StgBinding]                -- Bindings to convert
-         -> HpcInfo
-         -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> Module
+        -> [TyCon]
+        -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
+        -> [StgBinding]                -- Bindings to convert
+        -> HpcInfo
+        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
                                         -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
@@ -178,13 +178,13 @@ cgTopRhs rec bndr (StgRhsClosure cc bi fvs upd_flag _srt args body)
    module in the program, and we don't want to require that this name
    has the version and way info appended to it.
 
-We initialise the module tree by keeping a work-stack, 
+We initialise the module tree by keeping a work-stack,
         * pointed to by Sp
         * that grows downward
         * Sp points to the last occupied slot
 -}
 
-mkModuleInit 
+mkModuleInit
         :: CollectedCCs         -- cost centre info
         -> Module
         -> HpcInfo

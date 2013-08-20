@@ -106,10 +106,10 @@ initUpdFrameProf frame
 
 {-	Note [Saving the current cost centre]
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The current cost centre is like a global register.  Like other 
+The current cost centre is like a global register.  Like other
 global registers, it's a caller-saves one.  But consider
 	case (f x) of (p,q) -> rhs
-Since 'f' may set the cost centre, we must restore it 
+Since 'f' may set the cost centre, we must restore it
 before resuming rhs.  So we want code like this:
 	local_cc = CCC  -- save
 	r = f( x )
@@ -117,7 +117,7 @@ before resuming rhs.  So we want code like this:
 That is, we explicitly "save" the current cost centre in
 a LocalReg, local_cc; and restore it after the call. The
 C-- infrastructure will arrange to save local_cc across the
-call. 
+call.
 
 The same goes for join points;
 	let j x = join-stuff
@@ -125,7 +125,7 @@ The same goes for join points;
 We want this kind of code:
 	local_cc = CCC  -- save
 	blah-blah
-     J: 
+     J:
         CCC = local_cc  -- restore
 -}
 
@@ -140,7 +140,7 @@ saveCurrentCostCentre
                    return (Just local_cc)
 
 restoreCurrentCostCentre :: Maybe LocalReg -> FCode ()
-restoreCurrentCostCentre Nothing 
+restoreCurrentCostCentre Nothing
   = return ()
 restoreCurrentCostCentre (Just local_cc)
   = emit (storeCurCCS (CmmReg (CmmLocal local_cc)))
@@ -178,7 +178,7 @@ profAlloc words ccs
 -- Setting the current cost centre on entry to a closure
 
 enterCostCentreThunk :: CmmExpr -> FCode ()
-enterCostCentreThunk closure = 
+enterCostCentreThunk closure =
   ifProfiling $ do
       dflags <- getDynFlags
       emit $ storeCurCCS (costCentreFrom dflags closure)
@@ -220,7 +220,7 @@ initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
 
 
 emitCostCentreDecl :: CostCentre -> FCode ()
-emitCostCentreDecl cc = do 
+emitCostCentreDecl cc = do
   { dflags <- getDynFlags
   ; let is_caf | isCafCC cc = mkIntCLit dflags (ord 'c') -- 'c' == is a CAF
                | otherwise  = zero dflags
@@ -241,12 +241,12 @@ emitCostCentreDecl cc = do
               zero dflags,     -- StgWord time_ticks
               is_caf,   -- StgInt is_caf
               zero dflags      -- struct _CostCentre *link
-	    ] 
+	    ]
   ; emitDataLits (mkCCLabel cc) lits
   }
 
 emitCostCentreStackDecl :: CostCentreStack -> FCode ()
-emitCostCentreStackDecl ccs 
+emitCostCentreStackDecl ccs
   = case maybeSingletonCCS ccs of
     Just cc ->
         do dflags <- getDynFlags
@@ -316,12 +316,12 @@ staticLdvInit = zeroCLit
 -- Initial value of the LDV field in a dynamic closure
 --
 dynLdvInit :: DynFlags -> CmmExpr
-dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE  
+dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr dflags) [
       CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags (lDV_SHIFT dflags)],
       CmmLit (mkWordCLit dflags (iLDV_STATE_CREATE dflags))
   ]
-        
+
 --
 -- Initialise the LDV word of a new closure
 --
@@ -340,7 +340,7 @@ ldvEnterClosure closure_info = do dflags <- getDynFlags
                                   let tag = funTag dflags closure_info
                                   ldvEnter (cmmOffsetB dflags (CmmReg nodeReg) (-tag))
         -- don't forget to substract node's tag
-  
+
 ldvEnter :: CmmExpr -> FCode ()
 -- Argument is a closure pointer
 ldvEnter cl_ptr = do
@@ -364,8 +364,7 @@ loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth dflags))
              (cInt dflags)]
 
 ldvWord :: DynFlags -> CmmExpr -> CmmExpr
--- Takes the address of a closure, and returns 
+-- Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
 ldvWord dflags closure_ptr
     = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
-

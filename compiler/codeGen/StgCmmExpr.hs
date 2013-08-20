@@ -323,7 +323,7 @@ This special case handles code like
 -->  case tagToEnum# (a <$# b) of
         True -> .. ; False -> ...
 
---> case (a <$# b) of r -> 
+--> case (a <$# b) of r ->
     case tagToEnum# r of
         True -> .. ; False -> ...
 

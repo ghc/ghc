@@ -469,7 +469,7 @@ cannedGCEntryPoint dflags regs
                                   W32       -> Just (mkGcLabel "stg_gc_f1")
                                   W64       -> Just (mkGcLabel "stg_gc_d1")
                                   _         -> Nothing
-        
+
           | width == wordWidth dflags -> Just (mkGcLabel "stg_gc_unbx_r1")
           | width == W64              -> Just (mkGcLabel "stg_gc_l1")
           | otherwise                 -> Nothing

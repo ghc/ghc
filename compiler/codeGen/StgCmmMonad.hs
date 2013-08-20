@@ -12,7 +12,7 @@ module StgCmmMonad (
 
         initC, runC, thenC, thenFC, listCs,
         returnFC, fixC,
-        newUnique, newUniqSupply, 
+        newUnique, newUniqSupply,
 
         newLabelC, emitLabel,
 
@@ -46,7 +46,7 @@ module StgCmmMonad (
         -- ideally we wouldn't export these, but some other modules access internal state
         getState, setState, getInfoDown, getDynFlags, getThisPackage,
 
-        -- more localised access to monad state        
+        -- more localised access to monad state
         CgIdInfo(..), CgLoc(..),
         getBinds, setBinds, getStaticBinds,
 
@@ -132,7 +132,7 @@ returnFC :: a -> FCode a
 returnFC val = FCode (\_info_down state -> (# val, state #))
 
 thenC :: FCode () -> FCode a -> FCode a
-thenC (FCode m) (FCode k) = 
+thenC (FCode m) (FCode k) =
         FCode $ \info_down state -> case m info_down state of
                                      (# _,new_state #) -> k info_down new_state
 
@@ -141,7 +141,7 @@ listCs [] = return ()
 listCs (fc:fcs) = do
         fc
         listCs fcs
-           
+
 thenFC  :: FCode a -> (a -> FCode c) -> FCode c
 thenFC (FCode m) k = FCode $
         \info_down state ->
@@ -152,7 +152,7 @@ thenFC (FCode m) k = FCode $
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode (
-        \info_down state -> 
+        \info_down state ->
                 let
                         (v,s) = doFCode (fcode v) info_down state
                 in
@@ -163,8 +163,8 @@ fixC fcode = FCode (
 --        The code generator environment
 --------------------------------------------------------
 
--- This monadery has some information that it only passes 
--- *downwards*, as well as some ``state'' which is modified 
+-- This monadery has some information that it only passes
+-- *downwards*, as well as some ``state'' which is modified
 -- as we go along.
 
 data CgInfoDownwards        -- information only passed *downwards* by the monad
@@ -180,11 +180,11 @@ data CgInfoDownwards        -- information only passed *downwards* by the monad
 type CgBindings = IdEnv CgIdInfo
 
 data CgIdInfo
-  = CgIdInfo        
+  = CgIdInfo
         { cg_id :: Id        -- Id that this is the info for
-                        -- Can differ from the Id at occurrence sites by 
+                        -- Can differ from the Id at occurrence sites by
                         -- virtue of being externalised, for splittable C
-        , cg_lf  :: LambdaFormInfo 
+        , cg_lf  :: LambdaFormInfo
         , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
         }
 
@@ -193,9 +193,9 @@ data CgLoc
                         -- Hp, so that it remains valid across calls
 
   | LneLoc BlockId [LocalReg]             -- A join point
-        -- A join point (= let-no-escape) should only 
+        -- A join point (= let-no-escape) should only
         -- be tail-called, and in a saturated way.
-        -- To tail-call it, assign to these locals, 
+        -- To tail-call it, assign to these locals,
         -- and branch to the block id
 
 instance Outputable CgIdInfo where
@@ -212,7 +212,7 @@ data Sequel
   = Return Bool                  -- Return result(s) to continuation found on the stack
                           --         True <=> the continuation is update code (???)
 
-  | AssignTo 
+  | AssignTo
         [LocalReg]        -- Put result(s) in these regs and fall through
                         --         NB: no void arguments here
                         --
@@ -297,12 +297,12 @@ data ReturnKind
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
-  = MkCgInfoDown {      cgd_dflags    = dflags,
-                        cgd_mod       = mod,
-                        cgd_statics   = emptyVarEnv,
-                        cgd_updfr_off = initUpdFrameOff dflags,
-                        cgd_ticky     = mkTopTickyCtrLabel,
-                        cgd_sequel    = initSequel }
+  = MkCgInfoDown { cgd_dflags    = dflags
+                 , cgd_mod       = mod
+                 , cgd_statics   = emptyVarEnv
+                 , cgd_updfr_off = initUpdFrameOff dflags
+                 , cgd_ticky     = mkTopTickyCtrLabel
+                 , cgd_sequel    = initSequel }
 
 initSequel :: Sequel
 initSequel = Return False
@@ -321,9 +321,9 @@ data CgState
 
      cgs_tops  :: OrdList CmmDecl,
         -- Other procedures and data blocks in this compilation unit
-        -- Both are ordered only so that we can 
+        -- Both are ordered only so that we can
         -- reduce forward references, when it's easy to do so
-     
+
      cgs_binds :: CgBindings,        -- [Id -> info] : *local* bindings environment
                                      -- Bindings for top-level things are given in
                                 -- the info-down part
@@ -346,18 +346,19 @@ type VirtualHpOffset = WordOff
 
 initCgState :: UniqSupply -> CgState
 initCgState uniqs
-  = MkCgState { cgs_stmts      = mkNop, cgs_tops = nilOL,
-                cgs_binds      = emptyVarEnv, 
-                cgs_hp_usg     = initHpUsage,
-                cgs_uniqs      = uniqs }
+  = MkCgState { cgs_stmts  = mkNop
+              , cgs_tops   = nilOL
+              , cgs_binds  = emptyVarEnv
+              , cgs_hp_usg = initHpUsage
+              , cgs_uniqs  = uniqs }
 
 stateIncUsage :: CgState -> CgState -> CgState
--- stateIncUsage@ e1 e2 incorporates in e1 
+-- stateIncUsage@ e1 e2 incorporates in e1
 -- the heap high water mark found in e2.
 stateIncUsage s1 s2@(MkCgState { cgs_hp_usg = hp_usg })
      = s1 { cgs_hp_usg  = cgs_hp_usg  s1 `maxHpHw`  virtHp hp_usg }
        `addCodeBlocksFrom` s2
-                
+
 addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- Add code blocks from the latter to the former
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
@@ -370,13 +371,13 @@ s1 `addCodeBlocksFrom` s2
 -- only records the high water marks of forked-off branches, so to find the
 -- heap high water mark you have to take the max of virtHp and hwHp.  Remember,
 -- virtHp never retreats!
--- 
+--
 -- Note Jan 04: ok, so why do we only look at the virtual Hp??
 
 heapHWM :: HeapUsage -> VirtualHpOffset
 heapHWM = virtHp
 
-initHpUsage :: HeapUsage 
+initHpUsage :: HeapUsage
 initHpUsage = HeapUsage { virtHp = 0, realHp = 0 }
 
 maxHpHw :: HeapUsage -> VirtualHpOffset -> HeapUsage
@@ -396,7 +397,7 @@ getHpUsage :: FCode HeapUsage
 getHpUsage = do
         state <- getState
         return $ cgs_hp_usg state
-        
+
 setHpUsage :: HeapUsage -> FCode ()
 setHpUsage new_hp_usg = do
         state <- getState
@@ -404,24 +405,24 @@ setHpUsage new_hp_usg = do
 
 setVirtHp :: VirtualHpOffset -> FCode ()
 setVirtHp new_virtHp
-  = do        { hp_usage <- getHpUsage
+  = do  { hp_usage <- getHpUsage
         ; setHpUsage (hp_usage {virtHp = new_virtHp}) }
 
 getVirtHp :: FCode VirtualHpOffset
-getVirtHp 
-  = do        { hp_usage <- getHpUsage
+getVirtHp
+  = do  { hp_usage <- getHpUsage
         ; return (virtHp hp_usage) }
 
 setRealHp ::  VirtualHpOffset -> FCode ()
 setRealHp new_realHp
-  = do        { hp_usage <- getHpUsage
+  = do  { hp_usage <- getHpUsage
         ; setHpUsage (hp_usage {realHp = new_realHp}) }
 
 getBinds :: FCode CgBindings
 getBinds = do
         state <- getState
         return $ cgs_binds state
-        
+
 setBinds :: CgBindings -> FCode ()
 setBinds new_binds = do
         state <- getState
@@ -433,7 +434,7 @@ getStaticBinds = do
         return (cgd_statics info)
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
-withState (FCode fcode) newstate = FCode $ \info_down state -> 
+withState (FCode fcode) newstate = FCode $ \info_down state ->
   case fcode info_down newstate of
     (# retval, state2 #) -> (# (retval,state2), state #)
 
@@ -462,7 +463,7 @@ getThisPackage :: FCode PackageId
 getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
-withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state 
+withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state
 
 doFCode :: FCode a -> CgInfoDownwards -> CgState -> (a,CgState)
 doFCode (FCode fcode) info_down state =
@@ -480,7 +481,7 @@ getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
 
 withSequel :: Sequel -> FCode a -> FCode a
 withSequel sequel code
-  = do        { info  <- getInfoDown
+  = do  { info  <- getInfoDown
         ; withInfoDown code (info {cgd_sequel = sequel }) }
 
 getSequel :: FCode Sequel
@@ -499,12 +500,12 @@ getSequel = do  { info <- getInfoDown
 
 withUpdFrameOff :: UpdFrameOffset -> FCode a -> FCode a
 withUpdFrameOff size code
-  = do        { info  <- getInfoDown
+  = do  { info  <- getInfoDown
         ; withInfoDown code (info {cgd_updfr_off = size }) }
 
 getUpdFrameOff :: FCode UpdFrameOffset
 getUpdFrameOff
-  = do        { info  <- getInfoDown
+  = do  { info  <- getInfoDown
         ; return $ cgd_updfr_off info }
 
 -- ----------------------------------------------------------------------------
@@ -526,28 +527,27 @@ setTickyCtrLabel ticky code = do
 --------------------------------------------------------
 
 forkClosureBody :: FCode () -> FCode ()
--- forkClosureBody takes a code, $c$, and compiles it in a 
+-- forkClosureBody takes a code, $c$, and compiles it in a
 -- fresh environment, except that:
 --        - compilation info and statics are passed in unchanged.
 --        - local bindings are passed in unchanged
 --          (it's up to the enclosed code to re-bind the
 --           free variables to a field of the closure)
--- 
+--
 -- The current state is passed on completely unaltered, except that
 -- C-- from the fork is incorporated.
 
 forkClosureBody body_code
-  = do        { dflags <- getDynFlags
-              ; info <- getInfoDown
-        ; us   <- newUniqSupply
-        ; state <- getState
-           ; let body_info_down = info { cgd_sequel    = initSequel
-                                      , cgd_updfr_off = initUpdFrameOff dflags }
-                 fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-                 ((),fork_state_out)
-                    = doFCode body_code body_info_down fork_state_in
+  = do  { dflags <- getDynFlags
+        ; info   <- getInfoDown
+        ; us     <- newUniqSupply
+        ; state  <- getState
+        ; let body_info_down = info { cgd_sequel    = initSequel
+                                    , cgd_updfr_off = initUpdFrameOff dflags }
+              fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
+              ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
-        
+
 forkStatics :: FCode a -> FCode a
 -- @forkStatics@ $fc$ compiles $fc$ in an environment whose *statics* come
 -- from the current *local bindings*, but which is otherwise freshly initialised.
@@ -555,32 +555,32 @@ forkStatics :: FCode a -> FCode a
 -- bindings and usage information is otherwise unchanged.
 forkStatics body_code
   = do  { dflags <- getDynFlags
-        ; info  <- getInfoDown
-        ; us    <- newUniqSupply
-        ; state <- getState
+        ; info   <- getInfoDown
+        ; us     <- newUniqSupply
+        ; state  <- getState
         ; let   rhs_info_down = info { cgd_statics = cgs_binds state
-                                     , cgd_sequel  = initSequel 
+                                     , cgd_sequel  = initSequel
                                      , cgd_updfr_off = initUpdFrameOff dflags }
-                (result, fork_state_out) = doFCode body_code rhs_info_down 
+                (result, fork_state_out) = doFCode body_code rhs_info_down
                                                    (initCgState us)
         ; setState (state `addCodeBlocksFrom` fork_state_out)
         ; return result }
 
 forkProc :: FCode a -> FCode a
 -- 'forkProc' takes a code and compiles it in the *current* environment,
--- returning the graph thus constructed. 
+-- returning the graph thus constructed.
 --
 -- The current environment is passed on completely unchanged to
 -- the successor.  In particular, any heap usage from the enclosed
 -- code is discarded; it should deal with its own heap consumption
 forkProc body_code
-  = do        { info_down <- getInfoDown
-        ; us    <- newUniqSupply
-        ; state <- getState
-           ; let info_down' = info_down -- { cgd_sequel = initSequel }
-                 fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-                 (result, fork_state_out) = doFCode body_code info_down' fork_state_in
-          ; setState $ state `addCodeBlocksFrom` fork_state_out
+  = do  { info_down <- getInfoDown
+        ; us        <- newUniqSupply
+        ; state     <- getState
+        ; let info_down'    = info_down -- { cgd_sequel = initSequel }
+              fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
+              (result, fork_state_out) = doFCode body_code info_down' fork_state_in
+        ; setState $ state `addCodeBlocksFrom` fork_state_out
         ; return result }
 
 codeOnly :: FCode () -> FCode ()
@@ -588,7 +588,7 @@ codeOnly :: FCode () -> FCode ()
 -- Do not affect anything else in the outer state
 -- Used in almost-circular code to prevent false loop dependencies
 codeOnly body_code
-  = do        { info_down <- getInfoDown
+  = do  { info_down <- getInfoDown
         ; us   <- newUniqSupply
         ; state <- getState
         ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state,
@@ -623,7 +623,7 @@ forkAlts branch_fcodes
 -- collect the code emitted by an FCode computation
 getCodeR :: FCode a -> FCode (a, CmmAGraph)
 getCodeR fcode
-  = do        { state1 <- getState
+  = do  { state1 <- getState
         ; (a, state2) <- withState fcode (state1 { cgs_stmts = mkNop })
         ; setState $ state2 { cgs_stmts = cgs_stmts state1  }
         ; return (a, cgs_stmts state2) }
@@ -633,21 +633,21 @@ getCode fcode = do { (_,stmts) <- getCodeR fcode; return stmts }
 
 -- 'getHeapUsage' applies a function to the amount of heap that it uses.
 -- It initialises the heap usage to zeros, and passes on an unchanged
--- heap usage. 
+-- heap usage.
 --
 -- It is usually a prelude to performing a GC check, so everything must
 -- be in a tidy and consistent state.
--- 
+--
 -- Note the slightly subtle fixed point behaviour needed here
 
 getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
 getHeapUsage fcode
-  = do        { info_down <- getInfoDown
+  = do  { info_down <- getInfoDown
         ; state <- getState
         ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
                 (r, fstate_out) = doFCode (fcode hp_hw) info_down fstate_in
                 hp_hw = heapHWM (cgs_hp_usg fstate_out)        -- Loop here!
-                
+
         ; setState $ fstate_out { cgs_hp_usg = cgs_hp_usg state }
         ; return r }
 
@@ -683,12 +683,12 @@ newLabelC = do { u <- newUnique
 
 emit :: CmmAGraph -> FCode ()
 emit ag
-  = do        { state <- getState
+  = do  { state <- getState
         ; setState $ state { cgs_stmts = cgs_stmts state <*> ag } }
 
 emitDecl :: CmmDecl -> FCode ()
 emitDecl decl
-  = do         { state <- getState
+  = do  { state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
 
 emitOutOfLine :: BlockId -> CmmAGraph -> FCode ()
@@ -753,10 +753,10 @@ getCmm :: FCode () -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)
-getCmm code 
-  = do        { state1 <- getState
+getCmm code
+  = do  { state1 <- getState
         ; ((), state2) <- withState code (state1 { cgs_tops  = nilOL })
-        ; setState $ state2 { cgs_tops = cgs_tops state1 } 
+        ; setState $ state2 { cgs_tops = cgs_tops state1 }
         ; return (fromOL (cgs_tops state2)) }
 
 
@@ -777,7 +777,7 @@ mkCmmIfGoto e tid = do
 mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
 mkCmmIfThen e tbranch = do
   endif <- newLabelC
-  tid <- newLabelC
+  tid   <- newLabelC
   return $ mkCbranch e tid endif <*>
          mkLabel tid <*> tbranch <*> mkLabel endif
 
@@ -786,7 +786,7 @@ mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual]
        -> UpdFrameOffset -> [CmmActual] -> FCode CmmAGraph
 mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
   dflags <- getDynFlags
-  k <- newLabelC
+  k      <- newLabelC
   let area = Young k
       (off, _, copyin) = copyInOflow dflags retConv area results []
       copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack

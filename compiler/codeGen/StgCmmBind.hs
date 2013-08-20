@@ -106,7 +106,7 @@ cgTopRhsClosure rec id ccs _ upd_flag args body
               caffy         = idCafInfo id
               info_tbl      = mkCmmInfo closure_info -- XXX short-cut
               closure_rep   = mkStaticClosureFields dflags info_tbl ccs caffy []
-      
+
                  -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
         ; emitDataLits closure_label closure_rep
         ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
@@ -115,7 +115,7 @@ cgTopRhsClosure rec id ccs _ upd_flag args body
         -- Don't drop the non-void args until the closure info has been made
         ; forkClosureBody (closureCodeBody True id closure_info ccs
                                 (nonVoidIds args) (length args) body fv_details)
-      
+
         ; return () }
 
   unLit (CmmLit l) = l
@@ -582,7 +582,7 @@ emitBlackHoleCode node = do
   -- Eager blackholing is normally disabled, but can be turned on with
   -- -feager-blackholing.  When it is on, we replace the info pointer
   -- of the thunk with stg_EAGER_BLACKHOLE_info on entry.
-  
+
   -- If we wanted to do eager blackholing with slop filling, we'd need
   -- to do it at the *end* of a basic block, otherwise we overwrite
   -- the free variables in the thunk that we still need.  We have a
@@ -593,7 +593,7 @@ emitBlackHoleCode node = do
   -- on. But it didn't work, and it wasn't strictly necessary to bring
   -- back minimal ticky-ticky, so now EAGER_BLACKHOLING is
   -- unconditionally disabled. -- krc 1/2007
-  
+
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from CmmParse.
 

@@ -240,9 +240,9 @@ tickyEnterViaNode     = ifTicky $ bumpTickyCounter (fsLit "ENT_VIA_NODE_ctr")
 
 tickyEnterThunk :: ClosureInfo -> FCode ()
 tickyEnterThunk cl_info
-  = ifTicky $ do 
+  = ifTicky $ do
     { bumpTickyCounter ctr
-    ; unless static $ do 
+    ; unless static $ do
       ticky_ctr_lbl <- getTickyCtrLabel
       registerTickyCtrAtEntryDyn ticky_ctr_lbl
       bumpTickyEntryCount ticky_ctr_lbl }
@@ -581,6 +581,7 @@ bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram _lbl _n
 --  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLongWidth))
     = return ()    -- TEMP SPJ Apr 07
+                   -- six years passed - still temp? JS Aug 2013
 
 {-
 bumpHistogramE :: LitString -> CmmExpr -> FCode ()

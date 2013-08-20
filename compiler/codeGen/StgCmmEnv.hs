@@ -20,8 +20,8 @@ module StgCmmEnv (
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, idToReg,
         getArgAmode, getNonVoidArgAmodes,
-        getCgIdInfo, 
-        maybeLetNoEscape, 
+        getCgIdInfo,
+        maybeLetNoEscape,
     ) where
 
 #include "HsVersions.h"
@@ -114,7 +114,7 @@ addDynTag :: DynFlags -> CmmExpr -> DynTag -> CmmExpr
 addDynTag dflags expr tag = cmmOffsetB dflags expr tag
 
 cgIdInfoId :: CgIdInfo -> Id
-cgIdInfoId = cg_id 
+cgIdInfoId = cg_id
 
 cgIdInfoLF :: CgIdInfo -> LambdaFormInfo
 cgIdInfoLF = cg_lf
@@ -127,8 +127,8 @@ maybeLetNoEscape _other                                      = Nothing
 
 ---------------------------------------------------------
 --        The binding environment
--- 
--- There are three basic routines, for adding (addBindC), 
+--
+-- There are three basic routines, for adding (addBindC),
 -- modifying(modifyBindC) and looking up (getCgIdInfo) bindings.
 ---------------------------------------------------------
 
@@ -160,7 +160,7 @@ getCgIdInfo id
             Nothing   ->
 
                 -- Should be imported; make up a CgIdInfo for it
-        let 
+        let
             name = idName id
         in
         if isExternalName name then do
@@ -168,10 +168,10 @@ getCgIdInfo id
             dflags <- getDynFlags
             return (litIdInfo dflags id (mkLFImported id) ext_lbl)
         else
-            -- Bug        
+            -- Bug
             cgLookupPanic id
         }}}}
-    
+
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
   = do  static_binds <- getStaticBinds
@@ -192,7 +192,7 @@ getArgAmode (NonVoid (StgVarArg var))  =
 getArgAmode (NonVoid (StgLitArg lit))  = liftM CmmLit $ cgLit lit
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
--- NB: Filters out void args, 
+-- NB: Filters out void args,
 --     so the result list may be shorter than the argument list
 getNonVoidArgAmodes [] = return []
 getNonVoidArgAmodes (arg:args)
@@ -214,7 +214,7 @@ bindToReg nvid@(NonVoid id) lf_info
        return reg
 
 rebindToReg :: NonVoid Id -> FCode LocalReg
--- Like bindToReg, but the Id is already in scope, so 
+-- Like bindToReg, but the Id is already in scope, so
 -- get its LF info from the envt
 rebindToReg nvid@(NonVoid id)
   = do  { info <- getCgIdInfo id
@@ -233,7 +233,7 @@ idToReg :: DynFlags -> NonVoid Id -> LocalReg
 -- We re-use the Unique from the Id to make it easier to see what is going on
 --
 -- By now the Ids should be uniquely named; else one would worry
--- about accidental collision 
+-- about accidental collision
 idToReg dflags (NonVoid id)
              = LocalReg (idUnique id)
                         (case idPrimRep id of VoidRep -> pprPanic "idToReg" (ppr id)
