@@ -598,7 +598,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- The interface hash depends on:
    --   - the ABI hash, plus
    --   - usages
-   --   - deps
+   --   - deps (home and external packages, dependent files)
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash, 
