@@ -547,7 +547,8 @@ forkProc :: FCode a -> FCode a
 --
 -- The current environment is passed on completely unchanged to
 -- the successor.  In particular, any heap usage from the enclosed
--- code is discarded; it should deal with its own heap consumption
+-- code is discarded; it should deal with its own heap consumption.
+-- forkProc is used to compile let-no-escape bindings.
 forkProc body_code
   = do  { info_down <- getInfoDown
         ; us        <- newUniqSupply
