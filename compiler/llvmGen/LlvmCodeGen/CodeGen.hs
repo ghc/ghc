@@ -967,6 +967,9 @@ genMachOp _ op [x] = case op of
 
     MO_VS_Quot    _ _ -> panicOp
     MO_VS_Rem     _ _ -> panicOp
+
+    MO_VU_Quot    _ _ -> panicOp
+    MO_VU_Rem     _ _ -> panicOp
  
     MO_VF_Insert  _ _ -> panicOp
     MO_VF_Extract _ _ -> panicOp
@@ -1140,6 +1143,9 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_VS_Quot l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_SDiv
     MO_VS_Rem  l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_SRem
+
+    MO_VU_Quot l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_UDiv
+    MO_VU_Rem  l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_URem
  
     MO_VF_Add  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FAdd
     MO_VF_Sub  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FSub

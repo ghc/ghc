@@ -610,6 +610,8 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_VS_Quot {}    -> needLlvm
       MO_VS_Rem {}     -> needLlvm
       MO_VS_Neg {}     -> needLlvm
+      MO_VU_Quot {}    -> needLlvm
+      MO_VU_Rem {}     -> needLlvm
       MO_VF_Insert {}  -> needLlvm
       MO_VF_Extract {} -> needLlvm
       MO_VF_Add {}     -> needLlvm

@@ -651,6 +651,15 @@ pprMachOp_for_C mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
                                       ++ " should have been handled earlier!")
 
+        MO_VU_Quot {}     -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VU_Quot")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Quot"
+                                      ++ " should have been handled earlier!")
+        MO_VU_Rem {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VU_Rem")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
+                                      ++ " should have been handled earlier!")
+
         MO_VF_Insert {}   -> pprTrace "offending mop:"
                                 (ptext $ sLit "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"

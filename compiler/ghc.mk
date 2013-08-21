@@ -250,8 +250,12 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-code-size.hs-incl        \
                     primop-can-fail.hs-incl         \
                     primop-strictness.hs-incl       \
-                    primop-fixity.hs-incl       \
-                    primop-primop-info.hs-incl
+                    primop-fixity.hs-incl           \
+                    primop-primop-info.hs-incl      \
+                    primop-vector-uniques.hs-incl   \
+                    primop-vector-tys.hs-incl       \
+                    primop-vector-tys-exports.hs-incl \
+                    primop-vector-tycons.hs-incl
 
 PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
@@ -290,6 +294,14 @@ compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt
 	"$$(genprimopcode_INPLACE)" --fixity             < $$< > $$@
 compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
+compiler/stage$1/build/primop-vector-uniques.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-uniques     < $$< > $$@
+compiler/stage$1/build/primop-vector-tys.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-tys         < $$< > $$@
+compiler/stage$1/build/primop-vector-tys-exports.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-tys-exports < $$< > $$@
+compiler/stage$1/build/primop-vector-tycons.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-tycons      < $$< > $$@
 
 # Usages aren't used any more; but the generator
 # can still generate them if we want them back
