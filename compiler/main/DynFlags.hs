@@ -579,6 +579,10 @@ data DynFlags = DynFlags {
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
+  parUpsweepNum         :: Maybe Int,   -- ^ The number of modules to compile in parallel
+                                        --   during the upsweep, where Nothing ==> compile as
+                                        --   many in parallel as there are CPUs.
+
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
@@ -1253,6 +1257,8 @@ defaultDynFlags mySettings =
         floatLamArgs            = Just 0, -- Default: float only if no fvs
         historySize             = 20,
         strictnessBefore        = [],
+
+        parUpsweepNum           = Just 1,
 
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
@@ -2011,6 +2017,8 @@ dynamic_flags = [
          (HasArg (\s -> do addCmdlineHCInclude s
                            addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect"))
   , Flag "v"        (OptIntSuffix setVerbosity)
+
+  , Flag "j"        (OptIntSuffix (\n -> upd (\d -> d {parUpsweepNum = n})))
 
         ------- ways --------------------------------------------------------
   , Flag "prof"           (NoArg (addWay WayProf))
