@@ -58,7 +58,7 @@ import qualified ErrUtils as Err
 import Control.Monad
 import Data.Function
 import Data.List        ( sortBy )
-import Data.IORef       ( readIORef, writeIORef )
+import Data.IORef       ( atomicModifyIORef )
 \end{code}
 
 
@@ -857,9 +857,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
   -- Now we get to the real reason that all this is in the IO Monad:
   -- we have to update the name cache in a nice atomic fashion
 
-  | local  && internal = do { nc <- readIORef nc_var
-                            ; let (nc', new_local_name) = mk_new_local nc
-                            ; writeIORef nc_var nc'
+  | local  && internal = do { new_local_name <- atomicModifyIORef nc_var mk_new_local
                             ; return (occ_env', new_local_name) }
         -- Even local, internal names must get a unique occurrence, because
         -- if we do -split-objs we externalise the name later, in the code generator
@@ -867,9 +865,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
         -- Similarly, we must make sure it has a system-wide Unique, because
         -- the byte-code generator builds a system-wide Name->BCO symbol table
 
-  | local  && external = do { nc <- readIORef nc_var
-                            ; let (nc', new_external_name) = mk_new_external nc
-                            ; writeIORef nc_var nc'
+  | local  && external = do { new_external_name <- atomicModifyIORef nc_var mk_new_external
                             ; return (occ_env', new_external_name) }
 
   | otherwise = panic "tidyTopName"
