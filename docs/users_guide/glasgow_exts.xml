@@ -10886,6 +10886,20 @@ the user-supplied roles to make sure they don't break any promises. It would
 be bad, for example, if the user could make <literal>BadIdea</literal>'s role be R.
 </para>
 
+<para>As another example, we can consider a type <literal>Set a</literal> that
+represents a set of data, ordered according to <literal>a</literal>'s
+<literal>Ord</literal> instance. While it would generally be type-safe to
+consider <literal>a</literal> to be at role R, it is possible that a
+<literal>newtype</literal> and its base type have
+<emphasis>different</emphasis> orderings encoded in their respective
+<literal>Ord</literal> instances. This would lead to misbehavior at runtime.
+So, the author of the <literal>Set</literal> datatype would like its parameter
+to be at role N. This would be done with a declaration</para>
+
+<programlisting>
+  data Set a@N = ...
+</programlisting>
+
 <para>The other place where role annotations may be necessary are in
 <literal>hs-boot</literal> files (<xref linkend="mutual-recursion"/>), where
 the right-hand sides of definitions can be omitted. As usual, the
