@@ -6,28 +6,21 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module StgCmmProf (
-	initCostCentres, ccType, ccsType,
-	mkCCostCentre, mkCCostCentreStack,
+        initCostCentres, ccType, ccsType,
+        mkCCostCentre, mkCCostCentreStack,
 
-	-- Cost-centre Profiling
-	dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
+        -- Cost-centre Profiling
+        dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
         enterCostCentreThunk, enterCostCentreFun,
         costCentreFrom,
         curCCS, storeCurCCS,
         emitSetCCC,
 
-	saveCurrentCostCentre, restoreCurrentCostCentre,
+        saveCurrentCostCentre, restoreCurrentCostCentre,
 
-	-- Lag/drag/void stuff
-	ldvEnter, ldvEnterClosure, ldvRecordCreate
+        -- Lag/drag/void stuff
+        ldvEnter, ldvEnterClosure, ldvRecordCreate
   ) where
 
 #include "HsVersions.h"
@@ -78,8 +71,8 @@ mkCCostCentreStack :: CostCentreStack -> CmmLit
 mkCCostCentreStack ccs = CmmLabel (mkCCSLabel ccs)
 
 costCentreFrom :: DynFlags
-               -> CmmExpr 	-- A closure pointer
-	       -> CmmExpr	-- The cost centre from that closure
+               -> CmmExpr         -- A closure pointer
+               -> CmmExpr        -- The cost centre from that closure
 costCentreFrom dflags cl = CmmLoad (cmmOffsetB dflags cl (oFFSET_StgHeader_ccs dflags)) (ccsType dflags)
 
 -- | The profiling header words in a static closure
@@ -94,43 +87,43 @@ dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit dflags]
 -- | Initialise the profiling field of an update frame
 initUpdFrameProf :: CmmExpr -> FCode ()
 initUpdFrameProf frame
-  = ifProfiling $	-- frame->header.prof.ccs = CCCS
+  = ifProfiling $        -- frame->header.prof.ccs = CCCS
     do dflags <- getDynFlags
        emitStore (cmmOffset dflags frame (oFFSET_StgHeader_ccs dflags)) curCCS
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
-	-- is unnecessary because it is not used anyhow.
+        -- is unnecessary because it is not used anyhow.
 
 ---------------------------------------------------------------------------
--- 	Saving and restoring the current cost centre
+--         Saving and restoring the current cost centre
 ---------------------------------------------------------------------------
 
-{-	Note [Saving the current cost centre]
-	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-        Note [Saving the current cost centre]
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The current cost centre is like a global register.  Like other
 global registers, it's a caller-saves one.  But consider
-	case (f x) of (p,q) -> rhs
+        case (f x) of (p,q) -> rhs
 Since 'f' may set the cost centre, we must restore it
 before resuming rhs.  So we want code like this:
-	local_cc = CCC  -- save
-	r = f( x )
-	CCC = local_cc  -- restore
+        local_cc = CCC  -- save
+        r = f( x )
+        CCC = local_cc  -- restore
 That is, we explicitly "save" the current cost centre in
 a LocalReg, local_cc; and restore it after the call. The
 C-- infrastructure will arrange to save local_cc across the
 call.
 
 The same goes for join points;
-	let j x = join-stuff
-	in blah-blah
+        let j x = join-stuff
+        in blah-blah
 We want this kind of code:
-	local_cc = CCC  -- save
-	blah-blah
+        local_cc = CCC  -- save
+        blah-blah
      J:
         CCC = local_cc  -- restore
 -}
 
 saveCurrentCostCentre :: FCode (Maybe LocalReg)
-	-- Returns Nothing if profiling is off
+        -- Returns Nothing if profiling is off
 saveCurrentCostCentre
   = do dflags <- getDynFlags
        if not (gopt Opt_SccProfilingOn dflags)
@@ -207,7 +200,7 @@ ifProfilingL dflags xs
 
 
 ---------------------------------------------------------------
---	Initialising Cost Centres & CCSs
+--        Initialising Cost Centres & CCSs
 ---------------------------------------------------------------
 
 initCostCentres :: CollectedCCs -> FCode ()
@@ -233,15 +226,15 @@ emitCostCentreDecl cc = do
                    showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
-     lits = [ zero dflags,   	-- StgInt ccID,
-	      label,	-- char *label,
-	      modl,	-- char *module,
+     lits = [ zero dflags,           -- StgInt ccID,
+              label,        -- char *label,
+              modl,        -- char *module,
               loc,      -- char *srcloc,
               zero64,   -- StgWord64 mem_alloc
               zero dflags,     -- StgWord time_ticks
               is_caf,   -- StgInt is_caf
               zero dflags      -- struct _CostCentre *link
-	    ]
+            ]
   ; emitDataLits (mkCCLabel cc) lits
   }
 
@@ -290,19 +283,19 @@ emitSetCCC cc tick push
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result AddrHint
-	rtsPackageId
+        rtsPackageId
         (fsLit "pushCostCentre") [(ccs,AddrHint),
-				(CmmLit (mkCCostCentre cc), AddrHint)]
+                                (CmmLit (mkCCostCentre cc), AddrHint)]
         False
 
 bumpSccCount :: DynFlags -> CmmExpr -> CmmAGraph
 bumpSccCount dflags ccs
   = addToMem (rEP_CostCentreStack_scc_count dflags)
-	 (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
+         (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
 
 -----------------------------------------------------------------------------
 --
---		Lag/drag/void stuff
+--                Lag/drag/void stuff
 --
 -----------------------------------------------------------------------------
 
