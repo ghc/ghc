@@ -525,20 +525,15 @@ gen_wrappers (Info _ entries)
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
      ++ "import GHC.Tuple ()\n"
-     ++ "import GHC.Prim (" ++ concat (intersperse ", " othertycons) ++ ")\n"
-     ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"
-     ++ "import GHC.Prim (" ++ concat (intersperse ", " vectycons) ++ ")\n"
-     ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
-     ++ unlines (concatMap f otherspecs)
-     ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"
-     ++ unlines (concatMap f vecspecs)
-     ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
+     ++ "import GHC.Prim (" ++ types ++ ")\n"
+     ++ unlines (concatMap f specs)
      where
-        specs = filter (not.dodgy) (filter is_primop entries)
-        (vecspecs, otherspecs) = partition is_llvm_only specs
+        specs = filter (not.dodgy) $
+                filter (not.is_llvm_only) $
+                filter is_primop entries
         tycons = foldr union [] $ map (tyconsIn . ty) specs
-        (vectycons, othertycons) =
-            (partition llvmOnlyTyCon . filter (`notElem` ["()", "Bool"])) tycons
+        tycons' = filter (`notElem` ["()", "Bool"]) tycons
+        types = concat $ intersperse ", " tycons'
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
                      lhs = src_name ++ " " ++ unwords args
@@ -564,14 +559,6 @@ gen_wrappers (Info _ entries)
             case lookup_attrib "llvm_only" (opts entry) of
               Just (OptionTrue _) -> True
               _                   -> False
-
-        llvmOnlyTyCon :: TyCon -> Bool
-        llvmOnlyTyCon "Int32#"    = True
-        llvmOnlyTyCon "FloatX4#"  = True
-        llvmOnlyTyCon "DoubleX2#" = True
-        llvmOnlyTyCon "Int32X4#"  = True
-        llvmOnlyTyCon "Int64X2#"  = True
-        llvmOnlyTyCon _           = False
 
 gen_primop_list :: Info -> String
 gen_primop_list (Info _ entries)
