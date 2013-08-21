@@ -748,7 +748,7 @@ data DynFlags = DynFlags {
 
   llvmVersion           :: IORef Int,
 
-  nextWrapperNum        :: IORef Int,
+  nextWrapperNum        :: IORef (ModuleEnv Int),
 
   -- | Machine dependant flags (-m<blah> stuff)
   sseVersion            :: Maybe (Int, Int),  -- (major, minor)
@@ -1211,7 +1211,7 @@ initDynFlags dflags = do
  refGeneratedDumps <- newIORef Set.empty
  refLlvmVersion <- newIORef 28
  refRtldFlags <- newIORef Nothing
- wrapperNum <- newIORef 0
+ wrapperNum <- newIORef emptyModuleEnv
  canUseUnicodeQuotes <- do let enc = localeEncoding
                                str = "‛’"
                            (withCString enc str $ \cstr ->

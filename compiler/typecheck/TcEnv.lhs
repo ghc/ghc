@@ -781,8 +781,10 @@ mkWrapperName what nameBase
              wrapperRef = nextWrapperNum dflags
              pkg = packageIdString  (modulePackageId thisMod)
              mod = moduleNameString (moduleName      thisMod)
-         wrapperNum <- liftIO $ readIORef wrapperRef
-         liftIO $ writeIORef wrapperRef (wrapperNum + 1)
+         wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
+             let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
+                 mod_env' = extendModuleEnv mod_env thisMod (num+1)
+             in (mod_env', num)
          let components = [what, show wrapperNum, pkg, mod, nameBase]
          return $ mkFastString $ zEncodeString $ intercalate ":" components
 
@@ -795,6 +797,9 @@ generate are external names. This means that if a call to them ends up
 in an unfolding, then we can't alpha-rename them, and thus if the
 unique randomly changes from one compile to another then we get a
 spurious ABI change (#4012).
+
+The wrapper counter has to be per-module, not global, so that the number we end
+up using is not dependent on the modules compiled before the current one.
 -}
 \end{code}
 
