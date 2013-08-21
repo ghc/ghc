@@ -309,6 +309,12 @@ compiler_stage1_CONFIGURE_OPTS += --flags=stage1
 compiler_stage2_CONFIGURE_OPTS += --flags=stage2
 compiler_stage3_CONFIGURE_OPTS += --flags=stage3
 
+ifeq "$(GhcThreaded)" "YES"
+# We pass THREADED_RTS to the stage2 C files so that cbits/genSym.c will bring
+# the threaded version of atomic_inc() into scope.
+compiler_stage2_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
+endif
+
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 compiler_stage1_CONFIGURE_OPTS += --flags=ncg
 compiler_stage2_CONFIGURE_OPTS += --flags=ncg

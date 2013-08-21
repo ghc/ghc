@@ -4,6 +4,10 @@
 static HsInt GenSymCounter = 0;
 
 HsInt genSym(void) {
-    return GenSymCounter++;
+    if (n_capabilities == 1) {
+        return GenSymCounter++;
+    } else {
+        return atomic_inc((StgWord *)&GenSymCounter);
+    }
 }
 
