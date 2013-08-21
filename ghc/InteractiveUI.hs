@@ -388,6 +388,7 @@ interactiveUI config srcs maybe_exprs = do
         -- We don't want the cmd line to buffer any input that might be
         -- intended for the program, so unbuffer stdin.
         hSetBuffering stdin NoBuffering
+        hSetBuffering stderr NoBuffering
 #if defined(mingw32_HOST_OS)
         -- On Unix, stdin will use the locale encoding.  The IO library
         -- doesn't do this on Windows (yet), so for now we use UTF-8,

@@ -76,8 +76,8 @@ import Data.Maybe
 
 main :: IO ()
 main = do
-   hSetBuffering stdout NoBuffering
-   hSetBuffering stderr NoBuffering
+   hSetBuffering stdout LineBuffering
+   hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
