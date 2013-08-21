@@ -683,7 +683,8 @@ data DynFlags = DynFlags {
   filesToClean          :: IORef [FilePath],
   dirsToClean           :: IORef (Map FilePath FilePath),
   filesToNotIntermediateClean :: IORef [FilePath],
-
+  -- The next available suffix to uniquely name a temp file, updated atomically
+  nextTempSuffix        :: IORef Int,
 
   -- Names of files which were generated from -ddump-to-file; used to
   -- track which ones we need to truncate because it's our first run
@@ -1203,6 +1204,7 @@ initDynFlags dflags = do
      platformCanGenerateDynamicToo
          = platformOS (targetPlatform dflags) /= OSMinGW32
  refCanGenerateDynamicToo <- newIORef platformCanGenerateDynamicToo
+ refNextTempSuffix <- newIORef 0
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refFilesToNotIntermediateClean <- newIORef []
@@ -1218,6 +1220,7 @@ initDynFlags dflags = do
                                `catchIOError` \_ -> return False
  return dflags{
         canGenerateDynamicToo = refCanGenerateDynamicToo,
+        nextTempSuffix = refNextTempSuffix,
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
         filesToNotIntermediateClean = refFilesToNotIntermediateClean,
@@ -1310,6 +1313,7 @@ defaultDynFlags mySettings =
         depExcludeMods    = [],
         depSuffixes       = [],
         -- end of ghc -M values
+        nextTempSuffix = panic "defaultDynFlags: No nextTempSuffix",
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         filesToNotIntermediateClean = panic "defaultDynFlags: No filesToNotIntermediateClean",
