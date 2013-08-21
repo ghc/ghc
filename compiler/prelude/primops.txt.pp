@@ -2395,20 +2395,20 @@ section "SIMD Vectors"
 ------------------------------------------------------------------------
 
 #define ALL_VECTOR_TYPES \
-  [<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Word32,WORD32,4>,<Word64,WORD64,2> \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
   ,<Float,Float#,4>,<Double,Double#,2>]
 
 #define SIGNED_VECTOR_TYPES \
-  [<Int32,INT32,4>,<Int64,INT64,2> \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
   ,<Float,Float#,4>,<Double,Double#,2>]
 
 #define FLOAT_VECTOR_TYPES \
   [<Float,Float#,4>,<Double,Double#,2>]
 
 #define INT_VECTOR_TYPES \
-  [<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Word32,WORD32,4>,<Word64,WORD64,2>]
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2>]
 
 primtype VECTOR
    with llvm_only = True
