@@ -71,7 +71,6 @@ GHC_PRIM_DIR = $(shell $(LOCAL_GHC_PKG) field ghc-prim library-dirs | sed 's/^.*
 GHC_PRIM_LIB = $(shell $(LOCAL_GHC_PKG) field ghc-prim hs-libraries | sed 's/^.*: *//')
 INTEGER_GMP_DIR = $(shell $(LOCAL_GHC_PKG) field integer-gmp library-dirs | sed 's/^.*: *//')
 INTEGER_GMP_LIB = $(shell $(LOCAL_GHC_PKG) field integer-gmp hs-libraries | sed 's/^.*: *//')
-$(warning xxx$(BASE_DIR)xxx)
 
 BASE        = $(BASE_DIR)/lib$(BASE_LIB).a
 GHC_PRIM    = $(GHC_PRIM_DIR)/lib$(GHC_PRIM_LIB).a
