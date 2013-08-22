@@ -1,5 +1,3 @@
-#define THREADED_RTS
-
 #include "Rts.h"
 
 StgWord i;
