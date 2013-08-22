@@ -322,9 +322,7 @@ data CgState
         -- Both are ordered only so that we can
         -- reduce forward references, when it's easy to do so
 
-     cgs_binds :: CgBindings,        -- [Id -> info] : *local* bindings environment
-                                     -- Bindings for top-level things are given in
-                                -- the info-down part
+     cgs_binds :: CgBindings,
 
      cgs_hp_usg  :: HeapUsage,
 
