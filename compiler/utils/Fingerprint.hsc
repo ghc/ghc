@@ -1,5 +1,5 @@
 -- ----------------------------------------------------------------------------
--- 
+--
 --  (c) The University of Glasgow 2006
 --
 -- Fingerprints for recompilation checking and ABI versioning.
