@@ -75,8 +75,6 @@ fingerprintString str = unsafeDupablePerformIO $
 -- This function loops over the handle, running in constant memory.
 getFileHash :: FilePath -> IO Fingerprint
 getFileHash path = withBinaryFile path ReadMode $ \h -> do
-  fileSize <- hFileSize h
-
   allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
     c_MD5Init pctxt
 
