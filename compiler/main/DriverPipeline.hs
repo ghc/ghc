@@ -1116,8 +1116,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
                       | otherwise         = [ ]
 
-        let cc_opt | optLevel dflags >= 2 = "-O2"
-                   | otherwise            = "-O"
+        let cc_opt | optLevel dflags >= 2 = [ "-O2" ]
+                   | optLevel dflags >= 1 = [ "-O" ]
+                   | otherwise            = []
 
         -- Decide next phase
         let next_phase = As
@@ -1187,7 +1188,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
                              then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
                        ++ verbFlags
-                       ++ [ "-S", cc_opt ]
+                       ++ [ "-S" ]
+                       ++ cc_opt
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
                        ++ framework_paths
                        ++ split_opt
