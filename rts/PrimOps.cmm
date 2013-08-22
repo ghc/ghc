@@ -142,7 +142,8 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
 stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 /* MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
 {
-    gcptr p,h;
+    gcptr p;
+    W_ h;
 
     p = arr + SIZEOF_StgArrWords + WDS(ind);
     (h) = ccall cas(p, old, new);
@@ -154,7 +155,8 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
 /* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
 {
-    gcptr p, h;
+    gcptr p;
+    W_ h;
 
     p = arr + SIZEOF_StgArrWords + WDS(ind);
     (h) = ccall atomic_inc(p, incr);
@@ -234,7 +236,7 @@ stg_unsafeThawArrayzh ( gcptr arr )
 
 // RRN: Uses the ticketed approach; see casMutVar
 stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
-/* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #) */
+/* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */
 {
     gcptr p, h;
     W_ len;
@@ -317,7 +319,7 @@ stg_newMutVarzh ( gcptr init )
 // changing its pointer identity.  The ticket can then be safely used
 // in future CAS operations.
 stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
- /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, a #) */
+ /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, Any a #) */
 {
     gcptr h;
 
