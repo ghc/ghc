@@ -18,7 +18,8 @@ module GHC.Fingerprint (
         Fingerprint(..), fingerprint0, 
         fingerprintData,
         fingerprintString,
-        fingerprintFingerprints
+        fingerprintFingerprints,
+        getFileHash
    ) where
 
 import GHC.IO
@@ -26,8 +27,11 @@ import GHC.Base
 import GHC.Num
 import GHC.List
 import GHC.Real
+import GHC.Show
 import Foreign
 import Foreign.C
+import System.IO
+import Control.Monad (when)
 
 import GHC.Fingerprint.Type
 
@@ -66,6 +70,41 @@ fingerprintString str = unsafeDupablePerformIO $
                     fromIntegral (w32 `shiftR` 16),
                     fromIntegral (w32 `shiftR` 8),
                     fromIntegral w32]
+
+-- | Computes the hash of a given file.
+-- This function loops over the handle, running in constant memory.
+getFileHash :: FilePath -> IO Fingerprint
+getFileHash path = withBinaryFile path ReadMode $ \h -> do
+  fileSize <- hFileSize h
+
+  allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
+    c_MD5Init pctxt
+
+    processChunks h (\buf size -> c_MD5Update pctxt buf (fromIntegral size))
+
+    allocaBytes 16 $ \pdigest -> do
+      c_MD5Final pdigest pctxt
+      peek (castPtr pdigest :: Ptr Fingerprint)
+
+  where
+    _BUFSIZE = 4096
+
+    -- | Loop over _BUFSIZE sized chunks read from the handle,
+    -- passing the callback a block of bytes and its size.
+    processChunks :: Handle -> (Ptr Word8 -> Int -> IO ()) -> IO ()
+    processChunks h f = allocaBytes _BUFSIZE $ \arrPtr ->
+
+      let loop = do
+            count <- hGetBuf h arrPtr _BUFSIZE
+            eof <- hIsEOF h
+            when (count /= _BUFSIZE && not eof) $ error $
+              "GHC.Fingerprint.getFileHash: only read " ++ show count ++ " bytes"
+
+            f arrPtr count
+
+            when (not eof) loop
+
+      in loop
 
 data MD5Context
 
