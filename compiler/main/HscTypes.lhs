@@ -931,7 +931,7 @@ data ModGuts
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
-        mg_fam_insts :: ![FamInst], 
+        mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
@@ -1071,7 +1071,7 @@ data InteractiveContext
 
          ic_fix_env :: FixityEnv,
             -- ^ Fixities declared in let statements
-         
+
          ic_int_print  :: Name,
              -- ^ The function that is used for printing results
              -- of expressions in ghci and -e mode.
@@ -1534,7 +1534,7 @@ lookupType dflags hpt pte name
        return x
   | otherwise
   = lookupNameEnv pte name
-  where 
+  where
     mod = ASSERT2( isExternalName name, ppr name ) nameModule name
     this_pkg = thisPackage dflags
 
@@ -1814,13 +1814,13 @@ data Usage
         -- depend on their export lists
 
 instance Binary Usage where
-    put_ bh usg@UsagePackageModule{} = do 
+    put_ bh usg@UsagePackageModule{} = do
         putByte bh 0
         put_ bh (usg_mod usg)
         put_ bh (usg_mod_hash usg)
         put_ bh (usg_safe     usg)
 
-    put_ bh usg@UsageHomeModule{} = do 
+    put_ bh usg@UsageHomeModule{} = do
         putByte bh 1
         put_ bh (usg_mod_name usg)
         put_ bh (usg_mod_hash usg)
@@ -1828,7 +1828,7 @@ instance Binary Usage where
         put_ bh (usg_entities usg)
         put_ bh (usg_safe     usg)
 
-    put_ bh usg@UsageFile{} = do 
+    put_ bh usg@UsageFile{} = do
         putByte bh 2
         put_ bh (usg_file_path usg)
         put_ bh (usg_file_hash usg)
@@ -2457,4 +2457,3 @@ emptyModBreaks = ModBreaks
    , modBreaks_decls = array (0,-1) []
    }
 \end{code}
-
