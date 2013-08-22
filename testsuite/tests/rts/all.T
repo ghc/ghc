@@ -182,6 +182,7 @@ test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
 test('T8035', normal, compile_and_run, [''])
 
 test('linker_unload',
-     [ extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
+     [ when(ghci_dynamic(), expect_fail) # dynamic ghci can't load '.a's
+     , extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
      run_command,
      ['$MAKE -s --no-print-directory linker_unload'])
