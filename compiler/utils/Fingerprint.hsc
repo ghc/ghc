@@ -21,9 +21,12 @@ module Fingerprint (
 ##include "HsVersions.h"
 
 import Numeric          ( readHex )
+#if __GLASGOW_HASKELL__ < 707
+-- Only needed for getFileHash below.
 import Foreign
 import Panic
 import System.IO
+#endif
 
 import GHC.Fingerprint
 
