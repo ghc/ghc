@@ -1801,10 +1801,12 @@ data Usage
         -- ^ External file dependency. From a CPP #include or TH
         -- addDependentFile. Should be absolute.
         usg_file_hash  :: Fingerprint
-        -- ^ 'Fingerprint' of the file contents. We don't consider
-        -- things like modification timestamps here, because there's
-        -- no reason to recompile if the actual contents don't change.
-        -- This previously lead to odd recompilation behaviors; see #8114
+        -- ^ 'Fingerprint' of the file contents.
+
+        -- Note: We don't consider things like modification timestamps
+        -- here, because there's no reason to recompile if the actual
+        -- contents don't change.  This previously lead to odd
+        -- recompilation behaviors; see #8114
   }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
