@@ -1794,10 +1794,17 @@ data Usage
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from the current package
+  -- | A file upon which the module depends, e.g. a CPP #include, or using TH's
+  -- 'addDependentFile'
   | UsageFile {
         usg_file_path  :: FilePath,
+        -- ^ External file dependency. From a CPP #include or TH
+        -- addDependentFile. Should be absolute.
         usg_file_hash  :: Fingerprint
-        -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
+        -- ^ 'Fingerprint' of the file contents. We don't consider
+        -- things like modification timestamps here, because there's
+        -- no reason to recompile if the actual contents don't change.
+        -- This previously lead to odd recompilation behaviors; see #8114
   }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
