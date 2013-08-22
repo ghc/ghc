@@ -6,7 +6,7 @@
   #-}
 
 -- ----------------------------------------------------------------------------
--- 
+--
 --  (c) The University of Glasgow 2006
 --
 -- Fingerprints for recompilation checking and ABI versioning, and
@@ -15,7 +15,7 @@
 -- ----------------------------------------------------------------------------
 
 module GHC.Fingerprint (
-        Fingerprint(..), fingerprint0, 
+        Fingerprint(..), fingerprint0,
         fingerprintData,
         fingerprintString,
         fingerprintFingerprints,
@@ -112,4 +112,3 @@ foreign import ccall unsafe "__hsbase_MD5Update"
    c_MD5Update :: Ptr MD5Context -> Ptr Word8 -> CInt -> IO ()
 foreign import ccall unsafe "__hsbase_MD5Final"
    c_MD5Final  :: Ptr Word8 -> Ptr MD5Context -> IO ()
-
