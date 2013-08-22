@@ -215,15 +215,10 @@ tidyUnfolding tidy_env
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs
   | isStableSource src
-  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
-	  uf_src  = tidySrc tidy_env src }
+  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs }	   -- Preserves OccInfo
   | otherwise
   = unf_from_rhs
 tidyUnfolding _ unf _ = unf	-- NoUnfolding or OtherCon
-
-tidySrc :: TidyEnv -> UnfoldingSource -> UnfoldingSource
-tidySrc tidy_env (InlineWrapper w) = InlineWrapper (tidyVarOcc tidy_env w)
-tidySrc _        inl_info          = inl_info
 \end{code}
 
 Note [Tidy IdInfo]

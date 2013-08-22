@@ -277,6 +277,7 @@ data GeneralFlag
 
    -- optimisation opts
    | Opt_Strictness
+   | Opt_LateDmdAnal
    | Opt_KillAbsence
    | Opt_KillOneShot
    | Opt_FullLaziness
@@ -590,6 +591,7 @@ data DynFlags = DynFlags {
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
+
   historySize           :: Int,
 
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
@@ -1256,6 +1258,7 @@ defaultDynFlags mySettings =
         specConstrRecursive     = 3,
         liberateCaseThreshold   = Just 2000,
         floatLamArgs            = Just 0, -- Default: float only if no fvs
+
         historySize             = 20,
         strictnessBefore        = [],
 
@@ -2309,6 +2312,7 @@ dynamic_flags = [
   , Flag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
   , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
+
   , Flag "fhistory-size"               (intSuffix (\n d -> d{ historySize = n }))
 
   , Flag "funfolding-creation-threshold" (intSuffix   (\n d -> d {ufCreationThreshold = n}))
@@ -2513,6 +2517,7 @@ fFlags = [
   ( "error-spans",                      Opt_ErrorSpans, nop ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
   ( "strictness",                       Opt_Strictness, nop ),
+  ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
   ( "specialise",                       Opt_Specialise, nop ),
   ( "float-in",                         Opt_FloatIn, nop ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, nop ),

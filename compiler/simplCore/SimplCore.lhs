@@ -121,6 +121,7 @@ getCoreToDo dflags
     cse           = gopt Opt_CSE                          dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
     liberate_case = gopt Opt_LiberateCase                 dflags
+    late_dmd_anal = gopt Opt_LateDmdAnal                  dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
@@ -294,7 +295,15 @@ getCoreToDo dflags
         maybe_rule_check (Phase 0),
 
         -- Final clean-up simplification:
-        simpl_phase 0 ["final"] max_iter
+        simpl_phase 0 ["final"] max_iter,
+
+        runWhen late_dmd_anal $ CoreDoPasses [
+            CoreDoStrictness,
+            CoreDoWorkerWrapper,
+            simpl_phase 0 ["post-late-ww"] max_iter
+          ],
+
+        maybe_rule_check (Phase 0)
      ]
 \end{code}
 

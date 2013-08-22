@@ -30,7 +30,6 @@ import Demand           ( StrictSig(..), dmdTypeDepth )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold
 import CoreUtils
-import qualified CoreSubst
 import CoreArity
 import Rules            ( lookupRule, getRules )
 import TysPrim          ( realWorldStatePrimTy )
@@ -737,8 +736,7 @@ simplUnfolding env top_lvl id _
                    , uf_src = src, uf_guidance = guide })
   | isStableSource src
   = do { expr' <- simplExpr rule_env expr
-       ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst (text "inline-unf") env) src
-             is_top_lvl = isTopLevel top_lvl
+       ; let is_top_lvl = isTopLevel top_lvl
        ; case guide of
            UnfWhen sat_ok _    -- Happens for INLINE things
               -> let guide' = UnfWhen sat_ok (inlineBoringOk expr')
@@ -747,14 +745,14 @@ simplUnfolding env top_lvl id _
                      -- for dfuns for single-method classes; see
                      -- Note [Single-method classes] in TcInstDcls.
                      -- A test case is Trac #4138
-                 in return (mkCoreUnfolding src' is_top_lvl expr' arity guide')
+                 in return (mkCoreUnfolding src is_top_lvl expr' arity guide')
                  -- See Note [Top-level flag on inline rules] in CoreUnfold
 
            _other              -- Happens for INLINABLE things
               -> let bottoming = isBottomingId id
                  in bottoming `seq` -- See Note [Force bottoming field]
                     do dflags <- getDynFlags
-                       return (mkUnfolding dflags src' is_top_lvl bottoming expr')
+                       return (mkUnfolding dflags src is_top_lvl bottoming expr')
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.

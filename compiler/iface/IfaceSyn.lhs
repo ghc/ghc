@@ -583,9 +583,7 @@ data IfaceUnfolding
                  Bool           -- OK to inline even if context is boring
                  IfaceExpr
 
-  | IfExtWrapper Arity IfExtName  -- NB: sometimes we need a IfExtName (not just IfLclName)
-  | IfLclWrapper Arity IfLclName  --     because the worker can simplify to a function in
-                                  --     another module.
+  | IfWrapper IfaceExpr         -- cf TcIface's Note [wrappers in interface files]
 
   | IfDFunUnfold [IfaceBndr] [IfaceExpr]
 
@@ -600,20 +598,15 @@ instance Binary IfaceUnfolding where
         put_ bh b
         put_ bh c
         put_ bh d
-    put_ bh (IfLclWrapper a n) = do
+    put_ bh (IfWrapper e) = do
         putByte bh 2
-        put_ bh a
-        put_ bh n
-    put_ bh (IfExtWrapper a n) = do
-        putByte bh 3
-        put_ bh a
-        put_ bh n
+        put_ bh e
     put_ bh (IfDFunUnfold as bs) = do
-        putByte bh 4
+        putByte bh 3
         put_ bh as
         put_ bh bs
     put_ bh (IfCompulsory e) = do
-        putByte bh 5
+        putByte bh 4
         put_ bh e
     get bh = do
         h <- getByte bh
@@ -626,13 +619,9 @@ instance Binary IfaceUnfolding where
                     c <- get bh
                     d <- get bh
                     return (IfInlineRule a b c d)
-            2 -> do a <- get bh
-                    n <- get bh
-                    return (IfLclWrapper a n)
-            3 -> do a <- get bh
-                    n <- get bh
-                    return (IfExtWrapper a n)
-            4 -> do as <- get bh
+            2 -> do e <- get bh
+                    return (IfWrapper e)
+            3 -> do as <- get bh
                     bs <- get bh
                     return (IfDFunUnfold as bs)
             _ -> do e <- get bh
@@ -1299,10 +1288,7 @@ instance Outputable IfaceUnfolding where
   ppr (IfInlineRule a uok bok e) = sep [ptext (sLit "InlineRule")
                                             <+> ppr (a,uok,bok),
                                         pprParendIfaceExpr e]
-  ppr (IfLclWrapper a wkr) = ptext (sLit "Worker(lcl):") <+> ppr wkr
-                             <+> parens (ptext (sLit "arity") <+> int a)
-  ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext):") <+> ppr wkr
-                             <+> parens (ptext (sLit "arity") <+> int a)
+  ppr (IfWrapper e) = ptext (sLit "Wrapper:") <+> parens (ppr e)
   ppr (IfDFunUnfold bs es) = hang (ptext (sLit "DFun:") <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
 
@@ -1460,8 +1446,7 @@ freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
 freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
-freeNamesIfUnfold (IfExtWrapper _ v)     = unitNameSet v
-freeNamesIfUnfold (IfLclWrapper {})      = emptyNameSet
+freeNamesIfUnfold (IfWrapper e)          = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = fnList freeNamesIfBndr bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet

@@ -880,7 +880,7 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
 
         | Just inl_source <- isStableCoreUnfolding_maybe (idUnfolding bndr)
         = case inl_source of
-             InlineWrapper {} -> 10  -- Note [INLINE pragmas]
+             InlineWrapper    -> 10  -- Note [INLINE pragmas]
              _other           ->  3  -- Data structures are more important than this
                                      -- so that dictionary/method recursion unravels
                 -- Note that this case hits all InlineRule things, so we

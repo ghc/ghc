@@ -101,9 +101,9 @@ mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops 
   = DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = ops }
 
-mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
-mkWwInlineRule id expr arity
-  = mkCoreUnfolding (InlineWrapper id) True
+mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
+mkWwInlineRule expr arity
+  = mkCoreUnfolding InlineWrapper True
                    (simpleOptExpr expr) arity
                    (UnfWhen unSaturatedOk boringCxtNotOk)
 
