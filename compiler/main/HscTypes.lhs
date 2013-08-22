@@ -1796,7 +1796,7 @@ data Usage
     }                                           -- ^ Module from the current package
   | UsageFile {
         usg_file_path  :: FilePath,
-        usg_mtime      :: UTCTime
+        usg_file_hash  :: Fingerprint
         -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
   }
     deriving( Eq )
@@ -1831,7 +1831,7 @@ instance Binary Usage where
     put_ bh usg@UsageFile{} = do 
         putByte bh 2
         put_ bh (usg_file_path usg)
-        put_ bh (usg_mtime     usg)
+        put_ bh (usg_file_hash usg)
 
     get bh = do
         h <- getByte bh
@@ -1850,9 +1850,9 @@ instance Binary Usage where
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
                      usg_exports = exps, usg_entities = ents, usg_safe = safe }
           2 -> do
-            fp    <- get bh
-            mtime <- get bh
-            return UsageFile { usg_file_path = fp, usg_mtime = mtime }
+            fp   <- get bh
+            hash <- get bh
+            return UsageFile { usg_file_path = fp, usg_file_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 \end{code}
