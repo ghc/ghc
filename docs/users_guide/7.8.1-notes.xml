@@ -127,11 +127,10 @@
                 <literal>I#</literal> for ordinary names, e.g. <literal>==$#</literal>
                 compares <literal>Int#</literal>s for equality and
                 <literal>eqCharI#</literal> does the same for <literal>Char#</literal>s.
-                Old PrimOps have been removed and turned into wrappers. If your
-                code relied on removed PrimOps then importing
-                <literal>GHC.PrimWrappers</literal> will make it work again (no
-                need to add anything if your code already imports
-                <literal>GHC.Exts</literal>).
+                Old PrimOps have been removed and turned into wrappers. See
+                <ulink url="http://ghc.haskell.org/trac/ghc/wiki/NewPrimopsInGHC7.8">
+                this GHC wiki page</ulink> for instructions how to update your
+                existing code.
            </para>
        </listitem>
 
