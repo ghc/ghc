@@ -20,6 +20,7 @@ module Fingerprint (
 #include "md5.h"
 ##include "HsVersions.h"
 
+import Control.Monad    ( when )
 import Numeric          ( readHex )
 #if __GLASGOW_HASKELL__ < 707
 -- Only needed for getFileHash below.
@@ -50,7 +51,10 @@ getFileHash path = withBinaryFile path ReadMode $ \h -> do
 
   fileSize <- toIntFileSize `fmap` hFileSize h
 
-  allocaBytes fileSize (\bufPtr -> fingerprintData bufPtr fileSize)
+  allocaBytes fileSize $ \bufPtr -> do
+    n <- hGetBuf h bufPtr fileSize
+    when (n /= fileSize) readFailedError
+    fingerprintData bufPtr fileSize
 
   where
     toIntFileSize :: Integer -> Int
@@ -59,4 +63,7 @@ getFileHash path = withBinaryFile path ReadMode $ \h -> do
           Sorry $ "Fingerprint.getFileHash: Tried to calculate hash of file "
                   ++ path ++ " with size > maxBound :: Int. This is not supported."
       | otherwise = fromIntegral size
+
+    readFailedError = throwGhcException $
+        Panic $ "Fingerprint.getFileHash: hGetBuf failed on interface file"
 #endif
