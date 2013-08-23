@@ -782,7 +782,7 @@ sub main {
 
     $tags{"-"} = 1;
     $tags{"dph"} = 1;
-    if ($OSNAME =~ /^(MSWin32|Cygwin)$/) {
+    if ($OSNAME =~ /^(MSWin32|Cygwin|msys)$/) {
         $tags{"windows"} = 1;
     }
 
