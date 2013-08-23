@@ -316,10 +316,6 @@ sub gitall {
             }
         }
 
-        # Some extra packages like 'async' may be external URLs,
-        # e.g. git://... or http://...
-        my $is_external_url = $remotepath =~ m/^(git:\/\/|https:\/\/|http:\/\/)/;
-
         open RESUME, "> resume.tmp";
         print RESUME "$localpath\n";
         print RESUME "$doing\n";
@@ -328,12 +324,12 @@ sub gitall {
 
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
-        if ($is_github_repo && !defined($is_external_url)) {
+        if ($is_github_repo) {
             $remotepath =~ s/\//-/;
         }
 
         # Construct the path for this package in the repo we pulled from
-        $path = $is_external_url ? $remotepath : "$repo_base/$remotepath";
+        $path = "$repo_base/$remotepath";
 
         if ($command eq "get") {
             next if $remotepath eq "-"; # "git submodule init/update" will get this later
