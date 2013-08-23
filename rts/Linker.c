@@ -2046,9 +2046,8 @@ mmap_again:
 
 void freeObjectCode (ObjectCode *oc)
 {
-    int pagesize, size, r;
-
 #ifdef USE_MMAP
+    int pagesize, size, r;
 
     pagesize = getpagesize();
     size = ROUND_UP(oc->fileSize, pagesize);
@@ -2067,7 +2066,13 @@ void freeObjectCode (ObjectCode *oc)
 #else
 
     stgFree(oc->image);
+
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
     stgFree(oc->symbol_extras);
+#endif
+#endif
+
 
 #endif
 
