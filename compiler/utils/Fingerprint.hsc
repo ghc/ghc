@@ -13,7 +13,7 @@ module Fingerprint (
         readHexFingerprint,
         fingerprintData,
         fingerprintString,
-        -- Re-exported rom GHC.Fingerprint for GHC >= 7.7, local otherwise
+        -- Re-exported from GHC.Fingerprint for GHC >= 7.7, local otherwise
         getFileHash
    ) where
 
