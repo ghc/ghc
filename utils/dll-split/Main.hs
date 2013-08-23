@@ -38,7 +38,7 @@ doit depfile startModule expectedReachableMods
                                      in putStrLn (name ++ ": " ++ unwords ms)
           putStrLn ("Reachable modules from " ++ moduleName startModule
                  ++ " out of date")
-          putStrLn "Please fix it, or building DLLs on Widnows may break (#7780)"
+          putStrLn "Please fix compiler/ghc.mk, or building DLLs on Windows may break (#7780)"
           tellSet "Redundant modules" redundant
           tellSet "Extra modules"     extra
           exitFailure
