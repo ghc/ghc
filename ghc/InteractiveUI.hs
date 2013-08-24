@@ -958,7 +958,7 @@ lookupCommand' str' = do
   ghci_cmds <- ghci_commands `fmap` getGHCiState
   let{ (str, cmds) = case str' of
       ':' : rest -> (rest, ghci_cmds) -- "::" selects a builtin command
-      _ -> (str', ghci_cmds ++ macros) } -- otherwise prefer macros
+      _ -> (str', macros ++ ghci_cmds) } -- otherwise prefer macros
   -- look for exact match first, then the first prefix match
   return $ case [ c | c <- cmds, str == cmdName c ] of
            c:_ -> Just c
