@@ -25,7 +25,7 @@ AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
     x86_64-apple-darwin)
         $3='.dylib'
         ;;
-    arm-apple-darwin10)
+    arm-apple-darwin10|i386-apple-darwin11)
         $2='.a'
         $3='.dylib'
         ;;
@@ -1918,7 +1918,7 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
 case "$1-$2" in
-  darwin10-arm)
+  darwin10-arm|darwin11-i386)
     $3="ios"
     ;;
   *)

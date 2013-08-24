@@ -161,9 +161,9 @@ GhcUnregisterised=@Unregisterised@
 #
 # Target platforms supported:
 #   i386, powerpc
-#   AIX is not supported 
+#   IOS and AIX are not supported 
 ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
-OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst aix,,$(TargetOS_CPP))))
+OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(patsubst aix,,$(TargetOS_CPP)))))
 
 GhcWithNativeCodeGen := $(strip\
     $(if $(filter YESYESNO,\
