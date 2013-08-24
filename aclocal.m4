@@ -103,7 +103,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
                 echo "Can't work out target platform"
                 exit 1
             fi
-    
+
             TargetArch=`echo "$target" | sed 's/-.*//'`
             TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
             TargetOS=`echo "$target" | sed 's/.*-//'`
@@ -1602,7 +1602,7 @@ then
     # optimistiaclly assume that it actually works properly.
     AC_DEFINE([USE_TIMER_CREATE], 1,  [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)])
   else
-  AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
+  AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)],
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
 #include <stdio.h>
@@ -1722,7 +1722,7 @@ out:
      [fptools_cv_timer_create_works=no])
   ])
 case $fptools_cv_timer_create_works in
-    yes) AC_DEFINE([USE_TIMER_CREATE], 1, 
+    yes) AC_DEFINE([USE_TIMER_CREATE], 1,
                    [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)]);;
 esac
   fi
