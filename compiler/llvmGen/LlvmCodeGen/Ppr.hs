@@ -137,7 +137,7 @@ iTableSuf = "_itable"
 
 -- | Create a specially crafted section declaration that encodes the order this
 -- section should be in the final object code.
--- 
+--
 -- The LlvmMangler.llvmFixupAsm pass over the assembly produced by LLVM uses
 -- this section declaration to do its processing.
 mkLayoutSection :: Int -> LMSection
@@ -149,4 +149,3 @@ mkLayoutSection n
 -- be unique since we process the assembly pattern matching this.
 infoSection :: String
 infoSection = "X98A__STRIP,__me"
-
