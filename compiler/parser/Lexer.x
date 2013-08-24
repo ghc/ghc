@@ -660,7 +660,6 @@ reservedWordsFM = listToUFM $
          ( "then",           ITthen,          0 ),
          ( "type",           ITtype,          0 ),
          ( "where",          ITwhere,         0 ),
-         ( "_scc_",          ITscc,           0 ),            -- ToDo: remove
 
          ( "forall",         ITforall,        bit explicitForallBit .|.
                                               bit inRulePragBit),

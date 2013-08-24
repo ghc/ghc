@@ -227,7 +227,6 @@ incorrect.
  'then'         { L _ ITthen }
  'type'         { L _ ITtype }
  'where'        { L _ ITwhere }
- '_scc_'        { L _ ITscc }         -- ToDo: remove
 
  'forall'       { L _ ITforall }                -- GHC extension keywords
  'foreign'      { L _ ITforeign }
@@ -1504,9 +1503,7 @@ optSemi :: { Bool }
         | {- empty -} { False }
 
 scc_annot :: { Located FastString }
-        : '_scc_' STRING                        {% (addWarning Opt_WarnWarningsDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
-                                   ( do scc <- getSCC $2; return $ LL scc ) }
-        | '{-# SCC' STRING '#-}'                {% do scc <- getSCC $2; return $ LL scc }
+        : '{-# SCC' STRING '#-}'                {% do scc <- getSCC $2; return $ LL scc }
         | '{-# SCC' VARID  '#-}'                { LL (getVARID $2) }
 
 hpc_annot :: { Located (FastString,(Int,Int),(Int,Int)) }

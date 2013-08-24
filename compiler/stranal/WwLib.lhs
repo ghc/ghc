@@ -591,12 +591,12 @@ mkUnpackCase scrut uniq boxing_con unpk_args body
 Note [Profiling and unpacking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the original function looked like
-	f = \ x -> _scc_ "foo" E
+	f = \ x -> {-# SCC "foo" #-} E
 
 then we want the CPR'd worker to look like
-	\ x -> _scc_ "foo" (case E of I# x -> x)
+	\ x -> {-# SCC "foo" #-} (case E of I# x -> x)
 and definitely not
-	\ x -> case (_scc_ "foo" E) of I# x -> x)
+	\ x -> case ({-# SCC "foo" #-} E) of I# x -> x)
 
 This transform doesn't move work or allocation
 from one cost centre to another.
