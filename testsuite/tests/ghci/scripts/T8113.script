@@ -1,0 +1,18 @@
+:def type (\e -> putStrLn ("called :type for "++show e++" (ignoring)") >> return "")
+:def
+:t ()
+:ty True
+:typ ()
+:type False
+:def! type (\e -> putStrLn ("called :type for "++show e++" (chaining)") >> return ("::type "++e))
+:def
+:t ()
+:ty True
+:typ ()
+:type False
+:undef type
+:def
+:t ()
+:ty True
+:typ ()
+:type False
