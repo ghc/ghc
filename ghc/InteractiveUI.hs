@@ -315,6 +315,7 @@ defFullHelpText =
   "   :show linker                show current linker state\n" ++
   "   :show modules               show the currently loaded modules\n" ++
   "   :show packages              show the currently active package flags\n" ++
+  "   :show paths                 show the currently active search paths\n" ++
   "   :show language              show the currently active language flags\n" ++
   "   :show <setting>             show value of <setting>, which is one of\n" ++
   "                                  [args, prog, prompt, editor, stop]\n" ++
@@ -2156,6 +2157,7 @@ showCmd str = do
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
         ["packages"]  -> showPackages
+        ["paths"]     -> showPaths
         ["languages"] -> showLanguages -- backwards compat
         ["language"]  -> showLanguages
         ["lang"]      -> showLanguages -- useful abbreviation
@@ -2262,6 +2264,19 @@ showPackages = do
         showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
         showFlag (TrustPackage    p) = text $ "  -trust " ++ p
         showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
+
+showPaths :: GHCi ()
+showPaths = do
+  dflags <- getDynFlags
+  liftIO $ do
+    cwd <- getCurrentDirectory
+    putStrLn $ showSDoc dflags $
+      text "current working directory: " $$
+        nest 2 (text cwd)
+    let ipaths = importPaths dflags
+    putStrLn $ showSDoc dflags $
+      text ("module import search paths:"++if null ipaths then " none" else "") $$
+        nest 2 (vcat (map text ipaths))
 
 showLanguages :: GHCi ()
 showLanguages = getDynFlags >>= liftIO . showLanguages' False
@@ -2423,7 +2438,7 @@ completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
     where opts = ["args", "prog", "prompt", "prompt2", "editor", "stop",
                      "modules", "bindings", "linker", "breaks",
-                     "context", "packages", "language", "imports"]
+                     "context", "packages", "paths", "language", "imports"]
 
 completeShowiOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) ["language"])
