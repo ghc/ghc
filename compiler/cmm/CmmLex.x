@@ -135,6 +135,7 @@ data CmmToken
   | CmmT_Ne
   | CmmT_BoolAnd
   | CmmT_BoolOr
+  | CmmT_ANONYMOUS_CLOSURE
   | CmmT_CLOSURE
   | CmmT_INFO_TABLE
   | CmmT_INFO_TABLE_RET
@@ -218,6 +219,7 @@ name span buf len =
 
 reservedWordsFM = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
+        ( "ANONYMOUS_CLOSURE",  CmmT_ANONYMOUS_CLOSURE ),
         ( "CLOSURE",            CmmT_CLOSURE ),
         ( "INFO_TABLE",         CmmT_INFO_TABLE ),
         ( "INFO_TABLE_RET",     CmmT_INFO_TABLE_RET ),

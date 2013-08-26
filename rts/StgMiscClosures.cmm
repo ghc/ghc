@@ -457,7 +457,7 @@ INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALI
 INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF_STATIC,"NO_FINALIZER","NO_FINALIZER")
 { foreign "C" barf("NO_FINALIZER object entered!") never returns; }
 
-CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
+CLOSURE(stg_NO_FINALIZER);
 
 /* ----------------------------------------------------------------------------
    Stable Names are unlifted too.
@@ -516,13 +516,13 @@ INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_CHUN
 INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF_STATIC,"NO_TREC","NO_TREC")
 { foreign "C" barf("NO_TREC object entered!") never returns; }
 
-CLOSURE(stg_END_STM_WATCH_QUEUE_closure,stg_END_STM_WATCH_QUEUE);
+CLOSURE(stg_END_STM_WATCH_QUEUE);
 
-CLOSURE(stg_END_INVARIANT_CHECK_QUEUE_closure,stg_END_INVARIANT_CHECK_QUEUE);
+CLOSURE(stg_END_INVARIANT_CHECK_QUEUE);
 
-CLOSURE(stg_END_STM_CHUNK_LIST_closure,stg_END_STM_CHUNK_LIST);
+CLOSURE(stg_END_STM_CHUNK_LIST);
 
-CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
+CLOSURE(stg_NO_TREC);
 
 /* ----------------------------------------------------------------------------
    Messages
@@ -553,7 +553,7 @@ INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
 INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","END_TSO_QUEUE")
 { foreign "C" barf("END_TSO_QUEUE object entered!") never returns; }
 
-CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
+CLOSURE(stg_END_TSO_QUEUE);
 
 /* ----------------------------------------------------------------------------
    GCD_CAF
@@ -572,7 +572,7 @@ INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF_STATIC,"GCD_CAF","GCD_CAF")
 INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF_STATIC,"STM_AWOKEN","STM_AWOKEN")
 { foreign "C" barf("STM_AWOKEN object entered!") never returns; }
 
-CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
+CLOSURE(stg_STM_AWOKEN);
 
 /* ----------------------------------------------------------------------------
    Arrays
@@ -638,7 +638,7 @@ INFO_TABLE( stg_dummy_ret, 0, 0, CONSTR_NOCAF_STATIC, "DUMMY_RET", "DUMMY_RET")
 {
     return ();
 }
-CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
+CLOSURE(stg_dummy_ret);
 
 /* ----------------------------------------------------------------------------
    MVAR_TSO_QUEUE
@@ -673,8 +673,8 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
 #endif
 
 
-#define CHARLIKE_HDR(n)  CLOSURE(Char_hash_static_info, n)
-#define INTLIKE_HDR(n)   CLOSURE(Int_hash_static_info, n)
+#define CHARLIKE_HDR(n)  ANONYMOUS_CLOSURE(Char_hash_static_info, n)
+#define INTLIKE_HDR(n)   ANONYMOUS_CLOSURE(Int_hash_static_info, n)
 
 /* put these in the *data* section, since the garbage collector relies
  * on the fact that static closures live in the data section.

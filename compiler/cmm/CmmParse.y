@@ -300,6 +300,7 @@ import Data.Maybe
         '||'    { L _ (CmmT_BoolOr) }
 
         'CLOSURE'       { L _ (CmmT_CLOSURE) }
+        'ANONYMOUS_CLOSURE'{ L _ (CmmT_ANONYMOUS_CLOSURE) }
         'INFO_TABLE'    { L _ (CmmT_INFO_TABLE) }
         'INFO_TABLE_RET'{ L _ (CmmT_INFO_TABLE_RET) }
         'INFO_TABLE_FUN'{ L _ (CmmT_INFO_TABLE_FUN) }
@@ -369,10 +370,10 @@ cmmtop  :: { CmmParse () }
         : cmmproc                       { $1 }
         | cmmdata                       { $1 }
         | decl                          { $1 } 
-        | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'  
+        | 'CLOSURE' '(' NAME lits ')' ';'  
                 {% withThisPackage $ \pkg -> 
-                   do lits <- sequence $6;
-                      staticClosure pkg $3 $5 (map getLit lits) }
+                   do lits <- sequence $4;
+                      staticClosure pkg $3 (map getLit lits) }
 
 -- The only static closures in the RTS are dummy closures like
 -- stg_END_TSO_QUEUE_closure and stg_dummy_ret.  We don't need
@@ -411,7 +412,7 @@ static  :: { CmmParse [CmmStatic] }
         | typenot8 '[' INT ']' ';'      { return [CmmUninitialised 
                                                 (widthInBytes (typeWidth $1) * 
                                                         fromIntegral $3)] }
-        | 'CLOSURE' '(' NAME lits ')'
+        | 'ANONYMOUS_CLOSURE' '(' NAME lits ')'
                 { do { lits <- sequence $4
                 ; dflags <- getDynFlags
                      ; return $ map CmmStaticLit $
@@ -1101,11 +1102,11 @@ profilingInfo dflags desc_str ty_str
     else ProfilingInfo (stringToWord8s desc_str)
                        (stringToWord8s ty_str)
 
-staticClosure :: PackageKey -> FastString -> FastString -> [CmmLit] -> CmmParse ()
-staticClosure pkg cl_label info payload
+staticClosure :: PackageKey -> FastString -> [CmmLit] -> CmmParse ()
+staticClosure pkg label payload
   = do dflags <- getDynFlags
-       let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
-       code $ emitStaticClosure (mkCmmDataLabel pkg cl_label) lits
+       let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg label) dontCareCCS payload [] [] []
+       code $ emitStaticClosure (mkCmmClosureLabel pkg label) lits
 
 foreignCall
         :: String
