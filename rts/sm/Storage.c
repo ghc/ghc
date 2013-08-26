@@ -115,8 +115,8 @@ initStorage (void)
    */
   /* We use the NOT_NULL variant or gcc warns that the test is always true */
   ASSERT(LOOKS_LIKE_INFO_PTR_NOT_NULL((StgWord)&stg_BLOCKING_QUEUE_CLEAN_info));
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
-  ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(stg_dummy_ret_closure));
+  ASSERT(!HEAP_ALLOCED(stg_dummy_ret_closure));
   
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 

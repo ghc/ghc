@@ -682,7 +682,7 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
 
 #if !(defined(COMPILING_WINDOWS_DLL))
 section "data" {
- stg_CHARLIKE_closure:
+ stg_CHARLIKE_static_closure:
     CHARLIKE_HDR(0)
     CHARLIKE_HDR(1)
     CHARLIKE_HDR(2)
@@ -942,7 +942,7 @@ section "data" {
 }
 
 section "data" {
- stg_INTLIKE_closure:
+ stg_INTLIKE_static_closure:
     INTLIKE_HDR(-16) /* MIN_INTLIKE == -16 */
     INTLIKE_HDR(-15)
     INTLIKE_HDR(-14)

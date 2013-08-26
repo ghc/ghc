@@ -29,7 +29,7 @@ loadFunction mpkg m valsym = do
     let symbol = prefixUnderscore
                    ++ maybe "" (\p -> zEncodeString p ++ "_") mpkg
                    ++ zEncodeString m ++ "_" ++ zEncodeString valsym
-                   ++ "_closure"
+                   ++ "_static_closure"
     ptr@(Ptr addr) <- withCString symbol c_lookupSymbol
     if (ptr == nullPtr)
     then return Nothing

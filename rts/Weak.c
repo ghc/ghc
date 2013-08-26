@@ -21,7 +21,7 @@ runCFinalizers(StgCFinalizerList *list)
 {
     StgCFinalizerList *head;
     for (head = list;
-        (StgClosure *)head != &stg_NO_FINALIZER_closure;
+        (StgClosure *)head != stg_NO_FINALIZER_closure;
         head = (StgCFinalizerList *)head->link)
     {
         if (head->flag)
@@ -88,7 +88,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         // collector removes DEAD_WEAKs from the weak pointer list.
         ASSERT(w->header.info != &stg_DEAD_WEAK_info);
 
-        if (w->finalizer != &stg_NO_FINALIZER_closure) {
+        if (w->finalizer != stg_NO_FINALIZER_closure) {
             n++;
         }
 
@@ -124,7 +124,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     n = 0;
     for (w = list; w; w = w->link) {
-        if (w->finalizer != &stg_NO_FINALIZER_closure) {
+        if (w->finalizer != stg_NO_FINALIZER_closure) {
             arr->payload[n] = w->finalizer;
             n++;
         }

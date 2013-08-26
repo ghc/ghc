@@ -25,14 +25,14 @@
 #  define RTS_FUN_INFO(i)   extern W_(i)[]
 #  define RTS_THUNK_INFO(i) extern W_(i)[]
 #  define RTS_INFO(i)       extern W_(i)[]
-#  define RTS_CLOSURE(i)    extern W_(i)[]
+#  define RTS_CLOSURE(i)    extern W_(i ## _static_closure)[]
 #  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #else
 #  define RTS_RET_INFO(i)   extern DLL_IMPORT_RTS const StgRetInfoTable i
 #  define RTS_FUN_INFO(i)   extern DLL_IMPORT_RTS const StgFunInfoTable i
 #  define RTS_THUNK_INFO(i) extern DLL_IMPORT_RTS const StgThunkInfoTable i
 #  define RTS_INFO(i)       extern DLL_IMPORT_RTS const StgInfoTable i
-#  define RTS_CLOSURE(i)    extern DLL_IMPORT_RTS StgClosure i
+#  define RTS_CLOSURE(i)    extern DLL_IMPORT_RTS StgClosure i ## _static_closure
 #  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #endif
 
@@ -148,25 +148,25 @@ RTS_ENTRY(stg_NO_TREC);
 
 /* closures */
 
-RTS_CLOSURE(stg_END_TSO_QUEUE_closure);
-RTS_CLOSURE(stg_STM_AWOKEN_closure);
-RTS_CLOSURE(stg_NO_FINALIZER_closure);
-RTS_CLOSURE(stg_dummy_ret_closure);
-RTS_CLOSURE(stg_forceIO_closure);
+RTS_CLOSURE(stg_END_TSO_QUEUE);
+RTS_CLOSURE(stg_STM_AWOKEN);
+RTS_CLOSURE(stg_NO_FINALIZER);
+RTS_CLOSURE(stg_dummy_ret);
+RTS_CLOSURE(stg_forceIO);
 
-RTS_CLOSURE(stg_END_STM_WATCH_QUEUE_closure);
-RTS_CLOSURE(stg_END_INVARIANT_CHECK_QUEUE_closure);
-RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
-RTS_CLOSURE(stg_NO_TREC_closure);
+RTS_CLOSURE(stg_END_STM_WATCH_QUEUE);
+RTS_CLOSURE(stg_END_INVARIANT_CHECK_QUEUE);
+RTS_CLOSURE(stg_END_STM_CHUNK_LIST);
+RTS_CLOSURE(stg_NO_TREC);
 
 RTS_ENTRY(stg_NO_FINALIZER_entry);
 
 #if IN_STG_CODE
-extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_closure;
-extern DLL_IMPORT_RTS StgWordArray stg_INTLIKE_closure;
+extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_static_closure;
+extern DLL_IMPORT_RTS StgWordArray stg_INTLIKE_static_closure;
 #else
-extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_CHARLIKE_closure[];
-extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_closure[];
+extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_CHARLIKE_static_closure[];
+extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_static_closure[];
 #endif
 
 /* StgStartup */

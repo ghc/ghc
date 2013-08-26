@@ -776,7 +776,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	sp++;
     } else {
 	sp--;
-	sp[0] = (W_)&stg_dummy_ret_closure;
+	sp[0] = (W_)stg_dummy_ret_closure;
     }
 
     frame = sp + 1;
@@ -957,7 +957,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 // ATOMICALLY_FRAME instance for condemned
                 // transactions, but I don't fully understand the
                 // interaction with STM invariants.
-                stack->sp[1] = (W_)&stg_NO_TREC_closure;
+                stack->sp[1] = (W_)stg_NO_TREC_closure;
                 stack->sp[0] = (W_)&stg_ret_p_info;
                 tso->what_next = ThreadRunGHC;
                 goto done;

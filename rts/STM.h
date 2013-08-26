@@ -209,11 +209,11 @@ void stmWriteTVar(Capability *cap,
 
 /* NULLs */
 
-#define END_STM_WATCH_QUEUE ((StgTVarWatchQueue *)(void *)&stg_END_STM_WATCH_QUEUE_closure)
-#define END_INVARIANT_CHECK_QUEUE ((StgInvariantCheckQueue *)(void *)&stg_END_INVARIANT_CHECK_QUEUE_closure)
-#define END_STM_CHUNK_LIST ((StgTRecChunk *)(void *)&stg_END_STM_CHUNK_LIST_closure)
+#define END_STM_WATCH_QUEUE ((StgTVarWatchQueue *)stg_END_STM_WATCH_QUEUE_closure)
+#define END_INVARIANT_CHECK_QUEUE ((StgInvariantCheckQueue *)stg_END_INVARIANT_CHECK_QUEUE_closure)
+#define END_STM_CHUNK_LIST ((StgTRecChunk *)stg_END_STM_CHUNK_LIST_closure)
 
-#define NO_TREC ((StgTRecHeader *)(void *)&stg_NO_TREC_closure)
+#define NO_TREC ((StgTRecHeader *)stg_NO_TREC_closure)
 
 /*----------------------------------------------------------------------*/
 
