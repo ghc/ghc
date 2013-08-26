@@ -53,6 +53,8 @@ import UniqFM
 import Util
 
 import qualified Data.Map as Map
+import Data.Map (Map)
+import qualified Data.Set as Set
 import qualified FiniteMap as Map ( insertListWith )
 
 import Control.Concurrent ( forkIOWithUnmask, killThread )
@@ -658,6 +660,12 @@ buildCompGraph (scc:sccs) = case scc of
         return ((ms,mvar,log_queue):rest, cycle)
     CyclicSCC mss -> return ([], Just mss)
 
+-- A Module and whether it is a boot module.
+type BuildModule = (Module, Bool)
+
+mkBuildModule :: ModSummary -> BuildModule
+mkBuildModule ms = (ms_mod ms, isBootSummary ms)
+
 -- | The entry point to the parallel upsweep.
 --
 -- See also the simpler, sequential 'upsweep'.
@@ -685,11 +693,6 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
     -- module sucessfully gets compiled, its HMI is pruned from the old HPT.
     old_hpt_var <- liftIO $ newIORef old_hpt
 
-    -- The list of modules that have so far been successfully compiled. This is
-    -- used to re-typecheck module loops after the last module in the loop has
-    -- been compiled (see reTypecheckLoop).
-    mods_done_var <- liftIO $ newIORef []
-
     -- What we use to limit parallelism with.
     par_sem <- liftIO $ newQSem n_jobs
 
@@ -716,11 +719,24 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
     (comp_graph,cycle) <- liftIO $ buildCompGraph sccs
     let comp_graph_w_idx = zip comp_graph [1..]
 
+    -- The list of all loops in the compilation graph.
+    -- NB: For convenience, the last module of each loop (aka the module that
+    -- finishes the loop) is prepended to the beginning of the loop.
+    let comp_graph_loops = go (map fstOf3 (reverse comp_graph))
+          where
+            go [] = []
+            go (ms:mss) | Just loop <- getModLoop ms (ms:mss)
+                        = map mkBuildModule (ms:loop) : go mss
+                        | otherwise
+                        = go mss
+
     -- Build a Map out of the compilation graph with which we can efficiently
     -- look up the result MVar associated with a particular home module.
-    let mod_map :: Map.Map (Module,Bool) (MVar SuccessFlag, Int)
-        mod_map = Map.fromList [ ((ms_mod ms, isBootSummary ms), (mvar,idx))
-                               | ((ms,mvar,_),idx) <- comp_graph_w_idx ]
+    let home_mod_map :: Map BuildModule (MVar SuccessFlag, Int)
+        home_mod_map =
+            Map.fromList [ (mkBuildModule ms, (mvar, idx))
+                         | ((ms,mvar,_),idx) <- comp_graph_w_idx ]
+
 
     -- For each module in the module graph, spawn a worker thread that will
     -- compile this module.
@@ -742,8 +758,9 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
                 m_res <- try $ unmask $ prettyPrintGhcErrors lcl_dflags $
-                        parUpsweep_one mod mod_map lcl_dflags cleanup par_sem
-                                       hsc_env_var old_hpt_var mods_done_var
+                        parUpsweep_one mod home_mod_map comp_graph_loops
+                                       lcl_dflags cleanup
+                                       par_sem hsc_env_var old_hpt_var
                                        stable_mods mod_idx (length sccs)
 
                 res <- case m_res of
@@ -835,8 +852,10 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
 parUpsweep_one
     :: ModSummary
     -- ^ The module we wish to compile
-    -> Map.Map (Module,Bool) (MVar SuccessFlag, Int)
+    -> Map BuildModule (MVar SuccessFlag, Int)
     -- ^ The map of home modules and their result MVar
+    -> [[BuildModule]]
+    -- ^ The list of all module loops within the compilation graph.
     -> DynFlags
     -- ^ The thread-local DynFlags
     -> (HscEnv -> IO ())
@@ -847,8 +866,6 @@ parUpsweep_one
     -- ^ The MVar that synchronizes updates to the global HscEnv
     -> IORef HomePackageTable
     -- ^ The old HPT
-    -> IORef [ModSummary]
-    -- ^ The list of modules that have successfully compiled
     -> ([ModuleName],[ModuleName])
     -- ^ Lists of stable objects and BCOs
     -> Int
@@ -857,28 +874,88 @@ parUpsweep_one
     -- ^ The total number of modules
     -> IO SuccessFlag
     -- ^ The result of this compile
-parUpsweep_one mod mod_map lcl_dflags cleanup par_sem hsc_env_var
-               old_hpt_var mods_done_var stable_mods mod_index num_mods = do
+parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
+               hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
+
+    let this_build_mod = mkBuildModule mod
+
     let home_imps     = map unLoc $ ms_home_imps mod
-        home_src_imps = map unLoc $ ms_home_srcimps mod
-        all_imps      = zip home_imps (repeat False) ++
-                        zip home_src_imps (repeat True)
+    let home_src_imps = map unLoc $ ms_home_srcimps mod
 
-        -- The module's home-module dependencies.
-        dependencies_w_idx =
-              [ (mvar,idx) | (imp_name,is_boot) <- all_imps
-                           , let imp = mkModule (thisPackage lcl_dflags) imp_name
-                           , Just (mvar,idx) <- [Map.lookup (imp,is_boot) mod_map] ]
+    -- All the textual imports of this module.
+    let textual_deps = Set.fromList $ mapFst (mkModule (thisPackage lcl_dflags)) $
+                            zip home_imps     (repeat False) ++
+                            zip home_src_imps (repeat True)
 
-        -- Sort the list of dependencies in reverse-topological order. This
-        -- way, by the time we get woken up by the result of an earlier
-        -- dependency, subsequent dependencies are more likely to have
-        -- finished. This step effectively reduces the number of MVars that
-        -- each thread blocks on.
-        dependencies = map fst $ sortBy (flip (comparing snd)) dependencies_w_idx
+    -- Dealing with module loops
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~
+    --
+    -- Not only do we have to deal with explicit textual dependencies, we also
+    -- have to deal with implicit dependencies introduced by import cycles that
+    -- are broken by an hs-boot file. We have to ensure that:
+    --
+    -- 1. A module that breaks a loop must depend on all the modules in the
+    --    loop (transitively or otherwise). This is normally always fulfilled
+    --    by the module's textual dependencies except in degenerate loops,
+    --    e.g.:
+    --
+    --    A.hs imports B.hs-boot
+    --    B.hs doesn't import A.hs
+    --    C.hs imports A.hs, B.hs
+    --
+    --    In this scenario, getModLoop will detect the module loop [A,B] but
+    --    the loop finisher B doesn't depend on A. So we have to explicitly add
+    --    A in as a dependency of B when we are compiling B.
+    --
+    -- 2. A module that depends on a module in an external loop can't proceed
+    --    until the entire loop is re-typechecked.
+    --
+    -- These two invariants have to be maintained to correctly build a
+    -- compilation graph with one or more loops.
+
+
+    -- The loop that this module will finish. After this module successfully
+    -- compiles, this loop is going to get re-typechecked.
+    let finish_loop = listToMaybe
+            [ tail loop | loop <- comp_graph_loops
+                        , head loop == this_build_mod ]
+
+    -- If this module finishes a loop then it must depend on all the other
+    -- modules in that loop because the entire module loop is going to be
+    -- re-typechecked once this module gets compiled. These extra dependencies
+    -- are this module's "internal" loop dependencies, because this module is
+    -- inside the loop in question.
+    let int_loop_deps = Set.fromList $
+            case finish_loop of
+                Nothing   -> []
+                Just loop -> filter (/= this_build_mod) loop
+
+    -- If this module depends on a module within a loop then it must wait for
+    -- that loop to get re-typechecked, i.e. it must wait on the module that
+    -- finishes that loop. These extra dependencies are this module's
+    -- "external" loop dependencies, because this module is outside of the
+    -- loop(s) in question.
+    let ext_loop_deps = Set.fromList
+            [ head loop | loop <- comp_graph_loops
+                        , any (`Set.member` textual_deps) loop
+                        , this_build_mod `notElem` loop ]
+
+
+    let all_deps = foldl1 Set.union [textual_deps, int_loop_deps, ext_loop_deps]
+
+    -- All of the module's home-module dependencies.
+    let home_deps_with_idx =
+            [ home_dep | dep <- Set.toList all_deps
+                       , Just home_dep <- [Map.lookup dep home_mod_map] ]
+
+    -- Sort the list of dependencies in reverse-topological order. This way, by
+    -- the time we get woken up by the result of an earlier dependency,
+    -- subsequent dependencies are more likely to have finished. This step
+    -- effectively reduces the number of MVars that each thread blocks on.
+    let home_deps = map fst $ sortBy (flip (comparing snd)) home_deps_with_idx
 
     -- Wait for the all the module's dependencies to finish building.
-    deps_ok <- allM (fmap succeeded . readMVar) dependencies
+    deps_ok <- allM (fmap succeeded . readMVar) home_deps
 
     -- We can't build this module if any of its dependencies failed to build.
     if not deps_ok
@@ -915,17 +992,16 @@ parUpsweep_one mod mod_map lcl_dflags cleanup par_sem hsc_env_var
                     atomicModifyIORef old_hpt_var $ \old_hpt ->
                         (delFromUFM old_hpt this_mod, ())
 
-                -- Update and fetch the list of completed modules.
-                mods_done <- atomicModifyIORef mods_done_var $ \mods_done ->
-                                let mods_done' = mod:mods_done
-                                in (mods_done',mods_done')
-
-                -- Update and fetch the global HscEnv, and re-typecheck any
-                -- module loops.
+                -- Update and fetch the global HscEnv.
                 lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
                     let hsc_env' = hsc_env { hsc_HPT = addToUFM (hsc_HPT hsc_env)
                                                                 this_mod mod_info }
-                    hsc_env'' <- reTypecheckLoop hsc_env' mod mods_done
+                    -- If this module is a loop finisher, now is the time to
+                    -- re-typecheck the loop.
+                    hsc_env'' <- case finish_loop of
+                        Nothing   -> return hsc_env'
+                        Just loop -> typecheckLoop (localize_hsc_env hsc_env') $
+                                     map (moduleName . fst) loop
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
                 -- Clean up any intermediate files.
@@ -1223,23 +1299,31 @@ re-typecheck.
 
 Following this fix, GHC can compile itself with --make -O2.
 -}
+
 reTypecheckLoop :: HscEnv -> ModSummary -> ModuleGraph -> IO HscEnv
 reTypecheckLoop hsc_env ms graph
-  | not (isBootSummary ms) && 
-    any (\m -> ms_mod m == this_mod && isBootSummary m) graph
-  = do
-        let mss = reachableBackwards (ms_mod_name ms) graph
-            non_boot = filter (not.isBootSummary) mss
-        debugTraceMsg (hsc_dflags hsc_env) 2 $
-           text "Re-typechecking loop: " <> ppr (map ms_mod_name non_boot)
-        typecheckLoop hsc_env (map ms_mod_name non_boot)
+  | Just loop <- getModLoop ms graph
+  = typecheckLoop hsc_env (map ms_mod_name loop)
   | otherwise
   = return hsc_env
+
+getModLoop :: ModSummary -> ModuleGraph -> Maybe [ModSummary]
+getModLoop ms graph
+  | not (isBootSummary ms)
+  , any (\m -> ms_mod m == this_mod && isBootSummary m) graph
+  , let mss = reachableBackwards (ms_mod_name ms) graph
+  , let non_boot = filter (not.isBootSummary) mss
+  = Just non_boot
+  | otherwise
+  = Nothing
  where
   this_mod = ms_mod ms
 
+
 typecheckLoop :: HscEnv -> [ModuleName] -> IO HscEnv
 typecheckLoop hsc_env mods = do
+  debugTraceMsg (hsc_dflags hsc_env) 2 $
+     text "Re-typechecking loop: " <> ppr mods
   new_hpt <-
     fixIO $ \new_hpt -> do
       let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
