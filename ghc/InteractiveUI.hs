@@ -1315,9 +1315,18 @@ doLoad retain_context howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
   lift discardActiveBreakPoints
-  ok <- trySuccess $ GHC.load howmuch
-  afterLoad ok retain_context
-  return ok
+
+  -- Enable buffering stdout and stderr as we're compiling. Keeping these
+  -- handles unbuffered will just slow the compilation down, especially when
+  -- compiling in parallel.
+  gbracket (liftIO $ do hSetBuffering stdout LineBuffering
+                        hSetBuffering stderr LineBuffering)
+           (\_ ->
+            liftIO $ do hSetBuffering stdout NoBuffering
+                        hSetBuffering stderr NoBuffering) $ \_ -> do
+      ok <- trySuccess $ GHC.load howmuch
+      afterLoad ok retain_context
+      return ok
 
 
 afterLoad :: SuccessFlag
