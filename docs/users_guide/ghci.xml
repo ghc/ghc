@@ -2154,7 +2154,9 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 	  &lsquo;<literal>&tilde;</literal>&rsquo; symbol at the
 	  beginning of <replaceable>dir</replaceable> will be replaced
 	  by the contents of the environment variable
-	  <literal>HOME</literal>.</para>
+	  <literal>HOME</literal>.
+          See also the <literal>:show paths</literal> command for
+          showing the current working directory.</para>
 
 	  <para>NOTE: changing directories causes all currently loaded
 	  modules to be unloaded.  This is because the search path is
@@ -2919,6 +2921,19 @@ bar
     <para>Show the currently active package flags, as well as the list of
       packages currently loaded.</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:show paths</literal>
+          <indexterm><primary><literal>:show paths</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Show the current working directory (as set via
+          <literal>:cd</literal> command), as well as the list of
+          directories searched for source files (as set by the
+          <option>-i</option> option).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>

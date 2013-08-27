@@ -211,6 +211,13 @@
                     TODO FIXME: reference.
                </para>
            </listitem>
+           <listitem>
+                <para>
+                    The new <literal>:shows paths</literal> command
+                    shows the current working directory and the
+                    current search path for Haskell modules.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
