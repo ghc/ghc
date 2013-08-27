@@ -634,12 +634,16 @@ cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
 cgIdApp fun_id args = do
     dflags   <- getDynFlags
     fun_info <- getCgIdInfo fun_id
-    let fun_arg     = StgVarArg fun_id
-        fun_name    = idName            fun_id
+    let cg_fun_id   = cg_id fun_info
+        -- NB. use (cg_id fun_info) instead of fun_id, because the former
+        -- may be externalised for -split-objs.
+        -- See StgCmm.maybeExternaliseId.
+        fun_arg     = StgVarArg cg_fun_id
+        fun_name    = idName            cg_fun_id
         fun         = idInfoToAmode     fun_info
         lf_info     = cg_lf        fun_info
         node_points dflags = nodeMustPointToIt dflags lf_info
-    case (getCallMethod dflags fun_name (idCafInfo fun_id) lf_info (length args)) of
+    case (getCallMethod dflags fun_name (idCafInfo cg_fun_id) lf_info (length args)) of
 
             -- A value in WHNF, so we can just return it.
         ReturnIt -> emitReturn [fun]    -- ToDo: does ReturnIt guarantee tagged?
