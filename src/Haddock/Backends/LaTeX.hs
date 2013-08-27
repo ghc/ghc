@@ -245,6 +245,8 @@ declNames :: LHsDecl DocName -> [DocName]
 declNames (L _ decl) = case decl of
   TyClD d  -> [tcdName d]
   SigD (TypeSig lnames _) -> map unLoc lnames
+  ForD (ForeignImport (L _ n) _ _ _) -> [n]
+  ForD (ForeignExport (L _ n) _ _ _) -> [n]
   _ -> error "declaration not supported by declNames"
 
 
@@ -299,8 +301,10 @@ ppTyFam _ _ _ _ _ =
 
 
 ppFor :: SrcSpan -> DocForDecl DocName -> ForeignDecl DocName -> Bool -> LaTeX
-ppFor _ _ _ _ =
-  error "foreign declarations are currently not supported by --latex"
+ppFor loc doc (ForeignImport (L _ name) (L _ typ) _ _) unicode =
+  ppFunSig loc doc [name] typ unicode
+ppFor _ _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
+--  error "foreign declarations are currently not supported by --latex"
 
 
 -------------------------------------------------------------------------------
