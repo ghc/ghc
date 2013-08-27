@@ -89,7 +89,7 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 1300, 10)
+          [(wordsize(64), 1250, 10)
             # 2012-08-14: 1203 (amd64/Linux)
             # 2012-08-21: 1199 (amd64/Linux)
             # 2012-09-20: 1228 (amd64/Linux)
