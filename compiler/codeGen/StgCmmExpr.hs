@@ -635,9 +635,10 @@ cgIdApp fun_id args = do
     dflags   <- getDynFlags
     fun_info <- getCgIdInfo fun_id
     let cg_fun_id   = cg_id fun_info
-        -- NB. use (cg_id fun_info) instead of fun_id, because the former
-        -- may be externalised for -split-objs.
-        -- See StgCmm.maybeExternaliseId.
+           -- NB: use (cg_id fun_info) instead of fun_id, because
+           -- the former may be externalised for -split-objs.
+           -- See Note [Externalise when splitting] in StgCmmMonad
+
         fun_arg     = StgVarArg cg_fun_id
         fun_name    = idName            cg_fun_id
         fun         = idInfoToAmode     fun_info

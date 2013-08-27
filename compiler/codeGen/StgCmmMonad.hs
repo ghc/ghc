@@ -180,12 +180,20 @@ type CgBindings = IdEnv CgIdInfo
 
 data CgIdInfo
   = CgIdInfo
-        { cg_id :: Id        -- Id that this is the info for
+        { cg_id :: Id   -- Id that this is the info for
                         -- Can differ from the Id at occurrence sites by
                         -- virtue of being externalised, for splittable C
+                        -- See Note [Externalise when splitting]
         , cg_lf  :: LambdaFormInfo
         , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
         }
+
+-- Note [Externalise when splitting]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- If we're splitting the object with -fsplit-objs, we need to
+-- externalise *all* the top-level names, and then make sure we only
+-- use the externalised one in any C label we use which refers to this
+-- name.
 
 data CgLoc
   = CmmLoc CmmExpr        -- A stable CmmExpr; that is, one not mentioning
