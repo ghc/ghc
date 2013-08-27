@@ -1,0 +1,57 @@
+% Default Haddock style definitions.  To use your own style, invoke
+% Haddock with the option --latex-style=mystyle.
+
+\usepackage{tabulary} % see below
+
+% make hyperlinks in the PDF, and add an expandabale index
+\usepackage[pdftex,bookmarks=true]{hyperref}
+
+\newenvironment{haddocktitle}
+  {\begin{center}\bgroup\large\bfseries}
+  {\egroup\end{center}}
+\newenvironment{haddockprologue}{\vspace{1in}}{}
+
+\newcommand{\haddockmoduleheading}[1]{\chapter{\texttt{#1}}}
+
+\newcommand{\haddockbeginheader}{\hrulefill}
+\newcommand{\haddockendheader}{\noindent\hrulefill}
+
+% a little gap before the ``Methods'' header
+\newcommand{\haddockpremethods}{\vspace{2ex}}
+
+% inserted before \\begin{verbatim}
+\newcommand{\haddockverb}{\small}
+
+% an identifier: add an index entry
+\newcommand{\haddockid}[1]{\haddocktt{#1}\index{#1@\texttt{#1}}}
+
+% The tabulary environment lets us have a column that takes up ``the
+% rest of the space''.  Unfortunately it doesn't allow
+% the \end{tabulary} to be in the expansion of a macro, it must appear
+% literally in the document text, so Haddock inserts
+% the \end{tabulary} itself.
+\newcommand{\haddockbeginconstrs}{\begin{tabulary}{\linewidth}{@{}llJ@{}}}
+\newcommand{\haddockbeginargs}{\begin{tabulary}{\linewidth}{@{}llJ@{}}}
+
+\newcommand{\haddocktt}[1]{{\small \texttt{#1}}}
+\newcommand{\haddockdecltt}[1]{{\small\bfseries \texttt{#1}}}
+
+\makeatletter
+\newenvironment{haddockdesc}
+               {\list{}{\labelwidth\z@ \itemindent-\leftmargin
+                        \let\makelabel\haddocklabel}}
+               {\endlist}
+\newcommand*\haddocklabel[1]{\hspace\labelsep\haddockdecltt{#1}}
+\makeatother
+
+% after a declaration, start a new line for the documentation.
+% Otherwise, the documentation starts right after the declaration,
+% because we're using the list environment and the declaration is the
+% ``label''.  I tried making this newline part of the label, but
+% couldn't get that to work reliably (the space seemed to stretch
+% sometimes).
+\newcommand{\haddockbegindoc}{\hfill\\[1ex]}
+
+% spacing between paragraphs and no \parindent looks better
+\parskip=10pt plus2pt minus2pt
+\setlength{\parindent}{0cm}

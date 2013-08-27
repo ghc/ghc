@@ -31,6 +31,9 @@ extra-source-files:
   src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
+  latex-test/src/*.hs
+  latex-test/ref/*/*.tex
+  latex-test/ref/*/*.sty
 
 data-dir:   resources
 data-files: html/frames.html
@@ -187,6 +190,13 @@ test-suite html-test
   default-language: Haskell2010
   main-is:          run.lhs
   hs-source-dirs:   html-test
+  build-depends:    base, directory, process, filepath, Cabal
+
+test-suite latex-test
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          run.lhs
+  hs-source-dirs:   latex-test
   build-depends:    base, directory, process, filepath, Cabal
 
 test-suite spec

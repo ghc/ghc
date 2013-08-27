@@ -1,5 +1,6 @@
 /dist/
 /html-test/out/
+/latex-test/out/
 
 /doc/haddock
 /doc/autom4te.cache/
