@@ -1000,7 +1000,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
                     -- re-typecheck the loop.
                     hsc_env'' <- case finish_loop of
                         Nothing   -> return hsc_env'
-                        Just loop -> typecheckLoop (localize_hsc_env hsc_env') $
+                        Just loop -> typecheckLoop lcl_dflags hsc_env' $
                                      map (moduleName . fst) loop
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
@@ -1303,7 +1303,7 @@ Following this fix, GHC can compile itself with --make -O2.
 reTypecheckLoop :: HscEnv -> ModSummary -> ModuleGraph -> IO HscEnv
 reTypecheckLoop hsc_env ms graph
   | Just loop <- getModLoop ms graph
-  = typecheckLoop hsc_env (map ms_mod_name loop)
+  = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name loop)
   | otherwise
   = return hsc_env
 
@@ -1319,10 +1319,9 @@ getModLoop ms graph
  where
   this_mod = ms_mod ms
 
-
-typecheckLoop :: HscEnv -> [ModuleName] -> IO HscEnv
-typecheckLoop hsc_env mods = do
-  debugTraceMsg (hsc_dflags hsc_env) 2 $
+typecheckLoop :: DynFlags -> HscEnv -> [ModuleName] -> IO HscEnv
+typecheckLoop dflags hsc_env mods = do
+  debugTraceMsg dflags 2 $
      text "Re-typechecking loop: " <> ppr mods
   new_hpt <-
     fixIO $ \new_hpt -> do
