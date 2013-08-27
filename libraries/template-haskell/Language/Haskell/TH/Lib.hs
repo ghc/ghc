@@ -128,7 +128,7 @@ noBindS :: ExpQ -> StmtQ
 noBindS e = do { e1 <- e; return (NoBindS e1) }
 
 parS :: [[StmtQ]] -> StmtQ
-parS _ = fail "No parallel comprehensions yet"
+parS sss = do { sss1 <- mapM sequence sss; return (ParS sss1) }
 
 -------------------------------------------------------------------------------
 -- *   Range
