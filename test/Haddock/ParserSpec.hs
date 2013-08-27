@@ -3,7 +3,7 @@
              , IncoherentInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Haddock.ParseSpec (main, spec) where
+module Haddock.ParserSpec (main, spec) where
 
 import           Control.Applicative
 import           Data.Maybe (isJust)
