@@ -106,3 +106,4 @@ test('T7938', normal, compile_fail, [''])
 test('ClosedFam3', extra_clean(['ClosedFam3.o-boot', 'ClosedFam3.hi-boot']),
      multimod_compile_fail, ['ClosedFam3', '-v0'])
 test('ClosedFam4', normal, compile_fail, [''])
+test('T8155', normal, compile_fail, [''])
