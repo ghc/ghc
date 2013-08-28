@@ -294,7 +294,7 @@ load how_much = do
           let 
             main_mod = mainModIs dflags
             a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
-            do_linking = a_root_is_Main || no_hs_main || ghcLink dflags == LinkDynLib
+            do_linking = a_root_is_Main || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
 
           when (ghcLink dflags == LinkBinary 
                 && isJust ofile && not do_linking) $

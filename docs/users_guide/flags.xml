@@ -2085,6 +2085,15 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-staticlib</option></entry>
+            <entry>On Darwin/OS X/iOS only, generate a standalone static library 
+              (as opposed to an executable). 
+              This is the usual way to compile for iOS.
+              </entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-fPIC</option></entry>
             <entry>Generate position-independent code (where available)</entry>
             <entry>dynamic</entry>
@@ -2105,14 +2114,14 @@
           </row>
           <row>
             <entry><option>-framework</option> <replaceable>name</replaceable></entry>
-            <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
+            <entry>On Darwin/OS X/iOS only, link in the framework <replaceable>name</replaceable>.
               This option corresponds to the <option>-framework</option> option for Apple's Linker.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-framework-path</option> <replaceable>name</replaceable></entry>
-            <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
+            <entry>On Darwin/OS X/iOS only, add <replaceable>dir</replaceable> to the list of
               directories searched for frameworks.
               This option corresponds to the <option>-F</option> option for Apple's Linker.</entry>
             <entry>dynamic</entry>
@@ -2223,7 +2232,7 @@
             <entry>Set the install name (via <literal>-install_name</literal> passed to Apple's
               linker), specifying the full install path of the library file. Any libraries
               or executables that link with it later will pick up that path as their
-              runtime search location for it. (Darwin/MacOS X only)</entry>
+              runtime search location for it. (Darwin/OS X only)</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
@@ -2348,6 +2357,13 @@
             <entry><option>-pgmwindres</option> <replaceable>cmd</replaceable></entry>
             <entry>Use <replaceable>cmd</replaceable> as the program for
               embedding manifests on Windows.</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-pgmlibtool</option> <replaceable>cmd</replaceable></entry>
+            <entry>Use <replaceable>cmd</replaceable> as the command for libtool 
+              (with <option>-staticlib</option> only).</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

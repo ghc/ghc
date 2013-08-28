@@ -867,16 +867,19 @@ getPackageLibraryPath dflags pkgs =
 collectLibraryPaths :: [PackageConfig] -> [FilePath]
 collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
 
--- | Find all the link options in these and the preload packages
-getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
+-- | Find all the link options in these and the preload packages,
+-- returning (package hs lib options, extra library options, other flags)
+getPackageLinkOpts :: DynFlags -> [PackageId] -> IO ([String], [String], [String])
 getPackageLinkOpts dflags pkgs =
   collectLinkOpts dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
-collectLinkOpts :: DynFlags -> [PackageConfig] -> [String]
-collectLinkOpts dflags ps = concat (map all_opts ps)
-  where
-        libs p     = packageHsLibs dflags p ++ extraLibraries p
-        all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
+collectLinkOpts :: DynFlags -> [PackageConfig] -> ([String], [String], [String])
+collectLinkOpts dflags ps =
+    (
+        concatMap (map ("-l" ++) . packageHsLibs dflags) ps,
+        concatMap (map ("-l" ++) . extraLibraries) ps,
+        concatMap ldOptions ps
+    )
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)

@@ -66,7 +66,7 @@ module DynFlags (
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
-        pgm_sysman, pgm_windres, pgm_lo, pgm_lc,
+        pgm_sysman, pgm_windres, pgm_libtool, pgm_lo, pgm_lc,
         opt_L, opt_P, opt_F, opt_c, opt_a, opt_l,
         opt_windres, opt_lo, opt_lc,
 
@@ -798,6 +798,7 @@ data Settings = Settings {
   sPgm_T                 :: String,
   sPgm_sysman            :: String,
   sPgm_windres           :: String,
+  sPgm_libtool           :: String,
   sPgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
   sPgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
   -- options for particular phases
@@ -853,6 +854,8 @@ pgm_sysman            :: DynFlags -> String
 pgm_sysman dflags = sPgm_sysman (settings dflags)
 pgm_windres           :: DynFlags -> String
 pgm_windres dflags = sPgm_windres (settings dflags)
+pgm_libtool           :: DynFlags -> String
+pgm_libtool dflags = sPgm_libtool (settings dflags)
 pgm_lo                :: DynFlags -> (String,[Option])
 pgm_lo dflags = sPgm_lo (settings dflags)
 pgm_lc                :: DynFlags -> (String,[Option])
@@ -948,6 +951,7 @@ data GhcLink
   | LinkInMemory        -- ^ Use the in-memory dynamic linker (works for both
                         --   bytecode and object code).
   | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
+  | LinkStaticLib       -- ^ Link objects into a static lib
   deriving (Eq, Show)
 
 isNoLink :: GhcLink -> Bool
@@ -2044,6 +2048,7 @@ dynamic_flags = [
   , Flag "pgml"           (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
   , Flag "pgmdll"         (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
   , Flag "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
+  , Flag "pgmlibtool"     (hasArg (\f -> alterSettings (\s -> s { sPgm_libtool = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
   , Flag "optlo"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
@@ -2078,6 +2083,7 @@ dynamic_flags = [
         -------- Linking ----------------------------------------------------
   , Flag "no-link"            (noArg (\d -> d{ ghcLink=NoLink }))
   , Flag "shared"             (noArg (\d -> d{ ghcLink=LinkDynLib }))
+  , Flag "staticlib"          (noArg (\d -> d{ ghcLink=LinkStaticLib }))
   , Flag "dynload"            (hasArg parseDynLibLoaderMode)
   , Flag "dylib-install-name" (hasArg setDylibInstallName)
     -- -dll-split is an internal flag, used only during the GHC build
