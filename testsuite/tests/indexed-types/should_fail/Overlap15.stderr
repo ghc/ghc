@@ -1,0 +1,7 @@
+
+Overlap15.hs:16:9:
+    Couldn't match expected type ‛F b [b] Bool’ with actual type ‛Bool’
+    Relevant bindings include
+      foo :: Proxy * b -> F b [b] Bool (bound at Overlap15.hs:16:1)
+    In the expression: False
+    In an equation for ‛foo’: foo _ = False

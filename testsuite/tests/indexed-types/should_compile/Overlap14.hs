@@ -2,11 +2,11 @@
 
 module Overlap14 where
 
+import Data.Proxy
+
 type family F a b c where
-  F a a a   = Int
-  F Int b c = Bool
+  F a a Int = Int
+  F b c d   = Bool
 
-type family G x
-
-foo :: F Int (G Bool) Bool
-foo = False
+foo :: Proxy b -> F b [b] Bool
+foo _ = False

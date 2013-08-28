@@ -85,6 +85,7 @@ test('Overlap7', normal, compile_fail, [''])
 test('Overlap9', normal, compile_fail, [''])
 test('Overlap10', normal, compile_fail, [''])
 test('Overlap11', normal, compile_fail, [''])
+test('Overlap15', normal, compile_fail, [''])
 test('T7194', normal, compile_fail, [''])
 test('T7354', normal, compile_fail, [''])
 test('T7354a',
