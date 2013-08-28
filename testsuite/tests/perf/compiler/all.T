@@ -125,11 +125,13 @@ test('T4801',
           [(platform('x86_64-apple-darwin'), 58, 1),
                            # expected value: 58 (amd64/OS X)
            (wordsize(32), 30, 20),
-           (wordsize(64), 49, 20)]),
+           (wordsize(64), 60, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
             # 12/11/2012: 49 (amd64/Linux)
+            #                (^ REASON UNKNOWN!)
+            # 28/8/13:    60 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
 
       compiler_stats_num_field('bytes allocated',
