@@ -139,33 +139,33 @@ Various possibilities suggest themselves:
 
 \begin{code}
 applyTypeToArg :: Type -> CoreExpr -> Type
--- ^ Determines the type resulting from applying an expression to a function with the given type
+-- ^ Determines the type resulting from applying an expression with given type
+-- to a given argument expression
 applyTypeToArg fun_ty (Type arg_ty) = applyTy fun_ty arg_ty
 applyTypeToArg fun_ty _             = funResultTy fun_ty
 
 applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
-applyTypeToArgs _ op_ty [] = op_ty
-
-applyTypeToArgs e op_ty (Type ty : args)
-  =     -- Accumulate type arguments so we can instantiate all at once
-    go [ty] args
+applyTypeToArgs e op_ty args
+  = go op_ty args
   where
-    go rev_tys (Type ty : args) = go (ty:rev_tys) args
-    go rev_tys rest_args         = applyTypeToArgs e op_ty' rest_args
-                                 where
-                                   op_ty' = applyTysD msg op_ty (reverse rev_tys)
-                                   msg = ptext (sLit "applyTypeToArgs") <+>
-                                         panic_msg e op_ty
+    go op_ty []               = op_ty
+    go op_ty (Type ty : args) = go_ty_args op_ty [ty] args
+    go op_ty (_ : args)       | Just (_, res_ty) <- splitFunTy_maybe op_ty
+                              = go res_ty args
+    go _ _ = pprPanic "applyTypeToArgs" panic_msg
 
-applyTypeToArgs e op_ty (_ : args)
-  = case (splitFunTy_maybe op_ty) of
-        Just (_, res_ty) -> applyTypeToArgs e res_ty args
-        Nothing -> pprPanic "applyTypeToArgs" (panic_msg e op_ty)
-
-panic_msg :: CoreExpr -> Type -> SDoc
-panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
+    -- go_ty_args: accumulate type arguments so we can instantiate all at once
+    go_ty_args op_ty rev_tys (Type ty : args) 
+       = go_ty_args op_ty (ty:rev_tys) args
+    go_ty_args op_ty rev_tys args
+       = go (applyTysD panic_msg_w_hdr op_ty (reverse rev_tys)) args
+    
+    panic_msg_w_hdr = hang (ptext (sLit "applyTypeToArgs")) 2 panic_msg
+    panic_msg = vcat [ ptext (sLit "Expression:") <+> pprCoreExpr e
+                     , ptext (sLit "Type:") <+> ppr op_ty
+                     , ptext (sLit "Args:") <+> ppr args ]
 \end{code}
 
 %************************************************************************
