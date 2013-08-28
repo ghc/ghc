@@ -10,8 +10,9 @@ import Text.PrettyPrint (render)
 import Language.Haskell.TH.PprLib
 import Language.Haskell.TH.Syntax
 import Data.Word ( Word8 )
-import Data.Char ( toLower, chr )
+import Data.Char ( toLower, chr, ord, isSymbol )
 import GHC.Show  ( showMultiLineString )
+import Data.Ratio ( numerator, denominator )
 
 nestDepth :: Int
 nestDepth = 4
@@ -80,6 +81,20 @@ pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> ppr v
 ------------------------------
 instance Ppr Exp where
     ppr = pprExp noPrec
+
+pprPrefixOcc :: Name -> Doc
+-- Print operators with parens around them
+pprPrefixOcc n = parensIf (isSymOcc n) (ppr n)
+
+isSymOcc :: Name -> Bool
+isSymOcc n
+  = case nameBase n of 
+      []    -> True  -- Empty name; weird
+      (c:_) -> isSymbolASCII c || (ord c > 0x7f && isSymbol c) 
+                   -- c.f. OccName.startsVarSym in GHC itself
+
+isSymbolASCII :: Char -> Bool
+isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
 
 pprInfixExp :: Exp -> Doc
 pprInfixExp (VarE v) = pprName' Infix v
@@ -189,7 +204,9 @@ pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
-pprLit i (RationalL rat) = parensIf (i > noPrec) $ rational rat
+pprLit i (RationalL rat) = parensIf (i > noPrec) $
+                           integer (numerator rat) <+> char '/' 
+                              <+> integer (denominator rat)
 
 bytesToString :: [Word8] -> String
 bytesToString = map (chr . fromIntegral)
@@ -239,7 +256,7 @@ instance Ppr Dec where
 ppr_dec :: Bool     -- declaration on the toplevel?
         -> Dec 
         -> Doc
-ppr_dec _ (FunD f cs)   = vcat $ map (\c -> ppr f <+> ppr c) cs
+ppr_dec _ (FunD f cs)   = vcat $ map (\c -> pprPrefixOcc f <+> ppr c) cs
 ppr_dec _ (ValD p r ds) = ppr p <+> pprBody True r
                           $$ where_clause ds
 ppr_dec _ (TySynD t xs rhs) 
@@ -253,7 +270,7 @@ ppr_dec _  (ClassD ctxt c xs fds ds)
     $$ where_clause ds
 ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
                                   $$ where_clause ds
-ppr_dec _ (SigD f t)    = ppr f <+> text "::" <+> ppr t
+ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> text "::" <+> ppr t
 ppr_dec _ (ForeignD f)  = ppr f
 ppr_dec _ (InfixD fx n) = pprFixity n fx
 ppr_dec _ (PragmaD p)   = ppr p
