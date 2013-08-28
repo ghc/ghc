@@ -60,9 +60,10 @@ import Outputable
 import SrcLoc
 import FastString
 import Literal		( inCharRange )
-import Control.Monad	( when )
 import TysWiredIn       ( nilDataCon )
 import DataCon          ( dataConName )
+import Control.Monad	( when )
+import Data.Ratio
 \end{code}
 
 
@@ -643,9 +644,21 @@ rnLit :: HsLit -> RnM ()
 rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
 
+-- Turn a Fractional-looking literal which happens to be an integer into an
+-- Integer-looking literal.
+generalizeOverLitVal :: OverLitVal -> OverLitVal
+generalizeOverLitVal (HsFractional (FL {fl_value=val}))
+    | denominator val == 1 = HsIntegral (numerator val)
+generalizeOverLitVal lit = lit
+
 rnOverLit :: HsOverLit t -> RnM (HsOverLit Name, FreeVars)
-rnOverLit lit@(OverLit {ol_val=val})
-  = do	{ let std_name = hsOverLitName val
+rnOverLit origLit
+  = do  { opt_NumDecimals <- xoptM Opt_NumDecimals
+        ; let { lit@(OverLit {ol_val=val})
+            | opt_NumDecimals = origLit {ol_val = generalizeOverLitVal (ol_val origLit)}
+            | otherwise       = origLit
+          }
+        ; let std_name = hsOverLitName val
 	; (from_thing_name, fvs) <- lookupSyntaxName std_name
 	; let rebindable = case from_thing_name of
 				HsVar v -> v /= std_name

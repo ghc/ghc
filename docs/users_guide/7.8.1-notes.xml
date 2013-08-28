@@ -165,6 +165,21 @@
                </para>
            </listitem>
        </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                    There is a new extension,
+                    <literal>NumDecimals</literal>, which allows you
+                    to specify an integer using compact "floating
+                    literal" syntax. This lets you say things like
+                    <literal>1.2e6 :: Integer</literal> instead of
+                    <literal>1200000</literal>
+
+                    TODO FIXME: example?
+               </para>
+           </listitem>
+       </itemizedlist>
     </sect3>
 
     <sect3>

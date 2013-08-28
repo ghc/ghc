@@ -500,6 +500,7 @@ data ExtensionFlag
    | Opt_TypeFamilies
    | Opt_OverloadedStrings
    | Opt_OverloadedLists
+   | Opt_NumDecimals
    | Opt_DisambiguateRecordFields
    | Opt_RecordWildCards
    | Opt_RecordPuns
@@ -2677,6 +2678,7 @@ xFlags = [
     deprecatedForExtension "NamedFieldPuns" ),
   ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, nop ),
   ( "OverloadedStrings",                Opt_OverloadedStrings, nop ),
+  ( "NumDecimals",                      Opt_NumDecimals, nop),
   ( "OverloadedLists",                  Opt_OverloadedLists, nop),
   ( "GADTs",                            Opt_GADTs, nop ),
   ( "GADTSyntax",                       Opt_GADTSyntax, nop ),
