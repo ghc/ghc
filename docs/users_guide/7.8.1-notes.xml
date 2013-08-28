@@ -180,6 +180,20 @@
                </para>
            </listitem>
        </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                    There is a new extension,
+                    <literal>NegativeLiterals</literal>, which will
+                    cause GHC to interpret the expression
+                    <literal>-123</literal> as <literal>fromIntegral
+                    (-123)</literal>. Haskell 98 and Haskell 2010 both
+                    specify that it should instead desugar to
+                    <literal>negate (fromIntegral 123)</literal>
+               </para>
+           </listitem>
+       </itemizedlist>
     </sect3>
 
     <sect3>
