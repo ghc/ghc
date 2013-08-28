@@ -1623,10 +1623,10 @@ tryEtaReduce bndrs body
     -- for why we have an accumulating coercion
     go [] fun co
       | ok_fun fun 
-      , let result = mkCast fun co
-      , not (any (`elemVarSet` exprFreeVars result) bndrs)
-      = Just result   -- Check for any of the binders free in the result
-                      -- including the accumulated coercion
+      , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
+      , not (any (`elemVarSet` used_vars) bndrs)
+      = Just (mkCast fun co)   -- Check for any of the binders free in the result
+                               -- including the accumulated coercion
 
     go (b : bs) (App fun arg) co
       | Just co' <- ok_arg b arg co
