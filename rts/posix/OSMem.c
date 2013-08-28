@@ -184,7 +184,8 @@ osGetMBlocks(nat n)
 
   // Compute size = MBLOCK_SIZE * (W_)n,
   // while testing for integer overflow.
-  // We assume that W_ is at least as large a type as nat.
+  if (n > (nat)((W_)-1))
+      barf("osGetMBlocks: impossibly large MBlock count %d; nat larger than W_?", n);
   if ((W_)n > ((W_)-1) / MBLOCK_SIZE) {
       // We tried to allocate, say, 4 GB or more on a 32-bit system.
       errorBelch("out of memory (requested %d MBlocks)", n);
