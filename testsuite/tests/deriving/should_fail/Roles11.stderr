@@ -1,5 +1,5 @@
 
 Roles11.hs:5:1:
     Role mismatch on variable a:
-      Annotation says R but role N is required
+      Annotation says Representational but role Nominal is required
     In the data declaration for ‛T2’

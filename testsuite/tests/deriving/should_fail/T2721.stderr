@@ -4,5 +4,5 @@ T2721.hs:15:28:
       (even with cunning newtype deriving):
       the class has associated types
       it is not type-safe to use GeneralizedNewtypeDeriving on this class;
-      the last parameter of ‛C’ is at role N
+      the last parameter of ‛C’ is at role Nominal
     In the newtype declaration for ‛N’

@@ -1,5 +1,5 @@
 
 Roles8.hs:5:1:
     Role mismatch on variable a:
-      Annotation says P but role R is required
+      Annotation says Phantom but role Representational is required
     In the data declaration for ‛T1’
