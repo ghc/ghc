@@ -1477,7 +1477,7 @@ mkNewTypeEqn orig dflags tvs
                     ptext (sLit "GeneralizedNewtypeDeriving on this class;") $$
                     ptext (sLit "the last parameter of") <+>
                     quotes (ppr (className cls)) <+>
-                    ptext (sLit "is at role N")
+                    ptext (sLit "is at role Nominal")
 
 \end{code}
 

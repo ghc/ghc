@@ -26,12 +26,13 @@ module CoAxiom (
        coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
        placeHolderIncomps,
 
-       Role(..)
+       Role(..), pprFullRole
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
+import FastString
 import Name
 import Unique
 import Var
@@ -439,6 +440,11 @@ This is defined here to avoid circular dependencies.
 -- defined here to avoid cyclic dependency with Coercion
 data Role = Nominal | Representational | Phantom
   deriving (Eq, Data.Data, Data.Typeable)
+
+pprFullRole :: Role -> SDoc
+pprFullRole Nominal          = ptext (sLit "Nominal")
+pprFullRole Representational = ptext (sLit "Representational")
+pprFullRole Phantom          = ptext (sLit "Phantom")
 
 instance Outputable Role where
   ppr Nominal          = char 'N'
