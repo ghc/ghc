@@ -1501,7 +1501,7 @@
   <sect2>
     <title>Optimisation levels</title>
 
-    <para><xref linkend="options-optimise"/></para>
+    <para>These options are described in more detail in <xref linkend="options-optimise"/></para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -1531,10 +1531,10 @@
     </informaltable>
 
   </sect2>
-  <sect2>
+  <sect2 id="options-f-compact">
     <title>Individual optimisations</title>
 
-    <para><xref linkend="options-f"/></para>
+    <para>These options are described in more detail in <xref linkend="options-f"/>.</para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -1558,7 +1558,7 @@
             <entry><option>-fcse</option></entry>
             <entry>Turn on common sub-expression elimination. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-cse</entry>
+            <entry><option>-fno-cse</option></entry>
           </row>
 
           <row>
@@ -1634,14 +1634,14 @@
             <entry><option>-ffloat-in</option></entry>
             <entry>Turn on the float-in transformation. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-float-in</entry>
+            <entry><option>-fno-float-in</option></entry>
           </row>
 
           <row>
             <entry><option>-ffull-laziness</option></entry>
             <entry>Turn on full laziness (floating bindings outwards). Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-full-laziness</entry>
+            <entry><option>-fno-full-laziness</option></entry>
           </row>
 
           <row>
@@ -1673,14 +1673,21 @@
           </row>
 
           <row>
-            <entry><option>-fmax-simplifier-iterations</option></entry>
+            <entry><option>-fmax-relevant-bindings=N</option></entry>
+            <entry>Set the maximum number of bindings to display in type error messages (default 6).</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-max-relevant-bindings</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fmax-simplifier-iterations=N</option></entry>
             <entry>Set the max iterations for the simplifier</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
 
           <row>
-            <entry><option>-fmax-worker-args</option></entry>
+            <entry><option>-fmax-worker-args=N</option></entry>
             <entry>If a worker has that many arguments, none will be
               unpacked anymore (default: 10)</entry>
             <entry>dynamic</entry>
@@ -1744,7 +1751,7 @@
             <entry><option>-fspec-constr</option></entry>
             <entry>Turn on the SpecConstr transformation. Implied by <option>-O2</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-spec-constr</entry>
+            <entry><option>-fno-spec-constr</option></entry>
           </row>
 
           <row>
@@ -1767,14 +1774,14 @@
             <entry><option>-fspecialise</option></entry>
             <entry>Turn on specialisation of overloaded functions. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-specialise</entry>
+            <entry><option>-fno-specialise</option></entry>
           </row>
 
           <row>
             <entry><option>-fstrictness</option></entry>
             <entry>Turn on strictness analysis. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-strictness</entry>
+            <entry><option>-fno-strictness</option></entry>
           </row>
 
           <row>
@@ -1789,7 +1796,7 @@
             <entry><option>-fstatic-argument-transformation</option></entry>
             <entry>Turn on the static argument transformation. Implied by <option>-O2</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-static-argument-transformation</entry>
+            <entry><option>-fno-static-argument-transformation</option></entry>
           </row>
 
           <row>

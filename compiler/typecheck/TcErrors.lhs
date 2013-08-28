@@ -500,7 +500,7 @@ solve it.
 \begin{code}
 mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIrredErr ctxt cts 
-  = do { (ctxt, binds_msg) <- relevantBindings ctxt ct1
+  = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct1
        ; mkErrorMsg ctxt ct1 (msg $$ binds_msg) }
   where
     (ct1:_) = cts
@@ -516,7 +516,8 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ })
              msg = vcat [ hang (ptext (sLit "Found hole") <+> quotes (ppr occ))
                              2 (ptext (sLit "with type:") <+> pprType (ctEvPred (cc_ev ct)))
                         , ppUnless (null tyvars_msg) (ptext (sLit "Where:") <+> vcat tyvars_msg) ]
-       ; (ctxt, binds_doc) <- relevantBindings ctxt ct
+       ; (ctxt, binds_doc) <- relevantBindings False ctxt ct
+               -- The 'False' means "don't filter the bindings; see Trac #8191
        ; mkErrorMsg ctxt ct (msg $$ binds_doc) }
   where
     loc_msg tv 
@@ -532,7 +533,7 @@ mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 ----------------
 mkIPErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIPErr ctxt cts
-  = do { (ctxt, bind_msg) <- relevantBindings ctxt ct1
+  = do { (ctxt, bind_msg) <- relevantBindings True ctxt ct1
        ; mkErrorMsg ctxt ct1 (msg $$ bind_msg) }
   where
     (ct1:_) = cts
@@ -583,7 +584,7 @@ mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 -- Wanted constraints only!
 mkEqErr1 ctxt ct
   | isGiven ev
-  = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
+  = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; let (given_loc, given_msg) = mk_given (cec_encl ctxt)
        ; dflags <- getDynFlags
        ; mkEqErr_help dflags ctxt (given_msg $$ binds_msg) 
@@ -591,7 +592,7 @@ mkEqErr1 ctxt ct
                       Nothing ty1 ty2 }
 
   | otherwise   -- Wanted or derived
-  = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
+  = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin (cc_loc ct))
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
@@ -931,7 +932,7 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
 mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell)) 
   | null matches  -- No matches but perhaps several unifiers
   = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
-       ; (ctxt, binds_msg) <- relevantBindings ctxt ct
+       ; (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg)
        ; return (ctxt, cannot_resolve_msg is_ambig binds_msg ambig_msg) }
 
@@ -1171,17 +1172,25 @@ getSkolemInfo (implic:implics) tv
 -- careful to zonk the Id's type first, so it has to be in the monad.
 -- We must be careful to pass it a zonked type variable, too.
 
-relevantBindings :: ReportErrCtxt -> Ct
+relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
+                          -- See Trac #8191
+                 -> ReportErrCtxt -> Ct
                  -> TcM (ReportErrCtxt, SDoc)
-relevantBindings ctxt ct
-  = do { (tidy_env', docs) <- go (cec_tidy ctxt) (6, emptyVarSet) 
-                                 (reverse (tcl_bndrs lcl_env))
+relevantBindings want_filtering ctxt ct
+  = do { dflags <- getDynFlags
+       ; (tidy_env', docs, discards) 
+              <- go (cec_tidy ctxt) (maxRelevantBinds dflags) 
+                    emptyVarSet [] False
+                    (reverse (tcl_bndrs lcl_env))
          -- The 'reverse' makes us work from outside in
-         -- Blargh; maybe have a flag for this "6"
 
        ; traceTc "relevantBindings" (ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
        ; let doc = hang (ptext (sLit "Relevant bindings include")) 
-                      2 (vcat docs)
+                      2 (vcat docs $$ max_msg)
+             max_msg | discards 
+                     = ptext (sLit "(Some bindings suppressed; use -fmax-relevant-binds=N or -fno-max-relevant-binds)")
+                     | otherwise = empty
+
        ; if null docs 
          then return (ctxt, empty)
          else do { traceTc "rb" doc
@@ -1190,28 +1199,38 @@ relevantBindings ctxt ct
     lcl_env = ctLocEnv (cc_loc ct)
     ct_tvs = tyVarsOfCt ct
 
-    go :: TidyEnv -> (Int, TcTyVarSet)
-       -> [TcIdBinder] -> TcM (TidyEnv, [SDoc])
-    go tidy_env (_,_) []
-       = return (tidy_env, [])
-    go tidy_env (n_left,tvs_seen) (TcIdBndr id _ : tc_bndrs)
-       | n_left <= 0, ct_tvs `subVarSet` tvs_seen
-       =   -- We have run out of n_left, and we
-           -- already have bindings mentioning all of ct_tvs
-         go tidy_env (n_left,tvs_seen) tc_bndrs
-       | otherwise
+    run_out :: Maybe Int -> Bool
+    run_out Nothing = False
+    run_out (Just n) = n <= 0
+
+    dec_max :: Maybe Int -> Maybe Int
+    dec_max = fmap (\n -> n - 1)
+
+    go :: TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc] -> Bool
+       -> [TcIdBinder] 
+       -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
+                                        -- because of lack of fuel
+    go tidy_env _ _ docs discards []
+       = return (tidy_env, reverse docs, discards)
+    go tidy_env n_left tvs_seen docs discards (TcIdBndr id _ : tc_bndrs)
        = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
             ; let id_tvs = tyVarsOfType tidy_ty
                   doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
 		            , nest 2 (parens (ptext (sLit "bound at")
 			    	 <+> ppr (getSrcLoc id)))]
-            ; if id_tvs `intersectsVarSet` ct_tvs 
-              && (n_left > 0 || not (id_tvs `subVarSet` tvs_seen))
-                       -- Either we n_left is big enough, 
-                       -- or this binding mentions a new type variable
-              then do { (env', docs) <- go tidy_env' (n_left - 1, tvs_seen `unionVarSet` id_tvs) tc_bndrs
-                      ; return (env', doc:docs) }
-	      else go tidy_env (n_left, tvs_seen) tc_bndrs }
+                  new_seen = tvs_seen `unionVarSet` id_tvs
+
+            ; if (want_filtering && id_tvs `disjointVarSet` ct_tvs)
+                       -- We want to filter out this binding anyway
+              then go tidy_env n_left tvs_seen docs discards tc_bndrs
+
+              else if run_out n_left && id_tvs `subVarSet` tvs_seen
+                       -- We've run out of n_left fuel and this binding only
+                       -- mentions aleady-seen type variables, so discard it
+              then go tidy_env n_left tvs_seen docs True tc_bndrs
+
+                       -- Keep this binding, decrement fuel
+              else go tidy_env' (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
 
 -----------------------
 warnDefaulting :: Cts -> Type -> TcM ()
