@@ -1,8 +1,9 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
   T :: forall (k :: BOX). k -> *
-  data T (k::BOX)@N (a::k)@R
+  data T (k::BOX) (a::k)
       No C type associated
+      Roles: [nominal, representational]
       RecFlag NonRecursive, Not promotable
       =
       FamilyInstance: none

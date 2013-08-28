@@ -2,24 +2,24 @@
 ClosedFam3.hs-boot:5:13:
     Type constructor ‛Foo’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: closed type family Foo a@N :: * where
+    Main module: closed type family Foo a :: * where
                      Foo Int = Bool
                      Foo Double = Char
-    Boot file:   closed type family Foo a@N :: * where Foo Int = Bool
+    Boot file:   closed type family Foo a :: * where Foo Int = Bool
 
 ClosedFam3.hs-boot:8:13:
     Type constructor ‛Bar’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: closed type family Bar a@N :: * where
+    Main module: closed type family Bar a :: * where
                      Bar Int = Bool
                      Bar Double = Double
-    Boot file:   closed type family Bar a@N :: * where
+    Boot file:   closed type family Bar a :: * where
                      Bar Int = Bool
                      Bar Double = Char
 
 ClosedFam3.hs-boot:12:13:
     Type constructor ‛Baz’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: closed type family Baz a@N :: * where Baz Int = Bool
-    Boot file:   closed type family Baz (k::BOX)@N (a::k)@N :: * where
+    Main module: closed type family Baz a :: * where Baz Int = Bool
+    Boot file:   closed type family Baz (k::BOX) (a::k) :: * where
                      Baz * Int = Bool

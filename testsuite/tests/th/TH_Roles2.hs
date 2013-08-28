@@ -4,5 +4,6 @@ module TH_Roles2 where
 
 import Language.Haskell.TH
 
-$( return [DataD [] (mkName "T") [KindedRoledTV (mkName "a") (VarT (mkName "k")) Representational] [] []] )
+$( return [ DataD [] (mkName "T") [KindedTV (mkName "a") (VarT (mkName "k"))] [] []
+          , RoleAnnotD (mkName "T") [RepresentationalR] ] )
 

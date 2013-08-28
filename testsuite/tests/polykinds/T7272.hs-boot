@@ -2,4 +2,5 @@
 
 module T7272 where
 
-class C (a :: k)@P
+type role C phantom
+class C (a :: k)

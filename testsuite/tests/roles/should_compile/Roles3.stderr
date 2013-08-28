@@ -1,28 +1,32 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
   C1 :: * -> Constraint
-  class C1 a@R
+  class C1 a
+      Roles: [representational]
       RecFlag NonRecursive
       meth1 :: a -> a
   C2 :: * -> * -> Constraint
-  class C2 a@N b@N
+  class C2 a b
+      Roles: [nominal, nominal]
       RecFlag NonRecursive
       meth2 :: (~) * a b -> a -> b
   C3 :: * -> * -> Constraint
-  class C3 a@R b@N
+  class C3 a b
+      Roles: [representational, nominal]
       RecFlag NonRecursive
-      type family F3 b@N :: *
+      type family F3 b :: *
       meth3 :: a -> F3 b -> F3 b
   C4 :: * -> * -> Constraint
-  class C4 a@R b@N
+  class C4 a b
+      Roles: [representational, nominal]
       RecFlag NonRecursive
       meth4 :: a -> F4 b -> F4 b
   F4 :: * -> *
-  type family F4 a@N :: *
+  type family F4 a :: *
   Syn1 :: * -> *
-  type Syn1 a@N = F4 a
+  type Syn1 a = F4 a
   Syn2 :: * -> *
-  type Syn2 a@R = [a]
+  type Syn2 a = [a]
 COERCION AXIOMS
   axiom Roles3.NTCo:C1 :: C1 a = a -> a
   axiom Roles3.NTCo:C2 :: C2 a b = a ~ b => a -> b

@@ -2,7 +2,8 @@
 
 module Roles9 where
 
-class C a@N where
+type role C nominal
+class C a where
   meth :: a -> a
 
 instance C Int where

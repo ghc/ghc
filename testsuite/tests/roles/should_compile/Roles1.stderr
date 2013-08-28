@@ -1,44 +1,51 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
   T1 :: * -> *
-  data T1 a@N
+  data T1 a
       No C type associated
+      Roles: [nominal]
       RecFlag NonRecursive, Promotable
       = K1 :: forall a. a -> T1 a Stricts: _
       FamilyInstance: none
   T2 :: * -> *
-  data T2 a@R
+  data T2 a
       No C type associated
+      Roles: [representational]
       RecFlag NonRecursive, Promotable
       = K2 :: forall a. a -> T2 a Stricts: _
       FamilyInstance: none
   T3 :: forall (k :: BOX). k -> *
-  data T3 (k::BOX)@N (a::k)@P
+  data T3 (k::BOX) (a::k)
       No C type associated
+      Roles: [nominal, phantom]
       RecFlag NonRecursive, Not promotable
       = K3 :: forall (k::BOX) (a::k). T3 k a
       FamilyInstance: none
   T4 :: (* -> *) -> * -> *
-  data T4 (a::* -> *)@N b@N
+  data T4 (a::* -> *) b
       No C type associated
+      Roles: [nominal, nominal]
       RecFlag NonRecursive, Not promotable
       = K4 :: forall (a::* -> *) b. (a b) -> T4 a b Stricts: _
       FamilyInstance: none
   T5 :: * -> *
-  data T5 a@R
+  data T5 a
       No C type associated
+      Roles: [representational]
       RecFlag NonRecursive, Promotable
       = K5 :: forall a. a -> T5 a Stricts: _
       FamilyInstance: none
   T6 :: forall (k :: BOX). k -> *
-  data T6 (k::BOX)@N (a::k)@P
+  data T6 (k::BOX) (a::k)
       No C type associated
+      Roles: [nominal, phantom]
       RecFlag NonRecursive, Not promotable
       = K6 :: forall (k::BOX) (a::k). T6 k a
       FamilyInstance: none
   T7 :: forall (k :: BOX). k -> * -> *
-  data T7 (k::BOX)@N (a::k)@P b@R
+  data T7 (k::BOX) (a::k) b
       No C type associated
+      Roles: [nominal, phantom, representational]
       RecFlag NonRecursive, Not promotable
       = K7 :: forall (k::BOX) (a::k) b. b -> T7 k a b Stricts: _
       FamilyInstance: none

@@ -2,12 +2,14 @@
 Roles12.hs:5:6:
     Type constructor ‛T’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data T a@P
+    Main module: data T a
                      No C type associated
+                     Roles: [phantom]
                      RecFlag Recursive, Promotable
                      =
                      FamilyInstance: none
-    Boot file:   abstract(False) T a@R
+    Boot file:   abstract(False) T a
                      No C type associated
+                     Roles: [representational]
                      RecFlag NonRecursive, Not promotable
                      FamilyInstance: none

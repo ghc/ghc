@@ -1,0 +1,5 @@
+test('Roles1', only_ways('normal'), compile, ['-ddump-tc'])
+test('Roles2', only_ways('normal'), compile, ['-ddump-tc'])
+test('Roles3', only_ways('normal'), compile, ['-ddump-tc'])
+test('Roles4', only_ways('normal'), compile, ['-ddump-tc'])
+test('Roles13', only_ways('normal'), compile, ['-ddump-simpl -dsuppress-uniques'])

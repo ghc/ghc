@@ -1,5 +1,5 @@
 
-TcCoercibleFail.hs:10:8:
+TcCoercibleFail.hs:11:8:
     No instance for (Coercible Int ())
       because ‛Int’ and ‛()’ are different types.
       arising from a use of ‛coerce’
@@ -7,18 +7,18 @@ TcCoercibleFail.hs:10:8:
     In the expression: coerce $ one :: ()
     In an equation for ‛foo1’: foo1 = coerce $ one :: ()
 
-TcCoercibleFail.hs:13:8:
+TcCoercibleFail.hs:14:8:
     Could not deduce (Coercible (m Int) (m Age))
       because ‛m Int’ and ‛m Age’ are different types.
       arising from a use of ‛coerce’
     from the context (Monad m)
       bound by the type signature for foo2 :: Monad m => m Age
-      at TcCoercibleFail.hs:12:9-34
+      at TcCoercibleFail.hs:13:9-34
     In the expression: coerce
     In the expression: coerce $ (return one :: m Int)
     In an equation for ‛foo2’: foo2 = coerce $ (return one :: m Int)
 
-TcCoercibleFail.hs:15:8:
+TcCoercibleFail.hs:16:8:
     No instance for (Coercible (Map Int ()) (Map Age ()))
       because the first type argument of ‛Map’ has role Nominal,
       but the arguments ‛Int’ and ‛Age’ differ
@@ -27,7 +27,7 @@ TcCoercibleFail.hs:15:8:
     In the expression: coerce $ Map one () :: Map Age ()
     In an equation for ‛foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
-TcCoercibleFail.hs:17:8:
+TcCoercibleFail.hs:18:8:
     No instance for (Coercible Int (Down Int))
     because the constructor of ‛Down’ is not imported
       arising from a use of ‛coerce’
@@ -35,7 +35,7 @@ TcCoercibleFail.hs:17:8:
     In the expression: coerce $ one :: Down Int
     In an equation for ‛foo4’: foo4 = coerce $ one :: Down Int
 
-TcCoercibleFail.hs:21:8:
+TcCoercibleFail.hs:22:8:
     No instance for (Coercible (Void ()) ())
       because ‛Void’ is a recursive type constuctor
       arising from a use of ‛coerce’

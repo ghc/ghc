@@ -1,5 +1,4 @@
 
 TH_Roles1.hs:7:4:
-    Illegal role annotation
-    Perhaps you intended to use RoleAnnotations
-    In the data type declaration for ‛T’
+    Illegal role annotation for T;
+    did you intend to use RoleAnnotations?

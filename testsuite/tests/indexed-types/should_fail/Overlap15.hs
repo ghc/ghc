@@ -14,3 +14,4 @@ type family F a b c where
 
 foo :: Proxy b -> F b [b] Bool
 foo _ = False
+

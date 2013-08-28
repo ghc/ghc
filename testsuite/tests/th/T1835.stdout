@@ -1,4 +1,4 @@
-class GHC.Classes.Eq a_0 => Main.MyClass a_0@R
+class GHC.Classes.Eq a_0 => Main.MyClass a_0
 instance Main.MyClass Main.Foo
 instance Main.MyClass Main.Baz
 instance GHC.Classes.Eq a_1 => Main.MyClass (Main.Quux a_1)

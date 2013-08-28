@@ -5,7 +5,8 @@ import Data.Ord (Down)
 
 newtype Age = Age Int deriving Show
 
-data Map a@N b = Map a b deriving Show
+type role Map nominal _
+data Map a b = Map a b deriving Show
 
 foo1 = coerce $ one :: ()
 

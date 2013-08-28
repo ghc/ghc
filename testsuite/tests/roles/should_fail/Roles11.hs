@@ -2,6 +2,7 @@
 
 module Roles11 where
 
-data T2 a@R where
+type role T2 representational
+data T2 a where
   K2 :: T2 Int
 

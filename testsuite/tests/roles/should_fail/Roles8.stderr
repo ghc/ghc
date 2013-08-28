@@ -1,0 +1,10 @@
+
+Roles8.hs:7:1:
+    Duplicate role annotations for ‛T1’:
+      type role T1 nominal -- written at Roles8.hs:7:1-20
+      type role T1 nominal -- written at Roles8.hs:8:1-20
+
+Roles8.hs:12:1:
+    Duplicate role annotations for ‛T2’:
+      type role T2 representational -- written at Roles8.hs:12:1-29
+      type role T2 phantom -- written at Roles8.hs:13:1-20

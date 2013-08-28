@@ -1,9 +1,9 @@
 data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
-data TH_reifyDecl1.R a_0@R = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
-data TH_reifyDecl1.List a_0@R
+data TH_reifyDecl1.R a_0 = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
+data TH_reifyDecl1.List a_0
     = TH_reifyDecl1.Nil
     | TH_reifyDecl1.Cons a_0 (TH_reifyDecl1.List a_0)
-data TH_reifyDecl1.Tree a_0@P
+data TH_reifyDecl1.Tree a_0
     = TH_reifyDecl1.Leaf
     | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 type TH_reifyDecl1.IntList = [GHC.Types.Int]
@@ -12,14 +12,14 @@ Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall a_0 . TH_reify
 Class op from TH_reifyDecl1.C1: TH_reifyDecl1.m1 :: forall a_0 . TH_reifyDecl1.C1 a_0 =>
                                                                  a_0 -> GHC.Types.Int
                                 infixl 3 TH_reifyDecl1.m1
-class TH_reifyDecl1.C1 a_0@R
+class TH_reifyDecl1.C1 a_0
     where TH_reifyDecl1.m1 :: forall a_0 . TH_reifyDecl1.C1 a_0 =>
                                            a_0 -> GHC.Types.Int
-class TH_reifyDecl1.C2 a_0@R
+class TH_reifyDecl1.C2 a_0
     where TH_reifyDecl1.m2 :: forall a_0 . TH_reifyDecl1.C2 a_0 =>
                                            a_0 -> GHC.Types.Int
 instance TH_reifyDecl1.C2 GHC.Types.Int
-class TH_reifyDecl1.C3 a_0@N
+class TH_reifyDecl1.C3 a_0
 instance TH_reifyDecl1.C3 GHC.Types.Int
 type family TH_reifyDecl1.AT1 a_0 :: * -> *
 type instance TH_reifyDecl1.AT1 GHC.Types.Int = GHC.Types.Bool
