@@ -93,10 +93,12 @@
 
         <listitem>
             <para>
-                The LLVM backend now supports 128bit SIMD operations.  This is
-                now exploited in both the <literal>vector</literal> and
-                <literal>dph</literal> packages, exposing a high level
-                interface.
+                The LLVM backend now supports 128bit SIMD
+                operations. This is now exploited in both the
+                <literal>vector</literal> and <literal>dph</literal>
+                packages, exposing a high level interface. The LLVM
+                backend also saw a rather large rewrite, making it
+                much more maintainable.
 
                 TODO FIXME: reference.
            </para>
@@ -116,6 +118,17 @@
 
             <para>
                 The old code generator has been removed completely.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                GHC now has substantially better support for cross
+                compilation. In particular, GHC now has all the
+                necessary patches to support cross compilation to
+                Apple iOS, using the LLVM backend.
+
+                TODO FIXME: reference.
            </para>
        </listitem>
 
@@ -146,6 +159,8 @@
                 <literal>AutoDeriveTypeable</literal>
            </para>
        </listitem>
+
+
    </itemizedlist>
   </sect2>
 
