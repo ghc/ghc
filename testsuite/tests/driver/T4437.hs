@@ -41,6 +41,7 @@ expectedGhcOnlyExtensions = [
                              "EmptyCase",
                              "AutoDeriveTypeable",
                              "NegativeLiterals",
+                             "NumDecimals",
                              "NullaryTypeClasses"]
 
 expectedCabalOnlyExtensions :: [String]
