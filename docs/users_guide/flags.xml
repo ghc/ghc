@@ -2119,6 +2119,24 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-dynamic-too</option></entry>
+            <entry>Build dynamic object files <emphasis>as well as</emphasis> static object files during compilation</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-dyno</option></entry>
+            <entry>Set the output path for the <emphasis>dynamically</emphasis> linked objects</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-dynosuf</option></entry>
+            <entry>Set the output suffix for dynamic object files</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-dynload</option></entry>
             <entry>Selects one of a number of modes for finding shared
               libraries at runtime.</entry>
