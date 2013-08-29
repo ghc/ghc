@@ -796,6 +796,12 @@
             <entry><option>-XNoNegativeLiterals</option></entry>
           </row>
           <row>
+            <entry><option>-XNumDecimals</option></entry>
+            <entry>Enable support for 'fractional' integer literals</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoNumDecimals</option></entry>
+          </row>
+          <row>
             <entry><option>-XNoTraditionalRecordSyntax</option></entry>
             <entry>Disable support for traditional record syntax (as supported by Haskell 98) <literal>C {f = x}</literal></entry>
             <entry>dynamic</entry>

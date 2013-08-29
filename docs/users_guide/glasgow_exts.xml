@@ -455,6 +455,23 @@ Indeed, the bindings can even be recursive.
       </para>
    </sect2>
 
+    <sect2 id="num-decimals">
+      <title>Fractional looking integer literals</title>
+      <para>
+          Haskell 2010 and Haskell 98 define floating literals with
+          the syntax <literal>1.2e6</literal>. These literals have the
+          type <literal>Fractional a => Fractional</literal>.
+      </para>
+
+      <para>
+         The language extension <option>-XNumLiterals</option> allows
+         you to also use the floating literal syntax for instances of
+         <literal>Integral</literal>, and have values like
+         <literal>(1.2e6 :: Integral a => a)</literal>
+      </para>
+   </sect2>
+
+
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
 
 
