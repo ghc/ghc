@@ -177,18 +177,7 @@ void *
 osGetMBlocks(nat n)
 {
   caddr_t ret;
-  W_ size;
-
-  // Compute size = MBLOCK_SIZE * (W_)n,
-  // while testing for integer overflow.
-  // We assume that W_ is at least as large a type as nat.
-  if ((W_)n > ((W_)-1) / MBLOCK_SIZE) {
-      // We tried to allocate, say, 4 GB or more on a 32-bit system.
-      errorBelch("out of memory (requested %d MBlocks)", n);
-      stg_exit(EXIT_FAILURE);
-  } else {
-      size = MBLOCK_SIZE * (W_)n;
-  }
+  W_ size = MBLOCK_SIZE * (W_)n;
 
   if (next_request == 0) {
       // use gen_map_mblocks the first time.
