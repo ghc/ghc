@@ -121,19 +121,19 @@ is Less Cool because
 \begin{code}
 -- | A Haskell expression.
 data HsExpr id
-  = HsVar     id                        -- ^ variable
-  | HsIPVar   HsIPName                  -- ^ implicit parameter
+  = HsVar     id                        -- ^ Variable
+  | HsIPVar   HsIPName                  -- ^ Implicit parameter
   | HsOverLit (HsOverLit id)            -- ^ Overloaded literals
 
   | HsLit     HsLit                     -- ^ Simple (non-overloaded) literals
 
-  | HsLam     (MatchGroup id (LHsExpr id)) -- Currently always a single match
+  | HsLam     (MatchGroup id (LHsExpr id)) -- ^ Lambda abstraction. Currently always a single match
 
-  | HsLamCase PostTcType (MatchGroup id (LHsExpr id)) -- Lambda-case
+  | HsLamCase PostTcType (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
 
-  | HsApp     (LHsExpr id) (LHsExpr id) -- Application
+  | HsApp     (LHsExpr id) (LHsExpr id) -- ^ Application
 
-  -- Operator applications:
+  -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
 
   -- NB We need an expr for the operator in an OpApp/Section since
@@ -144,17 +144,20 @@ data HsExpr id
                 Fixity          -- Renamer adds fixity; bottom until then
                 (LHsExpr id)    -- right operand
 
-  | NegApp      (LHsExpr id)    -- negated expr
-                (SyntaxExpr id) -- Name of 'negate'
+  -- | Negation operator. Contains the negated expression and the name
+  -- of 'negate'              
+  | NegApp      (LHsExpr id) 
+                (SyntaxExpr id) 
 
-  | HsPar       (LHsExpr id)    -- Parenthesised expr; see Note [Parens in HsSyn]
+  | HsPar       (LHsExpr id)    -- ^ Parenthesised expr; see Note [Parens in HsSyn]
 
   | SectionL    (LHsExpr id)    -- operand; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operator
   | SectionR    (LHsExpr id)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operand
 
-  | ExplicitTuple               -- Used for explicit tuples and sections thereof
+  -- | Used for explicit tuples and sections thereof
+  | ExplicitTuple               
         [HsTupArg id]
         Boxity
 
@@ -168,9 +171,11 @@ data HsExpr id
                 (LHsExpr id)    --  then part
                 (LHsExpr id)    --  else part
 
-  | HsMultiIf   PostTcType [LGRHS id (LHsExpr id)] -- Multi-way if
+  -- | Multi-way if
+  | HsMultiIf   PostTcType [LGRHS id (LHsExpr id)] 
 
-  | HsLet       (HsLocalBinds id) -- let(rec)
+  -- | let(rec)
+  | HsLet       (HsLocalBinds id) 
                 (LHsExpr  id)
 
   | HsDo        (HsStmtContext Name) -- The parameterisation is unimportant
@@ -179,22 +184,24 @@ data HsExpr id
                 [ExprLStmt id]       -- "do":one or more stmts
                 PostTcType           -- Type of the whole expression
 
-  | ExplicitList                        -- syntactic list
+  -- | Syntactic list: [a,b,c,...]
+  | ExplicitList                        
                 PostTcType              -- Gives type of components of list
                 (Maybe (SyntaxExpr id)) -- For OverloadedLists, the fromListN witness
                 [LHsExpr id]
 
-  | ExplicitPArr                -- syntactic parallel array: [:e1, ..., en:]
+  -- | Syntactic parallel array: [:e1, ..., en:]
+  | ExplicitPArr                
                 PostTcType      -- type of elements of the parallel array
                 [LHsExpr id]
 
-  -- Record construction
+  -- | Record construction
   | RecordCon   (Located id)       -- The constructor.  After type checking
                                    -- it's the dataConWrapId of the constructor
                 PostTcExpr         -- Data con Id applied to type args
                 (HsRecordBinds id)
 
-  -- Record update
+  -- | Record update
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
@@ -207,7 +214,8 @@ data HsExpr id
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
-  | ExprWithTySig                       -- e :: type
+  -- | Expression with an explicit type signature. @e :: type@  
+  | ExprWithTySig                       
                 (LHsExpr id)
                 (LHsType id)
 
@@ -216,12 +224,14 @@ data HsExpr id
                 (LHsType Name)          -- Retain the signature for
                                         -- round-tripping purposes
 
-  | ArithSeq                            -- Arithmetic sequence
+  -- | Arithmetic sequence
+  | ArithSeq                            
                 PostTcExpr
                 (Maybe (SyntaxExpr id))   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo id)
 
-  | PArrSeq                             -- arith. sequence for parallel array
+  -- | Arithmetic sequence for parallel array
+  | PArrSeq                             
                 PostTcExpr              -- [:e1..e2:] or [:e1, e2..e3:]
                 (ArithSeqInfo id)
 
@@ -250,6 +260,7 @@ data HsExpr id
   -----------------------------------------------------------
   -- Arrow notation extension
 
+  -- | @proc@ notation for Arrows
   | HsProc      (LPat id)               -- arrow abstraction, proc
                 (LHsCmdTop id)          -- body of the abstraction
                                         -- always has an empty stack
@@ -315,20 +326,21 @@ data HsExpr id
   |  HsUnboundVar RdrName
   deriving (Data, Typeable)
 
--- HsTupArg is used for tuple sections
+-- | HsTupArg is used for tuple sections
 --  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
 data HsTupArg id
-  = Present (LHsExpr id)        -- The argument
-  | Missing PostTcType          -- The argument is missing, but this is its type
+  = Present (LHsExpr id)        -- ^ The argument
+  | Missing PostTcType          -- ^ The argument is missing, but this is its type
   deriving (Data, Typeable)
 
 tupArgPresent :: HsTupArg id -> Bool
 tupArgPresent (Present {}) = True
 tupArgPresent (Missing {}) = False
 
-type PendingSplice = (Name, LHsExpr Id) -- Typechecked splices, waiting to be
-                                        -- pasted back in by the desugarer
+-- | Typechecked splices, waiting to be
+-- pasted back in by the desugarer
+type PendingSplice = (Name, LHsExpr Id) 
 
 \end{code}
 
