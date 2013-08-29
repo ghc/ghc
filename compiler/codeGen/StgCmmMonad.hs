@@ -26,7 +26,7 @@ module StgCmmMonad (
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
         mkCall, mkCmmCall,
 
-        forkClosureBody, forkAlts, forkProc, codeOnly,
+        forkClosureBody, forkLneBody, forkAlts, codeOnly,
 
         ConTagZ,
 
@@ -44,10 +44,10 @@ module StgCmmMonad (
         getModuleName,
 
         -- ideally we wouldn't export these, but some other modules access internal state
-        getState, setState, getInfoDown, getDynFlags, getThisPackage,
+        getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags, getThisPackage,
 
         -- more localised access to monad state
-        CgIdInfo(..), CgLoc(..),
+        CgIdInfo(..),
         getBinds, setBinds,
 
         -- out of general friendliness, we also export ...
@@ -60,6 +60,7 @@ import Cmm
 import StgCmmClosure
 import DynFlags
 import Hoopl
+import Maybes
 import MkGraph
 import BlockId
 import CLabel
@@ -100,11 +101,10 @@ infixr 9 `thenFC`
 --  - A reader monad, for CgInfoDownwards, containing
 --    - DynFlags,
 --    - the current Module
---    - the static top-level environmnet
 --    - the update-frame offset
 --    - the ticky counter label
 --    - the Sequel (the continuation to return to)
-
+--    - the self-recursive tail call information
 
 --------------------------------------------------------
 
@@ -169,11 +169,15 @@ fixC fcode = FCode (
 
 data CgInfoDownwards        -- information only passed *downwards* by the monad
   = MkCgInfoDown {
-        cgd_dflags     :: DynFlags,
-        cgd_mod        :: Module,          -- Module being compiled
-        cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
-        cgd_ticky      :: CLabel,          -- Current destination for ticky counts
-        cgd_sequel     :: Sequel          -- What to do at end of basic block
+        cgd_dflags    :: DynFlags,
+        cgd_mod       :: Module,            -- Module being compiled
+        cgd_updfr_off :: UpdFrameOffset,    -- Size of current update frame
+        cgd_ticky     :: CLabel,            -- Current destination for ticky counts
+        cgd_sequel    :: Sequel,            -- What to do at end of basic block
+        cgd_self_loop :: Maybe SelfLoopInfo -- Which tail calls can be compiled
+                                            -- as local jumps? See Note
+                                            -- [Self-recursive tail calls] in
+                                            -- StgCmmExpr
   }
 
 type CgBindings = IdEnv CgIdInfo
@@ -195,24 +199,9 @@ data CgIdInfo
 -- use the externalised one in any C label we use which refers to this
 -- name.
 
-data CgLoc
-  = CmmLoc CmmExpr        -- A stable CmmExpr; that is, one not mentioning
-                        -- Hp, so that it remains valid across calls
-
-  | LneLoc BlockId [LocalReg]             -- A join point
-        -- A join point (= let-no-escape) should only
-        -- be tail-called, and in a saturated way.
-        -- To tail-call it, assign to these locals,
-        -- and branch to the block id
-
 instance Outputable CgIdInfo where
   ppr (CgIdInfo { cg_id = id, cg_loc = loc })
     = ppr id <+> ptext (sLit "-->") <+> ppr loc
-
-instance Outputable CgLoc where
-  ppr (CmmLoc e)    = ptext (sLit "cmm") <+> ppr e
-  ppr (LneLoc b rs) = ptext (sLit "lne") <+> ppr b <+> ppr rs
-
 
 -- Sequel tells what to do with the result of this expression
 data Sequel
@@ -308,7 +297,8 @@ initCgInfoDown dflags mod
                  , cgd_mod       = mod
                  , cgd_updfr_off = initUpdFrameOff dflags
                  , cgd_ticky     = mkTopTickyCtrLabel
-                 , cgd_sequel    = initSequel }
+                 , cgd_sequel    = initSequel
+                 , cgd_self_loop = Nothing }
 
 initSequel :: Sequel
 initSequel = Return False
@@ -455,6 +445,16 @@ newUnique = do
 getInfoDown :: FCode CgInfoDownwards
 getInfoDown = FCode $ \info_down state -> (# info_down,state #)
 
+getSelfLoop :: FCode (Maybe SelfLoopInfo)
+getSelfLoop = do
+        info_down <- getInfoDown
+        return $ cgd_self_loop info_down
+
+withSelfLoop :: SelfLoopInfo -> FCode a -> FCode a
+withSelfLoop self_loop code = do
+        info_down <- getInfoDown
+        withInfoDown code (info_down {cgd_self_loop = Just self_loop})
+
 instance HasDynFlags FCode where
     getDynFlags = liftM cgd_dflags getInfoDown
 
@@ -481,7 +481,7 @@ getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
 withSequel :: Sequel -> FCode a -> FCode a
 withSequel sequel code
   = do  { info  <- getInfoDown
-        ; withInfoDown code (info {cgd_sequel = sequel }) }
+        ; withInfoDown code (info {cgd_sequel = sequel, cgd_self_loop = Nothing }) }
 
 getSequel :: FCode Sequel
 getSequel = do  { info <- getInfoDown
@@ -526,15 +526,12 @@ setTickyCtrLabel ticky code = do
 --------------------------------------------------------
 
 forkClosureBody :: FCode () -> FCode ()
--- forkClosureBody takes a code, $c$, and compiles it in a
--- fresh environment, except that:
---        - compilation info and statics are passed in unchanged.
---        - local bindings are passed in unchanged
---          (it's up to the enclosed code to re-bind the
---           free variables to a field of the closure)
---
--- The current state is passed on completely unaltered, except that
--- C-- from the fork is incorporated.
+-- forkClosureBody compiles body_code in environment where:
+--   - sequel, update stack frame and self loop info are
+--     set to fresh values
+--   - state is set to a fresh value, except for local bindings
+--     that are passed in unchanged. It's up to the enclosed code to
+--     re-bind the free variables to a field of the closure.
 
 forkClosureBody body_code
   = do  { dflags <- getDynFlags
@@ -542,26 +539,25 @@ forkClosureBody body_code
         ; us     <- newUniqSupply
         ; state  <- getState
         ; let body_info_down = info { cgd_sequel    = initSequel
-                                    , cgd_updfr_off = initUpdFrameOff dflags }
+                                    , cgd_updfr_off = initUpdFrameOff dflags
+                                    , cgd_self_loop = Nothing }
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
               ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
-forkProc :: FCode a -> FCode a
--- 'forkProc' takes a code and compiles it in the *current* environment,
--- returning the graph thus constructed.
+forkLneBody :: FCode a -> FCode a
+-- 'forkLneBody' takes a body of let-no-escape binding and compiles
+-- it in the *current* environment, returning the graph thus constructed.
 --
 -- The current environment is passed on completely unchanged to
 -- the successor.  In particular, any heap usage from the enclosed
 -- code is discarded; it should deal with its own heap consumption.
--- forkProc is used to compile let-no-escape bindings.
-forkProc body_code
+forkLneBody body_code
   = do  { info_down <- getInfoDown
         ; us        <- newUniqSupply
         ; state     <- getState
-        ; let info_down'    = info_down -- { cgd_sequel = initSequel }
-              fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              (result, fork_state_out) = doFCode body_code info_down' fork_state_in
+        ; let fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
+              (result, fork_state_out) = doFCode body_code info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out
         ; return result }
 
