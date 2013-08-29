@@ -18,7 +18,7 @@ module CmmExpr
     , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
     , regSetToList
     , regUsedIn
-    
+
     , Area(..)
     , module CmmMachOp
     , module CmmType
@@ -119,7 +119,11 @@ data CmmLit
         -- Invariant: must be a continuation BlockId
         -- See Note [Continuation BlockId] in CmmNode.
 
-  | CmmHighStackMark -- stands for the max stack space used during a procedure
+  | CmmHighStackMark -- A late-bound constant that stands for the max
+                     -- #bytes of stack space used during a procedure.
+                     -- During the stack-layout pass, CmmHighStackMark
+                     -- is replaced by a CmmInt for the actual number
+                     -- of bytes used
   deriving Eq
 
 cmmExprType :: DynFlags -> CmmExpr -> CmmType
@@ -336,7 +340,7 @@ data GlobalReg
   | LongReg             -- long int registers (64-bit, really)
         {-# UNPACK #-} !Int     -- its number
 
-  | XmmReg                      -- 128-bit SIMD vector register 
+  | XmmReg                      -- 128-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
   -- STG registers

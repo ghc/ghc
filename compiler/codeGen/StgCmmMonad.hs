@@ -216,12 +216,12 @@ instance Outputable CgLoc where
 
 -- Sequel tells what to do with the result of this expression
 data Sequel
-  = Return Bool                  -- Return result(s) to continuation found on the stack
-                          --         True <=> the continuation is update code (???)
+  = Return Bool         -- Return result(s) to continuation found on the stack.
+                        -- True <=> the continuation is update code (???)
 
   | AssignTo
-        [LocalReg]        -- Put result(s) in these regs and fall through
-                        --         NB: no void arguments here
+        [LocalReg]      -- Put result(s) in these regs and fall through
+                        -- NB: no void arguments here
                         --
         Bool            -- Should we adjust the heap pointer back to
                         -- recover space that's unused on this path?
@@ -338,10 +338,10 @@ data CgState
 
 data HeapUsage =
   HeapUsage {
-        virtHp :: VirtualHpOffset,        -- Virtual offset of highest-allocated word
-                                                 --   Incremented whenever we allocate
+        virtHp :: VirtualHpOffset,       -- Virtual offset of highest-allocated word
+                                         --   Incremented whenever we allocate
         realHp :: VirtualHpOffset        -- realHp: Virtual offset of real heap ptr
-                                                 --   Used in instruction addressing modes
+                                         --   Used in instruction addressing modes
   }
 
 type VirtualHpOffset = WordOff
@@ -571,10 +571,10 @@ codeOnly :: FCode () -> FCode ()
 -- Used in almost-circular code to prevent false loop dependencies
 codeOnly body_code
   = do  { info_down <- getInfoDown
-        ; us   <- newUniqSupply
-        ; state <- getState
-        ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state,
-                                                   cgs_hp_usg  = cgs_hp_usg state }
+        ; us        <- newUniqSupply
+        ; state     <- getState
+        ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state
+                                                 , cgs_hp_usg  = cgs_hp_usg state }
                 ((), fork_state_out) = doFCode body_code info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
@@ -593,9 +593,8 @@ forkAlts branch_fcodes
                 where
                   (us1,us2) = splitUniqSupply us
                   branch_state = (initCgState us1) {
-                                        cgs_binds   = cgs_binds state,
-                                        cgs_hp_usg  = cgs_hp_usg state }
-
+                                        cgs_binds  = cgs_binds state
+                                      , cgs_hp_usg = cgs_hp_usg state }
               (_us, results) = mapAccumL compile us branch_fcodes
               (branch_results, branch_out_states) = unzip results
         ; setState $ foldl stateIncUsage state branch_out_states

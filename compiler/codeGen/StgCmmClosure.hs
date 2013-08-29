@@ -122,23 +122,23 @@ isGcPtrRep _      = False
 -- tail call or return that identifier.
 
 data LambdaFormInfo
-  = LFReEntrant                -- Reentrant closure (a function)
-        TopLevelFlag        -- True if top level
-        !RepArity                -- Arity. Invariant: always > 0
-        !Bool                -- True <=> no fvs
+  = LFReEntrant         -- Reentrant closure (a function)
+        TopLevelFlag    -- True if top level
+        !RepArity       -- Arity. Invariant: always > 0
+        !Bool           -- True <=> no fvs
         ArgDescr        -- Argument descriptor (should really be in ClosureInfo)
 
-  | LFThunk                -- Thunk (zero arity)
+  | LFThunk             -- Thunk (zero arity)
         TopLevelFlag
-        !Bool                -- True <=> no free vars
-        !Bool                -- True <=> updatable (i.e., *not* single-entry)
+        !Bool           -- True <=> no free vars
+        !Bool           -- True <=> updatable (i.e., *not* single-entry)
         StandardFormInfo
-        !Bool                -- True <=> *might* be a function type
+        !Bool           -- True <=> *might* be a function type
 
-  | LFCon                -- A saturated constructor application
-        DataCon                -- The constructor
+  | LFCon               -- A saturated constructor application
+        DataCon         -- The constructor
 
-  | LFUnknown                -- Used for function arguments and imported things.
+  | LFUnknown           -- Used for function arguments and imported things.
                         -- We know nothing about this closure.
                         -- Treat like updatable "LFThunk"...
                         -- Imported things which we *do* know something about use
@@ -149,10 +149,10 @@ data LambdaFormInfo
                         --        because then we know the entry code will do
                         --        For a function, the entry code is the fast entry point
 
-  | LFUnLifted                -- A value of unboxed type;
+  | LFUnLifted          -- A value of unboxed type;
                         -- always a value, needs evaluation
 
-  | LFLetNoEscape        -- See LetNoEscape module for precise description
+  | LFLetNoEscape       -- See LetNoEscape module for precise description
 
   | LFBlackHole                -- Used for the closures allocated to hold the result
                         -- of a CAF.  We want the target of the update frame to
@@ -175,7 +175,7 @@ data StandardFormInfo
         --      case x of
         --           con a1,..,an -> ak
         -- and the constructor is from a single-constr type.
-       WordOff                 -- 0-origin offset of ak within the "goods" of
+       WordOff          -- 0-origin offset of ak within the "goods" of
                         -- constructor (Recall that the a1,...,an may be laid
                         -- out in the heap in a non-obvious order.)
 
@@ -205,9 +205,9 @@ mkLFLetNoEscape :: LambdaFormInfo
 mkLFLetNoEscape = LFLetNoEscape
 
 -------------
-mkLFReEntrant :: TopLevelFlag        -- True of top level
-              -> [Id]                -- Free vars
-              -> [Id]                 -- Args
+mkLFReEntrant :: TopLevelFlag    -- True of top level
+              -> [Id]            -- Free vars
+              -> [Id]            -- Args
               -> ArgDescr        -- Argument descriptor
               -> LambdaFormInfo
 
@@ -256,7 +256,7 @@ mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
   | Just con <- isDataConWorkId_maybe id
   , isNullaryRepDataCon con
-  = LFCon con        -- An imported nullary constructor
+  = LFCon con   -- An imported nullary constructor
                 -- We assume that the constructor is evaluated so that
                 -- the id really does point directly to the constructor
 
@@ -679,7 +679,6 @@ mkCmmInfo ClosureInfo {..}
                  , cit_rep  = closureSMRep
                  , cit_prof = closureProf
                  , cit_srt  = NoC_SRT }
-
 
 --------------------------------------
 --        Building ClosureInfos
