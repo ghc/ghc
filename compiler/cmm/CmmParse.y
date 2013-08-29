@@ -496,7 +496,8 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                           ty  = Constr (fromIntegral $9)  -- Tag
                                        (stringToWord8s $13)
                           rep = mkRTSRep (fromIntegral $11) $
-                                  mkHeapRep dflags False (fromIntegral $5)
+                                  mkHeapRep dflags (fromIntegral $11 == cONSTR_NOCAF_STATIC)
+                                                  (fromIntegral $5)
                                                   (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
