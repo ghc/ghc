@@ -446,12 +446,17 @@ Indeed, the bindings can even be recursive.
           The literal <literal>-123</literal> is, according to
           Haskell98 and Haskell 2010, desugared as
           <literal>negate (fromInteger 123)</literal>.
+         The language extension <option>-XNegativeLiterals</option>
+         means that it is instead desugared as
+         <literal>fromInteger (-123)</literal>. 
       </para>
 
       <para>
-         The language extension <option>-XNegativeLiterals</option>
-         means that it is instead desugared as
-         <literal>fromInteger (-123)</literal>.
+      This can make a difference when the positive and negative range of 
+      a numeric data type don't match up.  For example, 
+      in 8-bit arithmetic -128 is representable, but +128 is not.
+      So <literal>negate (fromInteger 128)</literal> will elicit an 
+      unexpected integer-literal-overflow message.
       </para>
    </sect2>
 
