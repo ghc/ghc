@@ -214,6 +214,14 @@
            </listitem>
             <listitem>
                 <para>
+                    GHC now supports warning about overflow of integer
+                    literals, enabled by
+                    <literal>-fwarn-overflowed-literals</literal>. It
+                    is enabled by default
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     It's now possible to switch the system linker on Linux
                     (between GNU gold and GNU ld) at runtime without problem.
                </para>
