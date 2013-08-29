@@ -79,9 +79,6 @@ my_mmap (void *addr, W_ size)
 {
     void *ret;
 
-    if (size > (W_)SIZE_MAX)
-        barf("my_mmap: impossibly large allocation of %" FMT_Word " bytes; W_ larger than size_t?", size);
-
 #if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
     { 
 	int fd = open("/dev/zero",O_RDONLY);
