@@ -96,9 +96,7 @@
                 The LLVM backend now supports 128bit SIMD
                 operations. This is now exploited in both the
                 <literal>vector</literal> and <literal>dph</literal>
-                packages, exposing a high level interface. The LLVM
-                backend also saw a rather large rewrite, making it
-                much more maintainable.
+                packages, exposing a high level interface.
 
                 TODO FIXME: reference.
            </para>
