@@ -208,6 +208,24 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    GHC can now build both static and dynamic object
+                    files at the same time in a single compilation
+                    pass, when given the
+                    <literal>-dynamic-too</literal> flag. This will
+                    produce both a statically-linkable
+                    <literal>.o</literal> object file, and a
+                    dynamically-linkable <literal>.dyn_o</literal>
+                    file. The output suffix of the dynamic objects can
+                    be controlled by the flag
+                    <literal>-dyno</literal>.
+               </para>
+
+                <para>
+                    Note that GHC still builds statically by default.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     GHC now supports a <literal>--show-options</literal> flag,
                     which will dump all of the flags it supports to standard out.
                </para>
