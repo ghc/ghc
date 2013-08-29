@@ -59,7 +59,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import Data.List        ( isSuffixOf, isPrefixOf )
+import Data.List        ( isSuffixOf )
 import Data.Maybe
 import System.Environment
 import Data.Char
