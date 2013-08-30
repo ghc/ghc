@@ -2,7 +2,8 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.LaTeX
--- Copyright   :  (c) Simon Marlow 2010
+-- Copyright   :  (c) Simon Marlow      2010,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org

@@ -3,8 +3,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Create
--- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2009
+-- Copyright   :  (c) Simon Marlow      2003-2006,
+--                    David Waern       2006-2009,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -218,16 +219,20 @@ mkDocOpts mbOpts flags mdl = do
       [] -> tell ["No option supplied to DOC_OPTION/doc_option"] >> return []
       xs -> liftM catMaybes (mapM parseOption xs)
     Nothing -> return []
-  if Flag_HideModule (moduleString mdl) `elem` flags
-    then return $ OptHide : opts
-    else return opts
+  hm <- if Flag_HideModule (moduleString mdl) `elem` flags
+        then return $ OptHide : opts
+        else return opts
+  if Flag_ShowExtensions (moduleString mdl) `elem` flags
+    then return $ OptShowExtensions : hm
+    else return hm
 
 
 parseOption :: String -> ErrMsgM (Maybe DocOption)
-parseOption "hide"           = return (Just OptHide)
-parseOption "prune"          = return (Just OptPrune)
-parseOption "ignore-exports" = return (Just OptIgnoreExports)
-parseOption "not-home"       = return (Just OptNotHome)
+parseOption "hide"            = return (Just OptHide)
+parseOption "prune"           = return (Just OptPrune)
+parseOption "ignore-exports"  = return (Just OptIgnoreExports)
+parseOption "not-home"        = return (Just OptNotHome)
+parseOption "show-extensions" = return (Just OptShowExtensions)
 parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 
 
@@ -649,7 +654,7 @@ lookupDocs n warnings docMap argMap subMap =
 -- 2) B is visible, but not all its exports are in scope in A, in which case we
 --    only return those that are.
 -- 3) B is visible and all its exports are in scope, in which case we return
---    a single 'ExportModule' item. 
+--    a single 'ExportModule' item.
 moduleExports :: Module           -- ^ Module A
               -> ModuleName       -- ^ The real name of B, the exported module
               -> DynFlags         -- ^ The flags used when typechecking A

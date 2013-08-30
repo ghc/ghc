@@ -1,8 +1,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Options
--- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2009
+-- Copyright   :  (c) Simon Marlow      2003-2006,
+--                    David Waern       2006-2009,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -70,6 +71,7 @@ data Flag
   | Flag_GenIndex
   | Flag_IgnoreAllExports
   | Flag_HideModule String
+  | Flag_ShowExtensions String
   | Flag_OptGhc String
   | Flag_GhcLibDir String
   | Flag_GhcVersion
@@ -151,6 +153,8 @@ options backwardsCompat =
       "behave as if all modules have the\nignore-exports atribute",
     Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
       "behave as if MODULE has the hide attribute",
+    Option [] ["show-extensions"] (ReqArg Flag_ShowExtensions "MODULE")
+      "behave as if MODULE has the show-extensions attribute",
     Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
       "option to be forwarded to GHC",
     Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)

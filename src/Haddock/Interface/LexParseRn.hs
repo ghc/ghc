@@ -4,6 +4,7 @@
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
 -- Copyright   :  (c) Isaac Dupree 2009,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -17,7 +18,7 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-
+import qualified Data.IntSet as IS
 import Haddock.Types
 import Haddock.Parser
 import Haddock.Interface.ParseModuleHeader
@@ -28,10 +29,10 @@ import Data.List
 import Data.Maybe
 import FastString
 import GHC
+import DynFlags (ExtensionFlag(..), languageExtensions)
 import Name
 import Outputable
 import RdrName
-
 
 processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
 processDocStrings dflags gre strs = do
@@ -82,7 +83,14 @@ processModuleHeader dflags gre safety mayStr = do
                 hmi' = hmi { hmi_description = descr }
                 doc' = rename dflags gre doc
             return (hmi', Just doc')
-  return (hmi { hmi_safety = Just $ showPpr dflags safety }, doc)
+
+  let flags :: [ExtensionFlag]
+      -- We remove the flags implied by the language setting and we display the language instead
+      flags = map toEnum (IS.toList $ extensionFlags dflags) \\ languageExtensions (language dflags)
+  return (hmi { hmi_safety = Just $ showPpr dflags safety
+              , hmi_language = language dflags
+              , hmi_extensions = flags
+              } , doc)
   where
     failure = (emptyHaddockModInfo, Nothing)
 

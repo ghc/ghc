@@ -3,7 +3,8 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.InterfaceFile
--- Copyright   :  (c) David Waern 2006-2009
+-- Copyright   :  (c) David Waern       2006-2009,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -24,6 +25,7 @@ import Haddock.Utils hiding (out)
 
 import Control.Monad
 import Data.Array
+import Data.Functor ((<$>))
 import Data.IORef
 import Data.List
 import qualified Data.Map as Map
@@ -396,6 +398,8 @@ instance Binary DocOption where
             putByte bh 2
     put_ bh OptNotHome = do
             putByte bh 3
+    put_ bh OptShowExtensions = do
+            putByte bh 4
     get bh = do
             h <- getByte bh
             case h of
@@ -407,6 +411,8 @@ instance Binary DocOption where
                     return OptIgnoreExports
               3 -> do
                     return OptNotHome
+              4 -> do
+                    return OptShowExtensions
               _ -> fail "invalid binary data found"
 
 
@@ -590,6 +596,8 @@ instance Binary name => Binary (HaddockModInfo name) where
     put_ bh (hmi_stability   hmi)
     put_ bh (hmi_portability hmi)
     put_ bh (hmi_safety      hmi)
+    put_ bh (fromEnum <$> hmi_language hmi)
+    put_ bh (map fromEnum $ hmi_extensions hmi)
 
   get bh = do
     descr <- get bh
@@ -599,8 +607,9 @@ instance Binary name => Binary (HaddockModInfo name) where
     stabi <- get bh
     porta <- get bh
     safet <- get bh
-    return (HaddockModInfo descr copyr licen maint stabi porta safet)
-
+    langu <- fmap toEnum <$> get bh
+    exten <- map toEnum <$> get bh
+    return (HaddockModInfo descr copyr licen maint stabi porta safet langu exten)
 
 instance Binary DocName where
   put_ bh (Documented name modu) = do

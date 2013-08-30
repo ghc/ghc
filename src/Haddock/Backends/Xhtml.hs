@@ -1,9 +1,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Html
--- Copyright   :  (c) Simon Marlow   2003-2006,
---                    David Waern    2006-2009,
---                    Mark Lentczner 2010
+-- Copyright   :  (c) Simon Marlow      2003-2006,
+--                    David Waern       2006-2009,
+--                    Mark Lentczner    2010,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -38,7 +39,8 @@ import Control.Monad         ( when, unless )
 import Control.Monad.Instances ( ) -- for Functor Either a
 #endif
 import Data.Char             ( toUpper )
-import Data.List             ( sortBy, groupBy, intercalate )
+import Data.Functor          ( (<$>) )
+import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
 import System.Directory
@@ -48,10 +50,10 @@ import qualified Data.Set as Set hiding ( Set )
 import Data.Function
 import Data.Ord              ( comparing )
 
+import DynFlags (Language(..))
 import GHC hiding ( NoLink, moduleInfo )
 import Name
 import Module
-
 
 --------------------------------------------------------------------------------
 -- * Generating HTML documentation
@@ -174,7 +176,7 @@ bodyHtml doctitle iface
     divPackageHeader << [
       unordList (catMaybes [
         srcButton maybe_source_url iface,
-        wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
+        wikiButton maybe_wiki_url (ifaceMod <$> iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url])
             ! [theclass "links", identifier "page-menu"],
@@ -205,8 +207,26 @@ moduleInfo iface =
           ("Maintainer",hmi_maintainer),
           ("Stability",hmi_stability),
           ("Portability",hmi_portability),
-          ("Safe Haskell",hmi_safety)
-          ]
+          ("Safe Haskell",hmi_safety),
+          ("Language", lg)
+          ] ++ extsForm
+        where
+          lg inf = case hmi_language inf of
+            Nothing -> Nothing
+            Just Haskell98 -> Just "Haskell98"
+            Just Haskell2010 -> Just "Haskell2010"
+
+          extsForm
+            | OptShowExtensions `elem` ifaceOptions iface =
+              let fs = map (dropOpt . show) (hmi_extensions info)
+              in case map stringToHtml fs of
+                [] -> []
+                [x] -> extField x -- don't use a list for a single extension
+                xs -> extField $ unordList xs ! [theclass "extension-list"]
+            | otherwise = []
+            where
+              extField x = return $ th << "Extensions" <-> td << x
+              dropOpt x = if "Opt_" `isPrefixOf` x then drop 4 x else x
    in
       case entries of
          [] -> noHtml
@@ -283,7 +303,7 @@ mkNode qual ss p (Node s leaf pkg short ts) =
       -- We only need an explicit collapser button when the module name
       -- is also a leaf, and so is a link to a module page. Indeed, the
       -- spaceHtml is a minor hack and does upset the layout a fraction.
-      
+
     htmlModule = thespan ! modAttrs << (cBtn +++
       if leaf
         then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg))
@@ -529,7 +549,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
       | no_doc_at_all = noHtml
       | otherwise
       = divSynposis $
-            paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++ 
+            paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++
             shortDeclList (
                 mapMaybe (processExport True linksInfo unicode qual) exports
             ) ! (collapseSection "syn" False "" ++ collapseToggle "syn")
@@ -559,7 +579,7 @@ miniSynopsis mdl iface unicode qual =
 processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
                        -> [Html]
 processForMiniSynopsis mdl unicode qual (ExportDecl (L _loc decl0) _doc _ _insts) =
-  ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
+  ((divTopDecl <<).(declElem <<)) <$> case decl0 of
     TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
         (FamDecl decl)    -> [ppTyFamHeader True False decl unicode qual]
         (DataDecl{})   -> [keyword "data" <+> b]
@@ -666,5 +686,3 @@ groupTag lev
   | lev == 2  = h2
   | lev == 3  = h3
   | otherwise = h4
-
-

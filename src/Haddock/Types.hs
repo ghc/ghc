@@ -3,8 +3,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Types
--- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2009
+-- Copyright   :  (c) Simon Marlow      2003-2006,
+--                    David Waern       2006-2009,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskellorg
@@ -28,6 +29,7 @@ import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC hiding (NoLink)
+import DynFlags (ExtensionFlag, Language)
 import OccName
 import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
@@ -422,6 +424,8 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_stability   :: Maybe String
   , hmi_portability :: Maybe String
   , hmi_safety      :: Maybe String
+  , hmi_language    :: Maybe Language
+  , hmi_extensions  :: [ExtensionFlag]
   }
 
 
@@ -434,6 +438,8 @@ emptyHaddockModInfo = HaddockModInfo
   , hmi_stability   = Nothing
   , hmi_portability = Nothing
   , hmi_safety      = Nothing
+  , hmi_language    = Nothing
+  , hmi_extensions  = []
   }
 
 
@@ -450,6 +456,7 @@ data DocOption
   | OptIgnoreExports   -- ^ Pretend everything is exported.
   | OptNotHome         -- ^ Not the best place to get docs for things
                        -- exported by this module.
+  | OptShowExtensions  -- ^ Render enabled extensions for this module.
   deriving (Eq, Show)
 
 

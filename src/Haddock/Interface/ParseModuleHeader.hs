@@ -61,7 +61,9 @@ parseModuleHeader dflags str0 =
             hmi_maintainer = maintainerOpt,
             hmi_stability = stabilityOpt,
             hmi_portability = portabilityOpt,
-            hmi_safety = Nothing
+            hmi_safety = Nothing,
+            hmi_language = Nothing, -- set in LexParseRn
+            hmi_extensions = [] -- also set in LexParseRn
             }, doc)
 
 -- | This function is how we read keys.
@@ -158,4 +160,3 @@ parseKey key toParse0 =
       extractPrefix (c1:cs1) (c2:cs2)
          | toUpper c1 == toUpper c2 = extractPrefix cs1 cs2
          | otherwise = Nothing
-

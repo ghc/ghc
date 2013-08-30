@@ -3,7 +3,13 @@
 	padding: 0;
 }
 
-body { 
+.extension-list {
+    list-style-type: none;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+body {
   	background-color: #ffffff;
   	color: #000000;
   	font-size: 100%;
@@ -53,7 +59,7 @@ h1, h2, h3, h4, h5 {
 	margin-bottom: 0.5em;
 }
 
-p  { 
+p  {
 	padding-top: 2px;
 	padding-left: 10px;
 }
@@ -64,7 +70,7 @@ ul, ol, dl {
 	margin-left: 2.5em;
 }
 
-pre  { 
+pre  {
 	padding-top: 2px;
 	padding-left: 20px;
 }
@@ -209,7 +215,7 @@ table.info {
 #index .caption {
   padding-top: 15px;
   font-weight: bold;
-  font-size: 150%	
+  font-size: 150%
 }
 
 #synopsis {
@@ -357,7 +363,7 @@ p.arg {
 	margin-bottom: 0;
 }
 p.arg span {
-  background-color: #f0f0f0; 
+  background-color: #f0f0f0;
   font-family: monospace;
   white-space: nowrap;
 	float: none;
@@ -365,7 +371,7 @@ p.arg span {
 
 
 img.coll {
-	width : 0.75em; height: 0.75em; margin-bottom: 0; margin-right: 0.5em 
+	width : 0.75em; height: 0.75em; margin-bottom: 0; margin-right: 0.5em
 }
 
 
@@ -387,7 +393,7 @@ td.rdoc p {
   color: #ffffff;
   padding: 4px
   }
-  
+
 #footer p {
 	padding: 1px;
 	margin: 0;
