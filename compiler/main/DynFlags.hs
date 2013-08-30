@@ -101,6 +101,7 @@ module DynFlags (
         flagsPackage,
 
         supportedLanguagesAndExtensions,
+        languageExtensions,
 
         -- ** DynFlags C compiler options
         picCCOpts, picPOpts,
@@ -515,7 +516,7 @@ data ExtensionFlag
    | Opt_PolyKinds                -- Kind polymorphism
    | Opt_DataKinds                -- Datatype promotion
    | Opt_InstanceSigs
- 
+
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_AutoDeriveTypeable       -- Automatic derivation of Typeable
@@ -1682,7 +1683,7 @@ setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, addOptl, addOptc, addOptP,
-         addCmdlineFramework, addHaddockOpts, addGhciScript, 
+         addCmdlineFramework, addHaddockOpts, addGhciScript,
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
 setOutputFile, setDynOutputFile, setOutputHi, setDumpPrefixForce
@@ -1967,7 +1968,7 @@ safeFlagCheck cmdl dflags =
 
         apFix f = if safeInferOn dflags then id else f
 
-        safeFailure loc str 
+        safeFailure loc str
            = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring " ++ str]
 
 {- **********************************************************************
@@ -2294,7 +2295,7 @@ dynamic_flags = [
   , Flag "O"      (optIntSuffixM (\mb_n -> setOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
 
- 
+
   , Flag "fmax-relevant-binds"         (intSuffix (\n d -> d{ maxRelevantBinds = Just n }))
   , Flag "fno-max-relevant-binds"      (noArg (\d -> d{ maxRelevantBinds = Nothing }))
   , Flag "fsimplifier-phases"          (intSuffix (\n d -> d{ simplPhases = n }))
@@ -2584,7 +2585,7 @@ fFlags = [
 fLangFlags :: [FlagSpec ExtensionFlag]
 fLangFlags = [
   ( "th",                               Opt_TemplateHaskell,
-    \on -> deprecatedForExtension "TemplateHaskell" on 
+    \on -> deprecatedForExtension "TemplateHaskell" on
         >> checkTemplateHaskellOk on ),
   ( "fi",                               Opt_ForeignFunctionInterface,
     deprecatedForExtension "ForeignFunctionInterface" ),
@@ -2676,7 +2677,7 @@ xFlags = [
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
   ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
   ( "RecursiveDo",                      Opt_RecursiveDo, nop ),  -- Enables 'mdo' and 'rec'
-  ( "DoRec",                            Opt_RecursiveDo, 
+  ( "DoRec",                            Opt_RecursiveDo,
      deprecatedForExtension "RecursiveDo" ),
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
