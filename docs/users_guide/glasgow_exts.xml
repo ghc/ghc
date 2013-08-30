@@ -472,7 +472,7 @@ Indeed, the bindings can even be recursive.
          The language extension <option>-XNumLiterals</option> allows
          you to also use the floating literal syntax for instances of
          <literal>Integral</literal>, and have values like
-         <literal>(1.2e6 :: Integral a => a)</literal>
+         <literal>(1.2e6 :: Num a => a)</literal>
       </para>
    </sect2>
 
