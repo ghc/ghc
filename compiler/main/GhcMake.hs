@@ -1303,7 +1303,8 @@ Following this fix, GHC can compile itself with --make -O2.
 reTypecheckLoop :: HscEnv -> ModSummary -> ModuleGraph -> IO HscEnv
 reTypecheckLoop hsc_env ms graph
   | Just loop <- getModLoop ms graph
-  = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name loop)
+  , let non_boot = filter (not.isBootSummary) loop
+  = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name non_boot)
   | otherwise
   = return hsc_env
 
@@ -1312,8 +1313,7 @@ getModLoop ms graph
   | not (isBootSummary ms)
   , any (\m -> ms_mod m == this_mod && isBootSummary m) graph
   , let mss = reachableBackwards (ms_mod_name ms) graph
-  , let non_boot = filter (not.isBootSummary) mss
-  = Just non_boot
+  = Just mss
   | otherwise
   = Nothing
  where
