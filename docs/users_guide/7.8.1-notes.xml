@@ -201,6 +201,25 @@
                </para>
            </listitem>
        </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                     The <literal>IncoherentInstances</literal>
+                     extension has seen a behavioral change, and is
+                     now 'liberated' and less conservative during
+                     instance resolution. This allows more programs to
+                     compile than before.
+               </para>
+                <para>
+                     Now, <literal>IncoherentInstances</literal> will
+                     always pick an arbitrary matching instance, if
+                     multiple ones exist.
+               </para>
+           </listitem>
+       </itemizedlist>
+
+
     </sect3>
 
     <sect3>
