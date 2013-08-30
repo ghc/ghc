@@ -582,8 +582,8 @@ data DynFlags = DynFlags {
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
-  parUpsweepNum         :: Maybe Int,   -- ^ The number of modules to compile in parallel
-                                        --   during the upsweep, where Nothing ==> compile as
+  parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
+                                        --   in --make mode, where Nothing ==> compile as
                                         --   many in parallel as there are CPUs.
 
   maxRelevantBinds      :: Maybe Int,   -- ^ Maximum number of bindings from the type envt
@@ -1270,7 +1270,7 @@ defaultDynFlags mySettings =
         historySize             = 20,
         strictnessBefore        = [],
 
-        parUpsweepNum           = Just 1,
+        parMakeCount            = Just 1,
 
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
@@ -2030,7 +2030,7 @@ dynamic_flags = [
                            addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect"))
   , Flag "v"        (OptIntSuffix setVerbosity)
 
-  , Flag "j"        (OptIntSuffix (\n -> upd (\d -> d {parUpsweepNum = n})))
+  , Flag "j"        (OptIntSuffix (\n -> upd (\d -> d {parMakeCount = n})))
 
         ------- ways --------------------------------------------------------
   , Flag "prof"           (NoArg (addWay WayProf))

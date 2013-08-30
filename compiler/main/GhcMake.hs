@@ -270,7 +270,7 @@ load how_much = do
     liftIO $ debugTraceMsg dflags 2 (hang (text "Ready for upsweep")
                                2 (ppr mg))
 
-    n_jobs <- case parUpsweepNum dflags of
+    n_jobs <- case parMakeCount dflags of
                     Nothing -> liftIO getNumProcessors
                     Just n  -> return n
     let upsweep_fn | n_jobs > 1 = parUpsweep n_jobs
