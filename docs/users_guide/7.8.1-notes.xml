@@ -318,6 +318,23 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    The RTS linker can now unload object code at
+                    runtime (when using the GHC API
+                    <literal>ObjLink</literal> module.) Previously,
+                    GHC would not unload the old object file, causing
+                    a gradual memory leak as more objects were loaded
+                    over time.
+               </para>
+
+                <para>
+                    Note that this change in unloading behavior
+                    <emphasis>only</emphasis> affects statically
+                    linked binaries, and not dynamic ones.
+               </para>
+           </listitem>
+
+            <listitem>
+                <para>
                     The performance of <literal>StablePtr</literal>s and
                     <literal>StableName</literal>s has been improved.
                </para>
