@@ -236,7 +236,7 @@
                     dynamically-linkable <literal>.dyn_o</literal>
                     file. The output suffix of the dynamic objects can
                     be controlled by the flag
-                    <literal>-dyno</literal>.
+                    <literal>-dynosuf</literal>.
                </para>
 
                 <para>
