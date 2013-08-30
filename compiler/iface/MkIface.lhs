@@ -1723,7 +1723,7 @@ toIfaceIdInfo id_info
                     inline_hsinfo,  unfold_hsinfo] of
        []    -> NoInfo
        infos -> HasInfo infos
-               -- NB: strictness must appear in the list before unfolding
+               -- NB: strictness and arity must appear in the list before unfolding
                -- See TcIface.tcUnfolding
   where
     ------------  Arity  --------------
@@ -1762,10 +1762,7 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
           -> case guidance of
                UnfWhen unsat_ok boring_ok -> IfInlineRule arity unsat_ok boring_ok if_rhs
                _other                     -> IfCoreUnfold True if_rhs
-        InlineWrapper w | isExternalName n -> IfExtWrapper arity n
-                        | otherwise        -> IfLclWrapper arity (getFS n)
-                        where
-                          n = idName w
+        InlineWrapper -> IfWrapper if_rhs
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
         -- Yes, even if guidance is UnfNever, expose the unfolding

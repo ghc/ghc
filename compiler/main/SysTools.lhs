@@ -15,7 +15,7 @@ module SysTools (
         runUnlit, runCpp, runCc, -- [Option] -> IO ()
         runPp,                   -- [Option] -> IO ()
         runSplit,                -- [Option] -> IO ()
-        runAs, runLink,          -- [Option] -> IO ()
+        runAs, runLink, runLibtool, -- [Option] -> IO ()
         runMkDLL,
         runWindres,
         runLlvmOpt,
@@ -261,6 +261,7 @@ initSysTools mbMinusB
            split_script  = installed cGHC_SPLIT_PGM
 
        windres_path <- getSetting "windres command"
+       libtool_path <- getSetting "libtool command"
 
        tmpdir <- getTemporaryDirectory
 
@@ -331,6 +332,7 @@ initSysTools mbMinusB
                     sPgm_T   = touch_path,
                     sPgm_sysman  = top_dir ++ "/ghc/rts/parallel/SysMan",
                     sPgm_windres = windres_path,
+                    sPgm_libtool = libtool_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
                     -- Hans: this isn't right in general, but you can
@@ -716,6 +718,15 @@ runLink dflags args = do
       args2     = args0 ++ args1 ++ args ++ linkargs
   mb_env <- getGccEnv args2
   runSomethingFiltered dflags id "Linker" p args2 mb_env
+
+runLibtool :: DynFlags -> [Option] -> IO ()
+runLibtool dflags args = do
+  linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
+  let args1      = map Option (getOpts dflags opt_l)
+      args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
+      libtool    = pgm_libtool dflags    
+  mb_env <- getGccEnv args2
+  runSomethingFiltered dflags id "Linker" libtool args2 mb_env
 
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
@@ -1243,7 +1254,8 @@ linkDynLib dflags0 o_files dep_packages
                           pkgs
                       _ ->
                           filter ((/= rtsPackageId) . packageConfigId) pkgs
-    let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
+    let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
+                        in  package_hs_libs ++ extra_libs ++ other_flags
 
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
@@ -1338,6 +1350,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
               )
+        OSiOS -> throwGhcExceptionIO (ProgramError "dynamic libraries are not supported on iOS target")
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO

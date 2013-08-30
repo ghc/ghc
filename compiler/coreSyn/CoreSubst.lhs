@@ -22,7 +22,7 @@ module CoreSubst (
 	deShadowBinds, substSpec, substRulesForImportedIds,
 	substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
-	substUnfoldingSource, lookupIdSubst, lookupTvSubst, lookupCvSubst, substIdOcc,
+	lookupIdSubst, lookupTvSubst, lookupCvSubst, substIdOcc,
         substTickish,
 
         -- ** Operations on substitutions
@@ -665,35 +665,12 @@ substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
   = NoUnfolding
   | otherwise                 -- But keep a stable one!
-  = seqExpr new_tmpl `seq` 
-    new_src `seq`
-    unf { uf_tmpl = new_tmpl, uf_src = new_src }
+  = seqExpr new_tmpl `seq`
+    unf { uf_tmpl = new_tmpl }
   where
     new_tmpl = substExpr (text "subst-unf") subst tmpl
-    new_src  = substUnfoldingSource subst src
 
 substUnfolding _ unf = unf	-- NoUnfolding, OtherCon
-
--------------------
-substUnfoldingSource :: Subst -> UnfoldingSource -> UnfoldingSource
-substUnfoldingSource (Subst in_scope ids _ _) (InlineWrapper wkr)
-  | Just wkr_expr <- lookupVarEnv ids wkr 
-  = case wkr_expr of
-      Var w1 -> InlineWrapper w1
-      _other -> -- WARN( True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
-                --             <+> ifPprDebug (equals <+> ppr wkr_expr) )   
-			      -- Note [Worker inlining]
-                InlineStable  -- It's not a wrapper any more, but still inline it!
-
-  | Just w1  <- lookupInScope in_scope wkr = InlineWrapper w1
-  | otherwise = -- WARN( True, text "Interesting! CoreSubst.substWorker2:" <+> ppr wkr )
-    	      	-- This can legitimately happen.  The worker has been inlined and
-		-- dropped as dead code, because we don't treat the UnfoldingSource
-		-- as an "occurrence".
-                -- Note [Worker inlining]
-      	        InlineStable
-
-substUnfoldingSource _ src = src
 
 ------------------
 substIdOcc :: Subst -> Id -> Id

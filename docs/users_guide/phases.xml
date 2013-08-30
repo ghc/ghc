@@ -137,6 +137,17 @@
               linkend="options-linker" />.</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-pgmlibtool</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgmlibtool</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the libtool command 
+          (when using <option>-staticlib</option> only).</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 
@@ -721,12 +732,27 @@ $ cat foo.hspp</screen>
           <indexterm><primary><option>-framework</option></primary></indexterm>
         </term>
         <listitem>
-          <para>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
+          <para>On Darwin/OS X/iOS only, link in the framework <replaceable>name</replaceable>.
           This option corresponds to the <option>-framework</option> option for Apple's Linker.
           Please note that frameworks and packages are two different things - frameworks don't
           contain any haskell code. Rather, they are Apple's way of packaging shared libraries.
           To link to Apple's &ldquo;Carbon&rdquo; API, for example, you'd use
           <option>-framework Carbon</option>.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-staticlib</option>
+          <indexterm><primary><option>-staticlib</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>On Darwin/OS X/iOS only, link all passed files into a static library suitable
+          for linking into an iOS (when using a cross-compiler) or Mac Xcode project. To control
+          the name, use the <option>-o</option> <replaceable>name</replaceable> option as usual.
+          The default name is <literal>liba.a</literal>.
+          This should nearly always be passed when compiling for iOS with a cross-compiler.
           </para>
         </listitem>
       </varlistentry>
@@ -749,7 +775,7 @@ $ cat foo.hspp</screen>
           <indexterm><primary><option>-framework-path</option></primary></indexterm>
         </term>
         <listitem>
-          <para>On Darwin/MacOS X only, prepend the directory <replaceable>dir</replaceable> to
+          <para>On Darwin/OS X/iOS only, prepend the directory <replaceable>dir</replaceable> to
           the framework directories path. This option corresponds to the <option>-F</option>
           option for Apple's Linker (<option>-F</option> already means something else for GHC).</para>
         </listitem>
@@ -1189,7 +1215,7 @@ $ cat foo.hspp</screen>
           </indexterm>
         </term>
         <listitem>
-          <para>On Darwin/MacOS X, dynamic libraries are stamped at build time with an
+          <para>On Darwin/OS X, dynamic libraries are stamped at build time with an
               "install name", which is the ultimate install path of the library file.
               Any libraries or executables that subsequently link against it will pick
               up that path as their runtime search location for it. By default, ghc sets

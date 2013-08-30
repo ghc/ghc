@@ -93,10 +93,10 @@
 
         <listitem>
             <para>
-                The LLVM backend now supports 128bit SIMD operations.  This is
-                now exploited in both the <literal>vector</literal> and
-                <literal>dph</literal> packages, exposing a high level
-                interface.
+                The LLVM backend now supports 128bit SIMD
+                operations. This is now exploited in both the
+                <literal>vector</literal> and <literal>dph</literal>
+                packages, exposing a high level interface.
 
                 TODO FIXME: reference.
            </para>
@@ -116,6 +116,17 @@
 
             <para>
                 The old code generator has been removed completely.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                GHC now has substantially better support for cross
+                compilation. In particular, GHC now has all the
+                necessary patches to support cross compilation to
+                Apple iOS, using the LLVM backend.
+
+                TODO FIXME: reference.
            </para>
        </listitem>
 
@@ -160,11 +171,55 @@
                     <literal>NullaryTypeClasses</literal>, which
                     allows you to declare a type class without any
                     parameters.
-
-                    TODO FIXME: example?
                </para>
            </listitem>
        </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                    There is a new extension,
+                    <literal>NumDecimals</literal>, which allows you
+                    to specify an integer using compact "floating
+                    literal" syntax. This lets you say things like
+                    <literal>1.2e6 :: Integer</literal> instead of
+                    <literal>1200000</literal>
+               </para>
+           </listitem>
+       </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                    There is a new extension,
+                    <literal>NegativeLiterals</literal>, which will
+                    cause GHC to interpret the expression
+                    <literal>-123</literal> as <literal>fromIntegral
+                    (-123)</literal>. Haskell 98 and Haskell 2010 both
+                    specify that it should instead desugar to
+                    <literal>negate (fromIntegral 123)</literal>
+               </para>
+           </listitem>
+       </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                     The <literal>IncoherentInstances</literal>
+                     extension has seen a behavioral change, and is
+                     now 'liberated' and less conservative during
+                     instance resolution. This allows more programs to
+                     compile than before.
+               </para>
+                <para>
+                     Now, <literal>IncoherentInstances</literal> will
+                     always pick an arbitrary matching instance, if
+                     multiple ones exist.
+               </para>
+           </listitem>
+       </itemizedlist>
+
+
     </sect3>
 
     <sect3>
@@ -172,8 +227,34 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    GHC can now build both static and dynamic object
+                    files at the same time in a single compilation
+                    pass, when given the
+                    <literal>-dynamic-too</literal> flag. This will
+                    produce both a statically-linkable
+                    <literal>.o</literal> object file, and a
+                    dynamically-linkable <literal>.dyn_o</literal>
+                    file. The output suffix of the dynamic objects can
+                    be controlled by the flag
+                    <literal>-dyno</literal>.
+               </para>
+
+                <para>
+                    Note that GHC still builds statically by default.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     GHC now supports a <literal>--show-options</literal> flag,
                     which will dump all of the flags it supports to standard out.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    GHC now supports warning about overflow of integer
+                    literals, enabled by
+                    <literal>-fwarn-overflowed-literals</literal>. It
+                    is enabled by default
                </para>
            </listitem>
             <listitem>
@@ -209,6 +290,13 @@
                     continuation prompt of multi-line input.
 
                     TODO FIXME: reference.
+               </para>
+           </listitem>
+           <listitem>
+                <para>
+                    The new <literal>:shows paths</literal> command
+                    shows the current working directory and the
+                    current search path for Haskell modules.
                </para>
            </listitem>
        </itemizedlist>

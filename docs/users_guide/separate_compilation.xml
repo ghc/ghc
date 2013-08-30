@@ -600,23 +600,30 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 	  </listitem>
 	</varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-ddump-minimal-imports</option>
             <indexterm><primary><option>-ddump-minimal-imports</option></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Dump to the file "M.imports" (where M is the module
-            being compiled) a "minimal" set of import declarations.
-            You can safely replace all the import declarations in
-            "M.hs" with those found in "M.imports".  Why would you
-            want to do that?  Because the "minimal" imports (a) import
-            everything explicitly, by name, and (b) import nothing
-            that is not required.  It can be quite painful to maintain
-            this property by hand, so this flag is intended to reduce
-            the labour.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Dump to the file
+            <filename><replaceable>M</replaceable>.imports</filename>
+            (where <replaceable>M</replaceable> is the name of the
+            module being compiled) a "minimal" set of import
+            declarations.  The directory where the
+            <filename>.imports</filename> files are created can be
+            controlled via the <option>-dumpdir</option>
+            option.</para> <para>You can safely replace all the import
+            declarations in
+            <filename><replaceable>M</replaceable>.hs</filename> with
+            those found in its respective <filename>.imports</filename>
+            file.  Why would you want to do that?  Because the
+            "minimal" imports (a) import everything explicitly, by
+            name, and (b) import nothing that is not required.  It can
+            be quite painful to maintain this property by hand, so
+            this flag is intended to reduce the labour.</para>
+          </listitem>
+        </varlistentry>
 
 	<varlistentry>
 	  <term>

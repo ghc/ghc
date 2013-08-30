@@ -257,13 +257,10 @@ cgDataCon data_con
 --      Stuff to support splitting
 ---------------------------------------------------------------
 
--- If we're splitting the object, we need to externalise all the
--- top-level names (and then make sure we only use the externalised
--- one in any C label we use which refers to this name).
-
 maybeExternaliseId :: DynFlags -> Id -> FCode Id
 maybeExternaliseId dflags id
-  | gopt Opt_SplitObjs dflags,  -- Externalise the name for -split-objs
+  | gopt Opt_SplitObjs dflags,  -- See Note [Externalise when splitting]
+                                -- in StgCmmMonad
     isInternalName name = do { mod <- getModuleName
                              ; returnFC (setIdName id (externalise mod)) }
   | otherwise           = returnFC id

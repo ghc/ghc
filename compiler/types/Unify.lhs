@@ -383,19 +383,28 @@ failure.
 tcUnifyTysFG ("fine-grained") returns one of three results: success, occurs-check
 failure ("MaybeApart"), or general failure ("SurelyApart").
 
+See also Trac #8162.
+
+It's worth noting that unification in the presence of infinite types is not
+complete. This means that, sometimes, a closed type family does not reduce
+when it should. See test case indexed-types/should_fail/Overlap15 for an
+example.
+
 Note [The substitution in MaybeApart]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The constructor MaybeApart carries data with it, typically a TvSubstEnv. Why?
 Because consider unifying these:
 
-(a, a, a) ~ (Int, F Bool, Bool)
+(a, a, Int) ~ (b, [b], Bool)
 
-If we go left-to-right, we start with [a |-> Int]. Then, on the middle terms,
-we apply the subst we have so far and discover that Int is maybeApart from
-F Bool. But, we can't stop there! Because if we continue, we discover that
-Int is SurelyApart from Bool, and therefore the types are apart. This has
-practical consequences for the ability for closed type family applications
-to reduce. See test case indexed-types/should_compile/Overlap14.
+If we go left-to-right, we start with [a |-> b]. Then, on the middle terms, we
+apply the subst we have so far and discover that we need [b |-> [b]]. Because
+this fails the occurs check, we say that the types are MaybeApart (see above
+Note [Fine-grained unification]). But, we can't stop there! Because if we
+continue, we discover that Int is SurelyApart from Bool, and therefore the
+types are apart. This has practical consequences for the ability for closed
+type family applications to reduce. See test case
+indexed-types/should_compile/Overlap14.
 
 Note [Unifying with skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -405,7 +414,6 @@ may later be instantiated with a unifyable type. So, we return maybeApart
 in these cases.
 
 \begin{code}
--- See Note [Unification and apartness]
 tcUnifyTys :: (TyVar -> BindFlag)
 	   -> [Type] -> [Type]
 	   -> Maybe TvSubst	-- A regular one-shot (idempotent) substitution
@@ -419,7 +427,7 @@ tcUnifyTys bind_fn tys1 tys2
   = Nothing
 
 -- This type does double-duty. It is used in the UM (unifier monad) and to
--- return the final result.
+-- return the final result. See Note [Fine-grained unification]
 type UnifyResult = UnifyResultM TvSubst
 data UnifyResultM a = Unifiable a        -- the subst that unifies the types
                     | MaybeApart a       -- the subst has as much as we know

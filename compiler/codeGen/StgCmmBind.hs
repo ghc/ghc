@@ -30,6 +30,7 @@ import StgCmmForeign    (emitPrimCall)
 import MkGraph
 import CoreSyn          ( AltCon(..) )
 import SMRep
+import BlockId
 import Cmm
 import CmmInfo
 import CmmUtils
@@ -476,7 +477,17 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; let node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
                 ; when node_points (ldvEnterClosure cl_info)
-
+                -- Emit new label that might potentially be a header
+                -- of a self-recursive tail call. See Note
+                -- [Self-recursive tail calls] in StgCmmExpr
+                ; u <- newUnique
+                ; let loop_header_id = mkBlockId u
+                ; emitLabel loop_header_id
+                -- Extend reader monad with information that
+                -- self-recursive tail calls can be optimized into local
+                -- jumps
+                ; withSelfLoop (bndr, loop_header_id, arg_regs) $ do
+                {
                 -- Main payload
                 ; entryHeapCheck cl_info node' arity arg_regs $ do
                 { -- ticky after heap check to avoid double counting
@@ -490,7 +501,8 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 -- heap check, to reduce live vars over check
                 ; when node_points $ load_fvs node lf_info fv_bindings
                 ; void $ cgExpr body
-                }}
+                }}}
+
   }
 
 -- A function closure pointer may be tagged, so we

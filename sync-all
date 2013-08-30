@@ -1008,6 +1008,28 @@ Please remove it (e.g. "rm -r libraries/time"), and then run
 EOF
     }
 
+    message "== Checking for obsolete Git repo URL";
+    my $repo_url = &readgit(".", 'config', '--get', 'remote.origin.url');
+    if ($repo_url =~ /^http:\/\/darcs.haskell.org/) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You seem to be using obsolete Git repository URLs.
+
+Please run
+
+  ./sync-all -r git://git.haskell.org remote set-url
+
+or (in case port 9418/tcp is filtered by your firewall)
+
+  ./sync-all -r http://git.haskell.org remote set-url
+
+to update your local checkout to use the new Git URLs.
+============================
+EOF
+    }
+
     $? = $ec;
 }
 

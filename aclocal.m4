@@ -464,6 +464,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
+        SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
         if test -z "$LlcCmd"
         then
@@ -490,6 +491,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsPerlCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
+    AC_SUBST(SettingsLibtoolCommand)
     AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)

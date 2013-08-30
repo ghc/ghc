@@ -112,6 +112,27 @@ my_mmap (void *addr, W_ size)
     } else {
 	vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
     }
+#elif linux_HOST_OS
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
+               MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (ret == (void *)-1 && errno == EPERM) {
+        // Linux may return EPERM if it tried to give us
+        // a chunk of address space below mmap_min_addr,
+        // See Trac #7500.
+        if (addr != 0) {
+            // Try again with no hint address.
+            // It's not clear that this can ever actually help,
+            // but since our alternative is to abort, we may as well try.
+            ret = mmap(0, size, PROT_READ | PROT_WRITE,
+                       MAP_ANON | MAP_PRIVATE, -1, 0);
+        }
+        if (ret == (void *)-1 && errno == EPERM) {
+            // Linux is not willing to give us any mapping,
+            // so treat this as an out-of-memory condition
+            // (really out of virtual address space).
+            errno = ENOMEM;
+        }
+    }
 #else
     ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
                MAP_ANON | MAP_PRIVATE, -1, 0);
