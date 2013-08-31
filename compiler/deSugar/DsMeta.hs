@@ -1127,6 +1127,19 @@ repSts (BodyStmt e _ _ _ : ss) =
       ; z <- repNoBindSt e2
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
+repSts (ParStmt stmt_blocks _ _ : ss) =
+   do { (ss_s, stmt_blocks1) <- mapAndUnzipM rep_stmt_block stmt_blocks
+      ; let stmt_blocks2 = nonEmptyCoreList stmt_blocks1
+            ss1 = concat ss_s
+      ; z <- repParSt stmt_blocks2
+      ; (ss2, zs) <- addBinds ss1 (repSts ss)
+      ; return (ss1++ss2, z : zs) }
+   where
+     rep_stmt_block :: ParStmtBlock Name Name -> DsM ([GenSymBind], Core [TH.StmtQ])
+     rep_stmt_block (ParStmtBlock stmts _ _) =
+       do { (ss1, zs) <- repSts (map unLoc stmts)
+          ; zs1 <- coreList stmtQTyConName zs
+          ; return (ss1, zs1) }
 repSts [LastStmt e _]
   = do { e2 <- repLE e
        ; z <- repNoBindSt e2
@@ -1617,6 +1630,9 @@ repLetSt (MkC ds) = rep2 letSName [ds]
 
 repNoBindSt :: Core TH.ExpQ -> DsM (Core TH.StmtQ)
 repNoBindSt (MkC e) = rep2 noBindSName [e]
+
+repParSt :: Core [[TH.StmtQ]] -> DsM (Core TH.StmtQ)
+repParSt (MkC sss) = rep2 parSName [sss]
 
 -------------- Range (Arithmetic sequences) -----------
 repFrom :: Core TH.ExpQ -> DsM (Core TH.ExpQ)

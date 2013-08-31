@@ -295,6 +295,9 @@ link NoLink _ _ _
 link LinkBinary dflags batch_attempt_linking hpt
    = link' dflags batch_attempt_linking hpt
 
+link LinkStaticLib dflags batch_attempt_linking hpt
+   = link' dflags batch_attempt_linking hpt
+
 link LinkDynLib dflags batch_attempt_linking hpt
    = link' dflags batch_attempt_linking hpt
 
@@ -311,6 +314,10 @@ link' dflags batch_attempt_linking hpt
    | batch_attempt_linking
    = do
         let
+            staticLink = case ghcLink dflags of
+                          LinkStaticLib -> True
+                          _ -> platformBinariesAreStaticLibs (targetPlatform dflags)
+
             home_mod_infos = eltsUFM hpt
 
             -- the packages we depend on
@@ -330,9 +337,9 @@ link' dflags batch_attempt_linking hpt
         let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
 
-            exe_file = exeFileName dflags
+            exe_file = exeFileName staticLink dflags
 
-        linking_needed <- linkingNeeded dflags linkables pkg_deps
+        linking_needed <- linkingNeeded dflags staticLink linkables pkg_deps
 
         if not (gopt Opt_ForceRecomp dflags) && not linking_needed
            then do debugTraceMsg dflags 2 (text exe_file <+> ptext (sLit "is up to date, linking not required."))
@@ -343,9 +350,10 @@ link' dflags batch_attempt_linking hpt
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
-                LinkBinary  -> linkBinary
-                LinkDynLib  -> linkDynLibCheck
-                other       -> panicBadLink other
+                LinkBinary    -> linkBinary
+                LinkStaticLib -> linkStaticLibCheck
+                LinkDynLib    -> linkDynLibCheck
+                other         -> panicBadLink other
         link dflags obj_files pkg_deps
 
         debugTraceMsg dflags 3 (text "link: done")
@@ -359,12 +367,12 @@ link' dflags batch_attempt_linking hpt
         return Succeeded
 
 
-linkingNeeded :: DynFlags -> [Linkable] -> [PackageId] -> IO Bool
-linkingNeeded dflags linkables pkg_deps = do
+linkingNeeded :: DynFlags -> Bool -> [Linkable] -> [PackageId] -> IO Bool
+linkingNeeded dflags staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
-  let exe_file = exeFileName dflags
+  let exe_file = exeFileName staticLink dflags
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return True
@@ -482,10 +490,11 @@ doLink dflags stop_phase o_files
 
   | otherwise
   = case ghcLink dflags of
-        NoLink     -> return ()
-        LinkBinary -> linkBinary      dflags o_files []
-        LinkDynLib -> linkDynLibCheck dflags o_files []
-        other      -> panicBadLink other
+        NoLink        -> return ()
+        LinkBinary    -> linkBinary         dflags o_files []
+        LinkStaticLib -> linkStaticLibCheck dflags o_files []
+        LinkDynLib    -> linkDynLibCheck    dflags o_files []
+        other         -> panicBadLink other
 
 
 -- ---------------------------------------------------------------------------
@@ -1116,8 +1125,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
                       | otherwise         = [ ]
 
-        let cc_opt | optLevel dflags >= 2 = "-O2"
-                   | otherwise            = "-O"
+        let cc_opt | optLevel dflags >= 2 = [ "-O2" ]
+                   | optLevel dflags >= 1 = [ "-O" ]
+                   | otherwise            = []
 
         -- Decide next phase
         let next_phase = As
@@ -1187,7 +1197,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
                              then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
                        ++ verbFlags
-                       ++ [ "-S", cc_opt ]
+                       ++ [ "-S" ]
+                       ++ cc_opt
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
                        ++ framework_paths
                        ++ split_opt
@@ -1768,11 +1779,14 @@ getHCFilePackages filename =
 -- the packages.
 
 linkBinary :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
-linkBinary dflags o_files dep_packages = do
+linkBinary = linkBinary' False
+
+linkBinary' :: Bool -> DynFlags -> [FilePath] -> [PackageId] -> IO ()
+linkBinary' staticLink dflags o_files dep_packages = do
     let platform = targetPlatform dflags
         mySettings = settings dflags
         verbFlags = getVerbFlags dflags
-        output_fn = exeFileName dflags
+        output_fn = exeFileName staticLink dflags
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -1813,13 +1827,15 @@ linkBinary dflags o_files dep_packages = do
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_packages
 
-    pkg_link_opts <- if platformBinariesAreStaticLibs platform
-                     then -- If building an executable really means
-                          -- making a static library (e.g. iOS), then
-                          -- we don't want the options (like -lm)
-                          -- that getPackageLinkOpts gives us. #7720
-                          return []
-                     else getPackageLinkOpts dflags dep_packages
+    pkg_link_opts <- do
+        (package_hs_libs, extra_libs, other_flags) <- getPackageLinkOpts dflags dep_packages
+        return $ if staticLink
+            then package_hs_libs -- If building an executable really means making a static
+                                 -- library (e.g. iOS), then we only keep the -l options for
+                                 -- HS packages, because libtool doesn't accept other options.
+                                 -- In the case of iOS these need to be added by hand to the
+                                 -- final link in Xcode.
+            else package_hs_libs ++ extra_libs ++ other_flags
 
     pkg_framework_path_opts <-
         if platformUsesFrameworks platform
@@ -1867,14 +1883,17 @@ linkBinary dflags o_files dep_packages = do
             let os = platformOS (targetPlatform dflags)
             in if os == OSOsf3 then ["-lpthread", "-lexc"]
                else if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD,
-                                  OSNetBSD, OSHaiku, OSQNXNTO]
+                                  OSNetBSD, OSHaiku, OSQNXNTO, OSiOS]
                then []
                else ["-lpthread"]
          | otherwise               = []
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    SysTools.runLink dflags (
+    let link = if staticLink
+                   then SysTools.runLibtool
+                   else SysTools.runLink
+    link dflags (
                        map SysTools.Option verbFlags
                       ++ [ SysTools.Option "-o"
                          , SysTools.FileOption "" output_fn
@@ -1897,6 +1916,7 @@ linkBinary dflags o_files dep_packages = do
                       --     ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
                       -- on x86.
                       ++ (if sLdSupportsCompactUnwind mySettings &&
+                             not staticLink &&
                              platformOS   platform == OSDarwin &&
                              platformArch platform `elem` [ArchX86, ArchX86_64]
                           then ["-Wl,-no_compact_unwind"]
@@ -1909,7 +1929,8 @@ linkBinary dflags o_files dep_packages = do
                       -- whether this is something we ought to fix, but
                       -- for now this flags silences them.
                       ++ (if platformOS   platform == OSDarwin &&
-                             platformArch platform == ArchX86
+                             platformArch platform == ArchX86 &&
+                             not staticLink
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
@@ -1935,17 +1956,20 @@ linkBinary dflags o_files dep_packages = do
         throwGhcExceptionIO (InstallationError ("cannot move binary"))
 
 
-exeFileName :: DynFlags -> FilePath
-exeFileName dflags
+exeFileName :: Bool -> DynFlags -> FilePath
+exeFileName staticLink dflags
   | Just s <- outputFile dflags =
-      case platformOS (targetPlatform dflags) of 
+      case platformOS (targetPlatform dflags) of
           OSMinGW32 -> s <?.> "exe"
-          OSiOS     -> s <?.> "a"
-          _         -> s
+          _         -> if staticLink
+                         then s <?.> "a"
+                         else s
   | otherwise =
       if platformOS (targetPlatform dflags) == OSMinGW32
       then "main.exe"
-      else "a.out"
+      else if staticLink
+           then "liba.a"
+           else "a.out"
  where s <?.> ext | null (takeExtension s) = s <.> ext
                   | otherwise              = s
 
@@ -2011,6 +2035,13 @@ linkDynLibCheck dflags o_files dep_packages
            text "    Call hs_init_ghc() from your main() function to set these options.")
 
     linkDynLib dflags o_files dep_packages
+
+linkStaticLibCheck :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkStaticLibCheck dflags o_files dep_packages
+ = do
+    when (platformOS (targetPlatform dflags) `notElem` [OSiOS, OSDarwin]) $
+      throwGhcExceptionIO (ProgramError "Static archive creation only supported on Darwin/OS X/iOS")
+    linkBinary' True dflags o_files dep_packages
 
 -- -----------------------------------------------------------------------------
 -- Running CPP

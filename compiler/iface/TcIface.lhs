@@ -34,7 +34,6 @@ import CoreSyn
 import CoreUtils
 import CoreUnfold
 import CoreLint
-import WorkWrap                     ( mkWrapper )
 import MkCore                       ( castBottomExpr )
 import Id
 import MkId
@@ -46,7 +45,7 @@ import DataCon
 import PrelNames
 import TysWiredIn
 import TysPrim          ( superKindTyConName )
-import BasicTypes       ( Arity, strongLoopBreaker )
+import BasicTypes       ( strongLoopBreaker )
 import Literal
 import qualified Var
 import VarEnv
@@ -55,7 +54,7 @@ import Name
 import NameEnv
 import NameSet
 import OccurAnal        ( occurAnalyseExpr )
-import Demand           ( isBottomingSig )
+import Demand
 import Module
 import UniqFM
 import UniqSupply
@@ -1205,6 +1204,25 @@ do_one (IfaceRec pairs) thing_inside
 %*                                                                      *
 %************************************************************************
 
+Note [wrappers in interface files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to have a nice clever scheme in interface files for
+wrappers. A wrapper's unfolding can be reconstructed from its worker's
+id and its strictness. This decreased .hi file size (sometimes
+significantly, for modules like GHC.Classes with many high-arity w/w
+splits) and had a slight corresponding effect on compile times.
+
+However, when we added the second demand analysis, this scheme lead to
+some Core lint errors. The second analysis could change the strictness
+signatures, which sometimes resulted in a wrapper's regenerated
+unfolding applying the wrapper to too many arguments.
+
+Instead of repairing the clever .hi scheme, we abandoned it in favor
+of simplicity. The .hi sizes are usually insignificant (excluding the
++1M for base libraries), and compile time barely increases (~+1% for
+nofib). The nicer upshot is that unfolding sources no longer include
+an Id, so, eg, substitutions need not traverse them any longer.
+
 \begin{code}
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
@@ -1247,17 +1265,18 @@ tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding name _ info (IfCoreUnfold stable if_expr)
   = do  { dflags <- getDynFlags
         ; mb_expr <- tcPragExpr name if_expr
-        ; let unf_src = if stable then InlineStable else InlineRhs
-        ; return (case mb_expr of
-                    Nothing   -> NoUnfolding
-                    Just expr -> mkUnfolding dflags unf_src
-                                             True {- Top level -} 
-                                             is_bottoming
-                                             expr) }
+        ; let unf_src | stable    = InlineStable
+                      | otherwise = InlineRhs
+        ; return $ case mb_expr of
+            Nothing -> NoUnfolding
+            Just expr -> mkUnfolding dflags unf_src
+                           True {- Top level -}
+                           (isBottomingSig strict_sig)
+                           expr
+        }
   where
      -- Strictness should occur before unfolding!
-    is_bottoming = isBottomingSig $ strictnessInfo info              
-
+    strict_sig = strictnessInfo info
 tcUnfolding name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr name if_expr
         ; return (case mb_expr of
@@ -1282,30 +1301,15 @@ tcUnfolding name dfun_ty _ (IfDFunUnfold bs ops)
     doc = text "Class ops for dfun" <+> ppr name
     (_, _, cls, _) = tcSplitDFunTy dfun_ty
 
-tcUnfolding name ty info (IfExtWrapper arity wkr)
-  = tcIfaceWrapper name ty info arity (tcIfaceExtId wkr)
-tcUnfolding name ty info (IfLclWrapper arity wkr)
-  = tcIfaceWrapper name ty info arity (tcIfaceLclId wkr)
-
--------------
-tcIfaceWrapper :: Name -> Type -> IdInfo -> Arity -> IfL Id -> IfL Unfolding
-tcIfaceWrapper name ty info arity get_worker
-  = do  { mb_wkr_id <- forkM_maybe doc get_worker
-        ; us <- newUniqueSupply
-        ; dflags <- getDynFlags
-        ; return (case mb_wkr_id of
-                     Nothing     -> noUnfolding
-                     Just wkr_id -> make_inline_rule dflags wkr_id us) }
+tcUnfolding name _ info (IfWrapper if_expr)
+  = do  { mb_expr <- tcPragExpr name if_expr
+        ; return $ case mb_expr of
+            Nothing -> NoUnfolding
+            Just expr -> mkWwInlineRule expr arity -- see Note [wrappers in interface files]
+        }
   where
-    doc = text "Worker for" <+> ppr name
-
-    make_inline_rule dflags wkr_id us 
-        = mkWwInlineRule wkr_id
-                         (initUs_ us (mkWrapper dflags ty strict_sig) wkr_id) 
-                         arity
-        -- Again we rely here on strictness info 
-        -- always appearing before unfolding
-    strict_sig = strictnessInfo info
+     -- Arity should occur before unfolding!
+    arity = arityInfo info
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check

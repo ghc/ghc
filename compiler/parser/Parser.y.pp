@@ -2249,8 +2249,8 @@ hintExplicitForall span = do
     forall      <- extension explicitForallEnabled
     rulePrag    <- extension inRulePrag
     unless (forall || rulePrag) $ parseErrorSDoc span $ vcat
-      [ text "Illegal symbol '∀' in type"
+      [ text "Illegal symbol '\x2200' in type" -- U+2200 FOR ALL
       , text "Perhaps you intended -XRankNTypes or similar flag"
-      , text "to enable explicit-forall syntax: ∀ <tvs>. <type>"
+      , text "to enable explicit-forall syntax: \x2200 <tvs>. <type>"
       ]
 }

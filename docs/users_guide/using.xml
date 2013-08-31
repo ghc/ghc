@@ -1885,10 +1885,57 @@ f "2"    = 2
       them explicitly (indeed, doing so could lead to unexpected
       results).  A flag <option>-fwombat</option> can be negated by 
       saying <option>-fno-wombat</option>.  The flags below are off
-      by default, except where noted below.
+      by default, except where noted below.  See <xref linkend="options-f-compact"/> 
+      for a compact list.
      </para>
 
       <variablelist>
+        <varlistentry>
+          <term>
+            <option>-favoid-vect</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> avoidance optimisation. This
+            optimisation only works when used in combination with the
+            <option>-fvectorise</option> transformation.</para>
+
+            <para>While vectorisation of code using DPH is often a big win, it
+            can also produce worse results for some kinds of code. This
+            optimisation modifies the vectorisation transformation to try to
+            determine if a function would be better of unvectorised and if
+            so, do just that.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fcase-merge</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis> 
+            Merge immediately-nested case expressions that scrutinse the same variable. Example
+<programlisting>
+  case x of
+     Red -> e1
+     _   -> case x of 
+              Blue -> e2
+              Green -> e3
+==>
+  case x of
+     Red -> e1
+     Blue -> e2
+     Green -> e2
+</programlisting>
+            </para>
+          </listitem>
+        </varlistentry>
+
         <varlistentry>
           <term>
             <option>-fcse</option>
@@ -1899,6 +1946,507 @@ f "2"    = 2
             elimination optimisation.
             Switching this off can be useful if you have some <literal>unsafePerformIO</literal>
             expressions that you don't want commoned-up.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdicts-cheap</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>A very experimental flag that makes dictionary-valued
+            expressions seem cheap to the optimiser.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdo-lambda-eta-expansion</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Eta-expand let-bindings to increase their arity.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdo-eta-reduction</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Eta-reduce lambda expressions, if doing so gets rid of a whole
+            group of lambdas.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-feager-blackholing</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Usually GHC black-holes a thunk only when it switches
+            threads. This flag makes it do so as soon as the thunk is
+            entered. See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/">
+              Haskell on a shared-memory multiprocessor</ulink>.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fexcess-precision</option>
+            <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>When this option is given, intermediate floating
+            point values can have a <emphasis>greater</emphasis>
+            precision/range than the final type.  Generally this is a
+            good thing, but some programs may rely on the exact
+            precision/range of
+            <literal>Float</literal>/<literal>Double</literal> values
+            and should not use this option for their compilation.</para>
+
+            <para>
+              Note that the 32-bit x86 native code generator only
+              supports excess-precision mode, so neither
+              <option>-fexcess-precision</option> nor
+              <option>-fno-excess-precision</option> has any effect.
+              This is a known bug, see <xref linkend="bugs-ghc" />.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fexpose-all-unfoldings</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>An experimental flag to expose all unfoldings, even for very
+            large or recursive functions. This allows for all functions to be
+            inlined while usually GHC would avoid inlining larger functions.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-ffloat-in</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Float let-bindings inwards, nearer their binding site.  See
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">
+              Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
+            </para>
+
+            <para>This optimisation moves let bindings closer to their use
+            site. The benefit here is that this may avoid unnecessary
+            allocation if the branch the let is now on is never executed. It
+            also enables other optimisation passes to work more effectively
+            as they have more information locally.
+            </para>
+
+            <para>This optimisation isn't always beneficial though (so GHC
+            applies some heuristics to decide when to apply it). The details
+            get complicated but a simple example is that it is often beneficial
+            to move let bindings outwards so that multiple let bindings can be
+            grouped into a larger single let binding, effectively batching
+            their allocation and helping the garbage collector and allocator.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-ffull-laziness</option>
+            <indexterm><primary><option>-ffull-laziness</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Run the full laziness optimisation (also known as let-floating),
+            which floats let-bindings outside enclosing lambdas, in the hope
+            they will be thereby be computed less often.  See
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating:
+              moving bindings to give faster programs (ICFP'96)</ulink>.
+            Full laziness increases sharing, which can lead to increased memory
+            residency.
+            </para>
+
+            <para>NOTE: GHC doesn't implement complete full-laziness.
+            When optimisation in on, and <option>-fno-full-laziness</option>
+            is not given, some transformations that increase sharing are
+            performed, such as extracting repeated computations from a loop.
+            These are the same transformations that a fully lazy
+            implementation would do, the difference is that GHC doesn't
+            consistently apply full-laziness, so don't rely on it.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>--ffun-to-thunk</option>
+            <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Worker-wrapper removes unused arguments, but usually we 
+            do not remove them all, lest it turn a function closure into a thunk,
+            thereby perhaps causing extra allocation (since let-no-escape can't happen)
+            and/or a space leak.  This flag
+            allows worker/wrapper to remove <emphasis>all</emphasis> value lambdas.
+            Off by default.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fignore-asserts</option>
+            <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Causes GHC to ignore uses of the function
+            <literal>Exception.assert</literal> in source code (in
+            other words, rewriting <literal>Exception.assert p
+            e</literal> to <literal>e</literal> (see <xref
+            linkend="assertions"/>).  This flag is turned on by
+            <option>-O</option>.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fignore-interface-pragmas</option>
+            <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Tells GHC to ignore all inessential information when reading interface files.
+            That is, even if <filename>M.hi</filename> contains unfolding or strictness information
+            for a function, GHC will ignore that information.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fliberate-case</option>
+            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>Off by default, but enabled by -O2.</emphasis> 
+            Turn on the liberate-case transformation.  This unrolls recursive
+            function once in its own RHS, to avoid repeated case analysis of
+            free variables.  It's a bit like the call-pattern specialiser
+            (<option>-fspec-constr</option>) but for free variables rather than
+            arguments.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fliberate-case-threshold=N</option>
+            <indexterm><primary><option>-fliberate-case-threshold</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Set the size threshold for the liberate-case transformation.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-relevant-bindings=N</option>
+            <indexterm><primary><option>-fmax-relevant-bindings</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>The type checker sometimes displays a fragment of the type environment
+                  in error messages, but only up to some maximum number, set by this flag.
+                  The default is 6.  Turning it off with <option>-fno-max-relevant-bindings</option> 
+                   gives an unlimited number. 
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fno-state-hack</option>
+            <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn off the "state hack" whereby any lambda with a
+            <literal>State#</literal> token as argument is considered to be
+            single-entry, hence it is considered OK to inline things inside
+            it. This can improve performance of IO and ST monad code, but it
+            runs the risk of reducing sharing.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fomit-interface-pragmas</option>
+            <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Tells GHC to omit all inessential information from the
+            interface file generated for the module being compiled (say M).
+            This means that a module importing M will see only the
+            <emphasis>types</emphasis> of the functions that M exports, but
+            not their unfoldings, strictness info, etc.  Hence, for example,
+            no function exported by M will be inlined into an importing module.
+            The benefit is that modules that import M will need to be
+            recompiled less often (only when M's exports change their type, not
+            when they change their implementation).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fomit-yields</option>
+            <indexterm><primary><option>-fomit-yields</option></primary></indexterm>
+          </term>
+          <listitem>
+              <para><emphasis>On by default.</emphasis>  Tells GHC to omit
+            heap checks when no allocation is being performed.  While this improves
+            binary sizes by about 5%, it also means that threads run in
+            tight non-allocating loops will not get preempted in a timely
+            fashion.  If it is important to always be able to interrupt such
+            threads, you should turn this optimization off.  Consider also
+            recompiling all libraries with this optimization turned off, if you
+            need to guarantee interruptibility.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fpedantic-bottoms</option>
+            <indexterm><primary><option>-fpedantic-bottoms</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Make GHC be more precise about its treatment of bottom (but see also
+            <option>-fno-state-hack</option>). In particular, stop GHC
+            eta-expanding through a case expression, which is good for
+            performance, but bad if you are using <literal>seq</literal> on
+            partial applications.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fregs-graph</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>Off by default, but enabled by -O2. Only applies in
+              combination with the native code generator.</emphasis>
+            Use the graph colouring register allocator for register allocation
+            in the native code generator. By default, GHC uses a simpler,
+            faster linear register allocator. The downside being that the
+            linear register allocator usually generates worse code.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fregs-iterative</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>Off by default, only applies in combination with
+              the native code generator.</emphasis>
+            Use the iterative coalescing graph colouring register allocator for
+            register allocation in the native code generator. This is the same
+            register allocator as the <option>-freg-graph</option> one but also
+            enables iterative coalescing during register allocation.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fsimpl-tick-factor=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fsimpl-tick-factor</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>GHC's optimiser can diverge if you write rewrite rules (
+              <xref linkend="rewrite-rules"/>) that don't terminate, or (less
+            satisfactorily) if you code up recursion through data types
+            (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall
+            into an infinite loop, the optimiser carries a "tick count" and
+            stops inlining and applying rewrite rules when this count is
+            exceeded.  The limit is set as a multiple of the program size, so
+            bigger programs get more ticks. The
+            <option>-fsimpl-tick-factor</option> flag lets you change the
+            multiplier. The default is 100; numbers larger than 100 give more
+            ticks, and numbers smaller than 100 give fewer.
+            </para>
+
+            <para>If the tick-count expires, GHC summarises what simplifier
+            steps it has done; you can use
+            <option>-fddump-simpl-stats</option> to generate a much more
+            detailed list.  Usually that identifies the loop quite
+            accurately, because some numbers are very large.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
+            <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>(Default: 45) Governs the maximum size that GHC will allow a
+            function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
+            that reflects the cost in terms of &ldquo;code bloat&rdquo; of
+            expanding (aka inlining) that unfolding at a call site. A bigger
+            function would be assigned a bigger cost.)
+            </para>
+
+            <para>Consequences: (a) nothing larger than this will be inlined
+            (unless it has an INLINE pragma); (b) nothing larger than this
+            will be spewed into an interface file.
+            </para>
+
+            <para>Increasing this figure is more likely to result in longer
+            compile times than faster code. The
+            <option>-funfolding-use-threshold</option> is more useful.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-use-threshold=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>(Default: 8) This is the magic cut-off figure for unfolding
+            (aka inlining): below this size, a function definition will be
+            unfolded at the call-site, any bigger and it won't. The size
+            computed for a function depends on two things: the actual size of
+            the expression minus any discounts that
+            apply (see <option>-funfolding-con-discount</option>).
+            </para>
+
+            <para>The difference between this and
+            <option>-funfolding-creation-threshold</option> is that this one
+            determines if a function definition will be inlined <emphasis>at
+              a call site</emphasis>. The other option determines if a
+            function definition will be kept around at all for potential
+            inlining.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fvectorise</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> optimisation transformation. This
+            optimisation transforms the nested data parallelism code of programs
+            using DPH into flat data parallelism. Flat data parallel programs
+            should have better load balancing, enable SIMD parallelism and
+            friendlier cache behaviour.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fspec-constr</option>
+            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>Off by default, but enabled by -O2.</emphasis>
+            Turn on call-pattern specialisation; see
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm">
+              Call-pattern specialisation for Haskell programs</ulink>.
+            </para>
+
+            <para>This optimisation specializes recursive functions according to
+            their argument "shapes". This is best explained by example so
+            consider:
+<programlisting>
+last :: [a] -> a
+last [] = error "last"
+last (x : []) = x
+last (x : xs) = last xs
+</programlisting>
+            In this code, once we pass the initial check for an empty list we
+            know that in the recursive case this pattern match is redundant. As
+            such <option>-fspec-constr</option> will transform the above code
+            to:
+<programlisting>
+last :: [a] -> a
+last []       = error "last"
+last (x : xs) = last' x xs
+    where
+      last' x []       = x
+      last' x (y : ys) = last' y ys
+</programlisting>
+            </para>
+
+            <para>As well avoid unnecessary pattern matching it also helps avoid
+            unnecessary allocation. This applies when a argument is strict in
+            the recursive call to itself but not on the initial entry. As
+            strict recursive branch of the function is created similar to the
+            above example.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fspecialise</option>
+            <indexterm><primary><option>-fspecialise</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Specialise each type-class-overloaded function defined in this
+            module for the types at which it is called in this module.  Also
+            specialise imported functions that have an INLINABLE pragma
+            (<xref linkend="inlinable-pragma"/>) for the types at which they
+            are called in this module.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fstatic-argument-transformation</option>
+            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn on the static argument transformation, which turns a
+            recursive function into a non-recursive one with a local
+            recursive loop. See Chapter 7 of
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz">
+              Andre Santos's PhD thesis</ulink>
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1993,512 +2541,6 @@ data D = D !C
             <literal>Word64</literal>, and <literal>Int64</literal> constructor
             fields are unpacked on 32-bit platforms, even though they are
             technically larger than a pointer on those platforms.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fspec-constr</option>
-            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>Off by default, but enabled by -O2.</emphasis>
-            Turn on call-pattern specialisation; see
-            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm">
-              Call-pattern specialisation for Haskell programs</ulink>.
-            </para>
-
-            <para>This optimisation specializes recursive functions according to
-            their argument "shapes". This is best explained by example so
-            consider:
-<programlisting>
-last :: [a] -> a
-last [] = error "last"
-last (x : []) = x
-last (x : xs) = last xs
-</programlisting>
-            In this code, once we pass the initial check for an empty list we
-            know that in the recursive case this pattern match is redundant. As
-            such <option>-fspec-constr</option> will transform the above code
-            to:
-<programlisting>
-last :: [a] -> a
-last []       = error "last"
-last (x : xs) = last' x xs
-    where
-      last' x []       = x
-      last' x (y : ys) = last' y ys
-</programlisting>
-            </para>
-
-            <para>As well avoid unnecessary pattern matching it also helps avoid
-            unnecessary allocation. This applies when a argument is strict in
-            the recursive call to itself but not on the initial entry. As
-            strict recursive branch of the function is created similar to the
-            above example.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fspecialise</option>
-            <indexterm><primary><option>-fspecialise</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default.</emphasis>
-            Specialise each type-class-overloaded function defined in this
-            module for the types at which it is called in this module.  Also
-            specialise imported functions that have an INLINABLE pragma
-            (<xref linkend="inlinable-pragma"/>) for the types at which they
-            are called in this module.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fstatic-argument-transformation</option>
-            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turn on the static argument transformation, which turns a
-            recursive function into a non-recursive one with a local
-            recursive loop. See Chapter 7 of
-            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz">
-              Andre Santos's PhD thesis</ulink>
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-ffloat-in</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default.</emphasis>
-            Float let-bindings inwards, nearer their binding site.  See
-            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">
-              Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
-            </para>
-
-            <para>This optimisation moves let bindings closer to their use
-            site. The benefit here is that this may avoid unnecessary
-            allocation if the branch the let is now on is never executed. It
-            also enables other optimisation passes to work more effectively
-            as they have more information locally.
-            </para>
-
-            <para>This optimisation isn't always beneficial though (so GHC
-            applies some heuristics to decide when to apply it). The details
-            get complicated but a simple example is that it is often beneficial
-            to move let bindings outwards so that multiple let bindings can be
-            grouped into a larger single let binding, effectively batching
-            their allocation and helping the garbage collector and allocator.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-ffull-laziness</option>
-            <indexterm><primary><option>-ffull-laziness</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default.</emphasis>
-            Run the full laziness optimisation (also known as let-floating),
-            which floats let-bindings outside enclosing lambdas, in the hope
-            they will be thereby be computed less often.  See
-            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating:
-              moving bindings to give faster programs (ICFP'96)</ulink>.
-            Full laziness increases sharing, which can lead to increased memory
-            residency.
-            </para>
-
-            <para>NOTE: GHC doesn't implement complete full-laziness.
-            When optimisation in on, and <option>-fno-full-laziness</option>
-            is not given, some transformations that increase sharing are
-            performed, such as extracting repeated computations from a loop.
-            These are the same transformations that a fully lazy
-            implementation would do, the difference is that GHC doesn't
-            consistently apply full-laziness, so don't rely on it.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fdo-lambda-eta-expansion</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default.</emphasis>
-            Eta-expand let-bindings to increase their arity.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fdo-eta-reduction</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default.</emphasis>
-            Eta-reduce lambda expressions, if doing so gets rid of a whole
-            group of lambdas.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fcase-merge</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default.</emphasis> 
-            Merge immediately-nested case expressions that scrutinse the same variable. Example
-<programlisting>
-  case x of
-     Red -> e1
-     _   -> case x of 
-              Blue -> e2
-              Green -> e3
-==>
-  case x of
-     Red -> e1
-     Blue -> e2
-     Green -> e2
-</programlisting>
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fliberate-case</option>
-            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>Off by default, but enabled by -O2.</emphasis> 
-            Turn on the liberate-case transformation.  This unrolls recursive
-            function once in its own RHS, to avoid repeated case analysis of
-            free variables.  It's a bit like the call-pattern specialiser
-            (<option>-fspec-constr</option>) but for free variables rather than
-            arguments.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fdicts-cheap</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>A very experimental flag that makes dictionary-valued
-            expressions seem cheap to the optimiser.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-feager-blackholing</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Usually GHC black-holes a thunk only when it switches
-            threads. This flag makes it do so as soon as the thunk is
-            entered. See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/">
-              Haskell on a shared-memory multiprocessor</ulink>.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fno-state-hack</option>
-            <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turn off the "state hack" whereby any lambda with a
-            <literal>State#</literal> token as argument is considered to be
-            single-entry, hence it is considered OK to inline things inside
-            it. This can improve performance of IO and ST monad code, but it
-            runs the risk of reducing sharing.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fpedantic-bottoms</option>
-            <indexterm><primary><option>-fpedantic-bottoms</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Make GHC be more precise about its treatment of bottom (but see also
-            <option>-fno-state-hack</option>). In particular, stop GHC
-            eta-expanding through a case expression, which is good for
-            performance, but bad if you are using <literal>seq</literal> on
-            partial applications.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fsimpl-tick-factor=<replaceable>n</replaceable></option>
-            <indexterm><primary><option>-fsimpl-tick-factor</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>GHC's optimiser can diverge if you write rewrite rules (
-              <xref linkend="rewrite-rules"/>) that don't terminate, or (less
-            satisfactorily) if you code up recursion through data types
-            (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall
-            into an infinite loop, the optimiser carries a "tick count" and
-            stops inlining and applying rewrite rules when this count is
-            exceeded.  The limit is set as a multiple of the program size, so
-            bigger programs get more ticks. The
-            <option>-fsimpl-tick-factor</option> flag lets you change the
-            multiplier. The default is 100; numbers larger than 100 give more
-            ticks, and numbers smaller than 100 give fewer.
-            </para>
-
-            <para>If the tick-count expires, GHC summarises what simplifier
-            steps it has done; you can use
-            <option>-fddump-simpl-stats</option> to generate a much more
-            detailed list.  Usually that identifies the loop quite
-            accurately, because some numbers are very large.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
-            <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
-            <indexterm><primary>inlining, controlling</primary></indexterm>
-            <indexterm><primary>unfolding, controlling</primary></indexterm>
-          </term>
-          <listitem>
-            <para>(Default: 45) Governs the maximum size that GHC will allow a
-            function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
-            that reflects the cost in terms of &ldquo;code bloat&rdquo; of
-            expanding (aka inlining) that unfolding at a call site. A bigger
-            function would be assigned a bigger cost.)
-            </para>
-
-            <para>Consequences: (a) nothing larger than this will be inlined
-            (unless it has an INLINE pragma); (b) nothing larger than this
-            will be spewed into an interface file.
-            </para>
-
-            <para>Increasing this figure is more likely to result in longer
-            compile times than faster code. The
-            <option>-funfolding-use-threshold</option> is more useful.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-funfolding-use-threshold=<replaceable>n</replaceable></option>
-            <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
-            <indexterm><primary>inlining, controlling</primary></indexterm>
-            <indexterm><primary>unfolding, controlling</primary></indexterm>
-          </term>
-          <listitem>
-            <para>(Default: 8) This is the magic cut-off figure for unfolding
-            (aka inlining): below this size, a function definition will be
-            unfolded at the call-site, any bigger and it won't. The size
-            computed for a function depends on two things: the actual size of
-            the expression minus any discounts that
-            apply (see <option>-funfolding-con-discount</option>).
-            </para>
-
-            <para>The difference between this and
-            <option>-funfolding-creation-threshold</option> is that this one
-            determines if a function definition will be inlined <emphasis>at
-              a call site</emphasis>. The other option determines if a
-            function definition will be kept around at all for potential
-            inlining.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fexpose-all-unfoldings</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>An experimental flag to expose all unfoldings, even for very
-            large or recursive functions. This allows for all functions to be
-            inlined while usually GHC would avoid inlining larger functions.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fvectorise</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Part of <link linkend="dph">Data Parallel Haskell
-            (DPH)</link>.</para>
-
-            <para><emphasis>Off by default.</emphasis> Enable the
-            <emphasis>vectorisation</emphasis> optimisation transformation. This
-            optimisation transforms the nested data parallelism code of programs
-            using DPH into flat data parallelism. Flat data parallel programs
-            should have better load balancing, enable SIMD parallelism and
-            friendlier cache behaviour.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-favoid-vect</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Part of <link linkend="dph">Data Parallel Haskell
-            (DPH)</link>.</para>
-
-            <para><emphasis>Off by default.</emphasis> Enable the
-            <emphasis>vectorisation</emphasis> avoidance optimisation. This
-            optimisation only works when used in combination with the
-            <option>-fvectorise</option> transformation.</para>
-
-            <para>While vectorisation of code using DPH is often a big win, it
-            can also produce worse results for some kinds of code. This
-            optimisation modifies the vectorisation transformation to try to
-            determine if a function would be better of unvectorised and if
-            so, do just that.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fregs-graph</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>Off by default, but enabled by -O2. Only applies in
-              combination with the native code generator.</emphasis>
-            Use the graph colouring register allocator for register allocation
-            in the native code generator. By default, GHC uses a simpler,
-            faster linear register allocator. The downside being that the
-            linear register allocator usually generates worse code.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fregs-iterative</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>Off by default, only applies in combination with
-              the native code generator.</emphasis>
-            Use the iterative coalescing graph colouring register allocator for
-            register allocation in the native code generator. This is the same
-            register allocator as the <option>-freg-graph</option> one but also
-            enables iterative coalescing during register allocation.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fexcess-precision</option>
-            <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>When this option is given, intermediate floating
-            point values can have a <emphasis>greater</emphasis>
-            precision/range than the final type.  Generally this is a
-            good thing, but some programs may rely on the exact
-            precision/range of
-            <literal>Float</literal>/<literal>Double</literal> values
-            and should not use this option for their compilation.</para>
-
-            <para>
-              Note that the 32-bit x86 native code generator only
-              supports excess-precision mode, so neither
-              <option>-fexcess-precision</option> nor
-              <option>-fno-excess-precision</option> has any effect.
-              This is a known bug, see <xref linkend="bugs-ghc" />.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fignore-asserts</option>
-            <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Causes GHC to ignore uses of the function
-            <literal>Exception.assert</literal> in source code (in
-            other words, rewriting <literal>Exception.assert p
-            e</literal> to <literal>e</literal> (see <xref
-            linkend="assertions"/>).  This flag is turned on by
-            <option>-O</option>.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fignore-interface-pragmas</option>
-            <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Tells GHC to ignore all inessential information when reading interface files.
-            That is, even if <filename>M.hi</filename> contains unfolding or strictness information
-            for a function, GHC will ignore that information.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fomit-interface-pragmas</option>
-            <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Tells GHC to omit all inessential information from the
-            interface file generated for the module being compiled (say M).
-            This means that a module importing M will see only the
-            <emphasis>types</emphasis> of the functions that M exports, but
-            not their unfoldings, strictness info, etc.  Hence, for example,
-            no function exported by M will be inlined into an importing module.
-            The benefit is that modules that import M will need to be
-            recompiled less often (only when M's exports change their type, not
-            when they change their implementation).</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fomit-yields</option>
-            <indexterm><primary><option>-fomit-yields</option></primary></indexterm>
-          </term>
-          <listitem>
-              <para><emphasis>On by default.</emphasis>  Tells GHC to omit
-            heap checks when no allocation is being performed.  While this improves
-            binary sizes by about 5%, it also means that threads run in
-            tight non-allocating loops will not get preempted in a timely
-            fashion.  If it is important to always be able to interrupt such
-            threads, you should turn this optimization off.  Consider also
-            recompiling all libraries with this optimization turned off, if you
-            need to guarantee interruptibility.
             </para>
           </listitem>
         </varlistentry>

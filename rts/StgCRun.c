@@ -116,7 +116,7 @@ StgWord8 *win32AllocStack(void)
 
 #ifdef i386_HOST_ARCH
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #define STG_GLOBAL ".globl "
 #define STG_HIDDEN ".private_extern "
 #else

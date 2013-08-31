@@ -691,7 +691,7 @@ pprTcApp p pp tc tys
 pprTypeApp :: TyCon -> [Type] -> SDoc
 pprTypeApp tc tys 
   = ppr_type_name_app TopPrec ppr_type (getName tc) (ppr tc) tys
-        -- We have to to use ppr on the TyCon (not its name)
+        -- We have to use ppr on the TyCon (not its name)
         -- so that we get promotion quotes in the right place
 
 pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc

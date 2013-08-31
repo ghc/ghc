@@ -739,12 +739,12 @@ data UnfoldingSource
                        -- (see MkId.lhs, calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
 
-  | InlineWrapper Id   -- This unfolding is a the wrapper in a 
-		       --     worker/wrapper split from the strictness analyser
-	               -- The Id is the worker-id
-		       -- Used to abbreviate the uf_tmpl in interface files
-		       --	which don't need to contain the RHS; 
-		       --	it can be derived from the strictness info
+  | InlineWrapper      -- This unfolding is the wrapper in a
+                       -- worker/wrapper split from the strictness
+                       -- analyser
+                       --
+                       -- cf some history in TcIface's Note [wrappers
+                       -- in interface files]
 
 
 
@@ -844,9 +844,9 @@ isStableSource :: UnfoldingSource -> Bool
 -- Keep the unfolding template
 isStableSource InlineCompulsory   = True
 isStableSource InlineStable       = True
-isStableSource (InlineWrapper {}) = True
+isStableSource InlineWrapper      = True
 isStableSource InlineRhs          = False
- 
+
 -- | Retrieves the template of an unfolding: panics if none is known
 unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl

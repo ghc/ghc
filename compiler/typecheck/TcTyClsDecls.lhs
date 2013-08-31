@@ -2147,8 +2147,8 @@ inaccessibleCoAxBranch tc fi
 badRoleAnnot :: Name -> Role -> Role -> SDoc
 badRoleAnnot var annot inferred
   = hang (ptext (sLit "Role mismatch on variable") <+> ppr var <> colon)
-       2 (sep [ ptext (sLit "Annotation says"), ppr annot
-              , ptext (sLit "but role"), ppr inferred
+       2 (sep [ ptext (sLit "Annotation says"), pprFullRole annot
+              , ptext (sLit "but role"), pprFullRole inferred
               , ptext (sLit "is required") ])
 
 \end{code}

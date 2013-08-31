@@ -446,14 +446,36 @@ Indeed, the bindings can even be recursive.
           The literal <literal>-123</literal> is, according to
           Haskell98 and Haskell 2010, desugared as
           <literal>negate (fromInteger 123)</literal>.
+         The language extension <option>-XNegativeLiterals</option>
+         means that it is instead desugared as
+         <literal>fromInteger (-123)</literal>. 
       </para>
 
       <para>
-         The language extension <option>-XNegativeLiterals</option>
-         means that it is instead desugared as
-         <literal>fromInteger (-123)</literal>.
+      This can make a difference when the positive and negative range of 
+      a numeric data type don't match up.  For example, 
+      in 8-bit arithmetic -128 is representable, but +128 is not.
+      So <literal>negate (fromInteger 128)</literal> will elicit an 
+      unexpected integer-literal-overflow message.
       </para>
    </sect2>
+
+    <sect2 id="num-decimals">
+      <title>Fractional looking integer literals</title>
+      <para>
+          Haskell 2010 and Haskell 98 define floating literals with
+          the syntax <literal>1.2e6</literal>. These literals have the
+          type <literal>Fractional a => Fractional</literal>.
+      </para>
+
+      <para>
+         The language extension <option>-XNumLiterals</option> allows
+         you to also use the floating literal syntax for instances of
+         <literal>Integral</literal>, and have values like
+         <literal>(1.2e6 :: Num a => a)</literal>
+      </para>
+   </sect2>
+
 
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
 
@@ -4483,21 +4505,33 @@ and <option>-XIncoherentInstances</option>
 <indexterm><primary>-XIncoherentInstances
 </primary></indexterm>, as this section discusses.  Both these
 flags are dynamic flags, and can be set on a per-module basis, using
-an <literal>OPTIONS_GHC</literal> pragma if desired (<xref linkend="source-file-options"/>).</para>
+an <literal>LANGUAGE</literal> pragma if desired (<xref linkend="language-pragma"/>).</para>
 <para>
 The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
 the instance resolution described in <xref linkend="instance-resolution"/>, by
-allowing more than one instance to match, <emphasis>provided there is a most specific one</emphasis>.
+allowing more than one instance to match, <emphasis>provided there is a most
+specific one</emphasis>. The <option>-XIncoherentInstances</option> flag
+further loosens the resolution, by allowing more than one instance to match,
+irespective of whether there is a most specific one.
+</para>
+
+<para>
 For example, consider
 <programlisting>
-  instance context1 => C Int a     where ...  -- (A)
+  instance context1 => C Int b     where ...  -- (A)
   instance context2 => C a   Bool  where ...  -- (B)
-  instance context3 => C Int [a]   where ...  -- (C)
+  instance context3 => C a   [b]   where ...  -- (C)
   instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-The constraint <literal>C Int [Int]</literal> matches instances (A),
-(C) and (D), but the last is more specific, and hence is chosen.  If there is no
-most-specific match, the program is rejected.
+compiled with <option>-XOverlappingInstances</option> enabled. The constraint
+<literal>C Int [Int]</literal> matches instances (A), (C) and (D), but the last
+is more specific, and hence is chosen.
+</para>
+<para>If (D) did not exist then (A) and (C) would still be matched, but neither is
+most specific. In that case, the program would be rejected even with
+<option>-XOverlappingInstances</option>. With
+<option>-XIncoherentInstances</option> enabled, it would be accepted and (A) or
+(C) would be chosen arbitrarily.
 </para>
 <para>
 An instance declaration is <emphasis>more specific</emphasis> than another iff
@@ -4512,15 +4546,15 @@ However, GHC is conservative about committing to an overlapping instance.  For e
   f x = ...
 </programlisting>
 Suppose that from the RHS of <literal>f</literal> we get the constraint
-<literal>C Int [b]</literal>.  But
+<literal>C b [b]</literal>.  But
 GHC does not commit to instance (C), because in a particular
 call of <literal>f</literal>, <literal>b</literal> might be instantiate
 to <literal>Int</literal>, in which case instance (D) would be more specific still.
 So GHC rejects the program.</para>
 <para>
-If, however, you add the flag <option>-XIncoherentInstances</option>,
-GHC will instead pick (C), without complaining about
-the problem of subsequent instantiations.
+If, however, you add the flag <option>-XIncoherentInstances</option> when
+compiling the module that contians (D), GHC will instead pick (C), without
+complaining about the problem of subsequent instantiations.
 </para>
 <para>
 Notice that we gave a type signature to <literal>f</literal>, so GHC had to
@@ -4530,7 +4564,7 @@ it instead.  In this case, GHC will refrain from
 simplifying the constraint <literal>C Int [b]</literal> (for the same reason
 as before) but, rather than rejecting the program, it will infer the type
 <programlisting>
-  f :: C Int [b] => [b] -> [b]
+  f :: C b [b] => [b] -> [b]
 </programlisting>
 That postpones the question of which instance to pick to the
 call site for <literal>f</literal>
@@ -4627,6 +4661,10 @@ instantiated.  Usually GHC will regard this as a reason for not committing to
 some other constraint.  But if the instance declaration was compiled with
 <option>-XIncoherentInstances</option>, GHC will skip the "does-it-unify?"
 check for that declaration.
+</para></listitem>
+<listitem><para>
+If two instance declarations are matched and either is compiled with
+<option>-XIncoherentInstances</option>, then that declaration is ignored.
 </para></listitem>
 </itemizedlist>
 These rules make it possible for a library author to design a library that relies on

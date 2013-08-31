@@ -916,12 +916,13 @@ data Ct
       cc_loc  :: CtLoc
     }
 
-  | CNonCanonical { -- See Note [NonCanonical Semantics]
+  | CNonCanonical {        -- See Note [NonCanonical Semantics]
       cc_ev  :: CtEvidence,
       cc_loc :: CtLoc
     }
 
-  | CHoleCan {
+  | CHoleCan {             -- Treated as an "insoluble" constraint
+                           -- See Note [Insoluble constraints]
       cc_ev  :: CtEvidence,
       cc_loc :: CtLoc,
       cc_occ :: OccName    -- The name of this hole

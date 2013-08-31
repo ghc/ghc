@@ -11,7 +11,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module WorkWrap ( wwTopBinds, mkWrapper ) where
+module WorkWrap ( wwTopBinds ) where
 
 import CoreSyn
 import CoreUnfold	( certainlyWillInline, mkInlineUnfolding, mkWwInlineRule )
@@ -19,7 +19,6 @@ import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
 import Var
 import Id
-import Type		( Type )
 import IdInfo
 import UniqSupply
 import BasicTypes
@@ -358,7 +357,7 @@ splitFun dflags fn_id fn_info wrap_dmds res_info rhs
 		-- The inl_inline is bound to be False, else we would not be
 		--    making a wrapper
 
-	wrap_id   = fn_id `setIdUnfolding` mkWwInlineRule work_id wrap_rhs arity
+	wrap_id   = fn_id `setIdUnfolding` mkWwInlineRule wrap_rhs arity
 			  `setInlinePragma` wrap_prag
 		          `setIdOccInfo` NoOccInfo
 			        -- Zap any loop-breaker-ness, to avoid bleating from Lint
@@ -390,6 +389,9 @@ get_one_shots (Lam b e)
   | otherwise = get_one_shots e
 get_one_shots (Tick _ e) = get_one_shots e
 get_one_shots _    	 = noOneShotInfo
+
+noOneShotInfo :: [Bool]
+noOneShotInfo = repeat False
 \end{code}
 
 Note [Thunk splitting]
@@ -445,28 +447,4 @@ splitThunk :: DynFlags -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk dflags fn_id rhs = do
     (_, wrap_fn, work_fn) <- mkWWstr dflags [fn_id]
     return [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{The worker wrapper core}
-%*									*
-%************************************************************************
-
-@mkWrapper@ is called when importing a function.  We have the type of 
-the function and the name of its worker, and we want to make its body (the wrapper).
-
-\begin{code}
-mkWrapper :: DynFlags
-          -> Type		-- Wrapper type
-	  -> StrictSig		-- Wrapper strictness info
-	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
-
-mkWrapper dflags fun_ty (StrictSig (DmdType _ demands res_info)) = do
-    (_, wrap_fn, _) <- mkWwBodies dflags fun_ty demands res_info noOneShotInfo
-    return wrap_fn
-
-noOneShotInfo :: [Bool]
-noOneShotInfo = repeat False
 \end{code}

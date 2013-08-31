@@ -93,10 +93,10 @@
 
         <listitem>
             <para>
-                The LLVM backend now supports 128bit SIMD operations.  This is
-                now exploited in both the <literal>vector</literal> and
-                <literal>dph</literal> packages, exposing a high level
-                interface.
+                The LLVM backend now supports 128bit SIMD
+                operations. This is now exploited in both the
+                <literal>vector</literal> and <literal>dph</literal>
+                packages, exposing a high level interface.
 
                 TODO FIXME: reference.
            </para>
@@ -121,17 +121,27 @@
 
         <listitem>
             <para>
+                GHC now has substantially better support for cross
+                compilation. In particular, GHC now has all the
+                necessary patches to support cross compilation to
+                Apple iOS, using the LLVM backend.
+
+                TODO FIXME: reference.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
                 PrimOps for comparing unboxed values now return
                 <literal>Int#</literal> instead of <literal>Bool</literal>.
                 New PrimOps' names end with <literal>$#</literal> for operators and
                 <literal>I#</literal> for ordinary names, e.g. <literal>==$#</literal>
                 compares <literal>Int#</literal>s for equality and
                 <literal>eqCharI#</literal> does the same for <literal>Char#</literal>s.
-                Old PrimOps have been removed and turned into wrappers. If your
-                code relied on removed PrimOps then importing
-                <literal>GHC.PrimWrappers</literal> will make it work again (no
-                need to add anything if your code already imports
-                <literal>GHC.Exts</literal>).
+                Old PrimOps have been removed and turned into wrappers. See
+                <ulink url="http://ghc.haskell.org/trac/ghc/wiki/NewPrimopsInGHC7.8">
+                this GHC wiki page</ulink> for instructions how to update your
+                existing code.
            </para>
        </listitem>
 
@@ -161,11 +171,55 @@
                     <literal>NullaryTypeClasses</literal>, which
                     allows you to declare a type class without any
                     parameters.
-
-                    TODO FIXME: example?
                </para>
            </listitem>
        </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                    There is a new extension,
+                    <literal>NumDecimals</literal>, which allows you
+                    to specify an integer using compact "floating
+                    literal" syntax. This lets you say things like
+                    <literal>1.2e6 :: Integer</literal> instead of
+                    <literal>1200000</literal>
+               </para>
+           </listitem>
+       </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                    There is a new extension,
+                    <literal>NegativeLiterals</literal>, which will
+                    cause GHC to interpret the expression
+                    <literal>-123</literal> as <literal>fromIntegral
+                    (-123)</literal>. Haskell 98 and Haskell 2010 both
+                    specify that it should instead desugar to
+                    <literal>negate (fromIntegral 123)</literal>
+               </para>
+           </listitem>
+       </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
+                     The <literal>IncoherentInstances</literal>
+                     extension has seen a behavioral change, and is
+                     now 'liberated' and less conservative during
+                     instance resolution. This allows more programs to
+                     compile than before.
+               </para>
+                <para>
+                     Now, <literal>IncoherentInstances</literal> will
+                     always pick an arbitrary matching instance, if
+                     multiple ones exist.
+               </para>
+           </listitem>
+       </itemizedlist>
+
+
     </sect3>
 
     <sect3>
@@ -173,8 +227,34 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    GHC can now build both static and dynamic object
+                    files at the same time in a single compilation
+                    pass, when given the
+                    <literal>-dynamic-too</literal> flag. This will
+                    produce both a statically-linkable
+                    <literal>.o</literal> object file, and a
+                    dynamically-linkable <literal>.dyn_o</literal>
+                    file. The output suffix of the dynamic objects can
+                    be controlled by the flag
+                    <literal>-dynosuf</literal>.
+               </para>
+
+                <para>
+                    Note that GHC still builds statically by default.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     GHC now supports a <literal>--show-options</literal> flag,
                     which will dump all of the flags it supports to standard out.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    GHC now supports warning about overflow of integer
+                    literals, enabled by
+                    <literal>-fwarn-overflowed-literals</literal>. It
+                    is enabled by default
                </para>
            </listitem>
             <listitem>
@@ -212,6 +292,13 @@
                     TODO FIXME: reference.
                </para>
            </listitem>
+           <listitem>
+                <para>
+                    The new <literal>:shows paths</literal> command
+                    shows the current working directory and the
+                    current search path for Haskell modules.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -229,6 +316,23 @@
     <sect3>
         <title>Runtime system</title>
         <itemizedlist>
+            <listitem>
+                <para>
+                    The RTS linker can now unload object code at
+                    runtime (when using the GHC API
+                    <literal>ObjLink</literal> module.) Previously,
+                    GHC would not unload the old object file, causing
+                    a gradual memory leak as more objects were loaded
+                    over time.
+               </para>
+
+                <para>
+                    Note that this change in unloading behavior
+                    <emphasis>only</emphasis> affects statically
+                    linked binaries, and not dynamic ones.
+               </para>
+           </listitem>
+
             <listitem>
                 <para>
                     The performance of <literal>StablePtr</literal>s and

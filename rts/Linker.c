@@ -137,16 +137,6 @@
 #include <sys/tls.h>
 #endif
 
-// Defining this as 'int' rather than 'const int' means that we don't get
-// warnings like
-//    error: function might be possible candidate for attribute ‘noreturn’
-// from gcc:
-#ifdef DYNAMIC_GHC_PROGRAMS
-int dynamicGhcPrograms = 1;
-#else
-int dynamicGhcPrograms = 0;
-#endif
-
 /* Hash table mapping symbol names to Symbol */
 static /*Str*/HashTable *symhash;
 
@@ -155,6 +145,10 @@ static /*Str*/HashTable *stablehash;
 
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;     /* initially empty */
+
+/* List of objects that have been unloaded via unloadObj(), but are waiting
+   to be actually freed via checkUnload() */
+ObjectCode *unloaded_objects = NULL; /* initially empty */
 
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
@@ -228,6 +222,8 @@ static int ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
 static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 #endif
+
+static void freeProddableBlocks (ObjectCode *oc);
 
 /* on x86_64 we have a problem with relocating symbol references in
  * code that was compiled without -fPIC.  By default, the small memory
@@ -1521,6 +1517,9 @@ initLinker( void )
         linker_init_done = 1;
     }
 
+    objects = NULL;
+    unloaded_objects = NULL;
+
 #if defined(THREADED_RTS) && (defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO))
     initMutex(&dl_mutex);
 #endif
@@ -2047,6 +2046,48 @@ mmap_again:
 }
 #endif // USE_MMAP
 
+
+void freeObjectCode (ObjectCode *oc)
+{
+#ifdef USE_MMAP
+    int pagesize, size, r;
+
+    pagesize = getpagesize();
+    size = ROUND_UP(oc->fileSize, pagesize);
+
+    r = munmap(oc->image, size);
+    if (r == -1) {
+        sysErrorBelch("munmap");
+    }
+
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
+    if (!USE_CONTIGUOUS_MMAP)
+    {
+        munmap(oc->symbol_extras,
+               ROUND_UP(sizeof(SymbolExtra) * oc->n_symbol_extras, pagesize));
+    }
+#endif
+#endif
+
+#else
+
+    stgFree(oc->image);
+
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
+    stgFree(oc->symbol_extras);
+#endif
+#endif
+
+#endif
+
+    stgFree(oc->fileName);
+    stgFree(oc->archiveMemberName);
+    stgFree(oc);
+}
+
+
 static ObjectCode*
 mkOc( pathchar *path, char *image, int imageSize,
       char *archiveMemberName
@@ -2142,10 +2183,6 @@ loadArchive( pathchar *path )
 
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%" PATH_FMT" '\n", path));
-
-    if (dynamicGhcPrograms) {
-        barf("loadArchive called, but using dynamic GHC (%s)", path);
-    }
 
     gnuFileIndex = NULL;
     gnuFileIndexSize = 0;
@@ -2538,10 +2575,6 @@ loadObj( pathchar *path )
 #endif
    IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
 
-   if (dynamicGhcPrograms) {
-       barf("loadObj called, but using dynamic GHC (%s)", path);
-   }
-
    initLinker();
 
    /* debugBelch("loadObj %s\n", path ); */
@@ -2749,7 +2782,7 @@ resolveObjs( void )
 HsInt
 unloadObj( pathchar *path )
 {
-    ObjectCode *oc, *prev;
+    ObjectCode *oc, *prev, *next;
     HsBool unloadedAnyObj = HS_BOOL_FALSE;
 
     ASSERT(symhash != NULL);
@@ -2757,8 +2790,12 @@ unloadObj( pathchar *path )
 
     initLinker();
 
+    IF_DEBUG(linker, debugBelch("unloadObj: %s\n", path));
+
     prev = NULL;
-    for (oc = objects; oc; prev = oc, oc = oc->next) {
+    for (oc = objects; oc; prev = oc, oc = next) {
+        next = oc->next;
+
         if (!pathcmp(oc->fileName,path)) {
 
             /* Remove all the mappings for the symbols within this
@@ -2778,22 +2815,27 @@ unloadObj( pathchar *path )
             } else {
                 prev->next = oc->next;
             }
+            oc->next = unloaded_objects;
+            unloaded_objects = oc;
 
-            // We're going to leave this in place, in case there are
-            // any pointers from the heap into it:
-                // #ifdef mingw32_HOST_OS
-                // If uncommenting, note that currently oc->image is
-                // not the right address to free on Win64, as we added
-                // 4 bytes of padding at the start
-                //  VirtualFree(oc->image);
-                // #else
-            //  stgFree(oc->image);
-            // #endif
-            stgFree(oc->fileName);
-            stgFree(oc->archiveMemberName);
+            // The data itself and a few other bits (oc->fileName,
+            // oc->archiveMemberName) are kept until freeObjectCode(),
+            // which is only called when it has been determined that
+            // it is safe to unload the object.
             stgFree(oc->symbols);
-            stgFree(oc->sections);
-            stgFree(oc);
+
+            {
+                Section *s, *nexts;
+
+                for (s = oc->sections; s != NULL; s = nexts) {
+                    nexts = s->next;
+                    stgFree(s);
+                }
+            }
+
+            freeProddableBlocks(oc);
+
+            oc->status = OBJECT_UNLOADED;
 
             /* This could be a member of an archive so continue
              * unloading other members. */
@@ -2841,6 +2883,17 @@ checkProddableBlock (ObjectCode *oc, void *addr, size_t size )
       if (a >= s && (a+size) <= e) return;
    }
    barf("checkProddableBlock: invalid fixup in runtime linker: %p", addr);
+}
+
+static void freeProddableBlocks (ObjectCode *oc)
+{
+    ProddableBlock *pb, *next;
+
+    for (pb = oc->proddables; pb != NULL; pb = next) {
+        next = pb->next;
+        stgFree(pb);
+    }
+    oc->proddables = NULL;
 }
 
 /* -----------------------------------------------------------------------------
@@ -2931,6 +2984,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
                 memcpy(new, oc->image, oc->fileSize);
                 munmap(oc->image, n);
                 oc->image = new;
+                oc->fileSize = n + (sizeof(SymbolExtra) * count);
                 oc->symbol_extras = (SymbolExtra *) (oc->image + n);
             }
             else
@@ -3710,7 +3764,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
        * => I suspect we've been incorrectly handling .bss sections in (relocatable)
        * object files up until now. This turned out to bite us with ghc-6.4.1's use
        * of gcc-3.4.x, which has started to emit initially-zeroed-out local 'static'
-       * variable decls into to the .bss section. (The specific function in Q which
+       * variable decls into the .bss section. (The specific function in Q which
        * triggered this is libraries/base/cbits/dirUtils.c:__hscore_getFolderPath())
        */
       if (sectab_i->VirtualSize == 0 && sectab_i->SizeOfRawData == 0) continue;

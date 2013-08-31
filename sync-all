@@ -316,10 +316,6 @@ sub gitall {
             }
         }
 
-        # Some extra packages like 'async' may be external URLs,
-        # e.g. git://... or http://...
-        my $is_external_url = $remotepath =~ m/^(git:\/\/|https:\/\/|http:\/\/)/;
-
         open RESUME, "> resume.tmp";
         print RESUME "$localpath\n";
         print RESUME "$doing\n";
@@ -328,12 +324,12 @@ sub gitall {
 
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
-        if ($is_github_repo && !defined($is_external_url)) {
+        if ($is_github_repo) {
             $remotepath =~ s/\//-/;
         }
 
         # Construct the path for this package in the repo we pulled from
-        $path = $is_external_url ? $remotepath : "$repo_base/$remotepath";
+        $path = "$repo_base/$remotepath";
 
         if ($command eq "get") {
             next if $remotepath eq "-"; # "git submodule init/update" will get this later
@@ -786,7 +782,7 @@ sub main {
 
     $tags{"-"} = 1;
     $tags{"dph"} = 1;
-    if ($OSNAME =~ /^(MSWin32|Cygwin)$/) {
+    if ($OSNAME =~ /^(MSWin32|Cygwin|msys)$/) {
         $tags{"windows"} = 1;
     }
 
@@ -1008,6 +1004,28 @@ You have an old time package in your GHC tree!
 
 Please remove it (e.g. "rm -r libraries/time"), and then run
 "./sync-all get" to get the new repository.
+============================
+EOF
+    }
+
+    message "== Checking for obsolete Git repo URL";
+    my $repo_url = &readgit(".", 'config', '--get', 'remote.origin.url');
+    if ($repo_url =~ /^http:\/\/darcs.haskell.org/) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You seem to be using obsolete Git repository URLs.
+
+Please run
+
+  ./sync-all -r git://git.haskell.org remote set-url
+
+or (in case port 9418/tcp is filtered by your firewall)
+
+  ./sync-all -r http://git.haskell.org remote set-url
+
+to update your local checkout to use the new Git URLs.
 ============================
 EOF
     }

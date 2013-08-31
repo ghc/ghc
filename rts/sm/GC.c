@@ -47,6 +47,7 @@
 #include "RaiseAsync.h"
 #include "Papi.h"
 #include "Stable.h"
+#include "CheckUnload.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -660,6 +661,10 @@ GarbageCollect (nat collect_gen,
   resize_nursery();
 
   resetNurseries();
+
+  if (major_gc) {
+      checkUnload (gct->scavenged_static_objects);
+  }
 
  // mark the garbage collected CAFs as dead
 #if 0 && defined(DEBUG) // doesn't work at the moment

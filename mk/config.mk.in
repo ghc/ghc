@@ -161,9 +161,9 @@ GhcUnregisterised=@Unregisterised@
 #
 # Target platforms supported:
 #   i386, powerpc
-#   AIX is not supported 
+#   IOS and AIX are not supported
 ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
-OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst aix,,$(TargetOS_CPP))))
+OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(patsubst aix,,$(TargetOS_CPP)))))
 
 GhcWithNativeCodeGen := $(strip\
     $(if $(filter YESYESNO,\
@@ -185,7 +185,7 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
-else 
+else
 GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
 endif
 
@@ -249,7 +249,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 
 # In addition, the RTS is built in some further variations.  Ways that
 # make sense here:
-# 
+#
 #   thr         : threaded
 #   thr_p       : threaded profiled
 #   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
@@ -262,7 +262,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 GhcRTSWays=l
 
 # Usually want the debug version
-GhcRTSWays += debug 
+GhcRTSWays += debug
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
@@ -391,7 +391,7 @@ BIN_DIST_PREP_TAR_BZ2 = $(BIN_DIST_PREP_TAR).bz2
 BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 
 # -----------------------------------------------------------------------------
-# Utilities programs: flags 
+# Utilities programs: flags
 
 # If you want to give any standard flags to pretty much any utility
 # (see utils.mk for a complete list), by adding a line here
@@ -399,7 +399,7 @@ BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 # 	SRC_P_OPTS += ...
 #
 # where P is the utility. For example, to add -O to all Haskell
-# compilations, 
+# compilations,
 #
 #	SRC_HC_OPTS += -O
 
@@ -407,7 +407,7 @@ BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 # SRC_HC_OPTS includes flags to be added to *every* Haskell
 # compilation.  Setting SRC_HC_OPTS is a good way to set the default
 # optimisation level (-O) and heap size (-H<size>).
-# 
+#
 # SRC_HC_OPTS is *not* for adding flags that are required to make your
 # build work.  Examples:
 #
@@ -628,7 +628,7 @@ FIND			= @FindCmd@
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
 # install-sh script (if chosen). This not terribly useful to us, so we convert
 # it into an abs. path.
-# 
+#
 INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 
@@ -664,7 +664,7 @@ LdHasBuildId	        = @LdHasBuildId@
 # and compiler/main/DriverPipeline.hs.
 LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@
 
-# On MSYS, building with SplitObjs=YES fails with 
+# On MSYS, building with SplitObjs=YES fails with
 #   ar: Bad file number
 # see #3201.  We need to specify a smaller max command-line size
 # to work around it.  32767 doesn't work; 30000 does, but says
@@ -726,7 +726,7 @@ GHC_PKG		        = @GhcPkgCmd@
 # Happy
 #
 HAPPY			= @HappyCmd@
-HAPPY_VERSION		= @HappyVersion@		
+HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
@@ -736,7 +736,7 @@ SRC_HAPPY_OPTS		= -agc --strict
 # Alex
 #
 ALEX			= @AlexCmd@
-ALEX_VERSION		= @AlexVersion@		
+ALEX_VERSION		= @AlexVersion@
 Alex3			= @Alex3@
 #
 # Options to pass to Alex when we're going to compile the output with GHC
@@ -763,7 +763,7 @@ endif
 #
 ################################################################################
 
-# 
+#
 # It is possible to configure the compiler and prelude to support 31-bit
 # integers, suitable for a back-end and RTS using a tag bit on a 32-bit
 # architecture.  Currently the only useful output from this option is external Core

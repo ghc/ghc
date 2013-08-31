@@ -368,9 +368,12 @@ load_load_barrier(void) {
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
-#define write_barrier()      /* nothing */
-#define store_load_barrier() /* nothing */
-#define load_load_barrier()  /* nothing */
+EXTERN_INLINE void write_barrier(void);
+EXTERN_INLINE void store_load_barrier(void);
+EXTERN_INLINE void load_load_barrier(void);
+EXTERN_INLINE void write_barrier     () {} /* nothing */
+EXTERN_INLINE void store_load_barrier() {} /* nothing */
+EXTERN_INLINE void load_load_barrier () {} /* nothing */
 
 #if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord

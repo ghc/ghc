@@ -160,7 +160,7 @@ cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
        return ( lneIdInfo dflags bndr args
               , code )
   where
-   code = forkProc $ do {
+   code = forkLneBody $ do {
             ; withNewTickyCounterLNE (idName bndr) args $ do
             ; restoreCurrentCostCentre cc_slot
             ; arg_regs <- bindArgsToRegs args
@@ -632,14 +632,20 @@ cgConApp con stg_args
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
 cgIdApp fun_id args = do
-    dflags   <- getDynFlags
-    fun_info <- getCgIdInfo fun_id
-    let fun_arg     = StgVarArg fun_id
-        fun_name    = idName            fun_id
-        fun         = idInfoToAmode     fun_info
-        lf_info     = cg_lf        fun_info
+    dflags         <- getDynFlags
+    fun_info       <- getCgIdInfo fun_id
+    self_loop_info <- getSelfLoop
+    let cg_fun_id   = cg_id fun_info
+           -- NB: use (cg_id fun_info) instead of fun_id, because
+           -- the former may be externalised for -split-objs.
+           -- See Note [Externalise when splitting] in StgCmmMonad
+
+        fun_arg     = StgVarArg cg_fun_id
+        fun_name    = idName    cg_fun_id
+        fun         = idInfoToAmode fun_info
+        lf_info     = cg_lf         fun_info
         node_points dflags = nodeMustPointToIt dflags lf_info
-    case (getCallMethod dflags fun_name (idCafInfo fun_id) lf_info (length args)) of
+    case (getCallMethod dflags fun_name cg_fun_id lf_info (length args) (cg_loc fun_info) self_loop_info) of
 
             -- A value in WHNF, so we can just return it.
         ReturnIt -> emitReturn [fun]    -- ToDo: does ReturnIt guarantee tagged?
@@ -659,14 +665,87 @@ cgIdApp fun_id args = do
                      then directCall NativeNodeCall   lbl arity (fun_arg:args)
                      else directCall NativeDirectCall lbl arity args }
 
-        -- Let-no-escape call
-        JumpToIt -> let (LneLoc blk_id lne_regs) = cg_loc fun_info
-                    in do
-                       { adjustHpBackwards -- always do this before a tail-call
-                       ; cmm_args <- getNonVoidArgAmodes args
-                       ; emitMultiAssign lne_regs cmm_args
-                       ; emit (mkBranch blk_id)
-                       ; return AssignedDirectly }
+        -- Let-no-escape call or self-recursive tail-call
+        JumpToIt blk_id lne_regs -> do
+          { adjustHpBackwards -- always do this before a tail-call
+          ; cmm_args <- getNonVoidArgAmodes args
+          ; emitMultiAssign lne_regs cmm_args
+          ; emit (mkBranch blk_id)
+          ; return AssignedDirectly }
+
+-- Note [Self-recursive tail calls]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Self-recursive tail calls can be optimized into a local jump in the same
+-- way as let-no-escape bindings (see Note [What is a non-escaping let] in
+-- stgSyn/CoreToStg.lhs). Consider this:
+--
+-- foo.info:
+--     a = R1  // calling convention
+--     b = R2
+--     goto L1
+-- L1: ...
+--     ...
+-- ...
+-- L2: R1 = x
+--     R2 = y
+--     call foo(R1,R2)
+--
+-- Instead of putting x and y into registers (or other locations required by the
+-- calling convention) and performing a call we can put them into local
+-- variables a and b and perform jump to L1:
+--
+-- foo.info:
+--     a = R1
+--     b = R2
+--     goto L1
+-- L1: ...
+--     ...
+-- ...
+-- L2: a = x
+--     b = y
+--     goto L1
+--
+-- This can be done only when function is calling itself in a tail position
+-- and only if the call passes number of parameters equal to function's arity.
+-- Note that this cannot be performed if a function calls itself with a
+-- continuation.
+--
+-- This in fact implements optimization known as "loopification". It was
+-- described in "Low-level code optimizations in the Glasgow Haskell Compiler"
+-- by Krzysztof Woś, though we use different approach. Krzysztof performed his
+-- optimization at the Cmm level, whereas we perform ours during code generation
+-- (Stg-to-Cmm pass) essentially making sure that optimized Cmm code is
+-- generated in the first place.
+--
+-- Implementation is spread across a couple of places in the code:
+--
+--   * FCode monad stores additional information in its reader environment
+--     (cgd_self_loop field). This information tells us which function can
+--     tail call itself in an optimized way (it is the function currently
+--     being compiled), what is the label of a loop header (L1 in example above)
+--     and information about local registers in which we should arguments
+--     before making a call (this would be a and b in example above).
+--
+--   * Whenever we are compiling a function, we set that information to reflect
+--     the fact that function currently being compiled can be jumped to, instead
+--     of called. We also have to emit a label to which we will be jumping. Both
+--     things are done in closureCodyBody in StgCmmBind.
+--
+--   * When we began compilation of another closure we remove the additional
+--     information from the environment. This is done by forkClosureBody
+--     in StgCmmMonad. Other functions that duplicate the environment -
+--     forkLneBody, forkAlts, codeOnly - duplicate that information. In other
+--     words, we only need to clean the environment of the self-loop information
+--     when compiling right hand side of a closure (binding).
+--
+--   * When compiling a call (cgIdApp) we use getCallMethod to decide what kind
+--     of call will be generated. getCallMethod decides to generate a self
+--     recursive tail call when (a) environment stores information about
+--     possible self tail-call; (b) that tail call is to a function currently
+--     being compiled; (c) number of passed arguments is equal to function's
+--     arity.
+
 
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do

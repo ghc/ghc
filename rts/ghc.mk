@@ -333,10 +333,6 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
 
-ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
-rts/Linker_CC_OPTS += -DDYNAMIC_GHC_PROGRAMS
-endif
-
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the
 # GC runs about 50% slower on x86 due to the overheads of PIC.  The

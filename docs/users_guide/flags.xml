@@ -796,6 +796,12 @@
             <entry><option>-XNoNegativeLiterals</option></entry>
           </row>
           <row>
+            <entry><option>-XNumDecimals</option></entry>
+            <entry>Enable support for 'fractional' integer literals</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoNumDecimals</option></entry>
+          </row>
+          <row>
             <entry><option>-XNoTraditionalRecordSyntax</option></entry>
             <entry>Disable support for traditional record syntax (as supported by Haskell 98) <literal>C {f = x}</literal></entry>
             <entry>dynamic</entry>
@@ -1495,7 +1501,7 @@
   <sect2>
     <title>Optimisation levels</title>
 
-    <para><xref linkend="options-optimise"/></para>
+    <para>These options are described in more detail in <xref linkend="options-optimise"/></para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -1525,10 +1531,10 @@
     </informaltable>
 
   </sect2>
-  <sect2>
+  <sect2 id="options-f-compact">
     <title>Individual optimisations</title>
 
-    <para><xref linkend="options-f"/></para>
+    <para>These options are described in more detail in <xref linkend="options-f"/>.</para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -1552,7 +1558,7 @@
             <entry><option>-fcse</option></entry>
             <entry>Turn on common sub-expression elimination. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-cse</entry>
+            <entry><option>-fno-cse</option></entry>
           </row>
 
           <row>
@@ -1628,14 +1634,14 @@
             <entry><option>-ffloat-in</option></entry>
             <entry>Turn on the float-in transformation. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-float-in</entry>
+            <entry><option>-fno-float-in</option></entry>
           </row>
 
           <row>
             <entry><option>-ffull-laziness</option></entry>
             <entry>Turn on full laziness (floating bindings outwards). Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-full-laziness</entry>
+            <entry><option>-fno-full-laziness</option></entry>
           </row>
 
           <row>
@@ -1667,14 +1673,21 @@
           </row>
 
           <row>
-            <entry><option>-fmax-simplifier-iterations</option></entry>
+            <entry><option>-fmax-relevant-bindings=N</option></entry>
+            <entry>Set the maximum number of bindings to display in type error messages (default 6).</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-max-relevant-bindings</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fmax-simplifier-iterations=N</option></entry>
             <entry>Set the max iterations for the simplifier</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
 
           <row>
-            <entry><option>-fmax-worker-args</option></entry>
+            <entry><option>-fmax-worker-args=N</option></entry>
             <entry>If a worker has that many arguments, none will be
               unpacked anymore (default: 10)</entry>
             <entry>dynamic</entry>
@@ -1738,7 +1751,7 @@
             <entry><option>-fspec-constr</option></entry>
             <entry>Turn on the SpecConstr transformation. Implied by <option>-O2</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-spec-constr</entry>
+            <entry><option>-fno-spec-constr</option></entry>
           </row>
 
           <row>
@@ -1761,14 +1774,14 @@
             <entry><option>-fspecialise</option></entry>
             <entry>Turn on specialisation of overloaded functions. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-specialise</entry>
+            <entry><option>-fno-specialise</option></entry>
           </row>
 
           <row>
             <entry><option>-fstrictness</option></entry>
             <entry>Turn on strictness analysis. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-strictness</entry>
+            <entry><option>-fno-strictness</option></entry>
           </row>
 
           <row>
@@ -1783,7 +1796,7 @@
             <entry><option>-fstatic-argument-transformation</option></entry>
             <entry>Turn on the static argument transformation. Implied by <option>-O2</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-fno-static-argument-transformation</entry>
+            <entry><option>-fno-static-argument-transformation</option></entry>
           </row>
 
           <row>
@@ -2085,6 +2098,15 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-staticlib</option></entry>
+            <entry>On Darwin/OS X/iOS only, generate a standalone static library 
+              (as opposed to an executable). 
+              This is the usual way to compile for iOS.
+              </entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-fPIC</option></entry>
             <entry>Generate position-independent code (where available)</entry>
             <entry>dynamic</entry>
@@ -2097,6 +2119,24 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-dynamic-too</option></entry>
+            <entry>Build dynamic object files <emphasis>as well as</emphasis> static object files during compilation</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-dyno</option></entry>
+            <entry>Set the output path for the <emphasis>dynamically</emphasis> linked objects</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-dynosuf</option></entry>
+            <entry>Set the output suffix for dynamic object files</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-dynload</option></entry>
             <entry>Selects one of a number of modes for finding shared
               libraries at runtime.</entry>
@@ -2105,14 +2145,14 @@
           </row>
           <row>
             <entry><option>-framework</option> <replaceable>name</replaceable></entry>
-            <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
+            <entry>On Darwin/OS X/iOS only, link in the framework <replaceable>name</replaceable>.
               This option corresponds to the <option>-framework</option> option for Apple's Linker.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-framework-path</option> <replaceable>name</replaceable></entry>
-            <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
+            <entry>On Darwin/OS X/iOS only, add <replaceable>dir</replaceable> to the list of
               directories searched for frameworks.
               This option corresponds to the <option>-F</option> option for Apple's Linker.</entry>
             <entry>dynamic</entry>
@@ -2223,7 +2263,7 @@
             <entry>Set the install name (via <literal>-install_name</literal> passed to Apple's
               linker), specifying the full install path of the library file. Any libraries
               or executables that link with it later will pick up that path as their
-              runtime search location for it. (Darwin/MacOS X only)</entry>
+              runtime search location for it. (Darwin/OS X only)</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
@@ -2348,6 +2388,13 @@
             <entry><option>-pgmwindres</option> <replaceable>cmd</replaceable></entry>
             <entry>Use <replaceable>cmd</replaceable> as the program for
               embedding manifests on Windows.</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-pgmlibtool</option> <replaceable>cmd</replaceable></entry>
+            <entry>Use <replaceable>cmd</replaceable> as the command for libtool 
+              (with <option>-staticlib</option> only).</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

@@ -931,7 +931,7 @@ data ModGuts
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
-        mg_fam_insts :: ![FamInst], 
+        mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
@@ -1071,7 +1071,7 @@ data InteractiveContext
 
          ic_fix_env :: FixityEnv,
             -- ^ Fixities declared in let statements
-         
+
          ic_int_print  :: Name,
              -- ^ The function that is used for printing results
              -- of expressions in ghci and -e mode.
@@ -1534,7 +1534,7 @@ lookupType dflags hpt pte name
        return x
   | otherwise
   = lookupNameEnv pte name
-  where 
+  where
     mod = ASSERT2( isExternalName name, ppr name ) nameModule name
     this_pkg = thisPackage dflags
 
@@ -1794,10 +1794,19 @@ data Usage
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from the current package
+  -- | A file upon which the module depends, e.g. a CPP #include, or using TH's
+  -- 'addDependentFile'
   | UsageFile {
         usg_file_path  :: FilePath,
-        usg_mtime      :: UTCTime
-        -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
+        -- ^ External file dependency. From a CPP #include or TH
+        -- addDependentFile. Should be absolute.
+        usg_file_hash  :: Fingerprint
+        -- ^ 'Fingerprint' of the file contents.
+
+        -- Note: We don't consider things like modification timestamps
+        -- here, because there's no reason to recompile if the actual
+        -- contents don't change.  This previously lead to odd
+        -- recompilation behaviors; see #8114
   }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
@@ -1814,13 +1823,13 @@ data Usage
         -- depend on their export lists
 
 instance Binary Usage where
-    put_ bh usg@UsagePackageModule{} = do 
+    put_ bh usg@UsagePackageModule{} = do
         putByte bh 0
         put_ bh (usg_mod usg)
         put_ bh (usg_mod_hash usg)
         put_ bh (usg_safe     usg)
 
-    put_ bh usg@UsageHomeModule{} = do 
+    put_ bh usg@UsageHomeModule{} = do
         putByte bh 1
         put_ bh (usg_mod_name usg)
         put_ bh (usg_mod_hash usg)
@@ -1828,10 +1837,10 @@ instance Binary Usage where
         put_ bh (usg_entities usg)
         put_ bh (usg_safe     usg)
 
-    put_ bh usg@UsageFile{} = do 
+    put_ bh usg@UsageFile{} = do
         putByte bh 2
         put_ bh (usg_file_path usg)
-        put_ bh (usg_mtime     usg)
+        put_ bh (usg_file_hash usg)
 
     get bh = do
         h <- getByte bh
@@ -1850,9 +1859,9 @@ instance Binary Usage where
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
                      usg_exports = exps, usg_entities = ents, usg_safe = safe }
           2 -> do
-            fp    <- get bh
-            mtime <- get bh
-            return UsageFile { usg_file_path = fp, usg_mtime = mtime }
+            fp   <- get bh
+            hash <- get bh
+            return UsageFile { usg_file_path = fp, usg_file_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 \end{code}
@@ -2457,4 +2466,3 @@ emptyModBreaks = ModBreaks
    , modBreaks_decls = array (0,-1) []
    }
 \end{code}
-
