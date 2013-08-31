@@ -22,6 +22,7 @@ typedef enum {
 typedef 
    enum { SECTIONKIND_CODE_OR_RODATA,
           SECTIONKIND_RWDATA,
+          SECTIONKIND_INIT_ARRAY,
           SECTIONKIND_OTHER,
           SECTIONKIND_NOINFOAVAIL } 
    SectionKind;

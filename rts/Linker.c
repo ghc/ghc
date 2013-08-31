@@ -29,6 +29,7 @@
 #include "StgPrimFloat.h" // for __int_encodeFloat etc.
 #include "Stable.h"
 #include "Proftimer.h"
+#include "GetEnv.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -150,6 +151,9 @@ ObjectCode *objects = NULL;     /* initially empty */
    to be actually freed via checkUnload() */
 ObjectCode *unloaded_objects = NULL; /* initially empty */
 
+/* Type of the initializer */
+typedef void (*init_t) (int argc, char **argv, char **env);
+
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                          char *archiveMemberName
@@ -196,6 +200,7 @@ static pathchar* pathdup(pathchar *path)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
 static int ocResolve_ELF        ( ObjectCode* oc );
+static int ocRunInit_ELF        ( ObjectCode* oc );
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
 static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 #endif
@@ -2769,6 +2774,15 @@ resolveObjs( void )
             barf("resolveObjs: not implemented on this platform");
 #           endif
             if (!r) { return r; }
+
+#if defined(OBJFORMAT_ELF)
+            // run init/init_array
+            r = ocRunInit_ELF ( oc );
+            if (!r) { return r; }
+#else
+            IF_DEBUG(linker, debugBelch("resolveObjs: don't know how to run initializers!\n"));
+#endif
+
             oc->status = OBJECT_RESOLVED;
         }
     }
@@ -4643,6 +4657,12 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
         return SECTIONKIND_CODE_OR_RODATA;
     }
 
+    if (hdr->sh_type == SHT_INIT_ARRAY
+        && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
+       /* .init_array section */
+        return SECTIONKIND_INIT_ARRAY;
+    }
+
     if (hdr->sh_type == SHT_NOBITS
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
         /* .bss-style section */
@@ -5455,6 +5475,45 @@ ocResolve_ELF ( ObjectCode* oc )
    ocFlushInstructionCache( oc );
 #endif
 
+   return 1;
+}
+
+static int ocRunInit_ELF( ObjectCode *oc )
+{
+   int   i;
+   char*     ehdrC = (char*)(oc->image);
+   Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
+   Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
+   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+   int argc, envc;
+   char **argv, **envv;
+
+   getProgArgv(&argc, &argv);
+   getProgEnvv(&envc, &envv);
+
+   // XXX Apparently in some archs .init may be something
+   // special!  See DL_DT_INIT_ADDRESS macro in glibc
+   // as well as ELF_FUNCTION_PTR_IS_SPECIAL
+   for (i = 0; i < ehdr->e_shnum; i++) {
+      int is_bss = FALSE;
+      SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
+      if (kind == SECTIONKIND_CODE_OR_RODATA
+       && 0 == memcmp(".init", sh_strtab + shdr[i].sh_name, 5)) {
+         init_t init = (init_t)(ehdrC + shdr[i].sh_offset);
+         init(argc, argv, envv);
+      }
+
+      if (kind == SECTIONKIND_INIT_ARRAY) {
+         char *init_startC = ehdrC + shdr[i].sh_offset;
+         init_t *init = (init_t*)init_startC;
+         init_t *init_end = (init_t*)(init_startC + shdr[i].sh_size);
+         for (; init < init_end; init++) {
+            (*init)(argc, argv, envv);
+         }
+      }
+   }
+
+   freeProgEnvv(envc, envv);
    return 1;
 }
 
