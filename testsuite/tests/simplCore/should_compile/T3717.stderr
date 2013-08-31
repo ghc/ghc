@@ -18,7 +18,7 @@ T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S(S),1*U(1*U)>m,
- Unf=Unf{Src=Worker=T3717.$wfoo, TopLvl=True, Arity=1, Value=True,
+ Unf=Unf{Src=Wrapper, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int) ->

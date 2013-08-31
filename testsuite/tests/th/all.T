@@ -285,3 +285,5 @@ test('T8028',
 test('TH_Roles1', normal, compile_fail, ['-v0'])
 test('TH_Roles2', normal, compile, ['-v0 -ddump-tc'])
 test('TH_Roles3', normal, compile, ['-v0 -dsuppress-uniques'])
+
+test('T8186', normal, compile_and_run, ['-v0'])

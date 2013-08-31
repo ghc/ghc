@@ -85,6 +85,7 @@ test('Overlap7', normal, compile_fail, [''])
 test('Overlap9', normal, compile_fail, [''])
 test('Overlap10', normal, compile_fail, [''])
 test('Overlap11', normal, compile_fail, [''])
+test('Overlap15', normal, compile_fail, [''])
 test('T7194', normal, compile_fail, [''])
 test('T7354', normal, compile_fail, [''])
 test('T7354a',
@@ -105,3 +106,4 @@ test('T7938', normal, compile_fail, [''])
 test('ClosedFam3', extra_clean(['ClosedFam3.o-boot', 'ClosedFam3.hi-boot']),
      multimod_compile_fail, ['ClosedFam3', '-v0'])
 test('ClosedFam4', normal, compile_fail, [''])
+test('T8155', normal, compile_fail, [''])

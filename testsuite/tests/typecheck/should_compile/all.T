@@ -353,6 +353,10 @@ test('tc258', normal, compile, [''])
 test('tc259', normal, compile, [''])
 test('tc260', normal, compile, [''])
 test('tc261', normal, compile, [''])
+test('tc262', normal, compile, [''])
+test('tc263',
+    extra_clean(['Tc263_Help.o','Tc263_Help.hi']),
+    multimod_compile, ['tc263','-v0'])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])

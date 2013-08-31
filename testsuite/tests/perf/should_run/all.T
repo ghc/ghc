@@ -91,7 +91,7 @@ test('T3738',
 test('MethSharing',
      [stats_num_field('peak_megabytes_allocated', (1, 0)),
                                  # expected value: 1 (amd64/Linux)
-      stats_num_field('bytes allocated', 
+      stats_num_field('bytes allocated',
                       [(wordsize(32), 360940756, 5),
                     # expected value: 2685858140 (x86/OS X)
                           # expected: 360940756 (x86/Linux)
@@ -245,7 +245,7 @@ test('Conversions',
 
       only_ways(['normal'])
      ],
-    compile_and_run, ['-O'])
+    compile_and_run, ['-O -msse2'])
 
 test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
@@ -264,7 +264,7 @@ test('T7436',
      ['-O'])
 
 test('T7797',
-      [stats_num_field('bytes allocated', 
+      [stats_num_field('bytes allocated',
                       [(wordsize(32), 360940756, 5),
                     # expected value: 2685858140 (x86/OS X)
                           # expected: 360940756 (x86/Linux)
@@ -277,7 +277,7 @@ test('T7797',
      ['-O'])
 
 test('T7954',
-      [stats_num_field('bytes allocated', 
+      [stats_num_field('bytes allocated',
                       [(wordsize(32), 1380051408, 10),
                        (wordsize(64), 2720051528, 10)]),
       only_ways(['normal'])

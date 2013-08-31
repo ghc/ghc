@@ -3,5 +3,5 @@ CasePrune.hs:14:31:
     Can't make a derived instance of ‛C A’
       (even with cunning newtype deriving):
       it is not type-safe to use GeneralizedNewtypeDeriving on this class;
-      the last parameter of ‛C’ is at role N
+      the last parameter of ‛C’ is at role Nominal
     In the newtype declaration for ‛A’

@@ -63,7 +63,7 @@ test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
                    extra_run_opts('500000 +RTS -kc1k -kb100 -K96m -RTS') ],
                  compile_and_run, [''])
 
-test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
+test('atomicinc', [ c_src, only_ways(['normal','threaded1', 'threaded2']) ], compile_and_run, [''])
 
 test('T3424', # it's slow:
               [ when(fast(), skip), only_ways(['normal','threaded1','ghci']) ],
@@ -180,3 +180,8 @@ test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
              compile_and_run, [''])
 
 test('T8035', normal, compile_and_run, [''])
+
+test('linker_unload',
+     [ extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
+     run_command,
+     ['$MAKE -s --no-print-directory linker_unload'])

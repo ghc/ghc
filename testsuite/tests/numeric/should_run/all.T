@@ -60,3 +60,4 @@ test('T7014',
      ['$MAKE -s --no-print-directory T7014'])
 
 test('T7233', normal, compile_and_run, [''])
+test('NumDecimals', normal, compile_and_run, [''])
