@@ -306,6 +306,17 @@ test('shared001',
      run_command,
      ['$MAKE -s --no-print-directory shared001'])
 
+if config.os == 'darwin':
+  only_darwin = normal
+else:
+  only_darwin = skip
+
+test('static001',
+     [only_darwin,
+      extra_clean(['Static001.hi', 'Static001.o', 'liba.a', 'Static001_stub.h', 'Static001_stub.o'])],
+     run_command,
+     ['$MAKE -s --no-print-directory static001'])
+
 test('dynHelloWorld',
      only_ways(['dyn']),
      compile_and_run,

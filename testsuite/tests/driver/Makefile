@@ -438,6 +438,10 @@ shared001:
 	$(RM) Shared001.hi Shared001.o HSdll.dll.a HSdll.dll Shared001_stub.*
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP_NO_RTSOPTS) -v0 -shared Shared001.hs
 
+static001:
+	$(RM) Static001.hi Static001.o liba.a Static001_stub.*
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP_NO_RTSOPTS) -v0 -staticlib Static001.hs
+
 # -----------------------------------------------------------------------------
 
 T3674:
