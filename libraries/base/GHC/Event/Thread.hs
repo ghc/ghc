@@ -332,7 +332,7 @@ ioManagerCapabilitiesChanged = do
               -- copy the existing values into the new array:
               forM_ [0..high] $ \i -> do
                 Just (tid,mgr) <- readIOArray eventManagerArray i
-                if i < numEnabled - 1
+                if i < numEnabled
                   then writeIOArray new_eventManagerArray i (Just (tid,mgr))
                   else do tid' <- restartPollLoop mgr i
                           writeIOArray new_eventManagerArray i (Just (tid',mgr))
