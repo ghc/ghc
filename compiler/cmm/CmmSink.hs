@@ -43,32 +43,52 @@ import qualified Data.Set as Set
 --
 --  * Start by doing liveness analysis.
 --
---  * Keep a list of assignments A; earlier ones may refer to later ones
+--  * Keep a list of assignments A; earlier ones may refer to later ones.
+--    Currently we only sink assignments to local registers, because we don't
+--    have liveness information about global registers.
 --
 --  * Walk forwards through the graph, look at each node N:
---    * If any assignments in A (1) occur only once in N, and (2) are
---      not live after N, inline the assignment and remove it
---      from A.
---    * If N is an assignment:
---      * If the register is not live after N, discard it
---      * otherwise pick up the assignment and add it to A
---    * If N is a non-assignment node:
+--
+--    * If it is a dead assignment, i.e. assignment to a register that is
+--      not used after N, discard it.
+--
+--    * Try to inline based on current list of assignments
+--      * If any assignments in A (1) occur only once in N, and (2) are
+--        not live after N, inline the assignment and remove it
+--        from A.
+--
+--      * If an assignment in A is cheap (RHS is local register), then
+--        inline the assignment and keep it in A in case it is used afterwards.
+--
+--      * Otherwise don't inline.
+--
+--    * If N is assignment to a local register pick up the assignment
+--      and add it to A.
+--
+--    * If N is not an assignment to a local register:
 --      * remove any assignments from A that conflict with N, and
---        place them before N in the current block.  (we call this
---        "dropping" the assignments).
+--        place them before N in the current block.  We call this
+--        "dropping" the assignments.
+--
 --      * An assignment conflicts with N if it:
 --        - assigns to a register mentioned in N
 --        - mentions a register assigned by N
 --        - reads from memory written by N
 --      * do this recursively, dropping dependent assignments
---    * At a multi-way branch:
---      * drop any assignments that are live on more than one branch
---      * if any successor has more than one predecessor (a
---        join-point), drop everything live in that successor
--- 
--- As a side-effect we'll delete some dead assignments (transitively,
--- even).  This isn't as good as removeDeadAssignments, but it's much
--- cheaper.
+--
+--    * At an exit node:
+--      * drop any assignments that are live on more than one successor
+--        and are not trivial
+--      * if any successor has more than one predecessor (a join-point),
+--        drop everything live in that successor. Since we only propagate
+--        assignments that are not dead at the successor, we will therefore
+--        eliminate all assignments dead at this point. Thus analysis of a
+--        join-point will always begin with an empty list of assignments.
+--
+--
+-- As a result of above algorithm, sinking deletes some dead assignments
+-- (transitively, even).  This isn't as good as removeDeadAssignments,
+-- but it's much cheaper.
 
 -- If we do this *before* stack layout, we might be able to avoid
 -- saving some things across calls/procpoints.
@@ -268,7 +288,7 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
-    | shouldDiscard node live    = go ns block as
+    | shouldDiscard node live           = go ns block as -- discard dead assignment
     | Just a <- shouldSink dflags node2 = go ns block (a : as1)
     | otherwise                         = go ns block' as'
     where
@@ -316,7 +336,7 @@ shouldDiscard node live
        CmmAssign r (CmmReg r') | r == r' -> True
        CmmAssign (CmmLocal r) _ -> not (r `Set.member` live)
        _otherwise -> False
-  
+
 
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
