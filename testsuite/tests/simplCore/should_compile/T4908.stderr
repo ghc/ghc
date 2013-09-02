@@ -53,7 +53,7 @@ T4908.f [InlPrag=INLINE[0]]
  Arity=2,
  Caf=NoCafRefs,
  Str=DmdType <S(S),1*U(1*U)><L,1*U(A,U(U))>,
- Unf=Unf{Src=Wrapper, TopLvl=True, Arity=2, Value=True,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=2, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int)

@@ -99,7 +99,7 @@ Roman.foo_go [InlPrag=INLINE[0]]
 [GblId,
  Arity=2,
  Str=DmdType <S,1*U><S,1*U>m,
- Unf=Unf{Src=Wrapper, TopLvl=True, Arity=2, Value=True,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=2, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once] :: Data.Maybe.Maybe GHC.Types.Int)
