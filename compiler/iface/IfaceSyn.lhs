@@ -583,8 +583,6 @@ data IfaceUnfolding
                  Bool           -- OK to inline even if context is boring
                  IfaceExpr
 
-  | IfWrapper IfaceExpr         -- cf TcIface's Note [wrappers in interface files]
-
   | IfDFunUnfold [IfaceBndr] [IfaceExpr]
 
 instance Binary IfaceUnfolding where
@@ -598,15 +596,12 @@ instance Binary IfaceUnfolding where
         put_ bh b
         put_ bh c
         put_ bh d
-    put_ bh (IfWrapper e) = do
-        putByte bh 2
-        put_ bh e
     put_ bh (IfDFunUnfold as bs) = do
-        putByte bh 3
+        putByte bh 2
         put_ bh as
         put_ bh bs
     put_ bh (IfCompulsory e) = do
-        putByte bh 4
+        putByte bh 3
         put_ bh e
     get bh = do
         h <- getByte bh
@@ -619,9 +614,7 @@ instance Binary IfaceUnfolding where
                     c <- get bh
                     d <- get bh
                     return (IfInlineRule a b c d)
-            2 -> do e <- get bh
-                    return (IfWrapper e)
-            3 -> do as <- get bh
+            2 -> do as <- get bh
                     bs <- get bh
                     return (IfDFunUnfold as bs)
             _ -> do e <- get bh
@@ -1288,7 +1281,6 @@ instance Outputable IfaceUnfolding where
   ppr (IfInlineRule a uok bok e) = sep [ptext (sLit "InlineRule")
                                             <+> ppr (a,uok,bok),
                                         pprParendIfaceExpr e]
-  ppr (IfWrapper e) = ptext (sLit "Wrapper:") <+> parens (ppr e)
   ppr (IfDFunUnfold bs es) = hang (ptext (sLit "DFun:") <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
 
@@ -1446,7 +1438,6 @@ freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
 freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
-freeNamesIfUnfold (IfWrapper e)          = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = fnList freeNamesIfBndr bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet

@@ -1204,25 +1204,6 @@ do_one (IfaceRec pairs) thing_inside
 %*                                                                      *
 %************************************************************************
 
-Note [wrappers in interface files]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to have a nice clever scheme in interface files for
-wrappers. A wrapper's unfolding can be reconstructed from its worker's
-id and its strictness. This decreased .hi file size (sometimes
-significantly, for modules like GHC.Classes with many high-arity w/w
-splits) and had a slight corresponding effect on compile times.
-
-However, when we added the second demand analysis, this scheme lead to
-some Core lint errors. The second analysis could change the strictness
-signatures, which sometimes resulted in a wrapper's regenerated
-unfolding applying the wrapper to too many arguments.
-
-Instead of repairing the clever .hi scheme, we abandoned it in favor
-of simplicity. The .hi sizes are usually insignificant (excluding the
-+1M for base libraries), and compile time barely increases (~+1% for
-nofib). The nicer upshot is that unfolding sources no longer include
-an Id, so, eg, substitutions need not traverse them any longer.
-
 \begin{code}
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
@@ -1300,16 +1281,6 @@ tcUnfolding name dfun_ty _ (IfDFunUnfold bs ops)
   where
     doc = text "Class ops for dfun" <+> ppr name
     (_, _, cls, _) = tcSplitDFunTy dfun_ty
-
-tcUnfolding name _ info (IfWrapper if_expr)
-  = do  { mb_expr <- tcPragExpr name if_expr
-        ; return $ case mb_expr of
-            Nothing -> NoUnfolding
-            Just expr -> mkWwInlineRule expr arity -- see Note [wrappers in interface files]
-        }
-  where
-     -- Arity should occur before unfolding!
-    arity = arityInfo info
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check

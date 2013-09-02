@@ -714,7 +714,9 @@ data Unfolding
 
 ------------------------------------------------
 data UnfoldingSource
-  = InlineRhs          -- The current rhs of the function
+  = -- See also Note [Historical note: unfoldings for wrappers]
+   
+    InlineRhs          -- The current rhs of the function
     		       -- Replace uf_tmpl each time around
 
   | InlineStable       -- From an INLINE or INLINABLE pragma 
@@ -738,13 +740,6 @@ data UnfoldingSource
     		       -- Only a few primop-like things have this property 
                        -- (see MkId.lhs, calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
-
-  | InlineWrapper      -- This unfolding is the wrapper in a
-                       -- worker/wrapper split from the strictness
-                       -- analyser
-                       --
-                       -- cf some history in TcIface's Note [wrappers
-                       -- in interface files]
 
 
 
@@ -774,6 +769,25 @@ data UnfoldingGuidance
 
   | UnfNever	    -- The RHS is big, so don't inline it
 \end{code}
+
+Note [Historical note: unfoldings for wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to have a nice clever scheme in interface files for
+wrappers. A wrapper's unfolding can be reconstructed from its worker's
+id and its strictness. This decreased .hi file size (sometimes
+significantly, for modules like GHC.Classes with many high-arity w/w
+splits) and had a slight corresponding effect on compile times.
+
+However, when we added the second demand analysis, this scheme lead to
+some Core lint errors. The second analysis could change the strictness
+signatures, which sometimes resulted in a wrapper's regenerated
+unfolding applying the wrapper to too many arguments.
+
+Instead of repairing the clever .hi scheme, we abandoned it in favor
+of simplicity. The .hi sizes are usually insignificant (excluding the
++1M for base libraries), and compile time barely increases (~+1% for
+nofib). The nicer upshot is that the UnfoldingSource no longer mentions
+an Id, so, eg, substitutions need not traverse them.
 
 
 Note [DFun unfoldings]
@@ -844,7 +858,6 @@ isStableSource :: UnfoldingSource -> Bool
 -- Keep the unfolding template
 isStableSource InlineCompulsory   = True
 isStableSource InlineStable       = True
-isStableSource InlineWrapper      = True
 isStableSource InlineRhs          = False
 
 -- | Retrieves the template of an unfolding: panics if none is known
