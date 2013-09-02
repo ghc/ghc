@@ -50,11 +50,12 @@ sub parsePackages {
     foreach (@repos) {
         chomp;
         $lineNum++;
-        if (/^([^# ]+) +([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             my %line;
             $line{"localpath"}  = $1;
             $line{"tag"}        = $2;
             $line{"remotepath"} = $3;
+            $line{"upstreamurl"}= $4;
             push @packages, \%line;
 
             $tags{$2} = 0;
