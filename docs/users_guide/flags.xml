@@ -699,29 +699,24 @@
             <entry><option>-fno-glasgow-exts</option></entry>
           </row>
           <row>
-            <entry><option>-XOverlappingInstances</option></entry>
-            <entry>Enable <link linkend="instance-overlap">overlapping instances</link></entry>
+            <entry><option>-firrefutable-tuples</option></entry>
+            <entry>Make tuple pattern matching irrefutable</entry>
             <entry>dynamic</entry>
-            <entry><option>-XNoOverlappingInstances</option></entry>
-          </row>
-          <row>
-            <entry><option>-XIncoherentInstances</option></entry>
-            <entry>Enable <link linkend="instance-overlap">incoherent instances</link>.
-              Implies <option>-XOverlappingInstances</option> </entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoIncoherentInstances</option></entry>
-          </row>
-          <row>
-            <entry><option>-XUndecidableInstances</option></entry>
-            <entry>Enable <link linkend="undecidable-instances">undecidable instances</link></entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoUndecidableInstances</option></entry>
+            <entry><option>-fno-irrefutable-tuples</option></entry>
           </row>
           <row>
             <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
             <entry>set the <link linkend="undecidable-instances">limit for context reduction</link>. Default is 20.</entry>
             <entry>dynamic</entry>
             <entry></entry>
+          </row>
+          <row>
+            <entry><option>-XAllowAmbiguousTypes</option></entry>
+            <entry>Allow the user to write <link linkend="ambiguity">ambiguous types</link>, 
+                   and the type inference engine to infer them.
+                </entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoAllowAmbiguousTypes</option></entry>
           </row>
           <row>
             <entry><option>-XArrows</option></entry>
@@ -731,6 +726,43 @@
             <entry><option>-XNoArrows</option></entry>
           </row>
           <row>
+            <entry><option>-XAutoDeriveTypeable</option></entry>
+            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.
+            Implies <option>-XDeriveDataTypeable</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoAutoDeriveTypeable</option></entry>
+          </row>
+          <row>
+            <entry><option>-XConstraintKinds</option></entry>
+            <entry>Enable a <link linkend="constraint-kind">kind of constraints</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoConstraintKinds</option></entry>
+          </row>
+          <row>
+            <entry><option>-XDataKinds</option></entry>
+            <entry>Enable <link linkend="promotion">datatype promotion</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoDataKinds</option></entry>
+          </row>
+          <row>
+            <entry><option>-XDeriveDataTypeable</option></entry>
+            <entry>Enable <link linkend="deriving-typeable">deriving for the Data and Typeable classes</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoDeriveDataTypeable</option></entry>
+          </row>
+          <row>
+            <entry><option>-XDeriveGeneric</option></entry>
+            <entry>Enable <link linkend="deriving-typeable">deriving for the Generic class</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoDeriveGeneric</option></entry>
+          </row>
+          <row>
+            <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
+            <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoGeneralizedNewtypeDeriving</option></entry>
+          </row>
+          <row>
             <entry><option>-XDisambiguateRecordFields</option></entry>
             <entry>Enable <link linkend="disambiguate-fields">record
                 field disambiguation</link></entry>
@@ -738,11 +770,38 @@
             <entry><option>-XNoDisambiguateRecordFields</option></entry>
           </row>
           <row>
+            <entry><option>-XEmptyCase</option></entry>
+            <entry>Allow <link linkend="empty-case">empty case alternatives</link>
+                  </entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoEmptyCase</option></entry>
+          </row>
+          <row>
+            <entry><option>-XExtendedDefaultRules</option></entry>
+            <entry>Use GHCi's <link linkend="extended-default-rules">extended default rules</link> in a normal module</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoExtendedDefaultRules</option></entry>
+          </row>
+          <row>
             <entry><option>-XForeignFunctionInterface</option></entry>
             <entry>Enable <link linkend="ffi">foreign function interface</link> (implied by
               <option>-fglasgow-exts</option>)</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoForeignFunctionInterface</option></entry>
+          </row>
+          <row>
+            <entry><option>-XGADTs</option></entry>
+            <entry>Enable <link linkend="gadt">generalised algebraic data types</link>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoGADTs</option></entry>
+          </row>
+          <row>
+            <entry><option>-XGADTSyntax</option></entry>
+            <entry>Enable <link linkend="gadt-style">generalised algebraic data type syntax</link>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoGADTSyntax</option></entry>
           </row>
           <row>
             <entry><option>-XGenerics</option></entry>
@@ -760,22 +819,17 @@
             <entry><option>-XNoImplicitParams</option></entry>
           </row>
           <row>
-            <entry><option>-firrefutable-tuples</option></entry>
-            <entry>Make tuple pattern matching irrefutable</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-irrefutable-tuples</option></entry>
-          </row>
-          <row>
             <entry><option>-XNoImplicitPrelude</option></entry>
             <entry>Don't implicitly <literal>import Prelude</literal></entry>
             <entry>dynamic</entry>
             <entry><option>-XImplicitPrelude</option></entry>
           </row>
           <row>
-            <entry><option>-XRebindableSyntax</option></entry>
-            <entry>Employ <link linkend="rebindable-syntax">rebindable syntax</link></entry>
+            <entry><option>-XIncoherentInstances</option></entry>
+            <entry>Enable <link linkend="instance-overlap">incoherent instances</link>.
+              Implies <option>-XOverlappingInstances</option> </entry>
             <entry>dynamic</entry>
-            <entry><option>-XNoRebindableSyntax</option></entry>
+            <entry><option>-XNoIncoherentInstances</option></entry>
           </row>
           <row>
             <entry><option>-XNoMonomorphismRestriction</option></entry>
@@ -784,16 +838,16 @@
             <entry><option>-XMonomorphismRrestriction</option></entry>
           </row>
           <row>
+            <entry><option>-XNegativeLiterals</option></entry>
+            <entry>Enable support for <link linkend="negative-literals">negative literals</link></entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoNegativeLiterals</option></entry>
+          </row>
+          <row>
             <entry><option>-XNoNPlusKPatterns</option></entry>
             <entry>Disable support for <literal>n+k</literal> patterns</entry>
             <entry>dynamic</entry>
             <entry><option>-XNPlusKPatterns</option></entry>
-          </row>
-          <row>
-            <entry><option>-XNegativeLiterals</option></entry>
-            <entry>Enable support for negative literals</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoNegativeLiterals</option></entry>
           </row>
           <row>
             <entry><option>-XNumDecimals</option></entry>
@@ -802,29 +856,10 @@
             <entry><option>-XNoNumDecimals</option></entry>
           </row>
           <row>
-            <entry><option>-XNoTraditionalRecordSyntax</option></entry>
-            <entry>Disable support for traditional record syntax (as supported by Haskell 98) <literal>C {f = x}</literal></entry>
+            <entry><option>-XOverlappingInstances</option></entry>
+            <entry>Enable <link linkend="instance-overlap">overlapping instances</link></entry>
             <entry>dynamic</entry>
-            <entry><option>-XTraditionalRecordSyntax</option></entry>
-          </row>
-          <row>
-            <entry><option>-XRelaxedPolyRec</option></entry>
-            <entry>Relaxed checking for <link linkend="typing-binds">mutually-recursive polymorphic functions</link></entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoRelaxedPolyRec</option></entry>
-          </row>
-          <row>
-            <entry><option>-XExtendedDefaultRules</option></entry>
-            <entry>Use GHCi's <link linkend="extended-default-rules">extended default rules</link> in a normal module</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoExtendedDefaultRules</option></entry>
-          </row>
-          <row>
-            <entry><option>-XOverloadedStrings</option></entry>
-            <entry>Enable <link linkend="overloaded-strings">overloaded string literals</link>.
-            </entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoOverloadedStrings</option></entry>
+            <entry><option>-XNoOverlappingInstances</option></entry>
           </row>
           <row>
             <entry><option>-XOverloadedLists</option></entry>
@@ -834,18 +869,29 @@
             <entry><option>-XNoOverloadedLists</option></entry>
           </row>
           <row>
-            <entry><option>-XGADTs</option></entry>
-            <entry>Enable <link linkend="gadt">generalised algebraic data types</link>.
+            <entry><option>-XOverloadedStrings</option></entry>
+            <entry>Enable <link linkend="overloaded-strings">overloaded string literals</link>.
             </entry>
             <entry>dynamic</entry>
-            <entry><option>-XNoGADTs</option></entry>
+            <entry><option>-XNoOverloadedStrings</option></entry>
           </row>
           <row>
-            <entry><option>-XGADTSyntax</option></entry>
-            <entry>Enable <link linkend="gadt-style">generalised algebraic data type syntax</link>.
-            </entry>
+            <entry><option>-XQuasiQuotes</option></entry>
+            <entry>Enable <link linkend="th-quasiquotation">quasiquotation</link>.</entry>
             <entry>dynamic</entry>
-            <entry><option>-XNoGADTSyntax</option></entry>
+            <entry><option>-XNoQuasiQuotes</option></entry>
+          </row>
+          <row>
+            <entry><option>-XRelaxedPolyRec</option></entry>
+            <entry>Relaxed checking for <link linkend="typing-binds">mutually-recursive polymorphic functions</link></entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoRelaxedPolyRec</option></entry>
+          </row>
+          <row>
+            <entry><option>-XNoTraditionalRecordSyntax</option></entry>
+            <entry>Disable support for traditional record syntax (as supported by Haskell 98) <literal>C {f = x}</literal></entry>
+            <entry>dynamic</entry>
+            <entry><option>-XTraditionalRecordSyntax</option></entry>
           </row>
           <row>
             <entry><option>-XTypeFamilies</option></entry>
@@ -854,16 +900,10 @@
             <entry><option>-XNoTypeFamilies</option></entry>
           </row>
           <row>
-            <entry><option>-XConstraintKinds</option></entry>
-            <entry>Enable a <link linkend="constraint-kind">kind of constraints</link>.</entry>
+            <entry><option>-XUndecidableInstances</option></entry>
+            <entry>Enable <link linkend="undecidable-instances">undecidable instances</link></entry>
             <entry>dynamic</entry>
-            <entry><option>-XNoConstraintKinds</option></entry>
-          </row>
-          <row>
-            <entry><option>-XDataKinds</option></entry>
-            <entry>Enable <link linkend="promotion">datatype promotion</link>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoDataKinds</option></entry>
+            <entry><option>-XNoUndecidableInstances</option></entry>
           </row>
           <row>
             <entry><option>-XPolyKinds</option></entry>
@@ -871,13 +911,6 @@
                    Implies <option>-XKindSignatures</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPolyKinds</option></entry>
-          </row>
-          <row>
-            <entry><option>-XScopedTypeVariables</option></entry>
-            <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
-              Implied by <option>-fglasgow-exts</option>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoScopedTypeVariables</option></entry>
           </row>
           <row>
             <entry><option>-XMonoLocalBinds</option></entry>
@@ -888,17 +921,24 @@
             <entry><option>-XNoMonoLocalBinds</option></entry>
           </row>
           <row>
+            <entry><option>-XRebindableSyntax</option></entry>
+            <entry>Employ <link linkend="rebindable-syntax">rebindable syntax</link></entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoRebindableSyntax</option></entry>
+          </row>
+          <row>
+            <entry><option>-XScopedTypeVariables</option></entry>
+            <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
+              Implied by <option>-fglasgow-exts</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoScopedTypeVariables</option></entry>
+          </row>
+          <row>
             <entry><option>-XTemplateHaskell</option></entry>
             <entry>Enable <link linkend="template-haskell">Template Haskell</link>.
               No longer implied by <option>-fglasgow-exts</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTemplateHaskell</option></entry>
-          </row>
-          <row>
-            <entry><option>-XQuasiQuotes</option></entry>
-            <entry>Enable <link linkend="th-quasiquotation">quasiquotation</link>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoQuasiQuotes</option></entry>
           </row>
           <row>
             <entry><option>-XBangPatterns</option></entry>
@@ -1033,7 +1073,9 @@
           </row>
           <row>
             <entry><option>-XExplicitNamespaces</option></entry>
-            <entry>Enable using the keyword <literal>type</literal> to specify the namespace of entries in imports and exports.</entry>
+            <entry>Enable using the keyword <literal>type</literal> to specify the namespace of 
+                   entries in imports and exports (<xref linkend="explicit-namespaces"/>).
+                   Implied by <option>-XTypeOperators</option> and <option>-XTypeFamilies</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoExplicitNamespaces</option></entry>
           </row>
@@ -1078,31 +1120,6 @@
             <entry>Enable <link linkend="stand-alone-deriving">standalone deriving</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoStandaloneDeriving</option></entry>
-          </row>
-          <row>
-            <entry><option>-XDeriveDataTypeable</option></entry>
-            <entry>Enable <link linkend="deriving-typeable">deriving for the Data and Typeable classes</link>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoDeriveDataTypeable</option></entry>
-          </row>
-          <row>
-            <entry><option>-XAutoDeriveTypeable</option></entry>
-            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.
-            Implies <option>-XDeriveDataTypeable</option>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoAutoDeriveTypeable</option></entry>
-          </row>
-          <row>
-            <entry><option>-XDeriveGeneric</option></entry>
-            <entry>Enable <link linkend="deriving-typeable">deriving for the Generic class</link>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoDeriveGeneric</option></entry>
-          </row>
-          <row>
-            <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
-            <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-XNoGeneralizedNewtypeDeriving</option></entry>
           </row>
           <row>
             <entry><option>-XTypeSynonymInstances</option></entry>
@@ -1190,14 +1207,14 @@
             <entry><option>-</option></entry>
           </row>
           <row>
-            <entry><option>-fpackage-trust</option></entry>
-            <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworty modules.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-</option></entry>
-          </row>
-          <row>
             <entry><option>-XTypeHoles</option></entry>
             <entry>Enable <link linkend="type-holes">holes</link> in expressions.</entry>
+            <entry>dynamic</entry>
+            <entry><option>--XNoTypeHoles</option></entry>
+          </row>
+          <row>
+            <entry><option>-fpackage-trust</option></entry>
+            <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworty modules.</entry>
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
