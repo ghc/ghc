@@ -85,7 +85,7 @@ module Type (
         constraintKindTyCon, anyKindTyCon,
 
         -- * Type free variables
-        tyVarsOfType, tyVarsOfTypes,
+        tyVarsOfType, tyVarsOfTypes, closeOverKinds,
         expandTypeSynonyms,
         typeSize, varSetElemsKvsFirst,
 
@@ -171,7 +171,6 @@ import Util
 import Outputable
 import FastString
 
-import Data.List        ( partition )
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
@@ -995,13 +994,6 @@ typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
 typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
-
-varSetElemsKvsFirst :: VarSet -> [TyVar]
--- {k1,a,k2,b} --> [k1,k2,a,b]
-varSetElemsKvsFirst set
-  = kvs ++ tvs
-  where
-    (kvs, tvs) = partition isKindVar (varSetElems set)
 \end{code}
 
 

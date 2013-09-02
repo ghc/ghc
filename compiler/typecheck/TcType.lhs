@@ -142,7 +142,7 @@ module TcType (
   isUnboxedTupleType,	-- Ditto
   isPrimitiveType, 
 
-  tyVarsOfType, tyVarsOfTypes,
+  tyVarsOfType, tyVarsOfTypes, closeOverKinds,
   tcTyVarsOfType, tcTyVarsOfTypes,
 
   pprKind, pprParendKind, pprSigmaType,

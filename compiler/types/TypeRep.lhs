@@ -45,7 +45,7 @@ module TypeRep (
         pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
-        tyVarsOfType, tyVarsOfTypes,
+        tyVarsOfType, tyVarsOfTypes, closeOverKinds, varSetElemsKvsFirst,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -85,7 +85,7 @@ import StaticFlags( opt_PprStyle_Debug )
 import Util
 
 -- libraries
-import Data.List( mapAccumL )
+import Data.List( mapAccumL, partition )
 import qualified Data.Data        as Data hiding ( TyCon )
 \end{code}
 
@@ -327,6 +327,20 @@ tyVarsOfType (ForAllTy tyvar ty) = delVarSet (tyVarsOfType ty) tyvar
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet . tyVarsOfType) emptyVarSet tys
+
+closeOverKinds :: TyVarSet -> TyVarSet
+-- Add the kind variables free in the kinds
+-- of the tyvars in the given set
+closeOverKinds tvs
+  = foldVarSet (\tv ktvs -> tyVarsOfType (tyVarKind tv) `unionVarSet` ktvs) 
+               tvs tvs
+
+varSetElemsKvsFirst :: VarSet -> [TyVar]
+-- {k1,a,k2,b} --> [k1,k2,a,b]
+varSetElemsKvsFirst set
+  = kvs ++ tvs
+  where
+    (kvs, tvs) = partition isKindVar (varSetElems set)
 \end{code}
 
 %************************************************************************
