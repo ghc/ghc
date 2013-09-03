@@ -3,10 +3,10 @@ module Bug8 where
 infix -->
 infix --->
 
-data Typ = Type (String,[Typ])
-         | TFree (String, [String])
+data Typ = Type (Typ,[Typ])
+         | TFree (Typ, [Typ])
 
-x --> y = Type("fun",[s,t])
+x --> y = Type(s,[s,t])
 (--->) = flip $ foldr (-->)
 
 s = undefined

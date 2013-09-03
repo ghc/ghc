@@ -12,9 +12,9 @@
 module Haddock.Parser (parseString, parseParas) where
 
 import           Control.Applicative
-import           Data.Attoparsec.ByteString   hiding (takeWhile1, take, inClass)
+import           Data.Attoparsec.ByteString hiding (parse, takeWhile1, take, inClass)
 import qualified Data.Attoparsec.ByteString.Char8 as A8
-import           Data.Attoparsec.ByteString.Char8 hiding (take, string)
+import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, string)
 import qualified Data.ByteString as BS
 import           Data.Char (chr)
 import           Data.List (stripPrefix)
@@ -31,16 +31,15 @@ import           SrcLoc (mkRealSrcLoc, unLoc)
 import           StringBuffer (stringToStringBuffer)
 import           Haddock.Utf8
 
-default (Int)
+parse :: Parser a -> String -> Maybe a
+parse p = either (const Nothing) Just . parseOnly (p <* endOfInput) . encodeUtf8
 
 -- | Main entry point to the parser. Appends the newline character
 -- to the input string.
 parseParas :: DynFlags
               -> String -- ^ String to parse
               -> Maybe (Doc RdrName)
-parseParas d s = case parseOnly (p <* skipSpace) (encodeUtf8 $ s ++ "\n") of
-  Right r -> Just $ combineStringNodes r
-  _ -> Nothing
+parseParas d = fmap combineStringNodes . parse (p <* skipSpace) . (++ "\n")
   where
     p :: Parser (Doc RdrName)
     -- make sure that we don't swallow up whitespace belonging to next paragraph
@@ -51,7 +50,7 @@ parseParas d s = case parseOnly (p <* skipSpace) (encodeUtf8 $ s ++ "\n") of
 -- Drops any whitespace in front of the input string. It's dropped for the sake of
 -- section headings.
 parseString :: DynFlags -> String -> Maybe (Doc RdrName)
-parseString d = parseString'' d . dropWhile isSpace
+parseString d = parseString' d . dropWhile isSpace
 
 -- | A parser that parsers separate lines of the comments. Eventually
 -- called by 'parseParas'. Appends a newline character to the input string.
@@ -62,9 +61,7 @@ parseString'' d = parseString' d . (++ "\n")
 -- | An internal use function. Split from the 'parseString' is useful
 -- as we can specify separately when we want the newline to be appended.
 parseString' :: DynFlags -> String -> Maybe (Doc RdrName)
-parseString' d s = case parseOnly p (encodeUtf8 s) of
-  Right r -> Just $ combineStringNodes r
-  _ -> Nothing
+parseString' d = fmap combineStringNodes . parse p
   where
     p :: Parser (Doc RdrName)
     p = mconcat <$> some (charEscape <|> monospace d <|> anchor <|> identifier d
@@ -94,7 +91,7 @@ string' = DocString . decodeUtf8 <$> takeWhile1 (`notElem` "/<@\" &'`\\")
 -- >>> parseOnly emphasis "/Hello world/"
 -- Right (DocEmphasis (DocString "Hello world"))
 emphasis :: DynFlags -> Parser (Doc RdrName)
-emphasis d = stringBlock d id DocEmphasis "/" "/" "\n"
+emphasis d = DocEmphasis <$> stringBlock d "/" "/" "\n"
 
 -- | Skips a single character and treats it as a plain string.
 -- This is done to skip over any special characters belonging to other
@@ -119,17 +116,14 @@ anchor = DocAName . decodeUtf8 <$> ("#" *> takeWhile1 (`notElem` "#\n") <* "#")
 -- | Helper for markup structures surrounded with delimiters.
 stringBlock
   :: DynFlags
-     -> (String -> String) -- ^ Function used to transform parsed out text
-                           -- before we send it to 'parseString''
-     -> (Doc RdrName -> Doc RdrName) -- ^ 'Doc' to wrap around the result
      -> String -- ^ Opening delimiter
      -> String -- ^ Closing delimiter
      -> String -- ^ Additional characters to terminate parsing on
      -> Parser (Doc RdrName)
-stringBlock d f doc op ed n = do
+stringBlock d op ed n = do
   inner <- block op ed n
-  case parseString' d (f inner) of
-    Just r -> return $ doc r
+  case parseString' d inner of
+    Just r -> return r
     _ -> fail $ "inner parse fail with op: ‘" ++ op ++ "’, ed: ‘" ++ ed ++ "’"
 
 -- | Returns sections of text delimited by specified text.
@@ -171,7 +165,7 @@ takeWithSkip s n = do
 -- >>> parseOnly (monospace dynflags) "@cruel@"
 -- Right (DocMonospaced (DocString "cruel"))
 monospace :: DynFlags -> Parser (Doc RdrName)
-monospace d = stringBlock d id DocMonospaced "@" "@" ""
+monospace d = DocMonospaced <$> stringBlock d "@" "@" ""
 
 -- | Module name parser, surrounded by double quotes. This does a very primitive and
 -- purely syntactic checking so that obviously invalid names are not treated as valid

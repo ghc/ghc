@@ -3,7 +3,7 @@
 -- Module      :  Test
 -- Copyright   :  (c) Simon Marlow 2002
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -14,8 +14,8 @@
 -----------------------------------------------------------------------------
 
 -- This is plain comment, ignored by Haddock.
-
-module Test ( 
+{-# LANGUAGE Rank2Types, GADTs #-}
+module Test (
 
 	-- Section headings are introduced with '-- *':
 	-- * Type declarations
@@ -33,7 +33,7 @@ module Test (
 
 	-- * Class declarations
 	C(a,b), D(..), E, F(..),
-	
+
 	-- | Test that we can export a class method on its own:
 	a,
 
@@ -88,7 +88,7 @@ module Test (
 
 	-- * A section
 	-- and without an intervening comma:
-	-- ** A subsection 
+	-- ** A subsection
 
 {-|
  > a literal line
@@ -112,7 +112,7 @@ bla = Nothing
 data T a b
  = A Int (Maybe Float) -- ^ This comment describes the 'A' constructor
  | -- | This comment describes the 'B' constructor
-   B (T a b, T Int Float) -- ^ 
+   B (T a b, T Int Float) -- ^
 
 -- | An abstract data declaration
 data T2 a b = T2 a b
@@ -145,7 +145,7 @@ newtype N1 a = N1 a
 newtype N2 a b = N2 {n :: a b}
 
 -- | A newtype with a fieldname, documentation on the field
-newtype N3 a b = N3 {n3 :: a b -- ^ this is the 'n3' field 
+newtype N3 a b = N3 {n3 :: a b -- ^ this is the 'n3' field
 		    }
 
 -- | An abstract newtype - we show this one as data rather than newtype because
@@ -163,7 +163,7 @@ newtype N6 a b = N6 {n6 :: a b
 newtype N7 a b = N7 {n7 :: a b
 		    }
 		-- ^ The 'N7' constructor
-		 
+
 
 class (D a) => C a  where
    -- |this is a description of the 'a' method
@@ -198,7 +198,7 @@ class F a where
 
 -- | This is the documentation for the 'R' record, which has four fields,
 -- 'p', 'q', 'r', and 's'.
-data R = 
+data R =
   -- | This is the 'C1' record constructor, with the following fields:
   C1 { p :: Int -- ^ This comment applies to the 'p' field
      , q :: forall a . a->a  -- ^ This comment applies to the 'q' field
@@ -211,15 +211,15 @@ data R =
   -- ^ This is the 'C2' record constructor, also with some fields:
 
 -- | Testing different record commenting styles
-data R1 
+data R1
   -- | This is the 'C3' record constructor
-  = C3 { 
+  = C3 {
 	-- | The 's1' record selector
 	  s1 :: Int
 	-- | The 's2' record selector
 	, s2 :: Int
 	, s3 :: Int  -- NOTE: In the original examples/Test.hs in Haddock, there is an extra "," here.
-                     -- Since GHC doesn't allow that, I have removed it in this file. 
+                     -- Since GHC doesn't allow that, I have removed it in this file.
 	-- ^ The 's3' record selector
      }
 
@@ -240,11 +240,11 @@ using double quotes: "Foo".  We can add emphasis /like this/.
    - This is the next item (different kind of bullet)
 
    (1) This is an ordered list
- 
+
    2. This is the next item (different kind of bullet)
-   
+
    [cat] a small, furry, domesticated mammal
-   
+
    [pineapple] a fruit grown in the tropics
 
 @
@@ -350,15 +350,15 @@ test2
 
 -- $aux12
 -- > foo
--- 
+--
 -- > bar
--- 
+--
 
 -- | A data-type using existential\/universal types
-data Ex a 
+data Ex a
   = forall b . C b => Ex1 b
   | forall b . Ex2 b
-  | forall b . C a => Ex3 b -- NOTE: I have added "forall b" here make GHC accept this file 
+  | forall b . C a => Ex3 b -- NOTE: I have added "forall b" here make GHC accept this file
   | Ex4 (forall a . a -> a)
 
 -- | This is a function with documentation for each argument
@@ -374,7 +374,7 @@ k :: T () () 	  -- ^ This argument has type 'T'
 l :: (Int, Int, Float) -- ^ takes a triple
   -> Int -- ^ returns an 'Int'
 
--- | This function has some arg docs 
+-- | This function has some arg docs
 m :: R
   -> N1 ()	-- ^ one of the arguments
   -> IO Int	-- ^ and the return value
@@ -385,22 +385,22 @@ m :: R
 newn :: R		-- ^ one of the arguments, an 'R'
      -> N1 ()		-- ^ one of the arguments
      -> IO Int
-newn = undefined 
+newn = undefined
 
 
 -- | A foreign import with argument docs
-foreign import ccall unsafe 
+foreign import ccall unsafe
  o :: Float  -- ^ The input float
    -> IO Float  -- ^ The output float
 
 -- | We should be able to escape this: \#\#\#
 
--- p :: Int 
+-- p :: Int
 -- can't use the above original definition with GHC
-newp :: Int  
+newp :: Int
 newp = undefined
 
--- | a function with a prime can be referred to as 'f'' 
+-- | a function with a prime can be referred to as 'f''
 -- but f' doesn't get link'd 'f\''
 f' :: Int
 
@@ -416,7 +416,7 @@ withType = 1
 data T1
 f = undefined
 f' = undefined
-type CInt = Int  
+type CInt = Int
 k = undefined
 l = undefined
 m = undefined

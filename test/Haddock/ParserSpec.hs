@@ -6,7 +6,6 @@
 module Haddock.ParserSpec (main, spec) where
 
 import           Control.Applicative
-import           Data.Maybe (isJust)
 import           Data.Monoid
 import           Data.String
 import           Haddock.Doc (combineStringNodes)
@@ -43,7 +42,6 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-
   let filterSpecial = filter (`notElem` (".(=#-[*`\v\f\n\t\r\\\"'_/@<> " :: String))
 
   describe "parseString" $ do
@@ -53,65 +51,84 @@ spec = do
 
     it "is total" $ do
       property $ \xs ->
-        -- filter out primes as we might end up with an identifier
-        -- which will fail due to undefined DynFlags
-        parseString (filter (/= '\'') xs) `shouldSatisfy` isJust
+        (length . show . parseString) xs `shouldSatisfy` (> 0)
 
     context "when parsing URLs" $ do
       it "parses a URL" $ do
         "<http://example.com/>" `shouldParseTo`
-          hyperlink "http://example.com/" Nothing <> "\n"
+          hyperlink "http://example.com/" Nothing
 
       it "accepts an optional label" $ do
         "<http://example.com/ some link>" `shouldParseTo`
-          hyperlink "http://example.com/" "some link" <> "\n"
+          hyperlink "http://example.com/" "some link"
 
       it "finishes URL parsing as soon as it sees >, even if it's escaped" $ do
         "<http://examp\\>le.com" `shouldParseTo`
-          hyperlink "http://examp\\" Nothing <> "le.com\n"
+          hyperlink "http://examp\\" Nothing <> "le.com"
 
         "<http://exa\\>mp\\>le.com>" `shouldParseTo`
-          hyperlink "http://exa\\" Nothing <> "mp>le.com>\n"
+          hyperlink "http://exa\\" Nothing <> "mp>le.com>"
 
         -- Likewise in label
         "<http://example.com f\\>oo>" `shouldParseTo`
-          hyperlink "http://example.com" "f\\" <> "oo>\n"
+          hyperlink "http://example.com" "f\\" <> "oo>"
 
       it "parses inline URLs" $ do
         "Not yet working, see <http://trac.haskell.org/haddock/ticket/223>\n , isEmptyChan" `shouldParseTo`
              "Not yet working, see "
           <> hyperlink "http://trac.haskell.org/haddock/ticket/223" Nothing
-          <> "\n , isEmptyChan\n"
+          <> "\n , isEmptyChan"
 
       context "when autolinking URLs" $ do
         it "autolinks HTTP URLs" $ do
           "http://example.com/" `shouldParseTo`
-            hyperlink "http://example.com/" Nothing <> "\n"
+            hyperlink "http://example.com/" Nothing
 
         it "autolinks HTTPS URLs" $ do
           "https://www.example.com/" `shouldParseTo`
-            hyperlink "https://www.example.com/" Nothing <> "\n"
+            hyperlink "https://www.example.com/" Nothing
 
         it "autolinks FTP URLs" $ do
           "ftp://example.com/" `shouldParseTo`
-            hyperlink "ftp://example.com/" Nothing <> "\n"
+            hyperlink "ftp://example.com/" Nothing
 
         it "does not include a trailing exclamation mark" $ do
           "http://example.com/! Some other sentence." `shouldParseTo`
-            hyperlink "http://example.com/" Nothing <> "! Some other sentence.\n"
+            hyperlink "http://example.com/" Nothing <> "! Some other sentence."
 
         it "does not include a trailing comma" $ do
           "http://example.com/, Some other sentence." `shouldParseTo`
-            hyperlink "http://example.com/" Nothing <> ", Some other sentence.\n"
+            hyperlink "http://example.com/" Nothing <> ", Some other sentence."
 
         it "does not include a trailing dot" $ do
           "http://example.com/. Some other sentence." `shouldParseTo`
-            hyperlink "http://example.com/" Nothing <> ". Some other sentence.\n"
+            hyperlink "http://example.com/" Nothing <> ". Some other sentence."
 
         it "does not include a trailing question mark" $ do
           "http://example.com/? Some other sentence." `shouldParseTo`
-            hyperlink "http://example.com/" Nothing <> "? Some other sentence.\n"
+            hyperlink "http://example.com/" Nothing <> "? Some other sentence."
 
+    context "when parsing emphasised text" $ do
+      it "emphasises a word on its own" $ do
+        "/foo/" `shouldParseTo` DocEmphasis "foo"
+
+      it "emphasises inline correctly" $ do
+        "foo /bar/ baz" `shouldParseTo` "foo " <> DocEmphasis "bar" <> " baz"
+
+      it "emphasises unicode" $ do
+        "/灼眼のシャナ/" `shouldParseTo` DocEmphasis "灼眼のシャナ"
+
+      it "does not emphasise multi-line strings" $ do
+        " /foo\nbar/" `shouldParseTo` "/foo\nbar/"
+
+      it "does not emphasise the empty string" $ do
+        "//" `shouldParseTo` "//"
+
+      it "parses escaped slashes literally" $ do
+        "/foo\\/bar/" `shouldParseTo` DocEmphasis "foo/bar"
+
+      it "recognizes other markup constructs within emphasised text" $ do
+        "/foo @bar@ baz/" `shouldParseTo` DocEmphasis ("foo " <> DocMonospaced "bar" <> " baz")
 
   describe "parseParas" $ do
     let infix 1 `shouldParseTo`
@@ -121,9 +138,7 @@ spec = do
 
     it "is total" $ do
       property $ \xs ->
-        -- filter out primes as we might end up with an identifier
-        -- which will fail due to undefined DynFlags
-        parseParas (filter (/= '\'') xs) `shouldSatisfy` isJust
+        (length . show . parseParas) xs `shouldSatisfy` (> 0)
 
     it "parses a paragraph" $ do
       "foobar" `shouldParseTo` DocParagraph "foobar\n"
@@ -153,23 +168,6 @@ spec = do
       it "should parse a module inline" $ do
         "This is a \"Module\"." `shouldParseTo`
           DocParagraph ("This is a " <> (DocModule "Module" <> ".\n"))
-
-    context "when parsing emphasised strings" $ do
-      it "emphasises a word on its own" $ do
-        "/quux/" `shouldParseTo` (DocParagraph $ DocEmphasis "quux" <> "\n")
-
-      it "emphasises inline correctly" $ do
-        "This comment applies to the /following/ declaration" `shouldParseTo`
-          (DocParagraph $ "This comment applies to the "
-                <> DocEmphasis "following" <> " declaration\n")
-
-      it "emphasises unicode" $ do
-        "/灼眼のシャナ/" `shouldParseTo`
-          (DocParagraph $ DocEmphasis "灼眼のシャナ" <> "\n")
-
-      it "does not do /multi-line\\n emphasis/" $ do
-        " /multi-line\n emphasis/" `shouldParseTo`
-          DocParagraph "/multi-line\n emphasis/\n"
 
     context "when parsing codeblocks" $ do
       it "codeblock a word on its own" $ do
@@ -564,9 +562,6 @@ spec = do
         "[@q/uu/x@] h\ney" `shouldParseTo`
           DocDefList
                 [(DocMonospaced ("q" <> DocEmphasis "uu" <> "x"), " h\ney\n")]
-
-      it "/qu\\nux/" $ do
-        "/qu\nux/" `shouldParseTo` DocParagraph "/qu\nux/\n"
 
       -- regression test
       it "requires markup to be fully closed, even if nested" $ do

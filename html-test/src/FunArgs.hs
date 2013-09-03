@@ -1,3 +1,4 @@
+{-# LANGUAGE ExplicitForAll #-}
 module FunArgs where
 
 f :: forall a. Ord a

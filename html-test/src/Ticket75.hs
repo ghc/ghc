@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 module Ticket75 where
 
 data a :- b = Q
