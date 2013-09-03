@@ -16,7 +16,7 @@ A ``lint'' pass to check for Core correctness
 
 {-# OPTIONS_GHC -fprof-auto #-}
 
-module CoreLint ( lintCoreBindings, lintUnfolding ) where
+module CoreLint ( lintCoreBindings, lintUnfolding, lintExpr ) where
 
 #include "HsVersions.h"
 
@@ -120,14 +120,15 @@ find an occurence of an Id, we fetch it from the in-scope set.
 
 
 \begin{code}
-lintCoreBindings :: CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
+lintCoreBindings :: [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings binds
+lintCoreBindings local_in_scope binds
   = initL $ 
-    addLoc TopLevelBindings $
-    addInScopeVars binders  $
+    addLoc TopLevelBindings        $
+    addInScopeVars local_in_scope  $
+    addInScopeVars binders         $
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
 	-- into use 'unexpectedly'
@@ -177,6 +178,18 @@ lintUnfolding locn vars expr
   where
     (_warns, errs) = initL (addLoc (ImportedUnfolding locn) $
                             addInScopeVars vars	           $
+                            lintCoreExpr expr)
+
+lintExpr :: [Var]		-- Treat these as in scope
+	 -> CoreExpr
+	 -> Maybe MsgDoc	-- Nothing => OK
+
+lintExpr vars expr
+  | isEmptyBag errs = Nothing
+  | otherwise       = Just (pprMessageBag errs)
+  where
+    (_warns, errs) = initL (addLoc TopLevelBindings $
+                            addInScopeVars vars	    $
                             lintCoreExpr expr)
 \end{code}
 

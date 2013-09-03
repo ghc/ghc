@@ -363,7 +363,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
               }
 
-        ; endPass dflags CoreTidy all_tidy_binds tidy_rules
+        ; endPass hsc_env CoreTidy all_tidy_binds tidy_rules
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
