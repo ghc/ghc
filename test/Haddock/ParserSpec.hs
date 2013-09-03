@@ -21,7 +21,9 @@ import           Helper
 instance Outputable a => Show a where
   show = showSDoc dynFlags . ppr
 
+deriving instance Show a => Show (Header a)
 deriving instance Show a => Show (Doc a)
+deriving instance Eq a => Eq (Header a)
 deriving instance Eq a => Eq (Doc a)
 
 instance IsString RdrName where
@@ -651,3 +653,20 @@ spec = before initStaticOpts $ do
             ("cat", "kitten\n")
           , ("pineapple", "fruit\n")
           ]
+
+    context "when parsing function documentation headers" $ do
+      it "can parse a simple header" $ do
+        "= Header 1\nHello." `shouldParseTo`
+          DocParagraph (DocHeader (Header 1 "Header 1"))
+          <> DocParagraph "Hello."
+
+      it "allow consecutive headers" $ do
+        "= Header 1\n== Header 2" `shouldParseTo`
+          DocParagraph (DocHeader (Header 1 "Header 1"))
+          <> DocParagraph (DocHeader (Header 2 "Header 2"))
+
+      it "accepts markup in the header" $ do
+        "= /Header/ __1__\nFoo" `shouldParseTo`
+          DocParagraph (DocHeader
+                        (Header 1 (DocEmphasis "Header" <> " " <> DocBold "1")))
+          <> DocParagraph "Foo"

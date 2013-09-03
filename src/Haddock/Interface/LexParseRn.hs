@@ -125,6 +125,7 @@ rename dflags gre = rn
       DocExamples e -> DocExamples e
       DocEmpty -> DocEmpty
       DocString str -> DocString str
+      DocHeader (Header l t) -> DocHeader $ Header l (rn t)
 
 dataTcOccs' :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type

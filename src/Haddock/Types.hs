@@ -309,7 +309,14 @@ data Doc id
   | DocAName String
   | DocProperty String
   | DocExamples [Example]
+  | DocHeader (Header (Doc id))
   deriving (Functor, Foldable, Traversable)
+
+instance Foldable Header where
+  foldMap f (Header _ a) = f a
+
+instance Traversable Header where
+  traverse f (Header l a) = Header l `fmap` f a
 
 instance NFData a => NFData (Doc a) where
   rnf doc = case doc of
@@ -333,6 +340,7 @@ instance NFData a => NFData (Doc a) where
     DocAName a                -> a `deepseq` ()
     DocProperty a             -> a `deepseq` ()
     DocExamples a             -> a `deepseq` ()
+    DocHeader a               -> a `deepseq` ()
 
 
 instance NFData Name
@@ -351,6 +359,13 @@ data Picture = Picture
   , pictureTitle :: Maybe String
   } deriving (Eq, Show)
 
+data Header id = Header
+  { headerLevel :: Int
+  , headerTitle :: id
+  } deriving Functor
+
+instance NFData id => NFData (Header id) where
+  rnf (Header a b) = a `deepseq` b `deepseq` ()
 
 instance NFData Hyperlink where
   rnf (Hyperlink a b) = a `deepseq` b `deepseq` ()
@@ -395,6 +410,7 @@ data DocMarkup id a = Markup
   , markupPic                  :: Picture -> a
   , markupProperty             :: String -> a
   , markupExample              :: [Example] -> a
+  , markupHeader               :: Header a -> a
   }
 
 

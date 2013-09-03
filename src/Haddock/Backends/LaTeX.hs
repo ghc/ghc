@@ -1013,9 +1013,16 @@ parLatexMarkup ppId = Markup {
   markupHyperlink            = \l _ -> markupLink l,
   markupAName                = \_ _ -> empty,
   markupProperty             = \p _ -> quote $ verb $ text p,
-  markupExample              = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e
+  markupExample              = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e,
+  markupHeader               = \(Header l h) p -> header l (h p)
   }
   where
+    header 1 d = text "\\section*" <> braces d
+    header 2 d = text "\\subsection*" <> braces d
+    header l d
+      | l > 0 && l <= 6 = text "\\subsubsection*" <> braces d
+    header l _ = error $ "impossible header level in LaTeX generation: " ++ show l
+
     fixString Plain s = latexFilter s
     fixString Verb  s = s
     fixString Mono  s = latexMonoFilter s

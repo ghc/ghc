@@ -14,7 +14,7 @@ module Haddock.Parser (parseString, parseParas, parseStringMaybe, parseParasMayb
 import           Prelude hiding (takeWhile)
 import           Control.Monad (void, mfilter)
 import           Control.Applicative
-import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, string, endOfLine)
+import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, endOfLine)
 import qualified Data.ByteString.Char8 as BS
 import           Data.Char (chr, isAsciiUpper)
 import           Data.List (stripPrefix, intercalate)
@@ -168,7 +168,17 @@ picture = DocPic . makeLabeled Picture . decodeUtf8
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: DynFlags -> Parser (Doc RdrName)
 paragraph d = examples <|> skipSpace *> (list d <|> birdtracks <|> codeblock d
-                                         <|> property <|> textParagraph d)
+                                         <|> property <|> header d
+                                         <|> textParagraph d)
+
+header :: DynFlags -> Parser (Doc RdrName)
+header d = do
+  let psers = map (string . encodeUtf8 . concat . flip replicate "=") [6, 5 .. 1]
+      pser = foldl1 (<|>) psers
+  delim <- decodeUtf8 <$> pser
+  line <- skipHorizontalSpace *> nonEmptyLine >>= return . parseString d
+  rest <- paragraph d <|> return mempty
+  return $ docAppend (DocParagraph (DocHeader (Header (length delim) line))) rest
 
 textParagraph :: DynFlags -> Parser (Doc RdrName)
 textParagraph d = docParagraph . parseString d . intercalate "\n" <$> many1 nonEmptyLine

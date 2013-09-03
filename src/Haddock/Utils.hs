@@ -433,6 +433,7 @@ markup m (DocAName ref)              = markupAName m ref
 markup m (DocPic img)                = markupPic m img
 markup m (DocProperty p)             = markupProperty m p
 markup m (DocExamples e)             = markupExample m e
+markup m (DocHeader (Header l t))    = markupHeader m (Header l (markup m t))
 
 
 markupPair :: DocMarkup id a -> (Doc id, Doc id) -> (a, a)
@@ -461,7 +462,8 @@ idMarkup = Markup {
   markupAName                = DocAName,
   markupPic                  = DocPic,
   markupProperty             = DocProperty,
-  markupExample              = DocExamples
+  markupExample              = DocExamples,
+  markupHeader               = DocHeader
   }
 
 

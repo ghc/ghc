@@ -257,7 +257,8 @@ markupTag dflags = Markup {
   markupHyperlink            = \(Hyperlink url mLabel) -> (box (TagInline "a") . str) (fromMaybe url mLabel),
   markupAName                = const $ str "",
   markupProperty             = box TagPre . str,
-  markupExample              = box TagPre . str . unlines . map exampleToString
+  markupExample              = box TagPre . str . unlines . map exampleToString,
+  markupHeader               = \(Header l h) -> box (TagInline $ "h" ++ show l) h
   }
 
 

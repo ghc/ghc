@@ -53,9 +53,20 @@ parHtmlMarkup qual ppId = Markup {
   markupAName                = \aname -> namedAnchor aname << "",
   markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
   markupProperty             = pre . toHtml,
-  markupExample              = examplesToHtml
+  markupExample              = examplesToHtml,
+  markupHeader               = \(Header l t) -> makeHeader l t
   }
   where
+    makeHeader :: Int -> Html -> Html
+    makeHeader 1 mkup = h1 mkup
+    makeHeader 2 mkup = h2 mkup
+    makeHeader 3 mkup = h3 mkup
+    makeHeader 4 mkup = h4 mkup
+    makeHeader 5 mkup = h5 mkup
+    makeHeader 6 mkup = h6 mkup
+    makeHeader l _ = error $ "Somehow got a header level `" ++ show l ++ "' in DocMarkup!"
+
+
     examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
 
     exampleToHtml (Example expression result) = htmlExample
