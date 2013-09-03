@@ -429,6 +429,8 @@ foldExpForeignTarget exp (ForeignTarget e _) z = exp e z
 foldExpForeignTarget _   (PrimTarget _)      z = z
 
 -- Take a folder on expressions and apply it recursively.
+-- Specifically (wrapRecExpf f e z) deals with CmmMachOp and CmmLoad
+-- itself, delegating all the other CmmExpr forms to 'f'.
 wrapRecExpf :: (CmmExpr -> z -> z) -> CmmExpr -> z -> z
 wrapRecExpf f e@(CmmMachOp _ es) z = foldr (wrapRecExpf f) (f e z) es
 wrapRecExpf f e@(CmmLoad addr _) z = wrapRecExpf f addr (f e z)

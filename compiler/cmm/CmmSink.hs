@@ -90,12 +90,6 @@ import qualified Data.Set as Set
 -- (transitively, even).  This isn't as good as removeDeadAssignments,
 -- but it's much cheaper.
 
--- If we do this *before* stack layout, we might be able to avoid
--- saving some things across calls/procpoints.
---
--- *but*, that will invalidate the liveness analysis, and we'll have
--- to re-do it.
-
 -- -----------------------------------------------------------------------------
 -- things that we aren't optimising very well yet.
 --
@@ -142,6 +136,12 @@ type Assignment = (LocalReg, CmmExpr, AbsMem)
   -- Assignment caches AbsMem, an abstraction of the memory read by
   -- the RHS of the assignment.
 
+type Assignments = [Assignment]
+  -- A sequence of assignements; kept in *reverse* order
+  -- So the list [ x=e1, y=e2 ] means the sequence of assignments
+  --     y = e2
+  --     x = e1
+
 cmmSink :: DynFlags -> CmmGraph -> CmmGraph
 cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   where
@@ -152,7 +152,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: BlockEnv [Assignment] -> [CmmBlock] -> [CmmBlock]
+  sink :: BlockEnv Assignments -> [CmmBlock] -> [CmmBlock]
   sink _ [] = []
   sink sunk (b:bs) =
     -- pprTrace "sink" (ppr lbl) $
@@ -229,7 +229,8 @@ isSmall _ = False
 
 isTrivial :: CmmExpr -> Bool
 isTrivial (CmmReg (CmmLocal _)) = True
--- isTrivial (CmmLit _) = True
+-- isTrivial (CmmLit _) = True  -- Disabled because it used to make thing worse.
+                                -- Needs further investigation
 isTrivial _ = False
 
 --
@@ -254,7 +255,7 @@ findJoinPoints blocks = mapFilter (>1) succ_counts
 -- filter the list of assignments to remove any assignments that
 -- are not live in a continuation.
 --
-filterAssignments :: DynFlags -> LocalRegSet -> [Assignment] -> [Assignment]
+filterAssignments :: DynFlags -> LocalRegSet -> Assignments -> Assignments
 filterAssignments dflags live assigs = reverse (go assigs [])
   where go []             kept = kept
         go (a@(r,_,_):as) kept | needed    = go as (a:kept)
@@ -269,19 +270,29 @@ filterAssignments dflags live assigs = reverse (go assigs [])
 -- -----------------------------------------------------------------------------
 -- Walk through the nodes of a block, sinking and inlining assignments
 -- as we go.
+--
+-- On input we pass in a:
+--    * list of nodes in the block
+--    * a list of assignments that appeared *before* this block and
+--      that are being sunk.
+--
+-- On output we get:
+--    * a new block
+--    * a list of assignments that will be placed *after* that block.
+--
 
 walk :: DynFlags
      -> [(LocalRegSet, CmmNode O O)]    -- nodes of the block, annotated with
                                         -- the set of registers live *after*
                                         -- this node.
 
-     -> [Assignment]                    -- The current list of
+     -> Assignments                     -- The current list of
                                         -- assignments we are sinking.
                                         -- Later assignments may refer
                                         -- to earlier ones.
 
      -> ( Block CmmNode O O             -- The new block
-        , [Assignment]                  -- Assignments to sink further
+        , Assignments                   -- Assignments to sink further
         )
 
 walk dflags nodes assigs = go nodes emptyBlock assigs
@@ -341,12 +352,12 @@ shouldDiscard node live
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
 
-dropAssignmentsSimple :: DynFlags -> (Assignment -> Bool) -> [Assignment]
-                      -> ([CmmNode O O], [Assignment])
+dropAssignmentsSimple :: DynFlags -> (Assignment -> Bool) -> Assignments
+                      -> ([CmmNode O O], Assignments)
 dropAssignmentsSimple dflags f = dropAssignments dflags (\a _ -> (f a, ())) ()
 
-dropAssignments :: DynFlags -> (Assignment -> s -> (Bool, s)) -> s -> [Assignment]
-                -> ([CmmNode O O], [Assignment])
+dropAssignments :: DynFlags -> (Assignment -> s -> (Bool, s)) -> s -> Assignments
+                -> ([CmmNode O O], Assignments)
 dropAssignments dflags should_drop state assigs
  = (dropped, reverse kept)
  where
@@ -371,16 +382,16 @@ tryToInline
                                 -- that is live after the node, unless
                                 -- it is small enough to duplicate.
    -> CmmNode O x               -- The node to inline into
-   -> [Assignment]              -- Assignments to inline
+   -> Assignments               -- Assignments to inline
    -> (
         CmmNode O x             -- New node
-      , [Assignment]            -- Remaining assignments
+      , Assignments             -- Remaining assignments
       )
 
 tryToInline dflags live node assigs = go usages node [] assigs
  where
-  usages :: UniqFM Int
-  usages = foldRegsUsed dflags addUsage emptyUFM node
+  usages :: UniqFM Int -- Maps each LocalReg to a count of how often it is used
+  usages = foldLocalRegsUsed dflags addUsage emptyUFM node
 
   go _usages node _skipped [] = (node, [])
 
@@ -391,10 +402,10 @@ tryToInline dflags live node assigs = go usages node [] assigs
    | otherwise               = dont_inline
    where
         inline_and_discard = go usages' inl_node skipped rest
-          where usages' = foldRegsUsed dflags addUsage usages rhs
+          where usages' = foldLocalRegsUsed dflags addUsage usages rhs
 
-        dont_inline        = keep node  -- don't inline the assignment, keep it
-        inline_and_keep    = keep inl_node -- inline the assignment, keep it
+        dont_inline        = keep node     -- don't inline the assignment, keep it
+        inline_and_keep    = keep inl_node --       inline the assignment, keep it
 
         keep node' = (final_node, a : rest')
           where (final_node, rest') = go usages' node' (l:skipped) rest
