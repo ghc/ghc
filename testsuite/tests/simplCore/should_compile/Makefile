@@ -108,3 +108,6 @@ T7995:
 	$(RM) -f T7995.hi T7995.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package ghc -ddump-rule-firings -c -O T7995.hs | grep 'text/str'
 
+T8221:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221a.hs 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221.hs

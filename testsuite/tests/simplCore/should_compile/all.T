@@ -187,3 +187,8 @@ test('T7995',
      ['$MAKE -s --no-print-directory T7995'])
 
 test('T8196', normal, compile, [''])
+test('T8221b', normal, compile, [''])
+test('T8221',
+     extra_clean(['T8221a.hi', 'T8221a.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T8221'])
