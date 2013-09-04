@@ -605,33 +605,36 @@ tcIfaceDataCons tycon_name tycon _ if_cons
                          ifConStricts = if_stricts})
      = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
        bindIfaceTyVars ex_tvs    $ \ ex_tyvars -> do
-        { name  <- lookupIfaceTop occ
+        { traceIf (text "Start interface-file tc_con_decl" <+> ppr occ)
+        ; name  <- lookupIfaceTop occ
 
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of 
         --     the type itself, which is knot-tied
         -- (b) to avoid faulting in the component types unless 
         --     they are really needed
-        ; ~(eq_spec, theta, arg_tys) <- forkM (mk_doc name) $
+        ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
                 ; arg_tys <- mapM tcIfaceType args
-                ; return (eq_spec, theta, arg_tys) }
+                ; stricts <- mapM tc_strict if_stricts 
+                        -- The IfBang field can mention 
+                        -- the type itself; hence inside forkM
+                ; return (eq_spec, theta, arg_tys, stricts) }
         ; lbl_names <- mapM lookupIfaceTop field_lbls
-
-        ; stricts <- mapM tc_strict if_stricts
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon 
                                 (substTyVars (mkTopTvSubst eq_spec) univ_tyvars)
 
-        ; buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
+        ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
                        name is_infix
                        stricts lbl_names
                        univ_tyvars ex_tyvars 
                        eq_spec theta 
                        arg_tys orig_res_ty tycon
-        }
+        ; traceIf (text "Done interface-file tc_con_decl" <+> ppr name)
+        ; return con } 
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 
     tc_strict IfNoBang = return HsNoBang
