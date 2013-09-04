@@ -214,8 +214,11 @@ the sharing of E. Since absence analysis and worker-wrapper are keen
 to remove such unused arguments, we add in a void argument to prevent
 the function from becoming a thunk.
 
-The user can avoid that argument with the -ffun-to-thunk
-flag. However, removing all the value argus may introduce space leaks.
+The user can avoid adding the void argument with the -ffun-to-thunk
+flag. However, this can create sharing, which may be bad in two ways. 1) It can
+create a space leak. 2) It can prevent inlining *under a lambda*. If w/w
+removes the last argument from a function f, then f now looks like a thunk, and
+so f can't be inlined *under a lambda*.
 
 Note [All One-Shot Arguments of a Worker]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
