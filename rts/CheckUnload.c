@@ -246,7 +246,7 @@ void checkUnload (StgClosure *static_objects)
   HashTable *addrs;
   StgClosure* p;
   const StgInfoTable *info;
-  ObjectCode *oc, *prev;
+  ObjectCode *oc, *prev, *next;
   gen_workspace *ws;
   StgClosure* link;
 
@@ -283,7 +283,8 @@ void checkUnload (StgClosure *static_objects)
   // marked as unreferenced can be physically unloaded, because we
   // have no references to it.
   prev = NULL;
-  for (oc = unloaded_objects; oc; prev = oc, oc = oc->next) {
+  for (oc = unloaded_objects; oc; prev = oc, oc = next) {
+      next = oc->next;
       if (oc->referenced == 0) {
           if (prev == NULL) {
               unloaded_objects = oc->next;
