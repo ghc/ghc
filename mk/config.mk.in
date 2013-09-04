@@ -490,6 +490,7 @@ endif
 TargetPlatformFull    = @TargetPlatformFull@
 GccLT34         = @GccLT34@
 GccLT46         = @GccLT46@
+GccIsClang      = @GccIsClang@
 
 CC              = $(WhatGccIsCalled)
 CC_STAGE0       = @CC_STAGE0@
