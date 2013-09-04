@@ -801,7 +801,7 @@ printAllThreads(void)
   debugBelch("all threads:\n");
 
   for (i = 0; i < n_capabilities; i++) {
-      cap = &capabilities[i];
+      cap = capabilities[i];
       debugBelch("threads on capability %d:\n", cap->no);
       for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->_link) {
 	  printThreadStatus(t);
