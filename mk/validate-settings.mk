@@ -10,7 +10,7 @@ HADDOCK_DOCS    = YES
 #####################
 # Warnings
 
-ifeq "$(GccIsClang)" "NO"
+ifneq "$(GccIsClang)" "YES"
 
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
 # we turn it on explicitly for consistency with other users
