@@ -22,6 +22,9 @@ Flags:
   --fast            Omit dyn way, omit binary distribution
   --slow            Build stage2 with -DDEBUG.
                     2008-07-01: 14% slower than the default.
+  --no-dph:         Skip requiring libraries/dph. In --slow mode, these tests
+                    can take a substantial amount of time, and on some platforms
+                    with broken linkers, we don't want to try compiling it.
   --help            shows this usage help.
 
   Set environment variable 'CPUS' to number of cores, to exploit
@@ -36,6 +39,7 @@ no_clean=0
 testsuite_only=0
 hpc=NO
 speed=NORMAL
+skip_dph=0
 
 while [ $# -gt 0 ]
 do
@@ -57,6 +61,9 @@ do
         ;;
     --normal)
         speed=NORMAL
+        ;;
+    --no-dph)
+        skip_dph=1
         ;;
     --help)
         show_help
@@ -115,7 +122,11 @@ if [ $no_clean -eq 0 ]; then
         INSTDIR=`cygpath -m "$INSTDIR"`
     fi
 
-    /usr/bin/perl -w boot --validate --required-tag=dph
+    if [ $skip_dph -eq 1 ]; then
+        /usr/bin/perl -w boot --validate
+    else
+        /usr/bin/perl -w boot --validate --required-tag=dph
+    fi
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
