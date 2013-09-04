@@ -47,8 +47,6 @@ Other commonly-used options are:
     -v[n]	    Control verbosity (n is 0--5, normal verbosity level is 1,
 	              -v alone is equivalent to -v3)
 
-    -fglasgow-exts  Allow Glasgow extensions (unboxed types, etc.)
-
     -O		    An `optimising' package of compiler flags, for faster code
 
     -prof	    Compile for cost-centre profiling
