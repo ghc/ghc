@@ -20,7 +20,8 @@ import StgCmmMonad
 import StgCmmEnv
 import StgCmmCon
 import StgCmmHeap
-import StgCmmProf
+import StgCmmProf (curCCS, ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
+                   initUpdFrameProf, costCentreFrom)
 import StgCmmTicky
 import StgCmmLayout
 import StgCmmUtils

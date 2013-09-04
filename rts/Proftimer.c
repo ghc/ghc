@@ -76,7 +76,7 @@ handleProfTick(void)
     if (do_prof_ticks) {
         nat n;
         for (n=0; n < n_capabilities; n++) {
-            capabilities[n].r.rCCCS->time_ticks++;
+            capabilities[n]->r.rCCCS->time_ticks++;
         }
     }
 #endif

@@ -370,10 +370,11 @@ runCorePasses passes guts
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
     do_pass guts pass
-       = do { dflags <- getDynFlags
+       = do { hsc_env <- getHscEnv
+            ; let dflags = hsc_dflags hsc_env
             ; liftIO $ showPass dflags pass
             ; guts' <- doCorePass dflags pass guts
-            ; liftIO $ endPass dflags pass (mg_binds guts') (mg_rules guts')
+            ; liftIO $ endPass hsc_env pass (mg_binds guts') (mg_rules guts')
             ; return guts' }
 
 doCorePass :: DynFlags -> CoreToDo -> ModGuts -> CoreM ModGuts
@@ -676,7 +677,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           end_iteration dflags pass iteration_no counts1 binds2 rules1 ;
+           dump_end_iteration dflags iteration_no counts1 binds2 rules1 ;
+           lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
            do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
@@ -693,11 +695,10 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
-end_iteration :: DynFlags -> CoreToDo -> Int
+dump_end_iteration :: DynFlags -> Int
              -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
-end_iteration dflags pass iteration_no counts binds rules
-  = do { dumpPassResult dflags mb_flag hdr pp_counts binds rules
-       ; lintPassResult dflags pass binds }
+dump_end_iteration dflags iteration_no counts binds rules
+  = dumpPassResult dflags mb_flag hdr pp_counts binds rules
   where
     mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
             | otherwise                               = Nothing

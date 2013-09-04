@@ -269,7 +269,9 @@ rnHsTyKi _ _ ty@(HsQuasiQuoteTy _) = pprPanic "Can't do quasiquotation without G
 rnHsTyKi isType doc (HsQuasiQuoteTy qq)
   = ASSERT( isType )
     do { ty <- runQuasiQuoteType qq
-       ; rnHsType doc (unLoc ty) }
+         -- Wrap the result of the quasi-quoter in parens so that we don't
+         -- lose the outermost location set by runQuasiQuote (#7918) 
+       ; rnHsType doc (HsParTy ty) }
 #endif
 
 rnHsTyKi isType _ (HsCoreTy ty)

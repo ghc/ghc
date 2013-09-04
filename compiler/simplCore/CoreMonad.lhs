@@ -50,7 +50,8 @@ module CoreMonad (
     getAnnotations, getFirstAnnotations,
     
     -- ** Debug output
-    showPass, endPass, dumpPassResult, lintPassResult, dumpIfSet,
+    showPass, endPass, dumpPassResult, lintPassResult, 
+    lintInteractiveExpr, dumpIfSet,
 
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS, 
@@ -70,7 +71,7 @@ import Name( Name )
 import CoreSyn
 import PprCore
 import CoreUtils
-import CoreLint		( lintCoreBindings )
+import CoreLint		( lintCoreBindings, lintExpr )
 import HscTypes
 import Module
 import DynFlags
@@ -78,12 +79,13 @@ import StaticFlags
 import Rules            ( RuleBase )
 import BasicTypes       ( CompilerPhase(..) )
 import Annotations
-import Id		( Id )
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
 import TcEnv            ( tcLookupGlobal )
 import TcRnMonad        ( initTcForLookup )
+import Var
+import VarSet
 
 import Outputable
 import FastString
@@ -136,11 +138,12 @@ stuff before and after core passes, and do Core Lint when necessary.
 showPass :: DynFlags -> CoreToDo -> IO ()
 showPass dflags pass = Err.showPass dflags (showPpr dflags pass)
 
-endPass :: DynFlags -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
-endPass dflags pass binds rules
+endPass :: HscEnv -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
+endPass hsc_env pass binds rules
   = do { dumpPassResult dflags mb_flag (ppr pass) (pprPassDetails pass) binds rules
-       ; lintPassResult dflags pass binds }      
+       ; lintPassResult hsc_env pass binds }      
   where
+    dflags = hsc_dflags hsc_env 
     mb_flag = case coreDumpFlag pass of
                 Just flag | dopt flag dflags                    -> Just flag
                           | dopt Opt_D_verbose_core2core dflags -> Just flag
@@ -178,12 +181,16 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
                     , ptext (sLit "------ Local rules for imported ids --------")
                     , pprRules rules ]
 
-lintPassResult :: DynFlags -> CoreToDo -> CoreProgram -> IO ()
-lintPassResult dflags pass binds
-  = when (gopt Opt_DoCoreLinting dflags) $
-    do { let (warns, errs) = lintCoreBindings binds
+lintPassResult :: HscEnv -> CoreToDo -> CoreProgram -> IO ()
+lintPassResult hsc_env pass binds
+  | not (gopt Opt_DoCoreLinting dflags)
+  = return ()
+  | otherwise
+  = do { let (warns, errs) = lintCoreBindings (interactiveInScope hsc_env) binds
        ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults dflags pass warns errs binds  }
+  where 
+    dflags = hsc_dflags hsc_env
 
 displayLintResults :: DynFlags -> CoreToDo
                    -> Bag Err.MsgDoc -> Bag Err.MsgDoc -> CoreProgram
@@ -191,7 +198,7 @@ displayLintResults :: DynFlags -> CoreToDo
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)
   = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
-           (vcat [ banner "errors", Err.pprMessageBag errs
+           (vcat [ lint_banner "errors" (ppr pass), Err.pprMessageBag errs
                  , ptext (sLit "*** Offending Program ***")
                  , pprCoreBindings binds
                  , ptext (sLit "*** End of Offense ***") ])
@@ -206,19 +213,66 @@ displayLintResults dflags pass warns errs binds
   , not opt_NoDebugOutput
   , showLintWarnings pass
   = log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
-        (banner "warnings" $$ Err.pprMessageBag warns)
+        (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag warns)
 
   | otherwise = return ()
   where
-    banner string = ptext (sLit "*** Core Lint")      <+> text string 
-                    <+> ptext (sLit ": in result of") <+> ppr pass
-                    <+> ptext (sLit "***")
+
+lint_banner :: String -> SDoc -> SDoc
+lint_banner string pass = ptext (sLit "*** Core Lint")      <+> text string 
+                          <+> ptext (sLit ": in result of") <+> pass
+                          <+> ptext (sLit "***")
 
 showLintWarnings :: CoreToDo -> Bool
 -- Disable Lint warnings on the first simplifier pass, because
 -- there may be some INLINE knots still tied, which is tiresomely noisy
 showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
 showLintWarnings _ = True
+
+lintInteractiveExpr :: String -> HscEnv -> CoreExpr -> IO ()
+lintInteractiveExpr what hsc_env expr
+  | not (gopt Opt_DoCoreLinting dflags)
+  = return ()
+  | Just err <- lintExpr (interactiveInScope hsc_env) expr 
+  = do { display_lint_err err
+       ; Err.ghcExit dflags 1 }
+  | otherwise
+  = return ()
+  where
+    dflags = hsc_dflags hsc_env
+
+    display_lint_err err
+      = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
+               (vcat [ lint_banner "errors" (text what) 
+                     , err
+                     , ptext (sLit "*** Offending Program ***")
+                     , pprCoreExpr expr
+                     , ptext (sLit "*** End of Offense ***") ])
+           ; Err.ghcExit dflags 1 }
+
+interactiveInScope :: HscEnv -> [Var]
+-- In GHCi we may lint expressions, or bindings arising from 'deriving'
+-- clauses, that mention variables bound in the interactive context.
+-- These are Local things (see Note [Interactively-bound Ids in GHCi] in TcRnDriver).
+-- So we have to tell Lint about them, lest it reports them as out of scope.
+-- 
+-- We do this by find local-named things that may appear free in interactive
+-- context.  This function is pretty revolting and quite possibly not quite right.
+-- When we are not in GHCi, the interactive context (hsc_IC hsc_env) is empty
+-- so this is a (cheap) no-op.
+-- 
+-- See Trac #8215 for an example
+interactiveInScope hsc_env 
+  = tyvars ++ vars
+  where
+    ictxt  = hsc_IC hsc_env
+    te     = mkTypeEnvWithImplicits (ic_tythings ictxt ++ map AnId (ic_sys_vars ictxt))
+    vars   = typeEnvIds te
+    tyvars = varSetElems $ tyThingsTyVars $ typeEnvElts $ te
+              -- Why the type variables?  How can the top level envt have free tyvars?
+              -- I think it's becuase of the GHCi debugger, which can bind variables
+              --   f :: [t] -> [t]
+              -- where t is a RuntimeUnk (see TcType)
 \end{code}
 
 

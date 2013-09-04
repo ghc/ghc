@@ -70,21 +70,23 @@ checkAmbiguity ctxt ty
   | otherwise
   = do { allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
        ; unless allow_ambiguous $ 
-    do {(subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
+    do { traceTc "Ambiguity check for" (ppr ty)
+       ; (subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
        ; let ty' = substTy subst ty  
               -- The type might have free TyVars,
               -- so we skolemise them as TcTyVars
               -- Tiresome; but the type inference engine expects TcTyVars
-       ; (_wrap, wanted) <- addErrCtxtM (mk_msg ty') $
-                            captureConstraints $
-                            tcSubType (AmbigOrigin ctxt) ctxt ty' ty'
 
          -- Solve the constraints eagerly because an ambiguous type
-         -- can cause a cascade of further errors.  The free tyvars
-         -- are skolemised, so we can safely use tcSimplifyTop
-       ; _ev_binds <- simplifyTop wanted
+         -- can cause a cascade of further errors.  Since the free 
+         -- tyvars are skolemised, we can safely use tcSimplifyTop
+       ; addErrCtxtM (mk_msg ty') $
+         do { (_wrap, wanted) <- captureConstraints $
+                                 tcSubType (AmbigOrigin ctxt) ctxt ty' ty'
+            ; _ev_binds <- simplifyTop wanted
+            ; return () }
 
-       ; return () } } 
+       ; traceTc "Done ambiguity check for" (ppr ty) } }
  where
    mk_msg ty tidy_env 
      = return (tidy_env', msg)
@@ -174,7 +176,8 @@ checkValidType ctxt ty
         -- Check that the thing has kind Type, and is lifted if necessary
         -- Do this second, because we can't usefully take the kind of an 
         -- ill-formed type such as (a~Int)
-       ; check_kind ctxt ty }
+       ; check_kind ctxt ty
+       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty = check_mono_type SigmaCtxt MustBeMonoType ty

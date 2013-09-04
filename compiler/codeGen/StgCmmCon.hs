@@ -23,7 +23,7 @@ import StgCmmEnv
 import StgCmmHeap
 import StgCmmUtils
 import StgCmmClosure
-import StgCmmProf
+import StgCmmProf ( curCCS )
 
 import CmmExpr
 import CLabel

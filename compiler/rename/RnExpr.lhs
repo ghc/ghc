@@ -189,8 +189,10 @@ rnExpr (HsSpliceE splice)
 rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
 #else
 rnExpr (HsQuasiQuoteE qq)
-  = runQuasiQuoteExpr qq        `thenM` \ (L _ expr') ->
-    rnExpr expr'
+  = runQuasiQuoteExpr qq        `thenM` \ lexpr' ->
+    -- Wrap the result of the quasi-quoter in parens so that we don't
+    -- lose the outermost location set by runQuasiQuote (#7918) 
+    rnExpr (HsPar lexpr')
 #endif  /* GHCI */
 
 ---------------------------------------------

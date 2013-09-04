@@ -794,6 +794,14 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
+primop CasArrayOp  "casArray#" GenPrimOp
+   MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   {Unsafe, machine-level atomic compare and swap on an element within an Array.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+
 ------------------------------------------------------------------------
 section "Byte Arrays"
 	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
@@ -1109,6 +1117,21 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
+
+primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Machine-level atomic compare and swap on a word within a ByteArray.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) 
+   {Machine-level word-sized fetch-and-add within a ByteArray.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
 
 ------------------------------------------------------------------------
 section "Arrays of arrays"

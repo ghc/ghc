@@ -1184,6 +1184,7 @@ AC_SUBST(GccLT46)
 
 dnl Check to see if the C compiler is clang or llvm-gcc
 dnl
+GccIsClang=NO
 AC_DEFUN([FP_CC_LLVM_BACKEND],
 [AC_REQUIRE([AC_PROG_CC])
 AC_MSG_CHECKING([whether C compiler is clang])
@@ -1191,6 +1192,7 @@ $CC -x c /dev/null -dM -E > conftest.txt 2>&1
 if grep "__clang__" conftest.txt >/dev/null 2>&1; then
   AC_SUBST([CC_CLANG_BACKEND], [1])
   AC_SUBST([CC_LLVM_BACKEND], [1])
+  GccIsClang=YES
   AC_MSG_RESULT([yes])
 else
   AC_MSG_RESULT([no])
@@ -1205,6 +1207,7 @@ else
     AC_MSG_RESULT([no])
   fi
 fi
+AC_SUBST(GccIsClang)
 
 rm -f conftest.txt
 ])
@@ -2049,7 +2052,16 @@ AC_DEFUN([FIND_GCC],[
     then
         $1="$CC"
     else
-        FP_ARG_WITH_PATH_GNU_PROG([$1], [$2], [$3])
+        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
+        # From Xcode 5 on, OS X command line tools do not include gcc anymore. Use clang.
+        if test -z "$$1"
+        then
+            FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [clang], [clang])
+        fi
+        if test -z "$$1"
+        then
+            AC_MSG_ERROR([cannot find $3 nor clang in your PATH])
+        fi
     fi
     AC_SUBST($1)
 ])

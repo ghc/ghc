@@ -137,6 +137,34 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     return (p);
 }
 
+// RRN: This one does not use the "ticketing" approach because it
+// deals in unboxed scalars, not heap pointers.
+stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
+/* MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
+{
+    gcptr p;
+    W_ h;
+
+    p = arr + SIZEOF_StgArrWords + WDS(ind);
+    (h) = ccall cas(p, old, new);
+
+    return(h);
+}
+
+
+stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
+/* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
+{
+    gcptr p;
+    W_ h;
+
+    p = arr + SIZEOF_StgArrWords + WDS(ind);
+    (h) = ccall atomic_inc(p, incr);
+
+    return(h);
+}
+
+
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
     W_ words, size;
@@ -206,6 +234,29 @@ stg_unsafeThawArrayzh ( gcptr arr )
   }
 }
 
+// RRN: Uses the ticketed approach; see casMutVar
+stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
+/* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */
+{
+    gcptr p, h;
+    W_ len;
+
+    p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
+    (h) = ccall cas(p, old, new);
+    
+    if (h != old) {
+        // Failure, return what was there instead of 'old':
+        return (1,h);
+    } else {
+        // Compare and Swap Succeeded:
+        SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
+        len = StgMutArrPtrs_ptrs(arr);
+        // The write barrier.  We must write a byte into the mark table:
+        I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
+        return (0,new);
+    }
+}
+
 stg_newArrayArrayzh ( W_ n /* words */ )
 {
     W_ words, size;
@@ -262,8 +313,13 @@ stg_newMutVarzh ( gcptr init )
     return (mv);
 }
 
+// RRN: To support the "ticketed" approach, we return the NEW rather
+// than old value if the CAS is successful.  This is received in an
+// opaque form in the Haskell code, preventing the compiler from
+// changing its pointer identity.  The ticket can then be safely used
+// in future CAS operations.
 stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
- /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, a #) */
+ /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, Any a #) */
 {
     gcptr h;
 
@@ -275,7 +331,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
         }
-        return (0,h);
+        return (0,new);
     }
 }
 

@@ -103,7 +103,7 @@ mkDFunUnfolding bndrs con ops
 
 mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
 mkWwInlineRule expr arity
-  = mkCoreUnfolding InlineWrapper True
+  = mkCoreUnfolding InlineStable True
                    (simpleOptExpr expr) arity
                    (UnfWhen unSaturatedOk boringCxtNotOk)
 

@@ -62,7 +62,7 @@ ifeq "$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)" ""
 $1_$2_INSTALL_SHELL_WRAPPER_NAME = $$($1_$2_PROG)
 endif
 
-# Install the binary in $(libexecdir), and install a shell wrapper in $(bindir)
+# Install the binary in $(ghclibexecdir), and install a shell wrapper in $(bindir)
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 BINDIST_WRAPPERS += $$($1_$2_SHELL_WRAPPER_NAME)
 

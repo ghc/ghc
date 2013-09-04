@@ -409,7 +409,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        -- Remove any handwritten instance of poly-kinded Typeable and warn
        ; dflags <- getDynFlags
        ; when (wopt Opt_WarnTypeableInstances dflags) $
-              mapM_ (addWarnTc . instMsg) typeable_instances
+              mapM_ (failWithTc . instMsg) typeable_instances
 
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of old Typeable as then unsafe casts could be
@@ -444,7 +444,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
                               ++ " Haskell! Can only derive them"
 
-    instMsg i = hang (ptext (sLit $ "Typeable instances can only be derived; ignoring "
+    instMsg i = hang (ptext (sLit $ "Typeable instances can only be derived; replace "
                                  ++ "the following instance:"))
                      2 (pprInstance (iSpec i))
 

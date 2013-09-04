@@ -1639,6 +1639,7 @@ matchOpenFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
 matchOpenFam tycon args = wrapTcS $ tcLookupFamInst tycon args
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+-- Given (F tys) return (ty, co), where co :: F tys ~ ty
 matchFam tycon args
   | isOpenSynFamilyTyCon tycon
   = do { maybe_match <- matchOpenFam tycon args

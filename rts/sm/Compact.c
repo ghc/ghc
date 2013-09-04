@@ -933,7 +933,7 @@ compact(StgClosure *static_objects)
         bdescr *bd;
         StgPtr p;
         for (n = 0; n < n_capabilities; n++) {
-            for (bd = capabilities[n].mut_lists[g]; 
+            for (bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
                 for (p = bd->start; p < bd->free; p++) {
                     thread((StgClosure **)p);

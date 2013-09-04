@@ -52,13 +52,14 @@ EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
 EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 
 /*
- * Atomic increment
+ * Atomic addition by the provided quantity
  *
- * atomic_inc(p) {
- *   return ++(*p);
+ * atomic_inc(p, n) {
+ *   return ((*p) += n);
  * }
  */
-EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p);
+EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord n);
+
 
 /*
  * Atomic decrement
@@ -236,22 +237,24 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #endif
 }
 
+// RRN: Generalized to arbitrary increments to enable fetch-and-add in
+// Haskell code (fetchAddIntArray#).
 EXTERN_INLINE StgWord
-atomic_inc(StgVolatilePtr p)
+atomic_inc(StgVolatilePtr p, StgWord incr)
 {
 #if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     StgWord r;
-    r = 1;
+    r = incr;
     __asm__ __volatile__ (
         "lock\nxadd %0,%1":
             "+r" (r), "+m" (*p):
     );
-    return r+1;
+    return r + incr;
 #else
     StgWord old, new;
     do {
         old = *p;
-        new = old + 1;
+        new = old + incr;
     } while (cas(p, old, new) != old);
     return new;
 #endif
@@ -393,11 +396,13 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     return result;
 }
 
-INLINE_HEADER StgWord
-atomic_inc(StgVolatilePtr p)
+EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord incr);
+EXTERN_INLINE StgWord
+atomic_inc(StgVolatilePtr p, StgWord incr)
 {
-    return ++(*p);
+    return ((*p) += incr);
 }
+
 
 INLINE_HEADER StgWord
 atomic_dec(StgVolatilePtr p)

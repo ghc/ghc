@@ -246,7 +246,7 @@ void checkUnload (StgClosure *static_objects)
   HashTable *addrs;
   StgClosure* p;
   const StgInfoTable *info;
-  ObjectCode *oc, *prev;
+  ObjectCode *oc, *prev, *next;
   gen_workspace *ws;
   StgClosure* link;
 
@@ -254,7 +254,7 @@ void checkUnload (StgClosure *static_objects)
 
   // Mark every unloadable object as unreferenced initially
   for (oc = unloaded_objects; oc; oc = oc->next) {
-      IF_DEBUG(linker, debugBelch("Checking whether to unload %s\n",
+      IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
                                   oc->fileName));
       oc->referenced = rtsFalse;
   }
@@ -283,19 +283,20 @@ void checkUnload (StgClosure *static_objects)
   // marked as unreferenced can be physically unloaded, because we
   // have no references to it.
   prev = NULL;
-  for (oc = unloaded_objects; oc; prev = oc, oc = oc->next) {
+  for (oc = unloaded_objects; oc; prev = oc, oc = next) {
+      next = oc->next;
       if (oc->referenced == 0) {
           if (prev == NULL) {
               unloaded_objects = oc->next;
           } else {
               prev->next = oc->next;
           }
-          IF_DEBUG(linker, debugBelch("Unloading object file %s\n",
+          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
                                       oc->fileName));
           freeObjectCode(oc);
       } else {
-          IF_DEBUG(linker, debugBelch("Object file still in use: %s\n",
-                                      oc->fileName));
+          IF_DEBUG(linker, debugBelch("Object file still in use: %"
+                                      PATH_FMT "\n", oc->fileName));
       }
   }
 

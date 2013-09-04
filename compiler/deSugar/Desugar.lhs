@@ -143,14 +143,14 @@ deSugar hsc_env
 
 #ifdef DEBUG
           -- Debug only as pre-simple-optimisation program may be really big
-        ; endPass dflags CoreDesugar final_pgm rules_for_imps
+        ; endPass hsc_env CoreDesugar final_pgm rules_for_imps
 #endif
         ; (ds_binds, ds_rules_for_imps, ds_vects)
             <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
                          -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
 
-        ; endPass dflags CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPass hsc_env CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
         ; deps <- mkDependencies tcg_env
@@ -226,22 +226,23 @@ deSugarExpr :: HscEnv
             -> IO (Messages, Maybe CoreExpr)
 -- Prints its own errors; returns Nothing if error occurred
 
-deSugarExpr hsc_env this_mod rdr_env type_env tc_expr = do
-    let dflags = hsc_dflags hsc_env
-    showPass dflags "Desugar"
+deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
+  = do { let dflags = hsc_dflags hsc_env
+       ; showPass dflags "Desugar"
 
-    -- Do desugaring
-    (msgs, mb_core_expr) <- initDs hsc_env this_mod rdr_env type_env $
-                                   dsLExpr tc_expr
+         -- Do desugaring
+       ; (msgs, mb_core_expr) <- initDs hsc_env this_mod rdr_env type_env $
+                                 dsLExpr tc_expr
 
-    case mb_core_expr of
-      Nothing   -> return (msgs, Nothing)
-      Just expr -> do
+       ; case mb_core_expr of {
+            Nothing   -> return (msgs, Nothing) ;
+            Just expr ->
 
-        -- Dump output
-        dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
+ 
+         -- Dump output
+    do { dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
 
-        return (msgs, Just expr)
+       ; return (msgs, Just expr) } } }
 \end{code}
 
 %************************************************************************

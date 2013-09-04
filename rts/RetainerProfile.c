@@ -1789,7 +1789,7 @@ computeRetainerSet( void )
 	// because we can find MUT_VAR objects which have not been
 	// visited during retainer profiling.
         for (n = 0; n < n_capabilities; n++) {
-          for (bd = capabilities[n].mut_lists[g]; bd != NULL; bd = bd->link) {
+          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
 	    for (ml = bd->start; ml < bd->free; ml++) {
 
 		maybeInitRetainerSet((StgClosure *)*ml);

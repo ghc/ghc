@@ -169,7 +169,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define struct_stat struct _stat
 #define open wopen
 #define WSTR(s) L##s
-#define PATH_FMT "S"
 #else
 #define pathcmp strcmp
 #define pathlen strlen
@@ -177,7 +176,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define pathstat stat
 #define struct_stat struct stat
 #define WSTR(s) s
-#define PATH_FMT "s"
 #endif
 
 static pathchar* pathdup(pathchar *path)
@@ -1140,8 +1138,11 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_labelThreadzh)                                  \
       SymI_HasProto(stg_newArrayzh)                                     \
       SymI_HasProto(stg_newArrayArrayzh)                                \
+      SymI_HasProto(stg_casArrayzh)                                     \
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
+      SymI_HasProto(stg_casIntArrayzh)                                  \
+      SymI_HasProto(stg_fetchAddIntArrayzh)                             \
       SymI_HasProto_redirect(newCAF, newDynCAF)                         \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \

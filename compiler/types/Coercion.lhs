@@ -802,7 +802,7 @@ isReflCo_maybe _                 = Nothing
 mkCoVarCo :: CoVar -> Coercion
 -- cv :: s ~# t
 mkCoVarCo cv
-  | ty1 `eqType` ty2 = Refl Nominal ty1
+  | ty1 `eqType` ty2 = Refl (coVarRole cv) ty1
   | otherwise        = CoVarCo cv
   where
     (ty1, ty2) = ASSERT( isCoVar cv ) coVarKind cv
@@ -1360,8 +1360,7 @@ subst_co subst co
 
 substCoVar :: CvSubst -> CoVar -> Coercion
 substCoVar (CvSubst in_scope _ cenv) cv
-  | Just co  <- lookupVarEnv cenv cv      = ASSERT2( coercionRole co == Nominal, ppr co )
-                                            co
+  | Just co  <- lookupVarEnv cenv cv      = co
   | Just cv1 <- lookupInScope in_scope cv = ASSERT( isCoVar cv1 ) CoVarCo cv1
   | otherwise = WARN( True, ptext (sLit "substCoVar not in scope") <+> ppr cv $$ ppr in_scope)
                 ASSERT( isCoVar cv ) CoVarCo cv

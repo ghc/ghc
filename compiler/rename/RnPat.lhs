@@ -416,8 +416,9 @@ rnPatAndThen _ p@(QuasiQuotePat {})
 #else
 rnPatAndThen mk (QuasiQuotePat qq)
   = do { pat <- liftCps $ runQuasiQuotePat qq
-       ; L _ pat' <- rnLPatAndThen mk pat
-       ; return pat' }
+         -- Wrap the result of the quasi-quoter in parens so that we don't
+         -- lose the outermost location set by runQuasiQuote (#7918) 
+       ; rnPatAndThen mk (ParPat pat) }
 #endif  /* GHCI */
 
 rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)

@@ -236,8 +236,8 @@ GarbageCollect (nat collect_gen,
   // attribute any costs to CCS_GC
 #ifdef PROFILING
   for (n = 0; n < n_capabilities; n++) {
-      save_CCS[n] = capabilities[n].r.rCCCS;
-      capabilities[n].r.rCCCS = CCS_GC;
+      save_CCS[n] = capabilities[n]->r.rCCCS;
+      capabilities[n]->r.rCCCS = CCS_GC;
   }
 #endif
 
@@ -339,18 +339,18 @@ GarbageCollect (nat collect_gen,
   if (n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
 #if defined(THREADED_RTS)
-          scavenge_capability_mut_Lists1(&capabilities[n]);
+          scavenge_capability_mut_Lists1(capabilities[n]);
 #else
-          scavenge_capability_mut_lists(&capabilities[n]);
+          scavenge_capability_mut_lists(capabilities[n]);
 #endif
       }
   } else {
       scavenge_capability_mut_lists(gct->cap);
       for (n = 0; n < n_capabilities; n++) {
           if (gc_threads[n]->idle) {
-              markCapability(mark_root, gct, &capabilities[n],
+              markCapability(mark_root, gct, capabilities[n],
                              rtsTrue/*don't mark sparks*/);
-              scavenge_capability_mut_lists(&capabilities[n]);
+              scavenge_capability_mut_lists(capabilities[n]);
           }
       }
   }
@@ -363,7 +363,7 @@ GarbageCollect (nat collect_gen,
   gct->evac_gen_no = 0;
   if (n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
-          markCapability(mark_root, gct, &capabilities[n],
+          markCapability(mark_root, gct, capabilities[n],
                          rtsTrue/*don't mark sparks*/);
       }
   } else {
@@ -417,12 +417,12 @@ GarbageCollect (nat collect_gen,
 #ifdef THREADED_RTS
   if (n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
-          pruneSparkQueue(&capabilities[n]);
+          pruneSparkQueue(capabilities[n]);
       }
   } else {
       for (n = 0; n < n_capabilities; n++) {
           if (n == cap->no || gc_threads[n]->idle) {
-              pruneSparkQueue(&capabilities[n]);
+              pruneSparkQueue(capabilities[n]);
          }
       }
   }
@@ -495,7 +495,7 @@ GarbageCollect (nat collect_gen,
     if (g > 0) {
         W_ mut_list_size = 0;
         for (n = 0; n < n_capabilities; n++) {
-            mut_list_size += countOccupied(capabilities[n].mut_lists[g]);
+            mut_list_size += countOccupied(capabilities[n]->mut_lists[g]);
         }
 	copied +=  mut_list_size;
 
@@ -646,14 +646,14 @@ GarbageCollect (nat collect_gen,
   // Reset the nursery: make the blocks empty
   if (DEBUG_IS_ON || n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
-          clearNursery(&capabilities[n]);
+          clearNursery(capabilities[n]);
       }
   } else {
       // When doing parallel GC, clearNursery() is called by the
       // worker threads
       for (n = 0; n < n_capabilities; n++) {
           if (gc_threads[n]->idle) {
-              clearNursery(&capabilities[n]);
+              clearNursery(capabilities[n]);
           }
       }
   }
@@ -753,7 +753,7 @@ GarbageCollect (nat collect_gen,
   // restore enclosing cost centre
 #ifdef PROFILING
   for (n = 0; n < n_capabilities; n++) {
-      capabilities[n].r.rCCCS = save_CCS[n];
+      capabilities[n]->r.rCCCS = save_CCS[n];
   }
 #endif
 
@@ -794,7 +794,7 @@ new_gc_thread (nat n, gc_thread *t)
     nat g;
     gen_workspace *ws;
 
-    t->cap = &capabilities[n];
+    t->cap = capabilities[n];
 
 #ifdef THREADED_RTS
     t->id = 0;
@@ -866,12 +866,6 @@ initGcThreads (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
                                      "initGcThreads");
     }
 
-    // We have to update the gct->cap pointers to point to the new
-    // Capability array now.
-    for (i = 0; i < from; i++) {
-        gc_threads[i]->cap = &capabilities[gc_threads[i]->cap->no];
-    }
-
     for (i = from; i < to; i++) {
         gc_threads[i] =
             stgMallocBytes(sizeof(gc_thread) +
@@ -924,7 +918,7 @@ static StgWord
 inc_running (void)
 {
     StgWord new;
-    new = atomic_inc(&gc_running_threads);
+    new = atomic_inc(&gc_running_threads, 1);
     ASSERT(new <= n_gc_threads);
     return new;
 }
@@ -1124,7 +1118,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
         for (i=0; i < n_threads; i++) {
             if (i == me || gc_threads[i]->idle) continue;
             if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
-                prodCapability(&capabilities[i], cap->running_task);
+                prodCapability(capabilities[i], cap->running_task);
             }
         }
         for (j=0; j < 10; j++) {
@@ -1132,7 +1126,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
             for (i=0; i < n_threads; i++) {
                 if (i == me || gc_threads[i]->idle) continue;
                 write_barrier();
-                interruptCapability(&capabilities[i]);
+                interruptCapability(capabilities[i]);
                 if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
                     retry = rtsTrue;
                 }
@@ -1228,8 +1222,8 @@ prepare_collected_gen (generation *gen)
     g = gen->no;
     if (g != 0) {
         for (i = 0; i < n_capabilities; i++) {
-	    freeChain(capabilities[i].mut_lists[g]);
-	    capabilities[i].mut_lists[g] = allocBlock();
+            freeChain(capabilities[i]->mut_lists[g]);
+            capabilities[i]->mut_lists[g] = allocBlock();
 	}
     }
 
@@ -1360,7 +1354,7 @@ prepare_uncollected_gen (generation *gen)
     // allocate a fresh block for each one.  We'll traverse these
     // mutable lists as roots early on in the GC.
     for (i = 0; i < n_capabilities; i++) {
-        stash_mut_list(&capabilities[i], gen->no);
+        stash_mut_list(capabilities[i], gen->no);
     }
 
     ASSERT(gen->scavenged_large_objects == NULL);
@@ -1429,7 +1423,7 @@ collect_pinned_object_blocks (void)
 
     for (n = 0; n < n_capabilities; n++) {
         prev = NULL;
-        for (bd = capabilities[n].pinned_object_blocks; bd != NULL; bd = bd->link) {
+        for (bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
             prev = bd;
         }
         if (prev != NULL) {
@@ -1437,8 +1431,8 @@ collect_pinned_object_blocks (void)
             if (g0->large_objects != NULL) {
                 g0->large_objects->u.back = prev;
             }
-            g0->large_objects = capabilities[n].pinned_object_blocks;
-            capabilities[n].pinned_object_blocks = 0;
+            g0->large_objects = capabilities[n]->pinned_object_blocks;
+            capabilities[n]->pinned_object_blocks = 0;
         }
     }
 }

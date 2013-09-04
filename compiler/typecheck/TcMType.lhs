@@ -511,11 +511,9 @@ quantifyTyVars :: TcTyVarSet -> TcTyVarSet -> TcM [TcTyVar]
 quantifyTyVars gbl_tvs tkvs
   = do { tkvs    <- zonkTyVarsAndFV tkvs
        ; gbl_tvs <- zonkTyVarsAndFV gbl_tvs
-       ; let (kvs1, tvs) = partitionVarSet isKindVar (tkvs `minusVarSet` gbl_tvs)
-             kvs2 = varSetElems (foldVarSet add_kvs kvs1 tvs
-                                 `minusVarSet` gbl_tvs )
-             add_kvs tv kvs = tyVarsOfType (tyVarKind tv) `unionVarSet` kvs 
+       ; let (kvs, tvs) = partitionVarSet isKindVar (closeOverKinds tkvs `minusVarSet` gbl_tvs)
                               -- NB kinds of tvs are zonked by zonkTyVarsAndFV
+             kvs2 = varSetElems kvs
              qtvs = varSetElems tvs                       
 
              -- In the non-PolyKinds case, default the kind variables

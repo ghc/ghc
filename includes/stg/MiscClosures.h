@@ -364,9 +364,12 @@ RTS_FUN_DECL(stg_word64ToIntegerzh);
 #endif
 
 RTS_FUN_DECL(stg_unsafeThawArrayzh);
+RTS_FUN_DECL(stg_casArrayzh);
 RTS_FUN_DECL(stg_newByteArrayzh);
 RTS_FUN_DECL(stg_newPinnedByteArrayzh);
 RTS_FUN_DECL(stg_newAlignedPinnedByteArrayzh);
+RTS_FUN_DECL(stg_casIntArrayzh);
+RTS_FUN_DECL(stg_fetchAddIntArrayzh);
 RTS_FUN_DECL(stg_newArrayzh);
 RTS_FUN_DECL(stg_newArrayArrayzh);
 

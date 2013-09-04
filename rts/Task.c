@@ -326,34 +326,6 @@ discardTasksExcept (Task *keep)
     RELEASE_LOCK(&all_tasks_mutex);
 }
 
-//
-// After the capabilities[] array has moved, we have to adjust all
-// (Capability *) pointers to point to the new array.  The old array
-// is still valid at this point.
-//
-void updateCapabilityRefs (void)
-{
-    Task *task;
-    InCall *incall;
-
-    ACQUIRE_LOCK(&all_tasks_mutex);
-
-    for (task = all_tasks; task != NULL; task=task->all_next) {
-        if (task->cap != NULL) {
-            task->cap = &capabilities[task->cap->no];
-        }
-
-        for (incall = task->incall; incall != NULL; incall = incall->prev_stack) {
-            if (incall->suspended_cap != NULL) {
-                incall->suspended_cap = &capabilities[incall->suspended_cap->no];
-            }
-        }
-    }
-
-    RELEASE_LOCK(&all_tasks_mutex);
-}
-
-
 #if defined(THREADED_RTS)
 
 void

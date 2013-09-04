@@ -43,38 +43,52 @@ import qualified Data.Set as Set
 --
 --  * Start by doing liveness analysis.
 --
---  * Keep a list of assignments A; earlier ones may refer to later ones
+--  * Keep a list of assignments A; earlier ones may refer to later ones.
+--    Currently we only sink assignments to local registers, because we don't
+--    have liveness information about global registers.
 --
 --  * Walk forwards through the graph, look at each node N:
---    * If any assignments in A (1) occur only once in N, and (2) are
---      not live after N, inline the assignment and remove it
---      from A.
---    * If N is an assignment:
---      * If the register is not live after N, discard it
---      * otherwise pick up the assignment and add it to A
---    * If N is a non-assignment node:
+--
+--    * If it is a dead assignment, i.e. assignment to a register that is
+--      not used after N, discard it.
+--
+--    * Try to inline based on current list of assignments
+--      * If any assignments in A (1) occur only once in N, and (2) are
+--        not live after N, inline the assignment and remove it
+--        from A.
+--
+--      * If an assignment in A is cheap (RHS is local register), then
+--        inline the assignment and keep it in A in case it is used afterwards.
+--
+--      * Otherwise don't inline.
+--
+--    * If N is assignment to a local register pick up the assignment
+--      and add it to A.
+--
+--    * If N is not an assignment to a local register:
 --      * remove any assignments from A that conflict with N, and
---        place them before N in the current block.  (we call this
---        "dropping" the assignments).
+--        place them before N in the current block.  We call this
+--        "dropping" the assignments.
+--
 --      * An assignment conflicts with N if it:
 --        - assigns to a register mentioned in N
 --        - mentions a register assigned by N
 --        - reads from memory written by N
 --      * do this recursively, dropping dependent assignments
---    * At a multi-way branch:
---      * drop any assignments that are live on more than one branch
---      * if any successor has more than one predecessor (a
---        join-point), drop everything live in that successor
--- 
--- As a side-effect we'll delete some dead assignments (transitively,
--- even).  This isn't as good as removeDeadAssignments, but it's much
--- cheaper.
-
--- If we do this *before* stack layout, we might be able to avoid
--- saving some things across calls/procpoints.
 --
--- *but*, that will invalidate the liveness analysis, and we'll have
--- to re-do it.
+--    * At an exit node:
+--      * drop any assignments that are live on more than one successor
+--        and are not trivial
+--      * if any successor has more than one predecessor (a join-point),
+--        drop everything live in that successor. Since we only propagate
+--        assignments that are not dead at the successor, we will therefore
+--        eliminate all assignments dead at this point. Thus analysis of a
+--        join-point will always begin with an empty list of assignments.
+--
+--
+-- As a result of above algorithm, sinking deletes some dead assignments
+-- (transitively, even).  This isn't as good as removeDeadAssignments,
+-- but it's much cheaper.
 
 -- -----------------------------------------------------------------------------
 -- things that we aren't optimising very well yet.
@@ -122,6 +136,12 @@ type Assignment = (LocalReg, CmmExpr, AbsMem)
   -- Assignment caches AbsMem, an abstraction of the memory read by
   -- the RHS of the assignment.
 
+type Assignments = [Assignment]
+  -- A sequence of assignements; kept in *reverse* order
+  -- So the list [ x=e1, y=e2 ] means the sequence of assignments
+  --     y = e2
+  --     x = e1
+
 cmmSink :: DynFlags -> CmmGraph -> CmmGraph
 cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   where
@@ -132,7 +152,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: BlockEnv [Assignment] -> [CmmBlock] -> [CmmBlock]
+  sink :: BlockEnv Assignments -> [CmmBlock] -> [CmmBlock]
   sink _ [] = []
   sink sunk (b:bs) =
     -- pprTrace "sink" (ppr lbl) $
@@ -209,7 +229,8 @@ isSmall _ = False
 
 isTrivial :: CmmExpr -> Bool
 isTrivial (CmmReg (CmmLocal _)) = True
--- isTrivial (CmmLit _) = True
+-- isTrivial (CmmLit _) = True  -- Disabled because it used to make thing worse.
+                                -- Needs further investigation
 isTrivial _ = False
 
 --
@@ -234,7 +255,7 @@ findJoinPoints blocks = mapFilter (>1) succ_counts
 -- filter the list of assignments to remove any assignments that
 -- are not live in a continuation.
 --
-filterAssignments :: DynFlags -> LocalRegSet -> [Assignment] -> [Assignment]
+filterAssignments :: DynFlags -> LocalRegSet -> Assignments -> Assignments
 filterAssignments dflags live assigs = reverse (go assigs [])
   where go []             kept = kept
         go (a@(r,_,_):as) kept | needed    = go as (a:kept)
@@ -249,26 +270,36 @@ filterAssignments dflags live assigs = reverse (go assigs [])
 -- -----------------------------------------------------------------------------
 -- Walk through the nodes of a block, sinking and inlining assignments
 -- as we go.
+--
+-- On input we pass in a:
+--    * list of nodes in the block
+--    * a list of assignments that appeared *before* this block and
+--      that are being sunk.
+--
+-- On output we get:
+--    * a new block
+--    * a list of assignments that will be placed *after* that block.
+--
 
 walk :: DynFlags
      -> [(LocalRegSet, CmmNode O O)]    -- nodes of the block, annotated with
                                         -- the set of registers live *after*
                                         -- this node.
 
-     -> [Assignment]                    -- The current list of
+     -> Assignments                     -- The current list of
                                         -- assignments we are sinking.
                                         -- Later assignments may refer
                                         -- to earlier ones.
 
      -> ( Block CmmNode O O             -- The new block
-        , [Assignment]                  -- Assignments to sink further
+        , Assignments                   -- Assignments to sink further
         )
 
 walk dflags nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
-    | shouldDiscard node live    = go ns block as
+    | shouldDiscard node live           = go ns block as -- discard dead assignment
     | Just a <- shouldSink dflags node2 = go ns block (a : as1)
     | otherwise                         = go ns block' as'
     where
@@ -316,17 +347,17 @@ shouldDiscard node live
        CmmAssign r (CmmReg r') | r == r' -> True
        CmmAssign (CmmLocal r) _ -> not (r `Set.member` live)
        _otherwise -> False
-  
+
 
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
 
-dropAssignmentsSimple :: DynFlags -> (Assignment -> Bool) -> [Assignment]
-                      -> ([CmmNode O O], [Assignment])
+dropAssignmentsSimple :: DynFlags -> (Assignment -> Bool) -> Assignments
+                      -> ([CmmNode O O], Assignments)
 dropAssignmentsSimple dflags f = dropAssignments dflags (\a _ -> (f a, ())) ()
 
-dropAssignments :: DynFlags -> (Assignment -> s -> (Bool, s)) -> s -> [Assignment]
-                -> ([CmmNode O O], [Assignment])
+dropAssignments :: DynFlags -> (Assignment -> s -> (Bool, s)) -> s -> Assignments
+                -> ([CmmNode O O], Assignments)
 dropAssignments dflags should_drop state assigs
  = (dropped, reverse kept)
  where
@@ -351,16 +382,16 @@ tryToInline
                                 -- that is live after the node, unless
                                 -- it is small enough to duplicate.
    -> CmmNode O x               -- The node to inline into
-   -> [Assignment]              -- Assignments to inline
+   -> Assignments               -- Assignments to inline
    -> (
         CmmNode O x             -- New node
-      , [Assignment]            -- Remaining assignments
+      , Assignments             -- Remaining assignments
       )
 
 tryToInline dflags live node assigs = go usages node [] assigs
  where
-  usages :: UniqFM Int
-  usages = foldRegsUsed dflags addUsage emptyUFM node
+  usages :: UniqFM Int -- Maps each LocalReg to a count of how often it is used
+  usages = foldLocalRegsUsed dflags addUsage emptyUFM node
 
   go _usages node _skipped [] = (node, [])
 
@@ -371,10 +402,10 @@ tryToInline dflags live node assigs = go usages node [] assigs
    | otherwise               = dont_inline
    where
         inline_and_discard = go usages' inl_node skipped rest
-          where usages' = foldRegsUsed dflags addUsage usages rhs
+          where usages' = foldLocalRegsUsed dflags addUsage usages rhs
 
-        dont_inline        = keep node  -- don't inline the assignment, keep it
-        inline_and_keep    = keep inl_node -- inline the assignment, keep it
+        dont_inline        = keep node     -- don't inline the assignment, keep it
+        inline_and_keep    = keep inl_node --       inline the assignment, keep it
 
         keep node' = (final_node, a : rest')
           where (final_node, rest') = go usages' node' (l:skipped) rest
@@ -470,10 +501,10 @@ conflicts dflags (r, rhs, addr) node
   | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
 
   -- (4) assignments that read caller-saves GlobalRegs conflict with a
-  -- foreign call.  See Note [foreign calls clobber GlobalRegs].
+  -- foreign call.  See Note [Unsafe foreign calls clobber caller-save registers]
   | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs dflags rhs = True
 
-  -- (5) foreign calls clobber heap: see Note [foreign calls clobber heap]
+  -- (5) foreign calls clobber heap: see Note [Foreign calls clobber heap]
   | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
 
   -- (6) native calls clobber any memory
@@ -532,7 +563,8 @@ data AbsMem
 --  that was written in the same basic block.  To take advantage of
 --  non-aliasing of heap memory we will have to be more clever.
 
--- Note [foreign calls clobber]
+-- Note [Foreign calls clobber heap]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- It is tempting to say that foreign calls clobber only
 -- non-heap/stack memory, but unfortunately we break this invariant in
