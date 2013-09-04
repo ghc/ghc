@@ -185,3 +185,6 @@ test('linker_unload',
      [ extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
      run_command,
      ['$MAKE -s --no-print-directory linker_unload'])
+
+test('T8209', [ only_ways(threaded_ways), ignore_output ],
+              compile_and_run, [''])
