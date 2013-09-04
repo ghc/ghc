@@ -1,5 +1,5 @@
 
-annfail06.hs:21:1:
+annfail06.hs:22:1:
     GHC stage restriction:
       instance for ‛Data
                       InstancesInWrongModule’ is used in a top-level splice or annotation,

@@ -1,3 +1,5 @@
+{-# LANGUAGE StandaloneDeriving #-}
+
 module Annfail06 where
 -- Testing that we don't accept Typeable or Data instances defined in the same module
 
@@ -6,8 +8,7 @@ import Annfail06_Help
 import Data.Data
 import Data.Typeable
 
-instance Typeable InstancesInWrongModule where
-    typeRep _ = undefined
+deriving instance Typeable InstancesInWrongModule
 
 instance Data InstancesInWrongModule where
     gfoldl = undefined
