@@ -1524,14 +1524,16 @@ checkValidRoles tc
   = return ()
   where
     check_dc_roles datacon
-      = let univ_tvs   = dataConUnivTyVars datacon
-            ex_tvs     = dataConExTyVars datacon
-            args       = dataConRepArgTys datacon
-            univ_roles = zipVarEnv univ_tvs (tyConRoles tc)
+      = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
+           ; mapM_ (check_ty_roles role_env Representational) $
+                    eqSpecPreds eq_spec ++ theta ++ arg_tys }
+                    -- See Note [Role-checking data constructor arguments] in TcTyDecls
+      where
+        (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig datacon
+        univ_roles = zipVarEnv univ_tvs (tyConRoles tc)
               -- zipVarEnv uses zipEqual, but we don't want that for ex_tvs
-            ex_roles   = mkVarEnv (zip ex_tvs (repeat Nominal))
-            role_env   = univ_roles `plusVarEnv` ex_roles in
-        mapM_ (check_ty_roles role_env Representational) args
+        ex_roles   = mkVarEnv (zip ex_tvs (repeat Nominal))
+        role_env   = univ_roles `plusVarEnv` ex_roles
 
     check_ty_roles env role (TyVarTy tv)
       = case lookupVarEnv env tv of

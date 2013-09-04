@@ -615,6 +615,19 @@ roles(~#) = N, N
 With -dcore-lint on, the output of this algorithm is checked in checkValidRoles,
 called from checkValidTycon.
 
+Note [Role-checking data constructor arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T a where
+    MkT :: Eq b => F a -> (a->a) -> T (G a)
+
+Then we want to check the roles at which 'a' is used
+in MkT's type.  We want to work on the user-written type,
+so we need to take into account
+  * the arguments:   (F a) and (a->a)
+  * the context:     C a b
+  * the result type: (G a)   -- this is in the eq_spec
+
 \begin{code}
 type RoleEnv    = NameEnv [Role]        -- from tycon names to roles
 type RoleAnnots = NameEnv [Maybe Role]  -- from tycon names to role annotations,
@@ -695,9 +708,12 @@ irClass tc_name cls
 -- See Note [Role inference]
 irDataCon :: Name -> DataCon -> RoleM ()
 irDataCon tc_name datacon
-  = addRoleInferenceInfo tc_name (dataConUnivTyVars datacon) $
-    let ex_var_set = mkVarSet $ dataConExTyVars datacon in
-    mapM_ (irType ex_var_set) (dataConRepArgTys datacon)
+  = addRoleInferenceInfo tc_name univ_tvs $
+    mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta ++ arg_tys)
+      -- See Note [Role-checking data constructor arguments] 
+  where
+    (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig datacon
+    ex_var_set = mkVarSet ex_tvs
 
 irType :: VarSet -> Type -> RoleM ()
 irType = go
