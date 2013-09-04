@@ -30,19 +30,10 @@ check title expected got
          showProblems "Missing flags" missing
 
 expectedGhcOnlyExtensions :: [String]
-expectedGhcOnlyExtensions = [
-                             "AllowAmbiguousTypes",
-                             "RelaxedLayout",
+expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
-                             "ExplicitNamespaces",
-                             "TypeHoles",
-                             "OverloadedLists",
-                             "EmptyCase",
-                             "AutoDeriveTypeable",
-                             "NegativeLiterals",
-                             "NumDecimals",
-                             "NullaryTypeClasses"]
+                             "TypeHoles"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",
