@@ -77,4 +77,7 @@ online copy can be found here:
 
    http://haskell.org/haskellwiki/GHC
 
+If you *really* want to see every option, then you can pass
+'--show-options' to the compiler.
+
 ------------------------------------------------------------------------
