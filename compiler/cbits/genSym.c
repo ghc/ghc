@@ -7,7 +7,7 @@ HsInt genSym(void) {
     if (n_capabilities == 1) {
         return GenSymCounter++;
     } else {
-        return atomic_inc((StgWord *)&GenSymCounter);
+        return atomic_inc((StgWord *)&GenSymCounter, 1);
     }
 }
 
