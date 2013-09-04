@@ -1917,9 +1917,20 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       -- on x86.
                       ++ (if sLdSupportsCompactUnwind mySettings &&
                              not staticLink &&
-                             platformOS   platform == OSDarwin &&
-                             platformArch platform `elem` [ArchX86, ArchX86_64]
+                             (platformOS platform == OSDarwin || platformOS platform == OSiOS) &&
+                             case platformArch platform of
+                               ArchX86 -> True
+                               ArchX86_64 -> True
+                               ArchARM {} -> True
+                               _ -> False
                           then ["-Wl,-no_compact_unwind"]
+                          else [])
+
+                      -- '-no_pie'
+                      -- iOS uses 'dynamic-no-pic', so we must pass this to ld to suppress a warning; see #7722
+                      ++ (if platformOS platform == OSiOS &&
+                             not staticLink
+                          then ["-Wl,-no_pie"]
                           else [])
 
                       -- '-Wl,-read_only_relocs,suppress'
