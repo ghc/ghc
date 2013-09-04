@@ -8,7 +8,6 @@ module Haddock.ParseSpec (main, spec) where
 import           Control.Applicative
 import           Data.Monoid
 import           Data.String
-import           DynFlags (DynFlags, defaultDynFlags)
 import           Haddock.Doc (combineStringNodes)
 import           Haddock.Lex (tokenise)
 import qualified Haddock.Parse as Parse
@@ -17,8 +16,7 @@ import           Outputable (Outputable, showSDoc, ppr)
 import           RdrName (RdrName)
 import           Test.Hspec
 
-dynFlags :: DynFlags
-dynFlags = defaultDynFlags (error "dynFlags for Haddock tests: undefined")
+import           Helper
 
 instance Outputable a => Show a where
   show = showSDoc dynFlags . ppr
