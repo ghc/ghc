@@ -15,4 +15,4 @@ test('T7918',
        extra_clean(['T7918A.hi', 'T7918A.o', 'T7918A.dyn_hi', 'T7918A.dyn_o', 
                     'T7918B.hi', 'T7918B.o', 'T7918B.dyn_hi', 'T7918B.dyn_o'])],
       compile_and_run,
-      ['-package ghc'])
+      ['-package ghc ' + config.ghc_th_way_flags])
