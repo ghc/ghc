@@ -254,7 +254,7 @@ void checkUnload (StgClosure *static_objects)
 
   // Mark every unloadable object as unreferenced initially
   for (oc = unloaded_objects; oc; oc = oc->next) {
-      IF_DEBUG(linker, debugBelch("Checking whether to unload %s\n",
+      IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
                                   oc->fileName));
       oc->referenced = rtsFalse;
   }
@@ -290,12 +290,12 @@ void checkUnload (StgClosure *static_objects)
           } else {
               prev->next = oc->next;
           }
-          IF_DEBUG(linker, debugBelch("Unloading object file %s\n",
+          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
                                       oc->fileName));
           freeObjectCode(oc);
       } else {
-          IF_DEBUG(linker, debugBelch("Object file still in use: %s\n",
-                                      oc->fileName));
+          IF_DEBUG(linker, debugBelch("Object file still in use: %"
+                                      PATH_FMT "\n", oc->fileName));
       }
   }
 

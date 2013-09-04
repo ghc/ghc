@@ -169,7 +169,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define struct_stat struct _stat
 #define open wopen
 #define WSTR(s) L##s
-#define PATH_FMT "S"
 #else
 #define pathcmp strcmp
 #define pathlen strlen
@@ -177,7 +176,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define pathstat stat
 #define struct_stat struct stat
 #define WSTR(s) s
-#define PATH_FMT "s"
 #endif
 
 static pathchar* pathdup(pathchar *path)
