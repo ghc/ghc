@@ -501,10 +501,10 @@ conflicts dflags (r, rhs, addr) node
   | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
 
   -- (4) assignments that read caller-saves GlobalRegs conflict with a
-  -- foreign call.  See Note [foreign calls clobber GlobalRegs].
+  -- foreign call.  See Note [Unsafe foreign calls clobber caller-save registers]
   | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs dflags rhs = True
 
-  -- (5) foreign calls clobber heap: see Note [foreign calls clobber heap]
+  -- (5) foreign calls clobber heap: see Note [Foreign calls clobber heap]
   | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
 
   -- (6) native calls clobber any memory
@@ -563,7 +563,8 @@ data AbsMem
 --  that was written in the same basic block.  To take advantage of
 --  non-aliasing of heap memory we will have to be more clever.
 
--- Note [foreign calls clobber]
+-- Note [Foreign calls clobber heap]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- It is tempting to say that foreign calls clobber only
 -- non-heap/stack memory, but unfortunately we break this invariant in

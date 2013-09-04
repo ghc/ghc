@@ -52,7 +52,7 @@ data CmmNode e x where
       [CmmActual] ->            -- zero or more arguments
       CmmNode O O
       -- Semantics: clobbers any GlobalRegs for which callerSaves r == True
-      -- See Note [foreign calls clobber GlobalRegs]
+      -- See Note [Unsafe foreign calls clobber caller-save registers]
       --
       -- Invariant: the arguments and the ForeignTarget must not
       -- mention any registers for which CodeGen.Platform.callerSaves
@@ -158,8 +158,8 @@ made manifest in CmmLayoutStack, where they are lowered into the above
 sequence.
 -}
 
-{- Note [foreign calls clobber GlobalRegs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Unsafe foreign calls clobber caller-save registers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A foreign call is defined to clobber any GlobalRegs that are mapped to
 caller-saves machine registers (according to the prevailing C ABI).
@@ -329,8 +329,9 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
   foldRegsDefd dflags f z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall tgt _ _  -> fold f z (foreignTargetRegs tgt)
-    CmmCall {} -> fold f z activeRegs
-    CmmForeignCall {tgt=tgt} -> fold f z (foreignTargetRegs tgt)
+    CmmCall        {} -> fold f z activeRegs
+    CmmForeignCall {} -> fold f z activeRegs
+                      -- See Note [Safe foreign calls clobber STG registers]
     _ -> z
     where fold :: forall a b.
                    DefinerOfRegs GlobalReg a =>
@@ -344,6 +345,74 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
           foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
           foreignTargetRegs _ = activeCallerSavesRegs
 
+-- Note [Safe foreign calls clobber STG registers]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- During stack layout phase every safe foreign call is expanded into a block
+-- that contains unsafe foreign call (instead of safe foreign call) and ends
+-- with a normal call (See Note [Foreign calls]). This means that we must
+-- treat safe foreign call as if it was a normal call (because eventually it
+-- will be). This is important if we try to run sinking pass before stack
+-- layout phase. Consider this example of what might go wrong (this is cmm
+-- code from stablename001 test). Here is code after common block elimination
+-- (before stack layout):
+--
+--  c1q6:
+--      _s1pf::P64 = R1;
+--      _c1q8::I64 = performMajorGC;
+--      I64[(young<c1q9> + 8)] = c1q9;
+--      foreign call "ccall" arg hints:  []  result hints:  [] (_c1q8::I64)(...)
+--                   returns to c1q9 args: ([]) ress: ([])ret_args: 8ret_off: 8;
+--  c1q9:
+--      I64[(young<c1qb> + 8)] = c1qb;
+--      R1 = _s1pc::P64;
+--      call stg_makeStableName#(R1) returns to c1qb, args: 8, res: 8, upd: 8;
+--
+-- If we run sinking pass now (still before stack layout) we will get this:
+--
+--  c1q6:
+--      I64[(young<c1q9> + 8)] = c1q9;
+--      foreign call "ccall" arg hints:  []  result hints:  [] performMajorGC(...)
+--                   returns to c1q9 args: ([]) ress: ([])ret_args: 8ret_off: 8;
+--  c1q9:
+--      I64[(young<c1qb> + 8)] = c1qb;
+--      _s1pf::P64 = R1;         <------ _s1pf sunk past safe foreign call
+--      R1 = _s1pc::P64;
+--      call stg_makeStableName#(R1) returns to c1qb, args: 8, res: 8, upd: 8;
+--
+-- Notice that _s1pf was sunk past a foreign call. When we run stack layout
+-- safe call to performMajorGC will be turned into:
+--
+--  c1q6:
+--      _s1pc::P64 = P64[Sp + 8];
+--      I64[Sp - 8] = c1q9;
+--      Sp = Sp - 8;
+--      I64[I64[CurrentTSO + 24] + 16] = Sp;
+--      P64[CurrentNursery + 8] = Hp + 8;
+--      (_u1qI::I64) = call "ccall" arg hints:  [PtrHint,]
+--                           result hints:  [PtrHint] suspendThread(BaseReg, 0);
+--      call "ccall" arg hints:  []  result hints:  [] performMajorGC();
+--      (_u1qJ::I64) = call "ccall" arg hints:  [PtrHint]
+--                           result hints:  [PtrHint] resumeThread(_u1qI::I64);
+--      BaseReg = _u1qJ::I64;
+--      _u1qK::P64 = CurrentTSO;
+--      _u1qL::P64 = I64[_u1qK::P64 + 24];
+--      Sp = I64[_u1qL::P64 + 16];
+--      SpLim = _u1qL::P64 + 192;
+--      HpAlloc = 0;
+--      Hp = I64[CurrentNursery + 8] - 8;
+--      HpLim = I64[CurrentNursery] + (%MO_SS_Conv_W32_W64(I32[CurrentNursery + 48]) * 4096 - 1);
+--      call (I64[Sp])() returns to c1q9, args: 8, res: 8, upd: 8;
+--  c1q9:
+--      I64[(young<c1qb> + 8)] = c1qb;
+--      _s1pf::P64 = R1;         <------ INCORRECT!
+--      R1 = _s1pc::P64;
+--      call stg_makeStableName#(R1) returns to c1qb, args: 8, res: 8, upd: 8;
+--
+-- Notice that c1q6 now ends with a call. Sinking _s1pf::P64 = R1 past that
+-- call is clearly incorrect. This is what would happen if we assumed that
+-- safe foreign call has the same semantics as unsafe foreign call. To prevent
+-- this we need to treat safe foreign call as if was normal call.
 
 -----------------------------------
 -- mapping Expr in CmmNode
