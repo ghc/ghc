@@ -136,7 +136,14 @@ haddock args = handleTopExceptions $ do
   shortcutFlags flags
   qual <- case qualification flags of {Left msg -> throwE msg; Right q -> return q}
 
-  withGhc' flags $ do
+  -- inject dynamic-too into flags before we proceed
+  flags' <- withGhc' flags $ do
+        df <- getDynFlags
+        case lookup "GHC Dynamic" (compilerInfo df) of
+          Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
+          _ -> return flags
+
+  withGhc' flags' $ do
 
     dflags <- getDynFlags
 
