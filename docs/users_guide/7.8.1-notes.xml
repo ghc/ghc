@@ -146,6 +146,17 @@
        </listitem>
 
         <listitem>
+            <para> 
+                New PrimOps for atomic memory operations.
+                The <literal>casMutVar#</literal> PrimOp was introduced in
+                GHC 7.2 (debugged in 7.4).  This release also includes additional 
+                PrimOps for compare-and-swap (<literal>casArray#</literal> and 
+                <literal>casIntArray#</literal>) and one for fetch-and-add 
+                (<literal>fetchAddIntArray#</literal>).
+           </para>
+       </listitem>
+
+        <listitem>
             <para>
                 TODO: mention dynamic changes
            </para>
