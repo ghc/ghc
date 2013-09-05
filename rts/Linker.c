@@ -3835,6 +3835,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           /* ignore unknown section that appeared in gcc 3.4.5(?) */
           && 0!= strcmp(".reloc", (char*)secname)
           && 0 != strcmp(".rdata$zzz", (char*)secname)
+          /* ignore linker directive sections */
+          && 0 != strcmp(".drectve", (char*)secname)
          ) {
          errorBelch("Unknown PEi386 section name `%s' (while processing: %" PATH_FMT")", secname, oc->fileName);
          stgFree(secname);
