@@ -62,6 +62,7 @@ data Flag
   | Flag_Help
   | Flag_Verbosity String
   | Flag_Version
+  | Flag_CompatibleInterfaceVersions
   | Flag_InterfaceVersion
   | Flag_UseContents String
   | Flag_GenContents
@@ -131,6 +132,8 @@ options backwardsCompat =
       "display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
       "output version information and exit",
+    Option []  ["compatible-interface-versions"]  (NoArg Flag_CompatibleInterfaceVersions)
+      "output compatible interface file versions and exit",
     Option []  ["interface-version"]  (NoArg Flag_InterfaceVersion)
       "output interface file version and exit",
     Option ['v']  ["verbosity"]  (ReqArg Flag_Verbosity "VERBOSITY")
@@ -272,4 +275,3 @@ readIfaceArgs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
 optLast :: [a] -> Maybe a
 optLast [] = Nothing
 optLast xs = Just (last xs)
-

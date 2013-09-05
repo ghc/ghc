@@ -15,7 +15,7 @@
 module Haddock.InterfaceFile (
   InterfaceFile(..), ifPackageId,
   readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
-  writeInterfaceFile, binaryInterfaceVersion
+  writeInterfaceFile, binaryInterfaceVersion, binaryInterfaceVersionCompatibility
 ) where
 
 

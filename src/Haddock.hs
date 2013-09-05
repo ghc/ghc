@@ -367,6 +367,8 @@ shortcutFlags flags = do
   when (Flag_Help             `elem` flags) (bye usage)
   when (Flag_Version          `elem` flags) byeVersion
   when (Flag_InterfaceVersion `elem` flags) (bye (show binaryInterfaceVersion ++ "\n"))
+  when (Flag_CompatibleInterfaceVersions `elem` flags)
+    (bye (unwords (map show binaryInterfaceVersionCompatibility) ++ "\n"))
   when (Flag_GhcVersion       `elem` flags) (bye (cProjectVersion ++ "\n"))
 
   when (Flag_PrintGhcPath `elem` flags) $ do
@@ -448,4 +450,3 @@ getExecDir = return Nothing
 #endif
 
 #endif
-
