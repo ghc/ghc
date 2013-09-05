@@ -34,6 +34,7 @@ import Haddock.GhcUtils hiding (pretty)
 
 import Control.Monad hiding (forM_)
 import Data.Foldable (forM_)
+import Data.List (isPrefixOf)
 import Control.Exception
 import Data.Maybe
 import Data.IORef
@@ -144,6 +145,10 @@ haddock args = handleTopExceptions $ do
           Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
 
+  unless (Flag_NoWarnings `elem` flags) $ do
+    forM_ (warnings args) $ \warning -> do
+      hPutStrLn stderr warning
+
   withGhc' flags' $ do
 
     dflags <- getDynFlags
@@ -170,6 +175,12 @@ haddock args = handleTopExceptions $ do
 
       -- Render even though there are no input files (usually contents/index).
       liftIO $ renderStep dflags flags qual packages []
+
+-- | Create warnings about potential misuse of -optghc
+warnings :: [String] -> [String]
+warnings = map format . filter (isPrefixOf "-optghc")
+  where
+    format arg = concat ["Warning: `", arg, "' means `-o ", drop 2 arg, "', did you mean `-", arg, "'?"]
 
 
 withGhc' :: [Flag] -> Ghc a -> IO a
