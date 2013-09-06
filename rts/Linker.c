@@ -208,6 +208,7 @@ static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
+static int ocRunInit_PEi386     ( ObjectCode* oc );
 static void *lookupSymbolInDLLs ( unsigned char *lbl );
 static void zapTrailingAtSign   ( unsigned char *sym );
 #elif defined(OBJFORMAT_MACHO)
@@ -2775,13 +2776,15 @@ resolveObjs( void )
 #           endif
             if (!r) { return r; }
 
-#if defined(OBJFORMAT_ELF)
             // run init/init_array
+#if defined(OBJFORMAT_ELF)
             r = ocRunInit_ELF ( oc );
-            if (!r) { return r; }
+#elif defined(OBJFORMAT_PEi386)
+            r = ocRunInit_PEi386 ( oc );
 #else
             IF_DEBUG(linker, debugBelch("resolveObjs: don't know how to run initializers!\n"));
 #endif
+            if (!r) { return r; }
 
             oc->status = OBJECT_RESOLVED;
         }
@@ -3834,6 +3837,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (0==strcmp(".data",(char*)secname) ||
           0==strcmp(".bss",(char*)secname))
          kind = SECTIONKIND_RWDATA;
+      if (0==strcmp(".ctors", (char*)secname))
+         kind = SECTIONKIND_INIT_ARRAY;
 
       ASSERT(sectab_i->SizeOfRawData == 0 || sectab_i->VirtualSize == 0);
       sz = sectab_i->SizeOfRawData;
@@ -3850,8 +3855,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           /* Ignore sections called which contain exception information. */
           && 0 != strcmp(".pdata", (char*)secname)
           && 0 != strcmp(".xdata", (char*)secname)
-          /* ignore constructor section for now */
-          && 0 != strcmp(".ctors", (char*)secname)
           /* ignore section generated from .ident */
           && 0!= strncmp(".debug", (char*)secname, 6)
           /* ignore unknown section that appeared in gcc 3.4.5(?) */
@@ -4014,7 +4017,6 @@ ocResolve_PEi386 ( ObjectCode* oc )
           || 0 == strcmp(".stabstr", (char*)secname)
           || 0 == strcmp(".pdata", (char*)secname)
           || 0 == strcmp(".xdata", (char*)secname)
-          || 0 == strcmp(".ctors", (char*)secname)
           || 0 == strncmp(".debug", (char*)secname, 6)
           || 0 == strcmp(".rdata$zzz", (char*)secname)) {
           stgFree(secname);
@@ -4179,6 +4181,49 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
    IF_DEBUG(linker, debugBelch("completed %" PATH_FMT, oc->fileName));
    return 1;
+}
+
+static int
+ocRunInit_PEi386 ( ObjectCode *oc )
+{
+    COFF_header*  hdr;
+    COFF_section* sectab;
+    UChar*        strtab;
+    int i;
+
+    hdr = (COFF_header*)(oc->image);
+    sectab = (COFF_section*) (
+                ((UChar*)(oc->image))
+                + sizeof_COFF_header + hdr->SizeOfOptionalHeader
+             );
+    strtab = ((UChar*)(oc->image))
+             + hdr->PointerToSymbolTable
+             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
+
+    int argc, envc;
+    char **argv, **envv;
+
+    getProgArgv(&argc, &argv);
+    getProgEnvv(&envc, &envv);
+
+    for (i = 0; i < hdr->NumberOfSections; i++) {
+        COFF_section* sectab_i
+            = (COFF_section*)
+                myindex ( sizeof_COFF_section, sectab, i );
+        char *secname = cstring_from_section_name(sectab_i->Name, strtab);
+        if (0 == strcmp(".ctors", (char*)secname)) {
+            UChar *init_startC = (UChar*)(oc->image) + sectab_i->PointerToRawData;
+            init_t *init = (init_t*)init_startC;
+            init_t *init_end = (init_t*)(init_startC + sectab_i->SizeOfRawData);
+            // I heard that .ctors might need to be run backwards, but
+            // if that is true then the MinGW toolchain ignores that.
+            for (; init < init_end; init++) {
+                (*init)(argc, argv, envv);
+            }
+        }
+    }
+    freeProgEnvv(envc, envv);
+    return 1;
 }
 
 #endif /* defined(OBJFORMAT_PEi386) */
