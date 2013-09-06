@@ -30,6 +30,8 @@ import qualified Data.Map as Map
 import Data.Monoid
 import GHC hiding (NoLink)
 import OccName
+import Control.Applicative (Applicative(..))
+import Control.Monad (ap)
 
 
 -----------------------------------------------------------------------------
@@ -493,6 +495,9 @@ newtype ErrMsgM a = Writer { runWriter :: (a, [ErrMsg]) }
 instance Functor ErrMsgM where
         fmap f (Writer (a, msgs)) = Writer (f a, msgs)
 
+instance Applicative ErrMsgM where
+    pure = return
+    (<*>) = ap
 
 instance Monad ErrMsgM where
         return a = Writer (a, [])
@@ -543,6 +548,9 @@ liftErrMsg = WriterGhc . return . runWriter
 instance Functor ErrMsgGhc where
   fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
 
+instance Applicative ErrMsgGhc where
+    pure = return
+    (<*>) = ap
 
 instance Monad ErrMsgGhc where
   return a = WriterGhc (return (a, []))
