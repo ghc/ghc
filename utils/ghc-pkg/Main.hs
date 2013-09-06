@@ -33,6 +33,7 @@ import qualified Control.Exception as Exception
 import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
+import Data.Ord (comparing)
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           doesFileExist, renameFile, removeFile,
@@ -1012,7 +1013,8 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                  then hPutStrLn stdout "    (no packages)"
                  else hPutStrLn stdout $ unlines (map ("    " ++) pp_pkgs)
            where
-                 pp_pkgs = map pp_pkg pkg_confs
+                 -- Sort using instance Ord PackageId
+                 pp_pkgs = map pp_pkg . sortBy (comparing installedPackageId) $ pkg_confs
                  pp_pkg p
                    | sourcePackageId p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
@@ -1066,7 +1068,8 @@ simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
    let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
                                                   else display
-       strs = map showPkg $ sortBy compPkgIdVer $ map sourcePackageId pkgs
+       -- Sort using instance Ord PackageId
+       strs = map showPkg $ sort $ map sourcePackageId pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
 
@@ -1098,10 +1101,11 @@ latestPackage verbosity my_flags pkgid = do
      getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} my_flags
 
   ps <- findPackages flag_db_stack (Id pkgid)
-  show_pkg (sortBy compPkgIdVer (map sourcePackageId ps))
+  case ps of
+    [] -> die "no matches"
+    _  -> show_pkg . maximum . map sourcePackageId $ ps
   where
-    show_pkg [] = die "no matches"
-    show_pkg pids = hPutStrLn stdout (display (last pids))
+    show_pkg pid = hPutStrLn stdout (display pid)
 
 -- -----------------------------------------------------------------------------
 -- Describe
@@ -1164,9 +1168,6 @@ realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg
 (Substring _ m) `matchesPkg` pkg = m (display (sourcePackageId pkg))
-
-compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
-compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 -- -----------------------------------------------------------------------------
 -- Field
