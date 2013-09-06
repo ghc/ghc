@@ -38,7 +38,8 @@ module Language.Haskell.TH.PprLib (
 import Language.Haskell.TH.Syntax
     (Name(..), showName', NameFlavour(..), NameIs(..))
 import qualified Text.PrettyPrint as HPJ
-import Control.Monad (liftM, liftM2)
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, liftM2, ap)
 import Data.Map ( Map )
 import qualified Data.Map as Map ( lookup, insert, empty )
 import GHC.Base (Int(..))
@@ -146,6 +147,13 @@ data NameFlavour
 
 to_HPJ_Doc :: Doc -> HPJ.Doc
 to_HPJ_Doc d = fst $ runPprM d (Map.empty, 0)
+
+instance Functor PprM where
+      fmap = liftM
+
+instance Applicative PprM where
+      pure = return
+      (<*>) = ap
 
 instance Monad PprM where
     return x = PprM $ \s -> (x, s)
