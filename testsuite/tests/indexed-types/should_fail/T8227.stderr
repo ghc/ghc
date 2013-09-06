@@ -1,0 +1,7 @@
+
+T8227.hs:16:44:
+    Occurs check: cannot construct the infinite type: t0 ~ t0 -> t0
+    Expected type: Scalar (V (t0 -> t0))
+      Actual type: Scalar (V a)
+    In the first argument of ‛arcLengthToParam’, namely ‛eps’
+    In the expression: arcLengthToParam eps eps
