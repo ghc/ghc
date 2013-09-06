@@ -347,8 +347,23 @@ else
 compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
 endif
 
-ifeq "$(GhcProfiled)" "YES"
+# If we're bootstrapping the compiler during stage2, or we're being
+# built by a GHC whose version is > 7.8, we need -fcmm-sink to be
+# passed to the compiler. This is required on x86 to avoid the
+# register allocator running out of stack slots when compiling this
+# module with -fPIC -dynamic.
+ifeq "$(CMM_SINK_BOOTSTRAP_IS_NEEDED)" "YES"
+compiler/stage1/build/Parser_HC_OPTS += -fcmm-sink
+endif
+# However, we may be using e.g. 7.6, and thus the bootstrap compiler
+# does not need to pass -fcmm-sink, but stage1+ does!
+# We pass -fcmm-sink to every stage != 1
+# See #8182 for all the details
+compiler/stage2/build/Parser_HC_OPTS += -fcmm-sink
+compiler/stage3/build/Parser_HC_OPTS += -fcmm-sink
 
+
+ifeq "$(GhcProfiled)" "YES"
 # If we're profiling GHC then we want SCCs.  However, adding -auto-all
 # everywhere tends to give a hard-to-read profile, and adds lots of
 # overhead.  A better approach is to proceed top-down; identify the

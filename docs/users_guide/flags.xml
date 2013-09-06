@@ -1586,17 +1586,6 @@
           </row>
 
           <row>
-            <entry><option>-ffun-to-thunk</option></entry>
-            <entry>Worker-wrapper removes unused arguments; this flag
-            lets it thusly remove all value lambdas. Doing so creates
-            a thunk where it was previously a function closure, which
-            may save recomputation but also risks a space leak. Off by
-            default.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-fun-to-thunk</option></entry>
-          </row>
-
-          <row>
             <entry><option>-fdo-eta-reduction</option></entry>
             <entry>Enable eta-reduction. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
@@ -1662,6 +1651,15 @@
           </row>
 
           <row>
+            <entry><option>-ffun-to-thunk</option></entry>
+            <entry>Allow worker-wrapper to convert a function closure into a
+            thunk if the function does not use any of its arguments. Off by
+            default.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-fun-to-thunk</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fignore-asserts</option></entry>
             <entry>Ignore assertions in the source</entry>
             <entry>dynamic</entry>
@@ -1673,6 +1671,14 @@
             <entry>Ignore pragmas in interface files</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-ignore-interface-pragmas</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-flate-dmd-anal</option></entry>
+            <entry>Run demand analysis again, at the end of the simplification
+            pipeline</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-late-dmd-anal</option></entry>
           </row>
 
           <row>

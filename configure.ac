@@ -156,6 +156,12 @@ FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
                     GHC_PACKAGE_DB_FLAG=package-db)
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
+# GHC 7.7+ needs -fcmm-sink when compiling Parser.hs. See #8182
+FP_COMPARE_VERSIONS([$GhcVersion],[-gt],[7.7],
+                    CMM_SINK_BOOTSTRAP_IS_NEEDED=YES,
+                    CMM_SINK_BOOTSTRAP_IS_NEEDED=NO)
+AC_SUBST(CMM_SINK_BOOTSTRAP_IS_NEEDED)
+
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
 then

@@ -471,6 +471,8 @@ endif
 
 GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
+CMM_SINK_BOOTSTRAP_IS_NEEDED = @CMM_SINK_BOOTSTRAP_IS_NEEDED@
+
 #-----------------------------------------------------------------------------
 # C compiler
 #

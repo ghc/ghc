@@ -2095,16 +2095,15 @@ f "2"    = 2
 
         <varlistentry>
           <term>
-            <option>--ffun-to-thunk</option>
+            <option>-ffun-to-thunk</option>
             <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Worker-wrapper removes unused arguments, but usually we 
-            do not remove them all, lest it turn a function closure into a thunk,
-            thereby perhaps causing extra allocation (since let-no-escape can't happen)
-            and/or a space leak.  This flag
-            allows worker/wrapper to remove <emphasis>all</emphasis> value lambdas.
-            Off by default.
+            <para>Worker-wrapper removes unused arguments, but usually we do
+            not remove them all, lest it turn a function closure into a thunk,
+            thereby perhaps creating a space leak and/or disrupting inlining.
+            This flag allows worker/wrapper to remove <emphasis>all</emphasis>
+            value lambdas.  Off by default.
             </para>
           </listitem>
         </varlistentry>
@@ -2135,6 +2134,18 @@ f "2"    = 2
             That is, even if <filename>M.hi</filename> contains unfolding or strictness information
             for a function, GHC will ignore that information.</para>
           </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-flate-dmd-anal</option>
+            <indexterm><primary><option>-flate-dmd-anal</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>Off by default.</emphasis>Run demand analysis
+            again, at the end of the simplification pipeline
+            </para>
+            </listitem>
         </varlistentry>
 
         <varlistentry>
