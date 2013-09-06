@@ -481,6 +481,11 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                                          return CCallConv
 checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
                              return PrimCallConv
+checkCConv JavaScriptCallConv = do dflags <- getDynFlags
+                                   if platformArch (targetPlatform dflags) == ArchJavaScript
+                                       then return JavaScriptCallConv
+                                       else do addErrTc (text "The `javascript' calling convention is unsupported on this platform")
+                                               return JavaScriptCallConv
 \end{code}
 
 Warnings

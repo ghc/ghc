@@ -211,6 +211,7 @@ linearRegAlloc dflags first_id block_live sccs
       ArchAlpha     -> panic "linearRegAlloc ArchAlpha"
       ArchMipseb    -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel    -> panic "linearRegAlloc ArchMipsel"
+      ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
 
 linearRegAlloc'

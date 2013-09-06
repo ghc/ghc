@@ -972,7 +972,10 @@ mkImport cconv safety (L loc entity, v, ty)
   let funcTarget = CFunction (StaticTarget entity Nothing True)
       importSpec = CImport PrimCallConv safety Nothing funcTarget
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
-
+  | cconv == JavaScriptCallConv = do
+  let funcTarget = CFunction (StaticTarget entity Nothing True)
+      importSpec = CImport JavaScriptCallConv safety Nothing funcTarget
+  return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
   | otherwise = do
     case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
       Nothing         -> parseErrorSDoc loc (text "Malformed entity string")

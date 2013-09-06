@@ -938,6 +938,7 @@ is_cishCC CCallConv    = True
 is_cishCC CApiConv     = True
 is_cishCC StdCallConv  = True
 is_cishCC PrimCallConv = False
+is_cishCC JavaScriptCallConv = False
 
 -- ---------------------------------------------------------------------
 -- Find and print local and external declarations for a list of

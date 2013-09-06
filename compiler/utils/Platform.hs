@@ -54,6 +54,7 @@ data Arch
         | ArchAlpha
         | ArchMipseb
         | ArchMipsel
+        | ArchJavaScript
         deriving (Read, Show, Eq)
 
 isARM :: Arch -> Bool
