@@ -114,12 +114,12 @@ stgFree(void* p)
    -------------------------------------------------------------------------- */
 
 void
-stackOverflow(void)
+stackOverflow(StgTSO* tso)
 {
-  StackOverflowHook(RtsFlags.GcFlags.maxStkSize * sizeof(W_));
+    StackOverflowHook(tso->tot_stack_size * sizeof(W_));
 
 #if defined(TICKY_TICKY)
-  if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
+    if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 }
 
