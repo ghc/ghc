@@ -26,6 +26,7 @@ dynFlags = defaultDynFlags settings
       , sPgm_T = error "Haddock.ParserSpec.sPgm_T"
       , sPgm_sysman = error "Haddock.ParserSpec.sPgm_sysman"
       , sPgm_windres = error "Haddock.ParserSpec.sPgm_windres"
+      , sPgm_libtool = error "Haddock.ParserSpec.sPgm_libtool"
       , sPgm_lo = error "Haddock.ParserSpec.sPgm_lo"
       , sPgm_lc = error "Haddock.ParserSpec.sPgm_lc"
       , sOpt_L = []
