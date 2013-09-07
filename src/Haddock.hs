@@ -40,6 +40,7 @@ import Data.IORef
 import qualified Data.Map as Map
 import System.IO
 import System.Exit
+import System.Directory
 
 #if defined(mingw32_HOST_OS)
 import Foreign
@@ -339,11 +340,19 @@ withGhc libDir flags ghcActs = saveStaticFlagGlobals >>= \savedFlags -> do
 getHaddockLibDir :: [Flag] -> IO String
 getHaddockLibDir flags =
   case [str | Flag_Lib str <- flags] of
-    [] ->
+    [] -> do
 #ifdef IN_GHC_TREE
       getInTreeDir
 #else
-      getDataDir -- provided by Cabal
+      d <- getDataDir -- provided by Cabal
+      doesDirectoryExist d >>= \exists -> case exists of
+        True -> return d
+        False -> do
+          -- If directory does not exist then we are probably invoking from
+          -- ./dist/build/haddock/haddock so we use ./resources as a fallback.
+          doesDirectoryExist "resources" >>= \exists_ -> case exists_ of
+            True -> return "resources"
+            False -> die ("Haddock's resource directory (" ++ d ++ ") does not exist!\n")
 #endif
     fs -> return (last fs)
 
