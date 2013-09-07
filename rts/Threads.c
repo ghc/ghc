@@ -499,7 +499,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
     IF_DEBUG(sanity,checkTSO(tso));
 
-    if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize) {
+    if (RtsFlags.GcFlags.maxStkSize > 0
+        && tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize) {
         // #3677: In a stack overflow situation, stack squeezing may
         // reduce the stack size, but we don't know whether it has been
         // reduced enough for the stack check to succeed if we try
