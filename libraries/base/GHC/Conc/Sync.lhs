@@ -764,7 +764,9 @@ sharedCAF a get_or_set =
                 deRefStablePtr (castPtrToStablePtr (castPtr ref2))
 
 reportStackOverflow :: IO ()
-reportStackOverflow = callStackOverflowHook
+reportStackOverflow = do
+     ThreadId tid <- myThreadId
+     callStackOverflowHook tid
 
 reportError :: SomeException -> IO ()
 reportError ex = do
@@ -774,7 +776,7 @@ reportError ex = do
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.
 foreign import ccall unsafe "stackOverflow"
-        callStackOverflowHook :: IO ()
+        callStackOverflowHook :: ThreadId# -> IO ()
 
 {-# NOINLINE uncaughtExceptionHandler #-}
 uncaughtExceptionHandler :: IORef (SomeException -> IO ())
