@@ -1,8 +1,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
--- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2010
+-- Copyright   :  (c) Simon Marlow      2003-2006,
+--                    David Waern       2006-2010,
+--                    Mateusz Kowalczyk 2013
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -54,7 +55,7 @@ import DynFlags hiding (verbosity)
 import Exception
 import GHC hiding (verbosity)
 import HscTypes
-
+import FastString (unpackFS)
 
 -- | Create 'Interface's and a link environment by typechecking the list of
 -- modules using the GHC API and processing the resulting syntax trees.
@@ -169,11 +170,35 @@ processModule verbosity modsum flags modMap instIfaceMap = do
     out verbosity verbose "Creating interface..."
     (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
     liftIO $ mapM_ putStrLn msg
+    dflags <- getDynFlags
     let (haddockable, haddocked) = ifaceHaddockCoverage interface
         percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
         modString = moduleString (ifaceMod interface)
         coverageMsg = printf " %3d%% (%3d /%3d) in '%s'" percentage haddocked haddockable modString
+        header = case ifaceDoc interface of
+          Documentation Nothing _ -> False
+          _ -> True
+        undocumentedExports = [ formatName s n | ExportDecl { expItemDecl = L s n
+                                                            , expItemMbDoc = (Documentation Nothing _, _)
+                                                            } <- ifaceExportItems interface ]
+          where
+            formatName :: SrcSpan -> HsDecl Name -> String
+            formatName loc n = p (getMainDeclBinder n) ++ case loc of
+              RealSrcSpan rss -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
+              _ -> ""
+
+            p [] = ""
+            p (x:_) = let n = pretty dflags x
+                          ms = modString ++ "."
+                      in if ms `isPrefixOf` n
+                         then drop (length ms) n
+                         else n
+
     out verbosity normal coverageMsg
+    when (Flag_PrintMissingDocs `elem` flags && (header || not (null undocumentedExports))) $ do
+      out verbosity normal "  Missing documentation for:"
+      unless header $ out verbosity normal "    Module header"
+      mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
     interface' <- liftIO $ evaluate interface
     return (Just interface')
   else
@@ -181,7 +206,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
 
 
 --------------------------------------------------------------------------------
--- * Building of cross-linking environment  
+-- * Building of cross-linking environment
 --------------------------------------------------------------------------------
 
 
@@ -216,4 +241,3 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
 withTempDir :: (ExceptionMonad m, MonadIO m) => FilePath -> m a -> m a
 withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
                             (liftIO $ removeDirectoryRecursive dir)
-
