@@ -446,7 +446,7 @@ getPrologue dflags flags =
     [] -> return Nothing
     [filename] -> do
       str <- readFile filename
-      case parseParas dflags str of
+      case parseParasMaybe dflags str of
         Nothing -> throwE $ "failed to parse haddock prologue from file: " ++ filename
         Just doc -> return (Just doc)
     _otherwise -> throwE "multiple -p/--prologue options"

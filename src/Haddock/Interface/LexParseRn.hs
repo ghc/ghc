@@ -43,11 +43,11 @@ processDocStrings dflags gre strs = do
 
 
 processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
-processDocStringParas = process parseParas
+processDocStringParas = process parseParasMaybe
 
 
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
-processDocString = process parseString
+processDocString = process parseStringMaybe
 
 process :: (DynFlags -> String -> Maybe (Doc RdrName))
         -> DynFlags

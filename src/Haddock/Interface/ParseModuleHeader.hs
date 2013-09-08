@@ -46,13 +46,13 @@ parseModuleHeader dflags str0 =
       description1 :: Either String (Maybe (Doc RdrName))
       description1 = case descriptionOpt of
          Nothing -> Right Nothing
-         Just description -> case parseString dflags description of
+         Just description -> case parseStringMaybe dflags description of
             Nothing -> Left ("Cannot parse Description: " ++ description)
             Just doc -> Right (Just doc)
    in
       case description1 of
          Left mess -> Left mess
-         Right docOpt -> case parseParas dflags str8 of
+         Right docOpt -> case parseParasMaybe dflags str8 of
            Nothing -> Left "Cannot parse header documentation paragraphs"
            Just doc -> Right (HaddockModInfo {
             hmi_description = docOpt,
