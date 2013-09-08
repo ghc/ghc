@@ -14,6 +14,9 @@
 
 module Sample where
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 data Safe
 data MayFail
 
@@ -22,6 +25,13 @@ data Result s a where
    Fail ::        Result MayFail a
 
 newtype M s a = M { unM :: IO (Result s a) }
+
+instance Functor (M s) where
+    fmap = liftM
+
+instance Applicative (M s) where
+    pure = return
+    (<*>) = ap
 
 instance Monad (M s) where  
 

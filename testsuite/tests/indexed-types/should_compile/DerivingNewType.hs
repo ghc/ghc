@@ -2,6 +2,8 @@
 
 module ShouldCompile where
 
+import Control.Applicative (Applicative)
+
 data family S a
 
 newtype instance S Int = S Int
@@ -10,5 +12,5 @@ newtype instance S Int = S Int
 data family S2 a b
 
 newtype instance S2 Int b = S2 (IO b)
-		          deriving Monad
+		          deriving (Functor, Applicative, Monad)
 

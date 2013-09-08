@@ -1,5 +1,5 @@
-Breakpoint 0 activated at ../HappyTest.hs:(216,1)-(227,35)
-Stopped at ../HappyTest.hs:(216,1)-(227,35)
+Breakpoint 0 activated at ../HappyTest.hs:(226,1)-(237,35)
+Stopped at ../HappyTest.hs:(226,1)-(237,35)
 _result :: [Token] = _
 *** Ignoring breakpoint
 *** Ignoring breakpoint

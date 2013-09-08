@@ -2,6 +2,9 @@
 
 module Cpr001_imp where
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 data MS		= MS { instr	:: String
 		     , pc	:: Int
 		     , mem	:: String
@@ -17,6 +20,13 @@ newtype StateTrans s a = ST ( s -> (s, Maybe a))
 -- in case of an error, the state remains
 -- as it is and Nothing is returned as value
 -- else execution continues
+
+instance Functor (StateTrans s) where
+    fmap = liftM
+
+instance Applicative (StateTrans s) where
+    pure = return
+    (<*>) = ap
 
 instance Monad (StateTrans s) where
     (ST p) >>= k

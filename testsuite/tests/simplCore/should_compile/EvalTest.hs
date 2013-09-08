@@ -11,7 +11,17 @@ module EvalTest where
 
 import GHC.Conc
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 data Eval a = Done a
+
+instance Functor Eval where
+    fmap = liftM
+
+instance Applicative Eval where
+    pure = return
+    (<*>) = ap
 
 instance Monad Eval where
   return x = Done x

@@ -6,6 +6,9 @@ import System.IO
 import System.IO.Unsafe
 import Debug.Trace
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 -- parser produced by Happy Version 1.16
 
 data HappyAbsSyn 
@@ -165,6 +168,13 @@ happyError_ tk tks = happyError' (tk:tks)
 newtype HappyIdentity a = HappyIdentity a
 happyIdentity = HappyIdentity
 happyRunIdentity (HappyIdentity a) = a
+
+instance Functor HappyIdentity where
+    fmap = liftM
+
+instance Applicative HappyIdentity where
+    pure = return
+    (<*>) = ap
 
 instance Monad HappyIdentity where
     return = HappyIdentity

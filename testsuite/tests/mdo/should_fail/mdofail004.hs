@@ -10,7 +10,17 @@ module Main (main) where
 
 import Control.Monad.Fix
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 data X a = X a deriving Show
+
+instance Functor X where
+    fmap = liftM
+
+instance Applicative X where
+    pure = return
+    (<*>) = ap
 
 instance Monad X where
   return      = X

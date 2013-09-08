@@ -12,4 +12,4 @@ class MyFunctor f where
 class MyFunctor ap => MyApplicative ap where
        type ApplicativeCtxt ap a :: Constraint
        type ApplicativeCtxt ap a = FunctorCtxt ap a
-       (<*>) :: (ApplicativeCtxt ap a, ApplicativeCtxt ap b) => ap (a -> b) -> ap a -> ap b
+       (<***>) :: (ApplicativeCtxt ap a, ApplicativeCtxt ap b) => ap (a -> b) -> ap a -> ap b

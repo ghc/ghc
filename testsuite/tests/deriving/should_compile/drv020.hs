@@ -5,6 +5,9 @@
 -- one-argument newtype defined in the same module
 module ShouldSucceed where
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 -- library stuff
 
 class Monad m => MonadState s m | m -> s where
@@ -14,6 +17,13 @@ class Monad m => MonadState s m | m -> s where
 newtype State s a = State {
                            runState :: (s -> (a, s))
                           }
+
+instance Functor (State s) where
+    fmap = liftM
+
+instance Applicative (State s) where
+    pure = return
+    (<*>) = ap
 
 instance Monad (State s) where
 	return a = State $ \s -> (a, s)
@@ -28,7 +38,7 @@ instance MonadState s (State s) where
 -- test code
 
 newtype Foo a = MkFoo (State Int a)
- deriving (Monad, MonadState Int)
+ deriving (Functor, Applicative, Monad, MonadState Int)
 
 f :: Foo Int
 f = get

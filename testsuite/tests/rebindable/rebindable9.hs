@@ -7,7 +7,17 @@ module Foo where
 import qualified Prelude
 import Prelude hiding (Monad(..))
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 newtype Identity a = Identity { runIdentity :: a }
+
+instance Prelude.Functor Identity where
+    fmap = liftM
+
+instance Applicative Identity where
+    pure = Prelude.return
+    (<*>) = ap
 
 instance Prelude.Monad Identity where
     return a = Identity a

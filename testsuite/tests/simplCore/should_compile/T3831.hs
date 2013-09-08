@@ -6,6 +6,7 @@
 module T3831(setAttributes)  where
 
 import Data.Monoid
+import Control.Applicative (Applicative(..), Alternative(empty, (<|>)))
 import Control.Monad
 
 class (Monoid s, OutputCap s) => TermStr s
@@ -17,13 +18,13 @@ class OutputCap f where
 instance OutputCap [Char] where
 instance (Enum p, OutputCap f) => OutputCap (p -> f) where
 
-instance MonadPlus Capability where
-    mzero = Capability (const $ return Nothing)
-    Capability f `mplus` Capability g = Capability $ \t -> do
-        mx <- f t
-        case mx of
-            Nothing -> g t
-            _ -> return mx
+
+instance Functor Capability where
+    fmap = liftM
+
+instance Applicative Capability where
+    pure = return
+    (<*>) = ap
 
 instance Monad Capability where
     return = Capability . const . return . Just
@@ -32,6 +33,18 @@ instance Monad Capability where
         case mx of
             Nothing -> return Nothing
             Just x -> let Capability g' = g x in g' t
+
+instance Alternative Capability where
+    empty = mzero
+    (<|>) = mplus
+
+instance MonadPlus Capability where
+    mzero = Capability (const $ return Nothing)
+    Capability f `mplus` Capability g = Capability $ \t -> do
+        mx <- f t
+        case mx of
+            Nothing -> g t
+            _ -> return mx
 
 newtype Capability a = Capability (() -> IO (Maybe a))
 

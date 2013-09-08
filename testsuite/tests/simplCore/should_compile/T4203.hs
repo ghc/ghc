@@ -4,6 +4,8 @@
 
 module T4203 where
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
 
 newtype NonNegative a = NonNegative a
  deriving (Eq, Num, Show)
@@ -25,6 +27,13 @@ instance Arbitrary EmptyStackSet where
   coarbitrary = error "urk"
 
 newtype Gen a = Gen a
+
+instance Functor Gen where
+    fmap = liftM
+
+instance Applicative Gen where
+    pure = return
+    (<*>) = ap
 
 instance Monad Gen where
   return a    = Gen a

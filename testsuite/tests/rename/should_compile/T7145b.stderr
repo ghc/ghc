@@ -1,2 +1,2 @@
 
-T7145b.hs:6:1: Warning: Defined but not used: ‛pure’
+T7145b.hs:8:1: Warning: Defined but not used: ‛pure’

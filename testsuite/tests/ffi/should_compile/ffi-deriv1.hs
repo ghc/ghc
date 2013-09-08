@@ -6,8 +6,10 @@
 
 module ShouldCompile where
 
+import Control.Applicative (Applicative)
+
 import Foreign.Ptr
-newtype RenderM a = RenderM (IO a) deriving (Functor, Monad)
+newtype RenderM a = RenderM (IO a) deriving (Functor, Applicative, Monad)
 
 type RenderCallback = Int -> Int -> RenderM ()
 

@@ -50,6 +50,9 @@ module DriverPipeline (compileFile) where
 
 import Control.Exception
 
+import Control.Applicative (Applicative(..))
+import Control.Monad (liftM, ap)
+
 data Phase
         = Unlit ()
         | Ccpp
@@ -74,6 +77,13 @@ data PipeState = PipeState {
   }
 
 newtype CompPipeline a = P { unP :: PipeState -> IO (PipeState, a) }
+
+instance Functor CompPipeline where
+    fmap = liftM
+
+instance Applicative CompPipeline where
+    pure = return
+    (<*>) = ap
 
 instance Monad CompPipeline where
   return a = P $ \state -> return (state, a)

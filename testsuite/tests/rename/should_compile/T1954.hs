@@ -2,5 +2,7 @@
 {-# OPTIONS_GHC -Wall -Werror #-}
 module Bug(P) where
 
-newtype P a = P (IO a) deriving Monad
+import Control.Applicative (Applicative)
+
+newtype P a = P (IO a) deriving (Functor, Applicative, Monad)
 

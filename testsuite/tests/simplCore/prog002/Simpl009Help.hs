@@ -4,6 +4,7 @@
 
 module Simpl009Help where
   
+import Control.Applicative (Applicative(..), Alternative(empty, (<|>)))
 import Control.Monad
 
 newtype Parser s a
@@ -14,6 +15,13 @@ data P s res
   | Fail [String] [String]
   | Result res (P s res)
 
+instance Functor (Parser s) where
+    fmap = liftM
+
+instance Applicative (Parser s) where
+    pure = return
+    (<*>) = ap
+
 instance Monad (Parser s) where
   return a = Parser (\fut -> fut a)
   
@@ -22,6 +30,10 @@ instance Monad (Parser s) where
 
   fail s =
     Parser (\fut exp -> Fail exp [s])
+
+instance Alternative (Parser s) where
+    empty = mzero
+    (<|>) = mplus
 
 instance MonadPlus (Parser s) where
   mplus = error "urk"
