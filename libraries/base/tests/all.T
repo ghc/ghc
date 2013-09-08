@@ -53,7 +53,11 @@ test('char002', 	normal, compile_and_run, [''])
 
 test('cstring001', 	normal, compile_and_run, [''])
 
-test('length001', normal, compile_and_run, [''])
+test('length001',
+     # This fails without -O, as it relies on a RULE being applied
+     expect_fail_for(['normal', 'threaded1', 'llvm']),
+     compile_and_run,
+     [''])
 
 test('ratio001', 	normal, compile_and_run, [''])
 
