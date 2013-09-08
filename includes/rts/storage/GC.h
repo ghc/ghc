@@ -130,9 +130,15 @@ extern generation * oldest_gen;
 
    StgPtr allocate(Capability *cap, W_ n)
                                 Allocates memory from the nursery in
-				the current Capability.  This can be
-				done without taking a global lock,
-                                unlike allocate().
+                                the current Capability. This can be
+                                done without taking a global lock,
+                                unlike allocate(). In the event of a
+                                heap overflow the program will be
+                                terminated.
+
+   StgPtr allocateFail(Capability *cap, W_ n)
+                                Similar to allocate() but returns NULL
+                                in the event of a heap overflow.
 
    StgPtr allocatePinned(Capability *cap, W_ n)
                                 Allocates a chunk of contiguous store
@@ -154,6 +160,7 @@ extern generation * oldest_gen;
    -------------------------------------------------------------------------- */
 
 StgPtr  allocate        ( Capability *cap, W_ n );
+StgPtr  allocateFail    ( Capability *cap, W_ n );
 StgPtr  allocatePinned  ( Capability *cap, W_ n );
 
 /* memory allocator for executable memory */
