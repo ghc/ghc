@@ -392,14 +392,85 @@ spec = before initStaticOpts $ do
           , Example "fib 10" ["55"]
           ]
 
-      it "requires an example to be separated from a previous paragraph by an empty line" $ do
-        unlines [
-            "foobar"
-          , ""
-          , ">>> fib 10"
-          , "55"
-          ] `shouldParseTo` DocParagraph "foobar"
-                         <> DocExamples [Example "fib 10" ["55"]]
+
+    context "when parsing paragraphs nested in lists" $ do
+      it "can nest the same type of list" $ do
+        "* foo\n\n    * bar" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocUnorderedList [DocParagraph "bar"]]
+
+      it "can nest another type of list inside" $ do
+        "* foo\n\n    1. bar" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocOrderedList [DocParagraph "bar"]]
+
+      it "can nest a code block inside" $ do
+        "* foo\n\n    @foo bar baz@" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocCodeBlock "foo bar baz"]
+
+        "* foo\n\n    @\n    foo bar baz\n    @" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocCodeBlock "foo bar baz\n"]
+
+      it "can nest more than one level" $ do
+        "* foo\n\n    * bar\n\n        * baz\n        qux" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocUnorderedList [ DocParagraph $ "bar"
+                                                   <> DocUnorderedList [DocParagraph "baz\nqux"]
+                                                 ]
+                           ]
+
+      it "won't fail on not fully indented paragraph" $ do
+        "* foo\n\n    * bar\n\n        * qux\nquux" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocUnorderedList [ DocParagraph "bar" ]
+                           , DocParagraph "qux\nquux"]
+
+
+      it "can nest definition lists" $ do
+        "[a] foo\n\n    [b] bar\n\n        [c] baz\n        qux" `shouldParseTo`
+          DocDefList [ ("a", "foo"
+                             <> DocDefList [ ("b", "bar"
+                                                   <> DocDefList [("c", "baz\nqux")])
+                                           ])
+                     ]
+
+      it "can come back to top level with a different list" $ do
+        "* foo\n\n    * bar\n\n1. baz" `shouldParseTo`
+          DocUnorderedList [ DocParagraph $ "foo"
+                             <> DocUnorderedList [ DocParagraph "bar" ]
+                           ]
+          <> DocOrderedList [ DocParagraph "baz" ]
+
+      it "definition lists can come back to top level with a different list" $ do
+        "[foo] foov\n\n    [bar] barv\n\n1. baz" `shouldParseTo`
+          DocDefList [ ("foo", "foov"
+                               <> DocDefList [ ("bar", "barv") ])
+                     ]
+          <> DocOrderedList [ DocParagraph "baz" ]
+
+
+    context "when parsing consecutive paragraphs" $ do
+      it "will not capture irrelevant consecutive lists" $ do
+        "   * bullet\n\n   - different bullet\n\n   (1) ordered\n \n   "
+          ++ "2. different bullet\n   \n   [cat] kitten\n   \n   [pineapple] fruit"
+          `shouldParseTo`
+          DocUnorderedList [ DocParagraph "bullet"
+                           , DocParagraph "different bullet"]
+          <> DocOrderedList [ DocParagraph "ordered"
+                            , DocParagraph "different bullet"
+                            ]
+          <> DocDefList [ ("cat", "kitten")
+                        , ("pineapple", "fruit")
+                        ]
+
+    context "when parsing an example" $ do
+      it ("requires an example to be separated"
+          ++ " from a previous paragraph by an empty line") $ do
+        "foobar\n\n>>> fib 10\n55" `shouldParseTo`
+          DocParagraph "foobar"
+                <> DocExamples [Example "fib 10" ["55"]]
 
       it "parses bird-tracks inside of paragraphs as plain strings" $ do
         let xs = "foo\n>>> bar"
@@ -478,9 +549,9 @@ spec = before initStaticOpts $ do
           , " * three"
           ]
         `shouldParseTo` DocUnorderedList [
-            DocParagraph "one\n"
-          , DocParagraph "two\n"
-          , DocParagraph "three\n"
+            DocParagraph "one"
+          , DocParagraph "two"
+          , DocParagraph "three"
           ]
 
       it "ignores empty lines between list items" $ do
@@ -490,8 +561,8 @@ spec = before initStaticOpts $ do
           , "* two"
           ]
         `shouldParseTo` DocUnorderedList [
-            DocParagraph "one\n"
-          , DocParagraph "two\n"
+            DocParagraph "one"
+          , DocParagraph "two"
           ]
 
       it "accepts an empty list item" $ do
@@ -505,12 +576,12 @@ spec = before initStaticOpts $ do
           , "more two"
           ]
         `shouldParseTo` DocUnorderedList [
-            DocParagraph "point one\n  more one\n"
-          , DocParagraph "point two\nmore two\n"
+            DocParagraph "point one\n  more one"
+          , DocParagraph "point two\nmore two"
           ]
 
       it "accepts markup in list items" $ do
-        "* /foo/" `shouldParseTo` DocUnorderedList [DocParagraph (DocEmphasis "foo" <> "\n")]
+        "* /foo/" `shouldParseTo` DocUnorderedList [DocParagraph (DocEmphasis "foo")]
 
       it "requires empty lines between list and other paragraphs" $ do
         unlines [
@@ -520,7 +591,7 @@ spec = before initStaticOpts $ do
           , ""
           , "baz"
           ]
-        `shouldParseTo` DocParagraph "foo" <> DocUnorderedList [DocParagraph "bar\n"] <> DocParagraph "baz"
+        `shouldParseTo` DocParagraph "foo" <> DocUnorderedList [DocParagraph "bar"] <> DocParagraph "baz"
 
     context "when parsing ordered lists" $ do
       it "parses a simple list" $ do
@@ -530,9 +601,9 @@ spec = before initStaticOpts $ do
           , " 3. three"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "one\n"
-          , DocParagraph "two\n"
-          , DocParagraph "three\n"
+            DocParagraph "one"
+          , DocParagraph "two"
+          , DocParagraph "three"
           ]
 
       it "ignores empty lines between list items" $ do
@@ -542,8 +613,8 @@ spec = before initStaticOpts $ do
           , "2. two"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "one\n"
-          , DocParagraph "two\n"
+            DocParagraph "one"
+          , DocParagraph "two"
           ]
 
       it "accepts an empty list item" $ do
@@ -557,12 +628,12 @@ spec = before initStaticOpts $ do
           , "more two"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "point one\n  more one\n"
-          , DocParagraph "point two\nmore two\n"
+            DocParagraph "point one\n  more one"
+          , DocParagraph "point two\nmore two"
           ]
 
       it "accepts markup in list items" $ do
-        "1. /foo/" `shouldParseTo` DocOrderedList [DocParagraph (DocEmphasis "foo" <> "\n")]
+        "1. /foo/" `shouldParseTo` DocOrderedList [DocParagraph (DocEmphasis "foo")]
 
       it "requires empty lines between list and other paragraphs" $ do
         unlines [
@@ -572,7 +643,7 @@ spec = before initStaticOpts $ do
           , ""
           , "baz"
           ]
-        `shouldParseTo` DocParagraph "foo" <> DocOrderedList [DocParagraph "bar\n"] <> DocParagraph "baz"
+        `shouldParseTo` DocParagraph "foo" <> DocOrderedList [DocParagraph "bar"] <> DocParagraph "baz"
 
     context "when parsing definition lists" $ do
       it "parses a simple list" $ do
@@ -582,9 +653,9 @@ spec = before initStaticOpts $ do
           , " [baz] three"
           ]
         `shouldParseTo` DocDefList [
-            ("foo", "one\n")
-          , ("bar", "two\n")
-          , ("baz", "three\n")
+            ("foo", "one")
+          , ("bar", "two")
+          , ("baz", "three")
           ]
 
       it "ignores empty lines between list items" $ do
@@ -594,8 +665,8 @@ spec = before initStaticOpts $ do
           , "[bar] two"
           ]
         `shouldParseTo` DocDefList [
-            ("foo", "one\n")
-          , ("bar", "two\n")
+            ("foo", "one")
+          , ("bar", "two")
           ]
 
       it "accepts an empty list item" $ do
@@ -609,15 +680,15 @@ spec = before initStaticOpts $ do
           , "more two"
           ]
         `shouldParseTo` DocDefList [
-            ("foo", "point one\n  more one\n")
-          , ("bar", "point two\nmore two\n")
+            ("foo", "point one\n  more one")
+          , ("bar", "point two\nmore two")
           ]
 
       it "accepts markup in list items" $ do
-        "[foo] /foo/" `shouldParseTo` DocDefList [("foo", DocEmphasis "foo" <> "\n")]
+        "[foo] /foo/" `shouldParseTo` DocDefList [("foo", DocEmphasis "foo")]
 
       it "accepts markup for the label" $ do
-        "[/foo/] bar" `shouldParseTo` DocDefList [(DocEmphasis "foo", "bar\n")]
+        "[/foo/] bar" `shouldParseTo` DocDefList [(DocEmphasis "foo", "bar")]
 
       it "requires empty lines between list and other paragraphs" $ do
         unlines [
@@ -627,7 +698,7 @@ spec = before initStaticOpts $ do
           , ""
           , "baz"
           ]
-        `shouldParseTo` DocParagraph "foo" <> DocDefList [("foo", "bar\n")] <> DocParagraph "baz"
+        `shouldParseTo` DocParagraph "foo" <> DocDefList [("foo", "bar")] <> DocParagraph "baz"
 
     context "when parsing consecutive paragraphs" $ do
       it "accepts consecutive lists" $ do
@@ -644,14 +715,14 @@ spec = before initStaticOpts $ do
           , "   "
           , "   [pineapple] fruit"
           ] `shouldParseTo` DocUnorderedList [
-            DocParagraph "foo\n"
-          , DocParagraph "bar\n"
+            DocParagraph "foo"
+          , DocParagraph "bar"
           ] <> DocOrderedList [
-            DocParagraph "ordered foo\n"
-          , DocParagraph "ordered bar\n"
+            DocParagraph "ordered foo"
+          , DocParagraph "ordered bar"
           ] <> DocDefList [
-            ("cat", "kitten\n")
-          , ("pineapple", "fruit\n")
+            ("cat", "kitten")
+          , ("pineapple", "fruit")
           ]
 
     context "when parsing function documentation headers" $ do

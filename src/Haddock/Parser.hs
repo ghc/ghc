@@ -1,4 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving
+             , FlexibleInstances, UndecidableInstances
+             , IncoherentInstances #-}
 -- |
 -- Module      :  Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013,
@@ -12,6 +15,7 @@
 module Haddock.Parser (parseString, parseParas, parseStringMaybe, parseParasMaybe) where
 
 import           Prelude hiding (takeWhile)
+import           Control.Arrow (first)
 import           Control.Monad (void, mfilter)
 import           Control.Applicative
 import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, endOfLine)
@@ -208,36 +212,93 @@ orderedList d = (paren <|> dot) *> innerList (orderedList d) d
 innerList :: Parser [Doc RdrName] -> DynFlags -> Parser [Doc RdrName]
 innerList item d = do
   c <- takeLine
-  (cs, items) <- more
-  let contents = (docParagraph . parseString d . unlines) (c : cs)
-  return (contents : items)
-  where
-    more :: Parser ([String], [Doc RdrName])
-    more = moreListItems <|> moreContent <|> pure ([], [])
-
-    moreListItems :: Parser ([String], [Doc RdrName])
-    moreListItems = (,) [] <$> (skipSpace *> item)
-
-    moreContent :: Parser ([String], [Doc RdrName])
-    moreContent = mapFst . (:) <$> nonEmptyLine <*> more
+  (cs, items) <- more item d
+  let contents = docParagraph . parseString d . dropNLs . unlines $ c : cs
+  return $ case items of
+    Left p -> [contents `joinPara` p]
+    Right i -> contents : i
 
 -- | Parses definition lists.
 definitionList :: DynFlags -> Parser [(Doc RdrName, Doc RdrName)]
 definitionList d = do
-  label <- parseStringBS d <$> ("[" *> takeWhile1 (`notElem` "]\n") <* "]")
+  label <- "[" *> (parseStringBS d <$> takeWhile1 (`notElem` "]\n")) <* "]"
   c <- takeLine
-  (cs, items) <- more
-  let contents = (parseString d . unlines) (c : cs)
-  return ((label, contents) : items)
+  (cs, items) <- more (definitionList d) d
+  let contents = parseString d . dropNLs . unlines $ c : cs
+  return $ case items of
+    Left p -> [(label, contents `joinPara` p)]
+    Right i -> (label, contents) : i
+
+-- | If possible, appends two 'Doc's under a 'DocParagraph' rather than
+-- outside of it. This allows to get structures like
+--
+-- @DocParagraph (DocAppend … …)@
+--
+-- rather than
+--
+-- @DocAppend (DocParagraph …) …@
+joinPara :: Doc id -> Doc id -> Doc id
+joinPara (DocParagraph p) c = docParagraph $ docAppend p c
+joinPara d p = docAppend d p
+
+-- | Drops all trailing newlines.
+dropNLs :: String -> String
+dropNLs = reverse . dropWhile (== '\n') . reverse
+
+-- | Main worker for 'innerList' and 'definitionList'.
+-- We need the 'Either' here to be able to tell in the respective functions
+-- whether we're dealing with the next list or a nested paragraph.
+more :: Monoid a => Parser a -> DynFlags
+     -> Parser ([String], Either (Doc RdrName) a)
+more item d = innerParagraphs d <|> moreListItems item
+              <|> moreContent item d <|> pure ([], Right mempty)
+
+-- | Use by 'innerList' and 'definitionList' to parse any nested paragraphs.
+innerParagraphs :: DynFlags
+                -> Parser ([String], Either (Doc RdrName) a)
+innerParagraphs d = (,) [] . Left <$> ("\n" *> indentedParagraphs d)
+
+-- | Attemps to fetch the next list if possibly. Used by 'innerList' and
+-- 'definitionList' to recursivly grab lists that aren't separated by a whole
+-- paragraph.
+moreListItems :: Parser a
+              -> Parser ([String], Either (Doc RdrName) a)
+moreListItems item = (,) [] . Right <$> (skipSpace *> item)
+
+-- | Helper for 'innerList' and 'definitionList' which simply takes
+-- a line of text and attempts to parse more list content with 'more'.
+moreContent :: Monoid a => Parser a -> DynFlags
+            -> Parser ([String], Either (Doc RdrName) a)
+moreContent item d = first . (:) <$> nonEmptyLine <*> more item d
+
+-- | Collects and parses the result of 'dropFrontOfPara'
+indentedParagraphs :: DynFlags -> Parser (Doc RdrName)
+indentedParagraphs d = parseParas d . concat <$> dropFrontOfPara "    "
+
+-- | Grab as many fully indented paragraphs as we can.
+dropFrontOfPara :: Parser BS.ByteString -> Parser [String]
+dropFrontOfPara sp = do
+  currentParagraph <- some (sp *> takeNonEmptyLine)
+  followingParagraphs <-
+    skipHorizontalSpace *> nextPar -- we have more paragraphs to take
+    <|> skipHorizontalSpace *> nlList -- end of the ride, remember the newline
+    <|> endOfInput *> return [] -- nothing more to take at all
+  return (currentParagraph ++ followingParagraphs)
   where
-    more :: Parser ([String], [(Doc RdrName, Doc RdrName)])
-    more = moreListItems <|> moreContent <|> pure ([], [])
+    nextPar = (++) <$> nlList <*> dropFrontOfPara sp
+    nlList = "\n" *> return ["\n"]
 
-    moreListItems :: Parser ([String], [(Doc RdrName, Doc RdrName)])
-    moreListItems = (,) [] <$> (skipSpace *> definitionList d)
+nonSpace :: BS.ByteString -> Parser BS.ByteString
+nonSpace xs
+  | not $ any (not . isSpace) $ decodeUtf8 xs = fail "empty line"
+  | otherwise = return xs
 
-    moreContent :: Parser ([String], [(Doc RdrName, Doc RdrName)])
-    moreContent = mapFst . (:) <$> nonEmptyLine <*> more
+-- | Takes a non-empty, not fully whitespace line.
+--
+--  Doesn't discard the trailing newline.
+takeNonEmptyLine :: Parser String
+takeNonEmptyLine = do
+    (++ "\n") . decodeUtf8 <$> (takeWhile1 (/= '\n') >>= nonSpace) <* "\n"
 
 birdtracks :: Parser (Doc a)
 birdtracks = DocCodeBlock . DocString . intercalate "\n" <$> many1 line
@@ -263,7 +324,7 @@ examples = DocExamples <$> (many (skipHorizontalSpace *> "\n") *> go)
             moreExamples = (,) [] <$> go
 
             result :: Parser ([String], [Example])
-            result = mapFst . (:) <$> nonEmptyLine <*> resultAndMoreExamples
+            result = first . (:) <$> nonEmptyLine <*> resultAndMoreExamples
 
     makeExample :: String -> String -> [String] -> Example
     makeExample prefix expression res =
@@ -284,9 +345,6 @@ takeLine = decodeUtf8 <$> takeWhile (/= '\n') <* endOfLine
 
 endOfLine :: Parser ()
 endOfLine = void "\n" <|> endOfInput
-
-mapFst :: (a -> b) -> (a, c) -> (b, c)
-mapFst f (a, b) = (f a, b)
 
 -- | Property parser.
 --

@@ -23,6 +23,8 @@ combineDocumentation (Documentation mDoc mWarning)   = Just (fromMaybe mempty mW
 docAppend :: Doc id -> Doc id -> Doc id
 docAppend (DocDefList ds1) (DocDefList ds2) = DocDefList (ds1++ds2)
 docAppend (DocDefList ds1) (DocAppend (DocDefList ds2) d) = DocAppend (DocDefList (ds1++ds2)) d
+docAppend (DocOrderedList ds1) (DocOrderedList ds2) = DocOrderedList (ds1 ++ ds2)
+docAppend (DocUnorderedList ds1) (DocUnorderedList ds2) = DocUnorderedList (ds1 ++ ds2)
 docAppend DocEmpty d = d
 docAppend d DocEmpty = d
 docAppend (DocString s1) (DocString s2) = DocString (s1 ++ s2)

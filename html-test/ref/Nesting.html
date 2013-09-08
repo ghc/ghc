@@ -1,0 +1,288 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >Nesting</title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_Nesting.html");};
+//]]>
+</script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href=""
+	  >Contents</a
+	  ></li
+	><li
+	><a href=""
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      >&nbsp;</p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Nesting</p
+	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  ><a href=""
+	    >d</a
+	    > ::  t</li
+	  ><li class="src short"
+	  ><a href=""
+	    >e</a
+	    > ::  t</li
+	  ><li class="src short"
+	  ><a href=""
+	    >f</a
+	    > ::  t</li
+	  ><li class="src short"
+	  ><a href=""
+	    >g</a
+	    > ::  t</li
+	  ><li class="src short"
+	  ><a href=""
+	    >h</a
+	    > ::  t</li
+	  ><li class="src short"
+	  ><a href=""
+	    >i</a
+	    > ::  t</li
+	  ><li class="src short"
+	  ><a href=""
+	    >j</a
+	    > ::  t</li
+	  ></ul
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a name="v:d" class="def"
+	    >d</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><ul
+	    ><li
+	      >We can<ul
+		><li
+		  >easily go back<ol
+		    ><li
+		      >some indentation</li
+		      ></ol
+		    ></li
+		  ><li
+		  >levels</li
+		  ></ul
+		></li
+	      ></ul
+	    ><ol
+	    ><li
+	      ><pre
+		>back at the top</pre
+		></li
+	      ></ol
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:e" class="def"
+	    >e</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><ul
+	    ><li
+	      >Beginning of list<ul
+		><li
+		  >second list</li
+		  ></ul
+		></li
+	      ><li
+	      >Some indented list but
+the presence of this text pushes it out of nesting back to the top.</li
+	      ></ul
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:f" class="def"
+	    >f</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><ul
+	    ><li
+	      >Beginning of list<pre
+		>nested code
+    we preserve the space correctly
+</pre
+		></li
+	      ></ul
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:g" class="def"
+	    >g</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><ul
+	    ><li
+	      >Beginning of list<ul
+		><li
+		  >Nested list</li
+		  ></ul
+		></li
+	      ></ul
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:h" class="def"
+	    >h</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><ul
+	    ><li
+	      >Beginning of list<pre
+		> nested
+ bird
+ tracks</pre
+		></li
+	      ></ul
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:i" class="def"
+	    >i</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><ul
+	    ><li
+	      >Beginning of list
+This belongs to the list above!<pre
+		> nested
+ bird
+ tracks</pre
+		><ul
+		><li
+		  >Next list
+More of the indented list.<ul
+		    ><li
+		      >Deeper<ul
+			><li
+			  >Deeper<ul
+			    ><li
+			      >Even deeper!</li
+			      ><li
+			      >No newline separation even in indented lists.</li
+			      ></ul
+			    ></li
+			  ></ul
+			></li
+		      ></ul
+		    ></li
+		  ></ul
+		></li
+	      ></ul
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:j" class="def"
+	    >j</a
+	    > ::  t</p
+	  ><div class="doc"
+	  ><dl
+	    ><dt
+	      >All this</dt
+	      ><dd
+	      >Works for
+definition lists too.<pre
+		> nested
+ bird
+ tracks</pre
+		><ul
+		><li
+		  >Next list
+with more of the indented list content.<p
+		    >Even more content on a new line.</p
+		    ><ol
+		    ><li
+		      >Different type of list<ol
+			><li
+			  >Deeper</li
+			  ></ol
+			><pre class="screen"
+			><code class="prompt"
+			  >&gt;&gt;&gt; </code
+			  ><strong class="userinput"
+			  ><code
+			    >Here's an example in a list
+</code
+			    ></strong
+			  >example result
+</pre
+			><dl
+			><dt
+			  >b</dt
+			  ><dd
+			  >Even deeper!</dd
+			  ><dt
+			  >c</dt
+			  ><dd
+			  >No newline separation even in indented lists.
+        We can have any paragraph level element that we normally
+        can, like headers<p
+			    ><h3
+			      >Level 3 header</h3
+			      ></p
+			    ><p
+			    >with some content&#8230;</p
+			    ><ul
+			    ><li
+			      >and even more lists inside</li
+			      ></ul
+			    ></dd
+			  ></dl
+			></li
+		      ></ol
+		    ></li
+		  ></ul
+		></dd
+	      ></dl
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ><p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.14.0</p
+      ></div
+    ></body
+  ></html
+>
