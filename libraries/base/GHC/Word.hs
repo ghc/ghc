@@ -304,7 +304,7 @@ instance FiniteBits Word16 where
     finiteBitSize _ = 16
 
 byteSwap16 :: Word16 -> Word16
-byteSwap16 (W16# w#) = W16# (byteSwap16# w#)
+byteSwap16 (W16# w#) = W16# (narrow16Word# (byteSwap16# w#))
 
 {-# RULES
 "fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# x#
@@ -531,7 +531,7 @@ instance Read Word32 where
 #endif
 
 byteSwap32 :: Word32 -> Word32
-byteSwap32 (W32# w#) = W32# (byteSwap32# w#)
+byteSwap32 (W32# w#) = W32# (narrow32Word# (byteSwap32# w#))
 
 ------------------------------------------------------------------------
 -- type Word64
