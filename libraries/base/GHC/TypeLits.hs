@@ -8,9 +8,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}  -- for <=
 {-# LANGUAGE RankNTypes #-}             -- for SingI magic
 {-# LANGUAGE ScopedTypeVariables #-}    -- for SingI magic
+{-# LANGUAGE ConstraintKinds #-}        -- for <=
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -29,10 +29,9 @@ module GHC.TypeLits
 
     -- * Functions on type nats
   , type (<=), type (<=?), type (+), type (*), type (^)
-  , type (-)
 
     -- * Comparing for equality
-  , type (:~:) (..), eqSingNat, eqSingSym
+  , type (:~:) (..), eqSingNat, eqSingSym, eqSingBool
 
     -- * Destructing type-nat singletons.
   , isZero, IsZero(..)
@@ -83,6 +82,10 @@ newtype instance Sing (n :: Nat)    = SNat Integer
 
 newtype instance Sing (n :: Symbol) = SSym String
 
+data instance Sing (n :: Bool) where
+  SFalse :: Sing False
+  STrue  :: Sing True
+
 --------------------------------------------------------------------------------
 
 -- | The class 'SingI' provides a \"smart\" constructor for singleton types.
@@ -99,11 +102,13 @@ class SingI a where
 singByProxy :: SingI n => proxy n -> Sing n
 singByProxy _ = sing
 
+instance SingI False where sing = SFalse
+instance SingI True  where sing = STrue
+
 
 --------------------------------------------------------------------------------
 -- | Comparison of type-level naturals.
-class (m <=? n) ~ True => (m :: Nat) <= (n :: Nat)
-instance ((m <=? n) ~ True) => m <= n
+type x <= y = (x <=? y) ~ True
 
 type family (m :: Nat) <=? (n :: Nat) :: Bool
 
@@ -116,9 +121,7 @@ type family (m :: Nat) * (n :: Nat) :: Nat
 -- | Exponentiation of type-level naturals.
 type family (m :: Nat) ^ (n :: Nat) :: Nat
 
--- | Subtraction of type-level naturals.
--- Note that this operation is unspecified for some inputs.
-type family (m :: Nat) - (n :: Nat) :: Nat
+
 
 
 --------------------------------------------------------------------------------
@@ -143,6 +146,13 @@ instance SingE (KindParam :: KindIs Nat) where
 instance SingE (KindParam :: KindIs Symbol) where
   type DemoteRep (KindParam :: KindIs Symbol) = String
   fromSing (SSym s) = s
+
+
+instance SingE (KindParam :: KindIs Bool) where
+  type DemoteRep (KindParam :: KindIs Bool) = Bool
+  fromSing SFalse = False
+  fromSing STrue  = True
+
 
 {- | A convenient name for the type used to representing the values
 for a particular singleton family.  For example, @Demote 2 ~ Integer@,
@@ -185,6 +195,9 @@ instance ToSing (KindParam :: KindIs Nat) where
 instance ToSing (KindParam :: KindIs Symbol) where
   toSing n          = Just (incoherentForgetSing (SSym n))
 
+instance ToSing (KindParam :: KindIs Bool) where
+  toSing False      = Just (SomeSing SFalse)
+  toSing True       = Just (SomeSing STrue)
 
 
 {- PRIVATE:
@@ -327,6 +340,12 @@ eqSingSym:: Sing (m :: Symbol) -> Sing (n :: Symbol) -> Maybe (m :~: n)
 eqSingSym x y
   | fromSing x == fromSing y  = Just (unsafeCoerce Refl)
   | otherwise                 = Nothing
+
+
+eqSingBool :: Sing (m :: Bool) -> Sing (n :: Bool) -> Maybe (m :~: n)
+eqSingBool STrue STrue    = Just Refl
+eqSingBool SFalse SFalse  = Just Refl
+eqSingBool _ _            = Nothing
 
 
 
