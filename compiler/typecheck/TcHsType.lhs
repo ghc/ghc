@@ -1082,6 +1082,8 @@ kcStrategy (DataDecl { tcdDataDefn = HsDataDefn { dd_kindSig = m_ksig }})
   | Just _ <- m_ksig            = FullKindSignature
   | otherwise                   = ParametricKinds
 kcStrategy (ClassDecl {})     = ParametricKinds
+-- TODO: not sure if this is the right choice for 'data kind' decls
+kcStrategy (KindDecl {})      = ParametricKinds
 
 -- if the ClosedTypeFamily has no equations, do the defaulting to *, etc.
 kcStrategyFamDecl :: FamilyDecl Name -> KindCheckingStrategy
@@ -1754,6 +1756,13 @@ tc_kind_var_app name arg_kis
   = do { thing <- tcLookup name
        ; case thing of
   	   AGlobal (ATyCon tc)
+             | let (args,res) = splitFunTys (tyConKind tc)
+             , isSuperKind res
+             -> if length args == length arg_kis
+                   then return (mkTyConApp tc arg_kis)
+                   else tycon_err tc "is not fully applied"
+
+             | otherwise
   	     -> do { data_kinds <- xoptM Opt_DataKinds
   	           ; unless data_kinds $ addErr (dataKindsErr name)
   	     	   ; case promotableTyCon_maybe tc of
@@ -1775,7 +1784,7 @@ tc_kind_var_app name arg_kis
              -> return (mkAppTys (mkTyVarTy kind_var) arg_kis)
 
   	   -- It is in scope, but not what we expected
-  	   AThing _ 
+  	   AThing _
              | isTyVarName name 
              -> failWithTc (ptext (sLit "Type variable") <+> quotes (ppr name)
                             <+> ptext (sLit "used in a kind"))

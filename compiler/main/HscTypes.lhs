@@ -1376,9 +1376,12 @@ implicitTyConThings tc
 
       -- for each data constructor in order,
       --   the contructor, worker, and (possibly) wrapper
-    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
+    concatMap (extras_plus . ADataCon) (tyConDataCons tc) ++
       -- NB. record selectors are *not* implicit, they have fully-fledged
       -- bindings that pass through the compilation pipeline as normal.
+
+      -- type constructors, if this is a 'data kind' declaration.
+    map ATyCon (kConTypeCons tc)
   where
     class_stuff = case tyConClass_maybe tc of
         Nothing -> []
@@ -1414,9 +1417,13 @@ isImplicitTyThing (ACoAxiom ax) = isImplicitCoAxiom ax
 -- might have a parent.
 tyThingParent_maybe :: TyThing -> Maybe TyThing
 tyThingParent_maybe (ADataCon dc) = Just (ATyCon (dataConTyCon dc))
-tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
-                                      Just cls -> Just (ATyCon (classTyCon cls))
-                                      Nothing  -> Nothing
+tyThingParent_maybe (ATyCon tc)
+  | Just cls <- tyConAssoc_maybe tc
+  = Just (ATyCon (classTyCon cls))
+  | Just s <- tyConDataKind_maybe tc
+  = Just (ATyCon s)
+  | otherwise
+  = Nothing
 tyThingParent_maybe (AnId id)     = case idDetails id of
                                          RecSelId { sel_tycon = tc } -> Just (ATyCon tc)
                                          ClassOpId cls               -> Just (ATyCon (classTyCon cls))

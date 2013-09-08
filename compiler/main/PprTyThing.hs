@@ -40,6 +40,7 @@ import VarEnv( emptyTidyEnv )
 import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
+import Data.Maybe (isJust)
 
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API
@@ -116,7 +117,7 @@ pprTyConHdr pefas tyCon
   | Just cls <- tyConClass_maybe tyCon
   = pprClassHdr pefas cls
   | otherwise
-  = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> pprTvBndrs vars
+  = ptext keyword <+> opt_modifier <+> opt_stupid <+> ppr_bndr tyCon <+> pprTvBndrs vars
   where
     vars | GHC.isPrimTyCon tyCon ||
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
@@ -126,8 +127,10 @@ pprTyConHdr pefas tyCon
             | GHC.isNewTyCon tyCon = sLit "newtype"
             | otherwise            = sLit "data"
 
-    opt_family
+    opt_modifier
       | GHC.isFamilyTyCon tyCon = ptext (sLit "family")
+      | isJust (kConTypeCons_maybe tyCon) = ptext (sLit "kind")
+      | NeverPromote <- promotableTyConInfo tyCon = ptext (sLit "type")
       | otherwise             = empty
 
     opt_stupid 	-- The "stupid theta" part of the declaration
@@ -187,13 +190,32 @@ pprTyCon pefas ss tyCon
                                                  -- e.g. type T = forall a. a->a
   | Just cls <- GHC.tyConClass_maybe tyCon
   = pprClass pefas ss cls
+  | Just s <- tyConDataKind_maybe tyCon
+  = pprTyCon pefas ss s
+  | Just tys <- kConTypeCons_maybe tyCon
+  = pprDataKind pefas ss tyCon tys
   | otherwise
   = pprAlgTyCon pefas ss tyCon
-
   where
     closed_family_header
       = pprTyConHdr pefas tyCon <+> dcolon <+>
         pprTypeForUser pefas (GHC.synTyConResKind tyCon) <+> ptext (sLit "where")
+
+pprDataKind :: PrintExplicitForalls -> ShowSub -> TyCon -> [TyCon] -> SDoc
+pprDataKind pefas ss kcon tys =
+  hang (pprTyConHdr pefas kcon)
+     2 (add_bars (ppr_trim (map show_con tys)))
+  where
+  ok_con tyc = showSub ss tyc
+  show_con tyc
+    | ok_con tyc = Just (pprTyConDecl tyc)
+    | otherwise  = Nothing
+
+pprTyConDecl :: TyCon -> SDoc
+pprTyConDecl tyc = ppr_bndr tyc <+> sep (map GHC.pprParendType fs)
+  where
+  (_vars, kind) = GHC.splitForAllTys (tyConKind tyc)
+  (fs, _res)    = tcSplitFunTys kind
 
 pprAlgTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprAlgTyCon pefas ss tyCon

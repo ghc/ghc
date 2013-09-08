@@ -28,3 +28,16 @@ addConDocs (x:xs) doc = x : addConDocs xs doc
 addConDocFirst :: [LConDecl a] -> Maybe LHsDocString -> [LConDecl a]
 addConDocFirst [] _ = []
 addConDocFirst (x:xs) doc = addConDoc x doc : xs
+
+addTyConDoc :: LTyConDecl a -> Maybe LHsDocString -> LTyConDecl a
+addTyConDoc decl    Nothing = decl
+addTyConDoc (L p c) doc     = L p ( c { tycon_doc = tycon_doc c `mplus` doc } )
+
+addTyConDocs :: [LTyConDecl a] -> Maybe LHsDocString -> [LTyConDecl a]
+addTyConDocs [] _ = []
+addTyConDocs [x] doc = [addTyConDoc x doc]
+addTyConDocs (x:xs) doc = x : addTyConDocs xs doc
+
+addTyConDocFirst :: [LTyConDecl a] -> Maybe LHsDocString -> [LTyConDecl a]
+addTyConDocFirst [] _ = []
+addTyConDocFirst (x:xs) doc = addTyConDoc x doc : xs

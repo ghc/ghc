@@ -925,6 +925,22 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
                           , tcdDataDefn = defn', tcdFVs = fvs }, fvs) }
 
+rnTyClDecl KindDecl { tcdLName = kcon, tcdKVars = kvars, tcdTypeCons = tycons }
+  = do kcon' <- lookupLocatedTopBndrRn kcon
+       let doc = TyDataCtx kcon -- TODO is this right?
+           fixLoc o = L (getLoc o)
+
+       ((kvars', tycons'), fvs) <- bindHsTyVars doc Nothing (map unLoc kvars) (mkHsQTvs []) $ \ vars ->
+         do (tycons', fvss) <- mapAndUnzipM (rnTyConDecl doc . unLoc) tycons
+            return ((hsq_kvs vars, tycons'), plusFVs fvss)
+
+
+       return (KindDecl { tcdLName = kcon'
+                        , tcdKVars = zipWith fixLoc kvars kvars'
+                        , tcdTypeCons = zipWith fixLoc tycons tycons'
+                        , tcdFvs = fvs }
+              , fvs)
+
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls, 
                               tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
                               tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
@@ -995,6 +1011,7 @@ rnTySyn doc rhs = rnLHsType doc rhs
 
 rnDataDefn :: HsDocContext -> HsDataDefn RdrName -> RnM (HsDataDefn Name, FreeVars)
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                           , dd_try_promote = prom
                            , dd_ctxt = context, dd_cons = condecls 
                            , dd_kindSig = sig, dd_derivs = derivs })
   = do  { checkTc (h98_style || null (unLoc context)) 
@@ -1018,6 +1035,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
         ; return ( HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                              , dd_try_promote = prom
                               , dd_ctxt = context', dd_kindSig = sig'
                               , dd_cons = condecls', dd_derivs = derivs' }
                  , all_fvs )
@@ -1103,6 +1121,10 @@ depAnalTyClDecls ds_w_fvs
                  , tcdDataDefn = HsDataDefn { dd_cons = cons } } 
           -> do L _ dc <- cons
                 return (unLoc (con_name dc), data_name)
+        KindDecl { tcdLName = L _ kind_name
+                 , tcdTypeCons = cons }
+          -> do L _ tc <- cons
+                return (unLoc (tycon_name tc), kind_name)
         _ -> []
 \end{code}
 
@@ -1225,6 +1247,29 @@ rnConDeclDetails doc (RecCon fields)
                 -- No need to check for duplicate fields
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
         ; return (RecCon new_fields, fvs) }
+
+
+rnTyConDecl :: HsDocContext -> TyConDecl RdrName
+            -> RnM (TyConDecl Name, FreeVars)
+rnTyConDecl doc TyConDecl { tycon_name = name, tycon_details = details
+                          , tycon_doc = mb_doc }
+  = do name'           <- lookupLocatedTopBndrRn name
+       (details', fvs) <- case details of
+
+         PrefixCon args -> do
+           (args', fvs) <- rnLHsKinds doc args
+           return (PrefixCon args', fvs)
+
+         InfixCon l r -> do
+           (l',lfvs) <- rnLHsKind doc l
+           (r',rfvs) <- rnLHsKind doc r
+           return (InfixCon l' r', lfvs `plusFV` rfvs)
+
+         RecCon{} -> panic "rnTyConDecl" "unexpected record constructor"
+
+       return (TyConDecl { tycon_name = name', tycon_details = details'
+                         , tycon_doc = mb_doc }
+              , fvs)
 
 -------------------------------------------------
 deprecRecSyntax :: ConDecl RdrName -> SDoc

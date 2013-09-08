@@ -16,6 +16,7 @@ module IfaceSyn (
 
         IfaceDecl(..), IfaceSynTyConRhs(..), IfaceClassOp(..), IfaceAT(..), 
         IfaceConDecl(..), IfaceConDecls(..),
+        IfaceTyConDecl(..),
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
@@ -36,6 +37,7 @@ module IfaceSyn (
 
 #include "HsVersions.h"
 
+import TyCon( PromotionInfo(..) )
 import IfaceType
 import PprCore()            -- Printing DFunArgs
 import Demand
@@ -76,6 +78,12 @@ data IfaceDecl
               ifIdDetails :: IfaceIdDetails,
               ifIdInfo    :: IfaceIdInfo }
 
+  | IfaceDataKind { ifName   :: OccName,         -- Kind constructor
+                    ifRec    :: RecFlag,         -- Recursive or not?
+                    ifKVars  :: [IfaceTvBndr],   -- Kind parameters
+                    ifTyCons :: [IfaceTyConDecl] -- Type constructors of this kind
+    }
+
   | IfaceData { ifName       :: OccName,        -- Type constructor
                 ifCType      :: Maybe CType,    -- C type for CAPI FFI
                 ifTyVars     :: [IfaceTvBndr],  -- Type variables
@@ -83,7 +91,7 @@ data IfaceDecl
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
                 ifRec        :: RecFlag,        -- Recursive or not?
-                ifPromotable :: Bool,           -- Promotable to kind level?
+                ifPromotable :: PromotionInfo (),-- Promotable to kind level?
                 ifGadtSyntax :: Bool,           -- True <=> declared using
                                                 -- GADT syntax
                 ifAxiom      :: Maybe IfExtName -- The axiom, for a newtype, 
@@ -173,6 +181,14 @@ instance Binary IfaceDecl where
         put_ bh a3
         put_ bh a4
 
+    put_ bh (IfaceDataKind a1 a2 a3 a4) = do
+        putByte bh 6
+        put_ bh (occNameFS a1)
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+
+
     get bh = do
         h <- getByte bh
         case h of
@@ -212,12 +228,32 @@ instance Binary IfaceDecl where
                     a8 <- get bh
                     occ <- return $! mkOccNameFS clsName a2
                     return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8)
-            _ -> do a1 <- get bh
+            5 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
                     return (IfaceAxiom occ a2 a3 a4)
+            6 -> do a1 <- get bh
+                    a2 <- get bh
+                    a3 <- get bh
+                    a4 <- get bh
+                    occ <- return $! mkOccNameFS tcName a1
+                    return (IfaceDataKind occ a2 a3 a4)
+            _ -> error ("Binary.get(TyClDecl): Unknown tag " ++ show h)
+
+instance Binary (PromotionInfo ()) where
+  put_ bh p = case p of
+    NeverPromote  -> putByte bh 0x0
+    NotPromotable -> putByte bh 0x1
+    Promotable () -> putByte bh 0x2
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0x0 -> return NeverPromote
+      0x1 -> return NotPromotable
+      0x2 -> return (Promotable ())
+      _   -> error ("Binary.get(Promotable ()): Unknown tag " ++ show tag)
 
 data IfaceSynTyConRhs
   = IfaceOpenSynFamilyTyCon
@@ -397,6 +433,22 @@ instance Binary IfaceBang where
               1 -> do return IfStrict
               2 -> do return IfUnpack
               _ -> do { a <- get bh; return (IfUnpackCo a) }
+
+data IfaceTyConDecl
+  = IfTyCon {
+        ifTyConOcc   :: OccName,    -- constructor name
+        ifTyConArgKs :: [IfaceKind] -- constructor argument kinds
+    }
+
+instance Binary IfaceTyConDecl where
+  put_ bh (IfTyCon a1 a2) = do
+    put_ bh (occNameFS a1)
+    put_ bh a2
+  get bh = do
+    a1 <- get bh
+    a2 <- get bh
+    occ <- return $! mkOccNameFS tcName a1
+    return (IfTyCon occ a2)
 
 data IfaceClsInst
   = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
@@ -951,6 +1003,9 @@ ifaceDeclImplicitBndrs (IfaceData {ifName = _tc_occ,
           has_wrapper = ifConWrapper con_decl     -- This is the reason for
                                                   -- having the ifConWrapper field!
 
+ifaceDeclImplicitBndrs IfaceDataKind { ifTyCons = cons }
+  = map ifTyConOcc cons
+
 ifaceDeclImplicitBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_tc_occ,
                                ifSigs = sigs, ifATs = ats })
   = --   (possibly) newtype coercion
@@ -1020,6 +1075,15 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifRoles = roles,
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars roles)
        4 (dcolon <+> ppr kind)
 
+pprIfaceDecl IfaceDataKind {ifName = kcon, ifKVars = kvars,
+                            ifTyCons = tycons }
+  -- XXX what should the roles argument be here?
+  = hang (ptext (sLit "data kind") <+> pprIfaceDeclHead [] kcon kvars []) 4 $
+    if null tycons
+       then empty
+       else equals <+> sep (punctuate (ptext (sLit " |")) (map pprIfaceTyConDecl tycons))
+
+
 -- this case handles both abstract and instantiated closed family tycons
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifRoles = roles,
                         ifSynRhs = _closedSynFamilyTyCon, ifSynKind = kind })
@@ -1037,8 +1101,11 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                , pp_condecls tycon condecls
                , pprAxiom mbAxiom])
   where
-    pp_prom | is_prom   = ptext (sLit "Promotable")
-            | otherwise = ptext (sLit "Not promotable")
+    pp_prom = case is_prom of
+      NeverPromote  -> ptext (sLit "Never promotable")
+      NotPromotable -> ptext (sLit "Not promotable")
+      Promotable () -> ptext (sLit "Promotable")
+
     pp_nd = case condecls of
                 IfAbstractTyCon dis -> ptext (sLit "abstract") <> parens (ppr dis)
                 IfDataFamTyCon     -> ptext (sLit "data family")
@@ -1085,6 +1152,10 @@ pp_condecls _  IfDataFamTyCon      = empty
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
                                                             (map (pprIfaceConDecl tc) cs))
+
+pprIfaceTyConDecl :: IfaceTyConDecl -> SDoc
+pprIfaceTyConDecl IfTyCon { ifTyConOcc = name, ifTyConArgKs = kinds }
+  = hsep (parenSymOcc name (ppr name) : map pprParendIfaceType kinds)
 
 mkIfaceEqPred :: IfaceType -> IfaceType -> IfacePredType
 -- IA0_NOTE: This is wrong, but only used for pretty-printing.
@@ -1306,6 +1377,9 @@ freeNamesIfDecl d@IfaceData{} =
   maybe emptyNameSet unitNameSet (ifAxiom d) &&&
   freeNamesIfContext (ifCtxt d) &&&
   freeNamesIfConDecls (ifCons d)
+freeNamesIfDecl d@IfaceDataKind{} =
+  freeNamesIfTvBndrs (ifKVars d) &&&
+  fnList freeNamesIfTyConDecl (ifTyCons d)
 freeNamesIfDecl d@IfaceSyn{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfSynRhs (ifSynRhs d) &&&
@@ -1354,6 +1428,10 @@ freeNamesIfConDecls :: IfaceConDecls -> NameSet
 freeNamesIfConDecls (IfDataTyCon c) = fnList freeNamesIfConDecl c
 freeNamesIfConDecls (IfNewTyCon c)  = freeNamesIfConDecl c
 freeNamesIfConDecls _               = emptyNameSet
+
+freeNamesIfTyConDecl :: IfaceTyConDecl -> NameSet
+freeNamesIfTyConDecl c =
+  fnList freeNamesIfKind (ifTyConArgKs c)
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
 freeNamesIfConDecl c =

@@ -56,7 +56,7 @@ module Lexer (
    getLexState, popLexState, pushLexState,
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
-   typeLiteralsEnabled,
+   dataKindsEnabled,
    explicitForallEnabled,
    inRulePrag,
    explicitNamespacesEnabled, sccProfilingOn, hpcEnabled,
@@ -478,6 +478,7 @@ data Token
   | ITgroup
   | ITby
   | ITusing
+  | ITkind
   | ITnominal
   | ITrepresentational
   | ITphantom
@@ -656,6 +657,7 @@ reservedWordsFM = listToUFM $
          ( "group",          ITgroup,         bit transformComprehensionsBit),
          ( "by",             ITby,            bit transformComprehensionsBit),
          ( "using",          ITusing,         bit transformComprehensionsBit),
+         ( "kind",           ITkind,          bit dataKindsBit),
 
          ( "foreign",        ITforeign,       bit ffiBit),
          ( "export",         ITexport,        bit ffiBit),
@@ -1894,8 +1896,8 @@ safeHaskellBit :: Int
 safeHaskellBit = 26
 traditionalRecordSyntaxBit :: Int
 traditionalRecordSyntaxBit = 27
-typeLiteralsBit :: Int
-typeLiteralsBit = 28
+dataKindsBit    :: Int
+dataKindsBit    = 28
 explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
 lambdaCaseBit :: Int
@@ -1950,8 +1952,8 @@ sccProfilingOn :: Int -> Bool
 sccProfilingOn flags = testBit flags sccProfilingOnBit
 traditionalRecordSyntaxEnabled :: Int -> Bool
 traditionalRecordSyntaxEnabled flags = testBit flags traditionalRecordSyntaxBit
-typeLiteralsEnabled :: Int -> Bool
-typeLiteralsEnabled flags = testBit flags typeLiteralsBit
+dataKindsEnabled :: Int -> Bool
+dataKindsEnabled flags = testBit flags dataKindsBit
 
 explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
@@ -2019,7 +2021,7 @@ mkPState flags buf loc =
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. safeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
-               .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
+               .|. dataKindsBit                `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
                .|. negativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags

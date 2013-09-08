@@ -6152,6 +6152,81 @@ no way to quote a data constructor or type constructor whose second character
 is a single quote.</para>
 </sect2>
 
+<sect2 id="restricting-promotion">
+<title>Restricting Promotion</title>
+<para>
+By default, promotable types are always promoted.  In some cases, the promoted
+kind is not necessary, so to avoid name collisions the programmer may disable
+datatype promotion explicitly, by using a <literal>data type</literal>
+declaration.
+</para>
+
+<para>
+For example, if we wanted to declare a type for the natural numbers that is not
+promoted, we could use the following declaration:
+<programlisting>
+data type Nat = Ze | Su Nat
+</programlisting>
+This declaration will introduce a type <literal>Nat</literal>, and two
+value-level data constructors, <literal>Ze</literal> and <literal>Su</literal>
+(i.e., as though -XDataKinds was disabled for this declaration)
+</para>
+</sect2>
+
+<sect2 id="kind-only-declarations">
+<title>Kind-only Declarations</title>
+<para>
+Sometimes we may want to define only a new kind, without needing to promote a
+type declaration.  Typically, there are two reasons for this: (i) to avoid name
+clashes with existing types, and (ii) defining kinds that use primitive kinds
+such as <literal>*</literal> that are not also types.  This is done by using a
+<literal>data kind</literal> declaration.
+</para>
+
+<para>
+For example, to declare only the kind of natural numbers, without the
+corresponding type and value-level constructors, we would use:
+<programlisting>
+data kind Nat = Ze | Su Nat
+</programlisting>
+This introduces a new kind <literal>Nat</literal> and two new type constructors
+<literal>Ze :: Nat</literal> and <literal>Su :: Nat -> Nat</literal>.
+</para>
+
+<para>
+As another example, consider the following declaration:
+<programlisting>
+data kind Area = Array Nat Area
+               | Stored *
+</programlisting>
+This introduces a new kind <literal>Area</literal> and two type constructors,
+<literal>Array :: Nat -> Area -> Area</literal>, and <literal>Stored :: * ->
+Area</literal>.  Note that we could not declare this type by promotion, because
+both kinds <literal>Nat</literal> and <literal>*</literal> don't exist at the
+type-level.
+</para>
+
+<para>
+New kinds introduced with <literal>data kind</literal> may have kind parameters,
+although this requires that <literal>-XPolyKinds</literal> be enabled as the
+resulting type constructors have polymorphic kinds.  For example, a kind-only
+declaration for lists would look like:
+<programlisting>
+data kind List a = Nil | Cons a (List a)
+</programlisting>
+This introduces a new kind <literal>List</literal> and two type constructors,
+<literal>Nil :: forall a. a -> List a</literal>, and <literal>Cons :: forall a.
+a -> List a -> List a</literal>.
+</para>
+
+<para>
+As kinds and types currently share a namespace, <literal>data kind</literal> and
+<literal>data type</literal> declarations <i>in the same module</i> can still
+conflict.  However, if they are in separate modules, this can be controlled by
+use of the module system.
+</para>
+</sect2>
+
 <sect2 id="promoted-lists-and-tuples">
 <title>Promoted lists and tuples types</title>
 <para>

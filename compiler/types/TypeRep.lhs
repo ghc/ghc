@@ -63,7 +63,7 @@ module TypeRep (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon( DataCon, dataConTyCon, dataConName )
+import {-# SOURCE #-} DataCon( DataCon, dataConName )
 import {-# SOURCE #-} Type( noParenPred, isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
@@ -681,8 +681,7 @@ pprTcApp p pp tc tys
   = pprPromotionQuote tc <>
     tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
 
-  | Just dc <- isPromotedDataCon_maybe tc
-  , let dc_tc = dataConTyCon dc
+  | Just dc_tc <- promotedDataConParent tc
   , isTupleTyCon dc_tc 
   , let arity = tyConArity dc_tc    -- E.g. 3 for (,,) k1 k2 k3 t1 t2 t3
         ty_args = drop arity tys    -- Drop the kind args

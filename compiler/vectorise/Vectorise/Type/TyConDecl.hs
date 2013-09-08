@@ -106,7 +106,7 @@ vectTyConDecl tycon name'
                     []                      -- no stupid theta
                     rhs'                    -- new constructor defs
                     rec_flag                -- whether recursive
-                    False                   -- Not promotable
+                    NotPromotable
                     gadt_flag               -- whether in GADT syntax
                     NoParentTyCon           
        }
@@ -151,6 +151,9 @@ vectAlgTyConRhs tc (NewTyCon {})
        cantVectorise dflags noNewtypeErr (ppr tc)
   where
     noNewtypeErr = "Vectorisation of newtypes not supported yet; please use a 'data' declaration"
+vectAlgTyConRhs tc DataKindTyCon{} =
+    do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise 'data kind' declarations" (ppr tc)
 
 -- |Vectorise a data constructor by vectorising its argument and return types..
 --

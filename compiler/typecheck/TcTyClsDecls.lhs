@@ -118,6 +118,25 @@ tcTyAndClassDecls boot_details tyclds_s
              -- remaining groups are typecheck in the extended global env
 
 tcTyClGroup :: ModDetails -> TyClGroup Name -> TcM TcGblEnv
+tcTyClGroup boot_details decls
+  | all (isKindDecl . unLoc) decls
+  = do (kcons, _) <- fixM $ \ ~(_, conss) -> do
+         let rec_info = panic "tcTyClGroup" "rec_info"
+
+         kind_cons <- zipWithM (\ix d -> addLocM (mkKindCon rec_info (conss !! ix)) d) [0 ..] decls
+         let kind_env  = [ (kind_name, panic "tcTyClGroup" "kind")
+                         | L _ KindDecl { tcdLName = L _ kind_name } <- decls ]
+
+         final_conss <- tcExtendRecEnv (zipRecTyClss kind_env (map ATyCon kind_cons))
+             (mapM (addLocM (tcKindDecl rec_info)) decls)
+
+         return (kind_cons, final_conss)
+
+       let tycons = [ ATyCon x | x <- kcons ]
+       tcExtendGlobalEnv tycons (tcAddImplicits tycons)
+
+
+
 -- Typecheck one strongly-connected component of type and class decls
 tcTyClGroup boot_details tyclds
   = do {    -- Step 1: kind-check this group and returns the final
@@ -128,10 +147,16 @@ tcTyClGroup boot_details tyclds
        ; traceTc "tcTyAndCl generalized kinds" (ppr names_w_poly_kinds)
             -- the checkNoErrs is necessary to fix #7175.
 
+
+            -- If any of the data declarations are explicitly not promotable,
+            -- the whole group is not promotable.
+       ; let dont_promote = or [ not (dd_try_promote dd)
+                               | DataDecl { tcdDataDefn = dd } <- map unLoc tyclds ]
+
             -- Step 2: type-check all groups together, returning
             -- the final TyCons and Classes
        ; tyclss <- fixM $ \ rec_tyclss -> do
-           { let rec_flags = calcRecFlags boot_details role_annots rec_tyclss
+           { let rec_flags = calcRecFlags dont_promote boot_details role_annots rec_tyclss
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons
@@ -402,6 +427,10 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
              role_annots' = role_annots ++ replicate num_extra_tvs Nothing
        ; return ((main_pr : inner_prs), role_annots') }
 
+getInitialKind KindDecl {}
+  = failWithTc (ptext (sLit "`data kind` declarations can only be recursive")
+            <+> ptext (sLit "with other `data kind` declarations"))
+
 getInitialKind (FamDecl { tcdFam = decl }) 
   = do { pairs <- getFamDeclInitialKind decl
        ; return (pairs, []) }
@@ -492,6 +521,9 @@ kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = de
         ; mapM_ (wrapLocM (kcConDecl name)) cons }
 
 kcTyClDecl decl@(SynDecl {}) = pprPanic "kcTyClDecl" (ppr decl)
+
+-- do we need to do any sort checking here?
+kcTyClDecl (KindDecl {}) = return ()
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
                        , tcdCtxt = ctxt, tcdSigs = sigs })
@@ -619,6 +651,9 @@ tcTyClDecl1 _parent rec_info
   = ASSERT( isNoParent _parent )
     tcTyClTyVars tc_name tvs $ \ tvs' kind ->
     tcDataDefn rec_info tc_name tvs' kind defn
+
+tcTyClDecl1 _parent _rec_info KindDecl {}
+  = failWithTc (ptext (sLit "'data kind' declarations can not appear in a recursive group"))
 
 tcTyClDecl1 _parent rec_info
             (ClassDecl { tcdLName = L _ class_name, tcdTyVars = tvs
@@ -757,7 +792,7 @@ tcFamDecl1 parent
         roles     = map (const Nominal) final_tvs
         tycon = buildAlgTyCon tc_name final_tvs roles Nothing []
                               DataFamilyTyCon Recursive
-                              False   -- Not promotable to the kind level
+                              NotPromotable
                               True    -- GADT syntax
                               parent
   ; return [ATyCon tycon] }
@@ -776,12 +811,54 @@ tcTySynRhs rec_info tc_name tvs kind hs_ty
                                 kind NoParentTyCon
        ; return [ATyCon tycon] }
 
+mkKindCon :: RecTyInfo -> [TyCon] -> TyClDecl Name -> TcM TyCon
+mkKindCon _rec_info tycons KindDecl { tcdLName  = L _ kind_name
+                                     , tcdKVars  = lknames } =
+  do let knames = map unLoc lknames
+     kvars <- mapM (\n -> newSigTyVar n superKind) knames
+     return $ mkAlgTyCon
+       kind_name
+       sKind
+       kvars
+       [] -- XXX roles here?
+       Nothing
+       []
+       (DataKindTyCon tycons)
+       NoParentTyCon
+       -- TODO, make the rec_info work
+       NonRecursive --(rti_is_rec rec_info kind_name)
+       False
+       NotPromotable
+  where
+  -- for now, we assume all kind variables have sort BOX.
+  sKind = mkFunTys (replicate arity superKind) superKind
+  arity = length lknames
+
+mkKindCon _ _ _ =
+  panic "mkKindCon" "non 'data kind' declaration"
+
+tcKindDecl :: RecTyInfo -> TyClDecl Name -> TcM [TyCon]
+tcKindDecl rec_info KindDecl { tcdLName = L _ kind_name, tcdKVars = lknames
+                                  , tcdTypeCons = cons }
+  = do traceTc "tcKindDecl" (ppr kind_name)
+
+       ~(ATyCon kcon) <- tcLookupGlobal kind_name
+       let kvars  = tyConTyVars kcon
+           knames = map unLoc lknames
+           kind   = mkTyConApp kcon (mkTyVarTys kvars)
+       tcExtendTyVarEnv2 (knames `zip` kvars)
+           (mapM (addLocM (tcTyConDecl kvars kind)) cons)
+
+tcKindDecl _ _
+  = panic "tcKindDecl" "unexpected non-KindDecl constructor"
+
 tcDataDefn :: RecTyInfo -> Name
            -> [TyVar] -> Kind
            -> HsDataDefn Name -> TcM [TyThing]
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn rec_info tc_name tvs kind
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                     , dd_try_promote = try_promote
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
                      , dd_cons = cons })
   = do { extra_tvs <- tcDataKindSig kind
@@ -812,9 +889,13 @@ tcDataDefn rec_info tc_name tvs kind
                    DataType -> return (mkDataTyConRhs data_cons)
                    NewType  -> ASSERT( not (null data_cons) )
                                     mkNewTyConRhs tc_name tycon (head data_cons)
+             ; let prom_info
+                     | not try_promote         = NeverPromote
+                     | rti_promotable rec_info = Promotable ()
+                     | otherwise               = NotPromotable
              ; return (buildAlgTyCon tc_name final_tvs roles cType stupid_theta tc_rhs
                                      (rti_is_rec rec_info tc_name)
-                                     (rti_promotable rec_info)
+                                     prom_info
                                      (not h98_syntax) NoParentTyCon) }
        ; return [ATyCon tycon] }
 \end{code}
@@ -1303,6 +1384,19 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT res_ty)
                        new_tmpl = updateTyVarKind (substTy subst) tmpl
       | otherwise = pprPanic "tcResultType" (ppr res_ty)
     ex_tvs = dc_tvs `minusList` univ_tvs
+
+
+tcTyConDecl :: [TyVar] -> Kind -> TyConDecl Name -> TcM TyCon
+tcTyConDecl kvars kind TyConDecl { tycon_name = name, tycon_details = details }
+  = do ks <- case details of
+               PrefixCon args -> mapM tcLHsKind args
+               InfixCon l r   -> mapM tcLHsKind [l,r]
+               RecCon {}      -> panic "tcTyConDecl" "unexpected record constructor"
+       let (kcon,_) = splitTyConApp kind
+           con_kind = mkPiKinds kvars (mkFunTys ks kind)
+       return (mkDataKindTyCon kcon (unLoc name) con_kind)
+
+
 \end{code}
 
 Note [Substitution in template variables kinds]

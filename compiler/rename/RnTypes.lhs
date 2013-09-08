@@ -4,10 +4,17 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 module RnTypes (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
-        rnHsKind, rnLHsKind, rnLHsMaybeKind,
+        rnHsKind, rnLHsKind, rnLHsKinds, rnLHsMaybeKind,
         rnHsSigType, rnLHsInstType, rnConDeclFields,
         newTyVarNameRn,
 
@@ -308,6 +315,11 @@ rnTyVar is_type rdr_name
 rnLHsTypes :: HsDocContext -> [LHsType RdrName]
            -> RnM ([LHsType Name], FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
+
+
+rnLHsKinds :: HsDocContext -> [LHsKind RdrName]
+           -> RnM ([LHsKind Name], FreeVars)
+rnLHsKinds doc ks = mapFvRn (rnLHsKind doc) ks
 \end{code}
 
 

@@ -10,10 +10,11 @@ module RdrHsSyn (
         mkHsDo, mkHsSplice, mkTopSpliceDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
+        mkTyDataKind,
         mkTySynonym, mkTyFamInstEqn,
         mkTyFamInst, 
         mkFamDecl, 
-        splitCon, mkInlinePragma,
+        splitCon, mkInlinePragma, toTyConDetails,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyLit,
 
@@ -29,6 +30,7 @@ module RdrHsSyn (
         mkExtName,           -- RdrName -> CLabelString
         mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
         mkSimpleConDecl,
+        mkTyConDecl,
         mkDeprecatedGadtRecordDecl,
 
         -- Bunch of functions in the parser monad for
@@ -123,19 +125,59 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
 
 mkTyData :: SrcSpan
          -> NewOrData
+         -> Bool
          -> Maybe CType
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
          -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
-mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
+mkTyData loc new_or_data promotable cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tycl_hdr tparams
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+
+         -- promotion has been explicitly disabled, make sure that -XDataKinds
+         -- is present
+       ; when (not promotable) $ do
+           pstate  <- getPState
+           let enabled = xopt Opt_DataKinds (dflags pstate)
+           unless enabled (parseErrorSDoc loc (text "Illegal `data type` declaration (use -XDataKinds to enable)"))
+       ; defn <- mkDataDefn new_or_data promotable cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
                                    tcdDataDefn = defn,
                                    tcdFVs = placeHolderNames })) }
+
+mkTyDataKind :: SrcSpan
+         -> LHsType RdrName
+         -> [LTyConDecl RdrName]
+         -> P (LTyClDecl RdrName)
+mkTyDataKind loc k_hdr ty_cons
+  = do { (kc, kparamTys) <- checkTyClHdr k_hdr
+       ; unless (null kparamTys) $ do
+           pstate  <- getPState
+           let enabled = xopt Opt_PolyKinds (dflags pstate)
+           unless enabled (parseErrorSDoc loc (text "Illegal polymorphic `data kind` declaration (use -XPolyKinds to enable)"))
+       ; kparams  <- checkTyVars k_hdr kparamTys
+       ; kvars    <- checkKVars kparams
+       ; return $ L loc $ KindDecl
+         { tcdLName    = kc
+         , tcdKVars    = kvars
+         , tcdTypeCons = ty_cons
+         , tcdFvs      = placeHolderNames
+         }
+       }
+
+  where
+
+  -- check that there are no sort signatures
+  checkKVars tparams
+    | not (null (hsq_kvs tparams)) = panic "mkTyDataKind" "unexpected sort variables"
+    | otherwise                    = mapM checkKVar (hsq_tvs tparams)
+
+  checkKVar bndr = case unLoc bndr of
+    HsTyVarBndr n Nothing _  -> return (L (getLoc bndr) n)
+    HsTyVarBndr _ (Just _) _ -> parseErrorSDoc (getLoc bndr) (text "kind parameters may not have sort signatures")
+
 
 mkFamInstData :: SrcSpan
          -> NewOrData
@@ -147,21 +189,25 @@ mkFamInstData :: SrcSpan
          -> P (LDataFamInstDecl RdrName)
 mkFamInstData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+         -- promotable is always false here, as data families aren't currently
+         -- promotable
+       ; defn <- mkDataDefn new_or_data False cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstDecl { dfid_tycon = tc, dfid_pats = mkHsWithBndrs tparams
                                         , dfid_defn = defn, dfid_fvs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
+           -> Bool
            -> Maybe CType
            -> Maybe (LHsContext RdrName)
            -> Maybe (LHsKind RdrName)
            -> [LConDecl RdrName]
            -> Maybe [LHsType RdrName]
            -> P (HsDataDefn RdrName)
-mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+mkDataDefn new_or_data promotable cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; return (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                            , dd_try_promote = promotable
                             , dd_ctxt = cxt 
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
@@ -217,7 +263,7 @@ mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_
 
 mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
 mkTyLit l =
-  do allowed <- extension typeLiteralsEnabled
+  do allowed <- extension dataKindsEnabled
      if allowed
        then return (HsTyLit `fmap` l)
        else parseErrorSDoc (getLoc l)
@@ -345,17 +391,17 @@ has_args ((L _ (Match args _ _)) : _) = not (null args)
 -- This function splits up the type application, adds any pending
 -- arguments, and converts the type constructor back into a data constructor.
 
-splitCon :: LHsType RdrName
+splitCon :: Bool -> LHsType RdrName
       -> P (Located RdrName, HsConDeclDetails RdrName)
 -- This gets given a "type" that should look like
 --      C Int Bool
 -- or   C { x::Int, y::Bool }
 -- and returns the pieces
-splitCon ty
+splitCon changeNamespace ty
  = split ty []
  where
    split (L _ (HsAppTy t u)) ts    = split t (u : ts)
-   split (L l (HsTyVar tc))  ts    = do data_con <- tyConToDataCon l tc
+   split (L l (HsTyVar tc))  ts    = do data_con <- tyConToDataCon changeNamespace l tc
                                         return (data_con, mk_rest ts)
    split (L l (HsTupleTy _ [])) [] = return (L l (getRdrName unitDataCon), PrefixCon [])
                                          -- See Note [Unit tuples] in HsTypes
@@ -363,6 +409,12 @@ splitCon ty
 
    mk_rest [L _ (HsRecTy flds)] = RecCon flds
    mk_rest ts                   = PrefixCon ts
+
+toTyConDetails :: SrcSpan -> HsConDeclDetails RdrName -> P (HsTyConDeclDetails RdrName)
+toTyConDetails loc details = case details of
+  PrefixCon args -> return (PrefixCon args)
+  InfixCon l r   -> return (InfixCon l r)
+  RecCon _       -> parseErrorSDoc loc (text "record notation is not allowd in a `data kind` declaration")
 
 mkDeprecatedGadtRecordDecl :: SrcSpan
                            -> Located RdrName
@@ -373,7 +425,7 @@ mkDeprecatedGadtRecordDecl :: SrcSpan
 --    C { x,y ::Int } :: T a b
 -- We give it a RecCon details right away
 mkDeprecatedGadtRecordDecl loc (L con_loc con) flds res_ty
-  = do { data_con <- tyConToDataCon con_loc con
+  = do { data_con <- tyConToDataCon True con_loc con
        ; return (L loc (ConDecl { con_old_rec  = True
                                 , con_name     = data_con
                                 , con_explicit = Implicit
@@ -396,6 +448,14 @@ mkSimpleConDecl name qvars cxt details
             , con_details  = details
             , con_res      = ResTyH98
             , con_doc      = Nothing }
+
+mkTyConDecl :: Located RdrName -> HsTyConDeclDetails RdrName
+            -> TyConDecl RdrName
+mkTyConDecl name details
+  = TyConDecl { tycon_name    = name
+              , tycon_details = details
+              , tycon_doc     = Nothing
+              }
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType RdrName     -- Always a HsForAllTy
@@ -423,10 +483,10 @@ mkGadtDecl names (L _ (HsForAllTy imp qvars cxt tau))
                  , con_doc      = Nothing }
 mkGadtDecl _ other_ty = pprPanic "mkGadtDecl" (ppr other_ty)
 
-tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
-tyConToDataCon loc tc
+tyConToDataCon :: Bool -> SrcSpan -> RdrName -> P (Located RdrName)
+tyConToDataCon changeNamespace loc tc
   | isTcOcc (rdrNameOcc tc)
-  = return (L loc (setRdrNameSpace tc srcDataName))
+  = return (L loc newName)
   | otherwise
   = parseErrorSDoc loc (msg $$ extra)
   where
@@ -434,6 +494,12 @@ tyConToDataCon loc tc
     extra | tc == forall_tv_RDR
           = text "Perhaps you intended to use -XExistentialQuantification"
           | otherwise = empty
+
+   -- for ordinary data declarations, we change the namespace of the data
+   -- constructor, but for data kind declarations, we leave them in the type
+   -- namespace
+    newName | changeNamespace = setRdrNameSpace tc srcDataName
+            | otherwise       = tc
 \end{code}
 
 Note [Sorting out the result type]

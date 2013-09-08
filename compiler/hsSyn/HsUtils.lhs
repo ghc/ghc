@@ -655,6 +655,9 @@ hsTyClDeclBinders (ClassDecl { tcdLName = cls_name, tcdSigs = sigs
 hsTyClDeclBinders (DataDecl { tcdLName = name, tcdDataDefn = defn }) 
   = name : hsDataDefnBinders defn
 
+hsTyClDeclBinders (KindDecl { tcdLName = name, tcdTypeCons = cons })
+  = name : map (tycon_name . unLoc) cons
+
 -------------------
 hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
 hsInstDeclBinders (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } })
