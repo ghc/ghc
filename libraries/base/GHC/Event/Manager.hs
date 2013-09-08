@@ -248,6 +248,11 @@ loop mgr@EventManager{..} = do
     Created   -> go `onException` cleanup mgr
     Releasing -> go `onException` cleanup mgr
     Dying     -> cleanup mgr
+    -- While a poll loop is never forked when the event manager is in the
+    -- 'Finished' state, its state could read 'Finished' once the new thread
+    -- actually runs.  This is not an error, just an unfortunate race condition
+    -- in Thread.restartPollLoop.  See #8235
+    Finished  -> return ()
     _         -> do cleanup mgr
                     error $ "GHC.Event.Manager.loop: state is already " ++
                             show state
