@@ -499,8 +499,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
     IF_DEBUG(sanity,checkTSO(tso));
 
-    if (   (RtsFlags.GcFlags.maxStkSize > 0) // don't throw if we have infinite stack
-        && (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize)
+    if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
         && !(tso->flags & TSO_BLOCKEX)) {
         // NB. never raise a StackOverflow exception if the thread is
         // inside Control.Exceptino.block.  It is impractical to protect
@@ -576,12 +575,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                   "allocating new stack chunk of size %d bytes",
                   chunk_size * sizeof(W_));
 
-    new_stack = (StgStack*) allocateFail(cap, chunk_size);
-    if (new_stack == NULL) {
-        // We've really run out of memory in the heap, so die.
-        stackOverflow(tso);
-        stg_exit(EXIT_STACKOVERFLOW);
-    }
+    new_stack = (StgStack*) allocate(cap, chunk_size);
     SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
     TICK_ALLOC_STACK(chunk_size);
 

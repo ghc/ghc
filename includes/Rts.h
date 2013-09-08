@@ -250,7 +250,7 @@ void getWin32ProgArgv(int *argc, wchar_t **argv[]);
 void setWin32ProgArgv(int argc, wchar_t *argv[]);
 #endif
 
-void stackOverflow(StgTSO* tso);
+void stackOverflow(void);
 
 void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
@@ -268,7 +268,6 @@ int stg_sig_install (int, int, void *);
 #define EXIT_INTERRUPTED    252
 #define EXIT_HEAPOVERFLOW   251
 #define EXIT_KILLED         250
-#define EXIT_STACKOVERFLOW  249
 
 /* -----------------------------------------------------------------------------
    Miscellaneous garbage

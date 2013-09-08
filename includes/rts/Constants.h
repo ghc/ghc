@@ -234,7 +234,7 @@
  * stopped for one reason or another.  See typedef StgThreadReturnCode
  * in TSO.h.
  */
-#define HeapOverflow   1
+#define HeapOverflow   1                /* might also be StackOverflow */
 #define StackOverflow  2
 #define ThreadYielding 3
 #define ThreadBlocked  4

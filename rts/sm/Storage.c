@@ -624,27 +624,27 @@ move_STACK (StgStack *src, StgStack *dest)
 }
 
 /* -----------------------------------------------------------------------------
-   allocateFail()
+   allocate()
 
    This allocates memory in the current thread - it is intended for
-   use primarily from STG-land where we have a Capability. 
+   use primarily from STG-land where we have a Capability.  It is
+   better than allocate() because it doesn't require taking the
+   sm_mutex lock in the common case.
 
    Memory is allocated directly from the nursery if possible (but not
    from the current nursery block, so as not to interfere with
    Hp/HpLim).
-
-   We return NULL in the event of a heap overflow.
    -------------------------------------------------------------------------- */
 
 StgPtr
-allocateFail (Capability *cap, W_ n)
+allocate (Capability *cap, W_ n)
 {
     bdescr *bd;
     StgPtr p;
 
     TICK_ALLOC_HEAP_NOCTR(WDS(n));
     CCS_ALLOC(cap->r.rCCCS,n);
-
+    
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
         W_ req_blocks =  (W_)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
 
@@ -655,7 +655,14 @@ allocateFail (Capability *cap, W_ n)
             req_blocks >= HS_INT32_MAX)   // avoid overflow when
                                           // calling allocGroup() below
         {
-            return NULL; // heap overflow
+            heapOverflow();
+            // heapOverflow() doesn't exit (see #2592), but we aren't
+            // in a position to do a clean shutdown here: we
+            // either have to allocate the memory or exit now.
+            // Allocating the memory would be bad, because the user
+            // has requested that we not exceed maxHeapSize, so we
+            // just exit.
+            stg_exit(EXIT_HEAPOVERFLOW);
         }
 
         ACQUIRE_SM_LOCK
@@ -675,12 +682,12 @@ allocateFail (Capability *cap, W_ n)
 
     bd = cap->r.rCurrentAlloc;
     if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
-
+        
         // The CurrentAlloc block is full, we need to find another
         // one.  First, we try taking the next block from the
         // nursery:
         bd = cap->r.rCurrentNursery->link;
-
+        
         if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
             // The nursery is empty, or the next block is already
             // full: allocate a fresh block (we can't fail here).
@@ -710,36 +717,6 @@ allocateFail (Capability *cap, W_ n)
     bd->free += n;
 
     IF_DEBUG(sanity, ASSERT(*((StgWord8*)p) == 0xaa));
-    return p;
-}
-
-/* -----------------------------------------------------------------------------
-   allocate()
-
-   This allocates memory in the current thread - it is intended for
-   use primarily from STG-land where we have a Capability.
-
-   Memory is allocated directly from the nursery if possible (but not
-   from the current nursery block, so as not to interfere with
-   Hp/HpLim).
-
-   We crash with a HeapOverflow when the allocation fails.
-   -------------------------------------------------------------------------- */
-
-StgPtr
-allocate (Capability *cap, W_ n)
-{
-    StgPtr p = allocateFail(cap, n);
-    if (p == NULL) {
-        heapOverflow();
-        // heapOverflow() doesn't exit (see #2592), but we aren't
-        // in a position to do a clean shutdown here: we
-        // either have to allocate the memory or exit now.
-        // Allocating the memory would be bad, because the user
-        // has requested that we not exceed maxHeapSize, so we
-        // just exit.
-        stg_exit(EXIT_HEAPOVERFLOW);
-    }
     return p;
 }
 

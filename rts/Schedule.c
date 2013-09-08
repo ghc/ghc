@@ -393,7 +393,7 @@ schedule (Capability *initialCapability, Task *task)
 	 
 run_thread:
 
-    // CurrentTSO is the thread to run. It might be different if we
+    // CurrentTSO is the thread to run.  t might be different if we
     // loop back to run_thread, so make sure to set CurrentTSO after
     // that.
     cap->r.rCurrentTSO = t;
