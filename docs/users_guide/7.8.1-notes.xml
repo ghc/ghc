@@ -346,6 +346,27 @@
 
             <listitem>
                 <para>
+                     By default, the maximum stack size in the runtime
+                     system is now infinite. This is controlled by the
+                     <literal>+RTS -K</literal> flag, which was
+                     previously defaulted to 8MB. In general, this
+                     will allow more programs to run as they will no
+                     longer stack overflow as quickly, although they
+                     may use much more memory.
+               </para>
+
+                <para>
+                     Note that you will still eventually encounter a
+                     stack overflow - when the heap is completely
+                     exhausted, as stacks are serviced from the
+                     storage manager. This will cause a runtime abort
+                     after invoking
+                     <literal>StackOverflowHook</literal>.
+               </para>
+           </listitem>
+
+            <listitem>
+                <para>
                     The performance of <literal>StablePtr</literal>s and
                     <literal>StableName</literal>s has been improved.
                </para>
