@@ -966,6 +966,7 @@ test.hs:(5,4)-(6,7):
     program.  These are:
     <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-warnings-deprecations</option>,
+    <option>-fwarn-amp</option>,
     <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-unrecognised-pragmas</option>,
     <option>-fwarn-pointless-pragmas</option>,
@@ -1124,6 +1125,24 @@ test.hs:(5,4)-(6,7):
           module, function or type with a WARNING or DEPRECATED pragma
       is used. See <xref linkend="warning-deprecated-pragma"/> for more
       details on the pragmas.</para>
+
+          <para>This option is on by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-amp</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-amp</option></primary>
+          </indexterm>
+          <indexterm><primary>amp</primary></indexterm>
+          <indexterm><primary>applicative-monad proposal</primary></indexterm>
+          <para>Causes a warning to be emitted when a definition
+          is in conflict with the AMP (Applicative-Monad proosal),
+          namely:
+          1. Instance of Monad without Applicative;
+          2. Instance of MonadPlus without Alternative;
+          3. Custom definitions of join/pure/&lt;*&gt;</para>
 
           <para>This option is on by default.</para>
         </listitem>

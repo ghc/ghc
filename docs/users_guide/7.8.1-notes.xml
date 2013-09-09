@@ -185,6 +185,31 @@
                 <replaceable>N</replaceable> modules in parallel.
            </para>
        </listitem>
+
+        <listitem>
+            <para>
+                GHC now generates warnings when definitions conflict with the
+                Applicative-Monad Proposal (AMP).
+
+                TODO FIXME: reference.
+           </para>
+
+            <para>
+                A warning is emitted if a type is an instance of
+                <literal>Monad</literal> but not of
+                <literal>Applicative</literal>,
+                <literal>MonadPlus</literal> but not
+                <literal>Alternative</literal>, and when a local
+                function named <literal>join</literal>,
+                <literal>&lt;*&gt;</literal> or <literal>pure</literal> is
+                defined.
+           </para>
+
+            <para>
+                The warnings are enabled by default, and can be controlled
+                using the new flag <literal>-f[no-]warn-amp</literal>.
+           </para>
+       </listitem>
    </itemizedlist>
   </sect2>
 

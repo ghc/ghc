@@ -433,6 +433,7 @@ data WarningFlag =
    | Opt_WarnUnusedMatches
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
+   | Opt_WarnAMP
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -2503,6 +2504,7 @@ fWarningFlags = [
   ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
+  ( "warn-amp",                         Opt_WarnAMP, nop ),
   ( "warn-orphans",                     Opt_WarnOrphans, nop ),
   ( "warn-identities",                  Opt_WarnIdentities, nop ),
   ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
@@ -2916,6 +2918,7 @@ standardWarnings
     = [ Opt_WarnOverlappingPatterns,
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
+        Opt_WarnAMP,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnPointlessPragmas,
         Opt_WarnDuplicateConstraints,

@@ -184,6 +184,7 @@ basicKnownKeyNames
         dataClassName,
         isStringClassName,
         applicativeClassName,
+        alternativeClassName,
         foldableClassName,
         traversableClassName,
         typeableClassName,              -- derivable
@@ -203,10 +204,15 @@ basicKnownKeyNames
         enumFromName, enumFromThenName,
         enumFromThenToName, enumFromToName,
 
+        -- Applicative/Alternative stuff
+        pureAName,
+        apAName,
+
         -- Monad stuff
         thenIOName, bindIOName, returnIOName, failIOName,
         failMName, bindMName, thenMName, returnMName,
         fmapName,
+        joinMName,
 
         -- MonadRec stuff
         mfixName,
@@ -701,8 +707,8 @@ notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
 fmap_RDR, pure_RDR, ap_RDR, foldable_foldr_RDR, foldMap_RDR,
     traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
-pure_RDR                = varQual_RDR cONTROL_APPLICATIVE (fsLit "pure")
-ap_RDR                  = varQual_RDR cONTROL_APPLICATIVE (fsLit "<*>")
+pure_RDR                = nameRdrName pureAName
+ap_RDR                  = nameRdrName apAName
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
@@ -820,6 +826,24 @@ applicativeClassName, foldableClassName, traversableClassName :: Name
 applicativeClassName  = clsQual  cONTROL_APPLICATIVE (fsLit "Applicative") applicativeClassKey
 foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
 traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
+
+
+
+-- AMP additions
+
+joinMName,  apAName, pureAName, alternativeClassName :: Name
+joinMName            = methName mONAD               (fsLit "join")        joinMIdKey
+apAName              = methName cONTROL_APPLICATIVE (fsLit "<*>")         apAClassOpKey
+pureAName            = methName cONTROL_APPLICATIVE (fsLit "pure")        pureAClassOpKey
+alternativeClassName = clsQual  cONTROL_APPLICATIVE (fsLit "Alternative") alternativeClassKey
+
+joinMIdKey, apAClassOpKey, pureAClassOpKey, alternativeClassKey :: Unique
+joinMIdKey          = mkPreludeMiscIdUnique 750
+apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
+pureAClassOpKey     = mkPreludeMiscIdUnique 752
+alternativeClassKey = mkPreludeMiscIdUnique 753
+
+
 
 -- Functions for GHC extensions
 groupWithName :: Name
@@ -1812,7 +1836,8 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
                       functorClassKey,
                       monadClassKey, monadPlusClassKey,
                       isStringClassKey,
-                      applicativeClassKey, foldableClassKey, traversableClassKey
+                      applicativeClassKey, foldableClassKey,
+                      traversableClassKey, alternativeClassKey
                      ]
 \end{code}
 

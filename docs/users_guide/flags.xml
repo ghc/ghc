@@ -1502,6 +1502,13 @@
             <entry><option>-fno-warn-warnings-deprecations</option></entry>
           </row>
 
+          <row>
+            <entry><option>-fwarn-amp</option></entry>
+            <entry>warn on definitions conflicting with the Applicative-Monad Proposal (AMP)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-amp</option></entry>
+          </row>
+
         </tbody>
       </tgroup>
     </informaltable>

@@ -75,7 +75,7 @@ import DataCon
 import Type
 import Class
 import CoAxiom
-import Inst     ( tcGetInstEnvs )
+import Inst     ( tcGetInstEnvs, tcGetInsts )
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
 import Data.Ord
@@ -911,7 +911,147 @@ rnTopSrcDecls extra_deps group
         return (tcg_env', rn_decls)
    }
 
-------------------------------------------------
+
+
+-- ########## BEGIN AMP WARNINGS ###############################################
+--
+-- The functions defined here issue warnings according to the 2013
+-- Applicative-Monad proposal. (#8004)
+
+-- | Main entry point for generating AMP warnings
+tcAmpWarn :: TcM ()
+tcAmpWarn =
+    do { warnFlag <- woptM Opt_WarnAMP
+       ; when warnFlag $ do {
+
+         -- Monad without Applicative
+       ; tcAmpMissingParentClassWarn monadClassName
+                                     applicativeClassName
+
+         -- MonadPlus without Alternative
+       ; tcAmpMissingParentClassWarn monadPlusClassName
+                                     alternativeClassName
+
+         -- Custom local definitions of join/pure/<*>
+       ; mapM_ tcAmpFunctionWarn [joinMName, apAName, pureAName]
+    }}
+
+
+
+-- | Warn on local definitions of names that would clash with Prelude versions,
+--   i.e. join/pure/<*>
+tcAmpFunctionWarn :: Name -- ^ Name to check, e.g. joinMName for join
+                  -> TcM ()
+tcAmpFunctionWarn name = do
+    { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
+
+      -- Finds *other* elements having the same literal name. A name clashes
+      -- iff:
+      --   1. It is locally defined in the current module
+      --   2. It has the same literal name as the reference function
+      --   3. It is not identical to the reference function
+    ; let clashes :: GlobalRdrElt -> Bool
+          clashes x = and [ gre_prov x == LocalDef
+                          , nameOccName (gre_name x) == nameOccName name
+                          , gre_name x /= name
+                          ]
+
+          -- List of all offending definitions
+          clashingElts :: [GlobalRdrElt]
+          clashingElts = filter clashes rdrElts
+
+    ; traceTc "tcAmpFunctionWarn/amp_prelude_functions"
+                (hang (ppr name) 4 (sep [ppr clashingElts]))
+
+    ; let warn_msg x = addWarnAt (nameSrcSpan $ gre_name x) . hsep $
+              [ ptext (sLit "Local definition of")
+              , quotes . ppr . nameOccName $ gre_name x
+              , ptext (sLit "clashes with a future Prelude name")
+              , ptext (sLit "- this will become an error in GHC 7.10,")
+              , ptext (sLit "under the Applicative-Monad Proposal.")
+              ]
+    ; mapM_ warn_msg clashingElts
+    }
+
+-- | Issue a warning for instance definitions lacking a should-be parent class.
+--   Used for Monad without Applicative and MonadPlus without Alternative.
+tcAmpMissingParentClassWarn :: Name -- ^ Class instance is defined for
+                            -> Name -- ^ Class it should also be instance of
+                            -> TcM ()
+
+-- Notation: is* is for classes the type is an instance of, should* for those
+--           that it should also be an instance of based on the corresponding
+--           is*.
+--           Example: in case of Applicative/Monad: is = Monad,
+--                                                  should = Applicative
+tcAmpMissingParentClassWarn isName shouldName
+  = do { isClass'     <- tcLookupClassMaybe isName     -- Note [tryTc oddity] 
+       ; shouldClass' <- tcLookupClassMaybe shouldName -- Note [tryTc oddity]
+       ; case (isClass', shouldClass') of
+              (Just isClass, Just shouldClass) -> do
+                  { localInstances <- tcGetInsts
+                  ; let isInstance m = is_cls m == isClass
+                        isInsts = filter isInstance localInstances
+                  ; traceTc "tcAmpMissingParentClassWarn/isInsts" (ppr isInsts)
+                  ; forM_ isInsts $ checkShouldInst isClass shouldClass
+                  }
+              _ -> return ()
+       }
+  where
+    -- Checks whether the desired superclass exists in a given environment.
+    checkShouldInst :: Class   -- ^ Class of existing instance
+                    -> Class   -- ^ Class there should be an instance of
+                    -> ClsInst -- ^ Existing instance
+                    -> TcM ()
+    checkShouldInst isClass shouldClass isInst
+      = do { instEnv <- tcGetInstEnvs
+           ; let (instanceMatches, shouldInsts, _)
+                    = lookupInstEnv instEnv shouldClass (is_tys isInst)
+
+           ; traceTc "tcAmpMissingParentClassWarn/checkShouldInst"
+                     (hang (ppr isInst) 4
+                         (sep [ppr instanceMatches, ppr shouldInsts]))
+
+           -- "<location>: Warning: <type> is an instance of <is> but not <should>"
+           -- e.g. "Foo is an instance of Monad but not Applicative"
+           ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
+                 warnMsg (Just name:_) =
+                      addWarnAt instLoc . hsep $
+                           [ quotes (ppr $ nameOccName name)
+                           , ptext (sLit "is an instance of")
+                           , ppr . nameOccName $ className isClass
+                           , ptext (sLit "but not")
+                           , ppr . nameOccName $ className shouldClass
+                           , ptext (sLit "- this will become an error in GHC 7.10,")
+                           , ptext (sLit "under the Applicative-Monad Proposal.")
+                           ]
+                 warnMsg _ = return ()
+           ; when (null shouldInsts && null instanceMatches) $
+                  warnMsg (is_tcs isInst)
+           }
+
+{-
+Note [tryTc oddity]
+~~~~~~~~~~~~~~~~~~~
+tcLookupClass in tcLookupClassMaybe should fail all on its own if the
+given name doesn't exist, and the names we're looking for in the AMP
+check should always exist. However, under some mysterious
+circumstances, base apparently fails to compile without catching the
+errors via tryTc. So tcLookupClassMaybe wraps all this behavior
+together.
+-}
+
+-- | Looks up a class, returning Nothing on failure. Similar to
+--   TcEnv.tcLookupClass, but does not issue any error messages.
+tcLookupClassMaybe :: Name -> TcM (Maybe Class)
+tcLookupClassMaybe = fmap toMaybe . tryTc . tcLookupClass
+    where toMaybe (_, Just cls) = Just cls
+          toMaybe _             = Nothing
+
+-- ########## END AMP WARNINGS #################################################
+
+
+
 tcTopSrcDecls :: ModDetails -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls boot_details
         (HsGroup { hs_tyclds = tycl_decls,
@@ -933,6 +1073,11 @@ tcTopSrcDecls boot_details
         (tcg_env, inst_infos, deriv_binds)
             <- tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls ;
         setGblEnv tcg_env       $ do {
+
+
+                -- Generate Applicative/Monad proposal (AMP) warnings
+        traceTc "Tc3b" empty ;
+        tcAmpWarn ;
 
                 -- Foreign import declarations next.
         traceTc "Tc4" empty ;
