@@ -825,75 +825,98 @@ readElfSection _dflags section exe = do
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
+   $ mask_
    $ do let ref = dirsToClean dflags
-        ds <- readIORef ref
+        ds <- atomicModifyIORef ref $ \ds -> (Map.empty, ds)
         removeTmpDirs dflags (Map.elems ds)
-        writeIORef ref Map.empty
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
+   $ mask_
    $ do let ref = filesToClean dflags
-        fs <- readIORef ref
+        fs <- atomicModifyIORef ref $ \fs -> ([],fs)
         removeTmpFiles dflags fs
-        writeIORef ref []
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
 cleanTempFilesExcept dflags dont_delete
    = unless (gopt Opt_KeepTmpFiles dflags)
+   $ mask_
    $ do let ref = filesToClean dflags
-        files <- readIORef ref
-        let (to_keep, to_delete) = partition (`elem` dont_delete) files
-        writeIORef ref to_keep
+        to_delete <- atomicModifyIORef ref $ \files ->
+            let (to_keep,to_delete) = partition (`elem` dont_delete) files
+            in  (to_keep,to_delete)
         removeTmpFiles dflags to_delete
 
 
--- find a temporary name that doesn't already exist.
+-- Return a unique numeric temp file suffix
+newTempSuffix :: DynFlags -> IO Int
+newTempSuffix dflags = atomicModifyIORef (nextTempSuffix dflags) $ \n -> (n+1,n)
+
+-- Find a temporary name that doesn't already exist.
 newTempName :: DynFlags -> Suffix -> IO FilePath
 newTempName dflags extn
   = do d <- getTempDir dflags
        x <- getProcessID
-       findTempName (d </> "ghc" ++ show x ++ "_") 0
+       findTempName (d </> "ghc" ++ show x ++ "_")
   where
-    findTempName :: FilePath -> Integer -> IO FilePath
-    findTempName prefix x
-      = do let filename = (prefix ++ show x) <.> extn
-           b  <- doesFileExist filename
-           if b then findTempName prefix (x+1)
+    findTempName :: FilePath -> IO FilePath
+    findTempName prefix
+      = do n <- newTempSuffix dflags
+           let filename = prefix ++ show n <.> extn
+           b <- doesFileExist filename
+           if b then findTempName prefix
                 else do -- clean it up later
                         consIORef (filesToClean dflags) filename
                         return filename
 
--- return our temporary directory within tmp_dir, creating one if we
--- don't have one yet
+-- Return our temporary directory within tmp_dir, creating one if we
+-- don't have one yet.
 getTempDir :: DynFlags -> IO FilePath
-getTempDir dflags
-  = do let ref = dirsToClean dflags
-           tmp_dir = tmpDir dflags
-       mapping <- readIORef ref
-       case Map.lookup tmp_dir mapping of
-           Nothing ->
-               do x <- getProcessID
-                  let prefix = tmp_dir </> "ghc" ++ show x ++ "_"
-                  let
-                      mkTempDir :: Integer -> IO FilePath
-                      mkTempDir x
-                       = let dirname = prefix ++ show x
-                         in do createDirectory dirname
-                               let mapping' = Map.insert tmp_dir dirname mapping
-                               writeIORef ref mapping'
-                               debugTraceMsg dflags 2 (ptext (sLit "Created temporary directory:") <+> text dirname)
-                               return dirname
-                            `catchIO` \e ->
-                                    if isAlreadyExistsError e
-                                    then mkTempDir (x+1)
-                                    else ioError e
-                  mkTempDir 0
-           Just d -> return d
+getTempDir dflags = do
+    mapping <- readIORef dir_ref
+    case Map.lookup tmp_dir mapping of
+        Nothing -> do
+            pid <- getProcessID
+            let prefix = tmp_dir </> "ghc" ++ show pid ++ "_"
+            mask_ $ mkTempDir prefix
+        Just dir -> return dir
+  where
+    tmp_dir = tmpDir dflags
+    dir_ref = dirsToClean dflags
+
+    mkTempDir :: FilePath -> IO FilePath
+    mkTempDir prefix = do
+        n <- newTempSuffix dflags
+        let our_dir = prefix ++ show n
+
+        -- 1. Speculatively create our new directory.
+        createDirectory our_dir
+
+        -- 2. Update the dirsToClean mapping unless an entry already exists
+        -- (i.e. unless another thread beat us to it).
+        their_dir <- atomicModifyIORef dir_ref $ \mapping ->
+            case Map.lookup tmp_dir mapping of
+                Just dir -> (mapping, Just dir)
+                Nothing  -> (Map.insert tmp_dir our_dir mapping, Nothing)
+
+        -- 3. If there was an existing entry, return it and delete the
+        -- directory we created.  Otherwise return the directory we created.
+        case their_dir of
+            Nothing  -> do
+                debugTraceMsg dflags 2 $
+                    text "Created temporary directory:" <+> text our_dir
+                return our_dir
+            Just dir -> do
+                removeDirectory our_dir
+                return dir
+      `catchIO` \e -> if isAlreadyExistsError e || isDoesNotExistError e
+                      then mkTempDir prefix else ioError e
 
 addFilesToClean :: DynFlags -> [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
-addFilesToClean dflags files = mapM_ (consIORef (filesToClean dflags)) files
+addFilesToClean dflags new_files
+    = atomicModifyIORef (filesToClean dflags) $ \files -> (new_files++files, ())
 
 removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
 removeTmpDirs dflags ds

@@ -2064,6 +2064,11 @@ INFO_TABLE_RET(stg_noDuplicate, RET_SMALL, W_ info_ptr)
 
 stg_noDuplicatezh /* no arg list: explicit stack layout */
 {
+    // With a single capability there's no chance of work duplication.
+    if (CInt[n_capabilities] == 1 :: CInt) {
+        jump %ENTRY_CODE(Sp(0)) [];
+    }
+
     STK_CHK(WDS(1), stg_noDuplicatezh);
 
     // leave noDuplicate frame in case the current

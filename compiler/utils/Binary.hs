@@ -20,7 +20,6 @@ module Binary
     {-type-}  BinHandle,
     SymbolTable, Dictionary,
 
-   openBinIO, openBinIO_,
    openBinMem,
 --   closeBin,
 
@@ -108,15 +107,6 @@ data BinHandle
         -- XXX: should really store a "high water mark" for dumping out
         -- the binary data to a file.
 
-  | BinIO {                     -- binary data stored in a file
-     bh_usr :: UserData,
-     _off_r :: !FastMutInt,     -- the current offset (cached)
-     _hdl   :: !IO.Handle       -- the file handle (must be seekable)
-   }
-        -- cache the file ptr in BinIO; using hTell is too expensive
-        -- to call repeatedly.  If anyone else is modifying this Handle
-        -- at the same time, we'll be screwed.
-
 getUserData :: BinHandle -> UserData
 getUserData bh = bh_usr bh
 
@@ -155,15 +145,6 @@ putAt bh p x = do seekBin bh p; put_ bh x; return ()
 getAt  :: Binary a => BinHandle -> Bin a -> IO a
 getAt bh p = do seekBin bh p; get bh
 
-openBinIO_ :: IO.Handle -> IO BinHandle
-openBinIO_ h = openBinIO h
-
-openBinIO :: IO.Handle -> IO BinHandle
-openBinIO h = do
-  r <- newFastMutInt
-  writeFastMutInt r 0
-  return (BinIO noUserData r h)
-
 openBinMem :: Int -> IO BinHandle
 openBinMem size
  | size <= 0 = error "Data.Binary.openBinMem: size must be >= 0"
@@ -177,13 +158,9 @@ openBinMem size
    return (BinMem noUserData ix_r sz_r arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
-tellBin (BinIO  _ r _)   = do ix <- readFastMutInt r; return (BinPtr ix)
 tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin (BinIO _ ix_r h) (BinPtr p) = do
-  writeFastMutInt ix_r p
-  hSeek h AbsoluteSeek (fromIntegral p)
 seekBin h@(BinMem _ ix_r sz_r _) (BinPtr p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
@@ -191,11 +168,6 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr p) = do
         else writeFastMutInt ix_r p
 
 seekBy :: BinHandle -> Int -> IO ()
-seekBy (BinIO _ ix_r h) off = do
-  ix <- readFastMutInt ix_r
-  let ix' = ix + off
-  writeFastMutInt ix_r ix'
-  hSeek h AbsoluteSeek (fromIntegral ix')
 seekBy h@(BinMem _ ix_r sz_r _) off = do
   sz <- readFastMutInt sz_r
   ix <- readFastMutInt ix_r
@@ -209,10 +181,8 @@ isEOFBin (BinMem _ ix_r sz_r _) = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   return (ix >= sz)
-isEOFBin (BinIO _ _ h) = hIsEOF h
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
-writeBinMem (BinIO _ _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
@@ -239,7 +209,6 @@ readBinMem filename = do
   return (BinMem noUserData ix_r sz_r arr_r)
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
-fingerprintBinMem (BinIO _ _ _) = error "Binary.md5BinMem: not a memory handle"
 fingerprintBinMem (BinMem _ ix_r _ arr_r) = do
   arr <- readIORef arr_r
   ix <- readFastMutInt ix_r
@@ -268,8 +237,6 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
        copyBytes new old sz 
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
-expandBin (BinIO _ _ _) _ = return ()
--- no need to expand a file, we'll assume they expand by themselves.
 
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
@@ -286,11 +253,6 @@ putWord8 h@(BinMem _ ix_r sz_r arr_r) w = do
                 withForeignPtr arr $ \p -> pokeByteOff p ix w
                 writeFastMutInt ix_r (ix+1)
                 return ()
-putWord8 (BinIO _ ix_r h) w = do
-    ix <- readFastMutInt ix_r
-    hPutChar h (chr (fromIntegral w)) -- XXX not really correct
-    writeFastMutInt ix_r (ix+1)
-    return ()
 
 getWord8 :: BinHandle -> IO Word8
 getWord8 (BinMem _ ix_r sz_r arr_r) = do
@@ -302,11 +264,6 @@ getWord8 (BinMem _ ix_r sz_r arr_r) = do
     w <- withForeignPtr arr $ \p -> peekByteOff p ix
     writeFastMutInt ix_r (ix+1)
     return w
-getWord8 (BinIO _ ix_r h) = do
-    ix <- readFastMutInt ix_r
-    c <- hGetChar h
-    writeFastMutInt ix_r (ix+1)
-    return $! (fromIntegral (ord c)) -- XXX not really correct
 
 putByte :: BinHandle -> Word8 -> IO ()
 putByte bh w = put_ bh w
@@ -639,7 +596,11 @@ lazyGet :: Binary a => BinHandle -> IO a
 lazyGet bh = do
     p <- get bh -- a BinPtr
     p_a <- tellBin bh
-    a <- unsafeInterleaveIO (getAt bh p_a)
+    a <- unsafeInterleaveIO $ do
+        -- NB: Use a fresh off_r variable in the child thread, for thread
+        -- safety.
+        off_r <- newFastMutInt
+        getAt bh { _off_r = off_r } p_a
     seekBin bh p -- skip over the object for now
     return a
 
