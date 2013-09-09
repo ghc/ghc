@@ -30,7 +30,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 2 August, 2013
+\Large 9 September, 2013
 \end{center}
 
 \section{Introduction}
@@ -364,6 +364,9 @@ when \texttt{-dcore-lint} is set.
 \ottdefncheckXXdcXXroles{}
 
 In the following judgment, the role $[[R]]$ is an \emph{input}, not an output.
+The metavariable $[[O]]$ denotes a \emph{role context}, as shown here:
+
+\gram{\ottO}
 
 \ottdefncheckXXtyXXroles{}
 
