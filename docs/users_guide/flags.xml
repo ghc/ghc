@@ -1502,14 +1502,6 @@
             <entry><option>-fno-warn-warnings-deprecations</option></entry>
           </row>
 
-          <row>
-            <entry><option>-fwarn-typeable-instances</option></entry>
-            <entry>warn if there are any handwritten <literal>Typeable</literal>
-                   instances (see <xref linkend="deriving-typeable"/>)</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-warn-typeable-instances</option></entry>
-          </row>
-
         </tbody>
       </tgroup>
     </informaltable>

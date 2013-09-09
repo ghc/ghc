@@ -974,7 +974,6 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-wrong-do-bind</option>,
     <option>-fwarn-unsupported-calling-conventions</option>,
     <option>-fwarn-dodgy-foreign-imports</option>,
-    <option>-fwarn-typeable-instances</option>,
     <option>-fwarn-inline-rule-shadowing</option>, and
     <option>-fwarn-unsupported-llvm-version</option>.
     The following flags are simple ways to select standard
@@ -1735,19 +1734,6 @@ f "2"    = 2
             <programlisting>
                do { popInt 10 ; return 10 }
             </programlisting>
-          </para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term><option>-fwarn-typeable-instances</option>:</term>
-        <listitem>
-          <indexterm><primary><option>-fwarn-typeable-instances</option></primary></indexterm>
-          <indexterm><primary>typeable instances, warning</primary></indexterm>
-
-          <para>Report handwritten (ie. not derived) instances of the
-          <literal>Typeable</literal> class. These are ignore by the compiler;
-          only derived instances of <literal>Typeable</literal> are allowed.
           </para>
         </listitem>
       </varlistentry>

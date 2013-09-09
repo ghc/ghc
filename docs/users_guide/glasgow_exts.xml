@@ -3503,7 +3503,7 @@ See also <xref linkend="auto-derive-typeable"/>.
 </para>
 <para>
 Also since GHC 7.8.1, handwritten (ie. not derived) instances of
-<literal>Typeable</literal> are forbidden, and will be ignored with a warning.
+<literal>Typeable</literal> are forbidden, and will result in an error.
 </para>
 </listitem>
 

@@ -406,14 +406,13 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ; return (gbl_env, emptyBag, emptyValBindsOut) }
                  else tcDeriving tycl_decls inst_decls deriv_decls
 
-       -- Remove any handwritten instance of poly-kinded Typeable and warn
-       ; dflags <- getDynFlags
-       ; when (wopt Opt_WarnTypeableInstances dflags) $
-              mapM_ (failWithTc . instMsg) typeable_instances
+       -- Fail if there are any handwritten instance of poly-kinded Typeable
+       ; mapM_ (failWithTc . instMsg) typeable_instances
 
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of old Typeable as then unsafe casts could be
        -- performed. Derived instances are OK.
+       ; dflags <- getDynFlags
        ; when (safeLanguageOn dflags) $
              mapM_ (\x -> when (typInstCheck x)
                                (addErrAt (getSrcSpan $ iSpec x) typInstErr))
