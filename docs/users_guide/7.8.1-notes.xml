@@ -164,8 +164,15 @@
 
         <listitem>
             <para>
-                TODO: mention new <literal>Typeable</literal> and
-                <literal>AutoDeriveTypeable</literal>
+                <literal>Typeable</literal> is now poly-kinded, making
+                <literal>Typeable1</literal>, <literal>Typeable2</literal>,
+                etc., obsolete, deprecated, and relegated to
+                <literal>Data.OldTypeable</literal>. Furthermore, user-written
+                instances of <literal>Typeable</literal> are now disallowed:
+                use <literal>deriving</literal> or the new extension
+                <literal>-XAutoDeriveTypeable</literal>, which will create
+                <literal>Typeable</literal> instances for every datatype
+                declared in the module.
            </para>
        </listitem>
    </itemizedlist>
