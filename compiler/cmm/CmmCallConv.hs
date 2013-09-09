@@ -3,7 +3,7 @@ module CmmCallConv (
   ParamLocation(..),
   assignArgumentsPos,
   assignStack,
-  globalArgRegs, realArgRegsCover
+  realArgRegsCover
 ) where
 
 #include "HsVersions.h"
@@ -172,12 +172,6 @@ allRegs dflags = (allVanillaRegs dflags,
 
 nodeOnly :: AvailRegs
 nodeOnly = ([VanillaReg 1], [], [], [], [])
-
-globalArgRegs :: DynFlags -> [GlobalReg]
-globalArgRegs dflags = map ($ VGcPtr) (allVanillaRegs dflags) ++
-                       allFloatRegs dflags ++
-                       allDoubleRegs dflags ++
-                       allLongRegs dflags
 
 -- This returns the set of global registers that *cover* the machine registers
 -- used for argument passing. On platforms where registers can overlap---right
