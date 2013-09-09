@@ -118,7 +118,7 @@ tcTyAndClassDecls boot_details tyclds_s
              -- remaining groups are typecheck in the extended global env
 
 tcTyClGroup :: ModDetails -> TyClGroup Name -> TcM TcGblEnv
-tcTyClGroup boot_details decls
+tcTyClGroup _boot_details decls
   | all (isKindDecl . unLoc) decls
   = do (kcons, _) <- fixM $ \ ~(_, conss) -> do
          let rec_info = panic "tcTyClGroup" "rec_info"
@@ -820,13 +820,12 @@ mkKindCon _rec_info tycons KindDecl { tcdLName  = L _ kind_name
        kind_name
        sKind
        kvars
-       [] -- XXX roles here?
+       (replicate (length kvars) Nominal) -- no interesting kind equality
        Nothing
        []
        (DataKindTyCon tycons)
        NoParentTyCon
-       -- TODO, make the rec_info work
-       NonRecursive --(rti_is_rec rec_info kind_name)
+       NonRecursive -- XXX is this OK?
        False
        NotPromotable
   where
@@ -838,8 +837,8 @@ mkKindCon _ _ _ =
   panic "mkKindCon" "non 'data kind' declaration"
 
 tcKindDecl :: RecTyInfo -> TyClDecl Name -> TcM [TyCon]
-tcKindDecl rec_info KindDecl { tcdLName = L _ kind_name, tcdKVars = lknames
-                                  , tcdTypeCons = cons }
+tcKindDecl _rec_info KindDecl { tcdLName = L _ kind_name, tcdKVars = lknames
+                              , tcdTypeCons = cons }
   = do traceTc "tcKindDecl" (ppr kind_name)
 
        ~(ATyCon kcon) <- tcLookupGlobal kind_name
@@ -1394,7 +1393,9 @@ tcTyConDecl kvars kind TyConDecl { tycon_name = name, tycon_details = details }
                RecCon {}      -> panic "tcTyConDecl" "unexpected record constructor"
        let (kcon,_) = splitTyConApp kind
            con_kind = mkPiKinds kvars (mkFunTys ks kind)
-       return (mkDataKindTyCon kcon (unLoc name) con_kind)
+           roles    = replicate (length kvars) Nominal
+                   ++ replicate (length ks)    Representational
+       return (mkDataKindTyCon kcon (unLoc name) con_kind roles)
 
 
 \end{code}

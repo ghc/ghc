@@ -668,11 +668,12 @@ tcIfaceDataCons tycon_name tycon _ if_cons
                                       ; return (HsUnpack (Just co)) }
 
 tcIfaceTyConDecl :: Kind -> KCon -> IfaceTyConDecl -> IfL TyCon
-tcIfaceTyConDecl kind kcon IfTyCon { ifTyConOcc = occ_name, ifTyConArgKs = args }
+tcIfaceTyConDecl kind kcon IfTyCon { ifTyConOcc = occ_name, ifTyConArgKs = args,
+                                     ifTyConRoles = roles }
   = do name  <- lookupIfaceTop occ_name
        -- See the comment in tc_con_decl of tcIfaceDataCons for why forkM
        kinds <- forkM pp_name (mapM tcIfaceKind args)
-       return (mkDataKindTyCon kcon name (mkFunTys kinds kind))
+       return (mkDataKindTyCon kcon name (mkFunTys kinds kind) roles)
   where
   pp_name = ptext (sLit "Type constructor") <+> ppr occ_name
 

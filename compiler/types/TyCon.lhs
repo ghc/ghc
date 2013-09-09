@@ -1087,13 +1087,13 @@ mkPromotedDataCon con name unique kind roles
 
 -- | Construct a type constructor for a type introduced by a 'data kind'
 -- declaration.
-mkDataKindTyCon :: TyCon -> Name -> Kind -> TyCon
-mkDataKindTyCon kc name kind
+mkDataKindTyCon :: TyCon -> Name -> Kind -> [Role] -> TyCon
+mkDataKindTyCon kc name kind roles
   = PromotedDataCon {
         tyConName   = name,
         tyConUnique = nameUnique name,
-        tyConArity  = 0,
-        tc_roles    = [], -- XXX is this correct?
+        tyConArity  = length roles,
+        tc_roles    = roles,
         tc_kind     = kind,
         parentTyCon = kc
   }

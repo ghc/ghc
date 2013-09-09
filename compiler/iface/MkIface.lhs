@@ -1566,7 +1566,8 @@ tyConToIfaceDecl env tycon
 
     ifaceTyConDecl ty_con
         = IfTyCon { ifTyConOcc   = getOccName (tyConName ty_con),
-                    ifTyConArgKs = map (tidyToIfaceType emptyTidyEnv) args }
+                    ifTyConArgKs = map (tidyToIfaceType emptyTidyEnv) args,
+                    ifTyConRoles = tyConRoles ty_con }
         where
           (args,_) = splitFunTys (tyConKind ty_con)
 

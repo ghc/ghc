@@ -436,19 +436,22 @@ instance Binary IfaceBang where
 
 data IfaceTyConDecl
   = IfTyCon {
-        ifTyConOcc   :: OccName,    -- constructor name
-        ifTyConArgKs :: [IfaceKind] -- constructor argument kinds
+        ifTyConOcc   :: OccName,     -- constructor name
+        ifTyConArgKs :: [IfaceKind], -- constructor argument kinds
+        ifTyConRoles :: [Role]       -- constructor argument roles
     }
 
 instance Binary IfaceTyConDecl where
-  put_ bh (IfTyCon a1 a2) = do
+  put_ bh (IfTyCon a1 a2 a3) = do
     put_ bh (occNameFS a1)
     put_ bh a2
+    put_ bh a3
   get bh = do
     a1 <- get bh
     a2 <- get bh
+    a3 <- get bh
     occ <- return $! mkOccNameFS tcName a1
-    return (IfTyCon occ a2)
+    return (IfTyCon occ a2 a3)
 
 data IfaceClsInst
   = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
