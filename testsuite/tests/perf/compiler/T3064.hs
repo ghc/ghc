@@ -1,8 +1,16 @@
 {-# LANGUAGE Rank2Types, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
 module Bug2 where
+import Control.Applicative
 
 newtype ReaderT r m a = ReaderT { runReaderT :: r -> m a }
+
+instance Functor f => Functor (ReaderT r f) where
+  fmap f m = ReaderT $ (fmap f) . runReaderT m
+
+instance Applicative f => Applicative (ReaderT r f) where
+  pure m   = ReaderT (const $ pure m)
+  f <*> v = ReaderT $ \r -> runReaderT f r <*> runReaderT v r
 
 instance (Monad m) => Monad (ReaderT r m) where
     return a = ReaderT $ \_ -> return a
@@ -12,7 +20,7 @@ instance (Monad m) => Monad (ReaderT r m) where
     fail msg = ReaderT $ \_ -> fail msg
 
 newtype ResourceT r s m v = ResourceT { unResourceT :: ReaderT r m v }
-  deriving (Monad)
+  deriving (Functor, Applicative, Monad)
 
 data Ctx = Ctx
 
@@ -23,7 +31,7 @@ type CAT s c = ResourceT [Ch] (s,c)
 type CtxM c = ResourceT Ctx c IO
 
 newtype CA s c v = CA { unCA :: CAT s c (CtxM c) v }
-  deriving (Monad)
+  deriving (Functor, Applicative, Monad)
 
 class (Monad m) => MonadCA m where
   type CtxLabel m

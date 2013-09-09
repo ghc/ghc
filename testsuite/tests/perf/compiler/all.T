@@ -13,13 +13,14 @@ test('T1969',
              #            19 (x86/OS X)
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
-           (wordsize(64), 27, 10)]),
+           (wordsize(64), 30, 10)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
              # 2012-10-03 25 (amd64/Linux if .hi exists)
              # 2013-02-13 23, but unstable so increased to 10% range
              # 2013-02-13 27, very unstable!
+             # 2013-09-11 30 (amd64/Linux)
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5094914, 2),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -28,8 +29,8 @@ test('T1969',
            (wordsize(32), 6149572, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
-           (wordsize(64), 9000000, 20)]),
-               # looks like the peak is around 10M, but we're
+           (wordsize(64), 11000000, 20)]),
+               # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
@@ -170,11 +171,12 @@ test('T3064',
       compiler_stats_num_field('peak_megabytes_allocated',
           [(wordsize(32), 14, 1),
         # expected value: 14 (x86/Linux 28-06-2012):
-           (wordsize(64), 26, 20)]),
+           (wordsize(64), 30, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
             # (amd64/Linux) 2013-04-03: 26
+            # (amd64/Linux) 2013-09-11: 30; result of AMP patch
             # Increased range to 20%.  peak-usage varies from 22 to 26, 
             #  depending on whether the old .hi file exists
 
@@ -182,21 +184,22 @@ test('T3064',
           [(wordsize(32), 111189536, 10),
          # expected value: 56380288 (x86/Linux) (28/6/2011)
          #                111189536 (x86/Windows) (30/10/12)
-           (wordsize(64), 236404384, 5)]),
+           (wordsize(64), 290165632, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
-
+            # (amd64/Linux) (11/09/2013): 290165632, increase from AMP warnings
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 9211816, 20)]),
+           (wordsize(64), 12000480, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
             # (amd64/Linux)         (18/02/2013):  9397488
             # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
             # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
+            # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
             #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
        only_ways(['normal'])
       ],

@@ -9,7 +9,7 @@
       instance Show Float -- Defined in ‛GHC.Float’
       instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
         -- Defined in ‛GHC.Real’
-      ...plus 23 others
+      ...plus 24 others
     In a stmt of an interactive GHCi command: print it
 
 <interactive>:8:1:
@@ -22,5 +22,5 @@
       instance Show Float -- Defined in ‛GHC.Float’
       instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
         -- Defined in ‛GHC.Real’
-      ...plus 23 others
+      ...plus 24 others
     In a stmt of an interactive GHCi command: print it

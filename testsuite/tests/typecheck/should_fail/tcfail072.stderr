@@ -11,6 +11,6 @@ tcfail072.hs:23:13:
         -- Defined in ‛GHC.Real’
       instance Ord () -- Defined in ‛GHC.Classes’
       instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‛GHC.Classes’
-      ...plus 22 others
+      ...plus 23 others
     In the expression: g A
     In an equation for ‛g’: g (B _ _) = g A

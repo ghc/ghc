@@ -14,7 +14,7 @@ tcfail083.hs:8:53:
       instance Show Bar -- Defined at tcfail083.hs:3:43
       instance Show Double -- Defined in ‛GHC.Float’
       instance Show Float -- Defined in ‛GHC.Float’
-      ...plus 24 others
+      ...plus 25 others
     In the expression: print (f, b)
     In an equation for ‛display’:
         display (State {bar = Bar {flag = f, baz = b}}) = print (f, b)

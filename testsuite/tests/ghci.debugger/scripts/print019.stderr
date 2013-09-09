@@ -8,5 +8,5 @@
       instance Show a => Show (List1 a) -- Defined at ../Test.hs:11:12
       instance Show MyInt -- Defined at ../Test.hs:14:16
       instance Show a => Show (MkT a) -- Defined at ../Test.hs:17:13
-      ...plus 31 others
+      ...plus 32 others
     In a stmt of an interactive GHCi command: print it

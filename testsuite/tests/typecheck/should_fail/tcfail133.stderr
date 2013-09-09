@@ -10,7 +10,7 @@ tcfail133.hs:68:7:
       instance Show One -- Defined at tcfail133.hs:9:28
       instance (Show a, Show b, Number a, Digit b) => Show (a :@ b)
         -- Defined at tcfail133.hs:11:54
-      ...plus 26 others
+      ...plus 27 others
     In the expression: show
     In the expression: show $ add (One :@ Zero) (One :@ One)
     In an equation for ‛foo’:
