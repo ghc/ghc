@@ -251,6 +251,7 @@ incorrect.
  'ccall'        { L _ ITccallconv }
  'capi'         { L _ ITcapiconv }
  'prim'         { L _ ITprimcallconv }
+ 'javascript'   { L _ ITjavascriptcallconv }
  'proc'         { L _ ITproc }          -- for arrow notation extension
  'rec'          { L _ ITrec }           -- for arrow notation extension
  'group'    { L _ ITgroup }     -- for list transform extension
@@ -977,6 +978,7 @@ callconv :: { CCallConv }
           | 'ccall'                     { CCallConv   }
           | 'capi'                      { CApiConv    }
           | 'prim'                      { PrimCallConv}
+          | 'javascript'                { JavaScriptCallConv }
 
 safety :: { Safety }
         : 'unsafe'                      { PlayRisky }
@@ -2047,6 +2049,7 @@ special_id
         | 'ccall'               { L1 (fsLit "ccall") }
         | 'capi'                { L1 (fsLit "capi") }
         | 'prim'                { L1 (fsLit "prim") }
+        | 'javascript'          { L1 (fsLit "javascript") }
         | 'group'               { L1 (fsLit "group") }
 
 special_sym :: { Located FastString }

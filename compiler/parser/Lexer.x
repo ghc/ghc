@@ -472,6 +472,7 @@ data Token
   | ITccallconv
   | ITcapiconv
   | ITprimcallconv
+  | ITjavascriptcallconv
   | ITmdo
   | ITfamily
   | ITgroup
@@ -668,6 +669,7 @@ reservedWordsFM = listToUFM $
          ( "ccall",          ITccallconv,     bit ffiBit),
          ( "capi",           ITcapiconv,      bit cApiFfiBit),
          ( "prim",           ITprimcallconv,  bit ffiBit),
+         ( "javascript",     ITjavascriptcallconv, bit ffiBit),
 
          ( "rec",            ITrec,           bit arrowsBit .|.
                                               bit recursiveDoBit),
