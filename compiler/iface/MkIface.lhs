@@ -1514,7 +1514,8 @@ tyConToIfaceDecl env tycon
                 ifCons    = ifaceConDecls (algTyConRhs tycon),
                 ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                 ifGadtSyntax = isGadtSyntaxTyCon tycon,
-                ifPromotable = fmap (\_ -> ()) (promotableTyConInfo tycon),
+                ifPromotable = toIfacePromotionInfo
+                             $ fmap (\_ -> ()) (promotableTyConInfo tycon),
                 ifAxiom   = fmap coAxiomName (tyConFamilyCoercion_maybe tycon) }
 
   | isForeignTyCon tycon
@@ -1570,6 +1571,12 @@ tyConToIfaceDecl env tycon
                     ifTyConRoles = tyConRoles ty_con }
         where
           (args,_) = splitFunTys (tyConKind ty_con)
+
+toIfacePromotionInfo :: PromotionInfo () -> IfacePromotionInfo
+toIfacePromotionInfo pi = case pi of
+  NeverPromote  -> IfaceNeverPromote
+  NotPromotable -> IfaceNotPromotable
+  Promotable () -> IfacePromotable
 
 toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
 toIfaceBang _    HsNoBang            = IfNoBang

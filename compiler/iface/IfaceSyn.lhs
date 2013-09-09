@@ -23,6 +23,7 @@ module IfaceSyn (
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..), 
         IfaceBang(..), IfaceAxBranch(..),
+        IfacePromotionInfo(..),
 
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
@@ -37,7 +38,6 @@ module IfaceSyn (
 
 #include "HsVersions.h"
 
-import TyCon( PromotionInfo(..) )
 import IfaceType
 import PprCore()            -- Printing DFunArgs
 import Demand
@@ -91,7 +91,7 @@ data IfaceDecl
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
                 ifRec        :: RecFlag,        -- Recursive or not?
-                ifPromotable :: PromotionInfo (),-- Promotable to kind level?
+                ifPromotable :: IfacePromotionInfo,-- Promotable to kind level?
                 ifGadtSyntax :: Bool,           -- True <=> declared using
                                                 -- GADT syntax
                 ifAxiom      :: Maybe IfExtName -- The axiom, for a newtype, 
@@ -242,17 +242,22 @@ instance Binary IfaceDecl where
                     return (IfaceDataKind occ a2 a3 a4)
             _ -> error ("Binary.get(TyClDecl): Unknown tag " ++ show h)
 
-instance Binary (PromotionInfo ()) where
+data IfacePromotionInfo
+  = IfaceNeverPromote
+  | IfaceNotPromotable
+  | IfacePromotable
+
+instance Binary IfacePromotionInfo where
   put_ bh p = case p of
-    NeverPromote  -> putByte bh 0x0
-    NotPromotable -> putByte bh 0x1
-    Promotable () -> putByte bh 0x2
+    IfaceNeverPromote  -> putByte bh 0x0
+    IfaceNotPromotable -> putByte bh 0x1
+    IfacePromotable    -> putByte bh 0x2
   get bh = do
     tag <- getByte bh
     case tag of
-      0x0 -> return NeverPromote
-      0x1 -> return NotPromotable
-      0x2 -> return (Promotable ())
+      0x0 -> return IfaceNeverPromote
+      0x1 -> return IfaceNotPromotable
+      0x2 -> return IfacePromotable
       _   -> error ("Binary.get(Promotable ()): Unknown tag " ++ show tag)
 
 data IfaceSynTyConRhs
@@ -1105,9 +1110,9 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                , pprAxiom mbAxiom])
   where
     pp_prom = case is_prom of
-      NeverPromote  -> ptext (sLit "Never promotable")
-      NotPromotable -> ptext (sLit "Not promotable")
-      Promotable () -> ptext (sLit "Promotable")
+      IfaceNeverPromote  -> ptext (sLit "Never promotable")
+      IfaceNotPromotable -> ptext (sLit "Not promotable")
+      IfacePromotable    -> ptext (sLit "Promotable")
 
     pp_nd = case condecls of
                 IfAbstractTyCon dis -> ptext (sLit "abstract") <> parens (ppr dis)

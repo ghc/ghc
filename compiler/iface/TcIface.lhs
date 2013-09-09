@@ -473,10 +473,17 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
             ; parent' <- tc_parent tyvars mb_axiom_name
             ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
             ; return (buildAlgTyCon tc_name tyvars roles cType stupid_theta 
-                                    cons is_rec is_prom gadt_syn parent') }
+                                    cons is_rec is_prom' gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
   where
+
+    is_prom' :: PromotionInfo ()
+    is_prom'  = case is_prom of
+      IfaceNeverPromote  -> NeverPromote
+      IfaceNotPromotable -> NotPromotable
+      IfacePromotable    -> Promotable ()
+
     tc_parent :: [TyVar] -> Maybe Name -> IfL TyConParent
     tc_parent _ Nothing = return parent
     tc_parent tyvars (Just ax_name)
