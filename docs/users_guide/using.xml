@@ -2134,7 +2134,11 @@ f "2"    = 2
           </term>
           <listitem>
             <para><emphasis>Off by default.</emphasis>Run demand analysis
-            again, at the end of the simplification pipeline
+            again, at the end of the simplification pipeline.  We found some opportunities
+            for discovering strictness that were not visible earlier; and optimisations like
+            <literal>SpecConstr</literal> can create functions with unused arguments which
+            are eliminated by late demand analysis.  Improvements are modest, but so is the
+            cost.  See notes on the <ulink href="http://ghc.haskell.org/trac/ghc/wiki/LateDmd">Trac wiki page</ulink>.
             </para>
             </listitem>
         </varlistentry>
