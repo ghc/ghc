@@ -1,0 +1,12 @@
+ghc-stage1: panic! (the 'impossible' happened)
+  (GHC version 7.7.20130829 for x86_64-unknown-linux):
+	ASSERT failed!
+    file compiler/coreSyn/MkCore.lhs line 303
+    Sym cobox{v dfK} [lid]
+    ghc-prim:GHC.Prim.Int#{(w) tc 3G}
+    a{tv afq} [tv]
+    ghc-prim:GHC.Prim.#{(w) tc 34j}
+    ghc-prim:GHC.Prim.*{(w) tc 34d}
+
+Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug
+
