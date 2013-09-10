@@ -178,7 +178,7 @@
 
         <listitem>
             <para>
-                GHC now has a parallel compilataion driver. When
+                GHC now has a parallel compilation driver. When
                 compiling with <literal>--make</literal> (which is on
                 by default,) you may also specify
                 <literal>-jN</literal> in order to compile
