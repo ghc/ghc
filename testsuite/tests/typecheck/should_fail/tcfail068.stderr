@@ -39,9 +39,9 @@ tcfail068.hs:19:21:
     Expected type: STArray s1 (Int, Int) a
       Actual type: IndTree s a
     Relevant bindings include
+      arr :: IndTree s a (bound at tcfail068.hs:17:11)
       itiap :: (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:17:1)
-      arr :: IndTree s a (bound at tcfail068.hs:17:11)
     In the first argument of ‛readSTArray’, namely ‛arr’
     In the first argument of ‛(>>=)’, namely ‛readSTArray arr i’
 
@@ -63,14 +63,14 @@ tcfail068.hs:24:35:
     Expected type: GHC.ST.ST s1 (IndTree s a)
       Actual type: GHC.ST.ST s (IndTree s a)
     Relevant bindings include
+      itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a)
+        (bound at tcfail068.hs:26:9)
+      itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a)
+        (bound at tcfail068.hs:29:9)
+      arr :: IndTree s a (bound at tcfail068.hs:24:23)
       itrap :: ((Int, Int), (Int, Int))
                -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:24:1)
-      arr :: IndTree s a (bound at tcfail068.hs:24:23)
-      itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a)
-        (bound at tcfail068.hs:29:9)
-      itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a)
-        (bound at tcfail068.hs:26:9)
     In the first argument of ‛runST’, namely ‛(itrap' i k)’
     In the expression: runST (itrap' i k)
 
@@ -104,6 +104,11 @@ tcfail068.hs:36:46:
     Expected type: GHC.ST.ST s1 (c, IndTree s b)
       Actual type: GHC.ST.ST s (c, IndTree s b)
     Relevant bindings include
+      itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
+        (bound at tcfail068.hs:38:9)
+      itrapstatesnd :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
+        (bound at tcfail068.hs:41:9)
+      arr :: IndTree s b (bound at tcfail068.hs:36:34)
       itrapstate :: ((Int, Int), (Int, Int))
                     -> (a -> b -> (a, b))
                     -> ((Int, Int) -> c -> a)
@@ -112,10 +117,5 @@ tcfail068.hs:36:46:
                     -> IndTree s b
                     -> (c, IndTree s b)
         (bound at tcfail068.hs:36:1)
-      arr :: IndTree s b (bound at tcfail068.hs:36:34)
-      itrapstatesnd :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
-        (bound at tcfail068.hs:41:9)
-      itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
-        (bound at tcfail068.hs:38:9)
     In the first argument of ‛runST’, namely ‛(itrapstate' i k s)’
     In the expression: runST (itrapstate' i k s)

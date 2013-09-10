@@ -5,10 +5,10 @@ T7748a.hs:14:24:
       ‛a’ is a rigid type variable bound by
           the type signature for test :: a -> r -> () at T7748a.hs:11:9
     Relevant bindings include
-      test :: a -> r -> () (bound at T7748a.hs:12:1)
-      zd :: a (bound at T7748a.hs:12:6)
-      f :: r -> () (bound at T7748a.hs:13:8)
       g :: r -> () (bound at T7748a.hs:13:16)
+      f :: r -> () (bound at T7748a.hs:13:8)
+      zd :: a (bound at T7748a.hs:12:6)
+      test :: a -> r -> () (bound at T7748a.hs:12:1)
     In the pattern: Nothing
     In a case alternative: Nothing -> const ()
     In the expression:

@@ -2,11 +2,10 @@
 tcfail122.hs:8:9:
     Kind incompatibility when matching types:
       c0 :: (* -> *) -> *
-      a0 :: * -> *
-    Expected type: a0 b0
+      a :: * -> *
+    Expected type: a b
       Actual type: c0 d0
-    Relevant bindings include
-      foo :: [a0 b0] (bound at tcfail122.hs:7:1)
+    Relevant bindings include foo :: [a b] (bound at tcfail122.hs:7:1)
     In the expression:
         undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d
     In the expression:

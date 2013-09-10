@@ -3,11 +3,11 @@ simpl017.hs:44:12:
     Couldn't match expected type ‛forall v. [E m i] -> E' v m a’
                 with actual type ‛[E m i] -> E' v0 m a’
     Relevant bindings include
+      f :: [E m i] -> E' v0 m a (bound at simpl017.hs:43:9)
+      ix :: [E m i] -> m i (bound at simpl017.hs:41:9)
+      a :: arr i a (bound at simpl017.hs:39:11)
       liftArray :: arr i a -> E m (forall v. [E m i] -> E' v m a)
         (bound at simpl017.hs:39:1)
-      a :: arr i a (bound at simpl017.hs:39:11)
-      ix :: [E m i] -> m i (bound at simpl017.hs:41:9)
-      f :: [E m i] -> E' v0 m a (bound at simpl017.hs:43:9)
     In the first argument of ‛return’, namely ‛f’
     In a stmt of a 'do' block: return f
 
@@ -18,10 +18,10 @@ simpl017.hs:63:5:
     Expected type: [E (ST t0) Int] -> E (ST s) Int
       Actual type: forall v. [E (ST s) Int] -> E' v (ST s) Int
     Relevant bindings include
-      foo :: STArray s Int Int -> ST s Int (bound at simpl017.hs:59:1)
-      ma :: STArray s Int Int (bound at simpl017.hs:59:5)
       a :: forall v. [E (ST s) Int] -> E' v (ST s) Int
         (bound at simpl017.hs:60:5)
+      ma :: STArray s Int Int (bound at simpl017.hs:59:5)
+      foo :: STArray s Int Int -> ST s Int (bound at simpl017.hs:59:1)
     The function ‛a’ is applied to one argument,
     but its type ‛forall v. [E (ST s) Int] -> E' v (ST s) Int’ has none
     In the first argument of ‛plus’, namely ‛a [one]’
@@ -34,10 +34,10 @@ simpl017.hs:63:19:
     Expected type: [E (ST t1) Int] -> E (ST s) Int
       Actual type: forall v. [E (ST s) Int] -> E' v (ST s) Int
     Relevant bindings include
-      foo :: STArray s Int Int -> ST s Int (bound at simpl017.hs:59:1)
-      ma :: STArray s Int Int (bound at simpl017.hs:59:5)
       a :: forall v. [E (ST s) Int] -> E' v (ST s) Int
         (bound at simpl017.hs:60:5)
+      ma :: STArray s Int Int (bound at simpl017.hs:59:5)
+      foo :: STArray s Int Int -> ST s Int (bound at simpl017.hs:59:1)
     The function ‛a’ is applied to one argument,
     but its type ‛forall v. [E (ST s) Int] -> E' v (ST s) Int’ has none
     In the second argument of ‛plus’, namely ‛a [one]’

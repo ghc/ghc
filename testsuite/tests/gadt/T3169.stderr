@@ -10,9 +10,9 @@ T3169.hs:13:22:
     Expected type: Map a (Map b elt)
       Actual type: Map (a, b) elt
     Relevant bindings include
+      m :: Map (a, b) elt (bound at T3169.hs:12:17)
+      b :: b (bound at T3169.hs:12:13)
       lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
         (bound at T3169.hs:12:3)
-      b :: b (bound at T3169.hs:12:13)
-      m :: Map (a, b) elt (bound at T3169.hs:12:17)
     In the second argument of ‛lookup’, namely ‛m’
     In the expression: lookup a m :: Maybe (Map b elt)

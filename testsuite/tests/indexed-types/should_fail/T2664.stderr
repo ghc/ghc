@@ -15,8 +15,8 @@ T2664.hs:31:52:
     Expected type: Dual (Dual a)
       Actual type: b
     Relevant bindings include
-      newPChan :: IO (PChan (a :*: b), PChan c) (bound at T2664.hs:23:5)
       v :: MVar (Either (PChan a) (PChan b)) (bound at T2664.hs:24:9)
+      newPChan :: IO (PChan (a :*: b), PChan c) (bound at T2664.hs:23:5)
     In the third argument of ‛pchoose’, namely ‛newPChan’
     In the first argument of ‛E’, namely ‛(pchoose Right v newPChan)’
     In the expression:

@@ -7,10 +7,10 @@ tcfail201.hs:17:27:
                        -> (forall g. g -> c g) -> a -> c a
           at tcfail201.hs:15:12
     Relevant bindings include
+      hsDoc :: a (bound at tcfail201.hs:16:13)
       gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
                  -> (forall g. g -> c g) -> a -> c a
         (bound at tcfail201.hs:16:1)
-      hsDoc :: a (bound at tcfail201.hs:16:13)
     In the pattern: DocEmpty
     In a case alternative: DocEmpty -> z DocEmpty
     In the expression:

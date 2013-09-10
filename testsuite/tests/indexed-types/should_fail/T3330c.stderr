@@ -16,9 +16,9 @@ T3330c.hs:23:43:
     Expected type: Der ((->) x) (f1 x)
       Actual type: R f1
     Relevant bindings include
-      plug' :: R f -> Der f x -> x -> f x (bound at T3330c.hs:23:1)
-      rf :: R f1 (bound at T3330c.hs:23:13)
-      df :: f1 x (bound at T3330c.hs:23:25)
       x :: x (bound at T3330c.hs:23:29)
+      df :: f1 x (bound at T3330c.hs:23:25)
+      rf :: R f1 (bound at T3330c.hs:23:13)
+      plug' :: R f -> Der f x -> x -> f x (bound at T3330c.hs:23:1)
     In the first argument of ‛plug’, namely ‛rf’
     In the first argument of ‛Inl’, namely ‛(plug rf df x)’

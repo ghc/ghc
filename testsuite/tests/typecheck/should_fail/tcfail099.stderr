@@ -8,8 +8,8 @@ tcfail099.hs:9:20:
       in an equation for ‛call’
       at tcfail099.hs:9:7-9
     Relevant bindings include
-      call :: DS -> t -> Int (bound at tcfail099.hs:9:1)
-      f :: a -> Int (bound at tcfail099.hs:9:9)
       arg :: t (bound at tcfail099.hs:9:12)
+      f :: a -> Int (bound at tcfail099.hs:9:9)
+      call :: DS -> t -> Int (bound at tcfail099.hs:9:1)
     In the first argument of ‛f’, namely ‛arg’
     In the expression: f arg

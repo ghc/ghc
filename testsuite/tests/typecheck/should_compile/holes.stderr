@@ -3,29 +3,21 @@ holes.hs:5:5: Warning:
     Found hole ‛_’ with type: t
     Where: ‛t’ is a rigid type variable bound by
                the inferred type of f :: t at holes.hs:5:1
-    Relevant bindings include
-      z :: forall a. [a] -> [a] (bound at holes.hs:13:1)
-      h :: [Char] (bound at holes.hs:10:1)
-      g :: Int -> Char (bound at holes.hs:8:1)
-      f :: t (bound at holes.hs:5:1)
+    Relevant bindings include f :: t (bound at holes.hs:5:1)
     In the expression: _
     In an equation for ‛f’: f = _
 
 holes.hs:8:7: Warning:
     Found hole ‛_’ with type: Char
     Relevant bindings include
-      z :: forall a. [a] -> [a] (bound at holes.hs:13:1)
-      h :: [Char] (bound at holes.hs:10:1)
-      g :: Int -> Char (bound at holes.hs:8:1)
       x :: Int (bound at holes.hs:8:3)
+      g :: Int -> Char (bound at holes.hs:8:1)
     In the expression: _
     In an equation for ‛g’: g x = _
 
 holes.hs:10:5: Warning:
     Found hole ‛_’ with type: [Char]
-    Relevant bindings include
-      z :: forall a. [a] -> [a] (bound at holes.hs:13:1)
-      h :: [Char] (bound at holes.hs:10:1)
+    Relevant bindings include h :: [Char] (bound at holes.hs:10:1)
     In the first argument of ‛(++)’, namely ‛_’
     In the expression: _ ++ "a"
     In an equation for ‛h’: h = _ ++ "a"
@@ -34,8 +26,8 @@ holes.hs:13:15: Warning:
     Found hole ‛_’ with type: b0
     Where: ‛b0’ is an ambiguous type variable
     Relevant bindings include
-      z :: [a] -> [a] (bound at holes.hs:13:1)
       y :: [a] (bound at holes.hs:13:3)
+      z :: [a] -> [a] (bound at holes.hs:13:1)
     In the second argument of ‛const’, namely ‛_’
     In the expression: const y _
     In an equation for ‛z’: z y = const y _

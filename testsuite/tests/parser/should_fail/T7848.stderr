@@ -3,10 +3,10 @@ T7848.hs:10:9:
     Couldn't match expected type ‛forall a. a’
                 with actual type ‛t -> t1 -> A -> A -> A -> A -> t2’
     Relevant bindings include
-      x :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
-      (+) :: t (bound at T7848.hs:6:3)
-      (&) :: t1 (bound at T7848.hs:6:8)
       z :: t1 (bound at T7848.hs:6:12)
+      (&) :: t1 (bound at T7848.hs:6:8)
+      (+) :: t (bound at T7848.hs:6:3)
+      x :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
     In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
     In an equation for ‛x’:
         x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)

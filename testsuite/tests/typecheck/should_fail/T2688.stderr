@@ -9,8 +9,8 @@ T2688.hs:8:22:
       ‛v’ is a rigid type variable bound by
           the class declaration for ‛VectorSpace’ at T2688.hs:5:19
     Relevant bindings include
-      (^/) :: v -> s -> v (bound at T2688.hs:8:5)
-      v :: v (bound at T2688.hs:8:5)
       s :: s (bound at T2688.hs:8:10)
+      v :: v (bound at T2688.hs:8:5)
+      (^/) :: v -> s -> v (bound at T2688.hs:8:5)
     In the second argument of ‛(/)’, namely ‛s’
     In the second argument of ‛(*^)’, namely ‛(1 / s)’

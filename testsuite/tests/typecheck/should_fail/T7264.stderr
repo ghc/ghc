@@ -6,7 +6,7 @@ T7264.hs:13:19:
     Expected type: a -> Foo
       Actual type: (forall r. r -> String) -> Foo
     Relevant bindings include
-      mkFoo2 :: a -> Maybe Foo (bound at T7264.hs:13:1)
       val :: a (bound at T7264.hs:13:8)
+      mkFoo2 :: a -> Maybe Foo (bound at T7264.hs:13:1)
     In the first argument of ‛mmap’, namely ‛Foo’
     In the expression: mmap Foo (Just val)

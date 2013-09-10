@@ -21,8 +21,8 @@ T7869.hs:3:12:
     Expected type: [a1] -> b1
       Actual type: [a] -> b
     Relevant bindings include
-      f :: [a] -> b (bound at T7869.hs:3:1)
       x :: [a1] (bound at T7869.hs:3:7)
+      f :: [a] -> b (bound at T7869.hs:3:1)
     In the expression: f x
     In the expression: (\ x -> f x) :: [a] -> b
     In an equation for ‛f’: f = (\ x -> f x) :: [a] -> b

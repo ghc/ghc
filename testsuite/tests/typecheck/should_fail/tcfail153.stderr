@@ -6,8 +6,8 @@ tcfail153.hs:6:7:
     Expected type: [a]
       Actual type: [Bool]
     Relevant bindings include
-      f :: a -> [a] (bound at tcfail153.hs:6:1)
       x :: a (bound at tcfail153.hs:6:3)
+      f :: a -> [a] (bound at tcfail153.hs:6:1)
     In the expression: g x
     In an equation for ‛f’:
         f x

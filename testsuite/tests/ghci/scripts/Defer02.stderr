@@ -46,17 +46,17 @@
           the type signature for h :: a -> (Char, Char)
           at ../../typecheck/should_run/Defer01.hs:33:6
     Relevant bindings include
+      x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
       h :: a -> (Char, Char)
         (bound at ../../typecheck/should_run/Defer01.hs:34:1)
-      x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
     In the expression: x
     In the expression: (x, 'c')
 
 ../../typecheck/should_run/Defer01.hs:39:17: Warning:
     Couldn't match expected type ‛Bool’ with actual type ‛T a’
     Relevant bindings include
-      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
       a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
+      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
     In the first argument of ‛not’, namely ‛(K a)’
     In the expression: (not (K a))
 
@@ -151,17 +151,17 @@
           the type signature for h :: a -> (Char, Char)
           at ../../typecheck/should_run/Defer01.hs:33:6
     Relevant bindings include
+      x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
       h :: a -> (Char, Char)
         (bound at ../../typecheck/should_run/Defer01.hs:34:1)
-      x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
     In the expression: x
     In the expression: (x, 'c')
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:39:17:
     Couldn't match expected type ‛Bool’ with actual type ‛T a’
     Relevant bindings include
-      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
       a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
+      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
     In the first argument of ‛not’, namely ‛(K a)’
     In the expression: (not (K a))
 (deferred type error)

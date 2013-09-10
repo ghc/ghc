@@ -1,2 +1,2 @@
 exists Nothing
-  :: Floop * (KProxy (Maybe *)) a kp => Existential (Maybe *) kp
+  :: Floop * (KProxy (Maybe *)) a mp => Existential (Maybe *) mp

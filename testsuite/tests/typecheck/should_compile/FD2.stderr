@@ -21,10 +21,10 @@ FD2.hs:26:34:
              mf :: Elem a e1 => e1 -> Maybe e1 -> Maybe e1
            at FD2.hs:24:18
     Relevant bindings include
-      foldr1 :: (e -> e -> e) -> a -> e (bound at FD2.hs:22:3)
-      f :: e -> e -> e (bound at FD2.hs:22:10)
-      mf :: e1 -> Maybe e1 -> Maybe e1 (bound at FD2.hs:25:12)
-      x :: e1 (bound at FD2.hs:26:15)
       y :: e1 (bound at FD2.hs:26:23)
+      x :: e1 (bound at FD2.hs:26:15)
+      mf :: e1 -> Maybe e1 -> Maybe e1 (bound at FD2.hs:25:12)
+      f :: e -> e -> e (bound at FD2.hs:22:10)
+      foldr1 :: (e -> e -> e) -> a -> e (bound at FD2.hs:22:3)
     In the first argument of ‛Just’, namely ‛(f x y)’
     In the expression: Just (f x y)

@@ -11,8 +11,8 @@ T4272.hs:15:26:
     Expected type: TermFamily a (TermFamily a a)
       Actual type: TermFamily a a
     Relevant bindings include
-      laws :: TermFamily a a -> b (bound at T4272.hs:15:1)
       t :: TermFamily a a (bound at T4272.hs:15:6)
+      laws :: TermFamily a a -> b (bound at T4272.hs:15:1)
     In the first argument of ‛terms’, namely
       ‛(undefined :: TermFamily a a)’
     In the second argument of ‛prune’, namely

@@ -15,8 +15,8 @@ T3440.hs:11:22:
           the type signature for unwrap :: GADT (Fam a) -> (a, Fam a)
           at T3440.hs:10:11
     Relevant bindings include
-      unwrap :: GADT (Fam a) -> (a, Fam a) (bound at T3440.hs:11:1)
-      x :: a1 (bound at T3440.hs:11:14)
       y :: Fam a1 (bound at T3440.hs:11:16)
+      x :: a1 (bound at T3440.hs:11:14)
+      unwrap :: GADT (Fam a) -> (a, Fam a) (bound at T3440.hs:11:1)
     In the expression: x
     In the expression: (x, y)

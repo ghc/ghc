@@ -2,7 +2,7 @@
 tcfail014.hs:5:33:
     Occurs check: cannot construct the infinite type: t8 ~ t8 -> t7
     Relevant bindings include
-      h :: (t8 -> t7) -> t7 (bound at tcfail014.hs:5:25)
       z :: t8 -> t7 (bound at tcfail014.hs:5:27)
+      h :: (t8 -> t7) -> t7 (bound at tcfail014.hs:5:25)
     In the first argument of ‛z’, namely ‛z’
     In the expression: z z

@@ -3,7 +3,7 @@ tcfail004.hs:3:9:
     Couldn't match expected type ‛(t, t3)’
                 with actual type ‛(t0, t1, t2)’
     Relevant bindings include
-      g :: t3 (bound at tcfail004.hs:3:4)
       f :: t (bound at tcfail004.hs:3:2)
+      g :: t3 (bound at tcfail004.hs:3:4)
     In the expression: (1, 2, 3)
     In a pattern binding: (f, g) = (1, 2, 3)

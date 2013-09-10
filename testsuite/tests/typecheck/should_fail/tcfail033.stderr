@@ -2,8 +2,8 @@
 tcfail033.hs:4:12:
     Occurs check: cannot construct the infinite type: t ~ (t, t1)
     Relevant bindings include
-      buglet :: [(t, t1)] (bound at tcfail033.hs:4:1)
-      x :: t (bound at tcfail033.hs:4:17)
       y :: t1 (bound at tcfail033.hs:4:19)
+      x :: t (bound at tcfail033.hs:4:17)
+      buglet :: [(t, t1)] (bound at tcfail033.hs:4:1)
     In the expression: x
     In the expression: [x | (x, y) <- buglet]

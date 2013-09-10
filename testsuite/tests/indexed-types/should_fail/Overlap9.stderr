@@ -5,7 +5,7 @@ Overlap9.hs:10:7:
       bound by the type signature for g :: Show a => a -> F a
       at Overlap9.hs:9:6-23
     Relevant bindings include
-      g :: a -> F a (bound at Overlap9.hs:10:1)
       x :: a (bound at Overlap9.hs:10:3)
+      g :: a -> F a (bound at Overlap9.hs:10:1)
     In the expression: length (show x)
     In an equation for ‛g’: g x = length (show x)

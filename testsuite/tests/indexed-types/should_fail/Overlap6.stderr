@@ -8,8 +8,8 @@ Overlap6.hs:15:7:
     Expected type: Proxy Bool (And x 'True)
       Actual type: Proxy Bool x
     Relevant bindings include
+      x :: Proxy Bool x (bound at Overlap6.hs:15:3)
       g :: Proxy Bool x -> Proxy Bool (And x 'True)
         (bound at Overlap6.hs:15:1)
-      x :: Proxy Bool x (bound at Overlap6.hs:15:3)
     In the expression: x
     In an equation for ‛g’: g x = x

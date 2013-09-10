@@ -9,9 +9,9 @@ tcfail179.hs:14:39:
       ‛s’ is a rigid type variable bound by
           the type signature for run :: T s -> Int at tcfail179.hs:12:8
     Relevant bindings include
-      run :: T s -> Int (bound at tcfail179.hs:13:1)
-      ts :: T s (bound at tcfail179.hs:13:5)
-      g :: s -> (x -> s) -> (x, s, Int) (bound at tcfail179.hs:14:16)
       x :: x (bound at tcfail179.hs:14:26)
+      g :: s -> (x -> s) -> (x, s, Int) (bound at tcfail179.hs:14:16)
+      ts :: T s (bound at tcfail179.hs:13:5)
+      run :: T s -> Int (bound at tcfail179.hs:13:1)
     In the first argument of ‛g’, namely ‛x’
     In the expression: g x id

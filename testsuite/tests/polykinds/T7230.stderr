@@ -21,8 +21,8 @@ T7230.hs:48:32:
     Expected type: SBool (Increasing xs)
       Actual type: SBool (x :<<= x1)
     Relevant bindings include
-      x :: Sing Nat x (bound at T7230.hs:48:14)
       y :: Sing Nat x1 (bound at T7230.hs:48:23)
+      x :: Sing Nat x (bound at T7230.hs:48:14)
     In the expression: x %:<<= y
     In an equation for ‛crash’:
         crash (SCons x (SCons y xs)) = x %:<<= y

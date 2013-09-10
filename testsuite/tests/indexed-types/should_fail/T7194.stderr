@@ -6,8 +6,8 @@ T7194.hs:18:35:
       the type signature for g :: C (F a) => a -> Int
       at T7194.hs:17:23-41
     Relevant bindings include
-      x :: b0 (bound at T7194.hs:17:9)
-      g :: a -> Int (bound at T7194.hs:18:18)
       y :: a (bound at T7194.hs:18:20)
+      g :: a -> Int (bound at T7194.hs:18:18)
+      x :: b0 (bound at T7194.hs:17:9)
     In the expression: foo y
     In the first argument of ‛length’, namely ‛[x, foo y]’

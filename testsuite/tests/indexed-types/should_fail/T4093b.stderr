@@ -17,14 +17,14 @@ T4093b.hs:31:13:
     Expected type: EitherCO e (A C O n) (A O O n)
       Actual type: (MaybeC C (n C O), MaybeC O (n O C))
     Relevant bindings include
-      blockToNodeList :: Block n e x -> A e x n (bound at T4093b.hs:25:1)
-      b :: Block n e x (bound at T4093b.hs:25:17)
-      l :: n O C
-           -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C C n) (A O C n)
-        (bound at T4093b.hs:34:5)
       f :: n C O
            -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C O n) (A O O n)
         (bound at T4093b.hs:31:5)
+      l :: n O C
+           -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C C n) (A O C n)
+        (bound at T4093b.hs:34:5)
+      b :: Block n e x (bound at T4093b.hs:25:17)
+      blockToNodeList :: Block n e x -> A e x n (bound at T4093b.hs:25:1)
     In the expression: (JustC n, NothingC)
     In an equation for ‛f’: f n _ = (JustC n, NothingC)
     In an equation for ‛blockToNodeList’:

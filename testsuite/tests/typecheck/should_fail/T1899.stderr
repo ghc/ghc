@@ -5,7 +5,7 @@ T1899.hs:12:29:
           the type signature for transRHS :: [a] -> Int -> Constraint a
           at T1899.hs:9:14
     Relevant bindings include
-      transRHS :: [a] -> Int -> Constraint a (bound at T1899.hs:10:2)
       varSet :: [a] (bound at T1899.hs:10:11)
+      transRHS :: [a] -> Int -> Constraint a (bound at T1899.hs:10:2)
     In the first argument of ‛Prop’, namely ‛(Auxiliary undefined)’
     In the expression: Prop (Auxiliary undefined)

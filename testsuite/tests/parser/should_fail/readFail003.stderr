@@ -3,9 +3,9 @@ readFail003.hs:4:27:
     Occurs check: cannot construct the infinite type:
       t ~ (t, [a], [a1])
     Relevant bindings include
-      c :: [a1] (bound at readFail003.hs:4:7)
-      b :: [a] (bound at readFail003.hs:4:5)
       a :: t (bound at readFail003.hs:4:3)
+      b :: [a] (bound at readFail003.hs:4:5)
+      c :: [a1] (bound at readFail003.hs:4:7)
     In the expression: a
     In a pattern binding:
       ~(a, b, c)
@@ -19,9 +19,9 @@ readFail003.hs:5:27:
     Occurs check: cannot construct the infinite type:
       t ~ (t, [a], [a1])
     Relevant bindings include
-      c :: [a1] (bound at readFail003.hs:4:7)
-      b :: [a] (bound at readFail003.hs:4:5)
       a :: t (bound at readFail003.hs:4:3)
+      b :: [a] (bound at readFail003.hs:4:5)
+      c :: [a1] (bound at readFail003.hs:4:7)
     In the expression: a
     In a pattern binding:
       ~(a, b, c)
@@ -35,9 +35,9 @@ readFail003.hs:6:27:
     Occurs check: cannot construct the infinite type:
       t ~ (t, [a], [a1])
     Relevant bindings include
-      c :: [a1] (bound at readFail003.hs:4:7)
-      b :: [a] (bound at readFail003.hs:4:5)
       a :: t (bound at readFail003.hs:4:3)
+      b :: [a] (bound at readFail003.hs:4:5)
+      c :: [a1] (bound at readFail003.hs:4:7)
     In the expression: a
     In a pattern binding:
       ~(a, b, c)

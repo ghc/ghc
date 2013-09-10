@@ -5,14 +5,14 @@ T5439.hs:83:28:
     Expected type: f (Attempt (HNth n0 l0) -> Attempt (HElemOf l0))
       Actual type: f (Attempt (WaitOpResult (WaitOps rs)))
     Relevant bindings include
+      register :: Bool -> Peano n -> WaitOps (HDrop n rs) -> IO Bool
+        (bound at T5439.hs:65:9)
+      ev :: f (Attempt (WaitOpResult (WaitOps rs)))
+        (bound at T5439.hs:62:22)
+      ops :: WaitOps rs (bound at T5439.hs:62:18)
       registerWaitOp :: WaitOps rs
                         -> f (Attempt (WaitOpResult (WaitOps rs))) -> IO Bool
         (bound at T5439.hs:62:3)
-      ops :: WaitOps rs (bound at T5439.hs:62:18)
-      ev :: f (Attempt (WaitOpResult (WaitOps rs)))
-        (bound at T5439.hs:62:22)
-      register :: Bool -> Peano n -> WaitOps (HDrop n rs) -> IO Bool
-        (bound at T5439.hs:65:9)
     In the first argument of ‛complete’, namely ‛ev’
     In the expression: complete ev
 

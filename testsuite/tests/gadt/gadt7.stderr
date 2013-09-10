@@ -12,8 +12,8 @@ gadt7.hs:16:38:
       ‛t’ is a rigid type variable bound by
           the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
     Relevant bindings include
-      i1b :: T t2 -> t1 -> t (bound at gadt7.hs:16:1)
-      y :: t1 (bound at gadt7.hs:16:7)
       y1 :: t1 (bound at gadt7.hs:16:16)
+      y :: t1 (bound at gadt7.hs:16:7)
+      i1b :: T t2 -> t1 -> t (bound at gadt7.hs:16:1)
     In the expression: y1
     In a case alternative: K -> y1

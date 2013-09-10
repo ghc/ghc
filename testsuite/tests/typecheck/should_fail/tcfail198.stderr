@@ -6,8 +6,8 @@ tcfail198.hs:6:36:
       an expression type signature: a1
       at tcfail198.hs:6:36-41
     Relevant bindings include
-      f3 :: [a] -> [a] (bound at tcfail198.hs:6:6)
-      x :: a (bound at tcfail198.hs:6:19)
       xs :: [a] (bound at tcfail198.hs:6:21)
+      x :: a (bound at tcfail198.hs:6:19)
+      f3 :: [a] -> [a] (bound at tcfail198.hs:6:6)
     In the expression: x :: a
     In the second argument of ‛(++)’, namely ‛[x :: a]’

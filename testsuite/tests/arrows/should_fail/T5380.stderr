@@ -6,9 +6,9 @@ T5380.hs:7:27:
                    testB :: not_bool -> (() -> ()) -> () -> not_unit
                  at T5380.hs:6:10
     Relevant bindings include
+      b :: not_bool (bound at T5380.hs:7:7)
       testB :: not_bool -> (() -> ()) -> () -> not_unit
         (bound at T5380.hs:7:1)
-      b :: not_bool (bound at T5380.hs:7:7)
     In the expression: b
     In the expression: proc () -> if b then f -< () else f -< ()
 

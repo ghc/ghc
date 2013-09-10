@@ -4,9 +4,9 @@ tcfail016.hs:9:20:
     Expected type: Expr t
       Actual type: AnnExpr t
     Relevant bindings include
-      g :: Expr t -> [[Char]] (bound at tcfail016.hs:8:1)
-      e1 :: AnnExpr t (bound at tcfail016.hs:9:8)
       e2 :: AnnExpr t (bound at tcfail016.hs:9:11)
+      e1 :: AnnExpr t (bound at tcfail016.hs:9:8)
+      g :: Expr t -> [[Char]] (bound at tcfail016.hs:8:1)
     In the first argument of ‛g’, namely ‛e1’
     In the first argument of ‛(++)’, namely ‛(g e1)’
 
@@ -15,8 +15,8 @@ tcfail016.hs:9:28:
     Expected type: Expr t
       Actual type: AnnExpr t
     Relevant bindings include
-      g :: Expr t -> [[Char]] (bound at tcfail016.hs:8:1)
-      e1 :: AnnExpr t (bound at tcfail016.hs:9:8)
       e2 :: AnnExpr t (bound at tcfail016.hs:9:11)
+      e1 :: AnnExpr t (bound at tcfail016.hs:9:8)
+      g :: Expr t -> [[Char]] (bound at tcfail016.hs:8:1)
     In the first argument of ‛g’, namely ‛e2’
     In the second argument of ‛(++)’, namely ‛(g e2)’
