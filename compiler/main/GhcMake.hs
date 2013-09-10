@@ -1,4 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+-- NB: we specifically ignore deprecations. GHC 7.6 marks the .QSem module as
+-- deprecated, although it became un-deprecated later. As a result, using 7.6
+-- as your bootstrap compiler throws annoying warnings.
 
 -- -----------------------------------------------------------------------------
 --
