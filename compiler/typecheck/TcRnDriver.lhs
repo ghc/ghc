@@ -16,7 +16,7 @@ module TcRnDriver (
 #endif
         tcRnLookupName,
         tcRnGetInfo,
-        tcRnModule,
+        tcRnModule, tcRnModuleTcRnM,
         tcTopSrcDecls,
         tcRnExtCore
     ) where
@@ -118,19 +118,12 @@ tcRnModule :: HscEnv
            -> IO (Messages, Maybe TcGblEnv)
 
 tcRnModule hsc_env hsc_src save_rn_syntax
-   HsParsedModule {
-      hpm_module =
-         (L loc (HsModule maybe_mod export_ies
-                          import_decls local_decls mod_deprec
-                          maybe_doc_hdr)),
-      hpm_src_files =
-         src_files
-   }
+   parsedModule@HsParsedModule {hpm_module=L loc this_module}
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
-         (this_mod, prel_imp_loc)
-            = case maybe_mod of
+         pair@(this_mod,_)
+            = case hsmodName this_module of
                 Nothing -- 'module M where' is omitted
                     ->  (mAIN, srcLocSpan (srcSpanStart loc))
 
@@ -138,6 +131,23 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                     -> (mkModule this_pkg mod, mod_loc) } ;
 
    initTc hsc_env hsc_src save_rn_syntax this_mod $
+     tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
+
+tcRnModuleTcRnM :: HscEnv
+                -> HscSource
+                -> HsParsedModule
+                -> (Module, SrcSpan)
+                -> TcRn TcGblEnv
+tcRnModuleTcRnM hsc_env hsc_src
+   (HsParsedModule {
+      hpm_module =
+         (L loc (HsModule maybe_mod export_ies
+                          import_decls local_decls mod_deprec
+                          maybe_doc_hdr)),
+      hpm_src_files =
+         src_files
+   })
+   (this_mod, prel_imp_loc) =
    setSrcSpan loc $
    do {         -- Deal with imports; first add implicit prelude
         implicit_prelude <- xoptM Opt_ImplicitPrelude;
@@ -210,7 +220,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                 -- Dump output and return
         tcDump tcg_env ;
         return tcg_env
-    }}}}
+    }}}
 
 
 implicitPreludeWarn :: SDoc
