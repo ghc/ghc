@@ -377,14 +377,14 @@ getScopedTyVarBinds
 
 
 \begin{code}
-tcExtendLetEnv :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
-tcExtendLetEnv closed ids thing_inside 
+tcExtendLetEnv :: TopLevelFlag -> TopLevelFlag -> [TcId] -> TcM a -> TcM a
+tcExtendLetEnv top_lvl closed ids thing_inside 
   = do  { stage <- getStage
         ; tc_extend_local_env [ (idName id, ATcId { tct_id = id 
                                                   , tct_closed = closed
                                                   , tct_level = thLevel stage })
                               | id <- ids] $
-          tcExtendIdBndrs [TcIdBndr id closed | id <- ids] thing_inside }
+          tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] thing_inside }
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 tcExtendIdEnv ids thing_inside 

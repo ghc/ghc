@@ -776,7 +776,7 @@ tcInstDecls2 tycl_decls inst_decls
         ; let dm_ids = collectHsBindsBinders dm_binds
               -- Add the default method Ids (again)
               -- See Note [Default methods and instances]
-        ; inst_binds_s <- tcExtendLetEnv TopLevel dm_ids $
+        ; inst_binds_s <- tcExtendLetEnv TopLevel TopLevel dm_ids $
                           mapM tcInstDecl2 inst_decls
 
           -- Done

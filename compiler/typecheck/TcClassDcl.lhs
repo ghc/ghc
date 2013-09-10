@@ -247,7 +247,7 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
 			     -- NB: the binding is always a FunBind
 	; (ev_binds, (tc_bind, _, _)) 
                <- checkConstraints skol_info tyvars dfun_ev_vars $
-	          tcPolyCheck NotTopLevel NonRecursive no_prag_fn local_meth_sig [lm_bind]
+	          tcPolyCheck NonRecursive no_prag_fn local_meth_sig [lm_bind]
 
         ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
                            , abe_mono = local_meth_id, abe_prags = specs }

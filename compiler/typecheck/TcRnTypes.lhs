@@ -460,7 +460,13 @@ data TcLclEnv           -- Changes as we move inside an expression
     }
 
 type TcTypeEnv = NameEnv TcTyThing
-data TcIdBinder = TcIdBndr TcId TopLevelFlag
+
+data TcIdBinder 
+  = TcIdBndr 
+       TcId 
+       TopLevelFlag    -- Tells whether the bindind is syntactically top-level
+                       -- (The monomorphic Ids for a recursive group count
+                       --  as not-top-level for this purpose.)
 
 {- Note [Given Insts]
    ~~~~~~~~~~~~~~~~~~

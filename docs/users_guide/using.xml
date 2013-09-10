@@ -2179,7 +2179,9 @@ f "2"    = 2
             <para>The type checker sometimes displays a fragment of the type environment
                   in error messages, but only up to some maximum number, set by this flag.
                   The default is 6.  Turning it off with <option>-fno-max-relevant-bindings</option> 
-                   gives an unlimited number. 
+                   gives an unlimited number. Syntactically top-level bindings are also 
+                   usually excluded (since they may be numerous), but 
+                   <option>-fno-max-relevant-bindings</option> includes them too.
             </para>
           </listitem>
         </varlistentry>

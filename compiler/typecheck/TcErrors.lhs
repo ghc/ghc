@@ -1171,6 +1171,9 @@ getSkolemInfo (implic:implics) tv
 -- types mention any of the offending type variables.  It has to be
 -- careful to zonk the Id's type first, so it has to be in the monad.
 -- We must be careful to pass it a zonked type variable, too.
+--
+-- We always remove closed top-level bindings, though, 
+-- since they are never relevant (cf Trac #8233)
 
 relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
                           -- See Trac #8191
@@ -1181,8 +1184,9 @@ relevantBindings want_filtering ctxt ct
        ; (tidy_env', docs, discards) 
               <- go (cec_tidy ctxt) (maxRelevantBinds dflags) 
                     emptyVarSet [] False
-                    (reverse (tcl_bndrs lcl_env))
-         -- The 'reverse' makes us work from outside in
+                    (tcl_bndrs lcl_env)
+         -- tcl_bndrs has the innermost bindings first, 
+         -- which are probably the most relevant ones
 
        ; traceTc "relevantBindings" (ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
        ; let doc = hang (ptext (sLit "Relevant bindings include")) 
@@ -1206,13 +1210,14 @@ relevantBindings want_filtering ctxt ct
     dec_max :: Maybe Int -> Maybe Int
     dec_max = fmap (\n -> n - 1)
 
-    go :: TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc] -> Bool
+    go :: TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc] 
+       -> Bool                          -- True <=> some filtered out due to lack of fuel
        -> [TcIdBinder] 
        -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
     go tidy_env _ _ docs discards []
        = return (tidy_env, reverse docs, discards)
-    go tidy_env n_left tvs_seen docs discards (TcIdBndr id _ : tc_bndrs)
+    go tidy_env n_left tvs_seen docs discards (TcIdBndr id top_lvl : tc_bndrs)
        = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
             ; let id_tvs = tyVarsOfType tidy_ty
                   doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
@@ -1222,6 +1227,12 @@ relevantBindings want_filtering ctxt ct
 
             ; if (want_filtering && id_tvs `disjointVarSet` ct_tvs)
                        -- We want to filter out this binding anyway
+                       -- so discard it silently
+              then go tidy_env n_left tvs_seen docs discards tc_bndrs
+
+              else if isTopLevel top_lvl && not (isNothing n_left)
+                       -- It's a top-level binding and we have not specified
+                       -- -fno-max-relevant-bindings, so discard it silently
               then go tidy_env n_left tvs_seen docs discards tc_bndrs
 
               else if run_out n_left && id_tvs `subVarSet` tvs_seen
