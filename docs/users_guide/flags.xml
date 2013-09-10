@@ -1351,7 +1351,7 @@
 
           <row>
             <entry><option>-fwarn-lazy-unlifted-bindings</option></entry>
-            <entry>warn when a pattern binding looks lazy but must be strict</entry>
+            <entry><emphasis>(deprecated)</emphasis> warn when a pattern binding looks lazy but must be strict</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-lazy-unlifted-bindings</option></entry>
           </row>

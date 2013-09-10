@@ -1345,11 +1345,11 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
         ; checkTc (isSingleton orig_binds)
                   (strictBindErr "Multiple" unlifted orig_binds)
 
-        -- This should be a checkTc, not a warnTc, but as of GHC 6.11
-        -- the versions of alex and happy available have non-conforming
-        -- templates, so the GHC build fails if it's an error:
-        ; warnUnlifted <- woptM Opt_WarnLazyUnliftedBindings
-        ; warnTc (warnUnlifted && not bang_pat && lifted_pat)
+        -- Ensure that unlifted bindings which look lazy, like:
+        --   f x = let I# y = x
+        -- cause an error.
+        ; when lifted_pat $
+            checkTc bang_pat
                  -- No outer bang, but it's a compound pattern
                  -- E.g   (I# x#) = blah
                  -- Warn about this, but not about

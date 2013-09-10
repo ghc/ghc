@@ -976,7 +976,6 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-empty-enumerations</option>,
     <option>-fwarn-missing-fields</option>,
     <option>-fwarn-missing-methods</option>,
-    <option>-fwarn-lazy-unlifted-bindings</option>,
     <option>-fwarn-wrong-do-bind</option>,
     <option>-fwarn-unsupported-calling-conventions</option>,
     <option>-fwarn-dodgy-foreign-imports</option>,
@@ -1266,12 +1265,7 @@ foreign import "&amp;f" f :: FunPtr t
         <listitem>
           <indexterm><primary><option>-fwarn-lazy-unlifted-bindings</option></primary>
           </indexterm>
-          <para>Causes a warning to be emitted when an unlifted type
-      is bound in a way that looks lazy, e.g.
-      <literal>where (I# x) = ...</literal>. Use
-      <literal>where !(I# x) = ...</literal> instead. This will be an
-      error, rather than a warning, in GHC 7.2.
-      </para>
+          <para>This flag is a no-op, and will be removed in GHC 7.10.</para>
         </listitem>
       </varlistentry>
 
