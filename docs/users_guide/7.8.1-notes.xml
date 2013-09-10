@@ -175,6 +175,22 @@
                 declared in the module.
            </para>
        </listitem>
+
+        <listitem>
+            <para>
+                GHC now has a parallel compilataion driver. When
+                compiling with <literal>--make</literal> (which is on
+                by default,) you may also specify
+                <literal>-jN</literal> in order to compile
+                <replaceable>N</replaceable> modules in parallel.
+           </para>
+
+            <para>
+                Note that if you wish for GHC to use multiple cores,
+                you will need to use the <literal>+RTS -N</literal>
+                flag.
+           </para>
+       </listitem>
    </itemizedlist>
   </sect2>
 

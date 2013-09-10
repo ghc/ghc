@@ -596,6 +596,11 @@ ghc Main.hs
           invoked, so the dependencies never get out of sync with the
           source.</para>
         </listitem>
+        <listitem>
+          <para>Using the <literal>-j</literal> flag, you can compile
+          modules in parallel. Specify <literal>-jN</literal> to
+          compile <replaceable>N</replaceable> jobs in parallel.</para>
+        </listitem>
       </itemizedlist>
 
       <para>Any of the command-line options described in the rest of

@@ -2984,6 +2984,12 @@
         </thead>
         <tbody>
           <row>
+            <entry><option>-j <replaceable>N</replaceable></option></entry>
+            <entry>When compiling with <literal>--make</literal>, compile <replaceable>N</replaceable></entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-fno-hi-version-check</option></entry>
             <entry>Don't complain about <literal>.hi</literal> file mismatches</entry>
             <entry>static</entry>
