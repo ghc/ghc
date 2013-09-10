@@ -247,8 +247,8 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
               -- constraint.
 
        ; ev_binds_var <- newTcEvBinds
-       ; wanted_transformed <- solveWantedsTcMWithEvBinds ev_binds_var wanteds $
-                               solve_wanteds_and_drop
+       ; wanted_transformed_incl_derivs 
+               <- solveWantedsTcMWithEvBinds ev_binds_var wanteds solve_wanteds
                                -- Post: wanted_transformed are zonked
 
               -- Step 4) Candidates for quantification are an approximation of wanted_transformed
@@ -263,9 +263,11 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
        ; tc_lcl_env <- TcRnMonad.getLclEnv
        ; let untch = tcl_untch tc_lcl_env
+             wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
        ; quant_pred_candidates   -- Fully zonked
-           <- if insolubleWC wanted_transformed 
+           <- if insolubleWC wanted_transformed_incl_derivs
               then return []   -- See Note [Quantification with errors]
+                               -- NB: must include derived errors
               else do { gbl_tvs <- tcGetGlobalTyVars
                       ; let quant_cand = approximateWC wanted_transformed
                             meta_tvs   = filter isMetaTyVar (varSetElems (tyVarsOfCts quant_cand)) 
@@ -391,7 +393,11 @@ over, and instead make the function fully-polymorphic in whatever
 type we have found.  For two reasons
   a) Minimise downstream errors
   b) Avoid spurious errors from this function
-   
+
+But NB that we must include *derived* errors in the check. Example:   
+    (a::*) ~ Int#
+We get an insoluble derived error *~#, and we don't want to discard
+it before doing the isInsolubleWC test!  (Trac #8262)
 
 Note [Default while Inferring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -607,7 +613,7 @@ solveWantedsTcM wanted
 
 solve_wanteds_and_drop :: WantedConstraints -> TcS (WantedConstraints)
 -- Since solve_wanteds returns the residual WantedConstraints,
--- it should alway be called within a runTcS or something similar,
+-- it should always be called within a runTcS or something similar,
 solve_wanteds_and_drop wanted = do { wc <- solve_wanteds wanted 
                                    ; return (dropDerivedWC wc) }
 
