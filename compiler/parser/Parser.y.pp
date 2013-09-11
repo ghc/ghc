@@ -41,6 +41,7 @@ import BasicTypes
 import DynFlags
 import OrdList
 import HaddockUtils
+import BooleanFormula   ( BooleanFormula, mkAnd, mkOr, mkTrue, mkVar )
 
 import FastString
 import Maybes           ( orElse )
@@ -266,6 +267,7 @@ incorrect.
  '{-# VECTORISE'          { L _ ITvect_prag }
  '{-# VECTORISE_SCALAR'   { L _ ITvect_scalar_prag }
  '{-# NOVECTORISE'        { L _ ITnovect_prag }
+ '{-# MINIMAL'            { L _ ITminimal_prag }
  '{-# CTYPE'              { L _ ITctype }
  '#-}'                                          { L _ ITclose_prag }
 
@@ -1409,6 +1411,9 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                             | t <- $5] }
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 { LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
+        -- A minimal complete definition
+        | '{-# MINIMAL' name_boolformula_opt '#-}'
+                { LL $ unitOL (LL $ SigD (MinimalSig $2)) }
 
 activation :: { Maybe Activation }
         : {- empty -}                           { Nothing }
@@ -1848,6 +1853,22 @@ ipvar   :: { Located HsIPName }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
+
+name_boolformula_opt :: { BooleanFormula (Located RdrName) }
+        : name_boolformula          { $1 }
+        | {- empty -}               { mkTrue }
+
+name_boolformula :: { BooleanFormula (Located RdrName) }
+        : name_boolformula_and                      { $1 }
+        | name_boolformula_and '|' name_boolformula { mkOr [$1,$3] }
+
+name_boolformula_and :: { BooleanFormula (Located RdrName) }
+        : name_boolformula_atom                             { $1 }
+        | name_boolformula_atom ',' name_boolformula_and    { mkAnd [$1,$3] }
+
+name_boolformula_atom :: { BooleanFormula (Located RdrName) }
+        : '(' name_boolformula ')'  { $2 }
+        | name_var                  { mkVar $1 }
 
 namelist :: { Located [RdrName] }
 namelist : name_var              { L1 [unLoc $1] }

@@ -397,6 +397,7 @@ Library
         Unify
         Bag
         Binary
+        BooleanFormula
         BufWrite
         Digraph
         Encoding

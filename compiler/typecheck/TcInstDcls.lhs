@@ -66,9 +66,10 @@ import NameSet
 import Outputable
 import SrcLoc
 import Util
+import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
-import Maybes     ( orElse, isNothing )
+import Maybes     ( orElse, isNothing, isJust, whenIsJust )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -1175,6 +1176,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   op_items (VanillaInst binds sigs standalone_deriv)
   = do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; let hs_sig_fn = mkHsSigFun sigs
+       ; checkMinimalDefinition
        ; mapAndUnzipM (tc_item hs_sig_fn) op_items }
   where
     ----------------------
@@ -1215,7 +1217,6 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     tc_default sig_fn sel_id NoDefMeth     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
-           ; warnMissingMethodOrAT "method" (idName sel_id)
            ; (meth_id, _) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
                                        inst_tys sel_id
            ; dflags <- getDynFlags
@@ -1299,6 +1300,15 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     add_meth_ctxt sel_id generated_code rn_bind thing
       | generated_code = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys rn_bind) thing
       | otherwise      = thing
+
+    ----------------------
+
+    -- check if one of the minimal complete definitions is satisfied
+    checkMinimalDefinition
+      = whenIsJust (isUnsatisfied methodExists (classMinimalDef clas)) $
+          warnUnsatisifiedMinimalDefinition
+      where
+      methodExists meth = isJust (findMethodBind meth binds)
 
 
 tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
@@ -1410,6 +1420,16 @@ warnMissingMethodOrAT what name
                                         -- Don't warn about _foo methods
                 (ptext (sLit "No explicit") <+> text what <+> ptext (sLit "or default declaration for")
                  <+> quotes (ppr name)) }
+
+warnUnsatisifiedMinimalDefinition :: ClassMinimalDef -> TcM ()
+warnUnsatisifiedMinimalDefinition mindef
+  = do { warn <- woptM Opt_WarnMissingMethods
+       ; warnTc warn message
+       }
+  where
+    message = vcat [ptext (sLit "No explicit implementation for")
+                   ,nest 2 $ pprBooleanFormulaNice mindef
+                   ]
 \end{code}
 
 Note [Export helper functions]

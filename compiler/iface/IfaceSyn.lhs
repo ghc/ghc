@@ -55,6 +55,7 @@ import Module
 import TysWiredIn ( eqTyConName )
 import Fingerprint
 import Binary
+import BooleanFormula ( BooleanFormula )
 
 import Control.Monad
 import System.IO.Unsafe
@@ -103,6 +104,7 @@ data IfaceDecl
                  ifFDs     :: [FunDep FastString], -- Functional dependencies
                  ifATs     :: [IfaceAT],      -- Associated type families
                  ifSigs    :: [IfaceClassOp],   -- Method signatures
+                 ifMinDef  :: BooleanFormula OccName, -- Minimal complete definition
                  ifRec     :: RecFlag           -- Is newtype/datatype associated
                                                 --   with the class recursive?
     }
@@ -155,7 +157,7 @@ instance Binary IfaceDecl where
         put_ bh a4
         put_ bh a5
 
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8) = do
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 4
         put_ bh a1
         put_ bh (occNameFS a2)
@@ -165,6 +167,7 @@ instance Binary IfaceDecl where
         put_ bh a6
         put_ bh a7
         put_ bh a8
+        put_ bh a9
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 5
@@ -210,8 +213,9 @@ instance Binary IfaceDecl where
                     a6 <- get bh
                     a7 <- get bh
                     a8 <- get bh
+                    a9 <- get bh
                     occ <- return $! mkOccNameFS clsName a2
-                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8)
+                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8 a9)
             _ -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh

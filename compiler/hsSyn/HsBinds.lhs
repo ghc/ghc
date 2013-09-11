@@ -30,6 +30,7 @@ import SrcLoc
 import Var
 import Bag
 import FastString
+import BooleanFormula (BooleanFormula)
 
 import Data.Data hiding ( Fixity )
 import Data.List
@@ -559,6 +560,12 @@ data Sig name
         -- (Class tys); should be a specialisation of the
         -- current instance declaration
   | SpecInstSig (LHsType name)
+
+        -- | A minimal complete definition pragma
+        --
+        -- > {-# MINIMAL a | (b, c | (d | e)) #-}
+  | MinimalSig (BooleanFormula (Located name))
+
   deriving (Data, Typeable)
 
 
@@ -631,6 +638,10 @@ isInlineLSig :: LSig name -> Bool
 isInlineLSig (L _ (InlineSig {})) = True
 isInlineLSig _                    = False
 
+isMinimalLSig :: LSig name -> Bool
+isMinimalLSig (L _ (MinimalSig {})) = True
+isMinimalLSig _                    = False
+
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
 hsSigDoc (GenericSig {})        = ptext (sLit "default type signature")
@@ -639,6 +650,7 @@ hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> ptext (sLit "pragma")
 hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
 hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
+hsSigDoc (MinimalSig {})        = ptext (sLit "MINIMAL pragma")
 \end{code}
 
 Check if signatures overlap; this is used when checking for duplicate
@@ -657,6 +669,7 @@ ppr_sig (FixSig fix_sig)          = ppr fix_sig
 ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec (unLoc var) (ppr ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
+ppr_sig (MinimalSig bf)           = pragBrackets (pprMinimalSig bf)
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, pprInfixOcc (unLoc name)]
@@ -681,4 +694,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl) = pprSpec var (ptext (sLit "<type>")) inl
+
+pprMinimalSig :: OutputableBndr name => BooleanFormula (Located name) -> SDoc
+pprMinimalSig bf = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
 \end{code}

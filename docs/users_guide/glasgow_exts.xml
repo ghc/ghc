@@ -9181,6 +9181,36 @@ Assertion failures can be caught, see the documentation for the
       <option>-fno-warn-warnings-deprecations</option>.</para>
     </sect2>
 
+    <sect2 id="minimal-pragma">
+      <title>MINIMAL pragma</title>
+      <indexterm><primary>MINIMAL</primary></indexterm>
+      <para>The MINIMAL pragma is used to specify the minimal complete definition of a class. I.e. specify which methods must be implemented by all instances. If an instance does not satisfy the minimal complete definition, then a warning is generated.
+      This can be useful when a class has methods with circular defaults. For example
+      </para>
+<programlisting>
+class Eq a where
+    (==) :: a -> a -> Bool
+    (/=) :: a -> a -> Bool
+    x == y = not (x /= y)
+    x /= y = not (x == y)
+    {-# MINIMAL (==) | (/=) #-}
+</programlisting>
+      <para>Without the MINIMAL pragma no warning would be generated for an instance that implements neither method.
+      </para>
+      <para>The syntax for minimal complete definition is:</para>
+<screen>
+mindef ::= name
+        |  '(' mindef ')'
+        |  mindef '|' mindef
+        |  mindef ',' mindef
+</screen>
+      <para>A vertical bar denotes disjunction, i.e. one of the two sides is required.
+      A comma denotes conjunction, i.e. both sides are required.
+      Conjunction binds stronger than disjunction.</para>
+      <para>If no MINIMAL pragma is used, then all methods without a default will be requried, excluding methods with a name that starts with an underscore.</para>
+      <para>This warning can be turned off with the flag <option>-fno-warn-missing-methods</option>.</para>
+    </sect2>
+
     <sect2 id="inline-noinline-pragma">
       <title>INLINE and NOINLINE pragmas</title>
 

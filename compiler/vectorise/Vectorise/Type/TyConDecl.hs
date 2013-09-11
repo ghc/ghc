@@ -67,6 +67,7 @@ vectTyConDecl tycon name'
                      (snd . classTvsFds $ cls)  -- keep the original functional dependencies
                      []                         -- no associated types (for the moment)
                      methods'                   -- method info
+                     (defaultClassMinimalDef methods') -- default minimal complete definition
                      rec_flag                   -- whether recursive
 
            -- the original dictionary constructor must map to the vectorised one

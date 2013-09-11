@@ -17,6 +17,7 @@ module Class (
 	Class,
         ClassOpItem, DefMeth (..),
         ClassATItem,
+        ClassMinimalDef,
 	defMethSpecOfDefMeth,
 
 	FunDep,	pprFundeps, pprFunDep,
@@ -24,7 +25,7 @@ module Class (
 	mkClass, classTyVars, classArity, 
 	classKey, className, classATs, classATItems, classTyCon, classMethods,
 	classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
-        classAllSelIds, classSCSelId
+        classAllSelIds, classSCSelId, classMinimalDef
     ) where
 
 #include "Typeable.h"
@@ -40,6 +41,7 @@ import Unique
 import Util
 import Outputable
 import FastString
+import BooleanFormula (BooleanFormula)
 
 import Data.Typeable (Typeable)
 import qualified Data.Data as Data
@@ -79,7 +81,10 @@ data Class
         classATStuff :: [ClassATItem],	-- Associated type families
 
         -- Class operations (methods, not superclasses)
-	classOpStuff :: [ClassOpItem]	-- Ordered by tag
+	classOpStuff :: [ClassOpItem],	-- Ordered by tag
+
+	-- Minimal complete definition
+	classMinimalDef :: ClassMinimalDef
      }
   deriving Typeable
 
@@ -100,6 +105,8 @@ type ClassATItem = (TyCon,           -- See Note [Associated type tyvar names]
   -- We can have more than one default per type; see
   -- Note [Associated type defaults] in TcTyClsDecls
 
+type ClassMinimalDef = BooleanFormula Name -- Required methods
+
 -- | Convert a `DefMethSpec` to a `DefMeth`, which discards the name field in
 --   the `DefMeth` constructor of the `DefMeth`.
 defMethSpecOfDefMeth :: DefMeth -> DefMethSpec
@@ -115,24 +122,26 @@ The @mkClass@ function fills in the indirect superclasses.
 
 \begin{code}
 mkClass :: [TyVar]
-	-> [([TyVar], [TyVar])]
-	-> [PredType] -> [Id]
-	-> [ClassATItem]
-	-> [ClassOpItem]
-	-> TyCon
-	-> Class
+        -> [([TyVar], [TyVar])]
+        -> [PredType] -> [Id]
+        -> [ClassATItem]
+        -> [ClassOpItem]
+        -> ClassMinimalDef
+        -> TyCon
+        -> Class
 
 mkClass tyvars fds super_classes superdict_sels at_stuff
-	op_stuff tycon
-  = Class {	classKey     = tyConUnique tycon, 
-		className    = tyConName tycon,
-		classTyVars  = tyvars,
-		classFunDeps = fds,
-		classSCTheta = super_classes,
-		classSCSels  = superdict_sels,
-		classATStuff = at_stuff,
-		classOpStuff = op_stuff,
-		classTyCon   = tycon }
+        op_stuff mindef tycon
+  = Class { classKey     = tyConUnique tycon,
+            className    = tyConName tycon,
+            classTyVars  = tyvars,
+            classFunDeps = fds,
+            classSCTheta = super_classes,
+            classSCSels  = superdict_sels,
+            classATStuff = at_stuff,
+            classOpStuff = op_stuff,
+            classMinimalDef = mindef,
+            classTyCon   = tycon }
 \end{code}
 
 Note [Associated type tyvar names]

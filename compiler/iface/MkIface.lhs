@@ -1576,6 +1576,7 @@ classToIfaceDecl env clas
                  ifFDs    = map toIfaceFD clas_fds,
                  ifATs    = map toIfaceAT clas_ats,
                  ifSigs   = map toIfaceClassOp op_stuff,
+                 ifMinDef = fmap getOccName (classMinimalDef clas),
                  ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
   where
     (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff)

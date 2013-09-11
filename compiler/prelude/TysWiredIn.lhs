@@ -103,6 +103,7 @@ import FastString
 import Outputable
 import Config
 import Util
+import BooleanFormula   ( mkAnd )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -476,7 +477,7 @@ coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon
     args = [a, b]
 
 coercibleClass :: Class
-coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] coercibleTyCon
+coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
 
 \end{code}
 

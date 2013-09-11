@@ -620,9 +620,10 @@ tcTyClDecl1 _parent rec_info
                ; fds'  <- mapM (addLocM tc_fundep) fundeps
                ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
                ; at_stuff <- tcClassATs class_name (AssocFamilyTyCon clas) ats at_defs
+               ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
                ; clas <- buildClass False {- Must include unfoldings for selectors -}
                             class_name tvs' roles ctxt' fds' at_stuff
-                            sig_stuff tc_isrec
+                            sig_stuff mindef tc_isrec
                ; traceTc "tcClassDecl" (ppr fundeps $$ ppr tvs' $$ ppr fds')
                ; return (clas, tvs', gen_dm_env) }
 

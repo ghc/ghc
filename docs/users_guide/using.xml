@@ -1509,6 +1509,7 @@ module M where
             never <literal>_simpleFn</literal>; and (b)
             instance declarations can define either <literal>complexFn</literal> or <literal>_simpleFn</literal>.
             </para>
+          <para>The MINIMAL pragma can be used to change which combination of methods will be required for instances of a particular class. See <xref linkend="minimal-pragma"/>.</para>
         </listitem>
       </varlistentry>
 
