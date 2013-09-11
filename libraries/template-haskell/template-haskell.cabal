@@ -28,5 +28,5 @@ Library
 
 source-repository head
     type:     git
-    location: http://darcs.haskell.org/packages/template-haskell.git/
+    location: http://git.haskell.org/packages/template-haskell.git
 
