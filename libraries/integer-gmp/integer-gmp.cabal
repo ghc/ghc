@@ -18,7 +18,7 @@ extra-source-files:
 
 source-repository head
     type:     git
-    location: http://darcs.haskell.org/packages/integer-gmp.git/
+    location: http://git.haskell.org/packages/integer-gmp.git
 
 Library {
     build-depends: ghc-prim
