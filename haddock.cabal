@@ -233,4 +233,4 @@ test-suite spec
 
 source-repository head
   type:     git
-  location: http://darcs.haskell.org/haddock.git
+  location: http://git.haskell.org/haddock.git
