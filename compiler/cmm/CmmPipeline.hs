@@ -122,12 +122,12 @@ cpsTop hsc_env proc =
                   splitAtProcPoints dflags l call_pps proc_points pp_map
                                     (CmmProc h l v g)
             dumps Opt_D_dump_cmm_split "Post splitting" gs
-     
+
             ------------- Populate info tables with stack info -----------------
             gs <- {-# SCC "setInfoTableStackMap" #-}
                   return $ map (setInfoTableStackMap dflags stackmaps) gs
             dumps Opt_D_dump_cmm_info "after setInfoTableStackMap" gs
-     
+
             ----------- Control-flow optimisations -----------------------------
             gs <- {-# SCC "cmmCfgOpts(2)" #-}
                   return $ if optLevel dflags >= 1
@@ -147,7 +147,7 @@ cpsTop hsc_env proc =
             g <- {-# SCC "setInfoTableStackMap" #-}
                   return $ setInfoTableStackMap dflags stackmaps g
             dump' Opt_D_dump_cmm_info "after setInfoTableStackMap" g
-     
+
             ----------- Control-flow optimisations -----------------------------
             g <- {-# SCC "cmmCfgOpts(2)" #-}
                  return $ if optLevel dflags >= 1

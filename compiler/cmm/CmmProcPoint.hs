@@ -30,7 +30,7 @@ import Hoopl
 -- Compute a minimal set of proc points for a control-flow graph.
 
 -- Determine a protocol for each proc point (which live variables will
--- be passed as arguments and which will be on the stack). 
+-- be passed as arguments and which will be on the stack).
 
 {-
 A proc point is a basic block that, after CPS transformation, will
@@ -83,6 +83,33 @@ most once per iteration, then recompute the reachability information.
 arbitrary, and I don't know if the choice affects the final solution,
 so I don't know if the number of proc points chosen is the
 minimum---but the set will be minimal.
+
+
+
+Note [Proc-point analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Given a specified set of proc-points (a set of block-ids), "proc-point
+analysis" figures out, for every block, which proc-point it belongs to.
+All the blocks belonging to proc-point P will constitute a single
+top-level C procedure.
+
+A non-proc-point block B "belongs to" a proc-point P iff B is
+reachable from P without going through another proc-point.
+
+Invariant: a block B should belong to at most one proc-point; if it
+belongs to two, that's a bug.
+
+Note [Non-existing proc-points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+On some architectures it might happen that the list of proc-points
+computed before stack layout pass will be invalidated by the stack
+layout. This will happen if stack layout removes from the graph
+blocks that were determined to be proc-points. Later on in the pipeline
+we use list of proc-points to perform [Proc-point analysis], but
+if a proc-point does not exist anymore then we will get compiler panic.
+See #8205.
 -}
 
 type ProcPointSet = BlockSet
@@ -104,11 +131,14 @@ instance Outputable Status where
 procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (BlockEnv Status)
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
-procPointAnalysis procPoints g =
+-- See Note [Proc-point analysis]
+procPointAnalysis procPoints g@(CmmGraph {g_graph = graph}) =
   -- pprTrace "procPointAnalysis" (ppr procPoints) $
   dataflowAnalFwdBlocks g initProcPoints $ analFwd lattice forward
-  where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints]
-
+  where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints,
+                                            id `setMember` labelsInGraph ]
+                                    -- See Note [Non-existing proc-points]
+        labelsInGraph  = labelsDefined graph
 -- transfer equations
 
 forward :: FwdTransfer CmmNode Status
@@ -218,7 +248,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
              Just (ReachedBy set) ->
                case setElems set of
                  []   -> graphEnv
-                 [id] -> add graphEnv id bid b 
+                 [id] -> add graphEnv id bid b
                  _    -> panic "Each block should be reachable from only one ProcPoint"
              Nothing -> graphEnv
            where bid = entryLabel b
@@ -396,9 +426,9 @@ dataflow pass.  One might attempt to use this simple lattice:
 
   data Location = Unknown
                 | InProc BlockId -- node is in procedure headed by the named proc point
-                | ProcPoint      -- node is itself a proc point   
+                | ProcPoint      -- node is itself a proc point
 
-At a join, a node in two different blocks becomes a proc point.  
+At a join, a node in two different blocks becomes a proc point.
 The difficulty is that the change of information during iterative
 computation may promote a node prematurely.  Here's a program that
 illustrates the difficulty:
@@ -432,19 +462,19 @@ are no other proc points that directly reach L2.
 It may be worthwhile to attempt the Adams optimization by rewriting
 the graph before the assignment of proc-point protocols.  Here are a
 couple of rules:
-                                                                  
-  g() returns to k;                    g() returns to L;          
-  k: CopyIn c ress; goto L:             
-   ...                        ==>        ...                       
-  L: // no CopyIn node here            L: CopyIn c ress; 
 
-                                                                  
+  g() returns to k;                    g() returns to L;
+  k: CopyIn c ress; goto L:
+   ...                        ==>        ...
+  L: // no CopyIn node here            L: CopyIn c ress;
+
+
 And when c == c' and ress == ress', this also:
 
-  g() returns to k;                    g() returns to L;          
-  k: CopyIn c ress; goto L:             
-   ...                        ==>        ...                       
-  L: CopyIn c' ress'                   L: CopyIn c' ress' ; 
+  g() returns to k;                    g() returns to L;
+  k: CopyIn c ress; goto L:
+   ...                        ==>        ...
+  L: CopyIn c' ress'                   L: CopyIn c' ress' ;
 
 In both cases the goal is to eliminate k.
 -}
