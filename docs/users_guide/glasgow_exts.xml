@@ -9080,7 +9080,7 @@ Assertion failures can be caught, see the documentation for the
 
       <para>Every language extension can also be turned into a command-line flag
 	by prefixing it with "<literal>-X</literal>"; for example <option>-XForeignFunctionInterface</option>.
-	(Similarly, all "<literal>-X</literal>" flags can be written as <literal>LANGUAGE</literal> pragmas.
+	(Similarly, all "<literal>-X</literal>" flags can be written as <literal>LANGUAGE</literal> pragmas.)
       </para>
 
       <para>A list of all supported language extensions can be obtained by invoking
