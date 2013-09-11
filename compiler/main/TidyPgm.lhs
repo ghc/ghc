@@ -749,6 +749,13 @@ newtype DFFV a
       -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far
       -> ((VarSet,[Var]),a))  -- Output state
 
+instance Functor DFFV where
+    fmap = liftM
+
+instance Applicative DFFV where
+    pure = return
+    (<*>) = ap
+
 instance Monad DFFV where
   return a = DFFV $ \_ st -> (st, a)
   (DFFV m) >>= k = DFFV $ \env st ->

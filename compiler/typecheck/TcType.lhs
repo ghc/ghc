@@ -182,6 +182,8 @@ import Outputable
 import FastString
 
 import Data.IORef
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
 \end{code}
 
 %************************************************************************
@@ -1047,6 +1049,13 @@ data OccCheckResult a
   | OC_Forall 
   | OC_NonTyVar
   | OC_Occurs
+
+instance Functor OccCheckResult where
+      fmap = liftM
+
+instance Applicative OccCheckResult where
+      pure = return
+      (<*>) = ap
 
 instance Monad OccCheckResult where
   return x = OC_OK x

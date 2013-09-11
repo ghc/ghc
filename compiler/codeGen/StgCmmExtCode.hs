@@ -48,6 +48,9 @@ import Module
 import UniqFM
 import Unique
 
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
+
 
 -- | The environment contains variable definitions or blockids.
 data Named
@@ -75,6 +78,13 @@ returnExtFC a   = EC $ \_ s -> return (s, a)
 
 thenExtFC :: CmmParse a -> (a -> CmmParse b) -> CmmParse b
 thenExtFC (EC m) k = EC $ \e s -> do (s',r) <- m e s; unEC (k r) e s'
+
+instance Functor CmmParse where
+      fmap = liftM
+
+instance Applicative CmmParse where
+      pure = return
+      (<*>) = ap
 
 instance Monad CmmParse where
   (>>=) = thenExtFC

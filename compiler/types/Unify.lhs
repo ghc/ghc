@@ -39,6 +39,9 @@ import Type
 import TyCon
 import TypeRep
 import Util
+
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
 \end{code}
 
 
@@ -648,6 +651,13 @@ data BindFlag
 \begin{code}
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
 		         -> UnifyResultM a }
+
+instance Functor UM where
+      fmap = liftM
+
+instance Applicative UM where
+      pure = return
+      (<*>) = ap
 
 instance Monad UM where
   return a = UM (\_tvs -> Unifiable a)

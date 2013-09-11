@@ -36,6 +36,9 @@ import FastString
 import SrcLoc
 import Util
 
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
+
 
 stgMassageForProfiling
         :: DynFlags
@@ -219,6 +222,13 @@ newtype MassageM result
                  -> CollectedCCs
                  -> (CollectedCCs, result)
     }
+
+instance Functor MassageM where
+      fmap = liftM
+
+instance Applicative MassageM where
+      pure = return
+      (<*>) = ap
 
 instance Monad MassageM where
     return x = MassageM (\_ ccs -> (ccs, x))

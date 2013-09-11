@@ -21,6 +21,8 @@ import Outputable
 import DynFlags
 
 import Data.Maybe
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
 
 -- Things to check:
 --     - invariant on CmmBlock in CmmExpr (see comment there)
@@ -206,6 +208,13 @@ checkCond _ expr
 -- just a basic error monad:
 
 newtype CmmLint a = CmmLint { unCL :: DynFlags -> Either SDoc a }
+
+instance Functor CmmLint where
+      fmap = liftM
+
+instance Applicative CmmLint where
+      pure = return
+      (<*>) = ap
 
 instance Monad CmmLint where
   CmmLint m >>= k = CmmLint $ \dflags ->

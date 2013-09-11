@@ -44,6 +44,8 @@ import ForeignCall
 import Demand           ( isSingleUsed )
 import PrimOp           ( PrimCall(..) )
 
+import Control.Monad (liftM, ap)
+
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
 --
@@ -981,6 +983,13 @@ returnLne e = LneM $ \_ _ -> e
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
 thenLne m k = LneM $ \env lvs_cont
   -> unLneM (k (unLneM m env lvs_cont)) env lvs_cont
+
+instance Functor LneM where
+    fmap = liftM
+
+instance Applicative LneM where
+    pure = return
+    (<*>) = ap
 
 instance Monad LneM where
     return = returnLne

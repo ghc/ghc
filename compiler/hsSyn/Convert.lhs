@@ -32,7 +32,8 @@ import FastString
 import Outputable
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless )
+import Control.Monad( unless, liftM, ap )
+import Control.Applicative (Applicative(..))
 
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -71,6 +72,13 @@ newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc a }
 -- Use the loc everywhere, for lack of anything better
 -- In particular, we want it on binding locations, so that variables bound in
 -- the spliced-in declarations get a location that at least relates to the splice point
+
+instance Functor CvtM where
+    fmap = liftM
+
+instance Applicative CvtM where
+    pure = return
+    (<*>) = ap
 
 instance Monad CvtM where
   return x       = CvtM $ \_   -> Right x

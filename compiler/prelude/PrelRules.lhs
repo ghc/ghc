@@ -49,6 +49,7 @@ import Platform
 import Util
 import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
+import Control.Applicative ( Applicative(..), Alternative(..) )
 import Control.Monad
 import Data.Bits as Bits
 import qualified Data.ByteString as BS
@@ -540,12 +541,23 @@ mkBasicRule op_name n_args rm
 newtype RuleM r = RuleM
   { runRuleM :: DynFlags -> InScopeEnv -> [CoreExpr] -> Maybe r }
 
+instance Functor RuleM where
+    fmap = liftM
+
+instance Applicative RuleM where
+    pure = return
+    (<*>) = ap
+
 instance Monad RuleM where
   return x = RuleM $ \_ _ _ -> Just x
   RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
     Nothing -> Nothing
     Just r -> runRuleM (g r) dflags iu e
   fail _ = mzero
+
+instance Alternative RuleM where
+    empty = mzero
+    (<|>) = mplus
 
 instance MonadPlus RuleM where
   mzero = RuleM $ \_ _ _ -> Nothing

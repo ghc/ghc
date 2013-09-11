@@ -34,6 +34,7 @@ import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
 import Data.Ord (comparing)
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           doesFileExist, renameFile, removeFile,
@@ -1302,6 +1303,13 @@ type ValidateError   = (Force,String)
 type ValidateWarning = String
 
 newtype Validate a = V { runValidate :: IO (a, [ValidateError],[ValidateWarning]) }
+
+instance Functor Validate where
+    fmap = liftM
+
+instance Applicative Validate where
+    pure = return
+    (<*>) = ap
 
 instance Monad Validate where
    return a = V $ return (a, [], [])

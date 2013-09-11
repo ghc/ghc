@@ -35,6 +35,7 @@ import Outputable
 import Platform
 import Util
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import Control.Monad.ST ( runST )
 import Control.Monad.Trans.Class
@@ -222,6 +223,13 @@ data Assembler a
   | AllocLabel Word16 (Assembler a)
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
+
+instance Functor Assembler where
+    fmap = liftM
+
+instance Applicative Assembler where
+    pure = return
+    (<*>) = ap
 
 instance Monad Assembler where
   return = NullAsm

@@ -44,7 +44,7 @@ import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
 
 import HsSyn            
 import TcRnMonad
-import TcHsSyn          ( hsOverLitName )
+import TcHsSyn             ( hsOverLitName )
 import RnEnv
 import RnTypes
 import DynFlags
@@ -54,14 +54,14 @@ import NameSet
 import RdrName
 import BasicTypes
 import Util
-import ListSetOps       ( removeDups )
+import ListSetOps          ( removeDups )
 import Outputable
 import SrcLoc
 import FastString
-import Literal          ( inCharRange )
-import TysWiredIn       ( nilDataCon )
-import DataCon          ( dataConName )
-import Control.Monad    ( when )
+import Literal             ( inCharRange )
+import TysWiredIn          ( nilDataCon )
+import DataCon             ( dataConName )
+import Control.Monad       ( when, liftM, ap )
 import Data.Ratio
 \end{code}
 
@@ -97,6 +97,13 @@ p1 scope over p2,p3.
 newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
                                             -> RnM (r, FreeVars) }
         -- See Note [CpsRn monad]
+
+instance Functor CpsRn where
+    fmap = liftM
+
+instance Applicative CpsRn where
+    pure = return
+    (<*>) = ap
 
 instance Monad CpsRn where
   return x = CpsRn (\k -> k x)

@@ -32,6 +32,7 @@ import DynFlags
 import FastString
 import Exception
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import qualified Data.ByteString as BS
 import Data.Char
@@ -55,6 +56,14 @@ data CoreState = CoreState {
                      cs_dflags :: DynFlags,
                      cs_module :: Module
                  }
+
+instance Functor CoreM where
+    fmap = liftM
+
+instance Applicative CoreM where
+    pure = return
+    (<*>) = ap
+
 instance Monad CoreM where
   (CoreM m) >>= f = CoreM (\ s -> case m s of
                                     (s',r) -> case f r of

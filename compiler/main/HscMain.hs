@@ -194,6 +194,13 @@ knownKeyNames =              -- where templateHaskellNames are defined
 
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
 
+instance Functor Hsc where
+    fmap = liftM
+
+instance Applicative Hsc where
+    pure = return
+    (<*>) = ap
+
 instance Monad Hsc where
     return a    = Hsc $ \_ w -> return (a, w)
     Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
@@ -202,9 +209,6 @@ instance Monad Hsc where
 
 instance MonadIO Hsc where
     liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
-
-instance Functor Hsc where
-    fmap f m = m >>= \a -> return $ f a
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do

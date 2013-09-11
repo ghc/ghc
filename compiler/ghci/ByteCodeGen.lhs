@@ -55,6 +55,7 @@ import Data.List
 import Foreign
 import Foreign.C
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import Data.Char
 
@@ -1585,6 +1586,13 @@ thenBc_ (BcM expr) (BcM cont) = BcM $ \st0 -> do
 
 returnBc :: a -> BcM a
 returnBc result = BcM $ \st -> (return (st, result))
+
+instance Functor BcM where
+    fmap = liftM
+
+instance Applicative BcM where
+    pure = return
+    (<*>) = ap
 
 instance Monad BcM where
   (>>=) = thenBc

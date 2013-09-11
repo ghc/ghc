@@ -1025,6 +1025,13 @@ The same substitution also supports let-type, current expressed as
 Here we substitute 'ty' for 'a' in 'body', on the fly.
 -}
 
+instance Functor LintM where
+      fmap = liftM
+
+instance Applicative LintM where
+      pure = return
+      (<*>) = ap
+
 instance Monad LintM where
   return x = LintM (\ _   _     errs -> (Just x, errs))
   fail err = failWithL (text err)

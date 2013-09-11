@@ -106,6 +106,7 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Word
+import qualified Control.Applicative as A
 import Control.Monad
 
 import Prelude hiding   ( read )
@@ -819,9 +820,13 @@ instance Monad CoreM where
             let w = w1 `plusWriter` w2 -- forcing w before returning avoids a space leak (Trac #7702)
             return $ seq w (y, s'', w)
 
-instance Applicative CoreM where
+instance A.Applicative CoreM where
     pure = return
     (<*>) = ap
+
+instance MonadPlus IO => A.Alternative CoreM where
+    empty = mzero
+    (<|>) = mplus
 
 -- For use if the user has imported Control.Monad.Error from MTL
 -- Requires UndecidableInstances

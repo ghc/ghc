@@ -48,6 +48,7 @@ import UniqSet
 import Util
 import Maybes
 import Data.List
+import Control.Applicative (Applicative(..))
 import Control.Monad
 \end{code}
 
@@ -772,6 +773,14 @@ data RoleInferenceInfo = RII { var_ns :: VarPositions
 newtype RoleM a = RM { unRM :: Maybe RoleInferenceInfo
                             -> RoleInferenceState
                             -> (a, RoleInferenceState) }
+
+instance Functor RoleM where
+    fmap = liftM
+
+instance Applicative RoleM where
+    pure = return
+    (<*>) = ap
+
 instance Monad RoleM where
   return x = RM $ \_ state -> (x, state)
   a >>= f  = RM $ \m_info state -> let (a', state') = unRM a m_info state in

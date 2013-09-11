@@ -29,7 +29,7 @@ import CoreMonad
 import Outputable
 import FastString
 import MonadUtils
-import Control.Monad    ( when )
+import Control.Monad       ( when, liftM, ap )
 \end{code}
 
 %************************************************************************
@@ -96,6 +96,14 @@ computeMaxTicks dflags size
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
+
+
+instance Functor SimplM where
+    fmap = liftM
+
+instance Applicative SimplM where
+    pure = return
+    (<*>) = ap
 
 instance Monad SimplM where
    (>>)   = thenSmpl_

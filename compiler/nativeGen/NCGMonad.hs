@@ -41,6 +41,9 @@ import Unique           ( Unique )
 import DynFlags
 import Module
 
+import Control.Monad    ( liftM, ap )
+import Control.Applicative ( Applicative(..) )
+
 data NatM_State
         = NatM_State {
                 natm_us          :: UniqSupply,
@@ -64,6 +67,13 @@ initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
         = case unNat m init_st of { (r,st) -> (r,st) }
 
+
+instance Functor NatM where
+      fmap = liftM
+
+instance Applicative NatM where
+      pure = return
+      (<*>) = ap
 
 instance Monad NatM where
   (>>=) = thenNat

@@ -34,6 +34,7 @@ import Outputable
 import FastString
 import State
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -1866,6 +1867,13 @@ data SpecState = SpecState {
                      spec_uniq_supply :: UniqSupply,
                      spec_dflags :: DynFlags
                  }
+
+instance Functor SpecM where
+    fmap = liftM
+
+instance Applicative SpecM where
+    pure = return
+    (<*>) = ap
 
 instance Monad SpecM where
     SpecM x >>= f = SpecM $ do y <- x

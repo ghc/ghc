@@ -52,6 +52,8 @@ import Data.Map (Map)
 import Data.Word
 import System.IO
 import qualified Data.Map as Map
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
 
 import Data.Array.Unsafe ( castSTUArray )
 import Data.Array.ST hiding ( castSTUArray )
@@ -985,6 +987,13 @@ pprExternDecl _in_srt lbl
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
 newtype TE a = TE { unTE :: TEState -> (a, TEState) }
+
+instance Functor TE where
+      fmap = liftM
+
+instance Applicative TE where
+      pure = return
+      (<*>) = ap
 
 instance Monad TE where
    TE m >>= k  = TE $ \s -> case m s of (a, s') -> unTE (k a) s'
