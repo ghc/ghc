@@ -30,6 +30,8 @@ module Language.Haskell.TH(
 	-- *** Instance lookup
 	reifyInstances,
 	isInstance,
+        -- *** Roles lookup
+        reifyRoles,
 
 	-- * Names
 	Name, NameSpace,	-- Abstract
@@ -59,7 +61,7 @@ module Language.Haskell.TH(
     -- ** Patterns
         Pat(..), FieldExp, FieldPat,
     -- ** Types
-        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred(..), Role(..),
+        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred(..), Syntax.Role(..),
 
     -- * Library functions
     -- ** Abbreviations
@@ -108,11 +110,16 @@ module Language.Haskell.TH(
     -- *** Kinds
   varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,
 
+    -- *** Roles
+    nominalR, representationalR, phantomR, inferR,
+
     -- *** Top Level Declarations
     -- **** Data
 	valD, funD, tySynD, dataD, newtypeD,
     -- **** Class
     classD, instanceD, sigD,
+    -- **** Role annotations
+    roleAnnotD,
     -- **** Type Family / Data Family
     familyNoKindD, familyKindD, dataInstD,
     closedTypeFamilyNoKindD, closedTypeFamilyKindD,
@@ -129,7 +136,7 @@ module Language.Haskell.TH(
 
    ) where
 
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Syntax as Syntax
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Ppr
 

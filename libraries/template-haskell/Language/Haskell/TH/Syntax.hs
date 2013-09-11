@@ -54,6 +54,7 @@ class (Monad m, Applicative m) => Quasi m where
        -- Returns list of matching instance Decs 
        --    (with empty sub-Decs)
        -- Works for classes and type functions
+  qReifyRoles     :: Name -> m [Role]
 
   qLocation :: m Loc
 
@@ -84,6 +85,7 @@ instance Quasi IO where
   qLookupName _ _     = badIO "lookupName"
   qReify _            = badIO "reify"
   qReifyInstances _ _ = badIO "classInstances"
+  qReifyRoles _       = badIO "reifyRoles"
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _ = badIO "addDependentFile"
@@ -288,6 +290,13 @@ all instances of this family at the types @tys@ are returned.
 reifyInstances :: Name -> [Type] -> Q [InstanceDec]
 reifyInstances cls tys = Q (qReifyInstances cls tys)
 
+{- | @reifyRoles nm@ returns the list of roles associated with the parameters of
+the tycon @nm@. Fails if @nm@ cannot be found or is not a tycon.
+The returned list should never contain 'InferR'.
+-}
+reifyRoles :: Name -> Q [Role]
+reifyRoles nm = Q (qReifyRoles nm)
+
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
 isInstance :: Name -> [Type] -> Q Bool
 isInstance nm tys = do { decs <- reifyInstances nm tys
@@ -320,6 +329,7 @@ instance Quasi Q where
   qRecover  	    = recover 
   qReify    	    = reify
   qReifyInstances   = reifyInstances
+  qReifyRoles       = reifyRoles
   qLookupName       = lookupName
   qLocation 	    = location
   qRunIO    	    = runIO
@@ -1170,6 +1180,8 @@ data Dec
   | ClosedTypeFamilyD Name
       [TyVarBndr] (Maybe Kind)
       [TySynEqn]                  -- ^ @{ type family F a b :: * where ... }@
+
+  | RoleAnnotD Name [Role]        -- ^ @{ type role T nominal representational }@
   deriving( Show, Eq, Data, Typeable )
 
 -- | One equation of a type family instance or closed type family. The
@@ -1258,8 +1270,6 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@
                | KindedTV Name Kind       -- ^ @(a :: k)@
-               | RoledTV  Name Role       -- ^ @a\@R@
-               | KindedRoledTV Name Kind Role -- ^ @(a :: k)\@R@
       deriving( Show, Eq, Data, Typeable )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
@@ -1267,9 +1277,10 @@ data TyLit = NumTyLit Integer             -- ^ @2@
   deriving ( Show, Eq, Data, Typeable )
 
 -- | Role annotations
-data Role = Nominal            -- ^ @N@
-          | Representational   -- ^ @R@
-          | Phantom            -- ^ @P@
+data Role = NominalR            -- ^ @nominal@
+          | RepresentationalR   -- ^ @representational@
+          | PhantomR            -- ^ @phantom@
+          | InferR              -- ^ @_@
   deriving( Show, Eq, Data, Typeable )
 
 -- | To avoid duplication between kinds and types, they

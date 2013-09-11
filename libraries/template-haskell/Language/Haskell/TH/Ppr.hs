@@ -307,6 +307,8 @@ ppr_dec _ (ClosedTypeFamilyD tc tvs mkind eqns)
     ppr_eqn (TySynEqn lhs rhs)
       = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
 
+ppr_dec _ (RoleAnnotD name roles)
+  = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
 
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
@@ -502,14 +504,12 @@ instance Ppr TyLit where
 instance Ppr TyVarBndr where
     ppr (PlainTV nm)    = ppr nm
     ppr (KindedTV nm k) = parens (ppr nm <+> text "::" <+> ppr k)
-    ppr (RoledTV nm r)  = ppr nm <> text "@" <> ppr r
-    ppr (KindedRoledTV nm k r)
-      = parens (ppr nm <+> text "::" <+> ppr k) <> text "@" <> ppr r
 
 instance Ppr Role where
-    ppr Nominal          = text "N"
-    ppr Representational = text "R"
-    ppr Phantom          = text "P"
+    ppr NominalR          = text "nominal"
+    ppr RepresentationalR = text "representational"
+    ppr PhantomR          = text "phantom"
+    ppr InferR            = text "_"
 
 ------------------------------
 pprCxt :: Cxt -> Doc

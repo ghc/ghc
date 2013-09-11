@@ -7,7 +7,8 @@ module Language.Haskell.TH.Lib where
     -- be "public" functions.  The main module TH
     -- re-exports them all.
 
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Syntax hiding (Role)
+import qualified Language.Haskell.TH.Syntax as TH
 import Control.Monad( liftM, liftM2 )
 import Data.Word( Word8 )
 
@@ -37,6 +38,7 @@ type VarStrictTypeQ = Q VarStrictType
 type FieldExpQ      = Q FieldExp
 type RuleBndrQ      = Q RuleBndr
 type TySynEqnQ      = Q TySynEqn
+type Role           = TH.Role       -- must be defined here for DsMeta to find it
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -442,6 +444,9 @@ closedTypeFamilyKindD tc tvs kind eqns =
     eqns1 <- sequence eqns
     return (ClosedTypeFamilyD tc tvs (Just kind) eqns1)
 
+roleAnnotD :: Name -> [Role] -> DecQ
+roleAnnotD name roles = return $ RoleAnnotD name roles
+
 tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
 tySynEqn lhs rhs =
   do
@@ -566,12 +571,6 @@ plainTV = PlainTV
 kindedTV :: Name -> Kind -> TyVarBndr
 kindedTV = KindedTV
 
-roledTV :: Name -> Role -> TyVarBndr
-roledTV = RoledTV
-
-kindedRoledTV :: Name -> Kind -> Role -> TyVarBndr
-kindedRoledTV = KindedRoledTV
-
 varK :: Name -> Kind
 varK = VarT
 
@@ -599,10 +598,11 @@ constraintK = ConstraintT
 -------------------------------------------------------------------------------
 -- *   Role
 
-nominal, representational, phantom :: Role
-nominal = Nominal
-representational = Representational
-phantom = Phantom
+nominalR, representationalR, phantomR, inferR :: Role
+nominalR          = NominalR
+representationalR = RepresentationalR
+phantomR          = PhantomR
+inferR            = InferR
 
 -------------------------------------------------------------------------------
 -- *   Callconv
