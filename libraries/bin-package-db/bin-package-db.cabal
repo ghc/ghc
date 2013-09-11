@@ -8,8 +8,9 @@ cabal-version:  >=1.6
 build-type: Simple
 
 source-repository head
-    type:     darcs
-    location: http://darcs.haskell.org/ghc
+    type:     git
+    location: http://git.haskell.org/ghc.git
+    subdir:   libraries/bin-package-db
 
 Library {
     exposed-modules:
