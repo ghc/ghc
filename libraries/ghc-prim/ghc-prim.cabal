@@ -13,7 +13,7 @@ build-type: Custom
 
 source-repository head
     type:     git
-    location: http://darcs.haskell.org/packages/ghc-prim.git/
+    location: http://git.haskell.org/packages/ghc-prim.git
 
 flag include-ghc-prim {
     Description: Include GHC.Prim in exposed-modules
