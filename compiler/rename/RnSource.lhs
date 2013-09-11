@@ -28,6 +28,7 @@ import ForeignCall      ( CCallTarget(..) )
 import Module
 import HscTypes         ( Warnings(..), plusWarns )
 import Class            ( FunDep )
+import PrelNames        ( isUnboundName )
 import Name
 import NameSet
 import NameEnv
@@ -39,13 +40,14 @@ import FastString
 import SrcLoc
 import DynFlags
 import HscTypes         ( HscEnv, hsc_dflags )
-import ListSetOps       ( findDupsEq )
+import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
+import Util             ( mapSnd )
 
 import Control.Monad
-import Data.List( partition )
+import Data.List( partition, sortBy )
 import Data.Traversable (traverse)
-import Maybes( orElse )
+import Maybes( orElse, mapMaybe )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -862,11 +864,12 @@ isInPackage pkgId nm = case nameModule_maybe nm of
 -- there is no module name. In that case we cannot have mutual dependencies,
 -- so it's fine to return False here.
 
-rnTyClDecls :: [Name] -> [[LTyClDecl RdrName]]
-            -> RnM ([[LTyClDecl Name]], FreeVars)
+rnTyClDecls :: [Name] -> [TyClGroup RdrName]
+            -> RnM ([TyClGroup Name], FreeVars)
 -- Rename the declarations and do depedency analysis on them
 rnTyClDecls extra_deps tycl_ds
-  = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (concat tycl_ds)
+  = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
+       ; role_annot_env <- rnRoleAnnots (concatMap group_roles tycl_ds)
        ; thisPkg  <- fmap thisPackage getDynFlags
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
@@ -875,16 +878,23 @@ rnTyClDecls extra_deps tycl_ds
                                | otherwise
                                = fvs
 
-             ds_w_fvs' = map (\(ds, fvs) -> (ds, add_boot_deps fvs)) ds_w_fvs
+             ds_w_fvs' = mapSnd add_boot_deps ds_w_fvs
 
              sccs :: [SCC (LTyClDecl Name)]
              sccs = depAnalTyClDecls ds_w_fvs'
 
              all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs'
 
+             raw_groups = map flattenSCC sccs
+             -- See Note [Role annotations in the renamer]
+             groups = [ TyClGroup { group_tyclds = gp
+                                  , group_roles = roles }
+                      | gp <- raw_groups
+                      , let roles = mapMaybe ( lookupNameEnv role_annot_env
+                                             . tcdName
+                                             . unLoc ) gp ]
        ; traceRn (text "rnTycl"  <+> (ppr ds_w_fvs $$ ppr sccs))
-       ; return (map flattenSCC sccs, all_fvs) }
-
+       ; return (groups, all_fvs) }
 
 rnTyClDecl :: TyClDecl RdrName 
            -> RnM (TyClDecl Name, FreeVars)
@@ -992,6 +1002,48 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 -- "type" and "type instance" declarations
 rnTySyn :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnTySyn doc rhs = rnLHsType doc rhs
+
+-- Renames role annotations, returning them as the values in a NameEnv
+-- and checks for duplicate role annotations.
+-- It is quite convenient to do both of these in the same place.
+-- See also Note [Role annotations in the renamer]
+rnRoleAnnots :: [LRoleAnnotDecl RdrName]
+                -> RnM (NameEnv (LRoleAnnotDecl Name))
+rnRoleAnnots role_annots
+  = do {  -- check for duplicates *before* renaming, to avoid lumping
+          -- together all the unboundNames
+         let (no_dups, dup_annots) = removeDups role_annots_cmp role_annots
+             role_annots_cmp (L _ annot1) (L _ annot2)
+               = roleAnnotDeclName annot1 `compare` roleAnnotDeclName annot2
+       ; mapM_ dupRoleAnnotErr dup_annots
+       ; role_annots' <- mapM (wrapLocM rn_role_annot1) no_dups
+          -- some of the role annots will be unbound; we don't wish
+          -- to include these
+       ; return $ mkNameEnv [ (name, ra)
+                            | ra <- role_annots'
+                            , let name = roleAnnotDeclName (unLoc ra)
+                            , not (isUnboundName name) ] }
+  where
+    rn_role_annot1 (RoleAnnotDecl tycon roles)
+      = do {  -- the name is an *occurrence*
+             tycon' <- wrapLocM lookupGlobalOccInThisModule tycon
+           ; return $ RoleAnnotDecl tycon' roles }
+
+dupRoleAnnotErr :: [LRoleAnnotDecl RdrName] -> RnM ()
+dupRoleAnnotErr [] = panic "dupRoleAnnotErr"
+dupRoleAnnotErr list
+  = addErrAt loc $
+    hang (text "Duplicate role annotations for" <+>
+          quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
+       2 (vcat $ map pp_role_annot sorted_list)
+    where
+      sorted_list = sortBy cmp_annot list
+      (L loc first_decl : _) = sorted_list
+    
+      pp_role_annot (L loc decl) = hang (ppr decl)
+                                      4 (text "-- written at" <+> ppr loc)
+
+      cmp_annot (L loc1 _) (L loc2 _) = loc1 `compare` loc2
 
 rnDataDefn :: HsDocContext -> HsDataDefn RdrName -> RnM (HsDataDefn Name, FreeVars)
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
@@ -1119,6 +1171,24 @@ check T first, (fixing its kind) and *then* S.  If you do kind
 inference together, you might get an error reported in S, which
 is jolly confusing.  See Trac #4875
 
+Note [Role annotations in the renamer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must ensure that a type's role annotation is put in the same group as the
+proper type declaration. This is because role annotations are needed during
+type-checking when creating the type's TyCon. So, rnRoleAnnots builds a
+NameEnv (LRoleAnnotDecl Name) that maps a name to a role annotation for that
+type, if any. Then, this map can be used to add the role annotations to the
+groups after dependency analysis.
+
+This process checks for duplicate role annotations, where we must be careful
+to filter out the unbound annotations to avoid reporting spurious duplicates.
+We hold off doing other checks until validity checking in the type checker.
+
+Also, note that the tycon in a role annotation is renamed with
+lookupGlobalInThisModule. We want only annotations for local declarations.
+Because all of these are in scope by this point, this renaming technique
+also effectively identifies any orphan role annotations. Annotations on
+declarations that don't support them is checked for in the type-checker.
 
 %*********************************************************
 %*                                                      *
@@ -1277,7 +1347,7 @@ For example:
 Get the mapping from constructors to fields for this module.
 It's convenient to do this after the data type decls have been renamed
 \begin{code}
-extendRecordFieldEnv :: [[LTyClDecl RdrName]] -> [LInstDecl RdrName] -> TcM TcGblEnv
+extendRecordFieldEnv :: [TyClGroup RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
 extendRecordFieldEnv tycl_decls inst_decls
   = do  { tcg_env <- getGblEnv
         ; field_env' <- foldrM get_con (tcg_field_env tcg_env) all_data_cons
@@ -1287,7 +1357,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     --  (a) a datatype constructor
     --  (b) a record field
     -- knowing that they're from this module.
-    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn,
+    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn_maybe,
     -- which keeps only the local ones.
     lookup x = do { x' <- lookupLocatedTopBndrRn x
                     ; return $ unLoc x'}
@@ -1295,7 +1365,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     all_data_cons :: [ConDecl RdrName]
     all_data_cons = [con | HsDataDefn { dd_cons = cons } <- all_ty_defs
                          , L _ con <- cons ]
-    all_ty_defs = [ defn | L _ (DataDecl { tcdDataDefn = defn }) <- concat tycl_decls ]
+    all_ty_defs = [ defn | L _ (DataDecl { tcdDataDefn = defn }) <- tyClGroupConcat tycl_decls ]
                ++ map dfid_defn (instDeclDataFamInsts inst_decls)  -- Do not forget associated types!
 
     get_con (ConDecl { con_name = con, con_details = RecCon flds })
@@ -1398,6 +1468,10 @@ add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
 add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
   = addl (gp { hs_valds = add_bind (L l d) ts }) ds
 
+-- Role annotations: added to the TyClGroup
+add gp@(HsGroup {hs_tyclds = ts}) l (RoleAnnotD d) ds
+  = addl (gp { hs_tyclds = add_role_annot (L l d) ts }) ds
+
 -- The rest are routine
 add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
   = addl (gp { hs_instds = L l d : ts }) ds
@@ -1418,9 +1492,15 @@ add gp@(HsGroup {hs_vects  = ts}) l (VectD d) ds
 add gp l (DocD d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 
-add_tycld :: LTyClDecl a -> [[LTyClDecl a]] -> [[LTyClDecl a]]
-add_tycld d []       = [[d]]
-add_tycld d (ds:dss) = (d:ds) : dss
+add_tycld :: LTyClDecl a -> [TyClGroup a] -> [TyClGroup a]
+add_tycld d []       = [TyClGroup { group_tyclds = [d], group_roles = [] }]
+add_tycld d (ds@(TyClGroup { group_tyclds = tyclds }):dss)
+  = ds { group_tyclds = d : tyclds } : dss
+
+add_role_annot :: LRoleAnnotDecl a -> [TyClGroup a] -> [TyClGroup a]
+add_role_annot d [] = [TyClGroup { group_tyclds = [], group_roles = [d] }]
+add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
+  = tycls { group_roles = d : roles } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs

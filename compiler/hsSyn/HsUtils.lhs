@@ -271,7 +271,7 @@ mkHsString s = HsString (mkFastString s)
 -------------
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
 -- Caller sets location
-userHsTyVarBndrs loc bndrs = [ L loc (HsTyVarBndr v Nothing Nothing) | v <- bndrs ]
+userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
 \end{code}
 
 
@@ -625,11 +625,11 @@ hsForeignDeclsBinders :: [LForeignDecl Name] -> [Name]
 hsForeignDeclsBinders foreign_decls
   = [n | L _ (ForeignImport (L _ n) _ _ _) <- foreign_decls]
 
-hsTyClDeclsBinders :: [[LTyClDecl Name]] -> [Located (InstDecl Name)] -> [Name]
+hsTyClDeclsBinders :: [TyClGroup Name] -> [Located (InstDecl Name)] -> [Name]
 -- We need to look at instance declarations too, 
 -- because their associated types may bind data constructors
 hsTyClDeclsBinders tycl_decls inst_decls
-  = map unLoc (concatMap (concatMap hsLTyClDeclBinders) tycl_decls ++
+  = map unLoc (concatMap (concatMap hsLTyClDeclBinders . group_tyclds) tycl_decls ++
                concatMap (hsInstDeclBinders . unLoc) inst_decls)
 
 -------------------

@@ -280,11 +280,12 @@ Note [TyCon Role signatures]
 
 Every tycon has a role signature, assigning a role to each of the tyConTyVars
 (or of equal length to the tyConArity, if there are no tyConTyVars). An
-example demonstrates these best: say we have a tycon T, with parameters a@N,
-b@R, and c@P. Then, to prove representational equality between T a1 b1 c1 and
-T a2 b2 c2, we need to have nominal equality between a1 and a2, representational
-equality between b1 and b2, and nothing in particular (i.e., phantom equality)
-between c1 and c2. This might happen, say, with the following declaration:
+example demonstrates these best: say we have a tycon T, with parameters a at
+nominal, b at representational, and c at phantom. Then, to prove
+representational equality between T a1 b1 c1 and T a2 b2 c2, we need to have
+nominal equality between a1 and a2, representational equality between b1 and
+b2, and nothing in particular (i.e., phantom equality) between c1 and c2. This
+might happen, say, with the following declaration:
 
   data T a b c where
     MkT :: b -> T Int b c

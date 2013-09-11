@@ -364,14 +364,14 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @qual @varid                  { idtoken qvarid }
   @qual @conid                  { idtoken qconid }
   @varid                        { varid }
-  @conid                        { conid }
+  @conid                        { idtoken conid }
 }
 
 <0> {
   @qual @varid "#"+ / { ifExtension magicHashEnabled } { idtoken qvarid }
   @qual @conid "#"+ / { ifExtension magicHashEnabled } { idtoken qconid }
   @varid "#"+       / { ifExtension magicHashEnabled } { varid }
-  @conid "#"+       / { ifExtension magicHashEnabled } { conid }
+  @conid "#"+       / { ifExtension magicHashEnabled } { idtoken conid }
 }
 
 -- ToDo: - move `var` and (sym) into lexical syntax?
@@ -475,12 +475,10 @@ data Token
   | ITjavascriptcallconv
   | ITmdo
   | ITfamily
+  | ITrole
   | ITgroup
   | ITby
   | ITusing
-  | ITnominal
-  | ITrepresentational
-  | ITphantom
 
   -- Pragmas
   | ITinline_prag InlineSpec RuleMatchInfo
@@ -652,7 +650,9 @@ reservedWordsFM = listToUFM $
          ( "forall",         ITforall,        bit explicitForallBit .|.
                                               bit inRulePragBit),
          ( "mdo",            ITmdo,           bit recursiveDoBit),
-         ( "family",         ITfamily,        bit tyFamBit),
+             -- See Note [Lexing type pseudo-keywords]
+         ( "family",         ITfamily,        0 ),
+         ( "role",           ITrole,          0 ),
          ( "group",          ITgroup,         bit transformComprehensionsBit),
          ( "by",             ITby,            bit transformComprehensionsBit),
          ( "using",          ITusing,         bit transformComprehensionsBit),
@@ -676,13 +676,22 @@ reservedWordsFM = listToUFM $
          ( "proc",           ITproc,          bit arrowsBit)
      ]
 
-reservedUpcaseWordsFM :: UniqFM (Token, Int)
-reservedUpcaseWordsFM = listToUFM $
-    map (\(x, y, z) -> (mkFastString x, (y, z)))
-       [ ( "N",     ITnominal,          0 ), -- no extension bit for better error msgs
-         ( "R",     ITrepresentational, 0 ),
-         ( "P",     ITphantom,          0 )
-       ]
+{-----------------------------------
+Note [Lexing type pseudo-keywords]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+One might think that we wish to treat 'family' and 'role' as regular old
+varids whenever -XTypeFamilies and -XRoleAnnotations are off, respectively.
+But, there is no need to do so. These pseudo-keywords are not stolen syntax:
+they are only used after the keyword 'type' at the top-level, where varids are
+not allowed. Furthermore, checks further downstream (TcTyClsDecls) ensure that
+type families and role annotations are never declared without their extensions
+on. In fact, by unconditionally lexing these pseudo-keywords as special, we
+can get better error messages.
+
+Also, note that these are included in the `varid` production in the parser --
+a key detail to make all this work.
+-------------------------------------}
 
 reservedSymsFM :: UniqFM (Token, Int -> Bool)
 reservedSymsFM = listToUFM $
@@ -1028,20 +1037,8 @@ varid span buf len =
   where
     !fs = lexemeToFastString buf len
 
-conid :: Action
-conid span buf len =
-  case lookupUFM reservedUpcaseWordsFM fs of
-    Just (keyword, 0) -> return $ L span keyword
-
-    Just (keyword, exts) -> do
-      extsEnabled <- extension $ \i -> exts .&. i /= 0
-      if extsEnabled
-        then return $ L span keyword
-        else return $ L span $ ITconid fs
-
-    Nothing -> return $ L span $ ITconid fs
-  where
-    !fs = lexemeToFastString buf len
+conid :: StringBuffer -> Int -> Token
+conid buf len = ITconid $! lexemeToFastString buf len
 
 qvarsym, qconsym, prefixqvarsym, prefixqconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
@@ -1856,8 +1853,7 @@ explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
 bangPatBit :: Int
 bangPatBit = 8  -- Tells the parser to understand bang-patterns
                 -- (doesn't affect the lexer)
-tyFamBit :: Int
-tyFamBit = 9    -- indexed type families: 'family' keyword and kind sigs
+-- Bit #9 is available!
 haddockBit :: Int
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit :: Int
@@ -1902,6 +1898,7 @@ lambdaCaseBit :: Int
 lambdaCaseBit = 30
 negativeLiteralsBit :: Int
 negativeLiteralsBit = 31
+-- need another bit? See bit 9 above.
 
 
 always :: Int -> Bool
@@ -1918,8 +1915,6 @@ explicitForallEnabled :: Int -> Bool
 explicitForallEnabled flags = testBit flags explicitForallBit
 bangPatEnabled :: Int -> Bool
 bangPatEnabled   flags = testBit flags bangPatBit
--- tyFamEnabled :: Int -> Bool
--- tyFamEnabled     flags = testBit flags tyFamBit
 haddockEnabled :: Int -> Bool
 haddockEnabled   flags = testBit flags haddockBit
 magicHashEnabled :: Int -> Bool
@@ -2001,7 +1996,6 @@ mkPState flags buf loc =
                .|. ipBit                       `setBitIf` xopt Opt_ImplicitParams           flags
                .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
                .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
-               .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
                .|. haddockBit                  `setBitIf` gopt Opt_Haddock                  flags
                .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
                .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags

@@ -378,7 +378,7 @@ ifaceUnliftedTypeKind = ifaceTcType (IfaceTc unliftedTypeKindTyConName)
 ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
 
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
-toHsTvBndr (tv,k) = noLoc $ HsTyVarBndr (mkRdrUnqual (mkTyVarOccFS tv)) (Just bsig) Nothing
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOccFS tv)) bsig
                   where
                     bsig = toHsKind k
 

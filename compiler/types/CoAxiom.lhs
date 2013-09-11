@@ -26,7 +26,7 @@ module CoAxiom (
        coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
        placeHolderIncomps,
 
-       Role(..), pprFullRole,
+       Role(..), fsFromRole,
 
        CoAxiomRule(..), Eqn
        ) where 
@@ -444,15 +444,17 @@ This is defined here to avoid circular dependencies.
 data Role = Nominal | Representational | Phantom
   deriving (Eq, Data.Data, Data.Typeable)
 
-pprFullRole :: Role -> SDoc
-pprFullRole Nominal          = ptext (sLit "Nominal")
-pprFullRole Representational = ptext (sLit "Representational")
-pprFullRole Phantom          = ptext (sLit "Phantom")
+-- These names are slurped into the parser code. Changing these strings
+-- will change the **surface syntax** that GHC accepts! If you want to
+-- change only the pretty-printing, do some replumbing. See
+-- mkRoleAnnotDecl in RdrHsSyn
+fsFromRole :: Role -> FastString
+fsFromRole Nominal          = fsLit "nominal"
+fsFromRole Representational = fsLit "representational"
+fsFromRole Phantom          = fsLit "phantom"
 
 instance Outputable Role where
-  ppr Nominal          = char 'N'
-  ppr Representational = char 'R'
-  ppr Phantom          = char 'P'
+  ppr = ftext . fsFromRole
 
 instance Binary Role where
   put_ bh Nominal          = putByte bh 1

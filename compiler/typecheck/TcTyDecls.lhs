@@ -19,7 +19,7 @@ files for imported data types.
 module TcTyDecls(
         calcRecFlags, RecTyInfo(..), 
         calcSynCycles, calcClassCycles,
-        RoleAnnots
+        extractRoleAnnots, emptyRoleAnnots, RoleAnnots
     ) where
 
 #include "HsVersions.h"
@@ -361,10 +361,11 @@ data RecTyInfo = RTI { rti_promotable :: Bool
                      , rti_roles      :: Name -> [Role]
                      , rti_is_rec     :: Name -> RecFlag }
 
-calcRecFlags :: ModDetails -> RoleAnnots -> [TyThing] -> RecTyInfo
+calcRecFlags :: ModDetails -> Bool  -- hs-boot file?
+             -> RoleAnnots -> [TyThing] -> RecTyInfo
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
-calcRecFlags boot_details mrole_env tyclss
+calcRecFlags boot_details is_boot mrole_env tyclss
   = RTI { rti_promotable = is_promotable
         , rti_roles      = roles
         , rti_is_rec     = is_rec }
@@ -376,7 +377,7 @@ calcRecFlags boot_details mrole_env tyclss
 
     is_promotable = all (isPromotableTyCon rec_tycon_names) all_tycons
 
-    roles = inferRoles mrole_env all_tycons
+    roles = inferRoles is_boot mrole_env all_tycons
 
     ----------------- Recursion calculation ----------------
     is_rec n | n `elemNameSet` rec_names = Recursive
@@ -531,6 +532,25 @@ isPromotableType rec_tcs con_arg_ty
 
 %************************************************************************
 %*                                                                      *
+        Role annotations
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+type RoleAnnots = NameEnv (LRoleAnnotDecl Name)
+
+extractRoleAnnots :: TyClGroup Name -> RoleAnnots
+extractRoleAnnots (TyClGroup { group_roles = roles })
+  = mkNameEnv [ (tycon, role_annot)
+              | role_annot@(L _ (RoleAnnotDecl (L _ tycon) _)) <- roles ]
+
+emptyRoleAnnots :: RoleAnnots
+emptyRoleAnnots = emptyNameEnv
+
+\end{code}
+
+%************************************************************************
+%*                                                                      *
         Role inference
 %*                                                                      *
 %************************************************************************
@@ -631,41 +651,43 @@ so we need to take into account
 
 \begin{code}
 type RoleEnv    = NameEnv [Role]        -- from tycon names to roles
-type RoleAnnots = NameEnv [Maybe Role]  -- from tycon names to role annotations,
-                                        -- which may be left out
 
 -- This, and any of the functions it calls, must *not* look at the roles
 -- field of a tycon we are inferring roles about!
 -- See Note [Role inference]
-inferRoles :: RoleAnnots -> [TyCon] -> Name -> [Role]
-inferRoles annots tycons
-  = let role_env  = initialRoleEnv annots tycons
+inferRoles :: Bool -> RoleAnnots -> [TyCon] -> Name -> [Role]
+inferRoles is_boot annots tycons
+  = let role_env  = initialRoleEnv is_boot annots tycons
         role_env' = irGroup role_env tycons in
     \name -> case lookupNameEnv role_env' name of
       Just roles -> roles
       Nothing    -> pprPanic "inferRoles" (ppr name)
 
-initialRoleEnv :: RoleAnnots -> [TyCon] -> RoleEnv
-initialRoleEnv annots = extendNameEnvList emptyNameEnv .
-                        map (initialRoleEnv1 annots)
+initialRoleEnv :: Bool -> RoleAnnots -> [TyCon] -> RoleEnv
+initialRoleEnv is_boot annots = extendNameEnvList emptyNameEnv .
+                                map (initialRoleEnv1 is_boot annots)
 
-initialRoleEnv1 :: RoleAnnots -> TyCon -> (Name, [Role])
-initialRoleEnv1 annots_env tc
+initialRoleEnv1 :: Bool -> RoleAnnots -> TyCon -> (Name, [Role])
+initialRoleEnv1 is_boot annots_env tc
   | isFamilyTyCon tc = (name, map (const Nominal) tyvars)
   |  isAlgTyCon tc
   || isSynTyCon tc   = (name, default_roles)
   | otherwise        = pprPanic "initialRoleEnv1" (ppr tc)
   where name         = tyConName tc
         tyvars       = tyConTyVars tc
+        (kvs, tvs)   = span isKindVar tyvars
 
-         -- whether are not there are annotations, we're guaranteed that
-         -- the length of role_annots is appropriate
-        role_annots  = case lookupNameEnv annots_env name of
-                          Just annots -> annots
-                          Nothing     -> pprPanic "initialRoleEnv1 annots" (ppr name)
-        default_roles = let kvs = takeWhile isKindVar tyvars in
-                        map (const Nominal) kvs ++
-                        zipWith orElse role_annots (repeat Phantom)
+          -- if the number of annotations in the role annotation decl
+          -- is wrong, just ignore it. We check this in the validity check.
+        role_annots
+          = case lookupNameEnv annots_env name of
+              Just (L _ (RoleAnnotDecl _ annots))
+                | annots `equalLength` tvs -> map unLoc annots
+              _                            -> map (const Nothing) tvs
+        default_roles = map (const Nominal) kvs ++
+                        zipWith orElse role_annots (repeat default_role)
+
+        default_role = if is_boot then Representational else Phantom
 
 irGroup :: RoleEnv -> [TyCon] -> RoleEnv
 irGroup env tcs

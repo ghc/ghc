@@ -23,7 +23,7 @@ module IfaceType (
 
         -- Printing
         pprIfaceType, pprParendIfaceType, pprIfaceContext,
-        pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs, pprIfaceTvBndrsRoles,
+        pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs,
         pprIfaceBndrs,
         tOP_PREC, tYCON_PREC, noParens, maybeParen, pprIfaceForAllPart,
         pprIfaceCoercion, pprParendIfaceCoercion
@@ -186,11 +186,6 @@ pprIfaceTvBndr (tv, kind) = parens (ppr tv <> dcolon <> ppr kind)
 
 pprIfaceTvBndrs :: [IfaceTvBndr] -> SDoc
 pprIfaceTvBndrs tyvars = sep (map pprIfaceTvBndr tyvars)
-
-pprIfaceTvBndrsRoles :: [IfaceTvBndr] -> [Role] -> SDoc
-pprIfaceTvBndrsRoles tyvars roles = sep (zipWith ppr_bndr_role tyvars roles)
-  where
-    ppr_bndr_role bndr role = pprIfaceTvBndr bndr <> char '@' <> ppr role
 
 instance Binary IfaceBndr where
     put_ bh (IfaceIdBndr aa) = do
@@ -357,7 +352,11 @@ ppr_special_co ctxt_prec doc cos
                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
 
 ppr_role :: Role -> SDoc
-ppr_role r = underscore <> ppr r
+ppr_role r = underscore <> pp_role
+  where pp_role = case r of
+                    Nominal          -> char 'N'
+                    Representational -> char 'R'
+                    Phantom          -> char 'P'
 
 -------------------
 instance Outputable IfaceTyCon where

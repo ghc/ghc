@@ -37,6 +37,7 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
+import TcTyDecls  ( emptyRoleAnnots )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
@@ -62,7 +63,6 @@ import Id
 import MkId
 import Name
 import NameSet
-import NameEnv
 import Outputable
 import SrcLoc
 import Util
@@ -709,7 +709,7 @@ tcDataFamInstDecl mb_clsinfo
               ; return (rep_tc, fam_inst) }
 
          -- Remember to check validity; no recursion to worry about here
-       ; let role_annots = unitNameEnv rep_tc_name (repeat Nothing)
+       ; let role_annots = emptyRoleAnnots
        ; checkValidTyCon rep_tc role_annots
        ; return fam_inst } }
   where

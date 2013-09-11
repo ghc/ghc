@@ -490,7 +490,7 @@ getLocalNonValBinders fixity_env
                 hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
-        ; tc_avails <- mapM new_tc (concat tycl_decls)
+        ; tc_avails <- mapM new_tc (tyClGroupConcat tycl_decls)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
             -- Bring these things into scope first

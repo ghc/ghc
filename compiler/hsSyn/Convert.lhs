@@ -267,6 +267,11 @@ cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
        ; returnL $ TyClD (FamDecl (FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind')) }
   | otherwise
   = failWith (ptext (sLit "Illegal empty closed type family"))
+
+cvtDec (TH.RoleAnnotD tc roles)
+  = do { tc' <- tconNameL tc
+       ; let roles' = map (noLoc . cvtRole) roles
+       ; return $ noLoc $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
@@ -856,25 +861,17 @@ cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm)
   = do { nm' <- tName nm
-       ; returnL $ HsTyVarBndr nm' Nothing Nothing }
+       ; returnL $ UserTyVar nm' }
 cvt_tv (TH.KindedTV nm ki)
   = do { nm' <- tName nm
        ; ki' <- cvtKind ki
-       ; returnL $ HsTyVarBndr nm' (Just ki') Nothing }
-cvt_tv (TH.RoledTV nm r)
-  = do { nm' <- tName nm
-       ; r'  <- cvtRole r
-       ; returnL $ HsTyVarBndr nm' Nothing (Just r') }
-cvt_tv (TH.KindedRoledTV nm k r)
-  = do { nm' <- tName nm
-       ; k'  <- cvtKind k
-       ; r'  <- cvtRole r
-       ; returnL $ HsTyVarBndr nm' (Just k') (Just r') }
+       ; returnL $ KindedTyVar nm' ki' }
 
-cvtRole :: TH.Role -> CvtM Coercion.Role
-cvtRole TH.Nominal          = return Coercion.Nominal
-cvtRole TH.Representational = return Coercion.Representational
-cvtRole TH.Phantom          = return Coercion.Phantom
+cvtRole :: TH.Role -> Maybe Coercion.Role
+cvtRole TH.NominalR          = Just Coercion.Nominal
+cvtRole TH.RepresentationalR = Just Coercion.Representational
+cvtRole TH.PhantomR          = Just Coercion.Phantom
+cvtRole TH.InferR            = Nothing
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }

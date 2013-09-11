@@ -8,6 +8,7 @@ module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkHsSplice, mkTopSpliceDecl,
+        mkRoleAnnotDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
         mkTySynonym, mkTyFamInstEqn,
@@ -56,6 +57,7 @@ module RdrHsSyn (
 
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
+import CoAxiom          ( Role, fsFromRole )
 import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
                           isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace,
                           rdrNameSpace )
@@ -83,6 +85,8 @@ import Control.Applicative ((<$>))
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
+
+import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 #include "HsVersions.h"
 \end{code}
@@ -214,7 +218,6 @@ mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
 mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr       Explicit)
 mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr Implicit)
 
-
 -- Ensure a type literal is used correctly; notably, we need the proper extension enabled,
 -- and if it's an integer literal, the literal must be >= 0. This can occur with
 -- -XNegativeLiterals enabled (see #8306)
@@ -227,11 +230,39 @@ mkTyLit lit = extension typeLiteralsEnabled >>= check
     check False =
       parseErrorSDoc (getLoc lit)
         (text "Illegal literal in type (use DataKinds to enable):" <+> ppr lit)
-
     check True  =
       if not (negLit lit) then return (HsTyLit `fmap` lit)
        else parseErrorSDoc (getLoc lit)
               (text "Illegal literal in type (type literals must not be negative):" <+> ppr lit)
+
+
+mkRoleAnnotDecl :: SrcSpan
+                -> Located RdrName                   -- type being annotated
+                -> [Located (Maybe FastString)]      -- roles
+                -> P (LRoleAnnotDecl RdrName)
+mkRoleAnnotDecl loc tycon roles
+  = do { roles' <- mapM parse_role roles
+       ; return $ L loc $ RoleAnnotDecl tycon roles' }
+  where
+    role_data_type = dataTypeOf (undefined :: Role)
+    all_roles = map fromConstr $ dataTypeConstrs role_data_type
+    possible_roles = [(fsFromRole role, role) | role <- all_roles]
+
+    parse_role (L loc_role Nothing) = return $ L loc_role Nothing
+    parse_role (L loc_role (Just role))
+      = case lookup role possible_roles of
+          Just found_role -> return $ L loc_role $ Just found_role
+          Nothing         ->
+            let nearby = fuzzyLookup (unpackFS role) (mapFst unpackFS possible_roles) in
+            parseErrorSDoc loc_role
+              (text "Illegal role name" <+> quotes (ppr role) $$
+               suggestions nearby)
+
+    suggestions []   = empty
+    suggestions [r]  = text "Perhaps you meant" <+> quotes (ppr r)
+      -- will this last case ever happen??
+    suggestions list = hang (text "Perhaps you meant one of these:")
+                       2 (pprWithCommas (quotes . ppr) list)
 \end{code}
 
 %************************************************************************
@@ -470,14 +501,10 @@ checkTyVars tycl_hdr tparms = do { tvs <- mapM chk tparms
                                  ; return (mkHsQTvs tvs) }
   where
         -- Check that the name space is correct!
-    chk (L l (HsRoleAnnot (L _ (HsKindSig (L _ (HsTyVar tv)) k)) r))
-        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv (Just k) (Just r)))
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv (Just k) Nothing))
-    chk (L l (HsRoleAnnot (L _ (HsTyVar tv)) r))
-        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv Nothing (Just r)))
+        | isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
-        | isRdrTyVar tv    = return (L l (HsTyVarBndr tv Nothing Nothing))
+        | isRdrTyVar tv    = return (L l (UserTyVar tv))
     chk t@(L l _)
         = parseErrorSDoc l $
           vcat [ sep [ ptext (sLit "Unexpected type") <+> quotes (ppr t)

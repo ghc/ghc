@@ -20,7 +20,8 @@ module RnEnv (
         greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
-        lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
+        lookupGreRn, lookupGreRn_maybe,
+        lookupGlobalOccInThisModule, lookupGreLocalRn_maybe, 
         getLookupOccRn, addUsedRdrNames,
 
         newLocalBndrRn, newLocalBndrsRn,
@@ -219,7 +220,7 @@ lookupTopBndrRn_maybe rdr_name
                (do { op_ok <- xoptM Opt_TypeOperators
                    ; unless op_ok (addErr (opDeclErr rdr_name)) })
 
-        ; mb_gre <- lookupGreLocalRn rdr_name
+        ; mb_gre <- lookupGreLocalRn_maybe rdr_name
         ; case mb_gre of
                 Nothing  -> return Nothing
                 Just gre -> return (Just $ gre_name gre) }
@@ -680,12 +681,25 @@ lookupGreRn rdr_name
         ; return (GRE { gre_name = name, gre_par = NoParent,
                         gre_prov = LocalDef }) }}}
 
-lookupGreLocalRn :: RdrName -> RnM (Maybe GlobalRdrElt)
+lookupGreLocalRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Similar, but restricted to locally-defined things
-lookupGreLocalRn rdr_name
+lookupGreLocalRn_maybe rdr_name
   = lookupGreRn_help rdr_name lookup_fn
   where
     lookup_fn env = filter isLocalGRE (lookupGRE_RdrName rdr_name env)
+
+lookupGlobalOccInThisModule :: RdrName -> RnM Name
+-- If not found, add error message
+lookupGlobalOccInThisModule rdr_name
+  | Just n <- isExact_maybe rdr_name
+  = do { n' <- lookupExactOcc n; return n' }
+
+  | otherwise
+  = do { mb_gre <- lookupGreLocalRn_maybe rdr_name
+       ; case mb_gre of
+           Just gre -> return $ gre_name gre
+           Nothing -> do { traceRn (text "lookupGlobalInThisModule" <+> ppr rdr_name)
+                         ; unboundName WL_LocalTop rdr_name } }
 
 lookupGreRn_help :: RdrName                     -- Only used in error message
                  -> (GlobalRdrEnv -> [GlobalRdrElt])    -- Lookup function

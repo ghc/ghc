@@ -335,7 +335,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
                                               (mkFakeGroup ldecls) ;
    setEnvs tc_envs $ do {
 
-   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [] [ldecls] ;
+   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [] [mkTyClGroup ldecls] ;
    -- The empty list is for extra dependencies coming from .hs-boot files
    -- See Note [Extra dependencies from .hs-boot files] in RnSource
 
@@ -400,7 +400,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 mkFakeGroup :: [LTyClDecl a] -> HsGroup a
 mkFakeGroup decls -- Rather clumsy; lots of unused fields
-  = emptyRdrGroup { hs_tyclds = [decls] }
+  = emptyRdrGroup { hs_tyclds = [mkTyClGroup decls] }
 \end{code}
 
 
@@ -1104,7 +1104,7 @@ tcTopSrcDecls boot_details
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (tyClGroupConcat tycl_decls) inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1177,7 +1177,7 @@ tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls
       -- Note [AFamDataCon: not promoting data family constructors]
    do { tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
       ; setGblEnv tcg_env $
-        tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls }
+        tcInstDecls1 (tyClGroupConcat tycl_decls) inst_decls deriv_decls }
   where
     -- get_cons extracts the *constructor* bindings of the declaration
     get_cons :: LInstDecl Name -> [Name]
@@ -1686,7 +1686,7 @@ getGhciStepIO = do
 
         stepTy :: LHsType Name    -- Renamed, so needs all binders in place
         stepTy = noLoc $ HsForAllTy Implicit
-                            (HsQTvs { hsq_tvs = [noLoc (HsTyVarBndr a_tv Nothing Nothing)]
+                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar a_tv)]
                                     , hsq_kvs = [] })
                             (noLoc [])
                             (nlHsFunTy ghciM ioM)
