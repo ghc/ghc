@@ -1705,7 +1705,7 @@ internal_dlsym(void *hdl, const char *symbol) {
             return v;
         }
     }
-    v = dlsym(hdl, symbol)
+    v = dlsym(hdl, symbol);
     RELEASE_LOCK(&dl_mutex);
     return v;
 }
@@ -5386,12 +5386,12 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           barf("R_X86_64_GOTTPOFF relocation, but ALWAYS_PIC.");
 #else
         /* determine the offset of S to the current thread's tls
-           area 
+           area
            XXX: Move this to the beginning of function */
           struct tls_info ti;
           get_tls_area(0, &ti, sizeof(ti));
           /* make entry in GOT that contains said offset */
-          StgInt64 gotEntry = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), 
+          StgInt64 gotEntry = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info),
                                          (S - (Elf64_Addr)(ti.base)))->addr;
           *(Elf64_Word *)P = gotEntry + A - P;
 #endif
@@ -5533,7 +5533,7 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 
     IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
 
-    for (i = 0; i < header->ncmds; i++) {   
+    for (i = 0; i < header->ncmds; i++) {
         if (lc->cmd == LC_SYMTAB) {
 
                 // Find out the first and last undefined external
@@ -5590,7 +5590,7 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 
     IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
 
-    for (i = 0; i < header->ncmds; i++) {   
+    for (i = 0; i < header->ncmds; i++) {
         if (lc->cmd == LC_SYMTAB) {
 
                 // Just allocate one entry for every symbol
@@ -5865,7 +5865,7 @@ relocateSection(
 				       " and should be defined in a section, but isn't!\n", nm);
 		    }
 	    }
-	    
+
             value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, (unsigned long)addr)->addr;
 
             type = X86_64_RELOC_SIGNED;
@@ -6198,7 +6198,7 @@ relocateSection(
                         return 0;
                     }
 
-                    if (reloc->r_pcrel) {  
+                    if (reloc->r_pcrel) {
 #ifdef powerpc_HOST_ARCH
                             // In the .o file, this should be a relative jump to NULL
                             // and we'll change it to a relative jump to the symbol
@@ -6372,7 +6372,7 @@ ocGetNames_MachO(ObjectCode* oc)
             addSection(oc, SECTIONKIND_RWDATA,
                 (void*) (image + sections[i].offset),
                 (void*) (image + sections[i].offset + sections[i].size));
-        }    
+        }
         else if (!strcmp(sections[i].sectname,"__data")) {
 
             IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __data section\n"));
