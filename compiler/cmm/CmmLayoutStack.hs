@@ -164,24 +164,24 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_hwm blo
     go (b0 : bs) acc_stackmaps acc_hwm acc_blocks
       = do
        let (entry0@(CmmEntry entry_lbl), middle0, last0) = blockSplit b0
-    
+
        let stack0@StackMap { sm_sp = sp0 }
                = mapFindWithDefault
                      (pprPanic "no stack map for" (ppr entry_lbl))
                      entry_lbl acc_stackmaps
-    
+
        -- pprTrace "layout" (ppr entry_lbl <+> ppr stack0) $ return ()
-    
+
        -- (a) Update the stack map to include the effects of
        --     assignments in this block
        let stack1 = foldBlockNodesF (procMiddle acc_stackmaps) middle0 stack0
-    
+
        -- (b) Insert assignments to reload all the live variables if this
        --     block is a proc point
        let middle1 = if entry_lbl `setMember` procpoints
                         then foldr blockCons middle0 (insertReloads stack0)
                         else middle0
-    
+
        -- (c) Look at the last node and if we are making a call or
        --     jumping to a proc point, we must save the live
        --     variables, adjust Sp, and construct the StackMaps for
@@ -190,7 +190,7 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_hwm blo
        (middle2, sp_off, last1, fixup_blocks, out)
            <- handleLastNode dflags procpoints liveness cont_info
                              acc_stackmaps stack1 middle0 last0
-    
+
        -- pprTrace "layout(out)" (ppr out) $ return ()
 
        -- (d) Manifest Sp: run over the nodes in the block and replace
@@ -566,9 +566,9 @@ setupStackFrame dflags lbl liveness updfr_off ret_args stack0
 -- So to fix this we want to set up the stack frame before the
 -- conditional jump.  How do we know when to do this, and when it is
 -- safe?  The basic idea is, when we see the assignment
--- 
+--
 --   Sp[young(L)] = L
--- 
+--
 -- we know that
 --   * we are definitely heading for L
 --   * there can be no more reads from another stack area, because young(L)
@@ -877,7 +877,7 @@ stackMapToLiveness dflags StackMap{..} =
 -- Lowering safe foreign calls
 
 {-
-Note [lower safe foreign calls]
+Note [Lower safe foreign calls]
 
 We start with
 
@@ -907,7 +907,8 @@ live across the call.  Our job now is to expand the call so we get
    ...
 
 Note the copyOut, which saves the results in the places that L1 is
-expecting them (see Note {safe foreign call convention]).
+expecting them (see Note {safe foreign call convention]). Note also
+that safe foreign call is replace by an unsafe one in the Cmm graph.
 -}
 
 lowerSafeForeignCall :: DynFlags -> CmmBlock -> UniqSM CmmBlock
