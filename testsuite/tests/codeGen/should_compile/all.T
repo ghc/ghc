@@ -21,3 +21,4 @@ test('massive_array',
      compile, ['-fPIC'])
 test('T7237', normal, compile, [''])
 test('T7574', [cmm_src, expect_broken(7574), omit_ways(['llvm', 'optllvm'])], compile, [''])
+test('T8205', normal, compile, ['-O0'])
