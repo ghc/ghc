@@ -55,8 +55,13 @@ def fingerprint(source=None):
   `sync-all` command will be run to get the current fingerprint.
   """
   if source is None:
-    sync_all = ["./sync-all", "log", "-1", "--pretty=oneline"]
-    source  = Popen(sync_all, stdout=PIPE).stdout
+    if sys.platform == 'win32':
+      # Can't rely on perl being located at `/usr/bin/perl`.
+      sync_all = ["perl", "./sync-all", "log", "-1", "--pretty=oneline"]
+    else:
+      sync_all = ["./sync-all", "log", "-1", "--pretty=oneline"]
+
+    source = Popen(sync_all, stdout=PIPE).stdout
 
   lib = ""
   commits = {}
