@@ -40,9 +40,10 @@ main = do hSetBuffering stdout LineBuffering
                   doCheck dir
               "copy" : dir : distDir
                      : strip : myDestDir : myPrefix : myLibdir : myDocdir
-                     : args' ->
+                     : ghcLibWays : args' ->
                   doCopy dir distDir
                          strip myDestDir myPrefix myLibdir myDocdir
+                         ("dyn" `elem` words ghcLibWays)
                          args'
               "register" : dir : distDir : ghc : ghcpkg : topdir
                          : myDestDir : myPrefix : myLibdir : myDocdir
@@ -127,11 +128,11 @@ runHsColour directory distdir args
  $ defaultMainArgs ("hscolour" : "--builddir" : distdir : args)
 
 doCopy :: FilePath -> FilePath
-       -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+       -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> Bool
        -> [String]
        -> IO ()
 doCopy directory distDir
-       strip myDestDir myPrefix myLibdir myDocdir
+       strip myDestDir myPrefix myLibdir myDocdir withSharedLibs
        args
  = withCurrentDirectory directory $ do
      let copyArgs = ["copy", "--builddir", distDir]
@@ -172,7 +173,8 @@ doCopy directory distDir
             progs' <- configureProgram verbosity stripProgram' progs
             let lbi' = lbi {
                                withPrograms = progs',
-                               installDirTemplates = idts
+                               installDirTemplates = idts,
+                               withSharedLib = withSharedLibs
                            }
             f pd lbi' us flags
 

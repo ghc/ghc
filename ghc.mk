@@ -918,7 +918,8 @@ install_packages: rts/dist/package.conf.install
 	                                  '$(DESTDIR)'                \
 	                                  '$(prefix)'                 \
 	                                  '$(ghclibdir)'              \
-	                                  '$(docdir)/html/libraries'))
+	                                  '$(docdir)/html/libraries'  \
+	                                  '$(GhcLibWays)'))
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist/package.conf.install
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
