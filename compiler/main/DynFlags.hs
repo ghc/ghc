@@ -197,7 +197,7 @@ data DumpFlag
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
    | Opt_D_dump_cmm_proc
-   | Opt_D_dump_cmm_rewrite
+   | Opt_D_dump_cmm_sink
    | Opt_D_dump_cmm_sp
    | Opt_D_dump_cmm_procmap
    | Opt_D_dump_cmm_split
@@ -2220,7 +2220,7 @@ dynamic_flags = [
   , Flag "ddump-cmm-cfg"           (setDumpFlag Opt_D_dump_cmm_cfg)
   , Flag "ddump-cmm-cbe"           (setDumpFlag Opt_D_dump_cmm_cbe)
   , Flag "ddump-cmm-proc"          (setDumpFlag Opt_D_dump_cmm_proc)
-  , Flag "ddump-cmm-rewrite"       (setDumpFlag Opt_D_dump_cmm_rewrite)
+  , Flag "ddump-cmm-sink"          (setDumpFlag Opt_D_dump_cmm_sink)
   , Flag "ddump-cmm-sp"            (setDumpFlag Opt_D_dump_cmm_sp)
   , Flag "ddump-cmm-procmap"       (setDumpFlag Opt_D_dump_cmm_procmap)
   , Flag "ddump-cmm-split"         (setDumpFlag Opt_D_dump_cmm_split)

@@ -99,7 +99,7 @@ cpsTop hsc_env proc =
        ----------- Sink and inline assignments  --------------------------------
        g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
             condPass Opt_CmmSink (cmmSink dflags) g
-                     Opt_D_dump_cmm_rewrite "Sink assignments"
+                     Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
