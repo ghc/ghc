@@ -48,6 +48,7 @@ module TyCon(
         isFamilyTyCon, isOpenFamilyTyCon,
         isSynFamilyTyCon, isDataFamilyTyCon,
         isOpenSynFamilyTyCon, isClosedSynFamilyTyCon_maybe,
+        isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
         isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
@@ -88,12 +89,14 @@ module TyCon(
 
         -- * Recursion breaking
         RecTcChecker, initRecTc, checkRecTc
+
 ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
+import {-# SOURCE #-} FamInst ( TcBuiltInSynFamily )
 
 import Var
 import Class
@@ -628,6 +631,8 @@ data SynTyConRhs
    -- | A closed type synonym family declared in an hs-boot file with
    -- type family F a where ..
    | AbstractClosedSynFamilyTyCon
+
+   | BuiltInSynFamTyCon TcBuiltInSynFamily
 \end{code}
 
 Note [Closed type families]
@@ -1207,6 +1212,7 @@ isFamilyTyCon :: TyCon -> Bool
 isFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon })              = True
 isFamilyTyCon (SynTyCon {synTcRhs = ClosedSynFamilyTyCon {} })         = True
 isFamilyTyCon (SynTyCon {synTcRhs = AbstractClosedSynFamilyTyCon {} }) = True
+isFamilyTyCon (SynTyCon {synTcRhs = BuiltInSynFamTyCon {} })           = True
 isFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}})               = True
 isFamilyTyCon _ = False
 
@@ -1222,6 +1228,7 @@ isSynFamilyTyCon :: TyCon -> Bool
 isSynFamilyTyCon (SynTyCon {synTcRhs = OpenSynFamilyTyCon {}})           = True
 isSynFamilyTyCon (SynTyCon {synTcRhs = ClosedSynFamilyTyCon {}})         = True
 isSynFamilyTyCon (SynTyCon {synTcRhs = AbstractClosedSynFamilyTyCon {}}) = True
+isSynFamilyTyCon (SynTyCon {synTcRhs = BuiltInSynFamTyCon {}})           = True
 isSynFamilyTyCon _ = False
 
 isOpenSynFamilyTyCon :: TyCon -> Bool
@@ -1233,6 +1240,11 @@ isClosedSynFamilyTyCon_maybe :: TyCon -> Maybe (CoAxiom Branched)
 isClosedSynFamilyTyCon_maybe
   (SynTyCon {synTcRhs = ClosedSynFamilyTyCon ax}) = Just ax
 isClosedSynFamilyTyCon_maybe _ = Nothing
+
+isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe TcBuiltInSynFamily
+isBuiltInSynFamTyCon_maybe
+  SynTyCon {synTcRhs = BuiltInSynFamTyCon ops } = Just ops
+isBuiltInSynFamTyCon_maybe _ = Nothing
 
 -- | Is this a synonym 'TyCon' that can have may have further instances appear?
 isDataFamilyTyCon :: TyCon -> Bool

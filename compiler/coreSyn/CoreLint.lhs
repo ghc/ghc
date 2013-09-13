@@ -54,6 +54,7 @@ import OptCoercion ( checkAxInstCo )
 import Control.Monad
 import MonadUtils
 import Data.Maybe
+import Pair
 \end{code}
 
 Note [GHC Formalism]
@@ -987,6 +988,53 @@ lintCoercion co@(SubCo co')
   = do { (k,s,t,r) <- lintCoercion co'
        ; checkRole co Nominal r
        ; return (k,s,t,Representational) }
+
+
+lintCoercion this@(AxiomRuleCo co ts cs)
+  = do _ks <- mapM lintType ts
+       eqs <- mapM lintCoercion cs
+
+       let tyNum = length ts
+
+       case compare (coaxrTypeArity co) tyNum of
+         EQ -> return ()
+         LT -> err "Too many type arguments"
+                    [ txt "expected" <+> int (coaxrTypeArity co)
+                    , txt "provided" <+> int tyNum ]
+         GT -> err "Not enough type arguments"
+                    [ txt "expected" <+> int (coaxrTypeArity co)
+                          , txt "provided" <+> int tyNum ]
+       checkRoles 0 (coaxrAsmpRoles co) eqs
+
+       case coaxrProves co ts [ Pair l r | (_,l,r,_) <- eqs ] of
+         Nothing -> err "Malformed use of AxiomRuleCo" [ ppr this ]
+         Just (Pair l r) ->
+           do kL <- lintType l
+              kR <- lintType r
+              unless (eqKind kL kR)
+                $ err "Kind error in CoAxiomRule"
+                       [ppr kL <+> txt "/=" <+> ppr kR]
+              return (kL, l, r, coaxrRole co)
+  where
+  txt       = ptext . sLit
+  err m xs  = failWithL $
+                hang (txt m) 2 $ vcat (txt "Rule:" <+> ppr (coaxrName co) : xs)
+
+  checkRoles n (e : es) ((_,_,_,r) : rs)
+    | e == r    = checkRoles (n+1) es rs
+    | otherwise = err "Argument roles mismatch"
+                      [ txt "In argument:" <+> int (n+1)
+                      , txt "Expected:" <+> ppr e
+                      , txt "Found:" <+> ppr r ]
+  checkRoles _ [] []  = return ()
+  checkRoles n [] rs  = err "Too many coercion arguments"
+                          [ txt "Expected:" <+> int n
+                          , txt "Provided:" <+> int (n + length rs) ]
+
+  checkRoles n es []  = err "Not enough coercion arguments"
+                          [ txt "Expected:" <+> int (n + length es)
+                          , txt "Provided:" <+> int n ]
+
 \end{code}
 
 %************************************************************************

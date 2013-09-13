@@ -295,10 +295,6 @@ basicKnownKeyNames
 
         -- Type-level naturals
         singIClassName,
-        typeNatLeqClassName,
-        typeNatAddTyFamName,
-        typeNatMulTyFamName,
-        typeNatExpTyFamName,
 
         -- Implicit parameters
         ipClassName,
@@ -1144,13 +1140,8 @@ randomGenClassName  = clsQual rANDOM (fsLit "RandomGen") randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
 -- Type-level naturals
-singIClassName, typeNatLeqClassName,
-  typeNatAddTyFamName, typeNatMulTyFamName, typeNatExpTyFamName :: Name
+singIClassName :: Name
 singIClassName      = clsQual gHC_TYPELITS (fsLit "SingI") singIClassNameKey
-typeNatLeqClassName = clsQual gHC_TYPELITS (fsLit "<=")  typeNatLeqClassNameKey
-typeNatAddTyFamName = tcQual  gHC_TYPELITS (fsLit "+")   typeNatAddTyFamNameKey
-typeNatMulTyFamName = tcQual  gHC_TYPELITS (fsLit "*")   typeNatMulTyFamNameKey
-typeNatExpTyFamName = tcQual  gHC_TYPELITS (fsLit "^")   typeNatExpTyFamNameKey
 
 -- Implicit parameters
 ipClassName :: Name
@@ -1273,9 +1264,8 @@ constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
 -- SingI: see Note [SingI and EvLit] in TcEvidence
-singIClassNameKey, typeNatLeqClassNameKey :: Unique
+singIClassNameKey :: Unique
 singIClassNameKey       = mkPreludeClassUnique 42
-typeNatLeqClassNameKey  = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
@@ -1477,13 +1467,15 @@ rep1TyConKey = mkPreludeTyConUnique 156
 
 -- Type-level naturals
 typeNatKindConNameKey, typeSymbolKindConNameKey,
-  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey
+  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
+  typeNatLeqTyFamNameKey
   :: Unique
 typeNatKindConNameKey     = mkPreludeTyConUnique 160
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 161
 typeNatAddTyFamNameKey    = mkPreludeTyConUnique 162
 typeNatMulTyFamNameKey    = mkPreludeTyConUnique 163
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 164
+typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 165
 
 -- SIMD vector types (Unique keys)
 floatX4PrimTyConKey, doubleX2PrimTyConKey, int32X4PrimTyConKey,

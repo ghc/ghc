@@ -1422,6 +1422,7 @@ checkValidTyCon tc mroles
       SynonymTyCon ty              -> 
         do { check_roles
            ; checkValidType syn_ctxt ty }
+      BuiltInSynFamTyCon _ -> return ()
 
   | otherwise
   = do { unless (isFamilyTyCon tc) $ check_roles -- don't check data families!

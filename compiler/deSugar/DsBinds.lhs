@@ -847,6 +847,11 @@ ds_tc_coercion subst role tc_co
     go r (TcCastCo co1 co2)     = maybeSubCo r $ mkCoCast (go Nominal co1)
                                                           (go Nominal co2)
     go r (TcCoVarCo v)          = maybeSubCo r $ ds_ev_id subst v
+    go _ (TcAxiomRuleCo co ts cs) = AxiomRuleCo co
+                                      (map (Coercion.substTy subst) ts)
+                                      (map (go Nominal) cs)
+
+
 
     ds_co_binds :: TcEvBinds -> CvSubst
     ds_co_binds (EvBinds bs)      = foldl ds_scc subst (sccEvBinds bs)

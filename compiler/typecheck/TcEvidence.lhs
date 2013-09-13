@@ -22,6 +22,7 @@ module TcEvidence (
   mkTcReflCo, mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos, 
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcInstCos,
+  mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
   isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe,
   liftTcCoSubstWith
@@ -105,6 +106,9 @@ data TcCoercion
   | TcCoVarCo EqVar               -- variable always at role N
   | TcAxiomInstCo (CoAxiom Branched) Int [TcType] -- Int specifies branch number
                                                   -- See [CoAxiom Index] in Coercion.lhs
+  -- This is number of types and coercions are expected to macth to CoAxiomRule
+  -- (i.e., the CoAxiomRules are always fully saturated)
+  | TcAxiomRuleCo CoAxiomRule [TcType] [TcCoercion]
   | TcSymCo TcCoercion
   | TcTransCo TcCoercion TcCoercion
   | TcNthCo Int TcCoercion
@@ -155,6 +159,9 @@ mkTcAxInstCo ax ind tys
     n_tys = length tys
     arity = coAxiomArity ax ind
     ax_br = toBranchedAxiom ax
+
+mkTcAxiomRuleCo :: CoAxiomRule -> [TcType] -> [TcCoercion] -> TcCoercion
+mkTcAxiomRuleCo = TcAxiomRuleCo
 
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType] -> TcCoercion
 mkTcUnbranchedAxInstCo ax tys
@@ -231,6 +238,10 @@ tcCoercionKind co = go co
     go (TcTransCo co1 co2)    = Pair (pFst (go co1)) (pSnd (go co2))
     go (TcNthCo d co)         = tyConAppArgN d <$> go co
     go (TcLRCo lr co)         = (pickLR lr . tcSplitAppTy) <$> go co
+    go (TcAxiomRuleCo ax ts cs) =
+       case coaxrProves ax ts (map tcCoercionKind cs) of
+         Just res -> res
+         Nothing -> panic "tcCoercionKind: malformed TcAxiomRuleCo"
 
     -- c.f. Coercion.coercionKind
     go_inst (TcInstCo co ty) tys = go_inst co (ty:tys)
@@ -264,6 +275,8 @@ coVarsOfTcCo tc_co
                                    `minusVarSet` get_bndrs bs
     go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
                                      -- to evVarsOfTerm in the DEBUG check of setEvBind
+    go (TcAxiomRuleCo _ _ cos)   = foldr (unionVarSet . go) emptyVarSet cos
+
 
     -- We expect only coercion bindings, so use evTermCoercion 
     go_bind :: EvBind -> VarSet
@@ -330,6 +343,25 @@ ppr_co p (TcTransCo co1 co2) = maybeParen p FunPrec $
 ppr_co p (TcSymCo co)         = pprPrefixApp p (ptext (sLit "Sym")) [pprParendTcCo co]
 ppr_co p (TcNthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <+> int n) [pprParendTcCo co]
 ppr_co p (TcLRCo lr co)       = pprPrefixApp p (ppr lr) [pprParendTcCo co]
+ppr_co p (TcAxiomRuleCo co ts ps) = maybeParen p TopPrec
+                                  $ ppr_tc_axiom_rule_co co ts ps
+
+ppr_tc_axiom_rule_co :: CoAxiomRule -> [TcType] -> [TcCoercion] -> SDoc
+ppr_tc_axiom_rule_co co ts ps = ppr (coaxrName co) <> ppTs ts $$ nest 2 (ppPs ps)
+  where
+  ppTs []   = Outputable.empty
+  ppTs [t]  = ptext (sLit "@") <> ppr_type TopPrec t
+  ppTs ts   = ptext (sLit "@") <>
+                parens (hsep $ punctuate comma $ map pprType ts)
+
+  ppPs []   = Outputable.empty
+  ppPs [p]  = pprParendTcCo p
+  ppPs (p : ps) = ptext (sLit "(") <+> pprTcCo p $$
+                  vcat [ ptext (sLit ",") <+> pprTcCo q | q <- ps ] $$
+                  ptext (sLit ")")
+
+
+
 
 ppr_fun_co :: Prec -> TcCoercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)

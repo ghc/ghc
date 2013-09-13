@@ -184,6 +184,9 @@ pprTyCon pefas ss tyCon
       AbstractClosedSynFamilyTyCon -> closed_family_header <+> ptext (sLit "..")
       SynonymTyCon rhs_ty -> hang (pprTyConHdr pefas tyCon <+> equals) 
                                      2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
+      BuiltInSynFamTyCon {} -> pprTyConHdr pefas tyCon <+> dcolon <+> 
+                             pprTypeForUser pefas (GHC.synTyConResKind tyCon)
+
                                                  -- e.g. type T = forall a. a->a
   | Just cls <- GHC.tyConClass_maybe tyCon
   = pprClass pefas ss cls

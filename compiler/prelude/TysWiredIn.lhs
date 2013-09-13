@@ -14,6 +14,7 @@ module TysWiredIn (
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
         trueDataCon,  trueDataConId,  true_RDR,
         falseDataCon, falseDataConId, false_RDR,
+        promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon,
 
         -- * Ordering
         ltDataCon, ltDataConId,
@@ -68,6 +69,8 @@ module TysWiredIn (
         -- * Equality predicates
         eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
 
+        mkWiredInTyConName -- This is used in TcTypeNats to define the
+                           -- built-in functions for evaluation.
     ) where
 
 #include "HsVersions.h"
@@ -782,3 +785,15 @@ mkPArrFakeCon arity  = data_con
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
+
+Promoted Booleans
+
+\begin{code}
+promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon :: TyCon
+promotedBoolTyCon     = promoteTyCon boolTyCon
+promotedTrueDataCon   = promoteDataCon trueDataCon
+promotedFalseDataCon  = promoteDataCon falseDataCon
+\end{code}
+
+
+

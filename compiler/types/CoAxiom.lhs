@@ -26,7 +26,9 @@ module CoAxiom (
        coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
        placeHolderIncomps,
 
-       Role(..), pprFullRole
+       Role(..), pprFullRole,
+
+       CoAxiomRule(..), Eqn
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
@@ -38,6 +40,7 @@ import Unique
 import Var
 import Util
 import Binary
+import Pair
 import BasicTypes
 import Data.Typeable ( Typeable )
 import SrcLoc
@@ -463,3 +466,51 @@ instance Binary Role where
                           _ -> panic ("get Role " ++ show tag)
 
 \end{code}
+
+
+Rules for building Evidence
+---------------------------
+
+Conditional axioms.  The genral idea is that a `CoAxiomRule` looks like this:
+
+    forall as. (r1 ~ r2, s1 ~ s2) => t1 ~ t2
+
+My intension is to reuse these for both (~) and (~#).
+The short-term plan is to use this datatype to represent the type-nat axioms.
+In the longer run, it would probably be good to unify this and `CoAxiom`,
+as `CoAxiom` is the special case when there are no assumptions.
+
+\begin{code}
+-- | A more explicit representation for `t1 ~ t2`.
+type Eqn = Pair Type
+
+-- | For now, we work only with nominal equality.
+data CoAxiomRule = CoAxiomRule
+  { coaxrName      :: FastString
+  , coaxrTypeArity :: Int       -- number of type argumentInts
+  , coaxrAsmpRoles :: [Role]    -- roles of parameter equations
+  , coaxrRole      :: Role      -- role of resulting equation
+  , coaxrProves    :: [Type] -> [Eqn] -> Maybe Eqn
+    -- ^ This returns @Nothing@ when we don't like
+    -- the supplied arguments.
+  } deriving Typeable
+
+instance Data.Data CoAxiomRule where
+  -- don't traverse?
+  toConstr _   = abstractConstr "CoAxiomRule"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "CoAxiomRule"
+
+instance Uniquable CoAxiomRule where
+  getUnique = getUnique . coaxrName
+
+instance Eq CoAxiomRule where
+  x == y = coaxrName x == coaxrName y
+
+instance Ord CoAxiomRule where
+  compare x y = compare (coaxrName x) (coaxrName y)
+
+instance Outputable CoAxiomRule where
+  ppr = ppr . coaxrName
+\end{code}
+

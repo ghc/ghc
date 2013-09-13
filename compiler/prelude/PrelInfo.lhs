@@ -42,6 +42,7 @@ import HscTypes
 import Class
 import TyCon
 import Util
+import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
 
 import Data.Array
 \end{code}
@@ -89,7 +90,8 @@ wiredInThings
 	, map (AnId . primOpId) allThePrimOps
     ]
   where
-    tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
+    tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons
+                                    ++ typeNatTyCons)
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make

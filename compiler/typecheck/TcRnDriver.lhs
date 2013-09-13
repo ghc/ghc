@@ -784,6 +784,7 @@ checkBootTyCon tc1 tc2
             = eqClosedFamilyAx ax1 ax2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
+        eqSynRhs (BuiltInSynFamTyCon _) (BuiltInSynFamTyCon _) = tc1 == tc2
         eqSynRhs _ _ = False
     in
     roles1 == roles2 &&

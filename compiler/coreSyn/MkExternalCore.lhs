@@ -332,6 +332,8 @@ make_co dflags (NthCo d co)          = C.NthCoercion d (make_co dflags co)
 make_co dflags (LRCo lr co)          = C.LRCoercion (make_lr lr) (make_co dflags co)
 make_co dflags (InstCo co ty)        = C.InstCoercion (make_co dflags co) (make_ty dflags ty)
 make_co dflags (SubCo co)            = C.SubCoercion (make_co dflags co)
+make_co _ (AxiomRuleCo {})           = panic "make_co AxiomRuleCo: not yet implemented"
+
 
 make_lr :: LeftOrRight -> C.LeftOrRight
 make_lr CLeft  = C.CLeft

@@ -383,6 +383,7 @@ Library
         TcInteract
         TcCanonical
         TcSMonad
+        TcTypeNats
         Class
         Coercion
         FamInstEnv

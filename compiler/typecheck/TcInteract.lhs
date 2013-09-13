@@ -20,6 +20,7 @@ import VarSet
 import Type
 import Unify
 import FamInstEnv
+import FamInst(TcBuiltInSynFamily(..))
 import InstEnv( lookupInstEnv, instanceDFunId )
 
 import Var
@@ -44,11 +45,12 @@ import Maybes( orElse )
 import Bag
 
 import Control.Monad ( foldM )
+import Data.Maybe(catMaybes)
 
 import VarEnv
 
 import Control.Monad( when, unless )
-import Pair ()
+import Pair (Pair(..))
 import Unique( hasKey )
 import UniqFM
 import FastString ( sLit ) 
@@ -563,6 +565,7 @@ interactWithInertsStage wi
   = do { traceTcS "interactWithInerts" $ text "workitem = " <+> ppr wi
        ; rels <- extractRelevantInerts wi 
        ; traceTcS "relevant inerts are:" $ ppr rels
+       ; builtInInteractions
        ; foldlBagM interact_next (ContinueWith wi) rels }
 
   where interact_next Stop atomic_inert 
@@ -591,6 +594,31 @@ interactWithInertsStage wi
                        -> do { insertInertItemTcS atomic_inert
                              ; return (ContinueWith wi) }
                }
+
+        -- See if we can compute some new derived work for built-ins.
+        builtInInteractions
+          | CFunEqCan { cc_fun = tc, cc_tyargs = args, cc_rhs = xi } <- wi
+          , Just ops <- isBuiltInSynFamTyCon_maybe tc =
+            do is <- getInertsFunEqTyCon tc
+               traceTcS "builtInCandidates: " $ ppr is
+               let interact = sfInteractInert ops args xi
+               impMbs <- sequence
+                 [ do mb <- newDerived (mkTcEqPred lhs rhs)
+                      case mb of
+                        Just x -> return $ Just $ mkNonCanonical d x
+                        Nothing -> return Nothing
+                 | CFunEqCan { cc_tyargs = iargs
+                             , cc_rhs = ixi
+                             , cc_loc = d } <- is
+                 , Pair lhs rhs <- interact iargs ixi
+                 ]
+               let imps = catMaybes impMbs
+               unless (null imps) $ updWorkListTcS (extendWorkListEqs imps)
+          | otherwise = return ()
+
+
+
+
 \end{code}
 
 \begin{code}
@@ -1427,10 +1455,10 @@ doTopReactFunEq _ct fl fun_tc args xi loc
                 succeed_with "Fun/Cache" (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
            _other -> 
 
-    -- Look up in top-level instances
+    -- Look up in top-level instances, or built-in axiom
     do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
-           Nothing -> return NoTopInt ;
+           Nothing -> try_improve_and_return ;
            Just (co, ty) ->
 
     -- Found a top-level instance
@@ -1440,6 +1468,19 @@ doTopReactFunEq _ct fl fun_tc args xi loc
        ; succeed_with "Fun/Top" co ty } } } } }
   where
     fam_ty = mkTyConApp fun_tc args
+
+    try_improve_and_return =
+      do { case isBuiltInSynFamTyCon_maybe fun_tc of
+             Just ops ->
+               do { let eqns = sfInteractTop ops args xi
+                  ; impsMb <- mapM (\(Pair x y) -> newDerived (mkTcEqPred x y))
+                                   eqns
+                  ; let work = map (mkNonCanonical loc) (catMaybes impsMb)
+                  ; unless (null work) (updWorkListTcS (extendWorkListEqs work))
+                  }
+             _ -> return ()
+         ; return NoTopInt
+         }
 
     succeed_with :: String -> TcCoercion -> TcType -> TcS TopInteractResult
     succeed_with str co rhs_ty    -- co :: fun_tc args ~ rhs_ty

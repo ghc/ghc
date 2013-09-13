@@ -35,6 +35,7 @@ module Coercion (
 	mkInstCo, mkAppCo, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo, mkUnivCo, mkSubCo, mkPhantomCo,
         mkNewTypeCo, maybeSubCo, maybeSubCo2,
+        mkAxiomRuleCo,
 
         -- ** Decomposition
         splitNewTypeRepCo_maybe, instNewTyCon_maybe, 
@@ -179,6 +180,10 @@ data Coercion
   | UnivCo Role Type Type      -- :: "e" -> _ -> _ -> e
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
+
+    -- The number of types and coercions should match exactly the expectations
+    -- of the CoAxiomRule (i.e., the rule is fully saturated).
+  | AxiomRuleCo CoAxiomRule [Type] [Coercion]
 
   -- These are destructors
 
@@ -529,6 +534,7 @@ tyCoVarsOfCo (NthCo _ co)          = tyCoVarsOfCo co
 tyCoVarsOfCo (LRCo _ co)           = tyCoVarsOfCo co
 tyCoVarsOfCo (InstCo co ty)        = tyCoVarsOfCo co `unionVarSet` tyVarsOfType ty
 tyCoVarsOfCo (SubCo co)            = tyCoVarsOfCo co
+tyCoVarsOfCo (AxiomRuleCo _ ts cs) = tyVarsOfTypes ts `unionVarSet` tyCoVarsOfCos cs
 
 tyCoVarsOfCos :: [Coercion] -> VarSet
 tyCoVarsOfCos cos = foldr (unionVarSet . tyCoVarsOfCo) emptyVarSet cos
@@ -548,6 +554,7 @@ coVarsOfCo (NthCo _ co)          = coVarsOfCo co
 coVarsOfCo (LRCo _ co)           = coVarsOfCo co
 coVarsOfCo (InstCo co _)         = coVarsOfCo co
 coVarsOfCo (SubCo co)            = coVarsOfCo co
+coVarsOfCo (AxiomRuleCo _ _ cos) = coVarsOfCos cos
 
 coVarsOfCos :: [Coercion] -> VarSet
 coVarsOfCos cos = foldr (unionVarSet . coVarsOfCo) emptyVarSet cos
@@ -566,6 +573,8 @@ coercionSize (NthCo _ co)          = 1 + coercionSize co
 coercionSize (LRCo  _ co)          = 1 + coercionSize co
 coercionSize (InstCo co ty)        = 1 + coercionSize co + typeSize ty
 coercionSize (SubCo co)            = 1 + coercionSize co
+coercionSize (AxiomRuleCo _ tys cos) = 1 + sum (map typeSize tys)
+                                         + sum (map coercionSize cos)
 \end{code}
 
 %************************************************************************
@@ -598,6 +607,12 @@ tidyCo env@(_, subst) co
     go (LRCo lr co)           = LRCo lr $! go co
     go (InstCo co ty)         = (InstCo $! go co) $! tidyType env ty
     go (SubCo co)             = SubCo $! go co
+
+    go (AxiomRuleCo ax tys cos) = let tys1 = map (tidyType env) tys
+                                      cos1 = tidyCos env cos
+                                  in tys1 `seqList` cos1 `seqList`
+                                     AxiomRuleCo ax tys1 cos1
+
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
@@ -652,6 +667,24 @@ ppr_co p (SymCo co)         = pprPrefixApp p (ptext (sLit "Sym")) [pprParendCo c
 ppr_co p (NthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <> int n) [pprParendCo co]
 ppr_co p (LRCo sel co)      = pprPrefixApp p (ppr sel) [pprParendCo co]
 ppr_co p (SubCo co)         = pprPrefixApp p (ptext (sLit "Sub")) [pprParendCo co]
+ppr_co p (AxiomRuleCo co ts cs) = maybeParen p TopPrec $
+                                  ppr_axiom_rule_co co ts cs
+
+ppr_axiom_rule_co :: CoAxiomRule -> [Type] -> [Coercion] -> SDoc
+ppr_axiom_rule_co co ts ps = ppr (coaxrName co) <> ppTs ts $$ nest 2 (ppPs ps)
+  where
+  ppTs []   = Outputable.empty
+  ppTs [t]  = ptext (sLit "@") <> ppr_type TopPrec t
+  ppTs ts   = ptext (sLit "@") <>
+                parens (hsep $ punctuate comma $ map pprType ts)
+
+  ppPs []   = Outputable.empty
+  ppPs [p]  = pprParendCo p
+  ppPs (p : ps) = ptext (sLit "(") <+> pprCo p $$
+                  vcat [ ptext (sLit ",") <+> pprCo q | q <- ps ] $$
+                  ptext (sLit ")")
+
+
 
 ppr_role :: Role -> SDoc
 ppr_role r = underscore <> ppr r
@@ -972,6 +1005,9 @@ mkUnivCo role ty1 ty2
   | ty1 `eqType` ty2 = Refl role ty1
   | otherwise        = UnivCo role ty1 ty2
 
+mkAxiomRuleCo :: CoAxiomRule -> [Type] -> [Coercion] -> Coercion
+mkAxiomRuleCo = AxiomRuleCo
+
 -- input coercion is Nominal
 mkSubCo :: Coercion -> Coercion
 mkSubCo (Refl Nominal ty) = Refl Representational ty
@@ -980,6 +1016,7 @@ mkSubCo (TyConAppCo Nominal tc cos)
 mkSubCo (UnivCo Nominal ty1 ty2) = UnivCo Representational ty1 ty2
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co )
              SubCo co
+
 
 -- takes a Nominal coercion and possibly casts it into a Representational one
 maybeSubCo :: Role -> Coercion -> Coercion
@@ -1211,6 +1248,9 @@ coreEqCoercion2 env (InstCo co1 ty1) (InstCo co2 ty2)
 coreEqCoercion2 env (SubCo co1) (SubCo co2)
   = coreEqCoercion2 env co1 co2
 
+coreEqCoercion2 env (AxiomRuleCo a1 ts1 cs1) (AxiomRuleCo a2 ts2 cs2)
+  = a1 == a2 && all2 (eqTypeX env) ts1 ts2 && all2 (coreEqCoercion2 env) cs1 cs2
+
 coreEqCoercion2 _ _ _ = False
 \end{code}
 
@@ -1357,6 +1397,12 @@ subst_co subst co
     go (LRCo lr co)          = mkLRCo lr (go co)
     go (InstCo co ty)        = mkInstCo (go co) $! go_ty ty
     go (SubCo co)            = mkSubCo (go co)
+    go (AxiomRuleCo co ts cs)  = let ts1 = map go_ty ts
+                                     cs1 = map go cs
+                                 in ts1 `seqList` cs1 `seqList`
+                                    AxiomRuleCo co ts1 cs1
+
+
 
 substCoVar :: CvSubst -> CoVar -> Coercion
 substCoVar (CvSubst in_scope _ cenv) cv
@@ -1655,6 +1701,7 @@ seqCo (NthCo _ co)              = seqCo co
 seqCo (LRCo _ co)               = seqCo co
 seqCo (InstCo co ty)            = seqCo co `seq` seqType ty
 seqCo (SubCo co)                = seqCo co
+seqCo (AxiomRuleCo _ ts cs)     = seqTypes ts `seq` seqCos cs
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()
@@ -1702,6 +1749,11 @@ coercionKind co = go co
     go (LRCo lr co)          = (pickLR lr . splitAppTy) <$> go co
     go (InstCo aco ty)       = go_app aco [ty]
     go (SubCo co)            = go co
+    go (AxiomRuleCo ax tys cos) =
+      case coaxrProves ax tys (map coercionKind cos) of
+        Just res -> res
+        Nothing  -> panic "coercionKind: Malformed coercion"
+
 
     go_app :: Coercion -> [Type] -> Pair Type
     -- Collect up all the arguments and apply all at once
@@ -1731,6 +1783,7 @@ coercionRole = go
     go (LRCo _ _)           = Nominal
     go (InstCo co _)        = go co
     go (SubCo _)            = Representational
+    go (AxiomRuleCo c _ _)  = coaxrRole c
 \end{code}
 
 Note [Nested InstCos]

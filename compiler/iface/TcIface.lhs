@@ -17,6 +17,7 @@ module TcIface (
 
 #include "HsVersions.h"
 
+import TcTypeNats(typeNatCoAxiomRules)
 import IfaceSyn
 import LoadIface
 import IfaceEnv
@@ -67,6 +68,7 @@ import Util
 import FastString
 
 import Control.Monad
+import qualified Data.Map as Map
 \end{code}
 
 This module takes
@@ -1013,9 +1015,19 @@ tcIfaceCo (IfaceInstCo c1 t2)       = InstCo   <$> tcIfaceCo c1
 tcIfaceCo (IfaceNthCo d c)          = NthCo d  <$> tcIfaceCo c
 tcIfaceCo (IfaceLRCo lr c)          = LRCo lr  <$> tcIfaceCo c
 tcIfaceCo (IfaceSubCo c)            = SubCo    <$> tcIfaceCo c
+tcIfaceCo (IfaceAxiomRuleCo ax tys cos) = AxiomRuleCo
+                                            <$> tcIfaceCoAxiomRule ax
+                                            <*> mapM tcIfaceType tys
+                                            <*> mapM tcIfaceCo cos
 
 tcIfaceCoVar :: FastString -> IfL CoVar
 tcIfaceCoVar = tcIfaceLclId
+
+tcIfaceCoAxiomRule :: FastString -> IfL CoAxiomRule
+tcIfaceCoAxiomRule n =
+  case Map.lookup n typeNatCoAxiomRules of
+    Just ax -> return ax
+    _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
 \end{code}
 
 

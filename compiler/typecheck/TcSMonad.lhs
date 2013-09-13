@@ -72,6 +72,7 @@ module TcSMonad (
     modifyInertTcS,
     insertInertItemTcS, partitionCCanMap, partitionEqMap,
     getRelevantCts, extractRelevantInerts,
+    getInertsFunEqTyCon,
     CCanMap(..), CtTypeMap, CtFamHeadMap, CtPredMap,
     PredMap, FamHeadMap,
     partCtFamHeadMap, lookupFamHead, lookupSolvedDict,
@@ -826,6 +827,18 @@ checkAllSolved
       ; return (not (unsolved_eqs || unsolved_irreds
                      || unsolved_dicts || unsolved_funeqs
                      || not (isEmptyBag (inert_insols icans)))) }
+
+
+{- Get inert function equation constraints that have the given tycon
+in their head.  Not that the constraints remain in the inert set.
+We use this to check for derived interactions with built-in type-function
+constructors. -}
+getInertsFunEqTyCon :: TyCon -> TcS [Ct]
+getInertsFunEqTyCon tc =
+  do is <- getTcSInerts
+     let mp = unFamHeadMap $ inert_funeqs $ inert_cans is
+     return $ lookupTypeMapTyCon mp tc
+
 
 extractRelevantInerts :: Ct -> TcS Cts
 -- Returns the constraints from the inert set that are 'relevant' to react with 
@@ -1656,6 +1669,8 @@ matchFam tycon args
   = let co = mkTcAxInstCo ax ind inst_tys
         ty = pSnd (tcCoercionKind co)
     in return $ Just (co, ty)
+
+  | Just ops <- isBuiltInSynFamTyCon_maybe tycon = return (sfMatchFam ops args)
 
   | otherwise
   = return Nothing
