@@ -485,6 +485,11 @@
            </listitem>
             <listitem>
                 <para>
+                    There is now a <literal>Data</literal> instance for <literal>Data.Version</literal>
+               </para>
+           </listitem>
+             <listitem>
+                <para>
                     <literal>Control.Concurrent.MVar</literal> has a new
                     implementation of <literal>readMVar</literal>, which
                     fixes a long-standing bug where
