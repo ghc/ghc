@@ -16,6 +16,7 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, 
   EvTerm(..), mkEvCast, evVarsOfTerm, 
   EvLit(..), evTermCoercion,
+  EvCoercible(..), EvCoercibleArg(..), mapEvCoercibleArgM,
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
@@ -534,6 +535,9 @@ data EvTerm
   | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
                                  -- Note [SingI and EvLit]
 
+  | EvCoercible EvCoercible      -- Dictionary for "Coercible a b"
+                                 -- Note [Coercible Instances]
+
   deriving( Data.Data, Data.Typeable)
 
 
@@ -542,6 +546,22 @@ data EvLit
   | EvStr FastString
     deriving( Data.Data, Data.Typeable)
 
+data EvCoercible
+  = EvCoercibleRefl Type
+  | EvCoercibleTyCon TyCon [EvCoercibleArg EvTerm]
+  | EvCoercibleNewType LeftOrRight TyCon [Type] EvTerm
+    deriving( Data.Data, Data.Typeable)
+
+data EvCoercibleArg a
+  = EvCoercibleArgN Type
+  | EvCoercibleArgR a
+  | EvCoercibleArgP Type Type
+    deriving( Data.Data, Data.Typeable)
+
+mapEvCoercibleArgM :: Monad m => (a -> m b) -> EvCoercibleArg a -> m (EvCoercibleArg b)
+mapEvCoercibleArgM _ (EvCoercibleArgN t)     = return (EvCoercibleArgN t)
+mapEvCoercibleArgM f (EvCoercibleArgR v)     = do { v' <- f v; return (EvCoercibleArgR v') }
+mapEvCoercibleArgM _ (EvCoercibleArgP t1 t2) = return (EvCoercibleArgP t1 t2)
 \end{code}
 
 Note [Coercion evidence terms]
@@ -654,6 +674,12 @@ evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo c
 evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
+evVarsOfTerm (EvCoercible evnt)   = evVarsOfEvCoercible evnt
+
+evVarsOfEvCoercible :: EvCoercible -> VarSet
+evVarsOfEvCoercible (EvCoercibleRefl _)          = emptyVarSet
+evVarsOfEvCoercible (EvCoercibleTyCon _ evs)     = evVarsOfTerms [v | EvCoercibleArgR v <- evs ]
+evVarsOfEvCoercible (EvCoercibleNewType _ _ _ v) = evVarsOfTerm v
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = foldr (unionVarSet . evVarsOfTerm) emptyVarSet 
@@ -716,11 +742,23 @@ instance Outputable EvTerm where
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
   ppr (EvLit l)          = ppr l
+  ppr (EvCoercible co)   = ptext (sLit "Coercible") <+> ppr co
   ppr (EvDelayedError ty msg) =     ptext (sLit "error") 
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
   ppr (EvStr s) = text (show s)
+
+instance Outputable EvCoercible where
+  ppr (EvCoercibleRefl ty) = ppr ty
+  ppr (EvCoercibleTyCon tyCon evs) = ppr tyCon <+> hsep (map ppr evs)
+  ppr (EvCoercibleNewType CLeft tyCon tys v) = ppr (tyCon `mkTyConApp` tys) <+> char ';' <+> ppr v
+  ppr (EvCoercibleNewType CRight tyCon tys v) =ppr v <+> char ';' <+> ppr (tyCon `mkTyConApp` tys)
+
+instance Outputable a => Outputable (EvCoercibleArg a) where
+  ppr (EvCoercibleArgN t)     = ptext (sLit "N:") <+> ppr t
+  ppr (EvCoercibleArgR v)     = ptext (sLit "R:") <+> ppr v
+  ppr (EvCoercibleArgP t1 t2) = ptext (sLit "P:") <+> parens (ppr (t1,t2))
 \end{code}
 

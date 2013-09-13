@@ -68,6 +68,7 @@ module TysWiredIn (
 
         -- * Equality predicates
         eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
+        coercibleTyCon, coercibleDataCon, coercibleClass,
 
         mkWiredInTyConName -- This is used in TcTypeNats to define the
                            -- built-in functions for evaluation.
@@ -88,6 +89,7 @@ import Type             ( mkTyConApp )
 import DataCon
 import Var
 import TyCon
+import Class            ( Class, mkClass )
 import TypeRep
 import RdrName
 import Name
@@ -147,6 +149,7 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , listTyCon
               , parrTyCon
               , eqTyCon
+              , coercibleTyCon
               , typeNatKindCon
               , typeSymbolKindCon
               ]
@@ -171,6 +174,10 @@ mkWiredInDataConName built_in modu fs unique datacon
 eqTyConName, eqBoxDataConName :: Name
 eqTyConName      = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "~")   eqTyConKey      eqTyCon
 eqBoxDataConName = mkWiredInDataConName UserSyntax    gHC_TYPES (fsLit "Eq#") eqBoxDataConKey eqBoxDataCon
+
+coercibleTyConName, coercibleDataConName :: Name
+coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercible")  coercibleTyConKey   coercibleTyCon
+coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
 
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
@@ -451,6 +458,26 @@ eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVa
     k = mkTyVarTy kv
     a:b:_ = tyVarList k
     args = [kv, a, b]
+
+
+coercibleTyCon :: TyCon
+coercibleTyCon = mkClassTyCon
+    coercibleTyConName kind tvs [Representational, Representational]
+    rhs coercibleClass NonRecursive
+  where kind = mkArrowKinds [liftedTypeKind, liftedTypeKind] constraintKind
+        a:b:_ = tyVarList liftedTypeKind
+        tvs = [a, b]
+        rhs = DataTyCon [coercibleDataCon] False
+
+coercibleDataCon :: DataCon
+coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (liftedTypeKind : map mkTyVarTy args)] coercibleTyCon
+  where
+    a:b:_ = tyVarList liftedTypeKind
+    args = [a, b]
+
+coercibleClass :: Class
+coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] coercibleTyCon
+
 \end{code}
 
 \begin{code}

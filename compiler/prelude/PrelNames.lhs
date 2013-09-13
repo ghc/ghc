@@ -352,7 +352,7 @@ genericTyConNames = [
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_PRIMWRAPPERS, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
+gHC_PRIM, gHC_PRIMWRAPPERS, gHC_TYPES, gHC_GENERICS, gHC_MAGIC, gHC_COERCIBLE,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE, dATA_MONOID,
@@ -370,6 +370,7 @@ gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
 gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
 gHC_CLASSES     = mkPrimModule (fsLit "GHC.Classes")
+gHC_COERCIBLE   = mkPrimModule (fsLit "GHC.Coercible")
 
 gHC_BASE        = mkBaseModule (fsLit "GHC.Base")
 gHC_ENUM        = mkBaseModule (fsLit "GHC.Enum")
@@ -1486,6 +1487,11 @@ doubleX2PrimTyConKey = mkPreludeTyConUnique 171
 int32X4PrimTyConKey  = mkPreludeTyConUnique 172
 int64X2PrimTyConKey  = mkPreludeTyConUnique 173
 
+ntTyConKey:: Unique
+ntTyConKey = mkPreludeTyConUnique 174
+coercibleTyConKey :: Unique
+coercibleTyConKey = mkPreludeTyConUnique 175
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1504,7 +1510,7 @@ unitTyConKey = mkTupleTyConUnique BoxedTuple 0
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
     stableNameDataConKey, trueDataConKey, wordDataConKey,
-    ioDataConKey, integerDataConKey, eqBoxDataConKey :: Unique
+    ioDataConKey, integerDataConKey, eqBoxDataConKey, coercibleDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
 doubleDataConKey                        = mkPreludeDataConUnique  3
@@ -1544,6 +1550,8 @@ gtDataConKey                            = mkPreludeDataConUnique 29
 integerGmpSDataConKey, integerGmpJDataConKey :: Unique
 integerGmpSDataConKey                   = mkPreludeDataConUnique 30
 integerGmpJDataConKey                   = mkPreludeDataConUnique 31
+
+coercibleDataConKey                     = mkPreludeDataConUnique 32
 \end{code}
 
 %************************************************************************
@@ -1710,6 +1718,9 @@ undefinedKey                  = mkPreludeMiscIdUnique 155
 
 magicSingIKey :: Unique
 magicSingIKey              = mkPreludeMiscIdUnique 156
+
+coerceKey :: Unique
+coerceKey                     = mkPreludeMiscIdUnique 157
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

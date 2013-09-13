@@ -22,6 +22,7 @@ import TcSimplify ( simplifyTop )
 import TypeRep
 import TcType
 import TcMType
+import TysWiredIn ( coercibleClass )
 import Type
 import Unify( tcMatchTyX )
 import Kind
@@ -746,6 +747,9 @@ checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags <- getDynFlags
 
+       ; checkTc (clas `notElem` abstractClasses)
+                 (instTypeErr clas cls_args abstract_class_msg)
+
            -- Check language restrictions; 
            -- but not for SPECIALISE isntance pragmas
        ; let ty_args = dropWhile isKind cls_args
@@ -795,6 +799,12 @@ checkValidInstHead ctxt clas cls_args
     head_no_type_msg = parens (
                 text "No parameters in the instance head." $$
                 text "Use -XNullaryTypeClasses if you want to allow this.")
+
+    abstract_class_msg =
+                text "The class is abstract, manual instances are not permitted."
+
+abstractClasses :: [ Class ]
+abstractClasses = [ coercibleClass ]
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg

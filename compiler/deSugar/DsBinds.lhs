@@ -44,12 +44,12 @@ import Unique( Unique )
 import Digraph
 
 
-import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
+import TyCon      ( isTupleTyCon, tyConDataCons_maybe, unwrapNewTyCon_maybe )
 import TcEvidence
 import TcType
 import Type
 import Coercion hiding (substCo)
-import TysWiredIn ( eqBoxDataCon, tupleCon )
+import TysWiredIn ( eqBoxDataCon, coercibleTyCon, coercibleDataCon, tupleCon )
 import Id
 import Class
 import DataCon	( dataConWorkId )
@@ -784,6 +784,49 @@ dsEvTerm (EvLit l) =
   case l of
     EvNum n -> mkIntegerExpr n
     EvStr s -> mkStringExprFS s
+
+-- Note [Coercible Instances]
+dsEvTerm (EvCoercible (EvCoercibleRefl ty)) = do
+  return $ mkCoercible $ mkReflCo Representational ty
+
+dsEvTerm (EvCoercible (EvCoercibleTyCon tyCon evs)) = do
+  ntEvs <- mapM (mapEvCoercibleArgM dsEvTerm) evs
+  wrapInEqRCases ntEvs $ \cos -> do
+    return $ mkCoercible $
+      mkTyConAppCo Representational tyCon cos
+
+dsEvTerm (EvCoercible (EvCoercibleNewType lor tyCon tys v)) = do
+  ntEv <- dsEvTerm v
+  wrapInEqRCase ntEv $ \co -> do
+          return $ mkCoercible $
+                connect lor co $
+                mkUnbranchedAxInstCo Representational coAxiom tys
+  where Just (_, _, coAxiom) = unwrapNewTyCon_maybe tyCon
+        connect CLeft co2 co1 = mkTransCo co1 co2
+        connect CRight co2 co1 = mkTransCo co2 (mkSymCo co1)
+
+wrapInEqRCase :: CoreExpr -> (Coercion -> DsM CoreExpr) -> DsM CoreExpr
+wrapInEqRCase e mkBody = do
+  cov <- newSysLocalDs (mkCoercionType Representational ty1 ty2)
+  body' <- mkBody (mkCoVarCo cov)
+  return $
+        ASSERT (tc == coercibleTyCon)
+        mkWildCase
+                e
+                (exprType e)
+                (exprType body')
+                [(DataAlt coercibleDataCon, [cov], body')]
+  where
+  Just (tc, [ty1, ty2]) = splitTyConApp_maybe (exprType e)
+
+wrapInEqRCases :: [EvCoercibleArg CoreExpr] -> ([Coercion] -> DsM CoreExpr) -> DsM CoreExpr
+wrapInEqRCases (EvCoercibleArgN t:es) mkBody =
+  wrapInEqRCases es (\cos -> mkBody (mkReflCo Nominal t:cos))
+wrapInEqRCases (EvCoercibleArgR e:es) mkBody = wrapInEqRCase e $ \co ->
+  wrapInEqRCases es (\cos -> mkBody (co:cos))
+wrapInEqRCases (EvCoercibleArgP t1 t2:es) mkBody =
+  wrapInEqRCases es (\cos -> mkBody (mkUnivCo Phantom t1 t2:cos))
+wrapInEqRCases [] mkBody = mkBody []
 
 ---------------------------------------
 dsTcCoercion :: Role -> TcCoercion -> (Coercion -> CoreExpr) -> DsM CoreExpr

@@ -1178,6 +1178,9 @@ zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
 zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms
                                        ; return (EvTupleMk tms') }
 zonkEvTerm _   (EvLit l)          = return (EvLit l)
+zonkEvTerm env (EvCoercible evnt) = do { evnt' <- zonkEvCoercible env evnt
+                                       ; return (EvCoercible evnt')
+                                       }
 zonkEvTerm env (EvSuperClass d n) = do { d' <- zonkEvTerm env d
                                        ; return (EvSuperClass d' n) }
 zonkEvTerm env (EvDFunApp df tys tms)
@@ -1187,6 +1190,16 @@ zonkEvTerm env (EvDFunApp df tys tms)
 zonkEvTerm env (EvDelayedError ty msg)
   = do { ty' <- zonkTcTypeToType env ty
        ; return (EvDelayedError ty' msg) }
+
+
+zonkEvCoercible :: ZonkEnv -> EvCoercible -> TcM EvCoercible
+zonkEvCoercible _   (EvCoercibleRefl ty) = return (EvCoercibleRefl ty)
+zonkEvCoercible env (EvCoercibleTyCon tyCon evs) = do
+        evs' <- mapM (mapEvCoercibleArgM (zonkEvTerm env)) evs
+        return (EvCoercibleTyCon tyCon evs')
+zonkEvCoercible env (EvCoercibleNewType l tyCon tys v) = do
+        v' <- zonkEvTerm env v
+        return (EvCoercibleNewType l tyCon tys v')
 
 zonkTcEvBinds :: ZonkEnv -> TcEvBinds -> TcM (ZonkEnv, TcEvBinds)
 zonkTcEvBinds env (TcEvBinds var) = do { (env', bs') <- zonkEvBindsVar env var
