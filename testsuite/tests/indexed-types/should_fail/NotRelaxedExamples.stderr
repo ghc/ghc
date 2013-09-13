@@ -2,17 +2,17 @@
 NotRelaxedExamples.hs:9:15:
     Nested type family application
       in the type family application: F1 (F1 Char)
-    (Use -XUndecidableInstances to permit this)
+    (Use UndecidableInstances to permit this)
     In the type instance declaration for ‛F1’
 
 NotRelaxedExamples.hs:10:15:
     Application is no smaller than the instance head
       in the type family application: F2 [x]
-    (Use -XUndecidableInstances to permit this)
+    (Use UndecidableInstances to permit this)
     In the type instance declaration for ‛F2’
 
 NotRelaxedExamples.hs:11:15:
     Application is no smaller than the instance head
       in the type family application: F3 [Char]
-    (Use -XUndecidableInstances to permit this)
+    (Use UndecidableInstances to permit this)
     In the type instance declaration for ‛F3’

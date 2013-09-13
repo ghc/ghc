@@ -1,4 +1,4 @@
 
 readFail038.hs:6:7:
     Unexpected parallel statement in a list comprehension
-    Use -XParallelListComp
+    Use ParallelListComp

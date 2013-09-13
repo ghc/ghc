@@ -1,5 +1,5 @@
 
 GenShouldFail1_0.hs:9:1:
     Can't make a derived instance of ‛Generic1 X’:
-      You need -XDeriveGeneric to derive an instance for this class
+      You need DeriveGeneric to derive an instance for this class
     In the stand-alone deriving instance for ‛Generic1 X’

@@ -3,7 +3,7 @@ tcfail117.hs:5:32:
     Can't make a derived instance of ‛Enum N1’:
       ‛N1’ must be an enumeration type
       (an enumeration consists of one or more nullary, non-GADT constructors)
-      Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
     In the newtype declaration for ‛N1’
 
 tcfail117.hs:6:32:

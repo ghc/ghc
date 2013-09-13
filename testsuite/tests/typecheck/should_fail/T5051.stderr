@@ -5,7 +5,7 @@ T5051.hs:11:11:
       instance Eq a => Eq [a] -- Defined in ‛GHC.Classes’
       instance [overlap ok] Eq [T] -- Defined at T5051.hs:8:10
     (The choice depends on the instantiation of ‛a’
-     To pick the first instance above, use -XIncoherentInstances
+     To pick the first instance above, use IncoherentInstances
      when compiling the other instance declarations)
     In the expression: x >= x
     In an equation for ‛foo’: foo x = x >= x

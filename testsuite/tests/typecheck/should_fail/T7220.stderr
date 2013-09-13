@@ -2,7 +2,7 @@
 T7220.hs:24:6:
     Cannot instantiate unification variable ‛b0’
     with a type involving foralls: forall b. (C A b, TF b ~ Y) => b
-      Perhaps you want -XImpredicativeTypes
+      Perhaps you want ImpredicativeTypes
     In the expression: f :: (forall b. (C A b, TF b ~ Y) => b) -> X
     In the expression: (f :: (forall b. (C A b, TF b ~ Y) => b) -> X) u
     In an equation for ‛v’:

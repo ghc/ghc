@@ -1,5 +1,5 @@
 
 tcfail166.hs:5:21:
     Illegal symbol '.' in type
-    Perhaps you intended -XRankNTypes or similar flag
-    to enable explicit-forall syntax: forall <tvs>. <type>
+    Perhaps you intended to use RankNTypes or a similar language
+    extension to enable explicit-forall syntax: forall <tvs>. <type>

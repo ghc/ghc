@@ -1,4 +1,4 @@
 
 readFail035.hs:6:1:
-    ‛Foo’ has no constructors (-XEmptyDataDecls permits this)
+    ‛Foo’ has no constructors (EmptyDataDecls permits this)
     In the data declaration for ‛Foo’

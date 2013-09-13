@@ -1,7 +1,7 @@
 
 tcfail214.hs:9:10:
     Illegal constraint ‛F a’ in a superclass/instance context
-      (Use -XUndecidableInstances to permit this)
+      (Use UndecidableInstances to permit this)
     In the context: (F a)
     While checking an instance declaration
     In the instance declaration for ‛C [a]’

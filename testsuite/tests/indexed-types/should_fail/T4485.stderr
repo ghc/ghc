@@ -11,7 +11,7 @@ T4485.hs:47:15:
                               (IdentityT IO) (XMLGenT Identity ())
         -- Defined at T4485.hs:42:10
     (The choice depends on the instantiation of ‛m0’
-     To pick the first instance above, use -XIncoherentInstances
+     To pick the first instance above, use IncoherentInstances
      when compiling the other instance declarations)
     In the expression: asChild
     In the expression: asChild $ (genElement "foo")

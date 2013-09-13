@@ -1,11 +1,11 @@
 
 readFail042.hs:10:9:
     Unexpected transform statement in a list comprehension
-    Use -XTransformListComp
+    Use TransformListComp
 
 readFail042.hs:11:9:
     Unexpected transform statement in a list comprehension
-    Use -XTransformListComp
+    Use TransformListComp
 
 readFail042.hs:11:23: Not in scope: ‛by’
 

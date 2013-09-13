@@ -1,5 +1,5 @@
 
 T7809.hs:8:8:
     Illegal polymorphic or qualified type: PolyId
-    Perhaps you intended to use -XImpredicativeTypes
+    Perhaps you intended to use ImpredicativeTypes
     In the type signature for ‛foo’: foo :: F PolyId

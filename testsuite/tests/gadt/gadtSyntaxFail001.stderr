@@ -2,6 +2,6 @@
 gadtSyntaxFail001.hs:8:5:
     Data constructor ‛C2’ has existential type variables, a context, or a specialised result type
       C2 :: forall a. a -> Char -> Foo a Int
-      (Use -XExistentialQuantification or -XGADTs to allow this)
+      (Use ExistentialQuantification or GADTs to allow this)
     In the definition of data constructor ‛C2’
     In the data declaration for ‛Foo’

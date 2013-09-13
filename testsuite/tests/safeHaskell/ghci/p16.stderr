@@ -5,7 +5,7 @@
 <interactive>:16:29:
     Can't make a derived instance of ‛Op T2’:
       ‛Op’ is not a derivable class
-      Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
     In the newtype declaration for ‛T2’
 
 <interactive>:19:9:

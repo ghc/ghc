@@ -60,7 +60,7 @@ T5095.hs:9:11:
         -- Defined in ‛Control.Applicative’
       instance Eq Integer -- Defined in ‛integer-gmp:GHC.Integer.Type’
     (The choice depends on the instantiation of ‛a’
-     To pick the first instance above, use -XIncoherentInstances
+     To pick the first instance above, use IncoherentInstances
      when compiling the other instance declarations)
     In the expression: x == y
     In an equation for ‛f’: f x y = x == y

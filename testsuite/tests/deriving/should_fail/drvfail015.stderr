@@ -3,7 +3,7 @@ drvfail015.hs:10:19:
     Illegal instance declaration for ‛Eq T’
       (All instance types must be of the form (T t1 ... tn)
        where T is not a synonym.
-       Use -XTypeSynonymInstances if you want to disable this.)
+       Use TypeSynonymInstances if you want to disable this.)
     In the stand-alone deriving instance for ‛Eq T’
 
 drvfail015.hs:13:1:

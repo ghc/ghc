@@ -1,4 +1,4 @@
 
 rnfail053.hs:5:10:
     Not a data constructor: ‛forall’
-    Perhaps you intended to use -XExistentialQuantification
+    Perhaps you intended to use ExistentialQuantification

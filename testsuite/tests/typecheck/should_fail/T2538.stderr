@@ -1,12 +1,12 @@
 
 T2538.hs:6:6:
     Illegal polymorphic or qualified type: Eq a => a -> a
-    Perhaps you intended to use -XRankNTypes or -XRank2Types
+    Perhaps you intended to use RankNTypes or Rank2Types
     In the type signature for ‛f’: f :: (Eq a => a -> a) -> Int
 
 T2538.hs:9:6:
     Illegal polymorphic or qualified type: Eq a => a -> a
-    Perhaps you intended to use -XImpredicativeTypes
+    Perhaps you intended to use ImpredicativeTypes
     In the type signature for ‛g’: g :: [Eq a => a -> a] -> Int
 
 T2538.hs:12:6:
