@@ -587,13 +587,25 @@ globalRegMaybe (DoubleReg 6)            =
                                           Just (RealRegSingle REG_D6)
 #  endif
 # endif
-#if MAX_REAL_XMM_REG != 0
+# if MAX_REAL_XMM_REG != 0
+#  ifdef REG_XMM1
 globalRegMaybe (XmmReg 1)               = Just (RealRegSingle REG_XMM1)
+#  endif
+#  ifdef REG_XMM2
 globalRegMaybe (XmmReg 2)               = Just (RealRegSingle REG_XMM2)
+#  endif
+#  ifdef REG_XMM3
 globalRegMaybe (XmmReg 3)               = Just (RealRegSingle REG_XMM3)
+#  endif
+#  ifdef REG_XMM4
 globalRegMaybe (XmmReg 4)               = Just (RealRegSingle REG_XMM4)
+#  endif
+#  ifdef REG_XMM5
 globalRegMaybe (XmmReg 5)               = Just (RealRegSingle REG_XMM5)
+#  endif
+#  ifdef REG_XMM6
 globalRegMaybe (XmmReg 6)               = Just (RealRegSingle REG_XMM6)
+#  endif
 # endif
 # ifdef REG_Sp
 globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)
