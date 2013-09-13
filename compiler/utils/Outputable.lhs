@@ -32,7 +32,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, punctuate, ppWhen, ppUnless,
-        speakNth, speakNTimes, speakN, speakNOf, plural,
+        speakNth, speakNTimes, speakN, speakNOf, plural, isOrAre,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
@@ -908,6 +908,15 @@ speakNTimes t | t == 1     = ptext (sLit "once")
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
+
+-- | Determines the form of to be appropriate for the length of a list:
+--
+-- > isOrAre [] = ptext (sLit "are")
+-- > isOrAre ["Hello"] = ptext (sLit "is")
+-- > isOrAre ["Hello", "World"] = ptext (sLit "are")
+isOrAre :: [a] -> SDoc
+isOrAre [_] = ptext (sLit "is")
+isOrAre _   = ptext (sLit "are")
 \end{code}
 
 
