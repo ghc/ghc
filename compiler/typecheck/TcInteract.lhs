@@ -48,7 +48,7 @@ import Maybes( orElse )
 import Bag
 
 import Control.Monad ( foldM )
-import Data.Maybe ( catMaybes, mapPaybe )
+import Data.Maybe ( catMaybes, mapMaybe )
 
 import VarEnv
 
