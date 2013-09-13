@@ -676,11 +676,12 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
           <indexterm><primary>stack, maximum size</primary></indexterm>
         </term>
 	<listitem>
-	  <para>&lsqb;Default: 8M&rsqb; Set the maximum stack size for
-          an individual thread to <replaceable>size</replaceable>
-          bytes.  If the thread attempts to exceed this limit, it will
-          be sent the <literal>StackOverflow</literal> exception. The
-          limit can be disabled entiredly by specifying a size of zero.
+	  <para>&lsqb;Default: 80% physical memory size&rsqb; Set the
+          maximum stack size for an individual thread to
+          <replaceable>size</replaceable> bytes. If the thread
+          attempts to exceed this limit, it will be sent the
+          <literal>StackOverflow</literal> exception. The
+          limit can be disabled entirely by specifying a size of zero.
           </para>
           <para>
             This option is there mainly to stop the program eating up
