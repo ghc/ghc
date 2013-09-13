@@ -3488,7 +3488,7 @@ GHC extends this list with several more classes that may be automatically derive
 <itemizedlist>
 <listitem><para> With <option>-XDeriveDataTypeable</option>, you can derive instances of the classes
 <literal>Typeable</literal>, and <literal>Data</literal>, defined in the library
-modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively.
+modules <literal>Data.Typeable</literal> and <literal>Data.Data</literal> respectively.
 </para>
 <para>Since GHC 7.8.1, <literal>Typeable</literal> is kind-polymorphic (see
 <xref linkend="kind-polymorphism"/>) and can be derived for any datatype and
