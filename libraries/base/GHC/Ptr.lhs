@@ -38,7 +38,8 @@ import Numeric          ( showHex )
 ------------------------------------------------------------------------
 -- Data pointers.
 
-data Ptr a@R = Ptr Addr# deriving (Eq, Ord)
+type role Ptr representational
+data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
 -- of type @a@.
@@ -82,7 +83,8 @@ minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 ------------------------------------------------------------------------
 -- Function pointers for the default calling convention.
 
-data FunPtr a@R = FunPtr Addr# deriving (Eq, Ord)
+type role FunPtr representational
+data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'FunPtr' a@ is a pointer to a function callable
 -- from foreign code.  The type @a@ will normally be a /foreign type/,
 -- a function type with zero or more arguments where
