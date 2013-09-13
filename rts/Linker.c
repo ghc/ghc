@@ -2790,7 +2790,7 @@ unloadObj( pathchar *path )
 
     initLinker();
 
-    IF_DEBUG(linker, debugBelch("unloadObj: %s\n", path));
+    IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
     prev = NULL;
     for (oc = objects; oc; prev = oc, oc = next) {
