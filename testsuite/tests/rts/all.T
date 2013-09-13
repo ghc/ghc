@@ -130,6 +130,16 @@ test('T5423',
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
+test('T5435_v',
+     extra_clean(['T5435_c_v.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T5435_v'])
+
+test('T5435_dyn',
+     extra_clean(['T5435_c_dyn.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T5435_dyn'])
+
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),

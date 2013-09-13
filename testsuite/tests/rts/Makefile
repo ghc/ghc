@@ -45,6 +45,20 @@ T5423:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o -o T5423$(exeext)
 	./T5423
 
+.PHONY: T5435_v
+T5435_v:
+	$(RM) T5435_c_v.o T5435_v$(exeext)
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T5435.c -o T5435_c_v.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -o T5435_v$(exeext)
+	./T5435_v T5435_c_v.o
+
+.PHONY: T5435_dyn
+T5435_dyn:
+	$(RM) T5435_c_dyn.o T5435_dyn$(exeext)
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic -fPIC -c T5435.c -o T5435_c_dyn.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic -fPIC T5435.hs -o T5435_dyn$(exeext)
+	./T5435_dyn T5435_c_dyn.o
+
 T6006_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs
 
