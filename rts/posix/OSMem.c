@@ -263,6 +263,26 @@ W_ getPageSize (void)
     }
 }
 
+/* Returns 0 if physical memory size cannot be identified */
+StgWord64 getPhysicalMemorySize (void)
+{
+    static StgWord64 physMemSize = 0;
+    if (!physMemSize) {
+        long ret;
+        W_ pageSize = getPageSize();
+
+        ret = sysconf(_SC_PHYS_PAGES);
+        if (ret == -1) {
+#if defined(DEBUG)
+            errorBelch("warning: getPhysicsMemorySize: cannot get physical memory size");
+#endif
+            return 0;
+        }
+        physMemSize = ret * pageSize;
+    }
+    return physMemSize;
+}
+
 void setExecutable (void *p, W_ len, rtsBool exec)
 {
     StgWord pageSize = getPageSize();

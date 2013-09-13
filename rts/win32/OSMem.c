@@ -378,6 +378,24 @@ W_ getPageSize (void)
     }
 }
 
+/* Returns 0 if physical memory size cannot be identified */
+StgWord64 getPhysicalMemorySize (void)
+{
+    static StgWord64 physMemSize = 0;
+    if (!physMemSize) {
+        MEMORYSTATUSEX status;
+        status.dwLength = sizeof(status);
+        if (!GlobalMemoryStatusEx(&status)) {
+#if defined(DEBUG)
+            errorBelch("warning: getPhysicalMemorySize: cannot get physical memory size");
+#endif
+            return 0;
+        }
+        physMemSize = status.ullTotalPhys;
+    }
+    return physMemSize;
+}
+
 void setExecutable (void *p, W_ len, rtsBool exec)
 {
     DWORD dwOldProtect = 0;
