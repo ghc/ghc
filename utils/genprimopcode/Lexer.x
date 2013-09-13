@@ -33,6 +33,7 @@ words :-
                                                }
                                     }
     <0>         "->"                { mkT TArrow }
+    <0>         "=>"                { mkT TDArrow }
     <0>         "="                 { mkT TEquals }
     <0>         ","                 { mkT TComma }
     <0>         "("                 { mkT TOpenParen }
@@ -43,6 +44,7 @@ words :-
     <0>         "primop"            { mkT TPrimop }
     <0>         "pseudoop"          { mkT TPseudoop }
     <0>         "primtype"          { mkT TPrimtype }
+    <0>         "primclass"         { mkT TPrimclass }
     <0>         "with"              { mkT TWith }
     <0>         "defaults"          { mkT TDefaults }
     <0>         "True"              { mkT TTrue }

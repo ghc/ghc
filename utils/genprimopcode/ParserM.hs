@@ -58,6 +58,7 @@ init_state = St {
 
 data Token = TEOF
            | TArrow
+           | TDArrow
            | TEquals
            | TComma
            | TOpenParen
@@ -70,6 +71,7 @@ data Token = TEOF
            | TPrimop
            | TPseudoop
            | TPrimtype
+           | TPrimclass
            | TWith
            | TDefaults
            | TTrue

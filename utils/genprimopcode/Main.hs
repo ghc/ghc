@@ -134,6 +134,7 @@ gen_hs_source (Info defaults entries) =
         ++ "-- module directly.\n"
         ++ "--\n" 
         ++ "-----------------------------------------------------------------------------\n"
+        ++ "{-# LANGUAGE MultiParamTypeClasses #-}\n"
         ++ "module GHC.Prim (\n"
         ++ unlines (map (("\t" ++) . hdr) entries)
         ++ ") where\n"
@@ -148,16 +149,19 @@ gen_hs_source (Info defaults entries) =
            opt (OptionInteger n v) = n ++ " = " ++ show v
            opt (OptionFixity mf) = "fixity" ++ " = " ++ show mf
 
-           hdr s@(Section {})                    = sec s
-           hdr (PrimOpSpec { name = n })         = wrapOp n ++ ","
-           hdr (PseudoOpSpec { name = n })       = wrapOp n ++ ","
-           hdr (PrimTypeSpec { ty = TyApp n _ }) = wrapTy n ++ ","
-           hdr (PrimTypeSpec {})                 = error "Illegal type spec"
+           hdr s@(Section {})                      = sec s
+           hdr (PrimOpSpec { name = n })           = wrapOp n ++ ","
+           hdr (PseudoOpSpec { name = n })         = wrapOp n ++ ","
+           hdr (PrimTypeSpec { ty = TyApp n _ })   = wrapTy n ++ ","
+           hdr (PrimTypeSpec {})                   = error "Illegal type spec"
+           hdr (PrimClassSpec { cls = TyApp n _ }) = wrapTy n ++ ","
+           hdr (PrimClassSpec {})                  = error "Illegal class spec"
 
-           ent   (Section {})      = []
-           ent o@(PrimOpSpec {})   = spec o
-           ent o@(PrimTypeSpec {}) = spec o
-           ent o@(PseudoOpSpec {}) = spec o
+           ent   (Section {})       = []
+           ent o@(PrimOpSpec {})    = spec o
+           ent o@(PrimTypeSpec {})  = spec o
+           ent o@(PrimClassSpec {}) = spec o
+           ent o@(PseudoOpSpec {})  = spec o
 
            sec s = "\n-- * " ++ escape (title s) ++ "\n"
                         ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
@@ -174,6 +178,8 @@ gen_hs_source (Info defaults entries) =
                               wrapOp n ++ " = let x = x in x" ]
                         PrimTypeSpec { ty = t }   ->
                             [ "data " ++ pprTy t ]
+                        PrimClassSpec { cls = t }   ->
+                            [ "class " ++ pprTy t ]
                         Section { } -> []
 
                    comm = case (desc o) of
@@ -204,6 +210,7 @@ pprTy :: Ty -> String
 pprTy = pty
     where
           pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+          pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
           pty t      = pbty t
           pbty (TyApp tc ts) = tc ++ concat (map (' ' :) (map paty ts))
           pbty (TyUTup ts)   = "(# "
@@ -274,6 +281,7 @@ gen_ext_core_source entries =
         valEnt _                             = ""
         valEntry name' ty' = parens name' (mkForallTy (freeTvars ty') (pty ty'))
             where pty (TyF t1 t2) = mkFunTy (pty t1) (pty t2)
+                  pty (TyC t1 t2) = mkFunTy (pty t1) (pty t2)
                   pty (TyApp tc ts) = mkTconApp (mkTcon tc) (map pty ts)  
                   pty (TyUTup ts)   = mkUtupleTy (map pty ts)
                   pty (TyVar tv)    = paren $ "Tvar \"" ++ tv ++ "\""
@@ -295,6 +303,7 @@ gen_ext_core_source entries =
                   vKind _   = "Klifted"
 
                   freeTvars (TyF t1 t2)   = freeTvars t1 `union` freeTvars t2
+                  freeTvars (TyC t1 t2)   = freeTvars t1 `union` freeTvars t2
                   freeTvars (TyApp _ tys) = freeTvarss tys
                   freeTvars (TyVar v)     = [v]
                   freeTvars (TyUTup tys)  = freeTvarss tys
@@ -360,6 +369,13 @@ gen_latex_doc (Info defaults entries)
                  ++ d ++ "}{"
                  ++ mk_options o
                  ++ "}\n"
+           mk_entry (PrimClassSpec {cls=t,desc=d,opts=o}) =
+                 "\\primclassspec{"
+                 ++ latex_encode (mk_source_ty t) ++ "}{"
+                 ++ latex_encode (mk_core_ty t) ++ "}{"
+                 ++ d ++ "}{"
+                 ++ mk_options o
+                 ++ "}\n"
            mk_entry (PseudoOpSpec {name=n,ty=t,desc=d,opts=o}) =
                  "\\pseudoopspec{"
                  ++ latex_encode (zencode n) ++ "}{"
@@ -370,6 +386,7 @@ gen_latex_doc (Info defaults entries)
                  ++ "}\n"
            mk_source_ty typ = pty typ
              where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+                   pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
                    pty t = pbty t
                    pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
                    pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
@@ -379,6 +396,7 @@ gen_latex_doc (Info defaults entries)
            
            mk_core_ty typ = foralls ++ (pty typ)
              where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+                   pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
                    pty t = pbty t
                    pbty (TyApp tc ts) = (zencode tc) ++ (concat (map (' ':) (map paty ts)))
                    pbty (TyUTup ts) = (zencode (utuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
@@ -394,6 +412,7 @@ gen_latex_doc (Info defaults entries)
                    tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
                    tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
            tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
+           tvars_of (TyC t1 t2) = tvars_of t1 `union` tvars_of t2
            tvars_of (TyApp _ ts) = foldl union [] (map tvars_of ts)
            tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
            tvars_of (TyVar tv) = [tv]
@@ -712,6 +731,7 @@ ppType (TyUTup ts)               = "(mkTupleTy UnboxedTuple "
                                    ++ listify (map ppType ts) ++ ")"
 
 ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
+ppType (TyC s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 
 ppType other
    = error ("ppType: can't handle: " ++ show other ++ "\n")
@@ -726,16 +746,19 @@ listify ss = "[" ++ concat (intersperse ", " ss) ++ "]"
 
 flatTys :: Ty -> ([Ty],Ty)
 flatTys (TyF t1 t2) = case flatTys t2 of (ts,t) -> (t1:ts,t)
+flatTys (TyC t1 t2) = case flatTys t2 of (ts,t) -> (t1:ts,t)
 flatTys other       = ([],other)
 
 tvsIn :: Ty -> [TyVar]
 tvsIn (TyF t1 t2)    = tvsIn t1 ++ tvsIn t2
+tvsIn (TyC t1 t2)    = tvsIn t1 ++ tvsIn t2
 tvsIn (TyApp _ tys)  = concatMap tvsIn tys
 tvsIn (TyVar tv)     = [tv]
 tvsIn (TyUTup tys)   = concatMap tvsIn tys
 
 tyconsIn :: Ty -> [TyCon]
 tyconsIn (TyF t1 t2)    = tyconsIn t1 `union` tyconsIn t2
+tyconsIn (TyC t1 t2)    = tyconsIn t1 `union` tyconsIn t2
 tyconsIn (TyApp tc tys) = foldr union [tc] $ map tyconsIn tys
 tyconsIn (TyVar _)      = []
 tyconsIn (TyUTup tys)   = foldr union [] $ map tyconsIn tys

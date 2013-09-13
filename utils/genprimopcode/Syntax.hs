@@ -26,6 +26,9 @@ data Entry
     | PrimTypeSpec { ty    :: Ty,      -- name in prog text
                      desc  :: String,      -- description
                      opts  :: [Option] }   -- default overrides
+    | PrimClassSpec { cls   :: Ty,      -- name in prog text
+                      desc  :: String,      -- description
+                      opts  :: [Option] }   -- default overrides
     | Section { title :: String,         -- section title
                 desc  :: String }        -- description
     deriving Show
@@ -51,6 +54,7 @@ data Category
 -- types
 data Ty
    = TyF    Ty Ty
+   | TyC    Ty Ty -- We only allow one constraint, keeps the grammar simpler
    | TyApp  TyCon [Ty]
    | TyVar  TyVar
    | TyUTup [Ty]   -- unboxed tuples; just a TyCon really, 
