@@ -110,6 +110,7 @@ import Prelude -- necessary to get dependencies right
 
 import Data.Typeable
 import Data.Maybe
+import Data.Version( Version(..) )
 import Control.Monad
 
 -- Imports for the instances
@@ -1338,3 +1339,20 @@ instance (Typeable a, Data a) => Data (a :=: a) where
                       _ -> error "Data.Data.gunfold(:=:)"
   dataTypeOf _    = equalityDataType
   dataCast2 f     = gcast2 f
+
+-----------------------------------------------------------------------
+-- instance for Data.Version
+
+versionConstr :: Constr
+versionConstr = mkConstr versionDataType "Version" ["versionBranch","versionTags"] Prefix
+
+versionDataType :: DataType
+versionDataType = mkDataType "Data.Version.Version" [versionConstr]
+
+instance Data Version where
+  gfoldl k z (Version bs ts) = z Version `k` bs `k` ts
+  toConstr (Version _ _) = versionConstr
+  gunfold k z c = case constrIndex c of
+                    1 -> k (k (z Version))
+                    _ -> error "Data.Data.gunfold(Version)"
+  dataTypeOf _  = versionDataType
