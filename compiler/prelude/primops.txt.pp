@@ -1110,6 +1110,42 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
+  ByteArray# -> Int# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
+  {Copy a range of the ByteArray# to the memory range starting at the Addr#.
+   The ByteArray# and the memory region at Addr# must fully contain the
+   specified ranges, but this is not checked. The Addr# must not point into the
+   ByteArray# (e.g. if the ByteArray# were pinned), but this is not checked
+   either.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4}
+  can_fail = True
+
+primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
+  MutableByteArray# RealWorld -> Int# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
+  {Copy a range of the MutableByteArray# to the memory range starting at the
+   Addr#. The MutableByteArray# and the memory region at Addr# must fully
+   contain the specified ranges, but this is not checked. The Addr# must not
+   point into the MutableByteArray# (e.g. if the MutableByteArray# were
+   pinned), but this is not checked either.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4}
+  can_fail = True
+
+primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
+  Addr# -> MutableByteArray# s -> Int# -> Int# -> State# RealWorld -> State# RealWorld
+  {Copy a memory range starting at the Addr# to the specified range in the
+   MutableByteArray#. The memory region at Addr# and the ByteArray# must fully
+   contain the specified ranges, but this is not checked. The Addr# must not
+   point into the MutableByteArray# (e.g. if the MutableByteArray# were pinned),
+   but this is not checked either.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4}
+  can_fail = True
+
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> State# s
   {Set the range of the MutableByteArray# to the specified character.}

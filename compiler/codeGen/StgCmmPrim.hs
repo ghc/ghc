@@ -529,6 +529,12 @@ emitPrimOp _      [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyByteArrayOp src src_off dst dst_off n
 emitPrimOp _      [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyMutableByteArrayOp src src_off dst dst_off n
+emitPrimOp _      [] CopyByteArrayToAddrOp [src,src_off,dst,n] =
+    doCopyByteArrayToAddrOp src src_off dst n
+emitPrimOp _      [] CopyMutableByteArrayToAddrOp [src,src_off,dst,n] =
+    doCopyMutableByteArrayToAddrOp src src_off dst n
+emitPrimOp _      [] CopyAddrToByteArrayOp [src,dst,dst_off,n] =
+    doCopyAddrToByteArrayOp src dst dst_off n
 emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
 
@@ -1357,6 +1363,34 @@ emitCopyByteArray copy src src_off dst dst_off n = do
     dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
     src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
     copy src dst dst_p src_p n
+
+-- | Takes a source 'ByteArray#', an offset in the source array, a
+-- destination 'Addr#', and the number of bytes to copy.  Copies the given
+-- number of bytes from the source array to the destination memory region.
+doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyByteArrayToAddrOp src src_off dst_p bytes = do
+    -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
+    dflags <- getDynFlags
+    src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
+    emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags 1)
+
+-- | Takes a source 'MutableByteArray#', an offset in the source array, a
+-- destination 'Addr#', and the number of bytes to copy.  Copies the given
+-- number of bytes from the source array to the destination memory region.
+doCopyMutableByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                               -> FCode ()
+doCopyMutableByteArrayToAddrOp = doCopyByteArrayToAddrOp
+
+-- | Takes a source 'Addr#', a destination 'MutableByteArray#', an offset into
+-- the destination array, and the number of bytes to copy.  Copies the given
+-- number of bytes from the source memory region to the destination array.
+doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
+    -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
+    dflags <- getDynFlags
+    dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
+    emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags 1)
+
 
 -- ----------------------------------------------------------------------------
 -- Setting byte arrays
