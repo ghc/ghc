@@ -422,7 +422,7 @@ calcRecFlags boot_details mrole_env tyclss
     nt_edges = [(t, mk_nt_edges t) | t <- new_tycons]
 
     mk_nt_edges nt      -- Invariant: nt is a newtype
-        = concatMap (mk_nt_edges1 nt) (tcTyConsOfType (new_tc_rhs nt))
+        = concatMap (mk_nt_edges1 nt) (tyConsOfType (new_tc_rhs nt))
                         -- tyConsOfType looks through synonyms
 
     mk_nt_edges1 _ tc
@@ -439,7 +439,7 @@ calcRecFlags boot_details mrole_env tyclss
     mk_prod_edges tc    -- Invariant: tc is a product tycon
         = concatMap (mk_prod_edges1 tc) (dataConOrigArgTys (head (tyConDataCons tc)))
 
-    mk_prod_edges1 ptc ty = concatMap (mk_prod_edges2 ptc) (tcTyConsOfType ty)
+    mk_prod_edges1 ptc ty = concatMap (mk_prod_edges2 ptc) (tyConsOfType ty)
 
     mk_prod_edges2 ptc tc
         | tc `elem` prod_tycons   = [tc]                -- Local product
@@ -825,35 +825,4 @@ updateRoleEnv name n role
                               RIS { role_env = role_env', update = True }
                          else state )
 
-\end{code}
-
-%************************************************************************
-%*                                                                      *
-        Miscellaneous funcions
-%*                                                                      *
-%************************************************************************
-
-These two functions know about type representations, so they could be
-in Type or TcType -- but they are very specialised to this module, so
-I've chosen to put them here.
-
-\begin{code}
-tcTyConsOfType :: Type -> [TyCon]
--- tcTyConsOfType looks through all synonyms, but not through any newtypes.
--- When it finds a Class, it returns the class TyCon.  The reaons it's here
--- (not in Type.lhs) is because it is newtype-aware.
-tcTyConsOfType ty
-  = nameEnvElts (go ty)
-  where
-     go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
-     go ty | Just ty' <- tcView ty = go ty'
-     go (TyVarTy {})               = emptyNameEnv
-     go (LitTy {})                 = emptyNameEnv
-     go (TyConApp tc tys)          = go_tc tc tys
-     go (AppTy a b)                = go a `plusNameEnv` go b
-     go (FunTy a b)                = go a `plusNameEnv` go b
-     go (ForAllTy _ ty)            = go ty
-
-     go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
-     go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
 \end{code}
