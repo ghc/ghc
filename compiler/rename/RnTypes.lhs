@@ -451,7 +451,7 @@ badKindBndrs :: HsDocContext -> [RdrName] -> SDoc
 badKindBndrs doc kvs
   = vcat [ hang (ptext (sLit "Unexpected kind variable") <> plural kvs
                  <+> pprQuotedList kvs)
-              2 (ptext (sLit "Perhaps you intended to use -XPolyKinds"))
+              2 (ptext (sLit "Perhaps you intended to use PolyKinds"))
          , docOfHsDocContext doc ]
 
 badSigErr :: Bool -> HsDocContext -> LHsType RdrName -> TcM ()
@@ -464,13 +464,13 @@ badSigErr is_type doc (L loc ty)
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
-    flag | is_type   = ptext (sLit "-XScopedTypeVariables")
-         | otherwise = ptext (sLit "-XKindSignatures")
+    flag | is_type   = ptext (sLit "ScopedTypeVariables")
+         | otherwise = ptext (sLit "KindSignatures")
 
 dataKindsErr :: Bool -> HsType RdrName -> SDoc
 dataKindsErr is_type thing
   = hang (ptext (sLit "Illegal") <+> what <> colon <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
+       2 (ptext (sLit "Perhaps you intended to use DataKinds"))
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
@@ -479,7 +479,7 @@ badRoleAnnotOpt :: SrcSpan -> HsDocContext -> TcM ()
 badRoleAnnotOpt loc doc
   = setSrcSpan loc $ addErr $
     vcat [ ptext (sLit "Illegal role annotation")
-         , ptext (sLit "Perhaps you intended to use -XRoleAnnotations")
+         , ptext (sLit "Perhaps you intended to use RoleAnnotations")
          , docOfHsDocContext doc ]
 
 illegalRoleAnnotDoc :: HsDocContext -> LHsType RdrName -> TcM ()
@@ -850,7 +850,7 @@ opTyErr op ty@(HsOpTy ty1 _ _)
     extra | op == dot_tv_RDR && forall_head ty1
           = perhapsForallMsg
           | otherwise
-          = ptext (sLit "Use -XTypeOperators to allow operators in types")
+          = ptext (sLit "Use TypeOperators to allow operators in types")
 
     forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
     forall_head (L _ (HsAppTy ty _)) = forall_head ty

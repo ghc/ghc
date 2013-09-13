@@ -1965,8 +1965,8 @@ tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'       { LL (unLoc $2) }
         | '.'                   {% parseErrorSDoc (getLoc $1)
                                       (vcat [ptext (sLit "Illegal symbol '.' in type"),
-                                             ptext (sLit "Perhaps you intended -XRankNTypes or similar flag"),
-                                             ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")])
+                                             ptext (sLit "Perhaps you intended to use RankNTypes or a similar language"),
+                                             ptext (sLit "extension to enable explicit-forall syntax: forall <tvs>. <type>")])
                                 }
 
 tyvarid :: { Located RdrName }
@@ -2218,7 +2218,7 @@ hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
   mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
   unless mwiEnabled $ parseErrorSDoc span $
-    text "Multi-way if-expressions need -XMultiWayIf turned on"
+    text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about explicit-forall, assuming UnicodeSyntax is on
 hintExplicitForall :: SrcSpan -> P ()
@@ -2227,7 +2227,7 @@ hintExplicitForall span = do
     rulePrag    <- extension inRulePrag
     unless (forall || rulePrag) $ parseErrorSDoc span $ vcat
       [ text "Illegal symbol '\x2200' in type" -- U+2200 FOR ALL
-      , text "Perhaps you intended -XRankNTypes or similar flag"
-      , text "to enable explicit-forall syntax: \x2200 <tvs>. <type>"
+      , text "Perhaps you intended to use RankNTypes or a similar language"
+      , text "extension to enable explicit-forall syntax: \x2200 <tvs>. <type>"
       ]
 }

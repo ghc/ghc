@@ -979,7 +979,7 @@ misplacedInstSig name hs_ty
   = vcat [ hang (ptext (sLit "Illegal type signature in instance declaration:"))
               2 (hang (pprPrefixName name)
                     2 (dcolon <+> ppr hs_ty))
-         , ptext (sLit "(Use -XInstanceSigs to allow this)") ]
+         , ptext (sLit "(Use InstanceSigs to allow this)") ]
 
 ------------------------------
 tcSpecInstPrags :: DFunId -> InstBindings Name
@@ -1557,7 +1557,7 @@ badFamInstDecl :: Located Name -> SDoc
 badFamInstDecl tc_name
   = vcat [ ptext (sLit "Illegal family instance for") <+>
            quotes (ppr tc_name)
-         , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
+         , nest 2 (parens $ ptext (sLit "Use TypeFamilies to allow indexed type families")) ]
 
 notOpenFamily :: TyCon -> SDoc
 notOpenFamily tc

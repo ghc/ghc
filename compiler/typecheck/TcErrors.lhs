@@ -677,7 +677,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = do { let msg = vcat [ ptext (sLit "Cannot instantiate unification variable")
                           <+> quotes (ppr tv1)
                         , hang (ptext (sLit "with a type involving foralls:")) 2 (ppr ty2)
-                        , nest 2 (ptext (sLit "Perhaps you want -XImpredicativeTypes")) ]
+                        , nest 2 (ptext (sLit "Perhaps you want ImpredicativeTypes")) ]
        ; mkErrorMsg ctxt ct msg }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
@@ -1030,7 +1030,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
 		parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
 	    		          quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys)))
 			     , ppWhen (null (matching_givens)) $
-                               vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances")
+                               vcat [ ptext (sLit "To pick the first instance above, use IncoherentInstances")
 			            , ptext (sLit "when compiling the other instance declarations")]
                         ])]
         where

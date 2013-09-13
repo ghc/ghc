@@ -176,7 +176,7 @@ rnExpr e@(HsBracket br_body)
     thEnabled <- xoptM Opt_TemplateHaskell
     unless thEnabled $
       failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
-                      , ptext (sLit "Perhaps you intended to use -XTemplateHaskell") ] )
+                      , ptext (sLit "Perhaps you intended to use TemplateHaskell") ] )
     checkTH e "bracket"
     (body', fvs_e) <- rnBracket br_body
     return (HsBracket body', fvs_e)
@@ -1371,7 +1371,7 @@ okDoStmt dflags ctxt stmt
        RecStmt {}
          | Opt_RecursiveDo `xopt` dflags -> isOK
          | ArrowExpr <- ctxt -> isOK    -- Arrows allows 'rec'
-         | otherwise         -> Just (ptext (sLit "Use -XRecursiveDo"))
+         | otherwise         -> Just (ptext (sLit "Use RecursiveDo"))
        BindStmt {} -> isOK
        LetStmt {}  -> isOK
        BodyStmt {} -> isOK
@@ -1385,10 +1385,10 @@ okCompStmt dflags _ stmt
        BodyStmt {} -> isOK
        ParStmt {}
          | Opt_ParallelListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use -XParallelListComp"))
+         | otherwise -> Just (ptext (sLit "Use ParallelListComp"))
        TransStmt {}
          | Opt_TransformListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use -XTransformListComp"))
+         | otherwise -> Just (ptext (sLit "Use TransformListComp"))
        RecStmt {}  -> notOK
        LastStmt {} -> notOK  -- Should not happen (dealt with by checkLastStmt)
 
@@ -1400,7 +1400,7 @@ okPArrStmt dflags _ stmt
        BodyStmt {} -> isOK
        ParStmt {}
          | Opt_ParallelListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use -XParallelListComp"))
+         | otherwise -> Just (ptext (sLit "Use ParallelListComp"))
        TransStmt {} -> notOK
        RecStmt {}   -> notOK
        LastStmt {}  -> notOK  -- Should not happen (dealt with by checkLastStmt)
@@ -1411,7 +1411,7 @@ checkTupleSection args
   = do  { tuple_section <- xoptM Opt_TupleSections
         ; checkErr (all tupArgPresent args || tuple_section) msg }
   where
-    msg = ptext (sLit "Illegal tuple section: use -XTupleSections")
+    msg = ptext (sLit "Illegal tuple section: use TupleSections")
 
 ---------
 sectionErr :: HsExpr RdrName -> SDoc

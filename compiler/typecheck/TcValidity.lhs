@@ -233,9 +233,9 @@ data Rank = ArbitraryRank         -- Any rank ok
           | MustBeMonoType  -- Monotype regardless of flags
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType :: Rank
-rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types"))
-tyConArgMonoType = MonoType (ptext (sLit "Perhaps you intended to use -XImpredicativeTypes"))
-synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use -XLiberalTypeSynonyms"))
+rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types"))
+tyConArgMonoType = MonoType (ptext (sLit "Perhaps you intended to use ImpredicativeTypes"))
+synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use LiberalTypeSynonyms"))
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -390,7 +390,7 @@ forAllTyErr rank ty
           , suggestion ]
   where
     suggestion = case rank of
-                   LimitedRank {} -> ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types")
+                   LimitedRank {} -> ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types")
                    MonoType d     -> d
                    _              -> empty      -- Polytype is always illegal
 
@@ -501,7 +501,7 @@ check_class_pred dflags ctxt cls tys
     arity      = classArity cls
     n_tys      = length tys
     arity_err  = arityErr "Class" class_name arity n_tys
-    how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
+    how_to_allow = parens (ptext (sLit "Use FlexibleContexts to permit this"))
 
 
 check_eq_pred :: DynFlags -> UserTypeCtxt -> TcType -> TcType -> TcM ()
@@ -698,20 +698,20 @@ checkThetaCtxt ctxt theta
 eqPredTyErr, predTyVarErr, predTupleErr, predIrredErr, predIrredBadCtxtErr :: PredType -> SDoc
 eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprType pred
                     $$
-                    parens (ptext (sLit "Use -XGADTs or -XTypeFamilies to permit this"))
+                    parens (ptext (sLit "Use GADTs or TypeFamilies to permit this"))
 predTyVarErr pred  = hang (ptext (sLit "Non type-variable argument"))
                         2 (ptext (sLit "in the constraint:") <+> pprType pred)
 predTupleErr pred  = hang (ptext (sLit "Illegal tuple constraint:") <+> pprType pred)
-                        2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+                        2 (parens (ptext (sLit "Use ConstraintKinds to permit this")))
 predIrredErr pred  = hang (ptext (sLit "Illegal constraint:") <+> pprType pred)
-                        2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+                        2 (parens (ptext (sLit "Use ConstraintKinds to permit this")))
 predIrredBadCtxtErr pred = hang (ptext (sLit "Illegal constraint") <+> quotes (pprType pred)
                                  <+> ptext (sLit "in a superclass/instance context")) 
-                               2 (parens (ptext (sLit "Use -XUndecidableInstances to permit this")))
+                               2 (parens (ptext (sLit "Use UndecidableInstances to permit this")))
 
 constraintSynErr :: Type -> SDoc
 constraintSynErr kind = hang (ptext (sLit "Illegal constraint synonym of kind:") <+> quotes (ppr kind))
-                           2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+                           2 (parens (ptext (sLit "Use ConstraintKinds to permit this")))
 
 dupPredWarn :: [[PredType]] -> SDoc
 dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprType (map head dups)
@@ -784,21 +784,21 @@ checkValidInstHead ctxt clas cls_args
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
                 text "where T is not a synonym." $$
-                text "Use -XTypeSynonymInstances if you want to disable this.")
+                text "Use TypeSynonymInstances if you want to disable this.")
 
     head_type_args_tyvars_msg = parens (vcat [
                 text "All instance types must be of the form (T a1 ... an)",
                 text "where a1 ... an are *distinct type variables*,",
                 text "and each type variable appears at most once in the instance head.",
-                text "Use -XFlexibleInstances if you want to disable this."])
+                text "Use FlexibleInstances if you want to disable this."])
 
     head_one_type_msg = parens (
                 text "Only one type can be given in an instance head." $$
-                text "Use -XMultiParamTypeClasses if you want to allow more.")
+                text "Use MultiParamTypeClasses if you want to allow more.")
 
     head_no_type_msg = parens (
                 text "No parameters in the instance head." $$
-                text "Use -XNullaryTypeClasses if you want to allow this.")
+                text "Use NullaryTypeClasses if you want to allow this.")
 
     abstract_class_msg =
                 text "The class is abstract, manual instances are not permitted."
@@ -945,7 +945,7 @@ nomoreMsg tvs
 
 smallerMsg, undecidableMsg :: SDoc
 smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
-undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
+undecidableMsg = ptext (sLit "Use UndecidableInstances to permit this")
 \end{code}
 
 

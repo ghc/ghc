@@ -497,7 +497,7 @@ unifyTheta :: TcThetaType -> TcThetaType -> TcM [TcCoercion]
 unifyTheta theta1 theta2
   = do  { checkTc (equalLength theta1 theta2)
                   (vcat [ptext (sLit "Contexts differ in length"),
-                         nest 2 $ parens $ ptext (sLit "Use -XRelaxedPolyRec to allow this")])
+                         nest 2 $ parens $ ptext (sLit "Use RelaxedPolyRec to allow this")])
         ; zipWithM unifyPred theta1 theta2 }
 \end{code}
 

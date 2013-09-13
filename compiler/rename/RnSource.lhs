@@ -635,7 +635,7 @@ rnSrcDerivDecl (DerivDecl ty)
 standaloneDerivErr :: SDoc
 standaloneDerivErr
   = hang (ptext (sLit "Illegal standalone deriving declaration"))
-       2 (ptext (sLit "Use -XStandaloneDeriving to enable this extension"))
+       2 (ptext (sLit "Use StandaloneDeriving to enable this extension"))
 \end{code}
 
 %*********************************************************

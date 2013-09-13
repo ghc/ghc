@@ -1796,7 +1796,7 @@ tc_kind_var_app name arg_kis
 dataKindsErr :: Name -> SDoc
 dataKindsErr name
   = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr name))
-       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
+       2 (ptext (sLit "Perhaps you intended to use DataKinds"))
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
@@ -1805,7 +1805,7 @@ promotionErr name err
   where
     reason = case err of
                FamDataConPE -> ptext (sLit "it comes from a data family instance")
-               NoDataKinds  -> ptext (sLit "Perhaps you intended to use -XDataKinds")
+               NoDataKinds  -> ptext (sLit "Perhaps you intended to use DataKinds")
                _ -> ptext (sLit "it is defined and used in the same recursive group")
 \end{code}
 

@@ -812,7 +812,7 @@ rnMatch' ctxt rnBody match@(Match pats maybe_rhs_sig grhss)
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
 emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alterantives in") <+> pp_ctxt)
-                       2 (ptext (sLit "Use -XEmptyCase to allow this"))
+                       2 (ptext (sLit "Use EmptyCase to allow this"))
   where
     pp_ctxt = case ctxt of
                 CaseAlt    -> ptext (sLit "case expression")
@@ -898,7 +898,7 @@ misplacedSigErr (L loc sig)
 defaultSigErr :: Sig RdrName -> SDoc
 defaultSigErr sig = vcat [ hang (ptext (sLit "Unexpected default signature:"))
                               2 (ppr sig)
-                         , ptext (sLit "Use -XDefaultSignatures to enable default signatures") ] 
+                         , ptext (sLit "Use DefaultSignatures to enable default signatures") ]
 
 methodBindErr :: HsBindLR RdrName RdrName -> SDoc
 methodBindErr mbind
@@ -912,7 +912,7 @@ bindsInHsBootFile mbinds
 
 nonStdGuardErr :: Outputable body => [LStmtLR Name Name body] -> SDoc
 nonStdGuardErr guards
-  = hang (ptext (sLit "accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
+  = hang (ptext (sLit "accepting non-standard pattern guards (use PatternGuards to suppress this message)"))
        4 (interpp'SP guards)
 
 unusedPatBindWarn :: HsBind Name -> SDoc

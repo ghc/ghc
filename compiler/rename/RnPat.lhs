@@ -614,14 +614,14 @@ getFieldIds flds = map (unLoc . hsRecFieldId) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,
-                            ptext (sLit "Use -XRecordWildCards to permit this")]
+                            ptext (sLit "Use RecordWildCards to permit this")]
 
 badDotDot :: HsRecFieldContext -> SDoc
 badDotDot ctxt = ptext (sLit "You cannot use `..' in a record") <+> pprRFC ctxt
 
 badPun :: Located RdrName -> SDoc
 badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
-                   ptext (sLit "Use -XNamedFieldPuns to permit this")]
+                   ptext (sLit "Use NamedFieldPuns to permit this")]
 
 dupFieldErr :: HsRecFieldContext -> [RdrName] -> SDoc
 dupFieldErr ctxt dups
@@ -684,7 +684,7 @@ rnOverLit origLit
 patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
-        $$ nest 4 (ptext (sLit "Use -XScopedTypeVariables to permit it"))
+        $$ nest 4 (ptext (sLit "Use ScopedTypeVariables to permit it"))
 
 bogusCharError :: Char -> SDoc
 bogusCharError c
@@ -692,5 +692,5 @@ bogusCharError c
 
 badViewPat :: Pat RdrName -> SDoc
 badViewPat pat = vcat [ptext (sLit "Illegal view pattern: ") <+> ppr pat,
-                       ptext (sLit "Use -XViewPatterns to enable view patterns")]
+                       ptext (sLit "Use ViewPatterns to enable view patterns")]
 \end{code}

@@ -581,7 +581,7 @@ lookup_demoted rdr_name
   = reportUnboundName rdr_name
 
   where
-    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
+    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean DataKinds?")
 \end{code}
 
 Note [Demotion]
@@ -1638,7 +1638,7 @@ shadowedNameWarn occ shadowed_locs
 
 perhapsForallMsg :: SDoc
 perhapsForallMsg
-  = vcat [ ptext (sLit "Perhaps you intended to use -XExplicitForAll or similar flag")
+  = vcat [ ptext (sLit "Perhaps you intended to use ExplicitForAll or similar flag")
          , ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")]
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc
@@ -1664,7 +1664,7 @@ dupNamesErr get_loc names
 kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
+       2 (ptext (sLit "Perhaps you intended to use KindSignatures"))
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
@@ -1673,7 +1673,7 @@ badQualBndrErr rdr_name
 opDeclErr :: RdrName -> SDoc
 opDeclErr n
   = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
-       2 (ptext (sLit "Use -XTypeOperators to declare operators in type and declarations"))
+       2 (ptext (sLit "Use TypeOperators to declare operators in type and declarations"))
 
 checkTupSize :: Int -> RnM ()
 checkTupSize tup_size

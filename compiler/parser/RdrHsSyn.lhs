@@ -221,7 +221,7 @@ mkTyLit l =
      if allowed
        then return (HsTyLit `fmap` l)
        else parseErrorSDoc (getLoc l)
-              (text "Illegal literal in type (use -XDataKinds to enable):" <+>
+              (text "Illegal literal in type (use DataKinds to enable):" <+>
               ppr l)
 
 
@@ -432,7 +432,7 @@ tyConToDataCon loc tc
   where
     msg = text "Not a data constructor:" <+> quotes (ppr tc)
     extra | tc == forall_tv_RDR
-          = text "Perhaps you intended to use -XExistentialQuantification"
+          = text "Perhaps you intended to use ExistentialQuantification"
           | otherwise = empty
 \end{code}
 
@@ -484,7 +484,7 @@ checkDatatypeContext (Just (L loc c))
     = do allowed <- extension datatypeContextsEnabled
          unless allowed $
              parseErrorSDoc loc
-                 (text "Illegal datatype context (use -XDatatypeContexts):" <+>
+                 (text "Illegal datatype context (use DatatypeContexts):" <+>
                   pprHsContext c)
 
 checkRecordSyntax :: Outputable a => Located a -> P (Located a)
@@ -493,7 +493,7 @@ checkRecordSyntax lr@(L loc r)
          if allowed
              then return lr
              else parseErrorSDoc loc
-                      (text "Illegal record syntax (use -XTraditionalRecordSyntax):" <+>
+                      (text "Illegal record syntax (use TraditionalRecordSyntax):" <+>
                        ppr r)
 
 checkTyClHdr :: LHsType RdrName
@@ -585,7 +585,7 @@ checkAPat msg loc e0 = do
         | bang == bang_RDR
         -> do { bang_on <- extension bangPatEnabled
               ; if bang_on then checkLPat msg e >>= (return . BangPat)
-                else parseErrorSDoc loc (text "Illegal bang-pattern (use -XBangPatterns):" $$ ppr e0) }
+                else parseErrorSDoc loc (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e0) }
 
    ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
    EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
@@ -713,9 +713,9 @@ checkValSig lhs@(L l _) ty
                    $$ text hint)
   where
     hint = if foreign_RDR `looks_like` lhs
-           then "Perhaps you meant to use -XForeignFunctionInterface?"
+           then "Perhaps you meant to use ForeignFunctionInterface?"
            else if default_RDR `looks_like` lhs
-                then "Perhaps you meant to use -XDefaultSignatures?"
+                then "Perhaps you meant to use DefaultSignatures?"
                 else "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
@@ -740,7 +740,7 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
              parseErrorSDoc (combineLocs guardExpr elseExpr)
                             (text "Unexpected semi-colons in conditional:"
                           $$ nest 4 expr
-                          $$ text "Perhaps you meant to use -XDoAndIfThenElse?")
+                          $$ text "Perhaps you meant to use DoAndIfThenElse?")
  | otherwise            = return ()
     where pprOptSemi True  = semi
           pprOptSemi False = empty
@@ -1081,7 +1081,7 @@ mkTypeImpExp name =
      if allowed
        then return (fmap (`setRdrNameSpace` tcClsName) name)
        else parseErrorSDoc (getLoc name)
-              (text "Illegal keyword 'type' (use -XExplicitNamespaces to enable)")
+              (text "Illegal keyword 'type' (use ExplicitNamespaces to enable)")
 \end{code}
 
 -----------------------------------------------------------------------------

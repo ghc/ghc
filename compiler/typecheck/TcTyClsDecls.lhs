@@ -1758,7 +1758,7 @@ checkFamFlag tc_name
        ; checkTc idx_tys err_msg }
   where
     err_msg = hang (ptext (sLit "Illegal family declaraion for") <+> quotes (ppr tc_name))
-                 2 (ptext (sLit "Use -XTypeFamilies to allow indexed type families"))
+                 2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
 
 checkNoRoles :: LHsTyVarBndrs Name -> TcM ()
 checkNoRoles (HsQTvs { hsq_tvs = tvs })
@@ -2036,17 +2036,17 @@ classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
 nullaryClassErr :: Class -> SDoc
 nullaryClassErr cls
   = vcat [ptext (sLit "No parameters for class") <+> quotes (ppr cls),
-          parens (ptext (sLit "Use -XNullaryTypeClasses to allow no-parameter classes"))]
+          parens (ptext (sLit "Use NullaryTypeClasses to allow no-parameter classes"))]
 
 classArityErr :: Class -> SDoc
 classArityErr cls
   = vcat [ptext (sLit "Too many parameters for class") <+> quotes (ppr cls),
-          parens (ptext (sLit "Use -XMultiParamTypeClasses to allow multi-parameter classes"))]
+          parens (ptext (sLit "Use MultiParamTypeClasses to allow multi-parameter classes"))]
 
 classFunDepsErr :: Class -> SDoc
 classFunDepsErr cls
   = vcat [ptext (sLit "Fundeps in class") <+> quotes (ppr cls),
-          parens (ptext (sLit "Use -XFunctionalDependencies to allow fundeps"))]
+          parens (ptext (sLit "Use FunctionalDependencies to allow fundeps"))]
 
 noClassTyVarErr :: Class -> Var -> SDoc
 noClassTyVarErr clas op
@@ -2083,14 +2083,14 @@ badGadtKindCon data_con
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
   = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
-         , nest 2 (parens $ ptext (sLit "Use -XGADTs to allow GADTs")) ]
+         , nest 2 (parens $ ptext (sLit "Use GADTs to allow GADTs")) ]
 
 badExistential :: DataCon -> SDoc
 badExistential con
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr con) <+>
                 ptext (sLit "has existential type variables, a context, or a specialised result type"))
        2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
-               , parens $ ptext (sLit "Use -XExistentialQuantification or -XGADTs to allow this") ]) 
+               , parens $ ptext (sLit "Use ExistentialQuantification or GADTs to allow this") ])
 
 badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name
@@ -2115,12 +2115,12 @@ badSigTyDecl :: Name -> SDoc
 badSigTyDecl tc_name
   = vcat [ ptext (sLit "Illegal kind signature") <+>
            quotes (ppr tc_name)
-         , nest 2 (parens $ ptext (sLit "Use -XKindSignatures to allow kind signatures")) ]
+         , nest 2 (parens $ ptext (sLit "Use KindSignatures to allow kind signatures")) ]
 
 emptyConDeclsErr :: Name -> SDoc
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext (sLit "has no constructors"),
-         nest 2 $ ptext (sLit "(-XEmptyDataDecls permits this)")]
+         nest 2 $ ptext (sLit "(EmptyDataDecls permits this)")]
 
 wrongKindOfFamily :: TyCon -> SDoc
 wrongKindOfFamily family

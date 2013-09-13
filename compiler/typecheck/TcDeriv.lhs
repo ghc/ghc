@@ -1250,7 +1250,7 @@ checkFlag flag (dflags, _, _)
   | xopt flag dflags = Nothing
   | otherwise        = Just why
   where
-    why = ptext (sLit "You need -X") <> text flag_str
+    why = ptext (sLit "You need ") <> text flag_str
           <+> ptext (sLit "to derive an instance for this class")
     flag_str = case [ s | (s, f, _) <- xFlags, f==flag ] of
                  [s]   -> s
@@ -1356,7 +1356,7 @@ mkNewTypeEqn orig dflags tvs
         bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
 
         non_std    = nonStdErr cls
-        suggest_nd = ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
+        suggest_nd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
 
         -- Here is the plan for newtype derivings.  We see
         --        newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)

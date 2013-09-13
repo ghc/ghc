@@ -270,7 +270,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
   | cconv == PrimCallConv = do
       dflags <- getDynFlags
       check (xopt Opt_GHCForeignImportPrim dflags)
-            (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
+            (text "Use GHCForeignImportPrim to allow `foreign import prim'.")
       checkCg checkCOrAsmOrLlvmOrInterp
       checkCTarget target
       check (playSafe safety)

@@ -207,7 +207,7 @@ rnImportDecl this_mod
     when (mod_safe && not (safeImportsOn dflags)) $
         addErrAt loc (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
                   $+$ ptext (sLit $ "please enable Safe Haskell through either"
-                                 ++ "-XSafe, -XTruswrothy or -XUnsafe"))
+                                 ++ "Safe, Trustwrothy or Unsafe"))
 
     let imp_mod    = mi_module iface
         warns      = mi_warns iface
@@ -1707,5 +1707,5 @@ moduleWarn mod (DeprecatedTxt txt)
 
 packageImportErr :: SDoc
 packageImportErr
-  = ptext (sLit "Package-qualified imports are not enabled; use -XPackageImports")
+  = ptext (sLit "Package-qualified imports are not enabled; use PackageImports")
 \end{code}
