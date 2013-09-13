@@ -13,6 +13,7 @@
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "RtsFlags.h"
+#include "sm/OSMem.h"
 
 #ifdef HAVE_CTYPE_H
 #include <ctype.h>
@@ -93,10 +94,15 @@ static void errorRtsOptsDisabled(HsBool is_hs_main, const char *s);
 
 void initRtsFlagsDefaults(void)
 {
+    StgWord64 maxStkSize = 8 * getPhysicalMemorySize() / 10;
+    // if getPhysicalMemorySize fails just move along with an 8MB limit
+    if (maxStkSize == 0)
+        maxStkSize = (8 * 1024 * 1024) / sizeof(W_);
+
     RtsFlags.GcFlags.statsFile		= NULL;
     RtsFlags.GcFlags.giveStats		= NO_GC_STATS;
 
-    RtsFlags.GcFlags.maxStkSize		= (8 * 1024 * 1024) / sizeof(W_);
+    RtsFlags.GcFlags.maxStkSize		= maxStkSize;
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
     RtsFlags.GcFlags.stkChunkSize       = (32 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.stkChunkBufferSize = (1 * 1024) / sizeof(W_);
