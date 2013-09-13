@@ -38,12 +38,15 @@ module TcSMonad (
 
     -- Getting and setting the flattening cache
     addSolvedDict, addSolvedFunEq, getFlattenSkols,
+
+    -- Marking stuff as used
+    addUsedRdrNamesTcS,
     
     deferTcSForAllEq, 
     
     setEvBind,
     XEvTerm(..),
-    MaybeNew (..), isFresh, freshGoals, getEvTerms,
+    MaybeNew (..), isFresh, freshGoal, freshGoals, getEvTerm, getEvTerms,
 
     xCtFlavor,        -- Transform a CtEvidence during a step 
     rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
@@ -85,7 +88,7 @@ module TcSMonad (
     Untouchables, isTouchableMetaTyVarTcS, isFilledMetaTyVar_maybe,
     zonkTyVarsAndFV,
 
-    getDefaultInfo, getDynFlags,
+    getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
 
     matchFam, matchOpenFam, 
     checkWellStagedDFun, 
@@ -119,6 +122,8 @@ import Class
 import TyCon
 
 import Name
+import RdrName (RdrName, GlobalRdrEnv)
+import RnEnv (addUsedRdrNames)
 import Var
 import VarEnv
 import Outputable
@@ -1012,6 +1017,9 @@ traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
 
+getGlobalRdrEnvTcS :: TcS GlobalRdrEnv
+getGlobalRdrEnvTcS = wrapTcS TcM.getGlobalRdrEnv
+
 bumpStepCountTcS :: TcS ()
 bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
                                     ; n <- TcM.readTcRef ref
@@ -1275,6 +1283,12 @@ getTopEnv = wrapTcS $ TcM.getTopEnv
 getGblEnv :: TcS TcGblEnv 
 getGblEnv = wrapTcS $ TcM.getGblEnv 
 
+-- Setting names as used (used in the deriving of Coercible evidence)
+-- Too hackish to expose it to TcS? In that case somehow extract the used
+-- constructors from the result of solveInteract
+addUsedRdrNamesTcS :: [RdrName] -> TcS ()
+addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
+
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1473,6 +1487,10 @@ getEvTerm (Cached tm)  = tm
 
 getEvTerms :: [MaybeNew] -> [EvTerm]
 getEvTerms = map getEvTerm
+
+freshGoal :: MaybeNew -> Maybe CtEvidence
+freshGoal (Fresh ctev) = Just ctev
+freshGoal _ = Nothing
 
 freshGoals :: [MaybeNew] -> [CtEvidence]
 freshGoals mns = [ ctev | Fresh ctev <- mns ]
