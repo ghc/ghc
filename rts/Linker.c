@@ -215,6 +215,7 @@ static void zapTrailingAtSign   ( unsigned char *sym );
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
+static int ocRunInit_MachO        ( ObjectCode* oc );
 
 #ifndef USE_MMAP
 static int machoGetMisalignment( FILE * );
@@ -2776,13 +2777,15 @@ resolveObjs( void )
 #           endif
             if (!r) { return r; }
 
-            // run init/init_array
+            // run init/init_array/ctors/mod_init_func
 #if defined(OBJFORMAT_ELF)
             r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
             r = ocRunInit_PEi386 ( oc );
+#elif defined(OBJFORMAT_MACHO)
+            r = ocRunInit_MachO ( oc );
 #else
-            IF_DEBUG(linker, debugBelch("resolveObjs: don't know how to run initializers!\n"));
+            barf("resolveObjs: initializers not implemented on this platform");
 #endif
             if (!r) { return r; }
 
@@ -6465,32 +6468,21 @@ ocGetNames_MachO(ObjectCode* oc)
             sections[i].offset = zeroFillArea - image;
         }
 
-        if (!strcmp(sections[i].sectname,"__text")) {
+        SectionKind kind = SECTIONKIND_OTHER;
 
-            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __text section\n"));
-            addSection(oc, SECTIONKIND_CODE_OR_RODATA,
-                (void*) (image + sections[i].offset),
-                (void*) (image + sections[i].offset + sections[i].size));
+        if (0==strcmp(sections[i].sectname,"__text")) {
+            kind = SECTIONKIND_CODE_OR_RODATA;
         }
-        else if (!strcmp(sections[i].sectname,"__const")) {
-
-            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __const section\n"));
-            addSection(oc, SECTIONKIND_RWDATA,
-                (void*) (image + sections[i].offset),
-                (void*) (image + sections[i].offset + sections[i].size));
+        else if (0==strcmp(sections[i].sectname,"__const") ||
+                 0==strcmp(sections[i].sectname,"__data") ||
+                 0==strcmp(sections[i].sectname,"__bss") ||
+                 0==strcmp(sections[i].sectname,"__common") ||
+                 0==strcmp(sections[i].sectname,"__mod_init_func")) {
+            kind = SECTIONKIND_RWDATA;
         }
-        else if (!strcmp(sections[i].sectname,"__data")) {
 
-            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __data section\n"));
-            addSection(oc, SECTIONKIND_RWDATA,
-                (void*) (image + sections[i].offset),
-                (void*) (image + sections[i].offset + sections[i].size));
-        }
-        else if(!strcmp(sections[i].sectname,"__bss")
-                || !strcmp(sections[i].sectname,"__common")) {
-
-            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __bss section\n"));
-            addSection(oc, SECTIONKIND_RWDATA,
+        if (kind != SECTIONKIND_OTHER) {
+            addSection(oc, kind,
                 (void*) (image + sections[i].offset),
                 (void*) (image + sections[i].offset + sections[i].size));
         }
@@ -6670,6 +6662,47 @@ ocResolve_MachO(ObjectCode* oc)
     ocFlushInstructionCache( oc );
 #endif
 
+    return 1;
+}
+
+static int ocRunInit_MachO ( ObjectCode *oc )
+{
+    char *image = (char*) oc->image;
+    struct mach_header *header = (struct mach_header*) image;
+    struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
+    struct segment_command *segLC = NULL;
+    struct section *sections;
+    nat i;
+
+    for (i = 0; i < header->ncmds; i++) {
+        if (lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64) {
+            segLC = (struct segment_command*) lc;
+        }
+        lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
+    }
+    if (!segLC) {
+        barf("ocRunInit_MachO: no segment load command");
+    }
+    sections = (struct section*) (segLC+1);
+
+    int argc, envc;
+    char **argv, **envv;
+
+    getProgArgv(&argc, &argv);
+    getProgEnvv(&envc, &envv);
+
+    for (i = 0; i < segLC->nsects; i++) {
+        if (0 == strcmp(sections[i].sectname,"__mod_init_func")) {
+            char *init_startC = image + sections[i].offset;
+            init_t *init = (init_t*)init_startC;
+            init_t *init_end = (init_t*)(init_startC + sections[i].size);
+            for (; init < init_end; init++) {
+                (*init)(argc, argv, envv);
+            }
+        }
+    }
+
+    freeProgEnvv(envc, envv);
     return 1;
 }
 
