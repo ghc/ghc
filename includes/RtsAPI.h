@@ -62,6 +62,7 @@ typedef enum {
 typedef struct {
     RtsOptsEnabledEnum rts_opts_enabled;
     const char *rts_opts;
+    HsBool rts_hs_main;
 } RtsConfig;
 
 // Clients should start with defaultRtsConfig and then customise it.
@@ -79,6 +80,10 @@ extern void startupHaskell         ( int argc, char *argv[],
 
 /* DEPRECATED, use hs_exit() instead  */
 extern void shutdownHaskell        ( void );
+
+/* Like hs_init(), but allows rtsopts. For more complicated usage,
+ * use hs_init_ghc. */
+extern void hs_init_with_rtsopts (int *argc, char **argv[]);
 
 /*
  * GHC-specific version of hs_init() that allows specifying whether

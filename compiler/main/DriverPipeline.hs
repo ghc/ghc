@@ -1634,6 +1634,7 @@ mkExtraObjToLinkIntoBinary dflags = do
                 Nothing   -> empty
                 Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
                                text (show opts) <> semi,
+             ptext (sLit "    __conf.rts_hs_main = rtsTrue;"),
              ptext (sLit "    return hs_main(argc, argv, &ZCMain_main_closure,__conf);"),
              char '}',
              char '\n' -- final newline, to keep gcc happy

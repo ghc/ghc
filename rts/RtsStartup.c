@@ -69,7 +69,8 @@ static void flushStdHandles(void);
 
 const RtsConfig defaultRtsConfig  = {
     .rts_opts_enabled = RtsOptsSafeOnly,
-    .rts_opts = NULL
+    .rts_opts = NULL,
+    .rts_hs_main = rtsFalse
 };
 
 /* -----------------------------------------------------------------------------
@@ -111,6 +112,14 @@ hs_init(int *argc, char **argv[])
 }
 
 void
+hs_init_with_rtsopts(int *argc, char **argv[])
+{
+    RtsConfig rts_opts = defaultRtsConfig; /* by value */
+    rts_opts.rts_opts_enabled = RtsOptsAll;
+    hs_init_ghc(argc, argv, rts_opts);
+}
+
+void
 hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 {
     hs_init_count++;
@@ -146,11 +155,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         char *my_argv[] = { "<unknown>", NULL };
         setFullProgArgv(my_argc,my_argv);
         setupRtsFlags(&my_argc, my_argv,
-                      rts_config.rts_opts_enabled, rts_config.rts_opts);
+                      rts_config.rts_opts_enabled, rts_config.rts_opts, rts_config.rts_hs_main);
     } else {
         setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv,
-                      rts_config.rts_opts_enabled, rts_config.rts_opts);
+                      rts_config.rts_opts_enabled, rts_config.rts_opts, rts_config.rts_hs_main);
     }
 
     /* Initialise the stats department, phase 1 */
