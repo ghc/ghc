@@ -272,6 +272,27 @@
            </listitem>
        </itemizedlist>
 
+        <itemizedlist>
+            <listitem>
+                <para>
+                     A new built-in function <literal>coerce</literal> is
+                     provided that allows to safely coerce values between types
+                     that have the same run-time-presentation, such as
+                     newtypes, but also newtypes inside containers. See the
+                     haddock documentation of
+                     <ulink url="&libraryBaseLocation;/GHC-Exts.html#v%3Acoerce">coerce</ulink>
+                     and of the class
+                     <ulink url="&libraryBaseLocation;/GHC-Exts.html#t%3ACoercible">Coercible</ulink>
+                     for more details.
+               </para>
+                <para>
+                     This feature is included in this release as a technology
+                     preview, and may change its syntax and/or semantics in the
+                     next release.
+               </para>
+           </listitem>
+       </itemizedlist>
+
 
     </sect3>
 
