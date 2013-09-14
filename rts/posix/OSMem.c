@@ -251,14 +251,15 @@ W_ getPageSize (void)
 {
     static W_ pageSize = 0;
     if (pageSize) {
-	return pageSize;
+        return pageSize;
     } else {
-	long ret;
-	ret = sysconf(_SC_PAGESIZE);
-	if (ret == -1) {
-	    barf("getPageSize: cannot get page size");
-	}
-	return ret;
+        long ret;
+        ret = sysconf(_SC_PAGESIZE);
+        if (ret == -1) {
+           barf("getPageSize: cannot get page size");
+        }
+        pageSize = ret;
+        return ret;
     }
 }
 
