@@ -305,7 +305,8 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
-    | shouldDiscard node live           = go ns block as -- discard dead assignment
+    | shouldDiscard node live           = go ns block as
+       -- discard dead assignment
     | Just a <- shouldSink dflags node2 = go ns block (a : as1)
     | otherwise                         = go ns block' as'
     where
@@ -410,12 +411,13 @@ tryToInline dflags live node assigs = go usages node [] assigs
         inline_and_discard = go usages' inl_node skipped rest
           where usages' = foldLocalRegsUsed dflags addUsage usages rhs
 
-        dont_inline        = keep node     -- don't inline the assignment, keep it
-        inline_and_keep    = keep inl_node --       inline the assignment, keep it
+        dont_inline        = keep node  -- don't inline the assignment, keep it
+        inline_and_keep    = keep inl_node -- inline the assignment, keep it
 
         keep node' = (final_node, a : rest')
           where (final_node, rest') = go usages' node' (l:skipped) rest
-                usages' = foldLocalRegsUsed dflags (\m r -> addToUFM m r 2) usages rhs
+                usages' = foldLocalRegsUsed dflags (\m r -> addToUFM m r 2)
+                                            usages rhs
                 -- we must not inline anything that is mentioned in the RHS
                 -- of a binding that we have already skipped, so we set the
                 -- usages of the regs on the RHS to 2.
@@ -427,7 +429,8 @@ tryToInline dflags live node assigs = go usages node [] assigs
         occurs_once = not (l `elemRegSet` live)
                       && lookupUFM usages l == Just 1
 
-        inl_node = mapExpDeep inline node   -- mapExpDeep is where the inlining actually takes place!
+        inl_node = mapExpDeep inline node
+                   -- mapExpDeep is where the inlining actually takes place!
            where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
                  inline (CmmRegOff (CmmLocal l') off) | l == l'
                     = cmmOffset dflags rhs off
