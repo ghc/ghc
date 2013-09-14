@@ -10539,11 +10539,11 @@ r) ->
 In particular:
 <itemizedlist>
 <listitem><para>
-<ulink url="&libraryGhcPrimLocation;/GHC-Exts.html#v%3Ainline"><literal>inline</literal></ulink>
+<ulink url="&libraryBaseLocation;/GHC-Exts.html#v%3Ainline"><literal>inline</literal></ulink>
 allows control over inlining on a per-call-site basis.
 </para></listitem>
 <listitem><para>
-<ulink url="&libraryGhcPrimLocation;/GHC-Exts.html#v%3Alazy"><literal>lazy</literal></ulink>
+<ulink url="&libraryBaseLocation;/GHC-Exts.html#v%3Alazy"><literal>lazy</literal></ulink>
 restrains the strictness analyser.
 </para></listitem>
 </itemizedlist>
