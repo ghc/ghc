@@ -7,7 +7,7 @@ test('testblockalloc',
 # only GHCi triggers the bug, but we run the test all ways for completeness.
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
-     [when(platform('x86_64-unknown-mingw32'), expect_broken(6079)),
+     [when(opsys('mingw32'), expect_broken(6079)),
       # LLVM Optimiser considers dereference of a null pointer
       # undefined and marks the code as unreachable which means
       # that later optimisations remove it altogether.
@@ -24,7 +24,7 @@ test('derefnull',
       when(opsys('mingw32'), exit_code(1))],
      compile_and_run, [''])
 test('divbyzero',
-     [when(platform('x86_64-unknown-mingw32'), expect_broken(6079)),
+     [when(opsys('mingw32'), expect_broken(6079)),
       # SIGFPE on Linux
       exit_code(136),
       # Apparently the output can be different on different
@@ -110,7 +110,7 @@ test('exec_signals', [
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('T4850', normal, run_command, ['$MAKE -s --no-print-directory T4850'])
+test('T4850', when(opsys('mingw32'), expect_broken(4850)), run_command, ['$MAKE -s --no-print-directory T4850'])
 
 def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
@@ -199,5 +199,5 @@ test('linker_unload',
 test('T8209', [ only_ways(threaded_ways), ignore_output ],
               compile_and_run, [''])
 
-test('T8242', [ only_ways(threaded_ways), ignore_output ],
+test('T8242', [ when(opsys('mingw32'), expect_broken(8242)), only_ways(threaded_ways), ignore_output ],
               compile_and_run, [''])
