@@ -95,5 +95,5 @@ linker_unload:
 	$(RM) Test.o Test.hi
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Test.hs -v0
 	# -rtsopts causes a warning
-	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main
+	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main -optc-Werror
 	./linker_unload $(BASE) $(GHC_PRIM) $(INTEGER_GMP)
