@@ -78,7 +78,7 @@ import GHC.Base		( Int(..), StableName#, makeStableName#
 -}
 
 data StableName a = StableName (StableName# a)
-
+                    deriving Typeable
 
 -- | Makes a 'StableName' for an arbitrary object.  The object passed as
 -- the first argument is not evaluated by 'makeStableName'.
@@ -123,7 +123,4 @@ eqStableName (StableName sn1) (StableName sn2) =
 	 _  -> True
   -- Requested by Emil Axelsson on glasgow-haskell-users, who wants to
   -- use it for implementing observable sharing.
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE1(StableName,stableNameTc,"StableName")
 

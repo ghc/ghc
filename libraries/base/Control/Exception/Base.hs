@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-
-#include "Typeable.h"
 
 -----------------------------------------------------------------------------
 -- |
@@ -299,8 +297,7 @@ bracketOnError before after thing =
 
 -- |A pattern match failed. The @String@ gives information about the
 -- source location of the pattern.
-data PatternMatchFail = PatternMatchFail String
-INSTANCE_TYPEABLE0(PatternMatchFail,patternMatchFailTc,"PatternMatchFail")
+data PatternMatchFail = PatternMatchFail String deriving Typeable
 
 instance Show PatternMatchFail where
     showsPrec _ (PatternMatchFail err) = showString err
@@ -314,8 +311,7 @@ instance Exception PatternMatchFail
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record selector.
-data RecSelError = RecSelError String
-INSTANCE_TYPEABLE0(RecSelError,recSelErrorTc,"RecSelError")
+data RecSelError = RecSelError String deriving Typeable
 
 instance Show RecSelError where
     showsPrec _ (RecSelError err) = showString err
@@ -327,8 +323,7 @@ instance Exception RecSelError
 -- |An uninitialised record field was used. The @String@ gives
 -- information about the source location where the record was
 -- constructed.
-data RecConError = RecConError String
-INSTANCE_TYPEABLE0(RecConError,recConErrorTc,"RecConError")
+data RecConError = RecConError String deriving Typeable
 
 instance Show RecConError where
     showsPrec _ (RecConError err) = showString err
@@ -342,8 +337,7 @@ instance Exception RecConError
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record update.
-data RecUpdError = RecUpdError String
-INSTANCE_TYPEABLE0(RecUpdError,recUpdErrorTc,"RecUpdError")
+data RecUpdError = RecUpdError String deriving Typeable
 
 instance Show RecUpdError where
     showsPrec _ (RecUpdError err) = showString err
@@ -355,8 +349,7 @@ instance Exception RecUpdError
 -- |A class method without a definition (neither a default definition,
 -- nor a definition in the appropriate instance) was called. The
 -- @String@ gives information about which method it was.
-data NoMethodError = NoMethodError String
-INSTANCE_TYPEABLE0(NoMethodError,noMethodErrorTc,"NoMethodError")
+data NoMethodError = NoMethodError String deriving Typeable
 
 instance Show NoMethodError where
     showsPrec _ (NoMethodError err) = showString err
@@ -369,8 +362,7 @@ instance Exception NoMethodError
 -- guaranteed not to terminate. Note that there is no guarantee that
 -- the runtime system will notice whether any given computation is
 -- guaranteed to terminate or not.
-data NonTermination = NonTermination
-INSTANCE_TYPEABLE0(NonTermination,nonTerminationTc,"NonTermination")
+data NonTermination = NonTermination deriving Typeable
 
 instance Show NonTermination where
     showsPrec _ NonTermination = showString "<<loop>>"
@@ -381,8 +373,7 @@ instance Exception NonTermination
 
 -- |Thrown when the program attempts to call @atomically@, from the @stm@
 -- package, inside another call to @atomically@.
-data NestedAtomically = NestedAtomically
-INSTANCE_TYPEABLE0(NestedAtomically,nestedAtomicallyTc,"NestedAtomically")
+data NestedAtomically = NestedAtomically deriving Typeable
 
 instance Show NestedAtomically where
     showsPrec _ NestedAtomically = showString "Control.Concurrent.STM.atomically was nested"

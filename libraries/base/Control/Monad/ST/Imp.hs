@@ -1,5 +1,4 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -34,8 +33,6 @@ module Control.Monad.ST.Imp (
         unsafeIOToST,
         unsafeSTToIO
     ) where
-
-#include "Typeable.h"
 
 import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
 import GHC.Base         ( RealWorld )

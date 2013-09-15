@@ -1,7 +1,6 @@
 \begin{code}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
+{-# LANGUAGE NoImplicitPrelude
            , BangPatterns
            , MagicHash
            , UnboxedTuples
@@ -95,10 +94,7 @@ finalizer to the box itself fails when the outer box is optimised away
 by the compiler.
 
 -}
-data Weak v = Weak (Weak# v)
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
+data Weak v = Weak (Weak# v) deriving Typeable
 
 -- | Establishes a weak pointer to @k@, with value @v@ and a finalizer.
 --

@@ -16,8 +16,6 @@
 --
 -------------------------------------------------------------------------------
 
-#include "Typeable.h"
-
 module System.Timeout ( timeout ) where
 
 #ifndef mingw32_HOST_OS
@@ -38,8 +36,7 @@ import Data.Unique         (Unique, newUnique)
 -- interrupt the running IO computation when the timeout has
 -- expired.
 
-newtype Timeout = Timeout Unique deriving Eq
-INSTANCE_TYPEABLE0(Timeout,timeoutTc,"Timeout")
+newtype Timeout = Timeout Unique deriving (Eq, Typeable)
 
 instance Show Timeout where
     show _ = "<<timeout>>"

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -51,8 +51,6 @@ import GHC.Base
 import GHC.Show
 import GHC.Exception
 
-#include "Typeable.h"
-
 -------------------------------------------------------------
 --
 --              The type Dynamic
@@ -70,8 +68,7 @@ import GHC.Exception
   of the object\'s type; useful for debugging.
 -}
 data Dynamic = Dynamic TypeRep Obj
-
-INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
+               deriving Typeable
 
 instance Show Dynamic where
    -- the instance just prints the type representation.

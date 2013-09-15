@@ -26,8 +26,6 @@ module Data.Either (
    partitionEithers,
  ) where
 
-#include "Typeable.h"
-
 import GHC.Base
 import GHC.Show
 import GHC.Read
@@ -50,7 +48,7 @@ used to hold an error value and the 'Right' constructor is used to
 hold a correct value (mnemonic: \"right\" also means \"correct\").
 -}
 data  Either a b  =  Left a | Right b
-  deriving (Eq, Ord, Read, Show)
+  deriving (Eq, Ord, Read, Show, Typeable)
 
 instance Functor (Either a) where
     fmap _ (Left x) = Left x
@@ -67,8 +65,6 @@ instance Monad (Either e) where
 either                  :: (a -> c) -> (b -> c) -> Either a b -> c
 either f _ (Left x)     =  f x
 either _ g (Right y)    =  g y
-
-INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 
 -- | Extracts from a list of 'Either' all the 'Left' elements
 -- All the 'Left' elements are extracted in order.

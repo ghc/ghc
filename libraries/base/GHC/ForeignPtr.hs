@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
+{-# LANGUAGE NoImplicitPrelude
            , BangPatterns
            , MagicHash
            , UnboxedTuples
@@ -56,8 +55,6 @@ import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 
-#include "Typeable.h"
-
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the
 -- data structures usually managed by the Haskell storage manager.
@@ -75,6 +72,7 @@ import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 -- class 'Storable'.
 --
 data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
+                    deriving Typeable
         -- we cache the Addr# in the ForeignPtr object, but attach
         -- the finalizer to the IORef (or the MutableByteArray# in
         -- the case of a MallocPtr).  The aim of the representation
@@ -84,8 +82,6 @@ data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
         -- that touchForeignPtr only has to touch the ForeignPtrContents
         -- object, because that ensures that whatever the finalizer is
         -- attached to is kept alive.
-
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
 data Finalizers
   = NoFinalizers

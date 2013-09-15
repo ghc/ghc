@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -52,7 +52,7 @@ infix  6  :+
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
-        deriving (Eq, Show, Read, Data)
+        deriving (Eq, Show, Read, Data, Typeable)
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
@@ -108,9 +108,6 @@ phase (x:+y)     = atan2 y x
 
 -- -----------------------------------------------------------------------------
 -- Instances of Complex
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE1(Complex,complexTc,"Complex")
 
 instance  (RealFloat a) => Num (Complex a)  where
     {-# SPECIALISE instance Num (Complex Float) #-}

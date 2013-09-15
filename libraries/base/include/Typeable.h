@@ -14,6 +14,8 @@
 #ifndef TYPEABLE_H
 #define TYPEABLE_H
 
+#warning <Typeable.h> is obsolete and will be removed in GHC 7.10
+
 --  // For GHC, we can use DeriveDataTypeable + StandaloneDeriving to
 --  // generate the instances.
 

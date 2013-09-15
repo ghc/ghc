@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy, FlexibleInstances #-}
-{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables, PolyKinds #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
 {-# LANGUAGE StandaloneDeriving, DeriveDataTypeable, TypeOperators,
              GADTs #-}
 
@@ -124,9 +124,6 @@ import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
 --import GHC.ST                -- So we can give Data instance for ST
 --import GHC.Conc              -- So we can give Data instance for MVar & Co.
 import GHC.Arr               -- So we can give Data instance for Array
-
-#include "Typeable.h"
-
 
 
 ------------------------------------------------------------------------------

@@ -41,8 +41,6 @@ import Control.Concurrent.MVar
 import Control.Exception (mask_)
 import Data.Typeable
 
-#include "Typeable.h"
-
 #define _UPK_(x) {-# UNPACK #-} !(x)
 
 -- A channel is represented by two @MVar@s keeping track of the two ends
@@ -53,9 +51,7 @@ import Data.Typeable
 data Chan a
  = Chan _UPK_(MVar (Stream a))
         _UPK_(MVar (Stream a)) -- Invariant: the Stream a is always an empty MVar
-   deriving Eq
-
-INSTANCE_TYPEABLE1(Chan,chanTc,"Chan")
+   deriving (Eq,Typeable)
 
 type Stream a = MVar (ChItem a)
 

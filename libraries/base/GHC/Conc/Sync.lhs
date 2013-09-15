@@ -34,8 +34,6 @@
 -- bits it exports, we'd rather have Control.Concurrent and the other
 -- higher level modules be the home.  Hence:
 
-#include "Typeable.h"
-
 -- #not-home
 module GHC.Conc.Sync
         ( ThreadId(..)
@@ -527,11 +525,10 @@ transactions.
 \begin{code}
 -- |A monad supporting atomic memory transactions.
 newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #))
+                deriving Typeable
 
 unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
 unSTM (STM a) = a
-
-INSTANCE_TYPEABLE1(STM,stmTc,"STM")
 
 instance  Functor STM where
    fmap f x = x >>= (return . f)
@@ -670,8 +667,7 @@ always i = alwaysSucceeds ( do v <- i
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
-
-INSTANCE_TYPEABLE1(TVar,tvarTc,"TVar")
+              deriving Typeable
 
 instance Eq (TVar a) where
         (TVar tvar1#) == (TVar tvar2#) = sameTVar tvar1# tvar2#

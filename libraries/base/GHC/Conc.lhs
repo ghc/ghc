@@ -23,8 +23,6 @@
 -- bits it exports, we'd rather have Control.Concurrent and the other
 -- higher level modules be the home.  Hence:
 
-#include "Typeable.h"
-
 -- #not-home
 module GHC.Conc
         ( ThreadId(..)
