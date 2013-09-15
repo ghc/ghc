@@ -70,11 +70,6 @@ module System.Mem.Weak (
 	-- $precise
    ) where
 
-#ifdef __HUGS__
-import Hugs.Weak
-import Prelude
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.Weak
 #endif

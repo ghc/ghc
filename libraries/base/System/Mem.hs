@@ -24,10 +24,6 @@ module System.Mem (
  
 import Prelude
 
-#ifdef __HUGS__
-import Hugs.IOExts
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 -- | Triggers an immediate garbage collection
 foreign import ccall {-safe-} "performMajorGC" performGC :: IO ()

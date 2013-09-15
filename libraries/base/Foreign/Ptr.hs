@@ -73,10 +73,6 @@ import Data.Bits
 import Data.Typeable
 import Foreign.Storable ( Storable(..) )
 
-#ifdef __HUGS__
-import Hugs.Ptr
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 -- | Release the storage associated with the given 'FunPtr', which
 -- must have been obtained from a wrapper stub.  This should be called

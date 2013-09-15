@@ -23,14 +23,14 @@ module Foreign.ForeignPtr.Imp
         -- * Finalised data pointers
           ForeignPtr
         , FinalizerPtr
-#if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
+#ifdef __GLASGOW_HASKELL__
         , FinalizerEnvPtr
 #endif
         -- ** Basic operations
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
-#if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
+#ifdef __GLASGOW_HASKELL__
         , newForeignPtrEnv
         , addForeignPtrFinalizerEnv
 #endif
@@ -54,11 +54,6 @@ module Foreign.ForeignPtr.Imp
         where
 
 import Foreign.Ptr
-
-#ifdef __HUGS__
-import Hugs.ForeignPtr
-#endif
-
 import Foreign.Storable ( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
@@ -117,7 +112,7 @@ withForeignPtr fo io
        touchForeignPtr fo
        return r
 
-#if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
+#ifdef __GLASGOW_HASKELL__
 -- | This variant of 'newForeignPtr' adds a finalizer that expects an
 -- environment in addition to the finalized pointer.  The environment
 -- that will be passed to the finalizer is fixed by the second argument to
@@ -128,7 +123,7 @@ newForeignPtrEnv finalizer env p
   = do fObj <- newForeignPtr_ p
        addForeignPtrFinalizerEnv finalizer env fObj
        return fObj
-#endif /* __HUGS__ */
+#endif
 
 #ifndef __GLASGOW_HASKELL__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)

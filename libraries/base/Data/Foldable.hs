@@ -71,12 +71,7 @@ import Data.Proxy
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
-#endif
-
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Arr
-#elif defined(__HUGS__)
-import Hugs.Array
 #endif
 
 -- | Data structures that can be folded.

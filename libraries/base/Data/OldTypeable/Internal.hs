@@ -485,7 +485,7 @@ INSTANCE_TYPEABLE2((->),funTc,"->")
 #endif
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
+#ifdef __GLASGOW_HASKELL__
 -- Types defined in GHC.MVar
 INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 #endif
@@ -494,10 +494,6 @@ INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
 INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray")
 
 #ifdef __GLASGOW_HASKELL__
--- Hugs has these too, but their Typeable<n> instances are defined
--- elsewhere to keep this module within Haskell 98.
--- This is important because every invocation of runhugs or ffihugs
--- uses this module via Data.Dynamic.
 INSTANCE_TYPEABLE2(ST,stTc,"ST")
 INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
 INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")

@@ -56,12 +56,6 @@ import Data.Word
 import Foreign.StablePtr
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude
-import Hugs.Ptr
-import Hugs.Storable
-#endif
-
 {- |
 The member functions of this class facilitate writing values of
 primitive types to raw memory (which may have been allocated with the
@@ -190,9 +184,6 @@ instance Storable (T) where {                   \
 #ifdef __GLASGOW_HASKELL__
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
          readWideCharOffPtr,writeWideCharOffPtr)
-#elif defined(__HUGS__)
-STORABLE(Char,SIZEOF_HSCHAR,ALIGNMENT_HSCHAR,
-         readCharOffPtr,writeCharOffPtr)
 #endif
 
 STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,

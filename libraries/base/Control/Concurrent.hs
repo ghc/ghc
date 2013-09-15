@@ -138,18 +138,10 @@ import Data.Maybe (Maybe(..))
 #endif
 #endif
 
-#ifdef __HUGS__
-import Hugs.ConcBase
-#endif
-
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
 import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
-
-#ifdef __HUGS__
-type ThreadId = ()
-#endif
 
 {- $conc_intro
 
@@ -201,8 +193,6 @@ all other Haskell threads in the system, although I\/O operations will
 not.  With the @-threaded@ option, only foreign calls with the @unsafe@
 attribute will block all other threads.
 
-Using Hugs, all I\/O operations and foreign calls will block all other
-Haskell threads.
 -}
 
 -- | fork a thread and call the supplied function when the thread is about

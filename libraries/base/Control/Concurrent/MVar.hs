@@ -141,18 +141,10 @@ module Control.Concurrent.MVar
         , modifyMVar
         , modifyMVarMasked_
         , modifyMVarMasked
-#ifndef __HUGS__
         , tryReadMVar
         , mkWeakMVar
         , addMVarFinalizer
-#endif
     ) where
-
-#ifdef __HUGS__
-import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
-                  tryTakeMVar, tryPutMVar, isEmptyMVar,
-                )
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,

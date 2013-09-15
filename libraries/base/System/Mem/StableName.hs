@@ -44,10 +44,6 @@ import Prelude
 
 import Data.Typeable
 
-#ifdef __HUGS__
-import Hugs.Stable
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.IO           ( IO(..) )
 import GHC.Base		( Int(..), StableName#, makeStableName#

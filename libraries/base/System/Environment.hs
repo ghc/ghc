@@ -52,10 +52,6 @@ import System.Posix.Internals (withFilePath)
 #endif
 #endif
 
-#ifdef __HUGS__
-import Hugs.System
-#endif
-
 import System.Environment.ExecutablePath
 
 #ifdef mingw32_HOST_OS

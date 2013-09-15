@@ -28,10 +28,6 @@ import Prelude
 
 import Data.Ratio
 
-#ifdef __HUGS__
-import Hugs.Time ( getCPUTime, clockTicks )
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 import Foreign.Safe
 import Foreign.C

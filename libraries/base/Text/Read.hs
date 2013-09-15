@@ -32,7 +32,7 @@ module Text.Read (
    readParen,
    lex,
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
+#ifdef __GLASGOW_HASKELL__
    -- * New parsing functions
    module Text.ParserCombinators.ReadPrec,
    L.Lexeme(..),
@@ -55,26 +55,9 @@ import Data.Either
 import Data.Maybe
 import Text.ParserCombinators.ReadP as P
 #endif
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
+#ifdef __GLASGOW_HASKELL__
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L
-#endif
-
-#ifdef __HUGS__
--- copied from GHC.Read
-
-lexP :: ReadPrec L.Lexeme
-lexP = lift L.lex
-
-parens :: ReadPrec a -> ReadPrec a
-parens p = optional
- where
-  optional  = p +++ mandatory
-  mandatory = do
-    L.Punc "(" <- lexP
-    x          <- reset optional
-    L.Punc ")" <- lexP
-    return x
 #endif
 
 #ifdef __GLASGOW_HASKELL__

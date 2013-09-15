@@ -49,7 +49,7 @@ module Data.Bits (
 -- See library document for details on the semantics of the
 -- individual operations.
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
+#ifdef __GLASGOW_HASKELL__
 #include "MachDeps.h"
 #endif
 
@@ -58,10 +58,6 @@ import Data.Maybe
 import GHC.Enum
 import GHC.Num
 import GHC.Base
-#endif
-
-#ifdef __HUGS__
-import Hugs.Bits
 #endif
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
@@ -321,17 +317,6 @@ instance Bits Int where
 #else /* !__GLASGOW_HASKELL__ */
 
     popCount               = popCountDefault
-
-#ifdef __HUGS__
-    (.&.)                  = primAndInt
-    (.|.)                  = primOrInt
-    xor                    = primXorInt
-    complement             = primComplementInt
-    shift                  = primShiftInt
-    bit                    = primBitInt
-    testBit                = primTestInt
-    bitSize _              = SIZEOF_HSINT*8
-#endif
 
     x `rotate`  i
         | i<0 && x<0       = let left = i+bitSize x in

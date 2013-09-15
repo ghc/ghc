@@ -47,7 +47,6 @@ default ()              -- Double isn't available yet
 -- ---------------------------------------------------------------------------
 -- Standard functions over tuples
 
-#if !defined(__HUGS__)
 -- | Extract the first component of a pair.
 fst                     :: (a,b) -> a
 fst (x,_)               =  x
@@ -63,7 +62,6 @@ curry f x y             =  f (x, y)
 -- | 'uncurry' converts a curried function to a function on pairs.
 uncurry                 :: (a -> b -> c) -> ((a, b) -> c)
 uncurry f p             =  f (fst p) (snd p)
-#endif
 
 -- | Swap the components of a pair.
 swap                    :: (a,b) -> (b,a)

@@ -63,8 +63,3 @@ unsafeCoerce x = local_id (unsafeCoerce# x)
   -- NB: Do not eta-reduce this definition, else the type checker 
   -- give usafeCoerce the same (dangerous) type as unsafeCoerce#
 #endif
-
-#if defined(__HUGS__)
-import Hugs.IOExts (unsafeCoerce)
-#endif
-

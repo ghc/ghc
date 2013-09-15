@@ -64,11 +64,6 @@ import GHC.Num
 import GHC.Enum
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude (Ix)
-import Hugs.Char
-#endif
-
 -- | Convert a single digit 'Char' to the corresponding 'Int'.  
 -- This function fails unless its argument satisfies 'isHexDigit',
 -- but recognises both upper and lower-case hexadecimal digits
@@ -126,9 +121,6 @@ data GeneralCategory
 generalCategory :: Char -> GeneralCategory
 #if defined(__GLASGOW_HASKELL__)
 generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
-#endif
-#ifdef __HUGS__
-generalCategory c = toEnum (primUniGenCat c)
 #endif
 
 -- derived character classifiers

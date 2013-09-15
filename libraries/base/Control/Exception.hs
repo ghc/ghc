@@ -34,11 +34,7 @@
 module Control.Exception (
 
         -- * The Exception type
-#ifdef __HUGS__
-        SomeException,
-#else
         SomeException(..),
-#endif
         Exception(..),          -- class
         IOException,            -- instance Eq, Ord, Show, Typeable, Exception
         ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
@@ -48,7 +44,7 @@ module Control.Exception (
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         asyncExceptionToException, asyncExceptionFromException,
 
-#if __GLASGOW_HASKELL__ || __HUGS__
+#if __GLASGOW_HASKELL__
         NonTermination(..),
         NestedAtomically(..),
 #endif

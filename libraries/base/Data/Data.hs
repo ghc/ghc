@@ -126,9 +126,6 @@ import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
 --import GHC.Conc              -- So we can give Data instance for MVar & Co.
 import GHC.Arr               -- So we can give Data instance for Array
 #else
-# ifdef __HUGS__
-import Hugs.Prelude( Ratio(..) )
-# endif
 import Foreign.Ptr
 import Foreign.ForeignPtr
 import Data.Array

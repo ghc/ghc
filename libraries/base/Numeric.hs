@@ -71,11 +71,6 @@ import qualified Text.Read.Lex as L
 import Data.Char
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude
-import Hugs.Numeric
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- Reading

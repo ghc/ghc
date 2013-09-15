@@ -102,20 +102,12 @@ import GHC.IO.Exception
 import GHC.IO.Handle.Types
 import GHC.Num
 import GHC.Base
-#elif __HUGS__
-import Hugs.Prelude             ( Handle, IOError, ioError )
-import System.IO.Unsafe         ( unsafePerformIO )
 #else
 import System.IO                ( Handle )
 import System.IO.Error          ( IOError, ioError )
 import System.IO.Unsafe         ( unsafePerformIO )
 import Foreign.Storable         ( Storable(poke,peek) )
 #endif
-
-#ifdef __HUGS__
-{-# CFILES cbits/PrelIOUtils.c #-}
-#endif
-
 
 -- "errno" type
 -- ------------

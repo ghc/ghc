@@ -50,9 +50,6 @@ import Prelude hiding ( lex )
 import Data.Char( chr, ord, isSpace, isAlpha, isAlphaNum )
 import Data.Ratio( Ratio, (%) )
 #endif
-#ifdef __HUGS__
-import Hugs.Prelude( Ratio(..) )
-#endif
 import Data.Maybe
 import Control.Monad
 

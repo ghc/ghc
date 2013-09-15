@@ -31,10 +31,6 @@ import Prelude
 import GHC.Real         -- The basic defns for Ratio
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude(Ratio(..), (%), numerator, denominator)
-#endif
-
 -- -----------------------------------------------------------------------------
 -- approxRational
 

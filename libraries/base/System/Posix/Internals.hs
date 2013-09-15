@@ -53,15 +53,7 @@ import GHC.IO.Device
 import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 #endif
-#elif __HUGS__
-import Hugs.Prelude (IOException(..), IOErrorType(..))
-import Hugs.IO (IOMode(..))
 #endif
-
-#ifdef __HUGS__
-{-# CFILES cbits/PrelIOUtils.c cbits/consUtils.c #-}
-#endif
-
 
 -- ---------------------------------------------------------------------------
 -- Debugging the base package

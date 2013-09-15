@@ -31,10 +31,6 @@ import GHC.Base ( Int )
 import GHC.Int  ( Int8, Int16, Int32, Int64 )
 #endif
 
-#ifdef __HUGS__
-import Hugs.Int ( Int8, Int16, Int32, Int64 )
-#endif
-
 {- $notes
 
 * All arithmetic is performed modulo 2^n, where @n@ is the number of

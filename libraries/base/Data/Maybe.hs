@@ -35,7 +35,6 @@ module Data.Maybe
 import GHC.Base
 #endif
 
-#ifndef __HUGS__
 -- ---------------------------------------------------------------------------
 -- The Maybe type, and instances
 
@@ -76,7 +75,6 @@ instance  Monad Maybe  where
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n _ Nothing  = n
 maybe _ f (Just x) = f x
-#endif  /* __HUGS__ */
 
 -- | The 'isJust' function returns 'True' iff its argument is of the
 -- form @Just _@.

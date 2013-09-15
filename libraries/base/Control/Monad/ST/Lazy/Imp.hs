@@ -49,10 +49,6 @@ import qualified GHC.ST as GHC.ST
 import GHC.Base
 #endif
 
-#ifdef __HUGS__
-import Hugs.LazyST
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 -- | The lazy state-transformer monad.
 -- A computation of type @'ST' s a@ transforms an internal state indexed

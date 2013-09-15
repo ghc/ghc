@@ -34,10 +34,6 @@ module Foreign.StablePtr
 import GHC.Stable
 #endif
 
-#ifdef __HUGS__
-import Hugs.StablePtr
-#endif
-
 -- $cinterface
 --
 -- The following definition is available to C programs inter-operating with

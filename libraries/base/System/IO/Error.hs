@@ -81,13 +81,9 @@ module System.IO.Error (
     modifyIOError,
   ) where
 
-#ifndef __HUGS__
 import Control.Exception.Base
-#endif
 
-#ifndef __HUGS__
 import Data.Either
-#endif
 import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
@@ -96,10 +92,6 @@ import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Handle.Types
 import Text.Show
-#endif
-
-#ifdef __HUGS__
-import Hugs.Prelude(Handle, IOException(..), IOErrorType(..), IO)
 #endif
 
 -- | The construct 'tryIOError' @comp@ exposes IO errors which occur within a
@@ -325,7 +317,6 @@ annotateIOError ioe loc hdl path =
     Nothing `mplus` ys = ys
     xs      `mplus` _  = xs
 
-#ifndef __HUGS__
 -- | The 'catchIOError' function establishes a handler that receives any
 -- 'IOError' raised in the action protected by 'catchIOError'.
 -- An 'IOError' is caught by
@@ -348,5 +339,3 @@ annotateIOError ioe loc hdl path =
 -- exceptions, use 'Control.Exception.catch' from "Control.Exception".
 catchIOError :: IO a -> (IOError -> IO a) -> IO a
 catchIOError = catch
-#endif /* !__HUGS__ */
-

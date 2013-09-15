@@ -37,10 +37,6 @@ module Prelude (
     -- *** Tuples
     fst, snd, curry, uncurry,
 
-#ifdef __HUGS__
-    (:),                -- Not legal Haskell 98
-#endif
-
     -- ** Basic type classes
     Eq((==), (/=)),
     Ord(compare, (<), (<=), (>=), (>), max, min),
@@ -138,7 +134,6 @@ module Prelude (
 
   ) where
 
-#ifndef __HUGS__
 import Control.Monad
 import System.IO
 import System.IO.Error
@@ -146,7 +141,6 @@ import Data.List
 import Data.Either
 import Data.Maybe
 import Data.Tuple
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -158,13 +152,7 @@ import GHC.Float
 import GHC.Show
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude
-#endif
-
-#ifndef __HUGS__
 infixr 0 $!
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Miscellaneous functions
@@ -173,7 +161,7 @@ infixr 0 $!
 ($!)    :: (a -> b) -> a -> b
 #ifdef __GLASGOW_HASKELL__
 f $! x  = let !vx = x in f vx  -- see #2273
-#elif !defined(__HUGS__)
+#else
 f $! x  = x `seq` f x
 #endif
 

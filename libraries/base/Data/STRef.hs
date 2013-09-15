@@ -32,14 +32,6 @@ import GHC.ST
 import GHC.STRef
 #endif
 
-#ifdef __HUGS__
-import Hugs.ST
-import Data.Typeable
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
-#endif
-
 -- | Mutate the contents of an 'STRef'.
 --
 -- Be warned that 'modifySTRef' does not apply the function strictly.  This

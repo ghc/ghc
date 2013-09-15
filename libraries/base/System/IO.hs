@@ -105,7 +105,7 @@ module System.IO (
     hIsReadable, hIsWritable,
     hIsSeekable,
 
-    -- ** Terminal operations (not portable: GHC\/Hugs only)
+    -- ** Terminal operations (not portable: GHC only)
 
     hIsTerminalDevice,
 
@@ -158,11 +158,9 @@ module System.IO (
     hSetBinaryMode,
     hPutBuf,
     hGetBuf,
-#if !defined(__HUGS__)
     hGetBufSome,
     hPutBufNonBlocking,
     hGetBufNonBlocking,
-#endif
 
     -- * Temporary files
 
@@ -171,7 +169,6 @@ module System.IO (
     openTempFileWithDefaultPermissions,
     openBinaryTempFileWithDefaultPermissions,
 
-#if !defined(__HUGS__)
     -- * Unicode encoding\/decoding
 
     -- | A text-mode 'Handle' has an associated 'TextEncoding', which
@@ -201,9 +198,7 @@ module System.IO (
     localeEncoding,
     char8,
     mkTextEncoding,
-#endif
 
-#if !defined(__HUGS__)
     -- * Newline conversion
     
     -- | In Haskell, a newline is always represented by the character
@@ -227,7 +222,6 @@ module System.IO (
     Newline(..), nativeNewline, 
     NewlineMode(..), 
     noNewlineTranslation, universalNewlineMode, nativeNewlineMode,
-#endif
   ) where
 
 import Control.Exception.Base
@@ -257,13 +251,6 @@ import GHC.Num
 import Text.Read
 import GHC.Show
 import GHC.MVar
-#endif
-
-#ifdef __HUGS__
-import Hugs.IO
-import Hugs.IOExts
-import Hugs.IORef
-import System.IO.Unsafe ( unsafeInterleaveIO )
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -421,7 +408,7 @@ withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 -- ---------------------------------------------------------------------------
 -- fixIO
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
+#if defined(__GLASGOW_HASKELL__)
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     m <- newEmptyMVar
@@ -539,10 +526,6 @@ openTempFile' loc tmp_dir template binary mode = do
                   | null a = b
                   | last a == pathSeparator = a ++ b
                   | otherwise = a ++ [pathSeparator] ++ b
-
-#if __HUGS__
-        fdToHandle fd   = openFd (fromIntegral fd) False ReadWriteMode binary
-#endif
 
 #if defined(__GLASGOW_HASKELL__)
 data OpenNewFileResult

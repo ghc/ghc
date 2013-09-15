@@ -55,13 +55,6 @@ import GHC.Show
 import GHC.Exception
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude
-import Hugs.IO
-import Hugs.IORef
-import Hugs.IOExts
-#endif
-
 #include "Typeable.h"
 
 -------------------------------------------------------------
@@ -80,9 +73,7 @@ import Hugs.IOExts
   'Show'ing a value of type 'Dynamic' returns a pretty-printed representation
   of the object\'s type; useful for debugging.
 -}
-#ifndef __HUGS__
 data Dynamic = Dynamic TypeRep Obj
-#endif
 
 INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
 
@@ -107,7 +98,7 @@ type Obj = Any
  -- when evaluating it, and this will go wrong if the object is really a 
  -- function.  Using Any forces GHC to use
  -- a fallback convention for evaluating it that works for all types.
-#elif !defined(__HUGS__)
+#else
 data Obj = Obj
 #endif
 

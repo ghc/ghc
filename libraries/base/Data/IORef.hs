@@ -37,10 +37,6 @@ module Data.IORef
 
         ) where
 
-#ifdef __HUGS__
-import Hugs.IORef
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.STRef
@@ -102,14 +98,8 @@ modifyIORef' ref f = do
 -- Use 'atomicModifyIORef'' or 'atomicWriteIORef' to avoid this problem.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-#if defined(__GLASGOW_HASKELL__)
+#ifdef __GLASGOW_HASKELL__
 atomicModifyIORef = GHC.IORef.atomicModifyIORef
-
-#elif defined(__HUGS__)
-atomicModifyIORef = plainModifyIORef    -- Hugs has no preemption
-  where plainModifyIORef r f = do
-                a <- readIORef r
-                case f a of (a',b) -> writeIORef r a' >> return b
 #endif
 
 -- | Strict version of 'atomicModifyIORef'.  This forces both the value stored

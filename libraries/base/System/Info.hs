@@ -52,13 +52,6 @@ arch = HOST_ARCH
 compilerName = "ghc"
 compilerVersionRaw = __GLASGOW_HASKELL__
 
-#elif defined(__HUGS__)
-#include "platform.h"
-os = HOST_OS
-arch = HOST_ARCH
-compilerName = "hugs"
-compilerVersionRaw = 0  -- ToDo
-
 #else
 #error Unknown compiler name
 #endif

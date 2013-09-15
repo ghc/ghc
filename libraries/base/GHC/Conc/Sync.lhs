@@ -150,8 +150,6 @@ a pointer to the thread itself.  This means the thread itself can\'t be
 garbage collected until you drop the 'ThreadId'.
 This misfeature will hopefully be corrected at a later date.
 
-/Note/: Hugs does not provide any operations on other threads;
-it defines 'ThreadId' as a synonym for ().
 -}
 
 instance Show ThreadId where

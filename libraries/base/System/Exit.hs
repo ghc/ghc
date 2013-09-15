@@ -30,11 +30,6 @@ import GHC.IO
 import GHC.IO.Exception
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude (ExitCode(..))
-import Control.Exception.Base
-#endif
-
 -- ---------------------------------------------------------------------------
 -- exitWith
 

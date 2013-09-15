@@ -79,13 +79,6 @@ import GHC.Base
 import Control.Exception.Base   ( bracket )
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude             ( IOException(IOError),
-                                  IOErrorType(ResourceExhausted) )
-import Hugs.ForeignPtr          ( FinalizerPtr )
-#endif
-
-
 -- exported functions
 -- ------------------
 
@@ -223,9 +216,6 @@ failWhenNULL name f = do
 #if __GLASGOW_HASKELL__
       then ioError (IOError Nothing ResourceExhausted name 
                                         "out of memory" Nothing Nothing)
-#elif __HUGS__
-      then ioError (IOError Nothing ResourceExhausted name 
-                                        "out of memory" Nothing)
 #else
       then ioError (userError (name++": out of memory"))
 #endif

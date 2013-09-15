@@ -43,10 +43,6 @@ import Data.Typeable
 import Data.Data (Data)
 #endif
 
-#ifdef __HUGS__
-import Hugs.Prelude(Num(fromInt), Fractional(fromDouble))
-#endif
-
 infix  6  :+
 
 -- -----------------------------------------------------------------------------
@@ -135,9 +131,6 @@ instance  (RealFloat a) => Num (Complex a)  where
     signum (0:+0)       =  0
     signum z@(x:+y)     =  x/r :+ y/r  where r = magnitude z
     fromInteger n       =  fromInteger n :+ 0
-#ifdef __HUGS__
-    fromInt n           =  fromInt n :+ 0
-#endif
 
 instance  (RealFloat a) => Fractional (Complex a)  where
     {-# SPECIALISE instance Fractional (Complex Float) #-}
@@ -149,9 +142,6 @@ instance  (RealFloat a) => Fractional (Complex a)  where
                                  d   = x'*x'' + y'*y''
 
     fromRational a      =  fromRational a :+ 0
-#ifdef __HUGS__
-    fromDouble a        =  fromDouble a :+ 0
-#endif
 
 instance  (RealFloat a) => Floating (Complex a) where
     {-# SPECIALISE instance Floating (Complex Float) #-}
