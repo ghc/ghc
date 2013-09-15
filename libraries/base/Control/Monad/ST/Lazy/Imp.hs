@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples, RankNTypes #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, RankNTypes #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -44,12 +44,9 @@ import Control.Monad.Fix
 import qualified Control.Monad.ST.Safe as ST
 import qualified Control.Monad.ST.Unsafe as ST
 
-#ifdef __GLASGOW_HASKELL__
 import qualified GHC.ST as GHC.ST
 import GHC.Base
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 -- | The lazy state-transformer monad.
 -- A computation of type @'ST' s a@ transforms an internal state indexed
 -- by @s@, and returns a value of type @a@.
@@ -107,7 +104,6 @@ fixST m = ST (\ s ->
                    (r,s') = m_r s
                 in
                    (r,s'))
-#endif
 
 instance MonadFix (ST s) where
         mfix = fixST
@@ -115,7 +111,6 @@ instance MonadFix (ST s) where
 -- ---------------------------------------------------------------------------
 -- Strict <--> Lazy
 
-#ifdef __GLASGOW_HASKELL__
 {-|
 Convert a strict 'ST' computation into a lazy one.  The strict state
 thread passed to 'strictToLazyST' is not performed until the result of
@@ -136,7 +131,6 @@ Convert a lazy 'ST' computation into a strict one.
 lazyToStrictST :: ST s a -> ST.ST s a
 lazyToStrictST (ST m) = GHC.ST.ST $ \s ->
         case (m (S# s)) of (a, S# s') -> (# s', a #)
-#endif
 
 -- | A monad transformer embedding lazy state transformers in the 'IO'
 -- monad.  The 'RealWorld' parameter indicates that the internal state
@@ -148,10 +142,8 @@ stToIO = ST.stToIO . lazyToStrictST
 -- ---------------------------------------------------------------------------
 -- Strict <--> Lazy
 
-#ifdef __GLASGOW_HASKELL__
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST
-#endif
 
 unsafeIOToST :: IO a -> ST s a
 unsafeIOToST = strictToLazyST . ST.unsafeIOToST

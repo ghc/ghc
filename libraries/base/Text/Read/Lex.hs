@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -35,7 +35,6 @@ module Text.Read.Lex
 
 import Text.ParserCombinators.ReadP
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Char
 import GHC.Num( Num(..), Integer )
@@ -45,11 +44,6 @@ import GHC.Real( Rational, (%), fromIntegral,
                  toInteger, (^) )
 import GHC.List
 import GHC.Enum( minBound, maxBound )
-#else
-import Prelude hiding ( lex )
-import Data.Char( chr, ord, isSpace, isAlpha, isAlphaNum )
-import Data.Ratio( Ratio, (%) )
-#endif
 import Data.Maybe
 import Control.Monad
 

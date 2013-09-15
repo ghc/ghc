@@ -5,9 +5,7 @@
            , GeneralizedNewtypeDeriving
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
 
@@ -66,10 +64,9 @@ module Foreign.C.Types
           -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
           -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
         , CFloat(..),   CDouble(..)
--- GHC doesn't support CLDouble yet
-#ifndef __GLASGOW_HASKELL__
-        , CLDouble(..)
-#endif
+        -- XXX GHC doesn't support CLDouble yet
+        -- , CLDouble(..)
+
           -- ** Other types
 
           -- Instances of: Eq and Storable
@@ -82,7 +79,6 @@ import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
 import Data.Typeable
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Float
 import GHC.Enum
@@ -90,9 +86,6 @@ import GHC.Real
 import GHC.Show
 import GHC.Read
 import GHC.Num
-#else
-import Control.Monad    ( liftM )
-#endif
 
 #include "HsBaseConfig.h"
 #include "CTypes.h"
@@ -154,12 +147,7 @@ INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
 FLOATING_TYPE(CFloat,tyConCFloat,"CFloat",HTYPE_FLOAT)
 -- | Haskell type representing the C @double@ type.
 FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
--- GHC doesn't support CLDouble yet
-#ifndef __GLASGOW_HASKELL__
--- HACK: Currently no long double in the FFI, so we simply re-use double
--- | Haskell type representing the C @long double@ type.
-FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
-#endif
+-- XXX GHC doesn't support CLDouble yet
 
 {-# RULES
 "realToFrac/a->CFloat"    realToFrac = \x -> CFloat   (realToFrac x)

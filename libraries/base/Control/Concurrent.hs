@@ -33,17 +33,13 @@ module Control.Concurrent (
         -- * Basic concurrency operations
 
         ThreadId,
-#ifdef __GLASGOW_HASKELL__
         myThreadId,
-#endif
 
         forkIO,
-#ifdef __GLASGOW_HASKELL__
         forkFinally,
         forkIOWithUnmask,
         killThread,
         throwTo,
-#endif
 
         -- ** Threads with affinity
         forkOn,
@@ -61,14 +57,12 @@ module Control.Concurrent (
 
         -- $blocking
 
-#ifdef __GLASGOW_HASKELL__
         -- ** Waiting
         threadDelay,
         threadWaitRead,
         threadWaitWrite,
         threadWaitReadSTM,
         threadWaitWriteSTM,
-#endif
 
         -- * Communication abstractions
 
@@ -77,7 +71,6 @@ module Control.Concurrent (
         module Control.Concurrent.QSem,
         module Control.Concurrent.QSemN,
 
-#ifdef __GLASGOW_HASKELL__
         -- * Bound Threads
         -- $boundthreads
         rtsSupportsBoundThreads,
@@ -85,7 +78,6 @@ module Control.Concurrent (
         isCurrentThreadBound,
         runInBoundThread,
         runInUnboundThread,
-#endif
 
         -- * Weak references to ThreadIds
         mkWeakThreadId,
@@ -117,7 +109,6 @@ import Prelude
 
 import Control.Exception.Base as Exception
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Exception
 import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
@@ -135,7 +126,6 @@ import Control.Monad
 import Foreign.C
 import System.IO
 import Data.Maybe (Maybe(..))
-#endif
 #endif
 
 import Control.Concurrent.MVar
@@ -211,7 +201,6 @@ forkFinally action and_then =
   mask $ \restore ->
     forkIO $ try (restore action) >>= and_then
 
-#ifdef __GLASGOW_HASKELL__
 -- ---------------------------------------------------------------------------
 -- Bound Threads
 
@@ -396,9 +385,7 @@ runInUnboundThread action = do
 
 unsafeResult :: Either SomeException a -> IO a
 unsafeResult = either Exception.throwIO return
-#endif /* __GLASGOW_HASKELL__ */
 
-#ifdef __GLASGOW_HASKELL__
 -- ---------------------------------------------------------------------------
 -- threadWaitRead/threadWaitWrite
 
@@ -672,5 +659,3 @@ alternative then it is possible to prevent the thread from being
 considered deadlocked by making a 'StablePtr' pointing to it.  Don't
 forget to release the 'StablePtr' later with 'freeStablePtr'.
 -}
-
-#endif /* __GLASGOW_HASKELL__ */

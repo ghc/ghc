@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -59,9 +58,7 @@ import Data.Proxy
 import Text.ParserCombinators.ReadP (ReadP)
 import Text.ParserCombinators.ReadPrec (ReadPrec)
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Conc (STM, retry, orElse)
-#endif
 
 infixl 3 <|>
 infixl 4 <*>, <*, *>, <**>
@@ -181,7 +178,6 @@ instance Applicative (Lazy.ST s) where
     pure = return
     (<*>) = ap
 
-#ifdef __GLASGOW_HASKELL__
 instance Applicative STM where
     pure = return
     (<*>) = ap
@@ -189,7 +185,6 @@ instance Applicative STM where
 instance Alternative STM where
     empty = retry
     (<|>) = orElse
-#endif
 
 instance Applicative ((->) a) where
     pure = const

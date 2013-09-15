@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 
@@ -26,8 +26,6 @@ module Data.Tuple
   )
     where
 
-#ifdef __GLASGOW_HASKELL__
-
 import GHC.Base
 -- We need to depend on GHC.Base so that
 -- a) so that we get GHC.Classes, GHC.Types
@@ -39,8 +37,6 @@ import GHC.Tuple
 -- We must import GHC.Tuple, to ensure sure that the
 -- data constructors of `(,)' are in scope when we do
 -- the standalone deriving instance for Eq (a,b) etc
-
-#endif  /* __GLASGOW_HASKELL__ */
 
 default ()              -- Double isn't available yet
 

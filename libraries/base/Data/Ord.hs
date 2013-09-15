@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,9 +22,7 @@ module Data.Ord (
    comparing,
  ) where
 
-#if __GLASGOW_HASKELL__
 import GHC.Base
-#endif
 
 -- | 
 -- > comparing p x y = compare (p x) (p y)

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,9 +31,7 @@ module Data.Maybe
    , mapMaybe
    ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
-#endif
 
 -- ---------------------------------------------------------------------------
 -- The Maybe type, and instances

@@ -1,11 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 {-# LANGUAGE MagicHash #-}
 #if !defined(__PARALLEL_HASKELL__)
 {-# LANGUAGE UnboxedTuples #-}
-#endif
 #endif
 
 -----------------------------------------------------------------------------
@@ -44,7 +42,6 @@ import Prelude
 
 import Data.Typeable
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.IO           ( IO(..) )
 import GHC.Base		( Int(..), StableName#, makeStableName#
 			, eqStableName#, stableNameToInt# )
@@ -126,8 +123,6 @@ eqStableName (StableName sn1) (StableName sn2) =
 	 _  -> True
   -- Requested by Emil Axelsson on glasgow-haskell-users, who wants to
   -- use it for implementing observable sharing.
-
-#endif /* __GLASGOW_HASKELL__ */
 
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(StableName,stableNameTc,"StableName")

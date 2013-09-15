@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -44,11 +44,8 @@ module Control.Exception (
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         asyncExceptionToException, asyncExceptionFromException,
 
-#if __GLASGOW_HASKELL__
         NonTermination(..),
         NestedAtomically(..),
-#endif
-
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
         Deadlock(..),
@@ -63,9 +60,7 @@ module Control.Exception (
         throw,
         throwIO,
         ioError,
-#ifdef __GLASGOW_HASKELL__
         throwTo,
-#endif
 
         -- * Catching Exceptions
 
@@ -136,13 +131,9 @@ module Control.Exception (
 
 import Control.Exception.Base
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO (unsafeUnmask)
 import Data.Maybe
-#else
-import Prelude hiding (catch)
-#endif
 
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)

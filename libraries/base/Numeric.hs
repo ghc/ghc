@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -57,7 +57,6 @@ module Numeric (
 
         ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Read
 import GHC.Real
@@ -67,11 +66,7 @@ import GHC.Show
 import Data.Maybe
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified Text.Read.Lex as L
-#else
-import Data.Char
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- Reading
 
@@ -184,7 +179,6 @@ showGFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 showEFloat d x =  showString (formatRealFloat FFExponent d x)
 showFFloat d x =  showString (formatRealFloat FFFixed d x)
 showGFloat d x =  showString (formatRealFloat FFGeneric d x)
-#endif  /* __GLASGOW_HASKELL__ */
 
 -- ---------------------------------------------------------------------------
 -- Integer printing functions

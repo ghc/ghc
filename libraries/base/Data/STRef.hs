@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,10 +26,8 @@ module Data.STRef (
 
 import Prelude
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.ST
 import GHC.STRef
-#endif
 
 -- | Mutate the contents of an 'STRef'.
 --

@@ -95,13 +95,10 @@ import Data.OldTypeable.Internal hiding (mkTyCon)
 import Unsafe.Coerce
 import Data.Maybe
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 
 import GHC.Fingerprint.Type
 import GHC.Fingerprint
-
-#endif
 
 #include "OldTypeable.h"
 

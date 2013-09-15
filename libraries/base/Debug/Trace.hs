@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,16 +46,12 @@ import Prelude
 import System.IO.Unsafe
 import Control.Monad
 
-#ifdef __GLASGOW_HASKELL__
 import Foreign.C.String
 import GHC.Base
 import qualified GHC.Foreign
 import GHC.IO.Encoding
 import GHC.Ptr
 import GHC.Stack
-#else
-import System.IO (hPutStrLn,stderr)
-#endif
 
 -- $tracing
 --
@@ -73,9 +69,6 @@ import System.IO (hPutStrLn,stderr)
 --
 traceIO :: String -> IO ()
 traceIO msg = do
-#ifndef __GLASGOW_HASKELL__
-    hPutStrLn stderr msg
-#else
     withCString "%s\n" $ \cfmt ->
      withCString msg  $ \cmsg ->
       debugBelch cfmt cmsg
@@ -84,8 +77,6 @@ traceIO msg = do
 -- using the FFI.
 foreign import ccall unsafe "HsBase.h debugBelch2"
    debugBelch :: CString -> CString -> IO ()
-#endif
-
 
 -- | Deprecated. Use 'traceIO'.
 putTraceMsg :: String -> IO ()
@@ -219,14 +210,9 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
 -- other IO actions.
 --
 traceEventIO :: String -> IO ()
-#ifdef __GLASGOW_HASKELL__
 traceEventIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
     case traceEvent# p s of s' -> (# s', () #)
-#else
-traceEventIO msg = (return $! length msg) >> return ()
-#endif
-
 
 -- $markers
 --
@@ -272,11 +258,6 @@ traceMarker msg expr = unsafeDupablePerformIO $ do
 -- other IO actions.
 --
 traceMarkerIO :: String -> IO ()
-#ifdef __GLASGOW_HASKELL__
 traceMarkerIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
     case traceMarker# p s of s' -> (# s', () #)
-#else
-traceMarkerIO msg = (return $! length msg) >> return ()
-#endif
-

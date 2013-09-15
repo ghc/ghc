@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,22 +23,16 @@ module Foreign.ForeignPtr.Safe (
         -- * Finalised data pointers
           ForeignPtr
         , FinalizerPtr
-#ifdef __GLASGOW_HASKELL__
         , FinalizerEnvPtr
-#endif
+
         -- ** Basic operations
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
-#ifdef __GLASGOW_HASKELL__
         , newForeignPtrEnv
         , addForeignPtrFinalizerEnv
-#endif
         , withForeignPtr
-
-#ifdef __GLASGOW_HASKELL__
         , finalizeForeignPtr
-#endif
 
         -- ** Low-level operations
         , touchForeignPtr

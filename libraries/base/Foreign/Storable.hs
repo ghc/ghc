@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE BangPatterns #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -39,7 +37,6 @@ import Control.Monad            ( liftM )
 #include "MachDeps.h"
 #include "HsBaseConfig.h"
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Storable
 import GHC.Stable       ( StablePtr )
 import GHC.Num
@@ -50,11 +47,6 @@ import GHC.Base
 import GHC.Fingerprint.Type
 import Data.Bits
 import GHC.Real
-#else
-import Data.Int
-import Data.Word
-import Foreign.StablePtr
-#endif
 
 {- |
 The member functions of this class facilitate writing values of
@@ -146,13 +138,9 @@ class Storable a where
    -- restrictions might apply; see 'peek'.
  
    -- circular default instances
-#ifdef __GLASGOW_HASKELL__
    peekElemOff = peekElemOff_ undefined
       where peekElemOff_ :: a -> Ptr a -> Int -> IO a
             peekElemOff_ undef ptr off = peekByteOff ptr (off * sizeOf undef)
-#else
-   peekElemOff ptr off = peekByteOff ptr (off * sizeOfPtr ptr undefined)
-#endif
    pokeElemOff ptr off val = pokeByteOff ptr (off * sizeOf val) val
 
    peekByteOff ptr off = peek (ptr `plusPtr` off)
@@ -160,11 +148,6 @@ class Storable a where
 
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
-
-#ifndef __GLASGOW_HASKELL__
-sizeOfPtr :: Storable a => Ptr a -> a -> Int
-sizeOfPtr px x = sizeOf x
-#endif
 
 -- System-dependent, but rather obvious instances
 
@@ -181,10 +164,8 @@ instance Storable (T) where {                   \
     peekElemOff = read;                         \
     pokeElemOff = write }
 
-#ifdef __GLASGOW_HASKELL__
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
          readWideCharOffPtr,writeWideCharOffPtr)
-#endif
 
 STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,
          readIntOffPtr,writeIntOffPtr)
@@ -232,7 +213,6 @@ STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
          readInt64OffPtr,writeInt64OffPtr)
 
 -- XXX: here to avoid orphan instance in GHC.Fingerprint
-#ifdef __GLASGOW_HASKELL__
 instance Storable Fingerprint where
   sizeOf _ = 16
   alignment _ = 8
@@ -263,5 +243,3 @@ pokeFingerprint p0 (Fingerprint high low) = do
 
       pokeW64 (castPtr p0) 8 high
       pokeW64 (castPtr p0 `plusPtr` 8) 8 low
-#endif
-

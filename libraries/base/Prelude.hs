@@ -142,7 +142,6 @@ import Data.Either
 import Data.Maybe
 import Data.Tuple
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import Text.Read
 import GHC.Enum
@@ -150,7 +149,6 @@ import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.Show
-#endif
 
 infixr 0 $!
 
@@ -159,11 +157,7 @@ infixr 0 $!
 
 -- | Strict (call-by-value) application, defined in terms of 'seq'.
 ($!)    :: (a -> b) -> a -> b
-#ifdef __GLASGOW_HASKELL__
 f $! x  = let !vx = x in f vx  -- see #2273
-#else
-f $! x  = x `seq` f x
-#endif
 
 #ifdef __HADDOCK__
 -- | The value of @'seq' a b@ is bottom if @a@ is bottom, and otherwise

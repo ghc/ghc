@@ -28,7 +28,6 @@ import Prelude
 
 import Data.Ratio
 
-#ifdef __GLASGOW_HASKELL__
 import Foreign.Safe
 import Foreign.C
 
@@ -49,8 +48,6 @@ import Foreign.C
 #include <sys/times.h>
 #endif
 
-#endif
-
 ##ifdef mingw32_HOST_OS
 ## if defined(i386_HOST_ARCH)
 ##  define WINDOWS_CCONV stdcall
@@ -69,7 +66,6 @@ realToInteger ct = round (realToFrac ct :: Double)
   -- so we must convert to Double before we can round it
 #endif
 
-#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- |Computation 'getCPUTime' returns the number of picoseconds CPU time
 -- used by the current program.  The precision of this result is
@@ -152,7 +148,7 @@ foreign import WINDOWS_CCONV unsafe "GetCurrentProcess" getCurrentProcess :: IO 
 foreign import WINDOWS_CCONV unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
 
 #endif /* not _WIN32 */
-#endif /* __GLASGOW_HASKELL__ */
+
 
 -- |The 'cpuTimePrecision' constant is the smallest measurable difference
 -- in CPU time that the implementation can record, and is given as an
@@ -161,9 +157,7 @@ foreign import WINDOWS_CCONV unsafe "GetProcessTimes" getProcessTimes :: Ptr HAN
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % fromIntegral (clockTicks))
 
-#ifdef __GLASGOW_HASKELL__
 foreign import ccall unsafe clk_tck :: CLong
 
 clockTicks :: Int
 clockTicks = fromIntegral clk_tck
-#endif /* __GLASGOW_HASKELL__ */

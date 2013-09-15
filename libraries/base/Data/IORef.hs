@@ -28,7 +28,7 @@ module Data.IORef
         atomicModifyIORef',
         atomicWriteIORef,
 
-#if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
+#if !defined(__PARALLEL_HASKELL__)
         mkWeakIORef,
 #endif
         -- ** Memory Model
@@ -37,7 +37,6 @@ module Data.IORef
 
         ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.STRef
 import GHC.IORef hiding (atomicModifyIORef)
@@ -45,9 +44,8 @@ import qualified GHC.IORef
 #if !defined(__PARALLEL_HASKELL__)
 import GHC.Weak
 #endif
-#endif /* __GLASGOW_HASKELL__ */
 
-#if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
+#if !defined(__PARALLEL_HASKELL__)
 -- |Make a 'Weak' pointer to an 'IORef', using the second argument as a finalizer
 -- to run when 'IORef' is garbage-collected
 mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
@@ -98,9 +96,7 @@ modifyIORef' ref f = do
 -- Use 'atomicModifyIORef'' or 'atomicWriteIORef' to avoid this problem.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-#ifdef __GLASGOW_HASKELL__
 atomicModifyIORef = GHC.IORef.atomicModifyIORef
-#endif
 
 -- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
 -- in the 'IORef' as well as the value returned.

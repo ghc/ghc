@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
-#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,15 +28,12 @@ module Data.Either (
 
 #include "Typeable.h"
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Show
 import GHC.Read
-#endif
 
 import Data.Typeable
 
-#ifdef __GLASGOW_HASKELL__
 {-
 -- just for testing
 import Test.QuickCheck
@@ -72,7 +67,6 @@ instance Monad (Either e) where
 either                  :: (a -> c) -> (b -> c) -> Either a b -> c
 either f _ (Left x)     =  f x
 either _ g (Right y)    =  g y
-#endif  /* __GLASGOW_HASKELL__ */
 
 INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 

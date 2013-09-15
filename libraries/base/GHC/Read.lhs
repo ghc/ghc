@@ -1,6 +1,6 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, PatternGuards,
+{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, PatternGuards,
              ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK hide #-}
 

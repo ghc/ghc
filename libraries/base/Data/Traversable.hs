@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -58,9 +57,7 @@ import Data.Foldable (Foldable())
 import Data.Monoid (Monoid)
 import Data.Proxy
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Arr
-#endif
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.

@@ -4,9 +4,7 @@
            , MagicHash
            , GeneralizedNewtypeDeriving
   #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -97,7 +95,6 @@ import Foreign.C
 import Data.Typeable
 -- import Data.Bits
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Enum
 import GHC.Num
@@ -105,9 +102,6 @@ import GHC.Real
 -- import GHC.Prim
 import GHC.Read
 import GHC.Show
-#else
-import Control.Monad
-#endif
 
 #include "CTypes.h"
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -52,7 +52,6 @@ module Data.Char
     , readLitChar
     ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Arr (Ix)
 import GHC.Char
@@ -62,7 +61,6 @@ import GHC.Read (Read, readLitChar, lexLitChar)
 import GHC.Unicode
 import GHC.Num
 import GHC.Enum
-#endif
 
 -- | Convert a single digit 'Char' to the corresponding 'Int'.  
 -- This function fails unless its argument satisfies 'isHexDigit',
@@ -74,12 +72,6 @@ digitToInt c
  | c >= 'a' && c <= 'f' =  ord c - ord 'a' + 10
  | c >= 'A' && c <= 'F' =  ord c - ord 'A' + 10
  | otherwise            =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
-
-#ifndef __GLASGOW_HASKELL__
-isAsciiUpper, isAsciiLower :: Char -> Bool
-isAsciiLower c          =  c >= 'a' && c <= 'z'
-isAsciiUpper c          =  c >= 'A' && c <= 'Z'
-#endif
 
 -- | Unicode General Categories (column 2 of the UnicodeData table)
 -- in the order they are listed in the Unicode standard.
@@ -119,9 +111,7 @@ data GeneralCategory
 
 -- | The Unicode general category of the character.
 generalCategory :: Char -> GeneralCategory
-#if defined(__GLASGOW_HASKELL__)
 generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
-#endif
 
 -- derived character classifiers
 

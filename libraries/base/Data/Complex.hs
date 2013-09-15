@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE StandaloneDeriving #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -39,9 +37,7 @@ module Data.Complex
 import Prelude
 
 import Data.Typeable
-#ifdef __GLASGOW_HASKELL__
 import Data.Data (Data)
-#endif
 
 infix  6  :+
 
@@ -56,11 +52,7 @@ infix  6  :+
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
-# if __GLASGOW_HASKELL__
         deriving (Eq, Show, Read, Data)
-# else
-        deriving (Eq, Show, Read)
-# endif
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex

@@ -19,10 +19,9 @@
            , FlexibleInstances
            , MagicHash
            , KindSignatures
-           , PolyKinds #-}
-#ifdef __GLASGOW_HASKELL__
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
+           , PolyKinds
+           , DeriveDataTypeable
+           , StandaloneDeriving #-}
 
 module Data.Typeable.Internal (
     Proxy (..),
@@ -291,19 +290,15 @@ INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
 INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 
-#ifdef __GLASGOW_HASKELL__
 -- Types defined in GHC.MVar
 {- INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" ) -}
-#endif
 
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
 {- INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray") -}
 
-#ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE2(ST,stTc,"ST")
 INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
 INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
-#endif
 
 INSTANCE_TYPEABLE2((,),pairTc,"(,)")
 INSTANCE_TYPEABLE3((,,),tup3Tc,"(,,)")
@@ -314,9 +309,7 @@ INSTANCE_TYPEABLE7((,,,,,,),tup7Tc,"(,,,,,,)")
 
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
 INSTANCE_TYPEABLE1(FunPtr,funPtrTc,"FunPtr")
-#ifndef __GLASGOW_HASKELL__
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
-#endif
+
 {-
 INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
 INSTANCE_TYPEABLE1(IORef,iORefTc,"IORef") 
@@ -336,9 +329,6 @@ INSTANCE_TYPEABLE0(Int,intTc,"Int")
 INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
 INSTANCE_TYPEABLE0(Integer,integerTc,"Integer")
 INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
-#ifndef __GLASGOW_HASKELL__
-INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
-#endif
 
 {-
 INSTANCE_TYPEABLE0(Int8,int8Tc,"Int8")
@@ -355,8 +345,6 @@ INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
-#ifdef __GLASGOW_HASKELL__
 deriving instance Typeable RealWorld
 deriving instance Typeable Proxy
 deriving instance Typeable (:=:)
-#endif

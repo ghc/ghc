@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,13 +23,11 @@ module System.IO.Unsafe (
    unsafeFixIO,
   ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO
 import GHC.IORef
 import GHC.Exception
 import Control.Exception
-#endif
 
 -- | A slightly faster version of `System.IO.fixIO` that may not be
 -- safe to use with multiple threads.  The unsafety arises when used

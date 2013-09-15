@@ -1,9 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
-
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash, DeriveDataTypeable #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,20 +26,14 @@ import Prelude
 
 import System.IO.Unsafe (unsafePerformIO)
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
 import Data.Typeable
 import Data.IORef
-#endif
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
 -- compared for equality and ordering and hashed into 'Int'.
-newtype Unique = Unique Integer deriving (Eq,Ord
-#ifdef __GLASGOW_HASKELL__
-   ,Typeable
-#endif
-   )
+newtype Unique = Unique Integer deriving (Eq,Ord,Typeable)
 
 uniqSource :: IORef Integer
 uniqSource = unsafePerformIO (newIORef 0)
@@ -81,8 +71,4 @@ newUnique = do
 -- same value, although in practice this is unlikely.  The 'Int'
 -- returned makes a good hash key.
 hashUnique :: Unique -> Int
-#if defined(__GLASGOW_HASKELL__)
 hashUnique (Unique i) = I# (hashInteger i)
-#else
-hashUnique (Unique u) = fromInteger (u `mod` (toInteger (maxBound :: Int) + 1))
-#endif

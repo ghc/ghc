@@ -1,5 +1,5 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,9 +30,7 @@ module Data.Word
         -- $notes
         ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Word
-#endif
 
 {- $notes
 

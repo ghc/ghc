@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -86,13 +86,11 @@ import Control.Exception.Base
 import Data.Either
 import Data.Maybe
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Handle.Types
 import Text.Show
-#endif
 
 -- | The construct 'tryIOError' @comp@ exposes IO errors which occur within a
 -- computation, and which are not fully handled.
@@ -116,9 +114,7 @@ mkIOError t location maybe_hdl maybe_filename =
                IOError{ ioe_type = t, 
                         ioe_location = location,
                         ioe_description = "",
-#if defined(__GLASGOW_HASKELL__)
                         ioe_errno = Nothing,
-#endif
                         ioe_handle = maybe_hdl, 
                         ioe_filename = maybe_filename
                         }

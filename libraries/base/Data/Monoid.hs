@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -36,16 +36,12 @@ module Data.Monoid (
   ) where
 
 -- Push down the module in the dependency hierarchy.
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Base hiding (Any)
 import GHC.Enum
 import GHC.Num
 import GHC.Read
 import GHC.Show
 import Data.Maybe
-#else
-import Prelude
-#endif
 
 {-
 -- just for testing

@@ -1,7 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude, Trustworthy #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE PolyKinds #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,9 +17,7 @@
 module Data.Proxy
   (
         Proxy(..), asProxyTypeOf
-#ifdef __GLASGOW_HASKELL__
       , KProxy(..)
-#endif
   ) where
 
 import Data.Monoid
@@ -35,11 +31,9 @@ import GHC.Arr
 -- | A concrete, poly-kinded proxy type
 data Proxy t = Proxy
 
-#ifdef __GLASGOW_HASKELL__
 -- | A concrete, promotable proxy type, for use at the kind level
 -- There are no instances for this because it is intended at the kind level only
 data KProxy (t :: *) = KProxy
-#endif
 
 instance Eq (Proxy s) where
   _ == _ = True
@@ -69,10 +63,8 @@ instance Ix (Proxy s) where
     index _ _         = 0
     inRange _ _       = True
     rangeSize _       = 1
-#ifdef __GLASGOW_HASKELL__
     unsafeIndex _ _   = 0
     unsafeRangeSize _ = 1
-#endif
 
 instance Bounded (Proxy s) where
     minBound = Proxy

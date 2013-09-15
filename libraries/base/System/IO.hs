@@ -73,9 +73,7 @@ module System.IO (
     -- ** Determining and changing the size of a file
 
     hFileSize,
-#ifdef __GLASGOW_HASKELL__
     hSetFileSize,
-#endif
 
     -- ** Detecting the end of input
 
@@ -114,9 +112,7 @@ module System.IO (
 
     -- ** Showing handle state (not portable: GHC only)
 
-#ifdef __GLASGOW_HASKELL__
     hShow,
-#endif
 
     -- * Text input and output
 
@@ -237,7 +233,6 @@ import Foreign.C.Types
 import System.Posix.Internals
 import System.Posix.Types
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO hiding ( bracket, onException )
 import GHC.IO.IOMode
@@ -251,12 +246,10 @@ import GHC.Num
 import Text.Read
 import GHC.Show
 import GHC.MVar
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Standard IO
 
-#ifdef __GLASGOW_HASKELL__
 -- | Write a character to the standard output device
 -- (same as 'hPutChar' 'stdout').
 
@@ -364,7 +357,6 @@ readIO s        =  case (do { (x,t) <- reads s ;
 -- 'GHC.IO.Encoding.setLocaleEncoding' this value will not reflect that change.
 localeEncoding :: TextEncoding
 localeEncoding = initLocaleEncoding
-#endif  /* __GLASGOW_HASKELL__ */
 
 -- | Computation 'hReady' @hdl@ indicates whether at least one item is
 -- available for input from handle @hdl@.
@@ -408,7 +400,6 @@ withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 -- ---------------------------------------------------------------------------
 -- fixIO
 
-#if defined(__GLASGOW_HASKELL__)
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     m <- newEmptyMVar
@@ -431,7 +422,6 @@ fixIO k = do
 --
 -- See also System.IO.Unsafe.unsafeFixIO.
 --
-#endif
 
 -- | The function creates a temporary file in ReadWrite mode.
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
@@ -496,7 +486,6 @@ openTempFile' loc tmp_dir template binary mode = do
          -- beginning with '.' as the second component.
          _                      -> error "bug in System.IO.openTempFile"
 
-#if defined(__GLASGOW_HASKELL__)
     findTempName x = do
       r <- openNewFile filepath binary mode
       case r of
@@ -511,10 +500,6 @@ openTempFile' loc tmp_dir template binary mode = do
           h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
 
           return (filepath, h)
-#else
-         h <- fdToHandle fd `onException` c_close fd
-         return (filepath, h)
-#endif
 
       where
         filename        = prefix ++ show x ++ suffix
@@ -527,7 +512,6 @@ openTempFile' loc tmp_dir template binary mode = do
                   | last a == pathSeparator = a ++ b
                   | otherwise = a ++ [pathSeparator] ++ b
 
-#if defined(__GLASGOW_HASKELL__)
 data OpenNewFileResult
   = NewFileCreated CInt
   | FileExists
@@ -549,7 +533,7 @@ openNewFile filepath binary mode = do
       errno <- getErrno
       case errno of
         _ | errno == eEXIST -> return FileExists
-# ifdef mingw32_HOST_OS
+#ifdef mingw32_HOST_OS
         -- If c_open throws EACCES on windows, it could mean that filepath is a
         -- directory. In this case, we want to return FileExists so that the
         -- enclosing openTempFile can try again instead of failing outright.
@@ -564,13 +548,12 @@ openNewFile filepath binary mode = do
           return $ if exists
             then FileExists
             else OpenNewError errno
-# endif
+#endif
         _ -> return (OpenNewError errno)
     else return (NewFileCreated fd)
 
-# ifdef mingw32_HOST_OS
+#ifdef mingw32_HOST_OS
 foreign import ccall "file_exists" c_fileExists :: CString -> IO Bool
-# endif
 #endif
 
 -- XXX Should use filepath library

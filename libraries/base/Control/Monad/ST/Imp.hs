@@ -35,21 +35,8 @@ module Control.Monad.ST.Imp (
         unsafeSTToIO
     ) where
 
-#if !defined(__GLASGOW_HASKELL__)
-import Control.Monad.Fix
-#endif
-
 #include "Typeable.h"
 
-#if defined(__GLASGOW_HASKELL__)
 import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
 import GHC.Base         ( RealWorld )
 import GHC.IO           ( stToIO, unsafeIOToST, unsafeSTToIO )
-#endif
-
-#if !defined(__GLASGOW_HASKELL__)
-instance MonadFix (ST s) where
-        mfix = fixST
-#endif
-
-

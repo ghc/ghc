@@ -26,14 +26,11 @@ module System.Environment
       unsetEnv,
       withArgs,
       withProgName,
-#ifdef __GLASGOW_HASKELL__
       getEnvironment,
-#endif
   ) where
 
 import Prelude
 
-#ifdef __GLASGOW_HASKELL__
 import Foreign.Safe
 import Foreign.C
 import System.IO.Error (mkIOError)
@@ -50,7 +47,6 @@ import GHC.Windows
 #else
 import System.Posix.Internals (withFilePath)
 #endif
-#endif
 
 import System.Environment.ExecutablePath
 
@@ -63,8 +59,6 @@ import System.Environment.ExecutablePath
 #  error Unknown mingw32 arch
 # endif
 #endif
-
-#ifdef __GLASGOW_HASKELL__
 
 #include "HsBaseConfig.h"
 
@@ -449,4 +443,3 @@ divvy str =
   case break (=='=') str of
     (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
     (name,_:value) -> (name,value)
-#endif  /* __GLASGOW_HASKELL__ */

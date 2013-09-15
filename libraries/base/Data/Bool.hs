@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,9 +26,7 @@ module Data.Bool (
    bool,
   ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
-#endif
 
 -- | Case analysis for the 'Bool' type.
 -- @bool a b p@ evaluates to @a@ when @p@ is @False@, and evaluates to @b@

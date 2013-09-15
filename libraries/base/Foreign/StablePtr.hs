@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,9 +30,7 @@ module Foreign.StablePtr
           -- $cinterface
         ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Stable
-#endif
 
 -- $cinterface
 --

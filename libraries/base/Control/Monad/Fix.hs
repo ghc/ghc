@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,9 +25,7 @@ module Control.Monad.Fix (
 import Prelude
 import System.IO
 import Data.Function (fix)
-#if defined(__GLASGOW_HASKELL__)
 import GHC.ST
-#endif
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:
@@ -78,8 +75,5 @@ instance MonadFix (Either e) where
              where unRight (Right x) = x
                    unRight (Left  _) = error "mfix Either: Left"
 
-#if defined(__GLASGOW_HASKELL__)
 instance MonadFix (ST s) where
         mfix = fixST
-#endif
-

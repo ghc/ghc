@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -69,13 +69,9 @@ import Foreign.Storable (Storable(alignment,sizeOf,peekElemOff,pokeElemOff))
 import Foreign.Marshal.Alloc (mallocBytes, allocaBytesAligned, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Num
 import GHC.List
 import GHC.Base
-#else
-import Control.Monad (zipWithM_)
-#endif
 
 -- allocation
 -- ----------
@@ -151,28 +147,17 @@ peekArray0 marker ptr  = do
 -- |Write the list elements consecutive into memory
 --
 pokeArray :: Storable a => Ptr a -> [a] -> IO ()
-#ifndef __GLASGOW_HASKELL__
-pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
-#else
 pokeArray ptr vals0 = go vals0 0#
   where go [] _          = return ()
         go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
-#endif
 
 -- |Write the list elements consecutive into memory and terminate them with the
 -- given marker element
 --
 pokeArray0 :: Storable a => a -> Ptr a -> [a] -> IO ()
-#ifndef __GLASGOW_HASKELL__
-pokeArray0 marker ptr vals  = do
-  pokeArray ptr vals
-  pokeElemOff ptr (length vals) marker
-#else
 pokeArray0 marker ptr vals0 = go vals0 0#
   where go [] n#         = pokeElemOff ptr (I# n#) marker
         go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
-#endif
-
 
 -- combined allocation and marshalling
 -- -----------------------------------

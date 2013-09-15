@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,7 +19,4 @@ module Data.Eq (
    Eq(..),
  ) where
 
-#if __GLASGOW_HASKELL__
 import GHC.Base
-#endif
-

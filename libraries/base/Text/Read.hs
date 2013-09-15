@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,35 +32,26 @@ module Text.Read (
    readParen,
    lex,
 
-#ifdef __GLASGOW_HASKELL__
    -- * New parsing functions
    module Text.ParserCombinators.ReadPrec,
    L.Lexeme(..),
    lexP,
    parens,
-#endif
-#ifdef __GLASGOW_HASKELL__
    readListDefault,
    readListPrecDefault,
    readEither,
    readMaybe
-#endif
 
  ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Read
 import Data.Either
 import Data.Maybe
 import Text.ParserCombinators.ReadP as P
-#endif
-#ifdef __GLASGOW_HASKELL__
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 ------------------------------------------------------------------------
 -- utility functions
 
@@ -94,5 +85,3 @@ readMaybe s = case readEither s of
 -- completely consumed by the input process.
 read :: Read a => String -> a
 read s = either error id (readEither s)
-#endif
-

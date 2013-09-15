@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -23,22 +23,16 @@ module Foreign.ForeignPtr.Imp
         -- * Finalised data pointers
           ForeignPtr
         , FinalizerPtr
-#ifdef __GLASGOW_HASKELL__
         , FinalizerEnvPtr
-#endif
+
         -- ** Basic operations
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
-#ifdef __GLASGOW_HASKELL__
         , newForeignPtrEnv
         , addForeignPtrFinalizerEnv
-#endif
         , withForeignPtr
-
-#ifdef __GLASGOW_HASKELL__
         , finalizeForeignPtr
-#endif
 
         -- ** Low-level operations
         , unsafeForeignPtrToPtr
@@ -56,25 +50,9 @@ module Foreign.ForeignPtr.Imp
 import Foreign.Ptr
 import Foreign.Storable ( Storable(sizeOf) )
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
 import GHC.ForeignPtr
-#endif
-
-#if !defined(__GLASGOW_HASKELL__)
-import Foreign.Marshal.Alloc    ( malloc, mallocBytes, finalizerFree )
-
-instance Eq (ForeignPtr a) where 
-    p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
-
-instance Ord (ForeignPtr a) where 
-    compare p q  =  compare (unsafeForeignPtrToPtr p) (unsafeForeignPtrToPtr q)
-
-instance Show (ForeignPtr a) where
-    showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
-#endif
-
 
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and
@@ -112,7 +90,6 @@ withForeignPtr fo io
        touchForeignPtr fo
        return r
 
-#ifdef __GLASGOW_HASKELL__
 -- | This variant of 'newForeignPtr' adds a finalizer that expects an
 -- environment in addition to the finalized pointer.  The environment
 -- that will be passed to the finalizer is fixed by the second argument to
@@ -123,19 +100,6 @@ newForeignPtrEnv finalizer env p
   = do fObj <- newForeignPtr_ p
        addForeignPtrFinalizerEnv finalizer env fObj
        return fObj
-#endif
-
-#ifndef __GLASGOW_HASKELL__
-mallocForeignPtr :: Storable a => IO (ForeignPtr a)
-mallocForeignPtr = do
-  r <- malloc
-  newForeignPtr finalizerFree r
-
-mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
-mallocForeignPtrBytes n = do
-  r <- mallocBytes n
-  newForeignPtr finalizerFree r
-#endif /* !__GLASGOW_HASKELL__ */
 
 -- | This function is similar to 'Foreign.Marshal.Array.mallocArray',
 -- but yields a memory area that has a finalizer attached that releases

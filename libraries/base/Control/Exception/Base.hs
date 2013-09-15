@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
 
 #include "Typeable.h"
 
@@ -31,12 +29,8 @@ module Control.Exception.Base (
         AssertionFailed(..),
         SomeAsyncException(..), AsyncException(..),
         asyncExceptionToException, asyncExceptionFromException,
-
-#ifdef __GLASGOW_HASKELL__
         NonTermination(..),
         NestedAtomically(..),
-#endif
-
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
         Deadlock(..),
@@ -51,9 +45,7 @@ module Control.Exception.Base (
         throwIO,
         throw,
         ioError,
-#ifdef __GLASGOW_HASKELL__
         throwTo,
-#endif
 
         -- * Catching Exceptions
 
@@ -98,16 +90,13 @@ module Control.Exception.Base (
 
         finally,
 
-#ifdef __GLASGOW_HASKELL__
         -- * Calls for GHC runtime
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         absentError,
         nonTermination, nestedAtomically,
-#endif
   ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO hiding (bracket,finally,onException)
 import GHC.IO.Exception
@@ -115,7 +104,6 @@ import GHC.Exception
 import GHC.Show
 -- import GHC.Exception hiding ( Exception )
 import GHC.Conc.Sync
-#endif
 
 import Data.Dynamic
 import Data.Either
@@ -161,9 +149,7 @@ catch   :: Exception e
         => IO a         -- ^ The computation to run
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
-#if __GLASGOW_HASKELL__
 catch = catchException
-#endif
 
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
@@ -309,15 +295,8 @@ bracketOnError before after thing =
     a <- before
     restore (thing a) `onException` after a
 
-#if !__GLASGOW_HASKELL__
-assert :: Bool -> a -> a
-assert True x = x
-assert False _ = throw (AssertionFailed "")
-#endif
-
 -----
 
-#if __GLASGOW_HASKELL__
 -- |A pattern match failed. The @String@ gives information about the
 -- source location of the pattern.
 data PatternMatchFail = PatternMatchFail String
@@ -412,9 +391,6 @@ instance Exception NestedAtomically
 
 -----
 
-#endif /* __GLASGOW_HASKELL__ */
-
-#ifdef __GLASGOW_HASKELL__
 recSelError, recConError, irrefutPatError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
   absentError
@@ -438,4 +414,3 @@ nonTermination = toException NonTermination
 -- GHC's RTS calls this
 nestedAtomically :: SomeException
 nestedAtomically = toException NestedAtomically
-#endif
