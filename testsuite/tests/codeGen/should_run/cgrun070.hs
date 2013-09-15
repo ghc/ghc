@@ -179,7 +179,7 @@ newPinnedByteArray :: Int -> ST s (Ptr (), MByteArray s)
 newPinnedByteArray (I# n#) = ST $ \s# ->
     case newPinnedByteArray# n# s# of
         (# s2#, marr# #) ->
-          (# s2#, (Ptr (byteArrayContents# (unsafeCoerce# marr#)), 
+          (# s2#, (Ptr (byteArrayContents# (unsafeCoerce# marr#)),
                   MByteArray marr#) #)
 
 withNewPinnedByteArray :: Int -> (Ptr () -> MByteArray s -> ST s a) -> ST s a
