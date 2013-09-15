@@ -34,6 +34,7 @@ data ArgRep
   | L   -- long (64-bit)
   | V16 -- 16-byte (128-bit) vectors
   | V32 -- 32-byte (256-bit) vectors
+  | V64 -- 64-byte (512-bit) vectors
 
 -- size of a value in *words*
 argSize :: ArgRep -> Int
@@ -45,6 +46,7 @@ argSize D   = (SIZEOF_DOUBLE `quot` SIZEOF_VOID_P :: Int)
 argSize L   = (8 `quot` SIZEOF_VOID_P :: Int)
 argSize V16 = (16 `quot` SIZEOF_VOID_P :: Int)
 argSize V32 = (32 `quot` SIZEOF_VOID_P :: Int)
+argSize V64 = (64 `quot` SIZEOF_VOID_P :: Int)
 
 showArg :: ArgRep -> String
 showArg N   = "n"
@@ -55,6 +57,7 @@ showArg D   = "d"
 showArg L   = "l"
 showArg V16 = "v16"
 showArg V32 = "v32"
+showArg V64 = "v64"
 
 -- is a value a pointer?
 isPtr :: ArgRep -> Bool
@@ -508,6 +511,7 @@ argRep L   = text "L_"
 argRep P   = text "gcptr"
 argRep V16 = text "V16_"
 argRep V32 = text "V32_"
+argRep V64 = text "V64_"
 argRep _   = text "W_"
 
 genApply regstatus args =
@@ -859,6 +863,7 @@ applyTypes = [
         [L],
         [V16],
         [V32],
+        [V64],
         [N],
         [P],
         [P,V],
@@ -888,6 +893,7 @@ stackApplyTypes = [
         [L],
         [V16],
         [V32],
+        [V64],
         [N,N],
         [N,P],
         [P,N],

@@ -463,6 +463,7 @@ push_alts F   = bci_PUSH_ALTS_F
 push_alts D   = bci_PUSH_ALTS_D
 push_alts V16 = error "push_alts: vector"
 push_alts V32 = error "push_alts: vector"
+push_alts V64 = error "push_alts: vector"
 
 return_ubx :: ArgRep -> Word16
 return_ubx V   = bci_RETURN_V
@@ -473,6 +474,7 @@ return_ubx F   = bci_RETURN_F
 return_ubx D   = bci_RETURN_D
 return_ubx V16 = error "return_ubx: vector"
 return_ubx V32 = error "return_ubx: vector"
+return_ubx V64 = error "return_ubx: vector"
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
