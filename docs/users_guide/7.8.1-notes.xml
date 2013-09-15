@@ -30,6 +30,26 @@
 
         <listitem>
             <para>
+                GHC can now perform simple evaluation of type-level
+                natural numbers, when using the
+                <literal>TypeNats</literal> extension. For example,
+                given a type-level constraint such as <literal>(x + 3)
+                ~ 5</literal>, GHC is able to infer that
+                <literal>x</literal> is 2. Similarly, GHC can now
+                understand type-level identities such as <literal>x +
+                0 ~ x</literal>.
+           </para>
+
+            <para>
+                Note that the solving of these equations is only used
+                to resolve unification variables - it does not
+                generate new facts in the type checker. This is
+                similar to how functional dependencies work.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
                 It is now possible to declare a 'closed' <literal>type
                 family</literal> when using the
                 <literal>TypeFamilies</literal> extension. A closed
