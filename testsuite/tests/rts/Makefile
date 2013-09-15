@@ -50,14 +50,25 @@ T5435_v:
 	$(RM) T5435_c_v.o T5435_v$(exeext)
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T5435.c -o T5435_c_v.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf v_o -o T5435_v$(exeext)
-	./T5435_v T5435_c_v.o
+	./T5435_v v ./T5435_c_v.o
 
+# This doesn't work on Windows, which expects *no* file extension
+# File extension here is not right for Mac OS X, where it should be dylib.
+# Note that this is DLL-loading from a *static* executable; we probably
+# also ought to provide the dynamic way via the usual channels.
 .PHONY: T5435_dyn
 T5435_dyn:
 	$(RM) T5435_c_dyn.o T5435_dyn$(exeext)
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic -fPIC -c T5435.c -o T5435_c_dyn.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic -fPIC T5435.hs -osuf dyn_o -o T5435_dyn$(exeext)
-	./T5435_dyn T5435_c_dyn.o
+	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 -fPIC -shared -c T5435.c -osuf dyn_o -o T5435_c.so
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf dyn_o -o T5435_dyn$(exeext)
+	./T5435_dyn dyn ./T5435_c.so
+
+.PHONY: T5435_dyn_mingw32
+T5435_dyn_mingw32:
+	$(RM) T5435_c_dyn.o T5435_dyn$(exeext)
+	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 -fPIC -shared -c T5435.c -osuf dyn_o -o T5435_c.dll
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf dyn_o -o T5435_dyn$(exeext)
+	./T5435_dyn dyn ./T5435_c
 
 T6006_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs

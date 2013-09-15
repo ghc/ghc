@@ -136,9 +136,14 @@ test('T5435_v',
      ['$MAKE -s --no-print-directory T5435_v'])
 
 test('T5435_dyn',
-     extra_clean(['T5435_c_dyn.o']),
+     [when(opsys('mingw32'), skip), extra_clean(['T5435_c.so'])],
      run_command,
      ['$MAKE -s --no-print-directory T5435_dyn'])
+
+test('T5435_dyn_mingw32',
+     [when(not opsys('mingw32'), skip), extra_clean(['T5435_c.dll'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T5435_dyn_mingw32'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
