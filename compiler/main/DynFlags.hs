@@ -133,6 +133,10 @@ module DynFlags (
         isSse4_2Enabled,
         isAvxEnabled,
         isAvx2Enabled,
+        isAvx512cdEnabled,
+        isAvx512erEnabled,
+        isAvx512fEnabled,
+        isAvx512pfEnabled,
 
         -- * Linker information
         LinkerInfo(..),
@@ -774,6 +778,10 @@ data DynFlags = DynFlags {
   sseVersion            :: Maybe (Int, Int),  -- (major, minor)
   avx                   :: Bool,
   avx2                  :: Bool,
+  avx512cd              :: Bool, -- Enable AVX-512 Conflict Detection Instructions.
+  avx512er              :: Bool, -- Enable AVX-512 Exponential and Reciprocal Instructions.
+  avx512f               :: Bool, -- Enable AVX-512 instructions.
+  avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
 
   -- | Run-time linker information (what options we need, etc.)
   rtldFlags             :: IORef (Maybe LinkerInfo)
@@ -1407,6 +1415,10 @@ defaultDynFlags mySettings =
         sseVersion = Nothing,
         avx = False,
         avx2 = False,
+        avx512cd = False,
+        avx512er = False,
+        avx512f = False,
+        avx512pf = False,
         rtldFlags = panic "defaultDynFlags: no rtldFlags"
       }
 
@@ -2313,6 +2325,10 @@ dynamic_flags = [
   , Flag "msse"         (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
   , Flag "mavx"         (noArg (\d -> d{ avx = True }))
   , Flag "mavx2"        (noArg (\d -> d{ avx2 = True }))
+  , Flag "mavx512cd"    (noArg (\d -> d{ avx512cd = True }))
+  , Flag "mavx512er"    (noArg (\d -> d{ avx512er = True }))
+  , Flag "mavx512f"     (noArg (\d -> d{ avx512f = True }))
+  , Flag "mavx512pf"    (noArg (\d -> d{ avx512pf = True }))
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -3614,10 +3630,22 @@ isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just (4,2)
 
 isAvxEnabled :: DynFlags -> Bool
-isAvxEnabled dflags = avx dflags || avx2 dflags
+isAvxEnabled dflags = avx dflags || avx2 dflags || avx512f dflags
 
 isAvx2Enabled :: DynFlags -> Bool
-isAvx2Enabled dflags = avx2 dflags
+isAvx2Enabled dflags = avx2 dflags || avx512f dflags
+
+isAvx512cdEnabled :: DynFlags -> Bool
+isAvx512cdEnabled dflags = avx512cd dflags
+
+isAvx512erEnabled :: DynFlags -> Bool
+isAvx512erEnabled dflags = avx512er dflags
+
+isAvx512fEnabled :: DynFlags -> Bool
+isAvx512fEnabled dflags = avx512f dflags
+
+isAvx512pfEnabled :: DynFlags -> Bool
+isAvx512pfEnabled dflags = avx512pf dflags
 
 -- -----------------------------------------------------------------------------
 -- Linker information

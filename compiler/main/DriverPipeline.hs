@@ -1382,6 +1382,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 ++ map SysTools.Option abiOpts
                 ++ map SysTools.Option sseOpts
                 ++ map SysTools.Option avxOpts
+                ++ map SysTools.Option avx512Opts
                 ++ map SysTools.Option stackAlignOpts)
 
     return (RealPhase next_phase, output_fn)
@@ -1415,9 +1416,15 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 | isSse2Enabled dflags   = ["-mattr=+sse2"]
                 | otherwise              = []
 
-        avxOpts | isAvx2Enabled dflags   = ["-mattr=+avx2"]
-                | isAvxEnabled dflags    = ["-mattr=+avx"]
-                | otherwise              = []
+        avxOpts | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
+                | isAvx2Enabled dflags    = ["-mattr=+avx2"]
+                | isAvxEnabled dflags     = ["-mattr=+avx"]
+                | otherwise               = []
+
+        avx512Opts =
+          [ "-mattr=+avx512cd" | isAvx512cdEnabled dflags ] ++
+          [ "-mattr=+avx512er" | isAvx512erEnabled dflags ] ++
+          [ "-mattr=+avx512pf" | isAvx512pfEnabled dflags ]
 
         stackAlignOpts =
             case platformArch (targetPlatform dflags) of
@@ -2035,7 +2042,11 @@ doCpp dflags raw input_fn output_fn = do
 
     let avx_defs =
           [ "-D__AVX__=1"  | isAvxEnabled  dflags ] ++
-          [ "-D__AVX2__=1" | isAvx2Enabled dflags ]
+          [ "-D__AVX2__=1" | isAvx2Enabled dflags ] ++
+          [ "-D__AVX512CD__=1" | isAvx512cdEnabled dflags ] ++
+          [ "-D__AVX512ER__=1" | isAvx512erEnabled dflags ] ++
+          [ "-D__AVX512F__=1"  | isAvx512fEnabled  dflags ] ++
+          [ "-D__AVX512PF__=1" | isAvx512pfEnabled dflags ]
 
     backend_defs <- getBackendDefs dflags
 
