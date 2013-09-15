@@ -165,6 +165,7 @@ data CmmToken
   | CmmT_bits64
   | CmmT_bits128
   | CmmT_bits256
+  | CmmT_bits512
   | CmmT_float32
   | CmmT_float64
   | CmmT_gcptr
@@ -246,6 +247,7 @@ reservedWordsFM = listToUFM $
 	( "bits64",		CmmT_bits64 ),
 	( "bits128",		CmmT_bits128 ),
 	( "bits256",		CmmT_bits256 ),
+	( "bits512",		CmmT_bits512 ),
 	( "float32",		CmmT_float32 ),
 	( "float64",		CmmT_float64 ),
 -- New forms
@@ -255,6 +257,7 @@ reservedWordsFM = listToUFM $
 	( "b64",		CmmT_bits64 ),
 	( "b128",		CmmT_bits128 ),
 	( "b256",		CmmT_bits256 ),
+	( "b512",		CmmT_bits512 ),
 	( "f32",		CmmT_float32 ),
 	( "f64",		CmmT_float64 ),
 	( "gcptr",		CmmT_gcptr )

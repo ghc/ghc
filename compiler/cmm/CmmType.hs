@@ -1,7 +1,7 @@
 
 module CmmType
     ( CmmType   -- Abstract
-    , b8, b16, b32, b64, b128, b256, f32, f64, bWord, bHalfWord, gcWord
+    , b8, b16, b32, b64, b128, b256, b512, f32, f64, bWord, bHalfWord, gcWord
     , cInt, cLong
     , cmmBits, cmmFloat
     , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
@@ -107,13 +107,14 @@ cmmFloat = CmmType FloatCat
 
 -------- Common CmmTypes ------------
 -- Floats and words of specific widths
-b8, b16, b32, b64, b128, b256, f32, f64 :: CmmType
+b8, b16, b32, b64, b128, b256, b512, f32, f64 :: CmmType
 b8     = cmmBits W8
 b16    = cmmBits W16
 b32    = cmmBits W32
 b64    = cmmBits W64
 b128   = cmmBits W128
 b256   = cmmBits W256
+b512   = cmmBits W512
 f32    = cmmFloat W32
 f64    = cmmFloat W64
 
@@ -168,6 +169,7 @@ data Width   = W8 | W16 | W32 | W64
                         -- (we use Ord, so it'd better be in this order)
              | W128
              | W256
+             | W512
              deriving (Eq, Ord, Show)
 
 instance Outputable Width where
@@ -180,6 +182,7 @@ mrStr W32  = sLit("W32")
 mrStr W64  = sLit("W64")
 mrStr W128 = sLit("W128")
 mrStr W256 = sLit("W256")
+mrStr W512 = sLit("W512")
 mrStr W80  = sLit("W80")
 
 
@@ -220,6 +223,7 @@ widthInBits W32  = 32
 widthInBits W64  = 64
 widthInBits W128 = 128
 widthInBits W256 = 256
+widthInBits W512 = 512
 widthInBits W80  = 80
 
 widthInBytes :: Width -> Int
@@ -229,6 +233,7 @@ widthInBytes W32  = 4
 widthInBytes W64  = 8
 widthInBytes W128 = 16
 widthInBytes W256 = 32
+widthInBytes W512 = 64
 widthInBytes W80  = 10
 
 widthFromBytes :: Int -> Width
@@ -238,6 +243,7 @@ widthFromBytes 4  = W32
 widthFromBytes 8  = W64
 widthFromBytes 16 = W128
 widthFromBytes 32 = W256
+widthFromBytes 64 = W512
 widthFromBytes 10 = W80
 widthFromBytes n  = pprPanic "no width for given number of bytes" (ppr n)
 
@@ -249,6 +255,7 @@ widthInLog W32  = 2
 widthInLog W64  = 3
 widthInLog W128 = 4
 widthInLog W256 = 5
+widthInLog W512 = 6
 widthInLog W80  = panic "widthInLog: F80"
 
 -- widening / narrowing
