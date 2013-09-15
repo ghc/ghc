@@ -384,7 +384,7 @@ test('T6037', expect_broken(6037), run_command,
      ['$MAKE -s --no-print-directory T6037'])
 test('T2507',
      # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
-     [when(opsys('mingw32'), expect_fail), when(opsys('darwin'), expect_fail(2507))],
+     [when(opsys('mingw32'), expect_fail), when(opsys('darwin'), expect_fail)],
      run_command,
      ['$MAKE -s --no-print-directory T2507'])
 
