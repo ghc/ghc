@@ -1111,7 +1111,7 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   can_fail = True
 
 primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
-  ByteArray# -> Int# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
+  ByteArray# -> Int# -> Addr# -> Int# -> State# s -> State# s
   {Copy a range of the ByteArray# to the memory range starting at the Addr#.
    The ByteArray# and the memory region at Addr# must fully contain the
    specified ranges, but this is not checked. The Addr# must not point into the
@@ -1123,7 +1123,7 @@ primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
   can_fail = True
 
 primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
-  MutableByteArray# RealWorld -> Int# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
+  MutableByteArray# s -> Int# -> Addr# -> Int# -> State# s -> State# s
   {Copy a range of the MutableByteArray# to the memory range starting at the
    Addr#. The MutableByteArray# and the memory region at Addr# must fully
    contain the specified ranges, but this is not checked. The Addr# must not
@@ -1135,7 +1135,7 @@ primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
   can_fail = True
 
 primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
-  Addr# -> MutableByteArray# s -> Int# -> Int# -> State# RealWorld -> State# RealWorld
+  Addr# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
   {Copy a memory range starting at the Addr# to the specified range in the
    MutableByteArray#. The memory region at Addr# and the ByteArray# must fully
    contain the specified ranges, but this is not checked. The Addr# must not
