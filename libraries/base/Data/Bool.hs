@@ -23,9 +23,16 @@ module Data.Bool (
    (||),
    not,
    otherwise,
+   bool,
   ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 #endif
 
+-- | Case analysis for the 'Bool' type.
+-- @bool a b p@ evaluates to @a@ when @p@ is @False@, and evaluates to @b@
+-- when @p@ is @True@.
+bool :: a -> a -> Bool -> a
+bool f _ False = f
+bool _ t True  = t
