@@ -161,6 +161,9 @@ typedef void* AdjustorWritable;
 typedef void* AdjustorExecutable;
 
 AdjustorWritable allocateExec(W_ len, AdjustorExecutable *exec_addr);
+#if defined(ios_HOST_OS)
+AdjustorWritable execToWritable(AdjustorExecutable exec);
+#endif
 void             freeExec (AdjustorExecutable p);
 
 // Used by GC checks in external .cmm code:

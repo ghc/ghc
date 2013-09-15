@@ -57,16 +57,57 @@ extern void *adjustorCode;
 #endif
 
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
+/* There are subtle differences between how libffi adjustors work on
+ * different platforms, and the situation is a little complex.
+ * 
+ * HOW ADJUSTORS/CLOSURES WORK ON LIBFFI:
+ * libffi's ffi_closure_alloc() function gives you two pointers to a closure,
+ * 1. the writable pointer, and 2. the executable pointer. You write the
+ * closure into the writable pointer (and ffi_prep_closure_loc() will do this
+ * for you) and you execute it at the executable pointer.
+ *
+ * THE PROBLEM:
+ * The RTS deals only with the executable pointer, but when it comes time to
+ * free the closure, libffi wants the writable pointer back that it gave you
+ * when you allocated it.
+ *
+ * On Linux we solve this problem by storing the address of the writable
+ * mapping into itself, then returning both writable and executable pointers
+ * plus 1 machine word for preparing the closure for use by the RTS (see the
+ * Linux version of allocateExec() in rts/sm/Storage.c). When we want to
+ * recover the writable address, we subtract 1 word from the executable
+ * address and fetch. This works because Linux kernel magic gives us two
+ * pointers with different addresses that refer to the same memory. Whatever
+ * you write into the writeable address can be read back at the executable
+ * address. This method is very efficient.
+ *
+ * On iOS this breaks for two reasons: 1. the two pointers do not refer to
+ * the same memory (so we can't retrieve anything stored into the writable
+ * pointer if we only have the exec pointer), and 2. libffi's
+ * ffi_closure_alloc() assumes the pointer it has returned you is a
+ * ffi_closure structure and treats it as such: It uses that memory to
+ * communicate with ffi_prep_closure_loc(). On Linux by contrast
+ * ffi_closure_alloc() is viewed simply as a memory allocation, and only
+ * ffi_prep_closure_loc() deals in ffi_closure structures. Each of these
+ * differences is enough make the efficient way used on Linux not work on iOS.
+ * Instead on iOS we use hash tables to recover the writable address from the
+ * executable one. This method is conservative and would almost certainly work
+ * on any platform, but on Linux it makes sense to use the faster method.
+ */
 void
 freeHaskellFunctionPtr(void* ptr)
 {
     ffi_closure *cl;
 
+#if defined(ios_HOST_OS)
+    cl = execToWritable(ptr);
+#else
     cl = (ffi_closure*)ptr;
+#endif
     freeStablePtr(cl->user_data);
     stgFree(cl->cif->arg_types);
     stgFree(cl->cif);
-    freeExec(cl);
+    freeExec(ptr);
 }
 
 static ffi_type * char_to_ffi_type(char c)
