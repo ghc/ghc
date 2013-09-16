@@ -1534,6 +1534,7 @@ funEpilogue live = do
         isSSE (DoubleReg _) = True
         isSSE (XmmReg _)    = True
         isSSE (YmmReg _)    = True
+        isSSE (ZmmReg _)    = True
         isSSE _             = False
 
     -- Set to value or "undef" depending on whether the register is

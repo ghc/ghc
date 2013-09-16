@@ -82,6 +82,23 @@ import Reg
 # define ymm14 54
 # define ymm15 55
 
+# define zmm0  56
+# define zmm1  57
+# define zmm2  58
+# define zmm3  59
+# define zmm4  60
+# define zmm5  61
+# define zmm6  62
+# define zmm7  63
+# define zmm8  64
+# define zmm9  65
+# define zmm10 66
+# define zmm11 67
+# define zmm12 68
+# define zmm13 69
+# define zmm14 70
+# define zmm15 71
+
 #elif MACHREGS_powerpc
 
 # define r0 0
@@ -411,6 +428,9 @@ activeStgRegs = [
 #ifdef REG_YMM1
     ,YmmReg 1
 #endif
+#ifdef REG_ZMM1
+    ,ZmmReg 1
+#endif
 #ifdef REG_F2
     ,FloatReg 2
 #endif
@@ -422,6 +442,9 @@ activeStgRegs = [
 #endif
 #ifdef REG_YMM2
     ,YmmReg 2
+#endif
+#ifdef REG_ZMM2
+    ,ZmmReg 2
 #endif
 #ifdef REG_F3
     ,FloatReg 3
@@ -435,6 +458,9 @@ activeStgRegs = [
 #ifdef REG_YMM3
     ,YmmReg 3
 #endif
+#ifdef REG_ZMM3
+    ,ZmmReg 3
+#endif
 #ifdef REG_F4
     ,FloatReg 4
 #endif
@@ -446,6 +472,9 @@ activeStgRegs = [
 #endif
 #ifdef REG_YMM4
     ,YmmReg 4
+#endif
+#ifdef REG_ZMM4
+    ,ZmmReg 4
 #endif
 #ifdef REG_F5
     ,FloatReg 5
@@ -459,6 +488,9 @@ activeStgRegs = [
 #ifdef REG_YMM5
     ,YmmReg 5
 #endif
+#ifdef REG_ZMM5
+    ,ZmmReg 5
+#endif
 #ifdef REG_F6
     ,FloatReg 6
 #endif
@@ -470,6 +502,9 @@ activeStgRegs = [
 #endif
 #ifdef REG_YMM6
     ,YmmReg 6
+#endif
+#ifdef REG_ZMM6
+    ,ZmmReg 6
 #endif
 #else /* MAX_REAL_XMM_REG == 0 */
 #ifdef REG_F1
@@ -660,6 +695,26 @@ globalRegMaybe (YmmReg 5)               = Just (RealRegSingle REG_YMM5)
 #  endif
 #  ifdef REG_YMM6
 globalRegMaybe (YmmReg 6)               = Just (RealRegSingle REG_YMM6)
+#  endif
+# endif
+# if MAX_REAL_ZMM_REG != 0
+#  ifdef REG_ZMM1
+globalRegMaybe (ZmmReg 1)               = Just (RealRegSingle REG_ZMM1)
+#  endif
+#  ifdef REG_ZMM2
+globalRegMaybe (ZmmReg 2)               = Just (RealRegSingle REG_ZMM2)
+#  endif
+#  ifdef REG_ZMM3
+globalRegMaybe (ZmmReg 3)               = Just (RealRegSingle REG_ZMM3)
+#  endif
+#  ifdef REG_ZMM4
+globalRegMaybe (ZmmReg 4)               = Just (RealRegSingle REG_ZMM4)
+#  endif
+#  ifdef REG_ZMM5
+globalRegMaybe (ZmmReg 5)               = Just (RealRegSingle REG_ZMM5)
+#  endif
+#  ifdef REG_ZMM6
+globalRegMaybe (ZmmReg 6)               = Just (RealRegSingle REG_ZMM6)
 #  endif
 # endif
 # ifdef REG_Sp

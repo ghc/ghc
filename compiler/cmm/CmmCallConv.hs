@@ -68,6 +68,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
         where vec = case (w, regs) of
                       (W128, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
                       (W256, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
+                      (W512, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss))

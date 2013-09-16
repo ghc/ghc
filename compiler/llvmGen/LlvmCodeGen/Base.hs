@@ -156,6 +156,7 @@ llvmFunArgs dflags live =
           isSSE (DoubleReg _) = True
           isSSE (XmmReg _)    = True
           isSSE (YmmReg _)    = True
+          isSSE (ZmmReg _)    = True
           isSSE _             = False
 
 -- | Llvm standard fun attributes

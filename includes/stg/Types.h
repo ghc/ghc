@@ -87,6 +87,8 @@ typedef struct { StgWord64 h; StgWord64 l; } StgWord128;
 
 typedef struct { StgWord128 h; StgWord128 l; } StgWord256;
 
+typedef struct { StgWord256 h; StgWord256 l; } StgWord512;
+
 /*
  * Define the standard word size we'll use on this machine: make it
  * big enough to hold a pointer.
