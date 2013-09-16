@@ -129,6 +129,7 @@ module DynFlags (
         unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
 
         -- * SSE and AVX
+        isSseEnabled,
         isSse2Enabled,
         isSse4_2Enabled,
         isAvxEnabled,
@@ -3616,6 +3617,12 @@ setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 -- TODO: Instead of using a separate predicate (i.e. isSse2Enabled) to
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
 -- flag.
+
+isSseEnabled :: DynFlags -> Bool
+isSseEnabled dflags = case platformArch (targetPlatform dflags) of
+    ArchX86_64 -> True
+    ArchX86    -> sseVersion dflags >= Just (1,0)
+    _          -> False
 
 isSse2Enabled :: DynFlags -> Bool
 isSse2Enabled dflags = case platformArch (targetPlatform dflags) of

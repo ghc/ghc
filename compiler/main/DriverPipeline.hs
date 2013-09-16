@@ -1414,6 +1414,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
 
         sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
                 | isSse2Enabled dflags   = ["-mattr=+sse2"]
+                | isSseEnabled dflags    = ["-mattr=+sse"]
                 | otherwise              = []
 
         avxOpts | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
@@ -2033,12 +2034,10 @@ doCpp dflags raw input_fn output_fn = do
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 
-    let sse2 = isSse2Enabled dflags
-        sse4_2 = isSse4_2Enabled dflags
-        sse_defs =
-          [ "-D__SSE__=1" | sse2 || sse4_2 ] ++
-          [ "-D__SSE2__=1" | sse2 || sse4_2 ] ++
-          [ "-D__SSE4_2__=1" | sse4_2 ]
+    let sse_defs =
+          [ "-D__SSE__=1"    | isSseEnabled    dflags ] ++
+          [ "-D__SSE2__=1"   | isSse2Enabled   dflags ] ++
+          [ "-D__SSE4_2__=1" | isSse4_2Enabled dflags ]
 
     let avx_defs =
           [ "-D__AVX__=1"  | isAvxEnabled  dflags ] ++
