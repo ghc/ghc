@@ -580,8 +580,14 @@ showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
 data FFFormat = FFExponent | FFFixed | FFGeneric
 
+-- This is just a compatibility stub, as the "alt" argument formerly
+-- didn't exist.
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
-formatRealFloat fmt decs x
+formatRealFloat fmt decs x = formatRealFloatAlt fmt decs False x
+
+formatRealFloatAlt :: (RealFloat a) => FFFormat -> Maybe Int -> Bool -> a
+                 -> String
+formatRealFloatAlt fmt decs alt x
    | isNaN x                   = "NaN"
    | isInfinite x              = if x < 0 then "-Infinity" else "Infinity"
    | x < 0 || isNegativeZero x = '-':doFmt fmt (floatToDigits (toInteger base) (-x))
@@ -635,13 +641,13 @@ formatRealFloat fmt decs x
           (ei,is') = roundTo base (dec' + e) is
           (ls,rs)  = splitAt (e+ei) (map intToDigit is')
          in
-         mk0 ls ++ (if null rs then "" else '.':rs)
+         mk0 ls ++ (if null rs && not alt then "" else '.':rs)
         else
          let
           (ei,is') = roundTo base dec' (replicate (-e) 0 ++ is)
           d:ds' = map intToDigit (if ei > 0 then is' else 0:is')
          in
-         d : (if null ds' then "" else '.':ds')
+         d : (if null ds' && not alt then "" else '.':ds')
 
 
 roundTo :: Int -> Int -> [Int] -> (Int,[Int])

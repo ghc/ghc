@@ -6,7 +6,7 @@
 -- Module      :  Numeric
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -30,6 +30,8 @@ module Numeric (
         showEFloat,
         showFFloat,
         showGFloat,
+        showFFloatAlt,
+        showGFloatAlt,
         showFloat,
 
         floatToDigits,
@@ -89,7 +91,7 @@ readDec = readP_to_S L.readDecP
 -- | Read an unsigned number in hexadecimal notation.
 -- Both upper or lower case letters are allowed.
 readHex :: (Eq a, Num a) => ReadS a
-readHex = readP_to_S L.readHexP 
+readHex = readP_to_S L.readHexP
 
 -- | Reads an /unsigned/ 'RealFrac' value,
 -- expressed in decimal scientific notation.
@@ -168,7 +170,7 @@ showEFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 showFFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 
 -- | Show a signed 'RealFloat' value
--- using standard decimal notation for arguments whose absolute value lies 
+-- using standard decimal notation for arguments whose absolute value lies
 -- between @0.1@ and @9,999,999@, and scientific notation otherwise.
 --
 -- In the call @'showGFloat' digs val@, if @digs@ is 'Nothing',
@@ -179,6 +181,24 @@ showGFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 showEFloat d x =  showString (formatRealFloat FFExponent d x)
 showFFloat d x =  showString (formatRealFloat FFFixed d x)
 showGFloat d x =  showString (formatRealFloat FFGeneric d x)
+
+-- | Show a signed 'RealFloat' value
+-- using standard decimal notation (e.g. @245000@, @0.0015@).
+--
+-- This behaves as 'showFFloat', except that a decimal point
+-- is always guaranteed, even if not needed.
+showFFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
+
+-- | Show a signed 'RealFloat' value
+-- using standard decimal notation for arguments whose absolute value lies
+-- between @0.1@ and @9,999,999@, and scientific notation otherwise.
+--
+-- This behaves as 'showFFloat', except that a decimal point
+-- is always guaranteed, even if not needed.
+showGFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
+
+showFFloatAlt d x =  showString (formatRealFloatAlt FFFixed d True x)
+showGFloatAlt d x =  showString (formatRealFloatAlt FFGeneric d True x)
 
 -- ---------------------------------------------------------------------------
 -- Integer printing functions
