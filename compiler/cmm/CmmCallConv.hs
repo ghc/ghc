@@ -66,9 +66,12 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                                     | isFloatType ty = float
                                     | otherwise      = int
         where vec = case (w, regs) of
-                      (W128, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
-                      (W256, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
-                      (W512, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
+                      (W128, (vs, fs, ds, ls, s:ss))
+                          | passVectorInReg W128 dflags -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
+                      (W256, (vs, fs, ds, ls, s:ss))
+                          | passVectorInReg W256 dflags -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
+                      (W512, (vs, fs, ds, ls, s:ss))
+                          | passVectorInReg W512 dflags -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss))
@@ -99,6 +102,20 @@ passFloatArgsInXmm :: DynFlags -> Bool
 passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
                               ArchX86_64 -> True
                               _          -> False
+
+-- On X86_64, we always pass 128-bit-wide vectors in registers. On 32-bit X86
+-- and for all larger vector sizes on X86_64, LLVM's GHC calling convention
+-- doesn't currently passing vectors in registers. The patch to update the GHC
+-- calling convention to support passing SIMD vectors in registers is small and
+-- well-contained, so it may make it into LLVM 3.4. The hidden
+-- -fllvm-pass-vectors-in-regs flag will generate LLVM code that attempts to
+-- pass vectors in registers, but it must only be used with a version of LLVM
+-- that has an updated GHC calling convention.
+passVectorInReg :: Width -> DynFlags -> Bool
+passVectorInReg W128 dflags = case platformArch (targetPlatform dflags) of
+                                ArchX86_64 -> True
+                                _          -> gopt Opt_LlvmPassVectorsInRegisters dflags
+passVectorInReg _    dflags = gopt Opt_LlvmPassVectorsInRegisters dflags
 
 assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
             -> (
