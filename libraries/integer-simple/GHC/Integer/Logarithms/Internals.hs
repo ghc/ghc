@@ -18,8 +18,8 @@ module GHC.Integer.Logarithms.Internals
     ) where
 
 import GHC.Prim
-import GHC.PrimWrappers
 import GHC.Integer.Type
+import GHC.Types
 
 default ()
 
@@ -51,38 +51,38 @@ wordLog2# w =
 #if WORD_SIZE_IN_BITS == 64
     case uncheckedShiftRL# w 56# of
      a ->
-      if a `neWord#` 0##
+      if isTrue# (a `neWord#` 0##)
        then 64# -# zeros a
        else
         case uncheckedShiftRL# w 48# of
          b ->
-          if b `neWord#` 0##
+          if isTrue# (b `neWord#` 0##)
            then 56# -# zeros b
            else
             case uncheckedShiftRL# w 40# of
              c ->
-              if c `neWord#` 0##
+              if isTrue# (c `neWord#` 0##)
                then 48# -# zeros c
                else
                 case uncheckedShiftRL# w 32# of
                  d ->
-                  if d `neWord#` 0##
+                  if isTrue# (d `neWord#` 0##)
                    then 40# -# zeros d
                    else
 #endif
                     case uncheckedShiftRL# w 24# of
                      e ->
-                      if e `neWord#` 0##
+                      if isTrue# (e `neWord#` 0##)
                        then 32# -# zeros e
                        else
                         case uncheckedShiftRL# w 16# of
                          f ->
-                          if f `neWord#` 0##
+                          if isTrue# (f `neWord#` 0##)
                            then 24# -# zeros f
                            else
                             case uncheckedShiftRL# w 8# of
                              g ->
-                              if g `neWord#` 0##
+                              if isTrue# (g `neWord#` 0##)
                                then 16# -# zeros g
                                else  8# -# zeros w
 
@@ -107,7 +107,7 @@ integerLog2IsPowerOf2# (Positive digits) = couldBe 0# digits
     couldBe acc (Some dig None) =
         (# acc +# wordLog2# dig, word2Int# (and# dig (minusWord# dig 1##)) #)
     couldBe acc (Some dig digs) =
-        if eqWord# dig 0##
+        if isTrue# (eqWord# dig 0##)
            then couldBe (acc +# WORD_SIZE_IN_BITS#) digs
            else noPower (acc +# WORD_SIZE_IN_BITS#) digs
     couldBe acc None = (# acc, 1# #) -- should be impossible, error?
@@ -153,9 +153,9 @@ leadingZeros =
               case writeInt8Array# mba 0# 9# s1 of
                 s2 ->
                   let fillA lim val idx st =
-                        if idx ==# 256#
+                        if isTrue# (idx ==# 256#)
                           then st
-                          else if idx <# lim
+                          else if isTrue# (idx <# lim)
                                 then case writeInt8Array# mba idx val st of
                                         nx -> fillA lim val (idx +# 1#) nx
                                 else fillA (2# *# lim) (val -# 1#) idx st
