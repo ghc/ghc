@@ -53,7 +53,7 @@ module GHC.Integer.GMP.Prim (
   ) where
 
 import GHC.Prim
-import GHC.PrimWrappers
+import GHC.Types
 
 -- Double isn't available yet, and we shouldn't be using defaults anyway:
 default ()
@@ -198,10 +198,10 @@ foreign import ccall unsafe "hs_integerToWord64"
 
 -- used to be primops:
 integer2Int# :: Int# -> ByteArray# -> Int#
-integer2Int# s d = if s ==# 0#
+integer2Int# s d = if isTrue# (s ==# 0#)
                        then 0#
                        else let !v = indexIntArray# d 0# in
-                            if s <# 0#
+                            if isTrue# (s <# 0#)
                                then negateInt# v
                                else v
 

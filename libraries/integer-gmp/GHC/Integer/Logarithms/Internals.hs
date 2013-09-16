@@ -18,7 +18,7 @@ module GHC.Integer.Logarithms.Internals
     ) where
 
 import GHC.Prim
-import GHC.PrimWrappers
+import GHC.Types (isTrue#)
 import GHC.Integer.Type
 
 -- When larger word sizes become common, add support for those,
@@ -142,7 +142,7 @@ integerLog2IsPowerOf2# (J# s ba) = check (s -# 1#)
                             0## -> test (i -# 1#)
                             _   -> 1# #)
     test :: Int# -> Int#
-    test i = if i <# 0#
+    test i = if isTrue# (i <# 0#)
                 then 0#
                 else case indexWordArray# ba i of
                         0## -> test (i -# 1#)
@@ -163,9 +163,9 @@ roundingMode# :: Integer -> Int# -> Int#
 roundingMode# (S# i) t =
     case int2Word# i `and#` ((uncheckedShiftL# 2## t) `minusWord#` 1##) of
       k -> case uncheckedShiftL# 1## t of
-            c -> if c `gtWord#` k
+            c -> if isTrue# (c `gtWord#` k)
                     then 0#
-                    else if c `ltWord#` k
+                    else if isTrue# (c `ltWord#` k)
                             then 2#
                             else 1#
 roundingMode# (J# _ ba) t =
@@ -177,13 +177,13 @@ roundingMode# (J# _ ba) t =
                     ((uncheckedShiftL# 2## j) `minusWord#` 1##) of
               r ->
                 case uncheckedShiftL# 1## j of
-                  c -> if c `gtWord#` r
+                  c -> if isTrue# (c `gtWord#` r)
                         then 0#
-                        else if c `ltWord#` r
+                        else if isTrue# (c `ltWord#` r)
                                 then 2#
                                 else test (k -# 1#)
   where
-    test i = if i <# 0#
+    test i = if isTrue# (i <# 0#)
                 then 1#
                 else case indexWordArray# ba i of
                         0## -> test (i -# 1#)
@@ -199,38 +199,38 @@ wordLog2# w =
 #if WORD_SIZE_IN_BITS == 64
     case uncheckedShiftRL# w 56# of
      a ->
-      if a `neWord#` 0##
+      if isTrue# (a `neWord#` 0##)
        then 64# -# zeros a
        else
         case uncheckedShiftRL# w 48# of
          b ->
-          if b `neWord#` 0##
+          if isTrue# (b `neWord#` 0##)
            then 56# -# zeros b
            else
             case uncheckedShiftRL# w 40# of
              c ->
-              if c `neWord#` 0##
+              if isTrue# (c `neWord#` 0##)
                then 48# -# zeros c
                else
                 case uncheckedShiftRL# w 32# of
                  d ->
-                  if d `neWord#` 0##
+                  if isTrue# (d `neWord#` 0##)
                    then 40# -# zeros d
                    else
 #endif
                     case uncheckedShiftRL# w 24# of
                      e ->
-                      if e `neWord#` 0##
+                      if isTrue# (e `neWord#` 0##)
                        then 32# -# zeros e
                        else
                         case uncheckedShiftRL# w 16# of
                          f ->
-                          if f `neWord#` 0##
+                          if isTrue# (f `neWord#` 0##)
                            then 24# -# zeros f
                            else
                             case uncheckedShiftRL# w 8# of
                              g ->
-                              if g `neWord#` 0##
+                              if isTrue# (g `neWord#` 0##)
                                then 16# -# zeros g
                                else 8# -# zeros w
 
@@ -247,9 +247,9 @@ leadingZeros =
               case writeInt8Array# mba 0# 9# s1 of
                 s2 ->
                   let fillA lim val idx st =
-                        if idx ==# 256#
+                        if isTrue# (idx ==# 256#)
                           then st
-                          else if idx <# lim
+                          else if isTrue# (idx <# lim)
                                 then case writeInt8Array# mba idx val st of
                                         nx -> fillA lim val (idx +# 1#) nx
                                 else fillA (2# *# lim) (val -# 1#) idx st

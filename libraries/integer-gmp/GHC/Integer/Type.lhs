@@ -29,14 +29,9 @@ import GHC.Prim (
     -- Operations on Int# that we use for operations on S#
     quotInt#, remInt#, negateInt#,
     (*#), (-#),
-    (==$#), (/=$#), (<=$#), (>=$#), (<$#), (>$#),
+    (==#), (/=#), (<=#), (>=#), (<#), (>#),
     mulIntMayOflo#, addIntC#, subIntC#,
     and#, or#, xor#,
-    tagToEnum#
- )
-
-import GHC.PrimWrappers (
-    (==#), (/=#), (<=#), (>=#), (<#), (>#)
  )
 
 import GHC.Integer.GMP.Prim (
@@ -116,7 +111,7 @@ integerToWord64 (J# s d) = integerToWord64# s d
 
 {-# NOINLINE word64ToInteger #-}
 word64ToInteger :: Word64# -> Integer
-word64ToInteger w = if w `leWord64#` int64ToWord64# (intToInt64# 0x7FFFFFFF#)
+word64ToInteger w = if isTrue# (w `leWord64#` int64ToWord64# (intToInt64# 0x7FFFFFFF#))
                     then S# (int64ToInt# (word64ToInt64# w))
                     else case word64ToInteger# w of
                          (# s, d #) -> J# s d
@@ -128,8 +123,8 @@ integerToInt64 (J# s d) = integerToInt64# s d
 
 {-# NOINLINE int64ToInteger #-}
 int64ToInteger :: Int64# -> Integer
-int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
-                       (i `geInt64#` intToInt64# -0x80000000#))
+int64ToInteger i = if isTrue# (i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
+                      isTrue# (i `geInt64#` intToInt64# -0x80000000#)
                    then smallInteger (int64ToInt# i)
                    else case int64ToInteger# i of
                         (# s, d #) -> J# s d
@@ -267,11 +262,11 @@ gcdInteger a@(S# INT_MINBOUND) b = gcdInteger (toBig a) b
 gcdInteger a b@(S# INT_MINBOUND) = gcdInteger a (toBig b)
 gcdInteger (S# a) (S# b) = S# (gcdInt a b)
 gcdInteger ia@(S# a)  ib@(J# sb b)
- =      if a  ==# 0# then absInteger ib
-   else if sb ==# 0# then absInteger ia
-   else                   S# (gcdIntegerInt# absSb b absA)
-       where !absA  = if a  <# 0# then negateInt# a  else a
-             !absSb = if sb <# 0# then negateInt# sb else sb
+ =      if isTrue# (a  ==# 0#) then absInteger ib
+   else if isTrue# (sb ==# 0#) then absInteger ia
+   else                             S# (gcdIntegerInt# absSb b absA)
+       where !absA  = if isTrue# (a  <# 0#) then negateInt# a  else a
+             !absSb = if isTrue# (sb <# 0#) then negateInt# sb else sb
 gcdInteger ia@(J# _ _) ib@(S# _) = gcdInteger ib ia
 gcdInteger (J# sa a) (J# sb b)
   = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
@@ -290,7 +285,7 @@ gcdInt x  0# = absInt x
 gcdInt x  y  = gcdInt# (absInt x) (absInt y)
 
 absInt :: Int# -> Int#
-absInt x = if x <# 0# then negateInt# x else x
+absInt x = if isTrue# (x <# 0#) then negateInt# x else x
 
 divExact :: Integer -> Integer -> Integer
 divExact a@(S# INT_MINBOUND) b = divExact (toBig a) b
@@ -315,23 +310,23 @@ divExact (J# sa a) (J# sb b)
 \begin{code}
 {-# NOINLINE eqInteger# #-}
 eqInteger# :: Integer -> Integer -> Int#
-eqInteger# (S# i)     (S# j)     = i ==$# j
-eqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i ==$# 0#
-eqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i ==$# 0#
-eqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==$# 0#
+eqInteger# (S# i)     (S# j)     = i ==# j
+eqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i ==# 0#
+eqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i ==# 0#
+eqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==# 0#
 
 {-# NOINLINE neqInteger# #-}
 neqInteger# :: Integer -> Integer -> Int#
-neqInteger# (S# i)     (S# j)     = i /=$# j
-neqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i /=$# 0#
-neqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i /=$# 0#
-neqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=$# 0#
+neqInteger# (S# i)     (S# j)     = i /=# j
+neqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i /=# 0#
+neqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i /=# 0#
+neqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=# 0#
 
 {-# INLINE eqInteger  #-}
 {-# INLINE neqInteger #-}
 eqInteger, neqInteger :: Integer -> Integer -> Bool
-eqInteger  a b = tagToEnum# (a `eqInteger#`  b)
-neqInteger a b = tagToEnum# (a `neqInteger#` b)
+eqInteger  a b = isTrue# (a `eqInteger#`  b)
+neqInteger a b = isTrue# (a `neqInteger#` b)
 
 instance  Eq Integer  where
     (==) = eqInteger
@@ -341,62 +336,62 @@ instance  Eq Integer  where
 
 {-# NOINLINE leInteger# #-}
 leInteger# :: Integer -> Integer -> Int#
-leInteger# (S# i)     (S# j)     = i <=$# j
-leInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <=$# 0#
-leInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i >=$# 0#
-leInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=$# 0#
+leInteger# (S# i)     (S# j)     = i <=# j
+leInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <=# 0#
+leInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i >=# 0#
+leInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=# 0#
 
 {-# NOINLINE gtInteger# #-}
 gtInteger# :: Integer -> Integer -> Int#
-gtInteger# (S# i)     (S# j)     = i >$# j
-gtInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i >$# 0#
-gtInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <$# 0#
-gtInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >$# 0#
+gtInteger# (S# i)     (S# j)     = i ># j
+gtInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i ># 0#
+gtInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <# 0#
+gtInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ># 0#
 
 {-# NOINLINE ltInteger# #-}
 ltInteger# :: Integer -> Integer -> Int#
-ltInteger# (S# i)     (S# j)     = i <$# j
-ltInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <$# 0#
-ltInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i >$# 0#
-ltInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <$# 0#
+ltInteger# (S# i)     (S# j)     = i <# j
+ltInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <# 0#
+ltInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i ># 0#
+ltInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <# 0#
 
 {-# NOINLINE geInteger# #-}
 geInteger# :: Integer -> Integer -> Int#
-geInteger# (S# i)     (S# j)     = i >=$# j
-geInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i >=$# 0#
-geInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <=$# 0#
-geInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=$# 0#
+geInteger# (S# i)     (S# j)     = i >=# j
+geInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i >=# 0#
+geInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <=# 0#
+geInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=# 0#
 
 {-# INLINE leInteger #-}
 {-# INLINE ltInteger #-}
 {-# INLINE geInteger #-}
 {-# INLINE gtInteger #-}
 leInteger, gtInteger, ltInteger, geInteger :: Integer -> Integer -> Bool
-leInteger a b = tagToEnum# (a `leInteger#` b)
-gtInteger a b = tagToEnum# (a `gtInteger#` b)
-ltInteger a b = tagToEnum# (a `ltInteger#` b)
-geInteger a b = tagToEnum# (a `geInteger#` b)
+leInteger a b = isTrue# (a `leInteger#` b)
+gtInteger a b = isTrue# (a `gtInteger#` b)
+ltInteger a b = isTrue# (a `ltInteger#` b)
+geInteger a b = isTrue# (a `geInteger#` b)
 
 {-# NOINLINE compareInteger #-}
 compareInteger :: Integer -> Integer -> Ordering
 compareInteger (S# i)  (S# j)
-   =      if i ==# j then EQ
-     else if i <=# j then LT
-     else                 GT
+   =      if isTrue# (i ==# j) then EQ
+     else if isTrue# (i <=# j) then LT
+     else                           GT
 compareInteger (J# s d) (S# i)
    = case cmpIntegerInt# s d i of { res# ->
-     if res# <# 0# then LT else
-     if res# ># 0# then GT else EQ
+     if isTrue# (res# <# 0#) then LT else
+     if isTrue# (res# ># 0#) then GT else EQ
      }
 compareInteger (S# i) (J# s d)
    = case cmpIntegerInt# s d i of { res# ->
-     if res# ># 0# then LT else
-     if res# <# 0# then GT else EQ
+     if isTrue# (res# ># 0#) then LT else
+     if isTrue# (res# <# 0#) then GT else EQ
      }
 compareInteger (J# s1 d1) (J# s2 d2)
    = case cmpInteger# s1 d1 s2 d2 of { res# ->
-     if res# <# 0# then LT else
-     if res# ># 0# then GT else EQ
+     if isTrue# (res# <# 0#) then LT else
+     if isTrue# (res# ># 0#) then GT else EQ
      }
 
 instance Ord Integer where
@@ -418,27 +413,27 @@ instance Ord Integer where
 {-# NOINLINE absInteger #-}
 absInteger :: Integer -> Integer
 absInteger (S# INT_MINBOUND) = NEG_INT_MINBOUND
-absInteger n@(S# i) = if i >=# 0# then n else S# (negateInt# i)
-absInteger n@(J# s d) = if (s >=# 0#) then n else J# (negateInt# s) d
+absInteger n@(S# i)   = if isTrue# (i >=# 0#) then n else S# (negateInt# i)
+absInteger n@(J# s d) = if isTrue# (s >=# 0#) then n else J# (negateInt# s) d
 
 {-# NOINLINE signumInteger #-}
 signumInteger :: Integer -> Integer
-signumInteger (S# i) = if i <# 0# then S# -1#
-                       else if i ==# 0# then S# 0#
+signumInteger (S# i) = if isTrue# (i <# 0#) then S# -1#
+                       else if isTrue# (i ==# 0#) then S# 0#
                        else S# 1#
 signumInteger (J# s d)
   = let
         !cmp = cmpIntegerInt# s d 0#
     in
-    if      cmp >#  0# then S# 1#
-    else if cmp ==# 0# then S# 0#
-    else                    S# (negateInt# 1#)
+    if      isTrue# (cmp >#  0#) then S# 1#
+    else if isTrue# (cmp ==# 0#) then S# 0#
+    else                              S# (negateInt# 1#)
 
 {-# NOINLINE plusInteger #-}
 plusInteger :: Integer -> Integer -> Integer
 plusInteger i1@(S# i) i2@(S# j)  = case addIntC# i j of
                                    (# r, c #) ->
-                                       if c ==# 0#
+                                       if isTrue# (c ==# 0#)
                                        then S# r
                                        else plusInteger (toBig i1) (toBig i2)
 plusInteger i1@(J# _ _) i2@(S# _) = plusInteger i1 (toBig i2)
@@ -450,7 +445,7 @@ plusInteger (J# s1 d1) (J# s2 d2) = case plusInteger# s1 d1 s2 d2 of
 minusInteger :: Integer -> Integer -> Integer
 minusInteger i1@(S# i) i2@(S# j)   = case subIntC# i j of
                                      (# r, c #) ->
-                                         if c ==# 0# then S# r
+                                         if isTrue# (c ==# 0#) then S# r
                                          else minusInteger (toBig i1)
                                                            (toBig i2)
 minusInteger i1@(J# _ _) i2@(S# _) = minusInteger i1 (toBig i2)
@@ -460,7 +455,7 @@ minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of
 
 {-# NOINLINE timesInteger #-}
 timesInteger :: Integer -> Integer -> Integer
-timesInteger i1@(S# i) i2@(S# j)   = if mulIntMayOflo# i j ==# 0#
+timesInteger i1@(S# i) i2@(S# j)   = if isTrue# (mulIntMayOflo# i j ==# 0#)
                                      then S# (i *# j)
                                      else timesInteger (toBig i1) (toBig i2)
 timesInteger i1@(J# _ _) i2@(S# _) = timesInteger i1 (toBig i2)
@@ -538,28 +533,28 @@ introduce a spurious dependency to base.
 \begin{code}
 {-# NOINLINE andInteger #-}
 andInteger :: Integer -> Integer -> Integer
-(S# x) `andInteger` (S# y) = S# (word2Int# (int2Word# x `and#` int2Word# y))
-x@(S# _) `andInteger` y@(J# _ _) = toBig x `andInteger` y
-x@(J# _ _) `andInteger` y@(S# _) = x `andInteger` toBig y
-(J# s1 d1) `andInteger` (J# s2 d2) =
+(S# x)     `andInteger`   (S# y)     = S# (word2Int# (int2Word# x `and#` int2Word# y))
+x@(S# _)   `andInteger` y@(J# _ _)   = toBig x `andInteger` y
+x@(J# _ _) `andInteger` y@(S# _)     = x `andInteger` toBig y
+(J# s1 d1) `andInteger`   (J# s2 d2) =
      case andInteger# s1 d1 s2 d2 of
        (# s, d #) -> J# s d
 
 {-# NOINLINE orInteger #-}
 orInteger :: Integer -> Integer -> Integer
-(S# x) `orInteger` (S# y) = S# (word2Int# (int2Word# x `or#` int2Word# y))
-x@(S# _) `orInteger` y@(J# _ _) = toBig x `orInteger` y
-x@(J# _ _) `orInteger` y@(S# _) = x `orInteger` toBig y
-(J# s1 d1) `orInteger` (J# s2 d2) =
+(S# x)     `orInteger`   (S# y)     = S# (word2Int# (int2Word# x `or#` int2Word# y))
+x@(S# _)   `orInteger` y@(J# _ _)   = toBig x `orInteger` y
+x@(J# _ _) `orInteger` y@(S# _)     = x `orInteger` toBig y
+(J# s1 d1) `orInteger`   (J# s2 d2) =
      case orInteger# s1 d1 s2 d2 of
        (# s, d #) -> J# s d
 
 {-# NOINLINE xorInteger #-}
 xorInteger :: Integer -> Integer -> Integer
-(S# x) `xorInteger` (S# y) = S# (word2Int# (int2Word# x `xor#` int2Word# y))
-x@(S# _) `xorInteger` y@(J# _ _) = toBig x `xorInteger` y
-x@(J# _ _) `xorInteger` y@(S# _) = x `xorInteger` toBig y
-(J# s1 d1) `xorInteger` (J# s2 d2) =
+(S# x)     `xorInteger`   (S# y)     = S# (word2Int# (int2Word# x `xor#` int2Word# y))
+x@(S# _)   `xorInteger` y@(J# _ _)   = toBig x `xorInteger` y
+x@(J# _ _) `xorInteger` y@(S# _)     = x `xorInteger` toBig y
+(J# s1 d1) `xorInteger`   (J# s2 d2) =
      case xorInteger# s1 d1 s2 d2 of
        (# s, d #) -> J# s d
 
@@ -585,7 +580,7 @@ shiftRInteger (J# s d) i = case fdivQ2ExpInteger# s d i of
 {-# NOINLINE testBitInteger #-}
 testBitInteger :: Integer -> Int# -> Bool
 testBitInteger j@(S# _) i = testBitInteger (toBig j) i
-testBitInteger (J# s d) i = testBitInteger# s d i /=# 0#
+testBitInteger (J# s d) i = isTrue# (testBitInteger# s d i /=# 0#)
 \end{code}
 
 %*********************************************************
