@@ -16,8 +16,7 @@
 
 module Language.Haskell.TH.Syntax where
 
-import GHC.Base		( Int(..), Int#, (<#), (==#) )
-
+import GHC.Exts
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
 import Control.Applicative( Applicative(..) )
@@ -722,22 +721,22 @@ instance Ord NameFlavour where
 
   (NameU _)  `compare` NameS      = GT
   (NameU _)  `compare` (NameQ _)  = GT
-  (NameU u1) `compare` (NameU u2) | u1  <# u2 = LT
-				  | u1 ==# u2 = EQ
-				  | otherwise = GT
+  (NameU u1) `compare` (NameU u2) | isTrue# (u1  <# u2) = LT
+				  | isTrue# (u1 ==# u2) = EQ
+				  | otherwise           = GT
   (NameU _)  `compare` _     = LT
 
   (NameL _)  `compare` NameS      = GT
   (NameL _)  `compare` (NameQ _)  = GT
   (NameL _)  `compare` (NameU _)  = GT
-  (NameL u1) `compare` (NameL u2) | u1  <# u2 = LT
-				  | u1 ==# u2 = EQ
-				  | otherwise = GT
+  (NameL u1) `compare` (NameL u2) | isTrue# (u1  <# u2) = LT
+				  | isTrue# (u1 ==# u2) = EQ
+				  | otherwise           = GT
   (NameL _)  `compare` _          = LT
 
   (NameG ns1 p1 m1) `compare` (NameG ns2 p2 m2) = (ns1 `compare` ns2) `thenCmp`
                                             (p1 `compare` p2) `thenCmp`
-					    (m1 `compare` m2) 
+					    (m1 `compare` m2)
   (NameG _ _ _)    `compare` _ = GT
 
 data NameIs = Alone | Applied | Infix
