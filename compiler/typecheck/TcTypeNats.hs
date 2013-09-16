@@ -345,7 +345,7 @@ interactTopLeq _ _ = []
 
 
 {-------------------------------------------------------------------------------
-Interacton with inerts
+Interaction with inerts
 -------------------------------------------------------------------------------}
 
 interactInertAdd :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
