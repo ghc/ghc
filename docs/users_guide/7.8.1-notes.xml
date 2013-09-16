@@ -32,7 +32,7 @@
             <para>
                 GHC can now perform simple evaluation of type-level
                 natural numbers, when using the
-                <literal>TypeNats</literal> extension. For example,
+                <literal>DataKinds</literal> extension. For example,
                 given a type-level constraint such as <literal>(x + 3)
                 ~ 5</literal>, GHC is able to infer that
                 <literal>x</literal> is 2. Similarly, GHC can now
