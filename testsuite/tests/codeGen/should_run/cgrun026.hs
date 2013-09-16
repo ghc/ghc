@@ -10,7 +10,7 @@ import Data.Char 	( chr )
 import Control.Monad.ST
 import Data.Array.ST
 import Data.Array.Unboxed
-	
+
 import Data.Ratio
 
 main = putStr

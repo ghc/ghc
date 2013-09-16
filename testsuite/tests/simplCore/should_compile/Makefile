@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 T7865:
-	$(RM) -f T7865.o T7865.hi 
+	$(RM) -f T7865.o T7865.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dsuppress-uniques -O2 -c -ddump-simpl T7865.hs | grep expensive
 
 T3055:
@@ -12,27 +12,27 @@ T3055:
 	grep 'I# (-28)' T3055.simpl | sed 's/.*\(I# (-28)\).*/\1/'
 
 T5658b:
-	$(RM) -f T5658b.o T5658b.hi 
+	$(RM) -f T5658b.o T5658b.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5658b.hs -ddump-simpl | grep --count indexIntArray
 # Trac 5658 meant that there were three calls to indexIntArray instead of two
 
 T5776:
-	$(RM) -f T5776.o T5776.hi 
+	$(RM) -f T5776.o T5776.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5776.hs -ddump-rules | grep --count dEq
 
 T3772:
 	$(RM) -f T3772*.hi T3772*.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772_A.hs 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772_A.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772.hs -dsuppress-uniques -ddump-simpl
 
 T4306:
 	$(RM) -f T4306.hi T4306.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4306.hs 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4306.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4306.hi | grep 'wupd ::'
 
 T4201:
 	$(RM) -f T4201.hi T4201.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4201.hs 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4201.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4201.hi | grep -B2 'Sym'
 
 # This one looped as a result of bogus specialisation
@@ -43,8 +43,8 @@ T4903:
 
 T4918:
 	$(RM) -f T4918.hi T4918.o T4918a.hi T4918a.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918a.hs 
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918.hs 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4918.hi | grep 'C#'
 
 EvalTest:
@@ -109,5 +109,5 @@ T7995:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package ghc -ddump-rule-firings -c -O T7995.hs | grep 'text/str'
 
 T8221:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221a.hs 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221.hs
