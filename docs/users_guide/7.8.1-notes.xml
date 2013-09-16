@@ -550,6 +550,14 @@
                     use optimized machine instructions when available.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    <literal>Data.Bool</literal> now exports
+                    <literal>bool :: a -> a -> Bool -> a</literal>, analagous
+                    to <literal>maybe</literal> and <literal>either</literal>
+                    in their respective modules.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
