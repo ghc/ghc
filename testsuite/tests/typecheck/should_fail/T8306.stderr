@@ -1,0 +1,3 @@
+
+T8306.hs:4:10:
+    Illegal literal in type (type literals must not be negative): -1
