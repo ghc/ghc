@@ -4218,11 +4218,11 @@ ocRunInit_PEi386 ( ObjectCode *oc )
         char *secname = cstring_from_section_name(sectab_i->Name, strtab);
         if (0 == strcmp(".ctors", (char*)secname)) {
             UChar *init_startC = (UChar*)(oc->image) + sectab_i->PointerToRawData;
-            init_t *init = (init_t*)init_startC;
-            init_t *init_end = (init_t*)(init_startC + sectab_i->SizeOfRawData);
-            // I heard that .ctors might need to be run backwards, but
-            // if that is true then the MinGW toolchain ignores that.
-            for (; init < init_end; init++) {
+            init_t *init_start, *init_end, *init;
+            init_start = (init_t*)init_startC;
+            init_end = (init_t*)(init_startC + sectab_i->SizeOfRawData);
+            // ctors are run *backwards*!
+            for (init = init_end - 1; init >= init_start; init--) {
                 (*init)(argc, argv, envv);
             }
         }
