@@ -48,14 +48,14 @@ test_chars
     fill_in :: STUArray s Int Char -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
-      = if (first# ># last#)
+      = if isTrue# (first# ># last#)
 	then return ()
 	else writeArray arr_in# (I# first#) ((chr (I# first#))) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
     lookup_range :: UArray Int Char -> Int# -> Int# -> [Char]
     lookup_range arr from# to#
-      = if (from# ># to#)
+      = if isTrue# (from# ># to#)
 	then []
 	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
@@ -85,14 +85,14 @@ test_ints
     fill_in :: STUArray s Int Int -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
-      = if (first# ># last#)
+      = if isTrue# (first# ># last#)
 	then return ()
 	else writeArray arr_in# (I# first#) (I# (first# *# first#)) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
     lookup_range :: UArray Int Int -> Int# -> Int# -> [Int]
     lookup_range arr from# to#
-      = if (from# ># to#)
+      = if isTrue# (from# ># to#)
 	then []
 	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
@@ -122,7 +122,7 @@ test_addrs
     fill_in :: STUArray s Int (Ptr ()) -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
-      = if (first# ># last#)
+      = if isTrue# (first# ># last#)
 	then return ()
 	else writeArray arr_in# (I# first#)
 			    (Ptr (int2Addr# (first# *# first#))) >>
@@ -133,7 +133,7 @@ test_addrs
       = let
 	    a2i (Ptr a#) = I# (addr2Int# a#)
 	in
-	if (from# ># to#)
+	if isTrue# (from# ># to#)
 	then []
 	else (a2i (arr ! (I# from#)))
 	     : (lookup_range arr (from# +# 1#) to#)
@@ -163,7 +163,7 @@ test_floats
     fill_in :: STUArray s Int Float -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
-      = if (first# ># last#)
+      = if isTrue# (first# ># last#)
 	then return ()
 {-	else let e = ((fromIntegral (I# first#)) * pi)
 	     in trace (show e) $ writeFloatArray arr_in# (I# first#) e >>
@@ -174,7 +174,7 @@ test_floats
 
     lookup_range :: UArray Int Float -> Int# -> Int# -> [Float]
     lookup_range arr from# to#
-      = if (from# ># to#)
+      = if isTrue# (from# ># to#)
 	then []
 	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)
@@ -204,14 +204,14 @@ test_doubles
     fill_in :: STUArray s Int Double -> Int# -> Int# -> ST s ()
 
     fill_in arr_in# first# last#
-      = if (first# ># last#)
+      = if isTrue# (first# ># last#)
 	then return ()
 	else writeArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
     lookup_range :: UArray Int Double -> Int# -> Int# -> [Double]
     lookup_range arr from# to#
-      = if (from# ># to#)
+      = if isTrue# (from# ># to#)
 	then []
 	else (arr ! (I# from#))
 	     : (lookup_range arr (from# +# 1#) to#)

@@ -6,7 +6,7 @@ import GHC.Exts
 data CList = CNil | CCons Int# CList
 
 mk :: Int# -> CList
-mk n = case (n ==# 0#) of
+mk n = case isTrue# (n ==# 0#) of
        False -> CNil
        _     -> CCons 1# (mk (n -# 1#))
 

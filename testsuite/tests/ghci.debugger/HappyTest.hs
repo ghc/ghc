@@ -324,7 +324,7 @@ happyDoAction i tk st
 				     happyFail i tk st
 		-1# 	  -> (happyTrace ("accept.\n")) $
 				     happyAccept i tk st
-		n | (n <# (0# :: Int#)) -> (happyTrace ("reduce (rule " ++ show rule 						 ++ ")")) $
+		n | isTrue# (n <# (0# :: Int#)) -> (happyTrace ("reduce (rule " ++ show rule 						 ++ ")")) $
 
 				     (happyReduceArr ! rule) i tk st
 				     where rule = (I# ((negateInt# ((n +# (1# :: Int#))))))
@@ -335,8 +335,8 @@ happyDoAction i tk st
 				     where new_state = (n -# (1# :: Int#))
    where off    = indexShortOffAddr happyActOffsets st
 	 off_i  = (off +# i)
-	 check  = if (off_i >=# (0# :: Int#))
-			then (indexShortOffAddr happyCheck off_i ==#  i)
+	 check  = if isTrue# (off_i >=# (0# :: Int#))
+			then isTrue# (indexShortOffAddr happyCheck off_i ==#  i)
 			else False
  	 action | check     = indexShortOffAddr happyTable off_i
 		| otherwise = indexShortOffAddr happyDefActions st

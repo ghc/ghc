@@ -24,13 +24,13 @@ Roman.foo_$s$wgo =
                 (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc1 sc1) sc1) sc1) sc1)
              sc1)
           sc1 } in
-    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=$# sc 0)
+    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=# sc 0)
     of _ {
       GHC.Types.False ->
-        case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<$# sc 100)
+        case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# sc 100)
         of _ {
           GHC.Types.False ->
-            case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<$# sc 500)
+            case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# sc 500)
             of _ {
               GHC.Types.False ->
                 Roman.foo_$s$wgo (GHC.Prim.-# sc 1) (GHC.Prim.+# a a);
@@ -72,13 +72,13 @@ Roman.$wgo =
           Data.Maybe.Nothing -> Roman.foo_$s$wgo 10 a;
           Data.Maybe.Just n ->
             case n of _ { GHC.Types.I# x2 ->
-            case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=$# x2 0)
+            case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=# x2 0)
             of _ {
               GHC.Types.False ->
-                case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<$# x2 100)
-                of _ {
+                case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x2 100)
+                 of _ {
                   GHC.Types.False ->
-                    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<$# x2 500)
+                    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x2 500)
                     of _ {
                       GHC.Types.False ->
                         Roman.foo_$s$wgo (GHC.Prim.-# x2 1) (GHC.Prim.+# a a);

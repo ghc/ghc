@@ -12,7 +12,7 @@ main = do
   print 3.14159
 
 h :: Double# -> String
-h n = if (n ==## 3.0##) || (n ==## 4.0##)
+h n = if tagToEnum# (n ==## 3.0##) || tagToEnum# (n ==## 4.0##)
       then "First branch"
       else "Second branch"
 

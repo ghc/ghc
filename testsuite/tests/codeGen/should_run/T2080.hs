@@ -9,8 +9,8 @@ import GHC.Ptr (Ptr(..))
 utf8DecodeChar# :: Addr# -> Bool -> Bool
 {-# NOINLINE utf8DecodeChar# #-}
 utf8DecodeChar# a# fred =
-  case () of 
-    _ | word2Int# (indexWord8OffAddr# a# 0#) <=# 0x7F# -> True
+  case () of
+    _ | isTrue# (word2Int# (indexWord8OffAddr# a# 0#) <=# 0x7F#) -> True
 
 -- Omitting the next line gives an ASSERT error:
 -- ghc-6.9: panic! (the 'impossible' happened)

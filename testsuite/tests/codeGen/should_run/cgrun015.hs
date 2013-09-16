@@ -8,7 +8,7 @@ import GHC.Exts
 data CList = CNil | CCons Int# CList
 
 mk :: Int# -> CList
-mk n  = if (n ==# 0#)
+mk n  = if isTrue# (n ==# 0#)
 	then CNil
 	else CCons 1# (mk (n -# 1#))
 

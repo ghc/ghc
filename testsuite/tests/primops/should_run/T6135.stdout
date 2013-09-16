@@ -1,713 +1,356 @@
-=== testing gtCharI# ===
-gtCharI# False
-gtCharI# True
-gtCharI# False
-gtCharI# False
-gtCharI# False
-gtCharI# False
-gtCharI# True
-=== testing geCharI# ===
-geCharI# True
-geCharI# True
-geCharI# False
-geCharI# True
-geCharI# True
-geCharI# False
-geCharI# True
-=== testing ltCharI# ===
-ltCharI# False
-ltCharI# False
-ltCharI# True
-ltCharI# False
-ltCharI# False
-ltCharI# True
-ltCharI# False
-=== testing leCharI# ===
-leCharI# True
-leCharI# False
-leCharI# True
-leCharI# True
-leCharI# True
-leCharI# True
-leCharI# False
-=== testing eqCharI# ===
-eqCharI# True
-eqCharI# False
-eqCharI# False
-eqCharI# True
-eqCharI# True
-eqCharI# False
-eqCharI# False
-=== testing neCharI# ===
-neCharI# False
-neCharI# True
-neCharI# True
-neCharI# False
-neCharI# False
-neCharI# True
-neCharI# True
-=== testing >$# ===
->$# False
->$# True
->$# False
->$# False
->$# False
->$# True
->$# False
->$# False
->$# True
-=== testing <$# ===
-<$# False
-<$# False
-<$# True
-<$# False
-<$# False
-<$# True
-<$# False
-<$# False
-<$# True
-=== testing >=$# ===
->=$# True
->=$# True
->=$# False
->=$# True
->=$# True
->=$# True
->=$# False
->=$# False
->=$# True
-=== testing <=$# ===
-<=$# True
-<=$# False
-<=$# True
-<=$# True
-<=$# True
-<=$# True
-<=$# False
-<=$# False
-<=$# True
-=== testing ==$# ===
-==$# True
-==$# False
-==$# False
-==$# True
-==$# False
-==$# True
-==$# False
-==$# True
-==$# True
-==$# True
-==$# True
-=== testing /=$# ===
-/=$# False
-/=$# True
-/=$# True
-/=$# False
-/=$# True
-/=$# False
-/=$# True
-/=$# False
-/=$# False
-/=$# False
-/=$# False
-=== testing gtWordI# ===
-gtWordI# False
-gtWordI# True
-gtWordI# False
-gtWordI# False
-gtWordI# False
-gtWordI# True
-gtWordI# False
-gtWordI# False
-gtWordI# True
-=== testing ltWordI# ===
-ltWordI# False
-ltWordI# False
-ltWordI# True
-ltWordI# False
-ltWordI# False
-ltWordI# True
-ltWordI# False
-ltWordI# False
-ltWordI# True
-=== testing geWordI# ===
-geWordI# True
-geWordI# True
-geWordI# False
-geWordI# True
-geWordI# True
-geWordI# True
-geWordI# False
-geWordI# False
-geWordI# True
-=== testing leWordI# ===
-leWordI# True
-leWordI# False
-leWordI# True
-leWordI# True
-leWordI# True
-leWordI# True
-leWordI# False
-leWordI# False
-leWordI# True
-=== testing eqWordI# ===
-eqWordI# True
-eqWordI# False
-eqWordI# False
-eqWordI# True
-eqWordI# False
-eqWordI# True
-eqWordI# False
-eqWordI# True
-eqWordI# True
-eqWordI# True
-eqWordI# True
-=== testing neWordI# ===
-neWordI# False
-neWordI# True
-neWordI# True
-neWordI# False
-neWordI# True
-neWordI# False
-neWordI# True
-neWordI# False
-neWordI# False
-neWordI# False
-neWordI# False
-=== testing >$## ===
->$## False
->$## True
->$## False
->$## False
->$## False
->$## False
->$## False
->$## False
->$## True
->$## False
->$## False
->$## False
->$## False
->$## False
-=== testing <$## ===
-<$## False
-<$## False
-<$## True
-<$## False
-<$## False
-<$## False
-<$## False
-<$## False
-<$## False
-<$## True
-<$## False
-<$## False
-<$## False
-<$## False
-=== testing >=$## ===
->=$## True
->=$## True
->=$## False
->=$## False
->=$## False
->=$## False
->=$## True
->=$## True
->=$## True
->=$## False
->=$## False
->=$## False
->=$## False
->=$## False
-=== testing <=$## ===
-<=$## True
-<=$## False
-<=$## True
-<=$## False
-<=$## False
-<=$## False
-<=$## True
-<=$## True
-<=$## False
-<=$## True
-<=$## False
-<=$## False
-<=$## False
-<=$## False
-=== testing ==$## ===
-==$## True
-==$## False
-==$## False
-==$## False
-==$## False
-==$## False
-==$## True
-==$## True
-==$## False
-==$## False
-==$## False
-==$## False
-==$## False
-==$## False
-=== testing /=$## ===
-/=$## False
-/=$## True
-/=$## True
-/=$## True
-/=$## True
-/=$## True
-/=$## False
-/=$## False
-/=$## True
-/=$## True
-/=$## True
-/=$## True
-/=$## True
-/=$## True
-=== testing gtFloatI# ===
-gtFloatI# False
-gtFloatI# True
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-gtFloatI# True
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-gtFloatI# False
-=== testing ltFloatI# ===
-ltFloatI# False
-ltFloatI# False
-ltFloatI# True
-ltFloatI# False
-ltFloatI# False
-ltFloatI# False
-ltFloatI# False
-ltFloatI# False
-ltFloatI# False
-ltFloatI# True
-ltFloatI# False
-ltFloatI# False
-ltFloatI# False
-ltFloatI# False
-=== testing geFloatI# ===
-geFloatI# True
-geFloatI# True
-geFloatI# False
-geFloatI# False
-geFloatI# False
-geFloatI# False
-geFloatI# True
-geFloatI# True
-geFloatI# True
-geFloatI# False
-geFloatI# False
-geFloatI# False
-geFloatI# False
-geFloatI# False
-=== testing leFloatI# ===
-leFloatI# True
-leFloatI# False
-leFloatI# True
-leFloatI# False
-leFloatI# False
-leFloatI# False
-leFloatI# True
-leFloatI# True
-leFloatI# False
-leFloatI# True
-leFloatI# False
-leFloatI# False
-leFloatI# False
-leFloatI# False
-=== testing eqFloatI# ===
-eqFloatI# True
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-eqFloatI# True
-eqFloatI# True
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-eqFloatI# False
-=== testing neFloatI# ===
-neFloatI# False
-neFloatI# True
-neFloatI# True
-neFloatI# True
-neFloatI# True
-neFloatI# True
-neFloatI# False
-neFloatI# False
-neFloatI# True
-neFloatI# True
-neFloatI# True
-neFloatI# True
-neFloatI# True
-neFloatI# True
-=== TESTING WRAPPERS ===
-=== testing Char > ===
-Char > False
-Char > True
-Char > False
-Char > False
-Char > False
-Char > False
-Char > True
-=== testing Char >= ===
-Char >= True
-Char >= True
-Char >= False
-Char >= True
-Char >= True
-Char >= False
-Char >= True
-=== testing Char < ===
-Char < False
-Char < False
-Char < True
-Char < False
-Char < False
-Char < True
-Char < False
-=== testing Char <= ===
-Char <= True
-Char <= False
-Char <= True
-Char <= True
-Char <= True
-Char <= True
-Char <= False
-=== testing Char == ===
-Char == True
-Char == False
-Char == False
-Char == True
-Char == True
-Char == False
-Char == False
-=== testing Char /= ===
-Char /= False
-Char /= True
-Char /= True
-Char /= False
-Char /= False
-Char /= True
-Char /= True
-=== testing Int > ===
-Int > False
-Int > True
-Int > False
-Int > False
-Int > False
-Int > True
-Int > False
-Int > False
-Int > True
-=== testing Int < ===
-Int < False
-Int < False
-Int < True
-Int < False
-Int < False
-Int < True
-Int < False
-Int < False
-Int < True
-=== testing Int >= ===
-Int >= True
-Int >= True
-Int >= False
-Int >= True
-Int >= True
-Int >= True
-Int >= False
-Int >= False
-Int >= True
-=== testing Int <= ===
-Int <= True
-Int <= False
-Int <= True
-Int <= True
-Int <= True
-Int <= True
-Int <= False
-Int <= False
-Int <= True
-=== testing Int == ===
-Int == True
-Int == False
-Int == False
-Int == True
-Int == False
-Int == True
-Int == False
-Int == True
-Int == True
-Int == True
-Int == True
-=== testing Int /= ===
-Int /= False
-Int /= True
-Int /= True
-Int /= False
-Int /= True
-Int /= False
-Int /= True
-Int /= False
-Int /= False
-Int /= False
-Int /= False
-=== testing Word > ===
-Word > False
-Word > True
-Word > False
-Word > False
-Word > False
-Word > True
-Word > False
-Word > False
-Word > True
-=== testing Word < ===
-Word < False
-Word < False
-Word < True
-Word < False
-Word < False
-Word < True
-Word < False
-Word < False
-Word < True
-=== testing Word >= ===
-Word >= True
-Word >= True
-Word >= False
-Word >= True
-Word >= True
-Word >= True
-Word >= False
-Word >= False
-Word >= True
-=== testing Word <= ===
-Word <= True
-Word <= False
-Word <= True
-Word <= True
-Word <= True
-Word <= True
-Word <= False
-Word <= False
-Word <= True
-=== testing Word == ===
-Word == True
-Word == False
-Word == False
-Word == True
-Word == False
-Word == True
-Word == False
-Word == True
-Word == True
-Word == True
-Word == True
-=== testing Word /= ===
-Word /= False
-Word /= True
-Word /= True
-Word /= False
-Word /= True
-Word /= False
-Word /= True
-Word /= False
-Word /= False
-Word /= False
-Word /= False
-=== testing Double > ===
-Double > False
-Double > True
-Double > False
-Double > False
-Double > False
-Double > False
-Double > False
-Double > False
-Double > True
-Double > False
-Double > False
-Double > False
-Double > False
-Double > False
-=== testing Double < ===
-Double < False
-Double < False
-Double < True
-Double < False
-Double < False
-Double < False
-Double < False
-Double < False
-Double < False
-Double < True
-Double < False
-Double < False
-Double < False
-Double < False
-=== testing Double >= ===
-Double >= True
-Double >= True
-Double >= False
-Double >= False
-Double >= False
-Double >= False
-Double >= True
-Double >= True
-Double >= True
-Double >= False
-Double >= False
-Double >= False
-Double >= False
-Double >= False
-=== testing Double <= ===
-Double <= True
-Double <= False
-Double <= True
-Double <= False
-Double <= False
-Double <= False
-Double <= True
-Double <= True
-Double <= False
-Double <= True
-Double <= False
-Double <= False
-Double <= False
-Double <= False
-=== testing Double == ===
-Double == True
-Double == False
-Double == False
-Double == False
-Double == False
-Double == False
-Double == True
-Double == True
-Double == False
-Double == False
-Double == False
-Double == False
-Double == False
-Double == False
-=== testing Double /= ===
-Double /= False
-Double /= True
-Double /= True
-Double /= True
-Double /= True
-Double /= True
-Double /= False
-Double /= False
-Double /= True
-Double /= True
-Double /= True
-Double /= True
-Double /= True
-Double /= True
-=== testing Float > ===
-Float > False
-Float > True
-Float > False
-Float > False
-Float > False
-Float > False
-Float > False
-Float > False
-Float > True
-Float > False
-Float > False
-Float > False
-Float > False
-Float > False
-=== testing Float < ===
-Float < False
-Float < False
-Float < True
-Float < False
-Float < False
-Float < False
-Float < False
-Float < False
-Float < False
-Float < True
-Float < False
-Float < False
-Float < False
-Float < False
-=== testing Float >= ===
-Float >= True
-Float >= True
-Float >= False
-Float >= False
-Float >= False
-Float >= False
-Float >= True
-Float >= True
-Float >= True
-Float >= False
-Float >= False
-Float >= False
-Float >= False
-Float >= False
-=== testing Float <= ===
-Float <= True
-Float <= False
-Float <= True
-Float <= False
-Float <= False
-Float <= False
-Float <= True
-Float <= True
-Float <= False
-Float <= True
-Float <= False
-Float <= False
-Float <= False
-Float <= False
-=== testing Float == ===
-Float == True
-Float == False
-Float == False
-Float == False
-Float == False
-Float == False
-Float == True
-Float == True
-Float == False
-Float == False
-Float == False
-Float == False
-Float == False
-Float == False
-=== testing Float /= ===
-Float /= False
-Float /= True
-Float /= True
-Float /= True
-Float /= True
-Float /= True
-Float /= False
-Float /= False
-Float /= True
-Float /= True
-Float /= True
-Float /= True
-Float /= True
-Float /= True
+=== testing gtChar# ===
+gtChar# False
+gtChar# True
+gtChar# False
+gtChar# False
+gtChar# False
+gtChar# False
+gtChar# True
+=== testing geChar# ===
+geChar# True
+geChar# True
+geChar# False
+geChar# True
+geChar# True
+geChar# False
+geChar# True
+=== testing ltChar# ===
+ltChar# False
+ltChar# False
+ltChar# True
+ltChar# False
+ltChar# False
+ltChar# True
+ltChar# False
+=== testing leChar# ===
+leChar# True
+leChar# False
+leChar# True
+leChar# True
+leChar# True
+leChar# True
+leChar# False
+=== testing eqChar# ===
+eqChar# True
+eqChar# False
+eqChar# False
+eqChar# True
+eqChar# True
+eqChar# False
+eqChar# False
+=== testing neChar# ===
+neChar# False
+neChar# True
+neChar# True
+neChar# False
+neChar# False
+neChar# True
+neChar# True
+=== testing ># ===
+># False
+># True
+># False
+># False
+># False
+># True
+># False
+># False
+># True
+=== testing <# ===
+<# False
+<# False
+<# True
+<# False
+<# False
+<# True
+<# False
+<# False
+<# True
+=== testing >=# ===
+>=# True
+>=# True
+>=# False
+>=# True
+>=# True
+>=# True
+>=# False
+>=# False
+>=# True
+=== testing <=# ===
+<=# True
+<=# False
+<=# True
+<=# True
+<=# True
+<=# True
+<=# False
+<=# False
+<=# True
+=== testing ==# ===
+==# True
+==# False
+==# False
+==# True
+==# False
+==# True
+==# False
+==# True
+==# True
+==# True
+==# True
+=== testing /=# ===
+/=# False
+/=# True
+/=# True
+/=# False
+/=# True
+/=# False
+/=# True
+/=# False
+/=# False
+/=# False
+/=# False
+=== testing gtWord# ===
+gtWord# False
+gtWord# True
+gtWord# False
+gtWord# False
+gtWord# False
+gtWord# True
+gtWord# False
+gtWord# False
+gtWord# True
+=== testing ltWord# ===
+ltWord# False
+ltWord# False
+ltWord# True
+ltWord# False
+ltWord# False
+ltWord# True
+ltWord# False
+ltWord# False
+ltWord# True
+=== testing geWord# ===
+geWord# True
+geWord# True
+geWord# False
+geWord# True
+geWord# True
+geWord# True
+geWord# False
+geWord# False
+geWord# True
+=== testing leWord# ===
+leWord# True
+leWord# False
+leWord# True
+leWord# True
+leWord# True
+leWord# True
+leWord# False
+leWord# False
+leWord# True
+=== testing eqWord# ===
+eqWord# True
+eqWord# False
+eqWord# False
+eqWord# True
+eqWord# False
+eqWord# True
+eqWord# False
+eqWord# True
+eqWord# True
+eqWord# True
+eqWord# True
+=== testing neWord# ===
+neWord# False
+neWord# True
+neWord# True
+neWord# False
+neWord# True
+neWord# False
+neWord# True
+neWord# False
+neWord# False
+neWord# False
+neWord# False
+=== testing >## ===
+>## False
+>## True
+>## False
+>## False
+>## False
+>## False
+>## False
+>## False
+>## True
+>## False
+>## False
+>## False
+>## False
+>## False
+=== testing <## ===
+<## False
+<## False
+<## True
+<## False
+<## False
+<## False
+<## False
+<## False
+<## False
+<## True
+<## False
+<## False
+<## False
+<## False
+=== testing >=## ===
+>=## True
+>=## True
+>=## False
+>=## False
+>=## False
+>=## False
+>=## True
+>=## True
+>=## True
+>=## False
+>=## False
+>=## False
+>=## False
+>=## False
+=== testing <=## ===
+<=## True
+<=## False
+<=## True
+<=## False
+<=## False
+<=## False
+<=## True
+<=## True
+<=## False
+<=## True
+<=## False
+<=## False
+<=## False
+<=## False
+=== testing ==## ===
+==## True
+==## False
+==## False
+==## False
+==## False
+==## False
+==## True
+==## True
+==## False
+==## False
+==## False
+==## False
+==## False
+==## False
+=== testing /=## ===
+/=## False
+/=## True
+/=## True
+/=## True
+/=## True
+/=## True
+/=## False
+/=## False
+/=## True
+/=## True
+/=## True
+/=## True
+/=## True
+/=## True
+=== testing gtFloat# ===
+gtFloat# False
+gtFloat# True
+gtFloat# False
+gtFloat# False
+gtFloat# False
+gtFloat# False
+gtFloat# False
+gtFloat# False
+gtFloat# True
+gtFloat# False
+gtFloat# False
+gtFloat# False
+gtFloat# False
+gtFloat# False
+=== testing ltFloat# ===
+ltFloat# False
+ltFloat# False
+ltFloat# True
+ltFloat# False
+ltFloat# False
+ltFloat# False
+ltFloat# False
+ltFloat# False
+ltFloat# False
+ltFloat# True
+ltFloat# False
+ltFloat# False
+ltFloat# False
+ltFloat# False
+=== testing geFloat# ===
+geFloat# True
+geFloat# True
+geFloat# False
+geFloat# False
+geFloat# False
+geFloat# False
+geFloat# True
+geFloat# True
+geFloat# True
+geFloat# False
+geFloat# False
+geFloat# False
+geFloat# False
+geFloat# False
+=== testing leFloat# ===
+leFloat# True
+leFloat# False
+leFloat# True
+leFloat# False
+leFloat# False
+leFloat# False
+leFloat# True
+leFloat# True
+leFloat# False
+leFloat# True
+leFloat# False
+leFloat# False
+leFloat# False
+leFloat# False
+=== testing eqFloat# ===
+eqFloat# True
+eqFloat# False
+eqFloat# False
+eqFloat# False
+eqFloat# False
+eqFloat# False
+eqFloat# True
+eqFloat# True
+eqFloat# False
+eqFloat# False
+eqFloat# False
+eqFloat# False
+eqFloat# False
+eqFloat# False
+=== testing neFloat# ===
+neFloat# False
+neFloat# True
+neFloat# True
+neFloat# True
+neFloat# True
+neFloat# True
+neFloat# False
+neFloat# False
+neFloat# True
+neFloat# True
+neFloat# True
+neFloat# True
+neFloat# True
+neFloat# True
