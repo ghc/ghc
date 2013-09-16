@@ -5,7 +5,7 @@
 -- Module      :  Language.Haskell.Syntax
 -- Copyright   :  (c) The University of Glasgow 2003
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -44,14 +44,14 @@ class (Monad m, Applicative m) => Quasi m where
   qRecover :: m a -- ^ the error handler
            -> m a -- ^ action which may fail
            -> m a		-- ^ Recover from the monadic 'fail'
- 
+
 	-- Inspect the type-checker's environment
   qLookupName :: Bool -> String -> m (Maybe Name)
        -- True <=> type namespace, False <=> value namespace
   qReify          :: Name -> m Info
   qReifyInstances :: Name -> [Type] -> m [Dec]
        -- Is (n tys) an instance?
-       -- Returns list of matching instance Decs 
+       -- Returns list of matching instance Decs
        --    (with empty sub-Decs)
        -- Works for classes and type functions
   qReifyRoles     :: Name -> m [Role]
@@ -65,7 +65,7 @@ class (Monad m, Applicative m) => Quasi m where
 
 -----------------------------------------------------
 --	The IO instance of Quasi
--- 
+--
 --  This instance is used only when running a Q
 --  computation in the IO monad, usually just to
 --  print the result.  There is no interesting
@@ -91,7 +91,7 @@ instance Quasi IO where
   qAddDependentFile _ = badIO "addDependentFile"
 
   qRunIO m = m
-  
+
 badIO :: String -> IO a
 badIO op = do	{ qReport True ("Can't do `" ++ op ++ "' in the IO monad")
 		; fail "Template Haskell failure" }
@@ -115,7 +115,7 @@ newtype Q a = Q { unQ :: forall m. Quasi m => m a }
 -- are the usual way of running a 'Q' computation.
 --
 -- This function is primarily used in GHC internals, and for debugging
--- splices by running them in 'IO'. 
+-- splices by running them in 'IO'.
 --
 -- Note that many functions in 'Q', such as 'reify' and other compiler
 -- queries, are not supported when running 'Q' in 'IO'; these operations
@@ -133,15 +133,15 @@ instance Monad Q where
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)
 
-instance Applicative Q where 
-  pure x = Q (pure x) 
-  Q f <*> Q x = Q (f <*> x) 
+instance Applicative Q where
+  pure x = Q (pure x)
+  Q f <*> Q x = Q (f <*> x)
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
 
-{- | 
-Generate a fresh name, which cannot be captured. 
+{- |
+Generate a fresh name, which cannot be captured.
 
 For example, this:
 
@@ -177,7 +177,7 @@ of @x@, namely @VarP nm1@.
 newName :: String -> Q Name
 newName s = Q (qNewName s)
 
--- | Report an error (True) or warning (False), 
+-- | Report an error (True) or warning (False),
 -- but carry on; use 'fail' to stop.
 report  :: Bool -> String -> Q ()
 report b s = Q (qReport b s)
@@ -226,7 +226,7 @@ with name @s@ in scope at the current splice's location. If
 there is, the @Name@ of this value is returned;
 if not, then @Nothing@ is returned.
 
-The returned name cannot be \"captured\". 
+The returned name cannot be \"captured\".
 For example:
 
 > f = "global"
@@ -242,7 +242,7 @@ The lookup is performed in the context of the /top-level/ splice
 being run. For example:
 
 > f = "global"
-> g = $( [| let f = "local" in 
+> g = $( [| let f = "local" in
 >            $(do
 >                Just nm <- lookupValueName "f"
 >                varE nm
@@ -282,7 +282,7 @@ and to get information about @D@-the-type, use 'lookupTypeName'.
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
-{- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is, 
+{- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
 all instances of this family at the types @tys@ are returned.
@@ -307,10 +307,10 @@ location :: Q Loc
 location = Q qLocation
 
 -- |The 'runIO' function lets you run an I\/O computation in the 'Q' monad.
--- Take care: you are guaranteed the ordering of calls to 'runIO' within 
--- a single 'Q' computation, but not about the order in which splices are run.  
+-- Take care: you are guaranteed the ordering of calls to 'runIO' within
+-- a single 'Q' computation, but not about the order in which splices are run.
 --
--- Note: for various murky reasons, stdout and stderr handles are not 
+-- Note: for various murky reasons, stdout and stderr handles are not
 -- necesarily flushed when the  compiler finishes running, so you should
 -- flush them yourself.
 runIO :: IO a -> Q a
@@ -326,7 +326,7 @@ addDependentFile fp = Q (qAddDependentFile fp)
 instance Quasi Q where
   qNewName  	    = newName
   qReport   	    = report
-  qRecover  	    = recover 
+  qRecover  	    = recover
   qReify    	    = reify
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
@@ -358,7 +358,7 @@ sequenceQ = sequence
 
 class Lift t where
   lift :: t -> Q Exp
-  
+
 instance Lift Integer where
   lift x = return (LitE (IntegerL x))
 
@@ -418,7 +418,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 -- which we should take advantage of.
 -- NB: the lhs of the rule has no args, so that
 --     the rule will apply to a 'lift' all on its own
---     which happens to be the way the type checker 
+--     which happens to be the way the type checker
 --     creates it.
 {-# RULES "TH:liftString" lift = \s -> return (LitE (StringL s)) #-}
 
@@ -437,7 +437,7 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 
 
 -----------------------------------------------------
---		Names and uniques 
+--		Names and uniques
 -----------------------------------------------------
 
 newtype ModName = ModName String	-- Module name
@@ -477,7 +477,7 @@ occString (OccName occ) = occ
 -----------------------------------------------------
 --		 Names
 -----------------------------------------------------
--- 
+--
 -- For "global" names ('NameG') we need a totally unique name,
 -- so we must include the name-space of the thing
 --
@@ -526,7 +526,7 @@ What we actually want is for the @x@ in @f@ to be distinct from the
 > g x = let x' = 0 in x
 > h y = let x' = 0 in y
 
-which avoids name capture as desired. 
+which avoids name capture as desired.
 
 In the general case, we say that a @Name@ can be captured if
 the thing it refers to can be changed by adding new declarations.
@@ -539,19 +539,19 @@ An abstract type representing names in the syntax tree.
 name-capture guarantees (see "Language.Haskell.TH.Syntax#namecapture" for
 an explanation of name capture):
 
-  * the built-in syntax @'f@ and @''T@ can be used to construct names, 
-    The expression @'f@ gives a @Name@ which refers to the value @f@ 
+  * the built-in syntax @'f@ and @''T@ can be used to construct names,
+    The expression @'f@ gives a @Name@ which refers to the value @f@
     currently in scope, and @''T@ gives a @Name@ which refers to the
     type @T@ currently in scope. These names can never be captured.
-    
-  * 'lookupValueName' and 'lookupTypeName' are similar to @'f@ and 
+
+  * 'lookupValueName' and 'lookupTypeName' are similar to @'f@ and
      @''T@ respectively, but the @Name@s are looked up at the point
      where the current splice is being run. These names can never be
      captured.
 
   * 'newName' monadically generates a new name, which can never
      be captured.
-     
+
   * 'mkName' generates a capturable name.
 
 Names constructed using @newName@ and @mkName@ may be used in bindings
@@ -567,7 +567,7 @@ data NameFlavour
   | NameL Int#      -- ^ Local name bound outside of the TH AST
   | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
                 -- An original name (occurrences only, not binders)
-		-- Need the namespace too to be sure which 
+		-- Need the namespace too to be sure which
 		-- thing we are naming
   deriving ( Typeable )
 
@@ -615,7 +615,7 @@ ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
                              con_NameL, con_NameG]
 
 data NameSpace = VarName	-- ^ Variables
-	       | DataName	-- ^ Data constructors 
+	       | DataName	-- ^ Data constructors
 	       | TcClsName	-- ^ Type constructors and classes; Haskell has them
 				-- in the same name space for now.
 	       deriving( Eq, Ord, Data, Typeable )
@@ -632,7 +632,7 @@ nameModule (Name _ (NameQ m))     = Just (modString m)
 nameModule (Name _ (NameG _ _ m)) = Just (modString m)
 nameModule _                      = Nothing
 
-{- | 
+{- |
 Generate a capturable name. Occurrences of such names will be
 resolved according to the Haskell scoping rules at the occurrence
 site.
@@ -663,7 +663,7 @@ mkName :: String -> Name
 --
 -- Parse the string to see if it has a "." in it
 -- so we know whether to generate a qualified or unqualified name
--- It's a bit tricky because we need to parse 
+-- It's a bit tricky because we need to parse
 --
 -- > Foo.Baz.x   as    Qual Foo.Baz x
 --
@@ -672,7 +672,7 @@ mkName str
   = split [] (reverse str)
   where
     split occ []        = Name (mkOccName occ) NameS
-    split occ ('.':rev)	| not (null occ), 
+    split occ ('.':rev)	| not (null occ),
 			  not (null rev), head rev /= '.'
 			= Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
 	-- The 'not (null occ)' guard ensures that
@@ -849,61 +849,61 @@ type CharPos = (Int, Int)	-- ^ Line and character position
 
 -- | Obtained from 'reify' in the 'Q' Monad.
 data Info
-  = 
+  =
   -- | A class, with a list of its visible instances
-  ClassI 
+  ClassI
       Dec
       [InstanceDec]
-  
+
   -- | A class method
   | ClassOpI
        Name
        Type
        ParentName
        Fixity
-  
+
   -- | A \"plain\" type constructor. \"Fancier\" type constructors are returned using 'PrimTyConI' or 'FamilyI' as appropriate
-  | TyConI 
+  | TyConI
         Dec
 
   -- | A type or data family, with a list of its visible instances. A closed
   -- type family is returned with 0 instances.
-  | FamilyI 
+  | FamilyI
         Dec
         [InstanceDec]
-  
+
   -- | A \"primitive\" type constructor, which can't be expressed with a 'Dec'. Examples: @(->)@, @Int#@.
-  | PrimTyConI 
+  | PrimTyConI
        Name
        Arity
        Unlifted
-  
+
   -- | A data constructor
-  | DataConI 
+  | DataConI
        Name
        Type
        ParentName
        Fixity
 
-  {- | 
+  {- |
   A \"value\" variable (as opposed to a type variable, see 'TyVarI').
-  
-  The @Maybe Dec@ field contains @Just@ the declaration which 
-  defined the variable -- including the RHS of the declaration -- 
+
+  The @Maybe Dec@ field contains @Just@ the declaration which
+  defined the variable -- including the RHS of the declaration --
   or else @Nothing@, in the case where the RHS is unavailable to
   the compiler. At present, this value is _always_ @Nothing@:
   returning the RHS has not yet been implemented because of
   lack of interest.
   -}
-  | VarI 
+  | VarI
        Name
        Type
        (Maybe Dec)
        Fixity
 
-  {- | 
+  {- |
   A type variable.
-  
+
   The @Type@ field contains the type which underlies the variable.
   At present, this is always @'VarT' theName@, but future changes
   may permit refinement of this.
@@ -913,7 +913,7 @@ data Info
 	Type	-- What it is bound to
   deriving( Show, Data, Typeable )
 
-{- | 
+{- |
 In 'ClassOpI' and 'DataConI', name of the parent class or type
 -}
 type ParentName = Name
@@ -1017,8 +1017,8 @@ reassociate the tree as necessary.
 --
 -----------------------------------------------------
 
-data Lit = CharL Char 
-         | StringL String 
+data Lit = CharL Char
+         | StringL String
          | IntegerL Integer     -- ^ Used for overloaded and non-overloaded
                                 -- literals. We don't have a good way to
                                 -- represent non-overloaded literals at
@@ -1031,12 +1031,12 @@ data Lit = CharL Char
          | StringPrimL [Word8]	-- ^ A primitive C-style string, type Addr#
     deriving( Show, Eq, Data, Typeable )
 
-    -- We could add Int, Float, Double etc, as we do in HsLit, 
+    -- We could add Int, Float, Double etc, as we do in HsLit,
     -- but that could complicate the
     -- suppposedly-simple TH.Syntax literal type
 
 -- | Pattern in Haskell given in @{}@
-data Pat 
+data Pat
   = LitP Lit                      -- ^ @{ 5 or 'c' }@
   | VarP Name                     -- ^ @{ x }@
   | TupP [Pat]                    -- ^ @{ (p1,p2) }@
@@ -1066,8 +1066,8 @@ data Match = Match Pat Body [Dec] -- ^ @case e of { pat -> body where decs }@
 data Clause = Clause [Pat] Body [Dec]
                                   -- ^ @f { p1 p2 = body where decs }@
     deriving( Show, Eq, Data, Typeable )
- 
-data Exp 
+
+data Exp
   = VarE Name                          -- ^ @{ x }@
   | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
   | LitE Lit                           -- ^ @{ 5 or 'c'}@
@@ -1096,7 +1096,7 @@ data Exp
   | LetE [Dec] Exp                     -- ^ @{ let x=e1;   y=e2 in e3 }@
   | CaseE Exp [Match]                  -- ^ @{ case e of m1; m2 }@
   | DoE [Stmt]                         -- ^ @{ do { p <- e1; e2 }  }@
-  | CompE [Stmt]                       -- ^ @{ [ (x,y) | x <- xs, y <- ys ] }@ 
+  | CompE [Stmt]                       -- ^ @{ [ (x,y) | x <- xs, y <- ys ] }@
       --
       -- The result expression of the comprehension is
       -- the /last/ of the @'Stmt'@s, and should be a 'NoBindS'.
@@ -1119,8 +1119,8 @@ type FieldExp = (Name,Exp)
 -- Omitted: implicit parameters
 
 data Body
-  = GuardedB [(Guard,Exp)]   -- ^ @f p { | e1 = e2 
-                                 --      | e3 = e4 } 
+  = GuardedB [(Guard,Exp)]   -- ^ @f p { | e1 = e2
+                                 --      | e3 = e4 }
                                  -- where ds@
   | NormalB Exp              -- ^ @f p { = e } where ds@
   deriving( Show, Eq, Data, Typeable )
@@ -1140,18 +1140,18 @@ data Stmt
 data Range = FromR Exp | FromThenR Exp Exp
            | FromToR Exp Exp | FromThenToR Exp Exp Exp
           deriving( Show, Eq, Data, Typeable )
-  
-data Dec 
+
+data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
-  | DataD Cxt Name [TyVarBndr] 
+  | DataD Cxt Name [TyVarBndr]
          [Con] [Name]             -- ^ @{ data Cxt x => T x = A x | B (T x)
                                   --       deriving (Z,W)}@
-  | NewtypeD Cxt Name [TyVarBndr] 
+  | NewtypeD Cxt Name [TyVarBndr]
          Con [Name]               -- ^ @{ newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W)}@
   | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
-  | ClassD Cxt Name [TyVarBndr] 
+  | ClassD Cxt Name [TyVarBndr]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
   | InstanceD Cxt Type [Dec]      -- ^ @{ instance Show w => Show [w]
                                   --       where ds }@
@@ -1165,11 +1165,11 @@ data Dec
   | PragmaD Pragma                -- ^ @{ {\-# INLINE [1] foo #-\} }@
 
   -- | type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
-  | FamilyD FamFlavour Name 
+  | FamilyD FamFlavour Name
          [TyVarBndr] (Maybe Kind) -- ^ @{ type family T a b c :: * }@
-                                 
+
   | DataInstD Cxt Name [Type]
-         [Con] [Name]             -- ^ @{ data instance Cxt x => T [x] = A x 
+         [Con] [Name]             -- ^ @{ data instance Cxt x => T [x] = A x
                                   --                                | B (T x)
                                   --       deriving (Z,W)}@
   | NewtypeInstD Cxt Name [Type]
@@ -1291,7 +1291,7 @@ data Role = NominalR            -- ^ @nominal@
 -- 'PromotedT'. Similarly, tuple kinds are made with 'TupleT',
 -- not 'PromotedTupleT'.
 
-type Kind = Type     
+type Kind = Type
 
 {- Note [Representing concrete syntax in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1319,7 +1319,7 @@ but it's very smelly because there really is no type constructor
 corresponding to PromotedListT. So we encode HsExplicitListTy with
 PromotedConsT and PromotedNilT (which *do* have underlying type
 constructors):
-  '[ Maybe, IO ]    PromotedConsT `AppT` Maybe `AppT` 
+  '[ Maybe, IO ]    PromotedConsT `AppT` Maybe `AppT`
                     (PromotedConsT  `AppT` IO `AppT` PromotedNilT)
 -}
 
