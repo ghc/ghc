@@ -8,13 +8,13 @@
 -- Module      :  GHC.Enum
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
 -- The 'Enum' and 'Bounded' classes.
--- 
+--
 -----------------------------------------------------------------------------
 
 #include "MachDeps.h"
@@ -67,14 +67,14 @@ class  Bounded a  where
 -- whose constructors have no fields).  The nullary constructors are
 -- assumed to be numbered left-to-right by 'fromEnum' from @0@ through @n-1@.
 -- See Chapter 10 of the /Haskell Report/ for more details.
---  
+--
 -- For any type that is an instance of class 'Bounded' as well as 'Enum',
 -- the following should hold:
 --
 -- * The calls @'succ' 'maxBound'@ and @'pred' 'minBound'@ should result in
 --   a runtime error.
--- 
--- * 'fromEnum' and 'toEnum' should give a runtime error if the 
+--
+-- * 'fromEnum' and 'toEnum' should give a runtime error if the
 --   result value is not representable in the result type.
 --   For example, @'toEnum' 7 :: 'Bool'@ is an error.
 --
@@ -120,7 +120,7 @@ boundedEnumFrom :: (Enum a, Bounded a) => a -> [a]
 boundedEnumFrom n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
 
 boundedEnumFromThen :: (Enum a, Bounded a) => a -> a -> [a]
-boundedEnumFromThen n1 n2 
+boundedEnumFromThen n1 n2
   | i_n2 >= i_n1  = map toEnum [i_n1, i_n2 .. fromEnum (maxBound `asTypeOf` n1)]
   | otherwise     = map toEnum [i_n1, i_n2 .. fromEnum (minBound `asTypeOf` n1)]
   where
@@ -370,10 +370,10 @@ instance  Enum Char  where
 
     {-# INLINE enumFromTo #-}
     enumFromTo (C# x) (C# y) = eftChar (ord# x) (ord# y)
-    
+
     {-# INLINE enumFromThen #-}
     enumFromThen (C# x1) (C# x2) = efdChar (ord# x1) (ord# x2)
-    
+
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
 
@@ -471,7 +471,7 @@ go_dn_char_list x0 delta lim
 %*                                                      *
 %*********************************************************
 
-Be careful about these instances.  
+Be careful about these instances.
         (a) remember that you have to count down as well as up e.g. [13,12..0]
         (b) be careful of Int overflow
         (c) remember that Int is bounded, so [1..] terminates at maxInt
@@ -482,7 +482,7 @@ instance  Bounded Int where
     maxBound =  maxInt
 
 instance  Enum Int  where
-    succ x  
+    succ x
        | x == maxBound  = error "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
        | otherwise      = x + 1
     pred x
@@ -508,7 +508,7 @@ instance  Enum Int  where
 
 
 -----------------------------------------------------
--- eftInt and eftIntFB deal with [a..b], which is the 
+-- eftInt and eftIntFB deal with [a..b], which is the
 -- most common form, so we take a lot of care
 -- In particular, we have rules for deforestation
 

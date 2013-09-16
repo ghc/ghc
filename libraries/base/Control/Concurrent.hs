@@ -15,7 +15,7 @@
 -- Module      :  Control.Concurrent
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
@@ -50,7 +50,7 @@ module Control.Concurrent (
 
         -- * Scheduling
 
-        -- $conc_scheduling     
+        -- $conc_scheduling
         yield,
 
         -- ** Blocking
@@ -171,7 +171,7 @@ In GHC, threads may also communicate via exceptions.
     will print either @aaaaaaaaaaaaaa...@ or @bbbbbbbbbbbb...@,
     instead of some random interleaving of @a@s and @b@s.  In
     practice, cooperative multitasking is sufficient for writing
-    simple graphical user interfaces.  
+    simple graphical user interfaces.
 -}
 
 {- $blocking
@@ -228,7 +228,7 @@ called the function). Also, the @main@ action of every Haskell program is
 run in a bound thread.
 
 Why do we need this? Because if a foreign library is called from a thread
-created using 'forkIO', it won't have access to any /thread-local state/ - 
+created using 'forkIO', it won't have access to any /thread-local state/ -
 state variables that have specific values for each OS thread
 (see POSIX's @pthread_key_create@ or Win32's @TlsAlloc@). Therefore, some
 libraries (OpenGL, for example) will not work from a thread created using
@@ -258,7 +258,7 @@ waiting for the results in the main thread.
 foreign import ccall rtsSupportsBoundThreads :: Bool
 
 
-{- | 
+{- |
 Like 'forkIO', this sparks off a new thread to run the 'IO'
 computation passed as the first argument, and returns the 'ThreadId'
 of the newly created thread.
@@ -329,7 +329,7 @@ isCurrentThreadBound = IO $ \ s# ->
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 
 
-{- | 
+{- |
 Run the 'IO' computation passed as the first argument. If the calling thread
 is not /bound/, a bound thread is created temporarily. @runInBoundThread@
 doesn't finish until the 'IO' computation finishes.
@@ -354,7 +354,7 @@ runInBoundThread action
                   unsafeResult
     | otherwise = failNonThreaded
 
-{- | 
+{- |
 Run the 'IO' computation passed as the first argument. If the calling thread
 is /bound/, an unbound thread is created temporarily using 'forkIO'.
 @runInBoundThread@ doesn't finish until the 'IO' computation finishes.
@@ -457,7 +457,7 @@ threadWaitReadSTM fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
-threadWaitWriteSTM fd 
+threadWaitWriteSTM fd
 #ifdef mingw32_HOST_OS
   | threaded = do v <- newTVarIO Nothing
                   mask_ $ void $ forkIO $ do result <- try (waitFd fd 1)
@@ -573,7 +573,7 @@ foreign import ccall safe "fdReady"
 
 >    children :: MVar [MVar ()]
 >    children = unsafePerformIO (newMVar [])
->    
+>
 >    waitForChildren :: IO ()
 >    waitForChildren = do
 >      cs <- takeMVar children

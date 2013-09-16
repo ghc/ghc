@@ -6,7 +6,7 @@
 -- Module      :  Data.Bits
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Bits ( 
+module Data.Bits (
   Bits(
     (.&.), (.|.), xor,
     complement,
@@ -63,7 +63,7 @@ infixl 5 .|.
 
 {-# DEPRECATED bitSize "Use bitSizeMaybe or finiteBitSize instead" #-} -- deprecated in 7.8
 
-{-| 
+{-|
 The 'Bits' class defines bitwise operations over integral types.
 
 * Bits are numbered from 0 with bit 0 being the least
@@ -393,5 +393,5 @@ own to enable constant folding; for example 'shift':
            __DEFAULT -> Main.$wfold (+# ww_sOb 56) (+# wild_XM 1);
            10000000 -> ww_sOb
          }
--} 
+-}
 

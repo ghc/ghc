@@ -6,7 +6,7 @@
 -- Module      :  GHC.Exts
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -59,7 +59,7 @@ module GHC.Exts
 
         -- * The Constraint kind
         Constraint,
-        
+
         -- * Overloaded lists
         IsList(..)
        ) where
@@ -124,7 +124,7 @@ traceEvent = Debug.Trace.traceEventIO
 *									*
 ********************************************************************** -}
 
--- Annotating a type with NoSpecConstr will make SpecConstr 
+-- Annotating a type with NoSpecConstr will make SpecConstr
 -- not specialise for arguments of that type.
 
 -- This data type is defined here, rather than in the SpecConstr module
@@ -147,11 +147,11 @@ class IsList l where
   -- | The 'Item' type function returns the type of items of the structure
   --   @l@.
   type Item l
-  
+
   -- | The 'fromList' function constructs the structure @l@ from the given
   --   list of @Item l@
   fromList  :: [Item l] -> l
-  
+
   -- | The 'fromListN' function takes the input list's length as a hint. Its
   --   behaviour should be equivalent to 'fromList'. The hint can be used to
   --   construct the structure @l@ more efficiently compared to 'fromList'. If
@@ -159,9 +159,9 @@ class IsList l where
   --   'fromListN' is not specified.
   fromListN :: Int -> [Item l] -> l
   fromListN _ = fromList
-  
+
   -- | The 'toList' function extracts a list of @Item l@ from the structure @l@.
-  --   It should satisfy fromList . toList = id. 
+  --   It should satisfy fromList . toList = id.
   toList :: l -> [Item l]
 
 instance IsList [a] where
