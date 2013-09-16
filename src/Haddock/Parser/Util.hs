@@ -7,7 +7,7 @@ import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 
 takeUntil :: ByteString -> Parser ByteString
-takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p)
+takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p) >>= gotSome
   where
     end = BS.unpack end_
 
@@ -20,3 +20,7 @@ takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p)
 
     dropEnd = BS.reverse . BS.drop (length end) . BS.reverse
     requireEnd = mfilter (BS.isSuffixOf end_)
+
+    gotSome xs
+      | BS.null xs = fail "didn't get any content"
+      | otherwise = return xs

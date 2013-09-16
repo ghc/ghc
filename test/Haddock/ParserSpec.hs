@@ -68,6 +68,16 @@ spec = before initStaticOpts $ do
       it "allows to backslash-escape characters" $ do
         property $ \x -> ['\\', x] `shouldParseTo` DocString [x]
 
+      context "when parsing strings contaning numeric character references" $ do
+        it "will implicitly convert digits to characters" $ do
+          "&#65;&#65;&#65;&#65;" `shouldParseTo` "AAAA"
+
+          "&#28796;&#30524;&#12398;&#12471;&#12515;&#12490;"
+            `shouldParseTo` "灼眼のシャナ"
+
+        it "will implicitly convert hex encoded characters" $ do
+          "&#x65;&#x65;&#x65;&#x65;" `shouldParseTo` "eeee"
+
     context "when parsing identifiers" $ do
       it "parses identifiers enclosed within single ticks" $ do
         "'foo'" `shouldParseTo` DocIdentifier "foo"
@@ -75,8 +85,15 @@ spec = before initStaticOpts $ do
       it "parses identifiers enclosed within backticks" $ do
         "`foo`" `shouldParseTo` DocIdentifier "foo"
 
-      it "parses a word with one of the delimiters in it as ordinary string" $ do
-        "don't use apostrophe's in the wrong place's" `shouldParseTo` "don't use apostrophe's in the wrong place's"
+      it "parses a word with an one of the delimiters in it as DocString" $ do
+          "don't" `shouldParseTo` "don't"
+
+      it "doesn't pass pairs of delimiters with spaces between them" $ do
+        "hel'lo w'orld" `shouldParseTo` "hel'lo w'orld"
+
+      it "don't use apostrophe's in the wrong place's" $ do
+        " don't use apostrophe's in the wrong place's" `shouldParseTo`
+          "don't use apostrophe's in the wrong place's"
 
     context "when parsing URLs" $ do
       let hyperlink :: String -> Maybe String -> Doc RdrName
@@ -91,12 +108,24 @@ spec = before initStaticOpts $ do
       it "does not accept newlines in label" $ do
         "<foo bar\nbaz>" `shouldParseTo` "<foo bar\nbaz>"
 
-      it "does not allow to escap >" $ do
-        "<http://examp\\>le.com" `shouldParseTo` hyperlink "http://examp\\" Nothing <> "le.com"
+      -- new behaviour test, this will be now consistent with other markup
+      it "allows us to escape > inside the URL" $ do
+        "<http://examp\\>le.com>" `shouldParseTo`
+          hyperlink "http://examp>le.com" Nothing
+
+        "<http://exa\\>mp\\>le.com>" `shouldParseTo`
+          hyperlink "http://exa>mp>le.com" Nothing
+
+        -- Likewise in label
+        "<http://example.com f\\>oo>" `shouldParseTo`
+          hyperlink "http://example.com" "f>oo"
 
       it "parses inline URLs" $ do
         "foo <http://example.com/> bar" `shouldParseTo`
           "foo " <> hyperlink "http://example.com/" Nothing <> " bar"
+
+      it "doesn't allow for multi-line link tags" $ do
+        "<ba\nz aar>" `shouldParseTo` "<ba\nz aar>"
 
       context "when autolinking URLs" $ do
         it "autolinks HTTP URLs" $ do
@@ -129,19 +158,19 @@ spec = before initStaticOpts $ do
           picture uri = DocPic . Picture uri
 
       it "parses a simple picture" $ do
-        "<<foo>>" `shouldParseTo` picture "foo" Nothing
+        "<<baz>>" `shouldParseTo` picture "baz" Nothing
 
-      it "accepts an optional title" $ do
-        "<<foo bar baz>>" `shouldParseTo` picture "foo" (Just "bar baz")
-
-      it "does not accept newlines in title" $ do
-        "<<foo bar\nbaz>>" `shouldParseTo` "<<foo bar\nbaz>>"
+      it "parses a picture with a title" $ do
+        "<<b a z>>" `shouldParseTo` picture "b" (Just "a z")
 
       it "parses a picture with unicode" $ do
-        "<<灼眼 のシャナ>>" `shouldParseTo` picture "灼眼" (Just "のシャナ")
+        "<<灼眼のシャナ>>" `shouldParseTo` picture "灼眼のシャナ" Nothing
 
-      it "doesn't allow for escaping of the closing tags" $ do -- bug?
-        "<<ba\\>>z>>" `shouldParseTo` picture "ba\\" Nothing <> "z>>"
+      it "allows for escaping of the closing tags" $ do
+        "<<ba\\>>z>>" `shouldParseTo` picture "ba>>z" Nothing
+
+      it "doesn't allow for multi-line picture tags" $ do
+        "<<ba\nz aar>>" `shouldParseTo` "<<ba\nz aar>>"
 
     context "when parsing anchors" $ do
       it "parses a single word anchor" $ do
@@ -191,6 +220,25 @@ spec = before initStaticOpts $ do
       it "allows to escape the emphasis delimiter inside of emphasis" $ do
         "/empha\\/sis/" `shouldParseTo` DocEmphasis "empha/sis"
 
+    context "when parsing monospaced text" $ do
+      it "parses simple monospaced text" $ do
+        "@foo@" `shouldParseTo` DocMonospaced "foo"
+
+      it "parses inline monospaced text" $ do
+        "foo @bar@ baz" `shouldParseTo` "foo " <> DocMonospaced "bar" <> " baz"
+
+      it "allows to escape @" $ do
+        "@foo \\@ bar@" `shouldParseTo` DocMonospaced "foo @ bar"
+
+      it "accepts unicode" $ do
+        "@foo 灼眼のシャナ bar@" `shouldParseTo` DocMonospaced "foo 灼眼のシャナ bar"
+
+      it "accepts other markup in monospaced text" $ do
+        "@/foo/@" `shouldParseTo` DocMonospaced (DocEmphasis "foo")
+
+      it "requires the closing @" $ do
+        "@foo /bar/ baz" `shouldParseTo` "@foo " <> DocEmphasis "bar" <> " baz"
+
     context "when parsing bold strings" $ do
       it "allows for a bold string on its own" $ do
         "__bold string__" `shouldParseTo`
@@ -224,49 +272,41 @@ spec = before initStaticOpts $ do
         "__bo\\__ld__" `shouldParseTo`
           DocBold "bo__ld"
 
-    context "when parsing monospaced text" $ do
-      it "parses simple monospaced text" $ do
-        "@foo@" `shouldParseTo` DocMonospaced "foo"
+      it "doesn't allow for empty bold" $ do
+        "____" `shouldParseTo` "____"
 
-      it "parses inline monospaced text" $ do
-        "foo @bar@ baz" `shouldParseTo` "foo " <> DocMonospaced "bar" <> " baz"
+    context "when parsing module strings" $ do
+      it "should parse a module on its own" $ do
+        "\"Module\"" `shouldParseTo`
+          DocModule "Module"
 
-      it "allows to escape @" $ do
-        "@foo \\@ bar@" `shouldParseTo` DocMonospaced "foo @ bar"
+      it "should parse a module inline" $ do
+        "This is a \"Module\"." `shouldParseTo`
+          "This is a " <> DocModule "Module" <> "."
 
-      it "accepts unicode" $ do
-        "@foo 灼眼のシャナ bar@" `shouldParseTo` DocMonospaced "foo 灼眼のシャナ bar"
+      it "can accept a simple module name" $ do
+        "\"Hello\"" `shouldParseTo` DocModule "Hello"
 
-      it "accepts other markup in monospaced text" $ do
-        "@/foo/@" `shouldParseTo` DocMonospaced (DocEmphasis "foo")
+      it "can accept a module name with dots" $ do
+        "\"Hello.World\"" `shouldParseTo` DocModule "Hello.World"
 
-      it "requires the closing @" $ do
-        "@foo /bar/ baz" `shouldParseTo` "@foo " <> DocEmphasis "bar" <> " baz"
+      it "can accept a module name with unicode" $ do
+        "\"Hello.Worldλ\"" `shouldParseTo` DocModule "Hello.Worldλ"
 
-    context "when parsing module names" $ do
-      it "accepts a simple module name" $ do
-        "\"Foo\"" `shouldParseTo` DocModule "Foo"
+      it "parses a module name with a trailing dot as regular quoted string" $ do
+        "\"Hello.\"" `shouldParseTo` "\"Hello.\""
 
-      it "accepts a module name with dots" $ do
-        "\"Foo.Bar.Baz\"" `shouldParseTo` DocModule "Foo.Bar.Baz"
+      it "parses a module name with a space as regular quoted string" $ do
+        "\"Hello World\"" `shouldParseTo` "\"Hello World\""
+
+      it "parses a module name with invalid characters as regular quoted string" $ do
+        "\"Hello&[{}(=*)+]!\"" `shouldParseTo` "\"Hello&[{}(=*)+]!\""
 
       it "accepts a module name with unicode" $ do
         "\"Foo.Barλ\"" `shouldParseTo` DocModule "Foo.Barλ"
 
-      it "parses a module inline" $ do
-        "This is a \"Module\"." `shouldParseTo` ("This is a " <> (DocModule "Module" <> "."))
-
-      it "rejects empty module name" $ do
+      it "treats empty module name as regular double quotes" $ do
         "\"\"" `shouldParseTo` "\"\""
-
-      it "rejects a module name with a trailing dot" $ do
-        "\"Foo.\"" `shouldParseTo` "\"Foo.\""
-
-      it "rejects a module name with a space" $ do
-        "\"Foo Bar\"" `shouldParseTo` "\"Foo Bar\""
-
-      it "rejects a module name with invalid characters" $ do
-        "\"Foo&[{}(=*)+]!\"" `shouldParseTo` "\"Foo&[{}(=*)+]!\""
 
   describe "parseParas" $ do
     let infix 1 `shouldParseTo`
@@ -370,6 +410,14 @@ spec = before initStaticOpts $ do
           , "@"
           ] `shouldParseTo` DocCodeBlock "foo\n@\nbar\n"
 
+      it "accepts unicode" $ do
+        "@foo 灼眼のシャナ bar@" `shouldParseTo` DocCodeBlock "foo 灼眼のシャナ bar"
+
+      it "requires the closing @" $ do
+        "@foo /bar/ baz"
+          `shouldParseTo` DocParagraph ("@foo " <> DocEmphasis "bar" <> " baz")
+
+
     context "when parsing examples" $ do
       it "parses a simple example" $ do
         ">>> foo" `shouldParseTo` DocExamples [Example "foo" []]
@@ -391,6 +439,61 @@ spec = before initStaticOpts $ do
             Example "fib 5" ["5"]
           , Example "fib 10" ["55"]
           ]
+
+      it ("requires an example to be separated"
+          ++ " from a previous paragraph by an empty line") $ do
+        "foobar\n\n>>> fib 10\n55" `shouldParseTo`
+          DocParagraph "foobar"
+                <> DocExamples [Example "fib 10" ["55"]]
+
+      it "parses bird-tracks inside of paragraphs as plain strings" $ do
+        let xs = "foo\n>>> bar"
+        xs `shouldParseTo` DocParagraph (DocString xs)
+
+      it "skips empty lines in front of an example" $ do
+        "\n   \n\n>>> foo" `shouldParseTo` DocExamples [Example "foo" []]
+
+      it "terminates example on empty line" $ do
+        unlines [
+            ">>> foo"
+          , "bar"
+          , "    "
+          , "baz"
+          ]
+        `shouldParseTo`
+          DocExamples [Example "foo" ["bar"]] <> DocParagraph "baz"
+
+      it "parses a <BLANKLINE> result as an empty result" $ do
+        unlines [
+            ">>> foo"
+          , "bar"
+          , "<BLANKLINE>"
+          , "baz"
+          ]
+        `shouldParseTo` DocExamples [Example "foo" ["bar", "", "baz"]]
+
+      it "accepts unicode in examples" $ do
+        ">>> 灼眼\nシャナ" `shouldParseTo` DocExamples [Example "灼眼" ["シャナ"]]
+
+      context "when prompt is prefixed by whitespace" $ do
+        it "strips the exact same amount of whitespace from result lines" $ do
+          unlines [
+              "   >>> foo"
+            , "   bar"
+            , "   baz"
+            ] `shouldParseTo` DocExamples [Example "foo" ["bar", "baz"]]
+
+        it "preserves additional whitespace" $ do
+          unlines [
+              "   >>> foo"
+            , "    bar"
+            ] `shouldParseTo` DocExamples [Example "foo" [" bar"]]
+
+        it "keeps original if stripping is not possible" $ do
+          unlines [
+              "   >>> foo"
+            , " bar"
+            ] `shouldParseTo` DocExamples [Example "foo" [" bar"]]
 
 
     context "when parsing paragraphs nested in lists" $ do
@@ -449,77 +552,6 @@ spec = before initStaticOpts $ do
                                <> DocDefList [ ("bar", "barv") ])
                      ]
           <> DocOrderedList [ DocParagraph "baz" ]
-
-
-    context "when parsing consecutive paragraphs" $ do
-      it "will not capture irrelevant consecutive lists" $ do
-        "   * bullet\n\n   - different bullet\n\n   (1) ordered\n \n   "
-          ++ "2. different bullet\n   \n   [cat] kitten\n   \n   [pineapple] fruit"
-          `shouldParseTo`
-          DocUnorderedList [ DocParagraph "bullet"
-                           , DocParagraph "different bullet"]
-          <> DocOrderedList [ DocParagraph "ordered"
-                            , DocParagraph "different bullet"
-                            ]
-          <> DocDefList [ ("cat", "kitten")
-                        , ("pineapple", "fruit")
-                        ]
-
-    context "when parsing an example" $ do
-      it ("requires an example to be separated"
-          ++ " from a previous paragraph by an empty line") $ do
-        "foobar\n\n>>> fib 10\n55" `shouldParseTo`
-          DocParagraph "foobar"
-                <> DocExamples [Example "fib 10" ["55"]]
-
-      it "parses bird-tracks inside of paragraphs as plain strings" $ do
-        let xs = "foo\n>>> bar"
-        xs `shouldParseTo` DocParagraph (DocString xs)
-
-      it "skips empty lines in front of an example" $ do
-        "\n   \n\n>>> foo" `shouldParseTo` DocExamples [Example "foo" []]
-
-      it "terminates example on empty line" $ do
-        unlines [
-            ">>> foo"
-          , "bar"
-          , "    "
-          , "baz"
-          ]
-        `shouldParseTo`
-          DocExamples [Example "foo" ["bar"]] <> DocParagraph "baz"
-
-      it "parses a <BLANKLINE> result as an empty result" $ do
-        unlines [
-            ">>> foo"
-          , "bar"
-          , "<BLANKLINE>"
-          , "baz"
-          ]
-        `shouldParseTo` DocExamples [Example "foo" ["bar", "", "baz"]]
-
-      it "accepts unicode in examples" $ do
-        ">>> 灼眼\nシャナ" `shouldParseTo` DocExamples [Example "灼眼" ["シャナ"]]
-
-      context "when prompt is prefixed by whitespace" $ do
-        it "strips the exact same amount of whitespace from result lines" $ do
-          unlines [
-              "   >>> foo"
-            , "   bar"
-            , "   baz"
-            ] `shouldParseTo` DocExamples [Example "foo" ["bar", "baz"]]
-
-        it "preserves additional whitespace" $ do
-          unlines [
-              "   >>> foo"
-            , "    bar"
-            ] `shouldParseTo` DocExamples [Example "foo" [" bar"]]
-
-        it "keeps original if stripping is not possible" $ do
-          unlines [
-              "   >>> foo"
-            , " bar"
-            ] `shouldParseTo` DocExamples [Example "foo" [" bar"]]
 
     context "when parsing properties" $ do
       it "can parse a single property" $ do
@@ -701,29 +733,29 @@ spec = before initStaticOpts $ do
         `shouldParseTo` DocParagraph "foo" <> DocDefList [("foo", "bar")] <> DocParagraph "baz"
 
     context "when parsing consecutive paragraphs" $ do
-      it "accepts consecutive lists" $ do
-        unlines [
-            "   * foo"
-          , ""
-          , "   - bar"
-          , ""
-          , "   (1) ordered foo"
-          , " "
-          , "   2. ordered bar"
-          , "   "
-          , "   [cat] kitten"
-          , "   "
-          , "   [pineapple] fruit"
-          ] `shouldParseTo` DocUnorderedList [
-            DocParagraph "foo"
-          , DocParagraph "bar"
-          ] <> DocOrderedList [
-            DocParagraph "ordered foo"
-          , DocParagraph "ordered bar"
-          ] <> DocDefList [
-            ("cat", "kitten")
-          , ("pineapple", "fruit")
-          ]
+      it "will not capture irrelevant consecutive lists" $ do
+        unlines [ "   * bullet"
+                , ""
+                , ""
+                , "   - different bullet"
+                , ""
+                , ""
+                , "   (1) ordered"
+                , " "
+                , "   2. different bullet"
+                , "   "
+                , "   [cat] kitten"
+                , "   "
+                , "   [pineapple] fruit"
+                ] `shouldParseTo`
+          DocUnorderedList [ DocParagraph "bullet"
+                           , DocParagraph "different bullet"]
+          <> DocOrderedList [ DocParagraph "ordered"
+                            , DocParagraph "different bullet"
+                            ]
+          <> DocDefList [ ("cat", "kitten")
+                        , ("pineapple", "fruit")
+                        ]
 
     context "when parsing function documentation headers" $ do
       it "can parse a simple header" $ do

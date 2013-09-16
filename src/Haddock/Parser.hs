@@ -167,7 +167,7 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
 -- Right (DocPic (Picture "hello.png" (Just "world")))
 picture :: Parser (Doc a)
 picture = DocPic . makeLabeled Picture . decodeUtf8
-          <$> ("<<" *> takeWhile1 (`notElem` ">\n") <* ">>")
+          <$> disallowNewline ("<<" *> takeUntil ">>")
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: DynFlags -> Parser (Doc RdrName)
@@ -271,7 +271,8 @@ moreContent :: Monoid a => Parser a -> DynFlags
             -> Parser ([String], Either (Doc RdrName) a)
 moreContent item d = first . (:) <$> nonEmptyLine <*> more item d
 
--- | Collects and parses the result of 'dropFrontOfPara'
+-- | Runs the 'parseParas' parser on an indented paragraph.
+-- The indentation is 4 spaces.
 indentedParagraphs :: DynFlags -> Parser (Doc RdrName)
 indentedParagraphs d = parseParas d . concat <$> dropFrontOfPara "    "
 
@@ -367,7 +368,9 @@ codeblock d =
           | otherwise = Just $ c == '\n'
 
 hyperlink :: Parser (Doc a)
-hyperlink = DocHyperlink . makeLabeled Hyperlink . decodeUtf8 <$> ("<" *> takeWhile1 (`notElem` ">\n") <* ">")
+hyperlink = DocHyperlink . makeLabeled Hyperlink . decodeUtf8
+              <$> disallowNewline ("<" *> takeUntil ">")
+            <|> autoUrl
 
 autoUrl :: Parser (Doc a)
 autoUrl = mkLink <$> url
@@ -425,6 +428,14 @@ takeHorizontalSpace :: Parser BS.ByteString
 takeHorizontalSpace = takeWhile (`elem` " \t\f\v\r")
 
 makeLabeled :: (String -> Maybe String -> a) -> String -> a
-makeLabeled f input = case break isSpace $ strip input of
+makeLabeled f input = case break isSpace $ removeEscapes $ strip input of
   (uri, "")    -> f uri Nothing
   (uri, label) -> f uri (Just $ dropWhile isSpace label)
+  where
+    -- As we don't parse these any further, we don't do any processing to the
+    -- string so we at least remove escape character here. Perhaps we should
+    -- actually be parsing the label at the very least?
+    removeEscapes "" = ""
+    removeEscapes ('\\':'\\':xs) = '\\' : removeEscapes xs
+    removeEscapes ('\\':xs) = removeEscapes xs
+    removeEscapes (x:xs) = x : removeEscapes xs
