@@ -14,7 +14,7 @@ import Type hiding      ( substTy, extendTvSubst, substTyVar )
 import SimplEnv
 import SimplUtils
 import FamInstEnv       ( FamInstEnv )
-import Literal          ( litIsLifted, mkMachInt )
+import Literal          ( litIsLifted ) --, mkMachInt ) -- temporalily commented out. See #8326
 import Id
 import MkId             ( seqId, realWorldPrimId )
 import MkCore           ( mkImpossibleExpr, castBottomExpr )
@@ -23,9 +23,9 @@ import Name             ( mkSystemVarName, isExternalName )
 import Coercion hiding  ( substCo, substTy, substCoVar, extendTvSubst )
 import OptCoercion      ( optCoercion )
 import FamInstEnv       ( topNormaliseType )
-import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness 
-                        , isMarkedStrict, dataConTyCon, dataConTag, fIRST_TAG )
-import TyCon            ( isEnumerationTyCon )
+import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
+                        , isMarkedStrict ) --, dataConTyCon, dataConTag, fIRST_TAG )
+--import TyCon            ( isEnumerationTyCon ) -- temporalily commented out. See #8326
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth )
@@ -33,13 +33,13 @@ import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold
 import CoreUtils
 import CoreArity
-import PrimOp           ( tagToEnumKey )
+--import PrimOp           ( tagToEnumKey ) -- temporalily commented out. See #8326
 import Rules            ( lookupRule, getRules )
-import TysPrim          ( realWorldStatePrimTy, intPrimTy )
+import TysPrim          ( realWorldStatePrimTy ) --, intPrimTy ) -- temporalily commented out. See #8326
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )
 import Maybes           ( orElse )
-import Unique           ( hasKey )
+--import Unique           ( hasKey ) -- temporalily commented out. See #8326
 import Control.Monad
 import Data.List        ( mapAccumL )
 import Outputable
@@ -1559,13 +1559,13 @@ all this at once is TOO HARD!
 \begin{code}
 tryRules :: SimplEnv -> [CoreRule]
          -> Id -> [OutExpr] -> SimplCont
-         -> SimplM (Maybe (CoreExpr, SimplCont)) 
+         -> SimplM (Maybe (CoreExpr, SimplCont))
 -- The SimplEnv already has zapSubstEnv applied to it
 
 tryRules env rules fn args call_cont
   | null rules
   = return Nothing
-
+{- Disabled until we fix #8326
   | fn `hasKey` tagToEnumKey   -- See Note [Optimising tagToEnum#]
   , [_type_arg, val_arg] <- args
   , Select dup bndr ((_,[],rhs1) : rest_alts) se cont <- call_cont
@@ -1584,8 +1584,8 @@ tryRules env rules fn args call_cont
              new_alts = (DEFAULT, [], rhs1) : map enum_to_tag rest_alts
              new_bndr = setIdType bndr intPrimTy   
                  -- The binder is dead, but should have the right type
-      ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) } 
-
+      ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
+-}
   | otherwise
   = do { dflags <- getDynFlags
        ; case lookupRule dflags (getUnfoldingInRuleMatch env) (activeRule env) 
@@ -1621,15 +1621,22 @@ tryRules env rules fn args call_cont
 
 Note [Optimising tagToEnum#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to transform
+If we have an enumeration data type:
+
+  data Foo = A | B | C
+
+Then we want to transform
+
    case tagToEnum# x of   ==>    case x of
-     True -> e1                    DEFAULT -> e1
-     False -> e2                   0#      -> e2
+     A -> e1                       DEFAULT -> e1
+     B -> e2                       1#      -> e2
+     C -> e3                       2#      -> e3
 
 thereby getting rid of the tagToEnum# altogether.  If there was a DEFAULT
 alternative we retain it (remember it comes first).  If not the case must
 be exhaustive, and we reflect that in the transformed version by adding
 a DEFAULT.  Otherwise Lint complains that the new case is not exhaustive.
+See #8317.
 
 Note [Rules for recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

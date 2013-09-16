@@ -65,7 +65,7 @@ module FastTypes (
 #if defined(__GLASGOW_HASKELL__)
 
 -- Import the beggars
-import GHC.Exts
+import ExtsCompat46
 
 type FastInt = Int#
 

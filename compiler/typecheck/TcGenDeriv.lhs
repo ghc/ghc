@@ -181,7 +181,7 @@ gen_Eq_binds loc tycon
                   -- extract tags compare for equality
       = [([a_Pat, b_Pat],
          untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
-                    (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
+                    (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
     aux_binds | no_tag_match_cons = emptyBag
               | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
@@ -403,14 +403,14 @@ gen_Ord_binds loc tycon
 
       | tag > last_tag `div` 2  -- lower range is larger
       = untag_Expr tycon [(b_RDR, bh_RDR)] $
-        nlHsIf (genOpApp (nlHsVar bh_RDR) ltInt_RDR tag_lit)
+        nlHsIf (genPrimOpApp (nlHsVar bh_RDR) ltInt_RDR tag_lit)
                (gtResult op) $  -- Definitely GT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
                                  , mkSimpleHsAlt nlWildPat (ltResult op) ]
 
       | otherwise               -- upper range is larger
       = untag_Expr tycon [(b_RDR, bh_RDR)] $
-        nlHsIf (genOpApp (nlHsVar bh_RDR) gtInt_RDR tag_lit)
+        nlHsIf (genPrimOpApp (nlHsVar bh_RDR) gtInt_RDR tag_lit)
                (ltResult op) $  -- Definitely LT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
                                  , mkSimpleHsAlt nlWildPat (gtResult op) ]
@@ -477,7 +477,7 @@ unliftedOrdOp tycon ty op a b
        OrdGT      -> wrap gt_op
   where
    (lt_op, le_op, eq_op, ge_op, gt_op) = primOrdOps "Ord" tycon ty
-   wrap prim_op = genOpApp a_expr prim_op b_expr
+   wrap prim_op = genPrimOpApp a_expr prim_op b_expr
    a_expr = nlHsVar a
    b_expr = nlHsVar b
 
@@ -487,11 +487,11 @@ unliftedCompare :: RdrName -> RdrName
                 -> LHsExpr RdrName
 -- Return (if a < b then lt else if a == b then eq else gt)
 unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
-  = nlHsIf (genOpApp a_expr lt_op b_expr) lt $
+  = nlHsIf (genPrimOpApp a_expr lt_op b_expr) lt $
                         -- Test (<) first, not (==), because the latter
                         -- is true less often, so putting it first would
                         -- mean more tests (dynamically)
-        nlHsIf (genOpApp a_expr eq_op b_expr) eq gt
+        nlHsIf (genPrimOpApp a_expr eq_op b_expr) eq gt
 
 nlConWildPat :: DataCon -> LPat RdrName
 -- The pattern (K {})
@@ -754,8 +754,8 @@ gen_Ix_binds loc tycon
           untag_Expr tycon [(a_RDR, ah_RDR)] (
           untag_Expr tycon [(b_RDR, bh_RDR)] (
           untag_Expr tycon [(c_RDR, ch_RDR)] (
-          nlHsIf (genOpApp (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)) (
-             (genOpApp (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR))
+          nlHsIf (genPrimOpApp (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)) (
+             (genPrimOpApp (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR))
           ) {-else-} (
              false_Expr
           ))))
@@ -1465,41 +1465,41 @@ conIndex_RDR   = varQual_RDR  gENERICS (fsLit "constrIndex")
 prefix_RDR     = dataQual_RDR gENERICS (fsLit "Prefix")
 infix_RDR      = dataQual_RDR gENERICS (fsLit "Infix")
 
-eqChar_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "eqChar#")
-ltChar_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "ltChar#")
-leChar_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "leChar#")
-gtChar_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "gtChar#")
-geChar_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "geChar#")
+eqChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqChar#")
+ltChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltChar#")
+leChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "leChar#")
+gtChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtChar#")
+geChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "geChar#")
 
-eqInt_RDR      = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "==#")
-ltInt_RDR      = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "<#" )
-leInt_RDR      = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "<=#")
-gtInt_RDR      = varQual_RDR  gHC_PRIMWRAPPERS (fsLit ">#" )
-geInt_RDR      = varQual_RDR  gHC_PRIMWRAPPERS (fsLit ">=#")
+eqInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "==#")
+ltInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "<#" )
+leInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "<=#")
+gtInt_RDR      = varQual_RDR  gHC_PRIM (fsLit ">#" )
+geInt_RDR      = varQual_RDR  gHC_PRIM (fsLit ">=#")
 
-eqWord_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "eqWord#")
-ltWord_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "ltWord#")
-leWord_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "leWord#")
-gtWord_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "gtWord#")
-geWord_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "geWord#")
+eqWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqWord#")
+ltWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltWord#")
+leWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "leWord#")
+gtWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtWord#")
+geWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "geWord#")
 
-eqAddr_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "eqAddr#")
-ltAddr_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "ltAddr#")
-leAddr_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "leAddr#")
-gtAddr_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "gtAddr#")
-geAddr_RDR     = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "geAddr#")
+eqAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqAddr#")
+ltAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltAddr#")
+leAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "leAddr#")
+gtAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtAddr#")
+geAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "geAddr#")
 
-eqFloat_RDR    = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "eqFloat#")
-ltFloat_RDR    = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "ltFloat#")
-leFloat_RDR    = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "leFloat#")
-gtFloat_RDR    = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "gtFloat#")
-geFloat_RDR    = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "geFloat#")
+eqFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqFloat#")
+ltFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltFloat#")
+leFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "leFloat#")
+gtFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtFloat#")
+geFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "geFloat#")
 
-eqDouble_RDR   = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "==##")
-ltDouble_RDR   = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "<##" )
-leDouble_RDR   = varQual_RDR  gHC_PRIMWRAPPERS (fsLit "<=##")
-gtDouble_RDR   = varQual_RDR  gHC_PRIMWRAPPERS (fsLit ">##" )
-geDouble_RDR   = varQual_RDR  gHC_PRIMWRAPPERS (fsLit ">=##")
+eqDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "==##")
+ltDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<##" )
+leDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<=##")
+gtDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">##" )
+geDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">=##")
 \end{code}
 
 
@@ -2089,7 +2089,7 @@ and_Expr a b = genOpApp a and_RDR    b
 eq_Expr :: TyCon -> Type -> LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 eq_Expr tycon ty a b
     | not (isUnLiftedType ty) = genOpApp a eq_RDR b
-    | otherwise               = genOpApp a prim_eq b
+    | otherwise               = genPrimOpApp a prim_eq b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" tycon ty
 \end{code}
@@ -2163,6 +2163,9 @@ parenify e                 = mkHsPar e
 -- renamer won't subsequently try to re-associate it.
 genOpApp :: LHsExpr RdrName -> RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
+
+genPrimOpApp :: LHsExpr RdrName -> RdrName -> LHsExpr RdrName -> LHsExpr RdrName
+genPrimOpApp e1 op e2 = nlHsPar (nlHsApp (nlHsVar tagToEnum_RDR) (nlHsOpApp e1 op e2))
 \end{code}
 
 \begin{code}

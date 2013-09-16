@@ -86,7 +86,7 @@ import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
-import GHC.Exts
+import ExtsCompat46
 import GHC.Word                 ( Word8(..) )
 
 import GHC.IO ( IO(..) )

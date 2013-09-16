@@ -30,7 +30,7 @@ import DynFlags
 #ifdef GHCI
 import Control.Monad
 
-import GHC.Exts
+import ExtsCompat46
 import GHC.IO ( IO(..) )
 
 data BreakArray = BA (MutableByteArray# RealWorld)

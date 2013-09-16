@@ -134,25 +134,25 @@ section "The word size story."
 #endif
 
 ------------------------------------------------------------------------
-section "Char#" 
+section "Char#"
 	{Operations on 31-bit characters.}
 ------------------------------------------------------------------------
 
 primtype Char#
 
-primop   CharGtOp  "gtCharI#"   Compare   Char# -> Char# -> Int#
-primop   CharGeOp  "geCharI#"   Compare   Char# -> Char# -> Int#
+primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Int#
+primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Int#
 
-primop   CharEqOp  "eqCharI#"   Compare
+primop   CharEqOp  "eqChar#"   Compare
    Char# -> Char# -> Int#
    with commutable = True
 
-primop   CharNeOp  "neCharI#"   Compare
+primop   CharNeOp  "neChar#"   Compare
    Char# -> Char# -> Int#
    with commutable = True
 
-primop   CharLtOp  "ltCharI#"   Compare   Char# -> Char# -> Int#
-primop   CharLeOp  "leCharI#"   Compare   Char# -> Char# -> Int#
+primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> Int#
+primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Int#
 
 primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
    with code_size = 0
@@ -230,35 +230,35 @@ primop   NotIOp   "notI#"   Monadic   Int# -> Int#
 
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Add with carry.  First member of result is (wrapped) sum; 
+	 {Add with carry.  First member of result is (wrapped) sum;
           second member is 0 iff no overflow occured.}
    with code_size = 2
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Subtract with carry.  First member of result is (wrapped) difference; 
+	 {Subtract with carry.  First member of result is (wrapped) difference;
           second member is 0 iff no overflow occured.}
    with code_size = 2
 
-primop   IntGtOp  ">$#"   Compare   Int# -> Int# -> Int#
+primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntGeOp  ">=$#"   Compare   Int# -> Int# -> Int#
+primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntEqOp  "==$#"   Compare
+primop   IntEqOp  "==#"   Compare
    Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntNeOp  "/=$#"   Compare
+primop   IntNeOp  "/=#"   Compare
    Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntLtOp  "<$#"   Compare   Int# -> Int# -> Int#
+primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntLeOp  "<=$#"   Compare   Int# -> Int# -> Int#
+primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
 primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
@@ -345,12 +345,12 @@ primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
    with code_size = 0
 
-primop   WordGtOp   "gtWordI#"   Compare   Word# -> Word# -> Int#
-primop   WordGeOp   "geWordI#"   Compare   Word# -> Word# -> Int#
-primop   WordEqOp   "eqWordI#"   Compare   Word# -> Word# -> Int#
-primop   WordNeOp   "neWordI#"   Compare   Word# -> Word# -> Int#
-primop   WordLtOp   "ltWordI#"   Compare   Word# -> Word# -> Int#
-primop   WordLeOp   "leWordI#"   Compare   Word# -> Word# -> Int#
+primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Int#
+primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Int#
+primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Int#
+primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Int#
+primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Int#
+primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Int#
 
 primop   PopCnt8Op   "popCnt8#"   Monadic   Word# -> Word#
     {Count the number of set bits in the lower 8 bits of a word.}
@@ -435,26 +435,26 @@ section "Double#"
 
 primtype Double#
 
-primop   DoubleGtOp ">$##"   Compare   Double# -> Double# -> Int#
+primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleGeOp ">=$##"   Compare   Double# -> Double# -> Int#
+primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop DoubleEqOp "==$##"   Compare
+primop DoubleEqOp "==##"   Compare
    Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop DoubleNeOp "/=$##"   Compare
+primop DoubleNeOp "/=##"   Compare
    Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   DoubleLtOp "<$##"   Compare   Double# -> Double# -> Int#
+primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleLeOp "<=$##"   Compare   Double# -> Double# -> Int#
+primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   Dyadic
@@ -562,37 +562,37 @@ primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
    with out_of_line = True
 
 ------------------------------------------------------------------------
-section "Float#" 
+section "Float#"
 	{Operations on single-precision (32-bit) floating-point numbers.}
 ------------------------------------------------------------------------
 
 primtype Float#
 
-primop   FloatGtOp  "gtFloatI#"   Compare   Float# -> Float# -> Int#
-primop   FloatGeOp  "geFloatI#"   Compare   Float# -> Float# -> Int#
+primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Int#
 
-primop   FloatEqOp  "eqFloatI#"   Compare
+primop   FloatEqOp  "eqFloat#"   Compare
    Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatNeOp  "neFloatI#"   Compare
+primop   FloatNeOp  "neFloat#"   Compare
    Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatLtOp  "ltFloatI#"   Compare   Float# -> Float# -> Int#
-primop   FloatLeOp  "leFloatI#"   Compare   Float# -> Float# -> Int#
+primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
 
-primop   FloatAddOp   "plusFloat#"      Dyadic            
+primop   FloatAddOp   "plusFloat#"      Dyadic
    Float# -> Float# -> Float#
    with commutable = True
 
 primop   FloatSubOp   "minusFloat#"      Dyadic      Float# -> Float# -> Float#
 
-primop   FloatMulOp   "timesFloat#"      Dyadic    
+primop   FloatMulOp   "timesFloat#"      Dyadic
    Float# -> Float# -> Float#
    with commutable = True
 
-primop   FloatDivOp   "divideFloat#"      Dyadic  
+primop   FloatDivOp   "divideFloat#"      Dyadic
    Float# -> Float# -> Float#
    with can_fail = True
 
@@ -1303,12 +1303,12 @@ primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
    with code_size = 0
 #endif
 
-primop   AddrGtOp  "gtAddrI#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrGeOp  "geAddrI#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrEqOp  "eqAddrI#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrNeOp  "neAddrI#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrLtOp  "ltAddrI#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrLeOp  "leAddrI#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Int#
 
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#

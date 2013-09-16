@@ -428,6 +428,8 @@ Library
         UniqFM
         UniqSet
         Util
+        ExtsCompat46
+--      ^^^  a temporary module necessary to bootstrap with GHC <= 7.6
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins
