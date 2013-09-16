@@ -28,7 +28,6 @@ Library {
         GHC.Debug
         GHC.Magic
         GHC.PrimopWrappers
-        GHC.PrimWrappers
         GHC.IntWord64
         GHC.Tuple
         GHC.Types

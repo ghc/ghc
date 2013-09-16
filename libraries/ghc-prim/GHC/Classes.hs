@@ -23,7 +23,6 @@ module GHC.Classes where
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
 import GHC.Prim
-import GHC.PrimWrappers
 import GHC.Tuple
 import GHC.Types
 
@@ -95,14 +94,14 @@ deriving instance Eq Ordering
 deriving instance Eq Word
 
 instance Eq Char where
-    (C# c1) == (C# c2) = c1 `eqChar#` c2
-    (C# c1) /= (C# c2) = c1 `neChar#` c2
+    (C# c1) == (C# c2) = isTrue# (c1 `eqChar#` c2)
+    (C# c1) /= (C# c2) = isTrue# (c1 `neChar#` c2)
 
 instance Eq Float where
-    (F# x) == (F# y) = x `eqFloat#` y
+    (F# x) == (F# y) = isTrue# (x `eqFloat#` y)
 
 instance Eq Double where
-    (D# x) == (D# y) = x ==## y
+    (D# x) == (D# y) = isTrue# (x ==## y)
 
 instance Eq Int where
     (==) = eqInt
@@ -111,8 +110,8 @@ instance Eq Int where
 {-# INLINE eqInt #-}
 {-# INLINE neInt #-}
 eqInt, neInt :: Int -> Int -> Bool
-(I# x) `eqInt` (I# y) = x ==# y
-(I# x) `neInt` (I# y) = x /=# y
+(I# x) `eqInt` (I# y) = isTrue# (x ==# y)
+(I# x) `neInt` (I# y) = isTrue# (x /=# y)
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
@@ -199,32 +198,32 @@ deriving instance Ord Word
 -- instance defines only compare, which takes two primops.  Then
 -- '>' uses compare, and therefore takes two primops instead of one.
 instance Ord Char where
-    (C# c1) >  (C# c2) = c1 `gtChar#` c2
-    (C# c1) >= (C# c2) = c1 `geChar#` c2
-    (C# c1) <= (C# c2) = c1 `leChar#` c2
-    (C# c1) <  (C# c2) = c1 `ltChar#` c2
+    (C# c1) >  (C# c2) = isTrue# (c1 `gtChar#` c2)
+    (C# c1) >= (C# c2) = isTrue# (c1 `geChar#` c2)
+    (C# c1) <= (C# c2) = isTrue# (c1 `leChar#` c2)
+    (C# c1) <  (C# c2) = isTrue# (c1 `ltChar#` c2)
 
 instance Ord Float where
     (F# x) `compare` (F# y)
-        = if      x `ltFloat#` y then LT
-          else if x `eqFloat#` y then EQ
-          else                        GT
+        = if      isTrue# (x `ltFloat#` y) then LT
+          else if isTrue# (x `eqFloat#` y) then EQ
+          else                                  GT
 
-    (F# x) <  (F# y) = x `ltFloat#`  y
-    (F# x) <= (F# y) = x `leFloat#`  y
-    (F# x) >= (F# y) = x `geFloat#`  y
-    (F# x) >  (F# y) = x `gtFloat#`  y
+    (F# x) <  (F# y) = isTrue# (x `ltFloat#` y)
+    (F# x) <= (F# y) = isTrue# (x `leFloat#` y)
+    (F# x) >= (F# y) = isTrue# (x `geFloat#` y)
+    (F# x) >  (F# y) = isTrue# (x `gtFloat#` y)
 
 instance Ord Double where
     (D# x) `compare` (D# y)
-        = if      x <##  y then LT
-          else if x ==## y then EQ
-          else                  GT
+        = if      isTrue# (x <##  y) then LT
+          else if isTrue# (x ==## y) then EQ
+          else                            GT
 
-    (D# x) <  (D# y) = x <##  y
-    (D# x) <= (D# y) = x <=## y
-    (D# x) >= (D# y) = x >=## y
-    (D# x) >  (D# y) = x >##  y
+    (D# x) <  (D# y) = isTrue# (x <##  y)
+    (D# x) <= (D# y) = isTrue# (x <=## y)
+    (D# x) >= (D# y) = isTrue# (x >=## y)
+    (D# x) >  (D# y) = isTrue# (x >##  y)
 
 instance Ord Int where
     compare = compareInt
@@ -238,19 +237,19 @@ instance Ord Int where
 {-# INLINE ltInt #-}
 {-# INLINE leInt #-}
 gtInt, geInt, ltInt, leInt :: Int -> Int -> Bool
-(I# x) `gtInt` (I# y) = x >#  y
-(I# x) `geInt` (I# y) = x >=# y
-(I# x) `ltInt` (I# y) = x <#  y
-(I# x) `leInt` (I# y) = x <=# y
+(I# x) `gtInt` (I# y) = isTrue# (x >#  y)
+(I# x) `geInt` (I# y) = isTrue# (x >=# y)
+(I# x) `ltInt` (I# y) = isTrue# (x <#  y)
+(I# x) `leInt` (I# y) = isTrue# (x <=# y)
 
 compareInt :: Int -> Int -> Ordering
 (I# x#) `compareInt` (I# y#) = compareInt# x# y#
 
 compareInt# :: Int# -> Int# -> Ordering
 compareInt# x# y#
-    | x# <#  y# = LT
-    | x# ==# y# = EQ
-    | True      = GT
+    | isTrue# (x# <#  y#) = LT
+    | isTrue# (x# ==# y#) = EQ
+    | True                = GT
 
 -- OK, so they're technically not part of a class...:
 
@@ -283,15 +282,15 @@ x# `divInt#` y#
         -- code has problems with overflow:
 --    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
-    =      if (x# ># 0#) && (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
-      else if (x# <# 0#) && (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
+    =      if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
+      else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
       else x# `quotInt#` y#
 
 modInt# :: Int# -> Int# -> Int#
 x# `modInt#` y#
-    = if (x# ># 0#) && (y# <# 0#) ||
-         (x# <# 0#) && (y# ># 0#)
-      then if r# /=# 0# then r# +# y# else 0#
+    = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
+         isTrue# (x# <# 0#) && isTrue# (y# ># 0#)
+      then if isTrue# (r# /=# 0#) then r# +# y# else 0#
       else r#
     where
     !r# = x# `remInt#` y#
