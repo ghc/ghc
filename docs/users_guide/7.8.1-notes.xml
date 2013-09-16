@@ -553,7 +553,7 @@
             <listitem>
                 <para>
                     <literal>Data.Bool</literal> now exports
-                    <literal>bool :: a -> a -> Bool -> a</literal>, analagous
+                    <literal>bool :: a -> a -> Bool -> a</literal>, analogous
                     to <literal>maybe</literal> and <literal>either</literal>
                     in their respective modules.
                </para>
