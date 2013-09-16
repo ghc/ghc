@@ -28,10 +28,10 @@ module GHC.Exts
 
         -- * Primitive operations
         module GHC.Prim,
-        module GHC.PrimWrappers,
         shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
+        isTrue#,
 
         -- * Fusion
         build, augment,
@@ -67,7 +67,6 @@ module GHC.Exts
 import Prelude
 
 import GHC.Prim
-import GHC.PrimWrappers
 import GHC.Base
 import GHC.Word
 import GHC.Int

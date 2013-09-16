@@ -227,7 +227,7 @@ instance  Ix Int  where
               | otherwise   =  indexError b i "Int"
 
     {-# INLINE inRange #-}
-    inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
+    inRange (I# m,I# n) (I# i) =  isTrue# (m <=# i) && isTrue# (i <=# n)
 
 instance Ix Word where
     range (m,n)         = [m..n]
@@ -411,7 +411,7 @@ data STArray s i e
 -- Just pointer equality on mutable arrays:
 instance Eq (STArray s i e) where
     STArray _ _ _ arr1# == STArray _ _ _ arr2# =
-        sameMutableArray arr1# arr2#
+        isTrue# (sameMutableArray# arr1# arr2#)
 \end{code}
 
 
@@ -509,7 +509,7 @@ listArray :: Ix i => (i,i) -> [e] -> Array i e
 listArray (l,u) es = runST (ST $ \s1# ->
     case safeRangeSize (l,u)            of { n@(I# n#) ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr# #) ->
-    let fillFromList i# xs s3# | i# ==# n# = s3#
+    let fillFromList i# xs s3# | isTrue# (i# ==# n#) = s3#
                                | otherwise = case xs of
             []   -> s3#
             y:ys -> case writeArray# marr# i# y s3# of { s4# ->
@@ -816,7 +816,7 @@ unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
 freezeSTArray :: Ix i => STArray s i e -> ST s (Array i e)
 freezeSTArray (STArray l u n@(I# n#) marr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr'# #) ->
-    let copy i# s3# | i# ==# n# = s3#
+    let copy i# s3# | isTrue# (i# ==# n#) = s3#
                     | otherwise =
             case readArray# marr# i# s3# of { (# s4#, e #) ->
             case writeArray# marr'# i# e s4# of { s5# ->
@@ -834,7 +834,7 @@ unsafeFreezeSTArray (STArray l u n marr#) = ST $ \s1# ->
 thawSTArray :: Ix i => Array i e -> ST s (STArray s i e)
 thawSTArray (Array l u n@(I# n#) arr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr# #) ->
-    let copy i# s3# | i# ==# n# = s3#
+    let copy i# s3# | isTrue# (i# ==# n#) = s3#
                     | otherwise =
             case indexArray# arr# i#    of { (# e #) ->
             case writeArray# marr# i# e s3# of { s4# ->

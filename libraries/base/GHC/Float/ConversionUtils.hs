@@ -41,9 +41,9 @@ toByte64# i = word2Int# (and# 255## (int2Word# (int64ToInt# i)))
 elim64# :: Int64# -> Int# -> (# Integer, Int# #)
 elim64# n e =
     case zeroCount (toByte64# n) of
-      t | e <=# t   -> (# int64ToInteger (uncheckedIShiftRA64# n e), 0# #)
-        | t <# 8#   -> (# int64ToInteger (uncheckedIShiftRA64# n t), e -# t #)
-        | otherwise -> elim64# (uncheckedIShiftRA64# n 8#) (e -# 8#)
+      t | isTrue# (e <=# t) -> (# int64ToInteger (uncheckedIShiftRA64# n e), 0# #)
+        | isTrue# (t <# 8#) -> (# int64ToInteger (uncheckedIShiftRA64# n t), e -# t #)
+        | otherwise         -> elim64# (uncheckedIShiftRA64# n 8#) (e -# 8#)
 
 #else
 
@@ -62,9 +62,9 @@ elimZerosInteger m e = elim64# (TO64 m) e
 elimZerosInt# :: Int# -> Int# -> (# Integer, Int# #)
 elimZerosInt# n e =
     case zeroCount (toByte# n) of
-      t | e <=# t   -> (# smallInteger (uncheckedIShiftRA# n e), 0# #)
-        | t <# 8#   -> (# smallInteger (uncheckedIShiftRA# n t), e -# t #)
-        | otherwise -> elimZerosInt# (uncheckedIShiftRA# n 8#) (e -# 8#)
+      t | isTrue# (e <=# t) -> (# smallInteger (uncheckedIShiftRA# n e), 0# #)
+        | isTrue# (t <# 8#) -> (# smallInteger (uncheckedIShiftRA# n t), e -# t #)
+        | otherwise         -> elimZerosInt# (uncheckedIShiftRA# n 8#) (e -# 8#)
 
 {-# INLINE zeroCount #-}
 zeroCount :: Int# -> Int#
@@ -87,9 +87,11 @@ zeroCountArr =
               case writeInt8Array# mba 0# 8# s1 of
                 s2 ->
                   let fillA step val idx st
-                        | idx <# 256# = case writeInt8Array# mba idx val st of
+                        | isTrue# (idx <# 256#) =
+                                        case writeInt8Array# mba idx val st of
                                           nx -> fillA step val (idx +# step) nx
-                        | step <# 256# = fillA (2# *# step) (val +# 1#) step  st
+                        | isTrue# (step <# 256#) =
+                                        fillA (2# *# step) (val +# 1#) step  st
                         | otherwise   = st
                   in case fillA 2# 0# 1# s2 of
                        s3 -> case unsafeFreezeByteArray# mba s3 of

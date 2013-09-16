@@ -133,15 +133,15 @@ instance Bits Word8 where
     complement (W8# x#)       = W8# (x# `xor#` mb#)
         where !(W8# mb#) = maxBound
     (W8# x#) `shift` (I# i#)
-        | i# >=# 0#           = W8# (narrow8Word# (x# `shiftL#` i#))
+        | isTrue# (i# >=# 0#) = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
-    (W8# x#) `shiftL` (I# i#) = W8# (narrow8Word# (x# `shiftL#` i#))
+    (W8# x#) `shiftL`       (I# i#) = W8# (narrow8Word# (x# `shiftL#` i#))
     (W8# x#) `unsafeShiftL` (I# i#) =
         W8# (narrow8Word# (x# `uncheckedShiftL#` i#))
-    (W8# x#) `shiftR` (I# i#) = W8# (x# `shiftRL#` i#)
+    (W8# x#) `shiftR`       (I# i#) = W8# (x# `shiftRL#` i#)
     (W8# x#) `unsafeShiftR` (I# i#) = W8# (x# `uncheckedShiftRL#` i#)
-    (W8# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W8# x#
+    (W8# x#) `rotate`       (I# i#)
+        | isTrue# (i'# ==# 0#) = W8# x#
         | otherwise  = W8# (narrow8Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                           (x# `uncheckedShiftRL#` (8# -# i'#))))
         where
@@ -280,15 +280,15 @@ instance Bits Word16 where
     complement (W16# x#)       = W16# (x# `xor#` mb#)
         where !(W16# mb#) = maxBound
     (W16# x#) `shift` (I# i#)
-        | i# >=# 0#            = W16# (narrow16Word# (x# `shiftL#` i#))
+        | isTrue# (i# >=# 0#)  = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
-    (W16# x#) `shiftL` (I# i#) = W16# (narrow16Word# (x# `shiftL#` i#))
+    (W16# x#) `shiftL` (I# i#)       = W16# (narrow16Word# (x# `shiftL#` i#))
     (W16# x#) `unsafeShiftL` (I# i#) =
         W16# (narrow16Word# (x# `uncheckedShiftL#` i#))
-    (W16# x#) `shiftR` (I# i#) = W16# (x# `shiftRL#` i#)
+    (W16# x#) `shiftR`       (I# i#) = W16# (x# `shiftRL#` i#)
     (W16# x#) `unsafeShiftR` (I# i#) = W16# (x# `uncheckedShiftRL#` i#)
-    (W16# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W16# x#
+    (W16# x#) `rotate`       (I# i#)
+        | isTrue# (i'# ==# 0#) = W16# x#
         | otherwise  = W16# (narrow16Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                             (x# `uncheckedShiftRL#` (16# -# i'#))))
         where
@@ -452,7 +452,7 @@ instance Integral Word32 where
         | otherwise                 = divZeroError
     toInteger (W32# x#)
 #if WORD_SIZE_IN_BITS == 32
-        | i# >=# 0#                 = smallInteger i#
+        | isTrue# (i# >=# 0#)       = smallInteger i#
         | otherwise                 = wordToInteger x#
         where
         !i# = word2Int# x#
@@ -471,16 +471,16 @@ instance Bits Word32 where
     complement (W32# x#)       = W32# (x# `xor#` mb#)
         where !(W32# mb#) = maxBound
     (W32# x#) `shift` (I# i#)
-        | i# >=# 0#            = W32# (narrow32Word# (x# `shiftL#` i#))
+        | isTrue# (i# >=# 0#)  = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
-    (W32# x#) `shiftL` (I# i#) = W32# (narrow32Word# (x# `shiftL#` i#))
+    (W32# x#) `shiftL`       (I# i#) = W32# (narrow32Word# (x# `shiftL#` i#))
     (W32# x#) `unsafeShiftL` (I# i#) =
         W32# (narrow32Word# (x# `uncheckedShiftL#` i#))
-    (W32# x#) `shiftR` (I# i#) = W32# (x# `shiftRL#` i#)
+    (W32# x#) `shiftR`       (I# i#) = W32# (x# `shiftRL#` i#)
     (W32# x#) `unsafeShiftR` (I# i#) = W32# (x# `uncheckedShiftRL#` i#)
-    (W32# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W32# x#
-        | otherwise  = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
+    (W32# x#) `rotate`       (I# i#)
+        | isTrue# (i'# ==# 0#) = W32# x#
+        | otherwise   = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                             (x# `uncheckedShiftRL#` (32# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 31##)
@@ -543,14 +543,14 @@ data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- ^ 64-bit unsigned integer type
 
 instance Eq Word64 where
-    (W64# x#) == (W64# y#) = x# `eqWord64#` y#
-    (W64# x#) /= (W64# y#) = x# `neWord64#` y#
+    (W64# x#) == (W64# y#) = isTrue# (x# `eqWord64#` y#)
+    (W64# x#) /= (W64# y#) = isTrue# (x# `neWord64#` y#)
 
 instance Ord Word64 where
-    (W64# x#) <  (W64# y#) = x# `ltWord64#` y#
-    (W64# x#) <= (W64# y#) = x# `leWord64#` y#
-    (W64# x#) >  (W64# y#) = x# `gtWord64#` y#
-    (W64# x#) >= (W64# y#) = x# `geWord64#` y#
+    (W64# x#) <  (W64# y#) = isTrue# (x# `ltWord64#` y#)
+    (W64# x#) <= (W64# y#) = isTrue# (x# `leWord64#` y#)
+    (W64# x#) >  (W64# y#) = isTrue# (x# `gtWord64#` y#)
+    (W64# x#) >= (W64# y#) = isTrue# (x# `geWord64#` y#)
 
 instance Num Word64 where
     (W64# x#) + (W64# y#)  = W64# (int64ToWord64# (word64ToInt64# x# `plusInt64#` word64ToInt64# y#))
@@ -612,16 +612,16 @@ instance Bits Word64 where
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor64#` y#)
     complement (W64# x#)       = W64# (not64# x#)
     (W64# x#) `shift` (I# i#)
-        | i# >=# 0#            = W64# (x# `shiftL64#` i#)
+        | isTrue# (i# >=# 0#)  = W64# (x# `shiftL64#` i#)
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
-    (W64# x#) `shiftL` (I# i#) = W64# (x# `shiftL64#` i#)
+    (W64# x#) `shiftL`       (I# i#) = W64# (x# `shiftL64#` i#)
     (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL64#` i#)
-    (W64# x#) `shiftR` (I# i#) = W64# (x# `shiftRL64#` i#)
+    (W64# x#) `shiftR`       (I# i#) = W64# (x# `shiftRL64#` i#)
     (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL64#` i#)
     (W64# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W64# x#
-        | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
-                             (x# `uncheckedShiftRL64#` (64# -# i'#)))
+        | isTrue# (i'# ==# 0#) = W64# x#
+        | otherwise            = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
+                                       (x# `uncheckedShiftRL64#` (64# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSizeMaybe i            = Just (finiteBitSize i)
@@ -638,11 +638,11 @@ instance Bits Word64 where
 
 shiftL64#, shiftRL64# :: Word64# -> Int# -> Word64#
 
-a `shiftL64#` b  | b >=# 64#  = wordToWord64# 0##
-                 | otherwise  = a `uncheckedShiftL64#` b
+a `shiftL64#` b  | isTrue# (b >=# 64#) = wordToWord64# 0##
+                 | otherwise           = a `uncheckedShiftL64#` b
 
-a `shiftRL64#` b | b >=# 64#  = wordToWord64# 0##
-                 | otherwise  = a `uncheckedShiftRL64#` b
+a `shiftRL64#` b | isTrue# (b >=# 64#) = wordToWord64# 0##
+                 | otherwise           = a `uncheckedShiftRL64#` b
 
 {-# RULES
 "fromIntegral/Int->Word64"    fromIntegral = \(I#   x#) -> W64# (int64ToWord64# (intToInt64# x#))
@@ -712,7 +712,7 @@ instance Integral Word64 where
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
     toInteger (W64# x#)
-        | i# >=# 0#                 = smallInteger i#
+        | isTrue# (i# >=# 0#)       = smallInteger i#
         | otherwise                 = wordToInteger x#
         where
         !i# = word2Int# x#
@@ -728,16 +728,16 @@ instance Bits Word64 where
     complement (W64# x#)       = W64# (x# `xor#` mb#)
         where !(W64# mb#) = maxBound
     (W64# x#) `shift` (I# i#)
-        | i# >=# 0#            = W64# (x# `shiftL#` i#)
+        | isTrue# (i# >=# 0#)  = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
-    (W64# x#) `shiftL` (I# i#) = W64# (x# `shiftL#` i#)
+    (W64# x#) `shiftL`       (I# i#) = W64# (x# `shiftL#` i#)
     (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL#` i#)
-    (W64# x#) `shiftR` (I# i#) = W64# (x# `shiftRL#` i#)
+    (W64# x#) `shiftR`       (I# i#) = W64# (x# `shiftRL#` i#)
     (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL#` i#)
     (W64# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W64# x#
-        | otherwise  = W64# ((x# `uncheckedShiftL#` i'#) `or#`
-                             (x# `uncheckedShiftRL#` (64# -# i'#)))
+        | isTrue# (i'# ==# 0#) = W64# x#
+        | otherwise            = W64# ((x# `uncheckedShiftL#` i'#) `or#`
+                                       (x# `uncheckedShiftRL#` (64# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSizeMaybe i            = Just (finiteBitSize i)

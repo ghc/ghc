@@ -9,7 +9,7 @@ import GHC.Show
 -- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.
 chr :: Int -> Char
 chr i@(I# i#)
- | int2Word# i# `leWord#` 0x10FFFF## = C# (chr# i#)
+ | isTrue# (int2Word# i# `leWord#` 0x10FFFF##) = C# (chr# i#)
  | otherwise
     = error ("Prelude.chr: bad argument: " ++ showSignedInt (I# 9#) i "")
 

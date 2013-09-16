@@ -45,7 +45,7 @@ as a a box, which may be empty or full.
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
 instance Eq (MVar a) where
-        (MVar mvar1#) == (MVar mvar2#) = sameMVar mvar1# mvar2#
+        (MVar mvar1#) == (MVar mvar2#) = isTrue# (sameMVar# mvar1# mvar2#)
 
 {-
 M-Vars are rendezvous points for concurrent threads.  They begin
@@ -171,7 +171,7 @@ tryReadMVar (MVar m) = IO $ \ s ->
 isEmptyMVar :: MVar a -> IO Bool
 isEmptyMVar (MVar mv#) = IO $ \ s# ->
     case isEmptyMVar# mv# s# of
-        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
+        (# s2#, flg #) -> (# s2#, isTrue# (flg /=# 0#) #)
 
 -- |Add a finalizer to an 'MVar' (GHC only).  See "Foreign.ForeignPtr" and
 -- "System.Mem.Weak" for more about finalizers.

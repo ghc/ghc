@@ -16,10 +16,6 @@ GHC.Prim        Has no implementation.  It defines built-in things, and
                 The source file is GHC.Prim.hi-boot, which is just
                 copied to make GHC.Prim.hi
 
-GHC.PrimWrappers
-                Provides wrappers for built-in comparison operators.
-                These wrappers take unboxed operands and return a Bool.
-
 GHC.Base        Classes: Eq, Ord, Functor, Monad
                 Types:   list, (), Int, Bool, Ordering, Char, String
 
@@ -105,8 +101,8 @@ module GHC.Base
         module GHC.CString,
         module GHC.Magic,
         module GHC.Types,
-        module GHC.Prim,        -- Re-export GHC.Prim, GHC.PrimWrappers and
-        module GHC.PrimWrappers,-- [boot] GHC.Err, to avoid lots of people having to
+        module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
+                                -- to avoid lots of people having to
         module GHC.Err          -- import it explicitly
   )
         where
@@ -117,7 +113,6 @@ import GHC.CString
 import GHC.Magic
 import GHC.Prim
 import GHC.Err
-import GHC.PrimWrappers
 import {-# SOURCE #-} GHC.IO (failIO)
 
 -- This is not strictly speaking required by this module, but is an
@@ -675,11 +670,14 @@ divModInt :: Int -> Int -> (Int, Int)
 
 divModInt# :: Int# -> Int# -> (# Int#, Int# #)
 x# `divModInt#` y#
- | (x# ># 0#) && (y# <# 0#) = case (x# -# 1#) `quotRemInt#` y# of
-                              (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
- | (x# <# 0#) && (y# ># 0#) = case (x# +# 1#) `quotRemInt#` y# of
-                              (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
- | otherwise                = x# `quotRemInt#` y#
+ | isTrue# (x# ># 0#) && isTrue# (y# <# 0#) =
+                                    case (x# -# 1#) `quotRemInt#` y# of
+                                      (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
+ | isTrue# (x# <# 0#) && isTrue# (y# ># 0#) =
+                                    case (x# +# 1#) `quotRemInt#` y# of
+                                      (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
+ | otherwise                                =
+                                    x# `quotRemInt#` y#
 
 -- Wrappers for the shift operations.  The uncheckedShift# family are
 -- undefined when the amount being shifted by is greater than the size
@@ -692,32 +690,34 @@ x# `divModInt#` y#
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 shiftL# :: Word# -> Int# -> Word#
-a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = 0##
-                | otherwise                = a `uncheckedShiftL#` b
+a `shiftL#` b   | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
+                | otherwise                          = a `uncheckedShiftL#` b
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 shiftRL# :: Word# -> Int# -> Word#
-a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = 0##
-                | otherwise                = a `uncheckedShiftRL#` b
+a `shiftRL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
+                | otherwise                          = a `uncheckedShiftRL#` b
 
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 iShiftL# :: Int# -> Int# -> Int#
-a `iShiftL#` b  | b >=# WORD_SIZE_IN_BITS# = 0#
-                | otherwise                = a `uncheckedIShiftL#` b
+a `iShiftL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
+                | otherwise                          = a `uncheckedIShiftL#` b
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).
 iShiftRA# :: Int# -> Int# -> Int#
-a `iShiftRA#` b | b >=# WORD_SIZE_IN_BITS# = if a <# 0# then (-1#) else 0#
-                | otherwise                = a `uncheckedIShiftRA#` b
+a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = if isTrue# (a <# 0#)
+                                                          then (-1#)
+                                                          else 0#
+                | otherwise                          = a `uncheckedIShiftRA#` b
 
 -- | Shift the argument right (unsigned) by the specified number of bits
 -- (which must be non-negative).
 iShiftRL# :: Int# -> Int# -> Int#
-a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
-                | otherwise                = a `uncheckedIShiftRL#` b
+a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
+                | otherwise                          = a `uncheckedIShiftRL#` b
 
 -- Rules for C strings (the functions themselves are now in GHC.CString)
 {-# RULES

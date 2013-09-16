@@ -347,7 +347,7 @@ instance Integral Word where
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
     toInteger (W# x#)
-        | i# >=# 0#             = smallInteger i#
+        | isTrue# (i# >=# 0#)   = smallInteger i#
         | otherwise             = wordToInteger x#
         where
         !i# = word2Int# x#

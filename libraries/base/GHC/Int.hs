@@ -142,14 +142,14 @@ instance Bits Int8 where
     (I8# x#) `xor` (I8# y#)   = I8# (word2Int# (int2Word# x# `xor#` int2Word# y#))
     complement (I8# x#)       = I8# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
     (I8# x#) `shift` (I# i#)
-        | i# >=# 0#           = I8# (narrow8Int# (x# `iShiftL#` i#))
+        | isTrue# (i# >=# 0#) = I8# (narrow8Int# (x# `iShiftL#` i#))
         | otherwise           = I8# (x# `iShiftRA#` negateInt# i#)
-    (I8# x#) `shiftL` (I# i#) = I8# (narrow8Int# (x# `iShiftL#` i#))
+    (I8# x#) `shiftL`       (I# i#) = I8# (narrow8Int# (x# `iShiftL#` i#))
     (I8# x#) `unsafeShiftL` (I# i#) = I8# (narrow8Int# (x# `uncheckedIShiftL#` i#))
-    (I8# x#) `shiftR` (I# i#) = I8# (x# `iShiftRA#` i#)
+    (I8# x#) `shiftR`       (I# i#) = I8# (x# `iShiftRA#` i#)
     (I8# x#) `unsafeShiftR` (I# i#) = I8# (x# `uncheckedIShiftRA#` i#)
     (I8# x#) `rotate` (I# i#)
-        | i'# ==# 0#
+        | isTrue# (i'# ==# 0#)
         = I8# x#
         | otherwise
         = I8# (narrow8Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -301,14 +301,14 @@ instance Bits Int16 where
     (I16# x#) `xor` (I16# y#)  = I16# (word2Int# (int2Word# x# `xor#` int2Word# y#))
     complement (I16# x#)       = I16# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
     (I16# x#) `shift` (I# i#)
-        | i# >=# 0#            = I16# (narrow16Int# (x# `iShiftL#` i#))
+        | isTrue# (i# >=# 0#)  = I16# (narrow16Int# (x# `iShiftL#` i#))
         | otherwise            = I16# (x# `iShiftRA#` negateInt# i#)
-    (I16# x#) `shiftL` (I# i#) = I16# (narrow16Int# (x# `iShiftL#` i#))
+    (I16# x#) `shiftL`       (I# i#) = I16# (narrow16Int# (x# `iShiftL#` i#))
     (I16# x#) `unsafeShiftL` (I# i#) = I16# (narrow16Int# (x# `uncheckedIShiftL#` i#))
-    (I16# x#) `shiftR` (I# i#) = I16# (x# `iShiftRA#` i#)
+    (I16# x#) `shiftR`       (I# i#) = I16# (x# `iShiftRA#` i#)
     (I16# x#) `unsafeShiftR` (I# i#) = I16# (x# `uncheckedIShiftRA#` i#)
     (I16# x#) `rotate` (I# i#)
-        | i'# ==# 0#
+        | isTrue# (i'# ==# 0#)
         = I16# x#
         | otherwise
         = I16# (narrow16Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -465,15 +465,15 @@ instance Bits Int32 where
     (I32# x#) `xor` (I32# y#)  = I32# (word2Int# (int2Word# x# `xor#` int2Word# y#))
     complement (I32# x#)       = I32# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
     (I32# x#) `shift` (I# i#)
-        | i# >=# 0#            = I32# (narrow32Int# (x# `iShiftL#` i#))
+        | isTrue# (i# >=# 0#)  = I32# (narrow32Int# (x# `iShiftL#` i#))
         | otherwise            = I32# (x# `iShiftRA#` negateInt# i#)
-    (I32# x#) `shiftL` (I# i#) = I32# (narrow32Int# (x# `iShiftL#` i#))
+    (I32# x#) `shiftL`       (I# i#) = I32# (narrow32Int# (x# `iShiftL#` i#))
     (I32# x#) `unsafeShiftL` (I# i#) =
         I32# (narrow32Int# (x# `uncheckedIShiftL#` i#))
-    (I32# x#) `shiftR` (I# i#) = I32# (x# `iShiftRA#` i#)
+    (I32# x#) `shiftR`       (I# i#) = I32# (x# `iShiftRA#` i#)
     (I32# x#) `unsafeShiftR` (I# i#) = I32# (x# `uncheckedIShiftRA#` i#)
     (I32# x#) `rotate` (I# i#)
-        | i'# ==# 0#
+        | isTrue# (i'# ==# 0#)
         = I32# x#
         | otherwise
         = I32# (narrow32Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -553,14 +553,14 @@ data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64# deriving( Typeable )
 -- ^ 64-bit signed integer type
 
 instance Eq Int64 where
-    (I64# x#) == (I64# y#) = x# `eqInt64#` y#
-    (I64# x#) /= (I64# y#) = x# `neInt64#` y#
+    (I64# x#) == (I64# y#) = isTrue# (x# `eqInt64#` y#)
+    (I64# x#) /= (I64# y#) = isTrue# (x# `neInt64#` y#)
 
 instance Ord Int64 where
-    (I64# x#) <  (I64# y#) = x# `ltInt64#` y#
-    (I64# x#) <= (I64# y#) = x# `leInt64#` y#
-    (I64# x#) >  (I64# y#) = x# `gtInt64#` y#
-    (I64# x#) >= (I64# y#) = x# `geInt64#` y#
+    (I64# x#) <  (I64# y#) = isTrue# (x# `ltInt64#` y#)
+    (I64# x#) <= (I64# y#) = isTrue# (x# `leInt64#` y#)
+    (I64# x#) >  (I64# y#) = isTrue# (x# `gtInt64#` y#)
+    (I64# x#) >= (I64# y#) = isTrue# (x# `geInt64#` y#)
 
 instance Show Int64 where
     showsPrec p x = showsPrec p (toInteger x)
@@ -636,9 +636,9 @@ divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
 
 -- Define div in terms of quot, being careful to avoid overflow (#7233)
 x# `divInt64#` y#
-    | (x# `gtInt64#` zero) && (y# `ltInt64#` zero)
+    | isTrue# (x# `gtInt64#` zero) && isTrue# (y# `ltInt64#` zero)
         = ((x# `minusInt64#` one) `quotInt64#` y#) `minusInt64#` one
-    | (x# `ltInt64#` zero) && (y# `gtInt64#` zero)
+    | isTrue# (x# `ltInt64#` zero) && isTrue# (y# `gtInt64#` zero)
         = ((x# `plusInt64#` one)  `quotInt64#` y#) `minusInt64#` one
     | otherwise
         = x# `quotInt64#` y#
@@ -647,9 +647,9 @@ x# `divInt64#` y#
     !one  = intToInt64# 1#
 
 x# `modInt64#` y#
-    | (x# `gtInt64#` zero) && (y# `ltInt64#` zero) ||
-      (x# `ltInt64#` zero) && (y# `gtInt64#` zero)
-        = if r# `neInt64#` zero then r# `plusInt64#` y# else zero
+    | isTrue# (x# `gtInt64#` zero) && isTrue# (y# `ltInt64#` zero) ||
+      isTrue# (x# `ltInt64#` zero) && isTrue# (y# `gtInt64#` zero)
+        = if isTrue# (r# `neInt64#` zero) then r# `plusInt64#` y# else zero
     | otherwise = r#
     where
     !zero = intToInt64# 0#
@@ -668,14 +668,14 @@ instance Bits Int64 where
     (I64# x#) `xor` (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `xor64#` int64ToWord64# y#))
     complement (I64# x#)       = I64# (word64ToInt64# (not64# (int64ToWord64# x#)))
     (I64# x#) `shift` (I# i#)
-        | i# >=# 0#            = I64# (x# `iShiftL64#` i#)
+        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL64#` i#)
         | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
     (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL64#` i#)
     (I64# x#) `unsafeShiftL` (I# i#) = I64# (x# `uncheckedIShiftL64#` i#)
     (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA64#` i#)
     (I64# x#) `unsafeShiftR` (I# i#) = I64# (x# `uncheckedIShiftRA64#` i#)
     (I64# x#) `rotate` (I# i#)
-        | i'# ==# 0#
+        | isTrue# (i'# ==# 0#)
         = I64# x#
         | otherwise
         = I64# (word64ToInt64# ((x'# `uncheckedShiftL64#` i'#) `or64#`
@@ -698,12 +698,12 @@ instance Bits Int64 where
 
 iShiftL64#, iShiftRA64# :: Int64# -> Int# -> Int64#
 
-a `iShiftL64#` b  | b >=# 64# = intToInt64# 0#
-		  | otherwise = a `uncheckedIShiftL64#` b
+a `iShiftL64#` b  | isTrue# (b >=# 64#) = intToInt64# 0#
+		  | otherwise           = a `uncheckedIShiftL64#` b
 
-a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
-					then intToInt64# (-1#)
-					else intToInt64# 0#
+a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 0#))
+				          then intToInt64# (-1#)
+					  else intToInt64# 0#
 		  | otherwise = a `uncheckedIShiftRA64#` b
 
 {-# RULES
@@ -806,14 +806,14 @@ instance Bits Int64 where
     (I64# x#) `xor` (I64# y#)  = I64# (word2Int# (int2Word# x# `xor#` int2Word# y#))
     complement (I64# x#)       = I64# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
     (I64# x#) `shift` (I# i#)
-        | i# >=# 0#            = I64# (x# `iShiftL#` i#)
+        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL#` i#)
         | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
-    (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL#` i#)
+    (I64# x#) `shiftL`       (I# i#) = I64# (x# `iShiftL#` i#)
     (I64# x#) `unsafeShiftL` (I# i#) = I64# (x# `uncheckedIShiftL#` i#)
-    (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA#` i#)
+    (I64# x#) `shiftR`       (I# i#) = I64# (x# `iShiftRA#` i#)
     (I64# x#) `unsafeShiftR` (I# i#) = I64# (x# `uncheckedIShiftRA#` i#)
     (I64# x#) `rotate` (I# i#)
-        | i'# ==# 0#
+        | isTrue# (i'# ==# 0#)
         = I64# x#
         | otherwise
         = I64# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
