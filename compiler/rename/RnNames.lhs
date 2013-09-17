@@ -142,8 +142,8 @@ rnImports imports = do
     this_mod <- getModule
     let (source, ordinary) = partition is_source_import imports
         is_source_import d = ideclSource (unLoc d)
-    stuff1 <- mapM (rnImportDecl this_mod) ordinary
-    stuff2 <- mapM (rnImportDecl this_mod) source
+    stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
+    stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
     let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
     return (decls, rdr_env, imp_avails, hpc_usage)

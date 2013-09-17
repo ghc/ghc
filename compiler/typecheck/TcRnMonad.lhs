@@ -731,6 +731,10 @@ mapAndRecoverM f (x:xs) = do { mb_r <- try_m (f x)
                                           Left _  -> rs
                                           Right r -> r:rs) }
 
+-- | Succeeds if applying the argument to all members of the lists succeeds,
+--   but nevertheless runs it on all arguments, to collect all errors.
+mapAndReportM :: (a -> TcRn b) -> [a] -> TcRn [b]
+mapAndReportM f xs = checkNoErrs (mapAndRecoverM f xs)
 
 -----------------------
 tryTc :: TcRn a -> TcRn (Messages, Maybe a)
