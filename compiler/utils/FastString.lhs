@@ -79,17 +79,17 @@ module FastString
 
         -- * LitStrings
         LitString,
-        
+
         -- ** Construction
         sLit,
 #if defined(__GLASGOW_HASKELL__)
         mkLitString#,
 #endif
         mkLitString,
-        
+
         -- ** Deconstruction
         unpackLitString,
-        
+
         -- ** Operations
         lengthLS
        ) where

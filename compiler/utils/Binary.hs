@@ -234,7 +234,7 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
    arr' <- mallocForeignPtrBytes sz'
    withForeignPtr arr $ \old ->
      withForeignPtr arr' $ \new ->
-       copyBytes new old sz 
+       copyBytes new old sz
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
 
@@ -628,8 +628,8 @@ newReadState get_name get_fs
                ud_put_name = undef "put_name",
                ud_put_fs   = undef "put_fs"
              }
-   
-newWriteState :: (BinHandle -> Name       -> IO ()) 
+
+newWriteState :: (BinHandle -> Name       -> IO ())
               -> (BinHandle -> FastString -> IO ())
               -> UserData
 newWriteState put_name put_fs

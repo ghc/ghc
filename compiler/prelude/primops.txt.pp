@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- 
+--
 -- (c) 2010 The University of Glasgow
 --
 -- Primitive Operations and Types
@@ -34,7 +34,7 @@
 
 -- The default attribute values which apply if you don't specify
 -- other ones.  Attribute values can be True, False, or arbitrary
--- text between curly brackets.  This is a kludge to enable 
+-- text between curly brackets.  This is a kludge to enable
 -- processors of this file to easily get hold of simple info
 -- (eg, out_of_line), whilst avoiding parsing complex expressions
 -- needed for strictness info.
@@ -74,7 +74,7 @@ section "The word size story."
 	 GHC also implements a primitive unsigned integer type {\tt
 	 Word\#} which always has the same number of bits as {\tt
 	 Int\#}.
-	
+
 	 In addition, GHC supports families of explicit-sized integers
 	 and words at 8, 16, 32, and 64 bits, with the usual
 	 arithmetic operations, comparisons, and a range of
@@ -114,10 +114,10 @@ section "The word size story."
          but will work on existing 32-bit and 64-bit GHC targets; they
          are completely bogus when tag bits are used in {\tt Int\#},
          so are not available in this case.  }
-	
--- Define synonyms for indexing ops. 
 
-#if WORD_SIZE_IN_BITS < 32 
+-- Define synonyms for indexing ops.
+
+#if WORD_SIZE_IN_BITS < 32
 #define INT32 Int32#
 #define WORD32 Word32#
 #else
@@ -172,28 +172,28 @@ primop   IntAddOp    "+#"    Dyadic
 primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
    with fixity = infixl 6
 
-primop   IntMulOp    "*#" 
+primop   IntMulOp    "*#"
    Dyadic   Int# -> Int# -> Int#
    {Low word of signed integer multiply.}
    with commutable = True
         fixity = infixl 7
 
-primop   IntMulMayOfloOp  "mulIntMayOflo#" 
+primop   IntMulMayOfloOp  "mulIntMayOflo#"
    Dyadic   Int# -> Int# -> Int#
    {Return non-zero if there is any possibility that the upper word of a
     signed integer multiply might contain useful information.  Return
     zero only if you are completely sure that no overflow can occur.
-    On a 32-bit platform, the recommmended implementation is to do a 
+    On a 32-bit platform, the recommmended implementation is to do a
     32 x 32 -> 64 signed multiply, and subtract result[63:32] from
-    (result[31] >>signed 31).  If this is zero, meaning that the 
+    (result[31] >>signed 31).  If this is zero, meaning that the
     upper word is merely a sign extension of the lower one, no
     overflow can occur.
 
-    On a 64-bit platform it is not always possible to 
-    acquire the top 64 bits of the result.  Therefore, a recommended 
-    implementation is to take the absolute value of both operands, and 
-    return 0 iff bits[63:31] of them are zero, since that means that their 
-    magnitudes fit within 31 bits, so the magnitude of the product must fit 
+    On a 64-bit platform it is not always possible to
+    acquire the top 64 bits of the result.  Therefore, a recommended
+    implementation is to take the absolute value of both operands, and
+    return 0 iff bits[63:31] of them are zero, since that means that their
+    magnitudes fit within 31 bits, so the magnitude of the product must fit
     into 62 bits.
 
     If in doubt, return non-zero, but do make an effort to create the
@@ -373,7 +373,7 @@ primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
     {Swap bytes in a word.}
 
 ------------------------------------------------------------------------
-section "Narrowings" 
+section "Narrowings"
 	{Explicit narrowing of native-sized ints or words.}
 ------------------------------------------------------------------------
 
@@ -397,20 +397,20 @@ primtype Int32#
 
 ------------------------------------------------------------------------
 section "Word32#"
-	{Operations on 32-bit unsigned words. This type is only used 
+	{Operations on 32-bit unsigned words. This type is only used
 	 if plain {\tt Word\#} has less than 32 bits. In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
 
 primtype Word32#
 
-#endif 
+#endif
 
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
 section "Int64#"
-	{Operations on 64-bit unsigned words. This type is only used 
+	{Operations on 64-bit unsigned words. This type is only used
 	 if plain {\tt Int\#} has less than 64 bits. In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
@@ -419,7 +419,7 @@ primtype Int64#
 
 ------------------------------------------------------------------------
 section "Word64#"
-	{Operations on 64-bit unsigned words. This type is only used 
+	{Operations on 64-bit unsigned words. This type is only used
 	 if plain {\tt Word\#} has less than 64 bits. In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
@@ -489,71 +489,71 @@ primop   DoubleExpOp   "expDouble#"      Monadic
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleLogOp   "logDouble#"      Monadic         
+primop   DoubleLogOp   "logDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   DoubleSqrtOp   "sqrtDouble#"      Monadic  
+primop   DoubleSqrtOp   "sqrtDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleSinOp   "sinDouble#"      Monadic          
+primop   DoubleSinOp   "sinDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleCosOp   "cosDouble#"      Monadic          
+primop   DoubleCosOp   "cosDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleTanOp   "tanDouble#"      Monadic          
+primop   DoubleTanOp   "tanDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleAsinOp   "asinDouble#"      Monadic 
-   Double# -> Double#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-   can_fail = True
-
-primop   DoubleAcosOp   "acosDouble#"      Monadic  
+primop   DoubleAsinOp   "asinDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   DoubleAtanOp   "atanDouble#"      Monadic  
+primop   DoubleAcosOp   "acosDouble#"      Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   DoubleAtanOp   "atanDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleSinhOp   "sinhDouble#"      Monadic  
+primop   DoubleSinhOp   "sinhDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleCoshOp   "coshDouble#"      Monadic  
+primop   DoubleCoshOp   "coshDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleTanhOp   "tanhDouble#"      Monadic  
+primop   DoubleTanhOp   "tanhDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoublePowerOp   "**##" Dyadic  
+primop   DoublePowerOp   "**##" Dyadic
    Double# -> Double# -> Double#
    {Exponentiation.}
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp    
+primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
    Double# -> (# Int#, Word#, Word#, Int# #)
    {Convert to integer.
     First component of the result is -1 or 1, indicating the sign of the
@@ -603,70 +603,70 @@ primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
 
-primop   FloatExpOp   "expFloat#"      Monadic          
+primop   FloatExpOp   "expFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatLogOp   "logFloat#"      Monadic          
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-   can_fail = True
-
-primop   FloatSqrtOp   "sqrtFloat#"      Monadic          
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatSinOp   "sinFloat#"      Monadic          
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatCosOp   "cosFloat#"      Monadic          
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatTanOp   "tanFloat#"      Monadic          
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatAsinOp   "asinFloat#"      Monadic          
+primop   FloatLogOp   "logFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   FloatAcosOp   "acosFloat#"      Monadic          
+primop   FloatSqrtOp   "sqrtFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatSinOp   "sinFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatCosOp   "cosFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatTanOp   "tanFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatAsinOp   "asinFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   FloatAtanOp   "atanFloat#"      Monadic          
+primop   FloatAcosOp   "acosFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   FloatAtanOp   "atanFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatSinhOp   "sinhFloat#"      Monadic          
+primop   FloatSinhOp   "sinhFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatCoshOp   "coshFloat#"      Monadic          
+primop   FloatCoshOp   "coshFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatTanhOp   "tanhFloat#"      Monadic          
+primop   FloatTanhOp   "tanhFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatPowerOp   "powerFloat#"      Dyadic   
+primop   FloatPowerOp   "powerFloat#"      Dyadic
    Float# -> Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
@@ -764,7 +764,7 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
   Array# a -> Int# -> Int# -> Array# a
-  {Return a newly allocated Array# with the specified subrange of the provided Array#. 
+  {Return a newly allocated Array# with the specified subrange of the provided Array#.
    The provided Array# should contain the full subrange specified by the two Int#s, but this is not checked.}
   with
   has_side_effects = True
@@ -853,7 +853,7 @@ primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    with
    has_side_effects = True
 
-primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp  
+primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
    ByteArray# -> Int#
    {Return the size of the array in bytes.}
 
@@ -1162,7 +1162,7 @@ primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    has_side_effects = True
 
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) 
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Machine-level word-sized fetch-and-add within a ByteArray.}
    with
    out_of_line = True
@@ -1595,7 +1595,7 @@ section "Exceptions"
 
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
-       -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
+       -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
@@ -1617,11 +1617,11 @@ primop  RaiseOp "raise#" GenPrimOp
 -- must be *precise* - we don't want the strictness analyser turning
 -- one kind of bottom into another, as it is allowed to do in pure code.
 --
--- But we *do* want to know that it returns bottom after 
+-- But we *do* want to know that it returns bottom after
 -- being applied to two arguments, so that this function is strict in y
 --     f x y | x>0  	 = raiseIO blah
 --           | y>0  	 = return 1
---           | otherwise = return 2 
+--           | otherwise = return 2
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
@@ -1682,7 +1682,7 @@ primop	AtomicallyOp "atomically#" GenPrimOp
 -- where 'e' would be unreachable anyway.  See Trac #8091.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
-   with 
+   with
    strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd] botRes) }
    out_of_line = True
    has_side_effects = True
@@ -1691,7 +1691,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
-   with 
+   with
    out_of_line = True
    has_side_effects = True
 
@@ -1699,14 +1699,14 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
-   with 
+   with
    out_of_line = True
    has_side_effects = True
 
 primop  Check "check#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, () #) )
-   with 
+   with
    out_of_line = True
    has_side_effects = True
 
@@ -1890,7 +1890,7 @@ primtype RealWorld
 
 primtype ThreadId#
 	{(In a non-concurrent implementation, this can be a singleton
-	type, whose (unique) value is returned by {\tt myThreadId\#}.  The 
+	type, whose (unique) value is returned by {\tt myThreadId\#}.  The
 	other operations can be omitted.)}
 
 primop  ForkOp "fork#" GenPrimOp
@@ -1928,7 +1928,7 @@ primop LabelThreadOp "labelThread#" GenPrimOp
    with
    has_side_effects = True
    out_of_line      = True
-   
+
 primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, Int# #)
    with
@@ -1987,7 +1987,7 @@ primop  DeRefWeakOp "deRefWeak#" GenPrimOp
    out_of_line      = True
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
+   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
               (State# RealWorld -> (# State# RealWorld, () #)) #)
    with
    has_side_effects = True
@@ -2038,7 +2038,7 @@ primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Unsafe pointer equality"
---  (#1 Bad Guy: Alistair Reid :)   
+--  (#1 Bad Guy: Alistair Reid :)
 ------------------------------------------------------------------------
 
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
@@ -2146,11 +2146,11 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
 
 	-- dataToTag# must have an evaluated argument
 
-primop  TagToEnumOp "tagToEnum#" GenPrimOp     
+primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a
 
 ------------------------------------------------------------------------
-section "Bytecode operations" 
+section "Bytecode operations"
 	{Support for the bytecode interpreter and linker.}
 ------------------------------------------------------------------------
 
@@ -2201,7 +2201,7 @@ primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
      ("CAF"). }
 
 ------------------------------------------------------------------------
-section "Etc" 
+section "Etc"
 	{Miscellaneous built-ins}
 ------------------------------------------------------------------------
 
@@ -2212,13 +2212,13 @@ pseudoop   "seq"
 
 primtype Any k
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
-	lifted type, and back. 
+	lifted type, and back.
 
 	  * It is lifted, and hence represented by a pointer
 
 	  * It does not claim to be a {\it data} type, and that's important for
 	    the code generator, because the code gen may {\it enter} a data value
-	    but never enters a function value.  
+	    but never enters a function value.
 
 	It's also used to instantiate un-constrained type variables after type
 	checking.  For example, {\tt length} has type
@@ -2273,7 +2273,7 @@ pseudoop   "unsafeCoerce#"
 
          * Casting between two types that have the same runtime representation.  One case is when
            the two types differ only in "phantom" type parameters, for example
-           {\tt Ptr Int} to {\tt Ptr Float}, or {\tt [Int]} to {\tt [Float]} when the list is 
+           {\tt Ptr Int} to {\tt Ptr Float}, or {\tt [Int]} to {\tt [Float]} when the list is
            known to be empty.  Also, a {\tt newtype} of a type {\tt T} has the same representation
            at runtime as {\tt T}.
 
@@ -2284,7 +2284,7 @@ pseudoop   "unsafeCoerce#"
         have to do with GHC's internal representation details (for the congnoscenti, data values
 	can be entered but function closures cannot).  If you want a safe type to cast things
 	to, use {\tt Any}, which is not an algebraic data type.
-	
+
         }
 
 -- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
@@ -2373,7 +2373,7 @@ primclass Coercible a b
    }
 
 ------------------------------------------------------------------------
-section "Float SIMD Vectors" 
+section "Float SIMD Vectors"
 	{Operations on SIMD vectors of 4 single-precision (32-bit)
          floating-point numbers.}
 ------------------------------------------------------------------------
@@ -2381,24 +2381,24 @@ section "Float SIMD Vectors"
 primtype FloatX4#
    with llvm_only = True
 
-primop FloatToFloatX4Op "floatToFloatX4#" GenPrimOp     
+primop FloatToFloatX4Op "floatToFloatX4#" GenPrimOp
    Float# -> FloatX4#
    with llvm_only = True
 
-primop FloatX4PackOp "packFloatX4#" GenPrimOp         
+primop FloatX4PackOp "packFloatX4#" GenPrimOp
    Float# -> Float# -> Float# -> Float# -> FloatX4#
    with llvm_only = True
 
-primop FloatX4UnpackOp "unpackFloatX4#" GenPrimOp         
+primop FloatX4UnpackOp "unpackFloatX4#" GenPrimOp
    FloatX4# -> (# Float#, Float#, Float#, Float# #)
    with llvm_only = True
 
-primop FloatX4InsertOp "insertFloatX4#" GenPrimOp     
+primop FloatX4InsertOp "insertFloatX4#" GenPrimOp
    FloatX4# -> Float# -> Int# -> FloatX4#
    with can_fail = True
         llvm_only = True
 
-primop FloatX4AddOp "plusFloatX4#" Dyadic            
+primop FloatX4AddOp "plusFloatX4#" Dyadic
    FloatX4# -> FloatX4# -> FloatX4#
    with commutable = True
         llvm_only = True
@@ -2407,12 +2407,12 @@ primop FloatX4SubOp "minusFloatX4#" Dyadic
   FloatX4# -> FloatX4# -> FloatX4#
    with llvm_only = True
 
-primop FloatX4MulOp "timesFloatX4#" Dyadic    
+primop FloatX4MulOp "timesFloatX4#" Dyadic
    FloatX4# -> FloatX4# -> FloatX4#
    with commutable = True
         llvm_only = True
 
-primop FloatX4DivOp "divideFloatX4#" Dyadic  
+primop FloatX4DivOp "divideFloatX4#" Dyadic
    FloatX4# -> FloatX4# -> FloatX4#
    with can_fail = True
         llvm_only = True
@@ -2490,7 +2490,7 @@ primop  WriteOffAddrOp_FloatAsFloatX4 "writeFloatOffAddrAsFloatX4#" GenPrimOp
         llvm_only = True
 
 ------------------------------------------------------------------------
-section "Double SIMD Vectors" 
+section "Double SIMD Vectors"
 	{Operations on SIMD vectors of 2 double-precision (64-bit)
          floating-point numbers.}
 ------------------------------------------------------------------------
@@ -2498,24 +2498,24 @@ section "Double SIMD Vectors"
 primtype DoubleX2#
    with llvm_only = True
 
-primop DoubleToDoubleX2Op "doubleToDoubleX2#" GenPrimOp     
+primop DoubleToDoubleX2Op "doubleToDoubleX2#" GenPrimOp
    Double# -> DoubleX2#
    with llvm_only = True
 
-primop DoubleX2InsertOp "insertDoubleX2#" GenPrimOp     
+primop DoubleX2InsertOp "insertDoubleX2#" GenPrimOp
    DoubleX2# -> Double# -> Int# -> DoubleX2#
    with can_fail = True
         llvm_only = True
 
-primop DoubleX2PackOp "packDoubleX2#" GenPrimOp         
+primop DoubleX2PackOp "packDoubleX2#" GenPrimOp
    Double# -> Double# -> DoubleX2#
    with llvm_only = True
 
-primop DoubleX2UnpackOp "unpackDoubleX2#" GenPrimOp         
+primop DoubleX2UnpackOp "unpackDoubleX2#" GenPrimOp
    DoubleX2# -> (# Double#, Double# #)
    with llvm_only = True
 
-primop DoubleX2AddOp "plusDoubleX2#" Dyadic            
+primop DoubleX2AddOp "plusDoubleX2#" Dyadic
    DoubleX2# -> DoubleX2# -> DoubleX2#
    with commutable = True
         llvm_only = True
@@ -2524,12 +2524,12 @@ primop DoubleX2SubOp "minusDoubleX2#" Dyadic
   DoubleX2# -> DoubleX2# -> DoubleX2#
    with llvm_only = True
 
-primop DoubleX2MulOp "timesDoubleX2#" Dyadic    
+primop DoubleX2MulOp "timesDoubleX2#" Dyadic
    DoubleX2# -> DoubleX2# -> DoubleX2#
    with commutable = True
         llvm_only = True
 
-primop DoubleX2DivOp "divideDoubleX2#" Dyadic  
+primop DoubleX2DivOp "divideDoubleX2#" Dyadic
    DoubleX2# -> DoubleX2# -> DoubleX2#
    with can_fail = True
         llvm_only = True
@@ -2607,31 +2607,31 @@ primop  WriteOffAddrOp_DoubleAsDoubleX2 "writeDoubleOffAddrAsDoubleX2#" GenPrimO
         llvm_only = True
 
 ------------------------------------------------------------------------
-section "Int32 SIMD Vectors" 
+section "Int32 SIMD Vectors"
 	{Operations on SIMD vectors of 4 32-bit signed integers.}
 ------------------------------------------------------------------------
 
 primtype Int32X4#
    with llvm_only = True
 
-primop Int32ToInt32X4Op "int32ToInt32X4#" GenPrimOp     
+primop Int32ToInt32X4Op "int32ToInt32X4#" GenPrimOp
    INT32 -> Int32X4#
    with llvm_only = True
 
-primop Int32X4InsertOp "insertInt32X4#" GenPrimOp     
+primop Int32X4InsertOp "insertInt32X4#" GenPrimOp
    Int32X4# -> INT32 -> Int# -> Int32X4#
    with can_fail = True
         llvm_only = True
 
-primop Int32X4PackOp "packInt32X4#" GenPrimOp         
+primop Int32X4PackOp "packInt32X4#" GenPrimOp
    INT32 -> INT32 -> INT32 -> INT32 -> Int32X4#
    with llvm_only = True
 
-primop Int32X4UnpackOp "unpackInt32X4#" GenPrimOp         
+primop Int32X4UnpackOp "unpackInt32X4#" GenPrimOp
    Int32X4# -> (# INT32, INT32, INT32, INT32 #)
    with llvm_only = True
 
-primop Int32X4AddOp "plusInt32X4#" Dyadic            
+primop Int32X4AddOp "plusInt32X4#" Dyadic
    Int32X4# -> Int32X4# -> Int32X4#
    with commutable = True
         llvm_only = True
@@ -2640,17 +2640,17 @@ primop Int32X4SubOp "minusInt32X4#" Dyadic
   Int32X4# -> Int32X4# -> Int32X4#
    with llvm_only = True
 
-primop Int32X4MulOp "timesInt32X4#" Dyadic    
+primop Int32X4MulOp "timesInt32X4#" Dyadic
    Int32X4# -> Int32X4# -> Int32X4#
    with commutable = True
         llvm_only = True
 
-primop Int32X4QuotOp "quotInt32X4#" Dyadic  
+primop Int32X4QuotOp "quotInt32X4#" Dyadic
    Int32X4# -> Int32X4# -> Int32X4#
    with can_fail = True
         llvm_only = True
-   
-primop Int32X4RemOp "remInt32X4#" Dyadic  
+
+primop Int32X4RemOp "remInt32X4#" Dyadic
    Int32X4# -> Int32X4# -> Int32X4#
    with can_fail = True
         llvm_only = True
@@ -2728,31 +2728,31 @@ primop  WriteOffAddrOp_Int32AsInt32X4 "writeInt32OffAddrAsInt32X4#" GenPrimOp
         llvm_only = True
 
 ------------------------------------------------------------------------
-section "Int64 SIMD Vectors" 
+section "Int64 SIMD Vectors"
 	{Operations on SIMD vectors of 2 64-bit signed integers.}
 ------------------------------------------------------------------------
 
 primtype Int64X2#
    with llvm_only = True
 
-primop Int64ToInt64X2Op "int64ToInt64X2#" GenPrimOp     
+primop Int64ToInt64X2Op "int64ToInt64X2#" GenPrimOp
    INT64 -> Int64X2#
    with llvm_only = True
 
-primop Int64X2InsertOp "insertInt64X2#" GenPrimOp     
+primop Int64X2InsertOp "insertInt64X2#" GenPrimOp
    Int64X2# -> INT64 -> Int# -> Int64X2#
    with can_fail = True
         llvm_only = True
 
-primop Int64X2PackOp "packInt64X2#" GenPrimOp         
+primop Int64X2PackOp "packInt64X2#" GenPrimOp
    INT64 -> INT64 -> Int64X2#
    with llvm_only = True
 
-primop Int64X2UnpackOp "unpackInt64X2#" GenPrimOp         
+primop Int64X2UnpackOp "unpackInt64X2#" GenPrimOp
    Int64X2# -> (# INT64, INT64 #)
    with llvm_only = True
 
-primop Int64X2AddOp "plusInt64X2#" Dyadic            
+primop Int64X2AddOp "plusInt64X2#" Dyadic
    Int64X2# -> Int64X2# -> Int64X2#
    with commutable = True
         llvm_only = True
@@ -2761,17 +2761,17 @@ primop Int64X2SubOp "minusInt64X2#" Dyadic
   Int64X2# -> Int64X2# -> Int64X2#
    with llvm_only = True
 
-primop Int64X2MulOp "timesInt64X2#" Dyadic    
+primop Int64X2MulOp "timesInt64X2#" Dyadic
    Int64X2# -> Int64X2# -> Int64X2#
    with commutable = True
         llvm_only = True
 
-primop Int64X2QuotOp "quotInt64X2#" Dyadic  
+primop Int64X2QuotOp "quotInt64X2#" Dyadic
    Int64X2# -> Int64X2# -> Int64X2#
    with can_fail = True
         llvm_only = True
-   
-primop Int64X2RemOp "remInt64X2#" Dyadic  
+
+primop Int64X2RemOp "remInt64X2#" Dyadic
    Int64X2# -> Int64X2# -> Int64X2#
    with can_fail = True
         llvm_only = True
@@ -2846,9 +2846,9 @@ primop  WriteOffAddrOp_Int64AsInt64X2 "writeInt64OffAddrAsInt64X2#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   
+
 ------------------------------------------------------------------------
-section "Prefetch" 
+section "Prefetch"
 	{Prefetch operations}
 ------------------------------------------------------------------------
 

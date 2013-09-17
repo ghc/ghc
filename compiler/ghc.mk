@@ -238,7 +238,7 @@ compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
 	"$(CP)" $< $@
 
 # ----------------------------------------------------------------------------
-#		Generate supporting stuff for prelude/PrimOp.lhs 
+#		Generate supporting stuff for prelude/PrimOp.lhs
 #		from prelude/primops.txt
 
 PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
@@ -291,7 +291,7 @@ compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt
 compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
 
-# Usages aren't used any more; but the generator 
+# Usages aren't used any more; but the generator
 # can still generate them if we want them back
 compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --usage              < $$< > $$@

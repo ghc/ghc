@@ -18,8 +18,8 @@ module BreakArray
 #endif
     , newBreakArray
 #ifdef GHCI
-    , getBreak 
-    , setBreakOn 
+    , getBreak
+    , setBreakOn
     , setBreakOff
     , showBreakArray
 #endif
@@ -49,22 +49,22 @@ showBreakArray dflags array = do
 setBreakOn :: DynFlags -> BreakArray -> Int -> IO Bool
 setBreakOn dflags array index
     | safeIndex dflags array index = do
-          writeBreakArray array index breakOn 
+          writeBreakArray array index breakOn
           return True
-    | otherwise = return False 
+    | otherwise = return False
 
 setBreakOff :: DynFlags -> BreakArray -> Int -> IO Bool
 setBreakOff dflags array index
     | safeIndex dflags array index = do
           writeBreakArray array index breakOff
           return True
-    | otherwise = return False 
+    | otherwise = return False
 
 getBreak :: DynFlags -> BreakArray -> Int -> IO (Maybe Word)
 getBreak dflags array index
     | safeIndex dflags array index = do
-          val <- readBreakArray array index 
-          return $ Just val 
+          val <- readBreakArray array index
+          return $ Just val
     | otherwise = return Nothing
 
 safeIndex :: DynFlags -> BreakArray -> Int -> Bool
@@ -73,7 +73,7 @@ safeIndex dflags array index = index < size dflags array && index >= 0
 size :: DynFlags -> BreakArray -> Int
 size dflags (BA array) = (I# (sizeofMutableByteArray# array)) `div` wORD_SIZE dflags
 
-allocBA :: Int -> IO BreakArray 
+allocBA :: Int -> IO BreakArray
 allocBA (I# sz) = IO $ \s1 ->
     case newByteArray# sz s1 of { (# s2, array #) -> (# s2, BA array #) }
 
@@ -81,11 +81,11 @@ allocBA (I# sz) = IO $ \s1 ->
 newBreakArray :: DynFlags -> Int -> IO BreakArray
 newBreakArray dflags entries@(I# sz) = do
     BA array <- allocBA (entries * wORD_SIZE dflags)
-    case breakOff of 
+    case breakOff of
         W# off -> do    -- Todo: there must be a better way to write zero as a Word!
             let loop n | n ==# sz = return ()
                        | otherwise = do
-                             writeBA# array n off 
+                             writeBA# array n off
                              loop (n +# 1#)
             loop 0#
     return $ BA array
@@ -95,13 +95,13 @@ writeBA# array i word = IO $ \s ->
     case writeWordArray# array i word s of { s -> (# s, () #) }
 
 writeBreakArray :: BreakArray -> Int -> Word -> IO ()
-writeBreakArray (BA array) (I# i) (W# word) = writeBA# array i word 
+writeBreakArray (BA array) (I# i) (W# word) = writeBA# array i word
 
-readBA# :: MutableByteArray# RealWorld -> Int# -> IO Word 
-readBA# array i = IO $ \s -> 
+readBA# :: MutableByteArray# RealWorld -> Int# -> IO Word
+readBA# array i = IO $ \s ->
     case readWordArray# array i s of { (# s, c #) -> (# s, W# c #) }
 
-readBreakArray :: BreakArray -> Int -> IO Word 
+readBreakArray :: BreakArray -> Int -> IO Word
 readBreakArray (BA array) (I# i) = readBA# array i
 
 #else /* !GHCI */
