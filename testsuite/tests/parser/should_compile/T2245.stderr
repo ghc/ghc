@@ -1,26 +1,12 @@
 
 T2245.hs:4:10: Warning:
-    No explicit method or default declaration for ‛+’
-    In the instance declaration for ‛Num T’
-
-T2245.hs:4:10: Warning:
-    No explicit method or default declaration for ‛*’
-    In the instance declaration for ‛Num T’
-
-T2245.hs:4:10: Warning:
-    No explicit method or default declaration for ‛abs’
-    In the instance declaration for ‛Num T’
-
-T2245.hs:4:10: Warning:
-    No explicit method or default declaration for ‛signum’
-    In the instance declaration for ‛Num T’
-
-T2245.hs:4:10: Warning:
-    No explicit method or default declaration for ‛fromInteger’
+    No explicit implementation for
+      ‛+’, ‛*’, ‛abs’, ‛signum’, and ‛fromInteger’
     In the instance declaration for ‛Num T’
 
 T2245.hs:5:10: Warning:
-    No explicit method or default declaration for ‛fromRational’
+    No explicit implementation for
+      ‛fromRational’
     In the instance declaration for ‛Fractional T’
 
 T2245.hs:7:29: Warning:

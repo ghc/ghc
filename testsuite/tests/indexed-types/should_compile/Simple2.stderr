@@ -4,11 +4,8 @@ Simple2.hs:21:1: Warning:
     In the instance declaration for ‛C3 Char’
 
 Simple2.hs:21:10: Warning:
-    No explicit method or default declaration for ‛foo3n’
-    In the instance declaration for ‛C3 Char’
-
-Simple2.hs:21:10: Warning:
-    No explicit method or default declaration for ‛bar3n’
+    No explicit implementation for
+      ‛foo3n’ and ‛bar3n’
     In the instance declaration for ‛C3 Char’
 
 Simple2.hs:29:1: Warning:
@@ -16,11 +13,8 @@ Simple2.hs:29:1: Warning:
     In the instance declaration for ‛C3 Bool’
 
 Simple2.hs:29:10: Warning:
-    No explicit method or default declaration for ‛foo3n’
-    In the instance declaration for ‛C3 Bool’
-
-Simple2.hs:29:10: Warning:
-    No explicit method or default declaration for ‛bar3n’
+    No explicit implementation for
+      ‛foo3n’ and ‛bar3n’
     In the instance declaration for ‛C3 Bool’
 
 Simple2.hs:39:1: Warning:
@@ -32,9 +26,6 @@ Simple2.hs:39:1: Warning:
     In the instance declaration for ‛C3 Float’
 
 Simple2.hs:39:10: Warning:
-    No explicit method or default declaration for ‛foo3n’
-    In the instance declaration for ‛C3 Float’
-
-Simple2.hs:39:10: Warning:
-    No explicit method or default declaration for ‛bar3n’
+    No explicit implementation for
+      ‛foo3n’ and ‛bar3n’
     In the instance declaration for ‛C3 Float’
