@@ -14,7 +14,7 @@ import Type hiding      ( substTy, extendTvSubst, substTyVar )
 import SimplEnv
 import SimplUtils
 import FamInstEnv       ( FamInstEnv )
-import Literal          ( litIsLifted )
+import Literal          ( litIsLifted, mkMachInt )
 import Id
 import MkId             ( seqId, realWorldPrimId )
 import MkCore           ( mkImpossibleExpr, castBottomExpr )
@@ -23,7 +23,9 @@ import Name             ( mkSystemVarName, isExternalName )
 import Coercion hiding  ( substCo, substTy, substCoVar, extendTvSubst )
 import OptCoercion      ( optCoercion )
 import FamInstEnv       ( topNormaliseType )
-import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness, isMarkedStrict )
+import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness 
+                        , isMarkedStrict, dataConTyCon, dataConTag, fIRST_TAG )
+import TyCon            ( isEnumerationTyCon )
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth )
@@ -31,11 +33,13 @@ import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold
 import CoreUtils
 import CoreArity
+import PrimOp           ( tagToEnumKey )
 import Rules            ( lookupRule, getRules )
-import TysPrim          ( realWorldStatePrimTy )
+import TysPrim          ( realWorldStatePrimTy, intPrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )
 import Maybes           ( orElse )
+import Unique           ( hasKey )
 import Control.Monad
 import Data.List        ( mapAccumL )
 import Outputable
@@ -1561,6 +1565,27 @@ tryRules :: SimplEnv -> [CoreRule]
 tryRules env rules fn args call_cont
   | null rules
   = return Nothing
+
+  | fn `hasKey` tagToEnumKey   -- See Note [Optimising tagToEnum#]
+  , [_type_arg, val_arg] <- args
+  , Select dup bndr ((_,[],rhs1) : rest_alts) se cont <- call_cont
+  , isDeadBinder bndr
+  = do { dflags <- getDynFlags
+       ; let enum_to_tag :: CoreAlt -> CoreAlt
+                -- Takes   K -> e  into   tagK# -> e
+                -- where tagK# is the tag of constructor K
+             enum_to_tag (DataAlt con, [], rhs) 
+               = ASSERT( isEnumerationTyCon (dataConTyCon con) )
+                (LitAlt tag, [], rhs)
+              where
+                tag = mkMachInt dflags (toInteger (dataConTag con - fIRST_TAG))
+             enum_to_tag alt = pprPanic "tryRules: tagToEnum" (ppr alt)
+ 
+             new_alts = (DEFAULT, [], rhs1) : map enum_to_tag rest_alts
+             new_bndr = setIdType bndr intPrimTy   
+                 -- The binder is dead, but should have the right type
+      ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) } 
+
   | otherwise
   = do { dflags <- getDynFlags
        ; case lookupRule dflags (getUnfoldingInRuleMatch env) (activeRule env) 
@@ -1593,6 +1618,18 @@ tryRules env rules fn args call_cont
     log_rule dflags flag hdr details = liftIO . dumpSDoc dflags flag "" $
       sep [text hdr, nest 4 details]
 \end{code}
+
+Note [Optimising tagToEnum#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to transform
+   case tagToEnum# x of   ==>    case x of
+     True -> e1                    DEFAULT -> e1
+     False -> e2                   0#      -> e2
+
+thereby getting rid of the tagToEnum# altogether.  If there was a DEFAULT
+alternative we retain it (remember it comes first).  If not the case must
+be exhaustive, and we reflect that in the transformed version by adding
+a DEFAULT.  Otherwise Lint complains that the new case is not exhaustive.
 
 Note [Rules for recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
