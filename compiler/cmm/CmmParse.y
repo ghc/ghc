@@ -104,14 +104,39 @@ Both high-level and low-level code can use a raw tail-call:
 
     jump stg_fun [R1,R2]
 
-This always transfers control to a low-level Cmm function, but the
-call can be made from high-level code.  Arguments must be passed
-explicitly in R/F/D/L registers.
-
 NB. you *must* specify the list of GlobalRegs that are passed via a
 jump, otherwise the register allocator will assume that all the
 GlobalRegs are dead at the jump.
 
+
+Calling Conventions
+-------------------
+
+High-level procedures use the NativeNode calling convention, or the
+NativeReturn convention if the 'return' keyword is used (see Stack
+Frames below).
+
+Low-level procedures implement their own calling convention, so it can
+be anything at all.
+
+If a low-level procedure implements the NativeNode calling convention,
+then it can be called by high-level code using an ordinary function
+call.  In general this is hard to arrange because the calling
+convention depends on the number of physical register available for
+parameter passing, but there are two cases where the calling
+convention is platform-independnt:
+
+ - Zero arguments.
+
+ - One argument of pointer or non-pointer word type; this is always
+   passed in R1 according to the NativeNode convention.
+
+ - Returning a single value; these conventions are fixed and platform
+   independent.
+
+
+Stack Frames
+------------
 
 A stack frame is written like this:
 
