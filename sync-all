@@ -163,14 +163,14 @@ sub getrepo {
         my $git_dir = $bare_flag ? "ghc.git" : ".";
         my $branch = &readgit($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
         die "Bad branch: $branch"
-            unless $branch =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+            unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
         my $remote = &readgit($git_dir, "config", "branch.$branch.remote");
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
             $remote = "origin";
         }
         die "Bad remote: $remote"
-            unless $remote =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+            unless $remote =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
         $repo = &readgit($git_dir, "config", "remote.$remote.url");
     }
 
@@ -539,7 +539,7 @@ sub gitall {
             print (' ' x (40 - length($localpath)));
             my $branch = &readgit($localpath, "rev-parse", "--abbrev-ref", "HEAD");
             die "Bad branch: $branch"
-                unless $branch =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+                unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
             my $us   = &readgit(".", "ls-remote", $localpath, "refs/heads/$branch");
             my $them = &readgit(".", "ls-remote", $compareto, "refs/heads/$branch");
             $us   =~ s/[[:space:]].*//;
