@@ -1,6 +1,6 @@
 
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -optP -C #-}
+{-# OPTIONS_GHC -optP -C -optP -ffreestanding #-}
 
 #define A 'a'
 
