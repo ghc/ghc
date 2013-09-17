@@ -18,7 +18,7 @@ module TrieMap(
    CoercionMap, 
    MaybeMap, 
    ListMap,
-   TrieMap(..),
+   TrieMap(..), insertTM, deleteTM,
    lookupTypeMapTyCon
  ) where
 
@@ -71,6 +71,12 @@ class TrieMap m where
       -- The unusual argument order here makes 
       -- it easy to compose calls to foldTM; 
       -- see for example fdE below
+
+insertTM :: TrieMap m => Key m -> a -> m a -> m a
+insertTM k v m = alterTM k (\_ -> Just v) m
+
+deleteTM :: TrieMap m => Key m -> m a -> m a
+deleteTM k m = alterTM k (\_ -> Nothing) m
 
 ----------------------
 -- Recall that 

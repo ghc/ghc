@@ -44,7 +44,7 @@ module TcRnTypes(
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
         singleCt, extendCts, isEmptyCts, isCTyEqCan, isCFunEqCan,
-        isCDictCan_Maybe, isCFunEqCan_Maybe,
+        isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt,
         ctEvidence,
@@ -1080,9 +1080,9 @@ isCIrredEvCan :: Ct -> Bool
 isCIrredEvCan (CIrredEvCan {}) = True
 isCIrredEvCan _                = False
 
-isCFunEqCan_Maybe :: Ct -> Maybe TyCon
-isCFunEqCan_Maybe (CFunEqCan { cc_fun = tc }) = Just tc
-isCFunEqCan_Maybe _ = Nothing
+isCFunEqCan_maybe :: Ct -> Maybe (TyCon, [Type])
+isCFunEqCan_maybe (CFunEqCan { cc_fun = tc, cc_tyargs = xis }) = Just (tc, xis)
+isCFunEqCan_maybe _ = Nothing
 
 isCFunEqCan :: Ct -> Bool
 isCFunEqCan (CFunEqCan {}) = True
