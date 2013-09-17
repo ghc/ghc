@@ -53,14 +53,14 @@ T5423:
 
 define run_T5435_v
 $(RM) T5435_load_v_$(1) T5435_v_$(1)$(exeext)
-'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
+'$(TEST_HC)' $(TEST_HC_OPTS) -optc-D$(HostOS)_HOST_OS=1 -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
 '$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_v_$(1)_o -o T5435_v_$(1)$(exeext)
 ./T5435_v_$(1) v ./T5435_load_v_$(1).o
 endef
 
 define run_T5435_dyn
 $(RM) T5435_load_dyn_$(1) T5435_dyn_$(1)$(exeext)
-'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 -fPIC -shared -c T5435_$(1).c -osuf dyn_$(1)_o -o T5435_load_dyn_$(1)$(dllext)
+'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -optc-D$(HostOS)_HOST_OS=1 -v0 -fPIC -shared -c T5435_$(1).c -osuf dyn_$(1)_o -o T5435_load_dyn_$(1)$(dllext)
 '$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_dyn_$(1)_o -o T5435_dyn_$(1)$(exeext)
 ./T5435_dyn_$(1) dyn ./T5435_load_dyn_$(1)$(dllext)
 endef

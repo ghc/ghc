@@ -9,9 +9,13 @@ static void initArray2(void) { printf("initArray2\n"); fflush(stdout); }
 static void ctors1(void)     { printf("ctors1\n");     fflush(stdout); }
 static void ctors2(void)     { printf("ctors2\n");     fflush(stdout); }
 
-#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
+#if defined(cygwin32_HOST_OS) || defined(mingw32_HOST_OS)
 
-#error "Not implemented yet!"
+static void (*ctors[2])(void) __attribute__((
+            section(".ctors"),
+            used,
+            aligned(sizeof(void*))))
+    = {ctors2, ctors1}; // ctors run in reverse
 
 #elif defined(darwin_HOST_OS)
 
