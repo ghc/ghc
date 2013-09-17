@@ -5543,21 +5543,36 @@ static int ocRunInit_ELF( ObjectCode *oc )
 
    // XXX Apparently in some archs .init may be something
    // special!  See DL_DT_INIT_ADDRESS macro in glibc
-   // as well as ELF_FUNCTION_PTR_IS_SPECIAL
+   // as well as ELF_FUNCTION_PTR_IS_SPECIAL.  We've not handled
+   // it here, please file a bug report if it affects you.
    for (i = 0; i < ehdr->e_shnum; i++) {
+      init_t *init_start, *init_end, *init;
       int is_bss = FALSE;
       SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
       if (kind == SECTIONKIND_CODE_OR_RODATA
        && 0 == memcmp(".init", sh_strtab + shdr[i].sh_name, 5)) {
-         init_t init = (init_t)(ehdrC + shdr[i].sh_offset);
-         init(argc, argv, envv);
+         init_t init_f = (init_t)(ehdrC + shdr[i].sh_offset);
+         init_f(argc, argv, envv);
       }
 
       if (kind == SECTIONKIND_INIT_ARRAY) {
          char *init_startC = ehdrC + shdr[i].sh_offset;
-         init_t *init = (init_t*)init_startC;
-         init_t *init_end = (init_t*)(init_startC + shdr[i].sh_size);
-         for (; init < init_end; init++) {
+         init_start = (init_t*)init_startC;
+         init_end = (init_t*)(init_startC + shdr[i].sh_size);
+         for (init = init_start; init < init_end; init++) {
+            (*init)(argc, argv, envv);
+         }
+      }
+
+      // XXX could be more strict and assert that it's
+      // SECTIONKIND_RWDATA; but allowing RODATA seems harmless enough.
+      if ((kind == SECTIONKIND_RWDATA || kind == SECTIONKIND_CODE_OR_RODATA)
+       && 0 == memcmp(".ctors", sh_strtab + shdr[i].sh_name, 6)) {
+         char *init_startC = ehdrC + shdr[i].sh_offset;
+         init_start = (init_t*)init_startC;
+         init_end = (init_t*)(init_startC + shdr[i].sh_size);
+         // ctors run in reverse
+         for (init = init_end - 1; init >= init_start; init--) {
             (*init)(argc, argv, envv);
          }
       }
