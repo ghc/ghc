@@ -354,7 +354,7 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup Name -> [LHsDecl Name]
 ungroup group_ =
-  mkDecls (concat   . hs_tyclds) TyClD  group_ ++
+  mkDecls (tyClGroupConcat . hs_tyclds) TyClD  group_ ++
   mkDecls hs_derivds             DerivD group_ ++
   mkDecls hs_defds               DefD   group_ ++
   mkDecls hs_fords               ForD   group_ ++

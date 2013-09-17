@@ -263,8 +263,6 @@ renameType t = case t of
     k' <- renameLKind k
     return (HsKindSig ty' k')
 
-  HsRoleAnnot _ _ -> error "renameType: HsRoleAnnot"
-
   HsDocTy ty doc -> do
     ty' <- renameLType ty
     doc' <- renameLDocHsSyn doc
@@ -290,10 +288,13 @@ renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
                 -- This is rather bogus, but I'm not sure what else to do
 
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
-renameLTyVarBndr (L loc (HsTyVarBndr n mkind mrole))
+renameLTyVarBndr (L loc (UserTyVar n))
   = do { n' <- rename n
-       ; mkind' <- mapM renameLKind mkind
-       ; return (L loc (HsTyVarBndr n' mkind' mrole)) }
+       ; return (L loc (UserTyVar n')) }
+renameLTyVarBndr (L loc (KindedTyVar n kind))
+  = do { n' <- rename n
+       ; kind' <- renameLKind kind
+       ; return (L loc (KindedTyVar n' kind')) }
 
 renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
