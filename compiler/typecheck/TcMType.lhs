@@ -806,12 +806,12 @@ zonkFlats binds_var untch cts
       , not (isSigTyVar tv) || isTyVarTy ty_lhs     -- Never unify a SigTyVar with a non-tyvar
       , typeKind ty_lhs `tcIsSubKind` tyVarKind tv  -- c.f. TcInteract.trySpontaneousEqOneWay
       , not (tv `elemVarSet` tyVarsOfType ty_lhs)   -- Do not construct an infinite type
-      = ASSERT2( isWantedCt orig_ct, ppr orig_ct )
-        ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
+      = ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
         do { writeMetaTyVar tv ty_lhs
            ; let evterm = EvCoercion (mkTcReflCo ty_lhs)
                  evvar  = ctev_evar (cc_ev zct)
-           ; addTcEvBind binds_var evvar evterm
+           ; when (isWantedCt orig_ct) $         -- Can be derived (Trac #8129)
+             addTcEvBind binds_var evvar evterm
            ; traceTc "zonkFlats/unflattening" $
              vcat [ text "zct = " <+> ppr zct,
                     text "binds_var = " <+> ppr binds_var ]

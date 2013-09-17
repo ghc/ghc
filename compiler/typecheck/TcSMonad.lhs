@@ -732,19 +732,25 @@ prepareInertsForImplications is
                   , inert_funeqs = FamHeadMap funeqs
                   , inert_dicts  = dicts })
       = IC { inert_eqs    = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs 
-           , inert_funeqs = FamHeadMap (mapTM given_from_wanted funeqs)
+           , inert_funeqs = FamHeadMap (foldTM given_from_wanted funeqs emptyTM)
            , inert_irreds = Bag.filterBag isGivenCt irreds
            , inert_dicts  = keepGivenCMap dicts
            , inert_insols = emptyCts }
 
-    given_from_wanted funeq   -- This is where the magic processing happens 
-      | isGiven ev = funeq    -- for type-function equalities
-                              -- See Note [Preparing inert set for implications]
-      | otherwise  = funeq { cc_ev = given_ev }
+    given_from_wanted :: Ct -> TypeMap Ct -> TypeMap Ct
+    given_from_wanted funeq fhm   -- This is where the magic processing happens 
+                                  -- for type-function equalities
+                                  -- See Note [Preparing inert set for implications]
+      | isWanted ev  = insert_one (funeq { cc_ev = given_ev }) fhm
+      | isGiven ev   = insert_one funeq fhm   
+      | otherwise    = fhm  -- Drop derived constraints
       where
         ev = ctEvidence funeq
         given_ev = CtGiven { ctev_evtm = EvId (ctev_evar ev)
                            , ctev_pred = ctev_pred ev }
+
+    insert_one :: Ct -> TypeMap Ct -> TypeMap Ct
+    insert_one funeq fhm = insertTM (funEqHead funeq) funeq fhm 
 \end{code}
 
 Note [Preparing inert set for implications]
@@ -789,6 +795,8 @@ fundep (alpha~a) and this can float out again and be used to fix
 alpha.  (In general we can't float class constraints out just in case
 (C d blah) might help to solve (C Int a).)  But we ignore this possiblity.
 
+For Derived constraints we don't have evidence, so we do not turn
+them into Givens.  There can *be* deriving CFunEqCans; see Trac #8129.
 
 \begin{code}
 getInertEqs :: TcS (TyVarEnv Ct)
