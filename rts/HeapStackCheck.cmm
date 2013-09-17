@@ -172,36 +172,52 @@ __stg_gc_enter_1 (P_ node)
    code in a few common cases.
    -------------------------------------------------------------------------- */
 
-stg_gc_prim ()
+stg_gc_prim (W_ fun)
 {
-    W_ fun;
-    fun = R9;
     call stg_gc_noregs ();
     jump fun();
 }
 
-stg_gc_prim_p (P_ arg)
+stg_gc_prim_p (P_ arg, W_ fun)
 {
-    W_ fun;
-    fun = R9;
     call stg_gc_noregs ();
     jump fun(arg);
 }
 
-stg_gc_prim_pp (P_ arg1, P_ arg2)
+stg_gc_prim_pp (P_ arg1, P_ arg2, W_ fun)
 {
-    W_ fun;
-    fun = R9;
     call stg_gc_noregs ();
     jump fun(arg1,arg2);
 }
 
-stg_gc_prim_n (W_ arg)
+stg_gc_prim_n (W_ arg, W_ fun)
 {
-    W_ fun;
-    fun = R9;
     call stg_gc_noregs ();
     jump fun(arg);
+}
+
+stg_gc_prim_p_ll_ret
+{
+    W_ fun;
+    P_ arg;
+    fun = Sp(2);
+    arg = Sp(1);
+    Sp_adj(3);
+    R1 = arg;
+    jump fun [R1];
+}
+
+stg_gc_prim_p_ll
+{
+    W_ fun;
+    P_ arg;
+    fun = R2;
+    arg = R1;
+    Sp_adj(-3);
+    Sp(2) = fun;
+    Sp(1) = arg;
+    Sp(0) = stg_gc_prim_p_ll_ret;
+    jump stg_gc_noregs [];
 }
 
 /* -----------------------------------------------------------------------------

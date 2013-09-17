@@ -2069,7 +2069,7 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
         jump %ENTRY_CODE(Sp(0)) [];
     }
 
-    STK_CHK(WDS(1), stg_noDuplicatezh);
+    STK_CHK_LL (WDS(1), stg_noDuplicatezh);
 
     // leave noDuplicate frame in case the current
     // computation is suspended and restarted (see above).

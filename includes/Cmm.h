@@ -439,20 +439,32 @@
    if (0) { goto __L__; }
 
 #define GC_PRIM(fun)                            \
-        R9 = fun;                               \
-        jump stg_gc_prim();
+        jump stg_gc_prim(fun);
 
+// Version of GC_PRIM for use in low-level Cmm.  We can call
+// stg_gc_prim, because it takes one argument and therefore has a
+// platform-independent calling convention (Note [Syntax of .cmm
+// files] in CmmParse.y).
+#define GC_PRIM_LL(fun)                         \
+        R1 = fun;                               \
+        jump stg_gc_prim [R1];
+
+// We pass the fun as the second argument, because the arg is
+// usually already in the first argument position (R1), so this
+// avoids moving it to a different register / stack slot.
 #define GC_PRIM_N(fun,arg)                      \
-        R9 = fun;                               \
-        jump stg_gc_prim_n(arg);
+        jump stg_gc_prim_n(arg,fun);
 
 #define GC_PRIM_P(fun,arg)                      \
-        R9 = fun;                               \
-        jump stg_gc_prim_p(arg);
+        jump stg_gc_prim_p(arg,fun);
+
+#define GC_PRIM_P_LL(fun,arg)                   \
+        R1 = arg;                               \
+        R2 = fun;                               \
+        jump stg_gc_prim_p_ll [R1,R2];
 
 #define GC_PRIM_PP(fun,arg1,arg2)               \
-        R9 = fun;                               \
-        jump stg_gc_prim_pp(arg1,arg2);
+        jump stg_gc_prim_pp(arg1,arg2,fun);
 
 #define MAYBE_GC_(fun)                          \
     if (CHECK_GC()) {                           \
@@ -478,23 +490,26 @@
         GC_PRIM_PP(fun,arg1,arg2)               \
    }
 
-#define STK_CHK(n, fun)                         \
+#define STK_CHK_LL(n, fun)                      \
     TICK_BUMP(STK_CHK_ctr); 			\
     if (Sp - (n) < SpLim) {                     \
-        GC_PRIM(fun)                            \
+        GC_PRIM_LL(fun)                         \
     }
 
-#define STK_CHK_P(n, fun, arg)                  \
+#define STK_CHK_P_LL(n, fun, arg)               \
+    TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
-        GC_PRIM_P(fun,arg)                      \
+        GC_PRIM_P_LL(fun,arg)                   \
     }
 
 #define STK_CHK_PP(n, fun, arg1, arg2)          \
+    TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
         GC_PRIM_PP(fun,arg1,arg2)               \
     }
 
 #define STK_CHK_ENTER(n, closure)               \
+    TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
         jump __stg_gc_enter_1(closure);         \
     }
