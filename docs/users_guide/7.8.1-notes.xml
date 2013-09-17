@@ -558,6 +558,24 @@
                     in their respective modules.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                     Rewrote portions of <literal>Text.Printf</literal>, and
+                     made changes to <literal>Numeric</literal> (added
+                     <literal>Numeric.showFFloatAlt</literal> and
+                     <literal>Numeric.showGFloatAlt</literal>) and
+                     <literal>GHC.Float</literal> (added
+                     <literal>formatRealFloatAlt</literal>) to support it.
+                     Rewritten version is extensible to user types, adds a
+                     "generic" format specifier "<literal>%v</literal>",
+                     extends the <literal>printf</literal> spec
+                     to support much of C <literal>printf(3)</literal>
+                     functionality, and fixes the spurious GHC warnings about
+                     using <literal>Text.Printf.printf</literal> at
+                     <literal>(IO a)</literal> and ignoring the return value.
+                     This changes was contributed by Bart Massey.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
