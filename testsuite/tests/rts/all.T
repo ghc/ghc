@@ -130,20 +130,13 @@ test('T5423',
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
-test('T5435_v',
-     extra_clean(['T5435_c_v.o']),
-     run_command,
-     ['$MAKE -s --no-print-directory T5435_v'])
+# These should have extra_clean() arguments, but I need
+# to somehow extract out the name of DLLs to do that
 
-test('T5435_dyn',
-     [when(opsys('mingw32'), skip), extra_clean(['T5435_c.so'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T5435_dyn'])
-
-test('T5435_dyn_mingw32',
-     [when(not opsys('mingw32'), skip), extra_clean(['T5435_c.dll'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T5435_dyn_mingw32'])
+test('T5435_v_asm', normal, run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
+test('T5435_v_gcc', normal, run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
+test('T5435_dyn_asm', normal, run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
+test('T5435_dyn_gcc', normal, run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 

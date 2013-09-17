@@ -45,30 +45,41 @@ T5423:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o -o T5423$(exeext)
 	./T5423
 
-.PHONY: T5435_v
-T5435_v:
-	$(RM) T5435_c_v.o T5435_v$(exeext)
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T5435.c -o T5435_c_v.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf v_o -o T5435_v$(exeext)
-	./T5435_v v ./T5435_c_v.o
+# Naming convention: 'T5423_' obj-way '_' obj-src
+# obj-way ::= v | dyn
+# obj-src ::= gcc // using __attribute__(constructor)
+#           | asm // manually laid out sections
+# $(0) = obj-src
 
-# This doesn't work on Windows, which expects *no* file extension
-# File extension here is not right for Mac OS X, where it should be dylib.
-# Note that this is DLL-loading from a *static* executable; we probably
-# also ought to provide the dynamic way via the usual channels.
-.PHONY: T5435_dyn
-T5435_dyn:
-	$(RM) T5435_c_dyn.o T5435_dyn$(exeext)
-	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 -fPIC -shared -c T5435.c -osuf dyn_o -o T5435_c.so
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf dyn_o -o T5435_dyn$(exeext)
-	./T5435_dyn dyn ./T5435_c.so
+define run_T5435_v
+$(RM) T5435_load_v_$(1) T5435_v_$(1)$(exeext)
+'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
+'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_v_$(1)_o -o T5435_v_$(1)$(exeext)
+./T5435_v_$(1) v ./T5435_load_v_$(1).o
+endef
 
-.PHONY: T5435_dyn_mingw32
-T5435_dyn_mingw32:
-	$(RM) T5435_c_dyn.o T5435_dyn$(exeext)
-	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 -fPIC -shared -c T5435.c -osuf dyn_o -o T5435_c.dll
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf dyn_o -o T5435_dyn$(exeext)
-	./T5435_dyn dyn ./T5435_c
+define run_T5435_dyn
+$(RM) T5435_load_dyn_$(1) T5435_dyn_$(1)$(exeext)
+'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 -fPIC -shared -c T5435_$(1).c -osuf dyn_$(1)_o -o T5435_load_dyn_$(1)$(dllext)
+'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_dyn_$(1)_o -o T5435_dyn_$(1)$(exeext)
+./T5435_dyn_$(1) dyn ./T5435_load_dyn_$(1)$(dllext)
+endef
+
+.PHONY: T5435_v_gcc
+T5435_v_gcc :
+	$(call run_T5435_v,gcc)
+
+.PHONY: T5435_v_asm
+T5435_v_asm :
+	$(call run_T5435_v,asm)
+
+.PHONY: T5435_dyn_gcc
+T5435_dyn_gcc :
+	$(call run_T5435_dyn,gcc)
+
+.PHONY: T5435_dyn_asm
+T5435_dyn_asm :
+	$(call run_T5435_dyn,asm)
 
 T6006_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs

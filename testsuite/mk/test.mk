@@ -37,6 +37,14 @@ else
 exeext = .exe
 endif
 
+ifneq "$(filter $(TargetOS_CPP),cygwin32 mingw32)" ""
+dllext = .dll
+else ifeq "$(TargetOS_CPP)" "darwin"
+dllext = .dylib
+else
+dllext = .so
+endif
+
 RUNTEST_OPTS += -e ghc_compiler_always_flags="'$(TEST_HC_OPTS)'"
 
 RUNTEST_OPTS += -e ghc_debugged=$(GhcDebugged)
