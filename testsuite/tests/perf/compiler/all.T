@@ -320,10 +320,11 @@ test('T5837',
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 40000000, 10),
           # sample from x86/Linux
-           (wordsize(64), 81879216, 10)])
+           (wordsize(64), 90587232, 10)])
               # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
+             # 2013-09-18 90587232 amd64/Linux
       ],
       compile_fail,['-fcontext-stack=50'])
 
