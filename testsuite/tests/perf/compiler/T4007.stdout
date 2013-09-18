@@ -2,5 +2,6 @@ Rule fired: unpack
 Rule fired: Class op >>
 Rule fired: Class op return
 Rule fired: <=#
+Rule fired: tagToEnum#
 Rule fired: fold/build
 Rule fired: unpack-list
