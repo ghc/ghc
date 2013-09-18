@@ -206,6 +206,7 @@ class Read a where
   readList     = readPrec_to_S (list readPrec) 0
   readPrec     = readS_to_Prec readsPrec
   readListPrec = readS_to_Prec (\_ -> readList)
+  {-# MINIMAL readsPrec | readPrec #-}
 
 readListDefault :: Read a => ReadS [a]
 -- ^ A possible replacement definition for the 'readList' method (GHC only).

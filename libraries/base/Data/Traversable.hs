@@ -164,6 +164,7 @@ class (Functor t, Foldable t) => Traversable t where
     -- and collect the results.
     sequence :: Monad m => t (m a) -> m (t a)
     sequence = mapM id
+    {-# MINIMAL traverse | sequenceA #-}
 
 -- instances for Prelude types
 

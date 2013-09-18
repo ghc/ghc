@@ -151,6 +151,7 @@ class Foldable t where
       where
         mf Nothing y = Just y
         mf (Just x) y = Just (f x y)
+    {-# MINIMAL foldMap | foldr #-}
 
 -- instances for Prelude types
 

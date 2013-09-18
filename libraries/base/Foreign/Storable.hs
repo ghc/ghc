@@ -149,6 +149,10 @@ class Storable a where
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
 
+   {-# MINIMAL sizeOf, alignment,
+               (peek | peekElemOff | peekByteOff),
+               (poke | pokeElemOff | pokeByteOff) #-}
+
 -- System-dependent, but rather obvious instances
 
 instance Storable Bool where

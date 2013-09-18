@@ -157,6 +157,7 @@ class  Show a  where
     showsPrec _ x s = show x ++ s
     show x          = shows x ""
     showList ls   s = showList__ shows ls s
+    {-# MINIMAL showsPrec | show #-}
 
 showList__ :: (a -> ShowS) ->  [a] -> ShowS
 showList__ _     []     s = "[]" ++ s

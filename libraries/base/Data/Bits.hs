@@ -239,6 +239,11 @@ class Eq a => Bits a where
         known as the population count or the Hamming weight. -}
     popCount          :: a -> Int
 
+    {-# MINIMAL (.&.), (.|.), xor, complement,
+                (shift | (shiftL, shiftR)),
+                (rotate | (rotateL, rotateR)),
+                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+
 class Bits b => FiniteBits b where
     finiteBitSize :: b -> Int
 

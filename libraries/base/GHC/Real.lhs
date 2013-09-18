@@ -192,6 +192,7 @@ class  (Num a) => Fractional a  where
     {-# INLINE (/) #-}
     recip x             =  1 / x
     x / y               = x * recip y
+    {-# MINIMAL fromRational, (recip | (/)) #-}
 
 -- | Extracting components of fractions.
 --
