@@ -1,3 +1,8 @@
 
-T4966.hs:1:14:
-    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+T4966.hs:1:14: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+T4966.hs:34:10: Warning:
+    No explicit implementation for
+      either ‛==’ or ‛/=’
+    In the instance declaration for ‛Eq (TreeListObject a)’

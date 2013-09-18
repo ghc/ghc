@@ -1,0 +1,5 @@
+
+HasKey.hs:22:10: Warning:
+    No explicit implementation for
+      either ‛compare’ or ‛<=’
+    In the instance declaration for ‛Ord (Keyed x)’
