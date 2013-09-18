@@ -255,7 +255,7 @@ basicKnownKeyNames
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
-        wordTyConName, word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+        word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
         -- Others
         otherwiseIdName, inlineIdName,
@@ -1083,14 +1083,11 @@ int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
 int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
 
 -- Word module
-word8TyConName, word16TyConName, word32TyConName, word64TyConName,
-    wordTyConName, wordDataConName :: Name
+word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name
 word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
 word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
 word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
 word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
-wordTyConName     = tcQual  gHC_TYPES (fsLit "Word")   wordTyConKey
-wordDataConName   = conName gHC_TYPES (fsLit "W#") wordDataConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name

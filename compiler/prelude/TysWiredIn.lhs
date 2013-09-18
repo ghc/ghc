@@ -147,6 +147,7 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , doubleTyCon
               , floatTyCon
               , intTyCon
+              , wordTyCon
               , listTyCon
               , parrTyCon
               , eqTyCon
@@ -196,11 +197,13 @@ listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") li
 nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
-floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
-floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float") floatTyConKey floatTyCon
-floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#") floatDataConKey floatDataCon
-doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey doubleTyCon
-doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
+wordTyConName, wordDataConName, floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
+wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
+wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
+floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  floatTyConKey    floatTyCon
+floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#")     floatDataConKey  floatDataCon
+doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey   doubleTyCon
+doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     doubleDataConKey doubleDataCon
 
 -- Kinds
 typeNatKindConName, typeSymbolKindConName :: Name
