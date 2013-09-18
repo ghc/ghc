@@ -1,12 +1,14 @@
 
 T2245.hs:4:10: Warning:
     No explicit implementation for
-      ‛+’, ‛*’, ‛abs’, ‛signum’, and ‛fromInteger’
+      ‛+’, ‛*’, ‛abs’, ‛signum’, ‛fromInteger’, and (either ‛negate’
+                                                            or
+                                                            ‛-’)
     In the instance declaration for ‛Num T’
 
 T2245.hs:5:10: Warning:
     No explicit implementation for
-      ‛fromRational’
+      ‛fromRational’ and (either ‛recip’ or ‛/’)
     In the instance declaration for ‛Fractional T’
 
 T2245.hs:7:29: Warning:

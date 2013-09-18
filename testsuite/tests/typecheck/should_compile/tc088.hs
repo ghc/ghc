@@ -2,7 +2,8 @@
 
 module ShouldSucceed where
 
-instance Show (a->b)
+instance Show (a->b) where
+        show _ = error "attempt to show function"
 
 instance (Eq b) => Eq (a -> b) where
 	(==) f g = error "attempt to compare functions"

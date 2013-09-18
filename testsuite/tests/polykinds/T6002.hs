@@ -80,6 +80,7 @@ instance Num (Hidden Nat') where
   abs n = n
   Hide a + Hide b = Hide $ plus a b
   a * b = fromInteger $ toInteger a * toInteger b
+  negate a = error "negate(Hidden Nat')"
 
 instance Real (Hidden Nat') where
   toRational = toRational . toInteger

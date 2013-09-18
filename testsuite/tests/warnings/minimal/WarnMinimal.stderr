@@ -38,7 +38,9 @@ WarnMinimal.hs:92:1: Warning:
 
 WarnMinimal.hs:99:10: Warning:
     No explicit implementation for
-      ‛+’, ‛*’, ‛abs’, ‛signum’, and ‛fromInteger’
+      ‛+’, ‛*’, ‛abs’, ‛signum’, ‛fromInteger’, and (either ‛negate’
+                                                            or
+                                                            ‛-’)
     In the instance declaration for ‛Num Bool’
 
 WarnMinimal.hs:105:10: Warning:
