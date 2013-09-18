@@ -151,5 +151,5 @@ isTrue# x = tagToEnum# x
 -- if e1 or e2 do allocation. It will push heap checks into case alternatives
 -- which results in about 2.5% increase in code size. Until this is improved we
 -- just make isTrue# an alias to tagToEnum#. This is a temporary solution (if
--- you're reading this in 2023 then things went wrong).
+-- you're reading this in 2023 then things went wrong). See #8326.
 --
