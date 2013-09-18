@@ -578,19 +578,23 @@ void setupRtsFlags (int *argc, char *argv[],
  * procRtsOpts: Process rts_argv between rts_argc0 and rts_argc.
  * -------------------------------------------------------------------------- */
 
+#if defined(HAVE_UNISTD_H) && defined(HAVE_SYS_TYPES_H) && !defined(mingw32_HOST_OS)
 static void checkSuid(HsBool is_hs_main, RtsOptsEnabledEnum enabled)
 {
     if (enabled == RtsOptsSafeOnly) {
-#if defined(HAVE_UNISTD_H) && defined(HAVE_SYS_TYPES_H) && !defined(mingw32_HOST_OS)
 	/* This doesn't cover linux/posix capabilities like CAP_DAC_OVERRIDE,
 	   we'd have to link with -lcap for that. */
         if ((getuid() != geteuid()) || (getgid() != getegid())) {
             errorRtsOptsDisabled(is_hs_main, "RTS options are disabled for setuid binaries. %s");
             stg_exit(EXIT_FAILURE);
         }
-#endif
     }
 }
+#else
+static void checkSuid(HsBool is_hs_main STG_UNUSED, RtsOptsEnabledEnum enabled STG_UNUSED)
+{
+}
+#endif
 
 static void checkUnsafe(HsBool is_hs_main, RtsOptsEnabledEnum enabled)
 {
