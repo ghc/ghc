@@ -48,6 +48,7 @@ class  Eq a  where
     {-# INLINE (==) #-}
     x /= y               = not (x == y)
     x == y               = not (x /= y)
+    {-# MINIMAL (==) | (/=) #-}
 
 deriving instance Eq ()
 deriving instance (Eq  a, Eq  b) => Eq  (a, b)
@@ -145,6 +146,7 @@ class  (Eq a) => Ord a  where
         -- because the latter is often more expensive
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
+    {-# MINIMAL compare | (<=) #-}
 
 deriving instance Ord ()
 deriving instance (Ord a, Ord b) => Ord (a, b)
