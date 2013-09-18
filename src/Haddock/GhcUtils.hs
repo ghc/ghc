@@ -182,7 +182,7 @@ instance Foldable (GenLocated l) where
 
 instance Traversable (GenLocated l) where
   mapM f (L l x) = (return . L l) =<< f x
-
+  traverse f (L l x) = L l <$> f x
 
 -------------------------------------------------------------------------------
 -- * NamedThing instances
