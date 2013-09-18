@@ -744,7 +744,12 @@ cgIdApp fun_id args = do
 --     recursive tail call when (a) environment stores information about
 --     possible self tail-call; (b) that tail call is to a function currently
 --     being compiled; (c) number of passed arguments is equal to function's
---     arity.
+--     arity. (d) loopification is turned on via -floopification command-line
+--     option.
+--
+--   * Command line option to control turn loopification on and off is
+--     implemented in DynFlags
+--
 
 
 emitEnter :: CmmExpr -> FCode ReturnKind

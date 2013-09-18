@@ -527,9 +527,10 @@ getCallMethod :: DynFlags
               -> Maybe SelfLoopInfo -- can we perform a self-recursive tail call?
               -> CallMethod
 
-getCallMethod _ _ id _ n_args _cg_loc (Just (self_loop_id, block_id, args))
-  | id == self_loop_id, n_args == length args
+getCallMethod dflags _ id _ n_args _cg_loc (Just (self_loop_id, block_id, args))
+  | gopt Opt_Loopification dflags, id == self_loop_id, n_args == length args
   -- If these patterns match then we know that:
+  --   * loopification optimisation is turned on
   --   * function is performing a self-recursive call in a tail position
   --   * number of parameters of the function matches functions arity.
   -- See Note [Self-recursive tail calls] in StgCmmExpr for more details
