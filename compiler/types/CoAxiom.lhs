@@ -435,7 +435,7 @@ instance Typeable br => Data.Data (CoAxiom br) where
 %*                                                                      *
 %************************************************************************
 
-This is defined here to avoid circular dependencies.
+Roles are defined here to avoid circular dependencies.
 
 \begin{code}
 
@@ -470,16 +470,20 @@ instance Binary Role where
 \end{code}
 
 
-Rules for building Evidence
----------------------------
+%************************************************************************
+%*                                                                      *
+                    CoAxiomRule
+              Rules for building Evidence
+%*                                                                      *
+%************************************************************************
 
-Conditional axioms.  The genral idea is that a `CoAxiomRule` looks like this:
+Conditional axioms.  The general idea is that a `CoAxiomRule` looks like this:
 
     forall as. (r1 ~ r2, s1 ~ s2) => t1 ~ t2
 
-My intension is to reuse these for both (~) and (~#).
+My intention is to reuse these for both (~) and (~#).
 The short-term plan is to use this datatype to represent the type-nat axioms.
-In the longer run, it would probably be good to unify this and `CoAxiom`,
+In the longer run, it may be good to unify this and `CoAxiom`,
 as `CoAxiom` is the special case when there are no assumptions.
 
 \begin{code}
@@ -493,8 +497,10 @@ data CoAxiomRule = CoAxiomRule
   , coaxrAsmpRoles :: [Role]    -- roles of parameter equations
   , coaxrRole      :: Role      -- role of resulting equation
   , coaxrProves    :: [Type] -> [Eqn] -> Maybe Eqn
-    -- ^ This returns @Nothing@ when we don't like
-    -- the supplied arguments.
+        -- ^ coaxrProves returns @Nothing@ when it doesn't like
+        -- the supplied arguments.  When this happens in a coercion
+        -- that means that the coercion is ill-formed, and Core Lint
+        -- checks for that.
   } deriving Typeable
 
 instance Data.Data CoAxiomRule where
