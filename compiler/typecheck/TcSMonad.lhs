@@ -871,13 +871,11 @@ extractRelevantInerts wi
             let (cts,dict_map) = getRelevantCts cl (inert_dicts ics) 
             in (cts, ics { inert_dicts = dict_map })
 
-        extract_ics_relevants ct ics@(IC { inert_funeqs = funeq_map })
-            | Just (tc,tys) <- isCFunEqCan_maybe ct
-            , let fam_head = mkTyConApp tc tys
+        extract_ics_relevants (CFunEqCan { cc_fun = tc, cc_tyargs = tys }) 
+                              ics@(IC { inert_funeqs = funeq_map })
+            | let fam_head = mkTyConApp tc tys
             , Just ct <- lookupFamHead funeq_map fam_head
             = (singleCt ct, ics { inert_funeqs = delFamHead funeq_map fam_head })
-            | otherwise
-            = (emptyCts, ics)
 
         extract_ics_relevants (CHoleCan {}) ics
             = pprPanic "extractRelevantInerts" (ppr wi)
