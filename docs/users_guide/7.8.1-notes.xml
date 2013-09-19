@@ -205,6 +205,16 @@
 
         <listitem>
             <para>
+                GHC now has support for a new pragma,
+                <literal>{-# MINIMAL #-}</literal>, allowing you to
+                explicitly declare the minimal complete definition of
+                a class. Should an instance not provide the minimal
+                required definitions, a warning will be emitted.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
                 GHC now generates warnings when definitions conflict with the
                 Applicative-Monad Proposal (AMP).
 
@@ -310,7 +320,21 @@
            </listitem>
        </itemizedlist>
 
+        <itemizedlist>
+            <listitem>
+                <para>
+                     The new pragma, <literal>{-# MINIMAL #-}</literal>,
+                     allows to explicitly declare the minimal complete
+                     definition of a class. Should an instance not provide
+                     the minimal required definitions, a warning will be
+                     emitted.
+               </para>
 
+                <para>
+                     See <xref linkend="minimal-pragma"/> for more details.
+               </para>
+           </listitem>
+       </itemizedlist>
     </sect3>
 
     <sect3>
@@ -573,6 +597,14 @@
                      These changes were contributed by Bart Massey.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                     The minimal complete definitions for all
+                     type-classes with cyclic default implementations
+                     have been explicitly annotated with the new
+                     <literal>{-# MINIMAL #-}</literal> pragma.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -670,6 +702,14 @@
             <listitem>
                 <para>
                     Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                     The type-classes <literal>Eq</literal> and
+                     <literal>Ord</literal> have been annotated with
+                     the new <literal>{-# MINIMAL #-}</literal>
+                     pragma.
                </para>
            </listitem>
        </itemizedlist>
