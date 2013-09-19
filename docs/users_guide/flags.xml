@@ -1673,6 +1673,13 @@
           </row>
 
           <row>
+            <entry><option>-floopification</option></entry>
+            <entry>Turn saturated self-recursive tail-calls into local jumps in the generated assembly.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-loopification</option></entry>
+          </row>
+
+          <row>
             <entry><option>-flate-dmd-anal</option></entry>
             <entry>Run demand analysis again, at the end of the simplification
             pipeline</entry>
