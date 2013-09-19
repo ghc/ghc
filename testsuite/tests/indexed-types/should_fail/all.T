@@ -111,3 +111,8 @@ test('T8227',
      extra_clean(['T8227a.o', 'T8227a.hi']),
      run_command,
      ['$MAKE -s --no-print-directory T8227'])
+test('T8129',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T8129'])
+
