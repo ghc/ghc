@@ -712,7 +712,7 @@
           </row>
           <row>
             <entry><option>-XAllowAmbiguousTypes</option></entry>
-            <entry>Allow the user to write <link linkend="ambiguity">ambiguous types</link>, 
+            <entry>Allow the user to write <link linkend="ambiguity">ambiguous types</link>,
                    and the type inference engine to infer them.
                 </entry>
             <entry>dynamic</entry>
@@ -1073,7 +1073,7 @@
           </row>
           <row>
             <entry><option>-XExplicitNamespaces</option></entry>
-            <entry>Enable using the keyword <literal>type</literal> to specify the namespace of 
+            <entry>Enable using the keyword <literal>type</literal> to specify the namespace of
                    entries in imports and exports (<xref linkend="explicit-namespaces"/>).
                    Implied by <option>-XTypeOperators</option> and <option>-XTypeFamilies</option>.</entry>
             <entry>dynamic</entry>
@@ -2121,8 +2121,8 @@
           </row>
           <row>
             <entry><option>-staticlib</option></entry>
-            <entry>On Darwin/OS X/iOS only, generate a standalone static library 
-              (as opposed to an executable). 
+            <entry>On Darwin/OS X/iOS only, generate a standalone static library
+              (as opposed to an executable).
               This is the usual way to compile for iOS.
               </entry>
             <entry>dynamic</entry>
@@ -2415,7 +2415,7 @@
           </row>
           <row>
             <entry><option>-pgmlibtool</option> <replaceable>cmd</replaceable></entry>
-            <entry>Use <replaceable>cmd</replaceable> as the command for libtool 
+            <entry>Use <replaceable>cmd</replaceable> as the command for libtool
               (with <option>-staticlib</option> only).</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
