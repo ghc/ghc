@@ -89,6 +89,7 @@ import qualified GHC.Exts as E (
     sameMutVar#, sameTVar#, sameMVar#
  )
 
+-- See #8330
 #if __GLASGOW_HASKELL__ > 710
 #error What is minimal version of GHC required for bootstraping? If it's GHC 7.8 we should remove this module and use GHC.Exts instead.
 #endif
