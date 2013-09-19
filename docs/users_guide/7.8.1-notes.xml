@@ -154,14 +154,11 @@
             <para>
                 PrimOps for comparing unboxed values now return
                 <literal>Int#</literal> instead of <literal>Bool</literal>.
-                New PrimOps' names end with <literal>$#</literal> for operators and
-                <literal>I#</literal> for ordinary names, e.g. <literal>==$#</literal>
-                compares <literal>Int#</literal>s for equality and
-                <literal>eqCharI#</literal> does the same for <literal>Char#</literal>s.
-                Old PrimOps have been removed and turned into wrappers. See
+                This change is backwards incompatible. See
                 <ulink url="http://ghc.haskell.org/trac/ghc/wiki/NewPrimopsInGHC7.8">
                 this GHC wiki page</ulink> for instructions how to update your
-                existing code.
+                existing code. See <ulink url="http://ghc.haskell.org/trac/ghc/wiki/PrimBool">
+                here</ulink> for motivation and discussion of implementation details.
            </para>
        </listitem>
 
