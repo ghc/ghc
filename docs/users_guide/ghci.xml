@@ -1528,8 +1528,8 @@ _result :: IO ()
         <replaceable>expr</replaceable></literal> begins the evaluation of
         <replaceable>expr</replaceable> in single-stepping mode.  If
         <replaceable>expr</replaceable> is omitted, then it single-steps from
-        the current breakpoint. <literal>:stepover</literal>
-        works similarly.</para>
+        the current breakpoint. <literal>:steplocal</literal> and
+        <literal>:stepmodule</literal> work similarly.</para>
 
       <para>The <literal>:list</literal> command is particularly useful when
         single-stepping, to see where you currently are:</para>
@@ -2509,6 +2509,18 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
+          <literal>:issafe</literal><optional><replaceable>module</replaceable></optional>
+          <indexterm><primary><literal>:issafe</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Displays Safe Haskell information about the given
+          module (or the current module if omitted). This includes the trust
+          type of the module and its containing package.</para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term>
           <literal>:kind</literal><optional><literal>!</literal></optional> 
                         <replaceable>type</replaceable>
           <indexterm><primary><literal>:kind</literal></primary></indexterm>
@@ -2536,6 +2548,34 @@ T Int :: * -> *
             by expanding out type synonyms and evaluating type-function applications,
             and display the normalised result.</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:list</literal> <replaceable>identifier</replaceable>
+          <indexterm><primary><literal>:list</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Lists the source code around the definition of
+          <replaceable>identifier</replaceable> or the current
+          breakpoint is not given. This requires the identifier be
+          defined in an interpreted module.  If your output device
+          supports it, then GHCi will highlight the active
+          subexpression in bold.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:list</literal> <optional><replaceable>module</replaceable></optional> <replaceable>line</replaceable>
+          <indexterm><primary><literal>:list</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Lists the source code around the given line number of
+          <replaceable>module</replaceable>. This requires that the module be
+          interpreted. If your output device supports it, then GHCi will
+          highlight the active subexpression in bold.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -2984,19 +3024,47 @@ bar
 
       <varlistentry>
 	<term>
-          <literal>:step [<replaceable>expr</replaceable>]</literal>
+          <literal>:step</literal> <optional><replaceable>expr</replaceable></optional>
           <indexterm><primary><literal>:step</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Single-step from the last breakpoint.  With an expression
-            argument, begins evaluation of the expression with a
-            single-step.</para>
+	  <para>Enable all breakpoints and begin evaluating an
+          expression in single-stepping mode. In this
+          mode evaluation will be stopped after every reduction,
+          allowing local variables to be inspected.
+
+          If <replaceable>expr</replaceable> is not given, evaluation will
+          resume at the last breakpoint.
+
+          See <xref linkend="single-stepping" />.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term>
-          <literal>:trace [<replaceable>expr</replaceable>]</literal>
+          <literal>:steplocal</literal>
+          <indexterm><primary><literal>:steplocal</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Enable only breakpoints in the current top-level
+          binding and resume evaluation at the last breakpoint.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:stepmodule</literal>
+          <indexterm><primary><literal>:stepmodule</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Enable only breakpoints in the current module and
+          resume evaluation at the last breakpoint.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:trace <optional><replaceable>expr</replaceable></optional></literal>
           <indexterm><primary><literal>:trace</literal></primary></indexterm>
         </term>
 	<listitem>

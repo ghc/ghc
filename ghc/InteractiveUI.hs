@@ -272,7 +272,7 @@ defFullHelpText =
   "   :forward                    go forward in the history (after :back)\n" ++
   "   :history [<n>]              after :trace, show the execution history\n" ++
   "   :list                       show the source code around current breakpoint\n" ++
-  "   :list identifier            show the source code for <identifier>\n" ++
+  "   :list <identifier>          show the source code for <identifier>\n" ++
   "   :list [<module>] <line>     show the source code around line number <line>\n" ++
   "   :print [<name> ...]         prints a value without forcing its computation\n" ++
   "   :sprint [<name> ...]        simplifed version of :print\n" ++
