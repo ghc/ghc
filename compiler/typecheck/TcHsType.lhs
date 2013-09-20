@@ -884,7 +884,7 @@ as if $(..blah..) :: forall k. k.
 
 In the e1 example, the context of the splice fixes kappa to *.  But
 in the e2 example, we'll desugar the type, zonking the kind unification
-variables as we go.  When we encournter the unconstrained kappa, we
+variables as we go.  When we encounter the unconstrained kappa, we
 want to default it to '*', not to AnyK.
 
 

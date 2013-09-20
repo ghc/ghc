@@ -430,7 +430,7 @@ Indeed, the bindings can even be recursive.
 	  <listitem><para> <literal>&quot;foo&quot;&num;</literal> has type <literal>Addr&num;</literal></para> </listitem>
 	  <listitem><para> <literal>3&num;</literal> has type <literal>Int&num;</literal>. In general,
 	  any Haskell integer lexeme followed by a <literal>&num;</literal> is an <literal>Int&num;</literal> literal, e.g.
-            <literal>-0x3A&num;</literal> as well as <literal>32&num;</literal></para>.</listitem>
+            <literal>-0x3A&num;</literal> as well as <literal>32&num;</literal>.</para></listitem>
 	  <listitem><para> <literal>3&num;&num;</literal> has type <literal>Word&num;</literal>. In general,
 	  any non-negative Haskell integer lexeme followed by <literal>&num;&num;</literal>
 	      is a <literal>Word&num;</literal>. </para> </listitem>
@@ -441,14 +441,14 @@ Indeed, the bindings can even be recursive.
    </sect2>
 
     <sect2 id="negative-literals">
-      <title>Negative Literals</title>
+      <title>Negative literals</title>
       <para>
           The literal <literal>-123</literal> is, according to
           Haskell98 and Haskell 2010, desugared as
           <literal>negate (fromInteger 123)</literal>.
          The language extension <option>-XNegativeLiterals</option>
          means that it is instead desugared as
-         <literal>fromInteger (-123)</literal>. 
+         <literal>fromInteger (-123)</literal>.
       </para>
 
       <para>
@@ -465,11 +465,11 @@ Indeed, the bindings can even be recursive.
       <para>
           Haskell 2010 and Haskell 98 define floating literals with
           the syntax <literal>1.2e6</literal>. These literals have the
-          type <literal>Fractional a => Fractional</literal>.
+          type <literal>Fractional a => a</literal>.
       </para>
 
       <para>
-         The language extension <option>-XNumLiterals</option> allows
+         The language extension <option>-XNumDecimals</option> allows
          you to also use the floating literal syntax for instances of
          <literal>Integral</literal>, and have values like
          <literal>(1.2e6 :: Num a => a)</literal>
@@ -1743,7 +1743,7 @@ absurd x = case x of {}      -- (B)
 We much prefer (B). Why? Because GHC can figure out that <literal>(True :~: False)</literal>
 is an empty type. So (B) has no partiality and GHC should be able to compile with
 <option>-fwarn-incomplete-patterns</option>.  (Though the pattern match checking is not
-yet clever enough to do that.
+yet clever enough to do that.)
 On the other hand (A) looks dangerous, and GHC doesn't check to make
 sure that, in fact, the function can never get called.
 </para>

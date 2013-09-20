@@ -1007,7 +1007,7 @@ genMachOp _ op [x] = case op of
                  w | w > toWidth -> sameConv' reduce
                  _w              -> return x'
         
-        panicOp = panic $ "LLVM.CodeGen.genMachOp: non unary op encourntered"
+        panicOp = panic $ "LLVM.CodeGen.genMachOp: non unary op encountered"
                        ++ "with one argument! (" ++ show op ++ ")"
 
 -- Handle GlobalRegs pointers
@@ -1252,7 +1252,7 @@ genMachOp_slow opt op [x, y] = case op of
                 else
                     panic $ "isSMulOK: Not bit type! (" ++ showSDoc dflags (ppr word) ++ ")"
 
-        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encourntered"
+        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encountered"
                        ++ "with two arguments! (" ++ show op ++ ")"
 
 -- More then two expression, invalid!
