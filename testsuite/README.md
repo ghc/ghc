@@ -13,6 +13,9 @@ Commands to run testsuite:
  * Run a specific test: `make TEST=tc054`
  * Test a specific 'way': `make WAY=optllvm`
  * Test a specifc stage of GHC: `make stage=1`
+ * Set verbosity: `make VERBOSE=n`
+   where n=0: No per-test ouput, n=1: Only failures,
+         n=2: Progress output, n=3: Include commands called (default)
  * Pass in extra GHC options: `make EXTRA_HC_OPTS=-fvectorize`
 
 You can also change directory to a specific test folder to run that

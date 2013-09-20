@@ -43,7 +43,7 @@ class TestConfig:
         self.wordsize = ''
 
         # Verbosity level
-        self.verbose = 1
+        self.verbose = 3
 
         # run the "fast" version of the test suite
         self.fast = 0

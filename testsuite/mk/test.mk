@@ -159,6 +159,10 @@ ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
 endif
 
+ifneq "$(VERBOSE)" ""
+RUNTEST_OPTS += --verbose=$(VERBOSE)
+endif
+
 ifneq "$(CLEAN_ONLY)" ""
 RUNTEST_OPTS += -e clean_only=True
 else

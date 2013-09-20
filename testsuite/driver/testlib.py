@@ -712,10 +712,11 @@ def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
 
     try:
-        print '=====>', full_name, t.total_tests, 'of', len(allTestNames), \
-                        str([t.n_unexpected_passes,   \
-                             t.n_unexpected_failures, \
-                             t.n_framework_failures])
+        if_verbose(2, "=====> %s %d of %d %s " % \
+                    (full_name, t.total_tests, len(allTestNames), \
+                    [t.n_unexpected_passes, \
+                     t.n_unexpected_failures, \
+                     t.n_framework_failures]))
 
         if config.use_threads:
             t.lock.release()
@@ -754,13 +755,13 @@ def do_test(name, way, func, args):
                 else:
                     t.expected_passes[name] = [way]
             else:
-                print '*** unexpected pass for', full_name
+                if_verbose(1, '*** unexpected pass for %s' % full_name)
                 t.n_unexpected_passes = t.n_unexpected_passes + 1
                 addPassingTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
         elif passFail == 'fail':
             if getTestOpts().expect == 'pass' \
                and way not in getTestOpts().expect_fail_for:
-                print '*** unexpected failure for', full_name
+                if_verbose(1, '*** unexpected failure for %s' % full_name)
                 t.n_unexpected_failures = t.n_unexpected_failures + 1
                 reason = result['reason']
                 addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
@@ -820,7 +821,7 @@ def skiptest (name, way):
 
 def framework_fail( name, way, reason ):
     full_name = name + '(' + way + ')'
-    print '*** framework failure for', full_name, reason
+    if_verbose(1, '*** framework failure for %s %s ' %s (full_name, reason))
     t.n_framework_failures = t.n_framework_failures + 1
     if name in t.framework_failures:
         t.framework_failures[name].append(way)
@@ -1595,7 +1596,7 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
     if expected_str == actual_str:
         return 1
     else:
-        print 'Actual ' + kind + ' output differs from expected:'
+        if_verbose(1, 'Actual ' + kind + ' output differs from expected:')
 
         if expected_file_for_diff == '/dev/null':
             expected_normalised_file = '/dev/null'
@@ -1614,17 +1615,18 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
         # (including newlines) so the diff would be hard to read.
         # This does mean that the diff might contain changes that
         # would be normalised away.
-        r = os.system( 'diff -uw ' + expected_file_for_diff + \
-                               ' ' + actual_file )
+        if (config.verbose >= 1):
+            r = os.system( 'diff -uw ' + expected_file_for_diff + \
+                                   ' ' + actual_file )
 
-        # If for some reason there were no non-whitespace differences,
-        # then do a full diff
-        if r == 0:
-            r = os.system( 'diff -u ' + expected_file_for_diff + \
-                                  ' ' + actual_file )
+            # If for some reason there were no non-whitespace differences,
+            # then do a full diff
+            if r == 0:
+                r = os.system( 'diff -u ' + expected_file_for_diff + \
+                                      ' ' + actual_file )
 
         if config.accept:
-            print 'Accepting new output.'
+            if_verbose(1, 'Accepting new output.')
             write_file(expected_file, actual_raw)
             return 1
         else:
@@ -1766,7 +1768,7 @@ def rawSystemWithTimeout(cmd_and_args):
 # Then, when using the native Python, os.system will invoke the cmd shell
 
 def runCmd( cmd ):
-    if_verbose( 1, cmd )
+    if_verbose( 3, cmd )
     r = 0
     if config.os == 'mingw32':
         # On MinGW, we will always have timeout
@@ -1779,7 +1781,7 @@ def runCmd( cmd ):
     return r << 8
 
 def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
-    if_verbose( 1, cmd )
+    if_verbose( 3, cmd )
     r = 0
     if config.os == 'mingw32':
         # On MinGW, we will always have timeout

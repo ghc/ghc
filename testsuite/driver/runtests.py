@@ -44,6 +44,7 @@ long_options = [
   "skipway=",		# skip this way
   "threads=",           # threads to run simultaneously
   "check-files-written", # check files aren't written by multiple tests
+  "verbose=",          # verbose (0,1,2 so far)
   ]
 
 opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
@@ -91,6 +92,13 @@ for opt,arg in opts:
 
     if opt == '--check-files-written':
         config.check_files_written = True
+
+    if opt == '--verbose':
+        if arg not in ["0","1","2","3"]:
+            sys.stderr.write("ERROR: requested verbosity %s not supported, use 0,1,2 or 3" % arg)
+            sys.exit(1)
+        config.verbose = int(arg)
+
 
 if config.use_threads == 1:
     # Trac #1558 says threads don't work in python 2.4.4, but do
@@ -242,7 +250,7 @@ sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
 # First collect all the tests to be run
 for file in t_files:
-    print '====> Scanning', file
+    if_verbose(2, '====> Scanning %s' % file)
     newTestDir(os.path.dirname(file))
     try:
         execfile(file)
