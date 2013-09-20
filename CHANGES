@@ -12,6 +12,19 @@ Changes in version 2.14.0
 
  * Improved to Unicode support
 
+ * Bold markup support
+
+ * Nested paragraphs
+
+ * Better escaping
+
+ * Header markup
+
+ * Parser should no longer fail to parse any markup
+
+ * {-# OPTIONS_HADDOCK show-extensions #-} pragma will show the GHC extensions
+   enabled in the module.
+
 Changes in version 2.13.2
 
  * Handle HsExplicitListTy in renamer (#213)
@@ -121,7 +134,7 @@ Changes in version 2.9.0
   * Minor changes to the API
 
 Changes in the version that comes with GHC 7.0.1
-  
+
   [This version claims it is 2.8.0 but is actually based on 2.8.1]
 
   * Fix URL creation on Windows: Use / not \ in URLs.
@@ -267,7 +280,7 @@ Changed in version 2.4.2:
     (#65)
 
   * Fixes to the Hoogle backend
-  
+
   * Improvements to the haddock library
 
   * Many other fixes (including #67, #69, #58, #57)
@@ -358,7 +371,7 @@ Changes in version 2.0.0.0:
     in GHC 6.8.2
 
   * Format of module attributes has changed. The only way of specifiying
-    module attributes is via a new OPTIONS_HADDOCK pragma. Example: 
+    module attributes is via a new OPTIONS_HADDOCK pragma. Example:
     {-# OPTIONS_HADDOCK hide, prune #-}
 
   * Haddock understands literate source files
@@ -474,7 +487,7 @@ Changes in version 0.6:
     now turned off by default; Haddock should be a little less noisy
     in general.
 
-  * Markup for definition lists has been added.  See the documentation 
+  * Markup for definition lists has been added.  See the documentation
     for details.
 
   * New option: --package for setting the package name.  The package
@@ -514,7 +527,7 @@ Changes in version 0.4:
     which describe the exports of a set of modules.  This is useful
     for generating documentation which hyperlinks to
     previously-generated documentation.
-    
+
   * Support for generating the extra files required by the Microsoft
     Help compiler.
 
@@ -525,9 +538,9 @@ Changes in version 0.4:
 
 -----------------------------------------------------------------------------
 Changes in version 0.3:
-  
-  * Documentation on individual function arguments is now implemented 
-  
+
+  * Documentation on individual function arguments is now implemented
+
   * Links can be made to identifiers that aren't in scope, by using
     the fully qualified name.
 

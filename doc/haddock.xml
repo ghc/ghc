@@ -58,7 +58,7 @@
       <listitem>
 	<para>Documentation annotations in the source code should be
 	easy on the eye when editing the source code itself, so as not
-	to obsure the code and to make reading and writing
+	to obscure the code and to make reading and writing
 	documentation annotations easy.  The easier it is to write
 	documentation, the more likely the programmer is to do it.
 	Haddock therefore uses lightweight markup in its annotations,
@@ -170,40 +170,41 @@
       us.
       </para>
       <itemizedlist>
-	<listitem>Ashley Yakeley</listitem>
-	<listitem>Benjamin Franksen</listitem>
-	<listitem>Brett Letner</listitem>
-        <listitem>Clemens Fruhwirth</listitem>
-        <listitem>Conal Elliott</listitem>
-        <listitem>David Waern</listitem> 
-        <listitem>Duncan Coutts</listitem>
-        <listitem>George Pollard</listitem>
-        <listitem>George Russel</listitem>
-        <listitem>Hal Daume</listitem>
-        <listitem>Ian Lynagh</listitem>
-        <listitem>Isaac Dupree</listitem>
-        <listitem>Joachim Breitner</listitem>
-        <listitem>Krasimir Angelov</listitem>
-        <listitem>Lennart Augustsson</listitem>
-        <listitem>Luke Plant</listitem>
-        <listitem>Malcolm Wallace</listitem>
-        <listitem>Mark Lentczner</listitem>
-        <listitem>Mark Shields</listitem>
-        <listitem>Neil Mitchell</listitem>
-        <listitem>Mike Thomas</listitem>
-        <listitem>Manuel Chakravarty</listitem>
-        <listitem>Oliver Brown</listitem>
-        <listitem>Roman Cheplyaka</listitem>
-        <listitem>Ross Paterson</listitem>
-        <listitem>Simon Hengel</listitem>
-        <listitem>Simon Marlow</listitem>
-        <listitem>Simon Peyton-Jones</listitem>
-        <listitem>Sigbjorn Finne</listitem>
-        <listitem>Stefan O'Rear</listitem>
-        <listitem>Sven Panne</listitem>
-        <listitem>Thomas Schilling</listitem>
-        <listitem>Wolfgang Jeltsch</listitem>
-        <listitem>Yitzchak Gale</listitem>
+	<listitem><simpara>Ashley Yakeley</simpara></listitem>
+	<listitem><simpara>Benjamin Franksen</simpara></listitem>
+	<listitem><simpara>Brett Letner</simpara></listitem>
+        <listitem><simpara>Clemens Fruhwirth</simpara></listitem>
+        <listitem><simpara>Conal Elliott</simpara></listitem>
+        <listitem><simpara>David Waern</simpara></listitem>
+        <listitem><simpara>Duncan Coutts</simpara></listitem>
+        <listitem><simpara>George Pollard</simpara></listitem>
+        <listitem><simpara>George Russel</simpara></listitem>
+        <listitem><simpara>Hal Daume</simpara></listitem>
+        <listitem><simpara>Ian Lynagh</simpara></listitem>
+        <listitem><simpara>Isaac Dupree</simpara></listitem>
+        <listitem><simpara>Joachim Breitner</simpara></listitem>
+        <listitem><simpara>Krasimir Angelov</simpara></listitem>
+        <listitem><simpara>Lennart Augustsson</simpara></listitem>
+        <listitem><simpara>Luke Plant</simpara></listitem>
+        <listitem><simpara>Malcolm Wallace</simpara></listitem>
+        <listitem><simpara>Manuel Chakravarty</simpara></listitem>
+        <listitem><simpara>Mark Lentczner</simpara></listitem>
+        <listitem><simpara>Mark Shields</simpara></listitem>
+        <listitem><simpara>Mateusz Kowalczyk</simpara></listitem>
+        <listitem><simpara>Mike Thomas</simpara></listitem>
+        <listitem><simpara>Neil Mitchell</simpara></listitem>
+        <listitem><simpara>Oliver Brown</simpara></listitem>
+        <listitem><simpara>Roman Cheplyaka</simpara></listitem>
+        <listitem><simpara>Ross Paterson</simpara></listitem>
+        <listitem><simpara>Sigbjorn Finne</simpara></listitem>
+        <listitem><simpara>Simon Hengel</simpara></listitem>
+        <listitem><simpara>Simon Marlow</simpara></listitem>
+        <listitem><simpara>Simon Peyton-Jones</simpara></listitem>
+        <listitem><simpara>Stefan O'Rear</simpara></listitem>
+        <listitem><simpara>Sven Panne</simpara></listitem>
+        <listitem><simpara>Thomas Schilling</simpara></listitem>
+        <listitem><simpara>Wolfgang Jeltsch</simpara></listitem>
+        <listitem><simpara>Yitzchak Gale</simpara></listitem>
       </itemizedlist>
     </section>
     <section>
@@ -262,10 +263,13 @@
     in a module that isn't being processed as part of the current
     batch, simply won't be hyperlinked in the generated
     documentation.  Haddock will emit warnings listing all the
-    indentifiers it couldn't resolve.</para>
+    identifiers it couldn't resolve.</para>
 
     <para>The modules should <emphasis>not</emphasis> be mutually
     recursive, as Haddock don't like swimming in circles.</para>
+
+    <para>Note that while older version would fail on invalid markup, this is considered a bug in the
+    new versions. If you ever get failed parsing message, please report it.</para>
 
     <para>You must also specify an option for the output format.
     Currently only the <option>-h</option> option for HTML and the
@@ -435,7 +439,7 @@
 	      <term><filename>haddock-util.js</filename></term>
 	      <listitem>
 		<para>Some JavaScript utilities used to implement some of the
-		dynamic features like collapsable sections, and switching to
+		dynamic features like collapsible sections, and switching to
 		frames view.</para>
 	      </listitem>
 	    </varlistentry>
@@ -453,7 +457,7 @@
           will be generated into the current directory (or the
             specified directory if the <option>-o</option> option is
             given), including the following:</para>
-          
+
 	  <variablelist>
 	    <varlistentry>
 	      <term><filename><replaceable>package</replaceable>.tex</filename></term>
@@ -544,7 +548,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <option>--source-entity</option> option to add a source code link
 	  next to the documentation for every value and type in each module.
 	  </para>
-	  
+
 	  <para>In each case <replaceable>URL</replaceable> is the base URL
 	  where the source files can be found.  For the per-module and
 	  per-entity URLs, the following substitutions are made within the
@@ -590,7 +594,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  you would say
 	  <literal>haddock --source-base=<replaceable>url</replaceable>/
 	  --source-module=<replaceable>url</replaceable>/%F</literal></para>
-	  
+
 	  <para>If you have html versions of your sources online with anchors
 	  for each type and function name, you would say
 	  <literal>haddock --source-base=<replaceable>url</replaceable>/
@@ -650,7 +654,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <para>Include links to pages where readers may comment on the
 	  documentation. This feature would typically be used in conjunction
 	  with a Wiki system.</para>
-	  
+
 	  <para>Use the <option>--comments-base</option> option to add a
 	  user comments link in the header bar of the contents and index pages.
 	  Use the <option>--comments-module</option> to add a user comments
@@ -658,7 +662,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <option>--comments-entity</option> option to add a comments link
 	  next to the documentation for every value and type in each module.
 	  </para>
-	  
+
 	  <para>In each case <replaceable>URL</replaceable> is the base URL
 	  where the corresponding comments page can be found.  For the
 	  per-module and per-entity URLs the same substitutions are made as
@@ -669,7 +673,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  page, and every module to subpages, you would say
 	  <literal>haddock --comments-base=<replaceable>url</replaceable>
 	  --comments-module=<replaceable>url</replaceable>/%M</literal></para>
-	  
+
 	  <para>If your Wiki system doesn't like the '<literal>.</literal>' character
 	  in Haskell module names, you can replace it with a different character. For
 	  example to replace the '<literal>.</literal>' characters with
@@ -692,12 +696,12 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  documentation. If given multiple times then the pages will use the
 	  first theme given by default, and have alternate style sheets for
 	  the others. The reader can switch between themes with browsers that
-	  support alternate style sheets, or with the "Style" menu that gets 
+	  support alternate style sheets, or with the "Style" menu that gets
 	  added when the page is loaded. If
 	  no themes are specified, then just the default built-in theme
 	  ("Ocean") is used.
 	  </para>
-	  
+
 	  <para>The <replaceable>path</replaceable> parameter can be one of:
 	  </para>
 
@@ -825,16 +829,16 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
             <para>
                 <itemizedlist>
                     <listitem>
-                        none: x, y, z
+                        <simpara>none: x, y, z</simpara>
                     </listitem>
                     <listitem>
-                        full: A.x, A.B.y, C.z
+                        <simpara>full: A.x, A.B.y, C.z</simpara>
                     </listitem>
                     <listitem>
-                        local: x, A.B.y, C.z
+                        <simpara>local: x, A.B.y, C.z</simpara>
                     </listitem>
                     <listitem>
-                        relative: x, B.y, C.z
+                        <simpara>relative: x, B.y, C.z</simpara>
                     </listitem>
                 </itemizedlist>
 	        </para>
@@ -900,7 +904,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <para>When generating HTML, do not generate an index.
 	  Instead, redirect the Contents and/or Index link on each page to
 	  <replaceable>URL</replaceable>.  This option is intended for
-	  use in conjuction with <option>--gen-contents</option> and/or 
+	  use in conjunction with <option>--gen-contents</option> and/or
 	  <option>--gen-index</option> for
 	  generating a separate contents and/or index covering multiple
 	  libraries.</para>
@@ -917,10 +921,10 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <option>--gen-index</option>
         </term>
 	<listitem>
-	  <para>Generate an HTML contents and/or index containing entries pulled 
+	  <para>Generate an HTML contents and/or index containing entries pulled
 	  from all the specified interfaces (interfaces are specified using
 	  <option>-i</option> or <option>--read-interface</option>).
-	  This is used to generate a single contents and/or index for multiple 
+	  This is used to generate a single contents and/or index for multiple
 	  sets of Haddock documentation.</para>
 	</listitem>
       </varlistentry>
@@ -932,7 +936,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <option>--ignore-all-exports</option>
 	</term>
 	<listitem>
-	  <para>Causes Haddock to behaves as if every module has the
+	  <para>Causes Haddock to behave as if every module has the
 	    <literal>ignore-exports</literal> attribute (<xref
 	      linkend="module-attributes" />).  This might be useful for
 	    generating implementation documentation rather than interface
@@ -947,19 +951,32 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <option>--hide</option>&nbsp;<replaceable>module</replaceable>
 	</term>
 	<listitem>
-	  <para>Causes Haddock to behaves as if module
+	  <para>Causes Haddock to behave as if module
 	    <replaceable>module</replaceable> has the <literal>hide</literal>
-	    atribute. (<xref linkend="module-attributes" />).</para>
+	    attribute. (<xref linkend="module-attributes" />).</para>
 	</listitem>
       </varlistentry>
-      
+
+      <varlistentry>
+	<term>
+	  <indexterm><primary><option>--show-extensions</option></primary>
+	  </indexterm>
+	  <option>--show-extensions</option>&nbsp;<replaceable>module</replaceable>
+	</term>
+	<listitem>
+	  <para>Causes Haddock to behave as if module
+	    <replaceable>module</replaceable> has the <literal>show-extensions</literal>
+	    attribute. (<xref linkend="module-attributes" />).</para>
+	</listitem>
+      </varlistentry>
+
       <varlistentry>
 	<term>
           <indexterm><primary><option>--optghc</option></primary></indexterm>
           <option>--optghc</option>=<replaceable>option</replaceable>
         </term>
 	<listitem>
-	  <para>Pass <replaceable>option</replaceable> to GHC.</para>
+	  <para>Pass <replaceable>option</replaceable> to GHC. Note that there is a double dash there, unlike for GHC.</para>
 	</listitem>
       </varlistentry>
 
@@ -979,6 +996,19 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
         <term>
+          <indexterm><primary><option>--compatible-interface-versions</option></primary></indexterm>
+          <option>--compatible-interface-versions</option>
+        </term>
+	<listitem>
+          <para>
+            Prints out space-separated versions of binary Haddock interface files that this version is compatible
+            with.
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <indexterm><primary><option>--no-tmp-comp-dir</option></primary></indexterm>
           <option>--no-tmp-comp-dir</option>
         </term>
@@ -992,7 +1022,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <para>
           This flag can be used to avoid recompilation if compilation files already exist.
           Compilation files are produced when Haddock has to process modules that make use of
-          Template Haskell, in which case Haddock compiles the modules using the GHC API.  
+          Template Haskell, in which case Haddock compiles the modules using the GHC API.
           </para>
 	</listitem>
       </varlistentry>
@@ -1001,10 +1031,10 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
     <section id="cpp">
       <title>Using literate or pre-processed source</title>
 
-      <para>Since Haddock uses GHC internally, both plain and 
+      <para>Since Haddock uses GHC internally, both plain and
             literate Haskell sources are accepted without the need for the user
             to do anything. To use the C pre-processor, however,
-            the user must pass the the <option>-cpp</option> option to GHC 
+            the user must pass the the <option>-cpp</option> option to GHC
             using <option>--optghc</option>.
       </para>
     </section>
@@ -1349,6 +1379,17 @@ import C (a, b)
 	defined in the module.  In this special case the module body
 	may also include section headings (normally they would be
 	ignored by Haddock).</para>
+
+<programlisting>
+module Foo where
+
+-- * This heading will now appear before foo.
+
+-- | Documentation for 'foo'.
+foo :: Integer
+foo = 5
+</programlisting>
+
       </section>
     </section>
 
@@ -1461,7 +1502,7 @@ import B
 	    chosen as the home.</para>
 	</listitem>
 	<listitem>
-	  <para>A module with the <literal>not-home</literal> atribute is only
+	  <para>A module with the <literal>not-home</literal> attribute is only
 	    chosen if there are no other modules to choose.</para>
 	</listitem>
       </itemizedlist>
@@ -1555,6 +1596,20 @@ module A where
 	      <xref linkend="hyperlinking" /> for more details.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term>
+	    <indexterm><primary><literal>show-extensions</literal></primary></indexterm>
+      <literal>show-extensions</literal>
+	  </term>
+	  <listitem>
+	    <para>Indicates that we should render the extensions used in this module in the
+            resulting documentation. This will only render if the output format supports it.
+            If Language is set, it will be shown as well and all the extensions implied by it won't.
+            All enabled extensions will be rendered, including those implied by their more powerful versions.</para>
+	  </listitem>
+	</varlistentry>
+
       </variablelist>
 
     </section>
@@ -1669,7 +1724,7 @@ module A where
 </programlisting>
 	<para>Result lines that only contain the string
 	<literal>&lt;BLANKLINE&gt;</literal> are rendered as blank lines in the
-	generated documenation.</para>
+	generated documentation.</para>
       </section>
 
       <section>
@@ -1736,10 +1791,17 @@ module A where
       </section>
 
       <section>
-	<title>Emphasis and Monospaced text</title>
+	<title>Emphasis, Bold and Monospaced text</title>
 
 	<para>Emphasis may be added by surrounding text with
-	<literal>/.../</literal>.</para>
+	<literal>/.../</literal>. Other markup is valid inside emphasis. To have a forward
+        slash inside of emphasis, just escape it: <literal>/fo\/o/</literal></para>
+
+        <para>Bold (strong) text is indicated by surrounding it with <literal>__...__</literal>.
+        Other markup is valid inside bold. For example, <literal>__/foo/__</literal> will make the emphasised
+        text <literal>foo</literal> bold. You don't have to escape a single underscore if you need it bold:
+        <literal>__This_text_with_underscores_is_bold__</literal>.
+        </para>
 
 	<para>Monospaced (or typewriter) text is indicated by
 	surrounding it with <literal>@...@</literal>.  Other markup is
@@ -1757,6 +1819,11 @@ module A where
 <programlisting>
 -- | This is a reference to the "Foo" module.
 </programlisting>
+
+        <para>A basic check is done on the syntax of the header name to ensure that it is valid
+        before turning it into a link but unlike with identifiers, whether the module is in scope isn't checked
+        and will always be turned into a link.
+        </para>
 
       </section>
 
@@ -1791,6 +1858,59 @@ module A where
 --
 --     2. second item
 </programlisting>
+
+      <para>Lists of the same type don't have to be separated by a newline:</para>
+<programlisting>
+-- | This is an enumerated list:
+--
+--     (1) first item
+--     2. second item
+--
+-- This is a bulleted list:
+--
+--     * first item
+--     * second item
+</programlisting>
+
+      <para>You can have more than one line of content in a list element:
+      </para>
+<programlisting>
+-- |
+-- * first item
+-- and more content for the first item
+-- * second item
+-- and more content for the second item
+</programlisting>
+
+     <para>You can even nest whole paragraphs inside of list elements. The rules
+     are 4 spaces for each indentation level. You're required to use a newline before
+     such nested paragraph:
+     </para>
+<programlisting>
+{-|
+* Beginning of list
+This belongs to the list above!
+
+    > nested
+    > bird
+    > tracks
+
+    * Next list
+    More of the indented list.
+
+        * Deeper
+
+            @
+            even code blocks work
+            @
+
+            * Deeper
+
+                    1. Even deeper!
+                    2. No newline separation even in indented lists.
+-}
+</programlisting>
+
       </section>
 
       <section>
@@ -1831,7 +1951,11 @@ module A where
 	it is assumed to be a definition paragraph, and the next
 	<literal>]</literal> character found will close the definition
 	term.  Other markup operators may be used freely within the
-	definition term.</para>
+	definition term. You can escape <literal>]</literal> with a backslash as usual.</para>
+
+      <para>Same rules about nesting and no newline separation as for bulleted and numbered lists apply.
+      </para>
+
       </section>
 
       <section>
@@ -1843,12 +1967,31 @@ module A where
 	it, the URL will be turned into a hyperlink when
 	rendered.</para>
 
-        The URL can be followed by an optional label:
+        <para>The URL can be followed by an optional label:</para>
 <programlisting>
 &lt;http://example.com label&gt;
 </programlisting>
-        The label is then used as a descriptive text for the hyperlink, if the
-        output format supports it.
+      <para>The label is then used as a descriptive text for the hyperlink, if the
+        output format supports it.</para>
+
+      <para>If Haddock sees something that looks like a URL (such as something starting with
+      <literal>http://</literal> or <literal>ssh://</literal>) where the URL markup is valid,
+      it will automatically make it a hyperlink.</para>
+      </section>
+
+      <section>
+	<title>Images</title>
+
+	<para>An image can be included in a documentation comment by
+	surrounding it in double angle brackets:
+	<literal>&lt;&lt;...&gt;&gt;</literal>.  If the output format supports
+	it, the image will be rendered inside the documentation.</para>
+
+        <para>Title text can be included using an optional label:</para>
+<programlisting>
+&lt;&lt;pathtoimage.png title&gt;&gt;
+</programlisting>
+
       </section>
 
       <section>
@@ -1869,6 +2012,45 @@ module A where
 	the anchor label.  The module does not have to be local, it
 	can be imported via an interface.</para>
       </section>
+
+      <section>
+	<title>Headings</title>
+        <para>Headings inside of comment documentation are possible be preceding them with
+        a number of <literal>=</literal>s. From 1 to 6 are accepted. Extra <literal>=</literal>s will
+        be treated as belonging to the text of the heading. Note that it's up to the output format to decide
+        how to render the different levels.
+        </para>
+
+<programlisting>
+-- |
+-- = Heading level 1 with some __bold__
+-- Something underneath the heading.
+--
+-- == /Subheading/
+-- More content.
+--
+-- === Subsubheading
+-- Even more content.
+</programlisting>
+
+        <para>Note that while headings have to start on a new paragraph, we allow paragraph-level content to
+        follow these immediately.
+        </para>
+
+<programlisting>
+-- |
+-- = Heading level 1 with some __bold__
+-- Something underneath the heading.
+--
+-- == /Subheading/
+-- More content.
+--
+-- === Subsubheading
+-- >>> examples are only allowed at the start of paragraphs
+</programlisting>
+
+      </section>
+
     </section>
   </chapter>
   <index/>
