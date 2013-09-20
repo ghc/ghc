@@ -38,6 +38,7 @@ import HscTypes
 import Id( idType )
 import Class
 import Type
+import Kind( isKind )
 import ErrUtils
 import MkId
 import DataCon
@@ -693,7 +694,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 
       | className cls == typeableClassName
       -- We checked for errors before, so we don't need to do that again
-      = mkPolyKindedTypeableEqn orig tvs cls cls_tys tycon tc_args mtheta
+      = mkPolyKindedTypeableEqn orig tvs cls tycon tc_args mtheta
 
       | otherwise
       = do { (rep_tc, rep_tc_args) <- lookup_data_fam tycon tc_args
@@ -882,7 +883,7 @@ mkOldTypeableEqn orig tvs cls tycon tc_args mtheta
 
   | otherwise           -- standalone deriving
   = do  { checkTc (null tc_args)
-                  (ptext (sLit "Derived typeable instance must be of form (Typeable")
+                  (ptext (sLit "Derived Typeable instance must be of form (Typeable")
                         <> int (tyConArity tycon) <+> ppr tycon <> rparen)
         ; dfun_name <- new_dfun_name cls tycon
         ; loc <- getSrcSpanM
@@ -892,15 +893,18 @@ mkOldTypeableEqn orig tvs cls tycon tc_args mtheta
                      , ds_tc = tycon, ds_tc_args = []
                      , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
 
-mkPolyKindedTypeableEqn :: CtOrigin -> [TyVar] -> Class -> [TcType]
+mkPolyKindedTypeableEqn :: CtOrigin -> [TyVar] -> Class
                         -> TyCon -> [TcType] -> DerivContext
                         -> TcM EarlyDerivSpec
-mkPolyKindedTypeableEqn orig tvs cls _cls_tys tycon tc_args mtheta
+mkPolyKindedTypeableEqn orig tvs cls tycon tc_args mtheta
   -- The kind-polymorphic Typeable class is less special; namely, there is no
-  -- need to select the class with the right kind anymore, as we only have one.
-  = do  { checkTc (all is_kind_var tc_args)
-                  (ptext (sLit "Derived typeable instance must be of form (Typeable")
-                        <+> ppr tycon <> rparen)
+  -- need to select the class with the correct kind anymore, as we only have one.
+  = do  {    -- Check that we have not said, for example
+             --       deriving Typeable (T Int)
+             -- or    deriving Typeable (S :: * -> *)     where S is kind-polymorphic 
+
+          polykinds <- xoptM Opt_PolyKinds
+        ; checkTc (all is_kind_var tc_args) (mk_msg polykinds)
         ; dfun_name <- new_dfun_name cls tycon
         ; loc <- getSrcSpanM
         ; let tc_app = mkTyConApp tycon tc_args
@@ -916,6 +920,15 @@ mkPolyKindedTypeableEqn orig tvs cls _cls_tys tycon tc_args mtheta
     is_kind_var tc_arg = case tcGetTyVar_maybe tc_arg of
                            Just v  -> isKindVar v
                            Nothing -> False
+
+    mk_msg polykinds | not polykinds
+                     , all isKind tc_args   -- Non-empty, all kinds, at least one not a kind variable
+                     = hang (ptext (sLit "To make a Typeable instance of poly-kinded") 
+                              <+> quotes (ppr tycon) <> comma)
+                          2 (ptext (sLit "use XPolyKinds"))
+                     | otherwise     
+                     = ptext (sLit "Derived Typeable instance must be of form") 
+                       <+> parens (ptext (sLit "Typeable") <+> ppr tycon)
 
 ----------------------
 inferConstraints :: Class -> [TcType]
