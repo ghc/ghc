@@ -108,6 +108,7 @@ import qualified Data.Set as Set
 --
 -- a nice loop, but we didn't eliminate the silly assignment at the end.
 -- See Note [dependent assignments], which would probably fix this.
+-- This is #8336 on Trac.
 --
 -- -----------
 -- (2) From stg_atomically_frame in PrimOps.cmm
