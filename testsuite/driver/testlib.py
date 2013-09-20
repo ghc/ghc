@@ -12,6 +12,8 @@ import errno
 import string
 import re
 import traceback
+import time
+import datetime
 import copy
 import glob
 import types
@@ -2114,7 +2116,10 @@ def summary(t, file):
     file.write('\n')
     printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
     file.write('OVERALL SUMMARY for test run started at '
-               + t.start_time + '\n'
+               + time.strftime("%c %Z", t.start_time) + '\n'
+               + string.rjust(str(datetime.timedelta(seconds=
+                    round(time.time() - time.mktime(t.start_time)))), 8)
+               + ' spent to go through\n'
                + string.rjust(`t.total_tests`, 8)
                + ' total tests, which gave rise to\n'
                + string.rjust(`t.total_test_cases`, 8)

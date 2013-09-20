@@ -123,7 +123,7 @@ def getConfig():
 
 class TestRun:
    def __init__(self):
-       self.start_time = ''
+       self.start_time = None
        self.total_tests = 0
        self.total_test_cases = 0
        self.n_framework_failures = 0

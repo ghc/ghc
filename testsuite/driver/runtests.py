@@ -232,12 +232,9 @@ print 'Found', len(t_files), '.T files...'
 t = getTestRun()
 
 # Avoid cmd.exe built-in 'date' command on Windows
-if not windows:
-    t.start_time = chop(os.popen('date').read())
-else:
-    t.start_time = 'now'
+t.start_time = time.localtime()
 
-print 'Beginning test run at', t.start_time
+print 'Beginning test run at', time.strftime("%c %Z",t.start_time)
 
 # set stdout to unbuffered (is this the best way to do it?)
 sys.stdout.flush()
