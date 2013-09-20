@@ -105,7 +105,9 @@ test('conc009', [only_compiler_types(['ghc']), exit_code(1)],
 test('conc010', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # conc012(ghci) needs a smaller stack, or it takes forever
-test('conc012', normal, compile_and_run, ['+RTS -K8m -RTS'])
+test('conc012', [only_compiler_types(['ghc']),
+                 extra_run_opts('+RTS -K8m -RTS')],
+                compile_and_run, [''])
 
 test('conc013', only_compiler_types(['ghc']), compile_and_run, [''])
 
