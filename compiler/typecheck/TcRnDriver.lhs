@@ -87,7 +87,7 @@ import TcMatches
 import RnTypes
 import RnExpr
 import MkId
-import BasicTypes
+import BasicTypes hiding( SuccessFlag(..) )
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 #endif
@@ -911,14 +911,18 @@ rnTopSrcDecls extra_deps group
 
         return (tcg_env', rn_decls)
    }
+\end{code}
 
 
+%************************************************************************
+%*                                                                      *
+                AMP warnings
+     The functions defined here issue warnings according to 
+     the 2013 Applicative-Monad proposal. (Trac #8004)
+%*                                                                      *
+%************************************************************************
 
--- ########## BEGIN AMP WARNINGS ###############################################
---
--- The functions defined here issue warnings according to the 2013
--- Applicative-Monad proposal. (#8004)
-
+\begin{code}
 -- | Main entry point for generating AMP warnings
 tcAmpWarn :: TcM ()
 tcAmpWarn =
@@ -986,8 +990,8 @@ tcAmpMissingParentClassWarn :: Name -- ^ Class instance is defined for
 --           Example: in case of Applicative/Monad: is = Monad,
 --                                                  should = Applicative
 tcAmpMissingParentClassWarn isName shouldName
-  = do { isClass'     <- tcLookupClassMaybe isName     -- Note [tryTc oddity] 
-       ; shouldClass' <- tcLookupClassMaybe shouldName -- Note [tryTc oddity]
+  = do { isClass'     <- tcLookupClass_maybe isName
+       ; shouldClass' <- tcLookupClass_maybe shouldName
        ; case (isClass', shouldClass') of
               (Just isClass, Just shouldClass) -> do
                   { localInstances <- tcGetInsts
@@ -1031,28 +1035,31 @@ tcAmpMissingParentClassWarn isName shouldName
                   warnMsg (is_tcs isInst)
            }
 
-{-
-Note [tryTc oddity]
-~~~~~~~~~~~~~~~~~~~
-tcLookupClass in tcLookupClassMaybe should fail all on its own if the
-given name doesn't exist, and the names we're looking for in the AMP
-check should always exist. However, under some mysterious
-circumstances, base apparently fails to compile without catching the
-errors via tryTc. So tcLookupClassMaybe wraps all this behavior
-together.
--}
 
 -- | Looks up a class, returning Nothing on failure. Similar to
 --   TcEnv.tcLookupClass, but does not issue any error messages.
-tcLookupClassMaybe :: Name -> TcM (Maybe Class)
-tcLookupClassMaybe = fmap toMaybe . tryTc . tcLookupClass
-    where toMaybe (_, Just cls) = Just cls
-          toMaybe _             = Nothing
+--
+-- In particular, it may be called by the AMP check on, say, 
+-- Control.Applicative.Applicative, well before Control.Applicative 
+-- has been compiled.  In this case we just return Nothing, and the
+-- AMP test is silently dropped.
+tcLookupClass_maybe :: Name -> TcM (Maybe Class)
+tcLookupClass_maybe name
+  = do { mb_thing <- tcLookupImported_maybe name
+       ; case mb_thing of
+            Succeeded (ATyCon tc) | Just cls <- tyConClass_maybe tc -> return (Just cls)
+            _ -> return Nothing }
+\end{code}
 
--- ########## END AMP WARNINGS #################################################
+
+%************************************************************************
+%*                                                                      *
+                tcTopSrcDecls
+%*                                                                      *
+%************************************************************************
 
 
-
+\begin{code}
 tcTopSrcDecls :: ModDetails -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls boot_details
         (HsGroup { hs_tyclds = tycl_decls,

@@ -72,7 +72,8 @@ import Util
 import Data.List        ( mapAccumL )
 import Unique
 import Data.Maybe
-import BasicTypes
+import BasicTypes hiding( SuccessFlag(..) )
+import Maybes( MaybeErr(..) )
 import DynFlags
 import Panic
 import FastString
@@ -1135,14 +1136,10 @@ tcLookupTh name
                 Nothing    -> failWithTc (notInEnv name)
 
           else do               -- It's imported
-        { (eps,hpt) <- getEpsAndHpt
-        ; dflags <- getDynFlags
-        ; case lookupType dflags hpt (eps_PTE eps) name of
-            Just thing -> return (AGlobal thing)
-            Nothing    -> do { thing <- tcImportDecl name
-                             ; return (AGlobal thing) }
-                -- Imported names should always be findable;
-                -- if not, we fail hard in tcImportDecl
+        { mb_thing <- tcLookupImported_maybe name
+        ; case mb_thing of
+            Succeeded thing -> return (AGlobal thing)
+            Failed msg      -> failWithTc msg
     }}}}
 
 notInScope :: TH.Name -> SDoc

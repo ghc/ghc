@@ -81,13 +81,14 @@ import VarEnv
 import HscTypes
 import DynFlags
 import SrcLoc
-import BasicTypes
+import BasicTypes hiding( SuccessFlag(..) )
 import Module
 import Outputable
 import Encoding
 import FastString
 import ListSetOps
 import Util
+import Maybes( MaybeErr(..) )
 import Data.IORef
 import Data.List
 \end{code}
@@ -129,11 +130,10 @@ tcLookupGlobal name
                          | otherwise -> do
 
            -- Try home package table and external package table
-        { hsc_env <- getTopEnv
-        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
-        ; case mb_thing of  
-            Just thing -> return thing 
-            Nothing    -> tcImportDecl name   -- Go find it in an interface
+        { mb_thing <- tcLookupImported_maybe name
+        ; case mb_thing of
+            Succeeded thing -> return thing
+            Failed msg      -> failWithTc msg
         }}}}
 
 tcLookupField :: Name -> TcM Id         -- Returns the selector Id
