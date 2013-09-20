@@ -1837,13 +1837,17 @@ toIfaceExpr (Case s x ty as)
   | otherwise               = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
-toIfaceExpr (Tick t e)    = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
+toIfaceExpr (Tick t e) 
+  | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e) 
+  | otherwise                   = toIfaceExpr e
 
 ---------------------
-toIfaceTickish :: Tickish Id -> IfaceTickish
-toIfaceTickish (ProfNote cc tick push) = IfaceSCC cc tick push
-toIfaceTickish (HpcTick modl ix)       = IfaceHpcTick modl ix
-toIfaceTickish _ = panic "toIfaceTickish"
+toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
+toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
+toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
+toIfaceTickish (Breakpoint {})         = Nothing 
+   -- Ignore breakpoints, since they are relevant only to GHCi, and 
+   -- should not be serialised (Trac #8333)
 
 ---------------------
 toIfaceBind :: Bind Id -> IfaceBinding
