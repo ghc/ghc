@@ -288,3 +288,8 @@ test('TH_Roles3', normal, compile, ['-v0 -dsuppress-uniques'])
 test('TH_Roles4', normal, compile, ['-v0'])
 
 test('T8186', normal, compile_and_run, ['-v0'])
+
+test('T8333',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T8333'])

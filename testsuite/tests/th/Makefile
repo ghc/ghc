@@ -34,3 +34,6 @@ TH_Depends:
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
 	./TH_Depends
 
+
+T8333:
+	$(TEST_HC) $(TEST_HC_OPTS) $(ghcThWayFlags) --interactive T8333.hs < /dev/null

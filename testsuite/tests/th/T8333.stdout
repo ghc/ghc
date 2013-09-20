@@ -1,0 +1,7 @@
+GHCi, version 7.7.20130919: http://www.haskell.org/ghc/  :? for help
+Loading package ghc-prim ... linking ... done.
+Loading package integer-gmp ... linking ... done.
+Loading package base ... linking ... done.
+[1 of 1] Compiling Main             ( T8333.hs, interpreted )
+Ok, modules loaded: Main.
+*Main> Leaving GHCi.
