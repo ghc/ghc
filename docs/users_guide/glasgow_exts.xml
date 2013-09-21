@@ -423,7 +423,11 @@ Indeed, the bindings can even be recursive.
 	import <literal>GHC.Prim</literal> (see <xref linkend="primitives"/>);
 	the <option>-XMagicHash</option> extension
 	then allows you to <emphasis>refer</emphasis> to the <literal>Int&num;</literal>
-	that is now in scope.</para>
+	that is now in scope. Note that with this option, the meaning of <literal>x&num;y = 0</literal>
+	is changed: it defines a function <literal>x&num;</literal> taking a single argument <literal>y</literal>;
+        to define the operator <literal>&num;</literal>, put a space: <literal>x &num; y = 0</literal>.
+
+</para>
       <para> The <option>-XMagicHash</option> also enables some new forms of literals (see <xref linkend="glasgow-unboxed"/>):
 	<itemizedlist>
 	  <listitem><para> <literal>'x'&num;</literal> has type <literal>Char&num;</literal></para> </listitem>
@@ -2268,11 +2272,28 @@ The following syntax is stolen:
 	      <replaceable>string</replaceable><literal>&num;</literal>,
 	      <replaceable>integer</replaceable><literal>&num;</literal>,
 	      <replaceable>float</replaceable><literal>&num;</literal>,
-	      <replaceable>float</replaceable><literal>&num;&num;</literal>,
-	      <literal>(&num;</literal>, <literal>&num;)</literal>
+	      <replaceable>float</replaceable><literal>&num;&num;</literal>
 	</term>
 	<listitem><para>
 	Stolen by: <option>-XMagicHash</option>
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	      <literal>(&num;</literal>, <literal>&num;)</literal>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XUnboxedTuples</option>
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	      <replaceable>varid</replaceable><literal>!</literal><replaceable>varid</replaceable>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XBangPatterns</option>
 	  </para></listitem>
       </varlistentry>
     </variablelist>
