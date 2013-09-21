@@ -244,7 +244,20 @@ class Eq a => Bits a where
                 (rotate | (rotateL, rotateR)),
                 bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
 
+-- |The 'FiniteBits' class denotes types with a finite, fixed number of bits.
+--
+-- /Since: 4.7.0.0/
 class Bits b => FiniteBits b where
+    -- | Return the number of bits in the type of the argument.
+    -- The actual value of the argument is ignored. Moreover, 'finiteBitSize'
+    -- is total, in contrast to the deprecated 'bitSize' function it replaces.
+    --
+    -- @
+    -- 'finiteBitSize' = 'bitSize'
+    -- 'bitSizeMaybe' = 'Just' . 'finiteBitSize'
+    -- @
+    --
+    -- /Since: 4.7.0.0/
     finiteBitSize :: b -> Int
 
 -- The defaults below are written with lambdas so that e.g.
