@@ -871,14 +871,8 @@ allocMoreStack
   -> UniqSM (NatCmmDecl statics X86.Instr.Instr)
 
 allocMoreStack _ _ top@(CmmData _ _) = return top
-allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
-    let
-        infos = mapKeys info
-        entries = case code of
-                    [] -> infos
-                    BasicBlock entry _ : _ -- first block is the entry point
-                       | entry `elem` infos -> infos
-                       | otherwise          -> entry : infos
+allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
+    let entries = entryBlocks proc
 
     uniqs <- replicateM (length entries) getUniqueUs
 

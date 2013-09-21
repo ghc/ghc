@@ -40,7 +40,6 @@ import Digraph
 import DynFlags
 import Outputable
 import Platform
-import Unique
 import UniqSet
 import UniqFM
 import UniqSupply
@@ -638,9 +637,9 @@ natCmmTopToLive (CmmData i d)
 natCmmTopToLive (CmmProc info lbl live (ListGraph []))
         = CmmProc (LiveInfo info Nothing Nothing Map.empty) lbl live []
 
-natCmmTopToLive (CmmProc info lbl live (ListGraph blocks@(first : _)))
+natCmmTopToLive proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
  = let  first_id        = blockId first
-        sccs            = sccBlocks blocks
+        sccs            = sccBlocks blocks (entryBlocks proc)
         sccsLive        = map (fmap (\(BasicBlock l instrs) ->
                                         BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
                         $ sccs
@@ -648,21 +647,48 @@ natCmmTopToLive (CmmProc info lbl live (ListGraph blocks@(first : _)))
    in   CmmProc (LiveInfo info (Just first_id) Nothing Map.empty) lbl live sccsLive
 
 
+--
+-- Compute the liveness graph of the set of basic blocks.  Important:
+-- we also discard any unreachable code here, starting from the entry
+-- points (the first block in the list, and any blocks with info
+-- tables).  Unreachable code arises when code blocks are orphaned in
+-- earlier optimisation passes, and may confuse the register allocator
+-- by referring to registers that are not initialised.  It's easy to
+-- discard the unreachable code as part of the SCC pass, so that's
+-- exactly what we do. (#7574)
+--
 sccBlocks
         :: Instruction instr
         => [NatBasicBlock instr]
+        -> [BlockId]
         -> [SCC (NatBasicBlock instr)]
 
-sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
+sccBlocks blocks entries = map (fmap get_node) sccs
   where
+        sccs = stronglyConnCompFromG graph roots
+
+        graph = graphFromEdgedVertices nodes
+
+        -- nodes :: [(NatBasicBlock instr, Unique, [Unique])]
+        nodes = [ (block, id, getOutEdges instrs)
+                | block@(BasicBlock id instrs) <- blocks ]
+
+        get_node (n, _, _) = n
+
         getOutEdges :: Instruction instr => [instr] -> [BlockId]
         getOutEdges instrs = concat $ map jumpDestsOfInstr instrs
 
-        graph = [ (block, getUnique id, map getUnique (getOutEdges instrs))
-                | block@(BasicBlock id instrs) <- blocks ]
+        -- This is truly ugly, but I don't see a good alternative.
+        -- Digraph just has the wrong API.  We want to identify nodes
+        -- by their keys (BlockId), but Digraph requires the whole
+        -- node: (NatBasicBlock, BlockId, [BlockId]).  This takes
+        -- advantage of the fact that Digraph only looks at the key,
+        -- even though it asks for the whole triple.
+        roots = [(panic "sccBlocks",b,panic "sccBlocks") | b <- entries ]
 
 
----------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
 -- Annotate code with register liveness information
 --
 regLiveness
