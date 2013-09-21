@@ -173,7 +173,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #if i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ (
  	  "lock\ncmpxchg %3,%1"
-          :"=a"(o), "=m" (*(volatile unsigned int *)p) 
+          :"=a"(o), "+m" (*(volatile unsigned int *)p)
           :"0" (o), "r" (n));
     return o;
 #elif powerpc_HOST_ARCH
