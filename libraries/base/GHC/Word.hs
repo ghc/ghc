@@ -303,6 +303,9 @@ instance Bits Word16 where
 instance FiniteBits Word16 where
     finiteBitSize _ = 16
 
+-- | Swap bytes in 'Word16'.
+--
+-- /Since: 4.7.0.0/
 byteSwap16 :: Word16 -> Word16
 byteSwap16 (W16# w#) = W16# (narrow16Word# (byteSwap16# w#))
 
@@ -530,6 +533,9 @@ instance Read Word32 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 #endif
 
+-- | Reverse order of bytes in 'Word32'.
+--
+-- /Since: 4.7.0.0/
 byteSwap32 :: Word32 -> Word32
 byteSwap32 (W32# w#) = W32# (narrow32Word# (byteSwap32# w#))
 
@@ -781,6 +787,9 @@ instance Ix Word64 where
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
+-- | Reverse order of bytes in 'Word64'.
+--
+-- /Since: 4.7.0.0/
 #if WORD_SIZE_IN_BITS < 64
 byteSwap64 :: Word64 -> Word64
 byteSwap64 (W64# w#) = W64# (byteSwap64# w#)

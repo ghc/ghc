@@ -193,6 +193,8 @@ class Typeable a where
   typeRep :: proxy a -> TypeRep
   -- ^ Takes a value of type @a@ and returns a concrete representation
   -- of that type.
+  --
+  -- /Version: 4.7.0.0/
 
 -- Keeping backwards-compatibility
 typeOf :: forall a. Typeable a => a -> TypeRep

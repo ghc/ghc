@@ -111,6 +111,8 @@ renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) (reverse strs)
 
 -- | Like the function 'error', but appends a stack trace to the error
 -- message if one is available.
+--
+-- /Since: 4.7.0.0/
 errorWithStackTrace :: String -> a
 errorWithStackTrace x = unsafeDupablePerformIO $ do
    stack <- ccsToStrings =<< getCurrentCCS x

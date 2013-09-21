@@ -73,6 +73,8 @@ fingerprintString str = unsafeDupablePerformIO $
 
 -- | Computes the hash of a given file.
 -- This function loops over the handle, running in constant memory.
+--
+-- /Since: 4.7.0.0/
 getFileHash :: FilePath -> IO Fingerprint
 getFileHash path = withBinaryFile path ReadMode $ \h -> do
   allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do

@@ -156,6 +156,8 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
 -- |A non-blocking version of 'readMVar'.  The 'tryReadMVar' function
 -- returns immediately, with 'Nothing' if the 'MVar' was empty, or
 -- @'Just' a@ if the 'MVar' was full with contents @a@.
+--
+-- /Since: 4.7.0.0/
 tryReadMVar :: MVar a -> IO (Maybe a)
 tryReadMVar (MVar m) = IO $ \ s ->
     case tryReadMVar# m s of

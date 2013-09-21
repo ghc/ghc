@@ -266,6 +266,8 @@ ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
 --
 -- Throws `Control.Exception.IOException` if @name@ is the empty string or
 -- contains an equals sign.
+--
+-- /Since: 4.7.0.0/
 setEnv :: String -> String -> IO ()
 setEnv key_ value_
   | null key       = throwIO (mkIOError InvalidArgument "setEnv" Nothing Nothing)
@@ -308,6 +310,8 @@ foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
 --
 -- Throws `Control.Exception.IOException` if @name@ is the empty string or
 -- contains an equals sign.
+--
+-- /Since: 4.7.0.0/
 unsetEnv :: String -> IO ()
 #ifdef mingw32_HOST_OS
 unsetEnv key = withCWString key $ \k -> do

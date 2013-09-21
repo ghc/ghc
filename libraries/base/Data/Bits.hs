@@ -149,6 +149,8 @@ class Eq a => Bits a where
     {-| Return the number of bits in the type of the argument.  The actual
         value of the argument is ignored.  Returns Nothing
         for types that do not have a fixed bitsize, like 'Integer'.
+
+        /Since: 4.7.0.0/
         -}
     bitSizeMaybe      :: a -> Maybe Int
 

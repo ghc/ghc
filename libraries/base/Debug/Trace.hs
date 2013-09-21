@@ -105,6 +105,8 @@ trace string expr = unsafePerformIO $ do
 
 {-|
 Like 'trace' but returns the message instead of a third value.
+
+/Since: 4.7.0.0/
 -}
 traceId :: String -> String
 traceId a = trace a a
@@ -127,6 +129,8 @@ traceShow = trace . show
 
 {-|
 Like 'traceShow' but returns the shown value instead of a third value.
+
+/Since: 4.7.0.0/
 -}
 traceShowId :: (Show a) => a -> a
 traceShowId a = trace (show a) a
@@ -141,6 +145,8 @@ monad, as 'traceIO' is in the 'IO' monad.
 >   traceM $ "x: " ++ show x
 >   y <- ...
 >   traceM $ "y: " ++ show y
+
+/Since: 4.7.0.0/
 -}
 traceM :: (Monad m) => String -> m ()
 traceM string = trace string $ return ()
@@ -153,6 +159,8 @@ Like 'traceM', but uses 'show' on the argument to convert it to a 'String'.
 >   traceMShow $ x
 >   y <- ...
 >   traceMShow $ x + y
+
+/Since: 4.7.0.0/
 -}
 traceShowM :: (Show a, Monad m) => a -> m ()
 traceShowM = traceM . show
@@ -246,6 +254,7 @@ traceEventIO msg =
 -- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
 -- that uses 'traceMarker'.
 --
+-- /Since: 4.7.0.0/
 traceMarker :: String -> a -> a
 traceMarker msg expr = unsafeDupablePerformIO $ do
     traceMarkerIO msg
@@ -257,6 +266,7 @@ traceMarker msg expr = unsafeDupablePerformIO $ do
 -- Compared to 'traceMarker', 'traceMarkerIO' sequences the event with respect to
 -- other IO actions.
 --
+-- /Since: 4.7.0.0/
 traceMarkerIO :: String -> IO ()
 traceMarkerIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->

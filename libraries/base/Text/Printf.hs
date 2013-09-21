@@ -331,7 +331,9 @@ instance (PrintfArg a, HPrintfType r) => HPrintfType (a -> r) where
 -- default 'parseFormat' expects no modifiers: this is the normal
 -- case. Minimal instance: 'formatArg'.
 class PrintfArg a where
+    -- | /Since: 4.7.0.0/
     formatArg :: a -> FieldFormatter
+    -- | /Since: 4.7.0.0/
     parseFormat :: a -> ModifierParser
     parseFormat _ (c : cs) = FormatParse "" c cs
     parseFormat _ "" = errorShortFormat
@@ -398,7 +400,9 @@ instance PrintfArg Double where
 -- type, is not allowable as a typeclass instance. 'IsChar'
 -- is exported for backward-compatibility.
 class IsChar c where
+    -- | /Since: 4.7.0.0/
     toChar :: c -> Char
+    -- | /Since: 4.7.0.0/
     fromChar :: Char -> c
 
 instance IsChar Char where
@@ -409,14 +413,20 @@ instance IsChar Char where
 
 -- | Whether to left-adjust or zero-pad a field. These are
 -- mutually exclusive, with 'LeftAdjust' taking precedence.
+--
+-- /Since: 4.7.0.0/
 data FormatAdjustment = LeftAdjust | ZeroPad
 
 -- | How to handle the sign of a numeric field.  These are
 -- mutually exclusive, with 'SignPlus' taking precedence.
+--
+-- /Since: 4.7.0.0/
 data FormatSign = SignPlus | SignSpace
 
 -- | Description of field formatting for 'formatArg'. See UNIX `printf`(3)
 -- for a description of how field formatting works.
+--
+-- /Since: 4.7.0.0/
 data FieldFormat = FieldFormat {
   fmtWidth :: Maybe Int,       -- ^ Total width of the field.
   fmtPrecision :: Maybe Int,   -- ^ Secondary field width specifier.
@@ -449,6 +459,8 @@ data FieldFormat = FieldFormat {
 -- | The \"format parser\" walks over argument-type-specific
 -- modifier characters to find the primary format character.
 -- This is the type of its result.
+--
+-- /Since: 4.7.0.0/
 data FormatParse = FormatParse {
   fpModifiers :: String,   -- ^ Any modifiers found.
   fpChar :: Char,          -- ^ Primary format character.
@@ -489,26 +501,36 @@ parseIntFormat _ s =
 
 -- | This is the type of a field formatter reified over its
 -- argument.
+--
+-- /Since: 4.7.0.0/
 type FieldFormatter = FieldFormat -> ShowS
 
 -- | Type of a function that will parse modifier characters
 -- from the format string.
+--
+-- /Since: 4.7.0.0/
 type ModifierParser = String -> FormatParse
 
 -- | Substitute a \'v\' format character with the given
 -- default format character in the 'FieldFormat'. A
 -- convenience for user-implemented types, which should
 -- support \"%v\".
+--
+-- /Since: 4.7.0.0/
 vFmt :: Char -> FieldFormat -> FieldFormat
 vFmt c ufmt@(FieldFormat {fmtChar = 'v'}) = ufmt {fmtChar = c}
 vFmt _ ufmt = ufmt
 
 -- | Formatter for 'Char' values.
+--
+-- /Since: 4.7.0.0/
 formatChar :: Char -> FieldFormatter
 formatChar x ufmt =
   formatIntegral (Just 0) (toInteger $ ord x) $ vFmt 'c' ufmt
 
 -- | Formatter for 'String' values.
+--
+-- /Since: 4.7.0.0/
 formatString :: IsChar a => [a] -> FieldFormatter
 formatString x ufmt =
   case fmtChar $ vFmt 's' ufmt of
@@ -532,6 +554,8 @@ fixupMods ufmt m =
       Nothing -> perror "unknown format modifier"
 
 -- | Formatter for 'Int' values.
+--
+-- /Since: 4.7.0.0/
 formatInt :: (Integral a, Bounded a) => a -> FieldFormatter
 formatInt x ufmt =
   let lb = toInteger $ minBound `asTypeOf` x
@@ -543,6 +567,8 @@ formatInt x ufmt =
   formatIntegral m (toInteger x) ufmt'
 
 -- | Formatter for 'Integer' values.
+--
+-- /Since: 4.7.0.0/
 formatInteger :: Integer -> FieldFormatter
 formatInteger x ufmt =
   let m = fixupMods ufmt Nothing in
@@ -582,6 +608,8 @@ formatIntegral m x ufmt0 =
     upcase (s1, s2) = (s1, map toUpper s2)
 
 -- | Formatter for 'RealFloat' values.
+--
+-- /Since: 4.7.0.0/
 formatRealFloat :: RealFloat a => a -> FieldFormatter
 formatRealFloat x ufmt =
   let c = fmtChar $ vFmt 'g' ufmt
@@ -856,21 +884,31 @@ dfmt c p a d =
 
 -- | Raises an 'error' with a printf-specific prefix on the
 -- message string.
+--
+-- /Since: 4.7.0.0/
 perror :: String -> a
 perror s = error $ "printf: " ++ s
 
 -- | Calls 'perror' to indicate an unknown format letter for
 -- a given type.
+--
+-- /Since: 4.7.0.0/
 errorBadFormat :: Char -> a
 errorBadFormat c = perror $ "bad formatting char " ++ show c
 
 errorShortFormat, errorMissingArgument, errorBadArgument :: a
 -- | Calls 'perror' to indicate that the format string ended
 -- early.
+--
+-- /Since: 4.7.0.0/
 errorShortFormat = perror "formatting string ended prematurely"
 -- | Calls 'perror' to indicate that there is a missing
 -- argument in the argument list.
+--
+-- /Since: 4.7.0.0/
 errorMissingArgument = perror "argument list ended prematurely"
 -- | Calls 'perror' to indicate that there is a type
 -- error or similar in the given argument.
+--
+-- /Since: 4.7.0.0/
 errorBadArgument = perror "bad argument"

@@ -10,6 +10,7 @@
 -- function mkTyCon which is used by derived instances of Typeable to
 -- construct a TyCon.
 --
+-- /Since: 4.7.0.0/
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP

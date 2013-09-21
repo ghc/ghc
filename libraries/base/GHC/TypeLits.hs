@@ -316,6 +316,8 @@ type instance FromNat1 (Succ n) = 1 + FromNat1 n
 --------------------------------------------------------------------------------
 
 -- | A type that provides evidence for equality between two types.
+--
+-- /Since: 4.7.0.0/
 data (:~:) :: k -> k -> * where
   Refl :: a :~: a
 

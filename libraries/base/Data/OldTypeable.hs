@@ -28,6 +28,7 @@
 -- deprecated; users are recommended to use the kind-polymorphic
 -- "Data.Typeable" module instead.
 --
+-- /Since: 4.7.0.0/
 -----------------------------------------------------------------------------
 
 module Data.OldTypeable {-# DEPRECATED "Use Data.Typeable instead" #-} -- deprecated in 7.8

@@ -73,6 +73,7 @@ numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
 numberToInteger _ = Nothing
 
+-- | /Since: 4.7.0.0/
 numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
 numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart, 0)
 numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart, 0)
@@ -151,6 +152,7 @@ numberToRational (MkDecimal iPart mFPart mExp)
 lex :: ReadP Lexeme
 lex = skipSpaces >> lexToken
 
+-- | /Since: 4.7.0.0/
 expect :: Lexeme -> ReadP ()
 expect lexeme = do { skipSpaces 
                    ; thing <- lexToken

@@ -434,6 +434,8 @@ threadWaitWrite fd
 -- to read from a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
+--
+-- /Since: 4.7.0.0/
 threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM fd
 #ifdef mingw32_HOST_OS
@@ -456,6 +458,8 @@ threadWaitReadSTM fd
 -- can be written to a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
+--
+-- /Since: 4.7.0.0/
 threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM fd
 #ifdef mingw32_HOST_OS

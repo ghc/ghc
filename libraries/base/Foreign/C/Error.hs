@@ -204,6 +204,7 @@ eNOTDIR         = Errno (CONST_ENOTDIR)
 eNOTEMPTY       = Errno (CONST_ENOTEMPTY)
 eNOTSOCK        = Errno (CONST_ENOTSOCK)
 eNOTSUP         = Errno (CONST_ENOTSUP)
+-- ^ /Since: 4.7.0.0/
 eNOTTY          = Errno (CONST_ENOTTY)
 eNXIO           = Errno (CONST_ENXIO)
 eOPNOTSUPP      = Errno (CONST_EOPNOTSUPP)
