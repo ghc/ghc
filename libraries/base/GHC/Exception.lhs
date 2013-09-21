@@ -191,7 +191,7 @@ data ArithException
   | LossOfPrecision
   | DivideByZero
   | Denormal
-  | RatioZeroDenominator
+  | RatioZeroDenominator -- ^ /Since: 4.6.0.0/
   deriving (Eq, Ord, Typeable)
 
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException

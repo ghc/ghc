@@ -28,6 +28,10 @@ import Foreign.Ptr
 #include "Rts.h"
 
 foreign import ccall "getGCStats"        getGCStats_       :: Ptr () -> IO ()
+
+-- | Returns whether GC stats have been enabled (with @+RTS -T@, for example).
+--
+-- /Since: 4.6.0.0/
 foreign import ccall "getGCStatsEnabled" getGCStatsEnabled :: IO Bool
 
 -- I'm probably violating a bucket of constraints here... oops.

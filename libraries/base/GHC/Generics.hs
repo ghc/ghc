@@ -23,7 +23,8 @@
 -- (<http://www.haskell.org/haskellwiki/GHC.Generics>)
 -- or use the generic-deriving package on Hackage:
 -- <http://hackage.haskell.org/package/generic-deriving>.
--- 
+--
+-- /Since: 4.6.0.0/
 -----------------------------------------------------------------------------
 
 module GHC.Generics  (

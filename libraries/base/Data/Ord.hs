@@ -40,6 +40,8 @@ comparing p x y = compare (p x) (p y)
 -- values thus wrapped will give you the opposite of their normal sort order.
 -- This is particularly useful when sorting in generalised list comprehensions,
 -- as in: @then sortWith by 'Down' x@
+--
+-- /Since: 4.6.0.0/
 newtype Down a = Down a deriving (Eq)
 
 instance Ord a => Ord (Down a) where

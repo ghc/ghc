@@ -70,6 +70,8 @@ modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = readIORef ref >>= writeIORef ref . f
 
 -- |Strict version of 'modifyIORef'
+--
+-- /Since: 4.6.0.0/
 modifyIORef' :: IORef a -> (a -> a) -> IO ()
 modifyIORef' ref f = do
     x <- readIORef ref
@@ -100,6 +102,8 @@ atomicModifyIORef = GHC.IORef.atomicModifyIORef
 
 -- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
 -- in the 'IORef' as well as the value returned.
+--
+-- /Since: 4.6.0.0/
 atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
 atomicModifyIORef' ref f = do
     b <- atomicModifyIORef ref
@@ -109,6 +113,8 @@ atomicModifyIORef' ref f = do
 
 -- | Variant of 'writeIORef' with the \"barrier to reordering\" property that
 -- 'atomicModifyIORef' has.
+--
+-- /Since: 4.6.0.0/
 atomicWriteIORef :: IORef a -> a -> IO ()
 atomicWriteIORef ref a = do
     x <- atomicModifyIORef ref (\_ -> (a, ()))

@@ -269,6 +269,8 @@ class Bits b => FiniteBits b where
 -- | Default implementation for 'bit'.
 --
 -- Note that: @bitDefault i = 1 `shiftL` i@
+--
+-- /Since: 4.6.0.0/
 bitDefault :: (Bits a, Num a) => Int -> a
 bitDefault = \i -> 1 `shiftL` i
 {-# INLINE bitDefault #-}
@@ -276,6 +278,8 @@ bitDefault = \i -> 1 `shiftL` i
 -- | Default implementation for 'testBit'.
 --
 -- Note that: @testBitDefault x i = (x .&. bit i) /= 0@
+--
+-- /Since: 4.6.0.0/
 testBitDefault ::  (Bits a, Num a) => a -> Int -> Bool
 testBitDefault = \x i -> (x .&. bit i) /= 0
 {-# INLINE testBitDefault #-}
@@ -284,6 +288,8 @@ testBitDefault = \x i -> (x .&. bit i) /= 0
 --
 -- This implementation is intentionally naive. Instances are expected to provide
 -- an optimized implementation for their size.
+--
+-- /Since: 4.6.0.0/
 popCountDefault :: (Bits a, Num a) => a -> Int
 popCountDefault = go 0
  where

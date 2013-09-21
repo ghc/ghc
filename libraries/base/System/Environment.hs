@@ -213,6 +213,8 @@ foreign import WINDOWS_CCONV unsafe "windows.h GetLastError"
 -- there is no such value.
 --
 -- For POSIX users, this is equivalent to 'System.Posix.Env.getEnv'.
+--
+-- /Since: 4.6.0.0/
 lookupEnv :: String -> IO (Maybe String)
 #ifdef mingw32_HOST_OS
 lookupEnv name = withCWString name $ \s -> try_size s 256

@@ -196,6 +196,7 @@ attribute will block all other threads.
 -- This function is useful for informing the parent when a child
 -- terminates, for example.
 --
+-- /Since: 4.6.0.0/
 forkFinally :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
 forkFinally action and_then =
   mask $ \restore ->

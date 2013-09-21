@@ -61,6 +61,7 @@ data Lexeme
   | EOF
  deriving (Eq, Show)
 
+-- | /Since: 4.6.0.0/
 data Number = MkNumber Int              -- Base
                        Digits           -- Integral part
             | MkDecimal Digits          -- Integral part
@@ -130,6 +131,7 @@ numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
                 else Just (numberToRational n)
 numberToRangedRational _ n = Just (numberToRational n)
 
+-- | /Since: 4.6.0.0/
 numberToRational :: Number -> Rational
 numberToRational (MkNumber base iPart) = val (fromIntegral base) 0 iPart % 1
 numberToRational (MkDecimal iPart mFPart mExp)

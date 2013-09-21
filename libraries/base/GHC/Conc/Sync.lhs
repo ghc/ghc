@@ -507,6 +507,7 @@ threadCapability (ThreadId t) = IO $ \s ->
 -- caller must use @deRefWeak@ first to determine whether the thread
 -- still exists.
 --
+-- /Since: 4.6.0.0/
 mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
 mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
    case mkWeakNoFinalizer# t# t s of
