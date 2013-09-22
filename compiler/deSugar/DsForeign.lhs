@@ -676,7 +676,7 @@ foreignExportInitialiser hs_fn =
     [ text "static void stginit_export_" <> ppr hs_fn
          <> text "() __attribute__((constructor));"
     , text "static void stginit_export_" <> ppr hs_fn <> text "()"
-    , braces (text "getStablePtr"
+    , braces (text "foreignExportStablePtr"
        <> parens (text "(StgPtr) &" <> ppr hs_fn <> text "_closure")
        <> semi)
     ]

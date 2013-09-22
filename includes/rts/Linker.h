@@ -49,4 +49,7 @@ HsInt resolveObjs( void );
 /* load a dynamic library */
 const char *addDLL( pathchar* dll_name );
 
+/* called by the initialization code for a module, not a user API */
+StgStablePtr foreignExportStablePtr (StgPtr p);
+
 #endif /* RTS_LINKER_H */
