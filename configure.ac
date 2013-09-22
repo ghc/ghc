@@ -375,7 +375,7 @@ AC_ARG_WITH([ffi-includes],
     AC_MSG_WARN([--with-ffi-includes will be ignored, --with-system-libffi not set])
  else
     FFIIncludeDir="$withval"
-    LIBFFI_CFLAGS="-I $withval" 
+    LIBFFI_CFLAGS="-I$withval"
  fi
 ])
 
