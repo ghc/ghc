@@ -254,7 +254,6 @@ module GHC (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import Linker           ( HValue )
 import ByteCodeInstr
 import BreakArray
 import InteractiveEval

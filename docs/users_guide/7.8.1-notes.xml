@@ -237,6 +237,21 @@
                 using the new flag <literal>-f[no-]warn-amp</literal>.
            </para>
        </listitem>
+        <listitem>
+            <para>
+                GHC's internal compiler pipeline is now exposed
+                through a <literal>Hooks</literal> module inside the
+                GHC API. These hooks allow you to control most of the
+                internal compiler phase machinery, including compiling
+                expressions, phase control, and linking.
+           </para>
+
+            <para>
+                Note: this interface will likely see continuous
+                refinment and API changes in future releases, so it
+                should be considered a preview.
+           </para>
+       </listitem>
    </itemizedlist>
   </sect2>
 

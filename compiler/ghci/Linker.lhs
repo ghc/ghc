@@ -11,7 +11,7 @@
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
-module Linker ( HValue, getHValue, showLinkerState,
+module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,

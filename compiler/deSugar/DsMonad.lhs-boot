@@ -1,0 +1,33 @@
+\begin{code}
+module DsMonad (DsM) where
+
+import TcRnTypes
+
+data DsGblEnv
+data DsLclEnv
+type DsM result = TcRnIf DsGblEnv DsLclEnv result
+
+\end{code}
+
+Some notes about this boot file (from Edsko):
+
+
+DsMonad has a (transitive) dependency on Hooks in at least two ways:
+once through Finder, which imports Packages, which imports Hooks; but
+that's easily solved, because Finder can import PackageState
+instead. However, it is less obvious to me how to resolve the
+following import cycle
+
+- DsMonad imports tcIfaceGlobal from TcIface
+- TcIface imports (loadWiredInHomeIface, loadInterface, loadDecls,
+findAndReadIface) from LoadIface
+- LoadIFace imports Hooks
+
+(There might be still others, this is the most direct one at the moment.)
+
+(Just to be clear, Hooks imports DsMonad because it needs the DsM type
+for the dsForeignsHook.)
+
+I'm sure this cycle can be broken somehow, but I'm not familiar enough
+with this part of the compiler to see if there is a natural point to
+do it.

@@ -75,7 +75,9 @@ module BasicTypes(
 
         SuccessFlag(..), succeeded, failed, successIf,
 
-        FractionalLit(..), negateFractionalLit, integralFractionalLit
+        FractionalLit(..), negateFractionalLit, integralFractionalLit,
+
+        HValue(..)
    ) where
 
 import FastString
@@ -83,6 +85,7 @@ import Outputable
 
 import Data.Data hiding (Fixity)
 import Data.Function (on)
+import GHC.Exts (Any)
 \end{code}
 
 %************************************************************************
@@ -897,4 +900,10 @@ instance Ord FractionalLit where
 
 instance Outputable FractionalLit where
   ppr = text . fl_text
+\end{code}
+
+\begin{code}
+
+newtype HValue = HValue Any
+
 \end{code}

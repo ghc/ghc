@@ -134,6 +134,7 @@ Library
         Demand
         Exception
         GhcMonad
+        Hooks
         Id
         IdInfo
         Literal
@@ -276,6 +277,7 @@ Library
         Constants
         DriverMkDepend
         DriverPhases
+        PipelineMonad
         DriverPipeline
         DynFlags
         ErrUtils

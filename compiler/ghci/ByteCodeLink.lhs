@@ -8,7 +8,6 @@ ByteCodeLink: Bytecode assembler and linker
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeLink (
-        HValue,
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
         linkBCO, lookupStaticPtr, lookupName
        ,lookupIE
@@ -21,6 +20,7 @@ import ByteCodeAsm
 import ObjLink
 
 import DynFlags
+import BasicTypes
 import Name
 import NameEnv
 import PrimOp
@@ -52,7 +52,6 @@ import GHC.Ptr          ( castPtr )
 
 \begin{code}
 type ClosureEnv = NameEnv (Name, HValue)
-newtype HValue = HValue Any
 
 emptyClosureEnv :: ClosureEnv
 emptyClosureEnv = emptyNameEnv

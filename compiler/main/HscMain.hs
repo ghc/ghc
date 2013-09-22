@@ -70,11 +70,18 @@ module HscMain
     , hscDecls, hscDeclsWithLocation
     , hscTcExpr, hscImport, hscKcType
     , hscCompileCoreExpr
+    -- * Low-level exports for hooks
+    , hscCompileCoreExpr'
 #endif
+    , hscParse', hscSimplify', hscDesugar', tcRnModule'
+    , hscSimpleIface', hscNormalIface'
+    , oneShotMsg
+    , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
     ) where
 
 #ifdef GHCI
 import Id
+import BasicTypes       ( HValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
@@ -128,6 +135,7 @@ import NameSet          ( emptyNameSet )
 import InstEnv
 import FamInstEnv
 import Fingerprint      ( Fingerprint )
+import Hooks
 
 import DynFlags
 import ErrUtils
@@ -190,38 +198,6 @@ knownKeyNames =              -- where templateHaskellNames are defined
 #endif
 
 -- -----------------------------------------------------------------------------
--- The Hsc monad: Passing an enviornment and warning state
-
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-
-instance Functor Hsc where
-    fmap = liftM
-
-instance Applicative Hsc where
-    pure = return
-    (<*>) = ap
-
-instance Monad Hsc where
-    return a    = Hsc $ \_ w -> return (a, w)
-    Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
-                                   case k a of
-                                       Hsc k' -> k' e w1
-
-instance MonadIO Hsc where
-    liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
-
-runHsc :: HscEnv -> Hsc a -> IO a
-runHsc hsc_env (Hsc hsc) = do
-    (a, w) <- hsc hsc_env emptyBag
-    printOrThrowWarnings (hsc_dflags hsc_env) w
-    return a
-
--- A variant of runHsc that switches in the DynFlags from the
--- InteractiveContext before running the Hsc computation.
---
-runInteractiveHsc :: HscEnv -> Hsc a -> IO a
-runInteractiveHsc hsc_env =
-  runHsc (hsc_env { hsc_dflags = ic_dflags (hsc_IC hsc_env) })
 
 getWarnings :: Hsc WarningMessages
 getWarnings = Hsc $ \_ w -> return (w, w)
@@ -234,9 +210,6 @@ logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
-
-instance HasDynFlags Hsc where
-    getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
@@ -527,13 +500,6 @@ This is the only thing that isn't caught by the type-system.
 -}
 
 
--- | Status of a compilation to hard-code
-data HscStatus
-    = HscNotGeneratingCode
-    | HscUpToDate
-    | HscUpdateBoot
-    | HscRecomp CgGuts ModSummary
-
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
 
 genericHscCompileGetFrontendResult ::
@@ -607,23 +573,35 @@ genericHscCompileGetFrontendResult always_do_basic_recompilation_check m_tc_resu
                         return $ Right (tc_result, mb_old_hash)
 
 genericHscFrontend :: ModSummary -> Hsc TcGblEnv
-genericHscFrontend mod_summary
+genericHscFrontend mod_summary =
+  getHooked hscFrontendHook genericHscFrontend' >>= ($ mod_summary)
+
+genericHscFrontend' :: ModSummary -> Hsc TcGblEnv
+genericHscFrontend' mod_summary
     | ExtCoreFile <- ms_hsc_src mod_summary =
         panic "GHC does not currently support reading External Core files"
-    | otherwise = do
+    | otherwise =
         hscFileFrontEnd mod_summary
 
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
 
--- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: HscEnv
                   -> FilePath
                   -> ModSummary
                   -> SourceModified
                   -> IO HscStatus
-hscCompileOneShot hsc_env extCore_filename mod_summary src_changed
+hscCompileOneShot env =
+  lookupHook hscCompileOneShotHook hscCompileOneShot' (hsc_dflags env) env
+
+-- Compile Haskell, boot and extCore in OneShot mode.
+hscCompileOneShot' :: HscEnv
+                   -> FilePath
+                   -> ModSummary
+                   -> SourceModified
+                   -> IO HscStatus
+hscCompileOneShot' hsc_env extCore_filename mod_summary src_changed
   = do
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
@@ -1616,7 +1594,11 @@ mkModGuts mod safe binds =
 
 #ifdef GHCI
 hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
-hscCompileCoreExpr hsc_env srcspan ds_expr
+hscCompileCoreExpr hsc_env =
+  lookupHook hscCompileCoreExprHook hscCompileCoreExpr' (hsc_dflags hsc_env) hsc_env
+
+hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
+hscCompileCoreExpr' hsc_env srcspan ds_expr
     | rtsIsProfiled
     = throwIO (InstallationError "You can't call hscCompileCoreExpr in a profiled compiler")
             -- Otherwise you get a seg-fault when you run it

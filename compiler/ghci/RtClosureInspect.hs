@@ -35,8 +35,8 @@ module RtClosureInspect(
 import DebuggerUtils
 import ByteCodeItbls    ( StgInfoTable, peekItbl )
 import qualified ByteCodeItbls as BCI( StgInfoTable(..) )
+import BasicTypes       ( HValue )
 import HscTypes
-import Linker
 
 import DataCon
 import Type

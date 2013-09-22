@@ -142,6 +142,7 @@ import Platform
 import PlatformConstants
 import Module
 import PackageConfig
+import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
 import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
@@ -670,6 +671,9 @@ data DynFlags = DynFlags {
   -- Plugins
   pluginModNames        :: [ModuleName],
   pluginModNameOpts     :: [(ModuleName,String)],
+
+  -- GHC API hooks
+  hooks                 :: Hooks,
 
   --  For ghc -M
   depMakefile           :: FilePath,
@@ -1314,6 +1318,7 @@ defaultDynFlags mySettings =
 
         pluginModNames          = [],
         pluginModNameOpts       = [],
+        hooks                   = emptyHooks,
 
         outputFile              = Nothing,
         dynOutputFile           = Nothing,

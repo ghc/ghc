@@ -44,6 +44,7 @@ import GhcMonad
 import HscMain
 import HsSyn
 import HscTypes
+import BasicTypes ( HValue )
 import InstEnv
 import FamInstEnv ( FamInst, orphNamesOfFamInst )
 import TyCon

@@ -6,7 +6,13 @@
 Desugaring foreign declarations (see also DsCCall).
 
 \begin{code}
-module DsForeign ( dsForeigns ) where
+module DsForeign ( dsForeigns
+                 , dsForeigns'
+                 , dsFImport, dsCImport, dsFCall, dsPrimCall
+                 , dsFExport, dsFExportDynamic, mkFExportCBits
+                 , toCType
+                 , foreignExportInitialiser
+                 ) where
 
 #include "HsVersions.h"
 import TcRnMonad        -- temp
@@ -48,6 +54,7 @@ import Config
 import OrdList
 import Pair
 import Util
+import Hooks
 
 import Data.Maybe
 import Data.List
@@ -72,9 +79,13 @@ type Binding = (Id, CoreExpr)   -- No rec/nonrec structure;
 
 dsForeigns :: [LForeignDecl Id]
            -> DsM (ForeignStubs, OrdList Binding)
-dsForeigns []
+dsForeigns fos = getHooked dsForeignsHook dsForeigns' >>= ($ fos)
+
+dsForeigns' :: [LForeignDecl Id]
+            -> DsM (ForeignStubs, OrdList Binding)
+dsForeigns' []
   = return (NoStubs, nilOL)
-dsForeigns fos = do
+dsForeigns' fos = do
     fives <- mapM do_ldecl fos
     let
         (hs, cs, idss, bindss) = unzip4 fives

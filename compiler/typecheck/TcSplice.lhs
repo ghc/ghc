@@ -49,6 +49,7 @@ import NameSet
 import PrelNames
 import HscTypes
 import OccName
+import Hooks
 import Var
 import Module
 import Annotations
@@ -722,10 +723,12 @@ runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
         ; checkTc (not is_local) (quoteStageError quoter')
 
         ; traceTc "runQQ" (ppr quoter <+> ppr is_local)
+        ; HsQuasiQuote quoter'' _ quote' <- getHooked runQuasiQuoteHook return >>=
+             ($ HsQuasiQuote quoter' q_span quote)
 
           -- Build the expression
-        ; let quoterExpr = L q_span $! HsVar $! quoter'
-        ; let quoteExpr = L q_span $! HsLit $! HsString quote
+        ; let quoterExpr = L q_span $! HsVar $! quoter''
+        ; let quoteExpr = L q_span $! HsLit $! HsString quote'
         ; let expr = L q_span $
                      HsApp (L q_span $
                             HsApp (L q_span (HsVar quote_selector)) quoterExpr) quoteExpr
