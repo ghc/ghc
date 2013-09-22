@@ -26,7 +26,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.IO.Handle.Text ( 
         hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
         commitBuffer',       -- hack, see below

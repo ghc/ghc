@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Storable
         ( readWideCharOffPtr  
         , readIntOffPtr       

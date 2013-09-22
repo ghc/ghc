@@ -22,7 +22,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.IO (
         IO(..), unIO, failIO, liftIO,
         unsafePerformIO, unsafeInterleaveIO,

@@ -22,7 +22,6 @@
 
 #include "MachDeps.h"
 
--- #hide
 module GHC.Float.RealFracMethods
     ( -- * Double methods
       -- ** Integer results

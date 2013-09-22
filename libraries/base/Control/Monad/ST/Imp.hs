@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module Control.Monad.ST.Imp (
         -- * The 'ST' Monad
         ST,             -- abstract, instance of Functor, Monad, Typeable.

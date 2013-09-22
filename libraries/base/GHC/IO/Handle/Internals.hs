@@ -26,7 +26,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.IO.Handle.Internals (
   withHandle, withHandle', withHandle_,
   withHandle__', withHandle_', withAllHandles__,

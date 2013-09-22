@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.List (
    -- [] (..),          -- built-in syntax; can't be used in export list
 

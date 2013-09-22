@@ -21,7 +21,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module System.Posix.Internals where
 
 #include "HsBaseConfig.h"

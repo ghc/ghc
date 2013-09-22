@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.STRef (
         STRef(..),
         newSTRef, readSTRef, writeSTRef

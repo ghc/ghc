@@ -18,7 +18,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Unicode (
         isAscii, isLatin1, isControl,
         isAsciiUpper, isAsciiLower,

@@ -19,7 +19,6 @@
 
 #include "MachDeps.h"
 
--- #hide
 module GHC.Int (
         Int8(..), Int16(..), Int32(..), Int64(..),
         uncheckedIShiftL64#, uncheckedIShiftRA64#

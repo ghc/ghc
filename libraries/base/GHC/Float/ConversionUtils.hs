@@ -19,7 +19,6 @@
 
 #include "MachDeps.h"
 
--- #hide
 module GHC.Float.ConversionUtils ( elimZerosInteger, elimZerosInt# ) where
 
 import GHC.Base

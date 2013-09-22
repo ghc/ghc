@@ -4,6 +4,7 @@
            , ForeignFunctionInterface
            , NondecreasingIndentation
   #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,7 +20,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.IO.Encoding.Iconv (
 #if !defined(mingw32_HOST_OS)
    iconvEncoding, mkIconvEncoding,

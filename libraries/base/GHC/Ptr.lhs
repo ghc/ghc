@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Ptr (
         Ptr(..), FunPtr(..),
         nullPtr, castPtr, plusPtr, alignPtr, minusPtr,

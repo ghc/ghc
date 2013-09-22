@@ -28,7 +28,6 @@
 
 #include "ieee-flpt.h"
 
--- #hide
 module GHC.Float( module GHC.Float, Float(..), Double(..), Float#, Double#
                 , double2Int, int2Double, float2Int, int2Float )
     where

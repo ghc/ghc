@@ -16,7 +16,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Num (module GHC.Num, module GHC.Integer) where
 
 import GHC.Base

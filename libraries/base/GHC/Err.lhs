@@ -22,7 +22,6 @@
 -- 
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Err( absentErr, error, undefined ) where
 import GHC.CString ()
 import GHC.Types

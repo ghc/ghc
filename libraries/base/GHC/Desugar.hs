@@ -3,6 +3,7 @@
            , RankNTypes
            , ExistentialQuantification
   #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,7 +19,6 @@
 -- 
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Desugar ((>>>), AnnotationWrapper(..), toAnnotationWrapper) where
 
 import Control.Arrow    (Arrow(..))
