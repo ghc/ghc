@@ -20,5 +20,5 @@ test('massive_array',
      [ when(arch('i386'), omit_ways(['llvm', 'optllvm'])) ],
      compile, ['-fPIC'])
 test('T7237', normal, compile, [''])
-test('T7574', [cmm_src, expect_broken(7574), omit_ways(['llvm', 'optllvm'])], compile, [''])
+test('T7574', [cmm_src, omit_ways(['llvm', 'optllvm'])], compile, [''])
 test('T8205', normal, compile, ['-O0'])
