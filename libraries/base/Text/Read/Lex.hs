@@ -57,7 +57,7 @@ data Lexeme
   | Punc   String       -- ^ Punctuation or reserved symbol, e.g. @(@, @::@
   | Ident  String       -- ^ Haskell identifier, e.g. @foo@, @Baz@
   | Symbol String       -- ^ Haskell symbol, e.g. @>>@, @:%@
-  | Number Number
+  | Number Number       -- ^ /Since: 4.6.0.0/
   | EOF
  deriving (Eq, Show)
 
@@ -69,6 +69,7 @@ data Number = MkNumber Int              -- Base
                         (Maybe Integer) -- Exponent
  deriving (Eq, Show)
 
+-- | /Since: 4.5.1.0/
 numberToInteger :: Number -> Maybe Integer
 numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
@@ -102,6 +103,7 @@ numberToFixed _ _ = Nothing
 -- * We only worry about numbers that have an exponent. If they don't
 --   have an exponent then the Rational won't be much larger than the
 --   Number, so there is no problem
+-- | /Since: 4.5.1.0/
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
 numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))

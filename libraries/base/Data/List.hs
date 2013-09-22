@@ -224,7 +224,8 @@ infix 5 \\ -- comment to fool cpp
 -- > dropWhileEnd isSpace "foo\n" == "foo"
 -- > dropWhileEnd isSpace "foo bar" == "foo bar"
 -- > dropWhileEnd isSpace ("foo\n" ++ undefined) == "foo" ++ undefined
-
+--
+-- /Since: 4.5.0.0/
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 

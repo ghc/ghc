@@ -67,6 +67,7 @@ import GHC.Stack
 -- | The 'traceIO' function outputs the trace message from the IO monad.
 -- This sequences the output with respect to other IO actions.
 --
+-- /Since: 4.5.0.0/
 traceIO :: String -> IO ()
 traceIO msg = do
     withCString "%s\n" $ \cfmt ->
@@ -174,6 +175,7 @@ traceShowM = traceM . show
 -- stack correspond to @SCC@ annotations, so it is a good idea to use
 -- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
 --
+-- /Since: 4.5.0.0/
 traceStack :: String -> a -> a
 traceStack str expr = unsafePerformIO $ do
    traceIO str
@@ -206,6 +208,7 @@ traceStack str expr = unsafePerformIO $ do
 -- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
 -- that uses 'traceEvent'.
 --
+-- /Since: 4.5.0.0/
 traceEvent :: String -> a -> a
 traceEvent msg expr = unsafeDupablePerformIO $ do
     traceEventIO msg
@@ -217,6 +220,7 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
 -- Compared to 'traceEvent', 'traceEventIO' sequences the event with respect to
 -- other IO actions.
 --
+-- /Since: 4.5.0.0/
 traceEventIO :: String -> IO ()
 traceEventIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->

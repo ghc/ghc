@@ -84,9 +84,9 @@ instance Ord TypeRep where
 -- be built using 'mkTyCon'.
 data TyCon = TyCon {
    tyConHash    :: {-# UNPACK #-} !Fingerprint,
-   tyConPackage :: String,
-   tyConModule  :: String,
-   tyConName    :: String
+   tyConPackage :: String, -- ^ /Since: 4.5.0.0/
+   tyConModule  :: String, -- ^ /Since: 4.5.0.0/
+   tyConName    :: String  -- ^ /Since: 4.5.0.0/
  }
 
 instance Eq TyCon where

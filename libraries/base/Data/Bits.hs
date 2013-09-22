@@ -185,7 +185,9 @@ class Eq a => Bits a where
         result is undefined for negative shift amounts and shift amounts
         greater or equal to the 'bitSize'.
 
-        Defaults to 'shiftL' unless defined explicitly by an instance. -}
+        Defaults to 'shiftL' unless defined explicitly by an instance.
+
+        /Since: 4.5.0.0/ -}
     unsafeShiftL            :: a -> Int -> a
     {-# INLINE unsafeShiftL #-}
     x `unsafeShiftL` i = x `shiftL` i
@@ -212,7 +214,9 @@ class Eq a => Bits a where
         i.e. they fill the top bits with 1 if the @x@ is negative
         and with 0 otherwise.
 
-        Defaults to 'shiftR' unless defined explicitly by an instance. -}
+        Defaults to 'shiftR' unless defined explicitly by an instance.
+
+        /Since: 4.5.0.0/ -}
     unsafeShiftR            :: a -> Int -> a
     {-# INLINE unsafeShiftR #-}
     x `unsafeShiftR` i = x `shiftR` i
@@ -238,7 +242,9 @@ class Eq a => Bits a where
     x `rotateR` i = x `rotate` (-i)
 
     {-| Return the number of set bits in the argument.  This number is
-        known as the population count or the Hamming weight. -}
+        known as the population count or the Hamming weight.
+
+        /Since: 4.5.0.0/ -}
     popCount          :: a -> Int
 
     {-# MINIMAL (.&.), (.|.), xor, complement,

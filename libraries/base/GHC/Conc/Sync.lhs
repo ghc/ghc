@@ -283,6 +283,8 @@ garbage collection.  It is strongly recommended that the number of
 capabilities is not set larger than the number of physical processor
 cores, and it may often be beneficial to leave one or more cores free
 to avoid contention with other processes in the machine.
+
+/Since: 4.5.0.0/
 -}
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
@@ -290,6 +292,9 @@ setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
 foreign import ccall safe "setNumCapabilities"
   c_setNumCapabilities :: CUInt -> IO ()
 
+-- | Returns the number of CPUs that the machine has
+--
+-- /Since: 4.5.0.0/
 getNumProcessors :: IO Int
 getNumProcessors = fmap fromIntegral c_getNumberOfProcessors
 
