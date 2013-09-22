@@ -169,6 +169,8 @@ initForeignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
 -- This encoding never fails in either direction.  However, encoding
 -- discards information, so encode followed by decode is not the
 -- identity.
+--
+-- /Since: 4.4.0.0/
 char8 :: TextEncoding
 char8 = Latin1.latin1
 

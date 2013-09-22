@@ -172,6 +172,8 @@ single thread.  Hence, when you use 'unsafeDupablePerformIO',
 there is a possibility that the IO action may be performed multiple
 times (on a multiprocessor), and you should therefore ensure that
 it gives the same results each time.
+
+/Since: 4.4.0.0/
 -}
 {-# NOINLINE unsafeDupablePerformIO #-}
 unsafeDupablePerformIO  :: IO a -> a

@@ -97,6 +97,8 @@ import Text.Show
 --
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.try' from "Control.Exception".
+--
+-- /Since: 4.4.0.0/
 tryIOError     :: IO a -> IO (Either IOError a)
 tryIOError f   =  catch (do r <- f
                             return (Right r))
@@ -333,5 +335,7 @@ annotateIOError ioe loc hdl path =
 --
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.catch' from "Control.Exception".
+--
+-- /Since: 4.4.0.0/
 catchIOError :: IO a -> (IOError -> IO a) -> IO a
 catchIOError = catch

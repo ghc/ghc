@@ -216,6 +216,7 @@ forkIO action = IO $ \ s ->
 -- only be used in that thread; the behaviour is undefined if it is
 -- invoked in a different thread.
 --
+-- /Since: 4.4.0.0/
 forkIOWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkIOWithUnmask io = forkIO (io unsafeUnmask)
 
@@ -239,6 +240,8 @@ actual processor cores with @+RTS -qa@ if the underlying operating
 system supports that, although in practice this is usually unnecessary
 (and may actually degrade performance in some cases - experimentation
 is recommended).
+
+/Since: 4.4.0.0/
 -}
 forkOn :: Int -> IO () -> IO ThreadId
 forkOn (I# cpu) action = IO $ \ s ->
@@ -248,6 +251,8 @@ forkOn (I# cpu) action = IO $ \ s ->
 
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
 -- given CPU, as with 'forkOn'.
+--
+-- /Since: 4.4.0.0/
 forkOnWithUnmask :: Int -> ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkOnWithUnmask cpu io = forkOn cpu (io unsafeUnmask)
 
@@ -266,6 +271,8 @@ numCapabilities = unsafePerformIO $ getNumCapabilities
 Returns the number of Haskell threads that can run truly
 simultaneously (on separate physical processors) at any given time.  To change
 this value, use 'setNumCapabilities'.
+
+/Since: 4.4.0.0/
 -}
 getNumCapabilities :: IO Int
 getNumCapabilities = do
@@ -492,6 +499,8 @@ threadStatus (ThreadId t) = IO $ \s ->
 -- running, and a boolean indicating whether the thread is locked to
 -- that capability or not.  A thread is locked to a capability if it
 -- was created with @forkOn@.
+--
+-- /Since: 4.4.0.0/
 threadCapability :: ThreadId -> IO (Int, Bool)
 threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
