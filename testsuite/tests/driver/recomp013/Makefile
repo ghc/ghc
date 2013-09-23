@@ -19,6 +19,7 @@ recomp013: clean
 	echo 'module C where import B; a2 = 142' > C.hs
 	echo 'first run'
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make C.hs
+	sleep 1
 	echo 'module B (module A) where import A hiding (a1, a2)' > B.hs
 	echo 'second run'
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make C.hs
