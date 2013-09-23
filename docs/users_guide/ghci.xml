@@ -2558,7 +2558,7 @@ T Int :: * -> *
         <listitem>
           <para>Lists the source code around the definition of
           <replaceable>identifier</replaceable> or the current
-          breakpoint is not given. This requires the identifier be
+          breakpoint if not given. This requires that the identifier be
           defined in an interpreted module.  If your output device
           supports it, then GHCi will highlight the active
           subexpression in bold.</para>
