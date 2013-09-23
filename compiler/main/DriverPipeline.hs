@@ -1380,7 +1380,10 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option fpOpts
                 ++ map SysTools.Option abiOpts
-                ++ map SysTools.Option sseOpts)
+                ++ map SysTools.Option sseOpts
+                ++ map SysTools.Option avxOpts
+                ++ map SysTools.Option avx512Opts
+                ++ map SysTools.Option stackAlignOpts)
 
     return (RealPhase next_phase, output_fn)
   where
@@ -1411,7 +1414,23 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
 
         sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
                 | isSse2Enabled dflags   = ["-mattr=+sse2"]
+                | isSseEnabled dflags    = ["-mattr=+sse"]
                 | otherwise              = []
+
+        avxOpts | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
+                | isAvx2Enabled dflags    = ["-mattr=+avx2"]
+                | isAvxEnabled dflags     = ["-mattr=+avx"]
+                | otherwise               = []
+
+        avx512Opts =
+          [ "-mattr=+avx512cd" | isAvx512cdEnabled dflags ] ++
+          [ "-mattr=+avx512er" | isAvx512erEnabled dflags ] ++
+          [ "-mattr=+avx512pf" | isAvx512pfEnabled dflags ]
+
+        stackAlignOpts =
+            case platformArch (targetPlatform dflags) of
+              ArchX86_64 | isAvxEnabled dflags -> ["-stack-alignment=32"]
+              _                                -> []
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
@@ -2015,12 +2034,18 @@ doCpp dflags raw input_fn output_fn = do
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 
-    let sse2 = isSse2Enabled dflags
-        sse4_2 = isSse4_2Enabled dflags
-        sse_defs =
-          [ "-D__SSE__=1" | sse2 || sse4_2 ] ++
-          [ "-D__SSE2__=1" | sse2 || sse4_2 ] ++
-          [ "-D__SSE4_2__=1" | sse4_2 ]
+    let sse_defs =
+          [ "-D__SSE__=1"    | isSseEnabled    dflags ] ++
+          [ "-D__SSE2__=1"   | isSse2Enabled   dflags ] ++
+          [ "-D__SSE4_2__=1" | isSse4_2Enabled dflags ]
+
+    let avx_defs =
+          [ "-D__AVX__=1"  | isAvxEnabled  dflags ] ++
+          [ "-D__AVX2__=1" | isAvx2Enabled dflags ] ++
+          [ "-D__AVX512CD__=1" | isAvx512cdEnabled dflags ] ++
+          [ "-D__AVX512ER__=1" | isAvx512erEnabled dflags ] ++
+          [ "-D__AVX512F__=1"  | isAvx512fEnabled  dflags ] ++
+          [ "-D__AVX512PF__=1" | isAvx512pfEnabled dflags ]
 
     backend_defs <- getBackendDefs dflags
 
@@ -2031,6 +2056,7 @@ doCpp dflags raw input_fn output_fn = do
                     ++ map SysTools.Option backend_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option sse_defs
+                    ++ map SysTools.Option avx_defs
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash
         -- operator, which we tend to abuse. Clang in particular is not very happy

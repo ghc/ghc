@@ -5,7 +5,7 @@
 
 \begin{code}
 module PrimOp (
-        PrimOp(..), allThePrimOps,
+        PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig,
         primOpTag, maxPrimOpTag, primOpOcc,
 
@@ -25,6 +25,7 @@ module PrimOp (
 import TysPrim
 import TysWiredIn
 
+import CmmType
 import Demand
 import Var              ( TyVar )
 import OccName          ( OccName, pprOccName, mkVarOccFS )
@@ -64,6 +65,7 @@ primOpTag op = iBox (tagOf_PrimOp op)
 -- supplies
 -- tagOf_PrimOp :: PrimOp -> FastInt
 #include "primop-tag.hs-incl"
+tagOf_PrimOp _ = error "tagOf_PrimOp: unknown primop"
 
 
 instance Eq PrimOp where
@@ -80,6 +82,12 @@ instance Ord PrimOp where
 
 instance Outputable PrimOp where
     ppr op = pprPrimOp op
+\end{code}
+
+\begin{code}
+data PrimOpVecCat = IntVec
+                  | WordVec
+                  | FloatVec
 \end{code}
 
 An @Enum@-derived list would be better; meanwhile... (ToDo)
@@ -173,6 +181,7 @@ else, notably a type, can be constructed) for each @PrimOp@.
 \begin{code}
 primOpInfo :: PrimOp -> PrimOpInfo
 #include "primop-primop-info.hs-incl"
+primOpInfo _ = error "primOpInfo: unknown primop"
 \end{code}
 
 Here are a load of comments from the old primOp info:

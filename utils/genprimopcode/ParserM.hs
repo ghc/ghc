@@ -67,6 +67,10 @@ data Token = TEOF
            | THashCloseParen
            | TOpenBrace
            | TCloseBrace
+           | TOpenBracket
+           | TCloseBracket
+           | TOpenAngle
+           | TCloseAngle
            | TSection
            | TPrimop
            | TPseudoop
@@ -91,6 +95,10 @@ data Token = TEOF
            | TInfixL
            | TInfixR
            | TNothing
+           | TVector
+           | TSCALAR
+           | TVECTOR
+           | TVECTUPLE
     deriving Show
 
 -- Actions

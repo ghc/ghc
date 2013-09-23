@@ -47,6 +47,8 @@ data ArgRep = P   -- GC Ptr
             | F   -- Float
             | D   -- Double
             | V16 -- 16-byte (128-bit) vectors of Float/Double/Int8/Word32/etc.
+            | V32 -- 32-byte (256-bit) vectors of Float/Double/Int8/Word32/etc.
+            | V64 -- 64-byte (512-bit) vectors of Float/Double/Int8/Word32/etc.
 instance Outputable ArgRep where ppr = text . argRepString
 
 argRepString :: ArgRep -> String
@@ -57,6 +59,8 @@ argRepString V = "V"
 argRepString F = "F"
 argRepString D = "D"
 argRepString V16 = "V16"
+argRepString V32 = "V32"
+argRepString V64 = "V64"
 
 toArgRep :: PrimRep -> ArgRep
 toArgRep VoidRep           = V
@@ -68,9 +72,11 @@ toArgRep Int64Rep          = L
 toArgRep Word64Rep         = L
 toArgRep FloatRep          = F
 toArgRep DoubleRep         = D
-toArgRep (VecRep len elem)
-    | len*primElemRepSizeB elem == 16 = V16
-    | otherwise                       = error "toArgRep: bad vector primrep"
+toArgRep (VecRep len elem) = case len*primElemRepSizeB elem of
+                               16 -> V16
+                               32 -> V32
+                               64 -> V64
+                               _  -> error "toArgRep: bad vector primrep"
 
 isNonV :: ArgRep -> Bool
 isNonV V = False
@@ -84,6 +90,8 @@ argRepSizeW dflags L   = wORD64_SIZE        `quot` wORD_SIZE dflags
 argRepSizeW dflags D   = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
 argRepSizeW _      V   = 0
 argRepSizeW dflags V16 = 16                 `quot` wORD_SIZE dflags
+argRepSizeW dflags V32 = 32                 `quot` wORD_SIZE dflags
+argRepSizeW dflags V64 = 64                 `quot` wORD_SIZE dflags
 
 idArgRep :: Id -> ArgRep
 idArgRep = toArgRep . idPrimRep
@@ -132,4 +140,6 @@ slowCallPattern (F: _)                = (fsLit "stg_ap_f", 1)
 slowCallPattern (D: _)                = (fsLit "stg_ap_d", 1)
 slowCallPattern (L: _)                = (fsLit "stg_ap_l", 1)
 slowCallPattern (V16: _)              = (fsLit "stg_ap_v16", 1)
+slowCallPattern (V32: _)              = (fsLit "stg_ap_v32", 1)
+slowCallPattern (V64: _)              = (fsLit "stg_ap_v64", 1)
 slowCallPattern []                    = (fsLit "stg_ap_0", 0)

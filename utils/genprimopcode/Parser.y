@@ -32,6 +32,10 @@ import Syntax
     '#)'            { THashCloseParen }
     '{'             { TOpenBrace }
     '}'             { TCloseBrace }
+    '['             { TOpenBracket }
+    ']'             { TCloseBracket }
+    '<'             { TOpenAngle }
+    '>'             { TCloseAngle }
     section         { TSection }
     primop          { TPrimop }
     pseudoop        { TPseudoop }
@@ -50,6 +54,10 @@ import Syntax
     infixl          { TInfixL }
     infixr          { TInfixR }
     nothing         { TNothing }
+    vector          { TVector }
+    SCALAR          { TSCALAR }
+    VECTOR          { TVECTOR }
+    VECTUPLE        { TVECTUPLE }
     thats_all_folks { TThatsAllFolks }
     lowerName       { TLowerName $$ }
     upperName       { TUpperName $$ }
@@ -74,6 +82,7 @@ pOption : lowerName '=' false               { OptionFalse  $1 }
         | lowerName '=' true                { OptionTrue   $1 }
         | lowerName '=' pStuffBetweenBraces { OptionString $1 $3 }
         | lowerName '=' integer             { OptionInteger $1 $3 }
+        | vector    '=' pVectorTemplate     { OptionVector $3 }
         | fixity    '=' pInfix              { OptionFixity $3 }
 
 pInfix :: { Maybe Fixity }
@@ -147,6 +156,17 @@ pInside :: { String }
 pInside : '{' pInsides '}' { "{" ++ $2 ++ "}" }
         | noBraces         { $1 }
 
+pVectorTemplate :: { [(String, String, Int)] }
+pVectorTemplate : '[' pVectors ']' { $2 }
+
+pVectors :: { [(String, String, Int)] }
+pVectors : pVector ',' pVectors { [$1] ++ $3 }
+         | pVector              { [$1] }
+         | {- empty -}          { [] }
+
+pVector :: { (String, String, Int) }
+pVector : '<' upperName ',' upperName ',' integer '>' { ($2, $4, $6) }
+ 
 pType :: { Ty }
 pType : paT '->' pType { TyF $1 $3 }
       | paT '=>' pType { TyC $1 $3 }
@@ -175,9 +195,12 @@ ppT :: { Ty }
 ppT : lowerName { TyVar $1 }
     | pTycon    { TyApp $1 [] }
 
-pTycon :: { String }
-pTycon : upperName { $1 }
-       | '(' ')'   { "()" }
+pTycon :: { TyCon }
+pTycon : upperName { TyCon $1 }
+       | '(' ')'   { TyCon "()" }
+       | SCALAR    { SCALAR }
+       | VECTOR    { VECTOR }
+       | VECTUPLE  { VECTUPLE }
 
 {
 parse :: String -> Either String Info

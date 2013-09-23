@@ -128,9 +128,16 @@ module DynFlags (
 
         unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
 
-        -- * SSE
+        -- * SSE and AVX
+        isSseEnabled,
         isSse2Enabled,
         isSse4_2Enabled,
+        isAvxEnabled,
+        isAvx2Enabled,
+        isAvx512cdEnabled,
+        isAvx512erEnabled,
+        isAvx512fEnabled,
+        isAvx512pfEnabled,
 
         -- * Linker information
         LinkerInfo(..),
@@ -303,6 +310,7 @@ data GeneralFlag
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
    | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
+   | Opt_LlvmPassVectorsInRegisters     -- Pass SIMD vectors in registers (requires a patched LLVM) (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
@@ -770,6 +778,12 @@ data DynFlags = DynFlags {
 
   -- | Machine dependant flags (-m<blah> stuff)
   sseVersion            :: Maybe (Int, Int),  -- (major, minor)
+  avx                   :: Bool,
+  avx2                  :: Bool,
+  avx512cd              :: Bool, -- Enable AVX-512 Conflict Detection Instructions.
+  avx512er              :: Bool, -- Enable AVX-512 Exponential and Reciprocal Instructions.
+  avx512f               :: Bool, -- Enable AVX-512 instructions.
+  avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
 
   -- | Run-time linker information (what options we need, etc.)
   rtldFlags             :: IORef (Maybe LinkerInfo)
@@ -1401,6 +1415,12 @@ defaultDynFlags mySettings =
         interactivePrint = Nothing,
         nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
         sseVersion = Nothing,
+        avx = False,
+        avx2 = False,
+        avx512cd = False,
+        avx512er = False,
+        avx512f = False,
+        avx512pf = False,
         rtldFlags = panic "defaultDynFlags: no rtldFlags"
       }
 
@@ -2305,6 +2325,12 @@ dynamic_flags = [
   , Flag "monly-3-regs" (NoArg (addWarn "The -monly-3-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "msse"         (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
+  , Flag "mavx"         (noArg (\d -> d{ avx = True }))
+  , Flag "mavx2"        (noArg (\d -> d{ avx2 = True }))
+  , Flag "mavx512cd"    (noArg (\d -> d{ avx512cd = True }))
+  , Flag "mavx512er"    (noArg (\d -> d{ avx512er = True }))
+  , Flag "mavx512f"     (noArg (\d -> d{ avx512f = True }))
+  , Flag "mavx512pf"    (noArg (\d -> d{ avx512pf = True }))
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -2587,6 +2613,7 @@ fFlags = [
   ( "regs-graph",                       Opt_RegsGraph, nop ),
   ( "regs-iterative",                   Opt_RegsIterative, nop ),
   ( "llvm-tbaa",                        Opt_LlvmTBAA, nop), -- hidden flag
+  ( "llvm-pass-vectors-in-regs",        Opt_LlvmPassVectorsInRegisters, nop), -- hidden flag
   ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
   ( "cmm-sink",                         Opt_CmmSink, nop ),
   ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
@@ -3585,11 +3612,17 @@ setUnsafeGlobalDynFlags :: DynFlags -> IO ()
 setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 
 -- -----------------------------------------------------------------------------
--- SSE
+-- SSE and AVX
 
 -- TODO: Instead of using a separate predicate (i.e. isSse2Enabled) to
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
 -- flag.
+
+isSseEnabled :: DynFlags -> Bool
+isSseEnabled dflags = case platformArch (targetPlatform dflags) of
+    ArchX86_64 -> True
+    ArchX86    -> sseVersion dflags >= Just (1,0)
+    _          -> False
 
 isSse2Enabled :: DynFlags -> Bool
 isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
@@ -3604,6 +3637,24 @@ isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
 
 isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just (4,2)
+
+isAvxEnabled :: DynFlags -> Bool
+isAvxEnabled dflags = avx dflags || avx2 dflags || avx512f dflags
+
+isAvx2Enabled :: DynFlags -> Bool
+isAvx2Enabled dflags = avx2 dflags || avx512f dflags
+
+isAvx512cdEnabled :: DynFlags -> Bool
+isAvx512cdEnabled dflags = avx512cd dflags
+
+isAvx512erEnabled :: DynFlags -> Bool
+isAvx512erEnabled dflags = avx512er dflags
+
+isAvx512fEnabled :: DynFlags -> Bool
+isAvx512fEnabled dflags = avx512f dflags
+
+isAvx512pfEnabled :: DynFlags -> Bool
+isAvx512pfEnabled dflags = avx512pf dflags
 
 -- -----------------------------------------------------------------------------
 -- Linker information

@@ -65,6 +65,40 @@ import Reg
 # define xmm14 38
 # define xmm15 39
 
+# define ymm0  40
+# define ymm1  41
+# define ymm2  42
+# define ymm3  43
+# define ymm4  44
+# define ymm5  45
+# define ymm6  46
+# define ymm7  47
+# define ymm8  48
+# define ymm9  49
+# define ymm10 50
+# define ymm11 51
+# define ymm12 52
+# define ymm13 53
+# define ymm14 54
+# define ymm15 55
+
+# define zmm0  56
+# define zmm1  57
+# define zmm2  58
+# define zmm3  59
+# define zmm4  60
+# define zmm5  61
+# define zmm6  62
+# define zmm7  63
+# define zmm8  64
+# define zmm9  65
+# define zmm10 66
+# define zmm11 67
+# define zmm12 68
+# define zmm13 69
+# define zmm14 70
+# define zmm15 71
+
 #elif MACHREGS_powerpc
 
 # define r0 0
@@ -391,6 +425,12 @@ activeStgRegs = [
 #ifdef REG_XMM1
     ,XmmReg 1
 #endif
+#ifdef REG_YMM1
+    ,YmmReg 1
+#endif
+#ifdef REG_ZMM1
+    ,ZmmReg 1
+#endif
 #ifdef REG_F2
     ,FloatReg 2
 #endif
@@ -399,6 +439,12 @@ activeStgRegs = [
 #endif
 #ifdef REG_XMM2
     ,XmmReg 2
+#endif
+#ifdef REG_YMM2
+    ,YmmReg 2
+#endif
+#ifdef REG_ZMM2
+    ,ZmmReg 2
 #endif
 #ifdef REG_F3
     ,FloatReg 3
@@ -409,6 +455,12 @@ activeStgRegs = [
 #ifdef REG_XMM3
     ,XmmReg 3
 #endif
+#ifdef REG_YMM3
+    ,YmmReg 3
+#endif
+#ifdef REG_ZMM3
+    ,ZmmReg 3
+#endif
 #ifdef REG_F4
     ,FloatReg 4
 #endif
@@ -417,6 +469,12 @@ activeStgRegs = [
 #endif
 #ifdef REG_XMM4
     ,XmmReg 4
+#endif
+#ifdef REG_YMM4
+    ,YmmReg 4
+#endif
+#ifdef REG_ZMM4
+    ,ZmmReg 4
 #endif
 #ifdef REG_F5
     ,FloatReg 5
@@ -427,6 +485,12 @@ activeStgRegs = [
 #ifdef REG_XMM5
     ,XmmReg 5
 #endif
+#ifdef REG_YMM5
+    ,YmmReg 5
+#endif
+#ifdef REG_ZMM5
+    ,ZmmReg 5
+#endif
 #ifdef REG_F6
     ,FloatReg 6
 #endif
@@ -435,6 +499,12 @@ activeStgRegs = [
 #endif
 #ifdef REG_XMM6
     ,XmmReg 6
+#endif
+#ifdef REG_YMM6
+    ,YmmReg 6
+#endif
+#ifdef REG_ZMM6
+    ,ZmmReg 6
 #endif
 #else /* MAX_REAL_XMM_REG == 0 */
 #ifdef REG_F1
@@ -587,13 +657,65 @@ globalRegMaybe (DoubleReg 6)            =
                                           Just (RealRegSingle REG_D6)
 #  endif
 # endif
-#if MAX_REAL_XMM_REG != 0
+# if MAX_REAL_XMM_REG != 0
+#  ifdef REG_XMM1
 globalRegMaybe (XmmReg 1)               = Just (RealRegSingle REG_XMM1)
+#  endif
+#  ifdef REG_XMM2
 globalRegMaybe (XmmReg 2)               = Just (RealRegSingle REG_XMM2)
+#  endif
+#  ifdef REG_XMM3
 globalRegMaybe (XmmReg 3)               = Just (RealRegSingle REG_XMM3)
+#  endif
+#  ifdef REG_XMM4
 globalRegMaybe (XmmReg 4)               = Just (RealRegSingle REG_XMM4)
+#  endif
+#  ifdef REG_XMM5
 globalRegMaybe (XmmReg 5)               = Just (RealRegSingle REG_XMM5)
+#  endif
+#  ifdef REG_XMM6
 globalRegMaybe (XmmReg 6)               = Just (RealRegSingle REG_XMM6)
+#  endif
+# endif
+# if MAX_REAL_YMM_REG != 0
+#  ifdef REG_YMM1
+globalRegMaybe (YmmReg 1)               = Just (RealRegSingle REG_YMM1)
+#  endif
+#  ifdef REG_YMM2
+globalRegMaybe (YmmReg 2)               = Just (RealRegSingle REG_YMM2)
+#  endif
+#  ifdef REG_YMM3
+globalRegMaybe (YmmReg 3)               = Just (RealRegSingle REG_YMM3)
+#  endif
+#  ifdef REG_YMM4
+globalRegMaybe (YmmReg 4)               = Just (RealRegSingle REG_YMM4)
+#  endif
+#  ifdef REG_YMM5
+globalRegMaybe (YmmReg 5)               = Just (RealRegSingle REG_YMM5)
+#  endif
+#  ifdef REG_YMM6
+globalRegMaybe (YmmReg 6)               = Just (RealRegSingle REG_YMM6)
+#  endif
+# endif
+# if MAX_REAL_ZMM_REG != 0
+#  ifdef REG_ZMM1
+globalRegMaybe (ZmmReg 1)               = Just (RealRegSingle REG_ZMM1)
+#  endif
+#  ifdef REG_ZMM2
+globalRegMaybe (ZmmReg 2)               = Just (RealRegSingle REG_ZMM2)
+#  endif
+#  ifdef REG_ZMM3
+globalRegMaybe (ZmmReg 3)               = Just (RealRegSingle REG_ZMM3)
+#  endif
+#  ifdef REG_ZMM4
+globalRegMaybe (ZmmReg 4)               = Just (RealRegSingle REG_ZMM4)
+#  endif
+#  ifdef REG_ZMM5
+globalRegMaybe (ZmmReg 5)               = Just (RealRegSingle REG_ZMM5)
+#  endif
+#  ifdef REG_ZMM6
+globalRegMaybe (ZmmReg 6)               = Just (RealRegSingle REG_ZMM6)
+#  endif
 # endif
 # ifdef REG_Sp
 globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)

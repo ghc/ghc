@@ -118,6 +118,10 @@ data MachOp
   | MO_VS_Rem  Length Width
   | MO_VS_Neg  Length Width
 
+  -- Unsigned vector multiply/divide
+  | MO_VU_Quot Length Width
+  | MO_VU_Rem  Length Width
+
   -- Floting point vector element insertion and extraction operations
   | MO_VF_Insert  Length Width   -- Insert scalar into vector
   | MO_VF_Extract Length Width   -- Extract scalar from vector
@@ -375,6 +379,9 @@ machOpResultType dflags mop tys =
     MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
     MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
 
+    MO_VU_Quot l w      -> cmmVec l (cmmBits w)
+    MO_VU_Rem  l w      -> cmmVec l (cmmBits w)
+
     MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
     MO_VF_Extract _ w   -> cmmFloat w
 
@@ -460,6 +467,9 @@ machOpArgReps dflags op =
     MO_VS_Quot _ r      -> [r,r]
     MO_VS_Rem  _ r      -> [r,r]
     MO_VS_Neg  _ r      -> [r]
+
+    MO_VU_Quot _ r      -> [r,r]
+    MO_VU_Rem  _ r      -> [r,r]
 
     MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
     MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]

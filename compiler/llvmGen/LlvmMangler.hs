@@ -20,6 +20,10 @@ import System.IO
 import Data.List ( sortBy )
 import Data.Function ( on )
 
+#if x86_64_TARGET_ARCH
+#define REWRITE_AVX
+#endif
+
 -- Magic Strings
 secStmt, infoSec, newLine, textStmt, dataStmt, syntaxUnified :: B.ByteString
 secStmt       = B.pack "\t.section\t"
@@ -47,7 +51,7 @@ llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w
     hClose r
-    let fixed = fixTables ss
+    let fixed = (map rewriteAVX . fixTables) ss
     mapM_ (writeSection w) fixed
     hClose w
     return ()
@@ -89,6 +93,39 @@ writeSection w (hdr, cts) = do
   when (not $ B.null hdr) $
     B.hPutStrLn w hdr
   B.hPutStrLn w cts
+
+#if REWRITE_AVX
+rewriteAVX :: Section -> Section
+rewriteAVX = rewriteVmovaps . rewriteVmovdqa
+
+rewriteVmovdqa :: Section -> Section
+rewriteVmovdqa = rewriteInstructions vmovdqa vmovdqu
+  where
+    vmovdqa, vmovdqu :: B.ByteString
+    vmovdqa = B.pack "vmovdqa"
+    vmovdqu = B.pack "vmovdqu"
+
+rewriteVmovap :: Section -> Section
+rewriteVmovap = rewriteInstructions vmovap vmovup
+  where
+    vmovap, vmovup :: B.ByteString
+    vmovap = B.pack "vmovap"
+    vmovup = B.pack "vmovup"
+
+rewriteInstructions :: B.ByteString -> B.ByteString -> Section -> Section
+rewriteInstructions matchBS replaceBS (hdr, cts) =
+    (hdr, loop cts)
+  where
+    loop :: B.ByteString -> B.ByteString
+    loop cts =
+        case B.breakSubstring cts matchBS of
+          (hd,tl) | B.null tl -> hd
+                  | otherwise -> hd `B.append` replaceBS `B.append`
+                                 loop (B.drop (B.length matchBS) tl)
+#else /* !REWRITE_AVX */
+rewriteAVX :: Section -> Section
+rewriteAVX = id
+#endif /* !REWRITE_SSE */
 
 -- | Reorder and convert sections so info tables end up next to the
 -- code. Also does stack fixups.

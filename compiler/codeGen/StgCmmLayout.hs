@@ -385,6 +385,8 @@ stdPattern reps
         [D]   -> Just ARG_D
         [L]   -> Just ARG_L
         [V16] -> Just ARG_V16
+        [V32] -> Just ARG_V32
+        [V64] -> Just ARG_V64
 
         [N,N] -> Just ARG_NN
         [N,P] -> Just ARG_NP
