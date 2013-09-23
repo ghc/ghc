@@ -220,7 +220,8 @@ processOneArg opt_kind rest arg args
                           Just min <- parseInt min_s -> Right (f maj min, args)
                         | [maj_s] <- split '.' rest_no_eq,
                           Just maj <- parseInt maj_s -> Right (f maj 0, args)
-                        | otherwise -> Right (f 1 0, args)
+                        | null rest_no_eq -> Right (f 1 0, args)
+                        | otherwise -> Left ("malformed version argument in " ++ dash_arg)
 
 
 findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
