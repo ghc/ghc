@@ -1949,7 +1949,7 @@ lookupSymbol( char *lbl )
 }
 
 /* -----------------------------------------------------------------------------
-   Create a StablePtr for a foeign export.  This is normally called by
+   Create a StablePtr for a foreign export.  This is normally called by
    a C function with __attribute__((constructor)), which is generated
    by GHC and linked into the module.
 
