@@ -634,6 +634,15 @@
                      <literal>{-# MINIMAL #-}</literal> pragma.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                     <literal>Control.Applicative.WrappedMonad</literal>,
+                     which can be used to convert a <literal>Monad</literal>
+                     to an <literal>Applicative</literal>, has now
+                     a <literal>Monad m => Monad (WrappedMonad m)</literal>
+                     instance.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
