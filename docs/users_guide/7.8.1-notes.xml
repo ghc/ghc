@@ -163,12 +163,12 @@
        </listitem>
 
         <listitem>
-            <para> 
+            <para>
                 New PrimOps for atomic memory operations.
                 The <literal>casMutVar#</literal> PrimOp was introduced in
-                GHC 7.2 (debugged in 7.4).  This release also includes additional 
-                PrimOps for compare-and-swap (<literal>casArray#</literal> and 
-                <literal>casIntArray#</literal>) and one for fetch-and-add 
+                GHC 7.2 (debugged in 7.4).  This release also includes additional
+                PrimOps for compare-and-swap (<literal>casArray#</literal> and
+                <literal>casIntArray#</literal>) and one for fetch-and-add
                 (<literal>fetchAddIntArray#</literal>).
            </para>
        </listitem>
@@ -427,6 +427,20 @@
                     The new <literal>:shows paths</literal> command
                     shows the current working directory and the
                     current search path for Haskell modules.
+               </para>
+           </listitem>
+
+            <listitem>
+                <para>
+                    The GHCi linker now runs constructors for linked
+                    libraries. This means for example that C code
+                    using
+                    <literal>__attribute__((constructor))</literal>
+                    can now properly be loaded into GHCi.
+               </para>
+
+                <para>
+                    Note: destructors are not supported.
                </para>
            </listitem>
        </itemizedlist>
