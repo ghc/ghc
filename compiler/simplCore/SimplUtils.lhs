@@ -1553,7 +1553,7 @@ prepareAlts scrut case_bndr' alts
                     _     -> []
 \end{code}
 
-Note [Combine identical alterantives]
+Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  If several alternatives are identical, merge them into
  a single DEFAULT alternative.  I've occasionally seen this
@@ -1598,7 +1598,7 @@ defeats combineIdenticalAlts (see Trac #7360).
 
 \begin{code}
 combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
--- See Note [Combine identical alterantives]
+-- See Note [Combine identical alternatives]
 combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1                     -- Remember the default
   , length filtered_alts < length con_alts      -- alternative comes first

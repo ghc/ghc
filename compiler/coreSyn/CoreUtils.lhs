@@ -695,7 +695,7 @@ Should we inline 'v' at its use site inside the loop?  At the moment
 we do.  I experimented with saying that case are *not* work-free, but
 that increased allocation slightly.  It's a fairly small effect, and at
 the moment we go for the slightly more aggressive version which treats
-(case x of ....) as work-free if the alterantives are.
+(case x of ....) as work-free if the alternatives are.
 
 
 Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
@@ -984,7 +984,7 @@ app_ok primop_ok fun args
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
--- True  <=> the case alterantives are definiely exhaustive
+-- True  <=> the case alternatives are definiely exhaustive
 -- False <=> they may or may not be
 altsAreExhaustive []
   = False    -- Should not happen

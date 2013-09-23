@@ -388,13 +388,13 @@ is fine, and has type Bool.  This is one reason we need a type on
 the case expression: if the alternatives are empty we can't get the type
 from the alternatives!  I'll write this
    case (error Int "Hello") of Bool {}
-with the return type just before the alterantives.
+with the return type just before the alternatives.
 
 Here's another example:
   data T
   f :: T -> Bool
   f = \(x:t). case x of Bool {}
-Since T has no data constructors, the case alterantives are of course
+Since T has no data constructors, the case alternatives are of course
 empty.  However note that 'x' is not bound to a visbily-bottom value;
 it's the *type* that tells us it's going to diverge.  Its a bit of a
 degnerate situation but we do NOT want to replace

@@ -828,7 +828,7 @@ rnMatch' ctxt rnBody match@(Match pats maybe_rhs_sig grhss)
 	; return (Match pats' Nothing grhss', grhss_fvs) }}
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
-emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alterantives in") <+> pp_ctxt)
+emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alternatives in") <+> pp_ctxt)
                        2 (ptext (sLit "Use EmptyCase to allow this"))
   where
     pp_ctxt = case ctxt of

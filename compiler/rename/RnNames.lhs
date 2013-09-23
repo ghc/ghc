@@ -206,8 +206,8 @@ rnImportDecl this_mod
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErrAt loc (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
-                  $+$ ptext (sLit $ "please enable Safe Haskell through either"
-                                 ++ "Safe, Trustwrothy or Unsafe"))
+                  $+$ ptext (sLit $ "please enable Safe Haskell through either "
+                                 ++ "Safe, Trustworthy or Unsafe"))
 
     let imp_mod    = mi_module iface
         warns      = mi_warns iface

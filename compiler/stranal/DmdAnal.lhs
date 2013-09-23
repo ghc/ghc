@@ -831,7 +831,7 @@ Notice that j' is not a let-no-escape any more.
 
 However this means in turn that the *enclosing* function
 may be CPR'd (via the returned Justs).  But in the case of
-sums, there may be Nothing alterantives; and that messes
+sums, there may be Nothing alternatives; and that messes
 up the sum-type CPR.
 
 Conclusion: only do this for products.  It's still not
