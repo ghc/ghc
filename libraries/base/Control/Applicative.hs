@@ -243,6 +243,11 @@ instance Monad m => Applicative (WrappedMonad m) where
     pure = WrapMonad . return
     WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
 
+-- Added in base-4.7.0.0 (GHC Trac #8218)
+instance Monad m => Monad (WrappedMonad m) where
+    return = WrapMonad . return
+    a >>= f = WrapMonad (unwrapMonad a >>= unwrapMonad . f)
+
 instance MonadPlus m => Alternative (WrappedMonad m) where
     empty = WrapMonad mzero
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
