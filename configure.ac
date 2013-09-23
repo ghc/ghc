@@ -791,7 +791,7 @@ dnl ** check for math library
 dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
 dnl    for math functions or not
-dnl    (see http://hackage.haskell.org/trac/ghc/ticket/3730)
+dnl    (see http://ghc.haskell.org/trac/ghc/ticket/3730)
 AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
@@ -995,5 +995,5 @@ To make changes to the default build configuration, copy the file
 mk/build.mk.sample to mk/build.mk, and edit the settings in there.
 
 For more information on how to configure your GHC build, see
-   http://hackage.haskell.org/trac/ghc/wiki/Building
+   http://ghc.haskell.org/trac/ghc/wiki/Building
 "

@@ -178,7 +178,7 @@ not be what you want if you are developing GHC or the libraries, rather
 than simply building it to use it.
 
 For information on creating a mk/build.mk file, please see:
-    http://hackage.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
+    http://ghc.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
 
 EOF
     }

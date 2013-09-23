@@ -596,7 +596,7 @@ printRegisteredCounterInfo (FILE *tf)
     StgEntCounter *p;
 
     if ( ticky_entry_ctrs != NULL ) {
-      fprintf(tf,"\nThe following table is explained by http://hackage.haskell.org/trac/ghc/wiki/Debugging/TickyTicky\nAll allocation numbers are in bytes.\n");
+      fprintf(tf,"\nThe following table is explained by http://ghc.haskell.org/trac/ghc/wiki/Debugging/TickyTicky\nAll allocation numbers are in bytes.\n");
       fprintf(tf,"\n**************************************************\n\n");
     }
     fprintf(tf, "%11s%11s%11s  %-23s %s\n",

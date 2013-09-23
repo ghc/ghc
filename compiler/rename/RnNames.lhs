@@ -1283,7 +1283,7 @@ reportUnusedNames _export_decls gbl_env
 
 This code finds which import declarations are unused.  The
 specification and implementation notes are here:
-  http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/UnusedImports
+  http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/UnusedImports
 
 \begin{code}
 type ImportDeclUsage

@@ -768,7 +768,7 @@
     <para>
     There is a more detailed discussion of the issues involved in compilation
     safety and some potential solutions on the <ulink
-      url="http://hackage.haskell.org/trac/ghc/wiki/SafeHaskell/SafeCompilation">GHC
+      url="http://ghc.haskell.org/trac/ghc/wiki/SafeHaskell/SafeCompilation">GHC
       Wiki</ulink>.
     </para>
 

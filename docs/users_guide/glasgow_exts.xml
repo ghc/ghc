@@ -664,7 +664,7 @@ qualifier list has just one element, a boolean expression.
 <para>
 View patterns are enabled by the flag <literal>-XViewPatterns</literal>.
 More information and examples of view patterns can be found on the
-<ulink url="http://hackage.haskell.org/trac/ghc/wiki/ViewPatterns">Wiki
+<ulink url="http://ghc.haskell.org/trac/ghc/wiki/ViewPatterns">Wiki
 page</ulink>.
 </para>
 
@@ -782,7 +782,7 @@ let {(x -> y) = e1 ;
 </programlisting>
 
 (For some amplification on this design choice see
-<ulink url="http://hackage.haskell.org/trac/ghc/ticket/4061">Trac #4061</ulink>.)
+<ulink url="http://ghc.haskell.org/trac/ghc/ticket/4061">Trac #4061</ulink>.)
 
 </para>
 </listitem>
@@ -1734,7 +1734,7 @@ has no non-bottom values.  For example:
   f x = case x of { }
 </programlisting>
 With dependently-typed features it is more useful
-(see <ulink url="http://hackage.haskell.org/trac/ghc/ticket/2431">Trac</ulink>).
+(see <ulink url="http://ghc.haskell.org/trac/ghc/ticket/2431">Trac</ulink>).
 For example, consider these two candidate definitions of <literal>absurd</literal>:
 <programlisting>
 data a :==: b where
@@ -6269,7 +6269,7 @@ existential, and the above code is valid.
 </para>
 
 <para>
-See also <ulink url="http://hackage.haskell.org/trac/ghc/ticket/7347">Trac #7347</ulink>.
+See also <ulink url="http://ghc.haskell.org/trac/ghc/ticket/7347">Trac #7347</ulink>.
 </para>
 </sect2>
 
@@ -7552,7 +7552,7 @@ infer its type.  If you supply a type signature, then that fixes type of the bin
 </para><para>
 The rationale for this more conservative strategy is given in
 <ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">the papers</ulink> "Let should not be generalised" and "Modular type inference with local assumptions", and
-a related <ulink url="http://hackage.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7">blog post</ulink>.
+a related <ulink url="http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7">blog post</ulink>.
 </para><para>
 The flag <option>-XMonoLocalBinds</option> is implied by <option>-XTypeFamilies</option> and <option>-XGADTs</option>.  You can switch it off again
 with <option>-XNoMonoLocalBinds</option> but type inference becomes less predicatable if you do so. (Read the papers!)
@@ -7689,7 +7689,7 @@ main = print "b"
   </para>
   <para>
     For more motivation and details please refer to the <ulink
-      url="http://hackage.haskell.org/trac/ghc/wiki/DeferErrorsToRuntime">HaskellWiki</ulink>
+      url="http://ghc.haskell.org/trac/ghc/wiki/DeferErrorsToRuntime">HaskellWiki</ulink>
     page or the <ulink
       url="http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/">original
       paper</ulink>.
@@ -8097,7 +8097,7 @@ as, say, using the string <literal>"|~]"</literal> instead), and make your
 quoter function interpret <literal>"|~]"</literal> as <literal>"|]"</literal>.
 One way to implement this is to compose your quoter with a pre-processing pass to
 perform your escape conversion.  See the
-<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5348">
+<ulink url="http://ghc.haskell.org/trac/ghc/ticket/5348">
 discussion in Trac</ulink> for details.
 </para></listitem>
 </itemizedlist>
@@ -9804,7 +9804,7 @@ data T = T {-# UNPACK #-} !Float
       conjunction with <option>-O</option><footnote>in fact, UNPACK
           has no effect without <option>-O</option>, for technical
           reasons
-      (see <ulink url="http://hackage.haskell.org/trac/ghc/ticket/5252">tick
+      (see <ulink url="http://ghc.haskell.org/trac/ghc/ticket/5252">tick
             5252</ulink>)</footnote>, in order to expose
       unfoldings to the compiler so the reboxing can be removed as
       often as possible.  For example:</para>

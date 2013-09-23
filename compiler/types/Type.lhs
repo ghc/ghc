@@ -1587,7 +1587,7 @@ Kinds
 ~~~~~
 
 For the description of subkinding in GHC, see
-  http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeType#Kinds
+  http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeType#Kinds
 
 \begin{code}
 type MetaKindVar = TyVar  -- invariant: MetaKindVar will always be a

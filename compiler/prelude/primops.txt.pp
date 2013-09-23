@@ -5,7 +5,7 @@
 -- Primitive Operations and Types
 --
 -- For more information on PrimOps, see
---   http://hackage.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--   http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
 --
 -----------------------------------------------------------------------
 
@@ -18,7 +18,7 @@
 -- Information on how PrimOps are implemented and the steps necessary to
 -- add a new one can be found in the Commentary:
 --
---  http://hackage.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--  http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
 
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:

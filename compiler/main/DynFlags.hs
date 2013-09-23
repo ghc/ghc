@@ -3463,7 +3463,7 @@ picCCOpts dflags
       -- otherwise things like stub.c files don't get compiled
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
-      -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
+      -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
        | gopt Opt_PIC dflags || not (gopt Opt_Static dflags) ->
           ["-fPIC", "-U __PIC__", "-D__PIC__"]
        | otherwise                             -> []

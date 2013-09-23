@@ -699,7 +699,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
       sight!</para>
 
       <para>You can read
-      about <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance">how
+      about <ulink url="http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance">how
           all this works</ulink> in the GHC commentary.</para>
 
     </sect2>

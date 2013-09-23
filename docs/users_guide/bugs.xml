@@ -457,7 +457,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
     <title>Known bugs or infelicities</title>
 
     <para>The bug tracker lists bugs that have been reported in GHC but not
-      yet fixed: see the <ulink url="http://hackage.haskell.org/trac/ghc/">GHC Trac</ulink>.  In addition to those, GHC also has the following known bugs
+      yet fixed: see the <ulink url="http://ghc.haskell.org/trac/ghc/">GHC Trac</ulink>.  In addition to those, GHC also has the following known bugs
       or  infelicities.  These bugs are more permanent; it is unlikely that
       any of them will be fixed in the short term.</para>
 

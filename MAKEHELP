@@ -4,7 +4,7 @@ Using the GHC build system
 
 For a "Getting Started" guide, see:
 
-  http://hackage.haskell.org/trac/ghc/wiki/Building/Hacking
+  http://ghc.haskell.org/trac/ghc/wiki/Building/Hacking
 
 Common commands:
 

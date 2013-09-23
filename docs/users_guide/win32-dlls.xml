@@ -486,7 +486,7 @@ ghc -shared -o Adder.dll Adder.o Adder_stub.o StartEnd.o
   severe restrictions on which actions can be performed during
   <literal>DllMain</literal>, and <literal>hs_init</literal> violates these
   restrictions, which can lead to your dll freezing during startup (see
-  <ulink url="http://hackage.haskell.org/trac/ghc/ticket/3605">bug
+  <ulink url="http://ghc.haskell.org/trac/ghc/ticket/3605">bug
   #3605</ulink>).
 </para>
 

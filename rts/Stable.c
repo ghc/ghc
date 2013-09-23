@@ -83,7 +83,7 @@
 
   Future plans for stable ptrs include distinguishing them by the
   generation of the pointed object. See
-  http://hackage.haskell.org/trac/ghc/ticket/7670 for details.
+  http://ghc.haskell.org/trac/ghc/ticket/7670 for details.
 */
 
 snEntry *stable_name_table = NULL;

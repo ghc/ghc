@@ -40,7 +40,7 @@ foo = ...
           (disregarding the usual type restrictions of the splice syntax, and the usual restriction on splicing inside a splice - <literal>$([|1|])</literal> is fine as an annotation, albeit redundant).</para></listitem>
         </itemizedlist>
 
-        If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC">
+        If you feel strongly that any of these restrictions are too onerous, <ulink url="http://ghc.haskell.org/trac/ghc/wiki/MailingListsAndIRC">
         please give the GHC team a shout</ulink>.
       </para>
 
@@ -126,7 +126,7 @@ $
 
     <para>GHC has the ability to load compiler plugins at compile time. The feature is similar to the one provided by <ulink url="http://gcc.gnu.org/wiki/plugins">GCC</ulink>, and allows users to write plugins that can inspect and modify the compilation pipeline, as well as transform and inspect GHC's intermediate language, Core. Plugins are suitable for experimental analysis or optimization, and require no changes to GHC's source code to use.</para>
 
-    <para>Plugins cannot optimize/inspect C--, nor can they implement things like parser/front-end modifications like GCC. If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC"> please give the GHC team a shout</ulink>.</para>
+    <para>Plugins cannot optimize/inspect C--, nor can they implement things like parser/front-end modifications like GCC. If you feel strongly that any of these restrictions are too onerous, <ulink url="http://ghc.haskell.org/trac/ghc/wiki/MailingListsAndIRC"> please give the GHC team a shout</ulink>.</para>
 
     <sect2 id="using-compiler-plugins">
       <title>Using compiler plugins</title>

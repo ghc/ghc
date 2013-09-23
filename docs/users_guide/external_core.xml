@@ -1620,7 +1620,7 @@ case (error &quot;&quot;) of
       </authorgroup>
       <citetitle pubwork="article">System FC: equality constraints and coercions</citetitle>
       <pubdate>2006</pubdate>  
-      <bibliomisc><ulink url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC">http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC</ulink></bibliomisc>
+      <bibliomisc><ulink url="http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC">http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC</ulink></bibliomisc>
     </biblioentry>
 
     <biblioentry>

@@ -405,7 +405,7 @@ sub gitall {
                 my $myhead = &readgit('.', 'rev-parse', '--verify', 'HEAD');
 
                 if (not defined($remote_heads{$myhead})) {
-                    die "Sub module $localpath needs to be pushed; see http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream";
+                    die "Sub module $localpath needs to be pushed; see http://ghc.haskell.org/trac/ghc/wiki/Repositories/Upstream";
                 }
                 
                 chdir($initial_working_directory);
@@ -415,7 +415,7 @@ sub gitall {
             # We don't automatically push to the submodules. If you want
             # to push to them then you need to use a special command, as
             # described on
-            # http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream
+            # http://ghc.haskell.org/trac/ghc/wiki/Repositories/Upstream
             if ($remotepath ne "-") {
                 &git($localpath, "push", @args);
             }

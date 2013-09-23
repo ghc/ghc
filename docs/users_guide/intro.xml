@@ -53,7 +53,7 @@
 
     <para>Alternatively, if you want to build GHC yourself, head on
       over to the
-      <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">GHC
+      <ulink url="http://ghc.haskell.org/trac/ghc/wiki/Building">GHC
         Building Guide</ulink> to find out how to get the sources, and
         build it on your system.  Note that GHC itself is written in
         Haskell, so you will still need to install GHC in order to
@@ -76,7 +76,7 @@
       </listitem>
 
       <listitem>
-	<para><ulink url="http://hackage.haskell.org/trac/ghc/">GHC
+	<para><ulink url="http://ghc.haskell.org/trac/ghc/">GHC
 	Developers Home</ulink> (developer documentation, wiki, and
 	bug tracker)</para>
       </listitem>
@@ -189,7 +189,7 @@
     <para>
         Glasgow Haskell is a changing system so there are sure to be
         bugs in it. If you find one, please see
-        <ulink url="http://hackage.haskell.org/trac/ghc/wiki/ReportABug">this wiki page</ulink>
+        <ulink url="http://ghc.haskell.org/trac/ghc/wiki/ReportABug">this wiki page</ulink>
         for information on how to report it.
     </para>
 
@@ -236,7 +236,7 @@
             We may make snapshot releases of the current stable branch <ulink
             url="http://www.haskell.org/ghc/dist/stable/dist/">available for
             download</ulink>, and the latest sources are available from <ulink
-            url="http://hackage.haskell.org/trac/ghc/wiki/Repositories">the git
+            url="http://ghc.haskell.org/trac/ghc/wiki/Repositories">the git
             repositories</ulink>.
 	  </para>
 
@@ -271,7 +271,7 @@
             We may make snapshot releases of the HEAD <ulink
             url="http://www.haskell.org/ghc/dist/current/dist/">available for
             download</ulink>, and the latest sources are available from <ulink
-            url="http://hackage.haskell.org/trac/ghc/wiki/Repositories">the git
+            url="http://ghc.haskell.org/trac/ghc/wiki/Repositories">the git
             repositories</ulink>.
 	  </para>
 

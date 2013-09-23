@@ -32,7 +32,7 @@ module MkIface (
 A complete description of how recompilation checking works can be
 found in the wiki commentary:
 
- http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+ http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
 
 Please read the above page for a top-down description of how this all
 works.  Notes below cover specific issues related to the implementation.

@@ -72,7 +72,7 @@ On-line GHC-related resources
 Relevant URLs on the World-Wide Web:
 
 GHC home page              http://www.haskell.org/ghc/
-GHC developers' home page  http://hackage.haskell.org/trac/ghc/
+GHC developers' home page  http://ghc.haskell.org/trac/ghc/
 Haskell home page          http://www.haskell.org/
 
 
@@ -82,13 +82,13 @@ Supported Platforms
 The list of platforms we support, and the people responsible for them,
 is here:
 
-   http://hackage.haskell.org/trac/ghc/wiki/Contributors
+   http://ghc.haskell.org/trac/ghc/wiki/Contributors
 
 Ports to other platforms are possible with varying degrees of
 difficulty.  The Building Guide describes how to go about porting to a
 new platform:
 
-    http://hackage.haskell.org/trac/ghc/wiki/Building
+    http://ghc.haskell.org/trac/ghc/wiki/Building
 
 
 Developers
@@ -98,7 +98,7 @@ We welcome new contributors.  Instructions on accessing our source
 code repository, and getting started with hacking on GHC, are
 available from the GHC's developer's site run by Trac:
 
-  http://hackage.haskell.org/trac/ghc/
+  http://ghc.haskell.org/trac/ghc/
 
 
 Mailing lists
