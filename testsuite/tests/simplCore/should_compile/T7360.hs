@@ -1,5 +1,5 @@
 -- Both these functions should successfully simplify
--- using the combine-identical-alterantives optimisation
+-- using the combine-identical-alternatives optimisation
 
 module T7360 where
 

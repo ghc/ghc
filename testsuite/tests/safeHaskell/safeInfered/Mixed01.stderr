@@ -1,4 +1,4 @@
 
 Mixed01.hs:5:1:
     safe import can't be used as Safe Haskell isn't on!
-    please enable Safe Haskell through eitherSafe, Trustwrothy or Unsafe
+    please enable Safe Haskell through either Safe, Trustworthy or Unsafe
