@@ -821,7 +821,7 @@ def skiptest (name, way):
 
 def framework_fail( name, way, reason ):
     full_name = name + '(' + way + ')'
-    if_verbose(1, '*** framework failure for %s %s ' %s (full_name, reason))
+    if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     t.n_framework_failures = t.n_framework_failures + 1
     if name in t.framework_failures:
         t.framework_failures[name].append(way)
