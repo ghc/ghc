@@ -575,10 +575,10 @@ SPEC f :: ty                [n]   INLINE [k]
 
 \begin{code}
 decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
--- Take apart the LHS of a RULE.  It's supposed to look like
---     /\a. f a Int dOrdInt
--- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
--- That is, the RULE binders are lambda-bound
+-- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
+-- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
+-- may add some extra dictionary binders (see Note [Constant rule dicts])
+--
 -- Returns Nothing if the LHS isn't of the expected shape
 decomposeRuleLhs bndrs lhs 
   =  -- Note [Simplifying the left-hand side of a RULE]
