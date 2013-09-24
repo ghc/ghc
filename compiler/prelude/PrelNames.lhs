@@ -1465,7 +1465,7 @@ rep1TyConKey = mkPreludeTyConUnique 156
 -- Type-level naturals
 typeNatKindConNameKey, typeSymbolKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
-  typeNatLeqTyFamNameKey
+  typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
   :: Unique
 typeNatKindConNameKey     = mkPreludeTyConUnique 160
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 161
@@ -1473,6 +1473,7 @@ typeNatAddTyFamNameKey    = mkPreludeTyConUnique 162
 typeNatMulTyFamNameKey    = mkPreludeTyConUnique 163
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 164
 typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 165
+typeNatSubTyFamNameKey    = mkPreludeTyConUnique 166
 
 ntTyConKey:: Unique
 ntTyConKey = mkPreludeTyConUnique 174
