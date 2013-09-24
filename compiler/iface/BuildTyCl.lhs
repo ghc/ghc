@@ -18,8 +18,7 @@ module BuildTyCl (
         TcMethInfo, buildClass,
         distinctAbstractTyConRhs, totallyAbstractTyConRhs,
         mkNewTyConRhs, mkDataTyConRhs, 
-        newImplicitBinder,
-        defaultClassMinimalDef
+        newImplicitBinder
     ) where
 
 #include "HsVersions.h"
@@ -36,7 +35,6 @@ import Class
 import TyCon
 import Type
 import Coercion
-import BooleanFormula( mkAnd, mkVar )
 
 import DynFlags
 import TcRnMonad
@@ -289,14 +287,6 @@ buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
            ; return (mkDictSelId dflags no_unf op_name rec_clas, dm_info) }
-
--- by default require all methods without a defaul implementation who's names don't start with '_'
-defaultClassMinimalDef :: [TcMethInfo] -> ClassMinimalDef
-defaultClassMinimalDef meths
-  = mkAnd
-      [ mkVar name
-      | (name, NoDM, _) <- meths
-      , not (startsWithUnderscore (getOccName name)) ]
 \end{code}
 
 Note [Class newtypes and equality predicates]

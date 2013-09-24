@@ -33,7 +33,7 @@ import TcMType
 import Type     ( getClassPredTys_maybe )
 import TcType
 import TcRnMonad
-import BuildTyCl( TcMethInfo, defaultClassMinimalDef )
+import BuildTyCl( TcMethInfo )
 import Class
 import Id
 import Name
@@ -46,7 +46,7 @@ import Maybes
 import BasicTypes
 import Bag
 import FastString
-import BooleanFormula (impliesAtom, isUnsatisfied, pprBooleanFormulaNice)
+import BooleanFormula
 import Util
 
 import Control.Monad
@@ -269,12 +269,20 @@ tcClassMinimalDef _clas sigs op_info
   = case findMinimalDef sigs of
       Nothing -> return defMindef
       Just mindef -> do
-        -- warn if the given mindef does not imply the default one
+        -- Warn if the given mindef does not imply the default one
+        -- That is, the given mindef should at least ensure that the
+        -- class ops without default methods are required, since we
+        -- have no way to fill them in otherwise
         whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
-          warnTc True . warningMinimalDefIncomplete
+                   (\bf -> addWarnTc (warningMinimalDefIncomplete bf))
         return mindef
   where
-    defMindef = defaultClassMinimalDef op_info
+    -- By default require all methods without a default 
+    -- implementation whose names don't start with '_'
+    defMindef :: ClassMinimalDef
+    defMindef = mkAnd [ mkVar name
+                      | (name, NoDM, _) <- op_info
+                      , not (startsWithUnderscore (getOccName name)) ]
 \end{code}
 
 \begin{code}
