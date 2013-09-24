@@ -52,6 +52,12 @@ e15 = id
 e16 :: Sing (0 <=? x) -> Sing True
 e16 = id
 
+e17 :: Sing (3 - 2) -> Sing 1
+e17 = id
+
+e18 :: Sing (a - 0) -> Sing a
+e18 = id
+
 --------------------------------------------------------------------------------
 -- Test interactions with inerts
 
@@ -77,5 +83,11 @@ type family SomeFun (n :: Nat)
 
 ti7 :: (x <= y, y <= x) => Sing (SomeFun x) -> Sing y -> ()
 ti7 _ _ = ()
+
+ti8 :: Sing (x - y) -> Sing x -> ()
+ti8 _ _ = ()
+
+ti9 :: Sing (y - x) -> Sing x -> ()
+ti9 _ _ = ()
 
 
