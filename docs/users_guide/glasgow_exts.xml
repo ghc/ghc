@@ -272,7 +272,7 @@ If the types of <literal>p</literal> and <literal>q</literal> are not unboxed,
 the resulting binding is lazy like any other Haskell pattern binding.  The
 above example desugars like this:
 <programlisting>
-  f x = let t = case h x o f{ (# p,q #) -> (p,q)
+  f x = let t = case h x of { (# p,q #) -> (p,q) }
             p = fst t
             q = snd t
         in ..body..
