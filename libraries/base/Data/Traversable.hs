@@ -199,6 +199,9 @@ instance Traversable Proxy where
     sequence _ = return Proxy
     {-# INLINE sequence #-}
 
+instance Traversable (Const m) where
+    traverse _ (Const m) = pure $ Const m
+
 -- general functions
 
 -- | 'for' is 'traverse' with its arguments flipped.

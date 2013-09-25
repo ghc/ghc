@@ -201,6 +201,9 @@ instance Foldable Proxy where
     foldr1 _ _ = error "foldr1: Proxy"
     {-# INLINE foldr1 #-}
 
+instance Foldable (Const m) where
+    foldMap _ _ = mempty
+
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
 foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
