@@ -848,7 +848,7 @@ AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
 
 dnl
 dnl Check for Happy and version.  If we're building GHC, then we need
-dnl at least Happy version 1.14.  If there's no installed Happy, we look
+dnl at least Happy version 1.19.  If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
