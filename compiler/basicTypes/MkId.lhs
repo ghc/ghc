@@ -138,7 +138,8 @@ ghcPrimIds
     nullAddrId,
     seqId,
     magicSingIId,
-    coerceId
+    coerceId,
+    proxyHashId
     ]
 \end{code}
 
@@ -1037,7 +1038,7 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
-lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName, coercionTokenName, magicSingIName, coerceName :: Name
+lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName, coercionTokenName, magicSingIName, coerceName, proxyName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
@@ -1046,9 +1047,23 @@ lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")         lazyIdKey  
 coercionTokenName = mkWiredInIdName gHC_PRIM (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
 magicSingIName    = mkWiredInIdName gHC_PRIM (fsLit "magicSingI")    magicSingIKey magicSingIId
 coerceName        = mkWiredInIdName gHC_PRIM (fsLit "coerce")        coerceKey          coerceId
+proxyName         = mkWiredInIdName gHC_PRIM (fsLit "proxy#")        proxyHashKey       proxyHashId
 \end{code}
 
 \begin{code}
+
+------------------------------------------------
+-- proxy# :: forall a. Proxy# a
+proxyHashId :: Id
+proxyHashId
+  = pcMiscPrelId proxyName ty noCafIdInfo
+  where
+    ty      = mkForAllTys [kv, tv] (mkProxyPrimTy k t)
+    kv      = kKiVar
+    k       = mkTyVarTy kv
+    tv:_    = tyVarList k
+    t       = mkTyVarTy tv
+
 ------------------------------------------------
 -- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId :: Id

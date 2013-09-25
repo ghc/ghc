@@ -508,6 +508,7 @@ repPrim t = rep where
     | t == stablePtrPrimTyCon        = text "<stablePtr>"
     | t == stableNamePrimTyCon       = text "<stableName>"
     | t == statePrimTyCon            = text "<statethread>"
+    | t == proxyPrimTyCon            = text "<proxy>"
     | t == realWorldTyCon            = text "<realworld>"
     | t == threadIdPrimTyCon         = text "<ThreadId>"
     | t == weakPrimTyCon             = text "<Weak>"

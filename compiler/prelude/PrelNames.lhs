@@ -1480,6 +1480,9 @@ ntTyConKey = mkPreludeTyConUnique 174
 coercibleTyConKey :: Unique
 coercibleTyConKey = mkPreludeTyConUnique 175
 
+proxyPrimTyConKey :: Unique
+proxyPrimTyConKey = mkPreludeTyConUnique 176
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1792,6 +1795,9 @@ isListClassKey = mkPreludeMiscIdUnique 198
 fromListClassOpKey = mkPreludeMiscIdUnique 199
 fromListNClassOpKey = mkPreludeMiscIdUnique 500
 toListClassOpKey = mkPreludeMiscIdUnique 501
+
+proxyHashKey :: Unique
+proxyHashKey = mkPreludeMiscIdUnique 502
 
 ---------------- Template Haskell -------------------
 --      USES IdUniques 200-499
