@@ -9361,11 +9361,6 @@ itself, so an INLINE pragma is always ignored.</para>
         and <literal>INLINABLE</literal> (<xref linkend="inlinable-pragma"/>)
         pragmas.</para>
 
-	<para>Note: the HBC compiler doesn't like <literal>INLINE</literal> pragmas,
-	  so if you want your code to be HBC-compatible you'll have to surround
-	  the pragma with C pre-processor directives
-	  <literal>#ifdef __GLASGOW_HASKELL__</literal>...<literal>#endif</literal>.</para>
-
       </sect3>
 
       <sect3 id="inlinable-pragma">
@@ -9770,10 +9765,6 @@ instance (Eq a) => Eq (Foo a) where {
 </programlisting>
 The pragma must occur inside the <literal>where</literal> part
 of the instance declaration.
-</para>
-<para>
-Compatible with HBC, by the way, except perhaps in the placement
-of the pragma.
 </para>
 
 </sect2>
