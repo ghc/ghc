@@ -81,7 +81,7 @@ nofib                        nofib       nofib.git                       -
 libraries/parallel           extra       packages/parallel.git           -
 libraries/stm                extra       packages/stm.git                -
 libraries/random             dph         -                               -
-libraries/primitive          dph         -                               http://git.haskell.org/darcs-mirrors/primitive.git
-libraries/vector             dph         -                               http://git.haskell.org/darcs-mirrors/vector.git
+libraries/primitive          dph         -                               https://github.com/haskell/primitive.git
+libraries/vector             dph         -                               https://github.com/haskell/vector.git
 libraries/dph                dph         packages/dph.git                -
 .                            -           ghc.git                         -
