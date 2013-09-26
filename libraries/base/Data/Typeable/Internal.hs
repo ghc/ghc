@@ -29,6 +29,7 @@ module Data.Typeable.Internal (
     Fingerprint(..),
     typeOf, typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7,
     TyCon(..),
+    typeRep,
     mkTyCon,
     mkTyCon3,
     mkTyConApp,
@@ -190,11 +191,15 @@ tyConString = tyConName
 -- | The class 'Typeable' allows a concrete representation of a type to
 -- be calculated.
 class Typeable a where
-  typeRep :: proxy a -> TypeRep
-  -- ^ Takes a value of type @a@ and returns a concrete representation
-  -- of that type.
-  --
-  -- /Version: 4.7.0.0/
+  typeRep# :: Proxy# a -> TypeRep
+
+--  Takes a value of type @a@ and returns a concrete representation
+-- of that type.
+--
+-- /Version: 4.7.0.0/
+typeRep :: forall proxy a. Typeable a => proxy a -> TypeRep
+typeRep _ = typeRep# (proxy# :: Proxy# a)
+{-# INLINE typeRep #-}
 
 -- Keeping backwards-compatibility
 typeOf :: forall a. Typeable a => a -> TypeRep
@@ -228,8 +233,7 @@ typeOf7 _ = typeRep (Proxy :: Proxy t)
 
 -- | Kind-polymorphic Typeable instance for type application
 instance (Typeable s, Typeable a) => Typeable (s a) where
-  typeRep _ = typeRep (Proxy :: Proxy s) `mkAppTy` typeRep (Proxy :: Proxy a)
-
+  typeRep# _ = typeRep# (proxy# :: Proxy# s) `mkAppTy` typeRep# (proxy# :: Proxy# a)
 
 ----------------- Showing TypeReps --------------------
 
