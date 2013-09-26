@@ -915,18 +915,28 @@ The underlying idea is that
 checkInstTermination :: [TcType] -> ThetaType -> TcM ()
 -- See Note [Paterson conditions]
 checkInstTermination tys theta
-  = mapM_ check theta
+  = check_preds theta
   where
    fvs  = fvTypes tys
    size = sizeTypes tys
+
+   check_preds :: [PredType] -> TcM ()
+   check_preds preds = mapM_ check preds
+
+   check :: PredType -> TcM ()
    check pred 
-      | not (null bad_tvs)
-      = addErrTc (predUndecErr pred (nomoreMsg bad_tvs) $$ parens undecidableMsg)
-      | sizePred pred >= size
-      = addErrTc (predUndecErr pred smallerMsg $$ parens undecidableMsg)
-      | otherwise
-      = return ()
-      where
+     = case classifyPredType pred of
+         TuplePred preds -> check_preds preds  -- Look inside tuple predicates; Trac #8359
+         EqPred {}       -> return ()          -- You can't get from equalities
+                                               -- to class predicates, so this is safe
+         _other      -- ClassPred, IrredPred
+           | not (null bad_tvs)
+           -> addErrTc (predUndecErr pred (nomoreMsg bad_tvs) $$ parens undecidableMsg)
+           | sizePred pred >= size
+           -> addErrTc (predUndecErr pred smallerMsg $$ parens undecidableMsg)
+           | otherwise
+           -> return ()
+     where
         bad_tvs = filterOut isKindVar (fvType pred \\ fvs)
              -- Rightly or wrongly, we only check for
              -- excessive occurrences of *type* variables.
