@@ -9244,13 +9244,32 @@ mindef ::= name
 	<title>INLINE pragma</title>
 	<indexterm><primary>INLINE</primary></indexterm>
 
-	<para>GHC (with <option>-O</option>, as always) tries to
-        inline (or &ldquo;unfold&rdquo;) functions/values that are
-        &ldquo;small enough,&rdquo; thus avoiding the call overhead
-        and possibly exposing other more-wonderful optimisations.
-        Normally, if GHC decides a function is &ldquo;too
-        expensive&rdquo; to inline, it will not do so, nor will it
-        export that unfolding for other modules to use.</para>
+        <para>
+          GHC (with <option>-O</option>, as always) tries to inline
+          (or &ldquo;unfold&rdquo;) functions/values that are
+          &ldquo;small enough,&rdquo; thus avoiding the call overhead
+          and possibly exposing other more-wonderful optimisations.
+          GHC has a set of heuristics, tuned over a long period of
+          time using many benchmarks, that decide when it is
+          beneficial to inline a function at its call site.  The
+          heuristics are designed to inline functions when it appears
+          to be beneficial to do so, but without incurring excessive
+          code bloat.  If a function looks too big, it won't be
+          inlined, and functions larger than a certain size will not
+          even have their definition exported in the interface file.
+          Some of the thresholds that govern these heuristic decisions
+          can be changed using flags, see <xref linkend="options-f"
+          />.
+        </para>
+
+        <para>
+          Normally GHC will do a reasonable job of deciding by itself
+          when it is a good idea to inline a function.  However,
+          sometimes you might want to override the default behaviour.
+          For example, if you have a key function that is important to
+          inline because it leads to further optimisations, but GHC
+          judges it to be too big to inline.
+        </para>
 
         <para>The sledgehammer you can bring to bear is the
         <literal>INLINE</literal><indexterm><primary>INLINE
