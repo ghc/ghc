@@ -590,6 +590,14 @@
                     There is now a <literal>Data</literal> instance for <literal>Data.Version</literal>
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    A zero-width unboxed poly-kinded <literal>Proxy#</literal>
+                    was added to <literal>GHC.Prim</literal>. It can be used to make it so
+                    that there is no the operational overhead for passing around proxy
+                    arguments to model type application.
+               </para>
+           </listitem>
              <listitem>
                 <para>
                     <literal>Control.Concurrent.MVar</literal> has a new
