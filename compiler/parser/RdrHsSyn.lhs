@@ -8,9 +8,10 @@ module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkHsSplice, mkTopSpliceDecl,
+        mkRoleAnnotDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
-        mkTySynonym, mkTyFamInstEqn, mkTyFamInstGroup,
+        mkTySynonym, mkTyFamInstEqn,
         mkTyFamInst, 
         mkFamDecl, 
         splitCon, mkInlinePragma,
@@ -45,7 +46,6 @@ module RdrHsSyn (
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkDoAndIfThenElse,
         checkRecordSyntax,
-        parseError,
         parseErrorSDoc,
 
         -- Help with processing exports
@@ -57,6 +57,7 @@ module RdrHsSyn (
 
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
+import CoAxiom          ( Role, fsFromRole )
 import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
                           isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace,
                           rdrNameSpace )
@@ -84,6 +85,8 @@ import Control.Applicative ((<$>))
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
+
+import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 #include "HsVersions.h"
 \end{code}
@@ -178,39 +181,31 @@ mkTySynonym loc lhs rhs
        ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars,
                                  tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
-mkTyFamInstEqn :: SrcSpan
+mkTyFamInstEqn :: LHsType RdrName
                -> LHsType RdrName
-               -> LHsType RdrName
-               -> P (LTyFamInstEqn RdrName)
-mkTyFamInstEqn loc lhs rhs
+               -> P (TyFamInstEqn RdrName)
+mkTyFamInstEqn lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; return (L loc (TyFamInstEqn { tfie_tycon = tc
-                                     , tfie_pats  = mkHsWithBndrs tparams
-                                     , tfie_rhs   = rhs })) }
+       ; return (TyFamInstEqn { tfie_tycon = tc
+                              , tfie_pats  = mkHsWithBndrs tparams
+                              , tfie_rhs   = rhs }) }
 
 mkTyFamInst :: SrcSpan
             -> LTyFamInstEqn RdrName
             -> P (LTyFamInstDecl RdrName)
 mkTyFamInst loc eqn
-  = return (L loc (TyFamInstDecl { tfid_eqns  = [eqn]
-                                 , tfid_group = False
-                                 , tfid_fvs   = placeHolderNames }))
-
-mkTyFamInstGroup :: [LTyFamInstEqn RdrName]
-                 -> TyFamInstDecl RdrName
-mkTyFamInstGroup eqns = TyFamInstDecl { tfid_eqns  = eqns
-                                      , tfid_group = True
-                                      , tfid_fvs   = placeHolderNames }
+  = return (L loc (TyFamInstDecl { tfid_eqn  = eqn
+                                 , tfid_fvs  = placeHolderNames }))
 
 mkFamDecl :: SrcSpan
-          -> FamilyFlavour
+          -> FamilyInfo RdrName
           -> LHsType RdrName   -- LHS
           -> Maybe (LHsKind RdrName) -- Optional kind signature
           -> P (LFamilyDecl RdrName)
-mkFamDecl loc flavour lhs ksig
+mkFamDecl loc info lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
-       ; return (L loc (FamilyDecl flavour tc tyvars ksig)) }
+       ; return (L loc (FamilyDecl info tc tyvars ksig)) }
 
 mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- If the user wrote
@@ -223,18 +218,51 @@ mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
 mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr       Explicit)
 mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr Implicit)
 
+-- Ensure a type literal is used correctly; notably, we need the proper extension enabled,
+-- and if it's an integer literal, the literal must be >= 0. This can occur with
+-- -XNegativeLiterals enabled (see #8306)
+mkTyLit :: Located HsTyLit -> P (LHsType RdrName)
+mkTyLit lit = extension typeLiteralsEnabled >>= check
+  where
+    negLit (L _ (HsStrTy _)) = False
+    negLit (L _ (HsNumTy i)) = i < 0
 
-mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
-mkTyLit l =
-  do allowed <- extension typeLiteralsEnabled
-     if allowed
-       then return (HsTyLit `fmap` l)
-       else parseErrorSDoc (getLoc l)
-              (text "Illegal literal in type (use -XDataKinds to enable):" <+>
-              ppr l)
+    check False =
+      parseErrorSDoc (getLoc lit)
+        (text "Illegal literal in type (use DataKinds to enable):" <+> ppr lit)
+    check True  =
+      if not (negLit lit) then return (HsTyLit `fmap` lit)
+       else parseErrorSDoc (getLoc lit)
+              (text "Illegal literal in type (type literals must not be negative):" <+> ppr lit)
 
 
+mkRoleAnnotDecl :: SrcSpan
+                -> Located RdrName                   -- type being annotated
+                -> [Located (Maybe FastString)]      -- roles
+                -> P (LRoleAnnotDecl RdrName)
+mkRoleAnnotDecl loc tycon roles
+  = do { roles' <- mapM parse_role roles
+       ; return $ L loc $ RoleAnnotDecl tycon roles' }
+  where
+    role_data_type = dataTypeOf (undefined :: Role)
+    all_roles = map fromConstr $ dataTypeConstrs role_data_type
+    possible_roles = [(fsFromRole role, role) | role <- all_roles]
 
+    parse_role (L loc_role Nothing) = return $ L loc_role Nothing
+    parse_role (L loc_role (Just role))
+      = case lookup role possible_roles of
+          Just found_role -> return $ L loc_role $ Just found_role
+          Nothing         ->
+            let nearby = fuzzyLookup (unpackFS role) (mapFst unpackFS possible_roles) in
+            parseErrorSDoc loc_role
+              (text "Illegal role name" <+> quotes (ppr role) $$
+               suggestions nearby)
+
+    suggestions []   = empty
+    suggestions [r]  = text "Perhaps you meant" <+> quotes (ppr r)
+      -- will this last case ever happen??
+    suggestions list = hang (text "Perhaps you meant one of these:")
+                       2 (pprWithCommas (quotes . ppr) list)
 \end{code}
 
 %************************************************************************
@@ -441,7 +469,7 @@ tyConToDataCon loc tc
   where
     msg = text "Not a data constructor:" <+> quotes (ppr tc)
     extra | tc == forall_tv_RDR
-          = text "Perhaps you intended to use -XExistentialQuantification"
+          = text "Perhaps you intended to use ExistentialQuantification"
           | otherwise = empty
 \end{code}
 
@@ -489,7 +517,7 @@ checkDatatypeContext (Just (L loc c))
     = do allowed <- extension datatypeContextsEnabled
          unless allowed $
              parseErrorSDoc loc
-                 (text "Illegal datatype context (use -XDatatypeContexts):" <+>
+                 (text "Illegal datatype context (use DatatypeContexts):" <+>
                   pprHsContext c)
 
 checkRecordSyntax :: Outputable a => Located a -> P (Located a)
@@ -498,7 +526,7 @@ checkRecordSyntax lr@(L loc r)
          if allowed
              then return lr
              else parseErrorSDoc loc
-                      (text "Illegal record syntax (use -XTraditionalRecordSyntax):" <+>
+                      (text "Illegal record syntax (use TraditionalRecordSyntax):" <+>
                        ppr r)
 
 checkTyClHdr :: LHsType RdrName
@@ -590,7 +618,7 @@ checkAPat msg loc e0 = do
         | bang == bang_RDR
         -> do { bang_on <- extension bangPatEnabled
               ; if bang_on then checkLPat msg e >>= (return . BangPat)
-                else parseErrorSDoc loc (text "Illegal bang-pattern (use -XBangPatterns):" $$ ppr e0) }
+                else parseErrorSDoc loc (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e0) }
 
    ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
    EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
@@ -718,9 +746,9 @@ checkValSig lhs@(L l _) ty
                    $$ text hint)
   where
     hint = if foreign_RDR `looks_like` lhs
-           then "Perhaps you meant to use -XForeignFunctionInterface?"
+           then "Perhaps you meant to use ForeignFunctionInterface?"
            else if default_RDR `looks_like` lhs
-                then "Perhaps you meant to use -XDefaultSignatures?"
+                then "Perhaps you meant to use DefaultSignatures?"
                 else "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
@@ -745,7 +773,7 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
              parseErrorSDoc (combineLocs guardExpr elseExpr)
                             (text "Unexpected semi-colons in conditional:"
                           $$ nest 4 expr
-                          $$ text "Perhaps you meant to use -XDoAndIfThenElse?")
+                          $$ text "Perhaps you meant to use DoAndIfThenElse?")
  | otherwise            = return ()
     where pprOptSemi True  = semi
           pprOptSemi False = empty
@@ -977,7 +1005,10 @@ mkImport cconv safety (L loc entity, v, ty)
   let funcTarget = CFunction (StaticTarget entity Nothing True)
       importSpec = CImport PrimCallConv safety Nothing funcTarget
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
-
+  | cconv == JavaScriptCallConv = do
+  let funcTarget = CFunction (StaticTarget entity Nothing True)
+      importSpec = CImport JavaScriptCallConv safety Nothing funcTarget
+  return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
   | otherwise = do
     case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
       Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
@@ -1083,16 +1114,13 @@ mkTypeImpExp name =
      if allowed
        then return (fmap (`setRdrNameSpace` tcClsName) name)
        else parseErrorSDoc (getLoc name)
-              (text "Illegal keyword 'type' (use -XExplicitNamespaces to enable)")
+              (text "Illegal keyword 'type' (use ExplicitNamespaces to enable)")
 \end{code}
 
 -----------------------------------------------------------------------------
 -- Misc utils
 
 \begin{code}
-parseError :: SrcSpan -> String -> P a
-parseError span s = parseErrorSDoc span (text s)
-
 parseErrorSDoc :: SrcSpan -> SDoc -> P a
 parseErrorSDoc span s = failSpanMsgP span s
 \end{code}

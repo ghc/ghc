@@ -2,6 +2,7 @@
 
 use strict;
 use Cwd;
+use English;
 
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
@@ -49,12 +50,15 @@ sub parsePackages {
     foreach (@repos) {
         chomp;
         $lineNum++;
-        if (/^([^# ]+) +([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             my %line;
             $line{"localpath"}  = $1;
             $line{"tag"}        = $2;
             $line{"remotepath"} = $3;
+            $line{"upstreamurl"}= $4;
             push @packages, \%line;
+
+            $tags{$2} = 0;
         }
         elsif (! /^(#.*)?$/) {
             die "Bad content on line $lineNum of packages file: $_";
@@ -159,14 +163,14 @@ sub getrepo {
         my $git_dir = $bare_flag ? "ghc.git" : ".";
         my $branch = &readgit($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
         die "Bad branch: $branch"
-            unless $branch =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+            unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
         my $remote = &readgit($git_dir, "config", "branch.$branch.remote");
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
             $remote = "origin";
         }
         die "Bad remote: $remote"
-            unless $remote =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+            unless $remote =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
         $repo = &readgit($git_dir, "config", "remote.$remote.url");
     }
 
@@ -190,11 +194,11 @@ sub getrepo {
         # Don't drop the last part of the path if specified with -r, as
         # it expects repos of the form:
         #
-        #   http://darcs.haskell.org
+        #   http://git.haskell.org
         #
         # rather than
         #
-        #   http://darcs.haskell.org/ghc
+        #   http://git.haskell.org/ghc
         #
         if (!$defaultrepo) {
             $repo_base =~ s#/[^/]+/?$##;
@@ -243,8 +247,6 @@ sub gitall {
     my ($repo_base, $checked_out_tree) = getrepo();
 
     my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
-
-    parsePackages;
 
     @args = ();
 
@@ -403,7 +405,7 @@ sub gitall {
                 if (not defined($remote_heads{$myhead})) {
                     die "Sub module $localpath needs to be pushed; see http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream";
                 }
-                
+
                 chdir($initial_working_directory);
             }
         }
@@ -454,7 +456,16 @@ sub gitall {
             my $rpath;
             $ignore_failure = 1;
             if ($remotepath eq '-') {
-                $rpath = "$repo_base/$localpath";
+                $rpath = "$localpath.git"; # N.B.: $localpath lacks the .git suffix
+                if ($localpath =~ /^libraries\//) {
+                    # FIXME: This is just a simple heuristic to
+                    # infer the remotepath for Git submodules. A
+                    # proper solution would require to parse the
+                    # .gitmodules file to obtain the actual
+                    # localpath<->remotepath mapping.
+                    $rpath =~ s/^libraries\//packages\//;
+                }
+                $rpath = "$repo_base/$rpath";
             } else {
                 $rpath = $path;
             }
@@ -528,7 +539,7 @@ sub gitall {
             print (' ' x (40 - length($localpath)));
             my $branch = &readgit($localpath, "rev-parse", "--abbrev-ref", "HEAD");
             die "Bad branch: $branch"
-                unless $branch =~ /^[a-zA-Z][a-zA-Z0-9.-]*$/;
+                unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
             my $us   = &readgit(".", "ls-remote", $localpath, "refs/heads/$branch");
             my $them = &readgit(".", "ls-remote", $compareto, "refs/heads/$branch");
             $us   =~ s/[[:space:]].*//;
@@ -550,24 +561,40 @@ sub gitall {
     unlink "resume";
 }
 
+sub checkCurrentBranchIsMaster {
+    my $branch = `git symbolic-ref HEAD`;
+    $branch =~ s/refs\/heads\///;
+    $branch =~ s/\n//;
+
+    if ($branch !~ /master/) {
+        print "\nWarning: You trying to 'pull' while on branch '$branch'.\n"
+            . "Updates to this script will happen on the master branch which\n"
+            . "means the version on this branch may be out of date.\n\n";
+    }
+}
+
 sub help
 {
         my $exit = shift;
+
+        my $tags = join ' ', sort (grep !/^-$/, keys %tags);
 
         # Get the built in help
         my $help = <<END;
 Usage:
 
 ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
-           [--nofib] [--extra] [--testsuite] [--no-dph] [--resume]
+           [--<tag>] [--no-<tag>] [--resume]
            cmd [git flags]
+
+    where <tag> is one of: $tags
 
 Applies the command "cmd" to each repository in the tree.
 
 A full repository tree is obtained by first cloning the ghc
 repository, then getting the subrepositories with "sync-all get":
 
-  \$ git clone http://darcs.haskell.org/ghc.git
+  \$ git clone http://git.haskell.org/ghc.git
   \$ cd ghc
   \$ ./sync-all get
 
@@ -607,7 +634,7 @@ remote set-url [--push] <remote-name>
     repository location in each case appropriately.  For example, to
     add a new remote pointing to the upstream repositories:
 
-    ./sync-all -r http://darcs.haskell.org/ remote add upstream
+    ./sync-all -r http://git.haskell.org remote add upstream
 
     The -r flag points to the root of the repository tree (see "which
     repos to use" below).  For a repository on the local filesystem it
@@ -681,11 +708,11 @@ Flags given *after* the command are passed to git.
 
   --nofib also clones the nofib benchmark suite
 
-  --testsuite also clones the ghc testsuite 
+  --testsuite also clones the ghc testsuite
 
   --extra also clone some extra library packages
 
-  --no-dph avoids cloning the dph pacakges
+  --no-dph avoids cloning the dph packages
 
 
 ------------ Checking out a branch -------------
@@ -715,8 +742,8 @@ otherwise sync-all works on repos of form:
           <repo_base>/<remote-path>
 
 This logic lets you say
-      both    sync-all -r http://darcs.haskell.org/ghc-6.12 remote add ghc-6.12
-      and     sync-all -r ../working remote add working
+  both    sync-all -r http://example.org/ghc-6.12 remote add ghc-6.12
+  and     sync-all -r ../working remote add working
 The latter is called a "checked-out tree".
 
 sync-all *ignores* the defaultrepo of all repos other than the root one. So the
@@ -752,7 +779,13 @@ END
 
 sub main {
 
+    &parsePackages();
+
     $tags{"-"} = 1;
+    $tags{"dph"} = 1;
+    if ($OSNAME =~ /^(MSWin32|Cygwin|msys)$/) {
+        $tags{"windows"} = 1;
+    }
 
     while ($#_ ne -1) {
         my $arg = shift;
@@ -791,11 +824,14 @@ sub main {
         }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
-        elsif ($arg =~ m/^--no-(.*)$/) {
+        elsif ($arg =~ m/^--no-(.*)$/ && defined($tags{$1})) {
             $tags{$1} = 0;
         }
-        elsif ($arg =~ m/^--(.*)$/) {
+        elsif ($arg =~ m/^--(.*)$/ && defined($tags{$1})) {
             $tags{$1} = 1;
+        }
+        elsif ($arg =~ m/^-/) {
+            die "Unrecognised flag: $arg";
         }
         else {
             unshift @_, $arg;
@@ -813,7 +849,7 @@ sub main {
     if ($bare_flag && ! $bare_found && ! $defaultrepo) {
         die "error: bare repository ghc.git not found.\n"
           . "       Either clone a bare ghc repo first or specify the repo location. E.g.:\n"
-          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://darcs.haskell.org/ get\n"
+          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://git.haskell.org get\n"
     }
     elsif ($bare_found) {
         $bare_flag = "--bare";
@@ -875,6 +911,10 @@ sub main {
 }
 
 BEGIN {
+    my %argvHash = map { $_, 1 } @ARGV;
+    if ($argvHash {"pull"}) {
+        checkCurrentBranchIsMaster();
+    }
     $initial_working_directory = getcwd();
 }
 
@@ -965,6 +1005,28 @@ You have an old time package in your GHC tree!
 
 Please remove it (e.g. "rm -r libraries/time"), and then run
 "./sync-all get" to get the new repository.
+============================
+EOF
+    }
+
+    message "== Checking for obsolete Git repo URL";
+    my $repo_url = &readgit(".", 'config', '--get', 'remote.origin.url');
+    if ($repo_url =~ /^http:\/\/darcs.haskell.org/) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You seem to be using obsolete Git repository URLs.
+
+Please run
+
+  ./sync-all -r git://git.haskell.org remote set-url
+
+or (in case port 9418/tcp is filtered by your firewall)
+
+  ./sync-all -r http://git.haskell.org remote set-url
+
+to update your local checkout to use the new Git URLs.
 ============================
 EOF
     }

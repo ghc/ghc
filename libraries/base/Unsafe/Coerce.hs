@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,8 +31,7 @@
 
 module Unsafe.Coerce (unsafeCoerce) where
 
-
-#if defined(__GLASGOW_HASKELL__)
+import GHC.Integer () -- for build ordering
 import GHC.Prim (unsafeCoerce#)
 
 local_id :: a -> a
@@ -61,9 +60,3 @@ unsafeCoerce x = local_id (unsafeCoerce# x)
   -- See Note [Unsafe coerce magic] in basicTypes/MkId
   -- NB: Do not eta-reduce this definition, else the type checker 
   -- give usafeCoerce the same (dangerous) type as unsafeCoerce#
-#endif
-
-#if defined(__HUGS__)
-import Hugs.IOExts (unsafeCoerce)
-#endif
-

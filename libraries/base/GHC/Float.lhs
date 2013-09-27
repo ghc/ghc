@@ -28,7 +28,6 @@
 
 #include "ieee-flpt.h"
 
--- #hide
 module GHC.Float( module GHC.Float, Float(..), Double(..), Float#, Double#
                 , double2Int, int2Double, float2Int, int2Float )
     where
@@ -220,12 +219,12 @@ instance  Real Float  where
     toRational (F# x#)  =
         case decodeFloat_Int# x# of
           (# m#, e# #)
-            | e# >=# 0#                                 ->
+            | isTrue# (e# >=# 0#)                               ->
                     (smallInteger m# `shiftLInteger` e#) :% 1
-            | (int2Word# m# `and#` 1##) `eqWord#` 0##   ->
+            | isTrue# ((int2Word# m# `and#` 1##) `eqWord#` 0##) ->
                     case elimZerosInt# m# (negateInt# e#) of
                       (# n, d# #) -> n :% shiftLInteger 1 d#
-            | otherwise                                 ->
+            | otherwise                                         ->
                     smallInteger m# :% shiftLInteger 1 (negateInt# e#)
 
 instance  Fractional Float  where
@@ -386,12 +385,12 @@ instance  Real Double  where
     toRational (D# x#)  =
         case decodeDoubleInteger x# of
           (# m, e# #)
-            | e# >=# 0#                                     ->
+            | isTrue# (e# >=# 0#)                                  ->
                 shiftLInteger m e# :% 1
-            | (integerToWord m `and#` 1##) `eqWord#` 0##    ->
+            | isTrue# ((integerToWord m `and#` 1##) `eqWord#` 0##) ->
                 case elimZerosInteger m (negateInt# e#) of
                     (# n, d# #) ->  n :% shiftLInteger 1 d#
-            | otherwise                                     ->
+            | otherwise                                            ->
                 m :% shiftLInteger 1 (negateInt# e#)
 
 instance  Fractional Double  where
@@ -580,8 +579,14 @@ showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
 data FFFormat = FFExponent | FFFixed | FFGeneric
 
+-- This is just a compatibility stub, as the "alt" argument formerly
+-- didn't exist.
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
-formatRealFloat fmt decs x
+formatRealFloat fmt decs x = formatRealFloatAlt fmt decs False x
+
+formatRealFloatAlt :: (RealFloat a) => FFFormat -> Maybe Int -> Bool -> a
+                 -> String
+formatRealFloatAlt fmt decs alt x
    | isNaN x                   = "NaN"
    | isInfinite x              = if x < 0 then "-Infinity" else "Infinity"
    | x < 0 || isNegativeZero x = '-':doFmt fmt (floatToDigits (toInteger base) (-x))
@@ -635,13 +640,13 @@ formatRealFloat fmt decs x
           (ei,is') = roundTo base (dec' + e) is
           (ls,rs)  = splitAt (e+ei) (map intToDigit is')
          in
-         mk0 ls ++ (if null rs then "" else '.':rs)
+         mk0 ls ++ (if null rs && not alt then "" else '.':rs)
         else
          let
           (ei,is') = roundTo base dec' (replicate (-e) 0 ++ is)
           d:ds' = map intToDigit (if ei > 0 then is' else 0:is')
          in
-         d : (if null ds' then "" else '.':ds')
+         d : (if null ds' && not alt then "" else '.':ds')
 
 
 roundTo :: Int -> Int -> [Int] -> (Int,[Int])
@@ -933,12 +938,12 @@ fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
 fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
     case integerLog2IsPowerOf2# d of
       (# ld#, pw# #)
-        | pw# ==# 0# ->
+        | isTrue# (pw# ==# 0#) ->
           case integerLog2# n of
-            ln# | ln# >=# (ld# +# me# -# 1#) ->
+            ln# | isTrue# (ln# >=# (ld# +# me# -# 1#)) ->
                   -- this means n/d >= 2^(minEx-1), i.e. we are guaranteed to get
                   -- a normalised number, round to mantDigs bits
-                  if ln# <# md#
+                  if isTrue# (ln# <# md#)
                     then encodeFloat n (I# (negateInt# ld#))
                     else let n'  = n `shiftR` (I# (ln# +# 1# -# md#))
                              n'' = case roundingMode# n (ln# -# md#) of
@@ -953,9 +958,9 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                   -- the exponent for encoding is always minEx-mantDigs
                   -- so we must shift right by (minEx-mantDigs) - (-ld)
                   case ld# +# (me# -# md#) of
-                    ld'# | ld'# <=# 0#  -> -- we would shift left, so we don't shift
+                    ld'# | isTrue# (ld'# <=# 0#) -> -- we would shift left, so we don't shift
                            encodeFloat n (I# ((me# -# md#) -# ld'#))
-                         | ld'# <=# ln#  ->
+                         | isTrue# (ld'# <=# ln#) ->
                            let n' = n `shiftR` (I# ld'#)
                            in case roundingMode# n (ld'# -# 1#) of
                                 0# -> encodeFloat n' (minEx - mantDigs)
@@ -963,7 +968,7 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                                         then encodeFloat n' (minEx-mantDigs)
                                         else encodeFloat (n' + 1) (minEx-mantDigs)
                                 _  -> encodeFloat (n' + 1) (minEx-mantDigs)
-                         | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0 -- result of shift < 0.5
+                         | isTrue# (ld'# ># (ln# +# 1#)) -> encodeFloat 0 0 -- result of shift < 0.5
                          | otherwise ->  -- first bit of n shifted to 0.5 place
                            case integerLog2IsPowerOf2# n of
                             (# _, 0# #) -> encodeFloat 0 0  -- round to even
@@ -1015,12 +1020,12 @@ negateFloat :: Float -> Float
 negateFloat (F# x)        = F# (negateFloat# x)
 
 gtFloat, geFloat, eqFloat, neFloat, ltFloat, leFloat :: Float -> Float -> Bool
-gtFloat     (F# x) (F# y) = gtFloat# x y
-geFloat     (F# x) (F# y) = geFloat# x y
-eqFloat     (F# x) (F# y) = eqFloat# x y
-neFloat     (F# x) (F# y) = neFloat# x y
-ltFloat     (F# x) (F# y) = ltFloat# x y
-leFloat     (F# x) (F# y) = leFloat# x y
+gtFloat     (F# x) (F# y) = isTrue# (gtFloat# x y)
+geFloat     (F# x) (F# y) = isTrue# (geFloat# x y)
+eqFloat     (F# x) (F# y) = isTrue# (eqFloat# x y)
+neFloat     (F# x) (F# y) = isTrue# (neFloat# x y)
+ltFloat     (F# x) (F# y) = isTrue# (ltFloat# x y)
+leFloat     (F# x) (F# y) = isTrue# (leFloat# x y)
 
 expFloat, logFloat, sqrtFloat :: Float -> Float
 sinFloat, cosFloat, tanFloat  :: Float -> Float
@@ -1055,12 +1060,12 @@ negateDouble :: Double -> Double
 negateDouble (D# x)        = D# (negateDouble# x)
 
 gtDouble, geDouble, eqDouble, neDouble, leDouble, ltDouble :: Double -> Double -> Bool
-gtDouble    (D# x) (D# y) = x >## y
-geDouble    (D# x) (D# y) = x >=## y
-eqDouble    (D# x) (D# y) = x ==## y
-neDouble    (D# x) (D# y) = x /=## y
-ltDouble    (D# x) (D# y) = x <## y
-leDouble    (D# x) (D# y) = x <=## y
+gtDouble    (D# x) (D# y) = isTrue# (x >##  y)
+geDouble    (D# x) (D# y) = isTrue# (x >=## y)
+eqDouble    (D# x) (D# y) = isTrue# (x ==## y)
+neDouble    (D# x) (D# y) = isTrue# (x /=## y)
+ltDouble    (D# x) (D# y) = isTrue# (x <##  y)
+leDouble    (D# x) (D# y) = isTrue# (x <=## y)
 
 double2Float :: Double -> Float
 double2Float (D# x) = F# (double2Float# x)

@@ -1,0 +1,5 @@
+\begin{code}
+module FamInst where
+
+data TcBuiltInSynFamily
+\end{code}

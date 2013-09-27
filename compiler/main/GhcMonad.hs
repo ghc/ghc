@@ -97,6 +97,10 @@ data Session = Session !(IORef HscEnv)
 instance Functor Ghc where
   fmap f m = Ghc $ \s -> f `fmap` unGhc m s
 
+instance Applicative Ghc where
+  pure    = return
+  g <*> m = do f <- g; a <- m; return (f a)
+
 instance Monad Ghc where
   return a = Ghc $ \_ -> return a
   m >>= g  = Ghc $ \s -> do a <- unGhc m s; unGhc (g a) s
@@ -156,6 +160,10 @@ liftGhcT m = GhcT $ \_ -> m
 
 instance Functor m => Functor (GhcT m) where
   fmap f m = GhcT $ \s -> f `fmap` unGhcT m s
+
+instance Applicative m => Applicative (GhcT m) where
+  pure x  = GhcT $ \_ -> pure x
+  g <*> m = GhcT $ \s -> unGhcT g s <*> unGhcT m s
 
 instance Monad m => Monad (GhcT m) where
   return x = GhcT $ \_ -> return x

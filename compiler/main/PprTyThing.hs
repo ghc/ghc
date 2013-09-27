@@ -29,9 +29,11 @@ import GHC ( TyThing(..) )
 import DataCon
 import Id
 import TyCon
-import Coercion( pprCoAxiom )
+import Coercion( pprCoAxiom, pprCoAxBranch )
+import CoAxiom( CoAxiom(..), brListMap )
 import HscTypes( tyThingParent_maybe )
 import Type( tidyTopType, tidyOpenType )
+import TypeRep( pprTvBndrs )
 import TcType
 import Name
 import VarEnv( emptyTidyEnv )
@@ -106,6 +108,7 @@ ppr_ty_thing pefas _  (AnId id)          = pprId         pefas id
 ppr_ty_thing pefas _  (ADataCon dataCon) = pprDataConSig pefas dataCon
 ppr_ty_thing pefas ss (ATyCon tyCon)   	 = pprTyCon      pefas ss tyCon
 ppr_ty_thing _     _  (ACoAxiom ax)    	 = pprCoAxiom    ax
+
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr pefas tyCon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
@@ -113,7 +116,7 @@ pprTyConHdr pefas tyCon
   | Just cls <- tyConClass_maybe tyCon
   = pprClassHdr pefas cls
   | otherwise
-  = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
+  = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> pprTvBndrs vars
   where
     vars | GHC.isPrimTyCon tyCon ||
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
@@ -138,10 +141,9 @@ pprDataConSig pefas dataCon
 pprClassHdr :: PrintExplicitForalls -> GHC.Class -> SDoc
 pprClassHdr _ cls
   = ptext (sLit "class") <+>
-    GHC.pprThetaArrowTy (GHC.classSCTheta cls) <+>
-    ppr_bndr cls <+>
-    hsep (map ppr tyVars) <+>
-    GHC.pprFundeps funDeps
+    sep [ GHC.pprThetaArrowTy (GHC.classSCTheta cls)
+        , ppr_bndr cls <+> pprTvBndrs tyVars
+        , GHC.pprFundeps funDeps ]
   where
      (tyVars, funDeps) = GHC.classTvsFds cls
 
@@ -174,15 +176,27 @@ pprTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprTyCon pefas ss tyCon
   | Just syn_rhs <- GHC.synTyConRhs_maybe tyCon
   = case syn_rhs of
-      SynFamilyTyCon {} -> pprTyConHdr pefas tyCon <+> dcolon <+> 
-                           pprTypeForUser pefas (GHC.synTyConResKind tyCon)
+      OpenSynFamilyTyCon -> pprTyConHdr pefas tyCon <+> dcolon <+> 
+                                 pprTypeForUser pefas (GHC.synTyConResKind tyCon)
+      ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
+        hang closed_family_header
+           2 (vcat (brListMap (pprCoAxBranch tyCon) branches))
+      AbstractClosedSynFamilyTyCon -> closed_family_header <+> ptext (sLit "..")
       SynonymTyCon rhs_ty -> hang (pprTyConHdr pefas tyCon <+> equals) 
-                                2 (pprTypeForUser pefas rhs_ty)
+                                     2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
+      BuiltInSynFamTyCon {} -> pprTyConHdr pefas tyCon <+> dcolon <+> 
+                             pprTypeForUser pefas (GHC.synTyConResKind tyCon)
 
+                                                 -- e.g. type T = forall a. a->a
   | Just cls <- GHC.tyConClass_maybe tyCon
   = pprClass pefas ss cls
   | otherwise
   = pprAlgTyCon pefas ss tyCon
+
+  where
+    closed_family_header
+      = pprTyConHdr pefas tyCon <+> dcolon <+>
+        pprTypeForUser pefas (GHC.synTyConResKind tyCon) <+> ptext (sLit "where")
 
 pprAlgTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprAlgTyCon pefas ss tyCon

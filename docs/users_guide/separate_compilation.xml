@@ -600,23 +600,30 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 	  </listitem>
 	</varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <option>-ddump-minimal-imports</option>
             <indexterm><primary><option>-ddump-minimal-imports</option></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Dump to the file "M.imports" (where M is the module
-            being compiled) a "minimal" set of import declarations.
-            You can safely replace all the import declarations in
-            "M.hs" with those found in "M.imports".  Why would you
-            want to do that?  Because the "minimal" imports (a) import
-            everything explicitly, by name, and (b) import nothing
-            that is not required.  It can be quite painful to maintain
-            this property by hand, so this flag is intended to reduce
-            the labour.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Dump to the file
+            <filename><replaceable>M</replaceable>.imports</filename>
+            (where <replaceable>M</replaceable> is the name of the
+            module being compiled) a "minimal" set of import
+            declarations.  The directory where the
+            <filename>.imports</filename> files are created can be
+            controlled via the <option>-dumpdir</option>
+            option.</para> <para>You can safely replace all the import
+            declarations in
+            <filename><replaceable>M</replaceable>.hs</filename> with
+            those found in its respective <filename>.imports</filename>
+            file.  Why would you want to do that?  Because the
+            "minimal" imports (a) import everything explicitly, by
+            name, and (b) import nothing that is not required.  It can
+            be quite painful to maintain this property by hand, so
+            this flag is intended to reduce the labour.</para>
+          </listitem>
+        </varlistentry>
 
 	<varlistentry>
 	  <term>
@@ -836,7 +843,13 @@ values.  For example:
 </programlisting>
 </para></listitem>
 <listitem><para> Fixity declarations are exactly as in Haskell.</para></listitem>
-<listitem><para> Type synonym declarations are exactly as in Haskell.</para></listitem>
+<listitem><para> Vanilla type synonym declarations are exactly as in Haskell.</para></listitem>
+<listitem><para> Open type and data family declarations are exactly as in Haskell.</para></listitem>
+<listitem><para> A closed type family may optionally omit its equations, as in the following example:
+<programlisting>
+  type family ClosedFam a where ..
+</programlisting>
+The <literal>..</literal> is meant literally -- you should write two dots in your file. Note that the <literal>where</literal> clause is still necessary to distinguish closed families from open ones. If you give any equations of a closed family, you must give all of them, in the same order as they appear in the accompanying Haskell file.</para></listitem>
 <listitem><para> A data type declaration can either be given in full, exactly as in Haskell, or it
 can be given abstractly, by omitting the '=' sign and everything that follows.  For example:
 <programlisting>
@@ -865,6 +878,7 @@ methods entirely; but you must either omit them all or put them all in.
 </para></listitem>
 <listitem><para> You can include instance declarations just as in Haskell; but omit the "where" part.
  </para></listitem>
+<listitem><para>The default role for class and datatype parameters is now representational. To get another role, use a role annotation. (See <xref linkend="roles"/>.)</para></listitem>
 </itemizedlist>
 </para>
     </sect2>
@@ -1037,7 +1051,7 @@ M.o : X.hi-boot
 	locate any imported modules that come from packages.  The
 	package modules won't be included in the dependencies
 	generated, though (but see the
-	<option>&ndash;&ndash;include-pkg-deps</option> option below).</para>
+	<option>--include-pkg-deps</option> option below).</para>
 
 	<para>The dependency generation phase of GHC can take some
         additional options, which you may find useful.
@@ -1104,7 +1118,7 @@ M.o : X.hi-boot
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>&ndash;&ndash;exclude-module=&lt;file&gt;</option></term>
+	    <term><option>--exclude-module=&lt;file&gt;</option></term>
 	    <listitem>
 	      <para>Regard <filename>&lt;file&gt;</filename> as
               "stable"; i.e., exclude it from having dependencies on
@@ -1113,7 +1127,7 @@ M.o : X.hi-boot
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>&ndash;&ndash;include-pkg-deps</option></term>
+	    <term><option>--include-pkg-deps</option></term>
 	    <listitem>
 	      <para>Regard modules imported from packages as unstable,
               i.e., generate dependencies on any imported package modules

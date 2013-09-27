@@ -45,7 +45,7 @@ ifneq "$$(BINDIST)" "YES"
 # so we don't want to expand it yet.
 $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$$$(haddock_INPLACE) $$$$(ghc-cabal_INPLACE) $$($1_$2_HS_SRCS) $$$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
-	"$$(ghc-cabal_INPLACE)" hscolour $2 $1
+	"$$(ghc-cabal_INPLACE)" hscolour $1 $2
 endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \

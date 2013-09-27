@@ -4,26 +4,19 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module RnTypes ( 
-	-- Type related stuff
-	rnHsType, rnLHsType, rnLHsTypes, rnContext,
+module RnTypes (
+        -- Type related stuff
+        rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsMaybeKind,
-	rnHsSigType, rnLHsInstType, rnConDeclFields,
+        rnHsSigType, rnLHsInstType, rnConDeclFields,
         newTyVarNameRn,
 
-	-- Precence related stuff
-	mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
-	checkPrecMatch, checkSectionPrec, warnUnusedForAlls,
+        -- Precence related stuff
+        mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
+        checkPrecMatch, checkSectionPrec, warnUnusedForAlls,
 
-	-- Splice related stuff
-	rnSplice, checkTH,
+        -- Splice related stuff
+        rnSplice, checkTH,
 
         -- Binding related stuff
         bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig,
@@ -34,7 +27,7 @@ module RnTypes (
 import {-# SOURCE #-} RnExpr( rnLExpr )
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
-#endif 	/* GHCI */
+#endif  /* GHCI */
 
 import DynFlags
 import HsSyn
@@ -49,13 +42,13 @@ import SrcLoc
 import NameSet
 
 import Util
-import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
-			  Fixity(..), FixityDirection(..) )
+import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
+                          Fixity(..), FixityDirection(..) )
 import Outputable
 import FastString
 import Maybes
 import Data.List        ( nub )
-import Control.Monad	( unless, when )
+import Control.Monad    ( unless, when )
 
 #include "HsVersions.h"
 \end{code}
@@ -64,20 +57,20 @@ These type renamers are in a separate module, rather than in (say) RnSource,
 to break several loop.
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Renaming types}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 rnHsSigType :: SDoc -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
-	-- rnHsSigType is used for source-language type signatures,
-	-- which use *implicit* universal quantification.
+        -- rnHsSigType is used for source-language type signatures,
+        -- which use *implicit* universal quantification.
 rnHsSigType doc_str ty = rnLHsType (TypeSigCtx doc_str) ty
 
 rnLHsInstType :: SDoc -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 -- Rename the type in an instance or standalone deriving decl
-rnLHsInstType doc_str ty 
+rnLHsInstType doc_str ty
   = do { (ty', fvs) <- rnLHsType (GenericCtx doc_str) ty
        ; unless good_inst_ty (addErrAt (getLoc ty) (badInstTy ty))
        ; return (ty', fvs) }
@@ -88,7 +81,7 @@ rnLHsInstType doc_str ty
       | otherwise                = False
 
 badInstTy :: LHsType RdrName -> SDoc
-badInstTy ty = ptext (sLit "Malformed instance:") <+> ppr ty 
+badInstTy ty = ptext (sLit "Malformed instance:") <+> ppr ty
 \end{code}
 
 rnHsType is here because we call it from loadInstDecl, and I didn't
@@ -98,7 +91,7 @@ want a gratuitous knot.
 rnLHsTyKi  :: Bool --  True <=> renaming a type, False <=> a kind
            -> HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnLHsTyKi isType doc (L loc ty)
-  = setSrcSpan loc $ 
+  = setSrcSpan loc $
     do { (ty', fvs) <- rnHsTyKi isType doc ty
        ; return (L loc ty', fvs) }
 
@@ -110,9 +103,9 @@ rnLHsKind = rnLHsTyKi False
 
 rnLHsMaybeKind  :: HsDocContext -> Maybe (LHsKind RdrName)
                 -> RnM (Maybe (LHsKind Name), FreeVars)
-rnLHsMaybeKind _ Nothing 
+rnLHsMaybeKind _ Nothing
   = return (Nothing, emptyFVs)
-rnLHsMaybeKind doc (Just kind) 
+rnLHsMaybeKind doc (Just kind)
   = do { (kind', fvs) <- rnLHsKind doc kind
        ; return (Just kind', fvs) }
 
@@ -123,15 +116,15 @@ rnHsKind = rnHsTyKi False
 
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
-rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty) 
-  = ASSERT ( isType ) do
-	-- Implicit quantifiction in source code (no kinds on tyvars)
-	-- Given the signature  C => T  we universally quantify 
-	-- over FV(T) \ {in-scope-tyvars} 
+rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
+  = ASSERT( isType ) do
+        -- Implicit quantifiction in source code (no kinds on tyvars)
+        -- Given the signature  C => T  we universally quantify
+        -- over FV(T) \ {in-scope-tyvars}
     rdr_env <- getLocalRdrEnv
     loc <- getSrcSpanM
     let
-	(forall_kvs, forall_tvs) = filterInScope rdr_env $
+        (forall_kvs, forall_tvs) = filterInScope rdr_env $
                                    extractHsTysRdrTyVars (ty:ctxt)
            -- In for-all types we don't bring in scope
            -- kind variables mentioned in kind signatures
@@ -139,17 +132,17 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
            --    f :: Int -> T (a::k)    -- Not allowed
 
            -- The filterInScope is to ensure that we don't quantify over
-	   -- type variables that are in scope; when GlasgowExts is off,
-	   -- there usually won't be any, except for class signatures:
-	   --	class C a where { op :: a -> a }
-	tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
+           -- type variables that are in scope; when GlasgowExts is off,
+           -- there usually won't be any, except for class signatures:
+           --   class C a where { op :: a -> a }
+        tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
 
     rnForAll doc Implicit forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
 
 rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars lctxt@(L _ ctxt) tau)
-  = ASSERT ( isType ) do { 	-- Explicit quantification.
-         -- Check that the forall'd tyvars are actually 
-	 -- mentioned in the type, and produce a warning if not
+  = ASSERT( isType ) do {      -- Explicit quantification.
+         -- Check that the forall'd tyvars are actually
+         -- mentioned in the type, and produce a warning if not
          let (kvs, mentioned) = extractHsTysRdrTyVars (tau:ctxt)
              in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
        ; warnUnusedForAlls (in_type_doc $$ docOfHsDocContext doc) forall_tyvars mentioned
@@ -164,17 +157,17 @@ rnHsTyKi isType _ (HsTyVar rdr_name)
 -- a sensible error message, but we don't want to complain about the dot too
 -- Hence the jiggery pokery with ty1
 rnHsTyKi isType doc ty@(HsOpTy ty1 (wrapper, L loc op) ty2)
-  = ASSERT ( isType ) setSrcSpan loc $ 
-    do	{ ops_ok <- xoptM Opt_TypeOperators
-	; op' <- if ops_ok
-		 then rnTyVar isType op
-		 else do { addErr (opTyErr op ty)
-			 ; return (mkUnboundName op) }	-- Avoid double complaint
-	; let l_op' = L loc op'
-	; fix <- lookupTyFixityRn l_op'
-	; (ty1', fvs1) <- rnLHsType doc ty1
-	; (ty2', fvs2) <- rnLHsType doc ty2
-	; res_ty <- mkHsOpTyRn (\t1 t2 -> HsOpTy t1 (wrapper, l_op') t2) 
+  = ASSERT( isType ) setSrcSpan loc $
+    do  { ops_ok <- xoptM Opt_TypeOperators
+        ; op' <- if ops_ok
+                 then rnTyVar isType op
+                 else do { addErr (opTyErr op ty)
+                         ; return (mkUnboundName op) }  -- Avoid double complaint
+        ; let l_op' = L loc op'
+        ; fix <- lookupTyFixityRn l_op'
+        ; (ty1', fvs1) <- rnLHsType doc ty1
+        ; (ty2', fvs2) <- rnLHsType doc ty2
+        ; res_ty <- mkHsOpTyRn (\t1 t2 -> HsOpTy t1 (wrapper, l_op') t2)
                                op' fix ty1' ty2'
         ; return (res_ty, (fvs1 `plusFV` fvs2) `addOneFV` op') }
 
@@ -183,23 +176,24 @@ rnHsTyKi isType doc (HsParTy ty)
        ; return (HsParTy ty', fvs) }
 
 rnHsTyKi isType doc (HsBangTy b ty)
-  = ASSERT ( isType ) 
+  = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
        ; return (HsBangTy b ty', fvs) }
 
-rnHsTyKi isType doc (HsRecTy flds)
-  = ASSERT ( isType ) 
-    do { (flds', fvs) <- rnConDeclFields doc flds
+rnHsTyKi _ doc ty@(HsRecTy flds)
+  = do { addErr (hang (ptext (sLit "Record syntax is illegal here:"))
+                    2 (ppr ty))
+       ; (flds', fvs) <- rnConDeclFields doc flds
        ; return (HsRecTy flds', fvs) }
 
 rnHsTyKi isType doc (HsFunTy ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi isType doc ty1
-	-- Might find a for-all as the arg of a function type
+        -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi isType doc ty2
-	-- Or as the result.  This happens when reading Prelude.hi
-	-- when we find return :: forall m. Monad m -> forall a. a -> m a
+        -- Or as the result.  This happens when reading Prelude.hi
+        -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
-	-- Check for fixity rearrangements
+        -- Check for fixity rearrangements
        ; res_ty <- if isType
                    then mkHsOpTyRn HsFunTy funTyConName funTyFixity ty1' ty2'
                    else return (HsFunTy ty1' ty2')
@@ -212,15 +206,15 @@ rnHsTyKi isType doc listTy@(HsListTy ty)
        ; return (HsListTy ty', fvs) }
 
 rnHsTyKi isType doc (HsKindSig ty k)
-  = ASSERT ( isType ) 
+  = ASSERT( isType )
     do { kind_sigs_ok <- xoptM Opt_KindSignatures
        ; unless kind_sigs_ok (badSigErr False doc ty)
        ; (ty', fvs1) <- rnLHsType doc ty
        ; (k', fvs2) <- rnLHsKind doc k
        ; return (HsKindSig ty' k', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi isType doc (HsPArrTy ty) 
-  = ASSERT ( isType )
+rnHsTyKi isType doc (HsPArrTy ty)
+  = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
        ; return (HsPArrTy ty', fvs) }
 
@@ -249,19 +243,19 @@ rnHsTyKi isType doc (HsIParamTy n ty)
     do { (ty', fvs) <- rnLHsType doc ty
        ; return (HsIParamTy n ty', fvs) }
 
-rnHsTyKi isType doc (HsEqTy ty1 ty2) 
+rnHsTyKi isType doc (HsEqTy ty1 ty2)
   = ASSERT( isType )
     do { (ty1', fvs1) <- rnLHsType doc ty1
        ; (ty2', fvs2) <- rnLHsType doc ty2
        ; return (HsEqTy ty1' ty2', fvs1 `plusFV` fvs2) }
 
 rnHsTyKi isType _ (HsSpliceTy sp _ k)
-  = ASSERT ( isType ) 
-    do { (sp', fvs) <- rnSplice sp	-- ToDo: deal with fvs
+  = ASSERT( isType )
+    do { (sp', fvs) <- rnSplice sp      -- ToDo: deal with fvs
        ; return (HsSpliceTy sp' fvs k, fvs) }
 
-rnHsTyKi isType doc (HsDocTy ty haddock_doc) 
-  = ASSERT ( isType )
+rnHsTyKi isType doc (HsDocTy ty haddock_doc)
+  = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
        ; haddock_doc' <- rnLHsDoc haddock_doc
        ; return (HsDocTy ty' haddock_doc', fvs) }
@@ -269,19 +263,21 @@ rnHsTyKi isType doc (HsDocTy ty haddock_doc)
 #ifndef GHCI
 rnHsTyKi _ _ ty@(HsQuasiQuoteTy _) = pprPanic "Can't do quasiquotation without GHCi" (ppr ty)
 #else
-rnHsTyKi isType doc (HsQuasiQuoteTy qq) 
-  = ASSERT ( isType ) 
+rnHsTyKi isType doc (HsQuasiQuoteTy qq)
+  = ASSERT( isType )
     do { ty <- runQuasiQuoteType qq
-       ; rnHsType doc (unLoc ty) }
+         -- Wrap the result of the quasi-quoter in parens so that we don't
+         -- lose the outermost location set by runQuasiQuote (#7918) 
+       ; rnHsType doc (HsParTy ty) }
 #endif
 
-rnHsTyKi isType _ (HsCoreTy ty) 
-  = ASSERT ( isType ) 
+rnHsTyKi isType _ (HsCoreTy ty)
+  = ASSERT( isType )
     return (HsCoreTy ty, emptyFVs)
-    -- The emptyFVs probably isn't quite right 
+    -- The emptyFVs probably isn't quite right
     -- but I don't think it matters
 
-rnHsTyKi _ _ (HsWrapTy {}) 
+rnHsTyKi _ _ (HsWrapTy {})
   = panic "rnHsTyKi"
 
 rnHsTyKi isType doc ty@(HsExplicitListTy k tys)
@@ -291,7 +287,7 @@ rnHsTyKi isType doc ty@(HsExplicitListTy k tys)
        ; (tys', fvs) <- rnLHsTypes doc tys
        ; return (HsExplicitListTy k tys', fvs) }
 
-rnHsTyKi isType doc ty@(HsExplicitTupleTy kis tys) 
+rnHsTyKi isType doc ty@(HsExplicitTupleTy kis tys)
   = ASSERT( isType )
     do { data_kinds <- xoptM Opt_DataKinds
        ; unless data_kinds (addErr (dataKindsErr isType ty))
@@ -313,54 +309,54 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
 
 \begin{code}
-rnForAll :: HsDocContext -> HsExplicitFlag 
+rnForAll :: HsDocContext -> HsExplicitFlag
          -> [RdrName]                -- Kind variables
          -> LHsTyVarBndrs RdrName   -- Type variables
-	 -> LHsContext RdrName -> LHsType RdrName 
+         -> LHsContext RdrName -> LHsType RdrName
          -> RnM (HsType Name, FreeVars)
 
 rnForAll doc exp kvs forall_tyvars ctxt ty
   | null kvs, null (hsQTvBndrs forall_tyvars), null (unLoc ctxt)
   = rnHsType doc (unLoc ty)
-	-- One reason for this case is that a type like Int#
-	-- starts off as (HsForAllTy Nothing [] Int), in case
-	-- there is some quantification.  Now that we have quantified
-	-- and discovered there are no type variables, it's nicer to turn
-	-- it into plain Int.  If it were Int# instead of Int, we'd actually
-	-- get an error, because the body of a genuine for-all is
-	-- of kind *.
+        -- One reason for this case is that a type like Int#
+        -- starts off as (HsForAllTy Nothing [] Int), in case
+        -- there is some quantification.  Now that we have quantified
+        -- and discovered there are no type variables, it's nicer to turn
+        -- it into plain Int.  If it were Int# instead of Int, we'd actually
+        -- get an error, because the body of a genuine for-all is
+        -- of kind *.
 
   | otherwise
   = bindHsTyVars doc Nothing kvs forall_tyvars $ \ new_tyvars ->
     do { (new_ctxt, fvs1) <- rnContext doc ctxt
        ; (new_ty, fvs2) <- rnLHsType doc ty
        ; return (HsForAllTy exp new_tyvars new_ctxt new_ty, fvs1 `plusFV` fvs2) }
-	-- Retain the same implicit/explicit flag as before
-	-- so that we can later print it correctly
+        -- Retain the same implicit/explicit flag as before
+        -- so that we can later print it correctly
 
 ---------------
 bindSigTyVarsFV :: [Name]
-		-> RnM (a, FreeVars)
-	  	-> RnM (a, FreeVars)
+                -> RnM (a, FreeVars)
+                -> RnM (a, FreeVars)
 -- Used just before renaming the defn of a function
 -- with a separate type signature, to bring its tyvars into scope
 -- With no -XScopedTypeVariables, this is a no-op
 bindSigTyVarsFV tvs thing_inside
-  = do	{ scoped_tyvars <- xoptM Opt_ScopedTypeVariables
-	; if not scoped_tyvars then 
-		thing_inside 
-	  else
-		bindLocalNamesFV tvs thing_inside }
+  = do  { scoped_tyvars <- xoptM Opt_ScopedTypeVariables
+        ; if not scoped_tyvars then
+                thing_inside
+          else
+                bindLocalNamesFV tvs thing_inside }
 
 ---------------
-bindHsTyVars :: HsDocContext 
+bindHsTyVars :: HsDocContext
              -> Maybe a                 -- Just _  => an associated type decl
              -> [RdrName]               -- Kind variables from scope
              -> LHsTyVarBndrs RdrName   -- Type variables
              -> (LHsTyVarBndrs Name -> RnM (b, FreeVars))
              -> RnM (b, FreeVars)
--- (a) Bring kind variables into scope 
---     both (i)  passed in (kv_bndrs) 
+-- (a) Bring kind variables into scope
+--     both (i)  passed in (kv_bndrs)
 --     and  (ii) mentioned in the kinds of tv_bndrs
 -- (b) Bring type variables into scope
 bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
@@ -377,26 +373,26 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
                 -- We disallow this: too confusing!
 
        ; poly_kind <- xoptM Opt_PolyKinds
-       ; unless (poly_kind || null all_kvs) 
+       ; unless (poly_kind || null all_kvs)
                 (addErr (badKindBndrs doc all_kvs))
-       ; unless (null overlap_kvs) 
+       ; unless (null overlap_kvs)
                 (addErr (overlappingKindVars doc overlap_kvs))
 
        ; loc <- getSrcSpanM
        ; kv_names <- mapM (newLocalBndrRn . L loc) all_kvs
-       ; bindLocalNamesFV kv_names $ 
+       ; bindLocalNamesFV kv_names $
     do { let tv_names_w_loc = hsLTyVarLocNames tv_bndrs
 
-    	     rn_tv_bndr :: LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
-    	     rn_tv_bndr (L loc (UserTyVar rdr)) 
-    	       = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-    	            ; return (L loc (UserTyVar nm), emptyFVs) }
-    	     rn_tv_bndr (L loc (KindedTyVar rdr kind)) 
-    	       = do { sig_ok <- xoptM Opt_KindSignatures
+             rn_tv_bndr :: LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
+             rn_tv_bndr (L loc (UserTyVar rdr))
+               = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
+                    ; return (L loc (UserTyVar nm), emptyFVs) }
+             rn_tv_bndr (L loc (KindedTyVar rdr kind))
+               = do { sig_ok <- xoptM Opt_KindSignatures
                     ; unless sig_ok (badSigErr False doc kind)
                     ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-    	            ; (kind', fvs) <- rnLHsKind doc kind
-    	            ; return (L loc (KindedTyVar nm kind'), fvs) }
+                    ; (kind', fvs) <- rnLHsKind doc kind
+                    ; return (L loc (KindedTyVar nm kind'), fvs) }
 
        -- Check for duplicate or shadowed tyvar bindrs
        ; checkDupRdrNames tv_names_w_loc
@@ -413,8 +409,8 @@ newTyVarNameRn :: Maybe a -> LocalRdrEnv -> SrcSpan -> RdrName -> RnM Name
 newTyVarNameRn mb_assoc rdr_env loc rdr
   | Just _ <- mb_assoc    -- Use the same Name as the parent class decl
   , Just n <- lookupLocalRdrEnv rdr_env rdr
-  = return n   
-  | otherwise 
+  = return n
+  | otherwise
   = newLocalBndrRn (L loc rdr)
 
 --------------------------------
@@ -431,16 +427,16 @@ rnHsBndrSig doc (HsWB { hswb_cts = ty@(L loc _) }) thing_inside
                                                , not (tv `elemLocalRdrEnv` name_env) ]
        ; kv_names <- newLocalBndrsRn [L loc kv | kv <- kv_bndrs
                                                , not (kv `elemLocalRdrEnv` name_env) ]
-       ; bindLocalNamesFV kv_names $ 
-         bindLocalNamesFV tv_names $ 
+       ; bindLocalNamesFV kv_names $
+         bindLocalNamesFV tv_names $
     do { (ty', fvs1) <- rnLHsType doc ty
        ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty', hswb_kvs = kv_names, hswb_tvs = tv_names })
        ; return (res, fvs1 `plusFV` fvs2) } }
 
 overlappingKindVars :: HsDocContext -> [RdrName] -> SDoc
 overlappingKindVars doc kvs
-  = vcat [ ptext (sLit "Kind variable") <> plural kvs <+> 
-           ptext (sLit "also used as type variable") <> plural kvs 
+  = vcat [ ptext (sLit "Kind variable") <> plural kvs <+>
+           ptext (sLit "also used as type variable") <> plural kvs
            <> colon <+> pprQuotedList kvs
          , docOfHsDocContext doc ]
 
@@ -448,39 +444,39 @@ badKindBndrs :: HsDocContext -> [RdrName] -> SDoc
 badKindBndrs doc kvs
   = vcat [ hang (ptext (sLit "Unexpected kind variable") <> plural kvs
                  <+> pprQuotedList kvs)
-              2 (ptext (sLit "Perhaps you intended to use -XPolyKinds"))
+              2 (ptext (sLit "Perhaps you intended to use PolyKinds"))
          , docOfHsDocContext doc ]
 
 badSigErr :: Bool -> HsDocContext -> LHsType RdrName -> TcM ()
 badSigErr is_type doc (L loc ty)
   = setSrcSpan loc $ addErr $
-    vcat [ hang (ptext (sLit "Illegal") <+> what 
+    vcat [ hang (ptext (sLit "Illegal") <+> what
                  <+> ptext (sLit "signature:") <+> quotes (ppr ty))
               2 (ptext (sLit "Perhaps you intended to use") <+> flag)
          , docOfHsDocContext doc ]
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
-    flag | is_type   = ptext (sLit "-XScopedTypeVariables")
-         | otherwise = ptext (sLit "-XKindSignatures")
+    flag | is_type   = ptext (sLit "ScopedTypeVariables")
+         | otherwise = ptext (sLit "KindSignatures")
 
 dataKindsErr :: Bool -> HsType RdrName -> SDoc
 dataKindsErr is_type thing
   = hang (ptext (sLit "Illegal") <+> what <> colon <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
+       2 (ptext (sLit "Perhaps you intended to use DataKinds"))
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
 \end{code}
 
-Note [Renaming associated types] 
+Note [Renaming associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check that the RHS of the decl mentions only type variables
 bound on the LHS.  For example, this is not ok
    class C a b where
       type F a x :: *
    instance C (p,q) r where
-      type F (p,q) x = (x, r)	-- BAD: mentions 'r'
+      type F (p,q) x = (x, r)   -- BAD: mentions 'r'
 c.f. Trac #5515
 
 What makes it tricky is that the *kind* variable from the class *are*
@@ -488,8 +484,8 @@ in scope (Trac #5862):
     class Category (x :: k -> k -> *) where
       type Ob x :: k -> Constraint
       id :: Ob x a => x a a
-      (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c 
-Here 'k' is in scope in the kind signature even though it's not 
+      (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c
+Here 'k' is in scope in the kind signature even though it's not
 explicitly mentioned on the LHS of the type Ob declaration.
 
 We could force you to mention k explicitly, thus
@@ -499,13 +495,13 @@ but it seems tiresome to do so.
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Contexts and predicates}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
-rnConDeclFields :: HsDocContext -> [ConDeclField RdrName] 
+rnConDeclFields :: HsDocContext -> [ConDeclField RdrName]
                 -> RnM ([ConDeclField Name], FreeVars)
 rnConDeclFields doc fields = mapFvRn (rnField doc) fields
 
@@ -517,16 +513,16 @@ rnField doc (ConDeclField name ty haddock_doc)
        ; return (ConDeclField new_name new_ty new_haddock_doc, fvs) }
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
-rnContext doc (L loc cxt) 
+rnContext doc (L loc cxt)
   = do { (cxt', fvs) <- rnLHsTypes doc cxt
        ; return (L loc cxt', fvs) }
 \end{code}
 
 
 %************************************************************************
-%*									*
-	Fixities and precedence parsing
-%*									*
+%*                                                                      *
+        Fixities and precedence parsing
+%*                                                                      *
 %************************************************************************
 
 @mkOpAppRn@ deals with operator fixities.  The argument expressions
@@ -539,9 +535,9 @@ operator application.  Why? Because the parser parses all
 operator appications left-associatively, EXCEPT negation, which
 we need to handle specially.
 Infix types are read in a *right-associative* way, so that
-	a `op` b `op` c
+        a `op` b `op` c
 is always read in as
-	a `op` (b `op` c)
+        a `op` (b `op` c)
 
 mkHsOpTyRn rearranges where necessary.  The two arguments
 have already been renamed and rearranged.  It's made rather tiresome
@@ -551,46 +547,46 @@ by the presence of ->, which is a separate syntactic construct.
 ---------------
 -- Building (ty1 `op1` (ty21 `op2` ty22))
 mkHsOpTyRn :: (LHsType Name -> LHsType Name -> HsType Name)
-	   -> Name -> Fixity -> LHsType Name -> LHsType Name 
-	   -> RnM (HsType Name)
+           -> Name -> Fixity -> LHsType Name -> LHsType Name
+           -> RnM (HsType Name)
 
 mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy ty21 (w2, op2) ty22))
   = do  { fix2 <- lookupTyFixityRn op2
-	; mk_hs_op_ty mk1 pp_op1 fix1 ty1 
-		      (\t1 t2 -> HsOpTy t1 (w2, op2) t2)
-		      (unLoc op2) fix2 ty21 ty22 loc2 }
+        ; mk_hs_op_ty mk1 pp_op1 fix1 ty1
+                      (\t1 t2 -> HsOpTy t1 (w2, op2) t2)
+                      (unLoc op2) fix2 ty21 ty22 loc2 }
 
 mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy ty21 ty22))
-  = mk_hs_op_ty mk1 pp_op1 fix1 ty1 
-		HsFunTy funTyConName funTyFixity ty21 ty22 loc2
+  = mk_hs_op_ty mk1 pp_op1 fix1 ty1
+                HsFunTy funTyConName funTyFixity ty21 ty22 loc2
 
-mkHsOpTyRn mk1 _ _ ty1 ty2 		-- Default case, no rearrangment
+mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
   = return (mk1 ty1 ty2)
 
 ---------------
 mk_hs_op_ty :: (LHsType Name -> LHsType Name -> HsType Name)
-	    -> Name -> Fixity -> LHsType Name
-	    -> (LHsType Name -> LHsType Name -> HsType Name)
-	    -> Name -> Fixity -> LHsType Name -> LHsType Name -> SrcSpan
-	    -> RnM (HsType Name)
-mk_hs_op_ty mk1 op1 fix1 ty1 
-	    mk2 op2 fix2 ty21 ty22 loc2
+            -> Name -> Fixity -> LHsType Name
+            -> (LHsType Name -> LHsType Name -> HsType Name)
+            -> Name -> Fixity -> LHsType Name -> LHsType Name -> SrcSpan
+            -> RnM (HsType Name)
+mk_hs_op_ty mk1 op1 fix1 ty1
+            mk2 op2 fix2 ty21 ty22 loc2
   | nofix_error     = do { precParseErr (op1,fix1) (op2,fix2)
-		         ; return (mk1 ty1 (L loc2 (mk2 ty21 ty22))) }
+                         ; return (mk1 ty1 (L loc2 (mk2 ty21 ty22))) }
   | associate_right = return (mk1 ty1 (L loc2 (mk2 ty21 ty22)))
-  | otherwise	    = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
-			   new_ty <- mkHsOpTyRn mk1 op1 fix1 ty1 ty21
-			 ; return (mk2 (noLoc new_ty) ty22) }
+  | otherwise       = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
+                           new_ty <- mkHsOpTyRn mk1 op1 fix1 ty1 ty21
+                         ; return (mk2 (noLoc new_ty) ty22) }
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 
 ---------------------------
-mkOpAppRn :: LHsExpr Name			-- Left operand; already rearranged
-	  -> LHsExpr Name -> Fixity 		-- Operator and fixity
-	  -> LHsExpr Name			-- Right operand (not an OpApp, but might
-						-- be a NegApp)
-	  -> RnM (HsExpr Name)
+mkOpAppRn :: LHsExpr Name                       -- Left operand; already rearranged
+          -> LHsExpr Name -> Fixity             -- Operator and fixity
+          -> LHsExpr Name                       -- Right operand (not an OpApp, but might
+                                                -- be a NegApp)
+          -> RnM (HsExpr Name)
 
 -- (e11 `op1` e12) `op2` e2
 mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
@@ -606,13 +602,13 @@ mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 ---------------------------
---	(- neg_arg) `op` e2
+--      (- neg_arg) `op` e2
 mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
   | nofix_error
   = do precParseErr (negateName,negateFixity) (get_op op2,fix2)
        return (OpApp e1 op2 fix2 e2)
 
-  | associate_right 
+  | associate_right
   = do new_e <- mkOpAppRn neg_arg op2 fix2 e2
        return (NegApp (L loc' new_e) neg_name)
   where
@@ -620,19 +616,19 @@ mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
     (nofix_error, associate_right) = compareFixity negateFixity fix2
 
 ---------------------------
---	e1 `op` - neg_arg
-mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp _ _))	-- NegApp can occur on the right
-  | not associate_right			-- We *want* right association
+--      e1 `op` - neg_arg
+mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp _ _))     -- NegApp can occur on the right
+  | not associate_right                 -- We *want* right association
   = do precParseErr (get_op op1, fix1) (negateName, negateFixity)
        return (OpApp e1 op1 fix1 e2)
   where
     (_, associate_right) = compareFixity fix1 negateFixity
 
 ---------------------------
---	Default case
-mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
+--      Default case
+mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
   = ASSERT2( right_op_ok fix (unLoc e2),
-	     ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
+             ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
     )
     return (OpApp e1 op fix e2)
 
@@ -641,7 +637,7 @@ get_op :: LHsExpr Name -> Name
 get_op (L _ (HsVar n)) = n
 get_op other           = pprPanic "get_op" (ppr other)
 
--- Parser left-associates everything, but 
+-- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to
 -- in the right operarand.  So we just check that the right operand is OK
 right_op_ok :: Fixity -> HsExpr Name -> Bool
@@ -661,17 +657,17 @@ mkNegAppRn neg_arg neg_name
 
 not_op_app :: HsExpr id -> Bool
 not_op_app (OpApp _ _ _ _) = False
-not_op_app _    	   = True
+not_op_app _               = True
 
 ---------------------------
-mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
-	  -> LHsExpr Name -> Fixity 	-- Operator and fixity
-	  -> LHsCmdTop Name		-- Right operand (not an infix)
-	  -> RnM (HsCmd Name)
+mkOpFormRn :: LHsCmdTop Name            -- Left operand; already rearranged
+          -> LHsExpr Name -> Fixity     -- Operator and fixity
+          -> LHsCmdTop Name             -- Right operand (not an infix)
+          -> RnM (HsCmd Name)
 
 -- (e11 `op1` e12) `op2` e2
 mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ _ _))
-	op2 fix2 a2
+        op2 fix2 a2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
        return (HsCmdArrForm op2 (Just fix2) [a1, a2])
@@ -679,40 +675,40 @@ mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ 
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
        return (HsCmdArrForm op1 (Just fix1)
-	          [a11, L loc (HsCmdTop (L loc new_c) placeHolderType placeHolderType [])])
-	-- TODO: locs are wrong
+                  [a11, L loc (HsCmdTop (L loc new_c) placeHolderType placeHolderType [])])
+        -- TODO: locs are wrong
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
---	Default case
-mkOpFormRn arg1 op fix arg2 			-- Default case, no rearrangment
+--      Default case
+mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
   = return (HsCmdArrForm op (Just fix) [arg1, arg2])
 
 
 --------------------------------------
 mkConOpPatRn :: Located Name -> Fixity -> LPat Name -> LPat Name
-	     -> RnM (Pat Name)
+             -> RnM (Pat Name)
 
 mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
-  = do	{ fix1 <- lookupFixityRn (unLoc op1)
-	; let (nofix_error, associate_right) = compareFixity fix1 fix2
+  = do  { fix1 <- lookupFixityRn (unLoc op1)
+        ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
-	; if nofix_error then do
-		{ precParseErr (unLoc op1,fix1) (unLoc op2,fix2)
-		; return (ConPatIn op2 (InfixCon p1 p2)) }
+        ; if nofix_error then do
+                { precParseErr (unLoc op1,fix1) (unLoc op2,fix2)
+                ; return (ConPatIn op2 (InfixCon p1 p2)) }
 
-	  else if associate_right then do
-		{ new_p <- mkConOpPatRn op2 fix2 p12 p2
-		; return (ConPatIn op1 (InfixCon p11 (L loc new_p))) } -- XXX loc right?
-	  else return (ConPatIn op2 (InfixCon p1 p2)) }
+          else if associate_right then do
+                { new_p <- mkConOpPatRn op2 fix2 p12 p2
+                ; return (ConPatIn op1 (InfixCon p11 (L loc new_p))) } -- XXX loc right?
+          else return (ConPatIn op2 (InfixCon p1 p2)) }
 
-mkConOpPatRn op _ p1 p2 			-- Default case, no rearrangment
+mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
   = ASSERT( not_op_pat (unLoc p2) )
     return (ConPatIn op (InfixCon p1 p2))
 
 not_op_pat :: Pat Name -> Bool
 not_op_pat (ConPatIn _ (InfixCon _ _)) = False
-not_op_pat _        	               = True
+not_op_pat _                           = True
 
 --------------------------------------
 checkPrecMatch :: Name -> MatchGroup Name body -> RnM ()
@@ -720,36 +716,36 @@ checkPrecMatch :: Name -> MatchGroup Name body -> RnM ()
   --   eg  a `op` b `C` c = ...
   -- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch op (MG { mg_alts = ms })	
-  = mapM_ check ms			 	
+checkPrecMatch op (MG { mg_alts = ms })
+  = mapM_ check ms
   where
     check (L _ (Match (L l1 p1 : L l2 p2 :_) _ _))
       = setSrcSpan (combineSrcSpans l1 l2) $
         do checkPrec op p1 False
            checkPrec op p2 True
 
-    check _ = return ()	
-	-- This can happen.  Consider
-	--	a `op` True = ...
-	--	op          = ...
-	-- The infix flag comes from the first binding of the group
-	-- but the second eqn has no args (an error, but not discovered
-	-- until the type checker).  So we don't want to crash on the
-	-- second eqn.
+    check _ = return ()
+        -- This can happen.  Consider
+        --      a `op` True = ...
+        --      op          = ...
+        -- The infix flag comes from the first binding of the group
+        -- but the second eqn has no args (an error, but not discovered
+        -- until the type checker).  So we don't want to crash on the
+        -- second eqn.
 
 checkPrec :: Name -> Pat Name -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
     op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
     op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
     let
-	inf_ok = op1_prec > op_prec || 
-	         (op1_prec == op_prec &&
-		  (op1_dir == InfixR && op_dir == InfixR && right ||
-		   op1_dir == InfixL && op_dir == InfixL && not right))
+        inf_ok = op1_prec > op_prec ||
+                 (op1_prec == op_prec &&
+                  (op1_dir == InfixR && op_dir == InfixR && right ||
+                   op1_dir == InfixL && op_dir == InfixL && not right))
 
-	info  = (op,        op_fix)
-	info1 = (unLoc op1, op1_fix)
-	(infol, infor) = if right then (info, info1) else (info1, info)
+        info  = (op,        op_fix)
+        info1 = (unLoc op1, op1_fix)
+        (infol, infor) = if right then (info, info1) else (info1, info)
     unless inf_ok (precParseErr infol infor)
 
 checkPrec _ _ _
@@ -760,56 +756,56 @@ checkPrec _ _ _
 --   (a) its precedence must be higher than that of op
 --   (b) its precedency & associativity must be the same as that of op
 checkSectionPrec :: FixityDirection -> HsExpr RdrName
-	-> LHsExpr Name -> LHsExpr Name -> RnM ()
+        -> LHsExpr Name -> LHsExpr Name -> RnM ()
 checkSectionPrec direction section op arg
   = case unLoc arg of
-	OpApp _ op fix _ -> go_for_it (get_op op) fix
-	NegApp _ _	 -> go_for_it negateName  negateFixity
-	_    		 -> return ()
+        OpApp _ op fix _ -> go_for_it (get_op op) fix
+        NegApp _ _       -> go_for_it negateName  negateFixity
+        _                -> return ()
   where
     op_name = get_op op
     go_for_it arg_op arg_fix@(Fixity arg_prec assoc) = do
           op_fix@(Fixity op_prec _) <- lookupFixityRn op_name
-	  unless (op_prec < arg_prec
-	          || (op_prec == arg_prec && direction == assoc))
-		 (sectionPrecErr (op_name, op_fix) 	
-				 (arg_op, arg_fix) section)
+          unless (op_prec < arg_prec
+                  || (op_prec == arg_prec && direction == assoc))
+                 (sectionPrecErr (op_name, op_fix)
+                                 (arg_op, arg_fix) section)
 \end{code}
 
 Precedence-related error messages
 
 \begin{code}
 precParseErr :: (Name, Fixity) -> (Name, Fixity) -> RnM ()
-precParseErr op1@(n1,_) op2@(n2,_) 
+precParseErr op1@(n1,_) op2@(n2,_)
   | isUnboundName n1 || isUnboundName n2
-  = return ()	  -- Avoid error cascade
+  = return ()     -- Avoid error cascade
   | otherwise
   = addErr $ hang (ptext (sLit "Precedence parsing error"))
-      4 (hsep [ptext (sLit "cannot mix"), ppr_opfix op1, ptext (sLit "and"), 
-	       ppr_opfix op2,
-	       ptext (sLit "in the same infix expression")])
+      4 (hsep [ptext (sLit "cannot mix"), ppr_opfix op1, ptext (sLit "and"),
+               ppr_opfix op2,
+               ptext (sLit "in the same infix expression")])
 
 sectionPrecErr :: (Name, Fixity) -> (Name, Fixity) -> HsExpr RdrName -> RnM ()
 sectionPrecErr op@(n1,_) arg_op@(n2,_) section
   | isUnboundName n1 || isUnboundName n2
-  = return ()	  -- Avoid error cascade
+  = return ()     -- Avoid error cascade
   | otherwise
   = addErr $ vcat [ptext (sLit "The operator") <+> ppr_opfix op <+> ptext (sLit "of a section"),
-	 nest 4 (sep [ptext (sLit "must have lower precedence than that of the operand,"),
-	      	      nest 2 (ptext (sLit "namely") <+> ppr_opfix arg_op)]),
-	 nest 4 (ptext (sLit "in the section:") <+> quotes (ppr section))]
+         nest 4 (sep [ptext (sLit "must have lower precedence than that of the operand,"),
+                      nest 2 (ptext (sLit "namely") <+> ppr_opfix arg_op)]),
+         nest 4 (ptext (sLit "in the section:") <+> quotes (ppr section))]
 
 ppr_opfix :: (Name, Fixity) -> SDoc
 ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
    where
      pp_op | op == negateName = ptext (sLit "prefix `-'")
-     	   | otherwise        = quotes (ppr op)
+           | otherwise        = quotes (ppr op)
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Errors}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -821,7 +817,7 @@ warnUnusedForAlls in_doc bound mentioned_rdrs
     bound_names        = hsLTyVarLocNames bound
     bound_but_not_used = filterOut ((`elem` mentioned_rdrs) . unLoc) bound_names
 
-    add_warn (L loc tv) 
+    add_warn (L loc tv)
       = addWarnAt loc $
         vcat [ ptext (sLit "Unused quantified type variable") <+> quotes (ppr tv)
              , in_doc ]
@@ -829,30 +825,30 @@ warnUnusedForAlls in_doc bound mentioned_rdrs
 opTyErr :: RdrName -> HsType RdrName -> SDoc
 opTyErr op ty@(HsOpTy ty1 _ _)
   = hang (ptext (sLit "Illegal operator") <+> quotes (ppr op) <+> ptext (sLit "in type") <+> quotes (ppr ty))
-	 2 extra
+         2 extra
   where
     extra | op == dot_tv_RDR && forall_head ty1
-	  = perhapsForallMsg
-	  | otherwise 
-	  = ptext (sLit "Use -XTypeOperators to allow operators in types")
+          = perhapsForallMsg
+          | otherwise
+          = ptext (sLit "Use TypeOperators to allow operators in types")
 
     forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
     forall_head (L _ (HsAppTy ty _)) = forall_head ty
-    forall_head _other		     = False
+    forall_head _other               = False
 opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
 \end{code}
 
 %*********************************************************
-%*							*
-		Splices
-%*							*
+%*                                                      *
+                Splices
+%*                                                      *
 %*********************************************************
 
 Note [Splices]
 ~~~~~~~~~~~~~~
 Consider
-	f = ...
-	h = ...$(thing "f")...
+        f = ...
+        h = ...$(thing "f")...
 
 The splice can expand into literally anything, so when we do dependency
 analysis we must assume that it might mention 'f'.  So we simply treat
@@ -870,30 +866,30 @@ type checker.  Not very satisfactory really.
 \begin{code}
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
 rnSplice (HsSplice n expr)
-  = do	{ checkTH expr "splice"
-	; loc  <- getSrcSpanM
-	; n' <- newLocalBndrRn (L loc n)
-	; (expr', fvs) <- rnLExpr expr
+  = do  { checkTH expr "splice"
+        ; loc  <- getSrcSpanM
+        ; n' <- newLocalBndrRn (L loc n)
+        ; (expr', fvs) <- rnLExpr expr
 
-	-- Ugh!  See Note [Splices] above
-	; lcl_rdr <- getLocalRdrEnv
-	; gbl_rdr <- getGlobalRdrEnv
-	; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr, 
-						    isLocalGRE gre]
-	      lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
+        -- Ugh!  See Note [Splices] above
+        ; lcl_rdr <- getLocalRdrEnv
+        ; gbl_rdr <- getGlobalRdrEnv
+        ; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr,
+                                                    isLocalGRE gre]
+              lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
-	; return (HsSplice n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
+        ; return (HsSplice n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
 
 checkTH :: Outputable a => a -> String -> RnM ()
-#ifdef GHCI 
-checkTH _ _ = return ()	-- OK
+#ifdef GHCI
+checkTH _ _ = return () -- OK
 #else
-checkTH e what 	-- Raise an error in a stage-1 compiler
-  = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>  
-	          ptext (sLit "requires GHC with interpreter support"),
+checkTH e what  -- Raise an error in a stage-1 compiler
+  = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>
+                  ptext (sLit "requires GHC with interpreter support"),
                   ptext (sLit "Perhaps you are using a stage-1 compiler?"),
-	          nest 2 (ppr e)])
-#endif   
+                  nest 2 (ppr e)])
+#endif
 \end{code}
 
 %************************************************************************
@@ -924,7 +920,7 @@ recently, kind variables.  For example:
   *   type instance F (T (a :: Maybe k)) = ...a...k...
     Here we want to constrain the kind of 'a', and bind 'k'.
 
-In general we want to walk over a type, and find 
+In general we want to walk over a type, and find
   * Its free type variables
   * The free kind variables of any kind signatures in the type
 
@@ -935,7 +931,7 @@ See also Note [HsBSig binder lists] in HsTypes
 type FreeKiTyVars = ([RdrName], [RdrName])
 
 filterInScope :: LocalRdrEnv -> FreeKiTyVars -> FreeKiTyVars
-filterInScope rdr_env (kvs, tvs) 
+filterInScope rdr_env (kvs, tvs)
   = (filterOut in_scope kvs, filterOut in_scope tvs)
   where
     in_scope tv = tv `elemLocalRdrEnv` rdr_env
@@ -945,13 +941,13 @@ extractHsTyRdrTyVars :: LHsType RdrName -> FreeKiTyVars
 --                        or the free (sort, kind) variables of a HsKind
 -- It's used when making the for-alls explicit.
 -- See Note [Kind and type-variable binders]
-extractHsTyRdrTyVars ty 
+extractHsTyRdrTyVars ty
   = case extract_lty ty ([],[]) of
      (kvs, tvs) -> (nub kvs, nub tvs)
 
 extractHsTysRdrTyVars :: [LHsType RdrName] -> FreeKiTyVars
 -- See Note [Kind and type-variable binders]
-extractHsTysRdrTyVars ty 
+extractHsTysRdrTyVars ty
   = case extract_ltys ty ([],[]) of
      (kvs, tvs) -> (nub kvs, nub tvs)
 
@@ -1023,20 +1019,18 @@ extract_lty (L _ ty) acc
 
 extract_hs_tv_bndrs :: LHsTyVarBndrs RdrName -> FreeKiTyVars
                     -> FreeKiTyVars -> FreeKiTyVars
-extract_hs_tv_bndrs (HsQTvs { hsq_tvs = tvs }) 
-                    acc@(acc_kvs, acc_tvs)   -- Note accumulator comes first
+extract_hs_tv_bndrs (HsQTvs { hsq_tvs = tvs })
+                    (acc_kvs, acc_tvs)   -- Note accumulator comes first
                     (body_kvs, body_tvs)
   | null tvs
   = (body_kvs ++ acc_kvs, body_tvs ++ acc_tvs)
   | otherwise
-  = (outer_kvs ++ body_kvs,
-     outer_tvs ++ filterOut (`elem` local_tvs) body_tvs)
+  = (acc_kvs ++ filterOut (`elem` local_kvs) body_kvs,
+     acc_tvs ++ filterOut (`elem` local_tvs) body_tvs)
   where
     local_tvs = map hsLTyVarName tvs
-        -- Currently we don't have a syntax to explicitly bind 
-        -- kind variables, so these are all type variables
-
-    (outer_kvs, outer_tvs) = foldr extract_lkind acc [k | L _ (KindedTyVar _ k) <- tvs]
+    (_, local_kvs) = foldr extract_lty ([], []) [k | L _ (KindedTyVar _ k) <- tvs]
+       -- These kind variables are bound here if not bound further out
 
 extract_tv :: RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc

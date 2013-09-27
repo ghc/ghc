@@ -1672,6 +1672,7 @@ inner_loop:
         retainClosure(tso->bq,                 c, c_child_r);
         retainClosure(tso->trec,               c, c_child_r);
         if (  tso->why_blocked == BlockedOnMVar
+              || tso->why_blocked == BlockedOnMVarRead
               || tso->why_blocked == BlockedOnBlackHole
               || tso->why_blocked == BlockedOnMsgThrowTo
               || tso->why_blocked == Yielded
@@ -1769,9 +1770,12 @@ computeRetainerSet( void )
     //
     // The following code assumes that WEAK objects are considered to be roots
     // for retainer profilng.
-    for (weak = weak_ptr_list; weak != NULL; weak = weak->link)
-	// retainRoot((StgClosure *)weak);
-	retainRoot(NULL, (StgClosure **)&weak);
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (weak = generations[g].weak_ptr_list; weak != NULL; weak = weak->link) {
+            // retainRoot((StgClosure *)weak);
+            retainRoot(NULL, (StgClosure **)&weak);
+        }
+    }
 
     // Consider roots from the stable ptr table.
     markStableTables(retainRoot, NULL);
@@ -1787,7 +1791,7 @@ computeRetainerSet( void )
 	// because we can find MUT_VAR objects which have not been
 	// visited during retainer profiling.
         for (n = 0; n < n_capabilities; n++) {
-          for (bd = capabilities[n].mut_lists[g]; bd != NULL; bd = bd->link) {
+          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
 	    for (ml = bd->start; ml < bd->free; ml++) {
 
 		maybeInitRetainerSet((StgClosure *)*ml);

@@ -20,7 +20,7 @@ module Inst (
 
        newOverloadedLit, mkOverLit, 
      
-       tcGetInstEnvs, getOverlapFlag,
+       tcGetInsts, tcGetInstEnvs, getOverlapFlag,
        tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
        tcSyntaxName,
 
@@ -399,6 +399,10 @@ tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- and the home-pkg inst env (includes module being compiled)
 tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
 		     return (eps_inst_env eps, tcg_inst_env env) }
+
+tcGetInsts :: TcM [ClsInst]
+-- Gets the local class instances.
+tcGetInsts = fmap tcg_insts getGblEnv
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances

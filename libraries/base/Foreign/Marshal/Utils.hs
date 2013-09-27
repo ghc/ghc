@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
+{-# LANGUAGE NoImplicitPrelude, ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -51,11 +51,9 @@ import Foreign.Storable         ( Storable(poke) )
 import Foreign.C.Types          ( CSize(..) )
 import Foreign.Marshal.Alloc    ( malloc, alloca )
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Real                 ( fromIntegral )
 import GHC.Num
 import GHC.Base
-#endif
 
 -- combined allocation and marshalling
 -- -----------------------------------

@@ -39,8 +39,6 @@ import DataCon
 import MkId
 import DynFlags
 import FastString
-import Util
-import Panic
 
 #include "HsVersions.h"
 
@@ -130,12 +128,12 @@ splitPrimTyCon ty
 
 -- Coercion Construction -----------------------------------------------------
 
--- |Make a coersion to some builtin type.
+-- |Make a representational coersion to some builtin type.
 --
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
 mkBuiltinCo get_tc
   = do { tc <- builtin get_tc
-       ; return $ mkTyConAppCo tc []
+       ; return $ mkTyConAppCo Representational tc []
        }
 
 
@@ -211,10 +209,8 @@ pdataReprTyCon :: Type -> VM (TyCon, [Type])
 pdataReprTyCon ty 
   = do 
     { FamInstMatch { fim_instance = famInst
-                   , fim_index    = index
                    , fim_tys      = tys } <- builtin pdataTyCon >>= (`lookupFamInst` [ty])
-    ; ASSERT( index == 0 )
-      return (dataFamInstRepTyCon famInst, tys)
+    ; return (dataFamInstRepTyCon famInst, tys)
     }
 
 -- |Get the representation tycon of the 'PData' data family for a given type constructor.

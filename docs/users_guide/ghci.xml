@@ -161,7 +161,7 @@ Ok, modules loaded: Main.
       <para>or it can be set using the <literal>:set</literal> command
       from within GHCi (see <xref
       linkend="ghci-cmd-line-options"/>)<footnote><para>Note that in
-      GHCi, and <option>&ndash;&ndash;make</option> mode, the <option>-i</option>
+      GHCi, and <option>--make</option> mode, the <option>-i</option>
       option is used to specify the search path for
       <emphasis>source</emphasis> files, whereas in standard
       batch-compilation mode the <option>-i</option> option is used to
@@ -338,7 +338,7 @@ Compiling A                ( A.hs, interpreted )
     <para>HINT: since GHCi will only use a compiled object file if it
     can be sure that the compiled version is up-to-date, a good technique
     when working on a large program is to occasionally run
-    <literal>ghc &ndash;&ndash;make</literal> to compile the whole project (say
+    <literal>ghc --make</literal> to compile the whole project (say
     before you go for lunch :-), then continue working in the
     interpreter.  As you modify code, the changed modules will be
     interpreted, but the rest of the project will remain
@@ -423,18 +423,18 @@ Prelude>
 
       <para>If <option>-fprint-bind-result</option> is set then
       GHCi will print the result of a statement if and only if:
-	<itemizedlist>
-	  <listitem>
-	    <para>The statement is not a binding, or it is a monadic binding
-	      (<literal>p &lt;- e</literal>) that binds exactly one
-	      variable.</para>
-	  </listitem>
-	  <listitem>
-	    <para>The variable's type is not polymorphic, is not
-	      <literal>()</literal>, and is an instance of
-	      <literal>Show</literal></para>
-	  </listitem>
-	</itemizedlist>
+        <itemizedlist>
+          <listitem>
+            <para>The statement is not a binding, or it is a monadic binding
+              (<literal>p &lt;- e</literal>) that binds exactly one
+              variable.</para>
+          </listitem>
+          <listitem>
+            <para>The variable's type is not polymorphic, is not
+              <literal>()</literal>, and is an instance of
+              <literal>Show</literal></para>
+          </listitem>
+        </itemizedlist>
       <indexterm><primary><option>-fprint-bind-result</option></primary></indexterm><indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm>.
       </para>
 
@@ -459,7 +459,7 @@ Prelude>
 </screen>
 
       <para>Note that <literal>let</literal> bindings do not automatically
-	print the value bound, unlike monadic bindings.</para>
+        print the value bound, unlike monadic bindings.</para>
 
       <para>Hint: you can also use <literal>let</literal>-statements
       to define functions at the prompt:</para>
@@ -565,7 +565,7 @@ Prelude|
 Prelude> :set +m
 Prelude> let x = 42
 Prelude|     y = 3
-Prelude| 
+Prelude|
 Prelude>
 </screen>
 
@@ -654,7 +654,7 @@ Prelude> f A
     In the first argument of `f', namely `A'
     In the expression: f A
     In an equation for `it': it = f A
-Prelude> 
+Prelude>
 </screen>
 
     <para>The old, shadowed, version of <literal>T</literal> is
@@ -866,9 +866,9 @@ Ok, modules loaded: Main.
       </sect3>
 
       <sect3 id="ghci-import-qualified">
-	<title>Qualified names</title>
+        <title>Qualified names</title>
 
-	<para>To make life slightly easier, the GHCi prompt also
+        <para>To make life slightly easier, the GHCi prompt also
         behaves as if there is an implicit <literal>import
         qualified</literal> declaration for every module in every
         package, and every module currently loaded into GHCi.  This
@@ -1127,23 +1127,23 @@ def = toEnum 0
      <para>
        As an example, suppose we have following special printing module:
        <programlisting>
-	 module SpecPrinter where
-	 import System.IO
+         module SpecPrinter where
+         import System.IO
 
-	 sprint a = putStrLn $ show a ++ "!"
+         sprint a = putStrLn $ show a ++ "!"
        </programlisting>
        The <literal>sprint</literal> function adds an exclamation mark at the
        end of any printed value. Running GHCi with the command:
        <programlisting>
-	 ghci -interactive-print=SpecPrinter.sprinter SpecPrinter
+         ghci -interactive-print=SpecPrinter.sprinter SpecPrinter
        </programlisting>
        will start an interactive session where values with be printed using
        <literal>sprint</literal>:
        <programlisting>
-	 *SpecPrinter> [1,2,3]
-	 [1,2,3]!
-	 *SpecPrinter> 42
-	 42!
+         *SpecPrinter> [1,2,3]
+         [1,2,3]!
+         *SpecPrinter> 42
+         42!
        </programlisting>
      </para>
      <para>
@@ -1154,8 +1154,8 @@ def = toEnum 0
        The <literal>-interactive-print</literal> flag can also be used when
        running GHC in <literal>-e mode</literal>:
        <programlisting>
-	 % ghc -e "[1,2,3]" -interactive-print=SpecPrinter.sprint SpecPrinter
-	 [1,2,3]!
+         % ghc -e "[1,2,3]" -interactive-print=SpecPrinter.sprint SpecPrinter
+         [1,2,3]!
        </programlisting>
      </para>
    </sect2>
@@ -1510,13 +1510,13 @@ right :: [a]
       <para>Single-stepping is a great way to visualise the execution of your
         program, and it is also a useful tool for identifying the source of a
         bug. GHCi offers two variants of stepping. Use
-	<literal>:step</literal>  to enable all the
+        <literal>:step</literal>  to enable all the
         breakpoints in the program, and execute until the next breakpoint is
         reached. Use <literal>:steplocal</literal> to limit the set
-	of enabled breakpoints to those in the current top level function.
-	Similarly, use <literal>:stepmodule</literal> to single step only on
-	breakpoints contained in the current module.
-	For example:</para>
+        of enabled breakpoints to those in the current top level function.
+        Similarly, use <literal>:stepmodule</literal> to single step only on
+        breakpoints contained in the current module.
+        For example:</para>
 
 <screen>
 *Main> :step main
@@ -1528,8 +1528,8 @@ _result :: IO ()
         <replaceable>expr</replaceable></literal> begins the evaluation of
         <replaceable>expr</replaceable> in single-stepping mode.  If
         <replaceable>expr</replaceable> is omitted, then it single-steps from
-        the current breakpoint. <literal>:stepover</literal>
-        works similarly.</para>
+        the current breakpoint. <literal>:steplocal</literal> and
+        <literal>:stepmodule</literal> work similarly.</para>
 
       <para>The <literal>:list</literal> command is particularly useful when
         single-stepping, to see where you currently are:</para>
@@ -1715,7 +1715,7 @@ a :: a
       <para>The history is only available when
         using <literal>:trace</literal>; the reason for this is we found that
         logging each breakpoint in the history cuts performance by a factor of
-        2 or more.  By default, GHCi remembers the last 50 steps in the history, but this can be changed with the <option>-fghci-hist-size=<replaceable>n</replaceable></option><indexterm><primary><option>&ndash;fghci-hist-size</option></primary></indexterm> option).</para>
+        2 or more.  By default, GHCi remembers the last 50 steps in the history, but this can be changed with the <option>-fghci-hist-size=<replaceable>n</replaceable></option><indexterm><primary><option>-fghci-hist-size</option></primary></indexterm> option).</para>
     </sect2>
 
     <sect2 id="ghci-debugger-exceptions">
@@ -1740,11 +1740,11 @@ a :: a
         we can't set a breakpoint on it directly.  For this reason, GHCi
         provides the flags <literal>-fbreak-on-exception</literal> which causes
         the evaluator to stop when an exception is thrown, and <literal>
-	-fbreak-on-error</literal>, which works similarly but stops only on
-	uncaught exceptions. When stopping at an exception, GHCi will act
-	just as it does when a breakpoint is hit, with the deviation that it
-	will not show you any source code location. Due to this, these
-	commands are only really useful in conjunction with
+        -fbreak-on-error</literal>, which works similarly but stops only on
+        uncaught exceptions. When stopping at an exception, GHCi will act
+        just as it does when a breakpoint is hit, with the deviation that it
+        will not show you any source code location. Due to this, these
+        commands are only really useful in conjunction with
         <literal>:trace</literal>, in order to log the steps leading up to the
         exception.  For example:</para>
 
@@ -1898,10 +1898,10 @@ Just 20
             CAF (e.g. main), stop at a breakpoint, and ask for the value of the
             CAF at the prompt again.</para>
         </listitem>
-	<listitem><para>
-	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available
-	  at the scope of a breakpoint if there is an explicit type signature.
-	</para>
+        <listitem><para>
+          Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available
+          at the scope of a breakpoint if there is an explicit type signature.
+        </para>
         </listitem>
       </itemizedlist>
     </sect2>
@@ -1910,10 +1910,10 @@ Just 20
   <sect1 id="ghci-invocation">
     <title>Invoking GHCi</title>
     <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
-    <indexterm><primary><option>&ndash;&ndash;interactive</option></primary></indexterm>
+    <indexterm><primary><option>--interactive</option></primary></indexterm>
 
     <para>GHCi is invoked with the command <literal>ghci</literal> or
-    <literal>ghc &ndash;&ndash;interactive</literal>.  One or more modules or
+    <literal>ghc --interactive</literal>.  One or more modules or
     filenames can also be specified on the command line; this
     instructs GHCi to load the specified modules or filenames (and all
     the modules they depend on), just as if you had said
@@ -1983,17 +1983,17 @@ $ ghci -lm
       searches the following places for libraries, in this order:</para>
 
       <itemizedlist>
-	<listitem>
-	  <para>Paths specified using the
+        <listitem>
+          <para>Paths specified using the
           <literal>-L<replaceable>path</replaceable></literal>
           command-line option,</para>
-	</listitem>
-	<listitem>
-	  <para>the standard library search path for your system,
-	  which on some systems may be overridden by setting the
-	  <literal>LD_LIBRARY_PATH</literal> environment
-	  variable.</para>
-	</listitem>
+        </listitem>
+        <listitem>
+          <para>the standard library search path for your system,
+          which on some systems may be overridden by setting the
+          <literal>LD_LIBRARY_PATH</literal> environment
+          variable.</para>
+        </listitem>
       </itemizedlist>
 
       <para>On systems with <literal>.dll</literal>-style shared
@@ -2024,94 +2024,94 @@ $ ghci -lm
 
     <variablelist>
       <varlistentry>
-	<term>
+        <term>
           <literal>:abandon</literal>
           <indexterm><primary><literal>:abandon</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Abandons the current evaluation (only available when stopped at
+        <listitem>
+          <para>Abandons the current evaluation (only available when stopped at
           a breakpoint).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:add</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
           <indexterm><primary><literal>:add</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Add <replaceable>module</replaceable>(s) to the
-	  current <firstterm>target set</firstterm>, and perform a
-	  reload.  Normally pre-compiled code for the module will be
-	  loaded if available, or otherwise the module will be
-	  compiled to byte-code.  Using the <literal>*</literal>
-	  prefix forces the module to be loaded as byte-code.</para>
-	</listitem>
+        <listitem>
+          <para>Add <replaceable>module</replaceable>(s) to the
+          current <firstterm>target set</firstterm>, and perform a
+          reload.  Normally pre-compiled code for the module will be
+          loaded if available, or otherwise the module will be
+          compiled to byte-code.  Using the <literal>*</literal>
+          prefix forces the module to be loaded as byte-code.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:back</literal>
           <indexterm><primary><literal>:back</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Travel back one step in the history.  See <xref
+        <listitem>
+          <para>Travel back one step in the history.  See <xref
               linkend="tracing" />.  See also:
             <literal>:trace</literal>, <literal>:history</literal>,
             <literal>:forward</literal>.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:break [<replaceable>identifier</replaceable> |
             [<replaceable>module</replaceable>] <replaceable>line</replaceable>
             [<replaceable>column</replaceable>]]</literal>
         </term>
           <indexterm><primary><literal>:break</literal></primary></indexterm>
-	<listitem>
-	  <para>Set a breakpoint on the specified function or line and
+        <listitem>
+          <para>Set a breakpoint on the specified function or line and
               column.  See <xref linkend="setting-breakpoints" />.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:browse</literal><optional><literal>!</literal></optional> <optional><optional><literal>*</literal></optional><replaceable>module</replaceable></optional> ...
           <indexterm><primary><literal>:browse</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Displays the identifiers exported by the module
-	  <replaceable>module</replaceable>, which must be either
-	  loaded into GHCi or be a member of a package.  If
-	  <replaceable>module</replaceable> is omitted, the most
-	  recently-loaded module is used.</para>
+        <listitem>
+          <para>Displays the identifiers exported by the module
+          <replaceable>module</replaceable>, which must be either
+          loaded into GHCi or be a member of a package.  If
+          <replaceable>module</replaceable> is omitted, the most
+          recently-loaded module is used.</para>
 
-	  <para>Like all other GHCi commands, the output is always 
+          <para>Like all other GHCi commands, the output is always
           displayed in the current GHCi scope (<xref linkend="ghci-scope"/>).</para>
 
           <para>There are two variants of the browse command:
           <itemizedlist>
-          <listitem>  
+          <listitem>
              <para>If the <literal>*</literal> symbol is placed before
-	     the module name, then <emphasis>all</emphasis> the
-	     identifiers in scope in <replaceable>module</replaceable> 
+             the module name, then <emphasis>all</emphasis> the
+             identifiers in scope in <replaceable>module</replaceable>
              (rather that just its exports) are shown. </para>
 
              <para>The <literal>*</literal>-form is only available for modules
-	     which are interpreted; for compiled modules (including
-	     modules from packages) only the non-<literal>*</literal>
+             which are interpreted; for compiled modules (including
+             modules from packages) only the non-<literal>*</literal>
              form of <literal>:browse</literal> is available.</para>
           </listitem>
           <listitem>
           <para>Data constructors and class methods are usually
           displayed in the context of their data type or class declaration.
           However, if the <literal>!</literal> symbol is appended to the
-          command, thus <literal>:browse!</literal>, 
-          they are listed individually. 
-    	  The <literal>!</literal>-form also annotates the listing
-    	  with comments giving possible imports for each group of
-    	  entries.  Here is an example:
+          command, thus <literal>:browse!</literal>,
+          they are listed individually.
+          The <literal>!</literal>-form also annotates the listing
+          with comments giving possible imports for each group of
+          entries.  Here is an example:
 <screen>
 Prelude> :browse! Data.Maybe
 -- not currently imported
@@ -2138,83 +2138,172 @@ maybe :: b -> (a -> b) -> Maybe a -> b
     unqualified, or with a <literal>Prelude.</literal> qualifier.
   </para>
           </listitem>
-	</itemizedlist>
+        </itemizedlist>
       </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>:cd</literal> <replaceable>dir</replaceable>
-          <indexterm><primary><literal>:cd</literal></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Changes the current working directory to
-	  <replaceable>dir</replaceable>.  A
-	  &lsquo;<literal>&tilde;</literal>&rsquo; symbol at the
-	  beginning of <replaceable>dir</replaceable> will be replaced
-	  by the contents of the environment variable
-	  <literal>HOME</literal>.</para>
-
-	  <para>NOTE: changing directories causes all currently loaded
-	  modules to be unloaded.  This is because the search path is
-	  usually expressed using relative directories, and changing
-	  the search path in the middle of a session is not
-	  supported.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>:cmd</literal> <replaceable>expr</replaceable>
-          <indexterm><primary><literal>:cmd</literal></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Executes <replaceable>expr</replaceable> as a computation of
-            type <literal>IO String</literal>, and then executes the resulting
-            string as a list of GHCi commands.  Multiple commands are separated
-            by newlines.  The <literal>:cmd</literal> command is useful with
-            <literal>:def</literal> and <literal>:set stop</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>:continue</literal>
-          <indexterm><primary><literal>:continue</literal></primary></indexterm>
-        </term>
-	<listitem><para>Continue the current evaluation, when stopped at a
-            breakpoint.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-	  <literal>:ctags</literal> <optional><replaceable>filename</replaceable></optional>
-	  <literal>:etags</literal> <optional><replaceable>filename</replaceable></optional>
-	  <indexterm><primary><literal>:etags</literal></primary>
-	  </indexterm>
-	  <indexterm><primary><literal>:etags</literal></primary>
-	  </indexterm>
-	</term>
-	<listitem>
-	  <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
-	    (<literal>:ctags</literal>) or
-        Emacs-style editors (<literal>:etags</literal>).  If
-	    no filename is specified, the default <filename>tags</filename> or
-	    <filename>TAGS</filename> is
-	    used, respectively.  Tags for all the functions, constructors and
-	    types in the currently loaded modules are created.  All modules must
-	    be interpreted for these commands to work.</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
+          <literal>:cd</literal> <replaceable>dir</replaceable>
+          <indexterm><primary><literal>:cd</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Changes the current working directory to
+          <replaceable>dir</replaceable>.  A
+          &lsquo;<literal>&tilde;</literal>&rsquo; symbol at the
+          beginning of <replaceable>dir</replaceable> will be replaced
+          by the contents of the environment variable
+          <literal>HOME</literal>.
+          See also the <literal>:show paths</literal> command for
+          showing the current working directory.</para>
+
+          <para>NOTE: changing directories causes all currently loaded
+          modules to be unloaded.  This is because the search path is
+          usually expressed using relative directories, and changing
+          the search path in the middle of a session is not
+          supported.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:cmd</literal> <replaceable>expr</replaceable>
+          <indexterm><primary><literal>:cmd</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Executes <replaceable>expr</replaceable> as a computation of
+            type <literal>IO String</literal>, and then executes the resulting
+            string as a list of GHCi commands.  Multiple commands are separated
+            by newlines.  The <literal>:cmd</literal> command is useful with
+            <literal>:def</literal> and <literal>:set stop</literal>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:complete</literal> <replaceable>type</replaceable>
+                                       <optional><replaceable>n</replaceable>-</optional><optional><replaceable>m</replaceable></optional>
+                                       <replaceable>string-literal</replaceable>
+          <indexterm><primary><literal>:complete</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>This command allows to request command completions
+          from GHCi even when interacting over a pipe instead of a
+          proper terminal and is designed for integrating GHCi's
+          completion with text editors and IDEs.</para>
+
+          <para>When called, <literal>:complete</literal> prints the
+          <replaceable>n</replaceable><superscript>th</superscript> to
+          <replaceable>m</replaceable><superscript>th</superscript>
+          completion candidates for the partial input
+          <replaceable>string-literal</replaceable> for the completion
+          domain denoted by
+          <replaceable>type</replaceable>. Currently, only the
+          <literal>repl</literal> domain is supported which denotes
+          the kind of completion that would be provided interactively
+          by GHCi at the input prompt.</para>
+
+          <para>If omitted, <replaceable>n</replaceable> and
+          <replaceable>m</replaceable> default to the first or last
+          available completion candidate respectively. If there are
+          less candidates than requested via the range argument,
+          <replaceable>n</replaceable> and
+          <replaceable>m</replaceable> are implicitly capped to the
+          number of available completition candidates.</para>
+
+          <para>The output of <literal>:complete</literal> begins with
+          a header line containing three space-delimited fields:
+
+          <itemizedlist>
+            <listitem>An integer denoting the number
+            <replaceable>l</replaceable> of printed
+            completions,</listitem>
+
+            <listitem>an integer denoting the total number of
+            completions available, and finally</listitem>
+
+            <listitem>a string literal denoting a common
+            prefix to be added to the returned completion
+            candidates.</listitem>
+          </itemizedlist>
+
+          The header line is followed by <replaceable>l</replaceable>
+          lines each containing one completion candidate encoded as
+          (quoted) string literal. Here are some example invocations
+          showing the various cases:</para>
+
+<screen>
+Prelude&gt; :complete repl 0 ""
+0 470 ""
+Prelude&gt; :complete repl 5 "import For"
+5 21 "import "
+"Foreign"
+"Foreign.C"
+"Foreign.C.Error"
+"Foreign.C.String"
+"Foreign.C.Types"
+Prelude&gt; :complete repl 5-10 "import For"
+6 21 "import "
+"Foreign.C.Types"
+"Foreign.Concurrent"
+"Foreign.ForeignPtr"
+"Foreign.ForeignPtr.Safe"
+"Foreign.ForeignPtr.Unsafe"
+"Foreign.Marshal"
+Prelude&gt; :complete repl 20- "import For"
+2 21 "import "
+"Foreign.StablePtr"
+"Foreign.Storable"
+Prelude&gt; :complete repl "map"
+3 3 ""
+"map"
+"mapM"
+"mapM_"
+Prelude&gt; :complete repl 5-10 "map"
+0 3 ""
+</screen>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:continue</literal>
+          <indexterm><primary><literal>:continue</literal></primary></indexterm>
+        </term>
+        <listitem><para>Continue the current evaluation, when stopped at a
+            breakpoint.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:ctags</literal> <optional><replaceable>filename</replaceable></optional>
+          <literal>:etags</literal> <optional><replaceable>filename</replaceable></optional>
+          <indexterm><primary><literal>:etags</literal></primary>
+          </indexterm>
+          <indexterm><primary><literal>:etags</literal></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
+            (<literal>:ctags</literal>) or
+        Emacs-style editors (<literal>:etags</literal>).  If
+            no filename is specified, the default <filename>tags</filename> or
+            <filename>TAGS</filename> is
+            used, respectively.  Tags for all the functions, constructors and
+            types in the currently loaded modules are created.  All modules must
+            be interpreted for these commands to work.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <literal>:def<optional>!</optional> <optional><replaceable>name</replaceable> <replaceable>expr</replaceable></optional></literal>
           <indexterm><primary><literal>:def</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
           <para><literal>:def</literal> is used to define new
           commands, or macros, in GHCi.  The command
           <literal>:def</literal> <replaceable>name</replaceable>
@@ -2233,10 +2322,10 @@ maybe :: b -> (a -> b) -> Maybe a -> b
           the result must be separated by
           &lsquo;<literal>\n</literal>&rsquo;.</para>
 
-	  <para>That's all a little confusing, so here's a few
-	  examples.  To start with, here's a new GHCi command which
-	  doesn't take any arguments or produce any results, it just
-	  outputs the current date &amp; time:</para>
+          <para>That's all a little confusing, so here's a few
+          examples.  To start with, here's a new GHCi command which
+          doesn't take any arguments or produce any results, it just
+          outputs the current date &amp; time:</para>
 
 <screen>
 Prelude> let date _ = Time.getClockTime >>= print >> return ""
@@ -2245,8 +2334,8 @@ Prelude> :date
 Fri Mar 23 15:16:40 GMT 2001
 </screen>
 
-	  <para>Here's an example of a command that takes an argument.
-	  It's a re-implementation of <literal>:cd</literal>:</para>
+          <para>Here's an example of a command that takes an argument.
+          It's a re-implementation of <literal>:cd</literal>:</para>
 
 <screen>
 Prelude> let mycd d = Directory.setCurrentDirectory d >> return ""
@@ -2254,12 +2343,12 @@ Prelude> :def mycd mycd
 Prelude> :mycd ..
 </screen>
 
-	  <para>Or I could define a simple way to invoke
-	  &ldquo;<literal>ghc &ndash;&ndash;make Main</literal>&rdquo; in the
-	  current directory:</para>
+          <para>Or I could define a simple way to invoke
+          &ldquo;<literal>ghc --make Main</literal>&rdquo; in the
+          current directory:</para>
 
 <screen>
-Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
+Prelude> :def make (\_ -> return ":! ghc --make Main")
 </screen>
 
           <para>We can define a command that reads GHCi input from a
@@ -2281,86 +2370,86 @@ Prelude> :. cmds.ghci
           existing command name results in an error unless the
           <literal>:def!</literal> form is used, in which case the old
           command with that name is silently overwritten.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:delete * | <replaceable>num</replaceable> ...</literal>
           <indexterm><primary><literal>:delete</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Delete one or more breakpoints by number (use <literal>:show
+        <listitem>
+          <para>Delete one or more breakpoints by number (use <literal>:show
               breaks</literal> to see the number of each breakpoint).  The
             <literal>*</literal> form deletes all the breakpoints.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:edit <optional><replaceable>file</replaceable></optional></literal>
           <indexterm><primary><literal>:edit</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Opens an editor to edit the file
-	  <replaceable>file</replaceable>, or the most recently loaded
-	  module if <replaceable>file</replaceable> is omitted.  The
-	  editor to invoke is taken from the <literal>EDITOR</literal>
-	  environment variable, or a default editor on your system if
-	  <literal>EDITOR</literal> is not set.  You can change the
-	  editor using <literal>:set editor</literal>.</para>
-	</listitem>
+        <listitem>
+          <para>Opens an editor to edit the file
+          <replaceable>file</replaceable>, or the most recently loaded
+          module if <replaceable>file</replaceable> is omitted.  The
+          editor to invoke is taken from the <literal>EDITOR</literal>
+          environment variable, or a default editor on your system if
+          <literal>EDITOR</literal> is not set.  You can change the
+          editor using <literal>:set editor</literal>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:etags</literal>
         </term>
-	<listitem>
-	  <para>See <literal>:ctags</literal>.</para>
-	</listitem>
+        <listitem>
+          <para>See <literal>:ctags</literal>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:force <replaceable>identifier</replaceable> ...</literal>
           <indexterm><primary><literal>:force</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Prints the value of <replaceable>identifier</replaceable> in
+        <listitem>
+          <para>Prints the value of <replaceable>identifier</replaceable> in
             the same way as <literal>:print</literal>.   Unlike
             <literal>:print</literal>, <literal>:force</literal> evaluates each
             thunk that it encounters while traversing the value.  This may
             cause exceptions or infinite loops, or further breakpoints (which
             are ignored, but displayed).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:forward</literal>
           <indexterm><primary><literal>:forward</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Move forward in the history.   See <xref
+        <listitem>
+          <para>Move forward in the history.   See <xref
               linkend="tracing" />.  See also:
             <literal>:trace</literal>, <literal>:history</literal>,
             <literal>:back</literal>.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:help</literal>
           <indexterm><primary><literal>:help</literal></primary></indexterm>
         </term>
-	<term>
+        <term>
           <literal>:?</literal>
           <indexterm><primary><literal>:?</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Displays a list of the available commands.</para>
-	</listitem>
+        <listitem>
+          <para>Displays a list of the available commands.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -2375,60 +2464,72 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 
-	<term>
+        <term>
           <literal>:history [<replaceable>num</replaceable>]</literal>
           <indexterm><primary><literal>:history</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Display the history of evaluation steps.  With a
-	  number, displays that many steps (default: 20).  For use
-	  with <literal>:trace</literal>; see <xref linkend="tracing"
-	  />.  To set the number of history entries stored by GHCi,
-	  use
-	  <option>-fghci-hist-size=<replaceable>n</replaceable></option>.</para>
-	</listitem>
+        <listitem>
+          <para>Display the history of evaluation steps.  With a
+          number, displays that many steps (default: 20).  For use
+          with <literal>:trace</literal>; see <xref linkend="tracing"
+          />.  To set the number of history entries stored by GHCi,
+          use
+          <option>-fghci-hist-size=<replaceable>n</replaceable></option>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:info</literal><optional><literal>!</literal></optional><replaceable>name</replaceable> ...
           <indexterm><primary><literal>:info</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Displays information about the given name(s).  For
-	  example, if <replaceable>name</replaceable> is a class, then
-	  the class methods and their types will be printed;  if
-	  <replaceable>name</replaceable> is a type constructor, then
-	  its definition will be printed;  if
-	  <replaceable>name</replaceable> is a function, then its type
-	  will be printed.  If <replaceable>name</replaceable> has
-	  been loaded from a source file, then GHCi will also display
-	  the location of its definition in the source.</para>
-	  <para>For types and classes, GHCi also summarises instances that
-	  mention them.  To avoid showing irrelevant information, an instance
-	  is shown only if (a) its head mentions <replaceable>name</replaceable>,
-	  and (b) all the other things mentioned in the instance
-	  are in scope (either qualified or otherwise) as a result of
-	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
+        <listitem>
+          <para>Displays information about the given name(s).  For
+          example, if <replaceable>name</replaceable> is a class, then
+          the class methods and their types will be printed;  if
+          <replaceable>name</replaceable> is a type constructor, then
+          its definition will be printed;  if
+          <replaceable>name</replaceable> is a function, then its type
+          will be printed.  If <replaceable>name</replaceable> has
+          been loaded from a source file, then GHCi will also display
+          the location of its definition in the source.</para>
+          <para>For types and classes, GHCi also summarises instances that
+          mention them.  To avoid showing irrelevant information, an instance
+          is shown only if (a) its head mentions <replaceable>name</replaceable>,
+          and (b) all the other things mentioned in the instance
+          are in scope (either qualified or otherwise) as a result of
+          a <literal>:load</literal> or <literal>:module</literal> commands. </para>
           <para>
           The command <literal>:info!</literal> works in a similar fashion
           but it removes restriction (b), showing all instances that are in
           scope and mention <replaceable>name</replaceable> in their head.
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-          <literal>:kind</literal><optional><literal>!</literal></optional> 
+        <term>
+          <literal>:issafe</literal><optional><replaceable>module</replaceable></optional>
+          <indexterm><primary><literal>:issafe</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Displays Safe Haskell information about the given
+          module (or the current module if omitted). This includes the trust
+          type of the module and its containing package.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:kind</literal><optional><literal>!</literal></optional>
                         <replaceable>type</replaceable>
           <indexterm><primary><literal>:kind</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Infers and prints the kind of
-	  <replaceable>type</replaceable>. The latter can be an arbitrary
-	    type expression, including a partial application of a type constructor,
-	    such as <literal>Either Int</literal>.  In fact, <literal>:kind</literal>
+        <listitem>
+          <para>Infers and prints the kind of
+          <replaceable>type</replaceable>. The latter can be an arbitrary
+            type expression, including a partial application of a type constructor,
+            such as <literal>Either Int</literal>.  In fact, <literal>:kind</literal>
             even allows you to write a partial application of a type synonym (usually disallowed),
             so that this works:
 <programlisting>
@@ -2442,59 +2543,87 @@ T Int :: * -> *
 </programlisting>
             </para>
             <para>
-            If you specify the 
+            If you specify the
             optional "<literal>!</literal>", GHC will in addition normalise the type
             by expanding out type synonyms and evaluating type-function applications,
             and display the normalised result.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
+          <literal>:list</literal> <replaceable>identifier</replaceable>
+          <indexterm><primary><literal>:list</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Lists the source code around the definition of
+          <replaceable>identifier</replaceable> or the current
+          breakpoint is not given. This requires the identifier be
+          defined in an interpreted module.  If your output device
+          supports it, then GHCi will highlight the active
+          subexpression in bold.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:list</literal> <optional><replaceable>module</replaceable></optional> <replaceable>line</replaceable>
+          <indexterm><primary><literal>:list</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Lists the source code around the given line number of
+          <replaceable>module</replaceable>. This requires that the module be
+          interpreted. If your output device supports it, then GHCi will
+          highlight the active subexpression in bold.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <literal>:load</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
           <indexterm><primary><literal>:load</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Recursively loads the specified
-	  <replaceable>module</replaceable>s, and all the modules they
-	  depend on.  Here, each <replaceable>module</replaceable>
-	  must be a module name or filename, but may not be the name
-	  of a module in a package.</para>
+        <listitem>
+          <para>Recursively loads the specified
+          <replaceable>module</replaceable>s, and all the modules they
+          depend on.  Here, each <replaceable>module</replaceable>
+          must be a module name or filename, but may not be the name
+          of a module in a package.</para>
 
-	  <para>All previously loaded modules, except package modules,
-	  are forgotten.  The new set of modules is known as the
-	  <firstterm>target set</firstterm>.  Note that
-	  <literal>:load</literal> can be used without any arguments
-	  to unload all the currently loaded modules and
-	  bindings.</para>
+          <para>All previously loaded modules, except package modules,
+          are forgotten.  The new set of modules is known as the
+          <firstterm>target set</firstterm>.  Note that
+          <literal>:load</literal> can be used without any arguments
+          to unload all the currently loaded modules and
+          bindings.</para>
 
           <para>Normally pre-compiled code for a module will be loaded
-	  if available, or otherwise the module will be compiled to
-	  byte-code.  Using the <literal>*</literal> prefix forces a
-	  module to be loaded as byte-code.</para>
+          if available, or otherwise the module will be compiled to
+          byte-code.  Using the <literal>*</literal> prefix forces a
+          module to be loaded as byte-code.</para>
 
-	  <para>After a <literal>:load</literal> command, the current
-	  context is set to:</para>
+          <para>After a <literal>:load</literal> command, the current
+          context is set to:</para>
 
-	  <itemizedlist>
-	    <listitem>
-	      <para><replaceable>module</replaceable>, if it was loaded
-	      successfully, or</para>
-	    </listitem>
-	    <listitem>
-	      <para>the most recently successfully loaded module, if
-	      any other modules were loaded as a result of the current
-	      <literal>:load</literal>, or</para>
-	    </listitem>
-	    <listitem>
-	      <para><literal>Prelude</literal> otherwise.</para>
-	    </listitem>
-	  </itemizedlist>
-	</listitem>
+          <itemizedlist>
+            <listitem>
+              <para><replaceable>module</replaceable>, if it was loaded
+              successfully, or</para>
+            </listitem>
+            <listitem>
+              <para>the most recently successfully loaded module, if
+              any other modules were loaded as a result of the current
+              <literal>:load</literal>, or</para>
+            </listitem>
+            <listitem>
+              <para><literal>Prelude</literal> otherwise.</para>
+            </listitem>
+          </itemizedlist>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:main <replaceable>arg<subscript>1</subscript></replaceable> ... <replaceable>arg<subscript>n</subscript></replaceable></literal>
           <indexterm><primary><literal>:main</literal></primary></indexterm>
         </term>
@@ -2557,30 +2686,30 @@ bar
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable></literal>
           <indexterm><primary><literal>:module</literal></primary></indexterm>
         </term>
         <term>
           <literal>import <replaceable>mod</replaceable></literal>
         </term>
-	<listitem>
-	  <para>Sets or modifies the current context for statements
-	  typed at the prompt.  The form <literal>import
-	  <replaceable>mod</replaceable></literal> is equivalent to
-	  <literal>:module +<replaceable>mod</replaceable></literal>.
-	  See <xref linkend="ghci-scope"/> for
-	  more details.</para>
-	</listitem>
+        <listitem>
+          <para>Sets or modifies the current context for statements
+          typed at the prompt.  The form <literal>import
+          <replaceable>mod</replaceable></literal> is equivalent to
+          <literal>:module +<replaceable>mod</replaceable></literal>.
+          See <xref linkend="ghci-scope"/> for
+          more details.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:print </literal> <replaceable>names</replaceable> ...
           <indexterm><primary><literal>:print</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Prints a value without forcing its evaluation.
+        <listitem>
+          <para>Prints a value without forcing its evaluation.
             <literal>:print</literal> may be used on values whose types are
             unknown or partially known, which might be the case for local
             variables with polymorphic types at a breakpoint.  While inspecting
@@ -2593,127 +2722,139 @@ bar
             information.  See also the <literal>:sprint</literal> command,
             which works like <literal>:print</literal> but does not bind new
             variables.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:quit</literal>
           <indexterm><primary><literal>:quit</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Quits GHCi.  You can also quit by typing control-D
-	  at the prompt.</para>
-	</listitem>
+        <listitem>
+          <para>Quits GHCi.  You can also quit by typing control-D
+          at the prompt.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:reload</literal>
           <indexterm><primary><literal>:reload</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Attempts to reload the current target set (see
-	  <literal>:load</literal>) if any of the modules in the set,
-	  or any dependent module, has changed.  Note that this may
-	  entail loading new modules, or dropping modules which are no
-	  longer indirectly required by the target.</para>
-	</listitem>
+        <listitem>
+          <para>Attempts to reload the current target set (see
+          <literal>:load</literal>) if any of the modules in the set,
+          or any dependent module, has changed.  Note that this may
+          entail loading new modules, or dropping modules which are no
+          longer indirectly required by the target.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:run</literal>
           <indexterm><primary><literal>:run</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>See <literal>:main</literal>.</para>
-	</listitem>
+        <listitem>
+          <para>See <literal>:main</literal>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:script</literal> <optional><replaceable>n</replaceable></optional>
-	  <literal>filename</literal>
+          <literal>filename</literal>
           <indexterm><primary><literal>:script</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
     <para>Executes the lines of a file as a series of GHCi commands.  This command
     is compatible with multiline statements as set by <literal>:set +m</literal>
     </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:set</literal> <optional><replaceable>option</replaceable>...</optional>
           <indexterm><primary><literal>:set</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
     <para>Sets various options.  See <xref linkend="ghci-set"/> for a list of
       available options and <xref linkend="interactive-mode-options"/> for a
       list of GHCi-specific flags.  The <literal>:set</literal> command by
       itself shows which options are currently set. It also lists the current
       dynamic flag settings, with GHCi-specific flags listed separately.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>:set</literal> <literal>args</literal> <replaceable>arg</replaceable> ...
-          <indexterm><primary><literal>:set args</literal></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Sets the list of arguments which are returned when the
-	  program calls <literal>System.getArgs</literal><indexterm><primary>getArgs</primary>
-	    </indexterm>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-           <literal>:set</literal> <literal>editor</literal> <replaceable>cmd</replaceable>
-        </term>
-	<listitem>
-	  <para>Sets the command used by <literal>:edit</literal> to
-	  <replaceable>cmd</replaceable>.</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-           <literal>:set</literal> <literal>prog</literal> <replaceable>prog</replaceable>
-           <indexterm><primary><literal>:set prog</literal></primary></indexterm>
+        <term>
+          <literal>:set</literal> <literal>args</literal> <replaceable>arg</replaceable> ...
+          <indexterm><primary><literal>:set args</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Sets the string to be returned when the program calls
-	  <literal>System.getProgName</literal><indexterm><primary>getProgName</primary>
-	    </indexterm>.</para>
-	</listitem>
+        <listitem>
+          <para>Sets the list of arguments which are returned when the
+          program calls <literal>System.getArgs</literal><indexterm><primary>getArgs</primary>
+            </indexterm>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
+           <literal>:set</literal> <literal>editor</literal> <replaceable>cmd</replaceable>
+        </term>
+        <listitem>
+          <para>Sets the command used by <literal>:edit</literal> to
+          <replaceable>cmd</replaceable>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+           <literal>:set</literal> <literal>prog</literal> <replaceable>prog</replaceable>
+           <indexterm><primary><literal>:set prog</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Sets the string to be returned when the program calls
+          <literal>System.getProgName</literal><indexterm><primary>getProgName</primary>
+            </indexterm>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
            <literal>:set</literal> <literal>prompt</literal> <replaceable>prompt</replaceable>
         </term>
-	<listitem>
-	  <para>Sets the string to be used as the prompt in GHCi.
-	  Inside <replaceable>prompt</replaceable>, the sequence
-	  <literal>%s</literal> is replaced by the names of the
-	  modules currently in scope, and <literal>%%</literal> is
-	  replaced by <literal>%</literal>. If <replaceable>prompt</replaceable>
+        <listitem>
+          <para>Sets the string to be used as the prompt in GHCi.
+          Inside <replaceable>prompt</replaceable>, the sequence
+          <literal>%s</literal> is replaced by the names of the
+          modules currently in scope, <literal>%l</literal> is replaced
+          by the line number (as referenced in compiler messages) of the
+          current prompt, and <literal>%%</literal> is replaced by
+          <literal>%</literal>.  If <replaceable>prompt</replaceable>
       starts with &quot; then it is parsed as a Haskell String;
       otherwise it is treated as a literal string.</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
+           <literal>:set</literal> <literal>prompt2</literal> <replaceable>prompt</replaceable>
+        </term>
+        <listitem>
+          <para>Sets the string to be used as the continuation prompt
+      (used when using the <literal>:{</literal> command) in GHCi.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
            <literal>:set</literal> <literal>stop</literal>
           [<replaceable>num</replaceable>] <replaceable>cmd</replaceable>
         </term>
-	<listitem>
-	  <para>Set a command to be executed when a breakpoint is hit, or a new
+        <listitem>
+          <para>Set a command to be executed when a breakpoint is hit, or a new
           item in the history is selected.  The most common use of
             <literal>:set stop</literal> is to display the source code at the
             current location, e.g. <literal>:set stop :list</literal>.</para>
@@ -2733,15 +2874,15 @@ bar
 </screen>
           <para>Ignoring breakpoints for a specified number of iterations is
             also possible using similar techniques.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:seti</literal> <optional><replaceable>option</replaceable>...</optional>
           <indexterm><primary><literal>:seti</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
           <para>
             Like <literal>:set</literal>, but options set with
             <literal>:seti</literal> affect only expressions and
@@ -2759,187 +2900,228 @@ bar
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show bindings</literal>
           <indexterm><primary><literal>:show bindings</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Show the bindings made at the prompt and their
-	  types.</para>
-	</listitem>
+        <listitem>
+          <para>Show the bindings made at the prompt and their
+          types.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show breaks</literal>
           <indexterm><primary><literal>:show breaks</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>List the active breakpoints.</para>
-	</listitem>
+        <listitem>
+          <para>List the active breakpoints.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show context</literal>
           <indexterm><primary><literal>:show context</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>List the active evaluations that are stopped at breakpoints.</para>
-	</listitem>
+        <listitem>
+          <para>List the active evaluations that are stopped at breakpoints.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show imports</literal>
           <indexterm><primary><literal>:show imports</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
           <para>Show the imports that are currently in force, as
           created by <literal>import</literal> and
           <literal>:module</literal> commands.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show modules</literal>
           <indexterm><primary><literal>:show modules</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Show the list of modules currently loaded.</para>
-	</listitem>
+        <listitem>
+          <para>Show the list of modules currently loaded.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show packages</literal>
           <indexterm><primary><literal>:show packages</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
     <para>Show the currently active package flags, as well as the list of
       packages currently loaded.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
+          <literal>:show paths</literal>
+          <indexterm><primary><literal>:show paths</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Show the current working directory (as set via
+          <literal>:cd</literal> command), as well as the list of
+          directories searched for source files (as set by the
+          <option>-i</option> option).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <literal>:show language</literal>
           <indexterm><primary><literal>:show language</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
     <para>Show the currently active language flags for source files.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:showi language</literal>
           <indexterm><primary><literal>:showi language</literal></primary></indexterm>
         </term>
-	<listitem>
+        <listitem>
           <para>Show the currently active language flags for
           expressions typed at the prompt (see also <literal>:seti</literal>).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:show [args|prog|prompt|editor|stop]</literal>
           <indexterm><primary><literal>:show</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Displays the specified setting (see
+        <listitem>
+          <para>Displays the specified setting (see
             <literal>:set</literal>).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:sprint</literal>
           <indexterm><primary><literal>:sprint</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Prints a value without forcing its evaluation.
+        <listitem>
+          <para>Prints a value without forcing its evaluation.
             <literal>:sprint</literal> is similar to <literal>:print</literal>,
             with the difference that unevaluated subterms are not bound to new
             variables, they are simply denoted by &lsquo;_&rsquo;.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-          <literal>:step [<replaceable>expr</replaceable>]</literal>
+        <term>
+          <literal>:step</literal> <optional><replaceable>expr</replaceable></optional>
           <indexterm><primary><literal>:step</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Single-step from the last breakpoint.  With an expression
-            argument, begins evaluation of the expression with a
-            single-step.</para>
-	</listitem>
+        <listitem>
+          <para>Enable all breakpoints and begin evaluating an
+          expression in single-stepping mode. In this
+          mode evaluation will be stopped after every reduction,
+          allowing local variables to be inspected.
+
+          If <replaceable>expr</replaceable> is not given, evaluation will
+          resume at the last breakpoint.
+
+          See <xref linkend="single-stepping" />.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-          <literal>:trace [<replaceable>expr</replaceable>]</literal>
+        <term>
+          <literal>:steplocal</literal>
+          <indexterm><primary><literal>:steplocal</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Enable only breakpoints in the current top-level
+          binding and resume evaluation at the last breakpoint.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:stepmodule</literal>
+          <indexterm><primary><literal>:stepmodule</literal></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Enable only breakpoints in the current module and
+          resume evaluation at the last breakpoint.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <literal>:trace <optional><replaceable>expr</replaceable></optional></literal>
           <indexterm><primary><literal>:trace</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Evaluates the given expression (or from the last breakpoint if
+        <listitem>
+          <para>Evaluates the given expression (or from the last breakpoint if
             no expression is given), and additionally logs the evaluation
             steps for later inspection using <literal>:history</literal>.  See
             <xref linkend="tracing" />.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
          <literal>:type</literal> <replaceable>expression</replaceable>
          <indexterm><primary><literal>:type</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Infers and prints the type of
-	  <replaceable>expression</replaceable>, including explicit
-	  forall quantifiers for polymorphic types.  The monomorphism
-	  restriction is <emphasis>not</emphasis> applied to the
-	  expression during type inference.</para>
-	</listitem>
+        <listitem>
+          <para>Infers and prints the type of
+          <replaceable>expression</replaceable>, including explicit
+          forall quantifiers for polymorphic types.  The monomorphism
+          restriction is <emphasis>not</emphasis> applied to the
+          expression during type inference.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:undef</literal> <replaceable>name</replaceable>
           <indexterm><primary><literal>:undef</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Undefines the user-defined command
-	  <replaceable>name</replaceable> (see <literal>:def</literal>
-	  above).</para>
-	</listitem>
+        <listitem>
+          <para>Undefines the user-defined command
+          <replaceable>name</replaceable> (see <literal>:def</literal>
+          above).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:unset</literal> <replaceable>option</replaceable>...
           <indexterm><primary><literal>:unset</literal></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Unsets certain options.  See <xref linkend="ghci-set"/>
-	  for a list of available options.</para>
-	</listitem>
+        <listitem>
+          <para>Unsets certain options.  See <xref linkend="ghci-set"/>
+          for a list of available options.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>:!</literal> <replaceable>command</replaceable>...
           <indexterm><primary><literal>:!</literal></primary></indexterm>
           <indexterm><primary>shell commands</primary><secondary>in GHCi</secondary></indexterm>
         </term>
-	<listitem>
-	  <para>Executes the shell command
-	  <replaceable>command</replaceable>.</para>
-	</listitem>
+        <listitem>
+          <para>Executes the shell command
+          <replaceable>command</replaceable>.</para>
+        </listitem>
       </varlistentry>
 
     </variablelist>
@@ -2972,68 +3154,68 @@ bar
       <para>The available GHCi options are:</para>
 
       <variablelist>
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <literal>+m</literal>
             <indexterm><primary><literal>+m</literal></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Enable parsing of multiline commands.  A multiline command
-	    is prompted for when the current input line contains open layout
+          <listitem>
+            <para>Enable parsing of multiline commands.  A multiline command
+            is prompted for when the current input line contains open layout
             contexts (see <xref linkend="ghci-multiline" />).</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <literal>+r</literal>
             <indexterm><primary><literal>+r</literal></primary></indexterm>
             <indexterm><primary>CAFs</primary><secondary>in GHCi</secondary></indexterm>
             <indexterm><primary>Constant Applicative Form</primary><see>CAFs</see></indexterm>
           </term>
-	  <listitem>
-	    <para>Normally, any evaluation of top-level expressions
-	    (otherwise known as CAFs or Constant Applicative Forms) in
-	    loaded modules is retained between evaluations.  Turning
-	    on <literal>+r</literal> causes all evaluation of
-	    top-level expressions to be discarded after each
-	    evaluation (they are still retained
-	    <emphasis>during</emphasis> a single evaluation).</para>
+          <listitem>
+            <para>Normally, any evaluation of top-level expressions
+            (otherwise known as CAFs or Constant Applicative Forms) in
+            loaded modules is retained between evaluations.  Turning
+            on <literal>+r</literal> causes all evaluation of
+            top-level expressions to be discarded after each
+            evaluation (they are still retained
+            <emphasis>during</emphasis> a single evaluation).</para>
 
-	    <para>This option may help if the evaluated top-level
-	    expressions are consuming large amounts of space, or if
-	    you need repeatable performance measurements.</para>
-	  </listitem>
-	</varlistentry>
+            <para>This option may help if the evaluated top-level
+            expressions are consuming large amounts of space, or if
+            you need repeatable performance measurements.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <literal>+s</literal>
             <indexterm><primary><literal>+s</literal></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Display some stats after evaluating each expression,
-	    including the elapsed time and number of bytes allocated.
-	    NOTE: the allocation figure is only accurate to the size
-	    of the storage manager's allocation area, because it is
-	    calculated at every GC.  Hence, you might see values of
-	    zero if no GC has occurred.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Display some stats after evaluating each expression,
+            including the elapsed time and number of bytes allocated.
+            NOTE: the allocation figure is only accurate to the size
+            of the storage manager's allocation area, because it is
+            calculated at every GC.  Hence, you might see values of
+            zero if no GC has occurred.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
+        <varlistentry>
+          <term>
             <literal>+t</literal>
             <indexterm><primary><literal>+t</literal></primary></indexterm>
           </term>
-	  <listitem>
-	    <para>Display the type of each variable bound after a
-	    statement is entered at the prompt.  If the statement is a
-	    single expression, then the only variable binding will be
-	    for the variable
-	    &lsquo;<literal>it</literal>&rsquo;.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Display the type of each variable bound after a
+            statement is entered at the prompt.  If the statement is a
+            single expression, then the only variable binding will be
+            for the variable
+            &lsquo;<literal>it</literal>&rsquo;.</para>
+          </listitem>
+        </varlistentry>
       </variablelist>
     </sect2>
 
@@ -3176,7 +3358,7 @@ warning settings:
     Placing a <filename>.ghci</filename> file
     in a directory with a Haskell project is a useful way to set
     certain project-wide options so you don't have to type them
-    every time you start GHCi: eg. if your project uses multi-parameter 
+    every time you start GHCi: eg. if your project uses multi-parameter
     type classes, scoped type variables,
     and CPP, and has source files in three subdirectories A, B and C,
     you might put the following lines in
@@ -3208,7 +3390,7 @@ warning settings:
     wiki page: <ulink
       url="http://haskell.org/haskellwiki/GHC/GHCi">GHC/GHCi</ulink></para>
 
-	<para>Additionally, any files specified with
+        <para>Additionally, any files specified with
     <literal>-ghci-script</literal> flags will be read after the
     standard files, allowing the use of custom .ghci files.</para>
 
@@ -3217,24 +3399,24 @@ warning settings:
 
     <variablelist>
       <varlistentry>
-	<term>
+        <term>
           <option>-ignore-dot-ghci</option>
           <indexterm><primary><option>-ignore-dot-ghci</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Don't read either <filename>./.ghci</filename> or the
+        <listitem>
+          <para>Don't read either <filename>./.ghci</filename> or the
           other startup files when starting up.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
       <varlistentry>
-	<term>
+        <term>
          <option>-ghci-script</option>
          <indexterm><primary><option>-ghci-script</option></primary></indexterm>
     </term>
-	<listitem>
-	  <para>Read a specific file after the usual startup files.
-	  Maybe be specified repeatedly for multiple inputs.</para>
-	</listitem>
+        <listitem>
+          <para>Read a specific file after the usual startup files.
+          Maybe be specified repeatedly for multiple inputs.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
 
@@ -3271,77 +3453,77 @@ warning settings:
 
     <variablelist>
       <varlistentry>
-	<term>The interpreter can't load modules with foreign export
-	declarations!</term>
-	<listitem>
-	  <para>Unfortunately not.  We haven't implemented it yet.
-	  Please compile any offending modules by hand before loading
-	  them into GHCi.</para>
-	</listitem>
+        <term>The interpreter can't load modules with foreign export
+        declarations!</term>
+        <listitem>
+          <para>Unfortunately not.  We haven't implemented it yet.
+          Please compile any offending modules by hand before loading
+          them into GHCi.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <literal>-O</literal> doesn't work with GHCi!
           <indexterm><primary><option>-O</option></primary></indexterm>
          </term>
-	<listitem>
-	  <para>For technical reasons, the bytecode compiler doesn't
-	  interact well with one of the optimisation passes, so we
-	  have disabled optimisation when using the interpreter.  This
-	  isn't a great loss: you'll get a much bigger win by
-	  compiling the bits of your code that need to go fast, rather
-	  than interpreting them with optimisation turned on.</para>
-	</listitem>
+        <listitem>
+          <para>For technical reasons, the bytecode compiler doesn't
+          interact well with one of the optimisation passes, so we
+          have disabled optimisation when using the interpreter.  This
+          isn't a great loss: you'll get a much bigger win by
+          compiling the bits of your code that need to go fast, rather
+          than interpreting them with optimisation turned on.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>Unboxed tuples don't work with GHCi</term>
-	<listitem>
-	  <para>That's right.  You can always compile a module that
-	  uses unboxed tuples and load it into GHCi, however.
-	  (Incidentally the previous point, namely that
-	  <literal>-O</literal> is incompatible with GHCi, is because
-	  the bytecode compiler can't deal with unboxed
-	  tuples).</para>
-	</listitem>
+        <term>Unboxed tuples don't work with GHCi</term>
+        <listitem>
+          <para>That's right.  You can always compile a module that
+          uses unboxed tuples and load it into GHCi, however.
+          (Incidentally the previous point, namely that
+          <literal>-O</literal> is incompatible with GHCi, is because
+          the bytecode compiler can't deal with unboxed
+          tuples).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>Concurrent threads don't carry on running when GHCi is
+        <term>Concurrent threads don't carry on running when GHCi is
         waiting for input.</term>
-	<listitem>
-	  <para>This should work, as long as your GHCi was built with
-	  the <option>-threaded</option> switch, which is the default.
-	  Consult whoever supplied your GHCi installation.</para>
-	</listitem>
+        <listitem>
+          <para>This should work, as long as your GHCi was built with
+          the <option>-threaded</option> switch, which is the default.
+          Consult whoever supplied your GHCi installation.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>After using <literal>getContents</literal>, I can't use
-	<literal>stdin</literal> again until I do
-	<literal>:load</literal> or <literal>:reload</literal>.</term>
+        <term>After using <literal>getContents</literal>, I can't use
+        <literal>stdin</literal> again until I do
+        <literal>:load</literal> or <literal>:reload</literal>.</term>
 
-	<listitem>
-	  <para>This is the defined behaviour of
-	  <literal>getContents</literal>: it puts the stdin Handle in
-	  a state known as <firstterm>semi-closed</firstterm>, wherein
-	  any further I/O operations on it are forbidden.  Because I/O
-	  state is retained between computations, the semi-closed
-	  state persists until the next <literal>:load</literal> or
-	  <literal>:reload</literal> command.</para>
+        <listitem>
+          <para>This is the defined behaviour of
+          <literal>getContents</literal>: it puts the stdin Handle in
+          a state known as <firstterm>semi-closed</firstterm>, wherein
+          any further I/O operations on it are forbidden.  Because I/O
+          state is retained between computations, the semi-closed
+          state persists until the next <literal>:load</literal> or
+          <literal>:reload</literal> command.</para>
 
-	  <para>You can make <literal>stdin</literal> reset itself
-	  after every evaluation by giving GHCi the command
-	  <literal>:set +r</literal>.  This works because
-	  <literal>stdin</literal> is just a top-level expression that
-	  can be reverted to its unevaluated state in the same way as
-	  any other top-level expression (CAF).</para>
-	</listitem>
+          <para>You can make <literal>stdin</literal> reset itself
+          after every evaluation by giving GHCi the command
+          <literal>:set +r</literal>.  This works because
+          <literal>stdin</literal> is just a top-level expression that
+          can be reverted to its unevaluated state in the same way as
+          any other top-level expression (CAF).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>I can't use Control-C to interrupt computations in
+        <term>I can't use Control-C to interrupt computations in
           GHCi on Windows.</term>
         <listitem>
           <para>See <xref linkend="ghci-windows"/>.</para>
@@ -3349,7 +3531,7 @@ warning settings:
       </varlistentry>
 
       <varlistentry>
-	<term>The default buffering mode is different in GHCi to GHC.</term>
+        <term>The default buffering mode is different in GHCi to GHC.</term>
         <listitem>
           <para>
             In GHC, the stdout handle is line-buffered by default.

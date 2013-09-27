@@ -964,6 +964,13 @@ data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTrans
         -- a combination of a state monad (TickTransState) and a writer
         -- monad (FreeVars).
 
+instance Functor TM where
+    fmap = liftM
+
+instance Applicative TM where
+    pure = return
+    (<*>) = ap
+
 instance Monad TM where
   return a = TM $ \ _env st -> (a,noFVs,st)
   (TM m) >>= k = TM $ \ env st ->

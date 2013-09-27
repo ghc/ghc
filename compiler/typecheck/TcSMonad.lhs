@@ -38,12 +38,15 @@ module TcSMonad (
 
     -- Getting and setting the flattening cache
     addSolvedDict, addSolvedFunEq, getFlattenSkols,
+
+    -- Marking stuff as used
+    addUsedRdrNamesTcS,
     
     deferTcSForAllEq, 
     
     setEvBind,
     XEvTerm(..),
-    MaybeNew (..), isFresh, freshGoals, getEvTerms,
+    MaybeNew (..), isFresh, freshGoal, freshGoals, getEvTerm, getEvTerms,
 
     xCtFlavor,        -- Transform a CtEvidence during a step 
     rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
@@ -72,6 +75,7 @@ module TcSMonad (
     modifyInertTcS,
     insertInertItemTcS, partitionCCanMap, partitionEqMap,
     getRelevantCts, extractRelevantInerts,
+    getInertsFunEqTyCon,
     CCanMap(..), CtTypeMap, CtFamHeadMap, CtPredMap,
     PredMap, FamHeadMap,
     partCtFamHeadMap, lookupFamHead, lookupSolvedDict,
@@ -81,14 +85,12 @@ module TcSMonad (
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
     cloneMetaTyVar,
 
-    compatKind, mkKindErrorCtxtTcS,
-
     Untouchables, isTouchableMetaTyVarTcS, isFilledMetaTyVar_maybe,
     zonkTyVarsAndFV,
 
-    getDefaultInfo, getDynFlags,
+    getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
 
-    matchClass, matchFam, MatchInstResult (..), 
+    matchFam, matchOpenFam, 
     checkWellStagedDFun, 
     pprEq                                    -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the 
@@ -110,7 +112,6 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
        ( checkWellStaged, topIdLvl, tcGetDefaultTys )
-import {-# SOURCE #-} qualified TcUnify as TcM ( mkKindErrorCtxt )
 import Kind
 import TcType
 import DynFlags
@@ -121,6 +122,8 @@ import Class
 import TyCon
 
 import Name
+import RdrName (RdrName, GlobalRdrEnv)
+import RnEnv (addUsedRdrNames)
 import Var
 import VarEnv
 import Outputable
@@ -135,7 +138,7 @@ import TcRnTypes
 import Unique 
 import UniqFM
 import Maybes ( orElse, catMaybes, firstJust )
-import StaticFlags( opt_NoFlatCache )
+import Pair ( pSnd )
 
 import Control.Monad( unless, when, zipWithM )
 import Data.IORef
@@ -146,19 +149,6 @@ import StaticFlags( opt_PprStyle_Debug )
 import VarSet
 import Digraph
 #endif
-\end{code}
-
-
-\begin{code}
-compatKind :: Kind -> Kind -> Bool
-compatKind k1 k2 = k1 `tcIsSubKind` k2 || k2 `tcIsSubKind` k1 
-
-mkKindErrorCtxtTcS :: Type -> Kind 
-                   -> Type -> Kind 
-                   -> ErrCtxt
-mkKindErrorCtxtTcS ty1 ki1 ty2 ki2
-  = (False,TcM.mkKindErrorCtxt ty1 ty2 ki1 ki2)
-
 \end{code}
 
 %************************************************************************
@@ -247,7 +237,7 @@ workListSize (WorkList { wl_eqs = eqs, wl_funeqs = funeqs, wl_rest = rest })
 extendWorkListEq :: Ct -> WorkList -> WorkList
 -- Extension by equality
 extendWorkListEq ct wl 
-  | Just {} <- isCFunEqCan_Maybe ct
+  | Just {} <- isCFunEqCan_maybe ct
   = extendWorkListFunEq ct wl
   | otherwise
   = wl { wl_eqs = ct : wl_eqs wl }
@@ -428,10 +418,10 @@ lookupFamHead :: FamHeadMap a -> TcType -> Maybe a
 lookupFamHead (FamHeadMap m) key = lookupTM key m
 
 insertFamHead :: FamHeadMap a -> TcType -> a -> FamHeadMap a
-insertFamHead (FamHeadMap m) key value = FamHeadMap (alterTM key (const (Just value)) m)
+insertFamHead (FamHeadMap m) key value = FamHeadMap (insertTM key value m)
 
 delFamHead :: FamHeadMap a -> TcType -> FamHeadMap a
-delFamHead (FamHeadMap m) key = FamHeadMap (alterTM key (const Nothing) m)
+delFamHead (FamHeadMap m) key = FamHeadMap (deleteTM key m)
 
 anyFamHeadMap :: (Ct -> Bool) -> CtFamHeadMap -> Bool
 anyFamHeadMap f ctmap = foldTM ((||) . f) (unFamHeadMap ctmap) False
@@ -439,22 +429,24 @@ anyFamHeadMap f ctmap = foldTM ((||) . f) (unFamHeadMap ctmap) False
 partCtFamHeadMap :: (Ct -> Bool) 
                  -> CtFamHeadMap 
                  -> (Cts, CtFamHeadMap)
-partCtFamHeadMap f ctmap
-  = let (cts,tymap_final) = foldTM upd_acc tymap_inside (emptyBag, tymap_inside)
+partCtFamHeadMap f (FamHeadMap ctmap)
+  = let (cts, tymap_final) = foldTM upd_acc ctmap (emptyBag, ctmap)
     in (cts, FamHeadMap tymap_final)
   where
-    tymap_inside = unFamHeadMap ctmap 
     upd_acc ct (cts,acc_map)
-         | f ct      = (extendCts cts ct, alterTM ct_key (\_ -> Nothing) acc_map)
+         | f ct      = (extendCts cts ct, deleteTM fam_head acc_map)
          | otherwise = (cts,acc_map)
-         where ct_key | EqPred ty1 _ <- classifyPredType (ctPred ct)
-                      = ty1 
-                      | otherwise 
-                      = panic "partCtFamHeadMap, encountered non equality!"
+         where 
+           fam_head = funEqHead ct
+
+funEqHead :: Ct -> Type
+funEqHead ct = case isCFunEqCan_maybe ct of 
+                 Just (tc,tys) -> mkTyConApp tc tys
+                 Nothing       -> pprPanic "funEqHead" (ppr ct)
 
 filterSolved :: (CtEvidence -> Bool) -> PredMap CtEvidence -> PredMap CtEvidence
 filterSolved p (PredMap mp) = PredMap (foldTM upd mp emptyTM)
-  where upd a m = if p a then alterTM (ctEvPred a) (\_ -> Just a) m
+  where upd a m = if p a then insertTM (ctEvPred a) a m
                          else m
 \end{code}
 
@@ -667,8 +659,8 @@ insertInertItem item is
           | Just cls <- isCDictCan_Maybe item   -- Dictionary 
           = ics { inert_dicts = updCCanMap (cls,item) (inert_dicts ics) }
 
-          | Just _tc <- isCFunEqCan_Maybe item  -- Function equality
-          = let fam_head = mkTyConApp (cc_fun item) (cc_tyargs item)
+          | Just (tc,tys) <- isCFunEqCan_maybe item  -- Function equality
+          = let fam_head = mkTyConApp tc tys
                 upd_funeqs Nothing = Just item
                 upd_funeqs (Just _already_there) 
                   = panic "insertInertItem: item already there!"
@@ -701,10 +693,9 @@ addSolvedDict item
        ; updInertTcS upd_solved_dicts }
   where
     upd_solved_dicts is 
-      = is { inert_solved_dicts = PredMap $ alterTM pred upd_solved $ 
+      = is { inert_solved_dicts = PredMap $ insertTM pred item $ 
                                   unPredMap $ inert_solved_dicts is }
     pred = ctEvPred item
-    upd_solved _ = Just item
 
 addSolvedFunEq :: TcType -> CtEvidence -> TcType -> TcS ()
 addSolvedFunEq fam_ty ev rhs_ty
@@ -741,19 +732,25 @@ prepareInertsForImplications is
                   , inert_funeqs = FamHeadMap funeqs
                   , inert_dicts  = dicts })
       = IC { inert_eqs    = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs 
-           , inert_funeqs = FamHeadMap (mapTM given_from_wanted funeqs)
+           , inert_funeqs = FamHeadMap (foldTM given_from_wanted funeqs emptyTM)
            , inert_irreds = Bag.filterBag isGivenCt irreds
            , inert_dicts  = keepGivenCMap dicts
            , inert_insols = emptyCts }
 
-    given_from_wanted funeq   -- This is where the magic processing happens 
-      | isGiven ev = funeq    -- for type-function equalities
-                              -- See Note [Preparing inert set for implications]
-      | otherwise  = funeq { cc_ev = given_ev }
+    given_from_wanted :: Ct -> TypeMap Ct -> TypeMap Ct
+    given_from_wanted funeq fhm   -- This is where the magic processing happens 
+                                  -- for type-function equalities
+                                  -- See Note [Preparing inert set for implications]
+      | isWanted ev  = insert_one (funeq { cc_ev = given_ev }) fhm
+      | isGiven ev   = insert_one funeq fhm   
+      | otherwise    = fhm  -- Drop derived constraints
       where
         ev = ctEvidence funeq
         given_ev = CtGiven { ctev_evtm = EvId (ctev_evar ev)
                            , ctev_pred = ctev_pred ev }
+
+    insert_one :: Ct -> TypeMap Ct -> TypeMap Ct
+    insert_one funeq fhm = insertTM (funEqHead funeq) funeq fhm 
 \end{code}
 
 Note [Preparing inert set for implications]
@@ -798,6 +795,8 @@ fundep (alpha~a) and this can float out again and be used to fix
 alpha.  (In general we can't float class constraints out just in case
 (C d blah) might help to solve (C Int a).)  But we ignore this possiblity.
 
+For Derived constraints we don't have evidence, so we do not turn
+them into Givens.  There can *be* deriving CFunEqCans; see Trac #8129.
 
 \begin{code}
 getInertEqs :: TcS (TyVarEnv Ct)
@@ -843,6 +842,18 @@ checkAllSolved
                      || unsolved_dicts || unsolved_funeqs
                      || not (isEmptyBag (inert_insols icans)))) }
 
+
+{- Get inert function equation constraints that have the given tycon
+in their head.  Not that the constraints remain in the inert set.
+We use this to check for derived interactions with built-in type-function
+constructors. -}
+getInertsFunEqTyCon :: TyCon -> TcS [Ct]
+getInertsFunEqTyCon tc =
+  do is <- getTcSInerts
+     let mp = unFamHeadMap $ inert_funeqs $ inert_cans is
+     return $ lookupTypeMapTyCon mp tc
+
+
 extractRelevantInerts :: Ct -> TcS Cts
 -- Returns the constraints from the inert set that are 'relevant' to react with 
 -- this constraint. The monad is left with the 'thinner' inerts. 
@@ -860,13 +871,11 @@ extractRelevantInerts wi
             let (cts,dict_map) = getRelevantCts cl (inert_dicts ics) 
             in (cts, ics { inert_dicts = dict_map })
 
-        extract_ics_relevants ct@(CFunEqCan {}) ics@(IC { inert_funeqs = funeq_map })
-            | Just ct <- lookupFamHead funeq_map fam_head
+        extract_ics_relevants (CFunEqCan { cc_fun = tc, cc_tyargs = tys }) 
+                              ics@(IC { inert_funeqs = funeq_map })
+            | let fam_head = mkTyConApp tc tys
+            , Just ct <- lookupFamHead funeq_map fam_head
             = (singleCt ct, ics { inert_funeqs = delFamHead funeq_map fam_head })
-            | otherwise
-            = (emptyCts, ics)
-            where
-              fam_head = mkTyConApp (cc_fun ct) (cc_tyargs ct)
 
         extract_ics_relevants (CHoleCan {}) ics
             = pprPanic "extractRelevantInerts" (ppr wi)
@@ -896,18 +905,19 @@ lookupFlatEqn fam_ty
 lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet
 lookupInInerts pty
-  = do { IS { inert_solved_dicts = solved, inert_cans = ics } <- getTcSInerts
-       ; case lookupSolvedDict solved pty of
+  = do { inerts <- getTcSInerts
+       ; case lookupSolvedDict inerts pty of
            Just ctev -> return (Just ctev)
-           Nothing   -> return (lookupInInertCans ics pty) }
+           Nothing   -> return (lookupInInertCans inerts pty) }
 
-lookupSolvedDict :: PredMap CtEvidence -> TcPredType -> Maybe CtEvidence
+lookupSolvedDict :: InertSet -> TcPredType -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
-lookupSolvedDict tm pty = lookupTM pty $ unPredMap tm
+lookupSolvedDict (IS { inert_solved_dicts = solved }) pty 
+  = lookupTM pty (unPredMap solved)
 
-lookupInInertCans :: InertCans -> TcPredType -> Maybe CtEvidence
+lookupInInertCans :: InertSet -> TcPredType -> Maybe CtEvidence
 -- Returns Just if exactly this pred type exists in the inert canonicals
-lookupInInertCans ics pty
+lookupInInertCans (IS { inert_cans = ics }) pty
   = case (classifyPredType pty) of
       ClassPred cls _ 
          -> lookupCCanMap cls (\ct -> ctEvPred ct `eqType` pty) (inert_dicts ics)
@@ -1013,6 +1023,9 @@ traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
+
+getGlobalRdrEnvTcS :: TcS GlobalRdrEnv
+getGlobalRdrEnvTcS = wrapTcS TcM.getGlobalRdrEnv
 
 bumpStepCountTcS :: TcS ()
 bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
@@ -1160,6 +1173,7 @@ getTcSInertsRef = TcS (return . tcs_inerts)
 
 getTcSWorkListRef :: TcS (IORef WorkList) 
 getTcSWorkListRef = TcS (return . tcs_worklist) 
+
 getTcSInerts :: TcS InertSet 
 getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef) 
 
@@ -1276,6 +1290,12 @@ getTopEnv = wrapTcS $ TcM.getTopEnv
 getGblEnv :: TcS TcGblEnv 
 getGblEnv = wrapTcS $ TcM.getGblEnv 
 
+-- Setting names as used (used in the deriving of Coercible evidence)
+-- Too hackish to expose it to TcS? In that case somehow extract the used
+-- constructors from the result of solveInteract
+addUsedRdrNamesTcS :: [RdrName] -> TcS ()
+addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
+
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1380,8 +1400,9 @@ newFlattenSkolem Given fam_ty
        ; let rhs_ty = mkTyVarTy tv
              ctev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
                             , ctev_evtm = EvCoercion (mkTcReflCo fam_ty) }
+       ; dflags <- getDynFlags
        ; updInertTcS $ \ is@(IS { inert_fsks = fsks }) -> 
-            extendFlatCache fam_ty ctev rhs_ty
+            extendFlatCache dflags fam_ty ctev rhs_ty
             is { inert_fsks       = tv : fsks }
 
        ; return (ctev, rhs_ty) }
@@ -1391,12 +1412,14 @@ newFlattenSkolem _ fam_ty  -- Wanted or Derived: make new unification variable
        ; ctev <- newWantedEvVarNC (mkTcEqPred fam_ty rhs_ty)
                                    -- NC (no-cache) version because we've already
                                    -- looked in the solved goals an inerts (lookupFlatEqn)
-       ; updInertTcS $ extendFlatCache fam_ty ctev rhs_ty
+       ; dflags <- getDynFlags
+       ; updInertTcS $ extendFlatCache dflags fam_ty ctev rhs_ty
        ; return (ctev, rhs_ty) }
 
-extendFlatCache :: TcType -> CtEvidence -> TcType -> InertSet -> InertSet
-extendFlatCache 
-  | opt_NoFlatCache
+extendFlatCache :: DynFlags -> TcType -> CtEvidence -> TcType
+                -> InertSet -> InertSet
+extendFlatCache dflags
+  | not (gopt Opt_FlatCache dflags)
   = \ _ _ _ is -> is
   | otherwise
   = \ fam_ty ctev rhs_ty is@(IS { inert_flat_cache = fc }) -> 
@@ -1471,6 +1494,10 @@ getEvTerm (Cached tm)  = tm
 
 getEvTerms :: [MaybeNew] -> [EvTerm]
 getEvTerms = map getEvTerm
+
+freshGoal :: MaybeNew -> Maybe CtEvidence
+freshGoal (Fresh ctev) = Just ctev
+freshGoal _ = Nothing
 
 freshGoals :: [MaybeNew] -> [CtEvidence]
 freshGoals mns = [ ctev | Fresh ctev <- mns ]
@@ -1646,48 +1673,33 @@ rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_pred = old_pred }) new_pred c
 
 
 
--- Matching and looking up classes and family instances
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+matchOpenFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
+matchOpenFam tycon args = wrapTcS $ tcLookupFamInst tycon args
 
-data MatchInstResult mi
-  = MatchInstNo         -- No matching instance 
-  | MatchInstSingle mi  -- Single matching instance
-  | MatchInstMany       -- Multiple matching instances
+matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+-- Given (F tys) return (ty, co), where co :: F tys ~ ty
+matchFam tycon args
+  | isOpenSynFamilyTyCon tycon
+  = do { maybe_match <- matchOpenFam tycon args
+       ; case maybe_match of
+           Nothing -> return Nothing
+           Just (FamInstMatch { fim_instance = famInst
+                              , fim_tys      = inst_tys })
+             -> let co = mkTcUnbranchedAxInstCo (famInstAxiom famInst) inst_tys
+                    ty = pSnd $ tcCoercionKind co
+                in return $ Just (co, ty) }
 
+  | Just ax <- isClosedSynFamilyTyCon_maybe tycon
+  , Just (ind, inst_tys) <- chooseBranch ax args
+  = let co = mkTcAxInstCo ax ind inst_tys
+        ty = pSnd (tcCoercionKind co)
+    in return $ Just (co, ty)
 
-matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Maybe TcType])) 
--- Look up a class constraint in the instance environment
-matchClass clas tys
-  = do	{ let pred = mkClassPred clas tys 
-        ; instEnvs <- getInstEnvs
-        ; case lookupInstEnv instEnvs clas tys of {
-            ([], _unifs, _)               -- Nothing matches  
-                -> do { traceTcS "matchClass not matching" $ 
-                        vcat [ text "dict" <+> ppr pred
-                             {- , ppr instEnvs -} ]
-                        
-                      ; return MatchInstNo  
-                      } ;  
-	    ([(ispec, inst_tys)], [], _) -- A single match 
-		-> do	{ let dfun_id = is_dfun ispec
-			; traceTcS "matchClass success" $
-                          vcat [text "dict" <+> ppr pred, 
-                                text "witness" <+> ppr dfun_id
-                                               <+> ppr (idType dfun_id) ]
-				  -- Record that this dfun is needed
-                        ; return $ MatchInstSingle (dfun_id, inst_tys)
-                        } ;
-     	    (matches, _unifs, _)          -- More than one matches 
-		-> do	{ traceTcS "matchClass multiple matches, deferring choice" $
-                          vcat [text "dict" <+> ppr pred,
-                                text "matches" <+> ppr matches]
-                        ; return MatchInstMany 
-		        }
-	}
-        }
+  | Just ops <- isBuiltInSynFamTyCon_maybe tycon = return (sfMatchFam ops args)
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
-matchFam tycon args = wrapTcS $ tcLookupFamInst tycon args
+  | otherwise
+  = return Nothing
+       
 \end{code}
 
 \begin{code}

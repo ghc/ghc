@@ -21,7 +21,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module System.Posix.Internals where
 
 #include "HsBaseConfig.h"
@@ -41,7 +40,6 @@ import Data.Maybe
 import System.IO.Error
 #endif
 
-#if __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
 import GHC.Real
@@ -53,15 +51,6 @@ import GHC.IO.Device
 import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 #endif
-#elif __HUGS__
-import Hugs.Prelude (IOException(..), IOErrorType(..))
-import Hugs.IO (IOMode(..))
-#endif
-
-#ifdef __HUGS__
-{-# CFILES cbits/PrelIOUtils.c cbits/consUtils.c #-}
-#endif
-
 
 -- ---------------------------------------------------------------------------
 -- Debugging the base package
@@ -145,9 +134,7 @@ statGetType p_stat = do
 ioe_unknownfiletype :: IOException
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         "unknown file type"
-#if __GLASGOW_HASKELL__
                         Nothing
-#endif
                         Nothing
 
 fdGetMode :: FD -> IO IOMode
@@ -190,17 +177,10 @@ newFilePath :: FilePath -> IO CString
 peekFilePath :: CString -> IO FilePath
 peekFilePathLen :: CStringLen -> IO FilePath
 
-#if __GLASGOW_HASKELL__
 withFilePath fp f = getFileSystemEncoding >>= \enc -> GHC.withCString enc fp f
 newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
 peekFilePath fp = getFileSystemEncoding >>= \enc -> GHC.peekCString enc fp
 peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
-#else
-withFilePath = withCString
-newFilePath = newCString
-peekFilePath = peekCString
-peekFilePathLen = peekCStringLen
-#endif
 
 #endif
 
@@ -248,7 +228,6 @@ tcSetAttr fd fun = do
         throwErrnoIfMinus1Retry_ "tcSetAttr"
            (c_tcgetattr fd p_tios)
 
-#ifdef __GLASGOW_HASKELL__
         -- Save a copy of termios, if this is a standard file descriptor.
         -- These terminal settings are restored in hs_exit().
         when (fd <= 2) $ do
@@ -257,7 +236,6 @@ tcSetAttr fd fun = do
              saved_tios <- mallocBytes sizeof_termios
              copyBytes saved_tios p_tios sizeof_termios
              set_saved_termios fd saved_tios
-#endif
 
         -- tcsetattr() when invoked by a background process causes the process
         -- to be sent SIGTTOU regardless of whether the process has TOSTOP set
@@ -279,13 +257,11 @@ tcSetAttr fd fun = do
                  c_sigprocmask const_sig_setmask p_old_sigset nullPtr
              return r
 
-#ifdef __GLASGOW_HASKELL__
 foreign import ccall unsafe "HsBase.h __hscore_get_saved_termios"
    get_saved_termios :: CInt -> IO (Ptr CTermios)
 
 foreign import ccall unsafe "HsBase.h __hscore_set_saved_termios"
    set_saved_termios :: CInt -> (Ptr CTermios) -> IO ()
-#endif
 
 #else
 

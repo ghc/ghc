@@ -388,7 +388,7 @@ There are four cases in which a closure is destroyed:
 
 \begin{enumerate}
 \item A closure is overwritten with a blackhole: 
-  @UPD_BH_UPDATABLE()@ and @UPD_BH_SINGLE_ENTRY()@ in @includes/StgMacros.h@,
+  @UPD_BH_UPDATABLE()@ in @includes/StgMacros.h@,
   @threadLazyBlackHole()@ and @threadSqueezeStack()@ in @GC.c@,
   the entry code for @BLACKHOLE@ closures in @StgMiscClosures.hc@ (a 
   @BLACKHOLE@ closure is changed into a @BLACKHOLE_BQ@ closure).
@@ -499,7 +499,7 @@ size, we invoke @LDV_recordDead_FILL_SLOP_DYNAMIC()@ only from:
 \begin{enumerate}
 \item @threadLazyBlackHole()@ and @threadSqueezeStack()@ in @GC.c@
 (for lazy blackholing),
-\item @UPD_BH_UPDATABLE()@ and @UPD_BH_SINGLE_ENTRY()@ in
+\item @UPD_BH_UPDATABLE()@ in
 @includes/StgMacros.h@ (for eager blackholing, which isn't the
 default),
 \item @updateWithIndirection()@ and @updateWithPermIndirection()@ 
@@ -639,7 +639,7 @@ Only three files (@includes/StgLdvProf.h@, @LdvProfile.c@, and
 with LDVU profiling.
 \item[ClosureMacros.h] changes macro @SET_PROF_HDR()@.
 \item[Stg.h] includes th header file @StgLdvProf.h@.
-\item[StgMacros.h] changes macros @UPD_BH_UPDATABLE()@ and @UPD_BH_SINGLE_ENTRY()@.
+\item[StgMacros.h] changes macros @UPD_BH_UPDATABLE()@.
 \end{description}
 
 @\rts@ directory:

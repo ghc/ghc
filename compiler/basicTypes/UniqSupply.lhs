@@ -29,7 +29,7 @@ module UniqSupply (
 import Unique
 import FastTypes
 
-import GHC.IO (unsafeDupableInterleaveIO)
+import GHC.IO
 
 import MonadUtils
 import Control.Monad
@@ -80,8 +80,9 @@ mkSplitUniqSupply c
 
         -- This is one of the most hammered bits in the whole compiler
         mk_supply
-          = unsafeDupableInterleaveIO (
-                genSymZh    >>= \ u_ -> case iUnbox u_ of { u -> (
+          -- NB: Use unsafeInterleaveIO for thread-safety.
+          = unsafeInterleaveIO (
+                genSym      >>= \ u_ -> case iUnbox u_ of { u -> (
                 mk_supply   >>= \ s1 ->
                 mk_supply   >>= \ s2 ->
                 return (MkSplitUniqSupply (mask `bitOrFastInt` u) s1 s2)
@@ -89,7 +90,7 @@ mkSplitUniqSupply c
        in
        mk_supply
 
-foreign import ccall unsafe "genSymZh" genSymZh :: IO Int
+foreign import ccall unsafe "genSym" genSym :: IO Int
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
@@ -176,6 +177,10 @@ class Monad m => MonadUnique m where
     -- | Get an infinite list of new unique identifiers
     getUniquesM :: m [Unique]
 
+    -- This default definition of getUniqueM, while correct, is not as
+    -- efficient as it could be since it needlessly generates and throws away
+    -- an extra Unique. For your instances consider providing an explicit
+    -- definition for 'getUniqueM' which uses 'takeUniqFromSupply' directly.
     getUniqueM  = liftM uniqFromSupply  getUniqueSupplyM
     getUniquesM = liftM uniqsFromSupply getUniqueSupplyM
 
@@ -185,8 +190,8 @@ instance MonadUnique UniqSM where
     getUniquesM = getUniquesUs
 
 getUniqueUs :: UniqSM Unique
-getUniqueUs = USM (\us -> case splitUniqSupply us of
-                          (us1,us2) -> (# uniqFromSupply us1, us2 #))
+getUniqueUs = USM (\us -> case takeUniqFromSupply us of
+                          (u,us') -> (# u, us' #))
 
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us -> case splitUniqSupply us of

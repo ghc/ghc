@@ -157,7 +157,7 @@ module GHC (
         TyCon, 
         tyConTyVars, tyConDataCons, tyConArity,
         isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
-        isFamilyTyCon, tyConClass_maybe,
+        isFamilyTyCon, isOpenFamilyTyCon, tyConClass_maybe,
         synTyConRhs_maybe, synTyConDefn_maybe, synTyConResKind,
 
         -- ** Type variables
@@ -182,7 +182,7 @@ module GHC (
         pprInstance, pprInstanceHdr,
         pprFamInst,
 
-        FamInst, Branched,
+        FamInst,
 
         -- ** Types and Kinds
         Type, splitForAllTys, funResultTy, 
@@ -254,7 +254,6 @@ module GHC (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import Linker           ( HValue )
 import ByteCodeInstr
 import BreakArray
 import InteractiveEval
@@ -1004,7 +1003,7 @@ getBindings = withSession $ \hsc_env ->
     return $ icInScopeTTs $ hsc_IC hsc_env
 
 -- | Return the instances for the current interactive session.
-getInsts :: GhcMonad m => m ([ClsInst], [FamInst Branched])
+getInsts :: GhcMonad m => m ([ClsInst], [FamInst])
 getInsts = withSession $ \hsc_env ->
     return $ ic_instances (hsc_IC hsc_env)
 

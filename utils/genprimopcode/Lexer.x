@@ -33,16 +33,22 @@ words :-
                                                }
                                     }
     <0>         "->"                { mkT TArrow }
+    <0>         "=>"                { mkT TDArrow }
     <0>         "="                 { mkT TEquals }
     <0>         ","                 { mkT TComma }
     <0>         "("                 { mkT TOpenParen }
     <0>         ")"                 { mkT TCloseParen }
     <0>         "(#"                { mkT TOpenParenHash }
     <0>         "#)"                { mkT THashCloseParen }
+    <0>         "["                 { mkT TOpenBracket }
+    <0>         "]"                 { mkT TCloseBracket }
+    <0>         "<"                 { mkT TOpenAngle }
+    <0>         ">"                 { mkT TCloseAngle }
     <0>         "section"           { mkT TSection }
     <0>         "primop"            { mkT TPrimop }
     <0>         "pseudoop"          { mkT TPseudoop }
     <0>         "primtype"          { mkT TPrimtype }
+    <0>         "primclass"         { mkT TPrimclass }
     <0>         "with"              { mkT TWith }
     <0>         "defaults"          { mkT TDefaults }
     <0>         "True"              { mkT TTrue }
@@ -56,7 +62,11 @@ words :-
     <0>         "infixl"            { mkT TInfixL }
     <0>         "infixr"            { mkT TInfixR }
     <0>         "Nothing"           { mkT TNothing }
+    <0>         "vector"            { mkT TVector }
     <0>         "thats_all_folks"   { mkT TThatsAllFolks }
+    <0>         "SCALAR"            { mkT TSCALAR }
+    <0>         "VECTOR"            { mkT TVECTOR }
+    <0>         "VECTUPLE"          { mkT TVECTUPLE }
     <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
     <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
     <0>         [0-9][0-9]*         { mkTv (TInteger . read) }

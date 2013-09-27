@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -34,11 +34,7 @@
 module Control.Exception (
 
         -- * The Exception type
-#ifdef __HUGS__
-        SomeException,
-#else
         SomeException(..),
-#endif
         Exception(..),          -- class
         IOException,            -- instance Eq, Ord, Show, Typeable, Exception
         ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
@@ -48,11 +44,8 @@ module Control.Exception (
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         asyncExceptionToException, asyncExceptionFromException,
 
-#if __GLASGOW_HASKELL__ || __HUGS__
         NonTermination(..),
         NestedAtomically(..),
-#endif
-
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
         Deadlock(..),
@@ -67,9 +60,7 @@ module Control.Exception (
         throw,
         throwIO,
         ioError,
-#ifdef __GLASGOW_HASKELL__
         throwTo,
-#endif
 
         -- * Catching Exceptions
 
@@ -140,13 +131,9 @@ module Control.Exception (
 
 import Control.Exception.Base
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO (unsafeUnmask)
 import Data.Maybe
-#else
-import Prelude hiding (catch)
-#endif
 
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)
@@ -231,6 +218,8 @@ A typical use of 'tryJust' for recovery looks like this:
 --
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
+--
+-- /Since: 4.4.0.0/
 allowInterrupt :: IO ()
 allowInterrupt = unsafeUnmask $ return ()
 

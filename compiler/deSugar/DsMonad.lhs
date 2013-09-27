@@ -241,7 +241,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
                    _           -> pprPgmError "Unable to use Data Parallel Haskell (DPH):" err
                } }
 
-        paErr       = ptext (sLit "To use -XParallelArrays,") <+> specBackend $$ hint1 $$ hint2
+        paErr       = ptext (sLit "To use ParallelArrays,") <+> specBackend $$ hint1 $$ hint2
         veErr       = ptext (sLit "To use -fvectorise,") <+> specBackend $$ hint1 $$ hint2
         specBackend = ptext (sLit "you must specify a DPH backend package")
         hint1       = ptext (sLit "Look for packages named 'dph-lifted-*' with 'ghc-pkg'")

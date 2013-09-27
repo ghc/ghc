@@ -100,7 +100,7 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
         <para>
           If you absolutely positively want all the rest of the options
           in a command line to go to the program (and not the RTS), use a
-          <option>&ndash;&ndash;RTS</option><indexterm><primary><option>--RTS</option></primary></indexterm>.
+          <option>--RTS</option><indexterm><primary><option>--RTS</option></primary></indexterm>.
         </para>
 
         <para>
@@ -1435,7 +1435,7 @@ $ ./a.out +RTS --info
         <term><literal>RTS way</literal></term>
         <listitem>
           <para>The variant (&ldquo;way&rdquo;) of the runtime. The
-          most common values are <literal>rts</literal> (vanilla),
+          most common values are <literal>rts_v</literal> (vanilla),
           <literal>rts_thr</literal> (threaded runtime, i.e. linked using the
           <literal>-threaded</literal> option) and <literal>rts_p</literal>
           (profiling runtime, i.e. linked using the <literal>-prof</literal>

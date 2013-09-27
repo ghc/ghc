@@ -4,6 +4,34 @@
 # ensure we don't clash with any pre-supplied autoconf ones.
 
 
+AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
+[
+    $2=''
+    $3='.so'
+    case $1 in
+    *-unknown-cygwin32)
+        AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
+        AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
+        exit 1
+        ;;
+    *-unknown-mingw32)
+        windows=YES
+        $2='.exe'
+        $3='.dll'
+        ;;
+    i386-apple-darwin|powerpc-apple-darwin)
+        $3='.dylib'
+        ;;
+    x86_64-apple-darwin)
+        $3='.dylib'
+        ;;
+    arm-apple-darwin10|i386-apple-darwin11)
+        $2='.a'
+        $3='.dylib'
+        ;;
+    esac
+])
+
 # FPTOOLS_SET_PLATFORM_VARS
 # ----------------------------------
 # Set the platform variables
@@ -75,7 +103,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
                 echo "Can't work out target platform"
                 exit 1
             fi
-    
+
             TargetArch=`echo "$target" | sed 's/-.*//'`
             TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
             TargetOS=`echo "$target" | sed 's/.*-//'`
@@ -86,25 +114,12 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
+    GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
+    GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
     windows=NO
-    exeext=''
-    soext='.so'
     case $host in
-    *-unknown-cygwin32)
-        AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
-        AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
-        exit 1
-        ;;
     *-unknown-mingw32)
         windows=YES
-        exeext='.exe'
-        soext='.dll'
-        ;;
-    i386-apple-darwin|powerpc-apple-darwin)
-        soext='.dylib'
-        ;;
-    x86_64-apple-darwin)
-        soext='.dylib'
         ;;
     esac
 
@@ -149,8 +164,10 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     AC_SUBST(BuildVendor_CPP)
     AC_SUBST(TargetVendor_CPP)
 
-    AC_SUBST(exeext)
-    AC_SUBST(soext)
+    AC_SUBST(exeext_host)
+    AC_SUBST(exeext_target)
+    AC_SUBST(soext_host)
+    AC_SUBST(soext_target)
 ])
 
 
@@ -447,6 +464,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
+        SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
         if test -z "$LlcCmd"
         then
@@ -473,6 +491,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsPerlCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
+    AC_SUBST(SettingsLibtoolCommand)
     AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
@@ -490,6 +509,13 @@ AC_DEFUN([FP_SETTINGS],
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
+    case $$1 in
+    i386-*)
+        # Workaround for #7799
+        $2="$$2 -U__i686"
+        ;;
+    esac
+
     case $$1 in
     i386-apple-darwin)
         $2="$$2 -m32"
@@ -526,18 +552,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     if $CC -c conftest.c -fno-stack-protector > /dev/null 2>&1
     then
         $2="$$2 -fno-stack-protector"
-    fi
-
-    # Reduce memory usage when linking. See trac #5240.
-    if test -n "$LdHashSize31"
-    then
-        $3="$$3 -Wl,$LdHashSize31"
-        $4="$$4     $LdHashSize31"
-    fi
-    if test -n "$LdReduceMemoryOverheads"
-    then
-        $3="$$3 -Wl,$LdReduceMemoryOverheads"
-        $4="$$4     $LdReduceMemoryOverheads"
     fi
 
     rm -f conftest.c conftest.o
@@ -686,8 +700,6 @@ AC_ARG_WITH($2,
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
 #
 # Note: NeXTStep thinks diff'ing a file against itself is "trouble".
-#
-# Used by ghc, glafp-utils/ltx, and glafp-utils/runstdtest.
 AC_DEFUN([FP_PROG_CONTEXT_DIFF],
 [AC_CACHE_CHECK([for a working context diff], [fp_cv_context_diff],
 [echo foo > conftest1
@@ -854,8 +866,8 @@ changequote([, ])dnl
 ])
 if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs || test ! -f compiler/parser/ParserCore.hs
 then
-    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.16],
-      [AC_MSG_ERROR([Happy version 1.16 or later is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19],
+      [AC_MSG_ERROR([Happy version 1.19 or later is required to compile GHC.])])[]
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
@@ -883,8 +895,8 @@ FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.0],
   [Alex3=YES],[Alex3=NO])
 if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
 then
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.1.0],
-      [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.0],
+      [AC_MSG_ERROR([Alex version 3.1.0 or later is required to compile GHC.])])[]
 fi
 if test ! -f utils/haddock/src/Haddock/Lex.hs
 then
@@ -914,27 +926,6 @@ fi
 rm -rf conftest*])
 $2=$fp_cv_$2
 ])# FP_PROG_LD_FLAG
-
-
-# FP_PROG_LD_HashSize31
-# ------------
-# Sets the output variable LdHashSize31 to --hash-size=31 if ld supports
-# this flag. Otherwise the variable's value is empty.
-AC_DEFUN([FP_PROG_LD_HashSize31],
-[
-FP_PROG_LD_FLAG([--hash-size=31],[LdHashSize31])
-])# FP_PROG_LD_HashSize31
-
-
-# FP_PROG_LD_ReduceMemoryOverheads
-# ------------
-# Sets the output variable LdReduceMemoryOverheads to
-# --reduce-memory-overheads if ld supports this flag.
-# Otherwise the variable's value is empty.
-AC_DEFUN([FP_PROG_LD_ReduceMemoryOverheads],
-[
-FP_PROG_LD_FLAG([--reduce-memory-overheads],[LdReduceMemoryOverheads])
-])# FP_PROG_LD_ReduceMemoryOverheads
 
 
 # FP_PROG_LD_BUILD_ID
@@ -1124,30 +1115,42 @@ AC_SUBST([ArArgs], ["$fp_prog_ar_args"])
 
 # FP_PROG_AR_NEEDS_RANLIB
 # -----------------------
-# Sets the output variable RANLIB to "ranlib" if it is needed and found,
-# to "true" otherwise.
-AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],
-[AC_REQUIRE([FP_PROG_AR_IS_GNU])
-AC_REQUIRE([FP_PROG_AR_ARGS])
-AC_REQUIRE([AC_PROG_CC])
-AC_CACHE_CHECK([whether ranlib is needed], [fp_cv_prog_ar_needs_ranlib],
-[if test $fp_prog_ar_is_gnu = yes; then
-  fp_cv_prog_ar_needs_ranlib=no
-elif echo $TargetPlatform | grep "^.*-apple-darwin$"  > /dev/null 2> /dev/null; then
-  # It's quite tedious to check for Apple's crazy timestamps in .a files,
-  # so we hardcode it.
-  fp_cv_prog_ar_needs_ranlib=yes
-elif echo $fp_prog_ar_args | grep "s" > /dev/null 2> /dev/null; then
-  fp_cv_prog_ar_needs_ranlib=no
-else
-  fp_cv_prog_ar_needs_ranlib=yes
-fi])
-if test $fp_cv_prog_ar_needs_ranlib = yes; then
-   AC_PROG_RANLIB
-else
-  RANLIB="true"
-  AC_SUBST([RANLIB])
-fi
+# Sets the output variable RANLIB_CMD to "ranlib" if it is needed and
+# found, to "true" otherwise. Sets REAL_RANLIB_CMD to the ranlib program,
+# even if we don't need ranlib (libffi might still need it).
+AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
+    AC_REQUIRE([FP_PROG_AR_IS_GNU])
+    AC_REQUIRE([FP_PROG_AR_ARGS])
+    AC_REQUIRE([AC_PROG_CC])
+
+    AC_PROG_RANLIB
+
+    if test $fp_prog_ar_is_gnu = yes
+    then
+        fp_cv_prog_ar_needs_ranlib=no
+    elif test "$TargetOS_CPP" = "darwin"
+    then
+        # It's quite tedious to check for Apple's crazy timestamps in
+        # .a files, so we hardcode it.
+        fp_cv_prog_ar_needs_ranlib=yes
+    else
+        case $fp_prog_ar_args in
+        *s*)
+            fp_cv_prog_ar_needs_ranlib=no;;
+        *)
+            fp_cv_prog_ar_needs_ranlib=yes;;
+        esac
+    fi
+
+    REAL_RANLIB_CMD="$RANLIB"
+    if test $fp_cv_prog_ar_needs_ranlib = yes
+    then
+        RANLIB_CMD="$RANLIB"
+    else
+        RANLIB_CMD="true"
+    fi
+    AC_SUBST([REAL_RANLIB_CMD])
+    AC_SUBST([RANLIB_CMD])
 ])# FP_PROG_AR_NEEDS_RANLIB
 
 
@@ -1181,6 +1184,7 @@ AC_SUBST(GccLT46)
 
 dnl Check to see if the C compiler is clang or llvm-gcc
 dnl
+GccIsClang=NO
 AC_DEFUN([FP_CC_LLVM_BACKEND],
 [AC_REQUIRE([AC_PROG_CC])
 AC_MSG_CHECKING([whether C compiler is clang])
@@ -1188,6 +1192,7 @@ $CC -x c /dev/null -dM -E > conftest.txt 2>&1
 if grep "__clang__" conftest.txt >/dev/null 2>&1; then
   AC_SUBST([CC_CLANG_BACKEND], [1])
   AC_SUBST([CC_LLVM_BACKEND], [1])
+  GccIsClang=YES
   AC_MSG_RESULT([yes])
 else
   AC_MSG_RESULT([no])
@@ -1202,6 +1207,7 @@ else
     AC_MSG_RESULT([no])
   fi
 fi
+AC_SUBST(GccIsClang)
 
 rm -f conftest.txt
 ])
@@ -1546,6 +1552,15 @@ if test "$RELEASE" = "NO"; then
         AC_MSG_RESULT(given $PACKAGE_VERSION)
     else
         AC_MSG_WARN([cannot determine snapshot version: no .git directory and no VERSION file])
+        dnl We'd really rather this case didn't happen, but it might
+        dnl do (in particular, people using lndir trees may find that
+        dnl the build system can't find any other date). If it does
+        dnl happen, then we use the current date.
+        dnl This way we get some idea about how recent a build is.
+        dnl It also means that packages built for 2 different builds
+        dnl will probably use different version numbers, so things are
+        dnl less likely to go wrong.
+        PACKAGE_VERSION=${PACKAGE_VERSION}.`date +%Y%m%d`
     fi
 fi
 
@@ -1592,7 +1607,7 @@ then
     # optimistiaclly assume that it actually works properly.
     AC_DEFINE([USE_TIMER_CREATE], 1,  [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)])
   else
-  AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
+  AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)],
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
 #include <stdio.h>
@@ -1712,7 +1727,7 @@ out:
      [fptools_cv_timer_create_works=no])
   ])
 case $fptools_cv_timer_create_works in
-    yes) AC_DEFINE([USE_TIMER_CREATE], 1, 
+    yes) AC_DEFINE([USE_TIMER_CREATE], 1,
                    [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)]);;
 esac
   fi
@@ -1908,7 +1923,7 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
 case "$1-$2" in
-  darwin10-arm)
+  darwin10-arm|darwin11-i386)
     $3="ios"
     ;;
   *)
@@ -2008,7 +2023,7 @@ AC_DEFUN([FIND_LLVM_PROG],[
         for p in ${PATH}; do
             if test -d "${p}"; then
                 $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
-                if test -n "$1"; then
+                if test -n "$$1"; then
                     break
                 fi
             fi
@@ -2037,7 +2052,16 @@ AC_DEFUN([FIND_GCC],[
     then
         $1="$CC"
     else
-        FP_ARG_WITH_PATH_GNU_PROG([$1], [$2], [$3])
+        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
+        # From Xcode 5 on, OS X command line tools do not include gcc anymore. Use clang.
+        if test -z "$$1"
+        then
+            FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [clang], [clang])
+        fi
+        if test -z "$$1"
+        then
+            AC_MSG_ERROR([cannot find $3 nor clang in your PATH])
+        fi
     fi
     AC_SUBST($1)
 ])

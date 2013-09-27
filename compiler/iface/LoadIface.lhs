@@ -59,6 +59,7 @@ import Panic
 import Util
 import FastString
 import Fingerprint
+import Hooks
 
 import Control.Monad
 import Data.IORef
@@ -516,7 +517,9 @@ findAndReadIface doc_str mod hi_boot_file
 
        -- Check for GHC.Prim, and return its static interface
        if mod == gHC_PRIM
-           then return (Succeeded (ghcPrimIface,
+           then do
+               iface <- getHooked ghcPrimIfaceHook ghcPrimIface
+               return (Succeeded (iface,
                                    "<built in interface for GHC.Prim>"))
            else do
                dflags <- getDynFlags

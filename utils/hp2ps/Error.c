@@ -53,7 +53,7 @@ Usage(const char *str)
    printf("      -s  use small title box\n");
    printf("      -tf ignore trace bands which sum below f%% (default 1%%, max 5%%)\n");
    printf("      -y  traditional\n");
-   printf("      -c  colour ouput\n");
+   printf("      -c  colour output\n");
    exit(0);
 }
 

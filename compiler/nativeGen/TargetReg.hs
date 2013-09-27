@@ -57,7 +57,9 @@ targetVirtualRegSqueeze platform
       ArchAlpha     -> panic "targetVirtualRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetVirtualRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
+      ArchJavaScript-> panic "targetVirtualRegSqueeze ArchJavaScript"
       ArchUnknown   -> panic "targetVirtualRegSqueeze ArchUnknown"
+
 
 targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> FastInt
 targetRealRegSqueeze platform
@@ -71,6 +73,7 @@ targetRealRegSqueeze platform
       ArchAlpha     -> panic "targetRealRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetRealRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
+      ArchJavaScript-> panic "targetRealRegSqueeze ArchJavaScript"
       ArchUnknown   -> panic "targetRealRegSqueeze ArchUnknown"
 
 targetClassOfRealReg :: Platform -> RealReg -> RegClass
@@ -85,6 +88,7 @@ targetClassOfRealReg platform
       ArchAlpha     -> panic "targetClassOfRealReg ArchAlpha"
       ArchMipseb    -> panic "targetClassOfRealReg ArchMipseb"
       ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
+      ArchJavaScript-> panic "targetClassOfRealReg ArchJavaScript"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
 
 targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
@@ -99,6 +103,7 @@ targetMkVirtualReg platform
       ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
       ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
+      ArchJavaScript-> panic "targetMkVirtualReg ArchJavaScript"
       ArchUnknown   -> panic "targetMkVirtualReg ArchUnknown"
 
 targetRegDotColor :: Platform -> RealReg -> SDoc
@@ -113,6 +118,7 @@ targetRegDotColor platform
       ArchAlpha     -> panic "targetRegDotColor ArchAlpha"
       ArchMipseb    -> panic "targetRegDotColor ArchMipseb"
       ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
+      ArchJavaScript-> panic "targetRegDotColor ArchJavaScript"
       ArchUnknown   -> panic "targetRegDotColor ArchUnknown"
 
 

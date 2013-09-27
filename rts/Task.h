@@ -218,11 +218,6 @@ void interruptWorkerTask (Task *task);
 
 #endif /* THREADED_RTS */
 
-// Update any (Capability *) pointers belonging to Tasks after the
-// Capability array is moved/resized.
-//
-void updateCapabilityRefs (void);
-
 // For stats
 extern nat taskCount;
 extern nat workerCount;

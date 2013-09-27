@@ -36,6 +36,9 @@ import FastString
 import SrcLoc
 import Util
 
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
+
 
 stgMassageForProfiling
         :: DynFlags
@@ -91,7 +94,7 @@ stgMassageForProfiling dflags mod_name _us stg_binds
 
     do_top_rhs _ (StgRhsClosure _ _ _ _ _ []
                      (StgSCC _cc False{-not tick-} _push (StgConApp con args)))
-      | not (isDllConApp dflags con args)
+      | not (isDllConApp dflags mod_name con args)
         -- Trivial _scc_ around nothing but static data
         -- Eliminate _scc_ ... and turn into StgRhsCon
 
@@ -219,6 +222,13 @@ newtype MassageM result
                  -> CollectedCCs
                  -> (CollectedCCs, result)
     }
+
+instance Functor MassageM where
+      fmap = liftM
+
+instance Applicative MassageM where
+      pure = return
+      (<*>) = ap
 
 instance Monad MassageM where
     return x = MassageM (\_ ccs -> (ccs, x))

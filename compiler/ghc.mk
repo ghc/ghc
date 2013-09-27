@@ -117,6 +117,22 @@ ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 else
 	@echo 'cDYNAMIC_GHC_PROGRAMS = False'                               >> $@
 endif
+# Note that GhcThreaded just reflects the Makefile variable setting.
+# In particular, the stage1 compiler is never actually compiled with
+# -threaded, but it will nevertheless have cGhcThreaded = True.
+# The "+RTS --info" output will show what RTS GHC is really using.
+	@echo 'cGhcThreaded :: Bool'                                        >> $@
+ifeq "$(GhcThreaded)" "YES"
+	@echo 'cGhcThreaded = True'                                         >> $@
+else
+	@echo 'cGhcThreaded = False'                                        >> $@
+endif
+	@echo 'cGhcDebugged :: Bool'                                        >> $@
+ifeq "$(GhcDebugged)" "YES"
+	@echo 'cGhcDebugged = True'                                         >> $@
+else
+	@echo 'cGhcDebugged = False'                                        >> $@
+endif
 	@echo done.
 
 # -----------------------------------------------------------------------------
@@ -222,7 +238,7 @@ compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
 	"$(CP)" $< $@
 
 # ----------------------------------------------------------------------------
-#		Generate supporting stuff for prelude/PrimOp.lhs 
+#		Generate supporting stuff for prelude/PrimOp.lhs
 #		from prelude/primops.txt
 
 PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
@@ -234,8 +250,12 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-code-size.hs-incl        \
                     primop-can-fail.hs-incl         \
                     primop-strictness.hs-incl       \
-                    primop-fixity.hs-incl       \
-                    primop-primop-info.hs-incl
+                    primop-fixity.hs-incl           \
+                    primop-primop-info.hs-incl      \
+                    primop-vector-uniques.hs-incl   \
+                    primop-vector-tys.hs-incl       \
+                    primop-vector-tys-exports.hs-incl \
+                    primop-vector-tycons.hs-incl
 
 PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
@@ -274,8 +294,16 @@ compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt
 	"$$(genprimopcode_INPLACE)" --fixity             < $$< > $$@
 compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
+compiler/stage$1/build/primop-vector-uniques.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-uniques     < $$< > $$@
+compiler/stage$1/build/primop-vector-tys.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-tys         < $$< > $$@
+compiler/stage$1/build/primop-vector-tys-exports.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-tys-exports < $$< > $$@
+compiler/stage$1/build/primop-vector-tycons.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --primop-vector-tycons      < $$< > $$@
 
-# Usages aren't used any more; but the generator 
+# Usages aren't used any more; but the generator
 # can still generate them if we want them back
 compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --usage              < $$< > $$@
@@ -292,6 +320,12 @@ $(eval $(call preprocessCompilerFiles,3))
 compiler_stage1_CONFIGURE_OPTS += --flags=stage1
 compiler_stage2_CONFIGURE_OPTS += --flags=stage2
 compiler_stage3_CONFIGURE_OPTS += --flags=stage3
+
+ifeq "$(GhcThreaded)" "YES"
+# We pass THREADED_RTS to the stage2 C files so that cbits/genSym.c will bring
+# the threaded version of atomic_inc() into scope.
+compiler_stage2_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
+endif
 
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 compiler_stage1_CONFIGURE_OPTS += --flags=ncg
@@ -325,8 +359,26 @@ else
 compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
 endif
 
-ifeq "$(GhcProfiled)" "YES"
+# Careful optimisation of the parser: we don't want to throw everything
+# at it, because that takes too long and doesn't buy much, but we do want
+# to inline certain key external functions, so we instruct GHC not to
+# throw away inlinings as it would normally do in -O0 mode.
+compiler/stage1/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas
+# If we're bootstrapping the compiler during stage2, or we're being
+# built by a GHC whose version is > 7.8, we need -fcmm-sink to be
+# passed to the compiler. This is required on x86 to avoid the
+# register allocator running out of stack slots when compiling this
+# module with -fPIC -dynamic.
+# See #8182 for all the details
+ifeq "$(CMM_SINK_BOOTSTRAP_IS_NEEDED)" "YES"
+compiler/stage1/build/Parser_HC_OPTS += -fcmm-sink
+endif
+# We also pass -fcmm-sink to every stage != 1
+compiler/stage2/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
+compiler/stage3/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 
+
+ifeq "$(GhcProfiled)" "YES"
 # If we're profiling GHC then we want SCCs.  However, adding -auto-all
 # everywhere tends to give a hard-to-read profile, and adds lots of
 # overhead.  A better approach is to proceed top-down; identify the
@@ -405,7 +457,7 @@ compiler_stage3_SplitObjs = NO
 # We therefore need to split some of the modules off into a separate
 # DLL. This clump are the modules reachable from DynFlags:
 compiler_stage2_dll0_START_MODULE = DynFlags
-compiler_stage2_dll0_MODULES = Annotations Avail Bag BasicTypes Binary Bitmap BlockId BreakArray BufWrite ByteCodeAsm ByteCodeInstr ByteCodeItbls ByteCodeLink CLabel Class CmdLineParser Cmm CmmCallConv CmmExpr CmmInfo CmmMachOp CmmNode CmmType CmmUtils CoAxiom CodeGen.Platform CodeGen.Platform.ARM CodeGen.Platform.NoRegs CodeGen.Platform.PPC CodeGen.Platform.PPC_Darwin CodeGen.Platform.SPARC CodeGen.Platform.X86 CodeGen.Platform.X86_64 Coercion Config Constants CoreArity CoreFVs CoreSubst CoreSyn CoreTidy CoreUnfold CoreUtils CostCentre DataCon Demand Digraph DriverPhases DynFlags Encoding ErrUtils Exception FamInstEnv FastBool FastFunctions FastMutInt FastString FastTypes Fingerprint FiniteMap ForeignCall Hoopl Hoopl.Dataflow HsBinds HsDecls HsDoc HsExpr HsImpExp HsLit HsPat HsSyn HsTypes HsUtils HscTypes Id IdInfo IfaceSyn IfaceType InstEnv InteractiveEvalTypes Kind ListSetOps Literal Maybes MkCore MkGraph MkId Module MonadUtils Name NameEnv NameSet ObjLink OccName OccurAnal OptCoercion OrdList Outputable PackageConfig Packages Pair Panic Platform PlatformConstants PprCmm PprCmmDecl PprCmmExpr PprCore PrelNames PrelRules Pretty PrimOp RdrName Reg RegClass Rules SMRep Serialized SrcLoc StaticFlags StgCmmArgRep StgCmmClosure StgCmmEnv StgCmmLayout StgCmmMonad StgCmmProf StgCmmTicky StgCmmUtils StgSyn Stream StringBuffer TcEvidence TcType TyCon Type TypeRep TysPrim TysWiredIn Unify UniqFM UniqSet UniqSupply Unique Util Var VarEnv VarSet
+compiler_stage2_dll0_MODULES = Annotations Avail Bag BasicTypes BinIface Binary Bitmap BlockId BooleanFormula BreakArray BufWrite BuildTyCl ByteCodeAsm ByteCodeInstr ByteCodeItbls CLabel Class CmdLineParser Cmm CmmCallConv CmmExpr CmmInfo CmmMachOp CmmNode CmmType CmmUtils CoAxiom CodeGen.Platform CodeGen.Platform.ARM CodeGen.Platform.NoRegs CodeGen.Platform.PPC CodeGen.Platform.PPC_Darwin CodeGen.Platform.SPARC CodeGen.Platform.X86 CodeGen.Platform.X86_64 Coercion Config Constants CoreArity CoreFVs CoreLint CoreSubst CoreSyn CoreTidy CoreUnfold CoreUtils CostCentre DataCon Demand Digraph DriverPhases DsMonad DynFlags Encoding ErrUtils Exception ExtsCompat46 FamInst FamInstEnv FastBool FastFunctions FastMutInt FastString FastTypes Finder Fingerprint FiniteMap ForeignCall Hooks Hoopl Hoopl.Dataflow HsBinds HsDecls HsDoc HsExpr HsImpExp HsLit HsPat HsSyn HsTypes HsUtils HscTypes IOEnv Id IdInfo IfaceEnv IfaceSyn IfaceType InstEnv InteractiveEvalTypes Kind ListSetOps Literal LoadIface Maybes MkCore MkGraph MkId Module MonadUtils Name NameEnv NameSet OccName OccurAnal OptCoercion OrdList Outputable PackageConfig Packages Pair Panic PipelineMonad Platform PlatformConstants PprCmm PprCmmDecl PprCmmExpr PprCore PrelInfo PrelNames PrelRules Pretty PrimOp RdrName Reg RegClass Rules SMRep Serialized SrcLoc StaticFlags StgCmmArgRep StgCmmClosure StgCmmEnv StgCmmLayout StgCmmMonad StgCmmProf StgCmmTicky StgCmmUtils StgSyn Stream StringBuffer TcEvidence TcIface TcMType TcRnMonad TcRnTypes TcType TcTypeNats TrieMap TyCon Type TypeRep TysPrim TysWiredIn Unify UniqFM UniqSet UniqSupply Unique Util Var VarEnv VarSet
 
 compiler_stage2_dll0_HS_OBJS = \
     $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))

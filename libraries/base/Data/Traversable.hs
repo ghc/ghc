@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -56,12 +55,9 @@ import qualified Prelude (mapM, foldr)
 import Control.Applicative
 import Data.Foldable (Foldable())
 import Data.Monoid (Monoid)
+import Data.Proxy
 
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Arr
-#elif defined(__HUGS__)
-import Hugs.Array
-#endif
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.
@@ -168,6 +164,7 @@ class (Functor t, Foldable t) => Traversable t where
     -- and collect the results.
     sequence :: Monad m => t (m a) -> m (t a)
     sequence = mapM id
+    {-# MINIMAL traverse | sequenceA #-}
 
 -- instances for Prelude types
 
@@ -182,8 +179,28 @@ instance Traversable [] where
 
     mapM = Prelude.mapM
 
+instance Traversable (Either a) where
+    traverse _ (Left x) = pure (Left x)
+    traverse f (Right y) = Right <$> f y
+
+instance Traversable ((,) a) where
+    traverse f (x, y) = (,) x <$> f y
+
 instance Ix i => Traversable (Array i) where
     traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
+
+instance Traversable Proxy where
+    traverse _ _ = pure Proxy
+    {-# INLINE traverse #-}
+    sequenceA _ = pure Proxy
+    {-# INLINE sequenceA #-}
+    mapM _ _ = return Proxy
+    {-# INLINE mapM #-}
+    sequence _ = return Proxy
+    {-# INLINE sequence #-}
+
+instance Traversable (Const m) where
+    traverse _ (Const m) = pure $ Const m
 
 -- general functions
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -78,12 +78,9 @@ module Control.Monad
 
 import Data.Maybe
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.List
 import GHC.Base
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 infixr 1 =<<
 
 -- -----------------------------------------------------------------------------
@@ -117,8 +114,6 @@ mapM f as       =  sequence (map f as)
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
-
-#endif  /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
 -- The MonadPlus class definition

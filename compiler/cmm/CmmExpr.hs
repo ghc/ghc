@@ -18,7 +18,7 @@ module CmmExpr
     , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
     , regSetToList
     , regUsedIn
-    
+
     , Area(..)
     , module CmmMachOp
     , module CmmType
@@ -119,7 +119,11 @@ data CmmLit
         -- Invariant: must be a continuation BlockId
         -- See Note [Continuation BlockId] in CmmNode.
 
-  | CmmHighStackMark -- stands for the max stack space used during a procedure
+  | CmmHighStackMark -- A late-bound constant that stands for the max
+                     -- #bytes of stack space used during a procedure.
+                     -- During the stack-layout pass, CmmHighStackMark
+                     -- is replaced by a CmmInt for the actual number
+                     -- of bytes used
   deriving Eq
 
 cmmExprType :: DynFlags -> CmmExpr -> CmmType
@@ -336,7 +340,13 @@ data GlobalReg
   | LongReg             -- long int registers (64-bit, really)
         {-# UNPACK #-} !Int     -- its number
 
-  | XmmReg                      -- 128-bit SIMD vector register 
+  | XmmReg                      -- 128-bit SIMD vector register
+        {-# UNPACK #-} !Int     -- its number
+
+  | YmmReg                      -- 256-bit SIMD vector register 
+        {-# UNPACK #-} !Int     -- its number
+
+  | ZmmReg                      -- 512-bit SIMD vector register 
         {-# UNPACK #-} !Int     -- its number
 
   -- STG registers
@@ -375,6 +385,8 @@ instance Eq GlobalReg where
    DoubleReg i == DoubleReg j = i==j
    LongReg i == LongReg j = i==j
    XmmReg i == XmmReg j = i==j
+   YmmReg i == YmmReg j = i==j
+   ZmmReg i == ZmmReg j = i==j
    Sp == Sp = True
    SpLim == SpLim = True
    Hp == Hp = True
@@ -397,6 +409,8 @@ instance Ord GlobalReg where
    compare (DoubleReg i) (DoubleReg j) = compare i j
    compare (LongReg i)   (LongReg   j) = compare i j
    compare (XmmReg i)    (XmmReg    j) = compare i j
+   compare (YmmReg i)    (YmmReg    j) = compare i j
+   compare (ZmmReg i)    (ZmmReg    j) = compare i j
    compare Sp Sp = EQ
    compare SpLim SpLim = EQ
    compare Hp Hp = EQ
@@ -420,6 +434,10 @@ instance Ord GlobalReg where
    compare _ (LongReg _)      = GT
    compare (XmmReg _) _       = LT
    compare _ (XmmReg _)       = GT
+   compare (YmmReg _) _       = LT
+   compare _ (YmmReg _)       = GT
+   compare (ZmmReg _) _       = LT
+   compare _ (ZmmReg _)       = GT
    compare Sp _ = LT
    compare _ Sp = GT
    compare SpLim _ = LT
@@ -463,6 +481,8 @@ globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
 globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
+globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
+globalRegType _      (ZmmReg _)        = cmmVec 16 (cmmBits W32)
 
 globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all
@@ -475,4 +495,6 @@ isArgReg (FloatReg {})   = True
 isArgReg (DoubleReg {})  = True
 isArgReg (LongReg {})    = True
 isArgReg (XmmReg {})     = True
+isArgReg (YmmReg {})     = True
+isArgReg (ZmmReg {})     = True
 isArgReg _               = False

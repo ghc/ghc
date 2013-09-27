@@ -137,26 +137,6 @@ heapOverflow(void)
 }
 
 /* -----------------------------------------------------------------------------
-   genSym stuff, used by GHC itself for its splitting unique supply.
-
-   ToDo: put this somewhere sensible.
-   -------------------------------------------------------------------------  */
-
-static HsInt __GenSymCounter = 0;
-
-HsInt
-genSymZh(void)
-{
-    return(__GenSymCounter++);
-}
-HsInt
-resetGenSymZh(void) /* it's your funeral */
-{
-    __GenSymCounter=0;
-    return(__GenSymCounter);
-}
-
-/* -----------------------------------------------------------------------------
    Get the current time as a string.  Used in profiling reports.
    -------------------------------------------------------------------------- */
 

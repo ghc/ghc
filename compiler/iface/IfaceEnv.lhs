@@ -55,10 +55,27 @@ import Data.IORef    ( atomicModifyIORef, readIORef )
 %*							*
 %*********************************************************
 
+Note [The Name Cache]
+~~~~~~~~~~~~~~~~~~~~~
+The Name Cache makes sure that, during any invovcation of GHC, each
+External Name "M.x" has one, and only one globally-agreed Unique.
+
+* The first time we come across M.x we make up a Unique and record that
+  association in the Name Cache.
+
+* When we come across "M.x" again, we look it up in the Name Cache,
+  and get a hit.
+
+The functions newGlobalBinder, allocateGlobalBinder do the main work.
+When you make an External name, you should probably be calling one
+of them.
+
+
 \begin{code}
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
+-- See Note [The Name Cache]
 --
 -- The cache may already already have a binding for this thing,
 -- because we may have seen an occurrence before, but now is the
@@ -74,6 +91,7 @@ allocateGlobalBinder
   :: NameCache 
   -> Module -> OccName -> SrcSpan
   -> (NameCache, Name)
+-- See Note [The Name Cache]
 allocateGlobalBinder name_supply mod occ loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
         -- A hit in the cache!  We are at the binding site of the name.
@@ -170,6 +188,8 @@ lookupOrig mod occ
 		Name cache access
 %*									*
 %************************************************************************
+
+See Note [The Name Cache] above.
 
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name

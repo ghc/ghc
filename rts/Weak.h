@@ -14,9 +14,9 @@
 #include "BeginPrivate.h"
 
 extern rtsBool running_finalizers;
-extern StgWeak * weak_ptr_list;
+extern StgWeak * dead_weak_ptr_list;
 
-void runCFinalizer(void *fn, void *ptr, void *env, StgWord flag);
+void runCFinalizers(StgCFinalizerList *list);
 void runAllCFinalizers(StgWeak *w);
 void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);

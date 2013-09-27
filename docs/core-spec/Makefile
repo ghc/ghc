@@ -1,9 +1,10 @@
-OTT_FILES = CoreSyn.ott CoreLint.ott
+OTT_FILES = CoreSyn.ott CoreLint.ott OpSem.ott
 OTT_TEX   = CoreOtt.tex
 OTT_OPTS  = -tex_show_meta false
 TARGET    = core-spec
 
 $(TARGET).pdf: $(TARGET).tex $(OTT_TEX)
+	latex -output-format=pdf $<
 	latex -output-format=pdf $<
 
 $(TARGET).tex: $(TARGET).mng $(OTT_FILES)

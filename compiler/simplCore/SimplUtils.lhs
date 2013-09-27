@@ -15,15 +15,17 @@ module SimplUtils (
         simplEnvForGHCi, updModeForInlineRules,
 
         -- The continuation type
-        SimplCont(..), DupFlag(..), ArgInfo(..),
+        SimplCont(..), DupFlag(..), 
         isSimplified,
         contIsDupable, contResultType, contInputType,
         contIsTrivial, contArgs, dropArgs,
-        pushSimplifiedArgs, countValArgs, countArgs, addArgTo,
+        pushSimplifiedArgs, countValArgs, countArgs, 
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
-        interestingCallContext,
+        interestingCallContext, interestingArg, 
 
-        interestingArg, mkArgInfo,
+        -- ArgInfo
+        ArgInfo(..), ArgSpec(..), mkArgInfo, addArgTo, addCastTo, 
+        argInfoExpr, argInfoValArgs,
 
         abstractFloats
     ) where
@@ -132,7 +134,7 @@ data SimplCont
 data ArgInfo
   = ArgInfo {
         ai_fun   :: OutId,      -- The function
-        ai_args  :: [OutExpr],  -- ...applied to these args (which are in *reverse* order)
+        ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
         ai_type  :: OutType,    -- Type of (f a1 ... an)
 
         ai_rules :: [CoreRule], -- Rules for this function
@@ -149,9 +151,37 @@ data ArgInfo
                                 --   Always infinite
     }
 
+data ArgSpec = ValArg OutExpr       -- Apply to this
+             | CastBy OutCoercion   -- Cast by this
+
+instance Outputable ArgSpec where
+  ppr (ValArg e) = ptext (sLit "ValArg") <+> ppr e
+  ppr (CastBy c) = ptext (sLit "CastBy") <+> ppr c
+
 addArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addArgTo ai arg = ai { ai_args = arg : ai_args ai
+addArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
                      , ai_type = applyTypeToArg (ai_type ai) arg  }
+
+addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
+addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
+                     , ai_type = pSnd (coercionKind co) }
+
+argInfoValArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> ([OutExpr], SimplCont)
+argInfoValArgs env args cont
+  = go args [] cont
+  where
+    go :: [ArgSpec] -> [OutExpr] -> SimplCont -> ([OutExpr], SimplCont)
+    go (ValArg e  : as) acc cont = go as (e:acc) cont
+    go (CastBy co : as) acc cont = go as [] (CoerceIt co (pushSimplifiedArgs env acc cont))
+    go []               acc cont = (acc, cont)
+
+argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
+argInfoExpr fun args
+  = go args
+  where
+    go []               = Var fun
+    go (ValArg a : as)  = go as `App` a
+    go (CastBy co : as) = mkCast (go as) co
 
 instance Outputable SimplCont where
   ppr (Stop ty interesting)          = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
@@ -258,20 +288,26 @@ countArgs (ApplyTo _ _ _ cont) = 1 + countArgs cont
 countArgs _                    = 0
 
 contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
--- Uses substitution to turn each arg into an OutExpr
-contArgs cont@(ApplyTo {})
-  = case go [] cont of { (args, cont') -> (False, args, cont') }
+-- Summarises value args, discards type args and coercions
+-- The returned continuation of the call is only used to 
+-- answer questions like "are you interesting?"
+contArgs cont
+  | lone cont = (True, [], cont)
+  | otherwise = go [] cont
   where
+    lone (ApplyTo {})  = False  -- See Note [Lone variables] in CoreUnfold
+    lone (CoerceIt {}) = False
+    lone _             = True
+
     go args (ApplyTo _ arg se cont)
-      | isTypeArg arg = go args                           cont
-      | otherwise     = go (is_interesting arg se : args) cont
-    go args cont      = (reverse args, cont)
+      | isTypeArg arg         = go args                           cont
+      | otherwise             = go (is_interesting arg se : args) cont
+    go args (CoerceIt _ cont) = go args cont
+    go args cont              = (False, reverse args, cont)
 
     is_interesting arg se = interestingArg (substExpr (text "contArgs") se arg)
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
-
-contArgs cont = (True, [], cont)
 
 pushSimplifiedArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
 pushSimplifiedArgs _env []         cont = cont
@@ -641,19 +677,21 @@ activeUnfolding env
   where
     mode = getMode env
 
-getUnfoldingInRuleMatch :: SimplEnv -> IdUnfoldingFun
+getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
 -- When matching in RULE, we want to "look through" an unfolding
 -- (to see a constructor) if *rules* are on, even if *inlinings*
 -- are not.  A notable example is DFuns, which really we want to
 -- match in rules like (op dfun) in gentle mode. Another example
 -- is 'otherwise' which we want exprIsConApp_maybe to be able to
 -- see very early on
-getUnfoldingInRuleMatch env id
-  | unf_is_active = idUnfolding id
-  | otherwise     = NoUnfolding
+getUnfoldingInRuleMatch env
+  = (in_scope, id_unf)
   where
+    in_scope = seInScope env
     mode = getMode env
-    unf_is_active
+    id_unf id | unf_is_active id = idUnfolding id
+              | otherwise        = NoUnfolding
+    unf_is_active id
      | not (sm_rules mode) = active_unfolding_minimal id
      | otherwise           = isActive (sm_phase mode) (idInlineActivation id)
 
@@ -1062,7 +1100,7 @@ mkLam _env bndrs body
       | not (any bad bndrs)
         -- Note [Casts and lambdas]
       = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos bndrs co)) }
+           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
@@ -1124,6 +1162,7 @@ because the latter is not well-kinded.
 \begin{code}
 tryEtaExpand :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
+-- and Note [Eta expansion to manifest arity]
 tryEtaExpand env bndr rhs
   = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
@@ -1471,7 +1510,7 @@ prepareAlts tries these things:
 
 Here "cannot match" includes knowledge from GADTs
 
-It's a good idea do do this stuff before simplifying the alternatives, to
+It's a good idea to do this stuff before simplifying the alternatives, to
 avoid simplifying alternatives we know can't happen, and to come up with
 the list of constructors that are handled, to put into the IdInfo of the
 case binder, for use when simplifying the alternatives.
@@ -1514,7 +1553,7 @@ prepareAlts scrut case_bndr' alts
                     _     -> []
 \end{code}
 
-Note [Combine identical alterantives]
+Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  If several alternatives are identical, merge them into
  a single DEFAULT alternative.  I've occasionally seen this
@@ -1559,7 +1598,7 @@ defeats combineIdenticalAlts (see Trac #7360).
 
 \begin{code}
 combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
--- See Note [Combine identical alterantives]
+-- See Note [Combine identical alternatives]
 combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1                     -- Remember the default
   , length filtered_alts < length con_alts      -- alternative comes first

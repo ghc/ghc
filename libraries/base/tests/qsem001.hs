@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 import Control.Concurrent.QSem as OldQ
 
 import Control.Concurrent.Chan

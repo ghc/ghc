@@ -254,7 +254,7 @@ data PVar a = PVar (TVar# RealWorld a)
 INSTANCE_TYPEABLE1(PVar,pvarTc,"PVar")
 
 instance Eq (PVar a) where
-  (PVar tvar1#) == (PVar tvar2#) = sameTVar# tvar1# tvar2#
+  (PVar tvar1#) == (PVar tvar2#) = isTrue# (sameTVar# tvar1# tvar2#)
 
 {-# INLINE newPVar  #-}
 -- |Create a new PVar holding a value supplied
@@ -592,18 +592,18 @@ foreign import ccall rtsSupportsBoundThreads :: Bool
 isCurrentSContBound :: IO Bool
 isCurrentSContBound = IO $ \ s# ->
     case isCurrentThreadBound# s# of
-        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
+        (# s2#, flg #) -> (# s2#, isTrue# (flg /=# 0#) #)
 
 isSContBound :: SCont -> IO Bool
 isSContBound (SCont sc) = IO $ \ s# ->
     case isThreadBound# sc s# of
-        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
+        (# s2#, flg #) -> (# s2#, isTrue# (flg /=# 0#) #)
 
 
 isSContBoundPTM :: SCont -> PTM Bool
 isSContBoundPTM (SCont sc) = PTM $ \ s# ->
     case isThreadBound# sc s# of
-        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
+        (# s2#, flg #) -> (# s2#, isTrue# (flg /=# 0#) #)
 
 
 

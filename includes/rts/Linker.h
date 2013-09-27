@@ -16,8 +16,10 @@
 
 #if defined(mingw32_HOST_OS)
 typedef wchar_t pathchar;
+#define PATH_FMT "ls"
 #else
 typedef char    pathchar;
+#define PATH_FMT "s"
 #endif
 
 /* initialize the object linker */
@@ -46,5 +48,8 @@ HsInt resolveObjs( void );
 
 /* load a dynamic library */
 const char *addDLL( pathchar* dll_name );
+
+/* called by the initialization code for a module, not a user API */
+StgStablePtr foreignExportStablePtr (StgPtr p);
 
 #endif /* RTS_LINKER_H */

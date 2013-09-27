@@ -14,6 +14,7 @@ module TysWiredIn (
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
         trueDataCon,  trueDataConId,  true_RDR,
         falseDataCon, falseDataConId, false_RDR,
+        promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon,
 
         -- * Ordering
         ltDataCon, ltDataConId,
@@ -67,7 +68,10 @@ module TysWiredIn (
 
         -- * Equality predicates
         eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
+        coercibleTyCon, coercibleDataCon, coercibleClass,
 
+        mkWiredInTyConName -- This is used in TcTypeNats to define the
+                           -- built-in functions for evaluation.
     ) where
 
 #include "HsVersions.h"
@@ -85,6 +89,7 @@ import Type             ( mkTyConApp )
 import DataCon
 import Var
 import TyCon
+import Class            ( Class, mkClass )
 import TypeRep
 import RdrName
 import Name
@@ -98,6 +103,7 @@ import FastString
 import Outputable
 import Config
 import Util
+import BooleanFormula   ( mkAnd )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -141,9 +147,11 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , doubleTyCon
               , floatTyCon
               , intTyCon
+              , wordTyCon
               , listTyCon
               , parrTyCon
               , eqTyCon
+              , coercibleTyCon
               , typeNatKindCon
               , typeSymbolKindCon
               ]
@@ -169,6 +177,10 @@ eqTyConName, eqBoxDataConName :: Name
 eqTyConName      = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "~")   eqTyConKey      eqTyCon
 eqBoxDataConName = mkWiredInDataConName UserSyntax    gHC_TYPES (fsLit "Eq#") eqBoxDataConKey eqBoxDataCon
 
+coercibleTyConName, coercibleDataConName :: Name
+coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercible")  coercibleTyConKey   coercibleTyCon
+coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
+
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
 charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#") charDataConKey charDataCon
@@ -185,11 +197,13 @@ listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") li
 nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
-floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
-floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float") floatTyConKey floatTyCon
-floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#") floatDataConKey floatDataCon
-doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey doubleTyCon
-doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
+wordTyConName, wordDataConName, floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
+wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
+wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
+floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  floatTyConKey    floatTyCon
+floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#")     floatDataConKey  floatDataCon
+doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey   doubleTyCon
+doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     doubleDataConKey doubleDataCon
 
 -- Kinds
 typeNatKindConName, typeSymbolKindConName :: Name
@@ -236,12 +250,15 @@ pcNonRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 -- Not an enumeration, not promotable
 pcNonRecDataTyCon = pcTyCon False NonRecursive False
 
+-- This function assumes that the types it creates have all parameters at
+-- Representational role!
 pcTyCon :: Bool -> RecFlag -> Bool -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon is_enum is_rec is_prom name cType tyvars cons
   = tycon
   where
     tycon = buildAlgTyCon name
                 tyvars
+                (map (const Representational) tyvars)
                 cType
                 []              -- No stupid theta
                 (DataTyCon cons is_enum)
@@ -425,6 +442,7 @@ eqTyCon :: TyCon
 eqTyCon = mkAlgTyCon eqTyConName
             (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
             [kv, a, b]
+            [Nominal, Nominal, Nominal]
             Nothing
             []      -- No stupid theta
             (DataTyCon [eqBoxDataCon] False)
@@ -444,6 +462,26 @@ eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVa
     k = mkTyVarTy kv
     a:b:_ = tyVarList k
     args = [kv, a, b]
+
+
+coercibleTyCon :: TyCon
+coercibleTyCon = mkClassTyCon
+    coercibleTyConName kind tvs [Representational, Representational]
+    rhs coercibleClass NonRecursive
+  where kind = mkArrowKinds [liftedTypeKind, liftedTypeKind] constraintKind
+        a:b:_ = tyVarList liftedTypeKind
+        tvs = [a, b]
+        rhs = DataTyCon [coercibleDataCon] False
+
+coercibleDataCon :: DataCon
+coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (liftedTypeKind : map mkTyVarTy args)] coercibleTyCon
+  where
+    a:b:_ = tyVarList liftedTypeKind
+    args = [a, b]
+
+coercibleClass :: Class
+coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
+
 \end{code}
 
 \begin{code}
@@ -778,3 +816,15 @@ mkPArrFakeCon arity  = data_con
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
+
+Promoted Booleans
+
+\begin{code}
+promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon :: TyCon
+promotedBoolTyCon     = promoteTyCon boolTyCon
+promotedTrueDataCon   = promoteDataCon trueDataCon
+promotedFalseDataCon  = promoteDataCon falseDataCon
+\end{code}
+
+
+

@@ -23,13 +23,12 @@ module TcGenGenerics (canDoGenerics, canDoGenerics1,
 import DynFlags
 import HsSyn
 import Type
+import Kind             ( isKind )
 import TcType
 import TcGenDeriv
 import DataCon
 import TyCon
-import CoAxiom
-import Coercion         ( mkSingleCoAxiom )
-import FamInstEnv       ( FamInst, FamFlavor(..) )
+import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString )
 import IfaceEnv         ( newGlobalBinder )
@@ -49,10 +48,9 @@ import Bag
 import VarSet (elemVarSet)
 import Outputable 
 import FastString
-import UniqSupply
 import Util
 
-import Control.Monad (mplus)
+import Control.Monad (mplus,forM)
 import qualified State as S
 
 #include "HsVersions.h"
@@ -73,49 +71,40 @@ For the generic representation we need to generate:
 
 \begin{code}
 gen_Generic_binds :: GenericKind -> TyCon -> MetaTyCons -> Module
-                 -> TcM (LHsBinds RdrName, FamInst Unbranched)
+                 -> TcM (LHsBinds RdrName, FamInst)
 gen_Generic_binds gk tc metaTyCons mod = do
   repTyInsts <- tc_mkRepFamInsts gk tc metaTyCons mod
   return (mkBindsRep gk tc, repTyInsts)
 
 genGenericMetaTyCons :: TyCon -> Module -> TcM (MetaTyCons, BagDerivStuff)
 genGenericMetaTyCons tc mod =
-  do  uniqS <- newUniqueSupply
+  do  loc <- getSrcSpanM
       let
-        -- Uniques for everyone
-        (uniqD:uniqs) = uniqsFromSupply uniqS
-        (uniqsC,us) = splitAt (length tc_cons) uniqs
-        uniqsS :: [[Unique]] -- Unique supply for the S datatypes
-        uniqsS = mkUniqsS tc_arits us
-        mkUniqsS []    _  = []
-        mkUniqsS (n:t) us = case splitAt n us of
-                              (us1,us2) -> us1 : mkUniqsS t us2
-
         tc_name   = tyConName tc
         tc_cons   = tyConDataCons tc
         tc_arits  = map dataConSourceArity tc_cons
-        
+
         tc_occ    = nameOccName tc_name
         d_occ     = mkGenD tc_occ
         c_occ m   = mkGenC tc_occ m
         s_occ m n = mkGenS tc_occ m n
-        d_name    = mkExternalName uniqD mod d_occ wiredInSrcSpan
-        c_names   = [ mkExternalName u mod (c_occ m) wiredInSrcSpan
-                      | (u,m) <- zip uniqsC [0..] ]
-        s_names   = [ [ mkExternalName u mod (s_occ m n) wiredInSrcSpan 
-                        | (u,n) <- zip us [0..] ] | (us,m) <- zip uniqsS [0..] ]
-        
+
         mkTyCon name = ASSERT( isExternalName name )
-                       buildAlgTyCon name [] Nothing [] distinctAbstractTyConRhs
+                       buildAlgTyCon name [] [] Nothing [] distinctAbstractTyConRhs
                                           NonRecursive 
                                           False          -- Not promotable
                                           False          -- Not GADT syntax
                                           NoParentTyCon
 
+      d_name  <- newGlobalBinder mod d_occ loc
+      c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
+                    newGlobalBinder mod (c_occ m) loc
+      s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
+                    newGlobalBinder mod (s_occ m n) loc
+
       let metaDTyCon  = mkTyCon d_name
           metaCTyCons = map mkTyCon c_names
-          metaSTyCons =  [ [ mkTyCon s_name | s_name <- s_namesC ] 
-                         | s_namesC <- s_names ]
+          metaSTyCons = map (map mkTyCon) s_names
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
 
@@ -172,11 +161,11 @@ metaTyConsToDerivStuff tc metaDts =
                        (myZip2 s_insts s_binds)
        
         myZip1 :: [a] -> [b] -> [(a,b)]
-        myZip1 l1 l2 = ASSERT (length l1 == length l2) zip l1 l2
+        myZip1 l1 l2 = ASSERT(length l1 == length l2) zip l1 l2
         
         myZip2 :: [[a]] -> [[b]] -> [[(a,b)]]
         myZip2 l1 l2 =
-          ASSERT (and (zipWith (>=) (map length l1) (map length l2)))
+          ASSERT(and (zipWith (>=) (map length l1) (map length l2)))
             [ zip x1 x2 | (x1,x2) <- zip l1 l2 ]
         
       return $ mapBag DerivTyCon (metaTyCons2TyCons metaDts)
@@ -216,7 +205,7 @@ canDoGenerics tc tc_args
           -- The type arguments should not be instantiated (see #5939)
           -- Data family indices can be instantiated; the `tc_args` here are the
           -- representation tycon args
-              (if (all isTyVarTy (filterOut isKindTy tc_args))
+              (if (all isTyVarTy (filterOut isKind tc_args))
                 then Nothing
                 else Just (tc_name <+> text "must not be instantiated;" <+>
                            text "try deriving `" <> tc_name <+> tc_tys <>
@@ -400,7 +389,7 @@ mkBindsRep gk tycon =
         (from_alts, to_alts) = mkSum gk_ (1 :: US) tycon datacons
           where gk_ = case gk of
                   Gen0 -> Gen0_
-                  Gen1 -> ASSERT (length tyvars >= 1)
+                  Gen1 -> ASSERT(length tyvars >= 1)
                           Gen1_ (last tyvars)
                     where tyvars = tyConTyVars tycon
         
@@ -414,7 +403,7 @@ tc_mkRepFamInsts :: GenericKind     -- Gen0 or Gen1
                -> TyCon           -- The type to generate representation for
                -> MetaTyCons      -- Metadata datatypes to refer to
                -> Module          -- Used as the location of the new RepTy
-               -> TcM (FamInst Unbranched) -- Generated representation0 coercion
+               -> TcM (FamInst)   -- Generated representation0 coercion
 tc_mkRepFamInsts gk tycon metaDts mod = 
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
@@ -427,7 +416,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
      ; let -- `tyvars` = [a,b]
            (tyvars, gk_) = case gk of
              Gen0 -> (all_tyvars, Gen0_)
-             Gen1 -> ASSERT (not $ null all_tyvars)
+             Gen1 -> ASSERT(not $ null all_tyvars)
                      (init all_tyvars, Gen1_ $ last all_tyvars)
              where all_tyvars = tyConTyVars tycon
 
@@ -455,7 +444,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                         (nameSrcSpan (tyConName tycon))
 
      ; let axiom = mkSingleCoAxiom rep_name tyvars fam_tc appT repTy
-     ; newFamInst SynFamilyInst False axiom  }
+     ; newFamInst SynFamilyInst axiom  }
 
 --------------------------------------------------------------------------------
 -- Type representation
@@ -565,16 +554,16 @@ tc_mkRepTy gk_ tycon metaDts =
         
         -- Sums and products are done in the same way for both Rep and Rep1
         sumP [] = mkTyConTy v1
-        sumP l  = ASSERT (length metaCTyCons == length l)
+        sumP l  = ASSERT(length metaCTyCons == length l)
                     foldBal mkSum' [ mkC i d a
                                    | (d,(a,i)) <- zip metaCTyCons (zip l [0..])]
         -- The Bool is True if this constructor has labelled fields
         prod :: Int -> [Type] -> Bool -> Type
-        prod i [] _ = ASSERT (length metaSTyCons > i)
-                        ASSERT (length (metaSTyCons !! i) == 0)
+        prod i [] _ = ASSERT(length metaSTyCons > i)
+                        ASSERT(length (metaSTyCons !! i) == 0)
                           mkTyConTy u1
-        prod i l b  = ASSERT (length metaSTyCons > i)
-                        ASSERT (length l == length (metaSTyCons !! i))
+        prod i l b  = ASSERT(length metaSTyCons > i)
+                        ASSERT(length l == length (metaSTyCons !! i))
                           foldBal mkProd [ arg d t b
                                          | (d,t) <- zip (metaSTyCons !! i) l ]
         

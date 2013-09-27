@@ -52,7 +52,7 @@ wchar_t **win32_prog_argv = NULL;
 #endif
 
 /*
- * constants, used later 
+ * constants, used later
  */
 #define RTS 1
 #define PGM 0
@@ -61,7 +61,7 @@ wchar_t **win32_prog_argv = NULL;
    Static function decls
    -------------------------------------------------------------------------- */
 
-static void procRtsOpts      (int rts_argc0, RtsOptsEnabledEnum enabled);
+static void procRtsOpts      (HsBool is_hs_main, int rts_argc0, RtsOptsEnabledEnum enabled);
 
 static void normaliseRtsOpts (void);
 
@@ -84,6 +84,8 @@ static void errorUsage      (void) GNU_ATTRIBUTE(__noreturn__);
 static char *  copyArg  (char *arg);
 static char ** copyArgv (int argc, char *argv[]);
 static void    freeArgv (int argc, char *argv[]);
+
+static void errorRtsOptsDisabled(HsBool is_hs_main, const char *s);
 
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
@@ -111,9 +113,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = rtsFalse;
-#ifdef RTS_GTK_FRONTPANEL
-    RtsFlags.GcFlags.frontpanel         = rtsFalse;
-#endif
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
 #ifdef THREADED_RTS
     RtsFlags.GcFlags.doIdleGC           = rtsTrue;
@@ -260,9 +259,6 @@ usage_text[] = {
 "  -t[<file>] One-line GC statistics (if <file> omitted, uses stderr)",
 "  -s[<file>] Summary  GC statistics (if <file> omitted, uses stderr)",
 "  -S[<file>] Detailed GC statistics (if <file> omitted, uses stderr)",
-#ifdef RTS_GTK_FRONTPANEL
-"  -f       Display front panel (requires X11 & GTK+)",
-#endif
 "",
 "",
 "  -Z       Don't squeeze out update frames on stack overflow",
@@ -292,7 +288,7 @@ usage_text[] = {
 "    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
-"", 
+"",
 "  -L<chars>      Maximum length of a cost-centre stack in a heap profile",
 "                 (default: 25)",
 "",
@@ -438,9 +434,9 @@ static void splitRtsFlags(const char *s)
 	while (isspace(*c1)) { c1++; };
 	c2 = c1;
 	while (!isspace(*c2) && *c2 != '\0') { c2++; };
-	
+
 	if (c1 == c2) { break; }
-	
+
         t = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
         strncpy(t, c1, c2-c1);
         t[c2-c1] = '\0';
@@ -449,7 +445,18 @@ static void splitRtsFlags(const char *s)
 	c1 = c2;
     } while (*c1 != '\0');
 }
-    
+
+static void
+errorRtsOptsDisabled(HsBool is_hs_main, const char *s) {
+    char *advice;
+    if (is_hs_main) {
+        advice = "Link with -rtsopts to enable them.";
+    } else {
+        advice = "Use hs_init_with_rtsopts() to enable them.";
+    }
+    errorBelch(s, advice);
+}
+
 /* -----------------------------------------------------------------------------
    Parse the command line arguments, collecting options for the RTS.
 
@@ -469,7 +476,8 @@ static void splitRtsFlags(const char *s)
 
 void setupRtsFlags (int *argc, char *argv[],
                     RtsOptsEnabledEnum rtsOptsEnabled,
-                    const char *ghc_rts_opts)
+                    const char *ghc_rts_opts,
+                    HsBool is_hs_main)
 {
     nat mode;
     nat total_arg;
@@ -494,7 +502,7 @@ void setupRtsFlags (int *argc, char *argv[],
 	if (ghc_rts_opts != NULL) {
             splitRtsFlags(ghc_rts_opts);
             // opts from ghc_rts_opts are always enabled:
-            procRtsOpts(rts_argc0, RtsOptsAll);
+            procRtsOpts(is_hs_main, rts_argc0, RtsOptsAll);
             rts_argc0 = rts_argc;
         }
     }
@@ -506,11 +514,11 @@ void setupRtsFlags (int *argc, char *argv[],
 
 	if (ghc_rts != NULL) {
             if (rtsOptsEnabled == RtsOptsNone) {
-                errorBelch("Warning: Ignoring GHCRTS variable as RTS options are disabled.\n         Link with -rtsopts to enable them.");
+                errorRtsOptsDisabled(is_hs_main, "Warning: Ignoring GHCRTS variable as RTS options are disabled.\n         %s");
                 // We don't actually exit, just warn
             } else {
                 splitRtsFlags(ghc_rts);
-                procRtsOpts(rts_argc0, rtsOptsEnabled);
+                procRtsOpts(is_hs_main, rts_argc0, rtsOptsEnabled);
                 rts_argc0 = rts_argc;
             }
         }
@@ -549,7 +557,7 @@ void setupRtsFlags (int *argc, char *argv[],
     }
     argv[*argc] = (char *) 0;
 
-    procRtsOpts(rts_argc0, rtsOptsEnabled);
+    procRtsOpts(is_hs_main, rts_argc0, rtsOptsEnabled);
 
     appendRtsArg((char *)0);
     rts_argc--; // appendRtsArg will have bumped it for the NULL (#7227)
@@ -570,29 +578,33 @@ void setupRtsFlags (int *argc, char *argv[],
  * procRtsOpts: Process rts_argv between rts_argc0 and rts_argc.
  * -------------------------------------------------------------------------- */
 
-static void checkSuid(RtsOptsEnabledEnum enabled)
+#if defined(HAVE_UNISTD_H) && defined(HAVE_SYS_TYPES_H) && !defined(mingw32_HOST_OS)
+static void checkSuid(HsBool is_hs_main, RtsOptsEnabledEnum enabled)
 {
     if (enabled == RtsOptsSafeOnly) {
-#if defined(HAVE_UNISTD_H) && defined(HAVE_SYS_TYPES_H) && !defined(mingw32_HOST_OS)
 	/* This doesn't cover linux/posix capabilities like CAP_DAC_OVERRIDE,
 	   we'd have to link with -lcap for that. */
         if ((getuid() != geteuid()) || (getgid() != getegid())) {
-            errorBelch("RTS options are disabled for setuid binaries. Link with -rtsopts to enable them.");
+            errorRtsOptsDisabled(is_hs_main, "RTS options are disabled for setuid binaries. %s");
             stg_exit(EXIT_FAILURE);
         }
-#endif
     }
 }
+#else
+static void checkSuid(HsBool is_hs_main STG_UNUSED, RtsOptsEnabledEnum enabled STG_UNUSED)
+{
+}
+#endif
 
-static void checkUnsafe(RtsOptsEnabledEnum enabled)
+static void checkUnsafe(HsBool is_hs_main, RtsOptsEnabledEnum enabled)
 {
     if (enabled == RtsOptsSafeOnly) {
-        errorBelch("Most RTS options are disabled. Link with -rtsopts to enable them.");
+        errorRtsOptsDisabled(is_hs_main, "Most RTS options are disabled. %s");
         stg_exit(EXIT_FAILURE);
     }
 }
 
-static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum rtsOptsEnabled)
+static void procRtsOpts (HsBool is_hs_main, int rts_argc0, RtsOptsEnabledEnum rtsOptsEnabled)
 {
     rtsBool error = rtsFalse;
     int arg;
@@ -600,11 +612,11 @@ static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum rtsOptsEnabled)
     if (!(rts_argc0 < rts_argc)) return;
 
     if (rtsOptsEnabled == RtsOptsNone) {
-        errorBelch("RTS options are disabled. Link with -rtsopts to enable them.");
+        errorRtsOptsDisabled(is_hs_main, "RTS options are disabled. %s");
         stg_exit(EXIT_FAILURE);
     }
 
-    checkSuid(rtsOptsEnabled);
+    checkSuid(is_hs_main, rtsOptsEnabled);
 
     // Process RTS (rts_argv) part: mainly to determine statsfile
     for (arg = rts_argc0; arg < rts_argc; arg++) {
@@ -616,7 +628,7 @@ static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum rtsOptsEnabled)
         rtsBool option_checked = rtsFalse;
 
 #define OPTION_SAFE option_checked = rtsTrue;
-#define OPTION_UNSAFE checkUnsafe(rtsOptsEnabled); option_checked = rtsTrue;
+#define OPTION_UNSAFE checkUnsafe(is_hs_main, rtsOptsEnabled); option_checked = rtsTrue;
 
         if (rts_argv[arg][0] != '-') {
 	    fflush(stdout);
@@ -780,15 +792,15 @@ error = rtsTrue;
 	      case 'F':
         	OPTION_UNSAFE;
 	        RtsFlags.GcFlags.oldGenFactor = atof(rts_argv[arg]+2);
-	      
+
 		if (RtsFlags.GcFlags.oldGenFactor < 0)
 		  bad_option( rts_argv[arg] );
 		break;
-	      
+
 	      case 'D':
               OPTION_SAFE;
               DEBUG_BUILD_ONLY(
-	      { 
+	      {
 		  char *c;
 
 		  for (c  = rts_argv[arg] + 2; *c != '\0'; c++) {
@@ -908,13 +920,6 @@ error = rtsTrue;
                   }
                   break;
 
-#ifdef RTS_GTK_FRONTPANEL
-	      case 'f':
-        	  OPTION_UNSAFE;
-		  RtsFlags.GcFlags.frontpanel = rtsTrue;
-		  break;
-#endif
-
     	      case 'I':	/* idle GC delay */
         	OPTION_UNSAFE;
 		if (rts_argv[arg][2] == '\0') {
@@ -951,7 +956,7 @@ error = rtsTrue;
 		  goto stats;
 
 	    stats:
-		{ 
+		{
 		    int r;
 		    if (rts_argv[arg][2] != '\0') {
 		      OPTION_UNSAFE;
@@ -1060,7 +1065,7 @@ error = rtsTrue;
 				RtsFlags.ProfFlags.modSelector = left;
 				break;
 			    case 'D':
-			    case 'd': // closure descr select 
+			    case 'd': // closure descr select
 				RtsFlags.ProfFlags.descrSelector = left;
 				break;
 			    case 'Y':
@@ -1114,12 +1119,12 @@ error = rtsTrue;
 			  break;
 		    }
 		    break;
-		      
+
 		default:
 		    errorBelch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
-		) 
+		)
 #endif /* PROFILING */
     	    	break;
 
@@ -1175,7 +1180,7 @@ error = rtsTrue;
 		    }
                     if (rtsOptsEnabled == RtsOptsSafeOnly &&
                 	nNodes > (int)getNumberOfProcessors()) {
-                      errorBelch("Using large values for -N is not allowed by default. Link with -rtsopts to allow full control.");
+                      errorRtsOptsDisabled(is_hs_main, "Using large values for -N is not allowed by default. %s");
                       stg_exit(EXIT_FAILURE);
                     }
                     RtsFlags.ParFlags.nNodes = (nat)nNodes;
@@ -1266,7 +1271,7 @@ error = rtsTrue;
 
 		RtsFlags.TickyFlags.showTickyStats = rtsTrue;
 
-		{ 
+		{
 		    int r;
 		    if (rts_argv[arg][2] != '\0') {
 		      OPTION_UNSAFE;
@@ -1426,7 +1431,7 @@ static void normaliseRtsOpts (void)
 
     if (RtsFlags.ProfFlags.heapProfileInterval > 0) {
         RtsFlags.ProfFlags.heapProfileIntervalTicks =
-            RtsFlags.ProfFlags.heapProfileInterval / 
+            RtsFlags.ProfFlags.heapProfileInterval /
             RtsFlags.MiscFlags.tickInterval;
     } else {
         RtsFlags.ProfFlags.heapProfileIntervalTicks = 0;
@@ -1538,7 +1543,7 @@ decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
         m = atof(s);
         c = s[strlen(s)-1];
 
-        if (c == 'g' || c == 'G') 
+        if (c == 'g' || c == 'G')
             m *= 1024*1024*1024;
         else if (c == 'm' || c == 'M')
             m *= 1024*1024;
@@ -1801,7 +1806,7 @@ void
 setWin32ProgArgv(int argc, wchar_t *argv[])
 {
 	int i;
-    
+
 	freeWin32ProgArgv();
 
     win32_prog_argc = argc;
@@ -1809,7 +1814,7 @@ setWin32ProgArgv(int argc, wchar_t *argv[])
 		win32_prog_argv = NULL;
 		return;
 	}
-	
+
     win32_prog_argv = stgCallocBytes(argc + 1, sizeof (wchar_t *),
                                     "setWin32ProgArgv 1");
     for (i = 0; i < argc; i++) {

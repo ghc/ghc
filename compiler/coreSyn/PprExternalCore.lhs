@@ -102,22 +102,6 @@ pbty t = paty t
 
 pty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = fsep [pbty t1, text "->",pty t2]
 pty (Tforall tb t) = text "%forall" <+> pforall [tb] t
-pty (TransCoercion t1 t2) =
-  sep [text "%trans", paty t1, paty t2]
-pty (SymCoercion t) =
-  sep [text "%sym", paty t]
-pty (UnsafeCoercion t1 t2) =
-  sep [text "%unsafe", paty t1, paty t2]
-pty (NthCoercion n t) =
-  sep [text "%nth", int n, paty t]
-pty (LRCoercion CLeft t) =
-  sep [text "%left", paty t]
-pty (LRCoercion CRight t) =
-  sep [text "%right", paty t]
-pty (InstCoercion t1 t2) =
-  sep [text "%inst", paty t1, paty t2]
-pty (AxiomCoercion tc i cos) = 
-  pqname tc <+> int i <+> sep (map paty cos)
 pty ty@(Tapp {}) = pappty ty []
 pty ty@(Tvar {}) = paty ty
 pty ty@(Tcon {}) = paty ty
@@ -129,6 +113,48 @@ pappty t ts = sep (map paty (t:ts))
 pforall :: [Tbind] -> Ty -> Doc
 pforall tbs (Tforall tb t) = pforall (tbs ++ [tb]) t
 pforall tbs t = hsep (map ptbind tbs) <+> char '.' <+> pty t
+
+paco, pbco, pco :: Coercion -> Doc
+paco (ReflCoercion r ty) = char '<' <> pty ty <> text ">_" <> prole r
+paco (TyConAppCoercion r qtc []) = pqname qtc <> char '_' <> prole r
+paco (AxiomCoercion qtc i []) = pqname qtc <> char '[' <> int i <> char ']'
+paco (CoVarCoercion cv) = pname cv
+paco c = parens (pco c)
+
+pbco (TyConAppCoercion _ arr [co1, co2])
+  | arr == tcArrow
+  = parens (fsep [pbco co1, text "->", pco co2])
+pbco co = paco co
+
+pco c@(ReflCoercion {})          = paco c
+pco (SymCoercion co)             = sep [text "%sub", paco co]
+pco (TransCoercion co1 co2)      = sep [text "%trans", paco co1, paco co2]
+pco (TyConAppCoercion _ arr [co1, co2])
+  | arr == tcArrow               = fsep [pbco co1, text "->", pco co2]
+pco (TyConAppCoercion r qtc cos) = parens (pqname qtc <+> sep (map paco cos)) <> char '_' <> prole r
+pco co@(AppCoercion {})          = pappco co []
+pco (ForAllCoercion tb co)       = text "%forall" <+> pforallco [tb] co
+pco co@(CoVarCoercion {})        = paco co
+pco (UnivCoercion r ty1 ty2)     = sep [text "%univ", prole r, paty ty1, paty ty2]
+pco (InstCoercion co ty)         = sep [text "%inst", paco co, paty ty]
+pco (NthCoercion i co)           = sep [text "%nth", int i, paco co]
+pco (AxiomCoercion qtc i cos)    = pqname qtc <> char '[' <> int i <> char ']' <+> sep (map paco cos)
+pco (LRCoercion CLeft co)        = sep [text "%left", paco co]
+pco (LRCoercion CRight co)       = sep [text "%right", paco co]
+pco (SubCoercion co)             = sep [text "%sub", paco co]
+
+pappco :: Coercion -> [Coercion ] -> Doc
+pappco (AppCoercion co1 co2) cos = pappco co1 (co2:cos)
+pappco co cos = sep (map paco (co:cos))
+
+pforallco :: [Tbind] -> Coercion -> Doc
+pforallco tbs (ForAllCoercion tb co) = pforallco (tbs ++ [tb]) co
+pforallco tbs co = hsep (map ptbind tbs) <+> char '.' <+> pco co
+ 
+prole :: Role -> Doc
+prole Nominal          = char 'N'
+prole Representational = char 'R'
+prole Phantom          = char 'P'
 
 pvdefg :: Vdefg -> Doc
 pvdefg (Rec vdefs) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (map pvdef vdefs))))
@@ -172,7 +198,7 @@ pexp (Let vd e) = (text "%let" <+> pvdefg vd) $$ (text "%in" <+> pexp e)
 pexp (Case e vb ty alts) = sep [text "%case" <+> paty ty <+> paexp e,
                              text "%of" <+> pvbind vb]
                         $$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
-pexp (Cast e co) = (text "%cast" <+> parens (pexp e)) $$ paty co
+pexp (Cast e co) = (text "%cast" <+> parens (pexp e)) $$ paco co
 pexp (Tick s e) = (text "%source" <+> pstring s) $$ pexp e
 pexp (External n cc t) = (text "%external" <+> text cc <+> pstring n) $$ paty t
 pexp (DynExternal cc t) = (text "%dynexternal" <+> text cc) $$ paty t

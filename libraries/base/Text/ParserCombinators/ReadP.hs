@@ -1,9 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -75,17 +73,12 @@ module Text.ParserCombinators.ReadP
 
 import Control.Monad( MonadPlus(..), sequence, liftM2 )
 
-#ifdef __GLASGOW_HASKELL__
 import {-# SOURCE #-} GHC.Unicode ( isSpace  )
 import GHC.List ( replicate, null )
 import GHC.Base
-#else
-import Data.Char( isSpace )
-#endif
 
 infixr 5 +++, <++
 
-#ifdef __GLASGOW_HASKELL__
 ------------------------------------------------------------------------
 -- ReadS
 
@@ -95,7 +88,6 @@ infixr 5 +++, <++
 -- Note that this kind of backtracking parser is very inefficient;
 -- reading a large structure may be quite slow (cf 'ReadP').
 type ReadS a = String -> [(a,String)]
-#endif
 
 -- ---------------------------------------------------------------------------
 -- The P type
@@ -209,7 +201,6 @@ R f1 +++ R f2 = R (\k -> f1 k `mplus` f2 k)
 -- ^ Local, exclusive, left-biased choice: If left parser
 --   locally produces any result at all, then right parser is
 --   not used.
-#ifdef __GLASGOW_HASKELL__
 R f0 <++ q =
   do s <- look
      probe (f0 return) s 0#
@@ -222,20 +213,6 @@ R f0 <++ q =
 
   discard 0# = return ()
   discard n  = get >> discard (n-#1#)
-#else
-R f <++ q =
-  do s <- look
-     probe (f return) s 0
- where
-  probe (Get f)        (c:s) n = probe (f c) s (n+1)
-  probe (Look f)       s     n = probe (f s) s n
-  probe p@(Result _ _) _     n = discard n >> R (p >>=)
-  probe (Final r)      _     _ = R (Final r >>=)
-  probe _              _     _ = q
-
-  discard 0 = return ()
-  discard n  = get >> discard (n-1)
-#endif
 
 gather :: ReadP a -> ReadP (String, a)
 -- ^ Transforms a parser into one that does the same, but

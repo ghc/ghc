@@ -1,6 +1,6 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, PatternGuards,
+{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, PatternGuards,
              ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -18,7 +18,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Read
   ( Read(..)   -- class
 
@@ -68,7 +67,6 @@ import GHC.Real
 import GHC.Float
 import GHC.Show
 import GHC.Base
-import GHC.Err
 import GHC.Arr
 \end{code}
 
@@ -207,6 +205,7 @@ class Read a where
   readList     = readPrec_to_S (list readPrec) 0
   readPrec     = readS_to_Prec readsPrec
   readListPrec = readS_to_Prec (\_ -> readList)
+  {-# MINIMAL readsPrec | readPrec #-}
 
 readListDefault :: Read a => ReadS [a]
 -- ^ A possible replacement definition for the 'readList' method (GHC only).

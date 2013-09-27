@@ -81,13 +81,14 @@ import VarEnv
 import HscTypes
 import DynFlags
 import SrcLoc
-import BasicTypes
+import BasicTypes hiding( SuccessFlag(..) )
 import Module
 import Outputable
 import Encoding
 import FastString
 import ListSetOps
 import Util
+import Maybes( MaybeErr(..) )
 import Data.IORef
 import Data.List
 \end{code}
@@ -129,11 +130,10 @@ tcLookupGlobal name
                          | otherwise -> do
 
            -- Try home package table and external package table
-        { hsc_env <- getTopEnv
-        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
-        ; case mb_thing of  
-            Just thing -> return thing 
-            Nothing    -> tcImportDecl name   -- Go find it in an interface
+        { mb_thing <- tcLookupImported_maybe name
+        ; case mb_thing of
+            Succeeded thing -> return thing
+            Failed msg      -> failWithTc msg
         }}}}
 
 tcLookupField :: Name -> TcM Id         -- Returns the selector Id
@@ -377,14 +377,14 @@ getScopedTyVarBinds
 
 
 \begin{code}
-tcExtendLetEnv :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
-tcExtendLetEnv closed ids thing_inside 
+tcExtendLetEnv :: TopLevelFlag -> TopLevelFlag -> [TcId] -> TcM a -> TcM a
+tcExtendLetEnv top_lvl closed ids thing_inside 
   = do  { stage <- getStage
         ; tc_extend_local_env [ (idName id, ATcId { tct_id = id 
                                                   , tct_closed = closed
                                                   , tct_level = thLevel stage })
                               | id <- ids] $
-          tcExtendIdBndrs [TcIdBndr id closed | id <- ids] thing_inside }
+          tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] thing_inside }
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 tcExtendIdEnv ids thing_inside 
@@ -734,8 +734,9 @@ newGlobalBinder.
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
 
-newFamInstAxiomName :: SrcSpan -> Name -> [[Type]] -> TcM Name
-newFamInstAxiomName = mk_fam_inst_name mkInstTyCoOcc
+newFamInstAxiomName :: SrcSpan -> Name -> [CoAxBranch] -> TcM Name
+newFamInstAxiomName loc name branches
+  = mk_fam_inst_name mkInstTyCoOcc loc name (map coAxBranchLHS branches)
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss
@@ -780,8 +781,10 @@ mkWrapperName what nameBase
              wrapperRef = nextWrapperNum dflags
              pkg = packageIdString  (modulePackageId thisMod)
              mod = moduleNameString (moduleName      thisMod)
-         wrapperNum <- liftIO $ readIORef wrapperRef
-         liftIO $ writeIORef wrapperRef (wrapperNum + 1)
+         wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
+             let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
+                 mod_env' = extendModuleEnv mod_env thisMod (num+1)
+             in (mod_env', num)
          let components = [what, show wrapperNum, pkg, mod, nameBase]
          return $ mkFastString $ zEncodeString $ intercalate ":" components
 
@@ -794,6 +797,9 @@ generate are external names. This means that if a call to them ends up
 in an unfolding, then we can't alpha-rename them, and thus if the
 unique randomly changes from one compile to another then we get a
 spurious ABI change (#4012).
+
+The wrapper counter has to be per-module, not global, so that the number we end
+up using is not dependent on the modules compiled before the current one.
 -}
 \end{code}
 

@@ -22,7 +22,7 @@ module Type (
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe,
 
-        mkAppTy, mkAppTys, mkNakedAppTys, splitAppTy, splitAppTys,
+        mkAppTy, mkAppTys, splitAppTy, splitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe,
 
         mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe,
@@ -48,7 +48,7 @@ module Type (
         -- Pred types
         mkFamilyTyConApp,
         isDictLikeTy,
-        mkEqPred, mkPrimEqPred,
+        mkEqPred, mkPrimEqPred, mkReprPrimEqPred,
         mkClassPred,
         noParenPred, isClassPred, isEqPred,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
@@ -63,7 +63,7 @@ module Type (
 
         -- ** Predicates on types
         isTypeVar, isKindVar,
-        isTyVarTy, isFunTy, isDictTy, isPredTy, isKindTy,
+        isTyVarTy, isFunTy, isDictTy, isPredTy, 
 
         -- (Lifting and boxity)
         isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
@@ -85,7 +85,7 @@ module Type (
         constraintKindTyCon, anyKindTyCon,
 
         -- * Type free variables
-        tyVarsOfType, tyVarsOfTypes,
+        tyVarsOfType, tyVarsOfTypes, closeOverKinds,
         expandTypeSynonyms,
         typeSize, varSetElemsKvsFirst,
 
@@ -100,6 +100,7 @@ module Type (
         coreView, tcView,
 
         UnaryType, RepType(..), flattenRepType, repType,
+        tyConsOfType,
 
         -- * Type representation for the code generator
         typePrimRep, typeRepArity,
@@ -154,25 +155,23 @@ import TypeRep
 import Var
 import VarEnv
 import VarSet
+import NameEnv
 
 import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
-import PrelNames ( eqTyConKey, ipClassNameKey,
+import PrelNames ( eqTyConKey, ipClassNameKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
 
 -- others
 import Unique           ( Unique, hasKey )
 import BasicTypes       ( Arity, RepArity )
-import NameSet
-import StaticFlags
 import Util
 import Outputable
 import FastString
 
-import Data.List        ( partition )
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
@@ -349,11 +348,6 @@ mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1                []   = ty1
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
 mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
-
-mkNakedAppTys :: Type -> [Type] -> Type
-mkNakedAppTys ty1                []   = ty1
-mkNakedAppTys (TyConApp tc tys1) tys2 = mkNakedTyConApp tc (tys1 ++ tys2)
-mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -595,31 +589,6 @@ The reason is that we then get better (shorter) type signatures in
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 
-Note [Expanding newtypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-When expanding a type to expose a data-type constructor, we need to be
-careful about newtypes, lest we fall into an infinite loop. Here are
-the key examples:
-
-  newtype Id  x = MkId x
-  newtype Fix f = MkFix (f (Fix f))
-  newtype T     = MkT (T -> T)
-
-  Type           Expansion
- --------------------------
-  T              T -> T
-  Fix Maybe      Maybe (Fix Maybe)
-  Id (Id Int)    Int
-  Fix Id         NO NO NO
-
-Notice that we can expand T, even though it's recursive.
-And we can expand Id (Id Int), even though the Id shows up
-twice at the outer level.
-
-So, when expanding, we keep track of when we've seen a recursive
-newtype at outermost level; and bale out if we see it again.
-
-
                 Representation types
                 ~~~~~~~~~~~~~~~~~~~~
 
@@ -654,9 +623,9 @@ flattenRepType (UnaryRep ty)     = [ty]
 -- It's useful in the back end of the compiler.
 repType :: Type -> RepType
 repType ty
-  = go emptyNameSet ty
+  = go initRecTc ty
   where
-    go :: NameSet -> Type -> RepType
+    go :: RecTcChecker -> Type -> RepType
     go rec_nts ty                       -- Expand predicates and synonyms
       | Just ty' <- coreView ty
       = go rec_nts ty'
@@ -667,10 +636,7 @@ repType ty
     go rec_nts (TyConApp tc tys)        -- Expand newtypes
       | isNewTyCon tc
       , tys `lengthAtLeast` tyConArity tc
-      , let tc_name = tyConName tc
-            rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
-                     | otherwise           = rec_nts
-      , not (tc_name `elemNameSet` rec_nts)  -- See Note [Expanding newtypes]
+      , Just rec_nts' <- checkRecTc rec_nts tc   -- See Note [Expanding newtypes] in TyCon
       = go rec_nts' (newTyConInstRhs tc tys)
 
       | isUnboxedTupleTyCon tc
@@ -679,6 +645,26 @@ repType ty
          else UbxTupleRep (concatMap (flattenRepType . go rec_nts) tys)
 
     go _ ty = UnaryRep ty
+
+
+-- | All type constructors occurring in the type; looking through type
+--   synonyms, but not newtypes.
+--  When it finds a Class, it returns the class TyCon.
+tyConsOfType :: Type -> [TyCon]
+tyConsOfType ty
+  = nameEnvElts (go ty)
+  where
+     go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
+     go ty | Just ty' <- tcView ty = go ty'
+     go (TyVarTy {})               = emptyNameEnv
+     go (LitTy {})                 = emptyNameEnv
+     go (TyConApp tc tys)          = go_tc tc tys
+     go (AppTy a b)                = go a `plusNameEnv` go b
+     go (FunTy a b)                = go a `plusNameEnv` go b
+     go (ForAllTy _ ty)            = go ty
+
+     go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
+     go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
@@ -846,12 +832,25 @@ noParenPred :: PredType -> Bool
 noParenPred p = not (isIPPred p) && isClassPred p || isEqPred p
 
 isPredTy :: Type -> Bool
-isPredTy ty
-  | isSuperKind ty = False
-  | otherwise = isConstraintKind (typeKind ty)
+  -- NB: isPredTy is used when printing types, which can happen in debug printing
+  --     during type checking of not-fully-zonked types.  So it's not cool to say
+  --     isConstraintKind (typeKind ty) because absent zonking the type might 
+  --     be ill-kinded, and typeKind crashes
+  --     Hence the rather tiresome story here
+isPredTy ty = go ty []
+  where
+    go :: Type -> [KindOrType] -> Bool
+    go (AppTy ty1 ty2)   args = go ty1 (ty2 : args)
+    go (TyConApp tc tys) args = go_k (tyConKind tc) (tys ++ args)
+    go (TyVarTy tv)      args = go_k (tyVarKind tv) args
+    go _                 _    = False
 
-isKindTy :: Type -> Bool
-isKindTy = isSuperKind . typeKind
+    go_k :: Kind -> [KindOrType] -> Bool
+    -- True <=> kind is k1 -> .. -> kn -> Constraint
+    go_k k                [] = isConstraintKind k
+    go_k (FunTy _ k1)     (_ :args) = go_k k1 args
+    go_k (ForAllTy kv k1) (k2:args) = go_k (substKiWith [kv] [k2] k1) args
+    go_k _ _ = False                  -- Typeable * Int :: Constraint
 
 isClassPred, isEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
@@ -896,6 +895,13 @@ mkPrimEqPred :: Type -> Type -> Type
 mkPrimEqPred ty1  ty2
   = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
     TyConApp eqPrimTyCon [k, ty1, ty2]
+  where
+    k = typeKind ty1
+
+mkReprPrimEqPred :: Type -> Type -> Type
+mkReprPrimEqPred ty1  ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
+    TyConApp eqReprPrimTyCon [k, ty1, ty2]
   where
     k = typeKind ty1
 \end{code}
@@ -1006,13 +1012,6 @@ typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
 typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
-
-varSetElemsKvsFirst :: VarSet -> [TyVar]
--- {k1,a,k2,b} --> [k1,k2,a,b]
-varSetElemsKvsFirst set
-  = kvs ++ tvs
-  where
-    (kvs, tvs) = partition isKindVar (varSetElems set)
 \end{code}
 
 
@@ -1112,25 +1111,10 @@ isClosedAlgType ty
 \begin{code}
 -- | Computes whether an argument (or let right hand side) should
 -- be computed strictly or lazily, based only on its type.
--- Works just like 'isUnLiftedType', except that it has a special case
--- for dictionaries (i.e. does not work purely on representation types)
+-- Currently, it's just 'isUnLiftedType'.
 
--- Since it takes account of class 'PredType's, you might think
--- this function should be in 'TcType', but 'isStrictType' is used by 'DataCon',
--- which is below 'TcType' in the hierarchy, so it's convenient to put it here.
---
--- We may be strict in dictionary types, but only if it
--- has more than one component.
---
--- (Being strict in a single-component dictionary risks
---  poking the dictionary component, which is wrong.)
 isStrictType :: Type -> Bool
-isStrictType ty | Just ty' <- coreView ty = isStrictType ty'
-isStrictType (ForAllTy _ ty)   = isStrictType ty
-isStrictType (TyConApp tc _)
- | isUnLiftedTyCon tc               = True
- | isClassTyCon tc, opt_DictsStrict = True
-isStrictType _                      = False
+isStrictType = isUnLiftedType
 \end{code}
 
 \begin{code}
@@ -1234,7 +1218,7 @@ cmpTypeX env t1 t2 | Just t1' <- coreView t1 = cmpTypeX env t1' t2
 -- So the RHS has a data type
 
 cmpTypeX env (TyVarTy tv1)       (TyVarTy tv2)       = rnOccL env tv1 `compare` rnOccR env tv2
-cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv1)
+cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv2)
                                                        `thenCmp` cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
@@ -1275,13 +1259,31 @@ cmpTypesX _   _         []        = GT
 cmpTc :: TyCon -> TyCon -> Ordering
 -- Here we treat * and Constraint as equal
 -- See Note [Kind Constraint and kind *] in Kinds.lhs
-cmpTc tc1 tc2 = nu1 `compare` nu2
+--
+-- Also we treat OpenTypeKind as equal to either * or #
+-- See Note [Comparison with OpenTypeKind]
+cmpTc tc1 tc2 
+  | u1 == openTypeKindTyConKey, isSubOpenTypeKindKey u2 = EQ
+  | u2 == openTypeKindTyConKey, isSubOpenTypeKindKey u1 = EQ
+  | otherwise = nu1 `compare` nu2
   where
     u1  = tyConUnique tc1
     nu1 = if u1==constraintKindTyConKey then liftedTypeKindTyConKey else u1
     u2  = tyConUnique tc2
     nu2 = if u2==constraintKindTyConKey then liftedTypeKindTyConKey else u2
 \end{code}
+
+Note [Comparison with OpenTypeKind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In PrimOpWrappers we have things like
+   PrimOpWrappers.mkWeak# = /\ a b c. Prim.mkWeak# a b c
+where
+   Prim.mkWeak# :: forall (a:Open) b c. a -> b -> c 
+                                     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+Now, eta reduction will turn the definition into
+     PrimOpWrappers.mkWeak# = Prim.mkWeak#
+which is kind-of OK, but now the types aren't really equal.  So HACK HACK
+we pretend (in Core) that Open is equal to * or #.  I hate this.
 
 Note [cmpTypeX]
 ~~~~~~~~~~~~~~~

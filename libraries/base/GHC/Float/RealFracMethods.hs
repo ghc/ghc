@@ -22,7 +22,6 @@
 
 #include "MachDeps.h"
 
--- #hide
 module GHC.Float.RealFracMethods
     ( -- * Double methods
       -- ** Integer results
@@ -99,7 +98,7 @@ default ()
 -- of performance.
 properFractionFloatInt :: Float -> (Int, Float)
 properFractionFloatInt (F# x) =
-    if x `eqFloat#` 0.0#
+    if isTrue# (x `eqFloat#` 0.0#)
         then (I# 0#, F# 0.0#)
         else case float2Int# x of
                 n -> (I# n, F# (x `minusFloat#` int2Float# n))
@@ -109,14 +108,14 @@ properFractionFloatInt (F# x) =
 floorFloatInt :: Float -> Int
 floorFloatInt (F# x) =
     case float2Int# x of
-      n | x `ltFloat#` int2Float# n -> I# (n -# 1#)
-        | otherwise                 -> I# n
+      n | isTrue# (x `ltFloat#` int2Float# n) -> I# (n -# 1#)
+        | otherwise                           -> I# n
 
 ceilingFloatInt :: Float -> Int
 ceilingFloatInt (F# x) =
     case float2Int# x of
-      n | int2Float# n `ltFloat#` x  -> I# (n +# 1#)
-        | otherwise                 -> I# n
+      n | isTrue# (int2Float# n `ltFloat#` x) -> I# (n +# 1#)
+        | otherwise                           -> I# n
 
 roundFloatInt :: Float -> Int
 roundFloatInt x = float2Int (c_rintFloat x)
@@ -137,10 +136,10 @@ properFractionFloatInteger :: Float -> (Integer, Float)
 properFractionFloatInteger v@(F# x) =
     case decodeFloat_Int# x of
       (# m, e #)
-        | e <# 0#   ->
+        | isTrue# (e <# 0#) ->
           case negateInt# e of
-            s | s ># 23#    -> (0, v)
-              | m <# 0#     ->
+            s | isTrue# (s ># 23#) -> (0, v)
+              | isTrue# (m <#  0#) ->
                 case negateInt# (negateInt# m `uncheckedIShiftRA#` s) of
                   k -> (smallInteger k,
                             case m -# (k `uncheckedIShiftL#` s) of
@@ -165,10 +164,10 @@ floorFloatInteger :: Float -> Integer
 floorFloatInteger (F# x) =
     case decodeFloat_Int# x of
       (# m, e #)
-        | e <# 0#   ->
+        | isTrue# (e <# 0#) ->
           case negateInt# e of
-            s | s ># 23#    -> if m <# 0# then (-1) else 0
-              | otherwise   -> smallInteger (m `uncheckedIShiftRA#` s)
+            s | isTrue# (s ># 23#) -> if isTrue# (m <# 0#) then (-1) else 0
+              | otherwise          -> smallInteger (m `uncheckedIShiftRA#` s)
         | otherwise -> shiftLInteger (smallInteger m) e
 
 -- ceiling x = -floor (-x)
@@ -195,7 +194,7 @@ roundFloatInteger x = float2Integer (c_rintFloat x)
 -- of performance.
 properFractionDoubleInt :: Double -> (Int, Double)
 properFractionDoubleInt (D# x) =
-    if x ==## 0.0##
+    if isTrue# (x ==## 0.0##)
         then (I# 0#, D# 0.0##)
         else case double2Int# x of
                 n -> (I# n, D# (x -## int2Double# n))
@@ -205,14 +204,14 @@ properFractionDoubleInt (D# x) =
 floorDoubleInt :: Double -> Int
 floorDoubleInt (D# x) =
     case double2Int# x of
-      n | x <## int2Double# n   -> I# (n -# 1#)
-        | otherwise             -> I# n
+      n | isTrue# (x <## int2Double# n) -> I# (n -# 1#)
+        | otherwise                     -> I# n
 
 ceilingDoubleInt :: Double -> Int
 ceilingDoubleInt (D# x) =
     case double2Int# x of
-      n | int2Double# n <## x   -> I# (n +# 1#)
-        | otherwise             -> I# n
+      n | isTrue# (int2Double# n <## x) -> I# (n +# 1#)
+        | otherwise                     -> I# n
 
 roundDoubleInt :: Double -> Int
 roundDoubleInt x = double2Int (c_rintDouble x)
@@ -235,10 +234,10 @@ properFractionDoubleInteger :: Double -> (Integer, Double)
 properFractionDoubleInteger v@(D# x) =
     case decodeDoubleInteger x of
       (# m, e #)
-        | e <# 0#   ->
+        | isTrue# (e <# 0#) ->
           case negateInt# e of
-            s | s ># 52#    -> (0, v)
-              | m < 0       ->
+            s | isTrue# (s ># 52#) -> (0, v)
+              | m < 0                 ->
                 case TO64 (negateInteger m) of
                   n ->
                     case n `uncheckedIShiftRA64#` s of
@@ -269,10 +268,10 @@ floorDoubleInteger :: Double -> Integer
 floorDoubleInteger (D# x) =
     case decodeDoubleInteger x of
       (# m, e #)
-        | e <# 0#   ->
+        | isTrue# (e <# 0#) ->
           case negateInt# e of
-            s | s ># 52#    -> if m < 0 then (-1) else 0
-              | otherwise   ->
+            s | isTrue# (s ># 52#) -> if m < 0 then (-1) else 0
+              | otherwise          ->
                 case TO64 m of
                   n -> FROM64 (n `uncheckedIShiftRA64#` s)
         | otherwise -> shiftLInteger m e
@@ -314,7 +313,7 @@ double2Integer :: Double -> Integer
 double2Integer (D# x) =
     case decodeDoubleInteger x of
       (# m, e #)
-        | e <# 0#   ->
+        | isTrue# (e <# 0#) ->
           case TO64 m of
             n -> FROM64 (n `uncheckedIShiftRA64#` negateInt# e)
         | otherwise -> shiftLInteger m e
@@ -324,8 +323,8 @@ float2Integer :: Float -> Integer
 float2Integer (F# x) =
     case decodeFloat_Int# x of
       (# m, e #)
-        | e <# 0#   -> smallInteger (m `uncheckedIShiftRA#` negateInt# e)
-        | otherwise -> shiftLInteger (smallInteger m) e
+        | isTrue# (e <# 0#) -> smallInteger (m `uncheckedIShiftRA#` negateInt# e)
+        | otherwise         -> shiftLInteger (smallInteger m) e
 
 -- Foreign imports, the rounding is done faster in C when the value
 -- isn't integral, so we call out for rounding. For values of large

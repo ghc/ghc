@@ -28,6 +28,7 @@
 -- deprecated; users are recommended to use the kind-polymorphic
 -- "Data.Typeable" module instead.
 --
+-- /Since: 4.7.0.0/
 -----------------------------------------------------------------------------
 
 module Data.OldTypeable {-# DEPRECATED "Use Data.Typeable instead" #-} -- deprecated in 7.8
@@ -95,29 +96,10 @@ import Data.OldTypeable.Internal hiding (mkTyCon)
 import Unsafe.Coerce
 import Data.Maybe
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Err          (undefined)
 
 import GHC.Fingerprint.Type
-import {-# SOURCE #-} GHC.Fingerprint
-   -- loop: GHC.Fingerprint -> Foreign.Ptr -> Data.Typeable
-   -- Better to break the loop here, because we want non-SOURCE imports
-   -- of Data.Typeable as much as possible so we can optimise the derived
-   -- instances.
-
-#endif
-
-#ifdef __HUGS__
-import Hugs.Prelude     ( Key(..), TypeRep(..), TyCon(..), Ratio,
-                          Handle, Ptr, FunPtr, ForeignPtr, StablePtr )
-import Hugs.IORef       ( IORef, newIORef, readIORef, writeIORef )
-import Hugs.IOExts      ( unsafePerformIO )
-        -- For the Typeable instance
-import Hugs.Array       ( Array )
-import Hugs.IOArray
-import Hugs.ConcBase    ( MVar )
-#endif
+import GHC.Fingerprint
 
 #include "OldTypeable.h"
 

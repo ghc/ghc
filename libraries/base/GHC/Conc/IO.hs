@@ -25,11 +25,8 @@
 -- No: #hide, because bits of this module are exposed by the stm package.
 -- However, we don't want this module to be the home location for the
 -- bits it exports, we'd rather have Control.Concurrent and the other
--- higher level modules be the home.  Hence:
+-- higher level modules be the home.  Hence: #not-home
 
-#include "Typeable.h"
-
--- #not-home
 module GHC.Conc.IO
         ( ensureIOManagerIsRunning
         , ioManagerCapabilitiesChanged
@@ -123,7 +120,7 @@ threadWaitWrite fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitReadSTM fd
+threadWaitReadSTM fd 
 #ifndef mingw32_HOST_OS
   | threaded  = Event.threadWaitReadSTM fd
 #endif
@@ -142,7 +139,7 @@ threadWaitReadSTM fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitWriteSTM fd
+threadWaitWriteSTM fd 
 #ifndef mingw32_HOST_OS
   | threaded  = Event.threadWaitWriteSTM fd
 #endif

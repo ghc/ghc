@@ -33,33 +33,20 @@ compilerVersion :: Version
 compilerVersion = Version {versionBranch=[major, minor], versionTags=[]}
   where (major, minor) = compilerVersionRaw `divMod` 100
 
+#include "ghcplatform.h"
+
 -- | The operating system on which the program is running.
 os :: String
+os = HOST_OS
 
 -- | The machine architecture on which the program is running.
 arch :: String
+arch = HOST_ARCH
 
 -- | The Haskell implementation with which the program was compiled
 -- or is being interpreted.
 compilerName :: String
+compilerName = "ghc"
 
 compilerVersionRaw :: Int
-
-#if defined(__GLASGOW_HASKELL__)
-#include "ghcplatform.h"
-os = HOST_OS
-arch = HOST_ARCH
-compilerName = "ghc"
 compilerVersionRaw = __GLASGOW_HASKELL__
-
-#elif defined(__HUGS__)
-#include "platform.h"
-os = HOST_OS
-arch = HOST_ARCH
-compilerName = "hugs"
-compilerVersionRaw = 0  -- ToDo
-
-#else
-#error Unknown compiler name
-#endif
-

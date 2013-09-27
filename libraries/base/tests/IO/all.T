@@ -145,6 +145,7 @@ test('encoding001',
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
+test('encoding004', normal, compile_and_run, [''])
 
 test('environment001',
      [when(msys(), expect_fail), # Doesn't work on MSYS; see #5599
@@ -162,3 +163,4 @@ test('encodingerror001', normal, compile_and_run, [''])
 
 test('T4808', [exit_code(1), extra_clean(['T4808.test'])], compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
+test('T7853', normal, compile_and_run, [''])

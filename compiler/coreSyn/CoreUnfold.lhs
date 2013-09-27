@@ -48,7 +48,6 @@ module CoreUnfold (
 import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
-import TcType           ( tcSplitDFunTy )
 import OccurAnal        ( occurAnalyseExpr )
 import CoreSubst hiding( substTy )
 import CoreArity       ( manifestArity, exprBotStrictness_maybe )
@@ -98,17 +97,13 @@ mkImplicitUnfolding dflags expr
 mkSimpleUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkSimpleUnfolding dflags = mkUnfolding dflags InlineRhs False False
 
-mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
-mkDFunUnfolding dfun_ty ops 
-  = DFunUnfolding dfun_nargs data_con ops
-  where
-    (tvs, theta, cls, _) = tcSplitDFunTy dfun_ty
-    dfun_nargs = length tvs + length theta
-    data_con   = classDataCon cls
+mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
+mkDFunUnfolding bndrs con ops 
+  = DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = ops }
 
-mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
-mkWwInlineRule id expr arity
-  = mkCoreUnfolding (InlineWrapper id) True
+mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
+mkWwInlineRule expr arity
+  = mkCoreUnfolding InlineStable True
                    (simpleOptExpr expr) arity
                    (UnfWhen unSaturatedOk boringCxtNotOk)
 
@@ -952,6 +947,8 @@ tryUnfolding dflags id lone_variable
   where
     n_val_args = length arg_infos
     saturated  = n_val_args >= uf_arity
+    cont_info' | n_val_args > uf_arity = ValAppCtxt
+               | otherwise             = cont_info
 
     result | yes_or_no = Just unf_template
            | otherwise = Nothing
@@ -969,12 +966,11 @@ tryUnfolding dflags id lone_variable
     some_benefit 
        | not saturated = interesting_args	-- Under-saturated
     	   	      		     	-- Note [Unsaturated applications]
-       | n_val_args > uf_arity = True	-- Over-saturated
-       | otherwise = interesting_args	-- Saturated
-                  || interesting_saturated_call 
+       | otherwise = interesting_args	-- Saturated or over-saturated
+                  || interesting_call
 
-    interesting_saturated_call 
-      = case cont_info of
+    interesting_call 
+      = case cont_info' of
           BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
           CaseCtxt   -> not (lone_variable && is_wf)      -- Note [Lone variables]
           ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
@@ -996,7 +992,7 @@ tryUnfolding dflags id lone_variable
     	       discounted_size = size - discount
     	       small_enough = discounted_size <= ufUseThreshold dflags
     	       discount = computeDiscount dflags uf_arity arg_discounts 
-    	         		          res_discount arg_infos cont_info
+    	         		          res_discount arg_infos cont_info'
 \end{code}
 
 Note [RHS of lets]
@@ -1116,7 +1112,7 @@ AND
 
 then we should not inline it (unless there is some other reason,
 e.g. is is the sole occurrence).  That is what is happening at 
-the use of 'lone_variable' in 'interesting_saturated_call'.
+the use of 'lone_variable' in 'interesting_call'.
 
 Why?  At least in the case-scrutinee situation, turning
 	let x = (a,b) in case x of y -> ...
@@ -1187,9 +1183,9 @@ This kind of thing can occur if you have
 which Roman did.
 
 \begin{code}
-computeDiscount :: DynFlags -> Int -> [Int] -> Int -> [ArgSummary] -> CallCtxt
+computeDiscount :: DynFlags -> Arity -> [Int] -> Int -> [ArgSummary] -> CallCtxt
                 -> Int
-computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_info
+computeDiscount dflags uf_arity arg_discounts res_discount arg_infos cont_info
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
 	--  *size* whereas the discounts imply that there's some extra 
@@ -1199,7 +1195,7 @@ computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_i
   = 10          -- Discount of 1 because the result replaces the call
 		-- so we count 1 for the function itself
 
-    + 10 * length (take n_vals_wanted arg_infos)
+    + 10 * length (take uf_arity arg_infos)
       	       -- Discount of (un-scaled) 1 for each arg supplied, 
    	       -- because the result replaces the call
 
@@ -1214,8 +1210,9 @@ computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_i
 
     res_discount' = case cont_info of
 			BoringCtxt  -> 0
-			CaseCtxt    -> res_discount
-                        _other      -> 40 `min` res_discount
+			CaseCtxt    -> res_discount  -- Presumably a constructor
+			ValAppCtxt  -> res_discount  -- Presumably a function
+                        ArgCtxt {}  -> 40 `min` res_discount
 		-- res_discount can be very large when a function returns
 		-- constructors; but we only want to invoke that large discount
 		-- when there's a case continuation.

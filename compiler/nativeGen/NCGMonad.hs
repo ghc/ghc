@@ -16,6 +16,7 @@ module NCGMonad (
         mapAccumLNat,
         setDeltaNat,
         getDeltaNat,
+        getThisModuleNat,
         getBlockIdNat,
         getNewLabelNat,
         getNewRegNat,
@@ -38,14 +39,19 @@ import CLabel           ( CLabel, mkAsmTempLabel )
 import UniqSupply
 import Unique           ( Unique )
 import DynFlags
+import Module
+
+import Control.Monad    ( liftM, ap )
+import Control.Applicative ( Applicative(..) )
 
 data NatM_State
         = NatM_State {
-                natm_us      :: UniqSupply,
-                natm_delta   :: Int,
-                natm_imports :: [(CLabel)],
-                natm_pic     :: Maybe Reg,
-                natm_dflags  :: DynFlags
+                natm_us          :: UniqSupply,
+                natm_delta       :: Int,
+                natm_imports     :: [(CLabel)],
+                natm_pic         :: Maybe Reg,
+                natm_dflags      :: DynFlags,
+                natm_this_module :: Module
         }
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
@@ -53,14 +59,21 @@ newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> DynFlags -> NatM_State
-mkNatM_State us delta dflags
-        = NatM_State us delta [] Nothing dflags
+mkNatM_State :: UniqSupply -> Int -> DynFlags -> Module -> NatM_State
+mkNatM_State us delta dflags this_mod
+        = NatM_State us delta [] Nothing dflags this_mod
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
         = case unNat m init_st of { (r,st) -> (r,st) }
 
+
+instance Functor NatM where
+      fmap = liftM
+
+instance Applicative NatM where
+      pure = return
+      (<*>) = ap
 
 instance Monad NatM where
   (>>=) = thenNat
@@ -89,30 +102,29 @@ mapAccumLNat f b (x:xs)
        return (b__3, x__2:xs__2)
 
 getUniqueNat :: NatM Unique
-getUniqueNat = NatM $ \ (NatM_State us delta imports pic dflags) ->
-    case takeUniqFromSupply us of
-         (uniq, us') -> (uniq, (NatM_State us' delta imports pic dflags))
+getUniqueNat = NatM $ \ st ->
+    case takeUniqFromSupply $ natm_us st of
+    (uniq, us') -> (uniq, st {natm_us = us'})
 
 instance HasDynFlags NatM where
-    getDynFlags = NatM $ \ (NatM_State us delta imports pic dflags) ->
-                             (dflags, (NatM_State us delta imports pic dflags))
+    getDynFlags = NatM $ \ st -> (natm_dflags st, st)
 
 
 getDeltaNat :: NatM Int
-getDeltaNat
-        = NatM $ \ st -> (natm_delta st, st)
+getDeltaNat = NatM $ \ st -> (natm_delta st, st)
 
 
 setDeltaNat :: Int -> NatM ()
-setDeltaNat delta
-        = NatM $ \ (NatM_State us _ imports pic dflags) ->
-                   ((), NatM_State us delta imports pic dflags)
+setDeltaNat delta = NatM $ \ st -> ((), st {natm_delta = delta})
+
+
+getThisModuleNat :: NatM Module
+getThisModuleNat = NatM $ \ st -> (natm_this_module st, st)
 
 
 addImportNat :: CLabel -> NatM ()
 addImportNat imp
-        = NatM $ \ (NatM_State us delta imports pic dflags) ->
-                   ((), NatM_State us delta (imp:imports) pic dflags)
+        = NatM $ \ st -> ((), st {natm_imports = imp : natm_imports st})
 
 
 getBlockIdNat :: NatM BlockId

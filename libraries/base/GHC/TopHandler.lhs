@@ -25,7 +25,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.TopHandler (
         runMainIO, runIO, runIOFastExit, runNonIO,
         topHandler, topHandlerFastExit,

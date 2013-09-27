@@ -40,10 +40,10 @@ module Kind (
         isAnyKind, isAnyKindCon,
         okArrowArgKind, okArrowResultKind,
 
-        isSubOpenTypeKind, 
+        isSubOpenTypeKind, isSubOpenTypeKindKey,
         isSubKind, isSubKindCon, 
         tcIsSubKind, tcIsSubKindCon,
-        defaultKind,
+        defaultKind, defaultKind_maybe,
 
         -- ** Functions on variables
         kiVarsOfKind, kiVarsOfKinds
@@ -60,6 +60,7 @@ import TyCon
 import VarSet
 import PrelNames
 import Outputable
+import Maybes( orElse )
 import Util
 \end{code}
 
@@ -172,13 +173,8 @@ returnsConstraintKind _               = False
 --     arg -> res
 
 okArrowArgKindCon, okArrowResultKindCon :: TyCon -> Bool
-okArrowArgKindCon kc
-  | isLiftedTypeKindCon   kc = True
-  | isUnliftedTypeKindCon kc = True
-  | isConstraintKindCon   kc = True
-  | otherwise                = False
-
-okArrowResultKindCon = okArrowArgKindCon
+okArrowArgKindCon    = isSubOpenTypeKindCon
+okArrowResultKindCon = isSubOpenTypeKindCon
 
 okArrowArgKind, okArrowResultKind :: Kind -> Bool
 okArrowArgKind    (TyConApp kc []) = okArrowArgKindCon kc
@@ -198,14 +194,17 @@ isSubOpenTypeKind :: Kind -> Bool
 isSubOpenTypeKind (TyConApp kc []) = isSubOpenTypeKindCon kc
 isSubOpenTypeKind _                = False
 
-isSubOpenTypeKindCon kc
-  =  isOpenTypeKindCon   kc
-  || isUnliftedTypeKindCon kc
-  || isLiftedTypeKindCon   kc  
-  || isConstraintKindCon kc   -- Needed for error (Num a) "blah"
-                              -- and so that (Ord a -> Eq a) is well-kinded
-                              -- and so that (# Eq a, Ord b #) is well-kinded
-                              -- See Note [Kind Constraint and kind *]
+isSubOpenTypeKindCon kc = isSubOpenTypeKindKey (tyConUnique kc)
+
+isSubOpenTypeKindKey :: Unique -> Bool
+isSubOpenTypeKindKey uniq
+  =  uniq == openTypeKindTyConKey
+  || uniq == unliftedTypeKindTyConKey
+  || uniq == liftedTypeKindTyConKey
+  || uniq == constraintKindTyConKey  -- Needed for error (Num a) "blah"
+                                     -- and so that (Ord a -> Eq a) is well-kinded
+                                     -- and so that (# Eq a, Ord b #) is well-kinded
+                              	     -- See Note [Kind Constraint and kind *]
 
 -- | Is this a kind (i.e. a type-of-types)?
 isKind :: Kind -> Bool
@@ -271,7 +270,8 @@ tcIsSubKindCon kc1 kc2
   | otherwise               = isSubKindCon kc1 kc2
 
 -------------------------
-defaultKind :: Kind -> Kind
+defaultKind       :: Kind -> Kind
+defaultKind_maybe :: Kind -> Maybe Kind
 -- ^ Used when generalising: default OpenKind and ArgKind to *.
 -- See "Type#kind_subtyping" for more information on what that means
 
@@ -289,9 +289,11 @@ defaultKind :: Kind -> Kind
 -- This defaulting is done in TcMType.zonkTcTyVarBndr.
 --
 -- The test is really whether the kind is strictly above '*'
-defaultKind (TyConApp kc _args)
-  | isOpenTypeKindCon kc = ASSERT( null _args ) liftedTypeKind
-defaultKind k = k
+defaultKind_maybe (TyConApp kc _args)
+  | isOpenTypeKindCon kc = ASSERT( null _args ) Just liftedTypeKind
+defaultKind_maybe _      = Nothing
+
+defaultKind k = defaultKind_maybe k `orElse` k
 
 -- Returns the free kind variables in a kind
 kiVarsOfKind :: Kind -> VarSet

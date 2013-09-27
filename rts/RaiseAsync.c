@@ -415,6 +415,7 @@ check_target:
             }
 
         case BlockedOnMVar:
+        case BlockedOnMVarRead:
             {
                 /*
                    To establish ownership of this TSO, we need to acquire a
@@ -439,7 +440,7 @@ check_target:
 
                 // we have the MVar, let's check whether the thread
                 // is still blocked on the same MVar.
-                if (target->why_blocked != BlockedOnMVar
+                if ((target->why_blocked != BlockedOnMVar && target->why_blocked != BlockedOnMVarRead)
                     || (StgMVar *)target->block_info.closure != mvar) {
                     unlockClosure((StgClosure *)mvar, info);
                     goto retry;
@@ -544,7 +545,6 @@ check_target:
 #if defined(mingw32_HOST_OS)
         case BlockedOnDoProc:
 #endif
-#endif
             if ((target->flags & TSO_BLOCKEX) &&
                 ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
                 blockedThrowTo(cap,target,msg);
@@ -554,6 +554,7 @@ check_target:
                 raiseAsync(cap, target, msg->exception, rtsFalse, NULL, NULL);
                 return THROWTO_SUCCESS;
             }
+#endif
 
         case ThreadMigrating:
             // if is is ThreadMigrating and tso->cap is ours, then it

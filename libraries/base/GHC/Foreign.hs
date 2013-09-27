@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -49,13 +49,12 @@ import Control.Monad
 import Data.Tuple (fst)
 import Data.Maybe
 
-import {-# SOURCE #-} System.Posix.Internals (puts)
 import GHC.Show ( show )
 
 import Foreign.Marshal.Alloc
 import Foreign.ForeignPtr
 
-import GHC.Err (undefined)
+import GHC.Debug
 import GHC.List
 import GHC.Num
 import GHC.Base
@@ -70,7 +69,7 @@ c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
 
 putDebugMsg :: String -> IO ()
-putDebugMsg | c_DEBUG_DUMP = puts
+putDebugMsg | c_DEBUG_DUMP = debugLn
             | otherwise    = const (return ())
 
 

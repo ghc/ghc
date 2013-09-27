@@ -76,8 +76,9 @@ scavengeTSO (StgTSO *tso)
 
     evacuate((StgClosure **)&tso->_link);
     if (   tso->why_blocked == BlockedOnMVar
-      	|| tso->why_blocked == BlockedOnBlackHole
-      	|| tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == BlockedOnMVarRead
+        || tso->why_blocked == BlockedOnBlackHole
+        || tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
         || tso->why_blocked == Yielded
         || tso->why_blocked == BlockedInHaskell

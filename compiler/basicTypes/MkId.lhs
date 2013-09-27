@@ -35,7 +35,7 @@ module MkId (
         wiredInIds, ghcPrimIds,
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId, 
         voidArgId, nullAddrId, seqId, lazyId, lazyIdKey,
-        coercionTokenId,
+        coercionTokenId, magicSingIId,
 
 	-- Re-export error Ids
 	module PrelRules
@@ -136,7 +136,9 @@ ghcPrimIds
     realWorldPrimId,
     unsafeCoerceId,
     nullAddrId,
-    seqId
+    seqId,
+    magicSingIId,
+    coerceId
     ]
 \end{code}
 
@@ -320,9 +322,9 @@ mkDictSelId dflags no_unf name clas
 
     strict_sig = mkStrictSig (mkTopDmdType [arg_dmd] topRes)
     arg_dmd | new_tycon = evalDmd
-            | otherwise = mkProdDmd [ if the_arg_id == id then evalDmd else absDmd
+            | otherwise = mkManyUsedDmd $
+                          mkProdDmd [ if the_arg_id == id then evalDmd else absDmd
                                     | id <- arg_ids ]
-
 
     tycon      	   = classTyCon clas
     new_tycon  	   = isNewTyCon tycon
@@ -346,14 +348,13 @@ mkDictSelId dflags no_unf name clas
 				-- varToCoreExpr needed for equality superclass selectors
 				--   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
-dictSelRule :: Int -> Arity
-            -> DynFlags -> Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+dictSelRule :: Int -> Arity -> RuleFun
 -- Tries to persuade the argument to look like a constructor
 -- application, using exprIsConApp_maybe, and then selects
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
-dictSelRule val_index n_ty_args _ _ id_unf args
+dictSelRule val_index n_ty_args _ id_unf _ args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
   = Just (getNth con_args val_index)
@@ -547,7 +548,7 @@ mkDataConRep dflags fam_envs wrap_name data_con
     initial_wrap_app = Var (dataConWorkId data_con)
                       `mkTyApps`  res_ty_args
     	              `mkVarApps` ex_tvs                 
-    	              `mkCoApps`  map (mkReflCo . snd) eq_spec
+    	              `mkCoApps`  map (mkReflCo Nominal . snd) eq_spec
     	                -- Dont box the eq_spec coercions since they are
     	                -- marked as HsUnpack by mk_dict_strict_mark
 
@@ -695,8 +696,7 @@ dataConArgUnpack arg_ty
     -- An interface file specified Unpacked, but we couldn't unpack it
 
 isUnpackableType :: FamInstEnvs -> Type -> Bool
--- True if we can unpack the UNPACK fields of the constructor
--- without involving the NameSet tycons
+-- True if we can unpack the UNPACK the argument type 
 -- See Note [Recursive unboxing]
 -- We look "deeply" inside rather than relying on the DataCons
 -- we encounter on the way, because otherwise we might well
@@ -730,9 +730,11 @@ isUnpackableType fam_envs ty
          -- NB: dataConStrictMarks gives the *user* request; 
          -- We'd get a black hole if we used dataConRepBangs
 
-    attempt_unpack (HsUnpack {})              = True
-    attempt_unpack (HsUserBang (Just unpk) _) = unpk
-    attempt_unpack _                          = False
+    attempt_unpack (HsUnpack {})                 = True
+    attempt_unpack (HsUserBang (Just unpk) bang) = bang && unpk
+    attempt_unpack (HsUserBang Nothing bang)     = bang  -- Be conservative
+    attempt_unpack HsStrict                      = False
+    attempt_unpack HsNoBang                      = False
 \end{code}
 
 Note [Unpack one-wide fields]
@@ -761,14 +763,26 @@ Here we can represent T with an Int#.
 
 Note [Recursive unboxing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Be careful not to try to unbox this!
-	data T = MkT {-# UNPACK #-} !T Int
-Reason: consider
+Consider
   data R = MkR {-# UNPACK #-} !S Int
   data S = MkS {-# UNPACK #-} !Int
 The representation arguments of MkR are the *representation* arguments
-of S (plus Int); the rep args of MkS are Int#.  This is obviously no
-good for T, because then we'd get an infinite number of arguments.
+of S (plus Int); the rep args of MkS are Int#.  This is all fine.
+
+But be careful not to try to unbox this!
+	data T = MkT {-# UNPACK #-} !T Int
+Because then we'd get an infinite number of arguments.
+
+Here is a more complicated case:
+	data S = MkS {-# UNPACK #-} !T Int
+	data T = MkT {-# UNPACK #-} !S Int
+Each of S and T must decide independendently whether to unpack
+and they had better not both say yes. So they must both say no.
+
+Also behave conservatively when there is no UNPACK pragma
+	data T = MkS !T Int
+with -funbox-strict-fields or -funbox-small-strict-fields
+we need to behave as if there was an UNPACK pragma there.
 
 But it's the *argument* type that matters. This is fine:
 	data S = MkS S !Int
@@ -823,7 +837,7 @@ wrapNewTypeBody tycon args result_expr
     wrapFamInstBody tycon args $
     mkCast result_expr (mkSymCo co)
   where
-    co = mkUnbranchedAxInstCo (newTyConCo tycon) args
+    co = mkUnbranchedAxInstCo Representational (newTyConCo tycon) args
 
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
@@ -833,7 +847,7 @@ wrapNewTypeBody tycon args result_expr
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   = ASSERT( isNewTyCon tycon )
-    mkCast result_expr (mkUnbranchedAxInstCo (newTyConCo tycon) args)
+    mkCast result_expr (mkUnbranchedAxInstCo Representational (newTyConCo tycon) args)
 
 -- If the type constructor is a representation type of a data instance, wrap
 -- the expression into a cast adjusting the expression type, which is an
@@ -843,7 +857,7 @@ unwrapNewTypeBody tycon args result_expr
 wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast body (mkSymCo (mkUnbranchedAxInstCo co_con args))
+  = mkCast body (mkSymCo (mkUnbranchedAxInstCo Representational co_con args))
   | otherwise
   = body
 
@@ -851,7 +865,7 @@ wrapFamInstBody tycon args body
 -- represented by a `CoAxiom`, and not a `TyCon`
 wrapTypeFamInstBody :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
 wrapTypeFamInstBody axiom ind args body
-  = mkCast body (mkSymCo (mkAxInstCo axiom ind args))
+  = mkCast body (mkSymCo (mkAxInstCo Representational axiom ind args))
 
 wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
 wrapTypeUnbranchedFamInstBody axiom
@@ -860,13 +874,13 @@ wrapTypeUnbranchedFamInstBody axiom
 unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapFamInstScrut tycon args scrut
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast scrut (mkUnbranchedAxInstCo co_con args) -- data instances only
+  = mkCast scrut (mkUnbranchedAxInstCo Representational co_con args) -- data instances only
   | otherwise
   = scrut
 
 unwrapTypeFamInstScrut :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
 unwrapTypeFamInstScrut axiom ind args scrut
-  = mkCast scrut (mkAxInstCo axiom ind args)
+  = mkCast scrut (mkAxInstCo Representational axiom ind args)
 
 unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
 unwrapTypeUnbranchedFamInstScrut axiom
@@ -1023,13 +1037,15 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
-lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName, coercionTokenName :: Name
+lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName, coercionTokenName, magicSingIName, coerceName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPrimIdKey realWorldPrimId
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")         lazyIdKey           lazyId
 coercionTokenName = mkWiredInIdName gHC_PRIM (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
+magicSingIName    = mkWiredInIdName gHC_PRIM (fsLit "magicSingI")    magicSingIKey magicSingIId
+coerceName        = mkWiredInIdName gHC_PRIM (fsLit "coerce")        coerceKey          coerceId
 \end{code}
 
 \begin{code}
@@ -1082,8 +1098,7 @@ seqId = pcMiscPrelId seqName ty info
                                 , ru_try   = match_seq_of_cast
                                 }
 
-match_seq_of_cast :: DynFlags -> Id -> IdUnfoldingFun -> [CoreExpr]
-                  -> Maybe CoreExpr
+match_seq_of_cast :: RuleFun
     -- See Note [Built-in RULES for seq]
 match_seq_of_cast _ _ _ [Type _, Type res_ty, Cast scrut co, expr]
   = Just (Var seqId `mkApps` [Type (pFst (coercionKind co)), Type res_ty,
@@ -1096,6 +1111,30 @@ lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
+
+
+--------------------------------------------------------------------------------
+magicSingIId :: Id  -- See Note [magicSingIId magic]
+magicSingIId = pcMiscPrelId magicSingIName ty info
+  where
+  info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+  ty   = mkForAllTys [alphaTyVar] alphaTy
+
+--------------------------------------------------------------------------------
+
+coerceId :: Id
+coerceId = pcMiscPrelId coerceName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+    eqRTy = mkTyConApp coercibleTyCon [alphaTy, betaTy]
+    eqRPrimTy = mkTyConApp eqReprPrimTyCon [liftedTypeKind, alphaTy, betaTy]
+    ty   = mkForAllTys [alphaTyVar, betaTyVar] (mkFunTys [eqRTy, alphaTy] betaTy)
+
+    [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy,eqRPrimTy]
+    rhs = mkLams [alphaTyVar,betaTyVar,eqR,x] $
+          mkWildCase (Var eqR) eqRTy betaTy $
+	  [(DataAlt coercibleDataCon, [eq], Cast (Var x) (CoVarCo eq))]
 \end{code}
 
 Note [Unsafe coerce magic]
@@ -1188,6 +1227,45 @@ See Trac #3259 for a real world example.
 
 lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
 appears un-applied, we'll end up just calling it.
+
+
+Note [magicSingIId magic]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The identifier `magicSIngI` is just a place-holder, which is used to
+implement a primitve that we cannot define in Haskell but we can write
+in Core.  It is declared with a place-holder type:
+
+    magicSingI :: forall a. a
+
+The intention is that the identifier will be used in a very specific way,
+namely we add the following to the library:
+
+    withSingI :: Sing n -> (SingI n => a) -> a
+    withSingI x = magicSingI x ((\f -> f) :: () -> ())
+
+The actual primitive is `withSingI`, and it uses its first argument
+(of type `Sing n`) as the evidece/dictionary in the second argument.
+This is done by adding a built-in rule to `prelude/PrelRules.hs`
+(see `match_magicSingI`), which works as follows:
+
+magicSingI @ (Sing n -> (() -> ()) -> (SingI n -> a) -> a)
+             x
+             (\f -> _)
+
+---->
+
+\(f :: (SingI n -> a) -> a) -> f (cast x (newtypeCo n))
+
+The `newtypeCo` coercion is extracted from the `SingI` type constructor,
+which is available in the instantiation.  We are casting `Sing n` into `SingI n`,
+which is OK because `SingI` is a class with a single methid,
+and thus it is implemented as newtype.
+
+The `(\f -> f)` parameter is there just so that we can avoid
+having to make up a new name for the lambda, it is completely
+changed by the rewrite.
+
 
 -------------------------------------------------------------
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get

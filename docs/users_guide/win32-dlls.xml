@@ -313,7 +313,7 @@ option on all the Haskell modules that make up your application.
 
 <para>
 <indexterm><primary>Creating a Win32 DLL</primary></indexterm>
-<indexterm><primary>&ndash;shared</primary></indexterm>
+<indexterm><primary>-shared</primary></indexterm>
 Sealing up your Haskell library inside a DLL is straightforward;
 compile up the object files that make up the library, and then build
 the DLL by issuing a command of the form:
@@ -321,12 +321,12 @@ the DLL by issuing a command of the form:
 
 <para>
 <screen>
-ghc &ndash;shared -o foo.dll bar.o baz.o wibble.a -lfooble
+ghc -shared -o foo.dll bar.o baz.o wibble.a -lfooble
 </screen>
 </para>
 
 <para>
-By feeding the ghc compiler driver the option <option>&ndash;shared</option>, it
+By feeding the ghc compiler driver the option <option>-shared</option>, it
 will build a DLL rather than produce an executable. The DLL will
 consist of all the object files and archives given on the command
 line.
@@ -366,12 +366,12 @@ you compile into a DLL must have a common root.
 <listitem>
 <para>
 By default, the entry points of all the object files will be exported from
-the DLL when using <option>&ndash;shared</option>. Should you want to constrain
+the DLL when using <option>-shared</option>. Should you want to constrain
 this, you can specify the <emphasis>module definition file</emphasis> to use
 on the command line as follows:
 
 <screen>
-ghc &ndash;shared -o .... MyDef.def
+ghc -shared -o .... MyDef.def
 </screen>
 
 See Microsoft documentation for details, but a module definition file
@@ -390,7 +390,7 @@ EXPORTS
 
 <listitem>
 <para>
-In addition to creating a DLL, the <option>&ndash;shared</option> option also
+In addition to creating a DLL, the <option>-shared</option> option also
 creates an import library. The import library name is derived from the
 name of the DLL, as follows:
 

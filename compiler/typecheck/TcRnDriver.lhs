@@ -16,7 +16,7 @@ module TcRnDriver (
 #endif
         tcRnLookupName,
         tcRnGetInfo,
-        tcRnModule,
+        tcRnModule, tcRnModuleTcRnM,
         tcTopSrcDecls,
         tcRnExtCore
     ) where
@@ -34,7 +34,7 @@ import TcHsSyn
 import TcExpr
 import TcRnMonad
 import TcEvidence
-import Coercion( pprCoAxiom )
+import Coercion( pprCoAxiom, pprCoAxBranch )
 import FamInst
 import InstEnv
 import FamInstEnv
@@ -49,7 +49,6 @@ import TcInstDcls
 import TcIface
 import TcMType
 import MkIface
-import IfaceSyn
 import TcSimplify
 import TcTyClsDecls
 import LoadIface
@@ -75,8 +74,8 @@ import Outputable
 import DataCon
 import Type
 import Class
-import CoAxiom  ( CoAxBranch(..) )
-import Inst     ( tcGetInstEnvs )
+import CoAxiom
+import Inst     ( tcGetInstEnvs, tcGetInsts )
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
 import Data.Ord
@@ -88,7 +87,7 @@ import TcMatches
 import RnTypes
 import RnExpr
 import MkId
-import BasicTypes
+import BasicTypes hiding( SuccessFlag(..) )
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 #endif
@@ -119,19 +118,12 @@ tcRnModule :: HscEnv
            -> IO (Messages, Maybe TcGblEnv)
 
 tcRnModule hsc_env hsc_src save_rn_syntax
-   HsParsedModule {
-      hpm_module =
-         (L loc (HsModule maybe_mod export_ies
-                          import_decls local_decls mod_deprec
-                          maybe_doc_hdr)),
-      hpm_src_files =
-         src_files
-   }
+   parsedModule@HsParsedModule {hpm_module=L loc this_module}
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
-         (this_mod, prel_imp_loc)
-            = case maybe_mod of
+         pair@(this_mod,_)
+            = case hsmodName this_module of
                 Nothing -- 'module M where' is omitted
                     ->  (mAIN, srcLocSpan (srcSpanStart loc))
 
@@ -139,6 +131,23 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                     -> (mkModule this_pkg mod, mod_loc) } ;
 
    initTc hsc_env hsc_src save_rn_syntax this_mod $
+     tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
+
+tcRnModuleTcRnM :: HscEnv
+                -> HscSource
+                -> HsParsedModule
+                -> (Module, SrcSpan)
+                -> TcRn TcGblEnv
+tcRnModuleTcRnM hsc_env hsc_src
+   (HsParsedModule {
+      hpm_module =
+         (L loc (HsModule maybe_mod export_ies
+                          import_decls local_decls mod_deprec
+                          maybe_doc_hdr)),
+      hpm_src_files =
+         src_files
+   })
+   (this_mod, prel_imp_loc) =
    setSrcSpan loc $
    do {         -- Deal with imports; first add implicit prelude
         implicit_prelude <- xoptM Opt_ImplicitPrelude;
@@ -211,7 +220,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                 -- Dump output and return
         tcDump tcg_env ;
         return tcg_env
-    }}}}
+    }}}
 
 
 implicitPreludeWarn :: SDoc
@@ -326,7 +335,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
                                               (mkFakeGroup ldecls) ;
    setEnvs tc_envs $ do {
 
-   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [] [ldecls] ;
+   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [] [mkTyClGroup ldecls] ;
    -- The empty list is for extra dependencies coming from .hs-boot files
    -- See Note [Extra dependencies from .hs-boot files] in RnSource
 
@@ -391,7 +400,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 mkFakeGroup :: [LTyClDecl a] -> HsGroup a
 mkFakeGroup decls -- Rather clumsy; lots of unused fields
-  = emptyRdrGroup { hs_tyclds = [decls] }
+  = emptyRdrGroup { hs_tyclds = [mkTyClGroup decls] }
 \end{code}
 
 
@@ -460,6 +469,7 @@ tcRnSrcDecls boot_iface decls
                                    tcg_fords    = fords' } } ;
 
         setGlobalTypeEnv tcg_env' final_type_env
+       
    } }
 
 tc_rn_src_decls :: ModDetails
@@ -487,7 +497,7 @@ tc_rn_src_decls boot_details ds
         case group_tail of {
            Nothing -> do { tcg_env <- checkMain ;       -- Check for `main'
                            traceTc "returning from tc_rn_src_decls: " $
-                             ppr $ nameEnvElts $ tcg_type_env tcg_env ; -- RAE
+                             ppr $ nameEnvElts $ tcg_type_env tcg_env ;
                            return (tcg_env, tcl_env)
                       } ;
 
@@ -659,10 +669,7 @@ checkHiBootIface
         Just boot_thing <- mb_boot_thing
       = when (not (checkBootDecl boot_thing real_thing))
             $ addErrAt (nameSrcSpan (getName boot_thing))
-                       (let boot_decl = tyThingToIfaceDecl
-                                               (fromJust mb_boot_thing)
-                            real_decl = tyThingToIfaceDecl real_thing
-                        in bootMisMatch real_thing boot_decl real_decl)
+                       (bootMisMatch real_thing boot_thing)
 
       | otherwise
       = addErrTc (missingBootThing name "defined in")
@@ -757,6 +764,7 @@ checkBootTyCon tc1 tc2
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
          eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
     in
+       roles1 == roles2 &&
              -- Checks kind of class
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
@@ -769,17 +777,23 @@ checkBootTyCon tc1 tc2
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    let eqSynRhs (SynFamilyTyCon o1 i1) (SynFamilyTyCon o2 i2)
-            = o1==o2 && i1==i2
+    let eqSynRhs OpenSynFamilyTyCon OpenSynFamilyTyCon = True
+        eqSynRhs AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {}) = True
+        eqSynRhs (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon = True
+        eqSynRhs (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
+            = eqClosedFamilyAx ax1 ax2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
+        eqSynRhs (BuiltInSynFamTyCon _) (BuiltInSynFamTyCon _) = tc1 == tc2
         eqSynRhs _ _ = False
     in
+    roles1 == roles2 &&
     eqSynRhs syn_rhs1 syn_rhs2
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
+    roles1 == roles2 &&
     eqListBy (eqPredX env) (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
@@ -789,6 +803,9 @@ checkBootTyCon tc1 tc2
 
   | otherwise = False
   where
+    roles1 = tyConRoles tc1
+    roles2 = tyConRoles tc2
+
     eqAlgRhs (AbstractTyCon dis1) rhs2
       | dis1      = isDistinctAlgRhs rhs2   --Check compatibility
       | otherwise = True
@@ -806,6 +823,19 @@ checkBootTyCon tc1 tc2
       && dataConFieldLabels c1 == dataConFieldLabels c2
       && eqType (dataConUserType c1) (dataConUserType c2)
 
+    eqClosedFamilyAx (CoAxiom { co_ax_branches = branches1 })
+                     (CoAxiom { co_ax_branches = branches2 })
+      =  brListLength branches1 == brListLength branches2
+      && (and $ brListZipWith eqClosedFamilyBranch branches1 branches2)
+
+    eqClosedFamilyBranch (CoAxBranch { cab_tvs = tvs1, cab_lhs = lhs1, cab_rhs = rhs1 })
+                         (CoAxBranch { cab_tvs = tvs2, cab_lhs = lhs2, cab_rhs = rhs2 })
+      | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
+      = eqListBy (eqTypeX env) lhs1 lhs2 &&
+        eqTypeX env rhs1 rhs2
+
+      | otherwise = False
+
 emptyRnEnv2 :: RnEnv2
 emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 
@@ -815,11 +845,25 @@ missingBootThing name what
   = ppr name <+> ptext (sLit "is exported by the hs-boot file, but not")
               <+> text what <+> ptext (sLit "the module")
 
-bootMisMatch :: TyThing -> IfaceDecl -> IfaceDecl -> SDoc
-bootMisMatch thing boot_decl real_decl
-  = vcat [ppr thing <+> ptext (sLit "has conflicting definitions in the module and its hs-boot file"),
-          ptext (sLit "Main module:") <+> ppr real_decl,
-          ptext (sLit "Boot file:  ") <+> ppr boot_decl]
+bootMisMatch :: TyThing -> TyThing -> SDoc
+bootMisMatch real_thing boot_thing
+  = vcat [ppr real_thing <+>
+          ptext (sLit "has conflicting definitions in the module"),
+          ptext (sLit "and its hs-boot file"),
+          ptext (sLit "Main module:") <+> ppr_mismatch real_thing,
+          ptext (sLit "Boot file:  ") <+> ppr_mismatch boot_thing]
+  where
+      -- closed type families need special treatment, because they might differ
+      -- in their equations, which are not stored in the corresponding IfaceDecl
+    ppr_mismatch thing
+      | ATyCon tc <- thing
+      , Just (ClosedSynFamilyTyCon ax) <- synTyConRhs_maybe tc
+      = hang (ppr iface_decl <+> ptext (sLit "where"))
+           2 (vcat $ brListMap (pprCoAxBranch tc) (coAxiomBranches ax))
+      
+      | otherwise
+      = ppr iface_decl
+      where iface_decl = tyThingToIfaceDecl thing
 
 instMisMatch :: ClsInst -> SDoc
 instMisMatch inst
@@ -867,8 +911,155 @@ rnTopSrcDecls extra_deps group
 
         return (tcg_env', rn_decls)
    }
+\end{code}
 
-------------------------------------------------
+
+%************************************************************************
+%*                                                                      *
+                AMP warnings
+     The functions defined here issue warnings according to 
+     the 2013 Applicative-Monad proposal. (Trac #8004)
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- | Main entry point for generating AMP warnings
+tcAmpWarn :: TcM ()
+tcAmpWarn =
+    do { warnFlag <- woptM Opt_WarnAMP
+       ; when warnFlag $ do {
+
+         -- Monad without Applicative
+       ; tcAmpMissingParentClassWarn monadClassName
+                                     applicativeClassName
+
+         -- MonadPlus without Alternative
+       ; tcAmpMissingParentClassWarn monadPlusClassName
+                                     alternativeClassName
+
+         -- Custom local definitions of join/pure/<*>
+       ; mapM_ tcAmpFunctionWarn [joinMName, apAName, pureAName]
+    }}
+
+
+
+-- | Warn on local definitions of names that would clash with Prelude versions,
+--   i.e. join/pure/<*>
+tcAmpFunctionWarn :: Name -- ^ Name to check, e.g. joinMName for join
+                  -> TcM ()
+tcAmpFunctionWarn name = do
+    { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
+
+      -- Finds *other* elements having the same literal name. A name clashes
+      -- iff:
+      --   1. It is locally defined in the current module
+      --   2. It has the same literal name as the reference function
+      --   3. It is not identical to the reference function
+    ; let clashes :: GlobalRdrElt -> Bool
+          clashes x = and [ gre_prov x == LocalDef
+                          , nameOccName (gre_name x) == nameOccName name
+                          , gre_name x /= name
+                          ]
+
+          -- List of all offending definitions
+          clashingElts :: [GlobalRdrElt]
+          clashingElts = filter clashes rdrElts
+
+    ; traceTc "tcAmpFunctionWarn/amp_prelude_functions"
+                (hang (ppr name) 4 (sep [ppr clashingElts]))
+
+    ; let warn_msg x = addWarnAt (nameSrcSpan $ gre_name x) . hsep $
+              [ ptext (sLit "Local definition of")
+              , quotes . ppr . nameOccName $ gre_name x
+              , ptext (sLit "clashes with a future Prelude name")
+              , ptext (sLit "- this will become an error in GHC 7.10,")
+              , ptext (sLit "under the Applicative-Monad Proposal.")
+              ]
+    ; mapM_ warn_msg clashingElts
+    }
+
+-- | Issue a warning for instance definitions lacking a should-be parent class.
+--   Used for Monad without Applicative and MonadPlus without Alternative.
+tcAmpMissingParentClassWarn :: Name -- ^ Class instance is defined for
+                            -> Name -- ^ Class it should also be instance of
+                            -> TcM ()
+
+-- Notation: is* is for classes the type is an instance of, should* for those
+--           that it should also be an instance of based on the corresponding
+--           is*.
+--           Example: in case of Applicative/Monad: is = Monad,
+--                                                  should = Applicative
+tcAmpMissingParentClassWarn isName shouldName
+  = do { isClass'     <- tcLookupClass_maybe isName
+       ; shouldClass' <- tcLookupClass_maybe shouldName
+       ; case (isClass', shouldClass') of
+              (Just isClass, Just shouldClass) -> do
+                  { localInstances <- tcGetInsts
+                  ; let isInstance m = is_cls m == isClass
+                        isInsts = filter isInstance localInstances
+                  ; traceTc "tcAmpMissingParentClassWarn/isInsts" (ppr isInsts)
+                  ; forM_ isInsts $ checkShouldInst isClass shouldClass
+                  }
+              _ -> return ()
+       }
+  where
+    -- Checks whether the desired superclass exists in a given environment.
+    checkShouldInst :: Class   -- ^ Class of existing instance
+                    -> Class   -- ^ Class there should be an instance of
+                    -> ClsInst -- ^ Existing instance
+                    -> TcM ()
+    checkShouldInst isClass shouldClass isInst
+      = do { instEnv <- tcGetInstEnvs
+           ; let (instanceMatches, shouldInsts, _)
+                    = lookupInstEnv instEnv shouldClass (is_tys isInst)
+
+           ; traceTc "tcAmpMissingParentClassWarn/checkShouldInst"
+                     (hang (ppr isInst) 4
+                         (sep [ppr instanceMatches, ppr shouldInsts]))
+
+           -- "<location>: Warning: <type> is an instance of <is> but not <should>"
+           -- e.g. "Foo is an instance of Monad but not Applicative"
+           ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
+                 warnMsg (Just name:_) =
+                      addWarnAt instLoc . hsep $
+                           [ quotes (ppr $ nameOccName name)
+                           , ptext (sLit "is an instance of")
+                           , ppr . nameOccName $ className isClass
+                           , ptext (sLit "but not")
+                           , ppr . nameOccName $ className shouldClass
+                           , ptext (sLit "- this will become an error in GHC 7.10,")
+                           , ptext (sLit "under the Applicative-Monad Proposal.")
+                           ]
+                 warnMsg _ = return ()
+           ; when (null shouldInsts && null instanceMatches) $
+                  warnMsg (is_tcs isInst)
+           }
+
+
+-- | Looks up a class, returning Nothing on failure. Similar to
+--   TcEnv.tcLookupClass, but does not issue any error messages.
+--
+-- In particular, it may be called by the AMP check on, say, 
+-- Control.Applicative.Applicative, well before Control.Applicative 
+-- has been compiled.  In this case we just return Nothing, and the
+-- AMP test is silently dropped.
+tcLookupClass_maybe :: Name -> TcM (Maybe Class)
+tcLookupClass_maybe name
+  = do { mb_thing <- tcLookupImported_maybe name
+       ; case mb_thing of
+            Succeeded (ATyCon tc) | Just cls <- tyConClass_maybe tc -> return (Just cls)
+            _ -> return Nothing }
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+                tcTopSrcDecls
+%*                                                                      *
+%************************************************************************
+
+
+\begin{code}
 tcTopSrcDecls :: ModDetails -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls boot_details
         (HsGroup { hs_tyclds = tycl_decls,
@@ -890,6 +1081,11 @@ tcTopSrcDecls boot_details
         (tcg_env, inst_infos, deriv_binds)
             <- tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls ;
         setGblEnv tcg_env       $ do {
+
+
+                -- Generate Applicative/Monad proposal (AMP) warnings
+        traceTc "Tc3b" empty ;
+        tcAmpWarn ;
 
                 -- Foreign import declarations next.
         traceTc "Tc4" empty ;
@@ -915,7 +1111,7 @@ tcTopSrcDecls boot_details
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (tyClGroupConcat tycl_decls) inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -956,7 +1152,6 @@ tcTopSrcDecls boot_details
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
         addUsedRdrNames fo_rdr_names ;
-        traceTc "Tc8: type_env: " (ppr $ nameEnvElts $ tcg_type_env tcg_env') ; -- RAE
         return (tcg_env', tcl_env)
     }}}}}}
   where
@@ -989,7 +1184,7 @@ tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls
       -- Note [AFamDataCon: not promoting data family constructors]
    do { tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
       ; setGblEnv tcg_env $
-        tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls }
+        tcInstDecls1 (tyClGroupConcat tycl_decls) inst_decls deriv_decls }
   where
     -- get_cons extracts the *constructor* bindings of the declaration
     get_cons :: LInstDecl Name -> [Name]
@@ -1589,9 +1784,9 @@ tcRnType hsc_env ictxt normalise rdr_type
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
-                        ; return (snd (normaliseType fam_envs ty)) }
+                        ; return (snd (normaliseType fam_envs Nominal ty)) }
                         -- normaliseType returns a coercion
-                        -- which we discard
+                        -- which we discard, so the Role is irrelevant
                 else return ty ;
 
        ; return (ty', typeKind ty) }
@@ -1654,13 +1849,8 @@ tcRnDeclsi hsc_env ictxt local_decls =
                              tcg_vects     = vects',
                              tcg_fords     = fords' }
 
-    tcg_env'' <- setGlobalTypeEnv tcg_env' final_type_env
-
-    traceTc "returning from tcRnDeclsi: " $ ppr $ nameEnvElts $ tcg_type_env tcg_env'' -- RAE
-
-    return tcg_env''
-
-
+    setGlobalTypeEnv tcg_env' final_type_env
+    
 #endif /* GHCi */
 \end{code}
 
@@ -1738,7 +1928,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst Branched]))
+            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
 
 -- Used to implement :info in GHCi
 --
@@ -1763,13 +1953,13 @@ tcRnGetInfo hsc_env name
     (cls_insts, fam_insts) <- lookupInsts thing
     return (thing, fixity, cls_insts, fam_insts)
 
-lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst Branched])
+lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
   | Just cls <- tyConClass_maybe tc
   = do  { inst_envs <- tcGetInstEnvs
         ; return (classInstances inst_envs cls, []) }
 
-  | isFamilyTyCon tc || isTyConAssoc tc
+  | isOpenFamilyTyCon tc || isTyConAssoc tc
   = do  { inst_envs <- tcGetFamInstEnvs
         ; return ([], familyInstances inst_envs tc) }
 
@@ -1901,7 +2091,7 @@ ppr_types insts type_env
         -- that the type checker has invented.  Top-level user-defined things
         -- have External names.
 
-ppr_tycons :: [FamInst br] -> TypeEnv -> SDoc
+ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env
   = vcat [ text "TYPE CONSTRUCTORS"
          ,   nest 2 (ppr_tydecls tycons)
@@ -1919,7 +2109,7 @@ ppr_insts :: [ClsInst] -> SDoc
 ppr_insts []     = empty
 ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
 
-ppr_fam_insts :: [FamInst br] -> SDoc
+ppr_fam_insts :: [FamInst] -> SDoc
 ppr_fam_insts []        = empty
 ppr_fam_insts fam_insts =
   text "FAMILY INSTANCES" $$ nest 2 (pprFamInsts fam_insts)

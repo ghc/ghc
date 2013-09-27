@@ -32,7 +32,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, punctuate, ppWhen, ppUnless,
-        speakNth, speakNTimes, speakN, speakNOf, plural,
+        speakNth, speakNTimes, speakN, speakNOf, plural, isOrAre,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
@@ -90,6 +90,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
 import qualified Data.Map as M
+import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -421,7 +422,10 @@ rational :: Rational   -> SDoc
 
 empty       = docToSDoc $ Pretty.empty
 char c      = docToSDoc $ Pretty.char c
+
 text s      = docToSDoc $ Pretty.text s
+{-# INLINE text #-}   -- Inline so that the RULE Pretty.text will fire
+
 ftext s     = docToSDoc $ Pretty.ftext s
 ptext s     = docToSDoc $ Pretty.ptext s
 ztext s     = docToSDoc $ Pretty.ztext s
@@ -615,6 +619,12 @@ instance Outputable Char where
 instance Outputable Bool where
     ppr True  = ptext (sLit "True")
     ppr False = ptext (sLit "False")
+
+instance Outputable Int32 where
+   ppr n = integer $ fromIntegral n
+
+instance Outputable Int64 where
+   ppr n = integer $ fromIntegral n
 
 instance Outputable Int where
     ppr n = int n
@@ -898,6 +908,15 @@ speakNTimes t | t == 1     = ptext (sLit "once")
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
+
+-- | Determines the form of to be appropriate for the length of a list:
+--
+-- > isOrAre [] = ptext (sLit "are")
+-- > isOrAre ["Hello"] = ptext (sLit "is")
+-- > isOrAre ["Hello", "World"] = ptext (sLit "are")
+isOrAre :: [a] -> SDoc
+isOrAre [_] = ptext (sLit "is")
+isOrAre _   = ptext (sLit "are")
 \end{code}
 
 

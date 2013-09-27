@@ -8,7 +8,7 @@
 -- Module      :  GHC.List
 -- Copyright   :  (c) The University of Glasgow 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.List (
    -- [] (..),          -- built-in syntax; can't be used in export list
 
@@ -63,12 +62,12 @@ head []                 =  badHead
 badHead :: a
 badHead = errorEmptyList "head"
 
--- This rule is useful in cases like 
+-- This rule is useful in cases like
 --      head [y | (x,y) <- ps, x==t]
 {-# RULES
 "head/build"    forall (g::forall b.(a->b->b)->b->b) .
                 head (build g) = g (\x _ -> x) badHead
-"head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) . 
+"head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) .
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
@@ -226,7 +225,7 @@ foldr1 _ []             =  errorEmptyList "foldr1"
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
 scanr f q0 (x:xs)       =  f x q : qs
-                           where qs@(q:_) = scanr f q0 xs 
+                           where qs@(q:_) = scanr f q0 xs
 
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
 
@@ -234,7 +233,7 @@ scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
 scanr1 f (x:xs)         =  f x q : qs
-                           where qs@(q:_) = scanr1 f xs 
+                           where qs@(q:_) = scanr1 f xs
 
 -- | 'iterate' @f x@ returns an infinite list of repeated applications
 -- of @f@ to @x@:
@@ -297,7 +296,7 @@ cycle xs                = xs' where xs' = xs ++ xs'
 
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
-takeWhile p (x:xs) 
+takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
 
@@ -372,14 +371,14 @@ splitAt n xs           =  (take n xs, drop n xs)
 
 #else /* hack away */
 {-# RULES
-"take"     [~1] forall n xs . take n xs = takeFoldr n xs 
+"take"     [~1] forall n xs . take n xs = takeFoldr n xs
 "takeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n = takeUInt n xs
  #-}
 
 {-# INLINE takeFoldr #-}
 takeFoldr :: Int -> [a] -> [a]
 takeFoldr (I# n#) xs
-  = build (\c nil -> if n# <=# 0# then nil else
+  = build (\c nil -> if isTrue# (n# <=# 0#) then nil else
                      foldr (takeFB c nil) (takeConst nil) xs n#)
 
 {-# NOINLINE [0] takeConst #-}
@@ -390,8 +389,8 @@ takeConst x _ = x
 
 {-# NOINLINE [0] takeFB #-}
 takeFB :: (a -> b -> b) -> b -> a -> (Int# -> b) -> Int# -> b
-takeFB c n x xs m | m <=# 1#  = x `c` n
-                  | otherwise = x `c` xs (m -# 1#)
+takeFB c n x xs m | isTrue# (m <=# 1#) = x `c` n
+                  | otherwise          = x `c` xs (m -# 1#)
 
 {-# INLINE [0] take #-}
 take (I# n#) xs = takeUInt n# xs
@@ -402,8 +401,8 @@ take (I# n#) xs = takeUInt n# xs
 
 takeUInt :: Int# -> [b] -> [b]
 takeUInt n xs
-  | n >=# 0#  =  take_unsafe_UInt n xs
-  | otherwise =  []
+  | isTrue# (n >=# 0#) = take_unsafe_UInt n xs
+  | otherwise          = []
 
 take_unsafe_UInt :: Int# -> [b] -> [b]
 take_unsafe_UInt 0#  _  = []
@@ -414,8 +413,8 @@ take_unsafe_UInt m   ls =
 
 takeUInt_append :: Int# -> [b] -> [b] -> [b]
 takeUInt_append n xs rs
-  | n >=# 0#  =  take_unsafe_UInt_append n xs rs
-  | otherwise =  []
+  | isTrue# (n >=# 0#) = take_unsafe_UInt_append n xs rs
+  | otherwise          = []
 
 take_unsafe_UInt_append :: Int# -> [b] -> [b] -> [b]
 take_unsafe_UInt_append 0#  _ rs  = rs
@@ -425,8 +424,8 @@ take_unsafe_UInt_append m  ls rs  =
     (x:xs) -> x : take_unsafe_UInt_append (m -# 1#) xs rs
 
 drop (I# n#) ls
-  | n# <# 0#    = ls
-  | otherwise   = drop# n# ls
+  | isTrue# (n# <# 0#) = ls
+  | otherwise          = drop# n# ls
     where
         drop# :: Int# -> [a] -> [a]
         drop# 0# xs      = xs
@@ -434,8 +433,8 @@ drop (I# n#) ls
         drop# m# (_:xs)  = drop# (m# -# 1#) xs
 
 splitAt (I# n#) ls
-  | n# <# 0#    = ([], ls)
-  | otherwise   = splitAt# n# ls
+  | isTrue# (n# <# 0#) = ([], ls)
+  | otherwise          = splitAt# n# ls
     where
         splitAt# :: Int# -> [a] -> ([a], [a])
         splitAt# 0# xs     = ([], xs)
@@ -449,11 +448,11 @@ splitAt (I# n#) ls
 -- | 'span', applied to a predicate @p@ and a list @xs@, returns a tuple where
 -- first element is longest prefix (possibly empty) of @xs@ of elements that
 -- satisfy @p@ and second element is the remainder of the list:
--- 
+--
 -- > span (< 3) [1,2,3,4,1,2,3,4] == ([1,2],[3,4,1,2,3,4])
 -- > span (< 9) [1,2,3] == ([1,2,3],[])
 -- > span (< 0) [1,2,3] == ([],[1,2,3])
--- 
+--
 -- 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
 
 span                    :: (a -> Bool) -> [a] -> ([a],[a])
@@ -465,7 +464,7 @@ span p xs@(x:xs')
 -- | 'break', applied to a predicate @p@ and a list @xs@, returns a tuple where
 -- first element is longest prefix (possibly empty) of @xs@ of elements that
 -- /do not satisfy/ @p@ and second element is the remainder of the list:
--- 
+--
 -- > break (> 3) [1,2,3,4,1,2,3,4] == ([1,2,3],[4,1,2,3,4])
 -- > break (< 9) [1,2,3] == ([],[1,2,3])
 -- > break (> 9) [1,2,3] == ([1,2,3],[])
@@ -517,9 +516,9 @@ or (x:xs)       =  x || or xs
 {-# NOINLINE [1] or #-}
 
 {-# RULES
-"and/build"     forall (g::forall b.(Bool->b->b)->b->b) . 
+"and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
                 and (build g) = g (&&) True
-"or/build"      forall (g::forall b.(Bool->b->b)->b->b) . 
+"or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
                 or (build g) = g (||) False
  #-}
 #endif
@@ -549,9 +548,9 @@ all p (x:xs)    =  p x && all p xs
 {-# NOINLINE [1] all #-}
 
 {-# RULES
-"any/build"     forall p (g::forall b.(a->b->b)->b->b) . 
+"any/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 any p (build g) = g ((||) . p) False
-"all/build"     forall p (g::forall b.(a->b->b)->b->b) . 
+"all/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 all p (build g) = g ((&&) . p) True
  #-}
 #endif
@@ -614,12 +613,12 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 -- The semantics is not quite the same for error conditions
 -- in the more efficient version.
 --
-xs !! (I# n0) | n0 <# 0#   =  error "Prelude.(!!): negative index\n"
-               | otherwise =  sub xs n0
+xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
+              | otherwise          =  sub xs n0
                          where
                             sub :: [a] -> Int# -> a
                             sub []     _ = error "Prelude.(!!): index too large\n"
-                            sub (y:ys) n = if n ==# 0#
+                            sub (y:ys) n = if isTrue# (n ==# 0#)
                                            then y
                                            else sub ys (n -# 1#)
 #endif
@@ -651,10 +650,10 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 -- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
 -- foldr2 k z xs ys = foldr (foldr2_right k z) (\_ -> z) ys xs
 {-# RULES
-"foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) . 
+"foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
 
-"foldr2/right"  forall k z xs (g::forall b.(a->b->b)->b->b) . 
+"foldr2/right"  forall k z xs (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
  #-}
 \end{code}

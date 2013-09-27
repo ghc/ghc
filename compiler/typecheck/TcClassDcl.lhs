@@ -15,6 +15,7 @@ Typechecking class declarations
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
+		    tcClassMinimalDef,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
 		    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
 		  ) where
@@ -32,7 +33,7 @@ import TcMType
 import Type     ( getClassPredTys_maybe )
 import TcType
 import TcRnMonad
-import BuildTyCl( TcMethInfo )
+import BuildTyCl( TcMethInfo, defaultClassMinimalDef )
 import Class
 import Id
 import Name
@@ -45,6 +46,7 @@ import Maybes
 import BasicTypes
 import Bag
 import FastString
+import BooleanFormula (impliesAtom, isUnsatisfied, pprBooleanFormulaNice)
 import Util
 
 import Control.Monad
@@ -247,7 +249,7 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
 			     -- NB: the binding is always a FunBind
 	; (ev_binds, (tc_bind, _, _)) 
                <- checkConstraints skol_info tyvars dfun_ev_vars $
-	          tcPolyCheck NotTopLevel NonRecursive no_prag_fn local_meth_sig [lm_bind]
+	          tcPolyCheck NonRecursive no_prag_fn local_meth_sig [lm_bind]
 
         ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
                            , abe_mono = local_meth_id, abe_prags = specs }
@@ -260,6 +262,19 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
   where
     no_prag_fn  _ = []		-- No pragmas for local_meth_id; 
     		    		-- they are all for meth_id
+
+---------------
+tcClassMinimalDef :: Name -> [LSig Name] -> [TcMethInfo] -> TcM ClassMinimalDef
+tcClassMinimalDef _clas sigs op_info
+  = case findMinimalDef sigs of
+      Nothing -> return defMindef
+      Just mindef -> do
+        -- warn if the given mindef does not imply the default one
+        whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
+          warnTc True . warningMinimalDefIncomplete
+        return mindef
+  where
+    defMindef = defaultClassMinimalDef op_info
 \end{code}
 
 \begin{code}
@@ -313,6 +328,13 @@ findMethodBind sel_name binds
              | op_name == sel_name
     	     = Just (bind, bndr_loc)
     f _other = Nothing
+
+---------------------------
+findMinimalDef :: [LSig Name] -> Maybe ClassMinimalDef
+findMinimalDef = firstJusts . map toMinimalDef
+  where
+    toMinimalDef (L _ (MinimalSig bf)) = Just (fmap unLoc bf)
+    toMinimalDef _ = Nothing
 \end{code}
 
 Note [Polymorphic methods]
@@ -391,4 +413,10 @@ badDmPrag sel_id prag
   = addErrTc (ptext (sLit "The") <+> hsSigDoc prag <+> ptext (sLit "for default method") 
               <+> quotes (ppr sel_id) 
               <+> ptext (sLit "lacks an accompanying binding"))
+
+warningMinimalDefIncomplete :: ClassMinimalDef -> SDoc
+warningMinimalDefIncomplete mindef
+  = vcat [ ptext (sLit "The MINIMAL pragma does not require:")
+         , nest 2 (pprBooleanFormulaNice mindef)
+         , ptext (sLit "but there is no default implementation.") ]
 \end{code}

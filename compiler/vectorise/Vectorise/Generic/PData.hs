@@ -14,7 +14,6 @@ import Vectorise.Generic.Description
 import Vectorise.Utils
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
-import Coercion( mkSingleCoAxiom )
 import BasicTypes
 import BuildTyCl
 import DataCon
@@ -31,7 +30,7 @@ import Control.Monad
 
 -- buildPDataTyCon ------------------------------------------------------------
 -- | Build the PData instance tycon for a given type constructor.
-buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM (FamInst Unbranched)
+buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM FamInst
 buildPDataTyCon orig_tc vect_tc repr 
  = fixV $ \fam_inst ->
    do let repr_tc = dataFamInstRepTyCon fam_inst
@@ -42,7 +41,7 @@ buildPDataTyCon orig_tc vect_tc repr
  where
     orig_name = tyConName orig_tc
 
-buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM (FamInst Unbranched)
+buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM FamInst
 buildDataFamInst name' fam_tc vect_tc rhs
  = do { axiom_name <- mkDerivedName mkInstTyCoOcc name'
 
@@ -53,6 +52,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
             pat_tys  = [mkTyConApp vect_tc tys']
             rep_tc   = buildAlgTyCon name'
                            tyvars'
+                           (map (const Nominal) tyvars')
                            Nothing
                            []          -- no stupid theta
                            rhs
@@ -60,7 +60,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
                            False       -- Not promotable
                            False       -- not GADT syntax
                            (FamInstTyCon ax fam_tc pat_tys)
-      ; liftDs $ newFamInst (DataFamilyInst rep_tc) False ax }
+      ; liftDs $ newFamInst (DataFamilyInst rep_tc) ax }
  where
     tyvars    = tyConTyVars vect_tc
     rec_flag  = boolToRecFlag (isRecursiveTyCon vect_tc)
@@ -92,7 +92,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
 
 -- buildPDatasTyCon -----------------------------------------------------------
 -- | Build the PDatas instance tycon for a given type constructor.
-buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM (FamInst Unbranched)
+buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM FamInst
 buildPDatasTyCon orig_tc vect_tc repr 
  = fixV $ \fam_inst ->
    do let repr_tc = dataFamInstRepTyCon fam_inst

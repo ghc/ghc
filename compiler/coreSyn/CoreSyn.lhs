@@ -49,7 +49,6 @@ module CoreSyn (
 
         -- * Unfolding data types
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
-        DFunArg(..), dfunArgExprs,
 
 	-- ** Constructing 'Unfolding's
 	noUnfolding, evaldUnfolding, mkOtherCon,
@@ -78,7 +77,7 @@ module CoreSyn (
 
 	-- * Core rule data types
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
-	RuleName, IdUnfoldingFun,
+	RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
 	
 	-- ** Operations on 'CoreRule's 
 	seqRules, ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -92,6 +91,7 @@ module CoreSyn (
 #include "HsVersions.h"
 
 import CostCentre
+import VarEnv( InScopeSet )
 import Var
 import Type
 import Coercion
@@ -388,13 +388,13 @@ is fine, and has type Bool.  This is one reason we need a type on
 the case expression: if the alternatives are empty we can't get the type
 from the alternatives!  I'll write this
    case (error Int "Hello") of Bool {}
-with the return type just before the alterantives.
+with the return type just before the alternatives.
 
 Here's another example:
   data T
   f :: T -> Bool
   f = \(x:t). case x of Bool {}
-Since T has no data constructors, the case alterantives are of course
+Since T has no data constructors, the case alternatives are of course
 empty.  However note that 'x' is not bound to a visbily-bottom value;
 it's the *type* that tells us it's going to diverge.  Its a bit of a
 degnerate situation but we do NOT want to replace
@@ -577,12 +577,15 @@ data CoreRule
 	ru_fn    :: Name,       -- ^ As above
 	ru_nargs :: Int,	-- ^ Number of arguments that 'ru_try' consumes,
 				-- if it fires, including type arguments
-	ru_try  :: DynFlags -> Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+	ru_try   :: RuleFun
 		-- ^ This function does the rewrite.  It given too many
 		-- arguments, it simply discards them; the returned 'CoreExpr'
 		-- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
 		-- See Note [Extra args in rule matching] in Rules.lhs
+
+type RuleFun = DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
+type InScopeEnv = (InScopeSet, IdUnfoldingFun)
 
 type IdUnfoldingFun = Id -> Unfolding
 -- A function that embodies how to unfold an Id if you need
@@ -663,17 +666,15 @@ data Unfolding
 		       --
 		       -- Here, @f@ gets an @OtherCon []@ unfolding.
 
-  | DFunUnfolding       -- The Unfolding of a DFunId  
+  | DFunUnfolding {     -- The Unfolding of a DFunId  
     			-- See Note [DFun unfoldings]
-      		  	--     df = /\a1..am. \d1..dn. MkD (op1 a1..am d1..dn)
+      		  	--     df = /\a1..am. \d1..dn. MkD t1 .. tk
+                        --                                 (op1 a1..am d1..dn)
      		      	--     	    	      	       	   (op2 a1..am d1..dn)
-
-        Arity 		-- Arity = m+n, the *total* number of args 
-			--   (unusually, both type and value) to the dfun
-
-        DataCon 	-- The dictionary data constructor (possibly a newtype datacon)
-
-        [DFunArg CoreExpr]  -- Specification of superclasses and methods, in positional order
+        df_bndrs :: [Var],      -- The bound variables [a1..m],[d1..dn]
+        df_con   :: DataCon,    -- The dictionary data constructor (never a newtype datacon)
+        df_args  :: [CoreExpr]  -- Args of the data con: types, superclasses and methods,
+    }                           -- in positional order
 
   | CoreUnfolding {		-- An unfolding for an Id with no pragma, 
                                 -- or perhaps a NOINLINE pragma
@@ -710,24 +711,12 @@ data Unfolding
   --
   --  uf_guidance:  Tells us about the /size/ of the unfolding template
 
-------------------------------------------------
-data DFunArg e   -- Given (df a b d1 d2 d3)
-  = DFunPolyArg  e      -- Arg is (e a b d1 d2 d3)
-  | DFunLamArg   Int    -- Arg is one of [a,b,d1,d2,d3], zero indexed
-  deriving( Functor )
-
-  -- 'e' is often CoreExpr, which are usually variables, but can
-  -- be trivial expressions instead (e.g. a type application).
-
-dfunArgExprs :: [DFunArg e] -> [e]
-dfunArgExprs []                    = []
-dfunArgExprs (DFunPolyArg  e : as) = e : dfunArgExprs as
-dfunArgExprs (DFunLamArg {}  : as) = dfunArgExprs as
-
 
 ------------------------------------------------
 data UnfoldingSource
-  = InlineRhs          -- The current rhs of the function
+  = -- See also Note [Historical note: unfoldings for wrappers]
+   
+    InlineRhs          -- The current rhs of the function
     		       -- Replace uf_tmpl each time around
 
   | InlineStable       -- From an INLINE or INLINABLE pragma 
@@ -751,13 +740,6 @@ data UnfoldingSource
     		       -- Only a few primop-like things have this property 
                        -- (see MkId.lhs, calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
-
-  | InlineWrapper Id   -- This unfolding is a the wrapper in a 
-		       --     worker/wrapper split from the strictness analyser
-	               -- The Id is the worker-id
-		       -- Used to abbreviate the uf_tmpl in interface files
-		       --	which don't need to contain the RHS; 
-		       --	it can be derived from the strictness info
 
 
 
@@ -787,6 +769,25 @@ data UnfoldingGuidance
 
   | UnfNever	    -- The RHS is big, so don't inline it
 \end{code}
+
+Note [Historical note: unfoldings for wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to have a nice clever scheme in interface files for
+wrappers. A wrapper's unfolding can be reconstructed from its worker's
+id and its strictness. This decreased .hi file size (sometimes
+significantly, for modules like GHC.Classes with many high-arity w/w
+splits) and had a slight corresponding effect on compile times.
+
+However, when we added the second demand analysis, this scheme lead to
+some Core lint errors. The second analysis could change the strictness
+signatures, which sometimes resulted in a wrapper's regenerated
+unfolding applying the wrapper to too many arguments.
+
+Instead of repairing the clever .hi scheme, we abandoned it in favor
+of simplicity. The .hi sizes are usually insignificant (excluding the
++1M for base libraries), and compile time barely increases (~+1% for
+nofib). The nicer upshot is that the UnfoldingSource no longer mentions
+an Id, so, eg, substitutions need not traverse them.
 
 
 Note [DFun unfoldings]
@@ -857,9 +858,8 @@ isStableSource :: UnfoldingSource -> Bool
 -- Keep the unfolding template
 isStableSource InlineCompulsory   = True
 isStableSource InlineStable       = True
-isStableSource (InlineWrapper {}) = True
 isStableSource InlineRhs          = False
- 
+
 -- | Retrieves the template of an unfolding: panics if none is known
 unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl

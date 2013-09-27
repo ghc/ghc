@@ -441,8 +441,9 @@ thread_TSO (StgTSO *tso)
     thread_(&tso->global_link);
 
     if (   tso->why_blocked == BlockedOnMVar
-      	|| tso->why_blocked == BlockedOnBlackHole
-      	|| tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == BlockedOnMVarRead
+        || tso->why_blocked == BlockedOnBlackHole
+        || tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
         || tso->why_blocked == Yielded
         || tso->why_blocked == BlockedInHaskell
@@ -621,7 +622,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case WEAK:
     {
 	StgWeak *w = (StgWeak *)p;
-	thread(&w->cfinalizer);
+	thread(&w->cfinalizers);
 	thread(&w->key);
 	thread(&w->value);
 	thread(&w->finalizer);
@@ -918,19 +919,22 @@ compact(StgClosure *static_objects)
     markScheduler((evac_fn)thread_root, NULL);
 
     // the weak pointer lists...
-    if (weak_ptr_list != NULL) {
-	thread((void *)&weak_ptr_list);
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        if (generations[g].weak_ptr_list != NULL) {
+            thread((void *)&generations[g].weak_ptr_list);
+        }
     }
-    if (old_weak_ptr_list != NULL) {
-	thread((void *)&old_weak_ptr_list); // tmp
+
+    if (dead_weak_ptr_list != NULL) {
+        thread((void *)&dead_weak_ptr_list); // tmp
     }
 
     // mutable lists
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-	bdescr *bd;
-	StgPtr p;
+        bdescr *bd;
+        StgPtr p;
         for (n = 0; n < n_capabilities; n++) {
-            for (bd = capabilities[n].mut_lists[g];
+            for (bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
                 for (p = bd->start; p < bd->free; p++) {
                     thread((StgClosure **)p);

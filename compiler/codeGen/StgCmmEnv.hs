@@ -8,8 +8,6 @@
 module StgCmmEnv (
         CgIdInfo,
 
-        cgIdInfoId, cgIdInfoLF,
-
         litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
         idInfoToAmode,
 
@@ -20,8 +18,8 @@ module StgCmmEnv (
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, idToReg,
         getArgAmode, getNonVoidArgAmodes,
-        getCgIdInfo, 
-        maybeLetNoEscape, 
+        getCgIdInfo,
+        maybeLetNoEscape,
     ) where
 
 #include "HsVersions.h"
@@ -113,12 +111,6 @@ addDynTag :: DynFlags -> CmmExpr -> DynTag -> CmmExpr
 -- A tag adds a byte offset to the pointer
 addDynTag dflags expr tag = cmmOffsetB dflags expr tag
 
-cgIdInfoId :: CgIdInfo -> Id
-cgIdInfoId = cg_id 
-
-cgIdInfoLF :: CgIdInfo -> LambdaFormInfo
-cgIdInfoLF = cg_lf
-
 maybeLetNoEscape :: CgIdInfo -> Maybe (BlockId, [LocalReg])
 maybeLetNoEscape (CgIdInfo { cg_loc = LneLoc blk_id args}) = Just (blk_id, args)
 maybeLetNoEscape _other                                      = Nothing
@@ -127,15 +119,15 @@ maybeLetNoEscape _other                                      = Nothing
 
 ---------------------------------------------------------
 --        The binding environment
--- 
--- There are three basic routines, for adding (addBindC), 
+--
+-- There are three basic routines, for adding (addBindC),
 -- modifying(modifyBindC) and looking up (getCgIdInfo) bindings.
 ---------------------------------------------------------
 
-addBindC :: Id -> CgIdInfo -> FCode ()
-addBindC name stuff_to_bind = do
+addBindC :: CgIdInfo -> FCode ()
+addBindC stuff_to_bind = do
         binds <- getBinds
-        setBinds $ extendVarEnv binds name stuff_to_bind
+        setBinds $ extendVarEnv binds (cg_id stuff_to_bind) stuff_to_bind
 
 addBindsC :: [CgIdInfo] -> FCode ()
 addBindsC new_bindings = do
@@ -147,39 +139,26 @@ addBindsC new_bindings = do
 
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
-  = do        {         -- Try local bindings first
-        ; local_binds  <- getBinds
+  = do  { dflags <- getDynFlags
+        ; local_binds <- getBinds -- Try local bindings first
         ; case lookupVarEnv local_binds id of {
             Just info -> return info ;
-            Nothing   -> do
-
-        {         -- Try top-level bindings
-          static_binds <- getStaticBinds
-        ; case lookupVarEnv static_binds id of {
-            Just info -> return info ;
-            Nothing   ->
+            Nothing   -> do {
 
                 -- Should be imported; make up a CgIdInfo for it
-        let 
-            name = idName id
-        in
-        if isExternalName name then do
-            let ext_lbl = CmmLabel (mkClosureLabel name $ idCafInfo id)
-            dflags <- getDynFlags
-            return (litIdInfo dflags id (mkLFImported id) ext_lbl)
-        else
-            -- Bug        
-            cgLookupPanic id
-        }}}}
-    
+          let name = idName id
+        ; if isExternalName name then
+              let ext_lbl = CmmLabel (mkClosureLabel name $ idCafInfo id)
+              in return (litIdInfo dflags id (mkLFImported id) ext_lbl)
+          else
+              cgLookupPanic id -- Bug
+        }}}
+
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
-  = do  static_binds <- getStaticBinds
-        local_binds <- getBinds
+  = do  local_binds <- getBinds
         pprPanic "StgCmmEnv: variable not found"
                 (vcat [ppr id,
-                ptext (sLit "static binds for:"),
-                vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
                 ptext (sLit "local binds for:"),
                 vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ]
               ])
@@ -192,7 +171,7 @@ getArgAmode (NonVoid (StgVarArg var))  =
 getArgAmode (NonVoid (StgLitArg lit))  = liftM CmmLit $ cgLit lit
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
--- NB: Filters out void args, 
+-- NB: Filters out void args,
 --     so the result list may be shorter than the argument list
 getNonVoidArgAmodes [] = return []
 getNonVoidArgAmodes (arg:args)
@@ -210,15 +189,15 @@ bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 bindToReg nvid@(NonVoid id) lf_info
   = do dflags <- getDynFlags
        let reg = idToReg dflags nvid
-       addBindC id (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
+       addBindC (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
        return reg
 
 rebindToReg :: NonVoid Id -> FCode LocalReg
--- Like bindToReg, but the Id is already in scope, so 
+-- Like bindToReg, but the Id is already in scope, so
 -- get its LF info from the envt
 rebindToReg nvid@(NonVoid id)
   = do  { info <- getCgIdInfo id
-        ; bindToReg nvid (cgIdInfoLF info) }
+        ; bindToReg nvid (cg_lf info) }
 
 bindArgToReg :: NonVoid Id -> FCode LocalReg
 bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
@@ -233,7 +212,7 @@ idToReg :: DynFlags -> NonVoid Id -> LocalReg
 -- We re-use the Unique from the Id to make it easier to see what is going on
 --
 -- By now the Ids should be uniquely named; else one would worry
--- about accidental collision 
+-- about accidental collision
 idToReg dflags (NonVoid id)
              = LocalReg (idUnique id)
                         (case idPrimRep id of VoidRep -> pprPanic "idToReg" (ppr id)

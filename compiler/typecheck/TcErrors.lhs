@@ -27,8 +27,11 @@ import Unify            ( tcMatchTys )
 import Inst
 import InstEnv
 import TyCon
+import DataCon
 import TcEvidence
+import TysWiredIn       ( coercibleClass )
 import Name
+import RdrName          ( lookupGRE_Name )
 import Id 
 import Var
 import VarSet
@@ -42,7 +45,7 @@ import FastString
 import Outputable
 import SrcLoc
 import DynFlags
-import Data.List        ( partition, mapAccumL )
+import Data.List        ( partition, mapAccumL, zip4 )
 \end{code}
 
 %************************************************************************
@@ -500,7 +503,7 @@ solve it.
 \begin{code}
 mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIrredErr ctxt cts 
-  = do { (ctxt, binds_msg) <- relevantBindings ctxt ct1
+  = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct1
        ; mkErrorMsg ctxt ct1 (msg $$ binds_msg) }
   where
     (ct1:_) = cts
@@ -516,7 +519,8 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ })
              msg = vcat [ hang (ptext (sLit "Found hole") <+> quotes (ppr occ))
                              2 (ptext (sLit "with type:") <+> pprType (ctEvPred (cc_ev ct)))
                         , ppUnless (null tyvars_msg) (ptext (sLit "Where:") <+> vcat tyvars_msg) ]
-       ; (ctxt, binds_doc) <- relevantBindings ctxt ct
+       ; (ctxt, binds_doc) <- relevantBindings False ctxt ct
+               -- The 'False' means "don't filter the bindings; see Trac #8191
        ; mkErrorMsg ctxt ct (msg $$ binds_doc) }
   where
     loc_msg tv 
@@ -532,7 +536,7 @@ mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 ----------------
 mkIPErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIPErr ctxt cts
-  = do { (ctxt, bind_msg) <- relevantBindings ctxt ct1
+  = do { (ctxt, bind_msg) <- relevantBindings True ctxt ct1
        ; mkErrorMsg ctxt ct1 (msg $$ bind_msg) }
   where
     (ct1:_) = cts
@@ -583,7 +587,7 @@ mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 -- Wanted constraints only!
 mkEqErr1 ctxt ct
   | isGiven ev
-  = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
+  = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; let (given_loc, given_msg) = mk_given (cec_encl ctxt)
        ; dflags <- getDynFlags
        ; mkEqErr_help dflags ctxt (given_msg $$ binds_msg) 
@@ -591,7 +595,7 @@ mkEqErr1 ctxt ct
                       Nothing ty1 ty2 }
 
   | otherwise   -- Wanted or derived
-  = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
+  = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin (cc_loc ct))
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
@@ -673,7 +677,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = do { let msg = vcat [ ptext (sLit "Cannot instantiate unification variable")
                           <+> quotes (ppr tv1)
                         , hang (ptext (sLit "with a type involving foralls:")) 2 (ppr ty2)
-                        , nest 2 (ptext (sLit "Perhaps you want -XImpredicativeTypes")) ]
+                        , nest 2 (ptext (sLit "Perhaps you want ImpredicativeTypes")) ]
        ; mkErrorMsg ctxt ct msg }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
@@ -931,9 +935,11 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
 mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell)) 
   | null matches  -- No matches but perhaps several unifiers
   = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
-       ; (ctxt, binds_msg) <- relevantBindings ctxt ct
+       ; (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg)
-       ; return (ctxt, cannot_resolve_msg is_ambig binds_msg ambig_msg) }
+       ; safe_mod <- safeLanguageOn `fmap` getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
+       ; return (ctxt, cannot_resolve_msg safe_mod rdr_env is_ambig binds_msg ambig_msg) }
 
   | not safe_haskell   -- Some matches => overlap errors
   = return (ctxt, overlap_msg)
@@ -948,8 +954,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     givens      = getUserGivens ctxt
     all_tyvars  = all isTyVarTy tys
 
-    cannot_resolve_msg has_ambig_tvs binds_msg ambig_msg
-      = vcat [ addArising orig (no_inst_herald <+> pprParendType pred)
+    cannot_resolve_msg safe_mod rdr_env has_ambig_tvs binds_msg ambig_msg
+      = vcat [ addArising orig (no_inst_herald <+> pprParendType pred $$
+                                coercible_msg safe_mod rdr_env)
              , vcat (pp_givens givens)
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
                (vcat [ ambig_msg, binds_msg, potential_msg ])
@@ -1023,7 +1030,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
 		parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
 	    		          quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys)))
 			     , ppWhen (null (matching_givens)) $
-                               vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances")
+                               vcat [ ptext (sLit "To pick the first instance above, use IncoherentInstances")
 			            , ptext (sLit "when compiling the other instance declarations")]
                         ])]
         where
@@ -1062,6 +1069,78 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                     , nest 2 (vcat [pprInstances $ tail ispecs])
                     ]
              ]
+
+    -- This function tries to reconstruct why a "Coercible ty1 ty2" constraint
+    -- is left over. Therefore its logic has to stay in sync with
+    -- getCoericbleInst in TcInteract. See Note [Coercible Instances]
+    coercible_msg safe_mod rdr_env
+      | clas /= coercibleClass = empty
+      | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
+        Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
+        tc1 == tc2
+      = nest 2 $ vcat $
+          -- Only for safe haskell: First complain if tc is abstract, only if
+          -- not check if the type constructors therein are abstract
+          (if safe_mod
+           then case tyConAbstractMsg rdr_env tc1 empty of
+                    Just msg ->
+                       [ msg $$ ptext (sLit "as required in SafeHaskell mode") ]
+                    Nothing ->
+                       [ msg
+                       | tc <- tyConsOfTyCon tc1
+                       , Just msg <- return $
+                           tyConAbstractMsg rdr_env tc $
+                             parens $ ptext (sLit "used within") <+> quotes (ppr tc1)
+                       ]
+           else []
+          ) ++
+          [ fsep [ hsep [ ptext $ sLit "because the", speakNth n, ptext $ sLit "type argument"]
+                 , hsep [ ptext $ sLit "of", quotes (ppr tc1), ptext $ sLit "has role Nominal,"]
+                 , ptext $ sLit "but the arguments"
+                 , quotes (ppr t1)
+                 , ptext $ sLit "and"
+                 , quotes (ppr t2)
+                 , ptext $ sLit "differ" ]
+          | (n,Nominal,t1,t2) <- zip4 [1..] (tyConRoles tc1) tyArgs1 tyArgs2
+          , not (t1 `eqType` t2)
+          ]
+      | Just (tc,_) <- splitTyConApp_maybe ty1,
+        Just msg <- coercible_msg_for_tycon rdr_env tc
+      = msg
+      | Just (tc,_) <- splitTyConApp_maybe ty2,
+        Just msg <- coercible_msg_for_tycon rdr_env tc
+      = msg
+      | otherwise
+      = nest 2 $ hsep [ ptext $ sLit "because", quotes (ppr ty1),
+                        ptext $ sLit "and", quotes (ppr ty2),
+                        ptext $ sLit "are different types." ]
+      where
+        (clas, ~[ty1,ty2]) = getClassPredTys (ctPred ct)
+
+    dataConMissing rdr_env tc =
+        all (null . lookupGRE_Name rdr_env) (map dataConName (tyConDataCons tc))
+
+    coercible_msg_for_tycon rdr_env tc
+        | isRecursiveTyCon tc
+        = Just $ nest 2 $ hsep [ ptext $ sLit "because", quotes (ppr tc)
+                               , ptext $ sLit "is a recursive type constuctor" ]
+        | isNewTyCon tc
+        = tyConAbstractMsg rdr_env tc empty
+        | otherwise
+        = Nothing
+
+    tyConAbstractMsg rdr_env tc occExpl
+        | isAbstractTyCon tc || dataConMissing rdr_env tc = Just $ vcat $
+            [ fsep [ ptext $ sLit "because the type constructor", quotes (ppr tc) <+> occExpl
+                   , ptext $ sLit "is abstract" ]
+            | isAbstractTyCon tc
+            ] ++
+            [ fsep [ ptext (sLit "because the constructor") <> plural (tyConDataCons tc)
+                   , ptext (sLit "of") <+> quotes (ppr tc) <+> occExpl
+                   , isOrAre (tyConDataCons tc) <+> ptext (sLit "not imported") ]
+            | dataConMissing rdr_env tc
+            ]
+        | otherwise = Nothing
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty
@@ -1170,18 +1249,30 @@ getSkolemInfo (implic:implics) tv
 -- types mention any of the offending type variables.  It has to be
 -- careful to zonk the Id's type first, so it has to be in the monad.
 -- We must be careful to pass it a zonked type variable, too.
+--
+-- We always remove closed top-level bindings, though, 
+-- since they are never relevant (cf Trac #8233)
 
-relevantBindings :: ReportErrCtxt -> Ct
+relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
+                          -- See Trac #8191
+                 -> ReportErrCtxt -> Ct
                  -> TcM (ReportErrCtxt, SDoc)
-relevantBindings ctxt ct
-  = do { (tidy_env', docs) <- go (cec_tidy ctxt) (6, emptyVarSet) 
-                                 (reverse (tcl_bndrs lcl_env))
-         -- The 'reverse' makes us work from outside in
-         -- Blargh; maybe have a flag for this "6"
+relevantBindings want_filtering ctxt ct
+  = do { dflags <- getDynFlags
+       ; (tidy_env', docs, discards) 
+              <- go (cec_tidy ctxt) (maxRelevantBinds dflags) 
+                    emptyVarSet [] False
+                    (tcl_bndrs lcl_env)
+         -- tcl_bndrs has the innermost bindings first, 
+         -- which are probably the most relevant ones
 
        ; traceTc "relevantBindings" (ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
        ; let doc = hang (ptext (sLit "Relevant bindings include")) 
-                      2 (vcat docs)
+                      2 (vcat docs $$ max_msg)
+             max_msg | discards 
+                     = ptext (sLit "(Some bindings suppressed; use -fmax-relevant-binds=N or -fno-max-relevant-binds)")
+                     | otherwise = empty
+
        ; if null docs 
          then return (ctxt, empty)
          else do { traceTc "rb" doc
@@ -1190,28 +1281,45 @@ relevantBindings ctxt ct
     lcl_env = ctLocEnv (cc_loc ct)
     ct_tvs = tyVarsOfCt ct
 
-    go :: TidyEnv -> (Int, TcTyVarSet)
-       -> [TcIdBinder] -> TcM (TidyEnv, [SDoc])
-    go tidy_env (_,_) []
-       = return (tidy_env, [])
-    go tidy_env (n_left,tvs_seen) (TcIdBndr id _ : tc_bndrs)
-       | n_left <= 0, ct_tvs `subVarSet` tvs_seen
-       =   -- We have run out of n_left, and we
-           -- already have bindings mentioning all of ct_tvs
-         go tidy_env (n_left,tvs_seen) tc_bndrs
-       | otherwise
+    run_out :: Maybe Int -> Bool
+    run_out Nothing = False
+    run_out (Just n) = n <= 0
+
+    dec_max :: Maybe Int -> Maybe Int
+    dec_max = fmap (\n -> n - 1)
+
+    go :: TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc] 
+       -> Bool                          -- True <=> some filtered out due to lack of fuel
+       -> [TcIdBinder] 
+       -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
+                                        -- because of lack of fuel
+    go tidy_env _ _ docs discards []
+       = return (tidy_env, reverse docs, discards)
+    go tidy_env n_left tvs_seen docs discards (TcIdBndr id top_lvl : tc_bndrs)
        = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
             ; let id_tvs = tyVarsOfType tidy_ty
                   doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
 		            , nest 2 (parens (ptext (sLit "bound at")
 			    	 <+> ppr (getSrcLoc id)))]
-            ; if id_tvs `intersectsVarSet` ct_tvs 
-              && (n_left > 0 || not (id_tvs `subVarSet` tvs_seen))
-                       -- Either we n_left is big enough, 
-                       -- or this binding mentions a new type variable
-              then do { (env', docs) <- go tidy_env' (n_left - 1, tvs_seen `unionVarSet` id_tvs) tc_bndrs
-                      ; return (env', doc:docs) }
-	      else go tidy_env (n_left, tvs_seen) tc_bndrs }
+                  new_seen = tvs_seen `unionVarSet` id_tvs
+
+            ; if (want_filtering && id_tvs `disjointVarSet` ct_tvs)
+                       -- We want to filter out this binding anyway
+                       -- so discard it silently
+              then go tidy_env n_left tvs_seen docs discards tc_bndrs
+
+              else if isTopLevel top_lvl && not (isNothing n_left)
+                       -- It's a top-level binding and we have not specified
+                       -- -fno-max-relevant-bindings, so discard it silently
+              then go tidy_env n_left tvs_seen docs discards tc_bndrs
+
+              else if run_out n_left && id_tvs `subVarSet` tvs_seen
+                       -- We've run out of n_left fuel and this binding only
+                       -- mentions aleady-seen type variables, so discard it
+              then go tidy_env n_left tvs_seen docs True tc_bndrs
+
+                       -- Keep this binding, decrement fuel
+              else go tidy_env' (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
 
 -----------------------
 warnDefaulting :: Cts -> Type -> TcM ()

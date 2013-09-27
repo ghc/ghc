@@ -70,20 +70,26 @@ module HscMain
     , hscDecls, hscDeclsWithLocation
     , hscTcExpr, hscImport, hscKcType
     , hscCompileCoreExpr
+    -- * Low-level exports for hooks
+    , hscCompileCoreExpr'
 #endif
+    , hscParse', hscSimplify', hscDesugar', tcRnModule'
+    , hscSimpleIface', hscNormalIface'
+    , oneShotMsg
+    , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
     ) where
 
 #ifdef GHCI
 import Id
+import BasicTypes       ( HValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
 import Type             ( Type )
 import PrelNames
 import {- Kind parts of -} Type         ( Kind )
-import CoreLint         ( lintUnfolding )
+import CoreMonad        ( lintInteractiveExpr )
 import DsMeta           ( templateHaskellNames )
-import VarSet
 import VarEnv           ( emptyTidyEnv )
 import Panic
 
@@ -129,6 +135,7 @@ import NameSet          ( emptyNameSet )
 import InstEnv
 import FamInstEnv
 import Fingerprint      ( Fingerprint )
+import Hooks
 
 import DynFlags
 import ErrUtils
@@ -191,34 +198,6 @@ knownKeyNames =              -- where templateHaskellNames are defined
 #endif
 
 -- -----------------------------------------------------------------------------
--- The Hsc monad: Passing an enviornment and warning state
-
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-
-instance Monad Hsc where
-    return a    = Hsc $ \_ w -> return (a, w)
-    Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
-                                   case k a of
-                                       Hsc k' -> k' e w1
-
-instance MonadIO Hsc where
-    liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
-
-instance Functor Hsc where
-    fmap f m = m >>= \a -> return $ f a
-
-runHsc :: HscEnv -> Hsc a -> IO a
-runHsc hsc_env (Hsc hsc) = do
-    (a, w) <- hsc hsc_env emptyBag
-    printOrThrowWarnings (hsc_dflags hsc_env) w
-    return a
-
--- A variant of runHsc that switches in the DynFlags from the
--- InteractiveContext before running the Hsc computation.
---
-runInteractiveHsc :: HscEnv -> Hsc a -> IO a
-runInteractiveHsc hsc_env =
-  runHsc (hsc_env { hsc_dflags = ic_dflags (hsc_IC hsc_env) })
 
 getWarnings :: Hsc WarningMessages
 getWarnings = Hsc $ \_ w -> return (w, w)
@@ -231,9 +210,6 @@ logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
-
-instance HasDynFlags Hsc where
-    getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
@@ -303,7 +279,7 @@ hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
 
-hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst Branched]))
+hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
 hscTcRnGetInfo hsc_env0 name = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   ioMsgMaybe' $ tcRnGetInfo hsc_env name
@@ -524,13 +500,6 @@ This is the only thing that isn't caught by the type-system.
 -}
 
 
--- | Status of a compilation to hard-code
-data HscStatus
-    = HscNotGeneratingCode
-    | HscUpToDate
-    | HscUpdateBoot
-    | HscRecomp CgGuts ModSummary
-
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModSummary -> IO ()
 
 genericHscCompileGetFrontendResult ::
@@ -604,23 +573,35 @@ genericHscCompileGetFrontendResult always_do_basic_recompilation_check m_tc_resu
                         return $ Right (tc_result, mb_old_hash)
 
 genericHscFrontend :: ModSummary -> Hsc TcGblEnv
-genericHscFrontend mod_summary
+genericHscFrontend mod_summary =
+  getHooked hscFrontendHook genericHscFrontend' >>= ($ mod_summary)
+
+genericHscFrontend' :: ModSummary -> Hsc TcGblEnv
+genericHscFrontend' mod_summary
     | ExtCoreFile <- ms_hsc_src mod_summary =
         panic "GHC does not currently support reading External Core files"
-    | otherwise = do
+    | otherwise =
         hscFileFrontEnd mod_summary
 
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
 
--- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: HscEnv
                   -> FilePath
                   -> ModSummary
                   -> SourceModified
                   -> IO HscStatus
-hscCompileOneShot hsc_env extCore_filename mod_summary src_changed
+hscCompileOneShot env =
+  lookupHook hscCompileOneShotHook hscCompileOneShot' (hsc_dflags env) env
+
+-- Compile Haskell, boot and extCore in OneShot mode.
+hscCompileOneShot' :: HscEnv
+                   -> FilePath
+                   -> ModSummary
+                   -> SourceModified
+                   -> IO HscStatus
+hscCompileOneShot' hsc_env extCore_filename mod_summary src_changed
   = do
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
@@ -637,6 +618,7 @@ hscCompileOneShot hsc_env extCore_filename mod_summary src_changed
         compile mb_old_hash reason = runHsc hsc_env' $ do
             liftIO $ msg reason
             tc_result <- genericHscFrontend mod_summary
+            guts0 <- hscDesugar' (ms_location mod_summary) tc_result
             dflags <- getDynFlags
             case hscTarget dflags of
                 HscNothing -> return HscNotGeneratingCode
@@ -647,8 +629,7 @@ hscCompileOneShot hsc_env extCore_filename mod_summary src_changed
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return HscUpdateBoot
                     _ ->
-                        do guts0 <- hscDesugar' (ms_location mod_summary) tc_result
-                           guts <- hscSimplify' guts0
+                        do guts <- hscSimplify' guts0
                            (iface, changed, _details, cgguts) <- hscNormalIface' extCore_filename guts mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return $ HscRecomp cgguts mod_summary
@@ -1135,7 +1116,7 @@ hscWriteIface dflags iface no_change mod_summary = do
         -- TODO: Should handle the dynamic hi filename properly
         let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
             dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
-            dynDflags = doDynamicToo dflags
+            dynDflags = dynamicTooMkDynamicDynFlags dflags
         writeIfaceFile dynDflags dynIfaceFile' iface
 
 -- | Compile to hard-code.
@@ -1324,7 +1305,7 @@ myCoreToStg :: DynFlags -> Module -> CoreProgram
 myCoreToStg dflags this_mod prepd_binds = do
     stg_binds
         <- {-# SCC "Core2Stg" #-}
-           coreToStg dflags prepd_binds
+           coreToStg dflags this_mod prepd_binds
 
     (stg_binds2, cost_centre_info)
         <- {-# SCC "Stg2Stg" #-}
@@ -1385,12 +1366,12 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
 
             -- Desugar it
             ds_expr <- ioMsgMaybe $
-                           deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
+                       deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
+            liftIO (lintInteractiveExpr "desugar expression" hsc_env ds_expr)
             handleWarnings
 
             -- Then code-gen, and link it
-            hsc_env <- getHscEnv
-            hval    <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
+            hval <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
             let hval_io = unsafeCoerce# hval :: IO [HValue]
 
             return $ Just (ids, hval_io, fix_env)
@@ -1613,42 +1594,37 @@ mkModGuts mod safe binds =
 
 #ifdef GHCI
 hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
-hscCompileCoreExpr hsc_env srcspan ds_expr
+hscCompileCoreExpr hsc_env =
+  lookupHook hscCompileCoreExprHook hscCompileCoreExpr' (hsc_dflags hsc_env) hsc_env
+
+hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
+hscCompileCoreExpr' hsc_env srcspan ds_expr
     | rtsIsProfiled
     = throwIO (InstallationError "You can't call hscCompileCoreExpr in a profiled compiler")
             -- Otherwise you get a seg-fault when you run it
 
-    | otherwise = do
-        let dflags = hsc_dflags hsc_env
-        let lint_on = gopt Opt_DoCoreLinting dflags
+    | otherwise
+    = do { let dflags = hsc_dflags hsc_env
 
-        {- Simplify it -}
-        simpl_expr <- simplifyExpr dflags ds_expr
+           {- Simplify it -}
+         ; simpl_expr <- simplifyExpr dflags ds_expr
 
-        {- Tidy it (temporary, until coreSat does cloning) -}
-        let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
+           {- Tidy it (temporary, until coreSat does cloning) -}
+         ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
 
-        {- Prepare for codegen -}
-        prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
+           {- Prepare for codegen -}
+         ; prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
 
-        {- Lint if necessary -}
-        -- ToDo: improve SrcLoc
-        when lint_on $
-            let ictxt  = hsc_IC hsc_env
-                te     = mkTypeEnvWithImplicits (ic_tythings ictxt ++ map AnId (ic_sys_vars ictxt))
-                tyvars = varSetElems $ tyThingsTyVars $ typeEnvElts $ te
-                vars   = typeEnvIds te
-            in case lintUnfolding noSrcLoc (tyvars ++ vars) prepd_expr of
-                   Just err -> pprPanic "hscCompileCoreExpr" err
-                   Nothing  -> return ()
+           {- Lint if necessary -}
+         ; lintInteractiveExpr "hscCompileExpr" hsc_env prepd_expr 
 
-        {- Convert to BCOs -}
-        bcos <- coreExprToBCOs dflags iNTERACTIVE prepd_expr
+           {- Convert to BCOs -}
+         ; bcos <- coreExprToBCOs dflags iNTERACTIVE prepd_expr
 
-        {- link it -}
-        hval <- linkExpr hsc_env srcspan bcos
+           {- link it -}
+         ; hval <- linkExpr hsc_env srcspan bcos
 
-        return hval
+         ; return hval }
 #endif
 
 

@@ -99,6 +99,7 @@ Library
 
     c-sources:
         ghci/keepCAFsForGHCi.c
+        cbits/genSym.c
 
     hs-source-dirs:
         basicTypes
@@ -133,11 +134,13 @@ Library
         Demand
         Exception
         GhcMonad
+        Hooks
         Id
         IdInfo
         Literal
         Llvm
         Llvm.AbsSyn
+        Llvm.MetaData
         Llvm.PpLlvm
         Llvm.Types
         LlvmCodeGen
@@ -206,7 +209,6 @@ Library
         StgCmmEnv
         StgCmmExpr
         StgCmmForeign
-        StgCmmGran
         StgCmmHeap
         StgCmmHpc
         StgCmmArgRep
@@ -275,6 +277,7 @@ Library
         Constants
         DriverMkDepend
         DriverPhases
+        PipelineMonad
         DriverPipeline
         DynFlags
         ErrUtils
@@ -382,6 +385,7 @@ Library
         TcInteract
         TcCanonical
         TcSMonad
+        TcTypeNats
         Class
         Coercion
         FamInstEnv
@@ -395,6 +399,7 @@ Library
         Unify
         Bag
         Binary
+        BooleanFormula
         BufWrite
         Digraph
         Encoding
@@ -425,6 +430,8 @@ Library
         UniqFM
         UniqSet
         Util
+        ExtsCompat46
+--      ^^^  a temporary module necessary to bootstrap with GHC <= 7.6
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins
@@ -456,7 +463,6 @@ Library
         Vectorise
         Hoopl.Dataflow
         Hoopl
-
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 

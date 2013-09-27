@@ -20,7 +20,6 @@
 --                This will be cleaned up when we change the internal represention of '[::]' to not
 --                rely on a wired-in type constructor.
 
--- #hide
 module GHC.PArr where
 
 import GHC.Base

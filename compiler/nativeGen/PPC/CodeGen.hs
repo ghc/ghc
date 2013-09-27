@@ -561,7 +561,7 @@ getRegister' _ (CmmLit (CmmInt i rep))
 getRegister' _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
     dflags <- getDynFlags
-    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+    dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let size = floatSize frep
         code dst =
@@ -913,7 +913,7 @@ genCCall' _ _ (PrimTarget MO_Touch) _ _
  = return $ nilOL
 
 genCCall' dflags gcp target dest_regs args0
-  = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
+  = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
@@ -1107,7 +1107,7 @@ genCCall' dflags gcp target dest_regs args0
         outOfLineMachOp mop =
             do
                 dflags <- getDynFlags
-                mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
+                mopExpr <- cmmMakeDynamicReference dflags CallReference $
                               mkForeignLabel functionName Nothing ForeignLabelInThisPackage IsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
@@ -1155,6 +1155,7 @@ genCCall' dflags gcp target dest_regs args0
                     MO_Memset    -> (fsLit "memset", False)
                     MO_Memmove   -> (fsLit "memmove", False)
 
+                    MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
 
                     MO_S_QuotRem {}  -> unsupported
@@ -1179,7 +1180,7 @@ genSwitch dflags expr ids
         tmp <- getNewRegNat II32
         lbl <- getNewLabelNat
         dflags <- getDynFlags
-        dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let code = e_code `appOL` t_code `appOL` toOL [
                             SLW tmp reg (RIImm (ImmInt 2)),
@@ -1382,7 +1383,7 @@ coerceInt2FP fromRep toRep x = do
     itmp <- getNewRegNat II32
     ftmp <- getNewRegNat FF64
     dflags <- getDynFlags
-    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+    dynRef <- cmmMakeDynamicReference dflags DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [

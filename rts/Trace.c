@@ -180,6 +180,7 @@ static char *thread_stop_reasons[] = {
     [ThreadSwitch]                              = "switched to",
     [THREAD_SUSPENDED_FOREIGN_CALL]             = "suspended while making a foreign call",
     [STOP_EVENT_OFFSET + BlockedOnMVar]         = "blocked on an MVar",
+    [STOP_EVENT_OFFSET + BlockedOnMVarRead]     = "blocked on an atomic MVar read",
     [STOP_EVENT_OFFSET + BlockedOnBlackHole]    = "blocked on a black hole",
     [STOP_EVENT_OFFSET + BlockedOnRead]         = "blocked on a read operation",
     [STOP_EVENT_OFFSET + BlockedOnWrite]        = "blocked on a write operation",

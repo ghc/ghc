@@ -6,7 +6,7 @@
 -- Module      :  Data.Bits
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Bits ( 
+module Data.Bits (
   Bits(
     (.&.), (.|.), xor,
     complement,
@@ -49,20 +49,12 @@ module Data.Bits (
 -- See library document for details on the semantics of the
 -- individual operations.
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 #include "MachDeps.h"
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 import Data.Maybe
 import GHC.Enum
 import GHC.Num
 import GHC.Base
-#endif
-
-#ifdef __HUGS__
-import Hugs.Bits
-#endif
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
@@ -71,7 +63,7 @@ infixl 5 .|.
 
 {-# DEPRECATED bitSize "Use bitSizeMaybe or finiteBitSize instead" #-} -- deprecated in 7.8
 
-{-| 
+{-|
 The 'Bits' class defines bitwise operations over integral types.
 
 * Bits are numbered from 0 with bit 0 being the least
@@ -157,6 +149,8 @@ class Eq a => Bits a where
     {-| Return the number of bits in the type of the argument.  The actual
         value of the argument is ignored.  Returns Nothing
         for types that do not have a fixed bitsize, like 'Integer'.
+
+        /Since: 4.7.0.0/
         -}
     bitSizeMaybe      :: a -> Maybe Int
 
@@ -191,7 +185,9 @@ class Eq a => Bits a where
         result is undefined for negative shift amounts and shift amounts
         greater or equal to the 'bitSize'.
 
-        Defaults to 'shiftL' unless defined explicitly by an instance. -}
+        Defaults to 'shiftL' unless defined explicitly by an instance.
+
+        /Since: 4.5.0.0/ -}
     unsafeShiftL            :: a -> Int -> a
     {-# INLINE unsafeShiftL #-}
     x `unsafeShiftL` i = x `shiftL` i
@@ -218,7 +214,9 @@ class Eq a => Bits a where
         i.e. they fill the top bits with 1 if the @x@ is negative
         and with 0 otherwise.
 
-        Defaults to 'shiftR' unless defined explicitly by an instance. -}
+        Defaults to 'shiftR' unless defined explicitly by an instance.
+
+        /Since: 4.5.0.0/ -}
     unsafeShiftR            :: a -> Int -> a
     {-# INLINE unsafeShiftR #-}
     x `unsafeShiftR` i = x `shiftR` i
@@ -244,10 +242,30 @@ class Eq a => Bits a where
     x `rotateR` i = x `rotate` (-i)
 
     {-| Return the number of set bits in the argument.  This number is
-        known as the population count or the Hamming weight. -}
+        known as the population count or the Hamming weight.
+
+        /Since: 4.5.0.0/ -}
     popCount          :: a -> Int
 
+    {-# MINIMAL (.&.), (.|.), xor, complement,
+                (shift | (shiftL, shiftR)),
+                (rotate | (rotateL, rotateR)),
+                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+
+-- |The 'FiniteBits' class denotes types with a finite, fixed number of bits.
+--
+-- /Since: 4.7.0.0/
 class Bits b => FiniteBits b where
+    -- | Return the number of bits in the type of the argument.
+    -- The actual value of the argument is ignored. Moreover, 'finiteBitSize'
+    -- is total, in contrast to the deprecated 'bitSize' function it replaces.
+    --
+    -- @
+    -- 'finiteBitSize' = 'bitSize'
+    -- 'bitSizeMaybe' = 'Just' . 'finiteBitSize'
+    -- @
+    --
+    -- /Since: 4.7.0.0/
     finiteBitSize :: b -> Int
 
 -- The defaults below are written with lambdas so that e.g.
@@ -257,6 +275,8 @@ class Bits b => FiniteBits b where
 -- | Default implementation for 'bit'.
 --
 -- Note that: @bitDefault i = 1 `shiftL` i@
+--
+-- /Since: 4.6.0.0/
 bitDefault :: (Bits a, Num a) => Int -> a
 bitDefault = \i -> 1 `shiftL` i
 {-# INLINE bitDefault #-}
@@ -264,6 +284,8 @@ bitDefault = \i -> 1 `shiftL` i
 -- | Default implementation for 'testBit'.
 --
 -- Note that: @testBitDefault x i = (x .&. bit i) /= 0@
+--
+-- /Since: 4.6.0.0/
 testBitDefault ::  (Bits a, Num a) => a -> Int -> Bool
 testBitDefault = \x i -> (x .&. bit i) /= 0
 {-# INLINE testBitDefault #-}
@@ -272,6 +294,8 @@ testBitDefault = \x i -> (x .&. bit i) /= 0
 --
 -- This implementation is intentionally naive. Instances are expected to provide
 -- an optimized implementation for their size.
+--
+-- /Since: 4.6.0.0/
 popCountDefault :: (Bits a, Num a) => a -> Int
 popCountDefault = go 0
  where
@@ -284,7 +308,6 @@ instance Bits Int where
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
 
-#ifdef __GLASGOW_HASKELL__
     bit     = bitDefault
 
     testBit = testBitDefault
@@ -298,11 +321,11 @@ instance Bits Int where
     complement (I# x#)     = I# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
 
     (I# x#) `shift` (I# i#)
-        | i# >=# 0#        = I# (x# `iShiftL#` i#)
-        | otherwise        = I# (x# `iShiftRA#` negateInt# i#)
-    (I# x#) `shiftL` (I# i#) = I# (x# `iShiftL#` i#)
+        | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
+        | otherwise                = I# (x# `iShiftRA#` negateInt# i#)
+    (I# x#) `shiftL` (I# i#)       = I# (x# `iShiftL#` i#)
     (I# x#) `unsafeShiftL` (I# i#) = I# (x# `uncheckedIShiftL#` i#)
-    (I# x#) `shiftR` (I# i#) = I# (x# `iShiftRA#` i#)
+    (I# x#) `shiftR` (I# i#)       = I# (x# `iShiftRA#` i#)
     (I# x#) `unsafeShiftR` (I# i#) = I# (x# `uncheckedIShiftRA#` i#)
 
     {-# INLINE rotate #-} 	-- See Note [Constant folding for rotate]
@@ -318,37 +341,11 @@ instance Bits Int where
 
     popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
 
-#else /* !__GLASGOW_HASKELL__ */
-
-    popCount               = popCountDefault
-
-#ifdef __HUGS__
-    (.&.)                  = primAndInt
-    (.|.)                  = primOrInt
-    xor                    = primXorInt
-    complement             = primComplementInt
-    shift                  = primShiftInt
-    bit                    = primBitInt
-    testBit                = primTestInt
-    bitSize _              = SIZEOF_HSINT*8
-#endif
-
-    x `rotate`  i
-        | i<0 && x<0       = let left = i+bitSize x in
-                             ((x `shift` i) .&. complement ((-1) `shift` left))
-                             .|. (x `shift` left)
-        | i<0              = (x `shift` i) .|. (x `shift` (i+bitSize x))
-        | i==0             = x
-        | i>0              = (x `shift` i) .|. (x `shift` (i-bitSize x))
-
-#endif /* !__GLASGOW_HASKELL__ */
-
     isSigned _             = True
 
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
 
-#if defined(__GLASGOW_HASKELL__)
 instance Bits Word where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -360,14 +357,14 @@ instance Bits Word where
     complement (W# x#)       = W# (x# `xor#` mb#)
         where !(W# mb#) = maxBound
     (W# x#) `shift` (I# i#)
-        | i# >=# 0#          = W# (x# `shiftL#` i#)
-        | otherwise          = W# (x# `shiftRL#` negateInt# i#)
-    (W# x#) `shiftL` (I# i#) = W# (x# `shiftL#` i#)
+        | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
+        | otherwise                = W# (x# `shiftRL#` negateInt# i#)
+    (W# x#) `shiftL` (I# i#)       = W# (x# `shiftL#` i#)
     (W# x#) `unsafeShiftL` (I# i#) = W# (x# `uncheckedShiftL#` i#)
-    (W# x#) `shiftR` (I# i#) = W# (x# `shiftRL#` i#)
+    (W# x#) `shiftR` (I# i#)       = W# (x# `shiftRL#` i#)
     (W# x#) `unsafeShiftR` (I# i#) = W# (x# `uncheckedShiftRL#` i#)
     (W# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W# x#
+        | isTrue# (i'# ==# 0#) = W# x#
         | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
@@ -381,10 +378,8 @@ instance Bits Word where
 
 instance FiniteBits Word where
     finiteBitSize _ = WORD_SIZE_IN_BITS
-#endif
 
 instance Bits Integer where
-#if defined(__GLASGOW_HASKELL__)
    (.&.) = andInteger
    (.|.) = orInteger
    xor = xorInteger
@@ -392,26 +387,6 @@ instance Bits Integer where
    shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
                      | otherwise = shiftRInteger x (negateInt# i#)
    testBit x (I# i) = testBitInteger x i
-#else
-   -- reduce bitwise binary operations to special cases we can handle
-
-   x .&. y   | x<0 && y<0 = complement (complement x `posOr` complement y)
-             | otherwise  = x `posAnd` y
-   
-   x .|. y   | x<0 || y<0 = complement (complement x `posAnd` complement y)
-             | otherwise  = x `posOr` y
-   
-   x `xor` y | x<0 && y<0 = complement x `posXOr` complement y
-             | x<0        = complement (complement x `posXOr` y)
-             |        y<0 = complement (x `posXOr` complement y)
-             | otherwise  = x `posXOr` y
-
-   -- assuming infinite 2's-complement arithmetic
-   complement a = -1 - a
-   shift x i | i >= 0    = x * 2^i
-             | otherwise = x `div` 2^(-i)
-   testBit    = testBitDefault
-#endif
 
    bit        = bitDefault
    popCount   = popCountDefault
@@ -421,38 +396,6 @@ instance Bits Integer where
    bitSizeMaybe _ = Nothing
    bitSize _  = error "Data.Bits.bitSize(Integer)"
    isSigned _ = True
-
-#if !defined(__GLASGOW_HASKELL__)
--- Crude implementation of bitwise operations on Integers: convert them
--- to finite lists of Ints (least significant first), zip and convert
--- back again.
-
--- posAnd requires at least one argument non-negative
--- posOr and posXOr require both arguments non-negative
-
-posAnd, posOr, posXOr :: Integer -> Integer -> Integer
-posAnd x y   = fromInts $ zipWith (.&.) (toInts x) (toInts y)
-posOr x y    = fromInts $ longZipWith (.|.) (toInts x) (toInts y)
-posXOr x y   = fromInts $ longZipWith xor (toInts x) (toInts y)
-
-longZipWith :: (a -> a -> a) -> [a] -> [a] -> [a]
-longZipWith f xs [] = xs
-longZipWith f [] ys = ys
-longZipWith f (x:xs) (y:ys) = f x y:longZipWith f xs ys
-
-toInts :: Integer -> [Int]
-toInts n
-    | n == 0 = []
-    | otherwise = mkInt (n `mod` numInts):toInts (n `div` numInts)
-  where mkInt n | n > toInteger(maxBound::Int) = fromInteger (n-numInts)
-                | otherwise = fromInteger n
-
-fromInts :: [Int] -> Integer
-fromInts = foldr catInt 0
-    where catInt d n = (if d<0 then n+1 else n)*numInts + toInteger d
-
-numInts = toInteger (maxBound::Int) - toInteger (minBound::Int) + 1
-#endif /* !__GLASGOW_HASKELL__ */
 
 {- 	Note [Constant folding for rotate]
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -477,5 +420,5 @@ own to enable constant folding; for example 'shift':
            __DEFAULT -> Main.$wfold (+# ww_sOb 56) (+# wild_XM 1);
            10000000 -> ww_sOb
          }
--} 
+-}
 

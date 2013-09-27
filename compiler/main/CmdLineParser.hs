@@ -30,6 +30,9 @@ import SrcLoc
 import Data.Function
 import Data.List
 
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
+
 
 --------------------------------------------------------
 --         The Flag and OptKind types
@@ -72,6 +75,13 @@ newtype EwM m a = EwM { unEwM :: Located String -- Current parse arg
                               -> Errs -> Warns
                               -> m (Errs, Warns, a) }
 
+instance Monad m => Functor (EwM m) where
+    fmap = liftM
+
+instance Monad m => Applicative (EwM m) where
+    pure = return
+    (<*>) = ap
+
 instance Monad m => Monad (EwM m) where
     (EwM f) >>= k = EwM (\l e w -> do (e', w', r) <- f l e w
                                       unEwM (k r) l e' w')
@@ -107,6 +117,13 @@ liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
 -- (CmdLineP s) typically instantiates the 'm' in (EwM m) and (OptKind m)
 newtype CmdLineP s a = CmdLineP { runCmdLine :: s -> (a, s) }
+
+instance Functor (CmdLineP s) where
+    fmap = liftM
+
+instance Applicative (CmdLineP s) where
+    pure = return
+    (<*>) = ap
 
 instance Monad (CmdLineP s) where
     m >>= k = CmdLineP $ \s ->
@@ -203,6 +220,7 @@ processOneArg opt_kind rest arg args
                           Just min <- parseInt min_s -> Right (f maj min, args)
                         | [maj_s] <- split '.' rest_no_eq,
                           Just maj <- parseInt maj_s -> Right (f maj 0, args)
+                        | null rest_no_eq -> Right (f 1 0, args)
                         | otherwise -> Left ("malformed version argument in " ++ dash_arg)
 
 

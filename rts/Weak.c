@@ -16,46 +16,39 @@
 #include "Prelude.h"
 #include "Trace.h"
 
-// ForeignPtrs with C finalizers rely on weak pointers inside weak_ptr_list
-// to always be in the same order.
-
-StgWeak *weak_ptr_list;
-
-  void
-runCFinalizer(void *fn, void *ptr, void *env, StgWord flag)
+void
+runCFinalizers(StgCFinalizerList *list)
 {
-  if (flag)
-    ((void (*)(void *, void *))fn)(env, ptr);
-  else
-    ((void (*)(void *))fn)(ptr);
+    StgCFinalizerList *head;
+    for (head = list;
+        (StgClosure *)head != &stg_NO_FINALIZER_closure;
+        head = (StgCFinalizerList *)head->link)
+    {
+        if (head->flag)
+            ((void (*)(void *, void *))head->fptr)(head->eptr, head->ptr);
+        else
+            ((void (*)(void *))head->fptr)(head->ptr);
+    }
 }
 
-  void
+void
 runAllCFinalizers(StgWeak *list)
 {
-  StgWeak *w;
-  Task *task;
+    StgWeak *w;
+    Task *task;
 
-  task = myTask();
-  if (task != NULL) {
-    task->running_finalizers = rtsTrue;
-  }
+    task = myTask();
+    if (task != NULL) {
+        task->running_finalizers = rtsTrue;
+    }
 
-  for (w = list; w; w = w->link) {
-    StgArrWords *farr;
+    for (w = list; w; w = w->link) {
+	runCFinalizers((StgCFinalizerList *)w->cfinalizers);
+    }
 
-    farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
-
-    if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-      runCFinalizer((void *)farr->payload[0],
-                    (void *)farr->payload[1],
-                    (void *)farr->payload[2],
-                    farr->payload[3]);
-  }
-
-  if (task != NULL) {
-    task->running_finalizers = rtsFalse;
-  }
+    if (task != NULL) {
+        task->running_finalizers = rtsFalse;
+    }
 }
 
 /*
@@ -73,89 +66,81 @@ runAllCFinalizers(StgWeak *list)
  * Pre-condition: sched_mutex _not_ held.
  */
 
-  void
+void
 scheduleFinalizers(Capability *cap, StgWeak *list)
 {
-  StgWeak *w;
-  StgTSO *t;
-  StgMutArrPtrs *arr;
-  StgWord size;
-  nat n, i;
-  Task *task;
+    StgWeak *w;
+    StgTSO *t;
+    StgMutArrPtrs *arr;
+    StgWord size;
+    nat n, i;
+    Task *task;
 
-  task = myTask();
-  if (task != NULL) {
-    task->running_finalizers = rtsTrue;
-  }
-
-  // count number of finalizers, and kill all the weak pointers first...
-  n = 0;
-  for (w = list; w; w = w->link) {
-    StgArrWords *farr;
-
-    // Better not be a DEAD_WEAK at this stage; the garbage
-    // collector removes DEAD_WEAKs from the weak pointer list.
-    ASSERT(w->header.info != &stg_DEAD_WEAK_info);
-
-    if (w->finalizer != &stg_NO_FINALIZER_closure) {
-      n++;
+    task = myTask();
+    if (task != NULL) {
+        task->running_finalizers = rtsTrue;
     }
 
-    farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
+    // count number of finalizers, and kill all the weak pointers first...
+    n = 0;
+    for (w = list; w; w = w->link) { 
+	// Better not be a DEAD_WEAK at this stage; the garbage
+	// collector removes DEAD_WEAKs from the weak pointer list.
+	ASSERT(w->header.info != &stg_DEAD_WEAK_info);
 
-    if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-      runCFinalizer((void *)farr->payload[0],
-                    (void *)farr->payload[1],
-                    (void *)farr->payload[2],
-                    farr->payload[3]);
+	if (w->finalizer != &stg_NO_FINALIZER_closure) {
+	    n++;
+	}
+
+	runCFinalizers((StgCFinalizerList *)w->cfinalizers);
 
 #ifdef PROFILING
-    // A weak pointer is inherently used, so we do not need to call
-    // LDV_recordDead().
-    //
-    // Furthermore, when PROFILING is turned on, dead weak
-    // pointers are exactly as large as weak pointers, so there is
-    // no need to fill the slop, either.  See stg_DEAD_WEAK_info
-    // in StgMiscClosures.hc.
+        // A weak pointer is inherently used, so we do not need to call
+        // LDV_recordDead().
+	//
+        // Furthermore, when PROFILING is turned on, dead weak
+        // pointers are exactly as large as weak pointers, so there is
+        // no need to fill the slop, either.  See stg_DEAD_WEAK_info
+        // in StgMiscClosures.hc.
 #endif
-    SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
-  }
-
-  if (task != NULL) {
-    task->running_finalizers = rtsFalse;
-  }
-
-  // No finalizers to run?
-  if (n == 0) return;
-
-  debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
-
-  size = n + mutArrPtrsCardTableSize(n);
-  arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
-  TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
-  SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
-  arr->ptrs = n;
-  arr->size = size;
-
-  n = 0;
-  for (w = list; w; w = w->link) {
-    if (w->finalizer != &stg_NO_FINALIZER_closure) {
-      arr->payload[n] = w->finalizer;
-      n++;
+	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
-  }
-  // set all the cards to 1
-  for (i = n; i < size; i++) {
-    arr->payload[i] = (StgClosure *)(W_)(-1);
-  }
+	
+    if (task != NULL) {
+        task->running_finalizers = rtsFalse;
+    }
 
-  t = createIOThread(cap,
-                     RtsFlags.GcFlags.initialStkSize,
-                     rts_apply(cap,
-                               rts_apply(cap,
-                                         (StgClosure *)runFinalizerBatch_closure,
-                                         rts_mkInt(cap,n)),
-                               (StgClosure *)arr)
-                    );
-  scheduleThread(cap,t);
+    // No finalizers to run?
+    if (n == 0) return;
+
+    debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
+
+    size = n + mutArrPtrsCardTableSize(n);
+    arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
+    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
+    arr->ptrs = n;
+    arr->size = size;
+
+    n = 0;
+    for (w = list; w; w = w->link) {
+	if (w->finalizer != &stg_NO_FINALIZER_closure) {
+	    arr->payload[n] = w->finalizer;
+	    n++;
+	}
+    }
+    // set all the cards to 1
+    for (i = n; i < size; i++) {
+        arr->payload[i] = (StgClosure *)(W_)(-1);
+    }
+
+    t = createIOThread(cap, 
+		       RtsFlags.GcFlags.initialStkSize, 
+		       rts_apply(cap,
+			   rts_apply(cap,
+			       (StgClosure *)runFinalizerBatch_closure,
+			       rts_mkInt(cap,n)), 
+			   (StgClosure *)arr)
+	);
+    scheduleThread(cap,t);
 }

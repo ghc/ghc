@@ -119,7 +119,7 @@ startTimer(void)
 void
 stopTimer(void)
 {
-    if (atomic_inc(&timer_disabled) == 1) {
+    if (atomic_inc(&timer_disabled, 1) == 1) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
             stopTicker();
         }

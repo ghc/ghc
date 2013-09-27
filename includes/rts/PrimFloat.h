@@ -14,5 +14,7 @@
 
 StgDouble __int_encodeDouble (I_ j, I_ e);
 StgFloat  __int_encodeFloat (I_ j, I_ e);
+StgDouble __word_encodeDouble (W_ j, I_ e);
+StgFloat  __word_encodeFloat (W_ j, I_ e);
 
 #endif /* RTS_PRIMFLOAT_H */

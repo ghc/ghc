@@ -20,16 +20,20 @@ import VarSet
 import Type
 import Unify
 import FamInstEnv
-import Coercion( mkAxInstRHS )
+import FamInst(TcBuiltInSynFamily(..))
+import InstEnv( lookupInstEnv, instanceDFunId )
 
 import Var
 import TcType
 import PrelNames (singIClassName, ipClassNameKey )
-
+import TysWiredIn ( coercibleClass )
+import Id( idType )
 import Class
 import TyCon
+import DataCon
 import Name
-
+import RdrName ( GlobalRdrEnv, lookupGRE_Name, mkRdrQual, is_as,
+                 is_decl, Provenance(Imported), gre_prov )
 import FunDeps
 
 import TcEvidence
@@ -44,11 +48,12 @@ import Maybes( orElse )
 import Bag
 
 import Control.Monad ( foldM )
+import Data.Maybe ( catMaybes, mapMaybe )
 
 import VarEnv
 
 import Control.Monad( when, unless )
-import Pair ()
+import Pair (Pair(..))
 import Unique( hasKey )
 import UniqFM
 import FastString ( sLit ) 
@@ -243,9 +248,14 @@ spontaneousSolveStage workItem
   = do { mb_solved <- trySpontaneousSolve workItem
        ; case mb_solved of
            SPCantSolve
-              | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
+              | CTyEqCan { cc_tyvar = tv, cc_rhs = rhs, cc_ev = fl } <- workItem
               -- Unsolved equality
-              -> do { n_kicked <- kickOutRewritable (ctEvFlavour fl) tv
+              -> do { untch <- getUntouchables
+                    ; traceTcS "Can't solve tyvar equality" 
+                          (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+                                , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
+                                , text "Untouchables =" <+> ppr untch ])
+                    ; n_kicked <- kickOutRewritable (ctEvFlavour fl) tv
                     ; traceFireTcS workItem $
                       ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked <> colon 
                       <+> ppr workItem
@@ -404,7 +414,8 @@ trySpontaneousSolve :: WorkItem -> TcS SPSolveResult
 trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
                                        , cc_tyvar = tv1, cc_rhs = xi, cc_loc = d })
   | isGiven gw
-  = return SPCantSolve
+  = do { traceTcS "No spontaneous solve for given" (ppr workItem)
+       ; return SPCantSolve }
   | Just tv2 <- tcGetTyVar_maybe xi
   = do { tch1 <- isTouchableMetaTyVarTcS tv1
        ; tch2 <- isTouchableMetaTyVarTcS tv2
@@ -412,21 +423,17 @@ trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
            (True,  True)  -> trySpontaneousEqTwoWay d gw tv1 tv2
            (True,  False) -> trySpontaneousEqOneWay d gw tv1 xi
            (False, True)  -> trySpontaneousEqOneWay d gw tv2 (mkTyVarTy tv1)
-	   _ -> return SPCantSolve }
+	   _              -> return SPCantSolve }
   | otherwise
   = do { tch1 <- isTouchableMetaTyVarTcS tv1
        ; if tch1 then trySpontaneousEqOneWay d gw tv1 xi
-                 else do { untch <- getUntouchables
-                         ; traceTcS "Untouchable LHS, can't spontaneously solve workitem" $
-                           vcat [text "Untouchables =" <+> ppr untch
-                                , text "Workitem =" <+> ppr workItem ]
-                         ; return SPCantSolve }
-       }
+                 else return SPCantSolve }
 
   -- No need for 
   --      trySpontaneousSolve (CFunEqCan ...) = ...
   -- See Note [No touchables as FunEq RHS] in TcSMonad
-trySpontaneousSolve _ = return SPCantSolve
+trySpontaneousSolve item = do { traceTcS "Spont: no tyvar on lhs" (ppr item)
+                              ; return SPCantSolve }
 
 ----------------
 trySpontaneousEqOneWay :: CtLoc -> CtEvidence 
@@ -457,57 +464,6 @@ trySpontaneousEqTwoWay d gw tv1 tv2
     nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
 \end{code}
 
-Note [Kind errors] 
-~~~~~~~~~~~~~~~~~~
-Consider the wanted problem: 
-      alpha ~ (# Int, Int #) 
-where alpha :: ArgKind and (# Int, Int #) :: (#). We can't spontaneously solve this constraint, 
-but we should rather reject the program that give rise to it. If 'trySpontaneousEqTwoWay' 
-simply returns @CantSolve@ then that wanted constraint is going to propagate all the way and 
-get quantified over in inference mode. That's bad because we do know at this point that the 
-constraint is insoluble. Instead, we call 'recKindErrorTcS' here, which will fail later on.
-
-The same applies in canonicalization code in case of kind errors in the givens. 
-
-However, when we canonicalize givens we only check for compatibility (@compatKind@). 
-If there were a kind error in the givens, this means some form of inconsistency or dead code.
-
-You may think that when we spontaneously solve wanteds we may have to look through the 
-bindings to determine the right kind of the RHS type. E.g one may be worried that xi is 
-@alpha@ where alpha :: ? and a previous spontaneous solving has set (alpha := f) with (f :: *).
-But we orient our constraints so that spontaneously solved ones can rewrite all other constraint
-so this situation can't happen. 
-
-Note [Spontaneous solving and kind compatibility] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Note that our canonical constraints insist that *all* equalities (tv ~
-xi) or (F xis ~ rhs) require the LHS and the RHS to have *compatible*
-the same kinds.  ("compatible" means one is a subKind of the other.)
-
-  - It can't be *equal* kinds, because
-     b) wanted constraints don't necessarily have identical kinds
-               eg   alpha::? ~ Int
-     b) a solved wanted constraint becomes a given
-
-  - SPJ thinks that *given* constraints (tv ~ tau) always have that
-    tau has a sub-kind of tv; and when solving wanted constraints
-    in trySpontaneousEqTwoWay we re-orient to achieve this.
-
-  - Note that the kind invariant is maintained by rewriting.
-    Eg wanted1 rewrites wanted2; if both were compatible kinds before,
-       wanted2 will be afterwards.  Similarly givens.
-
-Caveat:
-  - Givens from higher-rank, such as: 
-          type family T b :: * -> * -> * 
-          type instance T Bool = (->) 
-
-          f :: forall a. ((T a ~ (->)) => ...) -> a -> ... 
-          flop = f (...) True 
-     Whereas we would be able to apply the type instance, we would not be able to 
-     use the given (T Bool ~ (->)) in the body of 'flop' 
-
-
 Note [Avoid double unifications] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The spontaneous solver has to return a given which mentions the unified unification
@@ -527,8 +483,6 @@ double unifications is the main reason we disallow touchable
 unification variables as RHS of type family equations: F xis ~ alpha.
 
 \begin{code}
-----------------
-
 solveWithIdentity :: CtLoc -> CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
 -- Solve with the identity coercion 
 -- Precondition: kind(xi) is a sub-kind of kind(tv)
@@ -614,6 +568,7 @@ interactWithInertsStage wi
   = do { traceTcS "interactWithInerts" $ text "workitem = " <+> ppr wi
        ; rels <- extractRelevantInerts wi 
        ; traceTcS "relevant inerts are:" $ ppr rels
+       ; builtInInteractions
        ; foldlBagM interact_next (ContinueWith wi) rels }
 
   where interact_next Stop atomic_inert 
@@ -642,6 +597,31 @@ interactWithInertsStage wi
                        -> do { insertInertItemTcS atomic_inert
                              ; return (ContinueWith wi) }
                }
+
+        -- See if we can compute some new derived work for built-ins.
+        builtInInteractions
+          | CFunEqCan { cc_fun = tc, cc_tyargs = args, cc_rhs = xi } <- wi
+          , Just ops <- isBuiltInSynFamTyCon_maybe tc =
+            do is <- getInertsFunEqTyCon tc
+               traceTcS "builtInCandidates: " $ ppr is
+               let interact = sfInteractInert ops args xi
+               impMbs <- sequence
+                 [ do mb <- newDerived (mkTcEqPred lhs rhs)
+                      case mb of
+                        Just x -> return $ Just $ mkNonCanonical d x
+                        Nothing -> return Nothing
+                 | CFunEqCan { cc_tyargs = iargs
+                             , cc_rhs = ixi
+                             , cc_loc = d } <- is
+                 , Pair lhs rhs <- interact iargs ixi
+                 ]
+               let imps = catMaybes impMbs
+               unless (null imps) $ updWorkListTcS (extendWorkListEqs imps)
+          | otherwise = return ()
+
+
+
+
 \end{code}
 
 \begin{code}
@@ -1397,7 +1377,7 @@ doTopReact inerts workItem
        ; case workItem of
       	   CDictCan { cc_ev = fl, cc_class = cls, cc_tyargs = xis
       	            , cc_loc = d }
-      	      -> doTopReactDict inerts workItem fl cls xis d
+      	      -> doTopReactDict inerts fl cls xis d
 
       	   CFunEqCan { cc_ev = fl, cc_fun = tc, cc_tyargs = args
       	             , cc_rhs = xi, cc_loc = d }
@@ -1407,42 +1387,31 @@ doTopReact inerts workItem
       	         return NoTopInt  }
 
 --------------------
-doTopReactDict :: InertSet -> WorkItem -> CtEvidence -> Class -> [Xi]
+doTopReactDict :: InertSet -> CtEvidence -> Class -> [Xi]
                -> CtLoc -> TcS TopInteractResult
-doTopReactDict inerts workItem fl cls xis loc
-  = do { instEnvs <- getInstEnvs 
-       ; let pred = mkClassPred cls xis
-             fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
-             
-       ; fd_work <- rewriteWithFunDeps fd_eqns loc
-       ; if not (null fd_work) then
-            do { updWorkListTcS (extendWorkListEqs fd_work)
-               ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
-                                   , tir_new_item = ContinueWith workItem } }
-         else if not (isWanted fl) then 
-            return NoTopInt
-         else do
+doTopReactDict inerts fl cls xis loc
+  | not (isWanted fl)
+  = try_fundeps_and_return
 
-       { solved_dicts <- getTcSInerts >>= (return . inert_solved_dicts)
-       ; case lookupSolvedDict solved_dicts pred of {
-            Just ev -> do { setEvBind dict_id (ctEvTerm ev); 
-                          ; return $ 
-                            SomeTopInt { tir_rule = "Dict/Top (cached)" 
-                                       , tir_new_item = Stop } } ;
-            Nothing -> do
+  | Just ev <- lookupSolvedDict inerts pred   -- Cached
+  = do { setEvBind dict_id (ctEvTerm ev); 
+       ; return $ SomeTopInt { tir_rule = "Dict/Top (cached)" 
+                             , tir_new_item = Stop } } 
 
-      { lkup_inst_res  <- matchClassInst inerts cls xis loc
-      ; case lkup_inst_res of
-           GenInst wtvs ev_term -> do { addSolvedDict fl 
-                                      ; doSolveFromInstance wtvs ev_term }
-           NoInstance -> return NoTopInt } } } }
+  | otherwise  -- Not cached
+   = do { lkup_inst_res <- matchClassInst inerts cls xis loc
+         ; case lkup_inst_res of
+               GenInst wtvs ev_term -> do { addSolvedDict fl 
+                                          ; solve_from_instance wtvs ev_term }
+               NoInstance -> try_fundeps_and_return }
    where 
      arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
-     
-     doSolveFromInstance :: [CtEvidence] -> EvTerm -> TcS TopInteractResult
+     pred = mkClassPred cls xis
+                       
+     solve_from_instance :: [CtEvidence] -> EvTerm -> TcS TopInteractResult
       -- Precondition: evidence term matches the predicate workItem
-     doSolveFromInstance evs ev_term 
+     solve_from_instance evs ev_term 
         | null evs
         = do { traceTcS "doTopReact/found nullary instance for" $
                ppr dict_id
@@ -1462,11 +1431,23 @@ doTopReactDict inerts workItem fl cls xis loc
                SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
                           , tir_new_item = Stop } }
 
+     -- We didn't solve it; so try functional dependencies with 
+     -- the instance environment, and return
+     -- NB: even if there *are* some functional dependencies against the
+     -- instance environment, there might be a unique match, and if 
+     -- so we make sure we get on and solve it first. See Note [Weird fundeps]
+     try_fundeps_and_return
+       = do { instEnvs <- getInstEnvs 
+            ; let fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
+            ; fd_work <- rewriteWithFunDeps fd_eqns loc
+            ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
+            ; return NoTopInt }
+       
 --------------------
 doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
                 -> CtLoc -> TcS TopInteractResult
 doTopReactFunEq _ct fl fun_tc args xi loc
-  = ASSERT (isSynFamilyTyCon fun_tc) -- No associated data families have 
+  = ASSERT(isSynFamilyTyCon fun_tc) -- No associated data families have
                                      -- reached this far 
     -- Look in the cache of solved funeqs
     do { fun_eq_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
@@ -1477,23 +1458,32 @@ doTopReactFunEq _ct fl fun_tc args xi loc
                 succeed_with "Fun/Cache" (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
            _other -> 
 
-    -- Look up in top-level instances
+    -- Look up in top-level instances, or built-in axiom
     do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
-           Nothing -> return NoTopInt ;
-           Just (FamInstMatch { fim_instance = famInst
-                              , fim_index    = index
-                              , fim_tys      = rep_tys }) -> 
+           Nothing -> try_improve_and_return ;
+           Just (co, ty) ->
 
     -- Found a top-level instance
     do {    -- Add it to the solved goals
          unless (isDerived fl) (addSolvedFunEq fam_ty fl xi)
 
-       ; let coe_ax = famInstAxiom famInst 
-       ; succeed_with "Fun/Top" (mkTcAxInstCo coe_ax index rep_tys)
-                      (mkAxInstRHS coe_ax index rep_tys) } } } } }
+       ; succeed_with "Fun/Top" co ty } } } } }
   where
     fam_ty = mkTyConApp fun_tc args
+
+    try_improve_and_return =
+      do { case isBuiltInSynFamTyCon_maybe fun_tc of
+             Just ops ->
+               do { let eqns = sfInteractTop ops args xi
+                  ; impsMb <- mapM (\(Pair x y) -> newDerived (mkTcEqPred x y))
+                                   eqns
+                  ; let work = map (mkNonCanonical loc) (catMaybes impsMb)
+                  ; unless (null work) (updWorkListTcS (extendWorkListEqs work))
+                  }
+             _ -> return ()
+         ; return NoTopInt
+         }
 
     succeed_with :: String -> TcCoercion -> TcType -> TcS TopInteractResult
     succeed_with str co rhs_ty    -- co :: fun_tc args ~ rhs_ty
@@ -1591,6 +1581,25 @@ and now we need improvement between that derived superclass an the Given (L a b)
 
 Test typecheck/should_fail/FDsFromGivens also shows why it's a good idea to 
 emit Derived FDs for givens as well. 
+
+Note [Weird fundeps]
+~~~~~~~~~~~~~~~~~~~~
+Consider   class Het a b | a -> b where
+              het :: m (f c) -> a -> m b
+
+	   class GHet (a :: * -> *) (b :: * -> *) | a -> b
+	   instance            GHet (K a) (K [a])
+	   instance Het a b => GHet (K a) (K b)
+
+The two instances don't actually conflict on their fundeps,
+although it's pretty strange.  So they are both accepted. Now
+try   [W] GHet (K Int) (K Bool)
+This triggers fudeps from both instance decls; but it also 
+matches a *unique* instance decl, and we should go ahead and
+pick that one right now.  Otherwise, if we don't, it ends up 
+unsolved in the inert set and is reported as an error.
+
+Trac #7875 is a case in point.
 
 Note [Overriding implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1718,6 +1727,11 @@ data LookupInstResult
   = NoInstance
   | GenInst [CtEvidence] EvTerm 
 
+instance Outputable LookupInstResult where
+  ppr NoInstance = text "NoInstance"
+  ppr (GenInst ev t) = text "GenInst" <+> ppr ev <+> ppr t
+
+
 matchClassInst :: InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
 
 matchClassInst _ clas [ k, ty ] _
@@ -1740,17 +1754,18 @@ matchClassInst _ clas [ k, ty ] _
     case unwrapNewTyCon_maybe (classTyCon clas) of
       Just (_,dictRep, axDict)
         | Just tcSing <- tyConAppTyCon_maybe dictRep ->
-           do mbInst <- matchFam tcSing [k,ty]
+           do mbInst <- matchOpenFam tcSing [k,ty]
               case mbInst of
                 Just FamInstMatch
                   { fim_instance = FamInst { fi_axiom  = axDataFam
                                            , fi_flavor = DataFamilyInst tcon
                                            }
-                  , fim_index = ix, fim_tys = tys
+                  , fim_tys = tys
                   } | Just (_,_,axSing) <- unwrapNewTyCon_maybe tcon ->
-
+                    -- co1 and co3 are at role R, while co2 is at role N.
+                    -- BUT, when desugaring to Coercions, the roles get fixed.
                   do let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axSing tys
-                         co2 = mkTcSymCo $ mkTcAxInstCo axDataFam ix tys
+                         co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDataFam tys
                          co3 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [k,ty]
                      return $ GenInst [] $ EvCast (EvLit evLit) $
                         mkTcTransCo co1 $ mkTcTransCo co2 co3
@@ -1761,46 +1776,71 @@ matchClassInst _ clas [ k, ty ] _
 
   unexpected = panicTcS (text "Unexpected evidence for SingI")
 
+matchClassInst _ clas [ ty1, ty2 ] _
+  | clas == coercibleClass =  do
+      traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2
+      rdr_env <- getGlobalRdrEnvTcS
+      safeMode <- safeLanguageOn `fmap` getDynFlags
+      ev <- getCoericbleInst safeMode rdr_env ty1 ty2
+      traceTcS "matchClassInst returned" $ ppr ev
+      return ev
+
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
-        ; let pred = mkClassPred clas tys 
-              incoherent_ok = xopt Opt_IncoherentInstances  dflags
-        ; mb_result <- matchClass clas tys
         ; untch <- getUntouchables
         ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
                                            , text "inerts=" <+> ppr inerts
                                            , text "untouchables=" <+> ppr untch ]
-        ; case mb_result of
-            MatchInstNo   -> return NoInstance
-            MatchInstMany -> return NoInstance -- defer any reactions of a multitude until
-                                               -- we learn more about the reagent 
-            MatchInstSingle (_,_)
-              | not incoherent_ok && given_overlap untch 
-              -> -- see Note [Instance and Given overlap]
-                 do { traceTcS "Delaying instance application" $ 
-                       vcat [ text "Workitem=" <+> pprType (mkClassPred clas tys)
-                            , text "Relevant given dictionaries=" <+> ppr givens_for_this_clas ]
-                     ; return NoInstance
-                     }
+        ; instEnvs <- getInstEnvs
+        ; case lookupInstEnv instEnvs clas tys of
+            ([], _, _)               -- Nothing matches  
+                -> do { traceTcS "matchClass not matching" $ 
+                        vcat [ text "dict" <+> ppr pred ]
+                      ; return NoInstance }
 
-            MatchInstSingle (dfun_id, mb_inst_tys) ->
-              do { checkWellStagedDFun pred dfun_id loc
+	    ([(ispec, inst_tys)], [], _) -- A single match 
+                | not (xopt Opt_IncoherentInstances dflags)
+                , given_overlap untch 
+                -> -- See Note [Instance and Given overlap]
+                   do { traceTcS "Delaying instance application" $ 
+                          vcat [ text "Workitem=" <+> pprType (mkClassPred clas tys)
+                               , text "Relevant given dictionaries=" <+> ppr givens_for_this_clas ]
+                      ; return NoInstance  }
 
-                       -- mb_inst_tys :: Maybe TcType 
-                       -- See Note [DFunInstType: instantiating types] in InstEnv
+                | otherwise
+		-> do	{ let dfun_id = instanceDFunId ispec
+			; traceTcS "matchClass success" $
+                          vcat [text "dict" <+> ppr pred, 
+                                text "witness" <+> ppr dfun_id
+                                               <+> ppr (idType dfun_id) ]
+				  -- Record that this dfun is needed
+                        ; match_one dfun_id inst_tys }
 
-                 ; (tys, dfun_phi) <- instDFunType dfun_id mb_inst_tys
-                 ; let (theta, _) = tcSplitPhiTy dfun_phi
-                 ; if null theta then
-                       return (GenInst [] (EvDFunApp dfun_id tys []))
-                   else do
-                     { evc_vars <- instDFunConstraints theta
-                     ; let new_ev_vars = freshGoals evc_vars
-                           -- new_ev_vars are only the real new variables that can be emitted 
-                           dfun_app = EvDFunApp dfun_id tys (getEvTerms evc_vars)
-                     ; return $ GenInst new_ev_vars dfun_app } }
-        }
+     	    (matches, _, _)    -- More than one matches 
+                               -- Defer any reactions of a multitude
+                               -- until we learn more about the reagent 
+		-> do	{ traceTcS "matchClass multiple matches, deferring choice" $
+                          vcat [text "dict" <+> ppr pred,
+                                text "matches" <+> ppr matches]
+                        ; return NoInstance } }
    where 
+     pred = mkClassPred clas tys 
+
+     match_one :: DFunId -> [Maybe TcType] -> TcS LookupInstResult
+                  -- See Note [DFunInstType: instantiating types] in InstEnv
+     match_one dfun_id mb_inst_tys
+       = do { checkWellStagedDFun pred dfun_id loc
+            ; (tys, dfun_phi) <- instDFunType dfun_id mb_inst_tys
+            ; let (theta, _) = tcSplitPhiTy dfun_phi
+            ; if null theta then
+                  return (GenInst [] (EvDFunApp dfun_id tys []))
+              else do
+            { evc_vars <- instDFunConstraints theta
+            ; let new_ev_vars = freshGoals evc_vars
+                      -- new_ev_vars are only the real new variables that can be emitted 
+                  dfun_app = EvDFunApp dfun_id tys (getEvTerms evc_vars)
+            ; return $ GenInst new_ev_vars dfun_app } }
+
      givens_for_this_clas :: Cts
      givens_for_this_clas 
          = lookupUFM (cts_given (inert_dicts $ inert_cans inerts)) clas 
@@ -1825,7 +1865,116 @@ matchClassInst inerts clas tys loc
        | otherwise = False -- No overlap with a solved, already been taken care of 
                            -- by the overlap check with the instance environment.
      matchable _tys ct = pprPanic "Expecting dictionary!" (ppr ct)
+
+-- See Note [Coercible Instances]
+-- Changes to this logic should likely be reflected in coercible_msg in TcErrors.
+getCoericbleInst :: Bool -> GlobalRdrEnv -> TcType -> TcType -> TcS LookupInstResult
+getCoericbleInst safeMode rdr_env ty1 ty2
+  | ty1 `eqType` ty2
+  = do return $ GenInst []
+              $ EvCoercible (EvCoercibleRefl ty1)
+
+  | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
+    Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
+    tc1 == tc2,
+    nominalArgsAgree tc1 tyArgs1 tyArgs2,
+    not safeMode || all (dataConsInScope rdr_env) (tyConsOfTyCon tc1)
+  = do -- Mark all used data constructors as used
+       when safeMode $ mapM_ (markDataConsAsUsed rdr_env) (tyConsOfTyCon tc1)
+       -- We want evidence for all type arguments of role R
+       arg_evs <- flip mapM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
+         case r of Nominal -> return (Nothing, EvCoercibleArgN ta1 {- == ta2, due to nominalArgsAgree -})
+                   Representational -> do
+                        ct_ev <- requestCoercible ta1 ta2
+                        return (freshGoal ct_ev, EvCoercibleArgR (getEvTerm ct_ev))
+                   Phantom -> do
+                        return (Nothing, EvCoercibleArgP ta1 ta2)
+       return $ GenInst (mapMaybe fst arg_evs)
+              $ EvCoercible (EvCoercibleTyCon tc1 (map snd arg_evs))
+
+  | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
+    Just (_, _, _) <- unwrapNewTyCon_maybe tc,
+    not (isRecursiveTyCon tc),
+    dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
+  = do markDataConsAsUsed rdr_env tc
+       let concTy = newTyConInstRhs tc tyArgs 
+       ct_ev <- requestCoercible concTy ty2
+       return $ GenInst (freshGoals [ct_ev])
+              $ EvCoercible (EvCoercibleNewType CLeft tc tyArgs (getEvTerm ct_ev))
+
+  | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
+    Just (_, _, _) <- unwrapNewTyCon_maybe tc,
+    not (isRecursiveTyCon tc),
+    dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
+  = do markDataConsAsUsed rdr_env tc
+       let concTy = newTyConInstRhs tc tyArgs 
+       ct_ev <- requestCoercible ty1 concTy
+       return $ GenInst (freshGoals [ct_ev])
+              $ EvCoercible (EvCoercibleNewType CRight tc tyArgs (getEvTerm ct_ev))
+
+  | otherwise
+  = return NoInstance
+
+
+nominalArgsAgree :: TyCon -> [Type] -> [Type] -> Bool
+nominalArgsAgree tc tys1 tys2 = all ok $ zip3 (tyConRoles tc) tys1 tys2
+  where ok (r,t1,t2) = r /= Nominal || t1 `eqType` t2
+
+dataConsInScope :: GlobalRdrEnv -> TyCon -> Bool
+dataConsInScope rdr_env tc = not hidden_data_cons
+  where
+    data_con_names = map dataConName (tyConDataCons tc)
+    hidden_data_cons = not (isWiredInName (tyConName tc)) &&
+                       (isAbstractTyCon tc || any not_in_scope data_con_names)
+    not_in_scope dc  = null (lookupGRE_Name rdr_env dc)
+
+markDataConsAsUsed :: GlobalRdrEnv -> TyCon -> TcS ()
+markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
+  [ mkRdrQual (is_as (is_decl imp_spec)) occ
+  | dc <- tyConDataCons tc
+  , let dc_name = dataConName dc
+        occ  = nameOccName dc_name
+        gres = lookupGRE_Name rdr_env dc_name
+  , not (null gres)
+  , Imported (imp_spec:_) <- [gre_prov (head gres)] ]
+
+requestCoercible :: TcType -> TcType -> TcS MaybeNew
+requestCoercible ty1 ty2 = newWantedEvVar (coercibleClass `mkClassPred` [ty1, ty2]) 
+
 \end{code}
+
+Note [Coercible Instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The class Coercible is special: There are no regular instances, and the user
+cannot even define them. Instead, the type checker will create instances and
+their evidence out of thin air, in getCoericbleInst. The following “instances”
+are present:
+
+ 1. instance Coercible a a
+    for any type a.
+ 2. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
+       Coercible (C t1_r  t2_r  ... t1_p  t2_p  ... t1_n t2_n ...)
+                 (C t1_r' t2_r' ... t1_p' t2_p' ... t1_n t2_n ...)
+    for a type constructor C where
+     * the nominal type arguments are not changed,
+     * the phantom type arguments may change arbitrarily
+     * the representational type arguments are again Coercible
+    Furthermore in Safe Haskell code, we check that
+     * the data constructors of C are in scope and
+     * the data constructors of all type constructors used in the definition of C are in scope.
+       This is required as otherwise the previous check can be circumvented by
+       just adding a local data type around C.
+ 3. instance Coercible r b => Coercible (NT t1 t2 ...) b
+    instance Coercible a r => Coercible a (NT t1 t2 ...)
+    for a newtype constructor NT where
+     * NT is not recursive
+     * r is the concrete type of NT, instantiated with the arguments t1 t2 ... 
+     * the data constructors of NT are in scope.
+     
+These three shapes of instances correspond to the three constructors of
+EvCoercible (defined in EvEvidence). They are assembled here and turned to Core
+by dsEvTerm in DsBinds.
+
 
 Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

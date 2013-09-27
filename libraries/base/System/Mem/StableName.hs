@@ -1,11 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 {-# LANGUAGE MagicHash #-}
 #if !defined(__PARALLEL_HASKELL__)
 {-# LANGUAGE UnboxedTuples #-}
-#endif
 #endif
 
 -----------------------------------------------------------------------------
@@ -44,11 +42,6 @@ import Prelude
 
 import Data.Typeable
 
-#ifdef __HUGS__
-import Hugs.Stable
-#endif
-
-#ifdef __GLASGOW_HASKELL__
 import GHC.IO           ( IO(..) )
 import GHC.Base		( Int(..), StableName#, makeStableName#
 			, eqStableName#, stableNameToInt# )
@@ -85,7 +78,7 @@ import GHC.Base		( Int(..), StableName#, makeStableName#
 -}
 
 data StableName a = StableName (StableName# a)
-
+                    deriving Typeable
 
 -- | Makes a 'StableName' for an arbitrary object.  The object passed as
 -- the first argument is not evaluated by 'makeStableName'.
@@ -123,6 +116,8 @@ instance Eq (StableName a) where
 
 -- | Equality on 'StableName' that does not require that the types of
 -- the arguments match.
+--
+-- /Since: 4.7.0.0/
 eqStableName :: StableName a -> StableName b -> Bool
 eqStableName (StableName sn1) (StableName sn2) =
        case eqStableName# sn1 sn2 of
@@ -130,9 +125,4 @@ eqStableName (StableName sn1) (StableName sn2) =
 	 _  -> True
   -- Requested by Emil Axelsson on glasgow-haskell-users, who wants to
   -- use it for implementing observable sharing.
-
-#endif /* __GLASGOW_HASKELL__ */
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE1(StableName,stableNameTc,"StableName")
 

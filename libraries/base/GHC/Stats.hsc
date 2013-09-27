@@ -11,6 +11,7 @@
 --
 -- This module is GHC-only and should not be considered portable.
 --
+-- /Since: 4.5.0.0/
 -----------------------------------------------------------------------------
 module GHC.Stats
     ( GCStats(..)
@@ -28,11 +29,17 @@ import Foreign.Ptr
 #include "Rts.h"
 
 foreign import ccall "getGCStats"        getGCStats_       :: Ptr () -> IO ()
+
+-- | Returns whether GC stats have been enabled (with @+RTS -T@, for example).
+--
+-- /Since: 4.6.0.0/
 foreign import ccall "getGCStatsEnabled" getGCStatsEnabled :: IO Bool
 
 -- I'm probably violating a bucket of constraints here... oops.
 
 -- | Global garbage collection and memory statistics.
+--
+-- /Since: 4.5.0.0/
 data GCStats = GCStats
     { bytesAllocated :: !Int64 -- ^ Total number of bytes allocated
     , numGcs :: !Int64 -- ^ Number of garbage collections performed
@@ -79,6 +86,8 @@ data GCStats = GCStats
 -- | Retrieves garbage collection and memory statistics as of the last
 -- garbage collection.  If you would like your statistics as recent as
 -- possible, first run a 'System.Mem.performGC'.
+--
+-- /Since: 4.5.0.0/
 getGCStats :: IO GCStats
 getGCStats = do
   statsEnabled <- getGCStatsEnabled
