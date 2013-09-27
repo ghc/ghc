@@ -219,16 +219,22 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- after a layout keyword (let, where, do, of), we begin a new layout
 -- context if the curly brace is missing.
 -- Careful! This stuff is quite delicate.
-<layout, layout_do> {
+<layout, layout_do, layout_if> {
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
   ^\# (line)?                           { begin line_prag1 }
 }
 
+-- after an 'if', a vertical bar starts a layout context for MultiWayIf
+<layout_if> {
+  \| / { notFollowedBySymbol }          { new_layout_context True ITvbar }
+  ()                                    { pop }
+}
+
 -- do is treated in a subtly different way, see new_layout_context
-<layout>    ()                          { new_layout_context True }
-<layout_do> ()                          { new_layout_context False }
+<layout>    ()                          { new_layout_context True  ITvocurly }
+<layout_do> ()                          { new_layout_context False ITvocurly }
 
 -- after a new layout context which was found to be to the left of the
 -- previous context, we have generated a '{' token, and we now need to
@@ -1143,6 +1149,7 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
           f ITlet   = pushLexState layout
           f ITwhere = pushLexState layout
           f ITrec   = pushLexState layout
+          f ITif    = pushLexState layout_if
           f _       = return ()
 
 -- Pushing a new implicit layout context.  If the indentation of the
@@ -1154,11 +1161,11 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
 -- by a 'do', then we allow the new context to be at the same indentation as
 -- the previous context.  This is what the 'strict' argument is for.
 --
-new_layout_context :: Bool -> Action
-new_layout_context strict span _buf _len = do
+new_layout_context :: Bool -> Token -> Action
+new_layout_context strict tok span _buf len = do
     _ <- popLexState
     (AI l _) <- getInput
-    let offset = srcLocCol l
+    let offset = srcLocCol l - len
     ctx <- getContext
     nondecreasing <- extension nondecreasingIndentation
     let strict' = strict || not nondecreasing
@@ -1169,10 +1176,10 @@ new_layout_context strict span _buf _len = do
                 -- token is indented to the left of the previous context.
                 -- we must generate a {} sequence now.
                 pushLexState layout_left
-                return (L span ITvocurly)
+                return (L span tok)
         _ -> do
                 setContext (Layout offset : ctx)
-                return (L span ITvocurly)
+                return (L span tok)
 
 do_layout_left :: Action
 do_layout_left span _buf _len = do

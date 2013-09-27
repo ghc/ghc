@@ -1459,7 +1459,7 @@ exp10 :: { LHsExpr RdrName }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                                         {% checkDoAndIfThenElse $2 $3 $5 $6 $8 >>
                                            return (LL $ mkHsIf $2 $5 $8) }
-        | 'if' gdpats                   {% hintMultiWayIf (getLoc $1) >>
+        | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>
                                            return (LL $ HsMultiIf placeHolderType (reverse $ unLoc $2)) }
         | 'case' exp 'of' altslist              { LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
         | '-' fexp                              { LL $ NegApp $2 noSyntaxExpr }
@@ -1753,6 +1753,19 @@ ralt :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
 gdpats :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
         : gdpats gdpat                  { LL ($2 : unLoc $1) }
         | gdpat                         { L1 [$1] }
+
+-- optional semi-colons between the guards of a MultiWayIf, because we use
+-- layout here, but we don't need (or want) the semicolon as a separator (#7783).
+gdpatssemi :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
+        : gdpatssemi gdpat optSemi      { sL (comb2 $1 $2) ($2 : unLoc $1) }
+        | gdpat optSemi                 { L1 [$1] }
+
+-- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
+-- generate the open brace in addition to the vertical bar in the lexer, and
+-- we don't need it.
+ifgdpats :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
+         : '{' gdpatssemi '}'              { LL (unLoc $2) }
+         |     gdpatssemi close            { $1 }
 
 gdpat   :: { LGRHS RdrName (LHsExpr RdrName) }
         : '|' guardquals '->' exp               { sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
