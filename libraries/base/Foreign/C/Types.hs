@@ -5,9 +5,7 @@
            , GeneralizedNewtypeDeriving
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
 
@@ -66,10 +64,9 @@ module Foreign.C.Types
           -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
           -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
         , CFloat(..),   CDouble(..)
--- GHC doesn't support CLDouble yet
-#ifndef __GLASGOW_HASKELL__
-        , CLDouble(..)
-#endif
+        -- XXX GHC doesn't support CLDouble yet
+        -- , CLDouble(..)
+
           -- ** Other types
 
           -- Instances of: Eq and Storable
@@ -80,11 +77,8 @@ import Foreign.Storable
 import Data.Bits        ( Bits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
-import {-# SOURCE #-} Data.Typeable
-  -- loop: Data.Typeable -> Data.List -> Data.Char -> GHC.Unicode
-  --            -> Foreign.C.Type
+import Data.Typeable
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Float
 import GHC.Enum
@@ -92,43 +86,36 @@ import GHC.Real
 import GHC.Show
 import GHC.Read
 import GHC.Num
-#else
-import Control.Monad    ( liftM )
-#endif
-
-#ifdef __HUGS__
-import Hugs.Ptr         ( castPtr )
-#endif
 
 #include "HsBaseConfig.h"
 #include "CTypes.h"
 
 -- | Haskell type representing the C @char@ type.
-INTEGRAL_TYPE(CChar,tyConCChar,"CChar",HTYPE_CHAR)
+INTEGRAL_TYPE(CChar,HTYPE_CHAR)
 -- | Haskell type representing the C @signed char@ type.
-INTEGRAL_TYPE(CSChar,tyConCSChar,"CSChar",HTYPE_SIGNED_CHAR)
+INTEGRAL_TYPE(CSChar,HTYPE_SIGNED_CHAR)
 -- | Haskell type representing the C @unsigned char@ type.
-INTEGRAL_TYPE(CUChar,tyConCUChar,"CUChar",HTYPE_UNSIGNED_CHAR)
+INTEGRAL_TYPE(CUChar,HTYPE_UNSIGNED_CHAR)
 
 -- | Haskell type representing the C @short@ type.
-INTEGRAL_TYPE(CShort,tyConCShort,"CShort",HTYPE_SHORT)
+INTEGRAL_TYPE(CShort,HTYPE_SHORT)
 -- | Haskell type representing the C @unsigned short@ type.
-INTEGRAL_TYPE(CUShort,tyConCUShort,"CUShort",HTYPE_UNSIGNED_SHORT)
+INTEGRAL_TYPE(CUShort,HTYPE_UNSIGNED_SHORT)
 
 -- | Haskell type representing the C @int@ type.
-INTEGRAL_TYPE(CInt,tyConCInt,"CInt",HTYPE_INT)
+INTEGRAL_TYPE(CInt,HTYPE_INT)
 -- | Haskell type representing the C @unsigned int@ type.
-INTEGRAL_TYPE(CUInt,tyConCUInt,"CUInt",HTYPE_UNSIGNED_INT)
+INTEGRAL_TYPE(CUInt,HTYPE_UNSIGNED_INT)
 
 -- | Haskell type representing the C @long@ type.
-INTEGRAL_TYPE(CLong,tyConCLong,"CLong",HTYPE_LONG)
+INTEGRAL_TYPE(CLong,HTYPE_LONG)
 -- | Haskell type representing the C @unsigned long@ type.
-INTEGRAL_TYPE(CULong,tyConCULong,"CULong",HTYPE_UNSIGNED_LONG)
+INTEGRAL_TYPE(CULong,HTYPE_UNSIGNED_LONG)
 
 -- | Haskell type representing the C @long long@ type.
-INTEGRAL_TYPE(CLLong,tyConCLLong,"CLLong",HTYPE_LONG_LONG)
+INTEGRAL_TYPE(CLLong,HTYPE_LONG_LONG)
 -- | Haskell type representing the C @unsigned long long@ type.
-INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
+INTEGRAL_TYPE(CULLong,HTYPE_UNSIGNED_LONG_LONG)
 
 {-# RULES
 "fromIntegral/a->CChar"   fromIntegral = \x -> CChar   (fromIntegral x)
@@ -157,15 +144,10 @@ INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
  #-}
 
 -- | Haskell type representing the C @float@ type.
-FLOATING_TYPE(CFloat,tyConCFloat,"CFloat",HTYPE_FLOAT)
+FLOATING_TYPE(CFloat,HTYPE_FLOAT)
 -- | Haskell type representing the C @double@ type.
-FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
--- GHC doesn't support CLDouble yet
-#ifndef __GLASGOW_HASKELL__
--- HACK: Currently no long double in the FFI, so we simply re-use double
--- | Haskell type representing the C @long double@ type.
-FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
-#endif
+FLOATING_TYPE(CDouble,HTYPE_DOUBLE)
+-- XXX GHC doesn't support CLDouble yet
 
 {-# RULES
 "realToFrac/a->CFloat"    realToFrac = \x -> CFloat   (realToFrac x)
@@ -180,13 +162,13 @@ FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
 -- "realToFrac/CLDouble->a"  realToFrac = \(CLDouble x) -> realToFrac x
 
 -- | Haskell type representing the C @ptrdiff_t@ type.
-INTEGRAL_TYPE(CPtrdiff,tyConCPtrdiff,"CPtrdiff",HTYPE_PTRDIFF_T)
+INTEGRAL_TYPE(CPtrdiff,HTYPE_PTRDIFF_T)
 -- | Haskell type representing the C @size_t@ type.
-INTEGRAL_TYPE(CSize,tyConCSize,"CSize",HTYPE_SIZE_T)
+INTEGRAL_TYPE(CSize,HTYPE_SIZE_T)
 -- | Haskell type representing the C @wchar_t@ type.
-INTEGRAL_TYPE(CWchar,tyConCWchar,"CWchar",HTYPE_WCHAR_T)
+INTEGRAL_TYPE(CWchar,HTYPE_WCHAR_T)
 -- | Haskell type representing the C @sig_atomic_t@ type.
-INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
+INTEGRAL_TYPE(CSigAtomic,HTYPE_SIG_ATOMIC_T)
 
 {-# RULES
 "fromIntegral/a->CPtrdiff"   fromIntegral = \x -> CPtrdiff   (fromIntegral x)
@@ -201,13 +183,17 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
  #-}
 
 -- | Haskell type representing the C @clock_t@ type.
-ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
+ARITHMETIC_TYPE(CClock,HTYPE_CLOCK_T)
 -- | Haskell type representing the C @time_t@ type.
-ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
+ARITHMETIC_TYPE(CTime,HTYPE_TIME_T)
 -- | Haskell type representing the C @useconds_t@ type.
-ARITHMETIC_TYPE(CUSeconds,tyConCUSeconds,"CUSeconds",HTYPE_USECONDS_T)
+--
+-- /Since: 4.4.0.0/
+ARITHMETIC_TYPE(CUSeconds,HTYPE_USECONDS_T)
 -- | Haskell type representing the C @suseconds_t@ type.
-ARITHMETIC_TYPE(CSUSeconds,tyConCSUSeconds,"CSUSeconds",HTYPE_SUSECONDS_T)
+--
+-- /Since: 4.4.0.0/
+ARITHMETIC_TYPE(CSUSeconds,HTYPE_SUSECONDS_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
 -- | Haskell type representing the C @FILE@ type.
@@ -217,10 +203,10 @@ data CFpos = CFpos
 -- | Haskell type representing the C @jmp_buf@ type.
 data CJmpBuf = CJmpBuf
 
-INTEGRAL_TYPE(CIntPtr,tyConCIntPtr,"CIntPtr",HTYPE_INTPTR_T)
-INTEGRAL_TYPE(CUIntPtr,tyConCUIntPtr,"CUIntPtr",HTYPE_UINTPTR_T)
-INTEGRAL_TYPE(CIntMax,tyConCIntMax,"CIntMax",HTYPE_INTMAX_T)
-INTEGRAL_TYPE(CUIntMax,tyConCUIntMax,"CUIntMax",HTYPE_UINTMAX_T)
+INTEGRAL_TYPE(CIntPtr,HTYPE_INTPTR_T)
+INTEGRAL_TYPE(CUIntPtr,HTYPE_UINTPTR_T)
+INTEGRAL_TYPE(CIntMax,HTYPE_INTMAX_T)
+INTEGRAL_TYPE(CUIntMax,HTYPE_UINTMAX_T)
 
 {-# RULES
 "fromIntegral/a->CIntPtr"  fromIntegral = \x -> CIntPtr  (fromIntegral x)

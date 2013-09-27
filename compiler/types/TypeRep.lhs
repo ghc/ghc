@@ -33,7 +33,7 @@ module TypeRep (
         PredType, ThetaType,      -- Synonyms
 
         -- Functions over types
-        mkNakedTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
+        mkTyConTy, mkTyVarTy, mkTyVarTys,
         isLiftedTypeKind, isSuperKind, isTypeVar, isKindVar,
         
         -- Pretty-printing
@@ -45,7 +45,7 @@ module TypeRep (
         pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
-        tyVarsOfType, tyVarsOfTypes,
+        tyVarsOfType, tyVarsOfTypes, closeOverKinds, varSetElemsKvsFirst,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -85,7 +85,7 @@ import StaticFlags( opt_PprStyle_Debug )
 import Util
 
 -- libraries
-import Data.List( mapAccumL )
+import Data.List( mapAccumL, partition )
 import qualified Data.Data        as Data hiding ( TyCon )
 \end{code}
 
@@ -140,7 +140,7 @@ data Type
 	Var         -- Type or kind variable
 	Type	        -- ^ A polymorphic type
 
-  | LitTy TyLit     -- ^ Type literals are simillar to type constructors.
+  | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
   deriving (Data.Data, Data.Typeable)
 
@@ -280,14 +280,6 @@ mkTyVarTy  = TyVarTy
 mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
-mkNakedTyConApp :: TyCon -> [Type] -> Type
--- Builds a TyConApp 
---   * without being strict in TyCon,
---   * the TyCon should never be a saturated FunTyCon 
--- Type.mkTyConApp is the usual one
-mkNakedTyConApp tc tys
-  = TyConApp (ASSERT( not (isFunTyCon tc && length tys == 2) ) tc) tys
-
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []
@@ -335,6 +327,20 @@ tyVarsOfType (ForAllTy tyvar ty) = delVarSet (tyVarsOfType ty) tyvar
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet . tyVarsOfType) emptyVarSet tys
+
+closeOverKinds :: TyVarSet -> TyVarSet
+-- Add the kind variables free in the kinds
+-- of the tyvars in the given set
+closeOverKinds tvs
+  = foldVarSet (\tv ktvs -> tyVarsOfType (tyVarKind tv) `unionVarSet` ktvs) 
+               tvs tvs
+
+varSetElemsKvsFirst :: VarSet -> [TyVar]
+-- {k1,a,k2,b} --> [k1,k2,a,b]
+varSetElemsKvsFirst set
+  = kvs ++ tvs
+  where
+    (kvs, tvs) = partition isKindVar (varSetElems set)
 \end{code}
 
 %************************************************************************
@@ -686,7 +692,7 @@ pprTcApp p pp tc tys
      sep (punctuate comma (map (pp TopPrec) ty_args)))
 
   | not opt_PprStyle_Debug
-  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey] 
+  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey, eqReprPrimTyConKey] 
                            -- We need to special case the type equality TyCons because
   , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
                            -- With -dppr-debug switch this off so we can see the kind
@@ -699,7 +705,7 @@ pprTcApp p pp tc tys
 pprTypeApp :: TyCon -> [Type] -> SDoc
 pprTypeApp tc tys 
   = ppr_type_name_app TopPrec ppr_type (getName tc) (ppr tc) tys
-        -- We have to to use ppr on the TyCon (not its name)
+        -- We have to use ppr on the TyCon (not its name)
         -- so that we get promotion quotes in the right place
 
 pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc

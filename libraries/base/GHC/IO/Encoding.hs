@@ -103,6 +103,8 @@ utf32be  :: TextEncoding
 utf32be = UTF32.utf32be
 
 -- | The Unicode encoding of the current locale
+--
+-- /Since: 4.5.0.0/
 getLocaleEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but allowing arbitrary
@@ -114,14 +116,20 @@ getLocaleEncoding :: IO TextEncoding
 -- On Windows, this encoding *should not* be used if possible because
 -- the use of code pages is deprecated: Strings should be retrieved
 -- via the "wide" W-family of UTF-16 APIs instead
+--
+-- /Since: 4.5.0.0/
 getFileSystemEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but where undecodable
 -- bytes are replaced with their closest visual match. Used for
 -- the 'CString' marshalling functions in "Foreign.C.String"
+--
+-- /Since: 4.5.0.0/
 getForeignEncoding :: IO TextEncoding
 
+-- | /Since: 4.5.0.0/
 setLocaleEncoding, setFileSystemEncoding, setForeignEncoding :: TextEncoding -> IO ()
+
 (getLocaleEncoding, setLocaleEncoding)         = mkGlobal initLocaleEncoding
 (getFileSystemEncoding, setFileSystemEncoding) = mkGlobal initFileSystemEncoding
 (getForeignEncoding, setForeignEncoding)       = mkGlobal initForeignEncoding
@@ -131,6 +139,7 @@ mkGlobal x = unsafePerformIO $ do
     x_ref <- newIORef x
     return (readIORef x_ref, writeIORef x_ref)
 
+-- | /Since: 4.5.0.0/
 initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
 
 #if !defined(mingw32_HOST_OS)
@@ -160,6 +169,8 @@ initForeignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
 -- This encoding never fails in either direction.  However, encoding
 -- discards information, so encode followed by decode is not the
 -- identity.
+--
+-- /Since: 4.4.0.0/
 char8 :: TextEncoding
 char8 = Latin1.latin1
 
@@ -175,8 +186,8 @@ char8 = Latin1.latin1
 --
 --  * @UTF-32@, @UTF-32BE@, @UTF-32LE@
 --
--- On systems using GNU iconv (e.g. Linux), there is additional
--- notation for specifying how illegal characters are handled:
+-- There is additional notation (borrowed from GNU iconv) for specifying
+-- how illegal characters are handled:
 --
 --  * a suffix of @\/\/IGNORE@, e.g. @UTF-8\/\/IGNORE@, will cause 
 --    all illegal sequences on input to be ignored, and on output
@@ -186,6 +197,28 @@ char8 = Latin1.latin1
 --  * a suffix of @\/\/TRANSLIT@ will choose a replacement character
 --    for illegal sequences or code points.
 --
+--  * a suffix of @\/\/ROUNDTRIP@ will use a PEP383-style escape mechanism
+--    to represent any invalid bytes in the input as Unicode codepoints (specifically,
+--    as lone surrogates, which are normally invalid in UTF-32).
+--    Upon output, these special codepoints are detected and turned back into the
+--    corresponding original byte.
+--
+--    In theory, this mechanism allows arbitrary data to be roundtripped via
+--    a 'String' with no loss of data. In practice, there are two limitations
+--    to be aware of:
+--
+--      1. This only stands a chance of working for an encoding which is an ASCII
+--         superset, as for security reasons we refuse to escape any bytes smaller
+--         than 128. Many encodings of interest are ASCII supersets (in particular,
+--         you can assume that the locale encoding is an ASCII superset) but many
+--         (such as UTF-16) are not.
+--
+--      2. If the underlying encoding is not itself roundtrippable, this mechanism
+--         can fail. Roundtrippable encodings are those which have an injective mapping
+--         into Unicode. Almost all encodings meet this criteria, but some do not. Notably,
+--         Shift-JIS (CP932) and Big5 contain several different encodings of the same
+--         Unicode codepoint.
+--
 -- On Windows, you can access supported code pages with the prefix
 -- @CP@; for example, @\"CP1250\"@.
 --
@@ -194,8 +227,6 @@ mkTextEncoding e = case mb_coding_failure_mode of
     Nothing -> unknownEncodingErr e
     Just cfm -> mkTextEncoding' cfm enc
   where
-    -- The only problem with actually documenting //IGNORE and //TRANSLIT as
-    -- supported suffixes is that they are not necessarily supported with non-GNU iconv
     (enc, suffix) = span (/= '/') e
     mb_coding_failure_mode = case suffix of
         ""            -> Just ErrorOnCodingFailure

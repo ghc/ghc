@@ -43,29 +43,6 @@
 
 #define __abs(a)		(( (a) >= 0 ) ? (a) : (-(a)))
 
-StgDouble
-__2Int_encodeDouble (I_ j_high, I_ j_low, I_ e)
-{
-  StgDouble r;
-  
-  /* assuming 32 bit ints */
-  ASSERT(sizeof(int          ) == 4            );
-
-  r = (StgDouble)((unsigned int)j_high);
-  r *= 4294967296.0; /* exp2f(32); */
-  r += (StgDouble)((unsigned int)j_low);
-  
-  /* Now raise to the exponent */
-  if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-    r = ldexp(r, e);
-  
-  /* sign is encoded in the size */
-  if (j_high < 0)
-    r = -r;
-  
-  return r;
-}
-
 /* Special version for words */
 StgDouble
 __word_encodeDouble (W_ j, I_ e)

@@ -43,6 +43,7 @@ import Data.Bits
 utf8 :: TextEncoding
 utf8 = mkUTF8 ErrorOnCodingFailure
 
+-- | /Since: 4.4.0.0/
 mkUTF8 :: CodingFailureMode -> TextEncoding
 mkUTF8 cfm = TextEncoding { textEncodingName = "UTF-8",
                             mkTextDecoder = utf8_DF cfm,
@@ -156,7 +157,8 @@ utf8_decode
                 _ | c0 <= 0x7f -> do 
                            ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
                            loop (ir+1) ow'
-                  | c0 >= 0xc0 && c0 <= 0xdf ->
+                  | c0 >= 0xc0 && c0 <= 0xc1 -> invalid -- Overlong forms
+                  | c0 >= 0xc2 && c0 <= 0xdf ->
                            if iw - ir < 2 then done InputUnderflow ir ow else do
                            c1 <- readWord8Buf iraw (ir+1)
                            if (c1 < 0x80 || c1 >= 0xc0) then invalid else do

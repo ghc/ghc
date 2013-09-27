@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Unsafe, DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -23,17 +23,20 @@ module GHC.MVar (
         , newMVar
         , newEmptyMVar
         , takeMVar
+        , readMVar
         , putMVar
         , tryTakeMVar
         , tryPutMVar
+        , tryReadMVar
         , isEmptyMVar
         , addMVarFinalizer
     ) where
 
 import GHC.Base
 import Data.Maybe
+import Data.Typeable
 
-data MVar a = MVar (MVar# RealWorld a)
+data MVar a = MVar (MVar# RealWorld a) deriving( Typeable )
 {- ^
 An 'MVar' (pronounced \"em-var\") is a synchronising variable, used
 for communication between concurrent threads.  It can be thought of
@@ -42,7 +45,7 @@ as a a box, which may be empty or full.
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
 instance Eq (MVar a) where
-        (MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
+        (MVar mvar1#) == (MVar mvar2#) = isTrue# (sameMVar# mvar1# mvar2#)
 
 {-
 M-Vars are rendezvous points for concurrent threads.  They begin
@@ -87,6 +90,31 @@ newMVar value =
 takeMVar :: MVar a -> IO a
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
+-- |Atomically read the contents of an 'MVar'.  If the 'MVar' is
+-- currently empty, 'readMVar' will wait until its full.
+-- 'readMVar' is guaranteed to receive the next 'putMVar'.
+--
+-- 'readMVar' is multiple-wakeup, so when multiple readers are
+-- blocked on an 'MVar', all of them are woken up at the same time.
+--
+-- /Compatibility note:/ Prior to base 4.7, 'readMVar' was a combination
+-- of 'takeMVar' and 'putMVar'.  This mean that in the presence of
+-- other threads attempting to 'putMVar', 'readMVar' could block.
+-- Furthermore, 'readMVar' would not receive the next 'putMVar' if there
+-- was already a pending thread blocked on 'takeMVar'.  The old behavior
+-- can be recovered by implementing 'readMVar as follows:
+--
+-- @
+--  readMVar :: MVar a -> IO a
+--  readMVar m =
+--    mask_ $ do
+--      a <- takeMVar m
+--      putMVar m a
+--      return a
+-- @
+readMVar :: MVar a -> IO a
+readMVar (MVar mvar#) = IO $ \ s# -> readMVar# mvar# s#
+
 -- |Put a value into an 'MVar'.  If the 'MVar' is currently full,
 -- 'putMVar' will wait until it becomes empty.
 --
@@ -125,6 +153,17 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
         (# s, 0# #) -> (# s, False #)
         (# s, _  #) -> (# s, True #)
 
+-- |A non-blocking version of 'readMVar'.  The 'tryReadMVar' function
+-- returns immediately, with 'Nothing' if the 'MVar' was empty, or
+-- @'Just' a@ if the 'MVar' was full with contents @a@.
+--
+-- /Since: 4.7.0.0/
+tryReadMVar :: MVar a -> IO (Maybe a)
+tryReadMVar (MVar m) = IO $ \ s ->
+    case tryReadMVar# m s of
+        (# s', 0#, _ #) -> (# s', Nothing #)      -- MVar is empty
+        (# s', _,  a #) -> (# s', Just a  #)      -- MVar is full
+
 -- |Check whether a given 'MVar' is empty.
 --
 -- Notice that the boolean value returned  is just a snapshot of
@@ -134,7 +173,7 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
 isEmptyMVar :: MVar a -> IO Bool
 isEmptyMVar (MVar mv#) = IO $ \ s# ->
     case isEmptyMVar# mv# s# of
-        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
+        (# s2#, flg #) -> (# s2#, isTrue# (flg /=# 0#) #)
 
 -- |Add a finalizer to an 'MVar' (GHC only).  See "Foreign.ForeignPtr" and
 -- "System.Mem.Weak" for more about finalizers.

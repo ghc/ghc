@@ -15,8 +15,9 @@ module GHC.Event.Thread
     ) where
 
 import Control.Exception (finally)
-import Control.Monad (forM, forM_, zipWithM, zipWithM_, when)
+import Control.Monad (forM, forM_, sequence_, zipWithM, when)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.List (zipWith3)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
@@ -99,16 +100,10 @@ closeFdWith close fd = do
     return mgr
   mask_ $ do
     tables <- forM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
-    tableAndCbApps <- zipWithM
-                      (\mgr table -> M.closeFd_ mgr table fd)
-                      mgrs
-                      tables
-    close fd
-    zipWithM_ finish mgrs tableAndCbApps
+    cbApps <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
+    close fd `finally` sequence_ (zipWith3 finish mgrs tables cbApps)
   where
-    finish mgr (table', cbApp) = do
-      putMVar (M.callbackTableVar mgr fd) table'
-      cbApp
+    finish mgr table cbApp = putMVar (M.callbackTableVar mgr fd) table >> cbApp
 
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
@@ -333,14 +328,14 @@ ioManagerCapabilitiesChanged = do
               -- copy the existing values into the new array:
               forM_ [0..high] $ \i -> do
                 Just (tid,mgr) <- readIOArray eventManagerArray i
-                if i < numEnabled - 1
+                if i < numEnabled
                   then writeIOArray new_eventManagerArray i (Just (tid,mgr))
                   else do tid' <- restartPollLoop mgr i
                           writeIOArray new_eventManagerArray i (Just (tid',mgr))
 
               -- create new IO managers for the new caps:
               forM_ [old_n_caps..new_n_caps-1] $
-                startIOManagerThread eventManagerArray
+                startIOManagerThread new_eventManagerArray
 
               -- update the event manager array reference:
               writeIORef eventManager new_eventManagerArray

@@ -17,7 +17,7 @@ import StgCmmMonad
 import StgCmmHeap
 import StgCmmEnv
 import StgCmmCon
-import StgCmmProf
+import StgCmmProf (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
 import StgCmmLayout
 import StgCmmPrim
 import StgCmmHpc
@@ -43,7 +43,6 @@ import Maybes
 import Util
 import FastString
 import Outputable
-import UniqSupply
 
 import Control.Monad (when,void)
 
@@ -70,8 +69,8 @@ cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
 
 cgExpr (StgLet binds expr)             = do { cgBind binds;     cgExpr expr }
 cgExpr (StgLetNoEscape _ _ binds expr) =
-  do { us <- newUniqSupply
-     ; let join_id = mkBlockId (uniqFromSupply us)
+  do { u <- newUnique
+     ; let join_id = mkBlockId u
      ; cgLneBinds join_id binds
      ; r <- cgExpr expr
      ; emitLabel join_id
@@ -107,7 +106,7 @@ cgLneBinds join_id (StgNonRec bndr rhs)
                 -- See Note [Saving the current cost centre]
         ; (info, fcode) <- cgLetNoEscapeRhs join_id local_cc bndr rhs
         ; fcode
-        ; addBindC (cg_id info) info }
+        ; addBindC info }
 
 cgLneBinds join_id (StgRec pairs)
   = do  { local_cc <- saveCurrentCostCentre
@@ -142,9 +141,9 @@ cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd _ args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc [] (StgConApp con args)
-        -- For a constructor RHS we want to generate a single chunk of 
-        -- code which can be jumped to from many places, which will 
-        -- return the constructor. It's easy; just behave as if it 
+        -- For a constructor RHS we want to generate a single chunk of
+        -- code which can be jumped to from many places, which will
+        -- return the constructor. It's easy; just behave as if it
         -- was an StgRhsClosure with a ConApp inside!
 
 -------------------------
@@ -161,7 +160,7 @@ cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
        return ( lneIdInfo dflags bndr args
               , code )
   where
-   code = forkProc $ do {
+   code = forkLneBody $ do {
             ; withNewTickyCounterLNE (idName bndr) args $ do
             ; restoreCurrentCostCentre cc_slot
             ; arg_regs <- bindArgsToRegs args
@@ -194,9 +193,9 @@ heapcheck will take their worst case into account.
 In favour of omitting !Q!, !R!:
 
  - *May* save a heap overflow test,
-   if ...P... allocates anything.  
+   if ...P... allocates anything.
 
- - We can use relative addressing from a single Hp to 
+ - We can use relative addressing from a single Hp to
    get at all the closures so allocated.
 
  - No need to save volatile vars etc across heap checks
@@ -204,7 +203,7 @@ In favour of omitting !Q!, !R!:
 
 Against omitting !Q!, !R!
 
-  - May put a heap-check into the inner loop.  Suppose 
+  - May put a heap-check into the inner loop.  Suppose
         the main loop is P -> R -> P -> R...
         Q is the loop exit, and only it does allocation.
     This only hurts us if P does no allocation.  If P allocates,
@@ -213,7 +212,7 @@ Against omitting !Q!, !R!
   - May do more allocation than reqd.  This sometimes bites us
     badly.  For example, nfib (ha!) allocates about 30\% more space if the
     worst-casing is done, because many many calls to nfib are leaf calls
-    which don't need to allocate anything. 
+    which don't need to allocate anything.
 
     We can un-allocate, but that costs an instruction
 
@@ -249,7 +248,7 @@ Hence: two basic plans for
 
         ...save current cost centre...
 
-        ...code for e, 
+        ...code for e,
            with sequel (SetLocals r)
 
         ...restore current cost centre...
@@ -314,12 +313,19 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
 
 {-
 Note [case on bool]
-
+~~~~~~~~~~~~~~~~~~~
 This special case handles code like
 
   case a <# b of
     True ->
     False ->
+
+-->  case tagToEnum# (a <$# b) of
+        True -> .. ; False -> ...
+
+--> case (a <$# b) of r ->
+    case tagToEnum# r of
+        True -> .. ; False -> ...
 
 If we let the ordinary case code handle it, we'll get something like
 
@@ -339,8 +345,12 @@ So we add a special case to generate
 
 and later optimisations will further improve this.
 
-We should really change all these primops to return Int# instead, that
-would make this special case go away.
+Now that #6135 has been resolved it should be possible to remove that
+special case. The idea behind this special case and pre-6135 implementation
+of Bool-returning primops was that tagToEnum# was added implicitly in the
+codegen and then optimized away. Now the call to tagToEnum# is explicit
+in the source code, which allows to optimize it away at the earlier stages
+of compilation (i.e. at the Core level).
 -}
 
 
@@ -499,7 +509,7 @@ cgAlts gc_plan bndr (PrimAlt _) alts
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
 
-              tagged_cmms' = [(lit,code) 
+              tagged_cmms' = [(lit,code)
                              | (LitAlt lit, code) <- tagged_cmms]
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
         ; return AssignedDirectly }
@@ -610,42 +620,36 @@ cgConApp con stg_args
 
   | otherwise   --  Boxed constructors; allocate and return
   = ASSERT( stg_args `lengthIs` dataConRepRepArity con )
-    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con)
+    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con) False
                                      currentCCS con stg_args
-                -- The first "con" says that the name bound to this closure is
-                -- is "con", which is a bit of a fudge, but it only affects profiling
+                -- The first "con" says that the name bound to this
+                -- closure is is "con", which is a bit of a fudge, but
+                -- it only affects profiling (hence the False)
 
         ; emit =<< fcode_init
         ; emitReturn [idInfoToAmode idinfo] }
 
-
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
-cgIdApp fun_id args
-  = do  { fun_info <- getCgIdInfo fun_id
-        ; case maybeLetNoEscape fun_info of
-            Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
-            Nothing -> cgTailCall (cg_id fun_info) fun_info args }
-            -- NB. use (cg_id fun_info) instead of fun_id, because the former
-            -- may be externalised for -split-objs.
-            -- See StgCmm.maybeExternaliseId.
+cgIdApp fun_id args = do
+    dflags         <- getDynFlags
+    fun_info       <- getCgIdInfo fun_id
+    self_loop_info <- getSelfLoop
+    let cg_fun_id   = cg_id fun_info
+           -- NB: use (cg_id fun_info) instead of fun_id, because
+           -- the former may be externalised for -split-objs.
+           -- See Note [Externalise when splitting] in StgCmmMonad
 
-cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ReturnKind
-cgLneJump blk_id lne_regs args  -- Join point; discard sequel
-  = do  { adjustHpBackwards -- always do this before a tail-call
-        ; cmm_args <- getNonVoidArgAmodes args
-        ; emitMultiAssign lne_regs cmm_args
-        ; emit (mkBranch blk_id)
-        ; return AssignedDirectly }
-    
-cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ReturnKind
-cgTailCall fun_id fun_info args = do
-    dflags <- getDynFlags
-    case (getCallMethod dflags fun_name (idCafInfo fun_id) lf_info (length args)) of
+        fun_arg     = StgVarArg cg_fun_id
+        fun_name    = idName    cg_fun_id
+        fun         = idInfoToAmode fun_info
+        lf_info     = cg_lf         fun_info
+        node_points dflags = nodeMustPointToIt dflags lf_info
+    case (getCallMethod dflags fun_name cg_fun_id lf_info (length args) (cg_loc fun_info) self_loop_info) of
 
             -- A value in WHNF, so we can just return it.
         ReturnIt -> emitReturn [fun]    -- ToDo: does ReturnIt guarantee tagged?
-    
+
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
 
@@ -653,7 +657,7 @@ cgTailCall fun_id fun_info args = do
                 { tickySlowCall lf_info args
                 ; emitComment $ mkFastString "slowCall"
                 ; slowCall fun args }
-    
+
         -- A direct function call (possibly with some left-over arguments)
         DirectEntry lbl arity -> do
                 { tickyDirectCall arity args
@@ -661,14 +665,91 @@ cgTailCall fun_id fun_info args = do
                      then directCall NativeNodeCall   lbl arity (fun_arg:args)
                      else directCall NativeDirectCall lbl arity args }
 
-        JumpToIt {} -> panic "cgTailCall"       -- ???
+        -- Let-no-escape call or self-recursive tail-call
+        JumpToIt blk_id lne_regs -> do
+          { adjustHpBackwards -- always do this before a tail-call
+          ; cmm_args <- getNonVoidArgAmodes args
+          ; emitMultiAssign lne_regs cmm_args
+          ; emit (mkBranch blk_id)
+          ; return AssignedDirectly }
 
-  where
-    fun_arg     = StgVarArg fun_id
-    fun_name    = idName            fun_id
-    fun         = idInfoToAmode     fun_info
-    lf_info     = cgIdInfoLF        fun_info
-    node_points dflags = nodeMustPointToIt dflags lf_info
+-- Note [Self-recursive tail calls]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Self-recursive tail calls can be optimized into a local jump in the same
+-- way as let-no-escape bindings (see Note [What is a non-escaping let] in
+-- stgSyn/CoreToStg.lhs). Consider this:
+--
+-- foo.info:
+--     a = R1  // calling convention
+--     b = R2
+--     goto L1
+-- L1: ...
+--     ...
+-- ...
+-- L2: R1 = x
+--     R2 = y
+--     call foo(R1,R2)
+--
+-- Instead of putting x and y into registers (or other locations required by the
+-- calling convention) and performing a call we can put them into local
+-- variables a and b and perform jump to L1:
+--
+-- foo.info:
+--     a = R1
+--     b = R2
+--     goto L1
+-- L1: ...
+--     ...
+-- ...
+-- L2: a = x
+--     b = y
+--     goto L1
+--
+-- This can be done only when function is calling itself in a tail position
+-- and only if the call passes number of parameters equal to function's arity.
+-- Note that this cannot be performed if a function calls itself with a
+-- continuation.
+--
+-- This in fact implements optimization known as "loopification". It was
+-- described in "Low-level code optimizations in the Glasgow Haskell Compiler"
+-- by Krzysztof Woś, though we use different approach. Krzysztof performed his
+-- optimization at the Cmm level, whereas we perform ours during code generation
+-- (Stg-to-Cmm pass) essentially making sure that optimized Cmm code is
+-- generated in the first place.
+--
+-- Implementation is spread across a couple of places in the code:
+--
+--   * FCode monad stores additional information in its reader environment
+--     (cgd_self_loop field). This information tells us which function can
+--     tail call itself in an optimized way (it is the function currently
+--     being compiled), what is the label of a loop header (L1 in example above)
+--     and information about local registers in which we should arguments
+--     before making a call (this would be a and b in example above).
+--
+--   * Whenever we are compiling a function, we set that information to reflect
+--     the fact that function currently being compiled can be jumped to, instead
+--     of called. We also have to emit a label to which we will be jumping. Both
+--     things are done in closureCodyBody in StgCmmBind.
+--
+--   * When we began compilation of another closure we remove the additional
+--     information from the environment. This is done by forkClosureBody
+--     in StgCmmMonad. Other functions that duplicate the environment -
+--     forkLneBody, forkAlts, codeOnly - duplicate that information. In other
+--     words, we only need to clean the environment of the self-loop information
+--     when compiling right hand side of a closure (binding).
+--
+--   * When compiling a call (cgIdApp) we use getCallMethod to decide what kind
+--     of call will be generated. getCallMethod decides to generate a self
+--     recursive tail call when (a) environment stores information about
+--     possible self tail-call; (b) that tail call is to a function currently
+--     being compiled; (c) number of passed arguments is equal to function's
+--     arity. (d) loopification is turned on via -floopification command-line
+--     option.
+--
+--   * Command line option to control turn loopification on and off is
+--     implemented in DynFlags
+--
 
 
 emitEnter :: CmmExpr -> FCode ReturnKind

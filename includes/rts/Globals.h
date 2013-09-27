@@ -25,5 +25,6 @@ StgStablePtr getOrSetSystemEventThreadEventManagerStore(StgStablePtr ptr);
 StgStablePtr getOrSetSystemEventThreadIOManagerThreadStore(StgStablePtr ptr);
 StgStablePtr getOrSetSystemTimerThreadEventManagerStore(StgStablePtr ptr);
 StgStablePtr getOrSetSystemTimerThreadIOManagerThreadStore(StgStablePtr ptr);
+StgStablePtr getOrSetLibHSghcFastStringTable(StgStablePtr ptr);
 
 #endif /* RTS_GLOBALS_H */

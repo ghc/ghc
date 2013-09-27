@@ -9,16 +9,15 @@
 -- Module      :  GHC.Arr
 -- Copyright   :  (c) The University of Glasgow, 1994-2000
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
 -- GHC\'s array implementation.
--- 
+--
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Arr (
         Ix(..), Array(..), STArray(..),
 
@@ -47,7 +46,7 @@ import GHC.Num
 import GHC.ST
 import GHC.Base
 import GHC.List
-import GHC.Real
+import GHC.Real( fromIntegral )
 import GHC.Show
 
 infixl 9  !, //
@@ -105,7 +104,7 @@ class (Ord a) => Ix a where
 	-- the same code, but using indexError instead of hopelessIndexError
 	-- Reason: we have 'Show' at the instances
     {-# INLINE index #-}  -- See Note [Inlining index]
-    index b i | inRange b i = unsafeIndex b i   
+    index b i | inRange b i = unsafeIndex b i
               | otherwise   = hopelessIndexError
 
     unsafeIndex b i = index b i
@@ -137,9 +136,9 @@ hence is empty
 
 Note [Inlining index]
 ~~~~~~~~~~~~~~~~~~~~~
-We inline the 'index' operation, 
+We inline the 'index' operation,
 
- * Partly because it generates much faster code 
+ * Partly because it generates much faster code
    (although bigger); see Trac #1216
 
  * Partly because it exposes the bounds checks to the simplifier which
@@ -151,20 +150,20 @@ Note [Double bounds-checking of index values]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When you index an array, a!x, there are two possible bounds checks we might make:
 
-  (A) Check that (inRange (bounds a) x) holds.  
+  (A) Check that (inRange (bounds a) x) holds.
 
       (A) is checked in the method for 'index'
 
-  (B) Check that (index (bounds a) x) lies in the range 0..n, 
+  (B) Check that (index (bounds a) x) lies in the range 0..n,
       where n is the size of the underlying array
 
       (B) is checked in the top-level function (!), in safeIndex.
 
-Of course it *should* be the case that (A) holds iff (B) holds, but that 
+Of course it *should* be the case that (A) holds iff (B) holds, but that
 is a property of the particular instances of index, bounds, and inRange,
 so GHC cannot guarantee it.
 
- * If you do (A) and not (B), then you might get a seg-fault, 
+ * If you do (A) and not (B), then you might get a seg-fault,
    by indexing at some bizarre location.  Trac #1610
 
  * If you do (B) but not (A), you may get no complaint when you index
@@ -227,7 +226,7 @@ instance  Ix Int  where
               | otherwise   =  indexError b i "Int"
 
     {-# INLINE inRange #-}
-    inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
+    inRange (I# m,I# n) (I# i) =  isTrue# (m <=# i) && isTrue# (i <=# n)
 
 instance Ix Word where
     range (m,n)         = [m..n]
@@ -366,7 +365,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 
     inRange ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 && 
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
       inRange (l5,u5) i5
 
     -- Default method for index
@@ -411,7 +410,7 @@ data STArray s i e
 -- Just pointer equality on mutable arrays:
 instance Eq (STArray s i e) where
     STArray _ _ _ arr1# == STArray _ _ _ arr2# =
-        sameMutableArray# arr1# arr2#
+        isTrue# (sameMutableArray# arr1# arr2#)
 \end{code}
 
 
@@ -483,16 +482,16 @@ unsafeArray' (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
 
 {-# INLINE fill #-}
 fill :: MutableArray# s e -> (Int, e) -> STRep s a -> STRep s a
--- NB: put the \s after the "=" so that 'fill' 
---     inlines when applied to three args 
-fill marr# (I# i#, e) next 
- = \s1# -> case writeArray# marr# i# e s1# of 
-             s2# -> next s2# 
+-- NB: put the \s after the "=" so that 'fill'
+--     inlines when applied to three args
+fill marr# (I# i#, e) next
+ = \s1# -> case writeArray# marr# i# e s1# of
+             s2# -> next s2#
 
 {-# INLINE done #-}
 done :: Ix i => i -> i -> Int -> MutableArray# s e -> STRep s (Array i e)
 -- See NB on 'fill'
-done l u n marr# 
+done l u n marr#
   = \s1# -> case unsafeFreezeArray# marr# s1# of
               (# s2#, arr# #) -> (# s2#, Array l u n arr# #)
 
@@ -509,7 +508,7 @@ listArray :: Ix i => (i,i) -> [e] -> Array i e
 listArray (l,u) es = runST (ST $ \s1# ->
     case safeRangeSize (l,u)            of { n@(I# n#) ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr# #) ->
-    let fillFromList i# xs s3# | i# ==# n# = s3#
+    let fillFromList i# xs s3# | isTrue# (i# ==# n#) = s3#
                                | otherwise = case xs of
             []   -> s3#
             y:ys -> case writeArray# marr# i# y s3# of { s4# ->
@@ -551,7 +550,7 @@ safeIndex (l,u) n i = let i' = index (l,u) i
 lessSafeIndex :: Ix i => (i, i) -> Int -> i -> Int
 -- See Note [Double bounds-checking of index values]
 -- Do only (A), the semantic check
-lessSafeIndex (l,u) _ i = index (l,u) i  
+lessSafeIndex (l,u) _ i = index (l,u) i
 
 -- Don't inline this long error message everywhere!!
 badSafeIndex :: Int -> Int -> Int
@@ -776,7 +775,7 @@ newSTArray (l,u) initial = ST $ \s1# ->
     (# s2#, STArray l u n marr# #) }}
 
 {-# INLINE boundsSTArray #-}
-boundsSTArray :: STArray s i e -> (i,i)  
+boundsSTArray :: STArray s i e -> (i,i)
 boundsSTArray (STArray l u _ _) = (l,u)
 
 {-# INLINE numElementsSTArray #-}
@@ -794,12 +793,12 @@ unsafeReadSTArray (STArray _ _ _ marr#) (I# i#)
     = ST $ \s1# -> readArray# marr# i# s1#
 
 {-# INLINE writeSTArray #-}
-writeSTArray :: Ix i => STArray s i e -> i -> e -> ST s () 
+writeSTArray :: Ix i => STArray s i e -> i -> e -> ST s ()
 writeSTArray marr@(STArray l u n _) i e =
     unsafeWriteSTArray marr (safeIndex (l,u) n i) e
 
 {-# INLINE unsafeWriteSTArray #-}
-unsafeWriteSTArray :: Ix i => STArray s i e -> Int -> e -> ST s () 
+unsafeWriteSTArray :: Ix i => STArray s i e -> Int -> e -> ST s ()
 unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
     case writeArray# marr# i# e s1# of
         s2# -> (# s2#, () #)
@@ -816,7 +815,7 @@ unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
 freezeSTArray :: Ix i => STArray s i e -> ST s (Array i e)
 freezeSTArray (STArray l u n@(I# n#) marr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr'# #) ->
-    let copy i# s3# | i# ==# n# = s3#
+    let copy i# s3# | isTrue# (i# ==# n#) = s3#
                     | otherwise =
             case readArray# marr# i# s3# of { (# s4#, e #) ->
             case writeArray# marr'# i# e s4# of { s5# ->
@@ -834,7 +833,7 @@ unsafeFreezeSTArray (STArray l u n marr#) = ST $ \s1# ->
 thawSTArray :: Ix i => Array i e -> ST s (STArray s i e)
 thawSTArray (Array l u n@(I# n#) arr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr# #) ->
-    let copy i# s3# | i# ==# n# = s3#
+    let copy i# s3# | isTrue# (i# ==# n#) = s3#
                     | otherwise =
             case indexArray# arr# i#    of { (# e #) ->
             case writeArray# marr# i# e s3# of { s4# ->

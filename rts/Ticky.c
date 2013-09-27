@@ -75,7 +75,8 @@ PrintTickyInfo(void)
 	tot_adm_wds + tot_gds_wds + tot_slp_wds;
 #endif
 
-  unsigned long tot_thk_enters = ENT_STATIC_THK_ctr + ENT_DYN_THK_ctr;
+  unsigned long tot_thk_enters = ENT_STATIC_THK_MANY_ctr + ENT_DYN_THK_MANY_ctr
+                               + ENT_STATIC_THK_SINGLE_ctr + ENT_DYN_THK_SINGLE_ctr;
   unsigned long tot_con_enters = ENT_STATIC_CON_ctr + ENT_DYN_CON_ctr;
 
   unsigned long tot_fun_direct_enters = ENT_STATIC_FUN_DIRECT_ctr + ENT_DYN_FUN_DIRECT_ctr;
@@ -452,8 +453,12 @@ PrintTickyInfo(void)
   PR_CTR(ENT_PAP_ctr);
   PR_CTR(ENT_AP_STACK_ctr);
   PR_CTR(ENT_BH_ctr);
-  PR_CTR(ENT_STATIC_THK_ctr);
-  PR_CTR(ENT_DYN_THK_ctr);
+  PR_CTR(ENT_STATIC_THK_SINGLE_ctr);
+  PR_CTR(ENT_STATIC_THK_MANY_ctr);
+  PR_CTR(ENT_DYN_THK_SINGLE_ctr);
+  PR_CTR(ENT_DYN_THK_MANY_ctr);
+  PR_CTR(UPD_CAF_BH_UPDATABLE_ctr);
+  PR_CTR(UPD_CAF_BH_SINGLE_ENTRY_ctr);
 
   PR_CTR(SLOW_CALL_fast_v16_ctr);
   PR_CTR(SLOW_CALL_fast_v_ctr);
@@ -547,10 +552,6 @@ PrintTickyInfo(void)
   PR_CTR(UPD_PAP_IN_NEW_ctr);
   PR_CTR(UPD_PAP_IN_PLACE_ctr);
 
-  PR_CTR(UPD_BH_UPDATABLE_ctr);
-  PR_CTR(UPD_BH_SINGLE_ENTRY_ctr);
-  PR_CTR(UPD_CAF_BH_UPDATABLE_ctr);
-  PR_CTR(UPD_CAF_BH_SINGLE_ENTRY_ctr);
 
   /* krc: put off till later...*/
 #if FALSE

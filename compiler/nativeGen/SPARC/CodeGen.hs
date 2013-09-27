@@ -588,7 +588,7 @@ outOfLineMachOp mop
                 = outOfLineMachOp_table mop
 
         dflags  <- getDynFlags
-        mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference
+        mopExpr <- cmmMakeDynamicReference dflags CallReference
                 $  mkForeignLabel functionName Nothing ForeignLabelInExternalPackage IsFunction
 
         let mopLabelOrExpr
@@ -647,6 +647,7 @@ outOfLineMachOp_table mop
         MO_Memset    -> fsLit "memset"
         MO_Memmove   -> fsLit "memmove"
 
+        MO_BSwap w   -> fsLit $ bSwapLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
 
         MO_S_QuotRem {}  -> unsupported

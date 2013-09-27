@@ -52,6 +52,8 @@ import Data.Map (Map)
 import Data.Word
 import System.IO
 import qualified Data.Map as Map
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
 
 import Data.Array.Unsafe ( castSTUArray )
 import Data.Array.ST hiding ( castSTUArray )
@@ -649,6 +651,15 @@ pprMachOp_for_C mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
                                       ++ " should have been handled earlier!")
 
+        MO_VU_Quot {}     -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VU_Quot")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Quot"
+                                      ++ " should have been handled earlier!")
+        MO_VU_Rem {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VU_Rem")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
+                                      ++ " should have been handled earlier!")
+
         MO_VF_Insert {}   -> pprTrace "offending mop:"
                                 (ptext $ sLit "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"
@@ -738,6 +749,7 @@ pprCallishMachOp_for_C mop
         MO_Memcpy       -> ptext (sLit "memcpy")
         MO_Memset       -> ptext (sLit "memset")
         MO_Memmove      -> ptext (sLit "memmove")
+        (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
 
@@ -937,6 +949,7 @@ is_cishCC CCallConv    = True
 is_cishCC CApiConv     = True
 is_cishCC StdCallConv  = True
 is_cishCC PrimCallConv = False
+is_cishCC JavaScriptCallConv = False
 
 -- ---------------------------------------------------------------------
 -- Find and print local and external declarations for a list of
@@ -983,6 +996,13 @@ pprExternDecl _in_srt lbl
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
 newtype TE a = TE { unTE :: TEState -> (a, TEState) }
+
+instance Functor TE where
+      fmap = liftM
+
+instance Applicative TE where
+      pure = return
+      (<*>) = ap
 
 instance Monad TE where
    TE m >>= k  = TE $ \s -> case m s of (a, s') -> unTE (k a) s'

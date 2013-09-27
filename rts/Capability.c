@@ -35,7 +35,13 @@ Capability MainCapability;
 
 nat n_capabilities = 0;
 nat enabled_capabilities = 0;
-Capability *capabilities = NULL;
+
+// The array of Capabilities.  It's important that when we need
+// to allocate more Capabilities we don't have to move the existing
+// Capabilities, because there may be pointers to them in use
+// (e.g. threads in waitForReturnCapability(), see #8209), so this is
+// an array of Capability* rather than an array of Capability.
+Capability **capabilities = NULL;
 
 // Holds the Capability which last became free.  This is used so that
 // an in-call has a chance of quickly finding a free Capability.
@@ -117,40 +123,38 @@ findSpark (Capability *cap)
       retry = rtsTrue;
     }
 
-    if (n_capabilities == 1) { return NULL; } // makes no sense...
+      if (n_capabilities == 1) { return NULL; } // makes no sense...
 
-    debugTrace(DEBUG_sched,
-               "cap %d: Trying to steal work from other capabilities",
-               cap->no);
+      debugTrace(DEBUG_sched,
+                 "cap %d: Trying to steal work from other capabilities",
+                 cap->no);
 
-    /* visit cap.s 0..n-1 in sequence until a theft succeeds. We could
-       start at a random place instead of 0 as well.  */
-    for ( i=0 ; i < n_capabilities ; i++ ) {
-      robbed = &capabilities[i];
-      if (cap == robbed)  // ourselves...
-        continue;
+      /* visit cap.s 0..n-1 in sequence until a theft succeeds. We could
+      start at a random place instead of 0 as well.  */
+      for ( i=0 ; i < n_capabilities ; i++ ) {
+          robbed = capabilities[i];
+          if (cap == robbed)  // ourselves...
+              continue;
 
-      if (emptySparkPoolCap(robbed)) // nothing to steal here
-        continue;
+          if (emptySparkPoolCap(robbed)) // nothing to steal here
+              continue;
 
-      spark = tryStealSpark(robbed->sparks);
-      while (spark != NULL && fizzledSpark(spark)) {
-        cap->spark_stats.fizzled++;
-        traceEventSparkFizzle(cap);
-        spark = tryStealSpark(robbed->sparks);
-      }
-      if (spark == NULL && !emptySparkPoolCap(robbed)) {
-        // we conflicted with another thread while trying to steal;
-        // try again later.
-        retry = rtsTrue;
-      }
-
-      if (spark != NULL) {
-        cap->spark_stats.converted++;
-        traceEventSparkSteal(cap, robbed->no);
-
-        return spark;
-      }
+          spark = tryStealSpark(robbed->sparks);
+          while (spark != NULL && fizzledSpark(spark)) {
+              cap->spark_stats.fizzled++;
+              traceEventSparkFizzle(cap);
+              spark = tryStealSpark(robbed->sparks);
+          }
+          if (spark == NULL && !emptySparkPoolCap(robbed)) {
+              // we conflicted with another thread while trying to steal;
+              // try again later.
+              retry = rtsTrue;
+          }
+          if (spark != NULL) {
+              cap->spark_stats.converted++;
+              traceEventSparkSteal(cap, robbed->no);
+              return spark;
+          }
       // otherwise: no success, try next one
     }
   } while (retry);
@@ -168,11 +172,11 @@ anySparks (void)
 {
   nat i;
 
-  for (i=0; i < n_capabilities; i++) {
-    if (!emptySparkPoolCap(&capabilities[i])) {
-      return rtsTrue;
+    for (i=0; i < n_capabilities; i++) {
+        if (!emptySparkPoolCap(capabilities[i])) {
+            return rtsTrue;
+        }
     }
-  }
   return rtsFalse;
 }
 #endif
@@ -327,57 +331,52 @@ initCapabilities( void )
 
 #else /* !THREADED_RTS */
 
-  n_capabilities = 1;
-  capabilities = &MainCapability;
-  initCapability(&MainCapability, 0);
+    n_capabilities = 1;
+    capabilities = stgMallocBytes(sizeof(Capability*), "initCapabilities");
+    capabilities[0] = &MainCapability;
+    initCapability(&MainCapability, 0);
 
 #endif
 
   enabled_capabilities = n_capabilities;
 
-  // There are no free capabilities to begin with.  We will start
-  // a worker Task to each Capability, which will quickly put the
-  // Capability on the free list when it finds nothing to do.
-  last_free_capability = &capabilities[0];
+    // There are no free capabilities to begin with.  We will start
+    // a worker Task to each Capability, which will quickly put the
+    // Capability on the free list when it finds nothing to do.
+    last_free_capability = capabilities[0];
 }
 
-Capability *
+void
 moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-  nat i;
-  Capability *old_capabilities = capabilities;
+    nat i;
+    Capability **old_capabilities = capabilities;
 
-  if (to == 1) {
-    // THREADED_RTS must work on builds that don't have a mutable
-    // BaseReg (eg. unregisterised), so in this case
-    // capabilities[0] must coincide with &MainCapability.
-    capabilities = &MainCapability;
-  } else {
-    capabilities = stgMallocBytes(to * sizeof(Capability),
-                                  "moreCapabilities");
+    capabilities = stgMallocBytes(to * sizeof(Capability*), "moreCapabilities");
 
-    if (from > 0) {
-      memcpy(capabilities, old_capabilities, from * sizeof(Capability));
+    if (to == 1) {
+        // THREADED_RTS must work on builds that don't have a mutable
+        // BaseReg (eg. unregisterised), so in this case
+	// capabilities[0] must coincide with &MainCapability.
+        capabilities[0] = &MainCapability;
     }
-  }
 
-  for (i = from; i < to; i++) {
-    initCapability(&capabilities[i], i);
-  }
+    for (i = 0; i < to; i++) {
+        if (i < from) {
+            capabilities[i] = old_capabilities[i];
+        } else {
+            capabilities[i] = stgMallocBytes(sizeof(Capability),
+                                             "moreCapabilities");
+            initCapability(capabilities[i], i);
+        }
+    }
 
-  last_free_capability = &capabilities[0];
+    debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
 
-  debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
-
-  // Return the old array to free later.
-  if (from > 1) {
-    return old_capabilities;
-  } else {
-    return NULL;
-  }
-#else
-  return NULL;
+    if (old_capabilities != NULL) {
+        stgFree(old_capabilities);
+    }
 #endif
 }
 
@@ -399,7 +398,7 @@ void initUpcallThreads (void) {
   nat i;
   Capability* cap;
   for (i=0; i < n_capabilities; i++) {
-    cap = &capabilities[i];
+    cap = capabilities[i];
     initUpcallThreadOnCapability (cap);
   }
 }
@@ -411,18 +410,18 @@ void initUpcallThreads (void) {
 
 void contextSwitchAllCapabilities(void)
 {
-  nat i;
-  for (i=0; i < n_capabilities; i++) {
-    contextSwitchCapability(&capabilities[i]);
-  }
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        contextSwitchCapability(capabilities[i]);
+    }
 }
 
 void interruptAllCapabilities(void)
 {
-  nat i;
-  for (i=0; i < n_capabilities; i++) {
-    interruptCapability(&capabilities[i]);
-  }
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        interruptCapability(capabilities[i]);
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -624,33 +623,33 @@ waitForReturnCapability (Capability **pCap, Task *task)
   *pCap = &MainCapability;
 
 #else
-  Capability *cap = *pCap;
+    Capability *cap = *pCap;
 
-  if (cap == NULL) {
-    // Try last_free_capability first
-    cap = last_free_capability;
-    if (cap->running_task) {
-      nat i;
-      // otherwise, search for a free capability
-      cap = NULL;
-      for (i = 0; i < n_capabilities; i++) {
-        if (!capabilities[i].running_task) {
-          cap = &capabilities[i];
-          break;
-        }
-      }
-      if (cap == NULL) {
-        // Can't find a free one, use last_free_capability.
-        cap = last_free_capability;
-      }
+    if (cap == NULL) {
+	// Try last_free_capability first
+	cap = last_free_capability;
+	if (cap->running_task) {
+	    nat i;
+	    // otherwise, search for a free capability
+            cap = NULL;
+	    for (i = 0; i < n_capabilities; i++) {
+                if (!capabilities[i]->running_task) {
+                    cap = capabilities[i];
+		    break;
+		}
+	    }
+            if (cap == NULL) {
+                // Can't find a free one, use last_free_capability.
+                cap = last_free_capability;
+            }
+	}
+
+	// record the Capability as the one this Task is now assocated with.
+	task->cap = cap;
+
+    } else {
+	ASSERT(task->cap == cap);
     }
-
-    // record the Capability as the one this Task is now assocated with.
-    task->cap = cap;
-
-  } else {
-    ASSERT(task->cap == cap);
-  }
 
   ACQUIRE_LOCK(&cap->lock);
 
@@ -982,11 +981,11 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
 void
 shutdownCapabilities(Task *task, rtsBool safe)
 {
-  nat i;
-  for (i=0; i < n_capabilities; i++) {
-    ASSERT(task->incall->tso == NULL);
-    shutdownCapability(&capabilities[i], task, safe);
-  }
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        ASSERT(task->incall->tso == NULL);
+        shutdownCapability(capabilities[i], task, safe);
+    }
 #if defined(THREADED_RTS)
   ASSERT(checkSparkCountInvariant());
 #endif
@@ -1009,15 +1008,17 @@ void
 freeCapabilities (void)
 {
 #if defined(THREADED_RTS)
-  nat i;
-  for (i=0; i < n_capabilities; i++) {
-    freeCapability(&capabilities[i]);
-  }
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        freeCapability(capabilities[i]);
+        stgFree(capabilities[i]);
+    }
 #else
   freeCapability(&MainCapability);
 #endif
-  traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
-  traceCapsetDelete(CAPSET_CLOCKDOMAIN_DEFAULT);
+    stgFree(capabilities);
+    traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
+    traceCapsetDelete(CAPSET_CLOCKDOMAIN_DEFAULT);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1063,39 +1064,38 @@ markCapability (evac_fn evac, void *user, Capability *cap,
 void
 markCapabilities (evac_fn evac, void *user)
 {
-  nat n;
-  for (n = 0; n < n_capabilities; n++) {
-    markCapability(evac, user, &capabilities[n], rtsFalse);
-  }
+    nat n;
+    for (n = 0; n < n_capabilities; n++) {
+        markCapability(evac, user, capabilities[n], rtsFalse);
+    }
 }
 
 #if defined(THREADED_RTS)
 rtsBool checkSparkCountInvariant (void)
 {
-  SparkCounters sparks = { 0, 0, 0, 0, 0, 0 };
-  StgWord64 remaining = 0;
-  nat i;
+    SparkCounters sparks = { 0, 0, 0, 0, 0, 0 };
+    StgWord64 remaining = 0;
+    nat i;
 
-  for (i = 0; i < n_capabilities; i++) {
-    sparks.created   += capabilities[i].spark_stats.created;
-    sparks.dud       += capabilities[i].spark_stats.dud;
-    sparks.overflowed+= capabilities[i].spark_stats.overflowed;
-    sparks.converted += capabilities[i].spark_stats.converted;
-    sparks.gcd       += capabilities[i].spark_stats.gcd;
-    sparks.fizzled   += capabilities[i].spark_stats.fizzled;
-    remaining        += sparkPoolSize(capabilities[i].sparks);
-  }
+    for (i = 0; i < n_capabilities; i++) {
+        sparks.created   += capabilities[i]->spark_stats.created;
+        sparks.dud       += capabilities[i]->spark_stats.dud;
+        sparks.overflowed+= capabilities[i]->spark_stats.overflowed;
+        sparks.converted += capabilities[i]->spark_stats.converted;
+        sparks.gcd       += capabilities[i]->spark_stats.gcd;
+        sparks.fizzled   += capabilities[i]->spark_stats.fizzled;
+        remaining        += sparkPoolSize(capabilities[i]->sparks);
+    }
 
-  /* The invariant is
-   *   created = converted + remaining + gcd + fizzled
-   */
-  debugTrace(DEBUG_sparks,"spark invariant: %ld == %ld + %ld + %ld + %ld "
-             "(created == converted + remaining + gcd + fizzled)",
-             sparks.created, sparks.converted, remaining,
-             sparks.gcd, sparks.fizzled);
+    /* The invariant is
+     *   created = converted + remaining + gcd + fizzled
+     */
+    debugTrace(DEBUG_sparks,"spark invariant: %ld == %ld + %ld + %ld + %ld "
+                            "(created == converted + remaining + gcd + fizzled)",
+                            sparks.created, sparks.converted, remaining,
+                            sparks.gcd, sparks.fizzled);
 
-  return (sparks.created ==
-          sparks.converted + remaining + sparks.gcd + sparks.fizzled);
-
+    return (sparks.created ==
+              sparks.converted + remaining + sparks.gcd + sparks.fizzled);
 }
 #endif

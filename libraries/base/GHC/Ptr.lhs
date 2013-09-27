@@ -1,6 +1,6 @@
 \begin{code}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, RoleAnnotations #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Ptr (
         Ptr(..), FunPtr(..),
         nullPtr, castPtr, plusPtr, alignPtr, minusPtr,
@@ -38,6 +37,7 @@ import Numeric          ( showHex )
 ------------------------------------------------------------------------
 -- Data pointers.
 
+type role Ptr representational
 data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
@@ -82,6 +82,7 @@ minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 ------------------------------------------------------------------------
 -- Function pointers for the default calling convention.
 
+type role FunPtr representational
 data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'FunPtr' a@ is a pointer to a function callable
 -- from foreign code.  The type @a@ will normally be a /foreign type/,

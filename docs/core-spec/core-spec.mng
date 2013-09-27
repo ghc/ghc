@@ -7,6 +7,7 @@
 \usepackage{xcolor}
 \usepackage{fullpage}
 \usepackage{multirow}
+\usepackage{url}
 
 \newcommand{\ghcfile}[1]{\textsl{#1}}
 \newcommand{\arraylabel}[1]{\multicolumn{2}{l}{\!\!\!\!\!\!\!\!\!\text{\underline{#1}:}}}
@@ -19,7 +20,7 @@
 \setlength{\parindent}{0in}
 \setlength{\parskip}{1ex}
 
-\newcommand{\gram}[1]{\ottgrammartabular{#1\ottinterrule}}
+\newcommand{\gram}[1]{\ottgrammartabular{#1\ottafterlastrule}}
 
 \begin{document}
 
@@ -29,10 +30,27 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large\today
+\Large 9 September, 2013
 \end{center}
 
 \section{Introduction}
+
+This document presents the typing system of System FC, very closely to how it is
+implemented in GHC. Care is taken to include only those checks that are actually
+written in the GHC code. It should be maintained along with any changes to this
+type system.
+
+Who will use this? Any implementer of GHC who wants to understand more about the
+type system can look here to see the relationships among constructors and the
+different types used in the implementation of the type system. Note that the
+type system here is quite different from that of Haskell---these are the details
+of the internal language, only.
+
+At the end of this document is a \emph{hypothetical} operational semantics for GHC.
+It is hypothetical because GHC does not strictly implement a concrete operational
+semantics anywhere in its code. While all the typing rules can be traced back to
+lines of real code, the operational semantics do not, in general, have as clear
+a provenance.
 
 There are a number of details elided from this presentation. The goal of the
 formalism is to aid in reasoning about type safety, and checks that do not
@@ -64,7 +82,6 @@ variables:
 \gram{
 \ottz
 }
-foo
 
 \gram{
 \ottn
@@ -132,12 +149,20 @@ a term-level literal, but we are ignoring this distinction here.
 
 Invariants on coercions:
 \begin{itemize}
-\item $[[<t1 t2>]]$ is used; never $[[<t1> <t2>]]$.
-\item If $[[<T>]]$ is applied to some coercions, at least one of which is not
-reflexive, use $[[T </ gi // i />]]$, never $[[<T> g1 g2]] \ldots$.
-\item The $[[T]]$ in $[[T </gi//i/>]]$ is never a type synonym, though it could
+\item $[[<t1 t2>_R]]$ is used; never $[[<t1>_R <t2>_Nom]]$.
+\item If $[[<T>_R]]$ is applied to some coercions, at least one of which is not
+reflexive, use $[[T_R </ gi // i />]]$, never $[[<T>_R g1 g2]] \ldots$.
+\item The $[[T]]$ in $[[T_R </gi//i/>]]$ is never a type synonym, though it could
 be a type function.
 \end{itemize}
+
+Roles label what equality relation a coercion is a witness of. Nominal equality
+means that two types are identical (have the same name); representational equality
+means that two types have the same representation (introduced by newtypes); and
+phantom equality includes all types. See \url{http://ghc.haskell.org/trac/ghc/wiki/Roles}
+for more background.
+
+\gram{\ottR}
 
 Is it a left projection or a right projection?
 
@@ -149,6 +174,12 @@ Axioms:
 \ottC\ottinterrule
 \ottaxBranch
 }
+
+The definition for $[[axBranch]]$ above does not include the list of
+incompatible branches (field \texttt{cab\_incomps} of \texttt{CoAxBranch}),
+as that would unduly clutter this presentation. Instead, as the list
+of incompatible branches can be computed at any time, it is checked for
+in the judgment $[[no_conflict]]$. See Section~\ref{sec:no_conflict}.
 
 \subsection{Type constructors}
 
@@ -179,7 +210,7 @@ the context sometimes requires creating a new, fresh variable name and then
 applying a substitution. We elide these details in this formalism, but
 see \coderef{types/Type.lhs}{substTyVarBndr} for details.
 
-\section{Judgments}
+\section{Typing judgments}
 
 The following functions are used from GHC. Their names are descriptive, and they
 are not formalized here: \coderef{types/TyCon.lhs}{tyConKind},
@@ -263,11 +294,21 @@ a dead id and for one-tuples. These checks are omitted here.
 
 \subsection{Coercion typing}
 
+In the coercion typing judgment, the $\#$ marks are left off the equality
+operators to reduce clutter. This is not actually inconsistent, because
+the GHC function that implements this check, \texttt{lintCoercion}, actually
+returns four separate values (the kind, the two types, and the role), not
+a type with head $[[(~#)]]$ or $[[(~R#)]]$. Note that the difference between
+these two forms of equality is interpreted in the rules \ottdrulename{Co\_CoVarCoNom}
+and \ottdrulename{Co\_CoVarCoRepr}.
+
 \ottdefnlintCoercion{}
 
 In \ottdrulename{Co\_AxiomInstCo}, the use of $[[inits]]$ creates substitutions from
 the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of 
 folding the substitution over the kinds for kind-checking.
+
+See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$.
 
 \subsection{Name consistency}
 
@@ -305,17 +346,111 @@ There are two very similar checks for names, one declared as a local function:
 
 \ottdefnisSubKind{}
 
+\subsection{Roles}
+\label{sec:tyconroles}
+
+During type-checking, role inference is carried out, assigning roles to the
+arguments of every type constructor. The function $[[tyConRoles]]$ extracts these
+roles. Also used in other judgments is $[[tyConRolesX]]$, which is the same as
+$[[tyConRoles]]$, but with an arbitrary number of $[[Nom]]$ at the end, to account
+for potential oversaturation.
+
+The checks encoded in the following
+judgments are run from \coderef{typecheck/TcTyClsDecls.lhs}{checkValidTyCon}
+when \texttt{-dcore-lint} is set.
+
+\ottdefncheckValidRoles{}
+
+\ottdefncheckXXdcXXroles{}
+
+In the following judgment, the role $[[R]]$ is an \emph{input}, not an output.
+The metavariable $[[O]]$ denotes a \emph{role context}, as shown here:
+
+\gram{\ottO}
+
+\ottdefncheckXXtyXXroles{}
+
+These judgments depend on a sub-role relation:
+
+\ottdefnltRole{}
+
 \subsection{Branched axiom conflict checking}
+\label{sec:no_conflict}
 
 The following judgment is used within \ottdrulename{Co\_AxiomInstCo} to make
 sure that a type family application cannot unify with any previous branch
-in the axiom.
+in the axiom. The actual code scans through only those branches that are
+flagged as incompatible. These branches are stored directly in the
+$[[axBranch]]$. However, it is cleaner in this presentation to simply
+check for compatibility here.
 
 \ottdefncheckXXnoXXconflict{}
 
-The judgment $[[apart]]$ checks to see whether two lists of types are surely apart.
-It checks to see if \coderef{types/Unify.lhs}{tcApartTys} returns \texttt{SurelyApart}.
-Two types are apart if neither type is a type family application and if they do not
-unify.
+The judgment $[[apart]]$ checks to see whether two lists of types are surely
+apart. $[[apart( </ ti // i />, </ si // i /> )]]$, where $[[ </ ti // i />
+]]$ is a list of types and $[[ </ si // i /> ]]$ is a list of type
+\emph{patterns} (as in a type family equation), first flattens the $[[ </ ti
+    // i /> ]]$ using \coderef{types/FamInstEnv.lhs}{flattenTys} and then checks to
+see if \coderef{types/Unify.lhs}{tcUnifyTysFG} returns \texttt{SurelyApart}.
+Flattening takes all type family applications and replaces them with fresh variables,
+taking care to map identical type family applications to the same fresh variable.
+
+The algorithm $[[unify]]$ is implemented in \coderef{types/Unify.lhs}{tcUnifyTys}.
+It performs a standard unification, returning a substitution upon success.
+
+\section{Operational semantics}
+
+\subsection{Disclaimer}
+GHC does not implement an operational semantics in any concrete form. Most
+of the rules below are implied by algorithms in, for example, the simplifier
+and optimizer. Yet, there is no one place in GHC that states these rules,
+analogously to \texttt{CoreLint.lhs}.
+Nevertheless, these rules are included in this document to help the reader
+understand System FC.
+
+\subsection{The context $[[S]]$}
+We use a context $[[S]]$ to keep track of the values of variables in a (mutually)
+recursive group. Its definition is as follows:
+\[
+[[S]] \quad ::= \quad [[ empty ]] \ |\ [[S]], [[ [n |-> e] ]]
+\]
+The presence of the context $[[S]]$ is solely to deal with recursion. If your
+use of FC does not require modeling recursion, you will not need to track $[[S]]$.
+
+\subsection{Operational semantics rules}
+
+\ottdefnstep{}
+
+\subsection{Notes}
+
+\begin{itemize}
+\item The \ottdrulename{S\_LetRec} and \ottdrulename{S\_LetRecReturn} rules
+implement recursion. \ottdrulename{S\_LetRec} adds to the context $[[S]]$ bindings
+for all of the mutually recursive equations. Then, after perhaps many steps,
+when the body of the $[[let]]\ [[rec]]$ contains no variables that are bound
+in the $[[let]]\ [[rec]]$, the context is popped.
+\item In the $[[case]]$ rules, a constructor $[[K]]$ is written taking three
+lists of arguments: two lists of types and a list of terms. The types passed
+in are the universally and, respectively, existentially quantified type variables
+to the constructor. The terms are the regular term arguments stored in an
+algebraic datatype. Coercions (say, in a GADT) are considered term arguments.
+\item The rule \ottdrulename{S\_CasePush} is the most complex rule.
+\begin{itemize}
+\item The logic in this rule is implemented in \coderef{coreSyn/CoreSubst.lhs}{exprIsConApp\_maybe}.
+\item The $[[coercionKind]]$ function (\coderef{types/Coercion.lhs}{coercionKind})
+extracts the two types (and their kind) from
+a coercion. It does not require a typing context, as it does not \emph{check} the
+coercion, just extracts its types.
+\item The $[[dataConRepType]]$ function (\coderef{basicTypes/DataCon.lhs}{dataConRepType}) extracts the full type of a data constructor. Following the notation for
+constructor expressions, the parameters to the constructor are broken into three
+groups: universally quantified types, existentially quantified types, and terms.
+\item The substitutions in the last premise to the rule are unusual: they replace
+\emph{type} variables with \emph{coercions}. This substitution is called lifting
+and is implemented in \coderef{types/Coercion.lhs}{liftCoSubst}. The notation is
+essentially a pun on the fact that types and coercions have such similar structure.
+\item Note that the types $[[ </ sbb // bb /> ]]$---the existentially quantified
+types---do not change during this step.
+\end{itemize}
+\end{itemize}
 
 \end{document}

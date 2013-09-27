@@ -208,6 +208,7 @@ data Instr
         | XOR         Size Operand Operand
         | NOT         Size Operand
         | NEGI        Size Operand              -- NEG instruction (name clash with Cond)
+        | BSWAP       Size Reg
 
         -- Shifts (amount may be immediate or %cl only)
         | SHL         Size Operand{-amount-} Operand
@@ -351,6 +352,7 @@ x86_regUsageOfInstr platform instr
 
     XOR    _ src dst    -> usageRM src dst
     NOT    _ op         -> usageM op
+    BSWAP  _ reg        -> mkRU [reg] [reg]
     NEGI   _ op         -> usageM op
     SHL    _ imm dst    -> usageRM imm dst
     SAR    _ imm dst    -> usageRM imm dst
@@ -489,6 +491,7 @@ x86_patchRegsOfInstr instr env
     OR   sz src dst     -> patch2 (OR   sz) src dst
     XOR  sz src dst     -> patch2 (XOR  sz) src dst
     NOT  sz op          -> patch1 (NOT  sz) op
+    BSWAP sz reg        -> BSWAP sz (env reg)
     NEGI sz op          -> patch1 (NEGI sz) op
     SHL  sz imm dst     -> patch1 (SHL sz imm) dst
     SAR  sz imm dst     -> patch1 (SAR sz imm) dst
@@ -868,14 +871,8 @@ allocMoreStack
   -> UniqSM (NatCmmDecl statics X86.Instr.Instr)
 
 allocMoreStack _ _ top@(CmmData _ _) = return top
-allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
-    let
-        infos = mapKeys info
-        entries = case code of
-                    [] -> infos
-                    BasicBlock entry _ : _ -- first block is the entry point
-                       | entry `elem` infos -> infos
-                       | otherwise          -> entry : infos
+allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
+    let entries = entryBlocks proc
 
     uniqs <- replicateM (length entries) getUniqueUs
 

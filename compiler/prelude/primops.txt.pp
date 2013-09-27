@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- 
+--
 -- (c) 2010 The University of Glasgow
 --
 -- Primitive Operations and Types
@@ -39,6 +39,22 @@
 -- (eg, out_of_line), whilst avoiding parsing complex expressions
 -- needed for strictness info.
 
+-- The vector attribute is rather special. It takes a list of 3-tuples, each of
+-- which is of the form <ELEM_TYPE,SCALAR_TYPE,LENGTH>. ELEM_TYPE is the type of
+-- the elements in the vector; LENGTH is the length of the vector; and
+-- SCALAR_TYPE is the scalar type used to inject to/project from vector
+-- element. Note that ELEM_TYPE and SCALAR_TYPE are not the same; for example,
+-- to broadcast a scalar value to a vector whose elements are of type Int8, we
+-- use an Int#.
+
+-- When a primtype or primop has a vector attribute, it is instantiated at each
+-- 3-tuple in the list of 3-tuples. That is, the vector attribute allows us to
+-- define a family of types or primops. Vector support also adds three new
+-- keywords: VECTOR, SCALAR, and VECTUPLE. These keywords are expanded to types
+-- derived from the 3-tuple. For the 3-tuple <Int64,INT64,2>, VECTOR expands to
+-- Int64X2#, SCALAR expands to INT64, and VECTUPLE expands to (# INT64, INT64
+-- #).
+
 defaults
    has_side_effects = False
    out_of_line      = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
@@ -48,6 +64,7 @@ defaults
    strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity topDmd) topRes) }
    fixity           = Nothing
    llvm_only        = False
+   vector           = []
 
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
@@ -140,19 +157,19 @@ section "Char#"
 
 primtype Char#
 
-primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Bool
-primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Bool
+primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Int#
+primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Int#
 
 primop   CharEqOp  "eqChar#"   Compare
-   Char# -> Char# -> Bool
+   Char# -> Char# -> Int#
    with commutable = True
 
 primop   CharNeOp  "neChar#"   Compare
-   Char# -> Char# -> Bool
+   Char# -> Char# -> Int#
    with commutable = True
 
-primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> Bool
-primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Bool
+primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> Int#
+primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Int#
 
 primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
    with code_size = 0
@@ -239,26 +256,26 @@ primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
           second member is 0 iff no overflow occured.}
    with code_size = 2
 
-primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Bool
+primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Bool
+primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
 primop   IntEqOp  "==#"   Compare
-   Int# -> Int# -> Bool
+   Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
 primop   IntNeOp  "/=#"   Compare
-   Int# -> Int# -> Bool
+   Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Bool
+primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Bool
+primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
    with fixity = infix 4
 
 primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
@@ -345,12 +362,12 @@ primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
    with code_size = 0
 
-primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Bool
-primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Bool
-primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Bool
-primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Bool
-primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Bool
-primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Bool
+primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Int#
+primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Int#
+primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Int#
+primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Int#
+primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Int#
+primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Int#
 
 primop   PopCnt8Op   "popCnt8#"   Monadic   Word# -> Word#
     {Count the number of set bits in the lower 8 bits of a word.}
@@ -362,6 +379,15 @@ primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
     {Count the number of set bits in a 64-bit word.}
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
+
+primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
+    {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
+primop   BSwap32Op   "byteSwap32#"   Monadic   Word# -> Word#
+    {Swap bytes in the lower 32 bits of a word. The higher bytes are undefined. }
+primop   BSwap64Op   "byteSwap64#"   Monadic   WORD64 -> WORD64
+    {Swap bytes in a 64 bits of a word.}
+primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
+    {Swap bytes in a word.}
 
 ------------------------------------------------------------------------
 section "Narrowings"
@@ -426,26 +452,26 @@ section "Double#"
 
 primtype Double#
 
-primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Bool
+primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Bool
+primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
 primop DoubleEqOp "==##"   Compare
-   Double# -> Double# -> Bool
+   Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
 primop DoubleNeOp "/=##"   Compare
-   Double# -> Double# -> Bool
+   Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Bool
+primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Bool
+primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   Dyadic
@@ -559,19 +585,19 @@ section "Float#"
 
 primtype Float#
 
-primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Bool
-primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Bool
+primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Int#
 
 primop   FloatEqOp  "eqFloat#"   Compare
-   Float# -> Float# -> Bool
+   Float# -> Float# -> Int#
    with commutable = True
 
 primop   FloatNeOp  "neFloat#"   Compare
-   Float# -> Float# -> Bool
+   Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Bool
-primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Bool
+primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
 
 primop   FloatAddOp   "plusFloat#"      Dyadic
    Float# -> Float# -> Float#
@@ -689,7 +715,7 @@ primop  NewArrayOp "newArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
-   MutableArray# s a -> MutableArray# s a -> Bool
+   MutableArray# s a -> MutableArray# s a -> Int#
 
 primop  ReadArrayOp "readArray#" GenPrimOp
    MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
@@ -785,6 +811,14 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
+primop CasArrayOp  "casArray#" GenPrimOp
+   MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   {Unsafe, machine-level atomic compare and swap on an element within an Array.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+
 ------------------------------------------------------------------------
 section "Byte Arrays"
 	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
@@ -828,7 +862,7 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
    {Intended for use with pinned arrays; otherwise very unsafe!}
 
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> MutableByteArray# s -> Bool
+   MutableByteArray# s -> MutableByteArray# s -> Int#
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
@@ -1093,6 +1127,42 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
+  ByteArray# -> Int# -> Addr# -> Int# -> State# s -> State# s
+  {Copy a range of the ByteArray# to the memory range starting at the Addr#.
+   The ByteArray# and the memory region at Addr# must fully contain the
+   specified ranges, but this is not checked. The Addr# must not point into the
+   ByteArray# (e.g. if the ByteArray# were pinned), but this is not checked
+   either.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4}
+  can_fail = True
+
+primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
+  MutableByteArray# s -> Int# -> Addr# -> Int# -> State# s -> State# s
+  {Copy a range of the MutableByteArray# to the memory range starting at the
+   Addr#. The MutableByteArray# and the memory region at Addr# must fully
+   contain the specified ranges, but this is not checked. The Addr# must not
+   point into the MutableByteArray# (e.g. if the MutableByteArray# were
+   pinned), but this is not checked either.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4}
+  can_fail = True
+
+primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
+  Addr# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+  {Copy a memory range starting at the Addr# to the specified range in the
+   MutableByteArray#. The memory region at Addr# and the ByteArray# must fully
+   contain the specified ranges, but this is not checked. The Addr# must not
+   point into the MutableByteArray# (e.g. if the MutableByteArray# were pinned),
+   but this is not checked either.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4}
+  can_fail = True
+
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> State# s
   {Set the range of the MutableByteArray# to the specified character.}
@@ -1100,6 +1170,21 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
+
+primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Machine-level atomic compare and swap on a word within a ByteArray.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Machine-level word-sized fetch-and-add within a ByteArray.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
 
 ------------------------------------------------------------------------
 section "Arrays of arrays"
@@ -1124,7 +1209,7 @@ primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
-   MutableArrayArray# s -> MutableArrayArray# s -> Bool
+   MutableArrayArray# s -> MutableArrayArray# s -> Int#
 
 primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
    MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
@@ -1235,12 +1320,12 @@ primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
    with code_size = 0
 #endif
 
-primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Bool
-primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Bool
+primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Int#
 
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
@@ -1501,7 +1586,7 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    can_fail         = True
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
-   MutVar# s a -> MutVar# s a -> Bool
+   MutVar# s a -> MutVar# s a -> Int#
 
 -- not really the right type, but we don't know about pairs here.  The
 -- correct type is
@@ -1602,9 +1687,20 @@ primop	AtomicallyOp "atomically#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop RetryOp "retry#" GenPrimOp
+-- NB: retry#'s strictness information specifies it to return bottom.
+-- This lets the compiler perform some extra simplifications, since retry#
+-- will technically never return.
+--
+-- This allows the simplifier to replace things like:
+--   case retry# s1
+--     (# s2, a #) -> e
+-- with:
+--   retry# s1
+-- where 'e' would be unreachable anyway.  See Trac #8091.
+primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd] botRes) }
    out_of_line = True
    has_side_effects = True
 
@@ -1665,7 +1761,7 @@ primop	WriteTVarOp "writeTVar#" GenPrimOp
    has_side_effects = True
 
 primop  SameTVarOp "sameTVar#" GenPrimOp
-   TVar# s a -> TVar# s a -> Bool
+   TVar# s a -> TVar# s a -> Int#
 
 
 ------------------------------------------------------------------------
@@ -1717,8 +1813,25 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
+primop  ReadMVarOp "readMVar#" GenPrimOp
+   MVar# s a -> State# s -> (# State# s, a #)
+   {If {\tt MVar\#} is empty, block until it becomes full.
+   Then read its contents without modifying the MVar, without possibility
+   of intervention from other threads.}
+   with
+   out_of_line      = True
+   has_side_effects = True
+
+primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
+   MVar# s a -> State# s -> (# State# s, Int#, a #)
+   {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
+   Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
+   with
+   out_of_line      = True
+   has_side_effects = True
+
 primop  SameMVarOp "sameMVar#" GenPrimOp
-   MVar# s a -> MVar# s a -> Bool
+   MVar# s a -> MVar# s a -> Int#
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int# #)
@@ -1989,8 +2102,15 @@ primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-primop  MkWeakForeignEnvOp "mkWeakForeignEnv#" GenPrimOp
-   o -> b -> Addr# -> Addr# -> Int# -> Addr# -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
+   Addr# -> Addr# -> Int# -> Addr# -> Weak# b
+          -> State# RealWorld -> (# State# RealWorld, Int# #)
+   { {\tt addCFinalizerToWeak# fptr ptr flag eptr w} attaches a C
+     function pointer {\tt fptr} to a weak pointer {\tt w} as a finalizer. If
+     {\tt flag} is zero, {\tt fptr} will be called with one argument,
+     {\tt ptr}. Otherwise, it will be called with two arguments,
+     {\tt eptr} and {\tt ptr}. {\tt addCFinalizerToWeak#} returns
+     1 on success, or 0 if {\tt w} is already dead. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -2330,484 +2450,271 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-
 ------------------------------------------------------------------------
-section "Float SIMD Vectors" 
-	{Operations on SIMD vectors of 4 single-precision (32-bit)
-         floating-point numbers.}
+section "Safe coercions"
 ------------------------------------------------------------------------
 
-primtype FloatX4#
-   with llvm_only = True
+pseudoop   "coerce"
+   Coercible a b => a -> b
+   { The function {\tt coerce} allows you to safely convert between values of
+     types that have the same representation with no run-time overhead. In the
+     simplest case you can use it instead of a newtype constructor, to go from
+     the newtype's concrete type to the abstract type. But it also works in
+     more complicated settings, e.g. converting a list of newtypes to a list of
+     concrete types.
+   }
 
-primop FloatToFloatX4Op "floatToFloatX4#" GenPrimOp     
-   Float# -> FloatX4#
-   with llvm_only = True
+primclass Coercible a b
+   { This two-parameter class has instances for types {\tt a} and {\tt b} if
+     the compiler can infer that they have the same representation. This class
+     does not have regular instances; instead they are created on-the-fly during
+     type-checking. Trying to manually declare an instance of {\tt Coercible}
+     is an error.
 
-primop FloatX4PackOp "packFloatX4#" GenPrimOp         
-   Float# -> Float# -> Float# -> Float# -> FloatX4#
-   with llvm_only = True
+     Nevertheless one can pretend that the following three kinds of instances
+     exist. First, as a trivial base-case:
 
-primop FloatX4UnpackOp "unpackFloatX4#" GenPrimOp         
-   FloatX4# -> (# Float#, Float#, Float#, Float# #)
-   with llvm_only = True
+     {\tt instance a a}
 
-primop FloatX4InsertOp "insertFloatX4#" GenPrimOp     
-   FloatX4# -> Float# -> Int# -> FloatX4#
+     Furthermore, for every type constructor there is
+     an instance that allows to coerce under the type constructor. For
+     example, let {\tt D} be a prototypical type constructor ({\tt data} or {\tt
+     newtype}) with three type arguments, which have roles Nominal,
+     Representational resp. Phantom. Then there is an instance of the form
+
+     {\tt instance Coercible b b' => Coercible (D a b c) (D a b' c')}
+
+     Note that the nominal type arguments are equal, the representational type
+     arguments can differ, but need to have a {\tt Coercible} instance
+     themself, and the phantom type arguments can be changed arbitrarily.
+
+     In SafeHaskell code, this instance is only usable if the constructors of
+     every type constructor used in the definition of {\tt D} (including
+     those of {\tt D} itself) is in scope.
+
+     The third kind of instance exists for every {\tt newtype NT = MkNT T} and
+     comes in two variants, namely
+
+     {\tt instance Coercible a T => Coercible a NT}
+
+     {\tt instance Coercible T b => Coercible NT b}
+
+     This instance is only usable if the constructor {\tt MkNT} is in scope.
+
+     If, as a library author of a type constructor like {\tt Set a}, you
+     want to prevent a user of your module to write
+     {\tt coerce :: Set T -> Set NT},
+     you need to set the role of {\tt Set}'s type parameter to Nominal.
+   }
+
+------------------------------------------------------------------------
+section "SIMD Vectors"
+	{Operations on SIMD vectors.}
+------------------------------------------------------------------------
+
+#define ALL_VECTOR_TYPES \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
+  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
+  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
+  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
+  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8> \
+  ,<Float,Float#,4>,<Double,Double#,2> \
+  ,<Float,Float#,8>,<Double,Double#,4> \
+  ,<Float,Float#,16>,<Double,Double#,8>]
+
+#define SIGNED_VECTOR_TYPES \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
+  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
+  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
+  ,<Float,Float#,4>,<Double,Double#,2> \
+  ,<Float,Float#,8>,<Double,Double#,4> \
+  ,<Float,Float#,16>,<Double,Double#,8>]
+
+#define FLOAT_VECTOR_TYPES \
+  [<Float,Float#,4>,<Double,Double#,2> \
+  ,<Float,Float#,8>,<Double,Double#,4> \
+  ,<Float,Float#,16>,<Double,Double#,8>]
+
+#define INT_VECTOR_TYPES \
+  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
+  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
+  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
+  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
+  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8>]
+
+primtype VECTOR
+   with llvm_only = True
+   	vector = ALL_VECTOR_TYPES
+
+primop VecBroadcastOp "broadcast#" GenPrimOp
+   SCALAR -> VECTOR
+   { Broadcast a scalar to all elements of a vector. }
+   with llvm_only = True
+   	vector = ALL_VECTOR_TYPES
+
+primop VecPackOp "pack#" GenPrimOp
+   VECTUPLE -> VECTOR
+   { Pack the elements of an unboxed tuple into a vector. }
+   with llvm_only = True
+   	vector = ALL_VECTOR_TYPES
+
+primop VecUnpackOp "unpack#" GenPrimOp
+   VECTOR -> VECTUPLE
+   { Unpack the elements of a vector into an unboxed tuple. #}
+   with llvm_only = True
+   	vector = ALL_VECTOR_TYPES
+
+primop VecInsertOp "insert#" GenPrimOp
+   VECTOR -> SCALAR -> Int# -> VECTOR
+   { Insert a scalar at the given position in a vector. }
    with can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop FloatX4AddOp "plusFloatX4#" Dyadic            
-   FloatX4# -> FloatX4# -> FloatX4#
+primop VecAddOp "plus#" Dyadic
+   VECTOR -> VECTOR -> VECTOR
+   { Add two vectors element-wise. }
    with commutable = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop FloatX4SubOp "minusFloatX4#" Dyadic
-  FloatX4# -> FloatX4# -> FloatX4#
+primop VecSubOp "minus#" Dyadic
+   VECTOR -> VECTOR -> VECTOR
+   { Subtract two vectors element-wise. }
    with llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop FloatX4MulOp "timesFloatX4#" Dyadic    
-   FloatX4# -> FloatX4# -> FloatX4#
+primop VecMulOp "times#" Dyadic
+   VECTOR -> VECTOR -> VECTOR
+   { Multiply two vectors element-wise. }
    with commutable = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop FloatX4DivOp "divideFloatX4#" Dyadic  
-   FloatX4# -> FloatX4# -> FloatX4#
+primop VecDivOp "divide#" Dyadic
+   VECTOR -> VECTOR -> VECTOR
+   { Divide two vectors element-wise. }
    with can_fail = True
         llvm_only = True
+   	vector = FLOAT_VECTOR_TYPES
 
-primop FloatX4NegOp "negateFloatX4#" Monadic
-   FloatX4# -> FloatX4#
+primop VecQuotOp "quot#" Dyadic
+   VECTOR -> VECTOR -> VECTOR
+   { Rounds towards zero element-wise. }
+   with can_fail = True
+        llvm_only = True
+   	vector = INT_VECTOR_TYPES
+
+primop VecRemOp "rem#" Dyadic
+   VECTOR -> VECTOR -> VECTOR
+   { Satisfies \texttt{(quot\# x y) times\# y plus\# (rem\# x y) == x}. }
+   with can_fail = True
+        llvm_only = True
+   	vector = INT_VECTOR_TYPES
+
+primop VecNegOp "negate#" Monadic
+   VECTOR -> VECTOR
+   { Negate element-wise. }
    with llvm_only = True
+   	vector = SIGNED_VECTOR_TYPES
 
-primop IndexByteArrayOp_FloatX4 "indexFloatX4Array#" GenPrimOp
-   ByteArray# -> Int# -> FloatX4#
+primop VecIndexByteArrayOp "indexArray#" GenPrimOp
+   ByteArray# -> Int# -> VECTOR
+   { Read a vector from specified index of immutable array. }
    with can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop ReadByteArrayOp_FloatX4 "readFloatX4Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, FloatX4# #)
+primop VecReadByteArrayOp "readArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
+   { Read a vector from specified index of mutable array. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop WriteByteArrayOp_FloatX4 "writeFloatX4Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> FloatX4# -> State# s -> State# s
+primop VecWriteByteArrayOp "writeArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
+   { Write a vector to specified index of mutable array. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop IndexOffAddrOp_FloatX4 "indexFloatX4OffAddr#" GenPrimOp
-   Addr# -> Int# -> FloatX4#
+primop VecIndexOffAddrOp "indexOffAddr#" GenPrimOp
+   Addr# -> Int# -> VECTOR
+   { Reads vector; offset in bytes. }
    with can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop ReadOffAddrOp_FloatX4 "readFloatX4OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, FloatX4# #)
+primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
+   { Reads vector; offset in bytes. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop  WriteOffAddrOp_FloatX4 "writeFloatX4OffAddr#" GenPrimOp
-   Addr# -> Int# -> FloatX4# -> State# s -> State# s
+primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
+   Addr# -> Int# -> VECTOR -> State# s -> State# s
+   { Write vector; offset in bytes. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop IndexByteArrayOp_FloatAsFloatX4 "indexFloatArrayAsFloatX4#" GenPrimOp
-   ByteArray# -> Int# -> FloatX4#
+
+primop VecIndexScalarByteArrayOp "indexArrayAs#" GenPrimOp
+   ByteArray# -> Int# -> VECTOR
+   { Read a vector from specified index of immutable array of scalars; offset is in scalar elements. }
    with can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop ReadByteArrayOp_FloatAsFloatX4 "readFloatArrayAsFloatX4#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, FloatX4# #)
+primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
+   { Read a vector from specified index of mutable array of scalars; offset is in scalar elements. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop WriteByteArrayOp_FloatAsFloatX4 "writeFloatArrayAsFloatX4#" GenPrimOp
-   MutableByteArray# s -> Int# -> FloatX4# -> State# s -> State# s
+primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
+   MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
+   { Write a vector to specified index of mutable array of scalars; offset is in scalar elements. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop IndexOffAddrOp_FloatAsFloatX4 "indexFloatOffAddrAsFloatX4#" GenPrimOp
-   Addr# -> Int# -> FloatX4#
+primop VecIndexScalarOffAddrOp "indexOffAddrAs#" GenPrimOp
+   Addr# -> Int# -> VECTOR
+   { Reads vector; offset in scalar elements. }
    with can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop ReadOffAddrOp_FloatAsFloatX4 "readFloatOffAddrAsFloatX4#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, FloatX4# #)
+primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
+   { Reads vector; offset in scalar elements. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
-primop  WriteOffAddrOp_FloatAsFloatX4 "writeFloatOffAddrAsFloatX4#" GenPrimOp
-   Addr# -> Int# -> FloatX4# -> State# s -> State# s
+primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
+   Addr# -> Int# -> VECTOR -> State# s -> State# s
+   { Write vector; offset in scalar elements. }
    with has_side_effects = True
         can_fail = True
         llvm_only = True
+   	vector = ALL_VECTOR_TYPES
 
 ------------------------------------------------------------------------
-section "Double SIMD Vectors" 
-	{Operations on SIMD vectors of 2 double-precision (64-bit)
-         floating-point numbers.}
-------------------------------------------------------------------------
-
-primtype DoubleX2#
-   with llvm_only = True
-
-primop DoubleToDoubleX2Op "doubleToDoubleX2#" GenPrimOp     
-   Double# -> DoubleX2#
-   with llvm_only = True
-
-primop DoubleX2InsertOp "insertDoubleX2#" GenPrimOp     
-   DoubleX2# -> Double# -> Int# -> DoubleX2#
-   with can_fail = True
-        llvm_only = True
-
-primop DoubleX2PackOp "packDoubleX2#" GenPrimOp         
-   Double# -> Double# -> DoubleX2#
-   with llvm_only = True
-
-primop DoubleX2UnpackOp "unpackDoubleX2#" GenPrimOp         
-   DoubleX2# -> (# Double#, Double# #)
-   with llvm_only = True
-
-primop DoubleX2AddOp "plusDoubleX2#" Dyadic            
-   DoubleX2# -> DoubleX2# -> DoubleX2#
-   with commutable = True
-        llvm_only = True
-
-primop DoubleX2SubOp "minusDoubleX2#" Dyadic
-  DoubleX2# -> DoubleX2# -> DoubleX2#
-   with llvm_only = True
-
-primop DoubleX2MulOp "timesDoubleX2#" Dyadic    
-   DoubleX2# -> DoubleX2# -> DoubleX2#
-   with commutable = True
-        llvm_only = True
-
-primop DoubleX2DivOp "divideDoubleX2#" Dyadic  
-   DoubleX2# -> DoubleX2# -> DoubleX2#
-   with can_fail = True
-        llvm_only = True
-
-primop DoubleX2NegOp "negateDoubleX2#" Monadic
-   DoubleX2# -> DoubleX2#
-   with llvm_only = True
-
-primop IndexByteArrayOp_DoubleX2 "indexDoubleX2Array#" GenPrimOp
-   ByteArray# -> Int# -> DoubleX2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadByteArrayOp_DoubleX2 "readDoubleX2Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, DoubleX2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop WriteByteArrayOp_DoubleX2 "writeDoubleX2Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> DoubleX2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexOffAddrOp_DoubleX2 "indexDoubleX2OffAddr#" GenPrimOp
-   Addr# -> Int# -> DoubleX2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadOffAddrOp_DoubleX2 "readDoubleX2OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, DoubleX2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop  WriteOffAddrOp_DoubleX2 "writeDoubleX2OffAddr#" GenPrimOp
-   Addr# -> Int# -> DoubleX2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexByteArrayOp_DoubleAsDoubleX2 "indexDoubleArrayAsDoubleX2#" GenPrimOp
-   ByteArray# -> Int# -> DoubleX2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadByteArrayOp_DoubleAsDoubleX2 "readDoubleArrayAsDoubleX2#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, DoubleX2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop WriteByteArrayOp_DoubleAsDoubleX2 "writeDoubleArrayAsDoubleX2#" GenPrimOp
-   MutableByteArray# s -> Int# -> DoubleX2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexOffAddrOp_DoubleAsDoubleX2 "indexDoubleOffAddrAsDoubleX2#" GenPrimOp
-   Addr# -> Int# -> DoubleX2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadOffAddrOp_DoubleAsDoubleX2 "readDoubleOffAddrAsDoubleX2#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, DoubleX2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop  WriteOffAddrOp_DoubleAsDoubleX2 "writeDoubleOffAddrAsDoubleX2#" GenPrimOp
-   Addr# -> Int# -> DoubleX2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-------------------------------------------------------------------------
-section "Int32 SIMD Vectors" 
-	{Operations on SIMD vectors of 4 32-bit signed integers.}
-------------------------------------------------------------------------
-
-primtype Int32X4#
-   with llvm_only = True
-
-primop Int32ToInt32X4Op "int32ToInt32X4#" GenPrimOp     
-   INT32 -> Int32X4#
-   with llvm_only = True
-
-primop Int32X4InsertOp "insertInt32X4#" GenPrimOp     
-   Int32X4# -> INT32 -> Int# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-
-primop Int32X4PackOp "packInt32X4#" GenPrimOp         
-   INT32 -> INT32 -> INT32 -> INT32 -> Int32X4#
-   with llvm_only = True
-
-primop Int32X4UnpackOp "unpackInt32X4#" GenPrimOp         
-   Int32X4# -> (# INT32, INT32, INT32, INT32 #)
-   with llvm_only = True
-
-primop Int32X4AddOp "plusInt32X4#" Dyadic            
-   Int32X4# -> Int32X4# -> Int32X4#
-   with commutable = True
-        llvm_only = True
-
-primop Int32X4SubOp "minusInt32X4#" Dyadic
-  Int32X4# -> Int32X4# -> Int32X4#
-   with llvm_only = True
-
-primop Int32X4MulOp "timesInt32X4#" Dyadic    
-   Int32X4# -> Int32X4# -> Int32X4#
-   with commutable = True
-        llvm_only = True
-
-primop Int32X4QuotOp "quotInt32X4#" Dyadic  
-   Int32X4# -> Int32X4# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-   
-primop Int32X4RemOp "remInt32X4#" Dyadic  
-   Int32X4# -> Int32X4# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-
-primop Int32X4NegOp "negateInt32X4#" Monadic
-   Int32X4# -> Int32X4#
-   with llvm_only = True
-
-primop IndexByteArrayOp_Int32X4 "indexInt32X4Array#" GenPrimOp
-   ByteArray# -> Int# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadByteArrayOp_Int32X4 "readInt32X4Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32X4# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop WriteByteArrayOp_Int32X4 "writeInt32X4Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int32X4# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexOffAddrOp_Int32X4 "indexInt32X4OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadOffAddrOp_Int32X4 "readInt32X4OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int32X4# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop  WriteOffAddrOp_Int32X4 "writeInt32X4OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int32X4# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexByteArrayOp_Int32AsInt32X4 "indexInt32ArrayAsInt32X4#" GenPrimOp
-   ByteArray# -> Int# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadByteArrayOp_Int32AsInt32X4 "readInt32ArrayAsInt32X4#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32X4# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop WriteByteArrayOp_Int32AsInt32X4 "writeInt32ArrayAsInt32X4#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int32X4# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexOffAddrOp_Int32AsInt32X4 "indexInt32OffAddrAsInt32X4#" GenPrimOp
-   Addr# -> Int# -> Int32X4#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadOffAddrOp_Int32AsInt32X4 "readInt32OffAddrAsInt32X4#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int32X4# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop  WriteOffAddrOp_Int32AsInt32X4 "writeInt32OffAddrAsInt32X4#" GenPrimOp
-   Addr# -> Int# -> Int32X4# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-------------------------------------------------------------------------
-section "Int64 SIMD Vectors" 
-	{Operations on SIMD vectors of 2 64-bit signed integers.}
-------------------------------------------------------------------------
-
-primtype Int64X2#
-   with llvm_only = True
-
-primop Int64ToInt64X2Op "int64ToInt64X2#" GenPrimOp     
-   INT64 -> Int64X2#
-   with llvm_only = True
-
-primop Int64X2InsertOp "insertInt64X2#" GenPrimOp     
-   Int64X2# -> INT64 -> Int# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-
-primop Int64X2PackOp "packInt64X2#" GenPrimOp         
-   INT64 -> INT64 -> Int64X2#
-   with llvm_only = True
-
-primop Int64X2UnpackOp "unpackInt64X2#" GenPrimOp         
-   Int64X2# -> (# INT64, INT64 #)
-   with llvm_only = True
-
-primop Int64X2AddOp "plusInt64X2#" Dyadic            
-   Int64X2# -> Int64X2# -> Int64X2#
-   with commutable = True
-        llvm_only = True
-
-primop Int64X2SubOp "minusInt64X2#" Dyadic
-  Int64X2# -> Int64X2# -> Int64X2#
-   with llvm_only = True
-
-primop Int64X2MulOp "timesInt64X2#" Dyadic    
-   Int64X2# -> Int64X2# -> Int64X2#
-   with commutable = True
-        llvm_only = True
-
-primop Int64X2QuotOp "quotInt64X2#" Dyadic  
-   Int64X2# -> Int64X2# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-   
-primop Int64X2RemOp "remInt64X2#" Dyadic  
-   Int64X2# -> Int64X2# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-
-primop Int64X2NegOp "negateInt64X2#" Monadic
-   Int64X2# -> Int64X2#
-   with llvm_only = True
-
-primop IndexByteArrayOp_Int64X2 "indexInt64X2Array#" GenPrimOp
-   ByteArray# -> Int# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadByteArrayOp_Int64X2 "readInt64X2Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64X2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop WriteByteArrayOp_Int64X2 "writeInt64X2Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int64X2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexOffAddrOp_Int64X2 "indexInt64X2OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadOffAddrOp_Int64X2 "readInt64X2OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int64X2# #)
-   with has_side_effects = True
-        llvm_only = True
-
-primop  WriteOffAddrOp_Int64X2 "writeInt64X2OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int64X2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexByteArrayOp_Int64AsInt64X2 "indexInt64ArrayAsInt64X2#" GenPrimOp
-   ByteArray# -> Int# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadByteArrayOp_Int64AsInt64X2 "readInt64ArrayAsInt64X2#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64X2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop WriteByteArrayOp_Int64AsInt64X2 "writeInt64ArrayAsInt64X2#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int64X2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop IndexOffAddrOp_Int64AsInt64X2 "indexInt64OffAddrAsInt64X2#" GenPrimOp
-   Addr# -> Int# -> Int64X2#
-   with can_fail = True
-        llvm_only = True
-
-primop ReadOffAddrOp_Int64AsInt64X2 "readInt64OffAddrAsInt64X2#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int64X2# #)
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-
-primop  WriteOffAddrOp_Int64AsInt64X2 "writeInt64OffAddrAsInt64X2#" GenPrimOp
-   Addr# -> Int# -> Int64X2# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-        llvm_only = True
-   
-------------------------------------------------------------------------
-section "Prefetch" 
+section "Prefetch"
 	{Prefetch operations}
 ------------------------------------------------------------------------
 

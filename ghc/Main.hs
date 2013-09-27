@@ -33,8 +33,7 @@ import Config
 import Constants
 import HscTypes
 import Packages         ( dumpPackages )
-import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
-                          startPhase, isHaskellSrcFilename )
+import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
 import DynFlags
@@ -77,8 +76,8 @@ import Data.Maybe
 
 main :: IO ()
 main = do
-   hSetBuffering stdout NoBuffering
-   hSetBuffering stderr NoBuffering
+   hSetBuffering stdout LineBuffering
+   hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
@@ -109,6 +108,7 @@ main = do
                    ShowSupportedExtensions -> showSupportedExtensions
                    ShowVersion             -> showVersion
                    ShowNumVersion          -> putStrLn cProjectVersion
+                   ShowOptions             -> showOptions
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc mbMinusB $ do
@@ -198,7 +198,8 @@ main' postLoadMode dflags0 args flagWarnings = do
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-    dflags5 = dflags4 { ldInputs = objs ++ ldInputs dflags4 }
+    dflags5 = dflags4 { ldInputs = map (FileOption "") objs
+                                   ++ ldInputs dflags4 }
 
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
@@ -370,11 +371,13 @@ data PreStartupMode
   = ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
   | ShowSupportedExtensions -- ghc --supported-extensions
+  | ShowOptions             -- ghc --show-options
 
-showVersionMode, showNumVersionMode, showSupportedExtensionsMode :: Mode
+showVersionMode, showNumVersionMode, showSupportedExtensionsMode, showOptionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion
 showNumVersionMode          = mkPreStartupMode ShowNumVersion
 showSupportedExtensionsMode = mkPreStartupMode ShowSupportedExtensions
+showOptionsMode             = mkPreStartupMode ShowOptions
 
 mkPreStartupMode :: PreStartupMode -> Mode
 mkPreStartupMode = Left
@@ -518,6 +521,7 @@ mode_flags =
   , Flag "-version"              (PassFlag (setMode showVersionMode))
   , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
   , Flag "-info"                 (PassFlag (setMode showInfoMode))
+  , Flag "-show-options"         (PassFlag (setMode showOptionsMode))
   , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
   ] ++
@@ -621,7 +625,7 @@ doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
         haskellish (f,Nothing) =
-          looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
+          looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
           phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
 
@@ -638,7 +642,8 @@ doMake srcs  = do
     o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
-    let dflags' = dflags { ldInputs = o_files ++ ldInputs dflags }
+    let dflags' = dflags { ldInputs = map (FileOption "") o_files
+                                      ++ ldInputs dflags }
     _ <- GHC.setSessionDynFlags dflags'
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs
@@ -690,6 +695,21 @@ showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
 
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+
+showOptions :: IO ()
+showOptions = putStr (unlines availableOptions)
+    where
+      availableOptions     = map ((:) '-') $
+                             getFlagNames mode_flags   ++
+                             getFlagNames flagsDynamic ++
+                             (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
+                             flagsStaticNames
+      getFlagNames opts         = map getFlagName opts
+      getFlagName (Flag name _) = name
+      -- this is a hack to get rid of two unwanted entries that get listed
+      -- as static flags. Hopefully this hack will disappear one day together
+      -- with static flags
+      filterUnwantedStatic      = filter (\x -> not (x `elem` ["f", "fno-"]))
 
 showGhcUsage :: DynFlags -> IO ()
 showGhcUsage = showUsage False

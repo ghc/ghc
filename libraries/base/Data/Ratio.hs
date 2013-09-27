@@ -1,5 +1,4 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,13 +26,7 @@ module Data.Ratio
 
 import Prelude
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Real         -- The basic defns for Ratio
-#endif
-
-#ifdef __HUGS__
-import Hugs.Prelude(Ratio(..), (%), numerator, denominator)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- approxRational

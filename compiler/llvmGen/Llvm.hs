@@ -32,20 +32,22 @@ module Llvm (
 
         -- * Variables and Type System
         LlvmVar(..), LlvmStatic(..), LlvmLit(..), LlvmType(..),
-        LlvmAlias, LMGlobal, LMString, LMSection, LMAlign,
+        LlvmAlias, LMGlobal(..), LMString, LMSection, LMAlign,
+        LMConst(..),
 
         -- ** Some basic types
         i64, i32, i16, i8, i1, i8Ptr, llvmWord, llvmWordPtr,
 
         -- ** Metadata types
-        LlvmMetaVal(..), LlvmMetaUnamed(..), LlvmMeta(..), MetaData,
+        MetaExpr(..), MetaAnnot(..), MetaDecl(..),
 
         -- ** Operations on the type system.
-        isGlobal, getLitType, getLit, getName, getPlainName, getVarType,
-        getLink, getStatType, getGlobalVar, getGlobalType, pVarLift, pVarLower,
+        isGlobal, getLitType, getVarType,
+        getLink, getStatType, pVarLift, pVarLower,
         pLift, pLower, isInt, isFloat, isPointer, isVector, llvmWidthInBits,
 
         -- * Pretty Printing
+        ppLit, ppName, ppPlainName,
         ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmGlobals,
         ppLlvmGlobal, ppLlvmFunctionDecls, ppLlvmFunctionDecl, ppLlvmFunctions,
         ppLlvmFunction, ppLlvmAlias, ppLlvmAliases, ppLlvmMetas, ppLlvmMeta,
@@ -53,6 +55,7 @@ module Llvm (
     ) where
 
 import Llvm.AbsSyn
+import Llvm.MetaData
 import Llvm.PpLlvm
 import Llvm.Types
 

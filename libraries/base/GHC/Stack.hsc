@@ -10,6 +10,7 @@
 --
 -- Access to GHC's call-stack simulation
 --
+-- /Since: 4.5.0.0/
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE UnboxedTuples, MagicHash, EmptyDataDecls #-}
@@ -82,6 +83,8 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 -- and contains suitable SCC annotations (e.g. by using @-fprof-auto@).
 -- Otherwise, the list returned is likely to be empty or
 -- uninformative.
+--
+-- /Since: 4.5.0.0/
 
 currentCallStack :: IO [String]
 currentCallStack = ccsToStrings =<< getCurrentCCS ()
@@ -101,6 +104,9 @@ ccsToStrings ccs0 = go ccs0 []
            then return acc
            else go parent ((mdl ++ '.':lbl ++ ' ':'(':loc ++ ")") : acc)
 
+-- | Get the stack trace attached to an object.
+--
+-- /Since: 4.5.0.0/
 whoCreated :: a -> IO [String]
 whoCreated obj = do
   ccs <- getCCSOf obj
@@ -111,6 +117,8 @@ renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) (reverse strs)
 
 -- | Like the function 'error', but appends a stack trace to the error
 -- message if one is available.
+--
+-- /Since: 4.7.0.0/
 errorWithStackTrace :: String -> a
 errorWithStackTrace x = unsafeDupablePerformIO $ do
    stack <- ccsToStrings =<< getCurrentCCS x

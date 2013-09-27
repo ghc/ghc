@@ -119,7 +119,7 @@ prDictOfPReprInst :: Type -> VM CoreExpr
 prDictOfPReprInst ty
   = do
     { (FamInstMatch { fim_instance = prepr_fam, fim_tys = prepr_args }) <- preprSynTyCon ty
-    ; prDictOfPReprInstTyCon ty (famInstAxiom (toUnbranchedFamInst prepr_fam)) prepr_args
+    ; prDictOfPReprInstTyCon ty (famInstAxiom prepr_fam) prepr_args
     }
 
 -- |Given a type @ty@, its PRepr synonym tycon and its type arguments,
@@ -145,7 +145,7 @@ prDictOfPReprInstTyCon _ty prepr_ax prepr_args
       pr_co <- mkBuiltinCo prTyCon
       let co = mkAppCo pr_co
              $ mkSymCo
-             $ mkUnbranchedAxInstCo prepr_ax prepr_args
+             $ mkUnbranchedAxInstCo Nominal prepr_ax prepr_args
       return $ mkCast dict co
 
 -- |Get the PR dictionary for a type. The argument must be a representation

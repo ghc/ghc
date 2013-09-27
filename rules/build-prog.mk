@@ -132,14 +132,6 @@ endif
 $(call all-target,$1,all_$1_$2)
 $(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
 
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
-$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
-	"$$(CP)" -p $$< $$@
-endif
-endif
-
 $(call shell-wrapper,$1,$2)
 
 ifeq "$$($1_$2_PROGRAM_WAY)" ""
@@ -204,9 +196,63 @@ $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
             $$(error Bad build stage)))),\
         $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
 
+$1_$2_PROG_NEEDS_C_WRAPPER = NO
+$1_$2_PROG_INPLACE = $$($1_$2_PROG)
 ifeq "$$(Windows_Host) $$($1_$2_PROGRAM_WAY)" "YES dyn"
-$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG).c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_HC) -no-hs-main -optc-g -optc-O0 $$< -o $$@
+ifneq "$$($1_$2_HS_SRCS)" ""
+$1_$2_PROG_NEEDS_C_WRAPPER = YES
+$1_$2_PROG_INPLACE = inplace-$$($1_$2_PROG)
+endif
+endif
+
+ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
+
+$1_$2_RTS_OPTS_FLAG = $$(lastword $$(filter -rtsopts -rtsopts=all -rtsopts=some -rtsopts=none -no-rtsopts,$$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS)))
+ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts"
+$1_$2_RTS_OPTS = RtsOptsAll
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=all"
+$1_$2_RTS_OPTS = RtsOptsAll
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=some"
+$1_$2_RTS_OPTS = RtsOptsSafeOnly
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=none"
+$1_$2_RTS_OPTS = RtsOptsNone
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-no-rtsopts"
+$1_$2_RTS_OPTS = RtsOptsNone
+else
+$1_$2_RTS_OPTS = RtsOptsSafeOnly
+endif
+
+$1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	echo '#include <Windows.h>' >> $$@
+	echo '#include "Rts.h"' >> $$@
+	echo 'LPTSTR path_dirs[] = {' >> $$@
+	$$(foreach d,$$($1_$2_DEP_LIB_REL_DIRS),$$(call make-command,echo '    TEXT("/../../$$d")$$(comma)' >> $$@))
+	echo '    TEXT("/../../$1/$2/build/tmp/"),' >> $$@
+	echo '    NULL};' >> $$@
+	echo 'LPTSTR progDll = TEXT("../../$1/$2/build/tmp/$$($1_$2_PROG).dll");' >> $$@
+	echo 'LPTSTR rtsDll = TEXT("$$($$(WINDOWS_DYN_PROG_RTS))");' >> $$@
+	echo 'int rtsOpts = $$($1_$2_RTS_OPTS);' >> $$@
+	cat driver/utils/dynwrapper.c >> $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	echo '#include <Windows.h>' >> $$@
+	echo '#include "Rts.h"' >> $$@
+	echo 'LPTSTR path_dirs[] = {' >> $$@
+	$$(foreach p,$$($1_$2_TRANSITIVE_DEPS),$$(call make-command,echo '    TEXT("/../lib/$$p")$$(comma)' >> $$@))
+	echo '    TEXT("/../lib/"),' >> $$@
+	echo '    NULL};' >> $$@
+	echo 'LPTSTR progDll = TEXT("../lib/$$($1_$2_PROG).dll");' >> $$@
+	echo 'LPTSTR rtsDll = TEXT("$$($$(WINDOWS_DYN_PROG_RTS))");' >> $$@
+	echo 'int rtsOpts = $$($1_$2_RTS_OPTS);' >> $$@
+	cat driver/utils/dynwrapper.c >> $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_HC) -no-hs-main -no-auto-link-packages -optc-g -optc-O0 -Iincludes $$< -o $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_HC) -no-hs-main -no-auto-link-packages -optc-g -optc-O0 -Iincludes $$< -o $$@
 
 $1/$2/build/tmp/$$($1_$2_PROG).dll : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call build-dll,$1,$2,$$($1_$2_PROGRAM_WAY),,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS),$$@)
@@ -214,18 +260,9 @@ else
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
-ifeq "$$(TargetOS_CPP)" "darwin"
-ifneq "$3" "0"
+
 ifeq "$$($1_$2_PROGRAM_WAY)" "dyn"
-# Use relative paths for all the libraries
-ifneq "$$($1_$2_TRANSITIVE_DEP_NAMES)" ""
-	install_name_tool $$(foreach d,$$($1_$2_TRANSITIVE_DEP_NAMES), -change $$(TOP)/$$($$($$d_INSTALL_INFO)_dyn_LIB) @loader_path/../$$d-$$($$($$d_INSTALL_INFO)_VERSION)/$$($$($$d_INSTALL_INFO)_dyn_LIB_NAME)) $$@
-endif
-# Use relative paths for the RTS. Rather than try to work out which RTS
-# way is being linked, we just change it for all ways
-	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../rts-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
-endif
-endif
+    $(call relative-dynlib-references,$1,$2,$3)
 endif
 else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
@@ -254,7 +291,18 @@ $(call all-target,$1_$2,$$($1_$2_INPLACE))
 endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
+# INPLACE_BIN might be empty if we're distcleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
+$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
+	"$$(CP)" -p $$< $$@
+endif
+endif
+
 ifeq "$$($1_$2_INSTALL)" "YES"
+ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
+INSTALL_LIBS     += $1/$2/build/tmp/$$($1_$2_PROG).dll
+endif
 ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else ifeq "$$($1_$2_TOPDIR)" "YES"

@@ -33,6 +33,8 @@ import qualified Control.Exception as Exception
 import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
+import Data.Ord (comparing)
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           doesFileExist, renameFile, removeFile,
@@ -612,7 +614,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
               pkgs <- parseMultiPackageConf verbosity path
               mkPackageDB pkgs
          Right fs
-           | not use_cache -> ignore_cache
+           | not use_cache -> ignore_cache (const $ return ())
            | otherwise -> do
               let cache = path </> cachefilename
               tdir     <- getModificationTime path
@@ -621,24 +623,42 @@ readParseDatabase verbosity mb_user_conf use_cache path
                 Left ex -> do
                      when (verbosity > Normal) $
                         warn ("warning: cannot read cache file " ++ cache ++ ": " ++ show ex)
-                     ignore_cache
-                Right tcache
-                  | tcache >= tdir -> do
-                     when (verbosity > Normal) $
-                        infoLn ("using cache: " ++ cache)
-                     pkgs <- myReadBinPackageDB cache
-                     let pkgs' = map convertPackageInfoIn pkgs
-                     mkPackageDB pkgs'
-                  | otherwise -> do
-                     when (verbosity >= Normal) $ do
-                        warn ("WARNING: cache is out of date: " ++ cache)
-                        warn "  use 'ghc-pkg recache' to fix."
-                     ignore_cache
+                     ignore_cache (const $ return ())
+                Right tcache -> do
+                  let compareTimestampToCache file =
+                          when (verbosity >= Verbose) $ do
+                              tFile <- getModificationTime file
+                              compareTimestampToCache' file tFile
+                      compareTimestampToCache' file tFile = do
+                          let rel = case tcache `compare` tFile of
+                                    LT -> " (NEWER than cache)"
+                                    GT -> " (older than cache)"
+                                    EQ -> " (same as cache)"
+                          warn ("Timestamp " ++ show tFile
+                             ++ " for " ++ file ++ rel)
+                  when (verbosity >= Verbose) $ do
+                      warn ("Timestamp " ++ show tcache ++ " for " ++ cache)
+                      compareTimestampToCache' path tdir
+                  if tcache >= tdir
+                      then do
+                          when (verbosity > Normal) $
+                             infoLn ("using cache: " ++ cache)
+                          pkgs <- myReadBinPackageDB cache
+                          let pkgs' = map convertPackageInfoIn pkgs
+                          mkPackageDB pkgs'
+                      else do
+                          when (verbosity >= Normal) $ do
+                              warn ("WARNING: cache is out of date: "
+                                 ++ cache)
+                              warn "Use 'ghc-pkg recache' to fix."
+                          ignore_cache compareTimestampToCache
             where
-                 ignore_cache = do
+                 ignore_cache :: (FilePath -> IO ()) -> IO PackageDB
+                 ignore_cache checkTime = do
                      let confs = filter (".conf" `isSuffixOf`) fs
-                     pkgs <- mapM (parseSingletonPackageConf verbosity) $
-                                   map (path </>) confs
+                         doFile f = do checkTime f
+                                       parseSingletonPackageConf verbosity f
+                     pkgs <- mapM doFile $ map (path </>) confs
                      mkPackageDB pkgs
   where
     mkPackageDB pkgs = do
@@ -883,6 +903,10 @@ updateDBCache verbosity db = do
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
+#ifndef mingw32_HOST_OS
+  status <- getFileStatus filename
+  setFileTimes (location db) (accessTime status) (modificationTime status)
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -990,7 +1014,8 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                  then hPutStrLn stdout "    (no packages)"
                  else hPutStrLn stdout $ unlines (map ("    " ++) pp_pkgs)
            where
-                 pp_pkgs = map pp_pkg pkg_confs
+                 -- Sort using instance Ord PackageId
+                 pp_pkgs = map pp_pkg . sortBy (comparing installedPackageId) $ pkg_confs
                  pp_pkg p
                    | sourcePackageId p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
@@ -1044,7 +1069,8 @@ simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
    let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
                                                   else display
-       strs = map showPkg $ sortBy compPkgIdVer $ map sourcePackageId pkgs
+       -- Sort using instance Ord PackageId
+       strs = map showPkg $ sort $ map sourcePackageId pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
 
@@ -1076,10 +1102,11 @@ latestPackage verbosity my_flags pkgid = do
      getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} my_flags
 
   ps <- findPackages flag_db_stack (Id pkgid)
-  show_pkg (sortBy compPkgIdVer (map sourcePackageId ps))
+  case ps of
+    [] -> die "no matches"
+    _  -> show_pkg . maximum . map sourcePackageId $ ps
   where
-    show_pkg [] = die "no matches"
-    show_pkg pids = hPutStrLn stdout (display (last pids))
+    show_pkg pid = hPutStrLn stdout (display pid)
 
 -- -----------------------------------------------------------------------------
 -- Describe
@@ -1142,9 +1169,6 @@ realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg
 (Substring _ m) `matchesPkg` pkg = m (display (sourcePackageId pkg))
-
-compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
-compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 -- -----------------------------------------------------------------------------
 -- Field
@@ -1279,6 +1303,13 @@ type ValidateError   = (Force,String)
 type ValidateWarning = String
 
 newtype Validate a = V { runValidate :: IO (a, [ValidateError],[ValidateWarning]) }
+
+instance Functor Validate where
+    fmap = liftM
+
+instance Applicative Validate where
+    pure = return
+    (<*>) = ap
 
 instance Monad Validate where
    return a = V $ return (a, [], [])

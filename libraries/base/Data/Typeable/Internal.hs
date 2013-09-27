@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-typeable-instances #-}
 {-# LANGUAGE Unsafe    #-}
 
 -----------------------------------------------------------------------------
@@ -20,10 +19,9 @@
            , FlexibleInstances
            , MagicHash
            , KindSignatures
-           , PolyKinds #-}
-#ifdef __GLASGOW_HASKELL__
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
+           , PolyKinds
+           , DeriveDataTypeable
+           , StandaloneDeriving #-}
 
 module Data.Typeable.Internal (
     Proxy (..),
@@ -50,18 +48,19 @@ import GHC.Base
 import GHC.Word
 import GHC.Show
 import Data.Maybe
-import Data.List
+import Data.Proxy
 import GHC.Num
 import GHC.Real
-import GHC.IORef
-import GHC.IOArray
-import GHC.MVar
+-- import GHC.IORef
+-- import GHC.IOArray
+-- import GHC.MVar
 import GHC.ST           ( ST )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
-import GHC.Stable
+-- import GHC.Stable
 import GHC.Arr          ( Array, STArray )
-import Data.Int
+import Data.Type.Equality
+-- import Data.Int
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
@@ -85,9 +84,9 @@ instance Ord TypeRep where
 -- be built using 'mkTyCon'.
 data TyCon = TyCon {
    tyConHash    :: {-# UNPACK #-} !Fingerprint,
-   tyConPackage :: String,
-   tyConModule  :: String,
-   tyConName    :: String
+   tyConPackage :: String, -- ^ /Since: 4.5.0.0/
+   tyConModule  :: String, -- ^ /Since: 4.5.0.0/
+   tyConName    :: String  -- ^ /Since: 4.5.0.0/
  }
 
 instance Eq TyCon where
@@ -165,7 +164,7 @@ mkTyCon3 :: String       -- ^ package name
          -> String       -- ^ the name of the type constructor
          -> TyCon        -- ^ A unique 'TyCon' object
 mkTyCon3 pkg modl name =
-  TyCon (fingerprintString (unwords [pkg, modl, name])) pkg modl name
+  TyCon (fingerprintString (pkg ++ (' ':modl) ++ (' ':name))) pkg modl name
 
 ----------------- Observation ---------------------
 
@@ -194,9 +193,8 @@ class Typeable a where
   typeRep :: proxy a -> TypeRep
   -- ^ Takes a value of type @a@ and returns a concrete representation
   -- of that type.
-
--- | A concrete, poly-kinded proxy type
-data Proxy t = Proxy
+  --
+  -- /Version: 4.7.0.0/
 
 -- Keeping backwards-compatibility
 typeOf :: forall a. Typeable a => a -> TypeRep
@@ -249,7 +247,7 @@ instance Show TypeRep where
             showParen (p > 9) $
             showsPrec p tycon . 
             showChar ' '      . 
-            showArgs tys
+            showArgs (showChar ' ') tys
 
 showsTypeRep :: TypeRep -> ShowS
 showsTypeRep = shows
@@ -263,22 +261,21 @@ isTupleTyCon _                         = False
 
 -- Some (Show.TypeRep) helpers:
 
-showArgs :: Show a => [a] -> ShowS
-showArgs [] = id
-showArgs [a] = showsPrec 10 a
-showArgs (a:as) = showsPrec 10 a . showString " " . showArgs as 
+showArgs :: Show a => ShowS -> [a] -> ShowS
+showArgs _   []     = id
+showArgs _   [a]    = showsPrec 10 a
+showArgs sep (a:as) = showsPrec 10 a . sep . showArgs sep as 
 
 showTuple :: [TypeRep] -> ShowS
 showTuple args = showChar '('
-               . (foldr (.) id $ intersperse (showChar ',') 
-                               $ map (showsPrec 10) args)
+               . showArgs (showChar ',') args
                . showChar ')'
 
 listTc :: TyCon
 listTc = typeRepTyCon (typeOf [()])
 
 funTc :: TyCon
-funTc = mkTyCon3 "ghc-prim" "GHC.Types" "->"
+funTc = typeRepTyCon (typeRep (Proxy :: Proxy (->)))
 
 -------------------------------------------------------------
 --
@@ -286,58 +283,28 @@ funTc = mkTyCon3 "ghc-prim" "GHC.Types" "->"
 --
 -------------------------------------------------------------
 
-#include "Typeable.h"
+deriving instance Typeable ()
+deriving instance Typeable []
+deriving instance Typeable Maybe
+deriving instance Typeable Ratio
+deriving instance Typeable (->)
+deriving instance Typeable IO
 
-INSTANCE_TYPEABLE0((),unitTc,"()")
-INSTANCE_TYPEABLE1([],listTc,"[]")
-INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
-INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
-#if defined(__GLASGOW_HASKELL__)
-{-
-TODO: Deriving this instance fails with:
-libraries/base/Data/Typeable.hs:589:1:
-    Can't make a derived instance of `Typeable2 (->)':
-      The last argument of the instance must be a data or newtype application
-    In the stand-alone deriving instance for `Typeable2 (->)'
--}
-instance Typeable (->) where { typeRep _ = mkTyConApp funTc [] }
-#else
-INSTANCE_TYPEABLE2((->),funTc,"->")
-#endif
-INSTANCE_TYPEABLE1(IO,ioTc,"IO")
+deriving instance Typeable Array
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
--- Types defined in GHC.MVar
-INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
-#endif
+deriving instance Typeable ST
+deriving instance Typeable STRef
+deriving instance Typeable STArray
 
-INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
-INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray")
+deriving instance Typeable (,)
+deriving instance Typeable (,,)
+deriving instance Typeable (,,,)
+deriving instance Typeable (,,,,)
+deriving instance Typeable (,,,,,)
+deriving instance Typeable (,,,,,,)
 
-#ifdef __GLASGOW_HASKELL__
--- Hugs has these too, but their Typeable<n> instances are defined
--- elsewhere to keep this module within Haskell 98.
--- This is important because every invocation of runhugs or ffihugs
--- uses this module via Data.Dynamic.
-INSTANCE_TYPEABLE2(ST,stTc,"ST")
-INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
-INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
-#endif
-
-INSTANCE_TYPEABLE2((,),pairTc,"(,)")
-INSTANCE_TYPEABLE3((,,),tup3Tc,"(,,)")
-INSTANCE_TYPEABLE4((,,,),tup4Tc,"(,,,)")
-INSTANCE_TYPEABLE5((,,,,),tup5Tc,"(,,,,)")
-INSTANCE_TYPEABLE6((,,,,,),tup6Tc,"(,,,,,)")
-INSTANCE_TYPEABLE7((,,,,,,),tup7Tc,"(,,,,,,)")
-
-INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
-INSTANCE_TYPEABLE1(FunPtr,funPtrTc,"FunPtr")
-#ifndef __GLASGOW_HASKELL__
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
-#endif
-INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
-INSTANCE_TYPEABLE1(IORef,iORefTc,"IORef")
+deriving instance Typeable Ptr
+deriving instance Typeable FunPtr
 
 -------------------------------------------------------
 --
@@ -345,41 +312,23 @@ INSTANCE_TYPEABLE1(IORef,iORefTc,"IORef")
 --
 -------------------------------------------------------
 
-INSTANCE_TYPEABLE0(Bool,boolTc,"Bool")
-INSTANCE_TYPEABLE0(Char,charTc,"Char")
-INSTANCE_TYPEABLE0(Float,floatTc,"Float")
-INSTANCE_TYPEABLE0(Double,doubleTc,"Double")
-INSTANCE_TYPEABLE0(Int,intTc,"Int")
-INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
-INSTANCE_TYPEABLE0(Integer,integerTc,"Integer")
-INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
-#ifndef __GLASGOW_HASKELL__
-INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
-#endif
+deriving instance Typeable Bool
+deriving instance Typeable Char
+deriving instance Typeable Float
+deriving instance Typeable Double
+deriving instance Typeable Int
+deriving instance Typeable Word
+deriving instance Typeable Integer
+deriving instance Typeable Ordering
 
-INSTANCE_TYPEABLE0(Int8,int8Tc,"Int8")
-INSTANCE_TYPEABLE0(Int16,int16Tc,"Int16")
-INSTANCE_TYPEABLE0(Int32,int32Tc,"Int32")
-INSTANCE_TYPEABLE0(Int64,int64Tc,"Int64")
+deriving instance Typeable Word8
+deriving instance Typeable Word16
+deriving instance Typeable Word32
+deriving instance Typeable Word64
 
-INSTANCE_TYPEABLE0(Word8,word8Tc,"Word8" )
-INSTANCE_TYPEABLE0(Word16,word16Tc,"Word16")
-INSTANCE_TYPEABLE0(Word32,word32Tc,"Word32")
-INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
+deriving instance Typeable TyCon
+deriving instance Typeable TypeRep
 
-INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
-INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
-
-#ifdef __GLASGOW_HASKELL__
-{-
-TODO: This can't be derived currently:
-libraries/base/Data/Typeable.hs:674:1:
-    Can't make a derived instance of `Typeable RealWorld':
-      The last argument of the instance must be a data or newtype application
-    In the stand-alone deriving instance for `Typeable RealWorld'
--}
-realWorldTc :: TyCon; \
-realWorldTc = mkTyCon3 "ghc-prim" "GHC.Types" "RealWorld"; \
-instance Typeable RealWorld where { typeRep _ = mkTyConApp realWorldTc [] }
-
-#endif
+deriving instance Typeable RealWorld
+deriving instance Typeable Proxy
+deriving instance Typeable (:=:)

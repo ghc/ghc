@@ -12,7 +12,7 @@
 module StgCmmExtCode (
         CmmParse, unEC,
         Named(..), Env,
-        
+
         loopDecls,
         getEnv,
 
@@ -48,15 +48,18 @@ import Module
 import UniqFM
 import Unique
 
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
+
 
 -- | The environment contains variable definitions or blockids.
-data Named      
+data Named
         = VarN CmmExpr          -- ^ Holds CmmLit(CmmLabel ..) which gives the label type,
-                                --      eg, RtsLabel, ForeignLabel, CmmLabel etc. 
+                                --      eg, RtsLabel, ForeignLabel, CmmLabel etc.
 
         | FunN   PackageId      -- ^ A function name from this package
         | LabelN BlockId                -- ^ A blockid of some code or data.
-        
+
 -- | An environment of named things.
 type Env        = UniqFM Named
 
@@ -65,7 +68,7 @@ type Decls      = [(FastString,Named)]
 
 -- | Does a computation in the FCode monad, with a current environment
 --      and a list of local declarations. Returns the resulting list of declarations.
-newtype CmmParse a      
+newtype CmmParse a
         = EC { unEC :: Env -> Decls -> FCode (Decls, a) }
 
 type ExtCode = CmmParse ()
@@ -75,6 +78,13 @@ returnExtFC a   = EC $ \_ s -> return (s, a)
 
 thenExtFC :: CmmParse a -> (a -> CmmParse b) -> CmmParse b
 thenExtFC (EC m) k = EC $ \e s -> do (s',r) <- m e s; unEC (k r) e s'
+
+instance Functor CmmParse where
+      fmap = liftM
+
+instance Applicative CmmParse where
+      pure = return
+      (<*>) = ap
 
 instance Monad CmmParse where
   (>>=) = thenExtFC
@@ -86,7 +96,7 @@ instance HasDynFlags CmmParse where
 
 
 -- | Takes the variable decarations and imports from the monad
---      and makes an environment, which is looped back into the computation.  
+--      and makes an environment, which is looped back into the computation.
 --      In this way, we can have embedded declarations that scope over the whole
 --      procedure, and imports that scope over the entire module.
 --      Discards the local declaration contained within decl'
@@ -107,8 +117,8 @@ addDecl :: FastString -> Named -> ExtCode
 addDecl name named = EC $ \_ s -> return ((name, named) : s, ())
 
 
--- | Add a new variable to the list of local declarations. 
---      The CmmExpr says where the value is stored. 
+-- | Add a new variable to the list of local declarations.
+--      The CmmExpr says where the value is stored.
 addVarDecl :: FastString -> CmmExpr -> ExtCode
 addVarDecl var expr = addDecl var (VarN expr)
 
@@ -118,11 +128,11 @@ addLabel name block_id = addDecl name (LabelN block_id)
 
 
 -- | Create a fresh local variable of a given type.
-newLocal 
+newLocal
         :: CmmType              -- ^ data type
         -> FastString           -- ^ name of variable
         -> CmmParse LocalReg    -- ^ register holding the value
-        
+
 newLocal ty name = do
    u <- code newUnique
    let reg = LocalReg u ty
@@ -141,32 +151,32 @@ newBlockId :: CmmParse BlockId
 newBlockId = code F.newLabelC
 
 -- | Add add a local function to the environment.
-newFunctionName 
-        :: FastString   -- ^ name of the function 
+newFunctionName
+        :: FastString   -- ^ name of the function
         -> PackageId    -- ^ package of the current module
         -> ExtCode
-        
+
 newFunctionName name pkg = addDecl name (FunN pkg)
-        
-        
+
+
 -- | Add an imported foreign label to the list of local declarations.
 --      If this is done at the start of the module the declaration will scope
 --      over the whole module.
-newImport 
-        :: (FastString, CLabel) 
+newImport
+        :: (FastString, CLabel)
         -> CmmParse ()
 
-newImport (name, cmmLabel) 
+newImport (name, cmmLabel)
    = addVarDecl name (CmmLit (CmmLabel cmmLabel))
 
 
 -- | Lookup the BlockId bound to the label with this name.
---      If one hasn't been bound yet, create a fresh one based on the 
+--      If one hasn't been bound yet, create a fresh one based on the
 --      Unique of the name.
 lookupLabel :: FastString -> CmmParse BlockId
 lookupLabel name = do
   env <- getEnv
-  return $ 
+  return $
      case lookupUFM env name of
         Just (LabelN l) -> l
         _other          -> mkBlockId (newTagUnique (getUnique name) 'L')
@@ -179,7 +189,7 @@ lookupLabel name = do
 lookupName :: FastString -> CmmParse CmmExpr
 lookupName name = do
   env    <- getEnv
-  return $ 
+  return $
      case lookupUFM env name of
         Just (VarN e)   -> e
         Just (FunN pkg) -> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
@@ -188,7 +198,7 @@ lookupName name = do
 
 -- | Lift an FCode computation into the CmmParse monad
 code :: FCode a -> CmmParse a
-code fc = EC $ \_ s -> do 
+code fc = EC $ \_ s -> do
                 r <- fc
                 return (s, r)
 

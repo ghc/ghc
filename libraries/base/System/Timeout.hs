@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
 
 -------------------------------------------------------------------------------
 -- |
@@ -18,30 +16,27 @@
 --
 -------------------------------------------------------------------------------
 
-#ifdef __GLASGOW_HASKELL__
-#include "Typeable.h"
-#endif
-
 module System.Timeout ( timeout ) where
 
-#ifdef __GLASGOW_HASKELL__
-import Control.Concurrent
+#ifndef mingw32_HOST_OS
+import Control.Monad
 import GHC.Event           (getSystemTimerManager,
                             registerTimeout, unregisterTimeout)
+#endif
+
+import Control.Concurrent
 import Control.Exception   (Exception(..), handleJust, bracket,
                             uninterruptibleMask_,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
-import Control.Monad
 
 -- An internal type that is thrown as a dynamic exception to
 -- interrupt the running IO computation when the timeout has
 -- expired.
 
-newtype Timeout = Timeout Unique deriving Eq
-INSTANCE_TYPEABLE0(Timeout,timeoutTc,"Timeout")
+newtype Timeout = Timeout Unique deriving (Eq, Typeable)
 
 instance Show Timeout where
     show _ = "<<timeout>>"
@@ -50,8 +45,6 @@ instance Show Timeout where
 instance Exception Timeout where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
-
-#endif /* !__GLASGOW_HASKELL__ */
 
 -- |Wrap an 'IO' computation to time out and return @Nothing@ in case no result
 -- is available within @n@ microseconds (@1\/10^6@ seconds). In case a result
@@ -83,10 +76,10 @@ instance Exception Timeout where
 -- I\/O or file I\/O using this combinator.
 
 timeout :: Int -> IO a -> IO (Maybe a)
-#ifdef __GLASGOW_HASKELL__
 timeout n f
     | n <  0    = fmap Just f
     | n == 0    = return Nothing
+#ifndef mingw32_HOST_OS
     | rtsSupportsBoundThreads = do
         -- In the threaded RTS, we use the Timer Manager to delay the
         -- (fairly expensive) 'forkIO' call until the timeout has expired.
@@ -116,6 +109,7 @@ timeout n f
                    (bracket (registerTimeout tm n handleTimeout)
                             cleanupTimeout
                             (\_ -> fmap Just f))
+#endif
     | otherwise = do
         pid <- myThreadId
         ex  <- fmap Timeout newUnique
@@ -126,7 +120,3 @@ timeout n f
                             (uninterruptibleMask_ . killThread)
                             (\_ -> fmap Just f))
         -- #7719 explains why we need uninterruptibleMask_ above.
-#else
-timeout n f = fmap Just f
-#endif /* !__GLASGOW_HASKELL__ */
-

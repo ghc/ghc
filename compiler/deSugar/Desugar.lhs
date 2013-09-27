@@ -6,13 +6,6 @@
 The Desugarer: turning HsSyn into Core.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Desugar ( deSugar, deSugarExpr ) where
 
 import DynFlags
@@ -34,15 +27,13 @@ import DsMonad
 import DsExpr
 import DsBinds
 import DsForeign
-import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
-				-- depends on DsExpr.hi-boot.
 import Module
 import RdrName
 import NameSet
 import NameEnv
 import Rules
 import BasicTypes       ( Activation(.. ) )
-import CoreMonad	( endPass, CoreToDo(..) )
+import CoreMonad        ( endPass, CoreToDo(..) )
 import FastString
 import ErrUtils
 import Outputable
@@ -57,9 +48,9 @@ import Control.Monad( when )
 \end{code}
 
 %************************************************************************
-%*									*
-%* 		The main function: deSugar
-%*									*
+%*                                                                      *
+%*              The main function: deSugar
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -67,14 +58,14 @@ import Control.Monad( when )
 deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
-deSugar hsc_env 
+deSugar hsc_env
         mod_loc
         tcg_env@(TcGblEnv { tcg_mod          = mod,
                             tcg_src          = hsc_src,
                             tcg_type_env     = type_env,
                             tcg_imports      = imports,
                             tcg_exports      = exports,
-                            tcg_keep	     = keep_var,
+                            tcg_keep         = keep_var,
                             tcg_th_splice_used = tc_splice_used,
                             tcg_rdr_env      = rdr_env,
                             tcg_fix_env      = fix_env,
@@ -97,16 +88,11 @@ deSugar hsc_env
   = do { let dflags = hsc_dflags hsc_env
         ; showPass dflags "Desugar"
 
-	-- Desugar the program
+        -- Desugar the program
         ; let export_set = availsToNameSet exports
         ; let target = hscTarget dflags
         ; let hpcInfo = emptyHpcInfo other_hpc_info
-	; (msgs, mb_res)
-              <- case target of
-	           HscNothing ->
-                       return (emptyMessages,
-                               Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
-                   _        -> do
+        ; (msgs, mb_res) <- do
 
                      let want_ticks = gopt Opt_Hpc dflags
                                    || target == HscInterpreted
@@ -143,7 +129,7 @@ deSugar hsc_env
 
         {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
-        ; let (rules_for_locals, rules_for_imps) 
+        ; let (rules_for_locals, rules_for_imps)
                    = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target
                               export_set keep_alive rules_for_locals (fromOL all_prs)
@@ -157,14 +143,14 @@ deSugar hsc_env
 
 #ifdef DEBUG
           -- Debug only as pre-simple-optimisation program may be really big
-        ; endPass dflags CoreDesugar final_pgm rules_for_imps 
+        ; endPass hsc_env CoreDesugar final_pgm rules_for_imps
 #endif
-        ; (ds_binds, ds_rules_for_imps, ds_vects) 
+        ; (ds_binds, ds_rules_for_imps, ds_vects)
             <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
-                         -- The simpleOptPgm gets rid of type 
+                         -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
 
-        ; endPass dflags CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPass hsc_env CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
         ; deps <- mkDependencies tcg_env
@@ -175,9 +161,9 @@ deSugar hsc_env
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
-                mg_boot	        = isHsBoot hsc_src,
+                mg_boot         = isHsBoot hsc_src,
                 mg_exports      = exports,
-                mg_deps	        = deps,
+                mg_deps         = deps,
                 mg_used_names   = used_names,
                 mg_used_th      = used_th,
                 mg_dir_imps     = imp_mods imports,
@@ -202,7 +188,7 @@ deSugar hsc_env
                 mg_dependent_files = dep_files
               }
         ; return (msgs, Just mod_guts)
-	}}}
+        }}}
 
 dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
 dsImpSpecs imp_specs
@@ -213,12 +199,12 @@ dsImpSpecs imp_specs
 combineEvBinds :: [CoreBind] -> [(Id,CoreExpr)] -> [CoreBind]
 -- Top-level bindings can include coercion bindings, but not via superclasses
 -- See Note [Top-level evidence]
-combineEvBinds [] val_prs 
+combineEvBinds [] val_prs
   = [Rec val_prs]
 combineEvBinds (NonRec b r : bs) val_prs
   | isId b    = combineEvBinds bs ((b,r):val_prs)
   | otherwise = NonRec b r : combineEvBinds bs val_prs
-combineEvBinds (Rec prs : bs) val_prs 
+combineEvBinds (Rec prs : bs) val_prs
   = combineEvBinds bs (prs ++ val_prs)
 \end{code}
 
@@ -227,7 +213,7 @@ Note [Top-level evidence]
 Top-level evidence bindings may be mutually recursive with the top-level value
 bindings, so we must put those in a Rec.  But we can't put them *all* in a Rec
 because the occurrence analyser doesn't teke account of type/coercion variables
-when computing dependencies.  
+when computing dependencies.
 
 So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
@@ -235,37 +221,38 @@ and Rec the rest.
 
 \begin{code}
 deSugarExpr :: HscEnv
-	    -> Module -> GlobalRdrEnv -> TypeEnv 
- 	    -> LHsExpr Id
-	    -> IO (Messages, Maybe CoreExpr)
+            -> Module -> GlobalRdrEnv -> TypeEnv
+            -> LHsExpr Id
+            -> IO (Messages, Maybe CoreExpr)
 -- Prints its own errors; returns Nothing if error occurred
 
-deSugarExpr hsc_env this_mod rdr_env type_env tc_expr = do
-    let dflags = hsc_dflags hsc_env
-    showPass dflags "Desugar"
+deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
+  = do { let dflags = hsc_dflags hsc_env
+       ; showPass dflags "Desugar"
 
-    -- Do desugaring
-    (msgs, mb_core_expr) <- initDs hsc_env this_mod rdr_env type_env $
-                                   dsLExpr tc_expr
+         -- Do desugaring
+       ; (msgs, mb_core_expr) <- initDs hsc_env this_mod rdr_env type_env $
+                                 dsLExpr tc_expr
 
-    case mb_core_expr of
-      Nothing   -> return (msgs, Nothing)
-      Just expr -> do
+       ; case mb_core_expr of {
+            Nothing   -> return (msgs, Nothing) ;
+            Just expr ->
 
-        -- Dump output
-        dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
+ 
+         -- Dump output
+    do { dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
 
-        return (msgs, Just expr)
+       ; return (msgs, Just expr) } } }
 \end{code}
 
 %************************************************************************
-%*									*
-%* 		Add rules and export flags to binders
-%*									*
+%*                                                                      *
+%*              Add rules and export flags to binders
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-addExportFlagsAndRules 
+addExportFlagsAndRules
     :: HscTarget -> NameSet -> NameSet -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
 addExportFlagsAndRules target exports keep_alive rules prs
@@ -276,33 +263,33 @@ addExportFlagsAndRules target exports keep_alive rules prs
          name = idName bndr
 
     ---------- Rules --------
-	-- See Note [Attach rules to local ids]
-	-- NB: the binder might have some existing rules,
-	-- arising from specialisation pragmas
+        -- See Note [Attach rules to local ids]
+        -- NB: the binder might have some existing rules,
+        -- arising from specialisation pragmas
     add_rules name bndr
-	| Just rules <- lookupNameEnv rule_base name
-	= bndr `addIdSpecialisations` rules
-	| otherwise
-	= bndr
+        | Just rules <- lookupNameEnv rule_base name
+        = bndr `addIdSpecialisations` rules
+        | otherwise
+        = bndr
     rule_base = extendRuleBaseList emptyRuleBase rules
 
     ---------- Export flag --------
     -- See Note [Adding export flags]
     add_export name bndr
-	| dont_discard name = setIdExported bndr
-	| otherwise	    = bndr
+        | dont_discard name = setIdExported bndr
+        | otherwise         = bndr
 
     dont_discard :: Name -> Bool
     dont_discard name = is_exported name
-		     || name `elemNameSet` keep_alive
+                     || name `elemNameSet` keep_alive
 
-    	-- In interactive mode, we don't want to discard any top-level
-    	-- entities at all (eg. do not inline them away during
-    	-- simplification), and retain them all in the TypeEnv so they are
-    	-- available from the command line.
-	--
-	-- isExternalName separates the user-defined top-level names from those
-	-- introduced by the type checker.
+        -- In interactive mode, we don't want to discard any top-level
+        -- entities at all (eg. do not inline them away during
+        -- simplification), and retain them all in the TypeEnv so they are
+        -- available from the command line.
+        --
+        -- isExternalName separates the user-defined top-level names from those
+        -- introduced by the type checker.
     is_exported :: Name -> Bool
     is_exported | targetRetainsAllBindings target = isExternalName
                 | otherwise                       = (`elemNameSet` exports)
@@ -311,13 +298,13 @@ addExportFlagsAndRules target exports keep_alive rules prs
 
 Note [Adding export flags]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Set the no-discard flag if either 
-	a) the Id is exported
-	b) it's mentioned in the RHS of an orphan rule
-	c) it's in the keep-alive set
+Set the no-discard flag if either
+        a) the Id is exported
+        b) it's mentioned in the RHS of an orphan rule
+        c) it's in the keep-alive set
 
 It means that the binding won't be discarded EVEN if the binding
-ends up being trivial (v = w) -- the simplifier would usually just 
+ends up being trivial (v = w) -- the simplifier would usually just
 substitute w for v throughout, but we don't apply the substitution to
 the rules (maybe we should?), so this substitution would make the rule
 bogus.
@@ -346,37 +333,37 @@ Reason
 
 
 %************************************************************************
-%*									*
-%* 		Desugaring transformation rules
-%*									*
+%*                                                                      *
+%*              Desugaring transformation rules
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
-  = putSrcSpanDs loc $ 
-    do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
+  = putSrcSpanDs loc $
+    do  { let bndrs' = [var | RuleBndr (L _ var) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
                   dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 
-	; rhs' <- dsLExpr rhs
+        ; rhs' <- dsLExpr rhs
         ; dflags <- getDynFlags
 
-	-- Substitute the dict bindings eagerly,
-	-- and take the body apart into a (f args) form
-	; case decomposeRuleLhs bndrs' lhs' of {
-		Left msg -> do { warnDs msg; return Nothing } ;
-		Right (final_bndrs, fn_id, args) -> do
-	
-	{ let is_local = isLocalId fn_id
-		-- NB: isLocalId is False of implicit Ids.  This is good because
-		-- we don't want to attach rules to the bindings of implicit Ids, 
-		-- because they don't show up in the bindings until just before code gen
-	      fn_name   = idName fn_id
-	      final_rhs = simpleOptExpr rhs'	-- De-crap it
-	      rule      = mkRule False {- Not auto -} is_local 
+        -- Substitute the dict bindings eagerly,
+        -- and take the body apart into a (f args) form
+        ; case decomposeRuleLhs bndrs' lhs' of {
+                Left msg -> do { warnDs msg; return Nothing } ;
+                Right (final_bndrs, fn_id, args) -> do
+
+        { let is_local = isLocalId fn_id
+                -- NB: isLocalId is False of implicit Ids.  This is good because
+                -- we don't want to attach rules to the bindings of implicit Ids,
+                -- because they don't show up in the bindings until just before code gen
+              fn_name   = idName fn_id
+              final_rhs = simpleOptExpr rhs'    -- De-crap it
+              rule      = mkRule False {- Not auto -} is_local
                                  name act fn_name final_bndrs args final_rhs
 
               inline_shadows_rule   -- Function can be inlined before rule fires
@@ -399,8 +386,8 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                        , ptext (sLit "Probable fix: add an INLINE[n] or NOINLINE[n] pragma on")
                          <+> quotes (ppr fn_id) ])
 
-	; return (Just rule)
-	} } }
+        ; return (Just rule)
+        } } }
 \end{code}
 
 Note [Desugaring RULE left hand sides]
@@ -429,7 +416,7 @@ the rule is precisly to optimise them:
 \begin{code}
 dsVect :: LVectDecl Id -> DsM CoreVect
 dsVect (L loc (HsVect (L _ v) rhs))
-  = putSrcSpanDs loc $ 
+  = putSrcSpanDs loc $
     do { rhs' <- dsLExpr rhs
        ; return $ Vect v rhs'
        }

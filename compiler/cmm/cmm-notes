@@ -79,7 +79,7 @@ Things to do:
    into separate C procedures.
 
    Short term:
-     compute and attach liveness into to LastCall
+     compute and attach liveness into LastCall
      right at end, split, cvt to old rep
      [must split before cvt, because old rep is not expressive enough]
 

@@ -1,5 +1,7 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE Trustworthy, FlexibleInstances #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving, DeriveDataTypeable, TypeOperators,
+             GADTs #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -108,12 +110,12 @@ import Prelude -- necessary to get dependencies right
 
 import Data.Typeable
 import Data.Maybe
+import Data.Version( Version(..) )
 import Control.Monad
 
 -- Imports for the instances
 import Data.Int              -- So we can give Data instance for Int8, ...
 import Data.Word             -- So we can give Data instance for Word8, ...
-#ifdef __GLASGOW_HASKELL__
 import GHC.Real( Ratio(..) ) -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
 import GHC.Ptr               -- So we can give Data instance for Ptr
@@ -122,17 +124,6 @@ import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
 --import GHC.ST                -- So we can give Data instance for ST
 --import GHC.Conc              -- So we can give Data instance for MVar & Co.
 import GHC.Arr               -- So we can give Data instance for Array
-#else
-# ifdef __HUGS__
-import Hugs.Prelude( Ratio(..) )
-# endif
-import Foreign.Ptr
-import Foreign.ForeignPtr
-import Data.Array
-#endif
-
-#include "Typeable.h"
-
 
 
 ------------------------------------------------------------------------------
@@ -1299,3 +1290,56 @@ instance (Typeable a, Data a, Data b, Ix a) => Data (Array a b)
   gunfold _ _  = error "Data.Data.gunfold(Array)"
   dataTypeOf _ = mkNoRepType "Data.Array.Array"
   dataCast2 x  = gcast2 x
+
+----------------------------------------------------------------------------
+-- Data instance for Proxy
+
+proxyConstr :: Constr
+proxyConstr = mkConstr proxyDataType "Proxy" [] Prefix
+
+proxyDataType :: DataType
+proxyDataType = mkDataType "Data.Proxy.Proxy" [proxyConstr]
+
+instance (Data t) => Data (Proxy t) where
+  gfoldl _ z Proxy  = z Proxy
+  toConstr Proxy  = proxyConstr
+  gunfold _ z c = case constrIndex c of
+                    1 -> z Proxy
+                    _ -> error "Data.Data.gunfold(Proxy)"
+  dataTypeOf _ = proxyDataType
+  dataCast1 f  = gcast1 f
+
+-----------------------------------------------------------------------
+-- instance for (:=:)
+
+reflConstr :: Constr
+reflConstr = mkConstr equalityDataType "Refl" [] Prefix
+
+equalityDataType :: DataType
+equalityDataType = mkDataType "Data.Type.Equality.(:=:)" [reflConstr]
+
+instance (Typeable a, Data a) => Data (a :=: a) where
+  gfoldl _ z Refl = z Refl
+  toConstr Refl   = reflConstr
+  gunfold _ z c   = case constrIndex c of
+                      1 -> z Refl
+                      _ -> error "Data.Data.gunfold(:=:)"
+  dataTypeOf _    = equalityDataType
+  dataCast2 f     = gcast2 f
+
+-----------------------------------------------------------------------
+-- instance for Data.Version
+
+versionConstr :: Constr
+versionConstr = mkConstr versionDataType "Version" ["versionBranch","versionTags"] Prefix
+
+versionDataType :: DataType
+versionDataType = mkDataType "Data.Version.Version" [versionConstr]
+
+instance Data Version where
+  gfoldl k z (Version bs ts) = z Version `k` bs `k` ts
+  toConstr (Version _ _) = versionConstr
+  gunfold k z c = case constrIndex c of
+                    1 -> k (k (z Version))
+                    _ -> error "Data.Data.gunfold(Version)"
+  dataTypeOf _  = versionDataType

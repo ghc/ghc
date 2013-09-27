@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -54,13 +53,12 @@ import Control.Monad.ST.Safe (ST)
 import qualified Control.Monad.ST.Lazy.Safe as Lazy (ST)
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
+import Data.Proxy
 
 import Text.ParserCombinators.ReadP (ReadP)
 import Text.ParserCombinators.ReadPrec (ReadPrec)
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Conc (STM, retry, orElse)
-#endif
 
 infixl 3 <|>
 infixl 4 <*>, <*, *>, <**>
@@ -180,7 +178,6 @@ instance Applicative (Lazy.ST s) where
     pure = return
     (<*>) = ap
 
-#ifdef __GLASGOW_HASKELL__
 instance Applicative STM where
     pure = return
     (<*>) = ap
@@ -188,7 +185,6 @@ instance Applicative STM where
 instance Alternative STM where
     empty = retry
     (<|>) = orElse
-#endif
 
 instance Applicative ((->) a) where
     pure = const
@@ -247,6 +243,11 @@ instance Monad m => Applicative (WrappedMonad m) where
     pure = WrapMonad . return
     WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
 
+-- Added in base-4.7.0.0 (GHC Trac #8218)
+instance Monad m => Monad (WrappedMonad m) where
+    return = WrapMonad . return
+    a >>= f = WrapMonad (unwrapMonad a >>= unwrapMonad . f)
+
 instance MonadPlus m => Alternative (WrappedMonad m) where
     empty = WrapMonad mzero
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
@@ -268,7 +269,7 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
 --
 -- @f '<$>' 'ZipList' xs1 '<*>' ... '<*>' 'ZipList' xsn = 'ZipList' (zipWithn f xs1 ... xsn)@
 --
-newtype ZipList a = ZipList { getZipList :: [a] }
+newtype ZipList a = ZipList { getZipList :: [a] } deriving (Show, Eq, Ord, Read)
 
 instance Functor ZipList where
     fmap f (ZipList xs) = ZipList (map f xs)
@@ -276,6 +277,12 @@ instance Functor ZipList where
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
     ZipList fs <*> ZipList xs = ZipList (zipWith id fs xs)
+
+instance Applicative Proxy where
+    pure _ = Proxy
+    {-# INLINE pure #-}
+    _ <*> _ = Proxy
+    {-# INLINE (<*>) #-}
 
 -- extra functions
 

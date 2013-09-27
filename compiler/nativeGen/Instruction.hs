@@ -8,6 +8,7 @@ module Instruction (
         NatCmmDecl,
         NatBasicBlock,
         topInfoTable,
+        entryBlocks,
         Instruction(..)
 )
 
@@ -64,6 +65,18 @@ topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
 topInfoTable _
   = Nothing
 
+-- | Return the list of BlockIds in a CmmDecl that are entry points
+-- for this proc (i.e. they may be jumped to from outside this proc).
+entryBlocks :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> [BlockId]
+entryBlocks (CmmProc info _ _ (ListGraph code)) = entries
+  where
+        infos = mapKeys info
+        entries = case code of
+                    [] -> infos
+                    BasicBlock entry _ : _ -- first block is the entry point
+                       | entry `elem` infos -> infos
+                       | otherwise          -> entry : infos
+entryBlocks _ = []
 
 -- | Common things that we can do with instructions, on all architectures.
 --      These are used by the shared parts of the native code generator,

@@ -26,7 +26,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.IO.Handle.Text ( 
         hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
         commitBuffer',       -- hack, see below
@@ -87,7 +86,7 @@ import GHC.List
 --    in this Handle's encoding.
 --
 -- NOTE for GHC users: unless you use the @-threaded@ flag,
--- @hWaitForInput t@ where @t >= 0@ will block all other Haskell
+-- @hWaitForInput hdl t@ where @t >= 0@ will block all other Haskell
 -- threads for the duration of the call.  It behaves like a
 -- @safe@ foreign call in this respect.
 --

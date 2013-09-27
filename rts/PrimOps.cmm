@@ -137,6 +137,34 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     return (p);
 }
 
+// RRN: This one does not use the "ticketing" approach because it
+// deals in unboxed scalars, not heap pointers.
+stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
+/* MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
+{
+    gcptr p;
+    W_ h;
+
+    p = arr + SIZEOF_StgArrWords + WDS(ind);
+    (h) = ccall cas(p, old, new);
+
+    return(h);
+}
+
+
+stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
+/* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
+{
+    gcptr p;
+    W_ h;
+
+    p = arr + SIZEOF_StgArrWords + WDS(ind);
+    (h) = ccall atomic_inc(p, incr);
+
+    return(h);
+}
+
+
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
     W_ words, size;
@@ -160,16 +188,16 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
     if (p < arr + WDS(words)) {
-  W_[p] = init;
-  p = p + WDS(1);
-  goto for;
+        W_[p] = init;
+        p = p + WDS(1);
+        goto for;
     }
     // Initialise the mark bits with 0
   for2:
     if (p < arr + WDS(size)) {
-  W_[p] = 0;
-  p = p + WDS(1);
-  goto for2;
+        W_[p] = 0;
+        p = p + WDS(1);
+        goto for2;
     }
 
     return (arr);
@@ -198,12 +226,35 @@ stg_unsafeThawArrayzh ( gcptr arr )
   if (StgHeader_info(arr) != stg_MUT_ARR_PTRS_FROZEN0_info) {
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
         recordMutable(arr);
-  // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
-  return (arr);
+        // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
+        return (arr);
   } else {
-  SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
-  return (arr);
+        SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
+        return (arr);
   }
+}
+
+// RRN: Uses the ticketed approach; see casMutVar
+stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
+/* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */
+{
+    gcptr p, h;
+    W_ len;
+
+    p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
+    (h) = ccall cas(p, old, new);
+
+    if (h != old) {
+        // Failure, return what was there instead of 'old':
+        return (1,h);
+    } else {
+        // Compare and Swap Succeeded:
+        SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
+        len = StgMutArrPtrs_ptrs(arr);
+        // The write barrier.  We must write a byte into the mark table:
+        I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
+        return (0,new);
+    }
 }
 
 stg_newArrayArrayzh ( W_ n /* words */ )
@@ -229,16 +280,16 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
     if (p < arr + WDS(words)) {
-  W_[p] = arr;
-  p = p + WDS(1);
-  goto for;
+        W_[p] = arr;
+        p = p + WDS(1);
+        goto for;
     }
     // Initialise the mark bits with 0
   for2:
     if (p < arr + WDS(size)) {
-  W_[p] = 0;
-  p = p + WDS(1);
-  goto for2;
+        W_[p] = 0;
+        p = p + WDS(1);
+        goto for2;
     }
 
     return (arr);
@@ -262,8 +313,13 @@ stg_newMutVarzh ( gcptr init )
     return (mv);
 }
 
+// RRN: To support the "ticketed" approach, we return the NEW rather
+// than old value if the CAS is successful.  This is received in an
+// opaque form in the Haskell code, preventing the compiler from
+// changing its pointer identity.  The ticket can then be safely used
+// in future CAS operations.
 stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
- /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, a #) */
+ /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, Any a #) */
 {
     gcptr h;
 
@@ -275,7 +331,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
         }
-        return (0,h);
+        return (0,new);
     }
 }
 
@@ -290,12 +346,12 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
 
        and the return value is
 
-   (sel_1 (f x))
+         (sel_1 (f x))
 
         obviously we can share (f x).
 
          z = [stg_ap_2 f x]  (max (HS + 2) MIN_UPD_SIZE)
-   y = [stg_sel_0 z]   (max (HS + 1) MIN_UPD_SIZE)
+         y = [stg_sel_0 z]   (max (HS + 1) MIN_UPD_SIZE)
          r = [stg_sel_1 z]   (max (HS + 1) MIN_UPD_SIZE)
     */
 
@@ -374,18 +430,14 @@ stg_mkWeakzh ( gcptr key,
   w = Hp - SIZEOF_StgWeak + WDS(1);
   SET_HDR(w, stg_WEAK_info, CCCS);
 
-  // We don't care about cfinalizer here.
-  // Should StgWeak_cfinalizer(w) be stg_NO_FINALIZER_closure or
-  // something else?
-
-  StgWeak_key(w)        = key;
-  StgWeak_value(w)      = value;
-  StgWeak_finalizer(w)  = finalizer;
-  StgWeak_cfinalizer(w) = stg_NO_FINALIZER_closure;
+  StgWeak_key(w)         = key;
+  StgWeak_value(w)       = value;
+  StgWeak_finalizer(w)   = finalizer;
+  StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
 
   ACQUIRE_LOCK(sm_mutex);
-  StgWeak_link(w) = W_[weak_ptr_list];
-  W_[weak_ptr_list]   = w;
+  StgWeak_link(w) = generation_weak_ptr_list(W_[g0]);
+  generation_weak_ptr_list(W_[g0]) = w;
   RELEASE_LOCK(sm_mutex);
 
   IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
@@ -398,60 +450,61 @@ stg_mkWeakNoFinalizzerzh ( gcptr key, gcptr value )
   jump stg_mkWeakzh (key, value, stg_NO_FINALIZER_closure);
 }
 
-stg_mkWeakForeignEnvzh ( gcptr key,
-                         gcptr val,
-                         W_ fptr,   // finalizer
-                         W_ ptr,
-                         W_ flag,   // has environment (0 or 1)
-                         W_ eptr )
+STRING(stg_cfinalizer_msg,"Adding a finalizer to %p\n")
+
+stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
+                             W_ ptr,
+                             W_ flag,   // has environment (0 or 1)
+                             W_ eptr,
+                             gcptr w )
 {
-  W_ payload_words, words;
-  gcptr w, p;
+  W_ c, info;
 
-  ALLOC_PRIM (SIZEOF_StgWeak);
+  ALLOC_PRIM (SIZEOF_StgCFinalizerList)
 
-  w = Hp - SIZEOF_StgWeak + WDS(1);
-  SET_HDR(w, stg_WEAK_info, CCCS);
+  c = Hp - SIZEOF_StgCFinalizerList + WDS(1);
+  SET_HDR(c, stg_C_FINALIZER_LIST_info, CCCS);
 
-  payload_words = 4;
-  words         = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-  ("ptr" p)     = ccall allocate(MyCapability() "ptr", words);
+  StgCFinalizerList_fptr(c) = fptr;
+  StgCFinalizerList_ptr(c) = ptr;
+  StgCFinalizerList_eptr(c) = eptr;
+  StgCFinalizerList_flag(c) = flag;
 
-  TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
-  SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+  LOCK_CLOSURE(w, info);
 
-  StgArrWords_bytes(p)     = WDS(payload_words);
-  StgArrWords_payload(p,0) = fptr;
-  StgArrWords_payload(p,1) = ptr;
-  StgArrWords_payload(p,2) = eptr;
-  StgArrWords_payload(p,3) = flag;
+  if (info == stg_DEAD_WEAK_info) {
+    // Already dead.
+    unlockClosure(w, info);
+    return (0);
+  }
 
-  // We don't care about the value here.
-  // Should StgWeak_value(w) be stg_NO_FINALIZER_closure or something else?
+  StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
+  StgWeak_cfinalizers(w) = c;
 
-  StgWeak_key(w)        = key;
-  StgWeak_value(w)      = val;
-  StgWeak_finalizer(w)  = stg_NO_FINALIZER_closure;
-  StgWeak_cfinalizer(w) = p;
+  unlockClosure(w, info);
 
-  ACQUIRE_LOCK(sm_mutex);
-  StgWeak_link(w)   = W_[weak_ptr_list];
-  W_[weak_ptr_list] = w;
-  RELEASE_LOCK(sm_mutex);
+  recordMutable(w);
 
-  IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
+  IF_DEBUG(weak, ccall debugBelch(stg_cfinalizer_msg,w));
 
-  return (w);
+  return (1);
 }
 
 stg_finalizzeWeakzh ( gcptr w )
 {
-  gcptr f, arr;
+  gcptr f, list;
+  W_ info;
+
+  LOCK_CLOSURE(w, info);
 
   // already dead?
-  if (GET_INFO(w) == stg_DEAD_WEAK_info) {
+  if (info == stg_DEAD_WEAK_info) {
+      unlockClosure(w, info);
       return (0,stg_NO_FINALIZER_closure);
   }
+
+  f    = StgWeak_finalizer(w);
+  list = StgWeak_cfinalizers(w);
 
   // kill it
 #ifdef PROFILING
@@ -469,19 +522,12 @@ stg_finalizzeWeakzh ( gcptr w )
   //
   // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
   //
-  SET_INFO(w,stg_DEAD_WEAK_info);
+  unlockClosure(w, stg_DEAD_WEAK_info);
+
   LDV_RECORD_CREATE(w);
 
-  f   = StgWeak_finalizer(w);
-  arr = StgWeak_cfinalizer(w);
-
-  StgDeadWeak_link(w) = StgWeak_link(w);
-
-  if (arr != stg_NO_FINALIZER_closure) {
-    ccall runCFinalizer(StgArrWords_payload(arr,0),
-                              StgArrWords_payload(arr,1),
-                              StgArrWords_payload(arr,2),
-                              StgArrWords_payload(arr,3));
+  if (list != stg_NO_FINALIZER_closure) {
+    ccall runCFinalizers(list);
   }
 
   /* return the finalizer */
@@ -494,10 +540,21 @@ stg_finalizzeWeakzh ( gcptr w )
 
 stg_deRefWeakzh ( gcptr w )
 {
-  W_ code;
+  W_ code, info;
   gcptr val;
 
-  if (GET_INFO(w) == stg_WEAK_info) {
+  info = GET_INFO(w);
+
+  if (info == stg_WHITEHOLE_info) {
+    // w is locked by another thread. Now it's not immediately clear if w is
+    // alive or not. We use lockClosure to wait for the info pointer to become
+    // something other than stg_WHITEHOLE_info.
+
+    LOCK_CLOSURE(w, info);
+    unlockClosure(w, info);
+  }
+
+  if (info == stg_WEAK_info) {
     code = 1;
     val = StgWeak_value(w);
   } else {
@@ -927,7 +984,7 @@ stg_forkzh ( gcptr closure )
   gcptr threadid;
 
   ("ptr" threadid) = ccall createIOThread( MyCapability() "ptr",
-        RtsFlags_GcFlags_initialStkSize(RtsFlags),
+                                RtsFlags_GcFlags_initialStkSize(RtsFlags),
                                 closure "ptr");
 
   /* start blocked if the current thread is blocked */
@@ -951,7 +1008,7 @@ again: MAYBE_GC(again);
   gcptr threadid;
 
   ("ptr" threadid) = ccall createIOThread( MyCapability() "ptr",
-        RtsFlags_GcFlags_initialStkSize(RtsFlags),
+                                RtsFlags_GcFlags_initialStkSize(RtsFlags),
                                 closure "ptr");
 
   /* start blocked if the current thread is blocked */
@@ -1522,9 +1579,9 @@ stg_writeTVarzh (P_ tvar,     /* :: TVar a */
 stg_isEmptyMVarzh ( P_ mvar /* :: MVar a */ )
 {
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
-  return (1);
+        return (1);
     } else {
-  return (0);
+        return (0);
     }
 }
 
@@ -1561,20 +1618,15 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
 {
     W_ val, info, tso, q;
 
-#if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
-#else
-    info = GET_INFO(mvar);
-#endif
-
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
+    LOCK_CLOSURE(mvar, info);
 
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
      */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
 
         // We want to put the heap check down here in the slow path,
         // but be careful to unlock the closure before returning to
@@ -1590,17 +1642,17 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
-  if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
-      StgMVar_head(mvar) = q;
-  } else {
+        if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+            StgMVar_head(mvar) = q;
+        } else {
             StgMVarTSOQueue_link(StgMVar_tail(mvar)) = q;
             ccall recordClosureMutated(MyCapability() "ptr",
                                              StgMVar_tail(mvar));
-  }
-  StgTSO__link(CurrentTSO)       = q;
-  StgTSO_block_info(CurrentTSO)  = mvar;
-  StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
-  StgMVar_tail(mvar)             = q;
+        }
+        StgTSO__link(CurrentTSO)       = q;
+        StgTSO_block_info(CurrentTSO)  = mvar;
+        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+        StgMVar_tail(mvar)             = q;
 
         jump stg_block_takemvar(mvar);
     }
@@ -1613,7 +1665,9 @@ loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further putMVars, MVar is now empty */
         StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-        unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        // If the MVar is not already dirty, then we don't need to make
+        // it dirty, as it is empty with nothing blocking on it.
+        unlockClosure(mvar, info);
         return (val);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1621,7 +1675,12 @@ loop:
         q = StgInd_indirectee(q);
         goto loop;
     }
+
     // There are putMVar(s) waiting... wake up the first thread on the queue
+
+    if (info == stg_MVAR_CLEAN_info) {
+        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+    }
 
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
@@ -1652,27 +1711,17 @@ stg_tryTakeMVarzh ( P_ mvar /* :: MVar a */ )
 {
     W_ val, info, tso, q;
 
-#if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
-    /* If the MVar is empty, put ourselves on its blocking queue,
-     * and wait until we're woken up.
-     */
+    /* If the MVar is empty, return 0. */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
         unlockClosure(mvar, info);
 #endif
-  /* HACK: we need a pointer to pass back,
-   * so we abuse NO_FINALIZER_closure
-   */
-  return (0, stg_NO_FINALIZER_closure);
-    }
-
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        /* HACK: we need a pointer to pass back,
+         * so we abuse NO_FINALIZER_closure
+         */
+        return (0, stg_NO_FINALIZER_closure);
     }
 
     /* we got the value... */
@@ -1683,9 +1732,10 @@ loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No further putMVars, MVar is now empty */
         StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-        unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        unlockClosure(mvar, info);
         return (1, val);
     }
+
     if (StgHeader_info(q) == stg_IND_info ||
         StgHeader_info(q) == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
@@ -1693,6 +1743,10 @@ loop:
     }
 
     // There are putMVar(s) waiting... wake up the first thread on the queue
+
+    if (info == stg_MVAR_CLEAN_info) {
+        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+    }
 
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
@@ -1724,17 +1778,13 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
 {
     W_ info, tso, q;
 
-#if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
-#else
-    info = GET_INFO(mvar);
-#endif
-
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
+    LOCK_CLOSURE(mvar, info);
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
+
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
 
         // We want to put the heap check down here in the slow path,
         // but be careful to unlock the closure before returning to
@@ -1750,17 +1800,17 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
-  if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
-      StgMVar_head(mvar) = q;
-  } else {
+        if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+            StgMVar_head(mvar) = q;
+        } else {
             StgMVarTSOQueue_link(StgMVar_tail(mvar)) = q;
             ccall recordClosureMutated(MyCapability() "ptr",
                                              StgMVar_tail(mvar));
-  }
-  StgTSO__link(CurrentTSO)       = q;
-  StgTSO_block_info(CurrentTSO)  = mvar;
-  StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
-  StgMVar_tail(mvar)             = q;
+        }
+        StgTSO__link(CurrentTSO)       = q;
+        StgTSO_block_info(CurrentTSO)  = mvar;
+        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+        StgMVar_tail(mvar)             = q;
 
         jump stg_block_putmvar(mvar,val);
     }
@@ -1768,9 +1818,12 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
-  /* No further takes, the MVar is now full. */
-  StgMVar_value(mvar) = val;
-      unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        /* No further takes, the MVar is now full. */
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
+        StgMVar_value(mvar) = val;
+        unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return ();
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1779,7 +1832,7 @@ loop:
         goto loop;
     }
 
-    // There are takeMVar(s) waiting: wake up the first one
+    // There are readMVar/takeMVar(s) waiting: wake up the first one
 
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
@@ -1787,8 +1840,11 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
     ASSERT(StgTSO_block_info(tso) == mvar);
+    // save why_blocked here, because waking up the thread destroys
+    // this information
+    W_ why_blocked;
+    why_blocked = TO_W_(StgTSO_why_blocked(tso));
 
     // actually perform the takeMVar
     W_ stack;
@@ -1804,7 +1860,16 @@ loop:
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
-    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    // If it was an readMVar, then we can still do work,
+    // so loop back. (XXX: This could take a while)
+    if (why_blocked == BlockedOnMVarRead) {
+        q = StgMVarTSOQueue_link(q);
+        goto loop;
+    }
+
+    ASSERT(why_blocked == BlockedOnMVar);
+
+    unlockClosure(mvar, info);
     return ();
 }
 
@@ -1814,29 +1879,25 @@ stg_tryPutMVarzh ( P_ mvar, /* :: MVar a */
 {
     W_ info, tso, q;
 
-#if defined(THREADED_RTS)
-    ("ptr" info) = ccall lockClosure(mvar "ptr");
-#else
-    info = GET_INFO(mvar);
-#endif
+    LOCK_CLOSURE(mvar, info);
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
-      unlockClosure(mvar, info);
+        unlockClosure(mvar, info);
 #endif
-  return (0);
-    }
-
-    if (info == stg_MVAR_CLEAN_info) {
-        ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        return (0);
     }
 
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
-  /* No further takes, the MVar is now full. */
-  StgMVar_value(mvar) = val;
-      unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        /* No further takes, the MVar is now full. */
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
+
+        StgMVar_value(mvar) = val;
+        unlockClosure(mvar, stg_MVAR_DIRTY_info);
         return (1);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1853,8 +1914,11 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
     ASSERT(StgTSO_block_info(tso) == mvar);
+    // save why_blocked here, because waking up the thread destroys
+    // this information
+    W_ why_blocked;
+    why_blocked = TO_W_(StgTSO_why_blocked(tso));
 
     // actually perform the takeMVar
     W_ stack;
@@ -1870,10 +1934,80 @@ loop:
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
-    unlockClosure(mvar, stg_MVAR_DIRTY_info);
+    // If it was an readMVar, then we can still do work,
+    // so loop back. (XXX: This could take a while)
+    if (why_blocked == BlockedOnMVarRead) {
+        q = StgMVarTSOQueue_link(q);
+        goto loop;
+    }
+
+    ASSERT(why_blocked == BlockedOnMVar);
+
+    unlockClosure(mvar, info);
     return (1);
 }
 
+stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
+{
+    W_ val, info, tso, q;
+
+    LOCK_CLOSURE(mvar, info);
+
+    /* If the MVar is empty, put ourselves on the blocked readers
+     * list and wait until we're woken up.
+     */
+    if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+
+        if (info == stg_MVAR_CLEAN_info) {
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        }
+
+        ALLOC_PRIM_WITH_CUSTOM_FAILURE
+            (SIZEOF_StgMVarTSOQueue,
+             unlockClosure(mvar, stg_MVAR_DIRTY_info);
+             GC_PRIM_P(stg_readMVarzh, mvar));
+
+        q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
+
+        // readMVars are pushed to the front of the queue, so
+        // they get handled immediately
+        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        StgMVarTSOQueue_link(q) = StgMVar_head(mvar);
+        StgMVarTSOQueue_tso(q)  = CurrentTSO;
+
+        StgTSO__link(CurrentTSO)       = q;
+        StgTSO_block_info(CurrentTSO)  = mvar;
+        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVarRead::I16;
+        StgMVar_head(mvar) = q;
+
+        if (StgMVar_tail(mvar) == stg_END_TSO_QUEUE_closure) {
+            StgMVar_tail(mvar) = q;
+        }
+
+        jump stg_block_readmvar(mvar);
+    }
+
+    val = StgMVar_value(mvar);
+
+    unlockClosure(mvar, info);
+    return (val);
+}
+
+stg_tryReadMVarzh ( P_ mvar, /* :: MVar a */ )
+{
+    W_ val, info, tso, q;
+
+    LOCK_CLOSURE(mvar, info);
+
+    if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+        return (0, stg_NO_FINALIZER_closure);
+    }
+
+    val = StgMVar_value(mvar);
+
+    unlockClosure(mvar, info);
+    return (1, val);
+}
 
 /* -----------------------------------------------------------------------------
    Stable pointer primitives
@@ -1946,9 +2080,9 @@ stg_newBCOzh ( P_ instrs,
     i = 0;
 for:
     if (i < BYTE_ARR_WDS(bitmap_arr)) {
-  StgBCO_bitmap(bco,i) = StgArrWords_payload(bitmap_arr,i);
-  i = i + 1;
-  goto for;
+        StgBCO_bitmap(bco,i) = StgArrWords_payload(bitmap_arr,i);
+        i = i + 1;
+        goto for;
     }
 
     return (bco);
@@ -2026,9 +2160,9 @@ out:
     p = 0;
 for:
     if(p < ptrs) {
-       W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(clos,p);
-   p = p + 1;
-   goto for;
+         W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(clos,p);
+         p = p + 1;
+         goto for;
     }
     /* We can leave the card table uninitialised, since the array is
        allocated in the nursery.  The GC will fill it in if/when the array
@@ -2039,9 +2173,9 @@ for:
     p = 0;
 for2:
     if(p < nptrs) {
-       W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(clos, p+ptrs);
-       p = p + 1;
-   goto for2;
+         W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(clos, p+ptrs);
+         p = p + 1;
+         goto for2;
     }
     return (info, ptrs_arr, nptrs_arr);
 }
@@ -2053,13 +2187,13 @@ for2:
 /* Add a thread to the end of the blocked queue. (C-- version of the C
  * macro in Schedule.h).
  */
-#define APPEND_TO_BLOCKED_QUEUE(tso)      \
-    ASSERT(StgTSO__link(tso) == END_TSO_QUEUE);   \
-    if (W_[blocked_queue_hd] == END_TSO_QUEUE) {  \
-      W_[blocked_queue_hd] = tso;     \
-    } else {            \
+#define APPEND_TO_BLOCKED_QUEUE(tso)                    \
+    ASSERT(StgTSO__link(tso) == END_TSO_QUEUE);         \
+    if (W_[blocked_queue_hd] == END_TSO_QUEUE) {        \
+      W_[blocked_queue_hd] = tso;                       \
+    } else {                                            \
       ccall setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl] "ptr", tso); \
-    }             \
+    }                                                   \
     W_[blocked_queue_tl] = tso;
 
 stg_waitReadzh ( W_ fd )
@@ -2116,7 +2250,7 @@ stg_delayzh ( W_ us_delay )
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-              stg_delayzh_malloc_str);
+                                        stg_delayzh_malloc_str);
     (reqID) = ccall addDelayRequest(us_delay);
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
@@ -2143,14 +2277,14 @@ stg_delayzh ( W_ us_delay )
     t = W_[sleeping_queue];
 while:
     if (t != END_TSO_QUEUE && StgTSO_block_info(t) < target) {
-  prev = t;
-  t = StgTSO__link(t);
-  goto while;
+        prev = t;
+        t = StgTSO__link(t);
+        goto while;
     }
 
     StgTSO__link(CurrentTSO) = t;
     if (prev == NULL) {
-  W_[sleeping_queue] = CurrentTSO;
+        W_[sleeping_queue] = CurrentTSO;
     } else {
         ccall setTSOLink(MyCapability() "ptr", prev "ptr", CurrentTSO);
     }
@@ -2299,6 +2433,11 @@ INFO_TABLE_RET(stg_noDuplicate, RET_SMALL, W_ info_ptr)
 
 stg_noDuplicatezh /* no arg list: explicit stack layout */
 {
+    // With a single capability there's no chance of work duplication.
+    if (CInt[n_capabilities] == 1 :: CInt) {
+        jump %ENTRY_CODE(Sp(0)) [];
+    }
+
     STK_CHK(WDS(1), stg_noDuplicatezh);
 
     // leave noDuplicate frame in case the current

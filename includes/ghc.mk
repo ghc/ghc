@@ -85,6 +85,11 @@ ifeq "$(CC_LLVM_BACKEND)" "1"
 	@echo "#define llvm_CC_FLAVOR 1" >> $@
 endif
 #
+ifeq "$(CC_CLANG_BACKEND)" "1"
+	@echo >> $@
+	@echo "#define clang_CC_FLAVOR 1" >> $@
+endif
+#
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
 	@echo "Done."
 
@@ -180,7 +185,7 @@ endif
 $(eval $(call clean-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM)))
 
-$(eval $(call all-target,includes,,\
+$(eval $(call all-target,includes,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \

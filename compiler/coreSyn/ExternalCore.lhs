@@ -34,7 +34,7 @@ data Exp
   | Lam Bind Exp
   | Let Vdefg Exp
   | Case Exp Vbind Ty [Alt] {- non-empty list -}
-  | Cast Exp Ty
+  | Cast Exp Coercion
   | Tick String Exp {- XXX probably wrong -}
   | External String String Ty {- target name, convention, and type -}
   | DynExternal String Ty {- convention and type (incl. Addr# of target as first arg) -}
@@ -52,23 +52,30 @@ data Alt
 type Vbind = (Var,Ty)
 type Tbind = (Tvar,Kind)
 
--- Internally, we represent types and coercions separately; but for
--- the purposes of external core (at least for now) it's still
--- convenient to collapse them into a single type.
 data Ty
   = Tvar Tvar
   | Tcon (Qual Tcon)
   | Tapp Ty Ty
   | Tforall Tbind Ty
+
+data Coercion
 -- We distinguish primitive coercions because External Core treats
 -- them specially, so we have to print them out with special syntax.
-  | TransCoercion Ty Ty
-  | SymCoercion Ty
-  | UnsafeCoercion Ty Ty
-  | InstCoercion Ty Ty
-  | NthCoercion Int Ty
-  | AxiomCoercion (Qual Tcon) Int [Ty]
-  | LRCoercion LeftOrRight Ty
+  = ReflCoercion Role Ty
+  | SymCoercion Coercion
+  | TransCoercion Coercion Coercion
+  | TyConAppCoercion Role (Qual Tcon) [Coercion]
+  | AppCoercion Coercion Coercion
+  | ForAllCoercion Tbind Coercion
+  | CoVarCoercion Var
+  | UnivCoercion Role Ty Ty
+  | InstCoercion Coercion Ty
+  | NthCoercion Int Coercion
+  | AxiomCoercion (Qual Tcon) Int [Coercion]
+  | LRCoercion LeftOrRight Coercion
+  | SubCoercion Coercion
+
+data Role = Nominal | Representational | Phantom
 
 data LeftOrRight = CLeft | CRight
 

@@ -15,11 +15,11 @@ module InteractiveEvalTypes (
 #ifdef GHCI
 
 import Id
+import BasicTypes
 import Name
 import RdrName
 import TypeRep
 import ByteCodeInstr
-import ByteCodeLink
 import SrcLoc
 import Exception
 import Control.Concurrent

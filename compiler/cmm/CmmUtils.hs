@@ -424,7 +424,7 @@ ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyM
 
 insertBlock :: CmmBlock -> BlockEnv CmmBlock -> BlockEnv CmmBlock
 insertBlock block map =
-  ASSERT (isNothing $ mapLookup id map)
+  ASSERT(isNothing $ mapLookup id map)
   mapInsert id block map
   where id = entryLabel block
 

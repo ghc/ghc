@@ -208,12 +208,10 @@ module Data.List
 import Data.Maybe
 import Data.Char        ( isSpace )
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Num
 import GHC.Real
 import GHC.List
 import GHC.Base
-#endif
 
 infix 5 \\ -- comment to fool cpp
 
@@ -226,7 +224,8 @@ infix 5 \\ -- comment to fool cpp
 -- > dropWhileEnd isSpace "foo\n" == "foo"
 -- > dropWhileEnd isSpace "foo bar" == "foo bar"
 -- > dropWhileEnd isSpace ("foo\n" ++ undefined) == "foo" ++ undefined
-
+--
+-- /Since: 4.5.0.0/
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
 dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
@@ -270,8 +269,7 @@ findIndex p     = listToMaybe . findIndices p
 -- | The 'findIndices' function extends 'findIndex', by returning the
 -- indices of all elements satisfying the predicate, in ascending order.
 findIndices      :: (a -> Bool) -> [a] -> [Int]
-
-#if defined(USE_REPORT_PRELUDE) || !defined(__GLASGOW_HASKELL__)
+#ifdef USE_REPORT_PRELUDE
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 #else
 -- Efficient definition
@@ -516,8 +514,6 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
-#ifdef __GLASGOW_HASKELL__
-
 -- | 'maximum' returns the maximum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.maximumBy', which allows the
@@ -556,8 +552,6 @@ minimum xs              =  foldl1 min xs
 strictMinimum           :: (Ord a) => [a] -> a
 strictMinimum []        =  errorEmptyList "minimum"
 strictMinimum xs        =  foldl1' min xs
-
-#endif /* __GLASGOW_HASKELL__ */
 
 -- | The 'maximumBy' function takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
@@ -996,29 +990,21 @@ unfoldr f b  =
 
 -- | A strict version of 'foldl'.
 foldl'           :: (b -> a -> b) -> b -> [a] -> b
-#ifdef __GLASGOW_HASKELL__
 foldl' f z0 xs0 = lgo z0 xs0
     where lgo z []     = z
           lgo z (x:xs) = let z' = f z x in z' `seq` lgo z' xs
-#else
-foldl' f a []     = a
-foldl' f a (x:xs) = let a' = f a x in a' `seq` foldl' f a' xs
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists.
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
-#endif /* __GLASGOW_HASKELL__ */
 
 -- | A strict version of 'foldl1'
 foldl1'                  :: (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs)         =  foldl' f x xs
 foldl1' _ []             =  errorEmptyList "foldl1'"
 
-#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- List sum and product
 
@@ -1056,7 +1042,6 @@ product l       = prod l 1
 -- characters.  The resulting strings do not contain newlines.
 lines                   :: String -> [String]
 lines ""                =  []
-#ifdef __GLASGOW_HASKELL__
 -- Somehow GHC doesn't detect the selector thunks in the below code,
 -- so s' keeps a reference to the first line via the pair and we have
 -- a space leak (cf. #4334).
@@ -1067,12 +1052,6 @@ lines s                 =  cons (case break (== '\n') s of
                                                     _:s''   -> lines s''))
   where
     cons ~(h, t)        =  h : t
-#else
-lines s                 =  let (l, s') = break (== '\n') s
-                           in  l : case s' of
-                                        []      -> []
-                                        (_:s'') -> lines s''
-#endif
 
 -- | 'unlines' is an inverse operation to 'lines'.
 -- It joins lines, after appending a terminating newline to each.
@@ -1108,12 +1087,3 @@ unwords []              =  ""
 unwords [w]             = w
 unwords (w:ws)          = w ++ ' ' : unwords ws
 #endif
-
-#else  /* !__GLASGOW_HASKELL__ */
-
-errorEmptyList :: String -> a
-errorEmptyList fun =
-  error ("Prelude." ++ fun ++ ": empty list")
-
-#endif /* !__GLASGOW_HASKELL__ */
-

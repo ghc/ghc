@@ -22,6 +22,7 @@ import TcSimplify ( simplifyTop )
 import TypeRep
 import TcType
 import TcMType
+import TysWiredIn ( coercibleClass )
 import Type
 import Unify( tcMatchTyX )
 import Kind
@@ -45,6 +46,7 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import FastString
+import BasicTypes ( Arity )
 
 import Control.Monad
 import Data.List        ( (\\) )
@@ -61,23 +63,31 @@ import Data.List        ( (\\) )
 \begin{code}
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
 checkAmbiguity ctxt ty
+  | GhciCtxt <- ctxt    -- Allow ambiguous types in GHCi's :kind command
+  = return ()           -- E.g.   type family T a :: *  -- T :: forall k. k -> *
+                        -- Then :k T should work in GHCi, not complain that
+                        -- (T k) is ambiguous!
+
+  | otherwise
   = do { allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
        ; unless allow_ambiguous $ 
-    do {(subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
+    do { traceTc "Ambiguity check for" (ppr ty)
+       ; (subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
        ; let ty' = substTy subst ty  
               -- The type might have free TyVars,
               -- so we skolemise them as TcTyVars
               -- Tiresome; but the type inference engine expects TcTyVars
-       ; (_wrap, wanted) <- addErrCtxtM (mk_msg ty') $
-                            captureConstraints $
-                            tcSubType (AmbigOrigin ctxt) ctxt ty' ty'
 
          -- Solve the constraints eagerly because an ambiguous type
-         -- can cause a cascade of further errors.  The free tyvars
-         -- are skolemised, so we can safely use tcSimplifyTop
-       ; _ev_binds <- simplifyTop wanted
+         -- can cause a cascade of further errors.  Since the free 
+         -- tyvars are skolemised, we can safely use tcSimplifyTop
+       ; addErrCtxtM (mk_msg ty') $
+         do { (_wrap, wanted) <- captureConstraints $
+                                 tcSubType (AmbigOrigin ctxt) ctxt ty' ty'
+            ; _ev_binds <- simplifyTop wanted
+            ; return () }
 
-       ; return () } } 
+       ; traceTc "Done ambiguity check for" (ppr ty) } }
  where
    mk_msg ty tidy_env 
      = return (tidy_env', msg)
@@ -167,7 +177,8 @@ checkValidType ctxt ty
         -- Check that the thing has kind Type, and is lifted if necessary
         -- Do this second, because we can't usefully take the kind of an 
         -- ill-formed type such as (a~Int)
-       ; check_kind ctxt ty }
+       ; check_kind ctxt ty
+       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty = check_mono_type SigmaCtxt MustBeMonoType ty
@@ -222,9 +233,9 @@ data Rank = ArbitraryRank         -- Any rank ok
           | MustBeMonoType  -- Monotype regardless of flags
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType :: Rank
-rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types"))
-tyConArgMonoType = MonoType (ptext (sLit "Perhaps you intended to use -XImpredicativeTypes"))
-synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use -XLiberalTypeSynonyms"))
+rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types"))
+tyConArgMonoType = MonoType (ptext (sLit "Perhaps you intended to use ImpredicativeTypes"))
+synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use LiberalTypeSynonyms"))
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -299,7 +310,7 @@ check_syn_tc_app ctxt rank ty tc tys
         ; liberal <- xoptM Opt_LiberalTypeSynonyms
         ; if not liberal || isSynFamilyTyCon tc then
                 -- For H98 and synonym families, do check the type args
-                mapM_ (check_mono_type ctxt synArgMonoType) tys
+                mapM_ check_arg tys
 
           else  -- In the liberal case (only for closed syns), expand then check
           case tcView ty of   
@@ -308,13 +319,15 @@ check_syn_tc_app ctxt rank ty tc tys
 
   | GhciCtxt <- ctxt  -- Accept under-saturated type synonyms in 
                       -- GHCi :kind commands; see Trac #7586
-  = mapM_ (check_mono_type ctxt synArgMonoType) tys
+  = mapM_ check_arg tys
 
   | otherwise
   = failWithTc (arityErr "Type synonym" (tyConName tc) tc_arity n_args)
   where
     n_args = length tys
     tc_arity  = tyConArity tc
+    check_arg | isSynFamilyTyCon tc = check_arg_type  ctxt rank
+              | otherwise           = check_mono_type ctxt synArgMonoType
          
 ----------------------------------------
 check_ubx_tuple :: UserTypeCtxt -> KindOrType 
@@ -377,7 +390,7 @@ forAllTyErr rank ty
           , suggestion ]
   where
     suggestion = case rank of
-                   LimitedRank {} -> ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types")
+                   LimitedRank {} -> ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types")
                    MonoType d     -> d
                    _              -> empty      -- Polytype is always illegal
 
@@ -488,7 +501,7 @@ check_class_pred dflags ctxt cls tys
     arity      = classArity cls
     n_tys      = length tys
     arity_err  = arityErr "Class" class_name arity n_tys
-    how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
+    how_to_allow = parens (ptext (sLit "Use FlexibleContexts to permit this"))
 
 
 check_eq_pred :: DynFlags -> UserTypeCtxt -> TcType -> TcType -> TcM ()
@@ -685,20 +698,20 @@ checkThetaCtxt ctxt theta
 eqPredTyErr, predTyVarErr, predTupleErr, predIrredErr, predIrredBadCtxtErr :: PredType -> SDoc
 eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprType pred
                     $$
-                    parens (ptext (sLit "Use -XGADTs or -XTypeFamilies to permit this"))
+                    parens (ptext (sLit "Use GADTs or TypeFamilies to permit this"))
 predTyVarErr pred  = hang (ptext (sLit "Non type-variable argument"))
                         2 (ptext (sLit "in the constraint:") <+> pprType pred)
 predTupleErr pred  = hang (ptext (sLit "Illegal tuple constraint:") <+> pprType pred)
-                        2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+                        2 (parens (ptext (sLit "Use ConstraintKinds to permit this")))
 predIrredErr pred  = hang (ptext (sLit "Illegal constraint:") <+> pprType pred)
-                        2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+                        2 (parens (ptext (sLit "Use ConstraintKinds to permit this")))
 predIrredBadCtxtErr pred = hang (ptext (sLit "Illegal constraint") <+> quotes (pprType pred)
                                  <+> ptext (sLit "in a superclass/instance context")) 
-                               2 (parens (ptext (sLit "Use -XUndecidableInstances to permit this")))
+                               2 (parens (ptext (sLit "Use UndecidableInstances to permit this")))
 
 constraintSynErr :: Type -> SDoc
 constraintSynErr kind = hang (ptext (sLit "Illegal constraint synonym of kind:") <+> quotes (ppr kind))
-                           2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+                           2 (parens (ptext (sLit "Use ConstraintKinds to permit this")))
 
 dupPredWarn :: [[PredType]] -> SDoc
 dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprType (map head dups)
@@ -734,6 +747,9 @@ checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags <- getDynFlags
 
+       ; checkTc (clas `notElem` abstractClasses)
+                 (instTypeErr clas cls_args abstract_class_msg)
+
            -- Check language restrictions; 
            -- but not for SPECIALISE isntance pragmas
        ; let ty_args = dropWhile isKind cls_args
@@ -768,21 +784,27 @@ checkValidInstHead ctxt clas cls_args
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
                 text "where T is not a synonym." $$
-                text "Use -XTypeSynonymInstances if you want to disable this.")
+                text "Use TypeSynonymInstances if you want to disable this.")
 
     head_type_args_tyvars_msg = parens (vcat [
                 text "All instance types must be of the form (T a1 ... an)",
                 text "where a1 ... an are *distinct type variables*,",
                 text "and each type variable appears at most once in the instance head.",
-                text "Use -XFlexibleInstances if you want to disable this."])
+                text "Use FlexibleInstances if you want to disable this."])
 
     head_one_type_msg = parens (
                 text "Only one type can be given in an instance head." $$
-                text "Use -XMultiParamTypeClasses if you want to allow more.")
+                text "Use MultiParamTypeClasses if you want to allow more.")
 
     head_no_type_msg = parens (
                 text "No parameters in the instance head." $$
-                text "Use -XNullaryTypeClasses if you want to allow this.")
+                text "Use NullaryTypeClasses if you want to allow this.")
+
+    abstract_class_msg =
+                text "The class is abstract, manual instances are not permitted."
+
+abstractClasses :: [ Class ]
+abstractClasses = [ coercibleClass ]
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg
@@ -923,7 +945,7 @@ nomoreMsg tvs
 
 smallerMsg, undecidableMsg :: SDoc
 smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
-undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
+undecidableMsg = ptext (sLit "Use UndecidableInstances to permit this")
 \end{code}
 
 
@@ -1127,10 +1149,25 @@ checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 --    e.g. we disallow (Trac #7536)
 --         type T a = Int
 --         type instance F (T a) = a
+-- c) Have the right number of patterns
 checkValidFamPats fam_tc tvs ty_pats
-  = do { mapM_ checkTyFamFreeness ty_pats
+  = do { -- A family instance must have exactly the same number of type
+         -- parameters as the family declaration.  You can't write
+         --     type family F a :: * -> *
+         --     type instance F Int y = y
+         -- because then the type (F Int) would be like (\y.y)
+         checkTc (length ty_pats == fam_arity) $
+           wrongNumberOfParmsErr (fam_arity - length fam_kvs) -- report only types
+       ; mapM_ checkTyFamFreeness ty_pats
        ; let unbound_tvs = filterOut (`elemVarSet` exactTyVarsOfTypes ty_pats) tvs
        ; checkTc (null unbound_tvs) (famPatErr fam_tc unbound_tvs ty_pats) }
+  where fam_arity    = tyConArity fam_tc
+        (fam_kvs, _) = splitForAllTys (tyConKind fam_tc)
+
+wrongNumberOfParmsErr :: Arity -> SDoc
+wrongNumberOfParmsErr exp_arity
+  = ptext (sLit "Number of parameters must match family declaration; expected")
+    <+> ppr exp_arity
 
 -- Ensure that no type family instances occur in a type.
 --

@@ -39,10 +39,6 @@
 #include "FileLock.h"
 void exitLinker( void );	// there is no Linker.h file to include
 
-#if defined(RTS_GTK_FRONTPANEL)
-#include "FrontPanel.h"
-#endif
-
 #if defined(PROFILING)
 # include "ProfHeap.h"
 # include "RetainerProfile.h"
@@ -74,7 +70,8 @@ static void flushStdHandles(void);
 
 const RtsConfig defaultRtsConfig  = {
     .rts_opts_enabled = RtsOptsSafeOnly,
-    .rts_opts = NULL
+    .rts_opts = NULL,
+    .rts_hs_main = rtsFalse
 };
 
 /* -----------------------------------------------------------------------------
@@ -116,6 +113,14 @@ hs_init(int *argc, char **argv[])
 }
 
 void
+hs_init_with_rtsopts(int *argc, char **argv[])
+{
+    RtsConfig rts_opts = defaultRtsConfig; /* by value */
+    rts_opts.rts_opts_enabled = RtsOptsAll;
+    hs_init_ghc(argc, argv, rts_opts);
+}
+
+void
 hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 {
     hs_init_count++;
@@ -151,11 +156,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         char *my_argv[] = { "<unknown>", NULL };
         setFullProgArgv(my_argc,my_argv);
         setupRtsFlags(&my_argc, my_argv,
-                      rts_config.rts_opts_enabled, rts_config.rts_opts);
+                      rts_config.rts_opts_enabled, rts_config.rts_opts, rts_config.rts_hs_main);
     } else {
 	setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv,
-                      rts_config.rts_opts_enabled, rts_config.rts_opts);
+                      rts_config.rts_opts_enabled, rts_config.rts_opts, rts_config.rts_hs_main);
     }
 
     /* Initialise the stats department, phase 1 */
@@ -248,12 +253,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     startupAsyncIO();
 #endif
 
-#ifdef RTS_GTK_FRONTPANEL
-    if (RtsFlags.GcFlags.frontpanel) {
-	initFrontPanel();
-    }
-#endif
-
 #if X86_INIT_FPU
     x86_init_fpu();
 #endif
@@ -314,6 +313,8 @@ hs_add_root(void (*init_root)(void) STG_UNUSED)
 static void
 hs_exit_(rtsBool wait_foreign)
 {
+    nat g;
+
     if (hs_init_count <= 0) {
 	errorBelch("warning: too many hs_exit()s");
 	return;
@@ -346,7 +347,9 @@ hs_exit_(rtsBool wait_foreign)
     exitScheduler(wait_foreign);
 
     /* run C finalizers for all active weak pointers */
-    runAllCFinalizers(weak_ptr_list);
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        runAllCFinalizers(generations[g].weak_ptr_list);
+    }
 
 #if defined(RTS_USER_SIGNALS)
     if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -394,12 +397,6 @@ hs_exit_(rtsBool wait_foreign)
 #if defined(DEBUG)
     /* free the thread label table */
     freeThreadLabelTable();
-#endif
-
-#ifdef RTS_GTK_FRONTPANEL
-    if (RtsFlags.GcFlags.frontpanel) {
-	stopFrontPanel();
-    }
 #endif
 
 #if defined(PROFILING)

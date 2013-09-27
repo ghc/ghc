@@ -149,7 +149,7 @@ initProfiling1 (void)
     {
         nat n;
         for (n=0; n < n_capabilities; n++) {
-            capabilities[n].r.rCCCS = CCS_SYSTEM;
+            capabilities[n]->r.rCCCS = CCS_SYSTEM;
         }
     }
 

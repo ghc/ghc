@@ -610,6 +610,8 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_VS_Quot {}    -> needLlvm
       MO_VS_Rem {}     -> needLlvm
       MO_VS_Neg {}     -> needLlvm
+      MO_VU_Quot {}    -> needLlvm
+      MO_VU_Rem {}     -> needLlvm
       MO_VF_Insert {}  -> needLlvm
       MO_VF_Extract {} -> needLlvm
       MO_VF_Add {}     -> needLlvm
@@ -1170,7 +1172,6 @@ memConstant align lit = do
   (addr, addr_code) <- if target32Bit (targetPlatform dflags)
                        then do dynRef <- cmmMakeDynamicReference
                                              dflags
-                                             addImportNat
                                              DataReference
                                              lbl
                                Amode addr addr_code <- getAmode dynRef
@@ -1659,6 +1660,29 @@ genCCall _ (PrimTarget MO_Touch) _ _ = return nilOL
 
 genCCall _ (PrimTarget MO_Prefetch_Data) _ _ = return nilOL
 
+genCCall is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] = do
+    dflags <- getDynFlags
+    let platform = targetPlatform dflags
+    let dst_r = getRegisterReg platform False (CmmLocal dst)
+    case width of
+        W64 | is32Bit -> do
+               ChildCode64 vcode rlo <- iselExpr64 src
+               let dst_rhi = getHiVRegFromLo dst_r
+                   rhi     = getHiVRegFromLo rlo
+               return $ vcode `appOL`
+                        toOL [ MOV II32 (OpReg rlo) (OpReg dst_rhi),
+                               MOV II32 (OpReg rhi) (OpReg dst_r),
+                               BSWAP II32 dst_rhi,
+                               BSWAP II32 dst_r ]
+        W16 -> do code_src <- getAnyReg src
+                  return $ code_src dst_r `appOL`
+                           unitOL (BSWAP II32 dst_r) `appOL`
+                           unitOL (SHR II32 (OpImm $ ImmInt 16) (OpReg dst_r))
+        _   -> do code_src <- getAnyReg src
+                  return $ code_src dst_r `appOL` unitOL (BSWAP size dst_r)
+  where
+    size = intSize width
+
 genCCall is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
          args@[src] = do
     sse4_2 <- sse4_2Enabled
@@ -1677,7 +1701,7 @@ genCCall is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
                          unitOL (POPCNT size (OpReg src_r)
                                  (getRegisterReg platform False (CmmLocal dst))))
         else do
-            targetExpr <- cmmMakeDynamicReference dflags addImportNat
+            targetExpr <- cmmMakeDynamicReference dflags
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
@@ -1689,7 +1713,7 @@ genCCall is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
 
 genCCall is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
     dflags <- getDynFlags
-    targetExpr <- cmmMakeDynamicReference dflags addImportNat
+    targetExpr <- cmmMakeDynamicReference dflags
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
@@ -1835,7 +1859,7 @@ genCCall32' dflags target dest_regs args = do
         use_sse2 <- sse2Enabled
         push_codes <- mapM (push_arg use_sse2) (reverse prom_args)
         delta <- getDeltaNat
-        MASSERT (delta == delta0 - tot_arg_size)
+        MASSERT(delta == delta0 - tot_arg_size)
 
         -- deal with static vs dynamic call targets
         (callinsns,cconv) <-
@@ -2271,7 +2295,7 @@ outOfLineCmmOp :: CallishMachOp -> Maybe CmmFormal -> [CmmActual] -> NatM InstrB
 outOfLineCmmOp mop res args
   = do
       dflags <- getDynFlags
-      targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
+      targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
       let target = ForeignTarget targetExpr
                            (ForeignConvention CCallConv [] [] CmmMayReturn)
 
@@ -2326,6 +2350,7 @@ outOfLineCmmOp mop res args
               MO_Memmove   -> fsLit "memmove"
 
               MO_PopCnt _  -> fsLit "popcnt"
+              MO_BSwap _   -> fsLit "bswap"
 
               MO_UF_Conv _ -> unsupported
 
@@ -2351,7 +2376,7 @@ genSwitch dflags expr ids
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
         dflags <- getDynFlags
-        dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
+        dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg (wORD_SIZE dflags)) (ImmInt 0))

@@ -25,7 +25,7 @@ bindist: bindist_$1
 bindist_$1:
 	$(foreach i,$2,\
 	    $(call make-command,\
-	        for f in $i; do echo $(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done \
+	        for f in $i; do echo $(BIN_DIST_NAME)/$$$$f >> bindist-list; done \
 	    ) \
 	    )
 endef

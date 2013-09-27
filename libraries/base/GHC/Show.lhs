@@ -32,7 +32,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Show
         (
         Show(..), ShowS,
@@ -157,6 +156,7 @@ class  Show a  where
     showsPrec _ x s = show x ++ s
     show x          = shows x ""
     showList ls   s = showList__ shows ls s
+    {-# MINIMAL showsPrec | show #-}
 
 showList__ :: (a -> ShowS) ->  [a] -> ShowS
 showList__ _     []     s = "[]" ++ s
@@ -209,7 +209,7 @@ instance Show Word where
 
 showWord :: Word# -> ShowS
 showWord w# cs
- | w# `ltWord#` 10## = C# (chr# (ord# '0'# +# word2Int# w#)) : cs
+ | isTrue# (w# `ltWord#` 10##) = C# (chr# (ord# '0'# +# word2Int# w#)) : cs
  | otherwise = case chr# (ord# '0'# +# word2Int# (w# `remWord#` 10##)) of
                c# ->
                    showWord (w# `quotWord#` 10##) (C# c# : cs)
@@ -424,20 +424,20 @@ Code specific for Ints.
 -- lower-case hexadecimal digits.
 intToDigit :: Int -> Char
 intToDigit (I# i)
-    | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' + I# i)
-    | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' + I# i - 10)
-    | otherwise           =  error ("Char.intToDigit: not a digit " ++ show (I# i))
+    | isTrue# (i >=# 0#)  && isTrue# (i <=#  9#) = unsafeChr (ord '0' + I# i)
+    | isTrue# (i >=# 10#) && isTrue# (i <=# 15#) = unsafeChr (ord 'a' + I# i - 10)
+    | otherwise =  error ("Char.intToDigit: not a digit " ++ show (I# i))
 
 showSignedInt :: Int -> Int -> ShowS
 showSignedInt (I# p) (I# n) r
-    | n <# 0# && p ># 6# = '(' : itos n (')' : r)
-    | otherwise          = itos n r
+    | isTrue# (n <# 0#) && isTrue# (p ># 6#) = '(' : itos n (')' : r)
+    | otherwise                              = itos n r
 
 itos :: Int# -> String -> String
 itos n# cs
-    | n# <# 0# =
+    | isTrue# (n# <# 0#) =
         let !(I# minInt#) = minInt in
-        if n# ==# minInt#
+        if isTrue# (n# ==# minInt#)
                 -- negateInt# minInt overflows, so we can't do that:
            then '-' : (case n# `quotRemInt#` 10# of
                        (# q, r #) ->
@@ -447,7 +447,7 @@ itos n# cs
     where
     itos' :: Int# -> String -> String
     itos' x# cs'
-        | x# <# 10#  = C# (chr# (ord# '0'# +# x#)) : cs'
+        | isTrue# (x# <# 10#) = C# (chr# (ord# '0'# +# x#)) : cs'
         | otherwise = case x# `quotRemInt#` 10# of
                       (# q, r #) ->
                           case chr# (ord# '0'# +# r) of

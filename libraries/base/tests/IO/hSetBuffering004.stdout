@@ -1,1 +1,2 @@
 '-'
+"-- test for #2678\nmodule Main (main) where\n\nimport System.IO\n\nmain :: IO ()\nmain = do hSetBuffering stdin NoBuffering\n          hLookAhead stdin >>= print\n          hSetBuffering stdin LineBuffering\n          getContents >>= print\n"

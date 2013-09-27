@@ -58,6 +58,7 @@ init_state = St {
 
 data Token = TEOF
            | TArrow
+           | TDArrow
            | TEquals
            | TComma
            | TOpenParen
@@ -66,10 +67,15 @@ data Token = TEOF
            | THashCloseParen
            | TOpenBrace
            | TCloseBrace
+           | TOpenBracket
+           | TCloseBracket
+           | TOpenAngle
+           | TCloseAngle
            | TSection
            | TPrimop
            | TPseudoop
            | TPrimtype
+           | TPrimclass
            | TWith
            | TDefaults
            | TTrue
@@ -89,6 +95,10 @@ data Token = TEOF
            | TInfixL
            | TInfixR
            | TNothing
+           | TVector
+           | TSCALAR
+           | TVECTOR
+           | TVECTUPLE
     deriving Show
 
 -- Actions

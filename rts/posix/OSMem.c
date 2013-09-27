@@ -81,13 +81,13 @@ my_mmap (void *addr, W_ size)
 
 #if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
     { 
-	int fd = open("/dev/zero",O_RDONLY);
-	ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-	close(fd);
+        int fd = open("/dev/zero",O_RDONLY);
+        ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+        close(fd);
     }
 #elif hpux_HOST_OS
     ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
-	       MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+               MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif darwin_HOST_OS
     // Without MAP_FIXED, Apple's mmap ignores addr.
     // With MAP_FIXED, it overwrites already mapped regions, whic
@@ -99,18 +99,39 @@ my_mmap (void *addr, W_ size)
     
     kern_return_t err = 0;
     ret = addr;
-    if(addr)	// try to allocate at address
-	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
-    if(!addr || err)	// try to allocate anywhere
-	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
-	
+    if(addr)    // try to allocate at address
+        err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
+    if(!addr || err)    // try to allocate anywhere
+        err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
+        
     if(err) {
-	// don't know what the error codes mean exactly, assume it's
-	// not our problem though.
-	errorBelch("memory allocation failed (requested %" FMT_Word " bytes)", size);
-	stg_exit(EXIT_FAILURE);
+        // don't know what the error codes mean exactly, assume it's
+        // not our problem though.
+        errorBelch("memory allocation failed (requested %" FMT_Word " bytes)", size);
+        stg_exit(EXIT_FAILURE);
     } else {
-	vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
+        vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
+    }
+#elif linux_HOST_OS
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
+               MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (ret == (void *)-1 && errno == EPERM) {
+        // Linux may return EPERM if it tried to give us
+        // a chunk of address space below mmap_min_addr,
+        // See Trac #7500.
+        if (addr != 0) {
+            // Try again with no hint address.
+            // It's not clear that this can ever actually help,
+            // but since our alternative is to abort, we may as well try.
+            ret = mmap(0, size, PROT_READ | PROT_WRITE,
+                       MAP_ANON | MAP_PRIVATE, -1, 0);
+        }
+        if (ret == (void *)-1 && errno == EPERM) {
+            // Linux is not willing to give us any mapping,
+            // so treat this as an out-of-memory condition
+            // (really out of virtual address space).
+            errno = ENOMEM;
+        }
     }
 #else
     ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
@@ -118,15 +139,15 @@ my_mmap (void *addr, W_ size)
 #endif
 
     if (ret == (void *)-1) {
-	if (errno == ENOMEM || 
-	    (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
-	    // If we request more than 3Gig, then we get EINVAL
-	    // instead of ENOMEM (at least on Linux).
+        if (errno == ENOMEM || 
+            (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
+            // If we request more than 3Gig, then we get EINVAL
+            // instead of ENOMEM (at least on Linux).
             errorBelch("out of memory (requested %" FMT_Word " bytes)", size);
             stg_exit(EXIT_FAILURE);
-	} else {
-	    barf("getMBlock: mmap: %s", strerror(errno));
-	}
+        } else {
+            barf("getMBlock: mmap: %s", strerror(errno));
+        }
     }
 
     return ret;
@@ -186,17 +207,17 @@ osGetMBlocks(nat n)
       ret = my_mmap(next_request, size);
 
       if (((W_)ret & MBLOCK_MASK) != 0) {
-	  // misaligned block!
+          // misaligned block!
 #if 0 // defined(DEBUG)
-	  errorBelch("warning: getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
+          errorBelch("warning: getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
 #endif
 
-	  // unmap this block...
-	  if (munmap(ret, size) == -1) {
-	      barf("getMBlock: munmap failed");
-	  }
-	  // and do it the hard way
-	  ret = gen_map_mblocks(size);
+          // unmap this block...
+          if (munmap(ret, size) == -1) {
+              barf("getMBlock: munmap failed");
+          }
+          // and do it the hard way
+          ret = gen_map_mblocks(size);
       }
   }
   // Next time, we'll try to allocate right after the block we just got.
@@ -230,14 +251,15 @@ W_ getPageSize (void)
 {
     static W_ pageSize = 0;
     if (pageSize) {
-	return pageSize;
+        return pageSize;
     } else {
-	long ret;
-	ret = sysconf(_SC_PAGESIZE);
-	if (ret == -1) {
-	    barf("getPageSize: cannot get page size");
-	}
-	return ret;
+        long ret;
+        ret = sysconf(_SC_PAGESIZE);
+        if (ret == -1) {
+           barf("getPageSize: cannot get page size");
+        }
+        pageSize = ret;
+        return ret;
     }
 }
 
@@ -251,7 +273,7 @@ void setExecutable (void *p, W_ len, rtsBool exec)
     StgWord startOfLastPage  = ((StgWord)p + len - 1) & mask;
     StgWord size             = startOfLastPage - startOfFirstPage + pageSize;
     if (mprotect((void*)startOfFirstPage, (size_t)size, 
-		 (exec ? PROT_EXEC : 0) | PROT_READ | PROT_WRITE) != 0) {
-	barf("setExecutable: failed to protect 0x%p\n", p);
+                 (exec ? PROT_EXEC : 0) | PROT_READ | PROT_WRITE) != 0) {
+        barf("setExecutable: failed to protect 0x%p\n", p);
     }
 }

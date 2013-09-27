@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.STRef (
         STRef(..),
         newSTRef, readSTRef, writeSTRef
@@ -48,6 +47,6 @@ writeSTRef (STRef var#) val = ST $ \s1# ->
 
 -- Just pointer equality on mutable references:
 instance Eq (STRef s a) where
-    STRef v1# == STRef v2# = sameMutVar# v1# v2#
+    STRef v1# == STRef v2# = isTrue# (sameMutVar# v1# v2#)
 
 \end{code}

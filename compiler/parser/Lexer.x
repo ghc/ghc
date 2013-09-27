@@ -57,6 +57,8 @@ module Lexer (
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
    typeLiteralsEnabled,
+   explicitForallEnabled,
+   inRulePrag,
    explicitNamespacesEnabled, sccProfilingOn, hpcEnabled,
    addWarning,
    lexTokenStream
@@ -385,12 +387,16 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- when trying to be close to Haskell98
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
-  @decimal           { tok_num positive 0 0 decimal }
-  0[oO] @octal       { tok_num positive 2 2 octal }
-  0[xX] @hexadecimal { tok_num positive 2 2 hexadecimal }
+  @decimal                                                               { tok_num positive 0 0 decimal }
+  0[oO] @octal                                                           { tok_num positive 2 2 octal }
+  0[xX] @hexadecimal                                                     { tok_num positive 2 2 hexadecimal }
+  @negative @decimal           / { ifExtension negativeLiteralsEnabled } { tok_num negative 1 1 decimal }
+  @negative 0[oO] @octal       / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
+  @negative 0[xX] @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
-  @floating_point    { strtoken tok_float }
+  @floating_point                                                        { strtoken tok_float }
+  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { strtoken tok_float }
 }
 
 <0> {
@@ -466,8 +472,10 @@ data Token
   | ITccallconv
   | ITcapiconv
   | ITprimcallconv
+  | ITjavascriptcallconv
   | ITmdo
   | ITfamily
+  | ITrole
   | ITgroup
   | ITby
   | ITusing
@@ -494,6 +502,7 @@ data Token
   | ITvect_prag
   | ITvect_scalar_prag
   | ITnovect_prag
+  | ITminimal_prag
   | ITctype
 
   | ITdotdot                    -- reserved symbols
@@ -642,7 +651,9 @@ reservedWordsFM = listToUFM $
          ( "forall",         ITforall,        bit explicitForallBit .|.
                                               bit inRulePragBit),
          ( "mdo",            ITmdo,           bit recursiveDoBit),
-         ( "family",         ITfamily,        bit tyFamBit),
+             -- See Note [Lexing type pseudo-keywords]
+         ( "family",         ITfamily,        0 ),
+         ( "role",           ITrole,          0 ),
          ( "group",          ITgroup,         bit transformComprehensionsBit),
          ( "by",             ITby,            bit transformComprehensionsBit),
          ( "using",          ITusing,         bit transformComprehensionsBit),
@@ -659,11 +670,29 @@ reservedWordsFM = listToUFM $
          ( "ccall",          ITccallconv,     bit ffiBit),
          ( "capi",           ITcapiconv,      bit cApiFfiBit),
          ( "prim",           ITprimcallconv,  bit ffiBit),
+         ( "javascript",     ITjavascriptcallconv, bit ffiBit),
 
-         ( "rec",            ITrec,           bit arrowsBit .|. 
+         ( "rec",            ITrec,           bit arrowsBit .|.
                                               bit recursiveDoBit),
          ( "proc",           ITproc,          bit arrowsBit)
      ]
+
+{-----------------------------------
+Note [Lexing type pseudo-keywords]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+One might think that we wish to treat 'family' and 'role' as regular old
+varids whenever -XTypeFamilies and -XRoleAnnotations are off, respectively.
+But, there is no need to do so. These pseudo-keywords are not stolen syntax:
+they are only used after the keyword 'type' at the top-level, where varids are
+not allowed. Furthermore, checks further downstream (TcTyClsDecls) ensure that
+type families and role annotations are never declared without their extensions
+on. In fact, by unconditionally lexing these pseudo-keywords as special, we
+can get better error messages.
+
+Also, note that these are included in the `varid` production in the parser --
+a key detail to make all this work.
+-------------------------------------}
 
 reservedSymsFM :: UniqFM (Token, Int -> Bool)
 reservedSymsFM = listToUFM $
@@ -696,8 +725,7 @@ reservedSymsFM = listToUFM $
 
        ,("∷",   ITdcolon, unicodeSyntaxEnabled)
        ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
-       ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i &&
-                                explicitForallEnabled i)
+       ,("∀",   ITforall, unicodeSyntaxEnabled)
        ,("→",   ITrarrow, unicodeSyntaxEnabled)
        ,("←",   ITlarrow, unicodeSyntaxEnabled)
 
@@ -1826,8 +1854,7 @@ explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
 bangPatBit :: Int
 bangPatBit = 8  -- Tells the parser to understand bang-patterns
                 -- (doesn't affect the lexer)
-tyFamBit :: Int
-tyFamBit = 9    -- indexed type families: 'family' keyword and kind sigs
+-- Bit #9 is available!
 haddockBit :: Int
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit :: Int
@@ -1870,6 +1897,9 @@ explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
 lambdaCaseBit :: Int
 lambdaCaseBit = 30
+negativeLiteralsBit :: Int
+negativeLiteralsBit = 31
+-- need another bit? See bit 9 above.
 
 
 always :: Int -> Bool
@@ -1886,8 +1916,6 @@ explicitForallEnabled :: Int -> Bool
 explicitForallEnabled flags = testBit flags explicitForallBit
 bangPatEnabled :: Int -> Bool
 bangPatEnabled   flags = testBit flags bangPatBit
--- tyFamEnabled :: Int -> Bool
--- tyFamEnabled     flags = testBit flags tyFamBit
 haddockEnabled :: Int -> Bool
 haddockEnabled   flags = testBit flags haddockBit
 magicHashEnabled :: Int -> Bool
@@ -1902,8 +1930,8 @@ datatypeContextsEnabled :: Int -> Bool
 datatypeContextsEnabled flags = testBit flags datatypeContextsBit
 qqEnabled :: Int -> Bool
 qqEnabled        flags = testBit flags qqBit
--- inRulePrag :: Int -> Bool
--- inRulePrag       flags = testBit flags inRulePragBit
+inRulePrag :: Int -> Bool
+inRulePrag       flags = testBit flags inRulePragBit
 rawTokenStreamEnabled :: Int -> Bool
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
 alternativeLayoutRule :: Int -> Bool
@@ -1925,6 +1953,8 @@ explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
 lambdaCaseEnabled :: Int -> Bool
 lambdaCaseEnabled flags = testBit flags lambdaCaseBit
+negativeLiteralsEnabled :: Int -> Bool
+negativeLiteralsEnabled flags = testBit flags negativeLiteralsBit
 
 -- PState for parsing options pragmas
 --
@@ -1967,7 +1997,6 @@ mkPState flags buf loc =
                .|. ipBit                       `setBitIf` xopt Opt_ImplicitParams           flags
                .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
                .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
-               .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
                .|. haddockBit                  `setBitIf` gopt Opt_Haddock                  flags
                .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
                .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
@@ -1988,6 +2017,7 @@ mkPState flags buf loc =
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. negativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -2375,6 +2405,7 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("ann", token ITann_prag),
                            ("vectorize", token ITvect_prag),
                            ("novectorize", token ITnovect_prag),
+                           ("minimal", token ITminimal_prag),
                            ("ctype", token ITctype)])
 
 twoWordPrags = Map.fromList([("inline conlike", token (ITinline_prag Inline ConLike)),

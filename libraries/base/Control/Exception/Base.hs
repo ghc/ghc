@@ -1,10 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
-#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-#endif
-
-#include "Typeable.h"
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,11 +19,7 @@
 module Control.Exception.Base (
 
         -- * The Exception type
-#ifdef __HUGS__
-        SomeException,
-#else
         SomeException(..),
-#endif
         Exception(..),
         IOException,
         ArithException(..),
@@ -35,12 +27,8 @@ module Control.Exception.Base (
         AssertionFailed(..),
         SomeAsyncException(..), AsyncException(..),
         asyncExceptionToException, asyncExceptionFromException,
-
-#if __GLASGOW_HASKELL__ || __HUGS__
         NonTermination(..),
         NestedAtomically(..),
-#endif
-
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
         Deadlock(..),
@@ -55,9 +43,7 @@ module Control.Exception.Base (
         throwIO,
         throw,
         ioError,
-#ifdef __GLASGOW_HASKELL__
         throwTo,
-#endif
 
         -- * Catching Exceptions
 
@@ -102,16 +88,13 @@ module Control.Exception.Base (
 
         finally,
 
-#ifdef __GLASGOW_HASKELL__
         -- * Calls for GHC runtime
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         absentError,
         nonTermination, nestedAtomically,
-#endif
   ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IO hiding (bracket,finally,onException)
 import GHC.IO.Exception
@@ -119,118 +102,10 @@ import GHC.Exception
 import GHC.Show
 -- import GHC.Exception hiding ( Exception )
 import GHC.Conc.Sync
-#endif
-
-#ifdef __HUGS__
-import Prelude hiding (catch)
-import Hugs.Prelude (ExitCode(..))
-import Hugs.IOExts (unsafePerformIO)
-import Hugs.Exception (SomeException(DynamicException, IOException,
-                                     ArithException, ArrayException, ExitException),
-                       evaluate, IOException, ArithException, ArrayException)
-import qualified Hugs.Exception
-#endif
 
 import Data.Dynamic
 import Data.Either
 import Data.Maybe
-
-#ifdef __HUGS__
-class (Typeable e, Show e) => Exception e where
-    toException   :: e -> SomeException
-    fromException :: SomeException -> Maybe e
-
-    toException e = DynamicException (toDyn e) (flip showsPrec e)
-    fromException (DynamicException dyn _) = fromDynamic dyn
-    fromException _ = Nothing
-
-INSTANCE_TYPEABLE0(SomeException,someExceptionTc,"SomeException")
-INSTANCE_TYPEABLE0(IOException,iOExceptionTc,"IOException")
-INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")
-INSTANCE_TYPEABLE0(ArrayException,arrayExceptionTc,"ArrayException")
-INSTANCE_TYPEABLE0(ExitCode,exitCodeTc,"ExitCode")
-INSTANCE_TYPEABLE0(ErrorCall,errorCallTc,"ErrorCall")
-INSTANCE_TYPEABLE0(AssertionFailed,assertionFailedTc,"AssertionFailed")
-INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
-INSTANCE_TYPEABLE0(BlockedIndefinitelyOnMVar,blockedIndefinitelyOnMVarTc,"BlockedIndefinitelyOnMVar")
-INSTANCE_TYPEABLE0(BlockedIndefinitelyOnSTM,blockedIndefinitelyOnSTM,"BlockedIndefinitelyOnSTM")
-INSTANCE_TYPEABLE0(Deadlock,deadlockTc,"Deadlock")
-
-instance Exception SomeException where
-    toException se = se
-    fromException = Just
-
-instance Exception IOException where
-    toException = IOException
-    fromException (IOException e) = Just e
-    fromException _ = Nothing
-
-instance Exception ArrayException where
-    toException = ArrayException
-    fromException (ArrayException e) = Just e
-    fromException _ = Nothing
-
-instance Exception ArithException where
-    toException = ArithException
-    fromException (ArithException e) = Just e
-    fromException _ = Nothing
-
-instance Exception ExitCode where
-    toException = ExitException
-    fromException (ExitException e) = Just e
-    fromException _ = Nothing
-
-data ErrorCall = ErrorCall String
-
-instance Show ErrorCall where
-    showsPrec _ (ErrorCall err) = showString err
-
-instance Exception ErrorCall where
-    toException (ErrorCall s) = Hugs.Exception.ErrorCall s
-    fromException (Hugs.Exception.ErrorCall s) = Just (ErrorCall s)
-    fromException _ = Nothing
-
-data BlockedIndefinitelyOnMVar = BlockedIndefinitelyOnMVar
-data BlockedIndefinitelyOnSTM = BlockedIndefinitelyOnSTM
-data Deadlock = Deadlock
-data AssertionFailed = AssertionFailed String
-data AsyncException
-  = StackOverflow
-  | HeapOverflow
-  | ThreadKilled
-  | UserInterrupt
-  deriving (Eq, Ord)
-
-instance Show BlockedIndefinitelyOnMVar where
-    showsPrec _ BlockedIndefinitelyOnMVar = showString "thread blocked indefinitely"
-
-instance Show BlockedIndefinitely where
-    showsPrec _ BlockedIndefinitely = showString "thread blocked indefinitely"
-
-instance Show Deadlock where
-    showsPrec _ Deadlock = showString "<<deadlock>>"
-
-instance Show AssertionFailed where
-    showsPrec _ (AssertionFailed err) = showString err
-
-instance Show AsyncException where
-    showsPrec _ StackOverflow   = showString "stack overflow"
-    showsPrec _ HeapOverflow    = showString "heap overflow"
-    showsPrec _ ThreadKilled    = showString "thread killed"
-    showsPrec _ UserInterrupt   = showString "user interrupt"
-
-instance Exception BlockedOnDeadMVar
-instance Exception BlockedIndefinitely
-instance Exception Deadlock
-instance Exception AssertionFailed
-instance Exception AsyncException
-
-throw :: Exception e => e -> a
-throw e = Hugs.Exception.throw (toException e)
-
-throwIO :: Exception e => e -> IO a
-throwIO e = Hugs.Exception.throwIO (toException e)
-#endif
 
 -----------------------------------------------------------------------------
 -- Catching exceptions
@@ -272,14 +147,7 @@ catch   :: Exception e
         => IO a         -- ^ The computation to run
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
-#if __GLASGOW_HASKELL__
 catch = catchException
-#elif __HUGS__
-catch m h = Hugs.Exception.catchException m h'
-  where h' e = case fromException e of
-            Just e' -> h e'
-            Nothing -> throwIO e
-#endif
 
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
@@ -425,31 +293,16 @@ bracketOnError before after thing =
     a <- before
     restore (thing a) `onException` after a
 
-#if !__GLASGOW_HASKELL__
-assert :: Bool -> a -> a
-assert True x = x
-assert False _ = throw (AssertionFailed "")
-#endif
-
 -----
 
-#if __GLASGOW_HASKELL__ || __HUGS__
 -- |A pattern match failed. The @String@ gives information about the
 -- source location of the pattern.
-data PatternMatchFail = PatternMatchFail String
-INSTANCE_TYPEABLE0(PatternMatchFail,patternMatchFailTc,"PatternMatchFail")
+data PatternMatchFail = PatternMatchFail String deriving Typeable
 
 instance Show PatternMatchFail where
     showsPrec _ (PatternMatchFail err) = showString err
 
-#ifdef __HUGS__
-instance Exception PatternMatchFail where
-    toException (PatternMatchFail err) = Hugs.Exception.PatternMatchFail err
-    fromException (Hugs.Exception.PatternMatchFail err) = Just (PatternMatchFail err)
-    fromException _ = Nothing
-#else
 instance Exception PatternMatchFail
-#endif
 
 -----
 
@@ -458,40 +311,24 @@ instance Exception PatternMatchFail
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record selector.
-data RecSelError = RecSelError String
-INSTANCE_TYPEABLE0(RecSelError,recSelErrorTc,"RecSelError")
+data RecSelError = RecSelError String deriving Typeable
 
 instance Show RecSelError where
     showsPrec _ (RecSelError err) = showString err
 
-#ifdef __HUGS__
-instance Exception RecSelError where
-    toException (RecSelError err) = Hugs.Exception.RecSelError err
-    fromException (Hugs.Exception.RecSelError err) = Just (RecSelError err)
-    fromException _ = Nothing
-#else
 instance Exception RecSelError
-#endif
 
 -----
 
 -- |An uninitialised record field was used. The @String@ gives
 -- information about the source location where the record was
 -- constructed.
-data RecConError = RecConError String
-INSTANCE_TYPEABLE0(RecConError,recConErrorTc,"RecConError")
+data RecConError = RecConError String deriving Typeable
 
 instance Show RecConError where
     showsPrec _ (RecConError err) = showString err
 
-#ifdef __HUGS__
-instance Exception RecConError where
-    toException (RecConError err) = Hugs.Exception.RecConError err
-    fromException (Hugs.Exception.RecConError err) = Just (RecConError err)
-    fromException _ = Nothing
-#else
 instance Exception RecConError
-#endif
 
 -----
 
@@ -500,40 +337,24 @@ instance Exception RecConError
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record update.
-data RecUpdError = RecUpdError String
-INSTANCE_TYPEABLE0(RecUpdError,recUpdErrorTc,"RecUpdError")
+data RecUpdError = RecUpdError String deriving Typeable
 
 instance Show RecUpdError where
     showsPrec _ (RecUpdError err) = showString err
 
-#ifdef __HUGS__
-instance Exception RecUpdError where
-    toException (RecUpdError err) = Hugs.Exception.RecUpdError err
-    fromException (Hugs.Exception.RecUpdError err) = Just (RecUpdError err)
-    fromException _ = Nothing
-#else
 instance Exception RecUpdError
-#endif
 
 -----
 
 -- |A class method without a definition (neither a default definition,
 -- nor a definition in the appropriate instance) was called. The
 -- @String@ gives information about which method it was.
-data NoMethodError = NoMethodError String
-INSTANCE_TYPEABLE0(NoMethodError,noMethodErrorTc,"NoMethodError")
+data NoMethodError = NoMethodError String deriving Typeable
 
 instance Show NoMethodError where
     showsPrec _ (NoMethodError err) = showString err
 
-#ifdef __HUGS__
-instance Exception NoMethodError where
-    toException (NoMethodError err) = Hugs.Exception.NoMethodError err
-    fromException (Hugs.Exception.NoMethodError err) = Just (NoMethodError err)
-    fromException _ = Nothing
-#else
 instance Exception NoMethodError
-#endif
 
 -----
 
@@ -541,27 +362,18 @@ instance Exception NoMethodError
 -- guaranteed not to terminate. Note that there is no guarantee that
 -- the runtime system will notice whether any given computation is
 -- guaranteed to terminate or not.
-data NonTermination = NonTermination
-INSTANCE_TYPEABLE0(NonTermination,nonTerminationTc,"NonTermination")
+data NonTermination = NonTermination deriving Typeable
 
 instance Show NonTermination where
     showsPrec _ NonTermination = showString "<<loop>>"
 
-#ifdef __HUGS__
-instance Exception NonTermination where
-    toException NonTermination = Hugs.Exception.NonTermination
-    fromException Hugs.Exception.NonTermination = Just NonTermination
-    fromException _ = Nothing
-#else
 instance Exception NonTermination
-#endif
 
 -----
 
 -- |Thrown when the program attempts to call @atomically@, from the @stm@
 -- package, inside another call to @atomically@.
-data NestedAtomically = NestedAtomically
-INSTANCE_TYPEABLE0(NestedAtomically,nestedAtomicallyTc,"NestedAtomically")
+data NestedAtomically = NestedAtomically deriving Typeable
 
 instance Show NestedAtomically where
     showsPrec _ NestedAtomically = showString "Control.Concurrent.STM.atomically was nested"
@@ -570,9 +382,6 @@ instance Exception NestedAtomically
 
 -----
 
-#endif /* __GLASGOW_HASKELL__ || __HUGS__ */
-
-#ifdef __GLASGOW_HASKELL__
 recSelError, recConError, irrefutPatError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
   absentError
@@ -596,4 +405,3 @@ nonTermination = toException NonTermination
 -- GHC's RTS calls this
 nestedAtomically :: SomeException
 nestedAtomically = toException NestedAtomically
-#endif

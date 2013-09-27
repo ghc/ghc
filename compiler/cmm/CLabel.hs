@@ -837,13 +837,13 @@ idInfoLabelType info =
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
 
-labelDynamic :: DynFlags -> PackageId -> CLabel -> Bool
-labelDynamic dflags this_pkg lbl =
+labelDynamic :: DynFlags -> PackageId -> Module -> CLabel -> Bool
+labelDynamic dflags this_pkg this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _           -> not (gopt Opt_Static dflags) && (this_pkg /= rtsPackageId)
 
-   IdLabel n _ _        -> isDllName dflags this_pkg n
+   IdLabel n _ _        -> isDllName dflags this_pkg this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
@@ -1030,9 +1030,9 @@ pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
   = hcat [ptext (sLit "stg_sel_"), text (show offset),
-                ptext (if upd_reqd
-                        then (sLit "_upd_info")
-                        else (sLit "_noupd_info"))
+          ptext (if upd_reqd
+                 then (sLit "_upd_info")
+                 else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))

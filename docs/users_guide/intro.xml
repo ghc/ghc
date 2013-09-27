@@ -302,7 +302,7 @@
 
     <para>The version number of your copy of GHC can be found by
     invoking <literal>ghc</literal> with the
-    <literal>&ndash;&ndash;version</literal> flag (see <xref
+    <literal>--version</literal> flag (see <xref
     linkend="options-help"/>).</para>
   </sect1>
 

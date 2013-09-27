@@ -25,6 +25,7 @@ import Util
 import SrcLoc
 import Outputable
 import FastString
+import Control.Applicative ( Applicative(..) )
 import Control.Monad
 import Data.Function
 
@@ -318,6 +319,13 @@ initL (LintM m)
     else
         Just (vcat (punctuate blankLine (bagToList errs)))
     }
+
+instance Functor LintM where
+      fmap = liftM
+
+instance Applicative LintM where
+      pure = return
+      (<*>) = ap
 
 instance Monad LintM where
     return a = LintM $ \_loc _scope errs -> (a, errs)

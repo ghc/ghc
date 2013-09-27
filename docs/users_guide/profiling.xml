@@ -1077,7 +1077,7 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
   </sect1>
 
   <sect1 id="hp2ps">
-    <title><command>hp2ps</command>&ndash;&ndash;heap profile to PostScript</title>
+    <title><command>hp2ps</command>--heap profile to PostScript</title>
 
     <indexterm><primary><command>hp2ps</command></primary></indexterm>
     <indexterm><primary>heap profiles</primary></indexterm>

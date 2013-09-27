@@ -35,14 +35,17 @@ import Outputable
 import Platform
 import Util
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import Control.Monad.ST ( runST )
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
 
 import Data.Array.MArray
-import Data.Array.Unboxed ( listArray )
+
+import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
+
 import Data.Array.Unsafe( castSTUArray )
 
 import Foreign
@@ -156,16 +159,16 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
   (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm dflags long_jumps env asm
 
   -- precomputed size should be equal to final size
-  ASSERT (n_insns == sizeSS final_insns) return ()
+  ASSERT(n_insns == sizeSS final_insns) return ()
 
   let asm_insns = ssElts final_insns
       barr a = case a of UArray _lo _hi _n b -> b
 
-      insns_arr = listArray (0, n_insns - 1) asm_insns
+      insns_arr = Array.listArray (0, n_insns - 1) asm_insns
       !insns_barr = barr insns_arr
 
       bitmap_arr = mkBitmapArray dflags bsize bitmap
-      !bitmap_barr = barr bitmap_arr
+      !bitmap_barr = toByteArray bitmap_arr
 
       ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
 
@@ -176,9 +179,15 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
+#if __GLASGOW_HASKELL__ > 706
+mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArrayStgWord Int
+mkBitmapArray dflags bsize bitmap
+  = SMRep.listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+#else
 mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArray Int StgWord
 mkBitmapArray dflags bsize bitmap
-  = listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+  = Array.listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+#endif
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,
@@ -214,6 +223,13 @@ data Assembler a
   | AllocLabel Word16 (Assembler a)
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
+
+instance Functor Assembler where
+    fmap = liftM
+
+instance Applicative Assembler where
+    pure = return
+    (<*>) = ap
 
 instance Monad Assembler where
   return = NullAsm
@@ -446,6 +462,8 @@ push_alts L   = bci_PUSH_ALTS_L
 push_alts F   = bci_PUSH_ALTS_F
 push_alts D   = bci_PUSH_ALTS_D
 push_alts V16 = error "push_alts: vector"
+push_alts V32 = error "push_alts: vector"
+push_alts V64 = error "push_alts: vector"
 
 return_ubx :: ArgRep -> Word16
 return_ubx V   = bci_RETURN_V
@@ -455,6 +473,8 @@ return_ubx L   = bci_RETURN_L
 return_ubx F   = bci_RETURN_F
 return_ubx D   = bci_RETURN_D
 return_ubx V16 = error "return_ubx: vector"
+return_ubx V32 = error "return_ubx: vector"
+return_ubx V64 = error "return_ubx: vector"
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the

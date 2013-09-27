@@ -535,7 +535,7 @@ lookupInstEnv' ie cls tys
       = find ((item, map (lookup_tv subst) tpl_tvs) : ms) us rest
 
         -- Does not match, so next check whether the things unify
-        -- See Note [Overlapping instances] above
+        -- See Note [Overlapping instances] and Note [Incoherent Instances]
       | Incoherent _ <- oflag
       = find ms us rest
 
@@ -582,14 +582,16 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
         -- misleading (complaining of multiple matches when some should be
         -- overlapped away)
 
-    -- Safe Haskell: We restrict code compiled in 'Safe' mode from 
-    -- overriding code compiled in any other mode. The rational is
-    -- that code compiled in 'Safe' mode is code that is untrusted
-    -- by the ghc user. So we shouldn't let that code change the
-    -- behaviour of code the user didn't compile in 'Safe' mode
-    -- since that's the code they trust. So 'Safe' instances can only
-    -- overlap instances from the same module. A same instance origin
-    -- policy for safe compiled instances.
+    -- NOTE [Safe Haskell isSafeOverlap]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- We restrict code compiled in 'Safe' mode from overriding code
+    -- compiled in any other mode. The rationale is that code compiled
+    -- in 'Safe' mode is code that is untrusted by the ghc user. So
+    -- we shouldn't let that code change the behaviour of code the
+    -- user didn't compile in 'Safe' mode since that's the code they
+    -- trust. So 'Safe' instances can only overlap instances from the
+    -- same module. A same instance origin policy for safe compiled
+    -- instances.
     check_safe match@(inst,_) others
         = case isSafeOverlap (is_flag inst) of
                 -- most specific isn't from a Safe module so OK
@@ -623,11 +625,18 @@ insert_overlapping new_item (item:items)
         -- Keep new one
   | old_beats_new = item : items
         -- Keep old one
+  | incoherent new_item = item : items -- note [Incoherent instances]
+        -- Keep old one
+  | incoherent item = new_item : items
+        -- Keep new one
   | otherwise     = item : insert_overlapping new_item items
         -- Keep both
   where
     new_beats_old = new_item `beats` item
     old_beats_new = item `beats` new_item
+
+    incoherent (inst, _) = case is_flag inst of Incoherent _ -> True
+                                                _            -> False
 
     (instA, _) `beats` (instB, _)
           = overlap_ok && 
@@ -643,6 +652,52 @@ insert_overlapping new_item (item:items)
                               (NoOverlap _, NoOverlap _) -> False
                               _                          -> True
 \end{code}
+
+Note [Incoherent instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For some classes, the choise of a particular instance does not matter, any one
+is good. E.g. consider
+
+        class D a b where { opD :: a -> b -> String }
+        instance D Int b where ...
+        instance D a Int where ...
+
+        g (x::Int) = opD x x
+
+For such classes this should work (without having to add an "instance D Int
+Int", and using -XOverlappingInstances, which would then work). This is what
+-XIncoherentInstances is for: Telling GHC "I don't care which instance you use;
+if you can use one, use it."
+
+
+Should this logic only work when all candidates have the incoherent flag, or
+even when all but one have it? The right choice is the latter, which can be
+justified by comparing the behaviour with how -XIncoherentInstances worked when
+it was only about the unify-check (note [Overlapping instances]):
+
+Example:
+        class C a b c where foo :: (a,b,c)
+        instance C [a] b Int
+        instance [incoherent] [Int] b c
+        instance [incoherent] C a Int c
+Thanks to the incoherent flags,
+        foo :: ([a],b,Int)
+works: Only instance one matches, the others just unify, but are marked
+incoherent.
+
+So I can write
+        (foo :: ([a],b,Int)) :: ([Int], Int, Int).
+but if that works then I really want to be able to write
+        foo :: ([Int], Int, Int)
+as well. Now all three instances from above match. None is more specific than
+another, so none is ruled out by the normal overlapping rules. One of them is
+not incoherent, but we still want this to compile. Hence the
+"all-but-one-logic".
+
+The implementation is in insert_overlapping, where we remove matching
+incoherent instances as long as there are are others.
+
 
 
 %************************************************************************

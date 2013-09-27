@@ -184,6 +184,7 @@ basicKnownKeyNames
         dataClassName,
         isStringClassName,
         applicativeClassName,
+        alternativeClassName,
         foldableClassName,
         traversableClassName,
         typeableClassName,              -- derivable
@@ -203,10 +204,15 @@ basicKnownKeyNames
         enumFromName, enumFromThenName,
         enumFromThenToName, enumFromToName,
 
+        -- Applicative/Alternative stuff
+        pureAName,
+        apAName,
+
         -- Monad stuff
         thenIOName, bindIOName, returnIOName, failIOName,
         failMName, bindMName, thenMName, returnMName,
         fmapName,
+        joinMName,
 
         -- MonadRec stuff
         mfixName,
@@ -233,13 +239,13 @@ basicKnownKeyNames
         -- Strings and lists
         unpackCStringName,
         unpackCStringFoldrName, unpackCStringUtf8Name,
-        
+
         -- Overloaded lists
         isListClassName,
         fromListName,
         fromListNName,
         toListName,
-        
+
         -- List operations
         concatName, filterName, mapName,
         zipName, foldrName, buildName, augmentName, appendName,
@@ -249,7 +255,7 @@ basicKnownKeyNames
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
-        wordTyConName, word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+        word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
         -- Others
         otherwiseIdName, inlineIdName,
@@ -265,11 +271,11 @@ basicKnownKeyNames
         plusIntegerName, timesIntegerName, smallIntegerName,
         wordToIntegerName,
         integerToWordName, integerToIntName, minusIntegerName,
-        negateIntegerName, eqIntegerName, neqIntegerName,
+        negateIntegerName, eqIntegerPrimName, neqIntegerPrimName,
         absIntegerName, signumIntegerName,
-        leIntegerName, gtIntegerName, ltIntegerName, geIntegerName,
+        leIntegerPrimName, gtIntegerPrimName, ltIntegerPrimName, geIntegerPrimName,
         compareIntegerName, quotRemIntegerName, divModIntegerName,
-        quotIntegerName, remIntegerName,
+        quotIntegerName, remIntegerName, divIntegerName, modIntegerName,
         floatFromIntegerName, doubleFromIntegerName,
         encodeFloatIntegerName, encodeDoubleIntegerName,
         decodeDoubleIntegerName,
@@ -289,10 +295,6 @@ basicKnownKeyNames
 
         -- Type-level naturals
         singIClassName,
-        typeNatLeqClassName,
-        typeNatAddTyFamName,
-        typeNatMulTyFamName,
-        typeNatExpTyFamName,
 
         -- Implicit parameters
         ipClassName,
@@ -350,8 +352,7 @@ genericTyConNames = [
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_TYPES, gHC_GENERICS,
-    gHC_MAGIC,
+gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC, gHC_COERCIBLE,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE, dATA_MONOID,
@@ -368,6 +369,7 @@ gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
 gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
 gHC_CLASSES     = mkPrimModule (fsLit "GHC.Classes")
+gHC_COERCIBLE   = mkPrimModule (fsLit "GHC.Coercible")
 
 gHC_BASE        = mkBaseModule (fsLit "GHC.Base")
 gHC_ENUM        = mkBaseModule (fsLit "GHC.Enum")
@@ -558,9 +560,8 @@ unpackCString_RDR       = nameRdrName unpackCStringName
 unpackCStringFoldr_RDR  = nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR   = nameRdrName unpackCStringUtf8Name
 
-newStablePtr_RDR, wordDataCon_RDR :: RdrName
+newStablePtr_RDR :: RdrName
 newStablePtr_RDR        = nameRdrName newStablePtrName
-wordDataCon_RDR         = dataQual_RDR gHC_TYPES (fsLit "W#")
 
 bindIO_RDR, returnIO_RDR :: RdrName
 bindIO_RDR              = nameRdrName bindIOName
@@ -617,11 +618,12 @@ punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
 ident_RDR               = dataQual_RDR lEX (fsLit "Ident")
 symbol_RDR              = dataQual_RDR lEX (fsLit "Symbol")
 
-step_RDR, alt_RDR, reset_RDR, prec_RDR :: RdrName
+step_RDR, alt_RDR, reset_RDR, prec_RDR, pfail_RDR :: RdrName
 step_RDR                = varQual_RDR  rEAD_PREC (fsLit "step")
 alt_RDR                 = varQual_RDR  rEAD_PREC (fsLit "+++")
 reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
 prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
+pfail_RDR               = varQual_RDR  rEAD_PREC (fsLit "pfail")
 
 showList_RDR, showList___RDR, showsPrec_RDR, showString_RDR,
     showSpace_RDR, showParen_RDR :: RdrName
@@ -701,8 +703,8 @@ notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
 fmap_RDR, pure_RDR, ap_RDR, foldable_foldr_RDR, foldMap_RDR,
     traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
-pure_RDR                = varQual_RDR cONTROL_APPLICATIVE (fsLit "pure")
-ap_RDR                  = varQual_RDR cONTROL_APPLICATIVE (fsLit "<*>")
+pure_RDR                = nameRdrName pureAName
+ap_RDR                  = nameRdrName apAName
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
@@ -798,10 +800,6 @@ stringTyConName         = tcQual  gHC_BASE (fsLit "String") stringTyConKey
 inlineIdName :: Name
 inlineIdName            = varQual gHC_MAGIC (fsLit "inline") inlineIdKey
 
--- The 'undefined' function. Used by supercompilation.
-undefinedName :: Name
-undefinedName = varQual gHC_ERR (fsLit "undefined") undefinedKey
-
 -- Base classes (Eq, Ord, Functor)
 fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
 eqClassName       = clsQual  gHC_CLASSES (fsLit "Eq")      eqClassKey
@@ -824,6 +822,24 @@ applicativeClassName, foldableClassName, traversableClassName :: Name
 applicativeClassName  = clsQual  cONTROL_APPLICATIVE (fsLit "Applicative") applicativeClassKey
 foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
 traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
+
+
+
+-- AMP additions
+
+joinMName,  apAName, pureAName, alternativeClassName :: Name
+joinMName            = methName mONAD               (fsLit "join")        joinMIdKey
+apAName              = methName cONTROL_APPLICATIVE (fsLit "<*>")         apAClassOpKey
+pureAName            = methName cONTROL_APPLICATIVE (fsLit "pure")        pureAClassOpKey
+alternativeClassName = clsQual  cONTROL_APPLICATIVE (fsLit "Alternative") alternativeClassKey
+
+joinMIdKey, apAClassOpKey, pureAClassOpKey, alternativeClassKey :: Unique
+joinMIdKey          = mkPreludeMiscIdUnique 750
+apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
+pureAClassOpKey     = mkPreludeMiscIdUnique 752
+alternativeClassKey = mkPreludeMiscIdUnique 753
+
+
 
 -- Functions for GHC extensions
 groupWithName :: Name
@@ -885,11 +901,11 @@ integerTyConName, mkIntegerName,
     plusIntegerName, timesIntegerName, smallIntegerName,
     wordToIntegerName,
     integerToWordName, integerToIntName, minusIntegerName,
-    negateIntegerName, eqIntegerName, neqIntegerName,
+    negateIntegerName, eqIntegerPrimName, neqIntegerPrimName,
     absIntegerName, signumIntegerName,
-    leIntegerName, gtIntegerName, ltIntegerName, geIntegerName,
+    leIntegerPrimName, gtIntegerPrimName, ltIntegerPrimName, geIntegerPrimName,
     compareIntegerName, quotRemIntegerName, divModIntegerName,
-    quotIntegerName, remIntegerName,
+    quotIntegerName, remIntegerName, divIntegerName, modIntegerName,
     floatFromIntegerName, doubleFromIntegerName,
     encodeFloatIntegerName, encodeDoubleIntegerName,
     decodeDoubleIntegerName,
@@ -910,19 +926,21 @@ integerToWordName     = varQual gHC_INTEGER_TYPE (fsLit "integerToWord")     int
 integerToIntName      = varQual gHC_INTEGER_TYPE (fsLit "integerToInt")      integerToIntIdKey
 minusIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "minusInteger")      minusIntegerIdKey
 negateIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "negateInteger")     negateIntegerIdKey
-eqIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "eqInteger")         eqIntegerIdKey
-neqIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "neqInteger")        neqIntegerIdKey
+eqIntegerPrimName     = varQual gHC_INTEGER_TYPE (fsLit "eqInteger#")        eqIntegerPrimIdKey
+neqIntegerPrimName    = varQual gHC_INTEGER_TYPE (fsLit "neqInteger#")       neqIntegerPrimIdKey
 absIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "absInteger")        absIntegerIdKey
 signumIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "signumInteger")     signumIntegerIdKey
-leIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "leInteger")         leIntegerIdKey
-gtIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "gtInteger")         gtIntegerIdKey
-ltIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "ltInteger")         ltIntegerIdKey
-geIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "geInteger")         geIntegerIdKey
+leIntegerPrimName     = varQual gHC_INTEGER_TYPE (fsLit "leInteger#")        leIntegerPrimIdKey
+gtIntegerPrimName     = varQual gHC_INTEGER_TYPE (fsLit "gtInteger#")        gtIntegerPrimIdKey
+ltIntegerPrimName     = varQual gHC_INTEGER_TYPE (fsLit "ltInteger#")        ltIntegerPrimIdKey
+geIntegerPrimName     = varQual gHC_INTEGER_TYPE (fsLit "geInteger#")        geIntegerPrimIdKey
 compareIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "compareInteger")    compareIntegerIdKey
 quotRemIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "quotRemInteger")    quotRemIntegerIdKey
 divModIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "divModInteger")     divModIntegerIdKey
 quotIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "quotInteger")       quotIntegerIdKey
 remIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "remInteger")        remIntegerIdKey
+divIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "divInteger")        divIntegerIdKey
+modIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "modInteger")        modIntegerIdKey
 floatFromIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "floatFromInteger")      floatFromIntegerIdKey
 doubleFromIntegerName = varQual gHC_INTEGER_TYPE (fsLit "doubleFromInteger")     doubleFromIntegerIdKey
 encodeFloatIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "encodeFloatInteger")  encodeFloatIntegerIdKey
@@ -1065,14 +1083,11 @@ int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
 int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
 
 -- Word module
-word8TyConName, word16TyConName, word32TyConName, word64TyConName,
-    wordTyConName, wordDataConName :: Name
+word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name
 word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
 word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
 word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
 word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
-wordTyConName     = tcQual  gHC_TYPES (fsLit "Word")   wordTyConKey
-wordDataConName   = conName gHC_TYPES (fsLit "W#") wordDataConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name
@@ -1122,13 +1137,8 @@ randomGenClassName  = clsQual rANDOM (fsLit "RandomGen") randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
 -- Type-level naturals
-singIClassName, typeNatLeqClassName,
-  typeNatAddTyFamName, typeNatMulTyFamName, typeNatExpTyFamName :: Name
+singIClassName :: Name
 singIClassName      = clsQual gHC_TYPELITS (fsLit "SingI") singIClassNameKey
-typeNatLeqClassName = clsQual gHC_TYPELITS (fsLit "<=")  typeNatLeqClassNameKey
-typeNatAddTyFamName = tcQual  gHC_TYPELITS (fsLit "+")   typeNatAddTyFamNameKey
-typeNatMulTyFamName = tcQual  gHC_TYPELITS (fsLit "*")   typeNatMulTyFamNameKey
-typeNatExpTyFamName = tcQual  gHC_TYPELITS (fsLit "^")   typeNatExpTyFamNameKey
 
 -- Implicit parameters
 ipClassName :: Name
@@ -1251,9 +1261,8 @@ constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
 -- SingI: see Note [SingI and EvLit] in TcEvidence
-singIClassNameKey, typeNatLeqClassNameKey :: Unique
+singIClassNameKey :: Unique
 singIClassNameKey       = mkPreludeClassUnique 42
-typeNatLeqClassNameKey  = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
@@ -1331,16 +1340,18 @@ arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 39
 mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 40
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
-  mutVarPrimTyConKey, ioTyConKey, wordPrimTyConKey, wordTyConKey, word8TyConKey,
-  word16TyConKey, word32PrimTyConKey, word32TyConKey, word64PrimTyConKey,
-  word64TyConKey, liftedConKey, unliftedConKey, anyBoxConKey, kindConKey,
-  boxityConKey, typeConKey, threadIdPrimTyConKey, sContPrimTyConKey,
-  bcoPrimTyConKey, ptrTyConKey, funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey:: Unique
+		mutVarPrimTyConKey, ioTyConKey, wordPrimTyConKey, wordTyConKey,
+		word8TyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
+		word64PrimTyConKey, word64TyConKey, liftedConKey, unliftedConKey,
+		anyBoxConKey, kindConKey, boxityConKey, typeConKey, threadIdPrimTyConKey,
+		sContPrimTyConKey, bcoPrimTyConKey, ptrTyConKey, funPtrTyConKey,
+		tVarPrimTyConKey, eqPrimTyConKey, eqReprPrimTyConKey :: Unique
 
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
 eqPrimTyConKey                          = mkPreludeTyConUnique 53
+eqReprPrimTyConKey                      = mkPreludeTyConUnique 54
 mutVarPrimTyConKey                      = mkPreludeTyConUnique 55
 ioTyConKey                              = mkPreludeTyConUnique 56
 wordPrimTyConKey                        = mkPreludeTyConUnique 58
@@ -1454,26 +1465,31 @@ rep1TyConKey = mkPreludeTyConUnique 156
 sContPrimTyConKey = mkPreludeTyConUnique 157
 -- Type-level naturals
 typeNatKindConNameKey, typeSymbolKindConNameKey,
-  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey
+  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
+  typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
   :: Unique
 typeNatKindConNameKey     = mkPreludeTyConUnique 160
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 161
 typeNatAddTyFamNameKey    = mkPreludeTyConUnique 162
 typeNatMulTyFamNameKey    = mkPreludeTyConUnique 163
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 164
+typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 165
+typeNatSubTyFamNameKey    = mkPreludeTyConUnique 166
 
--- SIMD vector types (Unique keys)
-floatX4PrimTyConKey, doubleX2PrimTyConKey, int32X4PrimTyConKey,
-  int64X2PrimTyConKey :: Unique
-
-floatX4PrimTyConKey  = mkPreludeTyConUnique 170
-doubleX2PrimTyConKey = mkPreludeTyConUnique 171
-int32X4PrimTyConKey  = mkPreludeTyConUnique 172
-int64X2PrimTyConKey  = mkPreludeTyConUnique 173
+ntTyConKey:: Unique
+ntTyConKey = mkPreludeTyConUnique 174
+coercibleTyConKey :: Unique
+coercibleTyConKey = mkPreludeTyConUnique 175
 
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
+
+----------------------- SIMD ------------------------
+--      USES TyConUniques 300-399
+-----------------------------------------------------
+
+#include "primop-vector-uniques.hs-incl"
 
 unitTyConKey :: Unique
 unitTyConKey = mkTupleTyConUnique BoxedTuple 0
@@ -1489,7 +1505,7 @@ unitTyConKey = mkTupleTyConUnique BoxedTuple 0
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
     stableNameDataConKey, trueDataConKey, wordDataConKey,
-    ioDataConKey, integerDataConKey, eqBoxDataConKey :: Unique
+    ioDataConKey, integerDataConKey, eqBoxDataConKey, coercibleDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
 doubleDataConKey                        = mkPreludeDataConUnique  3
@@ -1529,6 +1545,8 @@ gtDataConKey                            = mkPreludeDataConUnique 29
 integerGmpSDataConKey, integerGmpJDataConKey :: Unique
 integerGmpSDataConKey                   = mkPreludeDataConUnique 30
 integerGmpJDataConKey                   = mkPreludeDataConUnique 31
+
+coercibleDataConKey                     = mkPreludeDataConUnique 32
 \end{code}
 
 %************************************************************************
@@ -1595,10 +1613,10 @@ mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     word64ToIntegerIdKey, int64ToIntegerIdKey,
     plusIntegerIdKey, timesIntegerIdKey, minusIntegerIdKey,
     negateIntegerIdKey,
-    eqIntegerIdKey, neqIntegerIdKey, absIntegerIdKey, signumIntegerIdKey,
-    leIntegerIdKey, gtIntegerIdKey, ltIntegerIdKey, geIntegerIdKey,
+    eqIntegerPrimIdKey, neqIntegerPrimIdKey, absIntegerIdKey, signumIntegerIdKey,
+    leIntegerPrimIdKey, gtIntegerPrimIdKey, ltIntegerPrimIdKey, geIntegerPrimIdKey,
     compareIntegerIdKey, quotRemIntegerIdKey, divModIntegerIdKey,
-    quotIntegerIdKey, remIntegerIdKey,
+    quotIntegerIdKey, remIntegerIdKey, divIntegerIdKey, modIntegerIdKey,
     floatFromIntegerIdKey, doubleFromIntegerIdKey,
     encodeFloatIntegerIdKey, encodeDoubleIntegerIdKey,
     decodeDoubleIntegerIdKey,
@@ -1615,44 +1633,46 @@ plusIntegerIdKey              = mkPreludeMiscIdUnique 66
 timesIntegerIdKey             = mkPreludeMiscIdUnique 67
 minusIntegerIdKey             = mkPreludeMiscIdUnique 68
 negateIntegerIdKey            = mkPreludeMiscIdUnique 69
-eqIntegerIdKey                = mkPreludeMiscIdUnique 70
-neqIntegerIdKey               = mkPreludeMiscIdUnique 71
+eqIntegerPrimIdKey            = mkPreludeMiscIdUnique 70
+neqIntegerPrimIdKey           = mkPreludeMiscIdUnique 71
 absIntegerIdKey               = mkPreludeMiscIdUnique 72
 signumIntegerIdKey            = mkPreludeMiscIdUnique 73
-leIntegerIdKey                = mkPreludeMiscIdUnique 74
-gtIntegerIdKey                = mkPreludeMiscIdUnique 75
-ltIntegerIdKey                = mkPreludeMiscIdUnique 76
-geIntegerIdKey                = mkPreludeMiscIdUnique 77
+leIntegerPrimIdKey            = mkPreludeMiscIdUnique 74
+gtIntegerPrimIdKey            = mkPreludeMiscIdUnique 75
+ltIntegerPrimIdKey            = mkPreludeMiscIdUnique 76
+geIntegerPrimIdKey            = mkPreludeMiscIdUnique 77
 compareIntegerIdKey           = mkPreludeMiscIdUnique 78
-quotRemIntegerIdKey           = mkPreludeMiscIdUnique 79
-divModIntegerIdKey            = mkPreludeMiscIdUnique 80
-quotIntegerIdKey              = mkPreludeMiscIdUnique 81
-remIntegerIdKey               = mkPreludeMiscIdUnique 82
-floatFromIntegerIdKey         = mkPreludeMiscIdUnique 83
-doubleFromIntegerIdKey        = mkPreludeMiscIdUnique 84
-encodeFloatIntegerIdKey       = mkPreludeMiscIdUnique 85
-encodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 86
-gcdIntegerIdKey               = mkPreludeMiscIdUnique 87
-lcmIntegerIdKey               = mkPreludeMiscIdUnique 88
-andIntegerIdKey               = mkPreludeMiscIdUnique 89
-orIntegerIdKey                = mkPreludeMiscIdUnique 90
-xorIntegerIdKey               = mkPreludeMiscIdUnique 91
-complementIntegerIdKey        = mkPreludeMiscIdUnique 92
-shiftLIntegerIdKey            = mkPreludeMiscIdUnique 93
-shiftRIntegerIdKey            = mkPreludeMiscIdUnique 94
-wordToIntegerIdKey            = mkPreludeMiscIdUnique 95
-word64ToIntegerIdKey          = mkPreludeMiscIdUnique 96
-int64ToIntegerIdKey           = mkPreludeMiscIdUnique 97
-decodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 98
+quotIntegerIdKey              = mkPreludeMiscIdUnique 79
+remIntegerIdKey               = mkPreludeMiscIdUnique 80
+divIntegerIdKey               = mkPreludeMiscIdUnique 81
+modIntegerIdKey               = mkPreludeMiscIdUnique 82
+divModIntegerIdKey            = mkPreludeMiscIdUnique 83
+quotRemIntegerIdKey           = mkPreludeMiscIdUnique 84
+floatFromIntegerIdKey         = mkPreludeMiscIdUnique 85
+doubleFromIntegerIdKey        = mkPreludeMiscIdUnique 86
+encodeFloatIntegerIdKey       = mkPreludeMiscIdUnique 87
+encodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 88
+gcdIntegerIdKey               = mkPreludeMiscIdUnique 89
+lcmIntegerIdKey               = mkPreludeMiscIdUnique 90
+andIntegerIdKey               = mkPreludeMiscIdUnique 91
+orIntegerIdKey                = mkPreludeMiscIdUnique 92
+xorIntegerIdKey               = mkPreludeMiscIdUnique 93
+complementIntegerIdKey        = mkPreludeMiscIdUnique 94
+shiftLIntegerIdKey            = mkPreludeMiscIdUnique 95
+shiftRIntegerIdKey            = mkPreludeMiscIdUnique 96
+wordToIntegerIdKey            = mkPreludeMiscIdUnique 97
+word64ToIntegerIdKey          = mkPreludeMiscIdUnique 98
+int64ToIntegerIdKey           = mkPreludeMiscIdUnique 99
+decodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 100
 
 rootMainKey, runMainKey :: Unique
-rootMainKey                   = mkPreludeMiscIdUnique 100
-runMainKey                    = mkPreludeMiscIdUnique 101
+rootMainKey                   = mkPreludeMiscIdUnique 101
+runMainKey                    = mkPreludeMiscIdUnique 102
 
 thenIOIdKey, lazyIdKey, assertErrorIdKey :: Unique
-thenIOIdKey                   = mkPreludeMiscIdUnique 102
-lazyIdKey                     = mkPreludeMiscIdUnique 103
-assertErrorIdKey              = mkPreludeMiscIdUnique 104
+thenIOIdKey                   = mkPreludeMiscIdUnique 103
+lazyIdKey                     = mkPreludeMiscIdUnique 104
+assertErrorIdKey              = mkPreludeMiscIdUnique 105
 
 breakpointIdKey, breakpointCondIdKey, breakpointAutoIdKey,
     breakpointJumpIdKey, breakpointCondJumpIdKey,
@@ -1691,6 +1711,11 @@ checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 154
 undefinedKey :: Unique
 undefinedKey                  = mkPreludeMiscIdUnique 155
 
+magicSingIKey :: Unique
+magicSingIKey              = mkPreludeMiscIdUnique 156
+
+coerceKey :: Unique
+coerceKey                     = mkPreludeMiscIdUnique 157
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
@@ -1809,7 +1834,8 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
                       functorClassKey,
                       monadClassKey, monadPlusClassKey,
                       isStringClassKey,
-                      applicativeClassKey, foldableClassKey, traversableClassKey
+                      applicativeClassKey, foldableClassKey,
+                      traversableClassKey, alternativeClassKey
                      ]
 \end{code}
 

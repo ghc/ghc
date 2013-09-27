@@ -255,7 +255,7 @@ of certain types of closures and their layout.
 When building the runtime system, the @gcc@ compiler correctly figures out
 the size of every structure on its own.
 However, 
-GHC simply reads @includes/Constants.h@ to to determine the size of 
+GHC simply reads @includes/Constants.h@ to determine the size of 
 closures assumed by the runtime system.
 Thus, we must change the constants used by the GHC itself (as opposed to
 the runtime system). They are all found in @includes/Constants.h@.

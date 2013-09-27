@@ -40,7 +40,7 @@ available = False
 
 #include <sys/epoll.h>
 
-import Control.Monad (unless, when)
+import Control.Monad (when)
 import Data.Bits (Bits, (.|.), (.&.))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
@@ -52,7 +52,6 @@ import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
-import GHC.Err (undefined)
 import GHC.Num (Num(..))
 import GHC.Real (ceiling, fromIntegral)
 import GHC.Show (Show)
@@ -87,24 +86,28 @@ delete be = do
 
 -- | Change the set of events we are interested in for a given file
 -- descriptor.
-modifyFd :: EPoll -> Fd -> E.Event -> E.Event -> IO ()
-modifyFd ep fd oevt nevt = with (Event (fromEvent nevt) fd) $
-                             epollControl (epollFd ep) op fd
+modifyFd :: EPoll -> Fd -> E.Event -> E.Event -> IO Bool
+modifyFd ep fd oevt nevt =
+  with (Event (fromEvent nevt) fd) $ \evptr -> do
+    epollControl (epollFd ep) op fd evptr
+    return True
   where op | oevt == mempty = controlOpAdd
            | nevt == mempty = controlOpDelete
            | otherwise      = controlOpModify
 
-modifyFdOnce :: EPoll -> Fd -> E.Event -> IO ()
+modifyFdOnce :: EPoll -> Fd -> E.Event -> IO Bool
 modifyFdOnce ep fd evt =
   do let !ev = fromEvent evt .|. epollOneShot
      res <- with (Event ev fd) $
             epollControl_ (epollFd ep) controlOpModify fd
-     unless (res == 0) $ do
-         err <- getErrno
-         if err == eNOENT then
-             with (Event ev fd) $ epollControl (epollFd ep) controlOpAdd fd
-           else
-             throwErrno "modifyFdOnce"
+     if res == 0
+       then return True
+       else do err <- getErrno
+               if err == eNOENT
+                 then with (Event ev fd) $ \evptr -> do
+                        epollControl (epollFd ep) controlOpAdd fd evptr
+                        return True
+                 else throwErrno "modifyFdOnce"
 
 -- | Select a set of file descriptors which are ready for I/O
 -- operations and call @f@ for all ready file descriptors, passing the

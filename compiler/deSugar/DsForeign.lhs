@@ -6,7 +6,13 @@
 Desugaring foreign declarations (see also DsCCall).
 
 \begin{code}
-module DsForeign ( dsForeigns ) where
+module DsForeign ( dsForeigns
+                 , dsForeigns'
+                 , dsFImport, dsCImport, dsFCall, dsPrimCall
+                 , dsFExport, dsFExportDynamic, mkFExportCBits
+                 , toCType
+                 , foreignExportInitialiser
+                 ) where
 
 #include "HsVersions.h"
 import TcRnMonad        -- temp
@@ -48,6 +54,7 @@ import Config
 import OrdList
 import Pair
 import Util
+import Hooks
 
 import Data.Maybe
 import Data.List
@@ -72,9 +79,13 @@ type Binding = (Id, CoreExpr)   -- No rec/nonrec structure;
 
 dsForeigns :: [LForeignDecl Id]
            -> DsM (ForeignStubs, OrdList Binding)
-dsForeigns []
+dsForeigns fos = getHooked dsForeignsHook dsForeigns' >>= ($ fos)
+
+dsForeigns' :: [LForeignDecl Id]
+            -> DsM (ForeignStubs, OrdList Binding)
+dsForeigns' []
   = return (NoStubs, nilOL)
-dsForeigns fos = do
+dsForeigns' fos = do
     fives <- mapM do_ldecl fos
     let
         (hs, cs, idss, bindss) = unzip4 fives
@@ -418,7 +429,7 @@ dsFExportDynamic id co0 cconv = do
         export_ty     = mkFunTy stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs stable_ptr_ty
-    (h_code, c_code, typestring, args_size) <- dsFExport id (Refl export_ty) fe_nm cconv True
+    (h_code, c_code, typestring, args_size) <- dsFExport id (mkReflCo Representational export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
@@ -665,7 +676,7 @@ foreignExportInitialiser hs_fn =
     [ text "static void stginit_export_" <> ppr hs_fn
          <> text "() __attribute__((constructor));"
     , text "static void stginit_export_" <> ppr hs_fn <> text "()"
-    , braces (text "getStablePtr"
+    , braces (text "foreignExportStablePtr"
        <> parens (text "(StgPtr) &" <> ppr hs_fn <> text "_closure")
        <> semi)
     ]

@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,18 +26,8 @@ module Data.STRef (
 
 import Prelude
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.ST
 import GHC.STRef
-#endif
-
-#ifdef __HUGS__
-import Hugs.ST
-import Data.Typeable
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
-#endif
 
 -- | Mutate the contents of an 'STRef'.
 --
@@ -58,6 +47,8 @@ modifySTRef :: STRef s a -> (a -> a) -> ST s ()
 modifySTRef ref f = writeSTRef ref . f =<< readSTRef ref
 
 -- | Strict version of 'modifySTRef'
+--
+-- /Since: 4.6.0.0/
 modifySTRef' :: STRef s a -> (a -> a) -> ST s ()
 modifySTRef' ref f = do
     x <- readSTRef ref

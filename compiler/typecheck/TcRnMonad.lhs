@@ -44,12 +44,12 @@ import Outputable
 import UniqSupply
 import UniqFM
 import DynFlags
-import Maybes
 import StaticFlags
 import FastString
 import Panic
 import Util
 
+import Control.Exception
 import Data.IORef
 import qualified Data.Set as Set
 import Control.Monad
@@ -187,7 +187,11 @@ initTcPrintErrors       -- Used from the interactive loop only
 initTcPrintErrors env mod todo = initTc env HsSrcFile False mod todo
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
-initTcForLookup hsc_env = liftM (expectJust "initTcInteractive" . snd) . initTc hsc_env HsSrcFile False iNTERACTIVE
+initTcForLookup hsc_env tcm
+    = do (msgs, m) <- initTc hsc_env HsSrcFile False iNTERACTIVE tcm
+         case m of
+             Nothing -> throwIO $ mkSrcErr $ snd msgs
+             Just x -> return x
 \end{code}
 
 %************************************************************************
@@ -309,7 +313,7 @@ getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withDoDynamicToo m = do env <- getEnv
                         let dflags = extractDynFlags env
-                            dflags' = doDynamicToo dflags
+                            dflags' = dynamicTooMkDynamicDynFlags dflags
                             env' = replaceDynFlags env dflags'
                         setEnv env' m
 \end{code}
@@ -1262,7 +1266,11 @@ forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
 -- signatures, which is pretty benign
 
 forkM_maybe doc thing_inside
- = do { unsafeInterleaveM $
+ -- NB: Don't share the mutable env_us with the interleaved thread since env_us
+ --     does not get updated atomically (e.g. in newUnique and newUniqueSupply).
+ = do { child_us <- newUniqueSupply
+      ; child_env_us <- newMutVar child_us
+      ; unsafeInterleaveM $ updEnv (\env -> env { env_us = child_env_us }) $
         do { traceIf (text "Starting fork {" <+> doc)
            ; mb_res <- tryM $
                        updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $

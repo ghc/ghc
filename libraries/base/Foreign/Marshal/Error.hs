@@ -30,7 +30,6 @@ module Foreign.Marshal.Error (
 
 import Foreign.Ptr
 
-#ifdef __GLASGOW_HASKELL__
 #ifdef __HADDOCK__
 import Data.Bool
 import System.IO.Error
@@ -38,7 +37,6 @@ import System.IO.Error
 import GHC.Base
 import GHC.Num
 import GHC.IO.Exception
-#endif
 
 -- exported functions
 -- ------------------

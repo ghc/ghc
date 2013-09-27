@@ -30,6 +30,7 @@ import SrcLoc
 import Var
 import Bag
 import FastString
+import BooleanFormula (BooleanFormula)
 
 import Data.Data hiding ( Fixity )
 import Data.List
@@ -53,8 +54,9 @@ Global bindings (where clauses)
 
 type HsLocalBinds id = HsLocalBindsLR id id
 
-data HsLocalBindsLR idL idR    -- Bindings in a 'let' expression
-                               -- or a 'where' clause
+-- | Bindings in a 'let' expression
+-- or a 'where' clause
+data HsLocalBindsLR idL idR    
   = HsValBinds (HsValBindsLR idL idR)
   | HsIPBinds  (HsIPBinds idR)
   | EmptyLocalBinds
@@ -62,15 +64,20 @@ data HsLocalBindsLR idL idR    -- Bindings in a 'let' expression
 
 type HsValBinds id = HsValBindsLR id id
 
-data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
-  = ValBindsIn             -- Before renaming RHS; idR is always RdrName
-        (LHsBindsLR idL idR) [LSig idR] -- Not dependency analysed
-                                        -- Recursive by default
+-- | Value bindings (not implicit parameters)
+data HsValBindsLR idL idR   
+  = -- | Before renaming RHS; idR is always RdrName
+    -- Not dependency analysed
+    -- Recursive by default
+    ValBindsIn
+        (LHsBindsLR idL idR) [LSig idR] 
 
-  | ValBindsOut            -- After renaming RHS; idR can be Name or Id
-        [(RecFlag, LHsBinds idL)]       -- Dependency analysed, later bindings
-                                        -- in the list may depend on earlier
-                                        -- ones.
+    -- | After renaming RHS; idR can be Name or Id
+    --  Dependency analysed,
+    -- later bindings in the list may depend on earlier
+    -- ones.
+  | ValBindsOut            
+        [(RecFlag, LHsBinds idL)]       
         [LSig Name]
   deriving (Data, Typeable)
 
@@ -121,35 +128,38 @@ data HsBindLR idL idR
         fun_tick :: Maybe (Tickish Id)  -- ^ Tick to put on the rhs, if any
     }
 
-  | PatBind {   -- The pattern is never a simple variable;
-                -- That case is done by FunBind
+  -- | The pattern is never a simple variable;
+  -- That case is done by FunBind
+  | PatBind {   
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
-        pat_rhs_ty :: PostTcType,       -- Type of the GRHSs
-        bind_fvs   :: NameSet,          -- See Note [Bind free vars]
+        pat_rhs_ty :: PostTcType,       -- ^ Type of the GRHSs
+        bind_fvs   :: NameSet,          -- ^ See Note [Bind free vars]
         pat_ticks  :: (Maybe (Tickish Id), [Maybe (Tickish Id)])
                -- ^ Tick to put on the rhs, if any, and ticks to put on
                -- the bound variables.
     }
 
-  | VarBind {   -- Dictionary binding and suchlike
-        var_id     :: idL,           -- All VarBinds are introduced by the type checker
-        var_rhs    :: LHsExpr idR,   -- Located only for consistency
-        var_inline :: Bool           -- True <=> inline this binding regardless
+  -- | Dictionary binding and suchlike.
+  -- All VarBinds are introduced by the type checker
+  | VarBind {   
+        var_id     :: idL,           
+        var_rhs    :: LHsExpr idR,   -- ^ Located only for consistency
+        var_inline :: Bool           -- ^ True <=> inline this binding regardless
                                      -- (used for implication constraints only)
     }
 
-  | AbsBinds {                          -- Binds abstraction; TRANSLATION
+  | AbsBinds {                      -- Binds abstraction; TRANSLATION
         abs_tvs     :: [TyVar],
-        abs_ev_vars :: [EvVar],  -- Includes equality constraints
+        abs_ev_vars :: [EvVar],  -- ^ Includes equality constraints
 
-       -- AbsBinds only gets used when idL = idR after renaming,
+       -- | AbsBinds only gets used when idL = idR after renaming,
        -- but these need to be idL's for the collect... code in HsUtil
        -- to have the right type
         abs_exports :: [ABExport idL],
 
-        abs_ev_binds :: TcEvBinds,     -- Evidence bindings
-        abs_binds    :: LHsBinds idL   -- Typechecked user bindings
+        abs_ev_binds :: TcEvBinds,     -- ^ Evidence bindings
+        abs_binds    :: LHsBinds idL   -- ^ Typechecked user bindings
     }
 
   deriving (Data, Typeable)
@@ -166,15 +176,15 @@ data HsBindLR idL idR
         -- See Note [AbsBinds]
 
 data ABExport id
-  = ABE { abe_poly  :: id           -- Any INLINE pragmas is attached to this Id
+  = ABE { abe_poly  :: id           -- ^ Any INLINE pragmas is attached to this Id
         , abe_mono  :: id
-        , abe_wrap  :: HsWrapper    -- See Note [AbsBinds wrappers]
+        , abe_wrap  :: HsWrapper    -- ^ See Note [AbsBinds wrappers]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
-        , abe_prags :: TcSpecPrags  -- SPECIALISE pragmas
+        , abe_prags :: TcSpecPrags  -- ^ SPECIALISE pragmas
   } deriving (Data, Typeable)
 
+-- | Used for the NameSet in FunBind and PatBind prior to the renamer
 placeHolderNames :: NameSet
--- Used for the NameSet in FunBind and PatBind prior to the renamer
 placeHolderNames = panic "placeHolderNames"
 \end{code}
 
@@ -501,43 +511,61 @@ serves for both.
 \begin{code}
 type LSig name = Located (Sig name)
 
-data Sig name   -- Signatures and pragmas
-  =     -- An ordinary type signature
-        -- f :: Num a => a -> a
+-- | Signatures and pragmas
+data Sig name   
+  =   -- | An ordinary type signature
+      -- @f :: Num a => a -> a@
     TypeSig [Located name] (LHsType name)
 
-        -- A type signature for a default method inside a class
-        -- default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
+        -- | A type signature for a default method inside a class
+        --
+        -- > default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
+        --
   | GenericSig [Located name] (LHsType name)
 
-        -- A type signature in generated code, notably the code
+        -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
         -- the desired Id itself, replete with its name, type
         -- and IdDetails.  Otherwise it's just like a type
         -- signature: there should be an accompanying binding
   | IdSig Id
 
-        -- An ordinary fixity declaration
-        --      infixl *** 8
+        -- | An ordinary fixity declaration
+        --
+        -- >     infixl *** 8
+        --
   | FixSig (FixitySig name)
 
-        -- An inline pragma
-        -- {#- INLINE f #-}
+        -- | An inline pragma
+        --
+        -- > {#- INLINE f #-}
+        --
   | InlineSig   (Located name)  -- Function name
                 InlinePragma    -- Never defaultInlinePragma
 
-        -- A specialisation pragma
-        -- {-# SPECIALISE f :: Int -> Int #-}
-  | SpecSig     (Located name)  -- Specialise a function or datatype ...
+        -- | A specialisation pragma
+        --
+        -- > {-# SPECIALISE f :: Int -> Int #-}
+        --
+  | SpecSig     (Located name)  -- Specialise a function or datatype  ...
                 (LHsType name)  -- ... to these types
-                InlinePragma    -- The pragma on SPECIALISE_INLINE form
+                InlinePragma    -- The pragma on SPECIALISE_INLINE form.
                                 -- If it's just defaultInlinePragma, then we said
                                 --    SPECIALISE, not SPECIALISE_INLINE
 
-        -- A specialisation pragma for instance declarations only
-        -- {-# SPECIALISE instance Eq [Int] #-}
-  | SpecInstSig (LHsType name)  -- (Class tys); should be a specialisation of the
-                                -- current instance decl
+        -- | A specialisation pragma for instance declarations only
+        --
+        -- > {-# SPECIALISE instance Eq [Int] #-}
+        --
+        -- (Class tys); should be a specialisation of the
+        -- current instance declaration
+  | SpecInstSig (LHsType name)
+
+        -- | A minimal complete definition pragma
+        --
+        -- > {-# MINIMAL a | (b, c | (d | e)) #-}
+  | MinimalSig (BooleanFormula (Located name))
+
   deriving (Data, Typeable)
 
 
@@ -545,9 +573,9 @@ type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity
   deriving (Data, Typeable)
 
--- TsSpecPrags conveys pragmas from the type checker to the desugarer
+-- | TsSpecPrags conveys pragmas from the type checker to the desugarer
 data TcSpecPrags
-  = IsDefaultMethod     -- Super-specialised: a default method should
+  = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
   deriving (Data, Typeable)
@@ -556,9 +584,11 @@ type LTcSpecPrag = Located TcSpecPrag
 
 data TcSpecPrag
   = SpecPrag
-        Id              -- The Id to be specialised
-        HsWrapper       -- An wrapper, that specialises the polymorphic function
-        InlinePragma    -- Inlining spec for the specialised function
+        Id              
+        HsWrapper       
+        InlinePragma    
+  -- ^ The Id to be specialised, an wrapper that specialises the
+  -- polymorphic function, and inlining spec for the specialised function
   deriving (Data, Typeable)
 
 noSpecPrags :: TcSpecPrags
@@ -572,9 +602,7 @@ isDefaultMethod :: TcSpecPrags -> Bool
 isDefaultMethod IsDefaultMethod = True
 isDefaultMethod (SpecPrags {})  = False
 
-\end{code}
 
-\begin{code}
 isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True
 isFixityLSig _                 = False
@@ -610,14 +638,19 @@ isInlineLSig :: LSig name -> Bool
 isInlineLSig (L _ (InlineSig {})) = True
 isInlineLSig _                    = False
 
+isMinimalLSig :: LSig name -> Bool
+isMinimalLSig (L _ (MinimalSig {})) = True
+isMinimalLSig _                    = False
+
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
 hsSigDoc (GenericSig {})        = ptext (sLit "default type signature")
 hsSigDoc (IdSig {})             = ptext (sLit "id signature")
 hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
-hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
+hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> ptext (sLit "pragma")
 hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
 hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
+hsSigDoc (MinimalSig {})        = ptext (sLit "MINIMAL pragma")
 \end{code}
 
 Check if signatures overlap; this is used when checking for duplicate
@@ -636,6 +669,7 @@ ppr_sig (FixSig fix_sig)          = ppr fix_sig
 ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec (unLoc var) (ppr ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
+ppr_sig (MinimalSig bf)           = pragBrackets (pprMinimalSig bf)
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, pprInfixOcc (unLoc name)]
@@ -660,4 +694,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl) = pprSpec var (ptext (sLit "<type>")) inl
+
+pprMinimalSig :: OutputableBndr name => BooleanFormula (Located name) -> SDoc
+pprMinimalSig bf = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
 \end{code}

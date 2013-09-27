@@ -11,7 +11,7 @@
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
-module Linker ( HValue, getHValue, showLinkerState,
+module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,
@@ -291,15 +291,14 @@ reallyInitDynLinker dflags =
         ; pls <- linkPackages' dflags (preloadPackages (pkgState dflags)) pls0
 
           -- (c) Link libraries from the command-line
-        ; let optl = getOpts dflags opt_l
-        ; let minus_ls = [ lib | '-':'l':lib <- optl ]
+        ; let cmdline_ld_inputs = ldInputs dflags
+        ; let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
         ; let lib_paths = libraryPaths dflags
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
-        ; let cmdline_ld_inputs = ldInputs dflags
-
-        ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
+        ; classified_ld_inputs <- mapM (classifyLdInput dflags)
+                                    [ f | FileOption _ f <- cmdline_ld_inputs ]
 
           -- (e) Link any MacOS frameworks
         ; let platform = targetPlatform dflags
@@ -637,8 +636,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                         return lnk
 
             adjust_ul new_osuf (DotO file) = do
-                MASSERT (osuf `isSuffixOf` file)
-                let file_base = reverse (drop (length osuf + 1) (reverse file))
+                MASSERT(osuf `isSuffixOf` file)
+                let file_base = dropTail (length osuf + 1) file
                     new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file
                 if (not ok)
@@ -786,7 +785,7 @@ dynLinkObjs dflags pls objs = do
 
         if cDYNAMIC_GHC_PROGRAMS
             then do dynLoadObjs dflags wanted_objs
-                    return (pls, Succeeded)
+                    return (pls1, Succeeded)
             else do mapM_ loadObj wanted_objs
 
                     -- Link them all together
@@ -801,6 +800,7 @@ dynLinkObjs dflags pls objs = do
                             return (pls2, Failed)
 
 dynLoadObjs :: DynFlags -> [FilePath] -> IO ()
+dynLoadObjs _      []   = return ()
 dynLoadObjs dflags objs = do
     let platform = targetPlatform dflags
     soFile <- newTempName dflags (soExt platform)
@@ -896,7 +896,7 @@ linkSomeBCOs dflags toplevs_only ie ce_in ul_bcos
                                                else ce_all_additions
             ce_out = -- make sure we're not inserting duplicate names into the
                      -- closure environment, which leads to trouble.
-                     ASSERT (all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
+                     ASSERT(all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
                      extendClosureEnv ce_in ce_additions
         return (ce_out, hvals)
 
@@ -968,6 +968,9 @@ unload_wkr _ linkables pls
     maybeUnload :: [Linkable] -> Linkable -> IO Bool
     maybeUnload keep_linkables lnk
       | linkableInSet lnk keep_linkables = return True
+      -- We don't do any cleanup when linking objects with the dynamic linker.
+      -- Doing so introduces extra complexity for not much benefit.
+      | cDYNAMIC_GHC_PROGRAMS = return False
       | otherwise
       = do mapM_ unloadObj [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
@@ -1195,7 +1198,7 @@ locateLib dflags is_hs dirs lib
      mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
-     mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
+     mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
      mk_dyn_lib_path dir = dir </> so_name
@@ -1272,12 +1275,13 @@ findFile mk_file_path (dir : dirs)
 
 \begin{code}
 maybePutStr :: DynFlags -> String -> IO ()
-maybePutStr dflags s | verbosity dflags > 0 = putStr s
-                     | otherwise            = return ()
+maybePutStr dflags s
+    = when (verbosity dflags > 0) $
+          do let act = log_action dflags
+             act dflags SevInteractive noSrcSpan defaultUserStyle (text s)
 
 maybePutStrLn :: DynFlags -> String -> IO ()
-maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
-                       | otherwise            = return ()
+maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
 \end{code}
 
 %************************************************************************

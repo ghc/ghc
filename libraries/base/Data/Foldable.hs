@@ -1,5 +1,4 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -67,16 +66,10 @@ import Control.Applicative
 import Control.Monad (MonadPlus(..))
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Monoid
+import Data.Proxy
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
-#endif
-
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Arr
-#elif defined(__HUGS__)
-import Hugs.Array
-#endif
 
 -- | Data structures that can be folded.
 --
@@ -158,6 +151,7 @@ class Foldable t where
       where
         mf Nothing y = Just y
         mf (Just x) y = Just (f x y)
+    {-# MINIMAL foldMap | foldr #-}
 
 -- instances for Prelude types
 
@@ -175,11 +169,40 @@ instance Foldable [] where
     foldr1 = Prelude.foldr1
     foldl1 = Prelude.foldl1
 
+instance Foldable (Either a) where
+    foldMap _ (Left _) = mempty
+    foldMap f (Right y) = f y
+
+    foldr _ z (Left _) = z
+    foldr f z (Right y) = f y z
+
+instance Foldable ((,) a) where
+    foldMap f (_, y) = f y
+
+    foldr f z (_, y) = f y z
+
 instance Ix i => Foldable (Array i) where
     foldr f z = Prelude.foldr f z . elems
     foldl f z = Prelude.foldl f z . elems
     foldr1 f = Prelude.foldr1 f . elems
     foldl1 f = Prelude.foldl1 f . elems
+
+instance Foldable Proxy where
+    foldMap _ _ = mempty
+    {-# INLINE foldMap #-}
+    fold _ = mempty
+    {-# INLINE fold #-}
+    foldr _ z _ = z
+    {-# INLINE foldr #-}
+    foldl _ z _ = z
+    {-# INLINE foldl #-}
+    foldl1 _ _ = error "foldl1: Proxy"
+    {-# INLINE foldl1 #-}
+    foldr1 _ _ = error "foldr1: Proxy"
+    {-# INLINE foldr1 #-}
+
+instance Foldable (Const m) where
+    foldMap _ _ = mempty
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
@@ -238,11 +261,7 @@ msum = foldr mplus mzero
 -- | List of elements of a structure.
 toList :: Foldable t => t a -> [a]
 {-# INLINE toList #-}
-#ifdef __GLASGOW_HASKELL__
 toList t = build (\ c n -> foldr c n t)
-#else
-toList = foldr (:) []
-#endif
 
 -- | The concatenation of all the elements of a container of lists.
 concat :: Foldable t => t [a] -> [a]

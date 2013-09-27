@@ -46,6 +46,7 @@ import Data.IORef
 import System.CPUTime
 import System.Environment
 import System.IO
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import GHC.Exts
 
@@ -64,7 +65,7 @@ data GHCiState = GHCiState
         progname       :: String,
         args           :: [String],
         prompt         :: String,
-        def_prompt     :: String,
+        prompt2        :: String,
         editor         :: String,
         stop           :: String,
         options        :: [GHCiOption],
@@ -168,12 +169,16 @@ reifyGHCi f = GHCi f'
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
 
+instance Functor GHCi where
+    fmap = liftM
+
+instance Applicative GHCi where
+    pure = return
+    (<*>) = ap
+
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
   return a  = GHCi $ \_ -> return a
-
-instance Functor GHCi where
-    fmap f m = m >>= return . f
 
 getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> liftIO $ readIORef r

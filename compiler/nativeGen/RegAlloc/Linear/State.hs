@@ -40,13 +40,21 @@ import DynFlags
 import Unique
 import UniqSupply
 
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
+
 
 -- | The register allocator monad type.
 newtype RegM freeRegs a
         = RegM { unReg :: RA_State freeRegs -> (# RA_State freeRegs, a #) }
 
+instance Functor (RegM freeRegs) where
+      fmap = liftM
 
--- | The RegM Monad
+instance Applicative (RegM freeRegs) where
+      pure = return
+      (<*>) = ap
+
 instance Monad (RegM freeRegs) where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
   return a  =  RegM $ \s -> (# s, a #)

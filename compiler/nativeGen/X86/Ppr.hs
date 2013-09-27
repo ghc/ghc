@@ -578,6 +578,7 @@ pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
 pprInstr (POPCNT size src dst) = pprOpOp (sLit "popcnt") size src (OpReg dst)
 
 pprInstr (NOT size op) = pprSizeOp (sLit "not") size op
+pprInstr (BSWAP size op) = pprSizeOp (sLit "bswap") size (OpReg op)
 pprInstr (NEGI size op) = pprSizeOp (sLit "neg") size op
 
 pprInstr (SHL size src dst) = pprShift (sLit "shl") size src dst

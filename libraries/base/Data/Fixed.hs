@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, ScopedTypeVariables, PatternGuards #-}
+{-# LANGUAGE ScopedTypeVariables, PatternGuards #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 

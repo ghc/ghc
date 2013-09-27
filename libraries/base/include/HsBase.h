@@ -305,10 +305,6 @@ __hscore_setmode( int fd, HsBool toBin )
 #endif
 }
 
-#if __GLASGOW_HASKELL__
-
-#endif /* __GLASGOW_HASKELL__ */
-
 #if defined(__MINGW32__)
 // We want the versions of stat/fstat/lseek that use 64-bit offsets,
 // and you have to ask for those explicitly.  Unfortunately there

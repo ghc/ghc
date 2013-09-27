@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,12 +37,7 @@ import Prelude -- necessary to get dependencies right
 
 import Text.ParserCombinators.ReadP
 
-#if !__GLASGOW_HASKELL__
-import Data.Typeable    ( Typeable, TyCon, mkTyCon, mkTyConApp )
-#else
 import Data.Typeable    ( Typeable )
-#endif
-
 import Data.List        ( intersperse, sort )
 import Control.Monad    ( liftM )
 import Data.Char        ( isDigit, isAlphaNum )
@@ -90,19 +85,7 @@ data Version =
                 -- The interpretation of the list of tags is entirely dependent
                 -- on the entity that this version applies to.
         }
-  deriving (Read,Show
-#if __GLASGOW_HASKELL__
-        ,Typeable
-#endif
-        )
-
-#if !__GLASGOW_HASKELL__
-versionTc :: TyCon
-versionTc = mkTyCon "Version"
-
-instance Typeable Version where
-  typeOf _ = mkTyConApp versionTc []
-#endif
+  deriving (Read,Show,Typeable)
 
 instance Eq Version where
   v1 == v2  =  versionBranch v1 == versionBranch v2 
@@ -126,11 +109,7 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
-#if __GLASGOW_HASKELL__ || __HUGS__
 parseVersion :: ReadP Version
-#else
-parseVersion :: ReadP r Version
-#endif
 parseVersion = do branch <- sepBy1 (liftM read $ munch1 isDigit) (char '.')
                   tags   <- many (char '-' >> munch1 isAlphaNum)
                   return Version{versionBranch=branch, versionTags=tags}

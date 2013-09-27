@@ -14,6 +14,7 @@ module Maybes (
         mapCatMaybes,
         allMaybes,
         firstJust, firstJusts,
+        whenIsJust,
         expectJust,
         maybeToBool,
 
@@ -68,6 +69,10 @@ mapCatMaybes _ [] = []
 mapCatMaybes f (x:xs) = case f x of
                         Just y  -> y : mapCatMaybes f xs
                         Nothing -> mapCatMaybes f xs
+
+whenIsJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
+whenIsJust (Just x) f = f x
+whenIsJust Nothing  _ = return ()
 \end{code}
 
 \begin{code}

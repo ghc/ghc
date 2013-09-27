@@ -247,14 +247,15 @@ pprNode node = pp_node <+> pp_debug
                   | Just r <- k = ptext (sLit "returns to") <+> ppr r <> comma
                   | otherwise   = empty
 
-      CmmForeignCall {tgt=t, res=rs, args=as, succ=s, updfr=u, intrbl=i} ->
+      CmmForeignCall {tgt=t, res=rs, args=as, succ=s, ret_args=a, ret_off=u, intrbl=i} ->
           hcat $ if i then [ptext (sLit "interruptible"), space] else [] ++
                [ ptext (sLit "foreign call"), space
                , ppr t, ptext (sLit "(...)"), space
                , ptext (sLit "returns to") <+> ppr s
                     <+> ptext (sLit "args:") <+> parens (ppr as)
                     <+> ptext (sLit "ress:") <+> parens (ppr rs)
-               , ptext (sLit "upd:") <+> ppr u
+               , ptext (sLit "ret_args:") <+> ppr a
+               , ptext (sLit "ret_off:") <+> ppr u
                , semi ]
 
     pp_debug :: SDoc

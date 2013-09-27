@@ -1,5 +1,5 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,18 +22,15 @@ module Data.Word
         Word,
         Word8, Word16, Word32, Word64,
 
+        -- * byte swapping
+        byteSwap16, byteSwap32, byteSwap64,
+
         -- * Notes
 
         -- $notes
         ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Word
-#endif
-
-#ifdef __HUGS__
-import Hugs.Word
-#endif
 
 {- $notes
 

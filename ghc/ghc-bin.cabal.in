@@ -50,7 +50,4 @@ Executable ghc
                     FlexibleInstances,
                     MagicHash
 
-    Extensions: CPP, PatternGuards
-    if impl(ghc >= 7.1)
-        Extensions: NondecreasingIndentation
-
+    Extensions: CPP, PatternGuards, NondecreasingIndentation

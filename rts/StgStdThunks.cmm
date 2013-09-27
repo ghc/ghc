@@ -111,10 +111,10 @@ SELECTOR_CODE_UPD(15)
       UPD_BH_UPDATABLE(node);                                           \
       LDV_ENTER(node);                                                  \
       selectee = StgThunk_payload(node,0);                              \
+      ENTER_CCS_THUNK(node);                                            \
       if (NEED_EVAL(selectee)) {                                        \
-          ENTER_CCS_THUNK(node);                                        \
           SAVE_CCS;                                                     \
-          (P_ constr) = call %GET_ENTRY(selectee) (selectee);           \
+          (P_ constr) = call %GET_ENTRY(UNTAG_IF_PROF(selectee)) (selectee);           \
           RESTORE_CCS;                                                  \
           selectee = constr;                                            \
       }                                                                 \

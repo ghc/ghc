@@ -68,37 +68,35 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
                              ; pr_cls <- builtin prClass
                              ; return $ mkClassPred pr_cls [r]
                              }
-      ; super_tys <- sequence [mk_super_ty | not (null tvs)]
+      ; super_tys  <- sequence [mk_super_ty | not (null tvs)]
       ; super_args <- mapM (newLocalVar (fsLit "pr")) super_tys
-      ; let all_args = super_args ++ args
+      ; let val_args = super_args ++ args
+            all_args = tvs ++ val_args
      
           -- ...it is constant otherwise
       ; super_consts <- sequence [prDictOfPReprInstTyCon inst_ty prepr_ax [] | null tvs]
 
           -- Get ids for each of the methods in the dictionary, including superclass
       ; paMethodBuilders <- buildPAScAndMethods
-      ; method_ids       <- mapM (method all_args dfun_name) paMethodBuilders
+      ; method_ids       <- mapM (method val_args dfun_name) paMethodBuilders
 
           -- Expression to build the dictionary.
       ; pa_dc  <- builtin paDataCon
-      ; let dict = mkLams (tvs ++ all_args)
-                 $ mkConApp pa_dc
-                 $ Type inst_ty
-                 : map Var super_args ++ super_consts -- the superclass dictionary is either lambda-bound or constant
-                   ++ map (method_call all_args) method_ids
+      ; let dict = mkLams all_args (mkConApp pa_dc con_args)
+            con_args = Type inst_ty
+                     : map Var super_args  -- the superclass dictionary is either 
+                    ++ super_consts        -- lambda-bound or constant
+                    ++ map (method_call val_args) method_ids
 
           -- Build the type of the dictionary function.
       ; pa_cls <- builtin paClass
       ; let dfun_ty = mkForAllTys tvs
-                    $ mkFunTys (map varType all_args)
+                    $ mkFunTys (map varType val_args)
                                (mkClassPred pa_cls [inst_ty])
 
           -- Set the unfolding for the inliner.
       ; raw_dfun <- newExportedVar dfun_name dfun_ty
-      ; let dfun_unf = mkDFunUnfolding dfun_ty $
-                       map (const $ DFunLamArg 0) super_args
-                       ++ map DFunPolyArg super_consts
-                       ++ map (DFunPolyArg . Var) method_ids
+      ; let dfun_unf = mkDFunUnfolding all_args pa_dc con_args
             dfun = raw_dfun `setIdUnfolding`  dfun_unf
                             `setInlinePragma` dfunInlinePragma
 

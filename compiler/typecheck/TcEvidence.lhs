@@ -16,12 +16,14 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, 
   EvTerm(..), mkEvCast, evVarsOfTerm, 
   EvLit(..), evTermCoercion,
+  EvCoercible(..), EvCoercibleArg(..), mapEvCoercibleArgM,
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos, 
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcInstCos,
+  mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
   isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe,
   liftTcCoSubstWith
@@ -79,6 +81,12 @@ differences
   * The kind of a TcCoercion is  t1 ~  t2 
              of a Coercion   is  t1 ~# t2
 
+  * TcCoercions are essentially all at role Nominal -- the type-checker
+    reasons only about nominal equality, not representational.
+    --> Exception: there can be newtype axioms wrapped up in TcCoercions.
+                   These, of course, are only used in casts, so the desugarer
+                   will still produce the right 'Coercion's.
+
   * TcAxiomInstCo takes Types, not Coecions as arguments;
     the generality is required only in the Simplifier
 
@@ -96,9 +104,12 @@ data TcCoercion
   | TcAppCo TcCoercion TcCoercion
   | TcForAllCo TyVar TcCoercion 
   | TcInstCo TcCoercion TcType
-  | TcCoVarCo EqVar
+  | TcCoVarCo EqVar               -- variable always at role N
   | TcAxiomInstCo (CoAxiom Branched) Int [TcType] -- Int specifies branch number
                                                   -- See [CoAxiom Index] in Coercion.lhs
+  -- This is number of types and coercions are expected to macth to CoAxiomRule
+  -- (i.e., the CoAxiomRules are always fully saturated)
+  | TcAxiomRuleCo CoAxiomRule [TcType] [TcCoercion]
   | TcSymCo TcCoercion
   | TcTransCo TcCoercion TcCoercion
   | TcNthCo Int TcCoercion
@@ -149,6 +160,9 @@ mkTcAxInstCo ax ind tys
     n_tys = length tys
     arity = coAxiomArity ax ind
     ax_br = toBranchedAxiom ax
+
+mkTcAxiomRuleCo :: CoAxiomRule -> [TcType] -> [TcCoercion] -> TcCoercion
+mkTcAxiomRuleCo = TcAxiomRuleCo
 
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType] -> TcCoercion
 mkTcUnbranchedAxInstCo ax tys
@@ -225,6 +239,10 @@ tcCoercionKind co = go co
     go (TcTransCo co1 co2)    = Pair (pFst (go co1)) (pSnd (go co2))
     go (TcNthCo d co)         = tyConAppArgN d <$> go co
     go (TcLRCo lr co)         = (pickLR lr . tcSplitAppTy) <$> go co
+    go (TcAxiomRuleCo ax ts cs) =
+       case coaxrProves ax ts (map tcCoercionKind cs) of
+         Just res -> res
+         Nothing -> panic "tcCoercionKind: malformed TcAxiomRuleCo"
 
     -- c.f. Coercion.coercionKind
     go_inst (TcInstCo co ty) tys = go_inst co (ty:tys)
@@ -233,7 +251,7 @@ tcCoercionKind co = go co
 eqVarKind :: EqVar -> Pair Type
 eqVarKind cv
  | Just (tc, [_kind,ty1,ty2]) <- tcSplitTyConApp_maybe (varType cv)
- = ASSERT (tc `hasKey` eqTyConKey)
+ = ASSERT(tc `hasKey` eqTyConKey)
    Pair ty1 ty2
  | otherwise = pprPanic "eqVarKind, non coercion variable" (ppr cv <+> dcolon <+> ppr (varType cv))
 
@@ -258,6 +276,8 @@ coVarsOfTcCo tc_co
                                    `minusVarSet` get_bndrs bs
     go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
                                      -- to evVarsOfTerm in the DEBUG check of setEvBind
+    go (TcAxiomRuleCo _ _ cos)   = foldr (unionVarSet . go) emptyVarSet cos
+
 
     -- We expect only coercion bindings, so use evTermCoercion 
     go_bind :: EvBind -> VarSet
@@ -324,6 +344,25 @@ ppr_co p (TcTransCo co1 co2) = maybeParen p FunPrec $
 ppr_co p (TcSymCo co)         = pprPrefixApp p (ptext (sLit "Sym")) [pprParendTcCo co]
 ppr_co p (TcNthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <+> int n) [pprParendTcCo co]
 ppr_co p (TcLRCo lr co)       = pprPrefixApp p (ppr lr) [pprParendTcCo co]
+ppr_co p (TcAxiomRuleCo co ts ps) = maybeParen p TopPrec
+                                  $ ppr_tc_axiom_rule_co co ts ps
+
+ppr_tc_axiom_rule_co :: CoAxiomRule -> [TcType] -> [TcCoercion] -> SDoc
+ppr_tc_axiom_rule_co co ts ps = ppr (coaxrName co) <> ppTs ts $$ nest 2 (ppPs ps)
+  where
+  ppTs []   = Outputable.empty
+  ppTs [t]  = ptext (sLit "@") <> ppr_type TopPrec t
+  ppTs ts   = ptext (sLit "@") <>
+                parens (hsep $ punctuate comma $ map pprType ts)
+
+  ppPs []   = Outputable.empty
+  ppPs [p]  = pprParendTcCo p
+  ppPs (p : ps) = ptext (sLit "(") <+> pprTcCo p $$
+                  vcat [ ptext (sLit ",") <+> pprTcCo q | q <- ps ] $$
+                  ptext (sLit ")")
+
+
+
 
 ppr_fun_co :: Prec -> TcCoercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)
@@ -496,6 +535,9 @@ data EvTerm
   | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
                                  -- Note [SingI and EvLit]
 
+  | EvCoercible EvCoercible      -- Dictionary for "Coercible a b"
+                                 -- Note [Coercible Instances]
+
   deriving( Data.Data, Data.Typeable)
 
 
@@ -504,6 +546,22 @@ data EvLit
   | EvStr FastString
     deriving( Data.Data, Data.Typeable)
 
+data EvCoercible
+  = EvCoercibleRefl Type
+  | EvCoercibleTyCon TyCon [EvCoercibleArg EvTerm]
+  | EvCoercibleNewType LeftOrRight TyCon [Type] EvTerm
+    deriving( Data.Data, Data.Typeable)
+
+data EvCoercibleArg a
+  = EvCoercibleArgN Type
+  | EvCoercibleArgR a
+  | EvCoercibleArgP Type Type
+    deriving( Data.Data, Data.Typeable)
+
+mapEvCoercibleArgM :: Monad m => (a -> m b) -> EvCoercibleArg a -> m (EvCoercibleArg b)
+mapEvCoercibleArgM _ (EvCoercibleArgN t)     = return (EvCoercibleArgN t)
+mapEvCoercibleArgM f (EvCoercibleArgR v)     = do { v' <- f v; return (EvCoercibleArgR v') }
+mapEvCoercibleArgM _ (EvCoercibleArgP t1 t2) = return (EvCoercibleArgP t1 t2)
 \end{code}
 
 Note [Coercion evidence terms]
@@ -616,6 +674,12 @@ evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo c
 evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
+evVarsOfTerm (EvCoercible evnt)   = evVarsOfEvCoercible evnt
+
+evVarsOfEvCoercible :: EvCoercible -> VarSet
+evVarsOfEvCoercible (EvCoercibleRefl _)          = emptyVarSet
+evVarsOfEvCoercible (EvCoercibleTyCon _ evs)     = evVarsOfTerms [v | EvCoercibleArgR v <- evs ]
+evVarsOfEvCoercible (EvCoercibleNewType _ _ _ v) = evVarsOfTerm v
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = foldr (unionVarSet . evVarsOfTerm) emptyVarSet 
@@ -678,11 +742,23 @@ instance Outputable EvTerm where
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
   ppr (EvLit l)          = ppr l
+  ppr (EvCoercible co)   = ptext (sLit "Coercible") <+> ppr co
   ppr (EvDelayedError ty msg) =     ptext (sLit "error") 
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
   ppr (EvStr s) = text (show s)
+
+instance Outputable EvCoercible where
+  ppr (EvCoercibleRefl ty) = ppr ty
+  ppr (EvCoercibleTyCon tyCon evs) = ppr tyCon <+> hsep (map ppr evs)
+  ppr (EvCoercibleNewType CLeft tyCon tys v) = ppr (tyCon `mkTyConApp` tys) <+> char ';' <+> ppr v
+  ppr (EvCoercibleNewType CRight tyCon tys v) =ppr v <+> char ';' <+> ppr (tyCon `mkTyConApp` tys)
+
+instance Outputable a => Outputable (EvCoercibleArg a) where
+  ppr (EvCoercibleArgN t)     = ptext (sLit "N:") <+> ppr t
+  ppr (EvCoercibleArgR v)     = ptext (sLit "R:") <+> ppr v
+  ppr (EvCoercibleArgP t1 t2) = ptext (sLit "P:") <+> parens (ppr (t1,t2))
 \end{code}
 

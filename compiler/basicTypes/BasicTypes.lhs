@@ -16,73 +16,68 @@ types that
 \begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module BasicTypes(
-	Version, bumpVersion, initialVersion,
+        Version, bumpVersion, initialVersion,
 
         ConTag, fIRST_TAG,
 
-	Arity, RepArity,
-	
-	Alignment,
+        Arity, RepArity,
+
+        Alignment,
 
         FunctionOrData(..),
-	
-	WarningTxt(..),
 
-	Fixity(..), FixityDirection(..),
-	defaultFixity, maxPrecedence, 
-	negateFixity, funTyFixity,
-	compareFixity,
+        WarningTxt(..),
 
-	RecFlag(..), isRec, isNonRec, boolToRecFlag,
+        Fixity(..), FixityDirection(..),
+        defaultFixity, maxPrecedence, minPrecedence,
+        negateFixity, funTyFixity,
+        compareFixity,
 
-	RuleName,
+        RecFlag(..), isRec, isNonRec, boolToRecFlag,
 
-	TopLevelFlag(..), isTopLevel, isNotTopLevel,
+        RuleName,
 
-	OverlapFlag(..), 
+        TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
-	Boxity(..), isBoxed, 
+        OverlapFlag(..),
+
+        Boxity(..), isBoxed,
 
         TupleSort(..), tupleSortBoxity, boxityNormalTupleSort,
         tupleParens,
 
-	OccInfo(..), seqOccInfo, zapFragileOcc, isOneOcc, 
-	isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isNoOcc,
-        strongLoopBreaker, weakLoopBreaker, 
+        OccInfo(..), seqOccInfo, zapFragileOcc, isOneOcc,
+        isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isNoOcc,
+        strongLoopBreaker, weakLoopBreaker,
 
-	InsideLam, insideLam, notInsideLam,
-	OneBranch, oneBranch, notOneBranch,
-	InterestingCxt,
+        InsideLam, insideLam, notInsideLam,
+        OneBranch, oneBranch, notOneBranch,
+        InterestingCxt,
 
         EP(..),
 
-	DefMethSpec(..),
+        DefMethSpec(..),
         SwapFlag(..), flipSwap, unSwap,
 
         CompilerPhase(..), PhaseNum,
         Activation(..), isActive, isActiveIn,
         isNeverActive, isAlwaysActive, isEarlyActive,
-        RuleMatchInfo(..), isConLike, isFunLike, 
+        RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), isEmptyInlineSpec,
-        InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
-        neverInlinePragma, dfunInlinePragma, 
-	isDefaultInlinePragma, 
+        InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
+        neverInlinePragma, dfunInlinePragma,
+        isDefaultInlinePragma,
         isInlinePragma, isInlinablePragma, isAnyInlinePragma,
         inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
 
-	SuccessFlag(..), succeeded, failed, successIf,
-	
-	FractionalLit(..), negateFractionalLit, integralFractionalLit
+        SuccessFlag(..), succeeded, failed, successIf,
+
+        FractionalLit(..), negateFractionalLit, integralFractionalLit,
+
+        HValue(..)
    ) where
 
 import FastString
@@ -90,12 +85,13 @@ import Outputable
 
 import Data.Data hiding (Fixity)
 import Data.Function (on)
+import GHC.Exts (Any)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Arity]{Arity}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -114,9 +110,9 @@ type RepArity = Int
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
               Constructor tags
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -129,9 +125,9 @@ fIRST_TAG =  1
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Alignment]{Alignment}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -139,14 +135,14 @@ type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
            Swap flag
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-data SwapFlag 
-  = NotSwapped	-- Args are: actual,   expected
+data SwapFlag
+  = NotSwapped  -- Args are: actual,   expected
   | IsSwapped   -- Args are: expected, actual
 
 instance Outputable SwapFlag where
@@ -164,9 +160,9 @@ unSwap IsSwapped  f a b = f b a
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[FunctionOrData]{FunctionOrData}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -180,15 +176,15 @@ instance Outputable FunctionOrData where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Version]{Module and identifier version numbers}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 type Version = Int
 
-bumpVersion :: Version -> Version 
+bumpVersion :: Version -> Version
 bumpVersion v = v+1
 
 initialVersion :: Version
@@ -196,9 +192,9 @@ initialVersion = 1
 \end{code}
 
 %************************************************************************
-%*									*
-		Deprecations
-%*									*
+%*                                                                      *
+                Deprecations
+%*                                                                      *
 %************************************************************************
 
 
@@ -215,9 +211,9 @@ instance Outputable WarningTxt where
 \end{code}
 
 %************************************************************************
-%*									*
-		Rules
-%*									*
+%*                                                                      *
+                Rules
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -225,9 +221,9 @@ type RuleName = FastString
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Fixity]{Fixity info}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -238,12 +234,12 @@ data Fixity = Fixity Int FixityDirection
 instance Outputable Fixity where
     ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
 
-instance Eq Fixity where		-- Used to determine if two fixities conflict
+instance Eq Fixity where -- Used to determine if two fixities conflict
   (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
 
 ------------------------
-data FixityDirection = InfixL | InfixR | InfixN 
-		     deriving (Eq, Data, Typeable)
+data FixityDirection = InfixL | InfixR | InfixN
+                     deriving (Eq, Data, Typeable)
 
 instance Outputable FixityDirection where
     ppr InfixL = ptext (sLit "infixl")
@@ -251,48 +247,50 @@ instance Outputable FixityDirection where
     ppr InfixN = ptext (sLit "infix")
 
 ------------------------
-maxPrecedence :: Int
+maxPrecedence, minPrecedence :: Int
 maxPrecedence = 9
+minPrecedence = 0
+
 defaultFixity :: Fixity
 defaultFixity = Fixity maxPrecedence InfixL
 
 negateFixity, funTyFixity :: Fixity
 -- Wired-in fixities
-negateFixity = Fixity 6 InfixL 	-- Fixity of unary negate
-funTyFixity  = Fixity 0	InfixR	-- Fixity of '->'
+negateFixity = Fixity 6 InfixL  -- Fixity of unary negate
+funTyFixity  = Fixity 0 InfixR  -- Fixity of '->'
 \end{code}
 
 Consider
 
 \begin{verbatim}
-	a `op1` b `op2` c
+        a `op1` b `op2` c
 \end{verbatim}
 @(compareFixity op1 op2)@ tells which way to arrange appication, or
 whether there's an error.
 
 \begin{code}
 compareFixity :: Fixity -> Fixity
-	      -> (Bool,		-- Error please
-		  Bool)		-- Associate to the right: a op1 (b op2 c)
+              -> (Bool,         -- Error please
+                  Bool)         -- Associate to the right: a op1 (b op2 c)
 compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
   = case prec1 `compare` prec2 of
-	GT -> left
-	LT -> right
-	EQ -> case (dir1, dir2) of
-			(InfixR, InfixR) -> right
-			(InfixL, InfixL) -> left
-			_		 -> error_please
+        GT -> left
+        LT -> right
+        EQ -> case (dir1, dir2) of
+                        (InfixR, InfixR) -> right
+                        (InfixL, InfixL) -> left
+                        _                -> error_please
   where
-    right	 = (False, True)
+    right        = (False, True)
     left         = (False, False)
     error_please = (True,  False)
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Top-level/local]{Top-level/not-top level flag}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -305,7 +303,7 @@ isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
 isNotTopLevel NotTopLevel = True
 isNotTopLevel TopLevel    = False
 
-isTopLevel TopLevel	= True
+isTopLevel TopLevel     = True
 isTopLevel NotTopLevel  = False
 
 instance Outputable TopLevelFlag where
@@ -315,9 +313,9 @@ instance Outputable TopLevelFlag where
 
 
 %************************************************************************
-%*									*
-		Boxity flag
-%*									*
+%*                                                                      *
+                Boxity flag
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -333,15 +331,15 @@ isBoxed Unboxed = False
 
 
 %************************************************************************
-%*									*
-		Recursive/Non-Recursive flag
-%*									*
+%*                                                                      *
+                Recursive/Non-Recursive flag
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-data RecFlag = Recursive 
-	     | NonRecursive
-	     deriving( Eq, Data, Typeable )
+data RecFlag = Recursive
+             | NonRecursive
+             deriving( Eq, Data, Typeable )
 
 isRec :: RecFlag -> Bool
 isRec Recursive    = True
@@ -361,39 +359,41 @@ instance Outputable RecFlag where
 \end{code}
 
 %************************************************************************
-%*									*
-		Instance overlap flag
-%*									*
+%*                                                                      *
+                Instance overlap flag
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
+-- | The semantics allowed for overlapping instances for a particular
+-- instance. See Note [Safe Haskell isSafeOverlap] (in `InstEnv.lhs`) for a
+-- explanation of the `isSafeOverlap` field.
 data OverlapFlag
   -- | This instance must not overlap another
   = NoOverlap { isSafeOverlap :: Bool }
 
-  -- | Silently ignore this instance if you find a 
+  -- | Silently ignore this instance if you find a
   -- more specific one that matches the constraint
   -- you are trying to resolve
   --
   -- Example: constraint (Foo [Int])
-  -- 	    instances  (Foo [Int])
-  --		       (Foo [a])	OverlapOk
+  --        instances  (Foo [Int])
+  --                   (Foo [a])        OverlapOk
   -- Since the second instance has the OverlapOk flag,
-  -- the first instance will be chosen (otherwise 
+  -- the first instance will be chosen (otherwise
   -- its ambiguous which to choose)
   | OverlapOk { isSafeOverlap :: Bool }
 
-  -- | Like OverlapOk, but also ignore this instance 
-  -- if it doesn't match the constraint you are
-  -- trying to resolve, but could match if the type variables
-  -- in the constraint were instantiated
+  -- | Silently ignore this instance if you find any other that matches the
+  -- constraing you are trying to resolve, including when checking if there are
+  -- instances that do not match, but unify.
   --
   -- Example: constraint (Foo [b])
-  --	    instances  (Foo [Int])	Incoherent
-  --		       (Foo [a])
+  --        instances  (Foo [Int])      Incoherent
+  --                   (Foo [a])
   -- Without the Incoherent flag, we'd complain that
-  -- instantiating 'b' would change which instance 
-  -- was chosen
+  -- instantiating 'b' would change which instance
+  -- was chosen. See also note [Incoherent instances]
   | Incoherent { isSafeOverlap :: Bool }
   deriving (Eq, Data, Typeable)
 
@@ -408,9 +408,9 @@ pprSafeOverlap False = empty
 \end{code}
 
 %************************************************************************
-%*									*
-		Tuples
-%*									*
+%*                                                                      *
+                Tuples
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -431,36 +431,36 @@ boxityNormalTupleSort Unboxed = UnboxedTuple
 
 tupleParens :: TupleSort -> SDoc -> SDoc
 tupleParens BoxedTuple      p = parens p
-tupleParens ConstraintTuple p = parens p -- The user can't write fact tuples 
+tupleParens ConstraintTuple p = parens p -- The user can't write fact tuples
                                          -- directly, we overload the (,,) syntax
 tupleParens UnboxedTuple p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Generic]{Generic flag}
-%*									*
+%*                                                                      *
 %************************************************************************
 
-This is the "Embedding-Projection pair" datatype, it contains 
+This is the "Embedding-Projection pair" datatype, it contains
 two pieces of code (normally either RenamedExpr's or Id's)
 If we have a such a pair (EP from to), the idea is that 'from' and 'to'
-represents functions of type 
+represents functions of type
 
-	from :: T -> Tring
-	to   :: Tring -> T
+        from :: T -> Tring
+        to   :: Tring -> T
 
-And we should have 
+And we should have
 
-	to (from x) = x
+        to (from x) = x
 
 T and Tring are arbitrary, but typically T is the 'main' type while
-Tring is the 'representation' type.  (This just helps us remember 
+Tring is the 'representation' type.  (This just helps us remember
 whether to use 'from' or 'to'.
 
 \begin{code}
-data EP a = EP { fromEP :: a,	-- :: T -> Tring
-		 toEP   :: a }	-- :: Tring -> T
+data EP a = EP { fromEP :: a,   -- :: T -> Tring
+                 toEP   :: a }  -- :: Tring -> T
 \end{code}
 
 Embedding-projection pairs are used in several places:
@@ -468,15 +468,15 @@ Embedding-projection pairs are used in several places:
 First of all, each type constructor has an EP associated with it, the
 code in EP converts (datatype T) from T to Tring and back again.
 
-Secondly, when we are filling in Generic methods (in the typechecker, 
+Secondly, when we are filling in Generic methods (in the typechecker,
 tcMethodBinds), we are constructing bimaps by induction on the structure
 of the type of the method signature.
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Occurrence information}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 This data type is used exclusively by the simplifier, but it appears in a
@@ -486,21 +486,21 @@ defn of OccInfo here, safely at the bottom
 
 \begin{code}
 -- | Identifier occurrence information
-data OccInfo 
-  = NoOccInfo		-- ^ There are many occurrences, or unknown occurences
+data OccInfo
+  = NoOccInfo           -- ^ There are many occurrences, or unknown occurences
 
-  | IAmDead		-- ^ Marks unused variables.  Sometimes useful for
-			-- lambda and case-bound variables.
+  | IAmDead             -- ^ Marks unused variables.  Sometimes useful for
+                        -- lambda and case-bound variables.
 
   | OneOcc
-	!InsideLam
- 	!OneBranch
-	!InterestingCxt -- ^ Occurs exactly once, not inside a rule
+        !InsideLam
+        !OneBranch
+        !InterestingCxt -- ^ Occurs exactly once, not inside a rule
 
   -- | This identifier breaks a loop of mutually recursive functions. The field
   -- marks whether it is only a loop breaker due to a reference in a rule
-  | IAmALoopBreaker	-- Note [LoopBreaker OccInfo]
-	!RulesOnly
+  | IAmALoopBreaker     -- Note [LoopBreaker OccInfo]
+        !RulesOnly
 
 type RulesOnly = Bool
 \end{code}
@@ -508,7 +508,7 @@ type RulesOnly = Bool
 Note [LoopBreaker OccInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
    IAmALoopBreaker True  <=> A "weak" or rules-only loop breaker
-   		   	     Do not preInlineUnconditionally
+                             Do not preInlineUnconditionally
 
    IAmALoopBreaker False <=> A "strong" loop breaker
                              Do not inline at all
@@ -525,21 +525,21 @@ seqOccInfo :: OccInfo -> ()
 seqOccInfo occ = occ `seq` ()
 
 -----------------
-type InterestingCxt = Bool	-- True <=> Function: is applied
-				--	    Data value: scrutinised by a case with
-				--			at least one non-DEFAULT branch
+type InterestingCxt = Bool      -- True <=> Function: is applied
+                                --          Data value: scrutinised by a case with
+                                --                      at least one non-DEFAULT branch
 
 -----------------
-type InsideLam = Bool	-- True <=> Occurs inside a non-linear lambda
-			-- Substituting a redex for this occurrence is
-			-- dangerous because it might duplicate work.
+type InsideLam = Bool   -- True <=> Occurs inside a non-linear lambda
+                        -- Substituting a redex for this occurrence is
+                        -- dangerous because it might duplicate work.
 insideLam, notInsideLam :: InsideLam
 insideLam    = True
 notInsideLam = False
 
 -----------------
-type OneBranch = Bool	-- True <=> Occurs in only one case branch
-			--	so no code-duplication issue to worry about
+type OneBranch = Bool   -- True <=> Occurs in only one case branch
+                        --      so no code-duplication issue to worry about
 oneBranch, notOneBranch :: OneBranch
 oneBranch    = True
 notOneBranch = False
@@ -572,29 +572,29 @@ zapFragileOcc occ         = occ
 \begin{code}
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
-  ppr NoOccInfo  	   = empty
+  ppr NoOccInfo            = empty
   ppr (IAmALoopBreaker ro) = ptext (sLit "LoopBreaker") <> if ro then char '!' else empty
-  ppr IAmDead		   = ptext (sLit "Dead")
+  ppr IAmDead              = ptext (sLit "Dead")
   ppr (OneOcc inside_lam one_branch int_cxt)
-	= ptext (sLit "Once") <> pp_lam <> pp_br <> pp_args
-	where
-	  pp_lam | inside_lam = char 'L'
-		 | otherwise  = empty
-	  pp_br  | one_branch = empty
-		 | otherwise  = char '*'
-	  pp_args | int_cxt   = char '!'
-		  | otherwise = empty
+        = ptext (sLit "Once") <> pp_lam <> pp_br <> pp_args
+        where
+          pp_lam | inside_lam = char 'L'
+                 | otherwise  = empty
+          pp_br  | one_branch = empty
+                 | otherwise  = char '*'
+          pp_args | int_cxt   = char '!'
+                  | otherwise = empty
 \end{code}
 
 %************************************************************************
-%*									*
-		Default method specfication
-%*									*
+%*                                                                      *
+                Default method specfication
+%*                                                                      *
 %************************************************************************
 
 The DefMethSpec enumeration just indicates what sort of default method
-is used for a class. It is generated from source code, and present in 
-interface files; it is converted to Class.DefMeth before begin put in a 
+is used for a class. It is generated from source code, and present in
+interface files; it is converted to Class.DefMeth before begin put in a
 Class object.
 
 \begin{code}
@@ -609,9 +609,9 @@ instance Outputable DefMethSpec where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Success flag}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -635,9 +635,9 @@ failed Failed    = True
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Activation}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 When a rule or inlining is active
@@ -656,26 +656,26 @@ instance Outputable CompilerPhase where
    ppr InitialPhase = ptext (sLit "InitialPhase")
 
 data Activation = NeverActive
-		| AlwaysActive
+                | AlwaysActive
                 | ActiveBefore PhaseNum -- Active only *before* this phase
                 | ActiveAfter PhaseNum  -- Active in this phase and later
-		deriving( Eq, Data, Typeable )	-- Eq used in comparing rules in HsDecls
+                deriving( Eq, Data, Typeable )  -- Eq used in comparing rules in HsDecls
 
-data RuleMatchInfo = ConLike 			-- See Note [CONLIKE pragma]
+data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
                    | FunLike
                    deriving( Eq, Data, Typeable, Show )
-	-- Show needed for Lexer.x
+        -- Show needed for Lexer.x
 
-data InlinePragma  	     -- Note [InlinePragma]
+data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
       { inl_inline :: InlineSpec
 
-      , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n 
-      		      	    	     --            explicit (non-type, non-dictionary) args
-				     --   That is, inl_sat describes the number of *source-code*
-                                     --   arguments the thing must be applied to.  We add on the 
+      , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n
+                                     --            explicit (non-type, non-dictionary) args
+                                     --   That is, inl_sat describes the number of *source-code*
+                                     --   arguments the thing must be applied to.  We add on the
                                      --   number of implicit, dictionary arguments when making
-			             --   the InlineRule, and don't look at inl_sat further
+                                     --   the InlineRule, and don't look at inl_sat further
 
       , inl_act    :: Activation     -- Says during which phases inlining is allowed
 
@@ -686,14 +686,15 @@ data InlineSpec   -- What the user's INLINE pragama looked like
   = Inline
   | Inlinable
   | NoInline
-  | EmptyInlineSpec
+  | EmptyInlineSpec  -- Used in a place-holder InlinePragma in SpecPrag or IdInfo,
+                     -- where there isn't any real inline pragma at all
   deriving( Eq, Data, Typeable, Show )
-	-- Show needed for Lexer.x
+        -- Show needed for Lexer.x
 \end{code}
 
 Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~
-This data type mirrors what you can write in an INLINE or NOINLINE pragma in 
+This data type mirrors what you can write in an INLINE or NOINLINE pragma in
 the source program.
 
 If you write nothing at all, you get defaultInlinePragma:
@@ -701,7 +702,7 @@ If you write nothing at all, you get defaultInlinePragma:
    inl_act    = AlwaysActive
    inl_rule   = FunLike
 
-It's not possible to get that combination by *writing* something, so 
+It's not possible to get that combination by *writing* something, so
 if an Id has defaultInlinePragma it means the user didn't specify anything.
 
 If inl_inline = True, then the Id should have an InlineRule unfolding.
@@ -712,7 +713,7 @@ The ConLike constructor of a RuleMatchInfo is aimed at the following.
 Consider first
     {-# RULE "r/cons" forall a as. r (a:as) = f (a+1) #-}
     g b bs = let x = b:bs in ..x...x...(r x)...
-Now, the rule applies to the (r x) term, because GHC "looks through" 
+Now, the rule applies to the (r x) term, because GHC "looks through"
 the definition of 'x' to see that it is (b:bs).
 
 Now consider
@@ -720,7 +721,7 @@ Now consider
     g v = let x = f v in ..x...x...(r x)...
 Normally the (r x) would *not* match the rule, because GHC would be
 scared about duplicating the redex (f v), so it does not "look
-through" the bindings.  
+through" the bindings.
 
 However the CONLIKE modifier says to treat 'f' like a constructor in
 this situation, and "look through" the unfolding for x.  So (r x)
@@ -768,7 +769,7 @@ neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
 inlinePragmaSpec :: InlinePragma -> InlineSpec
 inlinePragmaSpec = inl_inline
 
--- A DFun has an always-active inline activation so that 
+-- A DFun has an always-active inline activation so that
 -- exprIsConApp_maybe can "see" its unfolding
 -- (However, its actual Unfolding is a DFunUnfolding, which is
 --  never inlined other than via exprIsConApp_maybe.)
@@ -797,7 +798,7 @@ isAnyInlinePragma prag = case inl_inline prag of
                         Inline    -> True
                         Inlinable -> True
                         _         -> False
- 
+
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
 
@@ -832,9 +833,9 @@ instance Outputable InlineSpec where
 instance Outputable InlinePragma where
   ppr (InlinePragma { inl_inline = inline, inl_act = activation
                     , inl_rule = info, inl_sat = mb_arity })
-    = ppr inline <> pp_act inline activation <+> pp_sat <+> pp_info 
+    = ppr inline <> pp_act inline activation <+> pp_sat <+> pp_info
     where
-      pp_act Inline   AlwaysActive = empty	
+      pp_act Inline   AlwaysActive = empty
       pp_act NoInline NeverActive  = empty
       pp_act _        act          = ppr act
 
@@ -864,7 +865,7 @@ isAlwaysActive _            = False
 
 isEarlyActive AlwaysActive      = True
 isEarlyActive (ActiveBefore {}) = True
-isEarlyActive _		        = False
+isEarlyActive _                 = False
 \end{code}
 
 
@@ -899,4 +900,10 @@ instance Ord FractionalLit where
 
 instance Outputable FractionalLit where
   ppr = text . fl_text
+\end{code}
+
+\begin{code}
+
+newtype HValue = HValue Any
+
 \end{code}

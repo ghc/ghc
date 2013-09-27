@@ -72,34 +72,39 @@ extern "C" {
   typedef struct {
     RtsOptsEnabledEnum rts_opts_enabled;
     const char *rts_opts;
-  } RtsConfig;
+    HsBool rts_hs_main;
+} RtsConfig;
 
-  // Clients should start with defaultRtsConfig and then customise it.
-  // Bah, I really wanted this to be a const struct value, but it seems
-  // you can't do that in C (it generates code).
-  extern const RtsConfig defaultRtsConfig;
+// Clients should start with defaultRtsConfig and then customise it.
+// Bah, I really wanted this to be a const struct value, but it seems
+// you can't do that in C (it generates code).
+extern const RtsConfig defaultRtsConfig;
 
-  /* ----------------------------------------------------------------------------
-     Starting up and shutting down the Haskell RTS.
-     ------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------
+   Starting up and shutting down the Haskell RTS.
+   ------------------------------------------------------------------------- */
 
-  /* DEPRECATED, use hs_init() or hs_init_ghc() instead  */
-  extern void startupHaskell         ( int argc, char *argv[],
-                                       void (*init_root)(void) );
+/* DEPRECATED, use hs_init() or hs_init_ghc() instead  */
+extern void startupHaskell         ( int argc, char *argv[],
+				     void (*init_root)(void) );
 
-  /* DEPRECATED, use hs_exit() instead  */
-  extern void shutdownHaskell        ( void );
+/* DEPRECATED, use hs_exit() instead  */
+extern void shutdownHaskell        ( void );
 
-  /*
-   * GHC-specific version of hs_init() that allows specifying whether
-   * +RTS ... -RTS options are allowed or not (default: only "safe"
-   * options are allowed), and allows passing an option string that is
-   * to be interpreted by the RTS only, not passed to the program.
-   */
-  extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
-                           RtsConfig rts_config);      // RTS configuration
+/* Like hs_init(), but allows rtsopts. For more complicated usage,
+ * use hs_init_ghc. */
+extern void hs_init_with_rtsopts (int *argc, char **argv[]);
 
-  extern void shutdownHaskellAndExit ( int exitCode )
+/*
+ * GHC-specific version of hs_init() that allows specifying whether
+ * +RTS ... -RTS options are allowed or not (default: only "safe"
+ * options are allowed), and allows passing an option string that is
+ * to be interpreted by the RTS only, not passed to the program.
+ */
+extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
+                         RtsConfig rts_config);      // RTS configuration
+
+extern void shutdownHaskellAndExit ( int exitCode )
 #if __GNUC__ >= 3
     __attribute__((__noreturn__))
 #endif

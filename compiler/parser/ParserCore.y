@@ -270,7 +270,10 @@ exp	:: { IfaceExpr }
 -- gaw 2004
 	| '%case' '(' ty ')' aexp '%of' id_bndr
 	  '{' alts1 '}'		      { IfaceCase $5 (fst $7) $9 }
-        | '%cast' aexp aty { IfaceCast $2 $3 }
+-- The following line is broken and is hard to fix. Not fixing now
+-- because this whole parser is bitrotten anyway.
+-- Richard Eisenberg, July 2013
+--        | '%cast' aexp aty { IfaceCast $2 $3 }
 -- No InlineMe any more
 -- 	| '%note' STRING exp 	   
 --	    { case $2 of

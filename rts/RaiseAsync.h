@@ -53,6 +53,7 @@ interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {
     case BlockedOnMVar:
+    case BlockedOnMVarRead:
     case BlockedOnMsgThrowTo:
     case BlockedOnRead:
     case BlockedOnWrite:

@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Unsafe, DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
@@ -21,7 +21,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Stable (
         StablePtr(..),
         newStablePtr,
@@ -33,6 +32,7 @@ module GHC.Stable (
 
 import GHC.Ptr
 import GHC.Base
+import Data.Typeable.Internal
 
 -----------------------------------------------------------------------------
 -- Stable Pointers
@@ -49,6 +49,7 @@ A value of type @StablePtr a@ is a stable pointer to a Haskell
 expression of type @a@.
 -}
 data {-# CTYPE "HsStablePtr" #-} StablePtr a = StablePtr (StablePtr# a)
+  deriving( Typeable )
 
 -- |
 -- Create a stable pointer referring to the given Haskell value.

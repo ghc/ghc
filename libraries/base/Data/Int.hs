@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,14 +26,8 @@ module Data.Int
         -- $notes
         ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base ( Int )
 import GHC.Int  ( Int8, Int16, Int32, Int64 )
-#endif
-
-#ifdef __HUGS__
-import Hugs.Int ( Int8, Int16, Int32, Int64 )
-#endif
 
 {- $notes
 

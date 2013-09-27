@@ -12,8 +12,6 @@ include:
 In addition, ghci accepts most of the command-line options that plain
 GHC does.  Some of the options that are commonly used are:
 
-    -fglasgow-exts  Allow Glasgow extensions (unboxed types, etc.)
-
     -i<dir>         Search for imported modules in the directory <dir>.
 
     -H32m	    Increase GHC's default heap size to 32m

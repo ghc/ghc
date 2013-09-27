@@ -557,7 +557,9 @@ isEmpty _     = False
 char  c = textBeside_ (Chr c) (_ILIT(1)) Empty
 
 text  s = case iUnbox (length   s) of {sl -> textBeside_ (Str s)  sl Empty}
-{-# NOINLINE [1] text #-}   -- Give the RULE a chance to fire
+{-# NOINLINE [0] text #-}   -- Give the RULE a chance to fire
+                            -- It must wait till after phase 1 when
+                            -- the unpackCString first is manifested
 
 ftext :: FastString -> Doc
 ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}

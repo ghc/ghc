@@ -28,9 +28,8 @@ import CLabel
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmMonad
-import StgCmmProf
+import StgCmmProf (profDynAlloc, dynProfHdr, staticProfHdr)
 import StgCmmTicky
-import StgCmmGran
 import StgCmmClosure
 import StgCmmEnv
 
@@ -42,6 +41,7 @@ import Cmm
 import CmmUtils
 import CostCentre
 import IdInfo( CafInfo(..), mayHaveCafRefs )
+import Id ( Id )
 import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
@@ -54,7 +54,8 @@ import Data.Maybe (isJust)
 -----------------------------------------------------------
 
 allocDynClosure
-        :: CmmInfoTable
+        :: Maybe Id
+        -> CmmInfoTable
         -> LambdaFormInfo
         -> CmmExpr              -- Cost Centre to stick in the object
         -> CmmExpr              -- Cost Centre to blame for this alloc
@@ -66,7 +67,7 @@ allocDynClosure
         -> FCode CmmExpr -- returns Hp+n
 
 allocDynClosureCmm
-        :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
+        :: Maybe Id -> CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
         -> [(CmmExpr, VirtualHpOffset)]
         -> FCode CmmExpr -- returns Hp+n
 
@@ -88,19 +89,19 @@ allocDynClosureCmm
 -- significant - see test T4801.
 
 
-allocDynClosure info_tbl lf_info use_cc _blame_cc args_w_offsets
+allocDynClosure mb_id info_tbl lf_info use_cc _blame_cc args_w_offsets
   = do  { let (args, offsets) = unzip args_w_offsets
         ; cmm_args <- mapM getArgAmode args     -- No void args
-        ; allocDynClosureCmm info_tbl lf_info
+        ; allocDynClosureCmm mb_id info_tbl lf_info
                              use_cc _blame_cc (zip cmm_args offsets)
         }
 
-allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
+allocDynClosureCmm mb_id info_tbl lf_info use_cc _blame_cc amodes_w_offsets
   = do  { virt_hp <- getVirtHp
 
         -- SAY WHAT WE ARE ABOUT TO DO
         ; let rep = cit_rep info_tbl
-        ; tickyDynAlloc (toRednCountsLbl $ cit_lbl info_tbl) rep lf_info
+        ; tickyDynAlloc mb_id rep lf_info
         ; profDynAlloc rep use_cc
 
         -- FIND THE OFFSET OF THE INFO-PTR WORD
@@ -133,8 +134,7 @@ emitSetDynHdr base info_ptr ccs
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs
-        -- ToDo: Gransim stuff
-        -- ToDo: Parallel stuff
+        -- ToDof: Parallel stuff
         -- No ticky header
 
 hpStore :: CmmExpr -> [CmmExpr] -> [VirtualHpOffset] -> FCode ()
@@ -205,16 +205,11 @@ mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
 mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
-  ++ variable_header_words
+  ++ staticProfHdr dflags ccs
   ++ concatMap (padLitToWord dflags) payload
   ++ padding
   ++ static_link_field
   ++ saved_info_field
-  where
-    variable_header_words
-        =  staticGranHdr
-        ++ staticParHdr
-        ++ staticProfHdr dflags ccs
 
 -- JD: Simon had ellided this padding, but without it the C back end asserts
 -- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
@@ -467,7 +462,7 @@ cannedGCEntryPoint dflags regs
                                   W32       -> Just (mkGcLabel "stg_gc_f1")
                                   W64       -> Just (mkGcLabel "stg_gc_d1")
                                   _         -> Nothing
-        
+
           | width == wordWidth dflags -> Just (mkGcLabel "stg_gc_unbx_r1")
           | width == W64              -> Just (mkGcLabel "stg_gc_l1")
           | otherwise                 -> Nothing
@@ -527,7 +522,6 @@ heapCheck checkStack checkYield do_gc code
                       | otherwise  = Nothing
         ; codeOnly $ do_checks stk_hwm checkYield mb_alloc_bytes do_gc
         ; tickyAllocHeap True hpHw
-        ; doGranAllocate hpHw
         ; setRealHp hpHw
         ; code }
 

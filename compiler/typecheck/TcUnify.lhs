@@ -31,11 +31,7 @@ module TcUnify (
   matchExpectedAppTy, 
   matchExpectedFunTys,
   matchExpectedFunKind,
-  wrapFunResCoercion,
-
-  --------------------------------
-  -- Errors
-  mkKindErrorCtxt
+  wrapFunResCoercion
 
   ) where
 
@@ -501,7 +497,7 @@ unifyTheta :: TcThetaType -> TcThetaType -> TcM [TcCoercion]
 unifyTheta theta1 theta2
   = do  { checkTc (equalLength theta1 theta2)
                   (vcat [ptext (sLit "Contexts differ in length"),
-                         nest 2 $ parens $ ptext (sLit "Use -XRelaxedPolyRec to allow this")])
+                         nest 2 $ parens $ ptext (sLit "Use RelaxedPolyRec to allow this")])
         ; zipWithM unifyPred theta1 theta2 }
 \end{code}
 
@@ -1166,7 +1162,7 @@ unifyKindEq (FunTy a1 r1) (FunTy a2 r2)
   
 unifyKindEq (TyConApp kc1 k1s) (TyConApp kc2 k2s)
   | kc1 == kc2
-  = ASSERT (length k1s == length k2s)
+  = ASSERT(length k1s == length k2s)
        -- Should succeed since the kind constructors are the same, 
        -- and the kinds are sort-checked, thus fully applied
     do { mb_eqs <- zipWithM unifyKindEq k1s k2s
@@ -1200,19 +1196,4 @@ uUnboundKVar kv1 non_var_k2
        ; case occurCheckExpand dflags kv1 k2b of
            OC_OK k2c -> do { writeMetaTyVar kv1 k2c; return (Just EQ) }
            _         -> return Nothing }
-
-mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
-mkKindErrorCtxt ty1 ty2 k1 k2 env0
-  = let (env1, ty1') = tidyOpenType env0 ty1
-        (env2, ty2') = tidyOpenType env1 ty2
-        (env3, k1' ) = tidyOpenKind env2 k1
-        (env4, k2' ) = tidyOpenKind env3 k2
-    in do ty1 <- zonkTcType ty1'
-          ty2 <- zonkTcType ty2'
-          k1  <- zonkTcKind k1'
-          k2  <- zonkTcKind k2'
-          return (env4, 
-                  vcat [ ptext (sLit "Kind incompatibility when matching types xx:")
-                       , nest 2 (vcat [ ppr ty1 <+> dcolon <+> ppr k1
-                                      , ppr ty2 <+> dcolon <+> ppr k2 ]) ])
 \end{code}

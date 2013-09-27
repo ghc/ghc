@@ -289,6 +289,8 @@ import Data.Maybe
         'bits32'        { L _ (CmmT_bits32) }
         'bits64'        { L _ (CmmT_bits64) }
         'bits128'       { L _ (CmmT_bits128) }
+        'bits256'       { L _ (CmmT_bits256) }
+        'bits512'       { L _ (CmmT_bits512) }
         'float32'       { L _ (CmmT_float32) }
         'float64'       { L _ (CmmT_float64) }
         'gcptr'         { L _ (CmmT_gcptr) }
@@ -589,7 +591,7 @@ stmt    :: { CmmParse () }
                 { pushStackFrame $3 $5 }
 
 foreignLabel     :: { CmmParse CmmExpr }
-        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction))) }
+        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }
 
 opt_never_returns :: { CmmReturnInfo }
         :                               { CmmMayReturn }
@@ -777,6 +779,8 @@ typenot8 :: { CmmType }
         | 'bits32'              { b32 }
         | 'bits64'              { b64 }
         | 'bits128'             { b128 }
+        | 'bits256'             { b256 }
+        | 'bits512'             { b512 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
         | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
@@ -1005,8 +1009,7 @@ stmtMacros = listToUFM [
                                         tickyAllocPAP goods slop ),
   ( fsLit "TICK_ALLOC_UP_THK",     \[goods,slop] ->
                                         tickyAllocThunk goods slop ),
-  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode False reg ),
-  ( fsLit "UPD_BH_SINGLE_ENTRY",   \[reg] -> emitBlackHoleCode True  reg )
+  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode reg )
  ]
 
 emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()

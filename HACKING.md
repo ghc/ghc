@@ -132,7 +132,7 @@ lost. But if the change is small and self contained, feel free to
 attach it to your email, and send it to `ghc-devs`.
 
 Furthermore, if you're a developer (or want to become one!) you're
-undoubtly also interested in the other mailing lists:
+undoubtedly also interested in the other mailing lists:
 
  * [glasgow-haskell-users](http://www.haskell.org/mailman/listinfo/glasgow-haskell-users)
    is where developers/users meet.

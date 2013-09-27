@@ -174,7 +174,7 @@ extendImportedVarsEnv ps genv
 
 -- |Extend the list of type family instances.
 --
-extendFamEnv :: [FamInst Unbranched] -> GlobalEnv -> GlobalEnv
+extendFamEnv :: [FamInst] -> GlobalEnv -> GlobalEnv
 extendFamEnv new genv
   = genv { global_fam_inst_env = (g_fam_inst, extendFamInstEnvList l_fam_inst new) }
   where (g_fam_inst, l_fam_inst) = global_fam_inst_env genv

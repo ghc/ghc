@@ -21,7 +21,7 @@ import StgCmmMonad
 import StgCmmUtils
 import StgCmmTicky
 import StgCmmHeap
-import StgCmmProf
+import StgCmmProf ( costCentreFrom, curCCS )
 
 import DynFlags
 import Platform
@@ -40,7 +40,7 @@ import FastString
 import Outputable
 import Util
 
-import Control.Monad (liftM)
+import Control.Monad (liftM, when)
 import Data.Bits
 
 ------------------------------------------------------------------------
@@ -106,15 +106,6 @@ cgOpApp (StgPrimOp primop) args res_ty
   = do (regs, _hints) <- newUnboxedTupleRegs res_ty
        cgPrimOp regs primop args
        emitReturn (map (CmmReg . CmmLocal) regs)
-
-  | ReturnsAlg tycon <- result_info
-  , isEnumerationTyCon tycon
-        -- c.f. cgExpr (...TagToEnumOp...)
-  = do dflags <- getDynFlags
-       tag_reg <- newTemp (bWord dflags)
-       cgPrimOp [tag_reg] primop args
-       emitReturn [tagToClosure dflags tycon
-                                (CmmReg (CmmLocal tag_reg))]
 
   | otherwise = panic "cgPrimop"
   where
@@ -389,14 +380,6 @@ emitPrimOp dflags res IndexOffAddrOp_Word8            args = doIndexOffAddrOp   
 emitPrimOp dflags res IndexOffAddrOp_Word16           args = doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
 emitPrimOp dflags res IndexOffAddrOp_Word32           args = doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
 emitPrimOp _      res IndexOffAddrOp_Word64           args = doIndexOffAddrOp   Nothing b64 res args
-emitPrimOp _      res IndexOffAddrOp_FloatX4          args = doIndexOffAddrOp   Nothing vec4f32 res args
-emitPrimOp _      res IndexOffAddrOp_FloatAsFloatX4   args = doIndexOffAddrOpAs Nothing vec4f32 f32 res args
-emitPrimOp _      res IndexOffAddrOp_DoubleX2         args = doIndexOffAddrOp   Nothing vec2f64 res args
-emitPrimOp _      res IndexOffAddrOp_DoubleAsDoubleX2 args = doIndexOffAddrOpAs Nothing vec2f64 f64 res args
-emitPrimOp _      res IndexOffAddrOp_Int32X4          args = doIndexOffAddrOp   Nothing vec4b32 res args
-emitPrimOp _      res IndexOffAddrOp_Int32AsInt32X4   args = doIndexOffAddrOpAs Nothing vec4b32 b32 res args
-emitPrimOp _      res IndexOffAddrOp_Int64X2          args = doIndexOffAddrOp   Nothing vec2b64 res args
-emitPrimOp _      res IndexOffAddrOp_Int64AsInt64X2   args = doIndexOffAddrOpAs Nothing vec2b64 b64 res args
 
 -- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
 
@@ -416,14 +399,6 @@ emitPrimOp dflags res ReadOffAddrOp_Word8            args = doIndexOffAddrOp   (
 emitPrimOp dflags res ReadOffAddrOp_Word16           args = doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
 emitPrimOp dflags res ReadOffAddrOp_Word32           args = doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
 emitPrimOp _      res ReadOffAddrOp_Word64           args = doIndexOffAddrOp   Nothing b64 res args
-emitPrimOp _      res ReadOffAddrOp_FloatX4          args = doIndexOffAddrOp   Nothing vec4f32 res args
-emitPrimOp _      res ReadOffAddrOp_FloatAsFloatX4   args = doIndexOffAddrOpAs Nothing vec4f32 b32 res args
-emitPrimOp _      res ReadOffAddrOp_DoubleX2         args = doIndexOffAddrOp   Nothing vec2f64 res args
-emitPrimOp _      res ReadOffAddrOp_DoubleAsDoubleX2 args = doIndexOffAddrOpAs Nothing vec2f64 b64 res args
-emitPrimOp _      res ReadOffAddrOp_Int32X4          args = doIndexOffAddrOp   Nothing vec4b32 res args
-emitPrimOp _      res ReadOffAddrOp_Int32AsInt32X4   args = doIndexOffAddrOpAs Nothing vec4b32 b32 res args
-emitPrimOp _      res ReadOffAddrOp_Int64X2          args = doIndexOffAddrOp   Nothing vec2b64 res args
-emitPrimOp _      res ReadOffAddrOp_Int64AsInt64X2   args = doIndexOffAddrOpAs Nothing vec2b64 b64 res args
 
 -- IndexXXXArray
 
@@ -443,14 +418,6 @@ emitPrimOp dflags res IndexByteArrayOp_Word8            args = doIndexByteArrayO
 emitPrimOp dflags res IndexByteArrayOp_Word16           args = doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
 emitPrimOp dflags res IndexByteArrayOp_Word32           args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
 emitPrimOp _      res IndexByteArrayOp_Word64           args = doIndexByteArrayOp   Nothing b64  res args
-emitPrimOp _      res IndexByteArrayOp_FloatX4          args = doIndexByteArrayOp   Nothing vec4f32 res args
-emitPrimOp _      res IndexByteArrayOp_FloatAsFloatX4   args = doIndexByteArrayOpAs Nothing vec4f32 f32 res args
-emitPrimOp _      res IndexByteArrayOp_DoubleX2         args = doIndexByteArrayOp   Nothing vec2f64 res args
-emitPrimOp _      res IndexByteArrayOp_DoubleAsDoubleX2 args = doIndexByteArrayOpAs Nothing vec2f64 f64 res args
-emitPrimOp _      res IndexByteArrayOp_Int32X4          args = doIndexByteArrayOp   Nothing vec4b32 res args
-emitPrimOp _      res IndexByteArrayOp_Int32AsInt32X4   args = doIndexByteArrayOpAs Nothing vec4b32 b32 res args
-emitPrimOp _      res IndexByteArrayOp_Int64X2          args = doIndexByteArrayOp   Nothing vec2b64 res args
-emitPrimOp _      res IndexByteArrayOp_Int64AsInt64X2   args = doIndexByteArrayOpAs Nothing vec2b64 b64 res args
 
 -- ReadXXXArray, identical to IndexXXXArray.
 
@@ -470,14 +437,6 @@ emitPrimOp dflags res ReadByteArrayOp_Word8            args = doIndexByteArrayOp
 emitPrimOp dflags res ReadByteArrayOp_Word16           args = doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
 emitPrimOp dflags res ReadByteArrayOp_Word32           args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
 emitPrimOp _      res ReadByteArrayOp_Word64           args = doIndexByteArrayOp   Nothing b64  res args
-emitPrimOp _      res ReadByteArrayOp_FloatX4          args = doIndexByteArrayOp   Nothing vec4f32 res args
-emitPrimOp _      res ReadByteArrayOp_FloatAsFloatX4   args = doIndexByteArrayOpAs Nothing vec4f32 f32 res args
-emitPrimOp _      res ReadByteArrayOp_DoubleX2         args = doIndexByteArrayOp   Nothing vec2f64 res args
-emitPrimOp _      res ReadByteArrayOp_DoubleAsDoubleX2 args = doIndexByteArrayOpAs Nothing vec2f64 f64 res args
-emitPrimOp _      res ReadByteArrayOp_Int32X4          args = doIndexByteArrayOp   Nothing vec4b32 res args
-emitPrimOp _      res ReadByteArrayOp_Int32AsInt32X4   args = doIndexByteArrayOpAs Nothing vec4b32 b32 res args
-emitPrimOp _      res ReadByteArrayOp_Int64X2          args = doIndexByteArrayOp   Nothing vec2b64 res args
-emitPrimOp _      res ReadByteArrayOp_Int64AsInt64X2   args = doIndexByteArrayOpAs Nothing vec2b64 b64 res args
 
 -- WriteXXXoffAddr
 
@@ -497,14 +456,6 @@ emitPrimOp dflags res WriteOffAddrOp_Word8            args = doWriteOffAddrOp (J
 emitPrimOp dflags res WriteOffAddrOp_Word16           args = doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
 emitPrimOp dflags res WriteOffAddrOp_Word32           args = doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
 emitPrimOp _      res WriteOffAddrOp_Word64           args = doWriteOffAddrOp Nothing b64 res args
-emitPrimOp _      res WriteOffAddrOp_FloatX4          args = doWriteOffAddrOp Nothing vec4f32 res args
-emitPrimOp _      res WriteOffAddrOp_FloatAsFloatX4   args = doWriteOffAddrOp Nothing f32 res args
-emitPrimOp _      res WriteOffAddrOp_DoubleX2         args = doWriteOffAddrOp Nothing vec2f64 res args
-emitPrimOp _      res WriteOffAddrOp_DoubleAsDoubleX2 args = doWriteOffAddrOp Nothing f64 res args
-emitPrimOp _      res WriteOffAddrOp_Int32X4          args = doWriteOffAddrOp Nothing vec4b32 res args
-emitPrimOp _      res WriteOffAddrOp_Int32AsInt32X4   args = doWriteOffAddrOp Nothing b32 res args
-emitPrimOp _      res WriteOffAddrOp_Int64X2          args = doWriteOffAddrOp Nothing vec2b64 res args
-emitPrimOp _      res WriteOffAddrOp_Int64AsInt64X2   args = doWriteOffAddrOp Nothing b64 res args
 
 -- WriteXXXArray
 
@@ -524,22 +475,25 @@ emitPrimOp dflags res WriteByteArrayOp_Word8            args = doWriteByteArrayO
 emitPrimOp dflags res WriteByteArrayOp_Word16           args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
 emitPrimOp dflags res WriteByteArrayOp_Word32           args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
 emitPrimOp _      res WriteByteArrayOp_Word64           args = doWriteByteArrayOp Nothing b64 res args
-emitPrimOp _      res WriteByteArrayOp_FloatX4          args = doWriteByteArrayOp Nothing vec4f32 res args
-emitPrimOp _      res WriteByteArrayOp_FloatAsFloatX4   args = doWriteByteArrayOp Nothing f32 res args
-emitPrimOp _      res WriteByteArrayOp_DoubleX2         args = doWriteByteArrayOp Nothing vec2f64 res args
-emitPrimOp _      res WriteByteArrayOp_DoubleAsDoubleX2 args = doWriteByteArrayOp Nothing f64 res args
-emitPrimOp _      res WriteByteArrayOp_Int32X4          args = doWriteByteArrayOp Nothing vec4b32 res args
-emitPrimOp _      res WriteByteArrayOp_Int32AsInt32X4   args = doWriteByteArrayOp Nothing b32 res args
-emitPrimOp _      res WriteByteArrayOp_Int64X2          args = doWriteByteArrayOp Nothing vec2b64 res args
-emitPrimOp _      res WriteByteArrayOp_Int64AsInt64X2   args = doWriteByteArrayOp Nothing b64 res args
 
 -- Copying and setting byte arrays
 emitPrimOp _      [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyByteArrayOp src src_off dst dst_off n
 emitPrimOp _      [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyMutableByteArrayOp src src_off dst dst_off n
+emitPrimOp _      [] CopyByteArrayToAddrOp [src,src_off,dst,n] =
+    doCopyByteArrayToAddrOp src src_off dst n
+emitPrimOp _      [] CopyMutableByteArrayToAddrOp [src,src_off,dst,n] =
+    doCopyMutableByteArrayToAddrOp src src_off dst n
+emitPrimOp _      [] CopyAddrToByteArrayOp [src,dst,dst_off,n] =
+    doCopyAddrToByteArrayOp src dst dst_off n
 emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
+
+emitPrimOp _      [res] BSwap16Op [w] = emitBSwapCall res w W16
+emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
+emitPrimOp _      [res] BSwap64Op [w] = emitBSwapCall res w W64
+emitPrimOp dflags [res] BSwapOp   [w] = emitBSwapCall res w (wordWidth dflags)
 
 -- Population count
 emitPrimOp _      [res] PopCnt8Op  [w] = emitPopCntCall res w W8
@@ -554,78 +508,152 @@ emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
 emitPrimOp _      [res] Word2DoubleOp [w] = emitPrimCall [res]
                                             (MO_UF_Conv W64) [w]
 
--- SIMD vector packing and unpacking
-emitPrimOp _ [res] FloatToFloatX4Op [e] =
-    doVecPackOp Nothing vec4f32 zero [e,e,e,e] res
+-- SIMD primops
+emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do
+    checkVecCompatibility dflags vcat n w
+    doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros (replicate n e) res
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 4 (CmmFloat 0 W32))
+    zeros :: CmmExpr
+    zeros = CmmLit $ CmmVec (replicate n zero)
 
-emitPrimOp _ [res] FloatX4PackOp es@[_,_,_,_] =
-    doVecPackOp Nothing vec4f32 zero es res
+    zero :: CmmLit
+    zero = case vcat of
+             IntVec   -> CmmInt 0 w
+             WordVec  -> CmmInt 0 w
+             FloatVec -> CmmFloat 0 w
+
+    ty :: CmmType
+    ty = vecVmmType vcat n w
+
+emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
+    checkVecCompatibility dflags vcat n w
+    when (length es /= n) $
+        panic "emitPrimOp: VecPackOp has wrong number of arguments"
+    doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros es res
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 4 (CmmFloat 0 W32))
+    zeros :: CmmExpr
+    zeros = CmmLit $ CmmVec (replicate n zero)
 
-emitPrimOp _ res@[_,_,_,_] FloatX4UnpackOp [arg] =
-    doVecUnpackOp Nothing vec4f32 arg res
+    zero :: CmmLit
+    zero = case vcat of
+             IntVec   -> CmmInt 0 w
+             WordVec  -> CmmInt 0 w
+             FloatVec -> CmmFloat 0 w
 
-emitPrimOp _ [res] FloatX4InsertOp [v,e,i] =
-    doVecInsertOp Nothing vec4f32 v e i res
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp _ [res] DoubleToDoubleX2Op [e] =
-    doVecPackOp Nothing vec2f64 zero [e,e] res
+emitPrimOp dflags res (VecUnpackOp vcat n w) [arg] = do
+    checkVecCompatibility dflags vcat n w
+    when (length res /= n) $
+        panic "emitPrimOp: VecUnpackOp has wrong number of results"
+    doVecUnpackOp (vecElemProjectCast dflags vcat w) ty arg res
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 2 (CmmFloat 0 W64))
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp _ [res] DoubleX2PackOp es@[_,_] =
-    doVecPackOp Nothing vec2f64 zero es res
+emitPrimOp dflags [res] (VecInsertOp vcat n w) [v,e,i] = do
+    checkVecCompatibility dflags vcat n w
+    doVecInsertOp (vecElemInjectCast dflags vcat w) ty v e i res
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 2 (CmmFloat 0 W64))
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp _ res@[_,_] DoubleX2UnpackOp [arg] =
-    doVecUnpackOp Nothing vec2f64 arg res
-
-emitPrimOp _ [res] DoubleX2InsertOp [v,e,i] =
-    doVecInsertOp Nothing vec2f64 v e i res
-
-emitPrimOp dflags [res] Int32ToInt32X4Op [e] =
-    doVecPackOp (Just (mo_WordTo32 dflags)) vec4b32 zero [e,e,e,e] res
+emitPrimOp dflags res (VecIndexByteArrayOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexByteArrayOp Nothing ty res args
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 4 (CmmInt 0 W32))
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp dflags [res] Int32X4PackOp es@[_,_,_,_] =
-    doVecPackOp (Just (mo_WordTo32 dflags)) vec4b32 zero es res
+emitPrimOp dflags res (VecReadByteArrayOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexByteArrayOp Nothing ty res args
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 4 (CmmInt 0 W32))
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp dflags res@[_,_,_,_] Int32X4UnpackOp [arg] =
-    doVecUnpackOp (Just (mo_s_32ToWord dflags)) vec4b32 arg res
-
-emitPrimOp dflags [res] Int32X4InsertOp [v,e,i] =
-    doVecInsertOp (Just (mo_WordTo32 dflags)) vec4b32 v e i res
-
-emitPrimOp _ [res] Int64ToInt64X2Op [e] =
-    doVecPackOp Nothing vec2b64 zero [e,e] res
+emitPrimOp dflags res (VecWriteByteArrayOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doWriteByteArrayOp Nothing ty res args
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 2 (CmmInt 0 W64))
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp _ [res] Int64X2PackOp es@[_,_] =
-    doVecPackOp Nothing vec2b64 zero es res
+emitPrimOp dflags res (VecIndexOffAddrOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexOffAddrOp Nothing ty res args
   where
-    zero :: CmmExpr
-    zero = CmmLit $ CmmVec (replicate 2 (CmmInt 0 W64))
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp _ res@[_,_] Int64X2UnpackOp [arg] =
-    doVecUnpackOp Nothing vec2b64 arg res
+emitPrimOp dflags res (VecReadOffAddrOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexOffAddrOp Nothing ty res args
+  where
+    ty :: CmmType
+    ty = vecVmmType vcat n w
 
-emitPrimOp _ [res] Int64X2InsertOp [v,e,i] =
-    doVecInsertOp Nothing vec2b64 v e i res
+emitPrimOp dflags res (VecWriteOffAddrOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doWriteOffAddrOp Nothing ty res args
+  where
+    ty :: CmmType
+    ty = vecVmmType vcat n w
+
+emitPrimOp dflags res (VecIndexScalarByteArrayOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexByteArrayOpAs Nothing vecty ty res args
+  where
+    vecty :: CmmType
+    vecty = vecVmmType vcat n w
+
+    ty :: CmmType
+    ty = vecCmmCat vcat w
+
+emitPrimOp dflags res (VecReadScalarByteArrayOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexByteArrayOpAs Nothing vecty ty res args
+  where
+    vecty :: CmmType
+    vecty = vecVmmType vcat n w
+
+    ty :: CmmType
+    ty = vecCmmCat vcat w
+
+emitPrimOp dflags res (VecWriteScalarByteArrayOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doWriteByteArrayOp Nothing ty res args
+  where
+    ty :: CmmType
+    ty = vecCmmCat vcat w
+
+emitPrimOp dflags res (VecIndexScalarOffAddrOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexOffAddrOpAs Nothing vecty ty res args
+  where
+    vecty :: CmmType
+    vecty = vecVmmType vcat n w
+
+    ty :: CmmType
+    ty = vecCmmCat vcat w
+
+emitPrimOp dflags res (VecReadScalarOffAddrOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doIndexOffAddrOpAs Nothing vecty ty res args
+  where
+    vecty :: CmmType
+    vecty = vecVmmType vcat n w
+
+    ty :: CmmType
+    ty = vecCmmCat vcat w
+
+emitPrimOp dflags res (VecWriteScalarOffAddrOp vcat n w) args = do
+    checkVecCompatibility dflags vcat n w
+    doWriteOffAddrOp Nothing ty res args
+  where
+    ty :: CmmType
+    ty = vecCmmCat vcat w
 
 -- Prefetch
 emitPrimOp _ res PrefetchByteArrayOp        args = doPrefetchByteArrayOp res args
@@ -942,33 +970,26 @@ translateOp _      FloatMulOp    = Just (MO_F_Mul  W32)
 translateOp _      FloatDivOp    = Just (MO_F_Quot W32)
 translateOp _      FloatNegOp    = Just (MO_F_Neg  W32)
 
--- Floating point vector ops
+-- Vector ops
 
-translateOp _ FloatX4AddOp  = Just (MO_VF_Add  4 W32)
-translateOp _ FloatX4SubOp  = Just (MO_VF_Sub  4 W32)
-translateOp _ FloatX4MulOp  = Just (MO_VF_Mul  4 W32)
-translateOp _ FloatX4DivOp  = Just (MO_VF_Quot 4 W32)
-translateOp _ FloatX4NegOp  = Just (MO_VF_Neg  4 W32)
+translateOp _ (VecAddOp FloatVec n w) = Just (MO_VF_Add  n w)
+translateOp _ (VecSubOp FloatVec n w) = Just (MO_VF_Sub  n w)
+translateOp _ (VecMulOp FloatVec n w) = Just (MO_VF_Mul  n w)
+translateOp _ (VecDivOp FloatVec n w) = Just (MO_VF_Quot n w)
+translateOp _ (VecNegOp FloatVec n w) = Just (MO_VF_Neg  n w)
 
-translateOp _ DoubleX2AddOp  = Just (MO_VF_Add  2 W64)
-translateOp _ DoubleX2SubOp  = Just (MO_VF_Sub  2 W64)
-translateOp _ DoubleX2MulOp  = Just (MO_VF_Mul  2 W64)
-translateOp _ DoubleX2DivOp  = Just (MO_VF_Quot 2 W64)
-translateOp _ DoubleX2NegOp  = Just (MO_VF_Neg  2 W64)
+translateOp _ (VecAddOp  IntVec n w) = Just (MO_V_Add   n w)
+translateOp _ (VecSubOp  IntVec n w) = Just (MO_V_Sub   n w)
+translateOp _ (VecMulOp  IntVec n w) = Just (MO_V_Mul   n w)
+translateOp _ (VecQuotOp IntVec n w) = Just (MO_VS_Quot n w)
+translateOp _ (VecRemOp  IntVec n w) = Just (MO_VS_Rem  n w)
+translateOp _ (VecNegOp  IntVec n w) = Just (MO_VS_Neg  n w)
 
-translateOp _ Int32X4AddOp   = Just (MO_V_Add   4 W32)
-translateOp _ Int32X4SubOp   = Just (MO_V_Sub   4 W32)
-translateOp _ Int32X4MulOp   = Just (MO_V_Mul   4 W32)
-translateOp _ Int32X4QuotOp  = Just (MO_VS_Quot 4 W32)
-translateOp _ Int32X4RemOp   = Just (MO_VS_Rem  4 W32)
-translateOp _ Int32X4NegOp   = Just (MO_VS_Neg  4 W32)
-
-translateOp _ Int64X2AddOp   = Just (MO_V_Add   2 W64)
-translateOp _ Int64X2SubOp   = Just (MO_V_Sub   2 W64)
-translateOp _ Int64X2MulOp   = Just (MO_V_Mul   2 W64)
-translateOp _ Int64X2QuotOp  = Just (MO_VS_Quot 2 W64)
-translateOp _ Int64X2RemOp   = Just (MO_VS_Rem  2 W64)
-translateOp _ Int64X2NegOp   = Just (MO_VS_Neg  2 W64)
+translateOp _ (VecAddOp  WordVec n w) = Just (MO_V_Add   n w)
+translateOp _ (VecSubOp  WordVec n w) = Just (MO_V_Sub   n w)
+translateOp _ (VecMulOp  WordVec n w) = Just (MO_V_Mul   n w)
+translateOp _ (VecQuotOp WordVec n w) = Just (MO_VU_Quot n w)
+translateOp _ (VecRemOp  WordVec n w) = Just (MO_VU_Rem  n w)
 
 -- Conversions
 
@@ -1042,7 +1063,7 @@ doIndexOffAddrOp _ _ _ _
 
 doIndexOffAddrOpAs :: Maybe MachOp
                    -> CmmType
-                   -> CmmType 
+                   -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
                    -> FCode ()
@@ -1059,19 +1080,19 @@ doIndexByteArrayOp :: Maybe MachOp
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
    = do dflags <- getDynFlags
         mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr rep idx
-doIndexByteArrayOp _ _ _ _ 
+doIndexByteArrayOp _ _ _ _
    = panic "StgCmmPrim: doIndexByteArrayOp"
 
 doIndexByteArrayOpAs :: Maybe MachOp
                     -> CmmType
-                    -> CmmType 
+                    -> CmmType
                     -> [LocalReg]
                     -> [CmmExpr]
                     -> FCode ()
 doIndexByteArrayOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
    = do dflags <- getDynFlags
         mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx_rep idx
-doIndexByteArrayOpAs _ _ _ _ _ 
+doIndexByteArrayOpAs _ _ _ _ _
    = panic "StgCmmPrim: doIndexByteArrayOpAs"
 
 doReadPtrArrayOp :: LocalReg
@@ -1181,6 +1202,70 @@ setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
 
 ------------------------------------------------------------------------------
+-- Helpers for translating vector primops.
+
+vecVmmType :: PrimOpVecCat -> Length -> Width -> CmmType
+vecVmmType pocat n w = vec n (vecCmmCat pocat w)
+
+vecCmmCat :: PrimOpVecCat -> Width -> CmmType
+vecCmmCat IntVec   = cmmBits
+vecCmmCat WordVec  = cmmBits
+vecCmmCat FloatVec = cmmFloat
+
+vecElemInjectCast :: DynFlags -> PrimOpVecCat -> Width -> Maybe MachOp
+vecElemInjectCast _      FloatVec _   =  Nothing
+vecElemInjectCast dflags IntVec   W8  =  Just (mo_WordTo8  dflags)
+vecElemInjectCast dflags IntVec   W16 =  Just (mo_WordTo16 dflags)
+vecElemInjectCast dflags IntVec   W32 =  Just (mo_WordTo32 dflags)
+vecElemInjectCast _      IntVec   W64 =  Nothing
+vecElemInjectCast dflags WordVec  W8  =  Just (mo_WordTo8  dflags)
+vecElemInjectCast dflags WordVec  W16 =  Just (mo_WordTo16 dflags)
+vecElemInjectCast dflags WordVec  W32 =  Just (mo_WordTo32 dflags)
+vecElemInjectCast _      WordVec  W64 =  Nothing
+vecElemInjectCast _      _        _   =  Nothing
+
+vecElemProjectCast :: DynFlags -> PrimOpVecCat -> Width -> Maybe MachOp
+vecElemProjectCast _      FloatVec _   =  Nothing
+vecElemProjectCast dflags IntVec   W8  =  Just (mo_s_8ToWord  dflags)
+vecElemProjectCast dflags IntVec   W16 =  Just (mo_s_16ToWord dflags)
+vecElemProjectCast dflags IntVec   W32 =  Just (mo_s_32ToWord dflags)
+vecElemProjectCast _      IntVec   W64 =  Nothing
+vecElemProjectCast dflags WordVec  W8  =  Just (mo_u_8ToWord  dflags)
+vecElemProjectCast dflags WordVec  W16 =  Just (mo_u_16ToWord dflags)
+vecElemProjectCast dflags WordVec  W32 =  Just (mo_u_32ToWord dflags)
+vecElemProjectCast _      WordVec  W64 =  Nothing
+vecElemProjectCast _      _        _   =  Nothing
+
+-- Check to make sure that we can generate code for the specified vector type
+-- given the current set of dynamic flags.
+checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
+checkVecCompatibility dflags vcat l w = do
+    when (hscTarget dflags /= HscLlvm) $ do
+        sorry $ unlines ["SIMD vector instructions require the LLVM back-end."
+                         ,"Please use -fllvm."]
+    check vecWidth vcat l w
+  where
+    check :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
+    check W128 FloatVec 4 W32 | not (isSseEnabled dflags) =
+        sorry $ "128-bit wide single-precision floating point " ++
+                "SIMD vector instructions require at least -msse."
+    check W128 _ _ _ | not (isSse2Enabled dflags) =
+        sorry $ "128-bit wide integer and double precision " ++
+                "SIMD vector instructions require at least -msse2."
+    check W256 FloatVec _ _ | not (isAvxEnabled dflags) =
+        sorry $ "256-bit wide floating point " ++
+                "SIMD vector instructions require at least -mavx."
+    check W256 _ _ _ | not (isAvx2Enabled dflags) =
+        sorry $ "256-bit wide integer " ++
+                "SIMD vector instructions require at least -mavx2."
+    check W512 _ _ _ | not (isAvx512fEnabled dflags) =
+        sorry $ "512-bit wide " ++
+                "SIMD vector instructions require -mavx512f."
+    check _ _ _ _ = return ()
+
+    vecWidth = typeWidth (vecVmmType vcat l w)
+
+------------------------------------------------------------------------------
 -- Helpers for translating vector packing and unpacking.
 
 doVecPackOp :: Maybe MachOp  -- Cast from element to vector component
@@ -1216,7 +1301,7 @@ doVecPackOp maybe_pre_write_cast ty z es res = do
                  Just cast -> CmmMachOp cast [val]
 
     len :: Length
-    len = vecLength ty 
+    len = vecLength ty
 
     wid :: Width
     wid = typeWidth (vecElemType ty)
@@ -1250,7 +1335,7 @@ doVecUnpackOp maybe_post_read_cast ty e res =
                  Just cast -> CmmMachOp cast [val]
 
     len :: Length
-    len = vecLength ty 
+    len = vecLength ty
 
     wid :: Width
     wid = typeWidth (vecElemType ty)
@@ -1277,7 +1362,7 @@ doVecInsertOp maybe_pre_write_cast ty src e idx res = do
                  Just cast -> CmmMachOp cast [val]
 
     len :: Length
-    len = vecLength ty 
+    len = vecLength ty
 
     wid :: Width
     wid = typeWidth (vecElemType ty)
@@ -1361,6 +1446,34 @@ emitCopyByteArray copy src src_off dst dst_off n = do
     dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
     src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
     copy src dst dst_p src_p n
+
+-- | Takes a source 'ByteArray#', an offset in the source array, a
+-- destination 'Addr#', and the number of bytes to copy.  Copies the given
+-- number of bytes from the source array to the destination memory region.
+doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyByteArrayToAddrOp src src_off dst_p bytes = do
+    -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
+    dflags <- getDynFlags
+    src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
+    emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags 1)
+
+-- | Takes a source 'MutableByteArray#', an offset in the source array, a
+-- destination 'Addr#', and the number of bytes to copy.  Copies the given
+-- number of bytes from the source array to the destination memory region.
+doCopyMutableByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                               -> FCode ()
+doCopyMutableByteArrayToAddrOp = doCopyByteArrayToAddrOp
+
+-- | Takes a source 'Addr#', a destination 'MutableByteArray#', an offset into
+-- the destination array, and the number of bytes to copy.  Copies the given
+-- number of bytes from the source memory region to the destination array.
+doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
+    -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
+    dflags <- getDynFlags
+    dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
+    emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags 1)
+
 
 -- ----------------------------------------------------------------------------
 -- Setting byte arrays
@@ -1567,6 +1680,13 @@ emitAllocateCall res cap n = do
   where
     allocate = CmmLit (CmmLabel (mkForeignLabel (fsLit "allocate") Nothing
                                  ForeignLabelInExternalPackage IsFunction))
+
+emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitBSwapCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_BSwap width)
+        [ x ]
 
 emitPopCntCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitPopCntCall res x width = do

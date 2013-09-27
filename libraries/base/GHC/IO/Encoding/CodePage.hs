@@ -3,13 +3,15 @@
              NondecreasingIndentation, MagicHash #-}
 
 module GHC.IO.Encoding.CodePage(
-#if !defined(mingw32_HOST_OS)
- ) where
-#else
+#if defined(mingw32_HOST_OS)
                         codePageEncoding, mkCodePageEncoding,
                         localeEncoding, mkLocaleEncoding
+#endif
                             ) where
 
+#if !defined(mingw32_HOST_OS)
+import GHC.Base () -- Build ordering
+#else
 import GHC.Base
 import GHC.Show
 import GHC.Num
@@ -23,9 +25,9 @@ import Data.Bits
 import Data.Maybe
 import Data.List (lookup)
 
+import qualified GHC.IO.Encoding.CodePage.API as API
 import GHC.IO.Encoding.CodePage.Table
 
-import GHC.IO.Encoding.Latin1 (mkLatin1)
 import GHC.IO.Encoding.UTF8 (mkUTF8)
 import GHC.IO.Encoding.UTF16 (mkUTF16le, mkUTF16be)
 import GHC.IO.Encoding.UTF32 (mkUTF32le, mkUTF32be)
@@ -76,7 +78,7 @@ mkCodePageEncoding cfm 1200 = mkUTF16le cfm
 mkCodePageEncoding cfm 1201 = mkUTF16be cfm
 mkCodePageEncoding cfm 12000 = mkUTF32le cfm
 mkCodePageEncoding cfm 12001 = mkUTF32be cfm
-mkCodePageEncoding cfm cp = maybe (mkLatin1 cfm) (buildEncoding cfm cp) (lookup cp codePageMap)
+mkCodePageEncoding cfm cp = maybe (API.mkCodePageEncoding cfm cp) (buildEncoding cfm cp) (lookup cp codePageMap)
 
 buildEncoding :: CodingFailureMode -> Word32 -> CodePageArrays -> TextEncoding
 buildEncoding cfm cp SingleByteCP {decoderArray = dec, encoderArray = enc}

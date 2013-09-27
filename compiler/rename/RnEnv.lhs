@@ -20,12 +20,13 @@ module RnEnv (
         greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
-        lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
+        lookupGreRn, lookupGreRn_maybe,
+        lookupGlobalOccInThisModule, lookupGreLocalRn_maybe, 
         getLookupOccRn, addUsedRdrNames,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalName, bindLocalNames, bindLocalNamesFV,
-        MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
+        MiniFixityEnv, 
         addLocalFixities,
         bindLocatedLocalsFV, bindLocatedLocalsRn,
         extendTyVarEnvFVRn,
@@ -36,7 +37,10 @@ module RnEnv (
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg,
-        HsDocContext(..), docOfHsDocContext
+        HsDocContext(..), docOfHsDocContext, 
+
+        -- FsEnv
+        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
 #include "HsVersions.h"
@@ -57,8 +61,9 @@ import Module
 import UniqFM
 import DataCon          ( dataConFieldLabels, dataConTyCon )
 import TyCon            ( isTupleTyCon, tyConArity )
-import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
+import PrelNames        ( mkUnboundName, isUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils         ( MsgDoc )
+import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence )
 import SrcLoc
 import Outputable
 import Util
@@ -70,12 +75,6 @@ import Control.Monad
 import Data.List
 import qualified Data.Set as Set
 import Constants        ( mAX_TUPLE_SIZE )
-\end{code}
-
-\begin{code}
--- XXX
-thenM :: Monad a => a b -> (b -> a c) -> a c
-thenM = (>>=)
 \end{code}
 
 %*********************************************************
@@ -221,7 +220,7 @@ lookupTopBndrRn_maybe rdr_name
                (do { op_ok <- xoptM Opt_TypeOperators
                    ; unless op_ok (addErr (opDeclErr rdr_name)) })
 
-        ; mb_gre <- lookupGreLocalRn rdr_name
+        ; mb_gre <- lookupGreLocalRn_maybe rdr_name
         ; case mb_gre of
                 Nothing  -> return Nothing
                 Just gre -> return (Just $ gre_name gre) }
@@ -530,8 +529,8 @@ we'll miss the fact that the qualified import is redundant.
 \begin{code}
 getLookupOccRn :: RnM (Name -> Maybe Name)
 getLookupOccRn
-  = getLocalRdrEnv                      `thenM` \ local_env ->
-    return (lookupLocalRdrOcc local_env . nameOccName)
+  = do local_env <- getLocalRdrEnv
+       return (lookupLocalRdrOcc local_env . nameOccName)
 
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
@@ -583,7 +582,7 @@ lookup_demoted rdr_name
   = reportUnboundName rdr_name
 
   where
-    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
+    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean DataKinds?")
 \end{code}
 
 Note [Demotion]
@@ -682,12 +681,25 @@ lookupGreRn rdr_name
         ; return (GRE { gre_name = name, gre_par = NoParent,
                         gre_prov = LocalDef }) }}}
 
-lookupGreLocalRn :: RdrName -> RnM (Maybe GlobalRdrElt)
+lookupGreLocalRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Similar, but restricted to locally-defined things
-lookupGreLocalRn rdr_name
+lookupGreLocalRn_maybe rdr_name
   = lookupGreRn_help rdr_name lookup_fn
   where
     lookup_fn env = filter isLocalGRE (lookupGRE_RdrName rdr_name env)
+
+lookupGlobalOccInThisModule :: RdrName -> RnM Name
+-- If not found, add error message
+lookupGlobalOccInThisModule rdr_name
+  | Just n <- isExact_maybe rdr_name
+  = do { n' <- lookupExactOcc n; return n' }
+
+  | otherwise
+  = do { mb_gre <- lookupGreLocalRn_maybe rdr_name
+       ; case mb_gre of
+           Just gre -> return $ gre_name gre
+           Nothing -> do { traceRn (text "lookupGlobalInThisModule" <+> ppr rdr_name)
+                         ; unboundName WL_LocalTop rdr_name } }
 
 lookupGreRn_help :: RdrName                     -- Only used in error message
                  -> (GlobalRdrEnv -> [GlobalRdrElt])    -- Lookup function
@@ -782,7 +794,7 @@ lookupImpDeprec iface gre
 
 Note [Used names with interface not loaded]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's (just) possible to to find a used
+It's (just) possible to find a used
 Name whose interface hasn't been loaded:
 
 a) It might be a WiredInName; in that case we may not load
@@ -814,15 +826,15 @@ lookupQualifiedName rdr_name
   | Just (mod,occ) <- isQual_maybe rdr_name
    -- Note: we want to behave as we would for a source file import here,
    -- and respect hiddenness of modules/packages, hence loadSrcInterface.
-   = loadSrcInterface doc mod False Nothing     `thenM` \ iface ->
+   = do iface <- loadSrcInterface doc mod False Nothing
 
-   case  [ name
-         | avail <- mi_exports iface,
-           name  <- availNames avail,
-           nameOccName name == occ ] of
-      (n:ns) -> ASSERT (null ns) return (Just n)
-      _ -> do { traceRn (text "lookupQualified" <+> ppr rdr_name)
-              ; return Nothing }
+        case  [ name
+              | avail <- mi_exports iface,
+                name  <- availNames avail,
+                nameOccName name == occ ] of
+           (n:ns) -> ASSERT(null ns) return (Just n)
+           _ -> do { traceRn (text "lookupQualified" <+> ppr rdr_name)
+                   ; return Nothing }
 
   | otherwise
   = pprPanic "RnEnv.lookupQualifiedName" (ppr rdr_name)
@@ -1040,10 +1052,12 @@ type FastStringEnv a = UniqFM a         -- Keyed by FastString
 emptyFsEnv  :: FastStringEnv a
 lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
 extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
 
 emptyFsEnv  = emptyUFM
 lookupFsEnv = lookupUFM
 extendFsEnv = addToUFM
+mkFsEnv     = listToUFM
 
 --------------------------------
 type MiniFixityEnv = FastStringEnv (Located Fixity)
@@ -1090,14 +1104,25 @@ lookupFixity is a bit strange.
 \begin{code}
 lookupFixityRn :: Name -> RnM Fixity
 lookupFixityRn name
-  = getModule                           `thenM` \ this_mod ->
-    if nameIsLocalOrFrom this_mod name
-    then do     -- It's defined in this module
-      local_fix_env <- getFixityEnv
-      traceRn (text "lookupFixityRn: looking up name in local environment:" <+>
-               vcat [ppr name, ppr local_fix_env])
-      return $ lookupFixity local_fix_env name
-    else        -- It's imported
+  | isUnboundName name
+  = return (Fixity minPrecedence InfixL) 
+    -- Minimise errors from ubound names; eg
+    --    a>0 `foo` b>0
+    -- where 'foo' is not in scope, should not give an error (Trac #7937)
+
+  | otherwise
+  = do { this_mod <- getModule
+       ; if nameIsLocalOrFrom this_mod name
+         then lookup_local
+         else lookup_imported }
+  where
+    lookup_local   -- It's defined in this module
+      = do { local_fix_env <- getFixityEnv
+           ; traceRn (text "lookupFixityRn: looking up name in local environment:" <+>
+                     vcat [ppr name, ppr local_fix_env])
+           ; return (lookupFixity local_fix_env name) }
+
+    lookup_imported
       -- For imported names, we have to get their fixities by doing a
       -- loadInterfaceForName, and consulting the Ifaces that comes back
       -- from that, because the interface file for the Name might not
@@ -1114,12 +1139,11 @@ lookupFixityRn name
       --
       -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
-        loadInterfaceForName doc name   `thenM` \ iface -> do {
-          traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+>
-                   vcat [ppr name, ppr $ mi_fix_fn iface (nameOccName name)]);
-           return (mi_fix_fn iface (nameOccName name))
-                                                           }
-  where
+      = do { iface <- loadInterfaceForName doc name
+           ; traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+>
+                      vcat [ppr name, ppr $ mi_fix_fn iface (nameOccName name)])
+           ; return (mi_fix_fn iface (nameOccName name)) }
+
     doc = ptext (sLit "Checking fixity for") <+> ppr name
 
 ---------------
@@ -1262,8 +1286,8 @@ bindLocatedLocalsFV :: [Located RdrName]
                     -> ([Name] -> RnM (a,FreeVars)) -> RnM (a, FreeVars)
 bindLocatedLocalsFV rdr_names enclosed_scope
   = bindLocatedLocalsRn rdr_names       $ \ names ->
-    enclosed_scope names                `thenM` \ (thing, fvs) ->
-    return (thing, delFVs names fvs)
+    do (thing, fvs) <- enclosed_scope names
+       return (thing, delFVs names fvs)
 
 -------------------------------------
 
@@ -1628,7 +1652,7 @@ shadowedNameWarn occ shadowed_locs
 
 perhapsForallMsg :: SDoc
 perhapsForallMsg
-  = vcat [ ptext (sLit "Perhaps you intended to use -XExplicitForAll or similar flag")
+  = vcat [ ptext (sLit "Perhaps you intended to use ExplicitForAll or similar flag")
          , ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")]
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc
@@ -1654,7 +1678,7 @@ dupNamesErr get_loc names
 kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
+       2 (ptext (sLit "Perhaps you intended to use KindSignatures"))
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
@@ -1663,7 +1687,7 @@ badQualBndrErr rdr_name
 opDeclErr :: RdrName -> SDoc
 opDeclErr n
   = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
-       2 (ptext (sLit "Use -XTypeOperators to declare operators in type and declarations"))
+       2 (ptext (sLit "Use TypeOperators to declare operators in type and declarations"))
 
 checkTupSize :: Int -> RnM ()
 checkTupSize tup_size

@@ -12,6 +12,10 @@ module HscTypes (
         FinderCache, FindResult(..), ModLocationCache,
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
+        HscStatus(..),
+
+        -- * Hsc monad
+        Hsc(..), runHsc, runInteractiveHsc,
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
@@ -37,7 +41,7 @@ module HscTypes (
 
         PackageInstEnv, PackageRuleBase,
 
-        mkSOName, soExt,
+        mkSOName, mkHsSOName, soExt,
 
         -- * Annotations
         prepareAnnotations,
@@ -143,7 +147,7 @@ import DataCon
 import PrelNames        ( gHC_PRIM, ioTyConName, printName )
 import Packages hiding  ( Version(..) )
 import DynFlags
-import DriverPhases
+import DriverPhases     ( Phase, HscSource(..), isHsBoot, hscSourceString )
 import BasicTypes
 import IfaceSyn
 import CoreSyn          ( CoreRule, CoreVect )
@@ -159,11 +163,12 @@ import StringBuffer     ( StringBuffer )
 import Fingerprint
 import MonadUtils
 import Bag
+import Binary
 import ErrUtils
 import Platform
 import Util
 
-import Control.Monad    ( mplus, guard, liftM, when )
+import Control.Monad    ( mplus, guard, liftM, when, ap )
 import Data.Array       ( Array, array )
 import Data.IORef
 import Data.Time
@@ -171,6 +176,54 @@ import Data.Word
 import Data.Typeable    ( Typeable )
 import Exception
 import System.FilePath
+
+-- -----------------------------------------------------------------------------
+-- Compilation state
+-- -----------------------------------------------------------------------------
+
+-- | Status of a compilation to hard-code
+data HscStatus
+    = HscNotGeneratingCode
+    | HscUpToDate
+    | HscUpdateBoot
+    | HscRecomp CgGuts ModSummary
+
+-- -----------------------------------------------------------------------------
+-- The Hsc monad: Passing an environment and warning state
+
+newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
+
+instance Functor Hsc where
+    fmap = liftM
+
+instance Applicative Hsc where
+    pure = return
+    (<*>) = ap
+
+instance Monad Hsc where
+    return a    = Hsc $ \_ w -> return (a, w)
+    Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
+                                   case k a of
+                                       Hsc k' -> k' e w1
+
+instance MonadIO Hsc where
+    liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
+
+instance HasDynFlags Hsc where
+    getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
+
+runHsc :: HscEnv -> Hsc a -> IO a
+runHsc hsc_env (Hsc hsc) = do
+    (a, w) <- hsc hsc_env emptyBag
+    printOrThrowWarnings (hsc_dflags hsc_env) w
+    return a
+
+-- A variant of runHsc that switches in the DynFlags from the
+-- InteractiveContext before running the Hsc computation.
+--
+runInteractiveHsc :: HscEnv -> Hsc a -> IO a
+runInteractiveHsc hsc_env =
+  runHsc (hsc_env { hsc_dflags = ic_dflags (hsc_IC hsc_env) })
 
 -- -----------------------------------------------------------------------------
 -- Source Errors
@@ -456,7 +509,7 @@ lookupIfaceByModule dflags hpt pit mod
 -- modules imported by this one, directly or indirectly, and are in the Home
 -- Package Table.  This ensures that we don't see instances from modules @--make@
 -- compiled before this one, but which are not below this one.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst Branched])
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
@@ -717,6 +770,113 @@ data ModIface
                 -- See Note [RnNames . Trust Own Package]
      }
 
+instance Binary ModIface where
+   put_ bh (ModIface {
+                 mi_module    = mod,
+                 mi_boot      = is_boot,
+                 mi_iface_hash= iface_hash,
+                 mi_mod_hash  = mod_hash,
+                 mi_flag_hash = flag_hash,
+                 mi_orphan    = orphan,
+                 mi_finsts    = hasFamInsts,
+                 mi_deps      = deps,
+                 mi_usages    = usages,
+                 mi_exports   = exports,
+                 mi_exp_hash  = exp_hash,
+                 mi_used_th   = used_th,
+                 mi_fixities  = fixities,
+                 mi_warns     = warns,
+                 mi_anns      = anns,
+                 mi_decls     = decls,
+                 mi_insts     = insts,
+                 mi_fam_insts = fam_insts,
+                 mi_rules     = rules,
+                 mi_orphan_hash = orphan_hash,
+                 mi_vect_info = vect_info,
+                 mi_hpc       = hpc_info,
+                 mi_trust     = trust,
+                 mi_trust_pkg = trust_pkg }) = do
+        put_ bh mod
+        put_ bh is_boot
+        put_ bh iface_hash
+        put_ bh mod_hash
+        put_ bh flag_hash
+        put_ bh orphan
+        put_ bh hasFamInsts
+        lazyPut bh deps
+        lazyPut bh usages
+        put_ bh exports
+        put_ bh exp_hash
+        put_ bh used_th
+        put_ bh fixities
+        lazyPut bh warns
+        lazyPut bh anns
+        put_ bh decls
+        put_ bh insts
+        put_ bh fam_insts
+        lazyPut bh rules
+        put_ bh orphan_hash
+        put_ bh vect_info
+        put_ bh hpc_info
+        put_ bh trust
+        put_ bh trust_pkg
+
+   get bh = do
+        mod_name    <- get bh
+        is_boot     <- get bh
+        iface_hash  <- get bh
+        mod_hash    <- get bh
+        flag_hash   <- get bh
+        orphan      <- get bh
+        hasFamInsts <- get bh
+        deps        <- lazyGet bh
+        usages      <- {-# SCC "bin_usages" #-} lazyGet bh
+        exports     <- {-# SCC "bin_exports" #-} get bh
+        exp_hash    <- get bh
+        used_th     <- get bh
+        fixities    <- {-# SCC "bin_fixities" #-} get bh
+        warns       <- {-# SCC "bin_warns" #-} lazyGet bh
+        anns        <- {-# SCC "bin_anns" #-} lazyGet bh
+        decls       <- {-# SCC "bin_tycldecls" #-} get bh
+        insts       <- {-# SCC "bin_insts" #-} get bh
+        fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
+        rules       <- {-# SCC "bin_rules" #-} lazyGet bh
+        orphan_hash <- get bh
+        vect_info   <- get bh
+        hpc_info    <- get bh
+        trust       <- get bh
+        trust_pkg   <- get bh
+        return (ModIface {
+                 mi_module      = mod_name,
+                 mi_boot        = is_boot,
+                 mi_iface_hash  = iface_hash,
+                 mi_mod_hash    = mod_hash,
+                 mi_flag_hash   = flag_hash,
+                 mi_orphan      = orphan,
+                 mi_finsts      = hasFamInsts,
+                 mi_deps        = deps,
+                 mi_usages      = usages,
+                 mi_exports     = exports,
+                 mi_exp_hash    = exp_hash,
+                 mi_used_th     = used_th,
+                 mi_anns        = anns,
+                 mi_fixities    = fixities,
+                 mi_warns       = warns,
+                 mi_decls       = decls,
+                 mi_globals     = Nothing,
+                 mi_insts       = insts,
+                 mi_fam_insts   = fam_insts,
+                 mi_rules       = rules,
+                 mi_orphan_hash = orphan_hash,
+                 mi_vect_info   = vect_info,
+                 mi_hpc         = hpc_info,
+                 mi_trust       = trust,
+                 mi_trust_pkg   = trust_pkg,
+                        -- And build the cached values
+                 mi_warn_fn     = mkIfaceWarnCache warns,
+                 mi_fix_fn      = mkIfaceFixCache fixities,
+                 mi_hash_fn     = mkIfaceHashCache decls })
+
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
 
@@ -777,7 +937,7 @@ data ModDetails
         md_exports   :: [AvailInfo],
         md_types     :: !TypeEnv,       -- ^ Local type environment for this particular module
         md_insts     :: ![ClsInst],    -- ^ 'DFunId's for the instances in this module
-        md_fam_insts :: ![FamInst Branched],
+        md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
                                         -- they only annotate things also declared in this module
@@ -823,7 +983,7 @@ data ModGuts
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
-        mg_fam_insts :: ![FamInst Branched], 
+        mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
@@ -953,7 +1113,7 @@ data InteractiveContext
              -- ^ Variables defined automatically by the system (e.g.
              -- record field selectors).  See Notes [ic_sys_vars]
 
-         ic_instances  :: ([ClsInst], [FamInst Branched]),
+         ic_instances  :: ([ClsInst], [FamInst]),
              -- ^ All instances and family instances created during
              -- this session.  These are grabbed en masse after each
              -- update to be sure that proper overlapping is retained.
@@ -963,7 +1123,7 @@ data InteractiveContext
 
          ic_fix_env :: FixityEnv,
             -- ^ Fixities declared in let statements
-         
+
          ic_int_print  :: Name,
              -- ^ The function that is used for printing results
              -- of expressions in ghci and -e mode.
@@ -1280,10 +1440,12 @@ implicitTyConThings tc
 extras_plus :: TyThing -> [TyThing]
 extras_plus thing = thing : implicitTyThings thing
 
--- For newtypes (only) add the implicit coercion tycon
+-- For newtypes and closed type families (only) add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
   | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
+  | Just co <- isClosedSynFamilyTyCon_maybe tc
+                                   = [ACoAxiom co]
   | otherwise                      = []
 
 -- | Returns @True@ if there should be no interface-file declaration
@@ -1379,12 +1541,12 @@ mkTypeEnvWithImplicits things =
     `plusNameEnv`
   mkTypeEnv (concatMap implicitTyThings things)
 
-typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst Branched] -> TypeEnv
+typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst] -> TypeEnv
 typeEnvFromEntities ids tcs famInsts =
   mkTypeEnv (   map AnId ids
              ++ map ATyCon all_tcs
              ++ concatMap implicitTyConThings all_tcs
-             ++ map (ACoAxiom . famInstAxiom) famInsts
+             ++ map (ACoAxiom . toBranchedAxiom . famInstAxiom) famInsts
             )
  where
   all_tcs = tcs ++ famInstsRepTyCons famInsts
@@ -1424,7 +1586,7 @@ lookupType dflags hpt pte name
        return x
   | otherwise
   = lookupNameEnv pte name
-  where 
+  where
     mod = ASSERT2( isExternalName name, ppr name ) nameModule name
     this_pkg = thisPackage dflags
 
@@ -1525,6 +1687,24 @@ data Warnings
      --        a Name to its fixity declaration.
   deriving( Eq )
 
+instance Binary Warnings where
+    put_ bh NoWarnings     = putByte bh 0
+    put_ bh (WarnAll t) = do
+            putByte bh 1
+            put_ bh t
+    put_ bh (WarnSome ts) = do
+            putByte bh 2
+            put_ bh ts
+
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return NoWarnings
+              1 -> do aa <- get bh
+                      return (WarnAll aa)
+              _ -> do aa <- get bh
+                      return (WarnSome aa)
+
 -- | Constructs the cache for the 'mi_warn_fn' field of a 'ModIface'
 mkIfaceWarnCache :: Warnings -> Name -> Maybe WarningTxt
 mkIfaceWarnCache NoWarnings  = \_ -> Nothing
@@ -1623,6 +1803,19 @@ data Dependencies
         -- Equality used only for old/new comparison in MkIface.addFingerprints
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
+instance Binary Dependencies where
+    put_ bh deps = do put_ bh (dep_mods deps)
+                      put_ bh (dep_pkgs deps)
+                      put_ bh (dep_orphs deps)
+                      put_ bh (dep_finsts deps)
+
+    get bh = do ms <- get bh
+                ps <- get bh
+                os <- get bh
+                fis <- get bh
+                return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
+                               dep_finsts = fis })
+
 noDependencies :: Dependencies
 noDependencies = Deps [] [] [] []
 
@@ -1653,10 +1846,19 @@ data Usage
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from the current package
+  -- | A file upon which the module depends, e.g. a CPP #include, or using TH's
+  -- 'addDependentFile'
   | UsageFile {
         usg_file_path  :: FilePath,
-        usg_mtime      :: UTCTime
-        -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
+        -- ^ External file dependency. From a CPP #include or TH
+        -- addDependentFile. Should be absolute.
+        usg_file_hash  :: Fingerprint
+        -- ^ 'Fingerprint' of the file contents.
+
+        -- Note: We don't consider things like modification timestamps
+        -- here, because there's no reason to recompile if the actual
+        -- contents don't change.  This previously lead to odd
+        -- recompilation behaviors; see #8114
   }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
@@ -1671,6 +1873,49 @@ data Usage
         --                      import M()
         -- And of course, for modules that aren't imported directly we don't
         -- depend on their export lists
+
+instance Binary Usage where
+    put_ bh usg@UsagePackageModule{} = do
+        putByte bh 0
+        put_ bh (usg_mod usg)
+        put_ bh (usg_mod_hash usg)
+        put_ bh (usg_safe     usg)
+
+    put_ bh usg@UsageHomeModule{} = do
+        putByte bh 1
+        put_ bh (usg_mod_name usg)
+        put_ bh (usg_mod_hash usg)
+        put_ bh (usg_exports  usg)
+        put_ bh (usg_entities usg)
+        put_ bh (usg_safe     usg)
+
+    put_ bh usg@UsageFile{} = do
+        putByte bh 2
+        put_ bh (usg_file_path usg)
+        put_ bh (usg_file_hash usg)
+
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> do
+            nm    <- get bh
+            mod   <- get bh
+            safe  <- get bh
+            return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod, usg_safe = safe }
+          1 -> do
+            nm    <- get bh
+            mod   <- get bh
+            exps  <- get bh
+            ents  <- get bh
+            safe  <- get bh
+            return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
+                     usg_exports = exps, usg_entities = ents, usg_safe = safe }
+          2 -> do
+            fp   <- get bh
+            hash <- get bh
+            return UsageFile { usg_file_path = fp, usg_file_hash = hash }
+          i -> error ("Binary.get(Usage): " ++ show i)
+
 \end{code}
 
 
@@ -1795,6 +2040,9 @@ mkSOName platform root
       OSDarwin  -> ("lib" ++ root) <.> "dylib"
       OSMinGW32 ->           root  <.> "dll"
       _         -> ("lib" ++ root) <.> "so"
+
+mkHsSOName :: Platform -> FilePath -> FilePath
+mkHsSOName platform root = ("lib" ++ root) <.> soExt platform
 
 soExt :: Platform -> FilePath
 soExt platform
@@ -2055,6 +2303,21 @@ instance Outputable VectInfo where
              , ptext (sLit "parallel vars   :") <+> ppr (vectInfoParallelVars   info)
              , ptext (sLit "parallel tycons :") <+> ppr (vectInfoParallelTyCons info)
              ]
+
+instance Binary IfaceVectInfo where
+    put_ bh (IfaceVectInfo a1 a2 a3 a4 a5) = do
+        put_ bh a1
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+    get bh = do
+        a1 <- get bh
+        a2 <- get bh
+        a3 <- get bh
+        a4 <- get bh
+        a5 <- get bh
+        return (IfaceVectInfo a1 a2 a3 a4 a5)
 \end{code}
 
 %************************************************************************
@@ -2106,6 +2369,10 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_Trustworthy)   = ptext $ sLit "trustworthy"
     ppr (TrustInfo Sf_Safe)          = ptext $ sLit "safe"
     ppr (TrustInfo Sf_SafeInferred)  = ptext $ sLit "safe-inferred"
+
+instance Binary IfaceTrustInfo where
+    put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
+    get bh = getByte bh >>= (return . numToTrustInfo)
 \end{code}
 
 %************************************************************************
@@ -2251,4 +2518,3 @@ emptyModBreaks = ModBreaks
    , modBreaks_decls = array (0,-1) []
    }
 \end{code}
-

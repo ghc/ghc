@@ -249,7 +249,7 @@ setOwningCapability (Capability *cap USED_IF_DEBUG,
   debugTrace (DEBUG_sched, "cap %d: Setting the capability of thread %d to %d",
               cap->no, tso->id, target);
   ASSERT (target < enabled_capabilities);
-  tso->cap = &capabilities[target];
+  tso->cap = capabilities[target];
 }
 
 /* ----------------------------------------------------------------------------
@@ -283,7 +283,8 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
   switch (tso->why_blocked)
   {
     case BlockedOnMVar:
-      {
+    case BlockedOnMVarRead:
+    {
         if (tso->_link == END_TSO_QUEUE) {
           tso->block_info.closure = (StgClosure*)END_TSO_QUEUE;
           if (hasHaskellScheduler (tso))
@@ -837,10 +838,13 @@ printThreadBlockage(StgTSO *tso)
       debugBelch("is blocked until %ld", (long)(tso->block_info.target));
       break;
 #endif
-    case BlockedOnMVar:
-      debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
-      break;
-    case BlockedOnBlackHole:
+  case BlockedOnMVar:
+    debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
+    break;
+  case BlockedOnMVarRead:
+    debugBelch("is blocked on atomic MVar read @ %p", tso->block_info.closure);
+    break;
+  case BlockedOnBlackHole:
       debugBelch("is blocked on a black hole %p",
                  ((StgBlockingQueue*)tso->block_info.bh->bh));
       break;
@@ -913,11 +917,11 @@ printAllThreads(void)
   debugBelch("all threads:\n");
 
   for (i = 0; i < n_capabilities; i++) {
-    cap = &capabilities[i];
-    debugBelch("threads on capability %d:\n", cap->no);
-    for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->_link) {
-      printThreadStatus(t);
-    }
+      cap = capabilities[i];
+      debugBelch("threads on capability %d:\n", cap->no);
+      for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->_link) {
+	  printThreadStatus(t);
+      }
   }
 
   debugBelch("other threads:\n");

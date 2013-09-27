@@ -422,15 +422,16 @@ instance Outputable UnfoldingGuidance where
 
 instance Outputable UnfoldingSource where
   ppr InlineCompulsory  = ptext (sLit "Compulsory")
-  ppr (InlineWrapper w) = ptext (sLit "Worker=") <> ppr w
   ppr InlineStable      = ptext (sLit "InlineStable")
   ppr InlineRhs         = ptext (sLit "<vanilla>")
 
 instance Outputable Unfolding where
   ppr NoUnfolding                = ptext (sLit "No unfolding")
   ppr (OtherCon cs)              = ptext (sLit "OtherCon") <+> ppr cs
-  ppr (DFunUnfolding ar con ops) = ptext (sLit "DFun") <> parens (ptext (sLit "arity=") <> int ar)
-                                   <+> ppr con <+> brackets (pprWithCommas ppr ops)
+  ppr (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
+       = hang (ptext (sLit "DFun:") <+> ptext (sLit "\\") 
+                <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
+            2 (ppr con <+> sep (map ppr args))
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_work_free=wf
@@ -451,10 +452,6 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
             -- blowup in the size of the printout!
-
-instance Outputable e => Outputable (DFunArg e) where
-  ppr (DFunPolyArg e) = braces (ppr e)
-  ppr (DFunLamArg i)  = char '<' <> int i <> char '>'
 \end{code}
 
 -----------------------------------------------------

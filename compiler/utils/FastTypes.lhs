@@ -14,10 +14,10 @@
 module FastTypes (
     -- * FastInt
     FastInt,
-    
+
     -- ** Getting in and out of FastInt
     _ILIT, iBox, iUnbox,
-    
+
     -- ** Arithmetic on FastInt
     (+#), (-#), (*#), quotFastInt, negateFastInt,
     --quotRemFastInt is difficult because unboxed values can't
@@ -51,11 +51,11 @@ module FastTypes (
     --character values above the range of Unicode
 
     -- * FastPtr
-    FastPtr, 
-    
+    FastPtr,
+
     -- ** Getting in and out of FastPtr
     pBox, pUnbox,
-    
+
     -- ** Casting FastPtrs
     castFastPtr
   ) where
@@ -65,7 +65,7 @@ module FastTypes (
 #if defined(__GLASGOW_HASKELL__)
 
 -- Import the beggars
-import GHC.Exts
+import ExtsCompat46
 
 type FastInt = Int#
 

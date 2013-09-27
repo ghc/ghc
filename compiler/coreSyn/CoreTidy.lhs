@@ -206,21 +206,19 @@ tidyIdBndr env@(tidy_env, var_env) id
 
 ------------ Unfolding  --------------
 tidyUnfolding :: TidyEnv -> Unfolding -> Unfolding -> Unfolding
-tidyUnfolding tidy_env (DFunUnfolding ar con args) _
-  = DFunUnfolding ar con (map (fmap (tidyExpr tidy_env)) args)
+tidyUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = args }) _
+  = df { df_bndrs = bndrs', df_args = map (tidyExpr tidy_env') args }
+  where
+    (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
+
 tidyUnfolding tidy_env 
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs
   | isStableSource src
-  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
-	  uf_src  = tidySrc tidy_env src }
+  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs }	   -- Preserves OccInfo
   | otherwise
   = unf_from_rhs
 tidyUnfolding _ unf _ = unf	-- NoUnfolding or OtherCon
-
-tidySrc :: TidyEnv -> UnfoldingSource -> UnfoldingSource
-tidySrc tidy_env (InlineWrapper w) = InlineWrapper (tidyVarOcc tidy_env w)
-tidySrc _        inl_info          = inl_info
 \end{code}
 
 Note [Tidy IdInfo]

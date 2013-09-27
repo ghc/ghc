@@ -84,7 +84,7 @@
 #define MAX_FLOAT_REG   6
 #define MAX_DOUBLE_REG  6
 #define MAX_LONG_REG    1
-#define MAX_SSE_REG     6
+#define MAX_XMM_REG     6
 
 /* -----------------------------------------------------------------------------
    Semi-Tagging constants
@@ -202,34 +202,35 @@
  */
 #define NotBlocked          0
 #define BlockedOnMVar       1
-#define BlockedOnBlackHole  2
-#define BlockedOnRead       3
-#define BlockedOnWrite      4
-#define BlockedOnDelay      5
-#define BlockedOnSTM        6
+#define BlockedOnMVarRead   2
+#define BlockedOnBlackHole  3
+#define BlockedOnRead       4
+#define BlockedOnWrite      5
+#define BlockedOnDelay      6
+#define BlockedOnSTM        7
 
 /* Win32 only: */
-#define BlockedOnDoProc     7
+#define BlockedOnDoProc     8
 
 /* Only relevant for PAR: */
   /* blocked on a remote closure represented by a Global Address: */
-#define BlockedOnGA         8
+#define BlockedOnGA         9
   /* same as above but without sending a Fetch message */
-#define BlockedOnGA_NoSend  9
+#define BlockedOnGA_NoSend  10
 /* Only relevant for THREADED_RTS: */
-#define BlockedOnCCall      10
-#define BlockedOnCCall_Interruptible 11
+#define BlockedOnCCall      11
+#define BlockedOnCCall_Interruptible 12
    /* same as above but permit killing the worker thread */
 
 /* Involved in a message sent to tso->msg_cap */
-#define BlockedOnMsgThrowTo 12
+#define BlockedOnMsgThrowTo 13
 
 /* The thread is not on any run queues, but can be woken up
    by tryWakeupThread() */
-#define ThreadMigrating     13
+#define ThreadMigrating     14
 /* MVar is blocked on a concurrent data structure in user-land */
-#define BlockedInHaskell    14
-#define Yielded             15
+#define BlockedInHaskell    15
+#define Yielded             16
 
 /*
  * These constants are returned to the scheduler by a thread that has

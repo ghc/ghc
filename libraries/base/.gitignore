@@ -10,6 +10,9 @@
 *.eventlog
 *.genscript
 
+# Backup files
+*~
+
 # Specific generated files
 /GNUmakefile
 /autom4te.cache/

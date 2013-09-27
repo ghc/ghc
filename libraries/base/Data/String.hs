@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,10 +26,7 @@ module Data.String (
  , unwords
  ) where
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.Base
-#endif
-
 import Data.List (lines, words, unlines, unwords)
 
 -- | Class for string-like datastructures; used by the overloaded string

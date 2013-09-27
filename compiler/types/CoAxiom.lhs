@@ -4,7 +4,7 @@
 
 \begin{code}
 
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -13,26 +13,34 @@ module CoAxiom (
        Branched, Unbranched, BranchIndex, BranchList(..),
        toBranchList, fromBranchList,
        toBranchedList, toUnbranchedList,
-       brListLength, brListNth, brListMap, brListFoldr,
-       brListZipWith, brListIndices,
+       brListLength, brListNth, brListMap, brListFoldr, brListMapM,
+       brListFoldlM_, brListZipWith,
 
        CoAxiom(..), CoAxBranch(..), 
 
        toBranchedAxiom, toUnbranchedAxiom,
        coAxiomName, coAxiomArity, coAxiomBranches,
-       coAxiomTyCon, isImplicitCoAxiom,
-       coAxiomNthBranch, coAxiomSingleBranch_maybe,
-       coAxiomSingleBranch, coAxBranchTyVars, coAxBranchLHS,
-       coAxBranchRHS, coAxBranchSpan
+       coAxiomTyCon, isImplicitCoAxiom, coAxiomNumPats,
+       coAxiomNthBranch, coAxiomSingleBranch_maybe, coAxiomRole,
+       coAxiomSingleBranch, coAxBranchTyVars, coAxBranchRoles,
+       coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
+       placeHolderIncomps,
+
+       Role(..), fsFromRole,
+
+       CoAxiomRule(..), Eqn
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
+import FastString
 import Name
 import Unique
 import Var
 import Util
+import Binary
+import Pair
 import BasicTypes
 import Data.Typeable ( Typeable )
 import SrcLoc
@@ -99,10 +107,10 @@ that code to deal with branched axioms, especially when the code can be sure
 of the fact that an axiom is indeed a singleton. At the same time, it seems
 dangerous to assume singlehood in various places through GHC.
 
-The solution to this is to label a CoAxiom (and FamInst) with a phantom
-type variable declaring whether it is known to be a singleton or not. The
-list of branches is stored using a special form of list, declared below,
-that ensures that the type variable is accurate.
+The solution to this is to label a CoAxiom with a phantom type variable
+declaring whether it is known to be a singleton or not. The list of branches
+is stored using a special form of list, declared below, that ensures that the
+type variable is accurate.
 
 As of this writing (Dec 2012), it would not be appropriate to use a promoted
 type as the phantom type, so we use empty datatypes. We wish to have GHC
@@ -154,14 +162,6 @@ brListLength :: BranchList a br -> Int
 brListLength (FirstBranch _) = 1
 brListLength (NextBranch _ t) = 1 + brListLength t
 
--- Indices
-brListIndices :: BranchList a br -> [BranchIndex]
-brListIndices bs = go 0 bs 
- where
-   go :: BranchIndex -> BranchList a br -> [BranchIndex]
-   go n (NextBranch _ t) = n : go (n+1) t
-   go n (FirstBranch {}) = [n]
-
 -- lookup
 brListNth :: BranchList a br -> BranchIndex -> a
 brListNth (FirstBranch b) 0 = b
@@ -177,6 +177,21 @@ brListMap f (NextBranch h t) = f h : (brListMap f t)
 brListFoldr :: (a -> b -> b) -> b -> BranchList a br -> b
 brListFoldr f x (FirstBranch b) = f b x
 brListFoldr f x (NextBranch h t) = f h (brListFoldr f x t)
+
+brListMapM :: Monad m => (a -> m b) -> BranchList a br -> m [b]
+brListMapM f (FirstBranch b) = f b >>= \fb -> return [fb]
+brListMapM f (NextBranch h t) = do { fh <- f h
+                                   ; ft <- brListMapM f t
+                                   ; return (fh : ft) }
+
+brListFoldlM_ :: forall a b m br. Monad m
+              => (a -> b -> m a) -> a -> BranchList b br -> m ()
+brListFoldlM_ f z brs = do { _ <- go z brs
+                           ; return () }
+  where go :: forall br'. Monad m => a -> BranchList b br' -> m a
+        go acc (FirstBranch b)  = f acc b
+        go acc (NextBranch h t) = do { fh <- f acc h
+                                     ; go fh t }
 
 -- zipWith
 brListZipWith :: (a -> b -> c) -> BranchList a br1 -> BranchList b br2 -> [c]
@@ -197,6 +212,25 @@ instance Outputable a => Outputable (BranchList a br) where
 %*                                                                      *
 %************************************************************************
 
+Note [Storing compatibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During axiom application, we need to be aware of which branches are compatible
+with which others. The full explanation is in Note [Compatibility] in
+FamInstEnv. (The code is placed there to avoid a dependency from CoAxiom on
+the unification algorithm.) Although we could theoretically compute
+compatibility on the fly, this is silly, so we store it in a CoAxiom.
+
+Specifically, each branch refers to all other branches with which it is
+incompatible. This list might well be empty, and it will always be for the
+first branch of any axiom.
+
+CoAxBranches that do not (yet) belong to a CoAxiom should have a panic thunk
+stored in cab_incomps. The incompatibilities are properly a property of the
+axiom as a whole, and they are computed only when the final axiom is built.
+
+During serialization, the list is converted into a list of the indices
+of the branches.
+
 \begin{code}
 -- | A 'CoAxiom' is a \"coercion constructor\", i.e. a named equality axiom.
 
@@ -206,6 +240,7 @@ data CoAxiom br
   = CoAxiom                   -- Type equality axiom.
     { co_ax_unique   :: Unique        -- unique identifier
     , co_ax_name     :: Name          -- name for pretty-printing
+    , co_ax_role     :: Role          -- role of the axiom's equality
     , co_ax_tc       :: TyCon         -- the head of the LHS patterns
     , co_ax_branches :: BranchList CoAxBranch br
                                       -- the branches that form this axiom
@@ -217,22 +252,28 @@ data CoAxiom br
 
 data CoAxBranch
   = CoAxBranch
-    { cab_loc      :: SrcSpan      -- Location of the defining equation
-                                   -- See Note [CoAxiom locations]
-    , cab_tvs      :: [TyVar]      -- Bound type variables; not necessarily fresh
-                                   -- See Note [CoAxBranch type variables]
-    , cab_lhs      :: [Type]       -- Type patterns to match against
-    , cab_rhs      :: Type         -- Right-hand side of the equality
+    { cab_loc      :: SrcSpan       -- Location of the defining equation
+                                    -- See Note [CoAxiom locations]
+    , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
+                                    -- See Note [CoAxBranch type variables]
+    , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
+    , cab_lhs      :: [Type]        -- Type patterns to match against
+    , cab_rhs      :: Type          -- Right-hand side of the equality
+    , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
+                                    -- See Note [Storing compatibility]
     }
   deriving Typeable
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
-toBranchedAxiom (CoAxiom unique name tc branches implicit)
-  = CoAxiom unique name tc (toBranchedList branches) implicit
+toBranchedAxiom (CoAxiom unique name role tc branches implicit)
+  = CoAxiom unique name role tc (toBranchedList branches) implicit
 
 toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
-toUnbranchedAxiom (CoAxiom unique name tc branches implicit)
-  = CoAxiom unique name tc (toUnbranchedList branches) implicit
+toUnbranchedAxiom (CoAxiom unique name role tc branches implicit)
+  = CoAxiom unique name role tc (toUnbranchedList branches) implicit
+
+coAxiomNumPats :: CoAxiom br -> Int
+coAxiomNumPats = length . coAxBranchLHS . (flip coAxiomNthBranch 0)
 
 coAxiomNthBranch :: CoAxiom br -> BranchIndex -> CoAxBranch
 coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
@@ -244,6 +285,9 @@ coAxiomArity ax index
 
 coAxiomName :: CoAxiom br -> Name
 coAxiomName = co_ax_name
+
+coAxiomRole :: CoAxiom br -> Role
+coAxiomRole = co_ax_role
 
 coAxiomBranches :: CoAxiom br -> BranchList CoAxBranch br
 coAxiomBranches = co_ax_branches
@@ -270,11 +314,20 @@ coAxBranchLHS = cab_lhs
 coAxBranchRHS :: CoAxBranch -> Type
 coAxBranchRHS = cab_rhs
 
+coAxBranchRoles :: CoAxBranch -> [Role]
+coAxBranchRoles = cab_roles
+
 coAxBranchSpan :: CoAxBranch -> SrcSpan
 coAxBranchSpan = cab_loc
 
 isImplicitCoAxiom :: CoAxiom br -> Bool
 isImplicitCoAxiom = co_ax_implicit
+
+coAxBranchIncomps :: CoAxBranch -> [CoAxBranch]
+coAxBranchIncomps = cab_incomps
+
+placeHolderIncomps :: [CoAxBranch]
+placeHolderIncomps = panic "placeHolderIncomps"
 
 \end{code}
 
@@ -299,6 +352,29 @@ class decl, we use the same 'b' to make the same check easy.
 
 So, unlike FamInsts, there is no expectation that the cab_tvs
 are fresh wrt each other, or any other CoAxBranch.
+
+Note [CoAxBranch roles]
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider this code:
+
+  newtype Age = MkAge Int
+  newtype Wrap a = MkWrap a
+
+  convert :: Wrap Age -> Int
+  convert (MkWrap (MkAge i)) = i
+
+We want this to compile to:
+
+  NTCo:Wrap :: forall a. Wrap a ~R a
+  NTCo:Age  :: Age ~R Int
+  convert = \x -> x |> (NTCo:Wrap[0] NTCo:Age[0])
+
+But, note that NTCo:Age is at role R. Thus, we need to be able to pass
+coercions at role R into axioms. However, we don't *always* want to be able to
+do this, as it would be disastrous with type families. The solution is to
+annotate the arguments to the axiom with roles, much like we annotate tycon
+tyvars. Where do these roles get set? Newtype axioms inherit their roles from
+the newtype tycon; family axioms are all at role N.
 
 Note [CoAxiom locations]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,5 +427,98 @@ instance Typeable br => Data.Data (CoAxiom br) where
     toConstr _   = abstractConstr "CoAxiom"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "CoAxiom"
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                    Roles
+%*                                                                      *
+%************************************************************************
+
+Roles are defined here to avoid circular dependencies.
+
+\begin{code}
+
+-- See Note [Roles] in Coercion
+-- defined here to avoid cyclic dependency with Coercion
+data Role = Nominal | Representational | Phantom
+  deriving (Eq, Data.Data, Data.Typeable)
+
+-- These names are slurped into the parser code. Changing these strings
+-- will change the **surface syntax** that GHC accepts! If you want to
+-- change only the pretty-printing, do some replumbing. See
+-- mkRoleAnnotDecl in RdrHsSyn
+fsFromRole :: Role -> FastString
+fsFromRole Nominal          = fsLit "nominal"
+fsFromRole Representational = fsLit "representational"
+fsFromRole Phantom          = fsLit "phantom"
+
+instance Outputable Role where
+  ppr = ftext . fsFromRole
+
+instance Binary Role where
+  put_ bh Nominal          = putByte bh 1
+  put_ bh Representational = putByte bh 2
+  put_ bh Phantom          = putByte bh 3
+
+  get bh = do tag <- getByte bh
+              case tag of 1 -> return Nominal
+                          2 -> return Representational
+                          3 -> return Phantom
+                          _ -> panic ("get Role " ++ show tag)
+
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+                    CoAxiomRule
+              Rules for building Evidence
+%*                                                                      *
+%************************************************************************
+
+Conditional axioms.  The general idea is that a `CoAxiomRule` looks like this:
+
+    forall as. (r1 ~ r2, s1 ~ s2) => t1 ~ t2
+
+My intention is to reuse these for both (~) and (~#).
+The short-term plan is to use this datatype to represent the type-nat axioms.
+In the longer run, it may be good to unify this and `CoAxiom`,
+as `CoAxiom` is the special case when there are no assumptions.
+
+\begin{code}
+-- | A more explicit representation for `t1 ~ t2`.
+type Eqn = Pair Type
+
+-- | For now, we work only with nominal equality.
+data CoAxiomRule = CoAxiomRule
+  { coaxrName      :: FastString
+  , coaxrTypeArity :: Int       -- number of type argumentInts
+  , coaxrAsmpRoles :: [Role]    -- roles of parameter equations
+  , coaxrRole      :: Role      -- role of resulting equation
+  , coaxrProves    :: [Type] -> [Eqn] -> Maybe Eqn
+        -- ^ coaxrProves returns @Nothing@ when it doesn't like
+        -- the supplied arguments.  When this happens in a coercion
+        -- that means that the coercion is ill-formed, and Core Lint
+        -- checks for that.
+  } deriving Typeable
+
+instance Data.Data CoAxiomRule where
+  -- don't traverse?
+  toConstr _   = abstractConstr "CoAxiomRule"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "CoAxiomRule"
+
+instance Uniquable CoAxiomRule where
+  getUnique = getUnique . coaxrName
+
+instance Eq CoAxiomRule where
+  x == y = coaxrName x == coaxrName y
+
+instance Ord CoAxiomRule where
+  compare x y = compare (coaxrName x) (coaxrName y)
+
+instance Outputable CoAxiomRule where
+  ppr = ppr . coaxrName
 \end{code}
 

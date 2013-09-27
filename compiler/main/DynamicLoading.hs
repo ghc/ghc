@@ -11,6 +11,7 @@ module DynamicLoading (
         
         -- * Loading values
         getValueSafely,
+        getHValueSafely,
         lessUnsafeCoerce
 #endif
     ) where
@@ -29,6 +30,7 @@ import PrelNames        ( iNTERACTIVE )
 import DynFlags
 
 import HscTypes         ( HscEnv(..), FindResult(..), ModIface(..), lookupTypeHscEnv )
+import BasicTypes       ( HValue )
 import TypeRep          ( TyThing(..), pprTyThingCategory )
 import Type             ( Type, eqType )
 import TyCon            ( TyCon )
@@ -40,6 +42,7 @@ import FastString
 import ErrUtils
 import Outputable
 import Exception
+import Hooks
 
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
@@ -86,8 +89,18 @@ forceLoadTyCon hsc_env con_name = do
 
 getValueSafely :: HscEnv -> Name -> Type -> IO (Maybe a)
 getValueSafely hsc_env val_name expected_type = do
-    forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of getValueSafely")) val_name
-    
+  mb_hval <- lookupHook getValueSafelyHook getHValueSafely dflags hsc_env val_name expected_type
+  case mb_hval of
+    Nothing   -> return Nothing
+    Just hval -> do
+      value <- lessUnsafeCoerce dflags "getValueSafely" hval
+      return (Just value)
+  where
+    dflags = hsc_dflags hsc_env
+
+getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
+getHValueSafely hsc_env val_name expected_type = do
+    forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of getHValueSafely")) val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupTypeHscEnv hsc_env val_name
     case mb_val_thing of
@@ -104,12 +117,10 @@ getValueSafely hsc_env val_name expected_type = do
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
                 hval <- getHValue hsc_env val_name
-                value <- lessUnsafeCoerce (hsc_dflags hsc_env) "getValueSafely" hval
-                return $ Just value
+                return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
-  where dflags = hsc_dflags hsc_env
-
+   where dflags = hsc_dflags hsc_env
 
 -- | Coerce a value as usual, but:
 --

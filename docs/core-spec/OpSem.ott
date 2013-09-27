@@ -1,0 +1,97 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Dynamic semantics  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% The definitions in this file do *not* strictly correspond to any specific
+% code in GHC. They are here to provide a reasonable operational semantic
+% interpretation to the typing rules presented in the other ott files. Thus,
+% your mileage may vary. In particular, there has been *no* attempt to
+% write any formal proofs over these semantics.
+%
+% With that disclaimer disclaimed, these rules are a reasonable jumping-off
+% point for an analysis of FC's operational semantics. If you don't want to
+% worry about mutual recursion (and who does?), you can even drop the
+% environment S.
+
+grammar
+
+defns
+OpSem :: '' ::=
+
+defn S |- e --> e'  ::  :: step :: 'S_' {{ com Single step semantics }}
+{{ tex [[S]] \labeledjudge{op} [[e]] [[-->]] [[e']] }}
+by
+
+S(n) = e
+----------------- :: Var
+S |- n --> e
+
+S |- e1 --> e1'
+------------------- :: App
+S |- e1 e2 --> e1' e2
+
+----------------------------- :: Beta
+S |- (\n.e1) e2 --> e1[n |-> e2]
+
+g0 = sym (nth 0 g)
+g1 = nth 1 g
+not e2 is_a_type
+not e2 is_a_coercion
+----------------------------------------------- :: Push
+S |- ((\n.e1) |> g) e2 --> (\n.e1 |> g1) (e2 |> g0)
+
+---------------------------------------- :: TPush
+S |- ((\n.e) |> g) t --> (\n.(e |> g n)) t
+
+g0 = nth 1 (nth 0 g)
+g1 = sym (nth 2 (nth 0 g))
+g2 = nth 1 g
+------------------------------- :: CPush
+S |- ((\n.e) |> g) g' --> (\n.e |> g2) (g0 ; g' ; g1)
+
+----------------- :: LetNonRec
+S |- let n = e1 in e2 --> e2[n |-> e1]
+
+
+S, </ [ni |-> ei] // i /> |- u --> u'
+------------------------------------ :: LetRec
+S |- let rec </ ni = ei // i /> in u --> let rec </ ni = ei // i /> in u'
+
+fv(u) \inter </ ni // i /> = empty
+------------------------------------------ :: LetRecReturn
+S |- let rec </ ni = ei // i /> in u --> u
+
+
+S |- e --> e'
+--------------------------------------- :: Case
+S |- case e as n return t of </ alti // i /> --> case e' as n return t of </ alti // i />
+
+altj = K </ alphabb_kbb // bb /> </ xcc_tcc // cc /> -> u
+u' = u[n |-> e] </ [alphabb_kbb |-> sbb] // bb /> </ [xcc_tcc |-> ecc] // cc />
+-------------------------------------------------------------- :: MatchData
+S |- case K </ t'aa // aa /> </ sbb // bb /> </ ecc // cc /> as n return t of </ alti // i /> --> u'
+
+altj = lit -> u
+---------------------------------------------------------------- :: MatchLit
+S |- case lit as n return t of </ alti // i /> --> u[n |-> lit]
+
+altj = _ -> u
+no other case matches
+------------------------------------------------------------ :: MatchDefault
+S |- case e as n return t of </ alti // i /> --> u[n |-> e]
+
+T </ taa // aa /> ~#k T </ t'aa // aa /> = coercionKind g
+forall </ alphaaa_kaa // aa />. forall </ betabb_k'bb // bb />. </ t1cc // cc /> @-> T </ alphaaa_kaa // aa /> = dataConRepType K
+</ e'cc = ecc |> (t1cc @ </ [alphaaa_kaa |-> nth aa g] // aa /> </ [betabb_k'bb |-> <sbb>_Nom] // bb />) // cc />
+--------------------------- :: CasePush
+S |- case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
+
+S |- e --> e'
+------------------------ :: Cast
+S |- e |> g --> e' |> g
+
+S |- e --> e'
+------------------------------ :: Tick
+S |- e { tick } --> e' { tick }
+
