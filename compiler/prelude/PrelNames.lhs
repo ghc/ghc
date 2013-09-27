@@ -1340,12 +1340,12 @@ arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 39
 mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 40
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
-		mutVarPrimTyConKey, ioTyConKey, wordPrimTyConKey, wordTyConKey,
-		word8TyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
-		word64PrimTyConKey, word64TyConKey, liftedConKey, unliftedConKey,
-		anyBoxConKey, kindConKey, boxityConKey, typeConKey, threadIdPrimTyConKey,
-		sContPrimTyConKey, bcoPrimTyConKey, ptrTyConKey, funPtrTyConKey,
-		tVarPrimTyConKey, eqPrimTyConKey, eqReprPrimTyConKey :: Unique
+    mutVarPrimTyConKey, ioTyConKey, wordPrimTyConKey, wordTyConKey,
+    word8TyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
+    word64PrimTyConKey, word64TyConKey, liftedConKey, unliftedConKey,
+    anyBoxConKey, kindConKey, boxityConKey, typeConKey, threadIdPrimTyConKey,
+    sContPrimTyConKey, bcoPrimTyConKey, ptrTyConKey, funPtrTyConKey,
+    tVarPrimTyConKey, eqPrimTyConKey, eqReprPrimTyConKey :: Unique
 
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51

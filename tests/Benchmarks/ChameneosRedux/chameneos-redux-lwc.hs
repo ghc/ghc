@@ -5,13 +5,13 @@
    Modified by Péter Diviánszky, 19 May 2010
    Modified by Louis Wasserman, 14 June 2010
 
-	 Should be compiled with -O2 -threaded -fvia-c -optc-O3 and run with +RTS
-	 -N<number of cores>. Disable thread migration <+RTS -qm> for predictable
-	 performance.
+   Should be compiled with -O2 -threaded -fvia-c -optc-O3 and run with +RTS
+   -N<number of cores>. Disable thread migration <+RTS -qm> for predictable
+   performance.
 
-	 XXX KC: The use of withArrayLen is unsafe. We obtain pointers to addresses
-	 inside the array but not the byte array itself. This is a recipe for
-	 disaster. See http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
+   XXX KC: The use of withArrayLen is unsafe. We obtain pointers to addresses
+   inside the array but not the byte array itself. This is a recipe for
+   disaster. See http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
 -}
 
 import LwConc.Substrate

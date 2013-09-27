@@ -43,7 +43,7 @@ runAllCFinalizers(StgWeak *list)
     }
 
     for (w = list; w; w = w->link) {
-	runCFinalizers((StgCFinalizerList *)w->cfinalizers);
+  runCFinalizers((StgCFinalizerList *)w->cfinalizers);
     }
 
     if (task != NULL) {
@@ -83,29 +83,29 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     // count number of finalizers, and kill all the weak pointers first...
     n = 0;
-    for (w = list; w; w = w->link) { 
-	// Better not be a DEAD_WEAK at this stage; the garbage
-	// collector removes DEAD_WEAKs from the weak pointer list.
-	ASSERT(w->header.info != &stg_DEAD_WEAK_info);
+    for (w = list; w; w = w->link) {
+  // Better not be a DEAD_WEAK at this stage; the garbage
+  // collector removes DEAD_WEAKs from the weak pointer list.
+  ASSERT(w->header.info != &stg_DEAD_WEAK_info);
 
-	if (w->finalizer != &stg_NO_FINALIZER_closure) {
-	    n++;
-	}
+  if (w->finalizer != &stg_NO_FINALIZER_closure) {
+      n++;
+  }
 
-	runCFinalizers((StgCFinalizerList *)w->cfinalizers);
+  runCFinalizers((StgCFinalizerList *)w->cfinalizers);
 
 #ifdef PROFILING
         // A weak pointer is inherently used, so we do not need to call
         // LDV_recordDead().
-	//
+  //
         // Furthermore, when PROFILING is turned on, dead weak
         // pointers are exactly as large as weak pointers, so there is
         // no need to fill the slop, either.  See stg_DEAD_WEAK_info
         // in StgMiscClosures.hc.
 #endif
-	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
+  SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
-	
+
     if (task != NULL) {
         task->running_finalizers = rtsFalse;
     }
@@ -124,23 +124,23 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     n = 0;
     for (w = list; w; w = w->link) {
-	if (w->finalizer != &stg_NO_FINALIZER_closure) {
-	    arr->payload[n] = w->finalizer;
-	    n++;
-	}
+  if (w->finalizer != &stg_NO_FINALIZER_closure) {
+      arr->payload[n] = w->finalizer;
+      n++;
+  }
     }
     // set all the cards to 1
     for (i = n; i < size; i++) {
         arr->payload[i] = (StgClosure *)(W_)(-1);
     }
 
-    t = createIOThread(cap, 
-		       RtsFlags.GcFlags.initialStkSize, 
-		       rts_apply(cap,
-			   rts_apply(cap,
-			       (StgClosure *)runFinalizerBatch_closure,
-			       rts_mkInt(cap,n)), 
-			   (StgClosure *)arr)
-	);
+    t = createIOThread(cap,
+           RtsFlags.GcFlags.initialStkSize,
+           rts_apply(cap,
+         rts_apply(cap,
+             (StgClosure *)runFinalizerBatch_closure,
+             rts_mkInt(cap,n)),
+         (StgClosure *)arr)
+  );
     scheduleThread(cap,t);
 }

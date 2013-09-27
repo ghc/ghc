@@ -358,7 +358,7 @@ moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
     if (to == 1) {
         // THREADED_RTS must work on builds that don't have a mutable
         // BaseReg (eg. unregisterised), so in this case
-	// capabilities[0] must coincide with &MainCapability.
+  // capabilities[0] must coincide with &MainCapability.
         capabilities[0] = &MainCapability;
     }
 
@@ -626,29 +626,29 @@ waitForReturnCapability (Capability **pCap, Task *task)
     Capability *cap = *pCap;
 
     if (cap == NULL) {
-	// Try last_free_capability first
-	cap = last_free_capability;
-	if (cap->running_task) {
-	    nat i;
-	    // otherwise, search for a free capability
+  // Try last_free_capability first
+  cap = last_free_capability;
+  if (cap->running_task) {
+      nat i;
+      // otherwise, search for a free capability
             cap = NULL;
-	    for (i = 0; i < n_capabilities; i++) {
+      for (i = 0; i < n_capabilities; i++) {
                 if (!capabilities[i]->running_task) {
                     cap = capabilities[i];
-		    break;
-		}
-	    }
+        break;
+    }
+      }
             if (cap == NULL) {
                 // Can't find a free one, use last_free_capability.
                 cap = last_free_capability;
             }
-	}
+  }
 
-	// record the Capability as the one this Task is now assocated with.
-	task->cap = cap;
+  // record the Capability as the one this Task is now assocated with.
+  task->cap = cap;
 
     } else {
-	ASSERT(task->cap == cap);
+  ASSERT(task->cap == cap);
     }
 
   ACQUIRE_LOCK(&cap->lock);

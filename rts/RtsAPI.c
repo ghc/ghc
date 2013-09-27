@@ -584,7 +584,7 @@ rts_checkSchedStatus (char* site, Capability *cap)
       errorBelch("%s: uncaught exception",site);
       stg_exit(EXIT_FAILURE);
     case Interrupted:
-	errorBelch("%s: interrupted", site);
+  errorBelch("%s: interrupted", site);
 #ifdef THREADED_RTS
         // The RTS is shutting down, and the process will probably
         // soon exit.  We don't want to preempt the shutdown

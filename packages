@@ -65,7 +65,7 @@ libraries/hoopl              -           packages/hoopl.git              -
 libraries/hpc                -           packages/hpc.git                -
 libraries/integer-gmp        -           packages/integer-gmp.git        -
 libraries/integer-simple     -           packages/integer-simple.git     -
-libraries/lwconc             -           packages/lwconc.git						 -
+libraries/lwconc             -           packages/lwconc.git             -
 libraries/old-locale         -           packages/old-locale.git         -
 libraries/old-time           -           packages/old-time.git           -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
