@@ -1081,11 +1081,8 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_ie (IEThingAbs rdr)
         = do gre <- lookupGreRn rdr
              let name = gre_name gre
-             case gre_par gre of
-                NoParent   -> return (IEThingAbs name,
-                                      AvailTC name [name])
-                ParentIs p -> return (IEThingAbs name,
-                                      AvailTC p [name])
+                 avail = greExportAvail gre
+             return (IEThingAbs name, avail)
 
     lookup_ie ie@(IEThingAll rdr)
         = do name <- lookupGlobalOccRn rdr
@@ -1408,11 +1405,7 @@ extendImportMap rdr_env rdr imp_map
         add _ avails = avail : avails -- add is really just a specialised (++)
         decl_loc = srcSpanEnd (is_dloc imp_decl_spec)
                    -- For srcSpanEnd see Note [The ImportMap]
-        name     = gre_name gre
-        avail    = case gre_par gre of
-                      ParentIs p                  -> AvailTC p [name]
-                      NoParent | isTyConName name -> AvailTC name [name]
-                               | otherwise        -> Avail name
+        avail    = greExportAvail gre
 
     bestImport :: [ImportSpec] -> ImportSpec
     bestImport iss
