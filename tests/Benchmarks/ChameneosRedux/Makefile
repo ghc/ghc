@@ -9,6 +9,6 @@ GHC_OPTS_EXTRA=-XDeriveDataTypeable -XBangPatterns -XCPP -XGeneralizedNewtypeDer
 PROFILE_FLAGS := -DPROFILE_ENABLED -prof -fprof-auto -auto -auto-all -caf-all
 
 #Uncomment the following line to enable profiled compilation
-GHC_OPTS_EXTRA += $(PROFILE_FLAGS)
+#GHC_OPTS_EXTRA += $(PROFILE_FLAGS)
 
 all: $(TARGET)

@@ -9,7 +9,7 @@
 	 -N<number of cores>. Disable thread migration <+RTS -qm> for predictable
 	 performance.
 
-	 XXX KC: The user of withArrayLen is unsafe. We obtain pointers to addresses
+	 XXX KC: The use of withArrayLen is unsafe. We obtain pointers to addresses
 	 inside the array but not the byte array itself. This is a recipe for
 	 disaster. See http://hackage.haskell.org/trac/ghc/ticket/7012. Solution?
 -}

@@ -46,7 +46,6 @@ _INL_(yieldControlAction)
 yieldControlAction :: Sched -> SCont -> PTM ()
 yieldControlAction !(Sched pa) !sc = do
   stat <- getSContStatus sc
-  unsafeIOToPTM $ debugPrint $ "yca: " ++ show sc ++ " " ++ show stat
   -- Fetch current capability's scheduler
   cc <- getCurrentCapability
   let !(frontRef, backRef)= pa ! cc
@@ -68,7 +67,6 @@ _INL_(scheduleSContAction)
 scheduleSContAction :: Sched -> SCont -> PTM ()
 scheduleSContAction !(Sched pa) !sc = do
   stat <- getSContStatus sc
-  unsafeIOToPTM $ debugPrint $ "ssa: " ++ show sc ++ " " ++ show stat
   -- Since we are making the given scont runnable, update its status to Yielded.
   setSContSwitchReason sc Yielded
   -- Fetch the given SCont's scheduler.
