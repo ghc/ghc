@@ -300,6 +300,17 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    There is a new extension,
+                    <literal>EmptyCase</literal>, which allows
+                    to write a case expression with no alternatives
+                    <literal>case ... of {}</literal>.
+               </para>
+           </listitem>
+       </itemizedlist>
+
+        <itemizedlist>
+            <listitem>
+                <para>
                      The <literal>IncoherentInstances</literal>
                      extension has seen a behavioral change, and is
                      now 'liberated' and less conservative during
