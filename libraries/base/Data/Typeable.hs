@@ -7,6 +7,7 @@
            , TypeOperators
            , PolyKinds
            , GADTs
+           , MagicHash
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -43,7 +44,8 @@ module Data.Typeable
         Proxy (..),
 
         -- * The Typeable class
-        Typeable( typeRep ),
+        Typeable,
+        typeRep,
 
         -- * Propositional equality
         (:=:)(Refl),

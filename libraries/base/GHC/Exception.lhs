@@ -194,8 +194,8 @@ data ArithException
   deriving (Eq, Ord, Typeable)
 
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException
-divZeroException    = toException DivideByZero
-overflowException   = toException Overflow
+divZeroException  	= toException DivideByZero
+overflowException 	= toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator
 
 instance Exception ArithException

@@ -162,8 +162,6 @@ sub getrepo {
         # based on where this GHC repo came from.
         my $git_dir = $bare_flag ? "ghc.git" : ".";
         my $branch = &readgit($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
-        die "Bad branch: $branch"
-            unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9.-/]*$!;
         my $remote = &readgit($git_dir, "config", "branch.$branch.remote");
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
