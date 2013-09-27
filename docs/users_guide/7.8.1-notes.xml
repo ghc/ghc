@@ -582,7 +582,7 @@
             <listitem>
                 <para>
                     There are now <literal>Foldable</literal> and <literal>Traversable</literal>
-                    instances for <literal>Either a</literal> and <literal>(,) a</literal>
+                    instances for <literal>Either a</literal>, <literal>Const r</literal>, and <literal>(,) a</literal>
                </para>
            </listitem>
             <listitem>
