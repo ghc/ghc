@@ -53,7 +53,7 @@ scavengeTSO (StgTSO *tso)
 
     debugTrace(DEBUG_gc,"scavenging thread %d",(int)tso->id);
 
-    // update the pointer from the Task.
+    // update the pointer from the InCall.
     if (tso->bound != NULL) {
         tso->bound->tso = tso;
     }
