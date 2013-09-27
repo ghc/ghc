@@ -6941,7 +6941,11 @@ explicit context.  For example in the first argument of the
 constructor <function>MkSwizzle</function>, an implicit "<literal>forall a.</literal>" is
 prefixed to the argument type.  The implicit <literal>forall</literal>
 quantifies all type variables that are not already in scope, and are
-mentioned in the type quantified over.
+mentioned in the type quantified over. (Arguably, it would be better
+to <emphasis>require</emphasis> explicit quantification on constructor arguments
+where that is what is wanted.
+See <ulink url="http://ghc.haskell.org/trac/ghc/ticket/4426">Trac #4426</ulink>.)
+
 </para>
 
 <para>
@@ -6949,19 +6953,17 @@ As for type signatures, implicit quantification happens for non-overloaded
 types too.  So if you write this:
 
 <programlisting>
-  data T a = MkT (Either a b) (b -> b)
+  f :: (a -> a) -> a
 </programlisting>
 
 it's just as if you had written this:
 
 <programlisting>
-  data T a = MkT (forall b. Either a b) (forall b. b -> b)
+  f :: forall a. (a -> a) -> a
 </programlisting>
 
-That is, since the type variable <literal>b</literal> isn't in scope, it's
-implicitly universally quantified.  (Arguably, it would be better
-to <emphasis>require</emphasis> explicit quantification on constructor arguments
-where that is what is wanted.  Feedback welcomed.)
+That is, since the type variable <literal>a</literal> isn't in scope, it's
+implicitly universally quantified.
 </para>
 
 <para>
