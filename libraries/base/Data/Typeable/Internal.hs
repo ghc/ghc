@@ -196,7 +196,7 @@ class Typeable a where
 --  Takes a value of type @a@ and returns a concrete representation
 -- of that type.
 --
--- /Version: 4.7.0.0/
+-- /Since: 4.7.0.0/
 typeRep :: forall proxy a. Typeable a => proxy a -> TypeRep
 typeRep _ = typeRep# (proxy# :: Proxy# a)
 {-# INLINE typeRep #-}
