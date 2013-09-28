@@ -124,6 +124,8 @@ type family (m :: Nat) * (n :: Nat) :: Nat
 type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 -- | Subtraction of type-level naturals.
+--
+-- /Since: 4.7.0.0/
 type family (m :: Nat) - (n :: Nat) :: Nat
 
 
@@ -312,6 +314,7 @@ instance Show (IsEven n) where
 -- Used both at the type and at the value level.
 data Nat1 = Zero | Succ Nat1
 
+-- | /Since: 4.7.0.0/
 type family ToNat1 (n :: Nat) where
   ToNat1 0 = Zero
   ToNat1 x = Succ (ToNat1 (x - 1))
