@@ -567,7 +567,7 @@ sub checkCurrentBranchIsMaster {
     $branch =~ s/\n//;
 
     if ($branch !~ /master/) {
-        print "\nWarning: You trying to 'pull' while on branch '$branch'.\n"
+        print "\nWarning: You are trying to 'pull' while on branch '$branch'.\n"
             . "Updates to this script will happen on the master branch which\n"
             . "means the version on this branch may be out of date.\n\n";
     }
