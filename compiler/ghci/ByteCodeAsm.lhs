@@ -167,8 +167,8 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
       insns_arr = Array.listArray (0, n_insns - 1) asm_insns
       !insns_barr = barr insns_arr
 
-      bitmap_arr = mkBitmapArray dflags bsize bitmap
-      !bitmap_barr = toByteArray bitmap_arr
+      bitmap_arr = mkBitmapArray bsize bitmap
+      !bitmap_barr = barr bitmap_arr
 
       ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
 
@@ -179,15 +179,13 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
-#if __GLASGOW_HASKELL__ > 706
-mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArrayStgWord Int
-mkBitmapArray dflags bsize bitmap
-  = SMRep.listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
-#else
-mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArray Int StgWord
-mkBitmapArray dflags bsize bitmap
-  = Array.listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
-#endif
+mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word
+-- Here the return type must be an array of Words, not StgWords,
+-- because the underlying ByteArray# will end up as a component
+-- of a BCO object.
+mkBitmapArray bsize bitmap
+  = Array.listArray (0, length bitmap) $
+      fromIntegral bsize : map (fromInteger . fromStgWord) bitmap
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,
