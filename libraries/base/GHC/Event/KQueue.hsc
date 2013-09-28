@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , CApiFFI
+{-# LANGUAGE CApiFFI
            , GeneralizedNewtypeDeriving
            , NoImplicitPrelude
            , RecordWildCards

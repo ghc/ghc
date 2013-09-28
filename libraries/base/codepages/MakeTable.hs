@@ -200,7 +200,7 @@ compress n ms = runState (mapM lookupOrAdd chunks) (Map.empty, Map.empty)
 -- Static parts of the generated module.
 
 languageDirectives :: [String]
-languageDirectives = ["{-# LANGUAGE CPP, MagicHash, NoImplicitPrelude #-}"]
+languageDirectives = ["{-# LANGUAGE MagicHash, NoImplicitPrelude #-}"]
 
 
 firstComment :: [FilePath] -> [String]

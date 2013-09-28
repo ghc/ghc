@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , GeneralizedNewtypeDeriving
+{-# LANGUAGE GeneralizedNewtypeDeriving
            , NoImplicitPrelude
            , BangPatterns
   #-}
