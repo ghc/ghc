@@ -1552,7 +1552,8 @@ instDeclCtxt2 dfun_ty
     (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
 inst_decl_ctxt :: SDoc -> SDoc
-inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes doc
+inst_decl_ctxt doc = hang (ptext (sLit "In the instance declaration for"))
+                        2 (quotes doc)
 
 badBootFamInstDeclErr :: SDoc
 badBootFamInstDeclErr

@@ -808,8 +808,8 @@ abstractClasses = [ coercibleClass ]
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg
-  = hang (ptext (sLit "Illegal instance declaration for") 
-          <+> quotes (pprClassPred cls tys))
+  = hang (hang (ptext (sLit "Illegal instance declaration for"))
+             2 (quotes (pprClassPred cls tys)))
        2 msg
 \end{code}
 
@@ -866,12 +866,12 @@ checkValidInstance ctxt hs_type ty
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM Opt_UndecidableInstances
         ; if undecidable_ok 
-          then do checkAmbiguity ctxt ty
-                  checkTc (checkInstLiberalCoverage clas theta inst_tys)
-                          (instTypeErr clas inst_tys liberal_msg)
-          else do { checkInstTermination inst_tys theta
-                  ; checkTc (checkInstCoverage clas inst_tys)
-                            (instTypeErr clas inst_tys msg) }
+          then checkAmbiguity ctxt ty
+          else checkInstTermination inst_tys theta
+
+        ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
+            Nothing  -> return ()   -- Check succeeded
+            Just msg -> addErrTc (instTypeErr clas inst_tys msg)
                   
         ; return (tvs, theta, clas, inst_tys) } 
 
@@ -879,13 +879,7 @@ checkValidInstance ctxt hs_type ty
   = failWithTc (ptext (sLit "Malformed instance head:") <+> ppr tau)
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
-    msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
-                         undecidableMsg])
 
-    liberal_msg = vcat
-      [ ptext $ sLit "Multiple uses of this instance may be inconsistent"
-      , ptext $ sLit "with the functional dependencies of the class."
-      ]
         -- The location of the "head" of the instance
     head_loc = case hs_type of
                  L _ (HsForAllTy _ _ _ (L loc _)) -> loc

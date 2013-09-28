@@ -19,7 +19,7 @@ module FunDeps (
         FDEq (..),
  	Equation(..), pprEquation,
 	improveFromInstEnv, improveFromAnother,
-	checkInstCoverage, checkInstLiberalCoverage, checkFunDeps,
+	checkInstCoverage, checkFunDeps,
 	growThetaTyVars, pprFundeps
     ) where
 
@@ -33,6 +33,7 @@ import Unify
 import InstEnv
 import VarSet
 import VarEnv
+import Maybes( firstJusts )
 import Outputable
 import Util
 import FastString
@@ -454,52 +455,65 @@ instFD (ls,rs) tvs tys
     env       = zipVarEnv tvs tys
     lookup tv = lookupVarEnv_NF env tv
 
-checkInstCoverage :: Class -> [Type] -> Bool
--- Check that the Coverage Condition is obeyed in an instance decl
--- For example, if we have 
---	class theta => C a b | a -> b
--- 	instance C t1 t2 
--- Then we require fv(t2) `subset` fv(t1)
--- See Note [Coverage Condition] below
+checkInstCoverage :: Bool   -- Be liberal
+                  -> Class -> [PredType] -> [Type] 
+                  -> Maybe SDoc
+-- "be_liberal" flag says whether to use "liberal" coveragek of 
+--              See Note [Coverage Condition] below
+--
+-- Return values
+--    Nothing  => no problems
+--    Just msg => coverage problem described by msg
 
-checkInstCoverage clas inst_taus
-  = all fundep_ok fds
+checkInstCoverage be_liberal clas theta inst_taus
+  = firstJusts (map fundep_ok fds)
   where
     (tyvars, fds) = classTvsFds clas
-    fundep_ok fd  = tyVarsOfTypes rs `subVarSet` tyVarsOfTypes ls
-		 where
-		   (ls,rs) = instFD fd tyvars inst_taus
+    fundep_ok fd 
+       | if be_liberal then liberal_ok else conservative_ok
+       = Nothing
+       | otherwise
+       = Just msg
+       where 
+         (ls,rs) = instFD fd tyvars inst_taus
+         ls_tvs = tyVarsOfTypes ls
+         rs_tvs = tyVarsOfTypes rs
+         
+         conservative_ok = rs_tvs `subVarSet` ls_tvs
+         liberal_ok      = rs_tvs `subVarSet` oclose theta ls_tvs
 
-checkInstLiberalCoverage :: Class -> [PredType] -> [Type] -> Bool
--- Check that the Liberal Coverage Condition is obeyed in an instance decl
--- For example, if we have:
---    class C a b | a -> b
---    instance theta => C t1 t2
--- Then we require fv(t2) `subset` oclose(fv(t1), theta)
--- This ensures the self-consistency of the instance, but
--- it does not guarantee termination.
--- See Note [Coverage Condition] below
-
-checkInstLiberalCoverage clas theta inst_taus
-  = all fundep_ok fds
-  where
-    (tyvars, fds) = classTvsFds clas
-    fundep_ok fd = tyVarsOfTypes rs `subVarSet` oclose theta (tyVarsOfTypes ls)
-                    where (ls,rs) = instFD fd tyvars inst_taus
+         liberal_doc = ppWhen be_liberal (ptext (sLit "liberal"))
+         msg = vcat [ sep [ ptext (sLit "The") <+> liberal_doc 
+                            <+> ptext (sLit "coverage condition fails in class")
+                            <+> quotes (ppr clas)
+                          , nest 2 $ ptext (sLit "for functional dependency:")
+                            <+> quotes (pprFunDep fd) ]
+                    , sep [ ptext (sLit "Reason:") <+> pprQuotedList ls
+                          , nest 2 $ ptext (sLit "do not jointly determine")
+                            <+> pprQuotedList rs ]
+                    , ppWhen (not be_liberal && liberal_ok) $
+                      ptext (sLit "Using UndecidableInstances might help") ]
 \end{code}
 
 Note [Coverage condition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-For the coverage condition, we used to require only that 
-	fv(t2) `subset` oclose(fv(t1), theta)
+Example
+      class C a b | a -> b
+      instance theta => C t1 t2
 
-Example:
-	class Mul a b c | a b -> c where
-		(.*.) :: a -> b -> c
+For the coverage condition, we check 
+   (normal)    fv(t2) `subset` fv(t1)
+   (liberal)   fv(t2) `subset` oclose(fv(t1), theta)
 
-	instance Mul Int Int Int where (.*.) = (*)
-	instance Mul Int Float Float where x .*. y = fromIntegral x * y
-	instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
+The liberal version  ensures the self-consistency of the instance, but
+it does not guarantee termination. Example:
+
+   class Mul a b c | a b -> c where
+   	(.*.) :: a -> b -> c
+
+   instance Mul Int Int Int where (.*.) = (*)
+   instance Mul Int Float Float where x .*. y = fromIntegral x * y
+   instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
 
 In the third instance, it's not the case that fv([c]) `subset` fv(a,[b]).
 But it is the case that fv([c]) `subset` oclose( theta, fv(a,[b]) )
