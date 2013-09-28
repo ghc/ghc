@@ -1,6 +1,5 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 

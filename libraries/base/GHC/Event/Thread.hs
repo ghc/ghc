@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns, ForeignFunctionInterface, NoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
 module GHC.Event.Thread
     ( getSystemEventManager
     , getSystemTimerManager

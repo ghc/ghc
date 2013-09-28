@@ -2,10 +2,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
-           , ForeignFunctionInterface
            , MagicHash
            , UnboxedTuples
-           , PatternGuards
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK hide #-}

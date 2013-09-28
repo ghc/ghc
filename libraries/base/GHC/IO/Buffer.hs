@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------

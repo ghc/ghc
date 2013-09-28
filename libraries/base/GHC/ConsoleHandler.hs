@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |

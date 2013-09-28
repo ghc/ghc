@@ -3,7 +3,6 @@
 {-# LANGUAGE NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
-           , ForeignFunctionInterface
   #-}
 {-# OPTIONS_HADDOCK hide #-}
 

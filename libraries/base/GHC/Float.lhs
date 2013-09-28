@@ -4,7 +4,6 @@
            , NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
-           , ForeignFunctionInterface
   #-}
 -- We believe we could deorphan this module, by moving lots of things
 -- around, but we haven't got there yet:

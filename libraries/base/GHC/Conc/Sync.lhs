@@ -6,11 +6,9 @@
            , MagicHash
            , UnboxedTuples
            , UnliftedFFITypes
-           , ForeignFunctionInterface
            , DeriveDataTypeable
            , StandaloneDeriving
            , RankNTypes
-           , PatternGuards
   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}

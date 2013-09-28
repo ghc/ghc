@@ -2,7 +2,6 @@
 {-# LANGUAGE KindSignatures #-}         -- (used all over)
 {-# LANGUAGE TypeFamilies #-}           -- for declaring operators + sing family
 {-# LANGUAGE TypeOperators #-}          -- for declaring operator
-{-# LANGUAGE EmptyDataDecls #-}         -- for declaring the kinds
 {-# LANGUAGE GADTs #-}                  -- for examining type nats
 {-# LANGUAGE PolyKinds #-}              -- for Sing family
 {-# LANGUAGE FlexibleContexts #-}

@@ -1,7 +1,6 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, PatternGuards,
-             ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------

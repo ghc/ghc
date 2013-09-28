@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude
            , OverlappingInstances
            , ScopedTypeVariables
-           , ForeignFunctionInterface
            , FlexibleInstances
            , TypeOperators
            , PolyKinds

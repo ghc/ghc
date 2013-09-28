@@ -1,6 +1,6 @@
 \begin{code}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, NoBangPatterns, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 

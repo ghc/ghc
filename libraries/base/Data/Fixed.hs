@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE ScopedTypeVariables, PatternGuards #-}
-{-# OPTIONS -Wall -fno-warn-unused-binds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS -Wall -fno-warn-unused-binds #-}
 
 -----------------------------------------------------------------------------
 -- |

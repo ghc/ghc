@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
-           , ForeignFunctionInterface
   #-}
 
 -----------------------------------------------------------------------------

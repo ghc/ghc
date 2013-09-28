@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples, ForeignFunctionInterface,
-    NoImplicitPrelude #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------

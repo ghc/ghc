@@ -3,7 +3,6 @@
            , NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
-           , ForeignFunctionInterface
   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}

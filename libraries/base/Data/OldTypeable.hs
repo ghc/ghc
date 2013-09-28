@@ -3,7 +3,6 @@
            , NoImplicitPrelude
            , OverlappingInstances
            , ScopedTypeVariables
-           , ForeignFunctionInterface
            , FlexibleInstances
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields -fno-warn-warnings-deprecations #-}

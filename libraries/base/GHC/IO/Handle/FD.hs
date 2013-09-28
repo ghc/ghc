@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |

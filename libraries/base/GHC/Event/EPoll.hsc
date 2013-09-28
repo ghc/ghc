@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
-           , ForeignFunctionInterface
            , GeneralizedNewtypeDeriving
            , NoImplicitPrelude
            , BangPatterns

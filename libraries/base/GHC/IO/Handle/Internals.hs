@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude
            , RecordWildCards
            , BangPatterns
-           , PatternGuards
            , NondecreasingIndentation
            , RankNTypes
   #-}

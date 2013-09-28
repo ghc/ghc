@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns, CPP, ForeignFunctionInterface, NoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns, CPP, NoImplicitPrelude #-}
 
 module GHC.Event.Array
     (

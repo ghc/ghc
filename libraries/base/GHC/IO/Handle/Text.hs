@@ -3,10 +3,8 @@
            , NoImplicitPrelude
            , RecordWildCards
            , BangPatterns
-           , PatternGuards
            , NondecreasingIndentation
            , MagicHash
-           , ForeignFunctionInterface
   #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}

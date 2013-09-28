@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE TypeOperators      #-}
 {-# LANGUAGE GADTs              #-}
-{-# LANGUAGE EmptyDataDecls     #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE NoImplicitPrelude  #-}

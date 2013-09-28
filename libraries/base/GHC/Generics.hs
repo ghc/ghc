@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy            #-}
 {-# LANGUAGE CPP                    #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
-{-# LANGUAGE EmptyDataDecls         #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE KindSignatures         #-}

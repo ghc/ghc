@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface, CApiFFI,
-             EmptyDataDecls #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, CApiFFI #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------

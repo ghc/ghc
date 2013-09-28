@@ -13,7 +13,7 @@
 -- /Since: 4.5.0.0/
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE UnboxedTuples, MagicHash, EmptyDataDecls #-}
+{-# LANGUAGE UnboxedTuples, MagicHash #-}
 module GHC.Stack (
     -- * Call stack
     currentCallStack,

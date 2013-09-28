@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns
-           , ForeignFunctionInterface
            , DeriveDataTypeable
   #-}
 {-# OPTIONS_GHC -fno-warn-identities #-}

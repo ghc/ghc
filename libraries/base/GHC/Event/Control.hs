@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP
-           , ForeignFunctionInterface
            , NoImplicitPrelude
            , ScopedTypeVariables
            , BangPatterns

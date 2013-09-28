@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
-           , ForeignFunctionInterface
            , MagicHash
            , GeneralizedNewtypeDeriving
   #-}

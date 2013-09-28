@@ -2,8 +2,6 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns
-           , ForeignFunctionInterface
-           , EmptyDataDecls
   #-}
 
 -- ----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |

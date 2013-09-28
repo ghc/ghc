@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
-           , ForeignFunctionInterface
            , NondecreasingIndentation
   #-}
 {-# OPTIONS_HADDOCK hide #-}

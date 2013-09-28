@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, ForeignFunctionInterface #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Conc.Signal
         ( Signal

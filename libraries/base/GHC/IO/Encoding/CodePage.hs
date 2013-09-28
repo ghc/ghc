@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, BangPatterns, ForeignFunctionInterface, NoImplicitPrelude,
+{-# LANGUAGE CPP, BangPatterns, NoImplicitPrelude,
              NondecreasingIndentation, MagicHash #-}
 
 module GHC.IO.Encoding.CodePage(
