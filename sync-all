@@ -176,6 +176,7 @@ sub getrepo {
 
     my $repo_base;
     my $checked_out_tree;
+    my $repo_local = 0;
 
     if ($repo =~ /^...*:/) {
         # HTTP or SSH
@@ -206,6 +207,7 @@ sub getrepo {
     }
     elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
         # Local filesystem, either absolute (C:/ or /) or relative (../) path
+        $repo_local = 1;
         $repo_base = $repo;
         if (-f "$repo/HEAD") {
             # assume a local mirror:
@@ -223,7 +225,7 @@ sub getrepo {
         die "Couldn't work out repo";
     }
 
-    return $repo_base, $checked_out_tree;
+    return $repo_base, $checked_out_tree, $repo_local;
 }
 
 sub gitall {
@@ -244,7 +246,7 @@ sub gitall {
     my $doing;
     my $start_repo;
 
-    my ($repo_base, $checked_out_tree) = getrepo();
+    my ($repo_base, $checked_out_tree, $repo_local) = getrepo();
 
     my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
 
@@ -559,6 +561,22 @@ sub gitall {
     }
 
     unlink "resume";
+}
+
+sub gitInitSubmodules {
+    &git(".", "submodule", "init", @_);
+
+    my ($repo_base, $checked_out_tree, $repo_local) = getrepo();
+    # if we came from a local repository, grab our submodules from their
+    # checkouts over there, if they exist.
+    if ($repo_local) {
+        my $gitConfig = &tryReadFile(".git/config");
+        foreach $_ (split /^/, $gitConfig) {
+            if ($_ =~ /^\[submodule "(.*)"\]$/ and -e "$repo_base/$1/.git") {
+                &git(".", "config", "submodule.$1.url", "$repo_base/$1");
+            }
+        }
+    }
 }
 
 sub checkCurrentBranchIsMaster {
@@ -892,18 +910,19 @@ sub main {
         my @submodule_args = grep(/^-q/,@_);
 
         if ($command eq "get") {
-            &git(".", "submodule", "init", @submodule_args);
+            &gitInitSubmodules(@submodule_args);
         }
+
         if ($command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
-                &git(".", "submodule", "init", @submodule_args);
+                &gitInitSubmodules(@submodule_args);
             }
         }
         if ($command eq "get" or $command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
-                &git(".", "submodule", "init", @submodule_args);
+                &gitInitSubmodules(@submodule_args);
             }
             &git(".", "submodule", "update", @submodule_args);
         }
