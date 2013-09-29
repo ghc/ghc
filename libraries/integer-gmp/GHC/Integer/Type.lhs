@@ -40,7 +40,7 @@ import GHC.Integer.GMP.Prim (
     plusInteger#, minusInteger#, timesInteger#,
     quotRemInteger#, quotInteger#, remInteger#,
     divModInteger#, divInteger#, modInteger#,
-    gcdInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
+    gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
@@ -271,6 +271,17 @@ gcdInteger ia@(S# a)  ib@(J# sb b)
 gcdInteger ia@(J# _ _) ib@(S# _) = gcdInteger ib ia
 gcdInteger (J# sa a) (J# sb b)
   = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
+
+-- | For a and b, compute their greatest common divisor g and the
+-- coefficient s satisfying @a*s + b*t = g@.
+{-# NOINLINE gcdExtInteger #-}
+gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
+gcdExtInteger a@(S# _)   b@(S# _) = gcdExtInteger (toBig a) (toBig b)
+gcdExtInteger a@(S# _) b@(J# _ _) = gcdExtInteger (toBig a) b
+gcdExtInteger a@(J# _ _) b@(S# _) = gcdExtInteger a (toBig b)
+gcdExtInteger (J# sa a) (J# sb b)
+  = case gcdExtInteger# sa a sb b of
+      (# sg, g, ss, s #) -> (# J# sg g, J# ss s #)
 
 {-# NOINLINE lcmInteger #-}
 lcmInteger :: Integer -> Integer -> Integer

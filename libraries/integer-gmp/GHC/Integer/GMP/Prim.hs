@@ -21,6 +21,7 @@ module GHC.Integer.GMP.Prim (
     divExactInteger#,
 
     gcdInteger#,
+    gcdExtInteger#,
     gcdIntegerInt#,
     gcdInt#,
 
@@ -123,6 +124,11 @@ foreign import prim "integer_cmm_divExactIntegerzh" divExactInteger#
 --
 foreign import prim "integer_cmm_gcdIntegerzh" gcdInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- | Extended greatest common divisor.
+--
+foreign import prim "integer_cmm_gcdExtIntegerzh" gcdExtInteger#
+  :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
 
 -- | Greatest common divisor, where second argument is an ordinary {\tt Int\#}.
 --
