@@ -14,11 +14,19 @@
 --
 -----------------------------------------------------------------------------
 
-module System.Mem (
-        performGC
-  ) where
- 
+module System.Mem
+       ( performGC
+       , performMajorGC
+       , performMinorGC
+       ) where
 import Prelude
 
--- | Triggers an immediate garbage collection
-foreign import ccall {-safe-} "performMajorGC" performGC :: IO ()
+-- | Triggers an immediate garbage collection.
+performGC :: IO ()
+performGC = performMajorGC
+
+-- | Triggers an immediate garbage collection.
+foreign import ccall "performMajorGC" performMajorGC :: IO ()
+
+-- | Triggers an immediate minor garbage collection.
+foreign import ccall "performMinorGC" performMinorGC :: IO ()
