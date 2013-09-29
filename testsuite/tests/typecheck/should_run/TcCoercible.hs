@@ -8,7 +8,8 @@ newtype Foo = Foo Age deriving Show
 newtype Bar = Bar Age deriving Show
 newtype Baz = Baz Bar deriving Show
 
-data Map a@N b = Map a b deriving Show
+type role Map nominal representational
+data Map a b = Map a b deriving Show
 
 main = do
     print (coerce $ one                       :: Age)
