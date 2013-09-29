@@ -41,6 +41,10 @@ module GHC.Integer.GMP.Prim (
     mul2ExpInteger#,
     fdivQ2ExpInteger#,
 
+    powInteger#,
+    powModInteger#,
+    recipModInteger#,
+
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -176,6 +180,21 @@ foreign import prim "integer_cmm_mul2ExpIntegerzh" mul2ExpInteger#
 --
 foreign import prim "integer_cmm_fdivQ2ExpIntegerzh" fdivQ2ExpInteger#
   :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_powIntegerzh" powInteger#
+  :: Int# -> ByteArray# -> Word# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_powModIntegerzh" powModInteger#
+  :: Int# -> ByteArray# -> Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_recipModIntegerzh" recipModInteger#
+  :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
 
 -- |
 --

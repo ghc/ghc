@@ -45,6 +45,7 @@ import GHC.Integer.GMP.Prim (
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
     testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
+    powInteger#, powModInteger#, recipModInteger#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -581,7 +582,45 @@ shiftRInteger (J# s d) i = case fdivQ2ExpInteger# s d i of
 testBitInteger :: Integer -> Int# -> Bool
 testBitInteger j@(S# _) i = testBitInteger (toBig j) i
 testBitInteger (J# s d) i = isTrue# (testBitInteger# s d i /=# 0#)
+
+-- | @powInteger b e@ computes base @b@ raised to exponent @e@.
+{-# NOINLINE powInteger #-}
+powInteger :: Integer -> Word# -> Integer
+powInteger j@(S# _) e = powInteger (toBig j) e
+powInteger (J# s d) e = case powInteger# s d e of
+                            (# s', d' #) -> J# s' d'
+
+-- | @powModInteger b e m@ computes base @b@ raised to exponent @e@
+-- modulo @m@.
+--
+-- Negative exponents are supported if an inverse modulo @m@
+-- exists. It's advised to avoid calling this primitive with negative
+-- exponents unless it is guaranteed the inverse exists, as failure to
+-- do so will likely cause program abortion due to a divide-by-zero
+-- fault. See also 'recipModInteger'.
+{-# NOINLINE powModInteger #-}
+powModInteger :: Integer -> Integer -> Integer -> Integer
+powModInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
+    case powModInteger# s1 d1 s2 d2 s3 d3 of
+        (# s', d' #) -> J# s' d'
+powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
+
+-- | @recipModInteger x m@ computes the inverse of @x@ modulo @m@. If
+-- the inverse exists, the return value @y@ will satisfy @0 < y <
+-- abs(m)@, otherwise the result is 0.
+--
+-- Note: The implementation exploits the undocumented property of
+-- @mpz_invert()@ to not mangle the result operand (which is initialized
+-- to 0) in case of non-existence of the inverse.
+{-# NOINLINE recipModInteger #-}
+recipModInteger :: Integer -> Integer -> Integer
+recipModInteger j@(S# _) m@(S# _)   = recipModInteger (toBig j) (toBig m)
+recipModInteger j@(S# _) m@(J# _ _) = recipModInteger (toBig j) m
+recipModInteger j@(J# _ _) m@(S# _) = recipModInteger j (toBig m)
+recipModInteger (J# s d) (J# ms md) = case recipModInteger# s d ms md of
+                           (# s', d' #) -> J# s' d'
 \end{code}
+
 
 %*********************************************************
 %*                                                      *

@@ -49,6 +49,9 @@ import "integer-gmp" __gmpz_and;
 import "integer-gmp" __gmpz_xor;
 import "integer-gmp" __gmpz_ior;
 import "integer-gmp" __gmpz_com;
+import "integer-gmp" __gmpz_pow_ui;
+import "integer-gmp" __gmpz_powm;
+import "integer-gmp" __gmpz_invert;
 
 import "integer-gmp" integer_cbits_decodeDouble;
 
@@ -246,6 +249,47 @@ again:                                                          \
          MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);        \
 }
 
+#define GMP_TAKE3_RET1(name,mp_fun)                             \
+name (W_ ws1, P_ d1, W_ ws2, P_ d2, W_ ws3, P_ d3)              \
+{                                                               \
+  CInt s1, s2, s3;                                              \
+  W_ mp_tmp1;                                                   \
+  W_ mp_tmp2;                                                   \
+  W_ mp_tmp3;                                                   \
+  W_ mp_result1;                                                \
+                                                                \
+again:                                                          \
+  STK_CHK_GEN_N (4 * SIZEOF_MP_INT);                            \
+  MAYBE_GC(again);                                              \
+                                                                \
+  s1 = W_TO_INT(ws1);                                           \
+  s2 = W_TO_INT(ws2);                                           \
+  s3 = W_TO_INT(ws3);                                           \
+                                                                \
+  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
+  mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                          \
+  mp_tmp3    = Sp - 3 * SIZEOF_MP_INT;                          \
+  mp_result1 = Sp - 4 * SIZEOF_MP_INT;                          \
+  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(BYTE_ARR_WDS(d1));       \
+  MP_INT__mp_size(mp_tmp1)  = (s1);                             \
+  MP_INT__mp_d(mp_tmp1)     = BYTE_ARR_CTS(d1);                 \
+  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(BYTE_ARR_WDS(d2));       \
+  MP_INT__mp_size(mp_tmp2)  = (s2);                             \
+  MP_INT__mp_d(mp_tmp2)     = BYTE_ARR_CTS(d2);                 \
+  MP_INT__mp_alloc(mp_tmp3) = W_TO_INT(BYTE_ARR_WDS(d3));       \
+  MP_INT__mp_size(mp_tmp3)  = (s3);                             \
+  MP_INT__mp_d(mp_tmp3)     = BYTE_ARR_CTS(d3);                 \
+                                                                \
+  ccall __gmpz_init(mp_result1 "ptr");                          \
+                                                                \
+  /* Perform the operation */                                   \
+  ccall mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr",  \
+               mp_tmp3  "ptr");                                 \
+                                                                \
+  return (TO_W_(MP_INT__mp_size(mp_result1)),                   \
+         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);        \
+}
+
 #define GMP_TAKE1_UL1_RET1(name,mp_fun)                         \
 name (W_ ws1, P_ d1, W_ wul)                                    \
 {                                                               \
@@ -388,6 +432,10 @@ GMP_TAKE1_RET1(integer_cmm_complementIntegerzh,     __gmpz_com)
 
 GMP_TAKE2_RET2(integer_cmm_quotRemIntegerzh,        __gmpz_tdiv_qr)
 GMP_TAKE2_RET2(integer_cmm_divModIntegerzh,         __gmpz_fdiv_qr)
+
+GMP_TAKE3_RET1(integer_cmm_powModIntegerzh,         __gmpz_powm)
+GMP_TAKE2_RET1(integer_cmm_recipModIntegerzh,       __gmpz_invert)
+GMP_TAKE1_UL1_RET1(integer_cmm_powIntegerzh,        __gmpz_pow_ui)
 
 integer_cmm_gcdIntzh (W_ int1, W_ int2)
 {
