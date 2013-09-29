@@ -1,6 +1,5 @@
 
 {-# LANGUAGE MagicHash #-}
-{-# OPTIONS_GHC -Werror #-}
 
 -- Trac #2806
 

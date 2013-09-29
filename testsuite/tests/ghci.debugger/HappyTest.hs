@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP, MagicHash, BangPatterns #-}
 import Data.Char
 import Data.Array
 import GHC.Exts
@@ -416,7 +416,7 @@ happyReduce k i fn 0# tk st sts stk
      = happyFail 0# tk st sts stk
 happyReduce k nt fn j tk st sts stk
      = case happyDrop (k -# (1# :: Int#)) sts of
-	 sts1@((HappyCons (st1@(action)) (_))) ->
+	 !sts1@((HappyCons (st1@(action)) (_))) ->
         	let r = fn stk in  -- it doesn't hurt to always seq here...
        		happyDoSeq r (happyGoto nt j tk st1 sts1 r)
 
@@ -424,14 +424,14 @@ happyMonadReduce k nt fn 0# tk st sts stk
      = happyFail 0# tk st sts stk
 happyMonadReduce k nt fn j tk st sts stk =
         happyThen1 (fn stk tk) (\r -> happyGoto nt j tk st1 sts1 (r `HappyStk` drop_stk))
-       where sts1@((HappyCons (st1@(action)) (_))) = happyDrop k (HappyCons (st) (sts))
+       where !sts1@((HappyCons (st1@(action)) (_))) = happyDrop k (HappyCons (st) (sts))
              drop_stk = happyDropStk k stk
 
 happyMonad2Reduce k nt fn 0# tk st sts stk
      = happyFail 0# tk st sts stk
 happyMonad2Reduce k nt fn j tk st sts stk =
        happyThen1 (fn stk tk) (\r -> happyNewToken new_state sts1 (r `HappyStk` drop_stk))
-       where sts1@((HappyCons (st1@(action)) (_))) = happyDrop k (HappyCons (st) (sts))
+       where !sts1@((HappyCons (st1@(action)) (_))) = happyDrop k (HappyCons (st) (sts))
              drop_stk = happyDropStk k stk
 
              off    = indexShortOffAddr happyGotoOffsets st1
