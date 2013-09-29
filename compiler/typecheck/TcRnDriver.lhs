@@ -945,16 +945,26 @@ tcAmpWarn =
 
 -- | Warn on local definitions of names that would clash with Prelude versions,
 --   i.e. join/pure/<*>
+--
+--   A name clashes if the following criteria are met:
+--       1. It would is imported (unqualified) from Prelude
+--       2. It is locally defined in the current module
+--       3. It has the same literal name as the reference function
+--       4. It is not identical to the reference function
 tcAmpFunctionWarn :: Name -- ^ Name to check, e.g. joinMName for join
                   -> TcM ()
 tcAmpFunctionWarn name = do
+    { traceTc "tcAmpFunctionWarn/wouldBeImported" empty
+    -- Is the name imported (unqualified) from Prelude? (Point 4 above)
+    ; rnImports <- fmap (map unLoc . tcg_rn_imports) getGblEnv
+    -- (Note that this automatically handles -XNoImplicitPrelude, as Prelude
+    -- will not appear in rnImports automatically if it is set.)
+
+    -- Continue only the name is imported from Prelude
+    ; when (tcAmpImportViaPrelude name rnImports) $ do
+      -- Handle 2.-4.
     { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
 
-      -- Finds *other* elements having the same literal name. A name clashes
-      -- iff:
-      --   1. It is locally defined in the current module
-      --   2. It has the same literal name as the reference function
-      --   3. It is not identical to the reference function
     ; let clashes :: GlobalRdrElt -> Bool
           clashes x = and [ gre_prov x == LocalDef
                           , nameOccName (gre_name x) == nameOccName name
@@ -976,7 +986,57 @@ tcAmpFunctionWarn name = do
               , ptext (sLit "under the Applicative-Monad Proposal.")
               ]
     ; mapM_ warn_msg clashingElts
-    }
+    }}
+
+-- | Is the given name imported via Prelude?
+--
+--   This function makes sure that e.g. "import Prelude (map)" should silence
+--   AMP warnings about "join" even when they are locally defined.
+--
+--   Possible scenarios:
+--     a) Prelude is imported implicitly, issue warnings.
+--     b) Prelude is imported explicitly, but without mentioning the name in
+--        question. Issue no warnings.
+--     c) Prelude is imported hiding the name in question. Issue no warnings.
+--     d) Qualified import of Prelude, no warnings.
+tcAmpImportViaPrelude :: Name
+                      -> [ImportDecl Name]
+                      -> Bool
+tcAmpImportViaPrelude name = any importViaPrelude
+  where
+    isPrelude :: ImportDecl Name -> Bool
+    isPrelude = (== "Prelude") .  moduleNameString . unLoc . ideclName
+
+    -- Implicit (Prelude) import?
+    isImplicit :: ImportDecl Name -> Bool
+    isImplicit = ideclImplicit
+
+    -- Unqualified import?
+    isUnqualified :: ImportDecl Name -> Bool
+    isUnqualified = not . ideclQualified
+
+    second :: (a -> b) -> (x, a) -> (x, b)
+    second f (x, y) = (x, f y)
+
+    -- List of explicitly imported (or hidden) Names from a single import.
+    --   Nothing -> No explicit imports
+    --   Just (False, <names>) -> Explicit import list of <names>
+    --   Just (True , <names>) -> Explicit hiding of <names>
+    importList :: ImportDecl Name -> Maybe (Bool, [Name])
+    importList = fmap (second (map (ieName . unLoc))) . ideclHiding
+
+    -- Check whether the given name would be imported (unqualified) from
+    -- an import declaration.
+    importViaPrelude :: ImportDecl Name -> Bool
+    importViaPrelude x = isPrelude x && isUnqualified x && or [
+        -- Whole Prelude imported -> potential clash
+          isImplicit x
+        -- Explicit import/hiding list, if applicable
+        , case importList x of
+            Just (False, explicit) -> nameOccName name `elem`    map nameOccName explicit
+            Just (True , hidden  ) -> nameOccName name `notElem` map nameOccName hidden
+            Nothing                -> False
+        ]
 
 -- | Issue a warning for instance definitions lacking a should-be parent class.
 --   Used for Monad without Applicative and MonadPlus without Alternative.
