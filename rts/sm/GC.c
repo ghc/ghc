@@ -801,6 +801,7 @@ new_gc_thread (nat n, gc_thread *t)
     initSpinLock(&t->gc_spin);
     initSpinLock(&t->mut_spin);
     ACQUIRE_SPIN_LOCK(&t->gc_spin);
+    ACQUIRE_SPIN_LOCK(&t->mut_spin);
     t->wakeup = GC_THREAD_INACTIVE;  // starts true, so we can wait for the
                           // thread to start up, see wakeup_gc_threads
 #endif
