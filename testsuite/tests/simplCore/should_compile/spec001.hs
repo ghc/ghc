@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, UnboxedTuples, MagicHash, StandaloneDeriving, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -O #-}
+{-# OPTIONS_GHC -fno-warn-amp #-}
 
 -- In GHC 6.4, compiling this module gave a Core Lint failure following the
 -- specialier, because a function was floated out that had a RULE that
@@ -136,8 +137,7 @@ comparePS (PS off1 len1 fp1) (PS off2 len2 fp2)
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpack ps) r
 
-#include "Typeable.h"
-INSTANCE_TYPEABLE0(PackedString,packedStringTc,"PackedString")
+deriving instance Typeable PackedString
 
 -- -----------------------------------------------------------------------------
 -- Constructor functions
