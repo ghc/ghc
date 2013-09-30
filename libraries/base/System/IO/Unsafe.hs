@@ -33,7 +33,7 @@ import Control.Exception
 -- safe to use with multiple threads.  The unsafety arises when used
 -- like this:
 --
--- >  unsafeFixIO $ \r ->
+-- >  unsafeFixIO $ \r -> do
 -- >     forkIO (print r)
 -- >     return (...)
 --
