@@ -1005,7 +1005,7 @@ tcAmpImportViaPrelude :: Name
 tcAmpImportViaPrelude name = any importViaPrelude
   where
     isPrelude :: ImportDecl Name -> Bool
-    isPrelude = (== "Prelude") .  moduleNameString . unLoc . ideclName
+    isPrelude imp = unLoc (ideclName imp) == pRELUDE_NAME
 
     -- Implicit (Prelude) import?
     isImplicit :: ImportDecl Name -> Bool
