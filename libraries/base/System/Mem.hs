@@ -29,4 +29,4 @@ performGC = performMajorGC
 foreign import ccall "performMajorGC" performMajorGC :: IO ()
 
 -- | Triggers an immediate minor garbage collection.
-foreign import ccall "performMinorGC" performMinorGC :: IO ()
+foreign import ccall "performGC" performMinorGC :: IO ()
