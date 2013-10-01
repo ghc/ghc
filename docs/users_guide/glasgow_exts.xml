@@ -2528,24 +2528,21 @@ After expanding type synonyms, GHC does validity checking on types, looking for
 the following mal-formedness which isn't detected simply by kind checking:
 <itemizedlist>
 <listitem><para>
-Type constructor applied to a type involving for-alls.
-</para></listitem>
-<listitem><para>
-Unboxed tuple on left of an arrow.
+Type constructor applied to a type involving for-alls (if <literal>XImpredicativeTypes</literal>
+is off)
 </para></listitem>
 <listitem><para>
 Partially-applied type synonym.
 </para></listitem>
 </itemizedlist>
-So, for example,
-this will be rejected:
+So, for example, this will be rejected:
 <programlisting>
-  type Pr = (# Int, Int #)
+  type Pr = forall a. a
 
-  h :: Pr -> Int
-  h x = ...
+  h :: [Pr]
+  h = ...
 </programlisting>
-because GHC does not allow  unboxed tuples on the left of a function arrow.
+because GHC does not allow type constructors applied to for-all types.
 </para>
 </sect2>
 
