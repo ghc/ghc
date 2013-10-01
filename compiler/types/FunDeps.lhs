@@ -475,14 +475,18 @@ checkInstCoverage be_liberal clas theta inst_taus
          conservative_ok = rs_tvs `subVarSet` ls_tvs
          liberal_ok      = rs_tvs `subVarSet` oclose theta ls_tvs
 
-         liberal_doc = ppWhen be_liberal (ptext (sLit "liberal"))
-         msg = vcat [ sep [ ptext (sLit "The") <+> liberal_doc
+         msg = vcat [ sep [ ptext (sLit "The")
+                            <+> ppWhen be_liberal (ptext (sLit "liberal"))
                             <+> ptext (sLit "coverage condition fails in class")
                             <+> quotes (ppr clas)
                           , nest 2 $ ptext (sLit "for functional dependency:")
                             <+> quotes (pprFunDep fd) ]
-                    , sep [ ptext (sLit "Reason:") <+> pprQuotedList ls
-                          , nest 2 $ ptext (sLit "do not jointly determine")
+                    , sep [ ptext (sLit "Reason: lhs type")<>plural ls <+> pprQuotedList ls
+                          , nest 2 $
+                            (if isSingleton ls
+                             then ptext (sLit "does not")
+                             else ptext (sLit "do not jointly"))
+                            <+> ptext (sLit "deternine rhs type")<>plural rs
                             <+> pprQuotedList rs ]
                     , ppWhen (not be_liberal && liberal_ok) $
                       ptext (sLit "Using UndecidableInstances might help") ]
