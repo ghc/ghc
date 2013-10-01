@@ -1316,16 +1316,41 @@ dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
 -- for dictionary selectors.  If the selector is saturated (ie has one
 -- argument: the dictionary), we feed the demand on the result into
 -- the indicated dictionary component.
-dmdTransformDictSelSig (StrictSig (DmdType _ [dictJd] _)) cd
-  = case peelCallDmd cd of
-      (cd',False,_) -> case splitProdDmd_maybe dictJd of
-        Just jds -> DmdType emptyDmdEnv [mkManyUsedDmd $ mkProdDmd $ map enhance jds] topRes
-          where enhance old | isAbsDmd old = old
-                            | otherwise    = mkManyUsedDmd cd'
-        Nothing   -> panic "dmdTransformDictSelSig: split failed"
-      _ -> topDmdType
+dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
+   | (cd',defer,_) <- peelCallDmd cd
+   , not defer
+   , Just jds <- splitProdDmd_maybe dict_dmd
+   = DmdType emptyDmdEnv [mkManyUsedDmd $ mkProdDmd $ map (enhance cd') jds] topRes
+   | otherwise
+   = topDmdType              -- See Note [Demand transformer for a ditionary selector]
+  where
+    enhance cd old | isAbsDmd old = old
+                   | otherwise    = mkManyUsedDmd cd
+
 dmdTransformDictSelSig _ _ = panic "dmdTransformDictSelSig: no args"
 \end{code}
+
+Note [Demand transformer for a ditionary selector]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we evaluate (op dict-expr) under demand 'd', then we can push the demand 'd'
+into the appropriate field of the dictionary. What *is* the appropriate field?
+We just look at the strictness signature of the class op, which will be
+something like: U(AAASAAAAA).  Then replace the 'S' by the demand 'd'.
+
+For single-method classes, which are represented by newtypes the signature 
+of 'op' won't look like U(...), so the splitProdDmd_maybe will fail.
+That's fine: if we are doing strictness analysis we are also doing inling,
+so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
+way, returning topDmdType.
+
+It is (just.. Trac #8329) possible to be running strictness analysis *without*
+having inlined class ops from single-method classes.  Suppose you are using
+ghc --make; and the first module has a local -O0 flag.  So you may load a class
+without interface pragmas, ie (currently) without an unfolding for the class
+ops.   Now if a subsequent module in the --make sweep has a local -O flag
+you might do strictness analysis, but there is no inlining for the class op.
+This is wierd so I'm not worried about whether this optimises brilliantly; but
+it should not fall over.
 
 Note [Non-full application] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
