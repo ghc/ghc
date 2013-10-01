@@ -1983,7 +1983,7 @@ showDynFlags show_all dflags = do
         (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flgs)
                                         DynFlags.fFlags
         flgs = [ Opt_PrintExplicitForalls
-               , Opt_PrintKindArgs
+               , Opt_PrintExplicitKinds
                , Opt_PrintBindResult
                , Opt_BreakOnException
                , Opt_BreakOnError
