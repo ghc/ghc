@@ -151,9 +151,7 @@ extern generation * oldest_gen;
 
    StgPtr allocate(Capability *cap, W_ n)
                                 Allocates memory from the nursery in
-                                the current Capability.  This can be
-                                done without taking a global lock,
-                                unlike allocate().
+                                the current Capability.
 
    StgPtr allocatePinned(Capability *cap, W_ n)
                                 Allocates a chunk of contiguous store
