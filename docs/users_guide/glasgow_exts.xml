@@ -9230,7 +9230,7 @@ mindef ::= name
       <para>A vertical bar denotes disjunction, i.e. one of the two sides is required.
       A comma denotes conjunction, i.e. both sides are required.
       Conjunction binds stronger than disjunction.</para>
-      <para>If no MINIMAL pragma is used, then all methods without a default will be requried, excluding methods with a name that starts with an underscore.</para>
+      <para>If no MINIMAL pragma is used, then all methods without a default will be required, excluding methods with a name that starts with an underscore.</para>
       <para>This warning can be turned off with the flag <option>-fno-warn-missing-methods</option>.</para>
     </sect2>
 

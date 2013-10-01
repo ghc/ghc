@@ -750,7 +750,7 @@ Prelude System.IO Map>
 </screen>
 
       <para>Note that the <literal>Prelude</literal> import is marked
-      as implicit.  It can be overriden with an explicit
+      as implicit.  It can be overridden with an explicit
       <literal>Prelude</literal> import, just like in a Haskell
       module.</para>
 

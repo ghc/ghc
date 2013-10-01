@@ -28,7 +28,7 @@
     <para>
         By default, GHC mainly aims to behave (mostly) like a Haskell&nbsp;2010
         compiler, although you can tell it to try to behave like a
-        particular version of the langauge with the
+        particular version of the language with the
         <literal>-XHaskell98</literal> and
         <literal>-XHaskell2010</literal> flags. The known deviations
         from the standards are described below. Unless otherwise stated,
@@ -107,7 +107,7 @@ main = do args &lt;- getArgs
   <sect3 id="infelicities-exprs-pats">
       <title>Expressions and patterns</title>
 
-    <para>In its default mode, GHC makes some programs sligtly more defined 
+    <para>In its default mode, GHC makes some programs slightly more defined 
     than they should be. For example, consider
     <programlisting>
 f :: [a] -> b -> b

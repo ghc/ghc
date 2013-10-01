@@ -248,7 +248,7 @@
 
             <para>
                 Note: this interface will likely see continuous
-                refinment and API changes in future releases, so it
+                refinement and API changes in future releases, so it
                 should be considered a preview.
            </para>
        </listitem>

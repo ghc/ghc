@@ -1214,7 +1214,7 @@
           </row>
           <row>
             <entry><option>-fpackage-trust</option></entry>
-            <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworty modules.</entry>
+            <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworthy modules.</entry>
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
@@ -2890,7 +2890,7 @@
           </row>
           <row>
             <entry><option>-dsuppress-all</option></entry>
-            <entry>In core dumps, suppress everything (except for uniques) that is suppressable.</entry>
+            <entry>In core dumps, suppress everything (except for uniques) that is suppressible.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
