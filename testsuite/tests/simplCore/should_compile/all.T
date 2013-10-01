@@ -192,3 +192,4 @@ test('T8221',
      extra_clean(['T8221a.hi', 'T8221a.o']),
      run_command,
      ['$MAKE -s --no-print-directory T8221'])
+test('T8329', only_ways(['optasm']), multimod_compile, ['T8329','-v0 -O'])
