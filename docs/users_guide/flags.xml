@@ -8,9 +8,7 @@
     (if available).</para>
 
   <sect2>
-    <title>Help and verbosity options</title>
-
-    <para><xref linkend="options-help"/></para>
+    <title>Verbosity options</title>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -24,18 +22,6 @@
         </thead>
         <tbody>
           <row>
-            <entry><option>-?</option></entry>
-            <entry>help</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--help</option></entry>
-            <entry>help</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-v</option></entry>
             <entry>verbose mode (equivalent to <option>-v3</option>)</entry>
             <entry>dynamic</entry>
@@ -48,46 +34,16 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-V</option></entry>
-            <entry>display GHC version</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
+            <entry><option>-fprint-explicit-foralls</option></entry>
+            <entry>print explicit <literal>forall</literal> quantification in types</entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-explicit-foralls</entry>
           </row>
           <row>
-            <entry><option>--supported-extensions</option> or <option>--supported-languages</option></entry>
-            <entry>display the supported languages and language extensions</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--show-options</option></entry>
-            <entry>display the supported command line options</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--info</option></entry>
-            <entry>display information about the compiler</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--version</option></entry>
-            <entry>display GHC version</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--numeric-version</option></entry>
-            <entry>display GHC version (numeric only)</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--print-libdir</option></entry>
-            <entry>display GHC library directory</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
+            <entry><option>-fprint-explicit-kinds</option></entry>
+            <entry>print explicit kind foralls and kind arguments in types</entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-explicit-kinds</entry>
           </row>
           <row>
             <entry><option>-ferror-spans</option></entry>
@@ -112,6 +68,110 @@
     </informaltable>
 
   </sect2>
+  <sect2>
+    <title>Alternative modes of operation</title>
+
+    <para><xref linkend="options-help"/></para>
+    <para><xref linkend="modes"/></para>
+
+    <informaltable>
+      <tgroup cols="4" align="left" colsep="1" rowsep="1">
+        <thead>
+          <row>
+            <entry>Flag</entry>
+            <entry>Description</entry>
+            <entry>Static/Dynamic</entry>
+            <entry>Reverse</entry>
+          </row>
+        </thead>
+        <tbody>
+          <row>
+            <entry><option>--help</option>,<option>-?</option></entry>
+            <entry>Disply help</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>--interactive</option></entry>
+            <entry>Interactive mode - normally used by just running <command>ghci</command>;
+              see <xref linkend="ghci"/> for details.</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>--make</option></entry>
+            <entry>Build a multi-module Haskell program, automatically figuring out dependencies. Likely to be much easier, and faster, than using <command>make</command>;
+              see <xref linkend="make-mode"/> for details..</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-e <replaceable>expr</replaceable></option></entry>
+            <entry>Evaluate <replaceable>expr</replaceable>;
+              see <xref linkend="eval-mode"/> for details.</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>--show-iface</option></entry>
+            <entry>Display the contents of an interface file.</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-M</option></entry>
+            <entry>Generate dependency information suitable for use in a <filename>Makefile</filename>;
+              see <xref linkend="makefile-dependencies"/> for details.</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+
+
+          <row>
+            <entry><option>--supported-extensions</option>, <option>--supported-languages</option></entry>
+            <entry>display the supported language extensions</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>--show-options</option></entry>
+            <entry>display the supported command line options</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>--info</option></entry>
+            <entry>display information about the compiler</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>--version, -V</option></entry>
+            <entry>display GHC version</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>--numeric-version</option></entry>
+            <entry>display GHC version (numeric only)</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>--print-libdir</option></entry>
+            <entry>display GHC library directory</entry>
+            <entry>mode</entry>
+            <entry>-</entry>
+          </row>
+
+        </tbody>
+      </tgroup>
+    </informaltable>
+  </sect2>
+
   <sect2>
     <title>Which phases to run</title>
 
@@ -156,55 +216,6 @@
             <entry><option>-x</option> <replaceable>suffix</replaceable></entry>
             <entry>Override default behaviour for source files</entry>
             <entry>static</entry>
-            <entry>-</entry>
-          </row>
-        </tbody>
-      </tgroup>
-    </informaltable>
-  </sect2>
-
-  <sect2>
-    <title>Alternative modes of operation</title>
-
-    <para><xref linkend="modes"/></para>
-
-    <informaltable>
-      <tgroup cols="4" align="left" colsep="1" rowsep="1">
-        <thead>
-          <row>
-            <entry>Flag</entry>
-            <entry>Description</entry>
-            <entry>Static/Dynamic</entry>
-            <entry>Reverse</entry>
-          </row>
-        </thead>
-        <tbody>
-          <row>
-            <entry><option>--interactive</option></entry>
-            <entry>Interactive mode - normally used by just running <command>ghci</command>;
-              see <xref linkend="ghci"/> for details.</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>--make</option></entry>
-            <entry>Build a multi-module Haskell program, automatically figuring out dependencies. Likely to be much easier, and faster, than using <command>make</command>;
-              see <xref linkend="make-mode"/> for details..</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-e <replaceable>expr</replaceable></option></entry>
-            <entry>Evaluate <replaceable>expr</replaceable>;
-              see <xref linkend="eval-mode"/> for details.</entry>
-            <entry>mode</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-M</option></entry>
-            <entry>Generate dependency information suitable for use in a <filename>Makefile</filename>;
-              see <xref linkend="makefile-dependencies"/> for details.</entry>
-            <entry>mode</entry>
             <entry>-</entry>
           </row>
         </tbody>

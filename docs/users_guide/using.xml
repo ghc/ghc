@@ -308,6 +308,7 @@ module X where
 
   <sect1 id="modes">
     <title>Modes of operation</title>
+    <indexterm><primary>help options</primary></indexterm>
 
     <para>
       GHC's behaviour is firstly controlled by a mode flag.  Only one
@@ -791,9 +792,8 @@ ghc -c Foo.hs
   </sect1>
 
   <sect1 id="options-help">
-    <title>Help and verbosity options</title>
+    <title>Verbosity options</title>
 
-    <indexterm><primary>help options</primary></indexterm>
     <indexterm><primary>verbosity options</primary></indexterm>
 
     <para>See also the <option>--help</option>, <option>--version</option>, <option>--numeric-version</option>,
@@ -878,6 +878,43 @@ ghc -c Foo.hs
               </listitem>
             </varlistentry>
           </variablelist>
+        </listitem>
+      </varlistentry>
+
+
+      <varlistentry>
+        <term><option>--fprint-explicit-foralls, -fprint-explicit-kinds</option>
+          <indexterm><primary><option>-fprint-explicit-foralls</option></primary></indexterm>
+          <indexterm><primary><option>-fprint-explicit-kinds</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>These two flags control the way in which GHC displays types, in error messages and in GHCi.
+          Using <option>-fprint-explicit-foralls</option> makes GHC print explicit <literal>forall</literal>
+          quantification at the top level of a type; normally this is suppressed.  For example, in GHCi:
+<screen>
+ghci> let f x = x
+ghci> :t f
+f :: a -> a
+ghci> :set -fprint-explicit-foralls
+ghci> :t f
+f :: forall a. a -> a
+</screen>
+         Using <option>-fprint-explicit-kinds</option> makes GHC print kind-foralls and kind applications
+         in types, which are normally suppressed.  This can be important when you are using kind polymorphism.
+         For example:
+<screen>
+ghci> :set -XPolyKinds
+ghci> data T a = MkT
+ghci> :t MkT
+MkT :: T b
+ghci> :set -fprint-explicit-foralls
+ghci> :t MkT
+MkT :: forall (b::k). T b
+ghci> :set -fprint-explicit-kinds
+ghci> :t MkT
+MkT :: forall (k::BOX) (b:k). T b
+</screen>
+         </para>
         </listitem>
       </varlistentry>
 
