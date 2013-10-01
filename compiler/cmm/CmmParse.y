@@ -122,9 +122,9 @@ be anything at all.
 If a low-level procedure implements the NativeNode calling convention,
 then it can be called by high-level code using an ordinary function
 call.  In general this is hard to arrange because the calling
-convention depends on the number of physical register available for
+convention depends on the number of physical registers available for
 parameter passing, but there are two cases where the calling
-convention is platform-independnt:
+convention is platform-independent:
 
  - Zero arguments.
 

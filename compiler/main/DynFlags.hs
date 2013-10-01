@@ -1126,7 +1126,7 @@ wayGeneralFlags _ WayDebug    = []
 wayGeneralFlags _ WayDyn      = [Opt_PIC]
     -- We could get away without adding -fPIC when compiling the
     -- modules of a program that is to be linked with -dynamic; the
-    -- program itself does not need to be position-independet, only
+    -- program itself does not need to be position-independent, only
     -- the libraries need to be.  HOWEVER, GHCi links objects into a
     -- .so before loading the .so using the system linker.  Since only
     -- PIC objects can be linked into a .so, we have to compile even

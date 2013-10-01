@@ -451,7 +451,7 @@ instFD (ls,rs) tvs tys
 checkInstCoverage :: Bool   -- Be liberal
                   -> Class -> [PredType] -> [Type]
                   -> Maybe SDoc
--- "be_liberal" flag says whether to use "liberal" coveragek of
+-- "be_liberal" flag says whether to use "liberal" coverage of
 --              See Note [Coverage Condition] below
 --
 -- Return values

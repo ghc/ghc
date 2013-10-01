@@ -1322,7 +1322,7 @@ dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
    , Just jds <- splitProdDmd_maybe dict_dmd
    = DmdType emptyDmdEnv [mkManyUsedDmd $ mkProdDmd $ map (enhance cd') jds] topRes
    | otherwise
-   = topDmdType              -- See Note [Demand transformer for a ditionary selector]
+   = topDmdType              -- See Note [Demand transformer for a dictionary selector]
   where
     enhance cd old | isAbsDmd old = old
                    | otherwise    = mkManyUsedDmd cd
@@ -1330,7 +1330,7 @@ dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
 dmdTransformDictSelSig _ _ = panic "dmdTransformDictSelSig: no args"
 \end{code}
 
-Note [Demand transformer for a ditionary selector]
+Note [Demand transformer for a dictionary selector]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we evaluate (op dict-expr) under demand 'd', then we can push the demand 'd'
 into the appropriate field of the dictionary. What *is* the appropriate field?
@@ -1349,7 +1349,7 @@ ghc --make; and the first module has a local -O0 flag.  So you may load a class
 without interface pragmas, ie (currently) without an unfolding for the class
 ops.   Now if a subsequent module in the --make sweep has a local -O flag
 you might do strictness analysis, but there is no inlining for the class op.
-This is wierd so I'm not worried about whether this optimises brilliantly; but
+This is weird, so I'm not worried about whether this optimises brilliantly; but
 it should not fall over.
 
 Note [Non-full application] 
