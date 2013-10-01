@@ -853,6 +853,7 @@ tests/lib/integer/integerBits
 tests/lib/integer/integerConstantFolding
 tests/lib/integer/integerConstantFolding.simpl
 tests/lib/integer/integerConversions
+tests/lib/integer/integerGmpInternals
 tests/lib/libposix/po003.out
 tests/lib/libposix/posix002
 tests/lib/libposix/posix003
