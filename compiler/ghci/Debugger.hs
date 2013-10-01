@@ -206,9 +206,8 @@ newGrimName userName  = do
 pprTypeAndContents :: GhcMonad m => Id -> m SDoc
 pprTypeAndContents id = do
   dflags  <- GHC.getSessionDynFlags
-  let pefas     = gopt Opt_PrintExplicitForalls dflags
-      pcontents = gopt Opt_PrintBindContents dflags
-      pprdId    = (PprTyThing.pprTyThing pefas . AnId) id
+  let pcontents = gopt Opt_PrintBindContents dflags
+      pprdId    = (PprTyThing.pprTyThing . AnId) id
   if pcontents 
     then do
       let depthBound = 100

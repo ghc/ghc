@@ -40,8 +40,8 @@ module TypeRep (
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, pprSigmaType,
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
-        pprKind, pprParendKind, pprTyLit,
-	Prec(..), maybeParen, pprTcApp, pprTypeNameApp, 
+        pprKind, pprParendKind, pprTyLit, suppressKinds,
+	Prec(..), maybeParen, pprTcApp, 
         pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
@@ -81,8 +81,8 @@ import PrelNames
 import Outputable
 import FastString
 import Pair
-import StaticFlags( opt_PprStyle_Debug )
 import Util
+import DynFlags
 
 -- libraries
 import Data.List( mapAccumL, partition )
@@ -527,10 +527,7 @@ pprEqPred (Pair ty1 ty2)
 
 ------------
 pprClassPred :: Class -> [Type] -> SDoc
-pprClassPred = ppr_class_pred ppr_type
-
-ppr_class_pred :: (Prec -> a -> SDoc) -> Class -> [a] -> SDoc
-ppr_class_pred pp clas tys = pprTypeNameApp TopPrec pp (getName clas) tys
+pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
 ------------
 pprTheta :: ThetaType -> SDoc
@@ -582,7 +579,7 @@ ppr_type _ (TyConApp tc [LitTy (StrTyLit n),ty])
   | tc `hasKey` ipClassNameKey
   = char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty
 
-ppr_type p (TyConApp tc tys)  = pprTcApp p ppr_type tc tys
+ppr_type p (TyConApp tc tys)  = pprTyTcApp p tc tys
 
 ppr_type p (LitTy l)          = ppr_tylit p l
 ppr_type p ty@(ForAllTy {})   = ppr_forall_type p ty
@@ -620,9 +617,14 @@ ppr_tylit _ tl =
 ppr_sigma_type :: Bool -> Type -> SDoc
 -- Bool <=> Show the foralls
 ppr_sigma_type show_foralls ty
-  =  sep [ if show_foralls then pprForAll tvs else empty
-        , pprThetaArrowTy ctxt
-        , pprType tau ]
+  = sdocWithDynFlags $ \ dflags -> 
+    let filtered_tvs | gopt Opt_PrintExplicitKinds dflags 
+                     = tvs
+                     | otherwise
+                     = filterOut isKindVar tvs
+    in sep [ ppWhen show_foralls (pprForAll filtered_tvs)
+           , pprThetaArrowTy ctxt
+           , pprType tau ]
   where
     (tvs,  rho) = split1 [] ty
     (ctxt, tau) = split2 [] rho
@@ -635,7 +637,8 @@ ppr_sigma_type show_foralls ty
 
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType ty = ppr_sigma_type opt_PprStyle_Debug ty
+pprSigmaType ty = sdocWithDynFlags $ \dflags ->
+                  ppr_sigma_type (gopt Opt_PrintExplicitForalls dflags) ty
 
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
@@ -671,7 +674,26 @@ remember to parenthesise the operator, thus
 See Trac #2766.
 
 \begin{code}
+pprTypeApp :: TyCon -> [Type] -> SDoc
+pprTypeApp tc tys = pprTyTcApp TopPrec tc tys
+        -- We have to use ppr on the TyCon (not its name)
+        -- so that we get promotion quotes in the right place
+
+pprTyTcApp :: Prec -> TyCon -> [Type] -> SDoc
+-- Used for types only; so that we can make a
+-- special case for type-level lists
+pprTyTcApp p tc tys
+  | tc `hasKey` consDataConKey
+  , [_kind,ty1,ty2] <- tys
+  = sdocWithDynFlags $ \dflags ->
+    if gopt Opt_PrintExplicitKinds dflags then pprTcApp  p ppr_type tc tys
+                                   else pprTyList p ty1 ty2
+
+  | otherwise
+  = pprTcApp p ppr_type tc tys
+
 pprTcApp :: Prec -> (Prec -> a -> SDoc) -> TyCon -> [a] -> SDoc
+-- Used for both types and coercions, hence polymorphism
 pprTcApp _ pp tc [ty]
   | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
@@ -691,43 +713,63 @@ pprTcApp p pp tc tys
     (tupleParens (tupleTyConSort dc_tc) $
      sep (punctuate comma (map (pp TopPrec) ty_args)))
 
-  | not opt_PprStyle_Debug
-  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey, eqReprPrimTyConKey] 
-                           -- We need to special case the type equality TyCons because
-  , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
-                           -- With -dppr-debug switch this off so we can see the kind
+  | otherwise
+  = sdocWithDynFlags (pprTcApp_help p pp tc tys)
+
+pprTcApp_help :: Prec -> (Prec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
+-- This one has accss to the DynFlags
+pprTcApp_help p pp tc tys dflags
+  | not (isSymOcc (nameOccName (tyConName tc)))
+  = pprPrefixApp p (ppr tc) (map (pp TyConPrec) tys_wo_kinds)
+
+  | [ty1,ty2] <- tys_wo_kinds  -- Infix, two arguments;
+                               -- we know nothing of precedence though
   = pprInfixApp p pp (ppr tc) ty1 ty2
 
+  |  tc `hasKey` liftedTypeKindTyConKey 
+  || tc `hasKey` unliftedTypeKindTyConKey 
+  = ASSERT( null tys ) ppr tc   -- Do not wrap *, # in parens
+
   | otherwise
-  = ppr_type_name_app p pp (getName tc) (ppr tc) tys
+  = pprPrefixApp p (parens (ppr tc)) (map (pp TyConPrec) tys_wo_kinds)
+  where
+    tys_wo_kinds = suppressKinds dflags (tyConKind tc) tys
+
+------------------
+suppressKinds :: DynFlags -> Kind -> [a] -> [a]
+-- Given the kind of a TyCon, and the args to which it is applied,
+-- suppress the args that are kind args
+suppressKinds dflags kind xs
+  | gopt Opt_PrintExplicitKinds dflags = xs
+  | otherwise                          = suppress kind xs
+  where
+    suppress (ForAllTy _ kind) (_ : xs) = suppress kind xs
+    suppress (FunTy _ res)     (x:xs)   = x : suppress res xs
+    suppress _                 xs       = xs
 
 ----------------
-pprTypeApp :: TyCon -> [Type] -> SDoc
-pprTypeApp tc tys 
-  = ppr_type_name_app TopPrec ppr_type (getName tc) (ppr tc) tys
-        -- We have to use ppr on the TyCon (not its name)
-        -- so that we get promotion quotes in the right place
-
-pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc
--- Used for classes and coercions as well as types; that's why it's separate from pprTcApp
-pprTypeNameApp p pp name tys
-  = ppr_type_name_app p pp name (ppr name) tys
-
-ppr_type_name_app :: Prec -> (Prec -> a -> SDoc) -> Name -> SDoc -> [a] -> SDoc
-ppr_type_name_app p pp nm_tc pp_tc tys
-  | not (isSymOcc (nameOccName nm_tc))
-  = pprPrefixApp p pp_tc (map (pp TyConPrec) tys)
-
-  | [ty1,ty2] <- tys  -- Infix, two arguments;
-                      -- we know nothing of precedence though
-  = pprInfixApp p pp pp_tc ty1 ty2
-
-  |  nm_tc `hasKey` liftedTypeKindTyConKey 
-  || nm_tc `hasKey` unliftedTypeKindTyConKey 
-  = ASSERT( null tys ) pp_tc   -- Do not wrap *, # in parens
-
-  | otherwise
-  = pprPrefixApp p (parens pp_tc) (map (pp TyConPrec) tys)
+pprTyList :: Prec -> Type -> Type -> SDoc
+-- Given a type-level list (t1 ': t2), see if we can print 
+-- it in list notation [t1, ...].  
+pprTyList p ty1 ty2
+  = case gather ty2 of
+      (arg_tys, Nothing) -> char '\'' <> brackets (fsep (punctuate comma 
+                                            (map (ppr_type TopPrec) (ty1:arg_tys))))
+      (arg_tys, Just tl) -> maybeParen p FunPrec $
+                            hang (ppr_type FunPrec ty1)
+                               2 (fsep [ colon <+> ppr_type FunPrec ty | ty <- arg_tys ++ [tl]])
+  where
+    gather :: Type -> ([Type], Maybe Type)
+     -- (gather ty) = (tys, Nothing) means ty is a list [t1, .., tn]
+     --             = (tys, Just tl) means ty is of form t1:t2:...tn:tl
+    gather (TyConApp tc tys)
+      | tc `hasKey` consDataConKey
+      , [_kind, ty1,ty2] <- tys
+      , (args, tl) <- gather ty2
+      = (ty1:args, tl)
+      | tc `hasKey` nilDataConKey
+      = ([], Nothing)
+    gather ty = ([], Just ty)
 
 ----------------
 pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> SDoc -> a -> a -> SDoc

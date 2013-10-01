@@ -283,6 +283,7 @@ data GeneralFlag
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
 
    | Opt_PrintExplicitForalls
+   | Opt_PrintExplicitKinds
 
    -- optimisation opts
    | Opt_Strictness
@@ -2583,6 +2584,7 @@ fFlags :: [FlagSpec GeneralFlag]
 fFlags = [
   ( "error-spans",                      Opt_ErrorSpans, nop ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
+  ( "print-explicit-kinds",             Opt_PrintExplicitKinds, nop ),
   ( "strictness",                       Opt_Strictness, nop ),
   ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
   ( "specialise",                       Opt_Specialise, nop ),
