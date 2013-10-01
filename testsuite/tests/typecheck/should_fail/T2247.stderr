@@ -1,6 +1,7 @@
 
 T2247.hs:6:10:
     Illegal instance declaration for ‛FD a b’
-      Multiple uses of this instance may be inconsistent
-      with the functional dependencies of the class.
+      The liberal coverage condition fails in class ‛FD’
+        for functional dependency: ‛x -> y’
+      Reason: ‛a’ do not jointly determine ‛b’
     In the instance declaration for ‛FD a b’

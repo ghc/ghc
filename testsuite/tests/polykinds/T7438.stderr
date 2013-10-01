@@ -4,17 +4,15 @@ T7438.hs:6:14:
       ‛t’ is untouchable
         inside the constraints (t2 ~ t3)
         bound by a pattern with constructor
-                   Nil :: forall (k :: BOX) (a :: k). Thrist k a a,
+                   Nil :: forall (a :: k). Thrist a a,
                  in an equation for ‛go’
         at T7438.hs:6:4-6
       ‛t’ is a rigid type variable bound by
-          the inferred type of go :: Thrist k t2 t3 -> t -> t1
-          at T7438.hs:6:1
+          the inferred type of go :: Thrist t2 t3 -> t -> t1 at T7438.hs:6:1
       ‛t1’ is a rigid type variable bound by
-           the inferred type of go :: Thrist k t2 t3 -> t -> t1
-           at T7438.hs:6:1
+           the inferred type of go :: Thrist t2 t3 -> t -> t1 at T7438.hs:6:1
     Relevant bindings include
       acc :: t (bound at T7438.hs:6:8)
-      go :: Thrist k t2 t3 -> t -> t1 (bound at T7438.hs:6:1)
+      go :: Thrist t2 t3 -> t -> t1 (bound at T7438.hs:6:1)
     In the expression: acc
     In an equation for ‛go’: go Nil acc = acc

@@ -1,6 +1,6 @@
 
 T6054.hs:7:14:
-    No instance for (Bar () '() a0)
+    No instance for (Bar '() a0)
       arising from an expression type signature
     In the first argument of ‛print’, namely
       ‛(Proxy :: Bar () a => Proxy a)’

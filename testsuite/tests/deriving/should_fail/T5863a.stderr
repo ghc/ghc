@@ -1,12 +1,12 @@
 
 T5863a.hs:9:31:
-    Can't make a derived instance of ‛Typeable * (T Int)’:
+    Can't make a derived instance of ‛Typeable (T Int)’:
       Deriving Typeable is not allowed for family instances;
       derive Typeable for ‛T’ alone
     In the data instance declaration for ‛T’
 
 T5863a.hs:12:32:
-    Can't make a derived instance of ‛Typeable * (T Bool)’:
+    Can't make a derived instance of ‛Typeable (T Bool)’:
       Deriving Typeable is not allowed for family instances;
       derive Typeable for ‛T’ alone
     In the data instance declaration for ‛T’

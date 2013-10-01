@@ -1,6 +1,7 @@
 
 tcfail170.hs:7:10:
     Illegal instance declaration for ‛C [p] [q]’
-      (the Coverage Condition fails for one of the functional dependencies;
-       Use UndecidableInstances to permit this)
+      The coverage condition fails for functional dependency: ‛a -> b’
+      Reason: ‛[p]’ do not jointly determine ‛[q]’
+      Using UndecidableInstances might help
     In the instance declaration for ‛C [p] [q]’

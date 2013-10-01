@@ -22,4 +22,4 @@ ClosedFam3.hs-boot:12:13:
     and its hs-boot file
     Main module: closed type family Baz a :: * where Baz Int = Bool
     Boot file:   closed type family Baz (k::BOX) (a::k) :: * where
-                     Baz * Int = Bool
+                     Baz Int = Bool
