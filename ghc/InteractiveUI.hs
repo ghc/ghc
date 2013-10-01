@@ -303,7 +303,7 @@ defFullHelpText =
   "    +s            print timing/memory stats after each evaluation\n" ++
   "    +t            print type after evaluation\n" ++
   "    -<flags>      most GHC command line flags can also be set here\n" ++
-  "                         (eg. -v2, -fglasgow-exts, etc.)\n" ++
+  "                         (eg. -v2, -XFlexibleInstances, etc.)\n" ++
   "                    for GHCi-specific flags, see User's Guide,\n"++
   "                    Flag reference, Interactive-mode options\n" ++
   "\n" ++
