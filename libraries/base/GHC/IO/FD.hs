@@ -279,9 +279,9 @@ getUniqueFileInfo _ dev ino = return (fromIntegral dev, fromIntegral ino)
 #else
 getUniqueFileInfo fd _ _ = do
   with 0 $ \devptr -> do
-  with 0 $ \inoptr -> do
-  c_getUniqueFileInfo fd devptr inoptr
-  liftM2 (,) (peek devptr) (peek inoptr)
+    with 0 $ \inoptr -> do
+      c_getUniqueFileInfo fd devptr inoptr
+      liftM2 (,) (peek devptr) (peek inoptr)
 #endif
 
 #ifdef mingw32_HOST_OS

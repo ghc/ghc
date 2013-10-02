@@ -539,14 +539,14 @@ openNewFile filepath binary mode = do
         -- See bug #4968.
         _ | errno == eACCES -> do
           withCString filepath $ \path -> do
-          -- There is a race here: the directory might have been moved or
-          -- deleted between the c_open call and the next line, but there
-          -- doesn't seem to be any direct way to detect that the c_open call
-          -- failed because of an existing directory.
-          exists <- c_fileExists path
-          return $ if exists
-            then FileExists
-            else OpenNewError errno
+            -- There is a race here: the directory might have been moved or
+            -- deleted between the c_open call and the next line, but there
+            -- doesn't seem to be any direct way to detect that the c_open call
+            -- failed because of an existing directory.
+            exists <- c_fileExists path
+            return $ if exists
+              then FileExists
+              else OpenNewError errno
 #endif
         _ -> return (OpenNewError errno)
     else return (NewFileCreated fd)
