@@ -108,7 +108,6 @@ import Binary
 import Fingerprint
 import Bag
 import Exception
-import Serialized
 
 import Control.Monad
 import Data.Function
@@ -274,7 +273,7 @@ mkIface_ hsc_env maybe_old_fingerprint
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         iface_vect_info = flattenVectInfo vect_info
         trust_info  = setSafeMode safe_mode
-        annotations = mkIfaceAnnotations anns
+        annotations = map mkIfaceAnnotation anns
 
         intermediate_iface = ModIface {
               mi_module      = this_mod,
@@ -314,8 +313,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 
               -- And build the cached values
               mi_warn_fn     = mkIfaceWarnCache warns,
-              mi_fix_fn      = mkIfaceFixCache fixities,
-              mi_ann_fn      = mkIfaceAnnCache annotations }
+              mi_fix_fn      = mkIfaceFixCache fixities }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}
@@ -606,7 +604,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
-                       ann_fn (mkVarOcc "module"),
+                       ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
                        mi_usages iface0,
                        sorted_deps,
                        mi_hpc iface0)
@@ -638,7 +636,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
     fix_fn = mi_fix_fn iface0
-    ann_fn = mi_ann_fn iface0
+    ann_fn = mkIfaceAnnCache (mi_anns iface0)
 
 getOrphanHashes :: HscEnv -> [Module] -> IO [Fingerprint]
 getOrphanHashes hsc_env mods = do
@@ -663,6 +661,22 @@ sortDependencies d
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 \end{code}
 
+
+\begin{code}
+-- | Creates cached lookup for the 'mi_anns' field of ModIface
+-- Hackily, we use "module" as the OccName for any module-level annotations
+mkIfaceAnnCache :: [IfaceAnnotation] -> OccName -> [AnnPayload]
+mkIfaceAnnCache anns
+  = \n -> lookupOccEnv env n `orElse` []
+  where
+    pair (IfaceAnnotation target value) =
+      (case target of
+          NamedTarget occn -> occn
+          ModuleTarget _   -> mkVarOcc "module"
+      , [value])
+    -- flipping (++), so the first argument is always short
+    env = mkOccEnv_C (flip (++)) (map pair anns)
+\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -696,28 +710,32 @@ and fingerprinting that as part of the declaration.
 type IfaceDeclABI = (Module, IfaceDecl, IfaceDeclExtras)
 
 data IfaceDeclExtras
-  = IfaceIdExtras    Fixity [IfaceRule] [Serialized]
+  = IfaceIdExtras IfaceIdExtras
 
   | IfaceDataExtras
        Fixity                   -- Fixity of the tycon itself
        [IfaceInstABI]           -- Local class and family instances of this tycon
                                 -- See Note [Orphans] in IfaceSyn
-       [Serialized]             -- Annotations of the type itself
-       [(Fixity,[IfaceRule],[Serialized])]
-                                -- For each constructor: fixity, RULES and annotations
+       [AnnPayload]             -- Annotations of the type itself
+       [IfaceIdExtras]          -- For each constructor: fixity, RULES and annotations
 
   | IfaceClassExtras
        Fixity                   -- Fixity of the class itself
        [IfaceInstABI]           -- Local instances of this class *or*
                                 --   of its associated data types
                                 -- See Note [Orphans] in IfaceSyn
-       [Serialized]             -- Annotations of the type itself
-       [(Fixity,[IfaceRule],[Serialized])]
-                                -- For each class method: fixity, RULES and annotations
+       [AnnPayload]             -- Annotations of the type itself
+       [IfaceIdExtras]          -- For each class method: fixity, RULES and annotations
 
-  | IfaceSynExtras   Fixity [IfaceInstABI] [Serialized]
+  | IfaceSynExtras   Fixity [IfaceInstABI] [AnnPayload]
 
   | IfaceOtherDeclExtras
+
+data IfaceIdExtras
+  = IdExtras
+       Fixity                   -- Fixity of the Id
+       [IfaceRule]              -- Rules for the Id
+       [AnnPayload]             -- Annotations for the Id
 
 -- When hashing a class or family instance, we hash only the
 -- DFunId or CoAxiom, because that depends on all the
@@ -737,23 +755,23 @@ freeNamesDeclABI (_mod, decl, extras) =
   freeNamesIfDecl decl `unionNameSets` freeNamesDeclExtras extras
 
 freeNamesDeclExtras :: IfaceDeclExtras -> NameSet
-freeNamesDeclExtras (IfaceIdExtras    _ rules _)
-  = unionManyNameSets (map freeNamesIfRule rules)
+freeNamesDeclExtras (IfaceIdExtras id_extras)
+  = freeNamesIdExtras id_extras
 freeNamesDeclExtras (IfaceDataExtras  _ insts _ subs)
-  = unionManyNameSets (mkNameSet insts : map freeNamesSub subs)
+  = unionManyNameSets (mkNameSet insts : map freeNamesIdExtras subs)
 freeNamesDeclExtras (IfaceClassExtras _ insts _ subs)
-  = unionManyNameSets (mkNameSet insts : map freeNamesSub subs)
+  = unionManyNameSets (mkNameSet insts : map freeNamesIdExtras subs)
 freeNamesDeclExtras (IfaceSynExtras _ insts _)
   = mkNameSet insts
 freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
 
-freeNamesSub :: (Fixity,[IfaceRule],[Serialized]) -> NameSet
-freeNamesSub (_,rules,_) = unionManyNameSets (map freeNamesIfRule rules)
+freeNamesIdExtras :: IfaceIdExtras -> NameSet
+freeNamesIdExtras (IdExtras _ rules _) = unionManyNameSets (map freeNamesIfRule rules)
 
 instance Outputable IfaceDeclExtras where
   ppr IfaceOtherDeclExtras       = empty
-  ppr (IfaceIdExtras  fix rules anns) = ppr_id_extras fix rules anns
+  ppr (IfaceIdExtras  extras)    = ppr_id_extras extras
   ppr (IfaceSynExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
   ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
                                                 ppr_id_extras_s stuff]
@@ -763,28 +781,31 @@ instance Outputable IfaceDeclExtras where
 ppr_insts :: [IfaceInstABI] -> SDoc
 ppr_insts _ = ptext (sLit "<insts>")
 
-ppr_id_extras_s :: [(Fixity, [IfaceRule], [Serialized])] -> SDoc
-ppr_id_extras_s stuff = vcat [ppr_id_extras f r s | (f,r,s)<- stuff]
+ppr_id_extras_s :: [IfaceIdExtras] -> SDoc
+ppr_id_extras_s stuff = vcat (map ppr_id_extras stuff)
 
-ppr_id_extras :: Fixity -> [IfaceRule] -> [Serialized] -> SDoc
-ppr_id_extras fix rules anns = ppr fix $$ vcat (map ppr rules) $$ vcat (map ppr anns)
+ppr_id_extras :: IfaceIdExtras -> SDoc
+ppr_id_extras (IdExtras fix rules anns) = ppr fix $$ vcat (map ppr rules) $$ vcat (map ppr anns)
 
 -- This instance is used only to compute fingerprints
 instance Binary IfaceDeclExtras where
   get _bh = panic "no get for IfaceDeclExtras"
-  put_ bh (IfaceIdExtras fix rules anns) = do
-   putByte bh 1; put_ bh fix; put_ bh rules; put_ bh anns
+  put_ bh (IfaceIdExtras extras) = do
+   putByte bh 1; put_ bh extras
   put_ bh (IfaceDataExtras fix insts anns cons) = do
    putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons
   put_ bh (IfaceClassExtras fix insts anns methods) = do
    putByte bh 3; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh methods
   put_ bh (IfaceSynExtras fix finsts anns) = do
    putByte bh 4; put_ bh fix; put_ bh finsts; put_ bh anns
-  put_ bh IfaceOtherDeclExtras = do
-   putByte bh 5
+  put_ bh IfaceOtherDeclExtras = putByte bh 5
+
+instance Binary IfaceIdExtras where
+  get _bh = panic "no get for IfaceIdExtras"
+  put_ bh (IdExtras fix rules anns)= do { put_ bh fix; put_ bh rules; put_ bh anns }
 
 declExtras :: (OccName -> Fixity)
-           -> (OccName -> [Serialized])
+           -> (OccName -> [AnnPayload])
            -> OccEnv [IfaceRule]
            -> OccEnv [IfaceClsInst]
            -> OccEnv [IfaceFamInst]
@@ -793,9 +814,7 @@ declExtras :: (OccName -> Fixity)
 
 declExtras fix_fn ann_fn rule_env inst_env fi_env decl
   = case decl of
-      IfaceId{} -> IfaceIdExtras (fix_fn n)
-                        (lookupOccEnvL rule_env n)
-                        (ann_fn n)
+      IfaceId{} -> IfaceIdExtras (id_extras n)
       IfaceData{ifCons=cons} ->
                      IfaceDataExtras (fix_fn n)
                         (map ifFamInstAxiom (lookupOccEnvL fi_env n) ++
@@ -816,7 +835,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
       _other -> IfaceOtherDeclExtras
   where
         n = ifName decl
-        id_extras occ = (fix_fn occ, lookupOccEnvL rule_env occ, ann_fn occ)
+        id_extras occ = IdExtras (fix_fn occ) (lookupOccEnvL rule_env occ) (ann_fn occ)
         at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (ifName decl)
 
 
@@ -1033,13 +1052,11 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
 \end{code}
 
 \begin{code}
-mkIfaceAnnotations :: [Annotation] -> [IfaceAnnotation]
-mkIfaceAnnotations = map mkIfaceAnnotation
-
 mkIfaceAnnotation :: Annotation -> IfaceAnnotation
-mkIfaceAnnotation (Annotation { ann_target = target, ann_value = serialized }) = IfaceAnnotation {
+mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload }) 
+  = IfaceAnnotation {
         ifAnnotatedTarget = fmap nameOccName target,
-        ifAnnotatedValue = serialized
+        ifAnnotatedValue = payload
     }
 \end{code}
 

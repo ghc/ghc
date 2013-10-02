@@ -56,7 +56,7 @@ module HscTypes (
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
-        emptyIfaceWarnCache, mkIfaceAnnCache, emptyIfaceAnnCache,
+        emptyIfaceWarnCache, 
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -139,7 +139,7 @@ import Id
 import IdInfo           ( IdDetails(..) )
 import Type
 
-import Annotations
+import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import Class
 import TyCon
 import CoAxiom
@@ -167,7 +167,6 @@ import Binary
 import ErrUtils
 import Platform
 import Util
-import Serialized
 
 import Control.Monad    ( mplus, guard, liftM, when, ap )
 import Data.Array       ( Array, array )
@@ -749,7 +748,6 @@ data ModIface
                 -- and are not put into the interface file
         mi_warn_fn   :: Name -> Maybe WarningTxt,        -- ^ Cached lookup for 'mi_warns'
         mi_fix_fn    :: OccName -> Fixity,               -- ^ Cached lookup for 'mi_fixities'
-        mi_ann_fn    :: OccName -> [Serialized],         -- ^ Cached lookup for 'mi_anns'
         mi_hash_fn   :: OccName -> Maybe (OccName, Fingerprint),
                 -- ^ Cached lookup for 'mi_decls'.
                 -- The @Nothing@ in 'mi_hash_fn' means that the thing
@@ -877,7 +875,6 @@ instance Binary ModIface where
                         -- And build the cached values
                  mi_warn_fn     = mkIfaceWarnCache warns,
                  mi_fix_fn      = mkIfaceFixCache fixities,
-                 mi_ann_fn      = mkIfaceAnnCache anns,
                  mi_hash_fn     = mkIfaceHashCache decls })
 
 -- | The original names declared of a certain module that are exported
@@ -910,7 +907,6 @@ emptyModIface mod
                mi_vect_info   = noIfaceVectInfo,
                mi_warn_fn     = emptyIfaceWarnCache,
                mi_fix_fn      = emptyIfaceFixCache,
-               mi_ann_fn      = emptyIfaceAnnCache,
                mi_hash_fn     = emptyIfaceHashCache,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
@@ -1754,24 +1750,6 @@ lookupFixity :: FixityEnv -> Name -> Fixity
 lookupFixity env n = case lookupNameEnv env n of
                         Just (FixItem _ fix) -> fix
                         Nothing         -> defaultFixity
-\end{code}
-
-\begin{code}
--- | Creates cached lookup for the 'mi_anns' field of ModIface
-mkIfaceAnnCache :: [IfaceAnnotation] -> OccName -> [Serialized]
-mkIfaceAnnCache anns
-  = \n -> lookupOccEnv env n `orElse` []
-  where
-    pair (IfaceAnnotation target value) =
-      (case target of
-          NamedTarget occn -> occn
-          ModuleTarget _   -> mkVarOcc "module"
-      , [value])
-    -- flipping (++), so the first argument is always short
-    env = mkOccEnv_C (flip (++)) (map pair anns)
-
-emptyIfaceAnnCache :: OccName -> [Serialized]
-emptyIfaceAnnCache _ = []
 \end{code}
 
 %************************************************************************

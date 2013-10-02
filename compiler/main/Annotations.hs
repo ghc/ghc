@@ -1,13 +1,13 @@
 -- |
 -- Support for source code annotation feature of GHC. That is the ANN pragma.
--- 
+--
 -- (c) The University of Glasgow 2006
 -- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 --
 module Annotations (
         -- * Main Annotation data types
-        Annotation(..),
-        AnnTarget(..), CoreAnnTarget, 
+        Annotation(..), AnnPayload,
+        AnnTarget(..), CoreAnnTarget,
         getAnnTargetName_maybe,
 
         -- * AnnEnv for collecting and querying Annotations
@@ -34,10 +34,12 @@ import Data.Word        ( Word8 )
 -- it's initial form of 'HsDecls.AnnDecl'
 data Annotation = Annotation {
         ann_target :: CoreAnnTarget,    -- ^ The target of the annotation
-        ann_value :: Serialized         -- ^ 'Serialized' version of the annotation that 
-                                        --   allows recovery of its value or can
-                                        --   be persisted to an interface file
+        ann_value  :: AnnPayload
     }
+
+type AnnPayload = Serialized    -- ^ The "payload" of an annotation
+                                --   allows recovery of its value at a given type,
+                                --   and can be persisted to an interface file
 
 -- | An annotation target
 data AnnTarget name 
@@ -84,7 +86,7 @@ instance Outputable Annotation where
 
 -- | A collection of annotations
 -- Can't use a type synonym or we hit bug #2412 due to source import
-newtype AnnEnv = MkAnnEnv (UniqFM [Serialized])
+newtype AnnEnv = MkAnnEnv (UniqFM [AnnPayload])
 
 -- | An empty annotation environment.
 emptyAnnEnv :: AnnEnv

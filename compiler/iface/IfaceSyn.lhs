@@ -39,7 +39,6 @@ module IfaceSyn (
 import IfaceType
 import PprCore()            -- Printing DFunArgs
 import Demand
-import Annotations
 import Class
 import NameSet
 import CoAxiom ( BranchIndex, Role )
@@ -47,7 +46,7 @@ import Name
 import CostCentre
 import Literal
 import ForeignCall
-import Serialized
+import Annotations( AnnPayload, AnnTarget )
 import BasicTypes
 import Outputable
 import FastString
@@ -488,7 +487,7 @@ instance Binary IfaceRule where
 data IfaceAnnotation
   = IfaceAnnotation {
         ifAnnotatedTarget :: IfaceAnnTarget,
-        ifAnnotatedValue :: Serialized
+        ifAnnotatedValue  :: AnnPayload
   }
 
 instance Outputable IfaceAnnotation where
