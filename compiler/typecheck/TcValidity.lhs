@@ -18,7 +18,7 @@ module TcValidity (
 
 -- friends:
 import TcUnify    ( tcSubType )
-import TcSimplify ( simplifyTop )
+import TcSimplify ( simplifyAmbiguityCheck )
 import TypeRep
 import TcType
 import TcMType
@@ -69,32 +69,31 @@ checkAmbiguity ctxt ty
                         -- (T k) is ambiguous!
 
   | otherwise
-  = do { allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
-       ; unless allow_ambiguous $ 
-    do { traceTc "Ambiguity check for" (ppr ty)
+  = do { traceTc "Ambiguity check for" (ppr ty)
        ; (subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
-       ; let ty' = substTy subst ty  
+       ; let ty' = substTy subst ty
               -- The type might have free TyVars,
               -- so we skolemise them as TcTyVars
               -- Tiresome; but the type inference engine expects TcTyVars
 
          -- Solve the constraints eagerly because an ambiguous type
-         -- can cause a cascade of further errors.  Since the free 
+         -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
-       ; addErrCtxtM (mk_msg ty') $
-         do { (_wrap, wanted) <- captureConstraints $
-                                 tcSubType (AmbigOrigin ctxt) ctxt ty' ty'
-            ; _ev_binds <- simplifyTop wanted
-            ; return () }
+       ; (_wrap, wanted) <- addErrCtxtM (mk_msg ty') $
+                            captureConstraints $
+                            tcSubType (AmbigOrigin ctxt) ctxt ty' ty'
+       ; simplifyAmbiguityCheck ty wanted
 
-       ; traceTc "Done ambiguity check for" (ppr ty) } }
+       ; traceTc "Done ambiguity check for" (ppr ty) }
  where
-   mk_msg ty tidy_env 
-     = return (tidy_env', msg)
+   mk_msg ty tidy_env
+     = do { allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
+          ; return (tidy_env', msg $$ ppWhen (not allow_ambiguous) ambig_msg) }
      where
        (tidy_env', tidy_ty) = tidyOpenType tidy_env ty
        msg = hang (ptext (sLit "In the ambiguity check for:"))
                 2 (ppr tidy_ty)
+       ambig_msg = ptext (sLit "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes")
 \end{code}
 
 

@@ -6463,9 +6463,7 @@ The ambiguity check rejects functions that can never be called; for example:
 </programlisting>
 The idea is there can be no legal calls to <literal>f</literal> because every call will
 give rise to an ambiguous constraint.  
-</para>
-<para>
-The <emphasis>only</emphasis> purpose of the
+Indeed, the <emphasis>only</emphasis> purpose of the
 ambiguity check is to report functions that cannot possibly be called.
 We could soundly omit the
 ambiguity check on type signatures entirely, at the expense of
@@ -6510,18 +6508,48 @@ After all <literal>f</literal> has exactly the same type, and <literal>g=f</lite
 But in fact <literal>f</literal>'s type
 is instantiated and the instantiated constraints are solved against
 the constraints bound by <literal>g</literal>'s signature.  So, in the case an ambiguous type, solving will fail.
-For example, consider the earlier definition <literal>f :: C a => Int</literal>.  Then in <literal>g</literal>'s definition,
-we'll instantiate to <literal>(C alpha)</literal> and try to 
+For example, consider the earlier definition <literal>f :: C a => Int</literal>:
+<programlisting>
+  f :: C a => Int
+  f = ...blah...
+
+  g :: C a => Int
+  g = f
+</programlisting>
+In <literal>g</literal>'s definition,
+we'll instantiate to <literal>(C alpha)</literal> and try to
 deduce <literal>(C alpha)</literal> from <literal>(C a)</literal>,
-and fail.  
+and fail.
 </para>
 <para>
-So in fact we use this as our <emphasis>definition</emphasis> of ambiguity: a type 
+So in fact we use this as our <emphasis>definition</emphasis> of ambiguity: a type
 <literal><replaceable>ty</replaceable></literal> is
-ambiguious if and only if <literal>((undefined :: <replaceable>ty</replaceable>) 
+ambiguious if and only if <literal>((undefined :: <replaceable>ty</replaceable>)
 :: <replaceable>ty</replaceable>)</literal> would fail to typecheck.  We use a
 very similar test for <emphasis>inferred</emphasis> types, to ensure that they too are
-unambiguous. 
+unambiguous.
+</para>
+<para><emphasis>Switching off the ambiguity check.</emphasis>
+Even if a function is has an ambiguous type according the "guiding principle",
+it is possible that the function is callable.  For example:
+<programlisting>
+  class D a b where ...
+  instance D Bool b where ...
+
+  strange :: D a b => a -> a
+  strange = ...blah...
+
+  foo = strange True
+</programlisting>
+Here <literal>strange</literal>'s type is ambiguous, but the call in <literal>foo</literal>
+is OK because it gives rise to a constraint <literal>(D Bool beta)</literal>, which is
+soluble by the <literal>(D Bool b)</literal> instance.  So the language extension
+<option>-XAllowAmbiguousTypes</option> allows you to switch off the ambiguity check.
+But even with ambiguity checking switched off, GHC will complain about a function
+that can <emphasis>never</emphasis> be called, such as this one:
+<programlisting>
+  f :: (Int ~ Bool) => a -> a
+</programlisting>
 </para>
 
 <para>

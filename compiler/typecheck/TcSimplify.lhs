@@ -39,6 +39,8 @@ import ListSetOps
 import Util
 import PrelInfo
 import PrelNames
+import Control.Monad    ( unless )
+import DynFlags         ( ExtensionFlag( Opt_AllowAmbiguousTypes ) )
 import Class		( classKey )
 import BasicTypes       ( RuleName )
 import Outputable
@@ -69,26 +71,25 @@ simplifyTop wanteds
        ; traceTc "reportUnsolved {" empty
        ; binds2 <- reportUnsolved zonked_final_wc
        ; traceTc "reportUnsolved }" empty
-         
+
        ; return (binds1 `unionBags` binds2) }
 
-  where
+simpl_top :: WantedConstraints -> TcS WantedConstraints
     -- See Note [Top-level Defaulting Plan]
-    simpl_top :: WantedConstraints -> TcS WantedConstraints
-    simpl_top wanteds
-      = do { wc_first_go <- nestTcS (solve_wanteds_and_drop wanteds)
+simpl_top wanteds
+  = do { wc_first_go <- nestTcS (solve_wanteds_and_drop wanteds)
                             -- This is where the main work happens
-           ; try_tyvar_defaulting wc_first_go }
-
+       ; try_tyvar_defaulting wc_first_go }
+  where
     try_tyvar_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_tyvar_defaulting wc
-      | isEmptyWC wc 
+      | isEmptyWC wc
       = return wc
       | otherwise
-      = do { free_tvs <- TcS.zonkTyVarsAndFV (tyVarsOfWC wc) 
+      = do { free_tvs <- TcS.zonkTyVarsAndFV (tyVarsOfWC wc)
            ; let meta_tvs = varSetElems (filterVarSet isMetaTyVar free_tvs)
                    -- zonkTyVarsAndFV: the wc_first_go is not yet zonked
-                   -- filter isMetaTyVar: we might have runtime-skolems in GHCi, 
+                   -- filter isMetaTyVar: we might have runtime-skolems in GHCi,
                    -- and we definitely don't want to try to assign to those!
 
            ; meta_tvs' <- mapM defaultTyVar meta_tvs   -- Has unification side effects
@@ -98,7 +99,7 @@ simplifyTop wanteds
              else do { wc_residual <- nestTcS (solve_wanteds_and_drop wc)
                             -- See Note [Must simplify after defaulting]
                      ; try_class_defaulting wc_residual } }
-    
+
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc
       | isEmptyWC wc || insolubleWC wc
@@ -107,7 +108,7 @@ simplifyTop wanteds
       | otherwise
       = do { something_happened <- applyDefaultingRules (approximateWC wc)
                                    -- See Note [Top-level Defaulting Plan]
-           ; if something_happened 
+           ; if something_happened
              then do { wc_residual <- nestTcS (solve_wanteds_and_drop wc)
                      ; try_class_defaulting wc_residual }
              else return wc }
@@ -124,18 +125,18 @@ errors, because it isn't an error!  Trac #7967 was due to this.
 
 Note [Top-level Defaulting Plan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have considered two design choices for where/when to apply defaulting.   
-   (i) Do it in SimplCheck mode only /whenever/ you try to solve some 
+We have considered two design choices for where/when to apply defaulting.
+   (i) Do it in SimplCheck mode only /whenever/ you try to solve some
        flat constraints, maybe deep inside the context of implications.
        This used to be the case in GHC 7.4.1.
-   (ii) Do it in a tight loop at simplifyTop, once all other constraint has 
+   (ii) Do it in a tight loop at simplifyTop, once all other constraint has
         finished. This is the current story.
 
-Option (i) had many disadvantages: 
-   a) First it was deep inside the actual solver, 
-   b) Second it was dependent on the context (Infer a type signature, 
-      or Check a type signature, or Interactive) since we did not want 
-      to always start defaulting when inferring (though there is an exception to  
+Option (i) had many disadvantages:
+   a) First it was deep inside the actual solver,
+   b) Second it was dependent on the context (Infer a type signature,
+      or Check a type signature, or Interactive) since we did not want
+      to always start defaulting when inferring (though there is an exception to
       this see Note [Default while Inferring])
    c) It plainly did not work. Consider typecheck/should_compile/DfltProb2.hs:
           f :: Int -> Bool
@@ -156,27 +157,37 @@ go with option (i), implemented at SimplifyTop. Namely:
 
 Now, that has to do with class defaulting. However there exists type variable /kind/
 defaulting. Again this is done at the top-level and the plan is:
-     - At the top-level, once you had a go at solving the constraint, do 
+     - At the top-level, once you had a go at solving the constraint, do
        figure out /all/ the touchable unification variables of the wanted constraints.
      - Apply defaulting to their kinds
 
 More details in Note [DefaultTyVar].
 
 \begin{code}
+------------------
+simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
+simplifyAmbiguityCheck ty wanteds
+  = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
+       ; ev_binds_var <- newTcEvBinds
+       ; zonked_final_wc <- solveWantedsTcMWithEvBinds ev_binds_var wanteds simpl_top
+       ; traceTc "End simplifyAmbiguityCheck }" empty
+
+       -- Normally report all errors; but with -XAllowAmbiguousTypes
+       -- report only insoluble ones, since they represent genuinely
+       -- inaccessible code
+       ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
+       ; traceTc "reportUnsolved(ambig) {" empty
+       ; unless (allow_ambiguous && not (insolubleWC zonked_final_wc))
+                (discardResult (reportUnsolved zonked_final_wc))
+       ; traceTc "reportUnsolved(ambig) }" empty
+
+       ; return () }
 
 ------------------
-simplifyAmbiguityCheck :: Name -> WantedConstraints -> TcM (Bag EvBind)
-simplifyAmbiguityCheck name wanteds
-  = traceTc "simplifyAmbiguityCheck" (text "name =" <+> ppr name) >> 
-    simplifyTop wanteds  -- NB: must be simplifyTop so that we
-                         --     do ambiguity resolution.  
-                         -- See Note [Impedence matching] in TcBinds.
- 
-------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
-simplifyInteractive wanteds 
+simplifyInteractive wanteds
   = traceTc "simplifyInteractive" empty >>
-    simplifyTop wanteds 
+    simplifyTop wanteds
 
 ------------------
 simplifyDefault :: ThetaType	-- Wanted; has no type variables in it
@@ -188,7 +199,7 @@ simplifyDefault theta
 
        ; traceTc "reportUnsolved {" empty
        -- See Note [Deferring coercion errors to runtime]
-       ; reportAllUnsolved unsolved 
+       ; reportAllUnsolved unsolved
          -- Postcondition of solveWantedsTcM is that returned
          -- constraints are zonked. So Precondition of reportUnsolved
          -- is true.

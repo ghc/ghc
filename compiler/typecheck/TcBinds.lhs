@@ -531,18 +531,20 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
          -- poly_ids are guaranteed zonked by mkExport
 
 --------------
-mkExport :: PragFun 
+mkExport :: PragFun
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
          -> TcM (ABExport Id)
--- mkExport generates exports with 
---      zonked type variables, 
+-- Only called for generalisation plan IferGen, not by CheckGen or NoGen
+--
+-- mkExport generates exports with
+--      zonked type variables,
 --      zonked poly_ids
 -- The former is just because no further unifications will change
 -- the quantified type variables, so we can fix their final form
 -- right now.
 -- The latter is needed because the poly_ids are used to extend the
--- type environment; see the invariant on TcEnv.tcExtendIdEnv 
+-- type environment; see the invariant on TcEnv.tcExtendIdEnv
 
 -- Pre-condition: the qtvs and theta are already zonked
 
@@ -567,20 +569,20 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
                 -- tcPrags requires a zonked poly_id
 
         ; let sel_poly_ty = mkSigmaTy qtvs theta mono_ty
-        ; traceTc "mkExport: check sig" 
-                  (ppr poly_name $$ ppr sel_poly_ty $$ ppr (idType poly_id)) 
+        ; traceTc "mkExport: check sig"
+                  (ppr poly_name $$ ppr sel_poly_ty $$ ppr (idType poly_id))
 
         -- Perform the impedence-matching and ambiguity check
         -- right away.  If it fails, we want to fail now (and recover
         -- in tcPolyBinds).  If we delay checking, we get an error cascade.
-        -- Remember we are in the tcPolyInfer case, so the type envt is 
+        -- Remember we are in the tcPolyInfer case, so the type envt is
         -- closed (unless we are doing NoMonoLocalBinds in which case all bets
         -- are off)
         -- See Note [Impedence matching]
         ; (wrap, wanted) <- addErrCtxtM (mk_msg poly_id) $
                             captureConstraints $
                             tcSubType origin sig_ctxt sel_poly_ty (idType poly_id)
-        ; ev_binds <- simplifyAmbiguityCheck poly_name wanted
+        ; ev_binds <- simplifyTop wanted
 
         ; return (ABE { abe_wrap = mkWpLet (EvBinds ev_binds) <.> wrap
                       , abe_poly = poly_id
@@ -600,7 +602,6 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
         pp_name = quotes (ppr poly_name)
         pp_ty   = quotes (ppr tidy_ty)
         (tidy_env', tidy_ty) = tidyOpenType tidy_env (idType poly_id)
-        
 
     prag_sigs = prag_fn poly_name
     origin    = AmbigOrigin sig_ctxt
