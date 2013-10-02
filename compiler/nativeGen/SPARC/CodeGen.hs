@@ -392,7 +392,10 @@ genCCall
 -- In the SPARC case we don't need a barrier.
 --
 genCCall (PrimTarget MO_WriteBarrier) _ _
- = do   return nilOL
+ = return $ nilOL
+
+genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
+ = return $ nilOL
 
 genCCall target dest_regs args0
  = do
@@ -657,7 +660,7 @@ outOfLineMachOp_table mop
         MO_U_Mul2 {}     -> unsupported
         MO_WriteBarrier  -> unsupported
         MO_Touch         -> unsupported
-        MO_Prefetch_Data -> unsupported
+        (MO_Prefetch_Data _) -> unsupported
     where unsupported = panic ("outOfLineCmmOp: " ++ show mop
                             ++ " not supported here")
 

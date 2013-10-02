@@ -1658,7 +1658,26 @@ genCCall _ (PrimTarget MO_WriteBarrier) _ _ = return nilOL
 
 genCCall _ (PrimTarget MO_Touch) _ _ = return nilOL
 
-genCCall _ (PrimTarget MO_Prefetch_Data) _ _ = return nilOL
+genCCall is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] =
+        case n of
+            0 -> genPrefetch src $ PREFETCH NTA  size
+            1 -> genPrefetch src $ PREFETCH Lvl2 size
+            2 -> genPrefetch src $ PREFETCH Lvl1 size
+            3 -> genPrefetch src $ PREFETCH Lvl0 size
+            l -> panic $ "unexpected prefetch level in genCCall MO_Prefetch_Data: " ++ (show l)
+            -- the c / llvm prefetch convention is 0, 1, 2, and 3
+            -- the x86 corresponding names are : NTA, 2 , 1, and 0
+   where
+        size = archWordSize is32bit
+        -- need to know what register width for pointers!
+        genPrefetch inRegSrc prefetchCTor =
+            do
+                code_src <- getAnyReg inRegSrc
+                src_r <- getNewRegNat size
+                return $ code_src src_r `appOL`
+                  (unitOL (prefetchCTor  (OpAddr
+                              ((AddrBaseIndex (EABaseReg src_r )   EAIndexNone (ImmInt 0))))  ))
+                  -- prefetch always takes an address
 
 genCCall is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] = do
     dflags <- getDynFlags
@@ -2361,7 +2380,7 @@ outOfLineCmmOp mop res args
               MO_U_Mul2 {}     -> unsupported
               MO_WriteBarrier  -> unsupported
               MO_Touch         -> unsupported
-              MO_Prefetch_Data -> unsupported
+              (MO_Prefetch_Data _ ) -> unsupported
         unsupported = panic ("outOfLineCmmOp: " ++ show mop
                           ++ " not supported here")
 

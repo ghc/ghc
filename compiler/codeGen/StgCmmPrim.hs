@@ -255,15 +255,6 @@ emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
 emitPrimOp _ res@[] TouchOp args@[_arg]
    = do emitPrimCall res MO_Touch args
 
-emitPrimOp _ res@[] PrefetchByteArrayOp args@[_arg]
-   = do emitPrimCall res MO_Prefetch_Data args
-
-emitPrimOp _ res@[] PrefetchMutableByteArrayOp args@[_arg]
-   = do emitPrimCall res MO_Prefetch_Data args
-
-emitPrimOp _ res@[] PrefetchAddrOp args@[_arg]
-   = do emitPrimCall res MO_Prefetch_Data args
-
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp dflags [res] ByteArrayContents_Char [arg]
    = emitAssign (CmmLocal res) (cmmOffsetB dflags arg (arrWordsHdrSize dflags))
@@ -656,9 +647,22 @@ emitPrimOp dflags res (VecWriteScalarOffAddrOp vcat n w) args = do
     ty = vecCmmCat vcat w
 
 -- Prefetch
-emitPrimOp _ res PrefetchByteArrayOp        args = doPrefetchByteArrayOp res args
-emitPrimOp _ res PrefetchMutableByteArrayOp args = doPrefetchByteArrayOp res args
-emitPrimOp _ res PrefetchAddrOp             args = doPrefetchAddrOp res args
+emitPrimOp _ res PrefetchByteArrayOp3        args = doPrefetchByteArrayOp 3 res args
+emitPrimOp _ res PrefetchMutableByteArrayOp3 args = doPrefetchByteArrayOp 3 res args
+emitPrimOp _ res PrefetchAddrOp3             args = doPrefetchAddrOp  3 res args
+
+emitPrimOp _ res PrefetchByteArrayOp2        args = doPrefetchByteArrayOp 2 res args
+emitPrimOp _ res PrefetchMutableByteArrayOp2 args = doPrefetchByteArrayOp 2 res args
+emitPrimOp _ res PrefetchAddrOp2             args = doPrefetchAddrOp 2 res args
+
+emitPrimOp _ res PrefetchByteArrayOp1        args = doPrefetchByteArrayOp 1 res args
+emitPrimOp _ res PrefetchMutableByteArrayOp1 args = doPrefetchByteArrayOp 1 res args
+emitPrimOp _ res PrefetchAddrOp1             args = doPrefetchAddrOp 1 res args
+
+emitPrimOp _ res PrefetchByteArrayOp0        args = doPrefetchByteArrayOp 0 res args
+emitPrimOp _ res PrefetchMutableByteArrayOp0 args = doPrefetchByteArrayOp 0 res args
+emitPrimOp _ res PrefetchAddrOp0             args = doPrefetchAddrOp 0 res args
+
 
 -- The rest just translate straightforwardly
 emitPrimOp dflags [res] op [arg]
@@ -1370,31 +1374,34 @@ doVecInsertOp maybe_pre_write_cast ty src e idx res = do
 ------------------------------------------------------------------------------
 -- Helpers for translating prefetching.
 
-doPrefetchByteArrayOp :: [LocalReg]
+doPrefetchByteArrayOp :: Int
+                      -> [LocalReg]
                       -> [CmmExpr]
                       -> FCode ()
-doPrefetchByteArrayOp res [addr,idx]
+doPrefetchByteArrayOp locality res [addr,idx]
    = do dflags <- getDynFlags
-        mkBasicPrefetch (arrWordsHdrSize dflags) res addr idx
-doPrefetchByteArrayOp _ _
+        mkBasicPrefetch locality (arrWordsHdrSize dflags) res addr idx
+doPrefetchByteArrayOp _ _ _
    = panic "StgCmmPrim: doPrefetchByteArrayOp"
 
-doPrefetchAddrOp :: [LocalReg]
+doPrefetchAddrOp ::Int
+                 -> [LocalReg]
                  -> [CmmExpr]
                  -> FCode ()
-doPrefetchAddrOp res [addr,idx]
-   = mkBasicPrefetch 0 res addr idx
-doPrefetchAddrOp _ _
+doPrefetchAddrOp locality  res [addr,idx]
+   = mkBasicPrefetch locality 0 res addr idx
+doPrefetchAddrOp _ _  _
    = panic "StgCmmPrim: doPrefetchAddrOp"
 
-mkBasicPrefetch :: ByteOff      -- Initial offset in bytes
+mkBasicPrefetch :: Int          -- Locality level 0-3
+                -> ByteOff      -- Initial offset in bytes
                 -> [LocalReg]   -- Destination
                 -> CmmExpr      -- Base address
                 -> CmmExpr      -- Index
                 -> FCode ()
-mkBasicPrefetch off res base idx
+mkBasicPrefetch locality off res base idx
    = do dflags <- getDynFlags
-        emitPrimCall [] MO_Prefetch_Data [cmmIndexExpr dflags W8 (cmmOffsetB dflags base off) idx]
+        emitPrimCall [] (MO_Prefetch_Data locality) [cmmIndexExpr dflags W8 (cmmOffsetB dflags base off) idx]
         case res of
           []    -> return ()
           [reg] -> emitAssign (CmmLocal reg) base

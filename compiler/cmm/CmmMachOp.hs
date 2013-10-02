@@ -107,10 +107,10 @@ data MachOp
   -- Vector element insertion and extraction operations
   | MO_V_Insert  Length Width   -- Insert scalar into vector
   | MO_V_Extract Length Width   -- Extract scalar from vector
-  
+
   -- Integer vector operations
-  | MO_V_Add Length Width  
-  | MO_V_Sub Length Width  
+  | MO_V_Add Length Width
+  | MO_V_Sub Length Width
   | MO_V_Mul Length Width
 
   -- Signed vector multiply/divide
@@ -127,8 +127,8 @@ data MachOp
   | MO_VF_Extract Length Width   -- Extract scalar from vector
 
   -- Floating point vector operations
-  | MO_VF_Add  Length Width  
-  | MO_VF_Sub  Length Width  
+  | MO_VF_Add  Length Width
+  | MO_VF_Sub  Length Width
   | MO_VF_Neg  Length Width             -- unary -
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
@@ -528,8 +528,14 @@ data CallishMachOp
   | MO_Touch         -- Keep variables live (when using interior pointers)
 
   -- Prefetch
-  | MO_Prefetch_Data -- Prefetch hint. May change program performance but not
+  | MO_Prefetch_Data Int -- Prefetch hint. May change program performance but not
                      -- program behavior.
+                     -- the Int can be 0-3. Needs to be known at compile time
+                     -- to interact with code generation correctly.
+                     --  TODO: add support for prefetch WRITES,
+                     --  currently only exposes prefetch reads, which
+                     -- would the majority of use cases in ghc anyways
+
 
   -- Note that these three MachOps all take 1 extra parameter than the
   -- standard C lib versions. The extra (last) parameter contains

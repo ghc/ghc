@@ -952,8 +952,16 @@ callishMachOps = listToUFM $
         ( "write_barrier", MO_WriteBarrier ),
         ( "memcpy", MO_Memcpy ),
         ( "memset", MO_Memset ),
-        ( "memmove", MO_Memmove )
+        ( "memmove", MO_Memmove ),
+
+        ("prefetch0",MO_Prefetch_Data 0),
+        ("prefetch1",MO_Prefetch_Data 1),
+        ("prefetch2",MO_Prefetch_Data 2),
+        ("prefetch3",MO_Prefetch_Data 3)
+
         -- ToDo: the rest, maybe
+        -- edit: which rest?
+        -- also: how do we tell CMM Lint how to type check callish macops?
     ]
 
 parseSafety :: String -> P Safety

@@ -200,7 +200,8 @@ genCall (PrimTarget (MO_UF_Conv _)) [_] args =
     "Can only handle 1, given" ++ show (length args) ++ "."
 
 -- Handle prefetching data
-genCall t@(PrimTarget MO_Prefetch_Data) [] args = do
+genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
+  | 0 <= localityInt && localityInt <= 3 = do
     ver <- getLlvmVer
     let argTy | ver <= 29  = [i8Ptr, i32, i32]
               | otherwise  = [i8Ptr, i32, i32, i32]
@@ -214,12 +215,13 @@ genCall t@(PrimTarget MO_Prefetch_Data) [] args = do
     (argVars', stmts3)      <- castVars $ zip argVars argTy
 
     trash <- getTrashStmts
-    let argSuffix | ver <= 29  = [mkIntLit i32 0, mkIntLit i32 3]
-                  | otherwise  = [mkIntLit i32 0, mkIntLit i32 3, mkIntLit i32 1]
+    let argSuffix | ver <= 29  = [mkIntLit i32 0, mkIntLit i32 localityInt]
+                  | otherwise  = [mkIntLit i32 0, mkIntLit i32 localityInt, mkIntLit i32 1]
         call = Expr $ Call StdCall fptr (argVars' ++ argSuffix) []
         stmts = stmts1 `appOL` stmts2 `appOL` stmts3
                 `appOL` trash `snocOL` call
     return (stmts, top1 ++ top2)
+  | otherwise = panic $ "prefetch locality level integer must be between 0 and 3, given: " ++ (show localityInt)
 
 -- Handle PopCnt and BSwap that need to only convert arg and return types
 genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
@@ -545,7 +547,8 @@ cmmPrimOpFunctions mop = do
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
-    MO_Prefetch_Data -> fsLit "llvm.prefetch"
+    (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
+
 
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
