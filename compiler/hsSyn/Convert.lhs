@@ -480,6 +480,19 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
                                      rhs' placeHolderNames
        }
 
+cvtPragmaD (AnnP target exp)
+  = do { exp' <- cvtl exp
+       ; target' <- case target of
+         ModuleAnnotation  -> return ModuleAnnProvenance
+         TypeAnnotation n  -> do
+           n' <- tconName n
+           return (TypeAnnProvenance  n')
+         ValueAnnotation n -> do
+           n' <- if isVarName n then vName n else cName n
+           return (ValueAnnProvenance n')
+       ; returnL $ Hs.AnnD $ HsAnnotation target' exp'
+       }
+
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive
 dfltActivation _           = AlwaysActive
