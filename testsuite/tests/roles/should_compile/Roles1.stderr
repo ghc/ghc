@@ -14,7 +14,7 @@ TYPE CONSTRUCTORS
       RecFlag NonRecursive, Promotable
       = K2 :: forall a. a -> T2 a Stricts: _
       FamilyInstance: none
-  T3 :: forall (k :: BOX). k -> *
+  T3 :: k -> *
   data T3 (k::BOX) (a::k)
       No C type associated
       Roles: [nominal, phantom]
@@ -35,14 +35,14 @@ TYPE CONSTRUCTORS
       RecFlag NonRecursive, Promotable
       = K5 :: forall a. a -> T5 a Stricts: _
       FamilyInstance: none
-  T6 :: forall (k :: BOX). k -> *
+  T6 :: k -> *
   data T6 (k::BOX) (a::k)
       No C type associated
       Roles: [nominal, phantom]
       RecFlag NonRecursive, Not promotable
       = K6 :: forall (k::BOX) (a::k). T6 k a
       FamilyInstance: none
-  T7 :: forall (k :: BOX). k -> * -> *
+  T7 :: k -> * -> *
   data T7 (k::BOX) (a::k) b
       No C type associated
       Roles: [nominal, phantom, representational]
