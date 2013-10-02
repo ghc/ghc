@@ -418,6 +418,23 @@
                     in the future.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    GHC now persists annotations to interface files,
+                    meaning they can be read by GHC API clients.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    There is a new set of primops for utilizing
+                    hardware-based prefetch instructions, to help
+                    guide the processors caching decisions.
+               </para>
+                <para>
+                    Currently, these are only supported with the LLVM
+                    backend and x86/amd64 backends.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -462,7 +479,12 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    Template Haskell now supports Roles (TODO FIXME: elaborate?)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    Template Haskell now supports annotation pragmas.
                </para>
            </listitem>
        </itemizedlist>
@@ -681,7 +703,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number XXXX (was XXXX)
+                    Version number 0.7.1.0 (was 0.5.1.1)
                </para>
            </listitem>
        </itemizedlist>
@@ -692,7 +714,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number XXXX (was XXXX)
+                    Version number 0.10.3.0 (was 0.10.0.0)
                </para>
            </listitem>
        </itemizedlist>
@@ -703,7 +725,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number XXXX (was XXXX)
+                    Version number 1.18.1 (was 1.16.0)
               </para>
           </listitem>
       </itemizedlist>
@@ -857,6 +879,13 @@
                     Version number XXXX (was XXXX)
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    Several bugs have been fixed, including deadlocks
+                    in <literal>readProcess</literal> and
+                    <literal>readProcessWithExitCode</literal>.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -877,6 +906,11 @@
             <listitem>
                 <para>
                     Version number XXXX (was XXXX)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    There is now support for annotation pragmas.
                </para>
            </listitem>
        </itemizedlist>
