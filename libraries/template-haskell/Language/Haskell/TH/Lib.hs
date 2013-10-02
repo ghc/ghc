@@ -404,6 +404,12 @@ pragRuleD n bndrs lhs rhs phases
       rhs1   <- rhs
       return $ PragmaD $ RuleP n bndrs1 lhs1 rhs1 phases
 
+pragAnnD :: AnnTarget -> ExpQ -> DecQ
+pragAnnD target expr
+  = do
+      exp1 <- expr
+      return $ PragmaD $ AnnP target exp1
+
 familyNoKindD :: FamFlavour -> Name -> [TyVarBndr] -> DecQ
 familyNoKindD flav tc tvs = return $ FamilyD flav tc tvs Nothing
 

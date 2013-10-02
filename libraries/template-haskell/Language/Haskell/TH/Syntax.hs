@@ -1209,6 +1209,7 @@ data Pragma = InlineP         Name Inline RuleMatch Phases
             | SpecialiseP     Name Type (Maybe Inline) Phases
             | SpecialiseInstP Type
             | RuleP           String [RuleBndr] Exp Exp Phases
+            | AnnP            AnnTarget Exp
         deriving( Show, Eq, Data, Typeable )
 
 data Inline = NoInline
@@ -1227,6 +1228,11 @@ data Phases = AllPhases
 
 data RuleBndr = RuleVar Name
               | TypedRuleVar Name Type
+              deriving (Show, Eq, Data, Typeable)
+
+data AnnTarget = ModuleAnnotation
+               | TypeAnnotation Name
+               | ValueAnnotation Name
               deriving (Show, Eq, Data, Typeable)
 
 type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@

@@ -53,7 +53,7 @@ module Language.Haskell.TH(
     -- ** Declarations
 	Dec(..), Con(..), Clause(..), 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	Inline(..), RuleMatch(..), Phases(..), RuleBndr(..),
+	Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
 	FunDep(..), FamFlavour(..), TySynEqn(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
     -- ** Expressions
@@ -129,7 +129,7 @@ module Language.Haskell.TH(
     cCall, stdCall, unsafe, safe, forImpD,
     -- **** Pragmas
     ruleVar, typedRuleVar,
-    pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD,
+    pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,
 
 	-- * Pretty-printer
     Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType

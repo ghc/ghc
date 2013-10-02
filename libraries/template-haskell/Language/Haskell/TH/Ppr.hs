@@ -395,6 +395,11 @@ instance Ppr Pragma where
                        | otherwise  =   text "forall"
                                     <+> fsep (map ppr bndrs)
                                     <+> char '.'
+    ppr (AnnP tgt expr)
+       = text "{-# ANN" <+> target1 tgt <+> ppr expr <+> text "#-}"
+      where target1 ModuleAnnotation    = text "module"
+            target1 (TypeAnnotation t)  = text "type" <+> ppr t
+            target1 (ValueAnnotation v) = ppr v
 
 ------------------------------
 instance Ppr Inline where
