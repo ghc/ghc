@@ -9,5 +9,6 @@ T1900.hs:13:10:
     Expected type: Depend s -> Bool
       Actual type: Depend s0 -> Bool
     In the ambiguity check for: forall s. Bug s => Depend s -> Bool
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛check’:
       check :: Bug s => Depend s -> Bool

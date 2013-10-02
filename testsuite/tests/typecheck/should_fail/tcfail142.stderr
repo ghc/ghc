@@ -7,4 +7,5 @@ tcfail142.hs:18:8:
       at tcfail142.hs:18:8-25
     The type variable ‛a0’ is ambiguous
     In the ambiguity check for: forall r a. Bar a r => r -> ()
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛bar’: bar :: Bar a r => r -> ()

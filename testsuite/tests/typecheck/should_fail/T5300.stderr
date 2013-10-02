@@ -11,6 +11,7 @@ T5300.hs:11:7:
       forall a b (m :: * -> *) c.
       (Monad m, C1 a b c) =>
       a -> StateT (T b) m a
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛f1’:
       f1 :: (Monad m, C1 a b c) => a -> StateT (T b) m a
 
@@ -27,6 +28,7 @@ T5300.hs:14:7:
       forall a1 b2 (m :: * -> *) a2 b1 c1 c2.
       (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
       a1 -> StateT (T b2) m a2
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛f2’:
       f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
             a1 -> StateT (T b2) m a2

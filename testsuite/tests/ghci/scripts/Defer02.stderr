@@ -83,11 +83,13 @@
     Inaccessible code in
       the type signature for k :: Int ~ Bool => Int -> Bool
     In the ambiguity check for: Int ~ Bool => Int -> Bool
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛k’: k :: Int ~ Bool => Int -> Bool
 
 ../../typecheck/should_run/Defer01.hs:45:6: Warning:
     Couldn't match expected type ‛Bool’ with actual type ‛Int’
     In the ambiguity check for: Int ~ Bool => Int -> Bool
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛k’: k :: Int ~ Bool => Int -> Bool
 
 ../../typecheck/should_run/Defer01.hs:45:6: Warning:

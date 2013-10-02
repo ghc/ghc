@@ -6,4 +6,5 @@ tcfail097.hs:5:6:
       at tcfail097.hs:5:6-23
     The type variable ‛a0’ is ambiguous
     In the ambiguity check for: forall a. Eq a => Int -> Int
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‛f’: f :: Eq a => Int -> Int

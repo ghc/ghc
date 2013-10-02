@@ -157,3 +157,5 @@ T5837.hs:8:6:
                                                                                                                                                        (TF
                                                                                                                                                           (TF
                                                                                                                                                              a)))))))))))))))))))))))))))))))))))))))))))))))))
+    In the ambiguity check for: forall a. a ~ TF (a, Int) => Int
+    In the type signature for ‛t’: t :: a ~ TF (a, Int) => Int
