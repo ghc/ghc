@@ -213,11 +213,16 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
   | otherwise = return ()
 
 getLHsIntegralLit :: LHsExpr Id -> Maybe (Integer, Name)
+-- See if the expression is an Integral literal
+-- Remember to look through automatically-added tick-boxes! (Trac #8384)
+getLHsIntegralLit (L _ (HsPar e))            = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsTick _ e))         = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsBinTick _ _ e))    = getLHsIntegralLit e
 getLHsIntegralLit (L _ (HsOverLit over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit _ = Nothing
 
 getIntegralLit :: HsOverLit Id -> Maybe (Integer, Name)
-getIntegralLit (OverLit { ol_val = HsIntegral i, ol_type = ty }) 
+getIntegralLit (OverLit { ol_val = HsIntegral i, ol_type = ty })
   | Just tc <- tyConAppTyCon_maybe ty
   = Just (i, tyConName tc)
 getIntegralLit _ = Nothing
