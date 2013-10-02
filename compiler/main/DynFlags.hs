@@ -1250,7 +1250,7 @@ dynamicTooMkDynamicDynFlags dflags0
 
 -----------------------------------------------------------------------------
 
--- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
+-- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
  let -- We can't build with dynamic-too on Windows, as labels before
@@ -1287,7 +1287,7 @@ initDynFlags dflags = do
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
--- and must be fully initialized by 'GHC.newSession' first.
+-- and must be fully initialized by 'GHC.runGhc' first.
 defaultDynFlags :: Settings -> DynFlags
 defaultDynFlags mySettings =
      DynFlags {

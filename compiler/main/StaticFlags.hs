@@ -81,7 +81,7 @@ parseStaticFlagsFull :: [Flag IO] -> [Located String]
                      -> IO ([Located String], [Located String])
 parseStaticFlagsFull flagsAvailable args = do
   ready <- readIORef v_opt_C_ready
-  when ready $ throwGhcExceptionIO (ProgramError "Too late for parseStaticFlags: call it before newSession")
+  when ready $ throwGhcExceptionIO (ProgramError "Too late for parseStaticFlags: call it before runGhc or runGhcT")
 
   (leftover, errs, warns) <- processArgs flagsAvailable args
   when (not (null errs)) $ throwGhcExceptionIO $ errorsToGhcException errs
@@ -100,7 +100,7 @@ staticFlags :: [String]
 staticFlags = unsafePerformIO $ do
   ready <- readIORef v_opt_C_ready
   if (not ready)
-        then panic "Static flags have not been initialised!\n        Please call GHC.newSession or GHC.parseStaticFlags early enough."
+        then panic "Static flags have not been initialised!\n        Please call GHC.parseStaticFlags early enough."
         else readIORef v_opt_C
 
 -- All the static flags should appear in this list.  It describes how each
