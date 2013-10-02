@@ -491,6 +491,9 @@ data IfaceAnnotation
         ifAnnotatedValue :: Serialized
   }
 
+instance Outputable IfaceAnnotation where
+  ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
+
 instance Binary IfaceAnnotation where
     put_ bh (IfaceAnnotation a1 a2) = do
         put_ bh a1
