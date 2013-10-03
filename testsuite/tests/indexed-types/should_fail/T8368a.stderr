@@ -1,0 +1,6 @@
+
+T8368a.hs:7:3:
+    Data constructor ‛MkFam’ returns type ‛Fam Bool b’
+      instead of an instance of its parent type ‛Fam Int b’
+    In the definition of data constructor ‛MkFam’
+    In the data instance declaration for ‛Fam’
