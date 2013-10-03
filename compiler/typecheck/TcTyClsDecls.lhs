@@ -16,7 +16,7 @@ module TcTyClsDecls (
         kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcSynFamInstDecl, tcFamTyPats,
         tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
-        wrongKindOfFamily,
+        wrongKindOfFamily, dataConCtxt, badDataConTyCon
     ) where
 
 #include "HsVersions.h"
@@ -900,7 +900,8 @@ kcDataDefn :: Name -> HsDataDefn Name -> TcKind -> TcM ()
 kcDataDefn tc_name
            (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
   = do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM (kcConDecl tc_name)) cons
+        ; checkNoErrs $ mapM_ (wrapLocM (kcConDecl tc_name)) cons
+          -- See Note [Failing early in kcDataDefn]
         ; kcResultKind mb_kind res_k }
 
 ------------------
@@ -929,6 +930,18 @@ type families.
 
 tcFamTyPats type checks the patterns, zonks, and then calls thing_inside
 to generate a desugaring. It is used during type-checking (not kind-checking).
+
+Note [Failing early in kcDataDefn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to use checkNoErrs when calling kcConDecl. This is because kcConDecl
+calls tcConDecl, which checks that the return type of a GADT-like constructor
+is actually an instance of the type head. Without the checkNoErrs, potentially
+two bad things could happen:
+
+ 1) Duplicate error messages, because tcConDecl will be called again during
+    *type* checking (as opposed to kind checking)
+ 2) If we just keep blindly forging forward after both kind checking and type
+    checking, we can get a panic in rejigConRes. See Trac #8368.
 
 \begin{code}
 -----------------
@@ -1187,7 +1200,8 @@ tcConRes tc_name dc_name (ResTyGADT res_ty)
          case hsTyGetAppHead_maybe res_ty of
            Just (tc_name', _)
              | tc_name' == tc_name -> return ()
-           _                       -> addErrTc (badDataConTyCon dc_name tc_name res_ty)
+           _                       -> addErrTc (badDataConTyCon dc_name (ppr tc_name)
+                                                                        (ppr res_ty))
        ; res_ty' <- tcHsLiftedType res_ty
        ; return (ResTyGADT res_ty') }
 
@@ -1596,8 +1610,7 @@ checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))     $
     addErrCtxt (dataConCtxt con)                $
-    do  { traceTc "Validity of data con" (ppr con)
-        ; traceTc "checkValidDataCon" (ppr con $$ ppr tc)
+    do  { traceTc "checkValidDataCon" (ppr con $$ ppr tc)
              -- IA0_TODO: we should also check that kind variables
              -- are only instantiated with kind variables
         ; checkValidMonoType (dataConOrigResTy con)
@@ -2048,11 +2061,11 @@ recClsErr cycles
   = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
                  nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
 
-badDataConTyCon :: Name -> Name -> LHsType Name -> SDoc
-badDataConTyCon data_con tc actual_res_ty
+badDataConTyCon :: Name -> SDoc -> SDoc -> SDoc
+badDataConTyCon data_con tc_doc actual_res_ty_doc
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
-                ptext (sLit "returns type") <+> quotes (ppr actual_res_ty))
-       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes (ppr tc))
+                ptext (sLit "returns type") <+> quotes actual_res_ty_doc)
+       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes tc_doc)
 
 badGadtKindCon :: DataCon -> SDoc
 badGadtKindCon data_con

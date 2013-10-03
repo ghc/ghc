@@ -37,6 +37,7 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
+import Unify      ( tcMatchTy )
 import TcTyDecls  ( emptyRoleAnnots )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
@@ -710,8 +711,8 @@ tcDataFamInstDecl mb_clsinfo
               ; return (rep_tc, fam_inst) }
 
          -- Remember to check validity; no recursion to worry about here
-       ; let role_annots = emptyRoleAnnots
-       ; checkValidTyCon rep_tc role_annots
+       ; checkNoErrs $ mapM_ (check_valid_data_con fam_tc rep_tc pats') (tyConDataCons rep_tc)
+       ; checkValidTyCon rep_tc emptyRoleAnnots
        ; return fam_inst } }
   where
     -- See Note [Eta reduction for data family axioms]
@@ -723,6 +724,24 @@ tcDataFamInstDecl mb_clsinfo
       , not (tv `elemVarSet` tyVarsOfTypes pats)
       = go tvs pats
     go tvs pats = (reverse tvs, reverse pats)
+
+    -- This checks for validity of GADT-like return types. The check for normal
+    -- (i.e., not data instance) datatypes is done in tcConRes. But, this check
+    -- just checks the *head* of the return type, because that is all that is
+    -- necessary there. Here, we check to make sure that the whole return type
+    -- is an instance of the header, even when the header contains some patterns.
+    -- It is quite inconvenient to do this elsewhere. See also Note
+    -- [Checking GADT return types] in TcTyClsDecls and Trac #8368.
+    check_valid_data_con fam_tc rep_tc pats datacon
+      = setSrcSpan (srcLocSpan (getSrcLoc datacon)) $
+        addErrCtxt (dataConCtxt datacon) $
+        let tmpl_vars = mkVarSet $ tyConTyVars rep_tc
+            tmpl_ty   = mkTyConApp fam_tc pats
+            res_ty    = dataConOrigResTy datacon
+            dc_name   = dataConName datacon in
+        checkTc (isJust (tcMatchTy tmpl_vars tmpl_ty res_ty))
+                (badDataConTyCon dc_name (ppr tmpl_ty) (ppr res_ty))
+      
 \end{code}
 
 Note [Eta reduction for data family axioms]
