@@ -1,0 +1,7 @@
+
+T8392a.hs:6:8:
+    Couldn't match type ‛Int’ with ‛Bool’
+    Inaccessible code in
+      the type signature for foo :: Int ~ Bool => a -> a
+    In the ambiguity check for: forall a. Int ~ Bool => a -> a
+    In the type signature for ‛foo’: foo :: Int ~ Bool => a -> a
