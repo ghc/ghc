@@ -1,32 +1,34 @@
 {-# LANGUAGE DataKinds, TypeOperators, TypeFamilies #-}
 module Main(main) where
 import GHC.TypeLits
+import Data.Proxy
 
 --------------------------------------------------------------------------------
 -- Test top-reactions
 
-tsub :: SingI x => Sing (x + y) -> Sing y -> Sing x
-tsub _ _ = sing
+tsub :: Proxy (x + y) -> Proxy y -> Proxy x
+tsub _ _ = Proxy
 
-tdiv :: SingI x => Sing (x * y) -> Sing y -> Sing x
-tdiv _ _ = sing
+tdiv :: Proxy (x * y) -> Proxy y -> Proxy x
+tdiv _ _ = Proxy
 
-troot :: SingI x => Sing (x ^ y) -> Sing y -> Sing x
-troot _ _ = sing
+troot :: Proxy (x ^ y) -> Proxy y -> Proxy x
+troot _ _ = Proxy
 
-tlog :: SingI y => Sing (x ^ y) -> Sing x -> Sing y
-tlog _ _ = sing
+tlog :: Proxy (x ^ y) -> Proxy x -> Proxy y
+tlog _ _ = Proxy
 
-tleq :: (SingI x, (x <=? y) ~ True) => Sing y -> Sing x
-tleq _ = sing
+tleq :: ((x <=? y) ~ True) => Proxy y -> Proxy x
+tleq _ = Proxy
 
 main :: IO ()
-main = print [ show (tsub  (sing :: Sing 5) (sing :: Sing 3)) == "2"
-             , show (tdiv  (sing :: Sing 8) (sing :: Sing 2)) == "4"
-             , show (troot (sing :: Sing 9) (sing :: Sing 2)) == "3"
-             , show (tlog  (sing :: Sing 8) (sing :: Sing 2)) == "3"
-             , show (tleq  (sing :: Sing 0))                  == "0"
+main = print [ sh (tsub  (Proxy :: Proxy 5) (Proxy :: Proxy 3)) == "2"
+             , sh (tdiv  (Proxy :: Proxy 8) (Proxy :: Proxy 2)) == "4"
+             , sh (troot (Proxy :: Proxy 9) (Proxy :: Proxy 2)) == "3"
+             , sh (tlog  (Proxy :: Proxy 8) (Proxy :: Proxy 2)) == "3"
+             , sh (tleq  (Proxy :: Proxy 0))                    == "0"
              ]
-
+  where
+  sh x = show (natVal x)
 
 
