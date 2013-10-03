@@ -114,6 +114,11 @@ instance Read SomeSymbol where
 
 --------------------------------------------------------------------------------
 
+infix  4 <=?, <=
+infixl 6 +, -
+infixl 7 *
+infixr 8 ^
+
 -- | Comparison of type-level naturals, as a constraint.
 type x <= y = (x <=? y) ~ True
 
