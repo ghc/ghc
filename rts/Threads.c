@@ -538,7 +538,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
     // We also want to avoid enlarging the stack if squeezing has
     // already released some of it.  However, we don't want to get into
-    // a pathalogical situation where a thread has a nearly full stack
+    // a pathological situation where a thread has a nearly full stack
     // (near its current limit, but not near the absolute -K limit),
     // keeps allocating a little bit, squeezing removes a little bit,
     // and then it runs again.  So to avoid this, if we squeezed *and*
