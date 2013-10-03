@@ -1082,7 +1082,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
 }
 
 /* -----------------------------------------------------------------------------
- * Handle a thread that returned to the scheduler with ThreadHeepOverflow
+ * Handle a thread that returned to the scheduler with ThreadHeapOverflow
  * -------------------------------------------------------------------------- */
 
 static rtsBool
