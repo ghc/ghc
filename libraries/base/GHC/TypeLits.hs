@@ -24,7 +24,7 @@ module GHC.TypeLits
     -- * Linking type and value level
   , KnownNat(..), KnownSymbol(..)
   , SomeNat(..), SomeSymbol(..)
-  , someNatVal, someSymVal
+  , someNatVal, someSymbolVal
 
     -- * Functions on type nats
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
@@ -80,8 +80,8 @@ someNatVal n
   | otherwise     = Nothing
 
 -- | Convert a string into an unknown type-level symbol.
-someSymVal :: String -> SomeSymbol
-someSymVal n      = forgetSingSymbol (SSym n)
+someSymbolVal :: String -> SomeSymbol
+someSymbolVal n   = forgetSingSymbol (SSym n)
 
 instance Eq SomeNat where
   SomeNat x == SomeNat y = natVal x == natVal y
@@ -109,7 +109,7 @@ instance Show SomeSymbol where
   showsPrec p (SomeSymbol x) = showsPrec p (symbolVal x)
 
 instance Read SomeSymbol where
-  readsPrec p xs = [ (someSymVal a, ys) | (a,ys) <- readsPrec p xs ]
+  readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
 
 
 --------------------------------------------------------------------------------
