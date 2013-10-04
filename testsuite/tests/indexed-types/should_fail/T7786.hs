@@ -4,8 +4,8 @@
              FlexibleContexts, ScopedTypeVariables #-}
 module T7786 where
 
-
-import GHC.TypeLits
+import GHC.TypeLits(Symbol,Nat)
+data family Sing (a :: k)
 
 data Inventory a = Empty | More (Inventory a) a
 
