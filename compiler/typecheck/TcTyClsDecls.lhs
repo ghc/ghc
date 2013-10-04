@@ -156,7 +156,7 @@ tcTyClGroup boot_details tyclds
            -- expects well-formed TyCons
        ; tcExtendGlobalEnv tyclss $ do
        { traceTc "Starting validity check" (ppr tyclss)
-       ; mapM_ (recoverM (return ()) . addLocM (checkValidTyCl role_annots)) decls
+       ; mapM_ (recoverM (return ()) . checkValidTyCl role_annots) tyclss
            -- We recover, which allows us to report multiple validity errors
 
            -- Step 4: Add the implicit things;
@@ -1350,39 +1350,33 @@ checkClassCycleErrs cls
   = unless (null cls_cycles) $ mapM_ recClsErr cls_cycles
   where cls_cycles = calcClassCycles cls
 
-checkValidDecl :: SDoc -- the context for error checking
-               -> Located Name -> RoleAnnots -> TcM ()
-checkValidDecl ctxt lname role_annots
-  = addErrCtxt ctxt $
-    do  { traceTc "Validity of 1" (ppr lname)
-        ; env <- getGblEnv
-        ; traceTc "Validity of 1a" (ppr (tcg_type_env env))
-        ; thing <- tcLookupLocatedGlobal lname
-        ; traceTc "Validity of 2" (ppr lname)
-        ; traceTc "Validity of" (ppr thing)
-        ; case thing of
-            ATyCon tc -> do
-                traceTc "  of kind" (ppr (tyConKind tc))
-                checkValidTyCon tc role_annots
-            AnId _    -> return ()  -- Generic default methods are checked
-                                    -- with their parent class
-            _         -> panic "checkValidTyCl"
-        ; traceTc "Done validity of" (ppr thing)
-        }
-                          
-checkValidTyCl :: RoleAnnots -> TyClDecl Name -> TcM ()
-checkValidTyCl role_annots decl
-  = do { checkValidDecl (tcMkDeclCtxt decl) (tyClDeclLName decl) role_annots
-       ; case decl of
-           ClassDecl { tcdATs = ats } ->
-             mapM_ (checkValidFamDecl role_annots . unLoc) ats
-           _ -> return () }
+checkValidTyCl :: RoleAnnots -> TyThing -> TcM ()
+checkValidTyCl role_annots thing
+  = setSrcSpan (getSrcSpan name) $
+    addErrCtxt ctxt $
+    case thing of
+      ATyCon tc -> checkValidTyCon tc role_annots
+      AnId _    -> return ()  -- Generic default methods are checked
+                              -- with their parent class
+      ACoAxiom _ -> return () -- Axioms checked with their parent
+                              -- closed family tycon
+      _         -> pprTrace "checkValidTyCl" (ppr thing) $ return ()
+  where
+    name = getName thing
+    flav = case thing of
+             ATyCon tc
+                | isClassTyCon tc      -> ptext (sLit "class")
+                | isSynFamilyTyCon tc  -> ptext (sLit "type family")
+                | isDataFamilyTyCon tc -> ptext (sLit "data family")
+                | isSynTyCon tc        -> ptext (sLit "type")
+                | isNewTyCon tc        -> ptext (sLit "newtype")
+                | isDataTyCon tc       -> ptext (sLit "data")
 
-checkValidFamDecl :: RoleAnnots -> FamilyDecl Name -> TcM ()
-checkValidFamDecl role_annots (FamilyDecl { fdLName = lname, fdInfo = flav })
-  = checkValidDecl (hsep [ptext (sLit "In the"), ppr flav,
-                          ptext (sLit "declaration for"), quotes (ppr lname)])
-                   lname role_annots
+             _ -> pprTrace "checkValidTyCl strange" (ppr thing)
+                  empty
+
+    ctxt = hsep [ ptext (sLit "In the"), flav
+                , ptext (sLit "declaration for"), quotes (ppr name) ]
 
 -------------------------
 -- For data types declared with record syntax, we require
