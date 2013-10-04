@@ -1,6 +1,6 @@
 data D where
   C :: (Int -> a) -> Char -> D
-  	-- Defined at ghci030.hs:8:6
+  	-- Defined at ghci030.hs:8:1
 data D where
   C :: (Int -> a) -> Char -> D
   	-- Defined at ghci030.hs:8:21

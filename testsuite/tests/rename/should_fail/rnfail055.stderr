@@ -11,19 +11,19 @@ RnFail055.hs-boot:4:1:
     Main module: f1 :: Int -> Float
     Boot file:   f1 :: Float -> Int
 
-RnFail055.hs-boot:6:6:
+RnFail055.hs-boot:6:1:
     Type constructor ‛S1’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type S1 a b = (a, b)
     Boot file:   type S1 a b c = (a, b)
 
-RnFail055.hs-boot:8:6:
+RnFail055.hs-boot:8:1:
     Type constructor ‛S2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type S2 a b = forall a1. (a1, b)
     Boot file:   type S2 a b = forall b1. (a, b1)
 
-RnFail055.hs-boot:12:6:
+RnFail055.hs-boot:12:1:
     Type constructor ‛T1’ has conflicting definitions in the module
     and its hs-boot file
     Main module: data T1 a b
@@ -39,7 +39,7 @@ RnFail055.hs-boot:12:6:
                      = T1 :: forall a b. [a] -> [b] -> T1 a b Stricts: _ _
                      FamilyInstance: none
 
-RnFail055.hs-boot:14:16:
+RnFail055.hs-boot:14:1:
     Type constructor ‛T2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: data Eq b => T2 a b
@@ -61,7 +61,7 @@ RnFail055.hs-boot:16:11:
 RnFail055.hs-boot:17:12:
     T3' is exported by the hs-boot file, but not exported by the module
 
-RnFail055.hs-boot:21:6:
+RnFail055.hs-boot:21:1:
     Type constructor ‛T5’ has conflicting definitions in the module
     and its hs-boot file
     Main module: data T5 a
@@ -77,7 +77,7 @@ RnFail055.hs-boot:21:6:
                      = T5 :: forall a. a -> T5 a Stricts: _
                      FamilyInstance: none
 
-RnFail055.hs-boot:23:6:
+RnFail055.hs-boot:23:1:
     Type constructor ‛T6’ has conflicting definitions in the module
     and its hs-boot file
     Main module: data T6
@@ -91,7 +91,7 @@ RnFail055.hs-boot:23:6:
                      = T6 :: Int -> T6 HasWrapper Stricts: !
                      FamilyInstance: none
 
-RnFail055.hs-boot:25:6:
+RnFail055.hs-boot:25:1:
     Type constructor ‛T7’ has conflicting definitions in the module
     and its hs-boot file
     Main module: data T7 a
@@ -110,7 +110,7 @@ RnFail055.hs-boot:25:6:
 RnFail055.hs-boot:27:22:
     RnFail055.m1 is exported by the hs-boot file, but not exported by the module
 
-RnFail055.hs-boot:28:7:
+RnFail055.hs-boot:28:1:
     Class ‛C2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: class C2 a b
@@ -122,7 +122,7 @@ RnFail055.hs-boot:28:7:
                      RecFlag NonRecursive
                      m2 :: a -> b
 
-RnFail055.hs-boot:29:24:
+RnFail055.hs-boot:29:1:
     Class ‛C3’ has conflicting definitions in the module
     and its hs-boot file
     Main module: class (Eq a, Ord a) => C3 a

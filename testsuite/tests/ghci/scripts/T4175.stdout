@@ -1,17 +1,17 @@
-type family A a b :: * 	-- Defined at T4175.hs:4:13
+type family A a b :: * 	-- Defined at T4175.hs:4:1
 type instance A (Maybe a) a -- Defined at T4175.hs:6:1
 type instance A Int Int -- Defined at T4175.hs:5:1
-data family B a 	-- Defined at T4175.hs:8:13
+data family B a 	-- Defined at T4175.hs:8:1
 data instance B () -- Defined at T4175.hs:9:15
 class C a where
   type family D a b :: *
-  	-- Defined at T4175.hs:12:10
+  	-- Defined at T4175.hs:12:5
 type D () () -- Defined at T4175.hs:18:5
 type D Int () -- Defined at T4175.hs:15:5
 type family E a :: * where
     E () = Bool
     E Int = String
-  	-- Defined at T4175.hs:20:13
+  	-- Defined at T4175.hs:20:1
 data () = () 	-- Defined in ‛GHC.Tuple’
 instance C () -- Defined at T4175.hs:17:10
 instance Bounded () -- Defined in ‛GHC.Enum’

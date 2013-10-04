@@ -11,10 +11,10 @@ rn_dup.hs:12:16:
                  rn_dup.hs:11:27
                  rn_dup.hs:12:16
 
-rn_dup.hs:17:8:
+rn_dup.hs:17:3:
     Multiple declarations of ‛CT’
-    Declared at: rn_dup.hs:15:8
-                 rn_dup.hs:17:8
+    Declared at: rn_dup.hs:15:3
+                 rn_dup.hs:17:3
 
 rn_dup.hs:18:3:
     Multiple declarations of ‛f’

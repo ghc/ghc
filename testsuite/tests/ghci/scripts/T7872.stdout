@@ -1,2 +1,2 @@
-type T = forall a. a -> a 	-- Defined at <interactive>:3:6
-data D = MkT (forall b. b -> b) 	-- Defined at <interactive>:4:6
+type T = forall a. a -> a 	-- Defined at <interactive>:3:1
+data D = MkT (forall b. b -> b) 	-- Defined at <interactive>:4:1

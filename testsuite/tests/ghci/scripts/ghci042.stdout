@@ -4,4 +4,4 @@ a :: Integer 	-- Defined at <interactive>:6:5
 3
 data R = B {a :: Int} 	-- Defined at <interactive>:9:13
 data T = A {main::Interactive.a :: Int}
-  	-- Defined at <interactive>:3:6
+  	-- Defined at <interactive>:3:1

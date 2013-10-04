@@ -8,7 +8,7 @@ data R
   | S {x :: Char}
   | T {y :: Int, z :: Float}
   | W
-  	-- Defined at T4015.hs:3:6
+  	-- Defined at T4015.hs:3:1
 data R = ... | S {...} | ... 	-- Defined at T4015.hs:4:10
 data R = ... | T {...} | ... 	-- Defined at T4015.hs:5:10
 data R = ... | W 	-- Defined at T4015.hs:6:10

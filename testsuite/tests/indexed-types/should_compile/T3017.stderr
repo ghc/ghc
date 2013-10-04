@@ -5,17 +5,17 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   Coll :: * -> Constraint
   class Coll c
-      Roles: [nominal]
-      RecFlag NonRecursive
-      type family Elem c :: *
-      empty :: c insert :: Elem c -> c -> c
+    Roles: [nominal]
+    RecFlag NonRecursive
+    type family Elem c :: * (open)
+    empty :: c insert :: Elem c -> c -> c
   ListColl :: * -> *
   data ListColl a
-      No C type associated
-      Roles: [representational]
-      RecFlag NonRecursive, Promotable
-      = L :: forall a. [a] -> ListColl a Stricts: _
-      FamilyInstance: none
+    No C type associated
+    Roles: [representational]
+    RecFlag NonRecursive, Promotable
+    = L :: forall a. [a] -> ListColl a Stricts: _
+    FamilyInstance: none
 COERCION AXIOMS
   axiom Foo.TFCo:R:ElemListColl :: Elem (ListColl a) = a
 INSTANCES

@@ -1,5 +1,5 @@
 
-mod38.hs:4:7:
+mod38.hs:4:1:
     Multiple declarations of ‛C’
-    Declared at: mod38.hs:3:6
-                 mod38.hs:4:7
+    Declared at: mod38.hs:3:1
+                 mod38.hs:4:1

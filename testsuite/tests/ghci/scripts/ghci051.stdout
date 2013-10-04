@@ -1,5 +1,5 @@
-data T = C | D 	-- Defined at <interactive>:9:10
-type T' = main::Interactive.T 	-- Defined at <interactive>:4:6
+data T = C | D 	-- Defined at <interactive>:9:1
+type T' = main::Interactive.T 	-- Defined at <interactive>:4:1
 data main::Interactive.T = A | ...
   	-- Defined at <interactive>:3:10
 data main::Interactive.T = B | ...

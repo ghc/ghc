@@ -1,23 +1,23 @@
 class Foo (a :: k) where
   type family Bar (a :: k) b :: *
-  	-- Defined at T7939.hs:6:9
+  	-- Defined at T7939.hs:6:4
 Bar :: k -> * -> *
-type family F a :: * 	-- Defined at T7939.hs:8:13
+type family F a :: * 	-- Defined at T7939.hs:8:1
 type instance F Int -- Defined at T7939.hs:9:1
 F :: * -> *
 type family G a :: * where G Int = Bool
-  	-- Defined at T7939.hs:11:13
+  	-- Defined at T7939.hs:11:1
 G :: * -> *
 type family H (a :: Bool) :: Bool where H 'False = 'True
-  	-- Defined at T7939.hs:14:13
+  	-- Defined at T7939.hs:14:1
 H :: Bool -> Bool
 type family J (a :: [k]) :: Bool where
     J '[] = 'False
     J (h : t) = 'True
-  	-- Defined at T7939.hs:17:13
+  	-- Defined at T7939.hs:17:1
 J :: [k] -> Bool
 type family K (a :: [k]) :: Maybe k where
     K '[] = 'Nothing
     K (h : t) = 'Just h
-  	-- Defined at T7939.hs:21:13
+  	-- Defined at T7939.hs:21:1
 K :: [k] -> Maybe k

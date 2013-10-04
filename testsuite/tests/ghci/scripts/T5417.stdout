@@ -3,5 +3,5 @@ data instance C.F (B1 a) = B2 a
 data family D a
 class C.C1 a where
   data family C.F a
-  	-- Defined at T5417a.hs:5:10
+  	-- Defined at T5417a.hs:5:5
 data C.F (B1 a) -- Defined at T5417.hs:8:10
