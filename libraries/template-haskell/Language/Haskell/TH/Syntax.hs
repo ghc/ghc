@@ -62,6 +62,14 @@ class (Monad m, Applicative m) => Quasi m where
 
   qAddDependentFile :: FilePath -> m ()
 
+  qAddTopDecls :: [Dec] -> m ()
+
+  qAddModFinalizer :: Q () -> m ()
+
+  qGetQ :: Typeable a => m (Maybe a)
+
+  qPutQ :: Typeable a => a -> m ()
+
 -----------------------------------------------------
 --	The IO instance of Quasi
 --
@@ -88,6 +96,10 @@ instance Quasi IO where
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _ = badIO "addDependentFile"
+  qAddTopDecls _      = badIO "addTopDecls"
+  qAddModFinalizer _  = badIO "addModFinalizer"
+  qGetQ               = badIO "getQ"
+  qPutQ _             = badIO "putQ"
 
   qRunIO m = m
 
@@ -135,6 +147,22 @@ instance Functor Q where
 instance Applicative Q where
   pure x = Q (pure x)
   Q f <*> Q x = Q (f <*> x)
+
+-----------------------------------------------------
+--
+--		The TExp type
+--
+-----------------------------------------------------
+
+newtype TExp a = TExp { unType :: Exp }
+
+unTypeQ :: Q (TExp a) -> Q Exp
+unTypeQ m = do { TExp e <- m
+               ; return e }
+
+unsafeTExpCoerce :: Q Exp -> Q (TExp a)
+unsafeTExpCoerce m = do { e <- m
+                        ; return (TExp e) }
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
@@ -322,6 +350,24 @@ runIO m = Q (qRunIO m)
 addDependentFile :: FilePath -> Q ()
 addDependentFile fp = Q (qAddDependentFile fp)
 
+-- | Add additional top-level declarations. The added declarations will be type
+-- checked along with the current declaration group.
+addTopDecls :: [Dec] -> Q ()
+addTopDecls ds = Q (qAddTopDecls ds)
+
+-- | Add a finalizer that will run in the Q monad after the current module has
+-- been type checked. This only makes sense when run within a top-level splice.
+addModFinalizer :: Q () -> Q ()
+addModFinalizer act = Q (qAddModFinalizer (unQ act))
+
+-- | Get state from the Q monad.
+getQ :: Typeable a => Q (Maybe a)
+getQ = Q qGetQ
+
+-- | Replace the state in the Q monad.
+putQ :: Typeable a => a -> Q ()
+putQ x = Q (qPutQ x)
+
 instance Quasi Q where
   qNewName  	    = newName
   qReport   	    = report
@@ -333,6 +379,10 @@ instance Quasi Q where
   qLocation 	    = location
   qRunIO    	    = runIO
   qAddDependentFile = addDependentFile
+  qAddTopDecls      = addTopDecls
+  qAddModFinalizer  = addModFinalizer
+  qGetQ             = getQ
+  qPutQ             = putQ
 
 
 ----------------------------------------------------

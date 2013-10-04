@@ -33,6 +33,9 @@ module Language.Haskell.TH(
         -- *** Roles lookup
         reifyRoles,
 
+	-- * Typed expressions
+	TExp, unType,
+
 	-- * Names
 	Name, NameSpace,	-- Abstract
 	-- ** Constructing names

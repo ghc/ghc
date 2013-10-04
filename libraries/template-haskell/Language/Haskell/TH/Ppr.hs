@@ -136,12 +136,22 @@ pprExp i (MultiIfE alts)
         []            -> [text "if {}"]
         (alt : alts') -> text "if" <+> pprGuarded arrow alt
                          : map (nest 3 . pprGuarded arrow) alts'
-pprExp i (LetE ds e) = parensIf (i > noPrec) $ text "let" <+> ppr ds
-                                            $$ text " in" <+> ppr e
+pprExp i (LetE ds_ e) = parensIf (i > noPrec) $ text "let" <+> pprDecs ds_
+                                             $$ text " in" <+> ppr e
+  where
+    pprDecs []  = empty
+    pprDecs [d] = ppr d
+    pprDecs ds  = braces $ sep $ punctuate semi $ map ppr ds
+
 pprExp i (CaseE e ms)
  = parensIf (i > noPrec) $ text "case" <+> ppr e <+> text "of"
                         $$ nest nestDepth (ppr ms)
-pprExp i (DoE ss) = parensIf (i > noPrec) $ text "do" <+> ppr ss
+pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
+  where
+    pprStms []  = empty
+    pprStms [s] = ppr s
+    pprStms ss  = braces $ sep $ punctuate semi $ map ppr ss
+    
 pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
 pprExp _ (CompE ss) = text "[" <> ppr s
