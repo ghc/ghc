@@ -599,12 +599,8 @@ schemeT d s p app
 --   = error "?!?!"
 
    -- Case 0
-   | Just (arg, constr_names) <- maybe_is_tagToEnum_call
-   = do (push, arg_words) <- pushAtom d p arg
-        tagToId_sequence <- implement_tagToId constr_names
-        return (push `appOL`  tagToId_sequence
-                       `appOL`  mkSLIDE 1 (d - s + fromIntegral arg_words)
-                       `snocOL` ENTER)
+   | Just (arg, constr_names) <- maybe_is_tagToEnum_call app
+   = implement_tagToId d s p arg constr_names
 
    -- Case 1
    | Just (CCall ccall_spec) <- isFCallId_maybe fn
@@ -632,25 +628,6 @@ schemeT d s p app
    = doTailCall d s p fn args_r_to_l
 
    where
-      -- Detect and extract relevant info for the tagToEnum kludge.
-      maybe_is_tagToEnum_call
-         = let extract_constr_Names ty
-                 | UnaryRep rep_ty <- repType ty
-                 , Just tyc <- tyConAppTyCon_maybe rep_ty,
-                   isDataTyCon tyc
-                   = map (getName . dataConWorkId) (tyConDataCons tyc)
-                   -- NOTE: use the worker name, not the source name of
-                   -- the DataCon.  See DataCon.lhs for details.
-                 | otherwise
-                   = pprPanic "maybe_is_tagToEnum_call.extract_constr_Ids" (ppr ty)
-           in
-           case app of
-              (AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
-                 -> case isPrimOpId_maybe v of
-                       Just TagToEnumOp -> Just (snd arg, extract_constr_Names t)
-                       _                -> Nothing
-              _ -> Nothing
-
         -- Extract the args (R->L) and fn
         -- The function will necessarily be a variable,
         -- because we are compiling a tail call
@@ -1163,23 +1140,87 @@ maybe_getCCallReturnRep fn_ty
      --trace (showSDoc (ppr (a_reps, r_reps))) $
      if ok then maybe_r_rep_to_go else blargh
 
--- Compile code which expects an unboxed Int on the top of stack,
--- (call it i), and pushes the i'th closure in the supplied list
--- as a consequence.
--- The [Name] is a list of the constructors of this (enumeration) type
-implement_tagToId :: [Name] -> BcM BCInstrList
-implement_tagToId names
-   = ASSERT( notNull names )
-     do labels <- getLabelsBc (genericLength names)
-        label_fail <- getLabelBc
-        label_exit <- getLabelBc
-        let infos = zip4 labels (tail labels ++ [label_fail])
-                                [0 ..] names
-            steps = map (mkStep label_exit) infos
-        return (concatOL steps
-                  `appOL`
-                  toOL [LABEL label_fail, CASEFAIL, LABEL label_exit])
-     where
+maybe_is_tagToEnum_call :: AnnExpr' Id VarSet -> Maybe (AnnExpr' Id VarSet, [Name])
+-- Detect and extract relevant info for the tagToEnum kludge.
+maybe_is_tagToEnum_call app
+  | AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg <- app
+  , Just TagToEnumOp <- isPrimOpId_maybe v
+  = Just (snd arg, extract_constr_Names t)
+  | otherwise
+  = Nothing
+  where
+    extract_constr_Names ty
+           | UnaryRep rep_ty <- repType ty
+           , Just tyc <- tyConAppTyCon_maybe rep_ty,
+             isDataTyCon tyc
+             = map (getName . dataConWorkId) (tyConDataCons tyc)
+             -- NOTE: use the worker name, not the source name of
+             -- the DataCon.  See DataCon.lhs for details.
+           | otherwise
+             = pprPanic "maybe_is_tagToEnum_call.extract_constr_Ids" (ppr ty)
+
+{- -----------------------------------------------------------------------------
+Note [Implementing tagToEnum#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(implement_tagToId arg names) compiles code which takes an argument
+'arg', (call it i), and enters the i'th closure in the supplied list
+as a consequence.  The [Name] is a list of the constructors of this
+(enumeration) type.
+
+The code we generate is this:
+                push arg
+                push bogus-word
+
+                TESTEQ_I 0 L1
+                  PUSH_G <lbl for first data con>
+                  JMP L_Exit
+
+        L1:     TESTEQ_I 1 L2
+                  PUSH_G <lbl for second data con>
+                  JMP L_Exit
+        ...etc...
+        Ln:     TESTEQ_I n L_fail
+                  PUSH_G <lbl for last data con>
+                  JMP L_Exit
+
+        L_fail: CASEFAIL
+
+        L_exit: SLIDE 1 n
+                ENTER
+
+The 'bogus-word' push is because TESTEQ_I expects the top of the stack
+to have an info-table, and the next word to have the value to be
+tested.  This is very weird, but it's the way it is right now.  See
+Interpreter.c.  We don't acutally need an info-table here; we just
+need to have the argument to be one-from-top on the stack, hence pushing
+a 1-word null. See Trac #8383.
+-}
+
+
+implement_tagToId :: Word -> Sequel -> BCEnv
+                  -> AnnExpr' Id VarSet -> [Name] -> BcM BCInstrList
+-- See Note [Implementing tagToEnum#]
+implement_tagToId d s p arg names
+  = ASSERT( notNull names )
+    do (push_arg, arg_words) <- pushAtom d p arg
+       labels <- getLabelsBc (genericLength names)
+       label_fail <- getLabelBc
+       label_exit <- getLabelBc
+       let infos = zip4 labels (tail labels ++ [label_fail])
+                               [0 ..] names
+           steps = map (mkStep label_exit) infos
+
+       return (push_arg
+               `appOL` unitOL (PUSH_UBX (Left MachNullAddr) 1)
+                   -- Push bogus word (see Note [Implementing tagToEnum#])
+               `appOL` concatOL steps
+               `appOL` toOL [ LABEL label_fail, CASEFAIL,
+                              LABEL label_exit ]
+                `appOL` mkSLIDE 1 (d - s + fromIntegral arg_words + 1)
+                   -- "+1" to account for bogus word
+                   --      (see Note [Implementing tagToEnum#])
+                `appOL` unitOL ENTER)
+  where
         mkStep l_exit (my_label, next_label, n, name_for_n)
            = toOL [LABEL my_label,
                    TESTEQ_I n next_label,
