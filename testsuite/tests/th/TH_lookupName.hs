@@ -10,6 +10,8 @@ f = "TH_lookupName.f"
 
 data D = D
 
+$(return [])
+
 main = mapM_ print [
   -- looking up values
   $(do { Just n <- lookupValueName "f" ; varE n }),

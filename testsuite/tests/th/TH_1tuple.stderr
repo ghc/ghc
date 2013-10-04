@@ -3,4 +3,3 @@ TH_1tuple.hs:11:7:
     Illegal 1-tuple type constructor
     When splicing a TH expression: 1 :: ()
     In the expression: $(sigE [| 1 |] (tupleT 1))
-    In an equation for ‛y’: y = $(sigE [| 1 |] (tupleT 1))

@@ -10,8 +10,3 @@ T6114.hs:6:17:
              instanceType <- [t| $(varT xName) |];
              _ <- reifyInstances ''Eq [instanceType];
              .... })
-    In an equation for ‛instanceVar’:
-        instanceVar
-          = $(do { xName <- newName "x";
-                   instanceType <- [t| $(varT xName) |];
-                   .... })

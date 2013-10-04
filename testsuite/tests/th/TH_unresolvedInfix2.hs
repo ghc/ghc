@@ -8,6 +8,8 @@ data Tree = N
   | Tree :+ Tree 
   | Tree :* Tree 
 
+$(return [])
+
 -- Should fail
 expr = $( let plus = conE '(:+)
               n = conE 'N

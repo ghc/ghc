@@ -5,7 +5,7 @@ instance C Bool where
 
 
 ==================== Renamer ====================
-bang
+$bang
 
 T7532.hs:1:1: Splicing declarations
     bang

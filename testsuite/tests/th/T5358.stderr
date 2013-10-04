@@ -1,35 +1,5 @@
 
-T5358.hs:7:1:
-    Couldn't match expected type ‛t1 -> t1’ with actual type ‛Int’
-    The equation(s) for ‛t1’ have one argument,
-    but its type ‛Int’ has none
-
-T5358.hs:8:1:
-    Couldn't match expected type ‛t0 -> t0’ with actual type ‛Int’
-    The equation(s) for ‛t2’ have one argument,
-    but its type ‛Int’ has none
-
-T5358.hs:10:13:
-    Couldn't match expected type ‛t -> a0’ with actual type ‛Int’
-    Relevant bindings include
-      x :: t (bound at T5358.hs:10:9)
-      prop_x1 :: t -> Bool (bound at T5358.hs:10:1)
-    The function ‛t1’ is applied to one argument,
-    but its type ‛Int’ has none
-    In the first argument of ‛(==)’, namely ‛t1 x’
-    In the expression: t1 x == t2 x
-
-T5358.hs:10:21:
-    Couldn't match expected type ‛t -> a0’ with actual type ‛Int’
-    Relevant bindings include
-      x :: t (bound at T5358.hs:10:9)
-      prop_x1 :: t -> Bool (bound at T5358.hs:10:1)
-    The function ‛t2’ is applied to one argument,
-    but its type ‛Int’ has none
-    In the second argument of ‛(==)’, namely ‛t2 x’
-    In the expression: t1 x == t2 x
-
-T5358.hs:12:15:
+T5358.hs:14:15:
     Exception when trying to run compile-time code:
       runTest called error: forall t_0 . t_0 -> GHC.Types.Bool
     Code: do { VarI _ t _ _ <- reify (mkName "prop_x1");
@@ -37,7 +7,3 @@ T5358.hs:12:15:
     In the expression:
       $(do { VarI _ t _ _ <- reify (mkName "prop_x1");
              error $ ("runTest called error: " ++ pprint t) })
-    In an equation for ‛runTests’:
-        runTests
-          = $(do { VarI _ t _ _ <- reify (mkName "prop_x1");
-                   error $ ("runTest called error: " ++ pprint t) })

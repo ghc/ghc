@@ -5,6 +5,8 @@ import Language.Haskell.TH
 
 type family S :: (* -> (* -> * -> *)) -> (* -> *) -> *
 
+$(return [])
+
 test :: String
 test = $(do
 	test <- [d| 
