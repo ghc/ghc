@@ -23,7 +23,7 @@ module RnTypes (
 
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
-#endif 	/* GHCI */
+#endif /* GHCI */
 import {-# SOURCE #-} RnSplice( rnSpliceType )
 
 import DynFlags
