@@ -10,6 +10,8 @@
   <sect2>
     <title>Verbosity options</title>
 
+    <para>More details in <xref linkend="options-help"/></para>
+
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
         <thead>
@@ -71,8 +73,7 @@
   <sect2>
     <title>Alternative modes of operation</title>
 
-    <para><xref linkend="options-help"/></para>
-    <para><xref linkend="modes"/></para>
+    <para>More details in <xref linkend="modes"/></para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
