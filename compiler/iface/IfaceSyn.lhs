@@ -282,7 +282,7 @@ pprAxBranch mtycon (IfaceAxBranch { ifaxbTyVars = tvs
                                   , ifaxbRHS = ty
                                   , ifaxbIncomps = incomps })
   = ppr tvs <+> ppr_lhs <+> char '=' <+> ppr ty $+$
-    nest 4 maybe_incomps
+    nest 2 maybe_incomps
       where
         ppr_lhs
           | Just tycon <- mtycon
@@ -1018,18 +1018,17 @@ pprIfaceDecl (IfaceSyn {ifName = tycon,
                         ifTyVars = tyvars,
                         ifSynRhs = IfaceSynonymTyCon mono_ty})
   = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (vcat [equals <+> ppr mono_ty])
+       2 (vcat [equals <+> ppr mono_ty])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
-                        ifSynRhs = IfaceOpenSynFamilyTyCon, ifSynKind = kind })
+                        ifSynRhs = rhs, ifSynKind = kind })
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (dcolon <+> ppr kind)
-
--- this case handles both abstract and instantiated closed family tycons
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
-                        ifSynRhs = _closedSynFamilyTyCon, ifSynKind = kind })
-  = hang (ptext (sLit "closed type family") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (dcolon <+> ppr kind)
+       2 (sep [dcolon <+> ppr kind, parens (pp_rhs rhs)])
+  where
+    pp_rhs IfaceOpenSynFamilyTyCon           = ptext (sLit "open")
+    pp_rhs (IfaceClosedSynFamilyTyCon ax)    = ptext (sLit "closed, axiom") <+> ppr ax
+    pp_rhs IfaceAbstractClosedSynFamilyTyCon = ptext (sLit "closed, abstract")
+    pp_rhs _ = panic "pprIfaceDecl syn"
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                          ifCtxt = context,
@@ -1037,9 +1036,9 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                          ifRec = isrec, ifPromotable = is_prom,
                          ifAxiom = mbAxiom})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [ pprCType cType
+       2 (vcat [ pprCType cType
                , pprRoles roles
-               , pprRec isrec <> comma <+> pp_prom 
+               , pprRec isrec <> comma <+> pp_prom
                , pp_condecls tycon condecls
                , pprAxiom mbAxiom])
   where
@@ -1055,7 +1054,7 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
                           ifRoles = roles, ifFDs = fds, ifATs = ats, ifSigs = sigs,
                           ifRec = isrec})
   = hang (ptext (sLit "class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
-       4 (vcat [pprRoles roles,
+       2 (vcat [pprRoles roles,
                 pprRec isrec,
                 sep (map ppr ats),
                 sep (map ppr sigs)])
@@ -1111,9 +1110,9 @@ pprIfaceConDecl tc
          if is_infix then ptext (sLit "Infix") else empty,
          if has_wrap then ptext (sLit "HasWrapper") else empty,
          ppUnless (null strs) $
-            nest 4 (ptext (sLit "Stricts:") <+> hsep (map ppr_bang strs)),
+            nest 2 (ptext (sLit "Stricts:") <+> hsep (map ppr_bang strs)),
          ppUnless (null fields) $
-            nest 4 (ptext (sLit "Fields:") <+> hsep (map ppr fields))]
+            nest 2 (ptext (sLit "Fields:") <+> hsep (map ppr fields))]
   where
     ppr_bang IfNoBang = char '_'        -- Want to see these
     ppr_bang IfStrict = char '!'
