@@ -461,8 +461,12 @@ kcTyClDecl :: TyClDecl Name -> TcM ()
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = defn })
   | HsDataDefn { dd_cons = cons, dd_kindSig = Just _ } <- defn
   = mapM_ (wrapLocM (kcConDecl name)) cons
-    -- hs_tvs and td_kindSig already dealt with in getInitialKind
-    -- Ignore the dd_ctxt; heavily deprecated and inconvenient
+    -- hs_tvs and dd_kindSig already dealt with in getInitialKind
+    -- If dd_kindSig is Just, this must be a GADT-style decl,
+    --        (see invariants of DataDefn declaration)
+    -- so (a) we don't need to bring the hs_tvs into scope, because the
+    --        ConDecls bind all their own variables
+    --    (b) dd_ctxt is not allowed for GADT-style decls, so we can ignore it
 
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
   = kcTyClTyVars name hs_tvs $
@@ -703,7 +707,7 @@ tcFamDecl1 parent
          -- differentiate names.
          -- See [Zonking inside the knot] in TcHsType
        ; loc <- getSrcSpanM
-       ; co_ax_name <- newFamInstAxiomName loc tc_name [] 
+       ; co_ax_name <- newFamInstAxiomName loc tc_name []
 
          -- mkBranchedCoAxiom will fail on an empty list of branches, but
          -- we'll never look at co_ax in this case
@@ -1145,10 +1149,10 @@ tcConDecl new_or_data tc_name rep_tycon tmpl_tvs res_tmpl        -- Data types
              --    ResTyH98:  the *existential* type variables only
              --    ResTyGADT: *all* the quantified type variables
              -- c.f. the comment on con_qvars in HsDecls
-       ; tkvs <- case res_ty of 
+       ; tkvs <- case res_ty of
                    ResTyH98         -> quantifyTyVars (mkVarSet tmpl_tvs) (tyVarsOfTypes (ctxt++arg_tys))
                    ResTyGADT res_ty -> quantifyTyVars emptyVarSet (tyVarsOfTypes (res_ty:ctxt++arg_tys))
-                   
+
              -- Zonk to Types
        ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv tkvs
        ; arg_tys <- zonkTcTypeToTypes ze arg_tys
