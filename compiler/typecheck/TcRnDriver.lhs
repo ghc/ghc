@@ -34,7 +34,8 @@ import TcHsSyn
 import TcExpr
 import TcRnMonad
 import TcEvidence
-import Coercion( pprCoAxiom, pprCoAxBranch )
+import PprTyThing( pprTyThing )
+import Coercion( pprCoAxiom )
 import FamInst
 import InstEnv
 import FamInstEnv
@@ -850,20 +851,8 @@ bootMisMatch real_thing boot_thing
   = vcat [ppr real_thing <+>
           ptext (sLit "has conflicting definitions in the module"),
           ptext (sLit "and its hs-boot file"),
-          ptext (sLit "Main module:") <+> ppr_mismatch real_thing,
-          ptext (sLit "Boot file:  ") <+> ppr_mismatch boot_thing]
-  where
-      -- closed type families need special treatment, because they might differ
-      -- in their equations, which are not stored in the corresponding IfaceDecl
-    ppr_mismatch thing
-      | ATyCon tc <- thing
-      , Just (ClosedSynFamilyTyCon ax) <- synTyConRhs_maybe tc
-      = hang (ppr iface_decl <+> ptext (sLit "where"))
-           2 (vcat $ brListMap (pprCoAxBranch tc) (coAxiomBranches ax))
-      
-      | otherwise
-      = ppr iface_decl
-      where iface_decl = tyThingToIfaceDecl thing
+          ptext (sLit "Main module:") <+> PprTyThing.pprTyThing real_thing,
+          ptext (sLit "Boot file:  ") <+> PprTyThing.pprTyThing boot_thing]
 
 instMisMatch :: ClsInst -> SDoc
 instMisMatch inst
