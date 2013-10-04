@@ -1166,6 +1166,7 @@ maybe_getCCallReturnRep fn_ty
 -- Compile code which expects an unboxed Int on the top of stack,
 -- (call it i), and pushes the i'th closure in the supplied list
 -- as a consequence.
+-- The [Name] is a list of the constructors of this (enumeration) type
 implement_tagToId :: [Name] -> BcM BCInstrList
 implement_tagToId names
    = ASSERT( notNull names )

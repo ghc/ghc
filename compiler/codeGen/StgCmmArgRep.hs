@@ -122,9 +122,15 @@ idArgRep = toArgRep . idPrimRep
 --
 -- NSF 6 Mar 2013
 
--- These cases were found to cover about 99% of all slow calls:
 slowCallPattern :: [ArgRep] -> (FastString, RepArity)
 -- Returns the generic apply function and arity
+--
+-- The first batch of cases match (some) specialised entries
+-- The last group deals exhaustively with the cases for the first argument
+--   (and the zero-argument case)
+--
+-- In 99% of cases this function will match *all* the arguments in one batch
+
 slowCallPattern (P: P: P: P: P: P: _) = (fsLit "stg_ap_pppppp", 6)
 slowCallPattern (P: P: P: P: P: _)    = (fsLit "stg_ap_ppppp", 5)
 slowCallPattern (P: P: P: P: _)       = (fsLit "stg_ap_pppp", 4)
