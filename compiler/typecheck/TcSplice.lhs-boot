@@ -2,6 +2,8 @@
 module TcSplice where
 import HsSyn    ( HsSplice, HsBracket, HsQuasiQuote,
                   HsExpr, LHsType, LHsExpr, LPat, LHsDecl )
+import HsExpr   ( PendingSplice )
+import Id       ( Id )
 import Name     ( Name )
 import NameSet  ( FreeVars )
 import RdrName  ( RdrName )
@@ -16,11 +18,14 @@ tcSpliceExpr :: HsSplice Name
 
 tcSpliceType :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
 
+tcSpliceDecls :: HsSplice Name -> TcM [LHsDecl RdrName]
+
 tcBracket :: HsBracket Name 
+          -> [PendingSplice]
           -> TcRhoType
           -> TcM (HsExpr TcId)
 
-tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
+tcTopSpliceExpr :: Bool -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 
@@ -29,4 +34,10 @@ runQuasiQuoteExpr :: HsQuasiQuote RdrName -> TcM (LHsExpr RdrName)
 runQuasiQuoteType :: HsQuasiQuote RdrName -> TcM (LHsType RdrName)
 runQuasiQuotePat  :: HsQuasiQuote RdrName -> TcM (LPat RdrName)
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
+
+runQuasi :: TH.Q a -> TcM a
+runMetaE :: LHsExpr Id -> TcM (LHsExpr RdrName)
+runMetaP :: LHsExpr Id -> TcM (LPat RdrName)
+runMetaT :: LHsExpr Id  -> TcM (LHsType RdrName)
+runMetaD :: LHsExpr Id -> TcM [LHsDecl RdrName]
 \end{code}

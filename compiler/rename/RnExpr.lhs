@@ -20,24 +20,21 @@ module RnExpr (
 import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
 #endif  /* GHCI */
 
-import RnSource  ( rnSrcDecls, findSplice )
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import HsSyn
 import TcRnMonad
-import TcEnv            ( thRnBrack )
 import RnEnv
+import RnSplice
 import RnTypes
 import RnPat
 import DynFlags
 import BasicTypes       ( FixityDirection(..) )
 import PrelNames
 
-import Module
 import Name
 import NameSet
 import RdrName
-import LoadIface        ( loadInterfaceForName )
 import UniqSet
 import Data.List
 import Util
@@ -113,7 +110,14 @@ rnExpr (HsVar v)
                                        -- OverloadedLists works correctly
               -> rnExpr (ExplicitList placeHolderType Nothing [])
               | otherwise
-              -> finishHsVar name } }
+              -> do { mb_bind_lvl <- lookupLocalOccThLvl_maybe v
+                    ; case mb_bind_lvl of
+                        { Nothing -> return ()
+                        ; Just bind_lvl
+                            | isExternalName name -> return ()
+                            | otherwise -> checkThLocalName name bind_lvl
+                        }
+                    ; finishHsVar name }}}
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
@@ -171,19 +175,9 @@ rnExpr (NegApp e _)
 -- Template Haskell extensions
 -- Don't ifdef-GHCI them because we want to fail gracefully
 -- (not with an rnExpr crash) in a stage-1 compiler.
-rnExpr e@(HsBracket br_body)
-  = do
-    thEnabled <- xoptM Opt_TemplateHaskell
-    unless thEnabled $
-      failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
-                      , ptext (sLit "Perhaps you intended to use TemplateHaskell") ] )
-    checkTH e "bracket"
-    (body', fvs_e) <- rnBracket br_body
-    return (HsBracket body', fvs_e)
+rnExpr e@(HsBracket br_body) = rnBracket e br_body
 
-rnExpr (HsSpliceE splice)
-  = rnSplice splice             `thenM` \ (splice', fvs) ->
-    return (HsSpliceE splice', fvs)
+rnExpr (HsSpliceE splice) = rnSpliceExpr splice
 
 #ifndef GHCI
 rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
@@ -609,60 +603,6 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
    rnLExpr expr3        `thenM` \ (expr3', fvExpr3) ->
    return (FromThenTo expr1' expr2' expr3',
             plusFVs [fvExpr1, fvExpr2, fvExpr3])
-\end{code}
-
-%************************************************************************
-%*                                                                      *
-        Template Haskell brackets
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-rnBracket :: HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
-rnBracket (VarBr flg n)
-  = do { name <- lookupOccRn n
-       ; this_mod <- getModule
-       ; unless (nameIsLocalOrFrom this_mod name) $  -- Reason: deprecation checking assumes
-         do { _ <- loadInterfaceForName msg name     -- the home interface is loaded, and
-            ; return () }                            -- this is the only way that is going
-                                                     -- to happen
-       ; return (VarBr flg name, unitFV name) }
-  where
-    msg = ptext (sLit "Need interface for Template Haskell quoted Name")
-
-rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
-                         ; return (ExpBr e', fvs) }
-
-rnBracket (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
-
-rnBracket (TypBr t) = do { (t', fvs) <- rnLHsType TypBrCtx t
-                         ; return (TypBr t', fvs) }
-
-rnBracket (DecBrL decls)
-  = do { (group, mb_splice) <- findSplice decls
-       ; case mb_splice of
-           Nothing -> return ()
-           Just (SpliceDecl (L loc _) _, _)
-              -> setSrcSpan loc $
-                 addErr (ptext (sLit "Declaration splices are not permitted inside declaration brackets"))
-                -- Why not?  See Section 7.3 of the TH paper.
-
-       ; gbl_env  <- getGblEnv
-       ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
-                          -- The emptyDUs is so that we just collect uses for this
-                          -- group alone in the call to rnSrcDecls below
-       ; (tcg_env, group') <- setGblEnv new_gbl_env $
-                              setStage thRnBrack $
-                              rnSrcDecls [] group
-   -- The empty list is for extra dependencies coming from .hs-boot files
-   -- See Note [Extra dependencies from .hs-boot files] in RnSource
-
-              -- Discard the tcg_env; it contains only extra info about fixity
-        ; traceRn (text "rnBracket dec" <+> (ppr (tcg_dus tcg_env) $$
-                   ppr (duUses (tcg_dus tcg_env))))
-        ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
-
-rnBracket (DecBrG _) = panic "rnBracket: unexpected DecBrG"
 \end{code}
 
 %************************************************************************

@@ -23,7 +23,7 @@ module HsPat (
         pprParendLPat
     ) where
 
-import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, pprLExpr)
+import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr)
 
 -- friends:
 import HsBinds
@@ -113,6 +113,9 @@ data Pat id
                   PostTcType        -- The overall type of the pattern
                                     -- (= the argument type of the view function)
                                     -- for hsPatType.
+
+        ------------ Pattern splices ---------------
+  | SplicePat       (HsSplice id)
 
         ------------ Quasiquoted patterns ---------------
         -- See Note [Quasi-quote overview] in TcSplice
@@ -268,6 +271,7 @@ pprPat (LitPat s)           = ppr s
 pprPat (NPat l Nothing  _)  = ppr l
 pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)  = hcat [ppr n, char '+', ppr k]
+pprPat (SplicePat splice)   = ppr splice
 pprPat (QuasiQuotePat qq)   = ppr qq
 pprPat (CoPat co pat _)     = pprHsWrapper (ppr pat) co
 pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
@@ -419,13 +423,16 @@ isIrrefutableHsPat pat
     go1 (NPat {})      = False
     go1 (NPlusKPat {}) = False
 
-    go1 (QuasiQuotePat {}) = urk pat    -- Gotten rid of by renamer, before
-                                        -- isIrrefutablePat is called
+    -- Both should be gotten rid of by renamer before
+    -- isIrrefutablePat is called
+    go1 (SplicePat {})     = urk pat    
+    go1 (QuasiQuotePat {}) = urk pat
 
     urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
 
 hsPatNeedsParens :: Pat a -> Bool
 hsPatNeedsParens (NPlusKPat {})      = True
+hsPatNeedsParens (SplicePat {})      = False
 hsPatNeedsParens (QuasiQuotePat {})  = True
 hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
 hsPatNeedsParens p@(ConPatOut {})    = conPatNeedsParens (pat_args p)

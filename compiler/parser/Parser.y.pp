@@ -348,8 +348,12 @@ incorrect.
 '[t|'           { L _ ITopenTypQuote  }
 '[d|'           { L _ ITopenDecQuote  }
 '|]'            { L _ ITcloseQuote    }
+'[||'           { L _ ITopenTExpQuote   }
+'||]'           { L _ ITcloseTExpQuote  }
 TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('            { L _ ITparenEscape   }     -- $( exp )
+TH_ID_TY_SPLICE { L _ (ITidTyEscape _)  }   -- $$x
+'$$('           { L _ ITparenTyEscape   }   -- $$( exp )
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
@@ -595,13 +599,13 @@ topdecl :: { OrdList (LHsDecl RdrName) }
                                                     VectD (HsVectTypeIn True $3 (Just $5)) }
         | '{-# VECTORISE' 'class' gtycon '#-}'  { unitOL $ LL $ VectD (HsVectClassIn $3) }
         | annotation { unitOL $1 }
-        | decl                                  { unLoc $1 }
+        | decl_no_th                            { unLoc $1 }
 
         -- Template Haskell Extension
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp                              { unitOL (LL $ mkTopSpliceDecl $1) }
+        | infixexp                              { unitOL (LL $ mkSpliceDecl $1) }
 
 -- Type classes
 --
@@ -1363,7 +1367,7 @@ docdecld :: { LDocDecl }
         | docnamed                              { L1 (case (unLoc $1) of (n, doc) -> DocCommentNamed n doc) }
         | docsection                            { L1 (case (unLoc $1) of (n, doc) -> DocGroup n doc) }
 
-decl    :: { Located (OrdList (LHsDecl RdrName)) }
+decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
         : sigdecl               { $1 }
 
         | '!' aexp rhs          {% do { let { e = LL (SectionR (LL (HsVar bang_RDR)) $2) };
@@ -1378,6 +1382,14 @@ decl    :: { Located (OrdList (LHsDecl RdrName)) }
                                         let { l = comb2 $1 $> };
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | docdecl               { LL $ unitOL $1 }
+
+decl    :: { Located (OrdList (LHsDecl RdrName)) }
+        : decl_no_th            { $1 }
+
+        -- Why do we only allow naked declaration splices in top-level
+        -- declarations and not here? Short answer: because readFail009
+        -- fails terribly with a panic in cvBindsAndSigs otherwise.
+        | splice_exp            { LL $ unitOL (LL $ mkSpliceDecl $1) }
 
 rhs     :: { Located (GRHSs RdrName (LHsExpr RdrName)) }
         : '=' exp wherebinds    { sL (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) }
@@ -1548,17 +1560,14 @@ aexp2   :: { LHsExpr RdrName }
         | '_'                           { L1 EWildPat }
 
         -- Template Haskell Extension
-        | TH_ID_SPLICE          { L1 $ HsSpliceE (mkHsSplice
-                                        (L1 $ HsVar (mkUnqual varName
-                                                        (getTH_ID_SPLICE $1)))) }
-        | '$(' exp ')'          { LL $ HsSpliceE (mkHsSplice $2) }
-
+        | splice_exp            { $1 }
 
         | SIMPLEQUOTE  qvar     { LL $ HsBracket (VarBr True  (unLoc $2)) }
         | SIMPLEQUOTE  qcon     { LL $ HsBracket (VarBr True  (unLoc $2)) }
         | TH_TY_QUOTE tyvar     { LL $ HsBracket (VarBr False (unLoc $2)) }
         | TH_TY_QUOTE gtycon    { LL $ HsBracket (VarBr False (unLoc $2)) }
         | '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }
+        | '[||' exp '||]'       { LL $ HsBracket (TExpBr $2) }
         | '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }
         | '[p|' infixexp '|]'   {% checkPattern empty $2 >>= \p ->
                                         return (LL $ HsBracket (PatBr p)) }
@@ -1567,6 +1576,16 @@ aexp2   :: { LHsExpr RdrName }
 
         -- arrow notation extension
         | '(|' aexp2 cmdargs '|)'       { LL $ HsArrForm $2 Nothing (reverse $3) }
+
+splice_exp :: { LHsExpr RdrName }
+        : TH_ID_SPLICE          { L1 $ mkHsSpliceE 
+                                        (L1 $ HsVar (mkUnqual varName 
+                                                        (getTH_ID_SPLICE $1))) } 
+        | '$(' exp ')'          { LL $ mkHsSpliceE $2 }               
+        | TH_ID_TY_SPLICE       { L1 $ mkHsSpliceTE 
+                                        (L1 $ HsVar (mkUnqual varName 
+                                                        (getTH_ID_TY_SPLICE $1))) } 
+        | '$$(' exp ')'         { LL $ mkHsSpliceTE $2 }               
 
 cmdargs :: { [LHsCmdTop RdrName] }
         : cmdargs acmd                  { $2 : $1 }
@@ -2214,6 +2233,7 @@ getPRIMWORD     (L _ (ITprimword x)) = x
 getPRIMFLOAT    (L _ (ITprimfloat  x)) = x
 getPRIMDOUBLE   (L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x
+getTH_ID_TY_SPLICE (L _ (ITidTyEscape x)) = x
 getINLINE       (L _ (ITinline_prag inl conl)) = (inl,conl)
 getSPEC_INLINE  (L _ (ITspec_inline_prag True))  = (Inline,  FunLike)
 getSPEC_INLINE  (L _ (ITspec_inline_prag False)) = (NoInline,FunLike)

@@ -1171,6 +1171,7 @@ collectl (L _ pat) bndrs
     go (SigPatOut pat _)          = collectl pat bndrs
     go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
     go (ViewPat _ pat _)          = collectl pat bndrs
+    go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
     go p@(QuasiQuotePat {})       = pprPanic "collectl/go" (ppr p)
 
 collectEvBinders :: TcEvBinds -> [Id]

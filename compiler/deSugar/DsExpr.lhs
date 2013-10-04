@@ -556,6 +556,7 @@ Here is where we desugar the Template Haskell brackets and escapes
 \begin{code}
 -- Template Haskell stuff
 
+dsExpr (HsRnBracketOut _ _) = panic "dsExpr HsRnBracketOut"
 #ifdef GHCI
 dsExpr (HsBracketOut x ps) = dsBracket x ps
 #else

@@ -799,8 +799,10 @@ tcExpr (PArrSeq _ _) _
 \begin{code}
 #ifdef GHCI     /* Only if bootstrapped */
         -- Rename excludes these cases otherwise
-tcExpr (HsSpliceE splice) res_ty = tcSpliceExpr splice res_ty
-tcExpr (HsBracket brack)  res_ty = tcBracket brack res_ty
+tcExpr (HsSpliceE splice)        res_ty = tcSpliceExpr splice res_ty
+tcExpr (HsRnBracketOut brack ps) res_ty = tcBracket brack ps res_ty
+tcExpr e@(HsBracketOut _ _) _ =
+    pprPanic "Should never see HsBracketOut in type checker" (ppr e)
 tcExpr e@(HsQuasiQuoteE _) _ =
     pprPanic "Should never see HsQuasiQuoteE in type checker" (ppr e)
 #endif /* GHCI */
@@ -1286,10 +1288,10 @@ checkCrossStageLifting :: Id -> ThLevel -> ThStage -> TcM ()
 -- Examples   \x -> [| x |]
 --            [| map |]
 
-checkCrossStageLifting _ _ Comp   = return ()
-checkCrossStageLifting _ _ Splice = return ()
+checkCrossStageLifting _ _ Comp      = return ()
+checkCrossStageLifting _ _ (Splice _) = return ()
 
-checkCrossStageLifting id _ (Brack _ ps_var lie_var)
+checkCrossStageLifting id _ (Brack _ _ ps_var lie_var)
   | thTopLevelId id
   =     -- Top-level identifiers in this module,
         -- (which have External Names)
@@ -1334,7 +1336,7 @@ checkCrossStageLifting id _ (Brack _ ps_var lie_var)
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; writeMutVar ps_var ((idName id, nlHsApp (noLoc lift) (nlHsVar id)) : ps)
+        ; writeMutVar ps_var (PendingTcSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id)) : ps)
 
         ; return () }
 #endif /* GHCI */

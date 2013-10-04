@@ -9,6 +9,7 @@ module RnEnv (
         lookupLocatedTopBndrRn, lookupTopBndrRn,
         lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe,
+        lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         reportUnboundName,
@@ -255,9 +256,18 @@ lookupExactOcc name
        ; case gres of
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
-                       ; unless (name `inLocalRdrEnvScope` lcl_env)
-                                (addErr exact_nm_err)
-                       ; return name }
+                       ; unless (name `inLocalRdrEnvScope` lcl_env) $
+#ifdef GHCI
+                         do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
+                            ; th_topnames <- readTcRef th_topnames_var
+                            ; unless (name `elemNameSet` th_topnames)
+                                     (addErr exact_nm_err)
+                            }
+#else /* !GHCI */
+                         addErr exact_nm_err
+#endif /* !GHCI */
+                       ; return name
+                       }
 
            [gre] -> return (gre_name gre)
            _     -> pprPanic "lookupExactOcc" (ppr name $$ ppr gres) }
@@ -540,6 +550,12 @@ lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupLocalOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
        ; return (lookupLocalRdrEnv local_env rdr_name) }
+
+lookupLocalOccThLvl_maybe :: RdrName -> RnM (Maybe ThLevel)
+-- Just look in the local environment
+lookupLocalOccThLvl_maybe rdr_name
+  = do { local_env <- getLocalRdrEnv
+       ; return (lookupLocalRdrThLvl local_env rdr_name) }
 
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnM Name
@@ -1264,13 +1280,15 @@ bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope
   = do { name_env <- getLocalRdrEnv
-       ; setLocalRdrEnv (extendLocalRdrEnvList name_env names)
+       ; stage <- getStage
+       ; setLocalRdrEnv (extendLocalRdrEnvList name_env (thLevel stage) names)
                         enclosed_scope }
 
 bindLocalName :: Name -> RnM a -> RnM a
 bindLocalName name enclosed_scope
   = do { name_env <- getLocalRdrEnv
-       ; setLocalRdrEnv (extendLocalRdrEnv name_env name)
+       ; stage <- getStage
+       ; setLocalRdrEnv (extendLocalRdrEnv name_env (thLevel stage) name)
                         enclosed_scope }
 
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)

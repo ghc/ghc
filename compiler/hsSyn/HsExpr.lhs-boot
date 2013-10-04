@@ -33,6 +33,7 @@ instance Data i => Data (HsCmd i)
 instance (Data i, Data body) => Data (MatchGroup i body)
 instance (Data i, Data body) => Data (GRHSs i body)
 
+instance OutputableBndr id => Outputable (HsSplice id)
 instance OutputableBndr id => Outputable (HsExpr id)
 instance OutputableBndr id => Outputable (HsCmd id)
 

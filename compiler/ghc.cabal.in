@@ -325,6 +325,7 @@ Library
         RnNames
         RnPat
         RnSource
+        RnSplice
         RnTypes
         CoreMonad
         CSE

@@ -7,7 +7,7 @@ Functions over HsSyn specialised to RdrName.
 module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
-        mkHsDo, mkHsSplice, mkTopSpliceDecl,
+        mkHsDo, mkSpliceDecl,
         mkRoleAnnotDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
@@ -215,16 +215,18 @@ reLocate :: SrcSpan -> Located a -> Located a
 -- a whole, rather than just the binding site
 reLocate loc (L _ x) = L loc x
 
-mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
+mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- If the user wrote
 --      [pads| ... ]   then return a QuasiQuoteD
 --      $(e)           then return a SpliceD
 -- but if she wrote, say,
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
-mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
-mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr       Explicit)
-mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr Implicit)
+mkSpliceDecl (L _ (HsQuasiQuoteE qq))   = QuasiQuoteD qq
+mkSpliceDecl (L loc (HsSpliceE splice)) = SpliceD (SpliceDecl (L loc splice) Explicit)
+mkSpliceDecl other_expr                 = SpliceD (SpliceDecl (L (getLoc other_expr) splice) Implicit)
+  where
+    HsSpliceE splice = mkHsSpliceE other_expr
 
 -- Ensure a type literal is used correctly; notably, we need the proper extension enabled,
 -- and if it's an integer literal, the literal must be >= 0. This can occur with
@@ -668,6 +670,7 @@ checkAPat msg loc e0 = do
    RecordCon c _ (HsRecFields fs dd)
                       -> do fs <- mapM (checkPatField msg) fs
                             return (ConPatIn c (RecCon (HsRecFields fs dd)))
+   HsSpliceE s        -> return (SplicePat s)
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
    _                  -> patFail msg loc e0
 
