@@ -228,23 +228,14 @@ mkSpliceDecl other_expr                 = SpliceD (SpliceDecl (L (getLoc other_e
   where
     HsSpliceE splice = mkHsSpliceE other_expr
 
--- Ensure a type literal is used correctly; notably, we need the proper extension enabled,
--- and if it's an integer literal, the literal must be >= 0. This can occur with
--- -XNegativeLiterals enabled (see #8306)
-mkTyLit :: Located HsTyLit -> P (LHsType RdrName)
-mkTyLit lit = extension typeLiteralsEnabled >>= check
-  where
-    negLit (L _ (HsStrTy _)) = False
-    negLit (L _ (HsNumTy i)) = i < 0
-
-    check False =
-      parseErrorSDoc (getLoc lit)
-        (text "Illegal literal in type (use DataKinds to enable):" <+> ppr lit)
-    check True  =
-      if not (negLit lit) then return (HsTyLit `fmap` lit)
-       else parseErrorSDoc (getLoc lit)
-              (text "Illegal literal in type (type literals must not be negative):" <+> ppr lit)
-
+mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
+mkTyLit l =
+  do allowed <- extension typeLiteralsEnabled
+     if allowed
+       then return (HsTyLit `fmap` l)
+       else parseErrorSDoc (getLoc l)
+              (text "Illegal literal in type (use DataKinds to enable):" <+>
+              ppr l)
 
 mkRoleAnnotDecl :: SrcSpan
                 -> Located RdrName                   -- type being annotated
