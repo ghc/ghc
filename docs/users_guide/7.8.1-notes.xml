@@ -609,6 +609,11 @@
            </listitem>
             <listitem>
                 <para>
+                    There is now a <literal>Monoid</literal> instance for <literal>Const</literal>
+               </para>
+           </listitem>
+             <listitem>
+                <para>
                     There is now a <literal>Data</literal> instance for <literal>Data.Version</literal>
                </para>
            </listitem>
