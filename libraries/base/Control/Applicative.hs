@@ -230,6 +230,11 @@ newtype Const a b = Const { getConst :: a }
 instance Functor (Const m) where
     fmap _ (Const v) = Const v
 
+-- Added in base-4.7.0.0
+instance Monoid a => Monoid (Const a b) where
+    mempty = Const mempty
+    mappend (Const a) (Const b) = Const (mappend a b)
+
 instance Monoid m => Applicative (Const m) where
     pure _ = Const mempty
     Const f <*> Const v = Const (f `mappend` v)
