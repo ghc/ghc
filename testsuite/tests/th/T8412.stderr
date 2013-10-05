@@ -1,0 +1,6 @@
+
+T8412.hs:5:12:
+    Illegal literal in type (type literals must not be negative): -1
+    In the result of the splice:
+      $(return $ LitT $ NumTyLit (- 1))
+    To see what the splice expanded to, use -ddump-splices
