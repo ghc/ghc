@@ -293,3 +293,10 @@ test('T8333',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T8333'])
+
+test('T4170', normal, compile, ['-v0'])
+test('T4124', normal, compile, ['-v0'])
+test('T4128', normal, compile, ['-v0'])
+test('T6062', normal, compile, ['-v0'])
+test('T4364', normal, compile, ['-v0'])
+
