@@ -60,6 +60,11 @@ def setLocalTestOpts(opts):
     global testopts_local
     testopts_local.x=opts
 
+def isStatsTest():
+    opts = getTestOpts()
+    return len(opts.compiler_stats_range_fields) > 0 or len(opts.stats_range_fields) > 0
+
+
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
 def setTestOpts( f ):
@@ -606,6 +611,7 @@ def test_common_work (name, opts, func, args):
             and (config.only == [] or name in config.only) \
             and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
+            and (not (config.skip_perf_tests and isStatsTest())) \
             and way not in getTestOpts().omit_ways
 
         # Which ways we are asked to skip

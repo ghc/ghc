@@ -163,6 +163,10 @@ ifneq "$(VERBOSE)" ""
 RUNTEST_OPTS += --verbose=$(VERBOSE)
 endif
 
+ifeq "$(SKIP_PERF_TESTS)" "YES"
+RUNTEST_OPTS += --skip-perf-tests
+endif
+
 ifneq "$(CLEAN_ONLY)" ""
 RUNTEST_OPTS += -e clean_only=True
 else

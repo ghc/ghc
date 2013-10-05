@@ -13,6 +13,7 @@ Commands to run testsuite:
  * Run a specific test: `make TEST=tc054`
  * Test a specific 'way': `make WAY=optllvm`
  * Test a specifc stage of GHC: `make stage=1`
+ * Skip performance tests: `make SKIP_PERF_TESTS=YES`
  * Set verbosity: `make VERBOSE=n`
    where n=0: No per-test ouput, n=1: Only failures,
          n=2: Progress output, n=3: Include commands called (default)

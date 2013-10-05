@@ -112,6 +112,9 @@ class TestConfig:
         # Should we check for files being written more than once?
         self.check_files_written = False
 
+        # Should we skip performance tests
+        self.skip_perf_tests = False
+
 global config
 config = TestConfig()
 

@@ -45,6 +45,7 @@ long_options = [
   "threads=",           # threads to run simultaneously
   "check-files-written", # check files aren't written by multiple tests
   "verbose=",          # verbose (0,1,2 so far)
+  "skip-perf-tests",       # skip performance tests
   ]
 
 opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
@@ -92,6 +93,9 @@ for opt,arg in opts:
 
     if opt == '--check-files-written':
         config.check_files_written = True
+
+    if opt == '--skip-perf-tests':
+        config.skip_perf_tests = True
 
     if opt == '--verbose':
         if arg not in ["0","1","2","3"]:
