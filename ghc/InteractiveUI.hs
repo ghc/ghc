@@ -1146,7 +1146,7 @@ trySuccess act =
 
 editFile :: String -> InputT GHCi ()
 editFile str =
-  do file <- if null str then lift chooseEditFile else return str
+  do file <- if null str then lift chooseEditFile else expandPath str
      st <- lift getGHCiState
      let cmd = editor st
      when (null cmd)
@@ -1495,7 +1495,8 @@ scriptCmd ws = do
 runScript :: String    -- ^ filename
            -> InputT GHCi ()
 runScript filename = do
-  either_script <- liftIO $ tryIO (openFile filename ReadMode)
+  filename' <- expandPath filename
+  either_script <- liftIO $ tryIO (openFile filename' ReadMode)
   case either_script of
     Left _err    -> throwGhcException (CmdLineError $ "IO error:  \""++filename++"\" "
                       ++(ioeGetErrorString _err))
@@ -1503,7 +1504,7 @@ runScript filename = do
       st <- lift $ getGHCiState
       let prog = progname st
           line = line_number st
-      lift $ setGHCiState st{progname=filename,line_number=0}
+      lift $ setGHCiState st{progname=filename',line_number=0}
       scriptLoop script
       liftIO $ hClose script
       new_st <- lift $ getGHCiState
