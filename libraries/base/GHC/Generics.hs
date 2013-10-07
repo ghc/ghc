@@ -62,7 +62,7 @@ module GHC.Generics  (
 -- causes the following representation to be generated:
 --
 -- @
--- class 'Generic' (Tree a) where
+-- instance 'Generic' (Tree a) where
 --   type 'Rep' (Tree a) =
 --     'D1' D1Tree
 --       ('C1' C1_0Tree
@@ -448,7 +448,7 @@ module GHC.Generics  (
 --
 -- The above declaration causes the following representation to be generated:
 --
--- class 'Generic1' Tree where
+-- instance 'Generic1' Tree where
 --   type 'Rep1' Tree =
 --     'D1' D1Tree
 --       ('C1' C1_0Tree
