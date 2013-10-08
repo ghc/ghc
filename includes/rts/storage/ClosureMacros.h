@@ -457,20 +457,31 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    OVERWRITING_CLOSURE(p) on the old closure that is about to be
    overwritten.
 
-   In PROFILING mode, LDV profiling requires that we fill the slop
-   with zeroes, and record the old closure as dead (LDV_recordDead()).
+   Note [zeroing slop]
 
-   In DEBUG mode, we must overwrite the slop with zeroes, because the
-   sanity checker wants to walk through the heap checking all the
-   pointers.
+   In some scenarios we write zero words into "slop"; memory that is
+   left unoccupied after we overwrite a closure in the heap with a
+   smaller closure.
 
-   In multicore mode, we *cannot* overwrite slop with zeroes, because
-   another thread might be reading it.  So,
+   Zeroing slop is required for:
 
-      LDV PROFILING is not compatible with +RTS -N<n> (for n > 1)
+    - full-heap sanity checks (DEBUG, and +RTS -DS)
+    - LDV profiling (PROFILING, and +RTS -hb)
 
-      THREADED_RTS can be used with DEBUG, but full heap sanity
-      checking is disabled except after major GC.
+   Zeroing slop must be disabled for:
+
+    - THREADED_RTS with +RTS -N2 and greater, because we cannot
+      overwrite slop when another thread might be reading it.
+
+   Hence, slop is zeroed when either:
+
+    - PROFILING && era <= 0 (LDV is on)
+    - !THREADED_RTS && DEBUG
+
+   And additionally:
+
+    - LDV profiling and +RTS -N2 are incompatible
+    - full-heap sanity checks are disabled for THREADED_RTS
 
    -------------------------------------------------------------------------- */
 
@@ -488,6 +499,11 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
     nat size, i;
+
+#if defined(PROFILING) && !defined(DEBUG)
+    // see Note [zeroing slop]
+    if (era <= 0) return;
+#endif
 
     size = closure_sizeW(p);
 
