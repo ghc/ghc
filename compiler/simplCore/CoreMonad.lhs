@@ -271,7 +271,7 @@ interactiveInScope hsc_env
     vars   = typeEnvIds te
     tyvars = varSetElems $ tyThingsTyVars $ typeEnvElts $ te
               -- Why the type variables?  How can the top level envt have free tyvars?
-              -- I think it's becuase of the GHCi debugger, which can bind variables
+              -- I think it's because of the GHCi debugger, which can bind variables
               --   f :: [t] -> [t]
               -- where t is a RuntimeUnk (see TcType)
 \end{code}

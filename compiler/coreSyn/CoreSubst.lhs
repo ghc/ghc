@@ -289,7 +289,7 @@ delBndr (Subst in_scope ids tvs cvs) v
 delBndrs :: Subst -> [Var] -> Subst
 delBndrs (Subst in_scope ids tvs cvs) vs
   = Subst in_scope (delVarEnvList ids vs) (delVarEnvList tvs vs) (delVarEnvList cvs vs)
-      -- Easist thing is just delete all from all!
+      -- Easiest thing is just delete all from all!
 
 -- | Simultaneously substitute for a bunch of variables
 --   No left-right shadowing

@@ -964,7 +964,7 @@ Note [Kind orientation for CTyEqCan]
 Given an equality  (t:* ~ s:Open), we absolutely want to re-orient it.
 We can't solve it by updating t:=s, ragardless of how touchable 't' is,
 because the kinds don't work.  Indeed we don't want to leave it with
-the orientation (t ~ s), becuase if that gets into the inert set we'll
+the orientation (t ~ s), because if that gets into the inert set we'll
 start replacing t's by s's, and that too is the wrong way round.
 
 Hence in a CTyEqCan, (t:k1 ~ xi:k2) we require that k2 is a subkind of k1.
