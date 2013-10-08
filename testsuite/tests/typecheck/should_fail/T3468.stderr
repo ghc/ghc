@@ -2,13 +2,6 @@
 T3468.hs-boot:3:1:
     Type constructor ‛Tool’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data Tool d
-                     No C type associated
-                     Roles: [phantom]
-                     RecFlag Recursive, Promotable
-                     = F :: forall d a. a -> Tool d Stricts: _
-                     FamilyInstance: none
-    Boot file:   abstract(False) Tool
-                     No C type associated
-                     RecFlag NonRecursive, Not promotable
-                     FamilyInstance: none
+    Main module: data Tool d where
+                   F :: a -> Tool d
+    Boot file:   data Tool

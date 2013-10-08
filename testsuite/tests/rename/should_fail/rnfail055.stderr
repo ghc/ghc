@@ -20,40 +20,20 @@ RnFail055.hs-boot:6:1:
 RnFail055.hs-boot:8:1:
     Type constructor ‛S2’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type S2 a b = forall a1. (a1, b)
-    Boot file:   type S2 a b = forall b1. (a, b1)
+    Main module: type S2 a b = forall a. (a, b)
+    Boot file:   type S2 a b = forall b. (a, b)
 
 RnFail055.hs-boot:12:1:
     Type constructor ‛T1’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data T1 a b
-                     No C type associated
-                     Roles: [representational, representational]
-                     RecFlag Recursive, Promotable
-                     = T1 :: forall a b. [b] -> [a] -> T1 a b Stricts: _ _
-                     FamilyInstance: none
-    Boot file:   data T1 a b
-                     No C type associated
-                     Roles: [representational, representational]
-                     RecFlag NonRecursive, Promotable
-                     = T1 :: forall a b. [a] -> [b] -> T1 a b Stricts: _ _
-                     FamilyInstance: none
+    Main module: data T1 a b = T1 [b] [a]
+    Boot file:   data T1 a b = T1 [a] [b]
 
 RnFail055.hs-boot:14:1:
     Type constructor ‛T2’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data Eq b => T2 a b
-                     No C type associated
-                     Roles: [representational, phantom]
-                     RecFlag Recursive, Promotable
-                     = T2 :: forall a b. a -> T2 a b Stricts: _
-                     FamilyInstance: none
-    Boot file:   data Eq a => T2 a b
-                     No C type associated
-                     Roles: [representational, representational]
-                     RecFlag NonRecursive, Promotable
-                     = T2 :: forall a b. a -> T2 a b Stricts: _
-                     FamilyInstance: none
+    Main module: data Eq b => T2 a b = T2 a
+    Boot file:   data Eq a => T2 a b = T2 a
 
 RnFail055.hs-boot:16:11:
     T3 is exported by the hs-boot file, but not exported by the module
@@ -64,48 +44,21 @@ RnFail055.hs-boot:17:12:
 RnFail055.hs-boot:21:1:
     Type constructor ‛T5’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data T5 a
-                     No C type associated
-                     Roles: [representational]
-                     RecFlag Recursive, Promotable
-                     = T5 :: forall a. a -> T5 a Stricts: _ Fields: field5
-                     FamilyInstance: none
-    Boot file:   data T5 a
-                     No C type associated
-                     Roles: [representational]
-                     RecFlag NonRecursive, Promotable
-                     = T5 :: forall a. a -> T5 a Stricts: _
-                     FamilyInstance: none
+    Main module: data T5 a = T5 {field5 :: a}
+    Boot file:   data T5 a = T5 a
 
 RnFail055.hs-boot:23:1:
     Type constructor ‛T6’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data T6
-                     No C type associated
-                     RecFlag Recursive, Not promotable
-                     = T6 :: Int -> T6 Stricts: _
-                     FamilyInstance: none
-    Boot file:   data T6
-                     No C type associated
-                     RecFlag NonRecursive, Not promotable
-                     = T6 :: Int -> T6 HasWrapper Stricts: !
-                     FamilyInstance: none
+    Main module: data T6 = T6 Int
+    Boot file:   data T6 = T6 !Int
 
 RnFail055.hs-boot:25:1:
     Type constructor ‛T7’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data T7 a
-                     No C type associated
-                     Roles: [phantom]
-                     RecFlag Recursive, Promotable
-                     = T7 :: forall a a1. a1 -> T7 a Stricts: _
-                     FamilyInstance: none
-    Boot file:   data T7 a
-                     No C type associated
-                     Roles: [representational]
-                     RecFlag NonRecursive, Promotable
-                     = T7 :: forall a. a -> T7 a Stricts: _
-                     FamilyInstance: none
+    Main module: data T7 a where
+                   T7 :: a -> T7 a
+    Boot file:   data T7 a = T7 a
 
 RnFail055.hs-boot:27:22:
     RnFail055.m1 is exported by the hs-boot file, but not exported by the module
@@ -113,21 +66,14 @@ RnFail055.hs-boot:27:22:
 RnFail055.hs-boot:28:1:
     Class ‛C2’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: class C2 a b
-                     Roles: [representational, representational]
-                     RecFlag Recursive
-                     m2 :: a -> b m2' :: a -> b
-    Boot file:   class C2 a b
-                     Roles: [representational, representational]
-                     RecFlag NonRecursive
-                     m2 :: a -> b
+    Main module: class C2 a b where
+                   m2 :: a -> b
+                   m2' :: a -> b
+    Boot file:   class C2 a b where
+                   m2 :: a -> b
 
 RnFail055.hs-boot:29:1:
     Class ‛C3’ has conflicting definitions in the module
     and its hs-boot file
     Main module: class (Eq a, Ord a) => C3 a
-                     Roles: [representational]
-                     RecFlag Recursive
     Boot file:   class (Ord a, Eq a) => C3 a
-                     Roles: [representational]
-                     RecFlag NonRecursive
