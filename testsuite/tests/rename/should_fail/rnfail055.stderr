@@ -32,7 +32,8 @@ RnFail055.hs-boot:12:1:
 RnFail055.hs-boot:14:1:
     Type constructor ‛T2’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data Eq b => T2 a b = T2 a
+    Main module: type role T2 representational phantom
+                 data Eq b => T2 a b = T2 a
     Boot file:   data Eq a => T2 a b = T2 a
 
 RnFail055.hs-boot:16:11:
@@ -56,7 +57,8 @@ RnFail055.hs-boot:23:1:
 RnFail055.hs-boot:25:1:
     Type constructor ‛T7’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: data T7 a where
+    Main module: type role T7 phantom
+                 data T7 a where
                    T7 :: a -> T7 a
     Boot file:   data T7 a = T7 a
 
