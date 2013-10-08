@@ -139,6 +139,7 @@ ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HostOS_CPP)" "mingw32" 
 rts_dist_$1_CC_OPTS += -DCOMPILING_WINDOWS_DLL
 endif
+rts_dist_$1_CC_OPTS += -DDYNAMIC
 endif
 
 ifneq "$$(findstring thr, $1)" ""

@@ -111,12 +111,6 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 else
 	@echo 'cLibFFI               = False'                               >> $@
 endif
-	@echo 'cDYNAMIC_GHC_PROGRAMS :: Bool'                               >> $@
-ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
-	@echo 'cDYNAMIC_GHC_PROGRAMS = True'                                >> $@
-else
-	@echo 'cDYNAMIC_GHC_PROGRAMS = False'                               >> $@
-endif
 # Note that GhcThreaded just reflects the Makefile variable setting.
 # In particular, the stage1 compiler is never actually compiled with
 # -threaded, but it will nevertheless have cGhcThreaded = True.

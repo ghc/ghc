@@ -117,6 +117,7 @@ module DynFlags (
 -- Only in stage 2 can we be sure that the RTS
 -- exposes the appropriate runtime boolean
         rtsIsProfiled,
+        dynamicGhc,
 #endif
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
@@ -166,6 +167,7 @@ import FastString
 import Outputable
 #ifdef GHCI
 import Foreign.C        ( CInt(..) )
+import System.IO.Unsafe ( unsafeDupablePerformIO )
 #endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 
@@ -1444,7 +1446,7 @@ defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        else []
 
 interpWays :: [Way]
-interpWays = if cDYNAMIC_GHC_PROGRAMS
+interpWays = if dynamicGhc
              then [WayDyn]
              else []
 
@@ -3069,7 +3071,21 @@ glasgowExtsFlags = [
 foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 
 rtsIsProfiled :: Bool
-rtsIsProfiled = unsafePerformIO rtsIsProfiledIO /= 0
+rtsIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
+#endif
+
+#ifdef GHCI
+-- Consult the RTS to find whether GHC itself has been built with
+-- dynamic linking.  This can't be statically known at compile-time,
+-- because we build both the static and dynamic versions together with
+-- -dynamic-too.
+foreign import ccall unsafe "rts_isDynamic" rtsIsDynamicIO :: IO CInt
+
+dynamicGhc :: Bool
+dynamicGhc = unsafeDupablePerformIO rtsIsDynamicIO /= 0
+#else
+dynamicGhc :: Bool
+dynamicGhc = False
 #endif
 
 setWarnSafe :: Bool -> DynP ()
@@ -3535,7 +3551,7 @@ compilerInfo dflags
        ("Support parallel --make",     "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
-       ("GHC Dynamic",                 if cDYNAMIC_GHC_PROGRAMS
+       ("GHC Dynamic",                 if dynamicGhc
                                        then "YES" else "NO"),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),

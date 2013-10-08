@@ -259,6 +259,16 @@ int stg_sig_install (int, int, void *);
 #endif
 
 /* -----------------------------------------------------------------------------
+   Ways
+   -------------------------------------------------------------------------- */
+
+// Returns non-zero if the RTS is a profiling version
+int rts_isProfiled(void);
+
+// Returns non-zero if the RTS is a dynamically-linked version
+int rts_isDynamic(void);
+
+/* -----------------------------------------------------------------------------
    RTS Exit codes
    -------------------------------------------------------------------------- */
 

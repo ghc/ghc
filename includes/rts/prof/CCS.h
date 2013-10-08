@@ -14,9 +14,6 @@
 #ifndef RTS_PROF_CCS_H
 #define RTS_PROF_CCS_H
 
-// Returns non-zero if the RTS is a profiling version
-int rts_isProfiled(void);
-
 /* -----------------------------------------------------------------------------
  * Data Structures 
  * ---------------------------------------------------------------------------*/  

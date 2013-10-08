@@ -413,14 +413,14 @@ preloadLib dflags lib_paths framework_paths lib_spec
     preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if cDYNAMIC_GHC_PROGRAMS
+                     else do if dynamicGhc
                                  then dynLoadObjs dflags [name]
                                  else loadObj name
                              return True
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if cDYNAMIC_GHC_PROGRAMS
+                     else do if dynamicGhc
                                  then panic "Loading archives not supported"
                                  else loadArchive name
                              return True
@@ -496,7 +496,7 @@ checkNonStdWay dflags srcspan =
     -- whereas we have __stginit_base_Prelude_.
       else if objectSuf dflags == normalObjectSuffix && not (null haskellWays)
       then failNonStd dflags srcspan
-      else return $ Just $ if cDYNAMIC_GHC_PROGRAMS
+      else return $ Just $ if dynamicGhc
                            then "dyn_o"
                            else "o"
     where haskellWays = filter (not . wayRTSOnly) (ways dflags)
@@ -509,7 +509,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
   ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
   ptext (sLit "You need to build the program twice: once the") <+> ghciWay <+> ptext (sLit "way, and then") $$
   ptext (sLit "in the desired way using -osuf to set the object file suffix.")
-    where ghciWay = if cDYNAMIC_GHC_PROGRAMS
+    where ghciWay = if dynamicGhc
                     then ptext (sLit "dynamic")
                     else ptext (sLit "normal")
 
@@ -783,7 +783,7 @@ dynLinkObjs dflags pls objs = do
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
-        if cDYNAMIC_GHC_PROGRAMS
+        if dynamicGhc
             then do dynLoadObjs dflags wanted_objs
                     return (pls1, Succeeded)
             else do mapM_ loadObj wanted_objs
@@ -970,7 +970,7 @@ unload_wkr _ linkables pls
       | linkableInSet lnk keep_linkables = return True
       -- We don't do any cleanup when linking objects with the dynamic linker.
       -- Doing so introduces extra complexity for not much benefit.
-      | cDYNAMIC_GHC_PROGRAMS = return False
+      | dynamicGhc = return False
       | otherwise
       = do mapM_ unloadObj [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
@@ -1182,7 +1182,7 @@ locateLib dflags is_hs dirs lib
     --
   = findDll `orElse` findArchive `orElse` tryGcc `orElse` assumeDll
 
-  | not cDYNAMIC_GHC_PROGRAMS
+  | not dynamicGhc
     -- When the GHC package was not compiled as dynamic library
     -- (=DYNAMIC not set), we search for .o libraries or, if they
     -- don't exist, .a libraries.
