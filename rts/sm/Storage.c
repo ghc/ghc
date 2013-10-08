@@ -722,8 +722,8 @@ allocate (Capability *cap, W_ n)
             //            +-+           +-+
             // nursery -> |B| -> ... -> |A| -> ...
             //            +-+           +-+
-            //             \
-            //              CurrentAlloc
+            //             |
+            //             CurrentAlloc
             //
             // The point is to get the block out of the way of the
             // advancing CurrentNursery pointer, while keeping it
