@@ -1770,7 +1770,35 @@ which is roughly equivalent to
     ...
     _ | guardN -> exprN
 </programlisting>
-except that multi-way if-expressions do not alter the layout.
+</para>
+
+<para>Multi-way if expressions introduce a new layout context.  So the
+example above is equivalent to:
+<programlisting>
+  if { | guard1 -> expr1
+     ; | ...
+     ; | guardN -> exprN
+     }
+</programlisting>
+The following behaves as expected:
+<programlisting>
+  if | guard1 -> if | guard2 -> expr2
+                    | guard3 -> expr3
+     | guard4 -> expr4
+</programlisting>
+because layout translates it as
+<programlisting>
+  if { | guard1 -> if { | guard2 -> expr2
+                      ; | guard3 -> expr3
+                      }
+     ; | guard4 -> expr4
+     }
+</programlisting>
+Layout with multi-way if works in the same way as other layout
+contexts, except that the semi-colons between guards in a multi-way if
+are optional.  So it is not necessary to line up all the guards at the
+same column; this is consistent with the way guards work in function
+definitions and case expressions.
 </para>
 </sect2>
 
