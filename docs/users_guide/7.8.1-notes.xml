@@ -428,7 +428,7 @@
                 <para>
                     There is a new set of primops for utilizing
                     hardware-based prefetch instructions, to help
-                    guide the processors caching decisions.
+                    guide the processor's caching decisions.
                </para>
                 <para>
                     Currently, these are only supported with the LLVM
