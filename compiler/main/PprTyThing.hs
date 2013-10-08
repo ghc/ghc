@@ -181,27 +181,38 @@ pprTyCon :: ShowSub -> TyCon -> SDoc
 pprTyCon ss tyCon
   | Just syn_rhs <- synTyConRhs_maybe tyCon
   = case syn_rhs of
-      OpenSynFamilyTyCon -> pprTyConHdr tyCon <+> dcolon <+>
-                                 pprTypeForUser (synTyConResKind tyCon)
-      ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
-        hang closed_family_header
-           2 (vcat (brListMap (pprCoAxBranch tyCon) branches))
-      AbstractClosedSynFamilyTyCon -> closed_family_header <+> ptext (sLit "..")
-      SynonymTyCon rhs_ty -> hang (pprTyConHdr tyCon <+> equals)
-                                     2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
-      BuiltInSynFamTyCon {} -> pprTyConHdr tyCon <+> dcolon <+>
-                             pprTypeForUser (synTyConResKind tyCon)
+      OpenSynFamilyTyCon    -> pp_tc_with_kind
+      BuiltInSynFamTyCon {} -> pp_tc_with_kind
+
+      ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches })
+         -> hang closed_family_header
+              2  (vcat (brListMap (pprCoAxBranch tyCon) branches))
+
+      AbstractClosedSynFamilyTyCon
+         -> closed_family_header <+> ptext (sLit "..")
+
+      SynonymTyCon rhs_ty
+         -> hang (pprTyConHdr tyCon <+> equals)
+               2 (ppr rhs_ty)   -- Don't suppress foralls on RHS type!
 
                                                  -- e.g. type T = forall a. a->a
   | Just cls <- tyConClass_maybe tyCon
-  = pprClass ss cls
+  = pp_roles $$ pprClass ss cls
+
   | otherwise
-  = pprAlgTyCon ss tyCon
+  = pp_roles $$ pprAlgTyCon ss tyCon
 
   where
+    pp_roles = sdocWithDynFlags $ \dflags ->
+               let roles = suppressKinds dflags (tyConKind tyCon) (tyConRoles tyCon)
+               in ppUnless (all (== Representational) roles) $
+                  ptext (sLit "type role") <+> ppr tyCon <+> hsep (map ppr roles)
+
+    pp_tc_with_kind = vcat [ pp_roles
+                           , pprTyConHdr tyCon <+> dcolon
+                             <+> pprTypeForUser (synTyConResKind tyCon) ]
     closed_family_header
-      = pprTyConHdr tyCon <+> dcolon <+>
-        pprTypeForUser (synTyConResKind tyCon) <+> ptext (sLit "where")
+       = pp_tc_with_kind <+> ptext (sLit "where")
 
 pprAlgTyCon :: ShowSub -> TyCon -> SDoc
 pprAlgTyCon ss tyCon
