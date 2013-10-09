@@ -420,8 +420,9 @@
            </listitem>
             <listitem>
                 <para>
-                    GHC now persists annotations to interface files,
-                    meaning they can be read by GHC API clients.
+                    GHC now detects annotation changes during
+                    recompilation, and correctly persists new
+                    annotations.
                </para>
            </listitem>
             <listitem>
