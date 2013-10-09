@@ -3,5 +3,5 @@ T2247.hs:6:10:
     Illegal instance declaration for ‛FD a b’
       The liberal coverage condition fails in class ‛FD’
         for functional dependency: ‛a -> b’
-      Reason: lhs type ‛a’ does not deternine rhs type ‛b’
+      Reason: lhs type ‛a’ does not determine rhs type ‛b’
     In the instance declaration for ‛FD a b’
