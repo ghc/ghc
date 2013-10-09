@@ -1056,7 +1056,8 @@ proxyName         = mkWiredInIdName gHC_PRIM (fsLit "proxy#")        proxyHashKe
 -- proxy# :: forall a. Proxy# a
 proxyHashId :: Id
 proxyHashId
-  = pcMiscPrelId proxyName ty noCafIdInfo
+  = pcMiscPrelId proxyName ty
+       (noCafIdInfo `setUnfoldingInfo` evaldUnfolding) -- Note [evaldUnfoldings]
   where
     ty      = mkForAllTys [kv, tv] (mkProxyPrimTy k t)
     kv      = kKiVar
@@ -1297,11 +1298,15 @@ This comes up in strictness analysis
 realWorldPrimId :: Id
 realWorldPrimId -- :: State# RealWorld
   = pcMiscPrelId realWorldName realWorldStatePrimTy
-                 (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)
-        -- The evaldUnfolding makes it look that realWorld# is evaluated
-        -- which in turn makes Simplify.interestingArg return True,
-        -- which in turn makes INLINE things applied to realWorld# likely
-        -- to be inlined
+      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)  -- Note [evaldUnfoldings]
+
+{- Note [evaldUnfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The evaldUnfolding makes it look that some primitive value is
+evaluated, which in turn makes Simplify.interestingArg return True,
+which in turn makes INLINE things applied to said value likely to be
+inlined.
+-}
 
 voidArgId :: Id
 voidArgId       -- :: State# RealWorld
