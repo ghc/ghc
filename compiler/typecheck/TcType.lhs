@@ -421,7 +421,7 @@ equality.   Example (with same T)
 We decide (x::alpha), and generate an implication like
       [1]forall a. (Bool ~ alpha[0])
 We do NOT unify directly, bur rather float out (if the constraint
-does not memtion 'a') to get
+does not mention 'a') to get
       (Bool ~ alpha[0]) /\ [1]forall a.()
 and NOW we can unify alpha.
 

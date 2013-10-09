@@ -487,7 +487,7 @@ checkInstCoverage be_liberal clas theta inst_taus
                             (if isSingleton ls
                              then ptext (sLit "does not")
                              else ptext (sLit "do not jointly"))
-                            <+> ptext (sLit "deternine rhs type")<>plural rs
+                            <+> ptext (sLit "determine rhs type")<>plural rs
                             <+> pprQuotedList rs ]
                     , ppWhen (not be_liberal && liberal_ok) $
                       ptext (sLit "Using UndecidableInstances might help") ]
