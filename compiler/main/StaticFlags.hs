@@ -48,7 +48,6 @@ import Util
 import Panic
 
 import Control.Monad
-import Data.Char
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 
@@ -124,11 +123,6 @@ flagsStatic = [
   , Flag "dno-debug-output" (PassFlag addOptEwM)
   -- rest of the debugging flags are dynamic
 
-  ----- RTS opts ------------------------------------------------------
-  , Flag "H"           (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
-
-  , Flag "Rghc-timing" (NoArg (liftEwM enableTimingStats))
-
   ------ Compiler flags -----------------------------------------------
   -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   , Flag "fno-"
@@ -195,22 +189,6 @@ opt_CprOff         = lookUp  (fsLit "-fcpr-off")
 opt_NoOptCoercion  :: Bool
 opt_NoOptCoercion  = lookUp  (fsLit "-fno-opt-coercion")
 
-
------------------------------------------------------------------------------
--- Convert sizes like "3.5M" into integers
-
-decodeSize :: String -> Integer
-decodeSize str
-  | c == ""      = truncate n
-  | c == "K" || c == "k" = truncate (n * 1000)
-  | c == "M" || c == "m" = truncate (n * 1000 * 1000)
-  | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
-  | otherwise            = throwGhcException (CmdLineError ("can't decode size: " ++ str))
-  where (m, c) = span pred str
-        n      = readRational m
-        pred c = isDigit c || c == '.'
-
-
 -----------------------------------------------------------------------------
 -- Tunneling our global variables into a new instance of the GHC library
 
@@ -221,13 +199,6 @@ restoreStaticFlagGlobals :: (Bool, [String]) -> IO ()
 restoreStaticFlagGlobals (c_ready, c) = do
     writeIORef v_opt_C_ready c_ready
     writeIORef v_opt_C c
-
-
------------------------------------------------------------------------------
--- RTS Hooks
-
-foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
-foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
 
 
 {-

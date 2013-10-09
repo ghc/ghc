@@ -600,6 +600,9 @@ data DynFlags = DynFlags {
                                         --   in --make mode, where Nothing ==> compile as
                                         --   many in parallel as there are CPUs.
 
+  enableTimeStats       :: Bool,        -- ^ Enable RTS timing statistics?
+  ghcHeapSize           :: Maybe Int,   -- ^ The heap size to set.
+
   maxRelevantBinds      :: Maybe Int,   -- ^ Maximum number of bindings from the type envt
                                         --   to show in type error messages
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -1313,6 +1316,9 @@ defaultDynFlags mySettings =
 
         parMakeCount            = Just 1,
 
+        enableTimeStats         = False,
+        ghcHeapSize             = Nothing,
+
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
         mainModIs               = mAIN,
@@ -1969,6 +1975,12 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
                         let ss = map (Set.fromList . words) (lines xs)
                         return $ dflags4 { dllSplit = Just ss }
 
+  -- Set timer stats & heap size
+  when (enableTimeStats dflags5) $ liftIO enableTimingStats
+  case (ghcHeapSize dflags5) of
+    Just x -> liftIO (setHeapSize x)
+    _      -> return ()
+
   liftIO $ setUnsafeGlobalDynFlags dflags5
 
   return (dflags5, leftover, consistency_warnings ++ sh_warns ++ warns)
@@ -2080,7 +2092,13 @@ dynamic_flags = [
 
   , Flag "j"        (OptIntSuffix (\n -> upd (\d -> d {parMakeCount = n})))
 
-        ------- ways --------------------------------------------------------
+    -- RTS options -------------------------------------------------------------
+  , Flag "H"           (HasArg (\s -> upd (\d ->
+          d { ghcHeapSize = Just $ fromIntegral (decodeSize s)})))
+
+  , Flag "Rghc-timing" (NoArg (upd (\d -> d { enableTimeStats = True })))
+
+    ------- ways ---------------------------------------------------------------
   , Flag "prof"           (NoArg (addWay WayProf))
   , Flag "eventlog"       (NoArg (addWay WayEventLog))
   , Flag "parallel"       (NoArg (addWay WayPar))
@@ -3675,3 +3693,21 @@ data LinkerInfo
   | DarwinLD [Option]
   | UnknownLD
   deriving Eq
+
+-- -----------------------------------------------------------------------------
+-- RTS hooks
+
+-- Convert sizes like "3.5M" into integers
+decodeSize :: String -> Integer
+decodeSize str
+  | c == ""      = truncate n
+  | c == "K" || c == "k" = truncate (n * 1000)
+  | c == "M" || c == "m" = truncate (n * 1000 * 1000)
+  | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
+  | otherwise            = throwGhcException (CmdLineError ("can't decode size: " ++ str))
+  where (m, c) = span pred str
+        n      = readRational m
+        pred c = isDigit c || c == '.'
+
+foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
+foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
