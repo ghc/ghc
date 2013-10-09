@@ -18,6 +18,7 @@ module StaticFlags (
 
         staticFlags,
         initStaticOpts,
+        discardStaticFlags,
 
         -- Output style options
         opt_PprStyle_Debug,
@@ -30,9 +31,6 @@ module StaticFlags (
 
         -- For the parser
         addOpt, removeOpt, v_opt_C_ready,
-
-        -- Saving/restoring globals
-        saveStaticFlagGlobals, restoreStaticFlagGlobals,
 
         -- For options autocompletion
         flagsStatic, flagsStaticNames
@@ -145,6 +143,21 @@ flagsStaticNames = [
     "fcpr-off"
     ]
 
+-- We specifically need to discard static flags for clients of the
+-- GHC API, since they can't be safely reparsed or reinitialized. In general,
+-- the existing flags do nothing other than control debugging and some low-level
+-- optimizer phases, so for the most part this is OK.
+--
+-- See GHC issue #8267: http://ghc.haskell.org/trac/ghc/ticket/8276#comment:37
+discardStaticFlags :: [String] -> [String]
+discardStaticFlags = filter (\x -> x `notElem` flags)
+  where flags = [ "-fno-state-hack"
+                , "-fno-opt-coercion"
+                , "-fcpr-off"
+                , "-dppr-debug"
+                , "-dno-debug-output"
+                ]
+
 
 initStaticOpts :: IO ()
 initStaticOpts = writeIORef v_opt_C_ready True
@@ -188,18 +201,6 @@ opt_CprOff         = lookUp  (fsLit "-fcpr-off")
 
 opt_NoOptCoercion  :: Bool
 opt_NoOptCoercion  = lookUp  (fsLit "-fno-opt-coercion")
-
------------------------------------------------------------------------------
--- Tunneling our global variables into a new instance of the GHC library
-
-saveStaticFlagGlobals :: IO (Bool, [String])
-saveStaticFlagGlobals = liftM2 (,) (readIORef v_opt_C_ready) (readIORef v_opt_C)
-
-restoreStaticFlagGlobals :: (Bool, [String]) -> IO ()
-restoreStaticFlagGlobals (c_ready, c) = do
-    writeIORef v_opt_C_ready c_ready
-    writeIORef v_opt_C c
-
 
 {-
 -- (lookup_str "foo") looks for the flag -foo=X or -fooX,

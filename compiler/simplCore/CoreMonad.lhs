@@ -777,11 +777,10 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
-        cr_globals :: ((Bool, [String]),
 #ifdef GHCI
-                       (MVar PersistentLinkerState, Bool))
+        cr_globals :: (MVar PersistentLinkerState, Bool)
 #else
-                       ())
+        cr_globals :: ()
 #endif
 }
 
@@ -854,7 +853,7 @@ runCoreM :: HscEnv
          -> CoreM a
          -> IO (a, SimplCount)
 runCoreM hsc_env rule_base us mod m = do
-        glbls <- liftM2 (,) saveStaticFlagGlobals saveLinkerGlobals
+        glbls <- saveLinkerGlobals
         liftM extract $ runIOEnv (reader glbls) $ unCoreM m state
   where
     reader glbls = CoreReader {
@@ -997,10 +996,9 @@ argument to the plugin function so that we can turn this function into
 \begin{code}
 reinitializeGlobals :: CoreM ()
 reinitializeGlobals = do
-    (sf_globals, linker_globals) <- read cr_globals
+    linker_globals <- read cr_globals
     hsc_env <- getHscEnv
     let dflags = hsc_dflags hsc_env
-    liftIO $ restoreStaticFlagGlobals sf_globals
     liftIO $ restoreLinkerGlobals linker_globals
     liftIO $ setUnsafeGlobalDynFlags dflags
 \end{code}
