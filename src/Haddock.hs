@@ -59,7 +59,7 @@ import Paths_haddock
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (verbosity)
-import StaticFlags (saveStaticFlagGlobals, restoreStaticFlagGlobals)
+import StaticFlags (discardStaticFlags)
 import Panic (handleGhcException)
 import Module
 
@@ -313,9 +313,7 @@ readInterfaceFiles name_cache_accessor pairs = do
 -- | Start a GHC session with the -haddock flag set. Also turn off
 -- compilation and linking. Then run the given 'Ghc' action.
 withGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
-withGhc libDir flags ghcActs = saveStaticFlagGlobals >>= \savedFlags -> do
-  -- TODO: handle warnings?
-  (restFlags, _) <- parseStaticFlags (map noLoc flags)
+withGhc libDir flags ghcActs = do
   runGhc (Just libDir) $ do
     dynflags  <- getSessionDynFlags
     let dynflags' = gopt_set dynflags Opt_Haddock
@@ -324,24 +322,31 @@ withGhc libDir flags ghcActs = saveStaticFlagGlobals >>= \savedFlags -> do
         ghcMode   = CompManager,
         ghcLink   = NoLink
       }
-    dynflags''' <- parseGhcFlags dynflags'' restFlags flags
+    dynflags''' <- parseGhcFlags dynflags''
     defaultCleanupHandler dynflags''' $ do
         -- ignore the following return-value, which is a list of packages
         -- that may need to be re-linked: Haddock doesn't do any
         -- dynamic or static linking at all!
         _ <- setSessionDynFlags dynflags'''
         ghcActs dynflags'''
-  `finally` restoreStaticFlagGlobals savedFlags
   where
-    parseGhcFlags :: MonadIO m => DynFlags -> [Located String]
-                  -> [String] -> m DynFlags
-    parseGhcFlags dynflags flags_ origFlags = do
+    parseGhcFlags :: MonadIO m => DynFlags -> m DynFlags
+    parseGhcFlags dynflags = do
       -- TODO: handle warnings?
-      (dynflags', rest, _) <- parseDynamicFlags dynflags flags_
-      if not (null rest)
-        then throwE ("Couldn't parse GHC options: " ++ unwords origFlags)
-        else return dynflags'
 
+      -- NOTA BENE: We _MUST_ discard any static flags here, because we cannot
+      -- rely on Haddock to parse them, as it only parses the DynFlags. Yet if
+      -- we pass any, Haddock will fail. Since StaticFlags are global to the
+      -- GHC invocation, there's also no way to reparse/save them to set them
+      -- again properly.
+      --
+      -- This is a bit of a hack until we get rid of the rest of the remaining
+      -- StaticFlags. See GHC issue #8276.
+      let flags' = discardStaticFlags flags
+      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags')
+      if not (null rest)
+        then throwE ("Couldn't parse GHC options: " ++ unwords flags')
+        else return dynflags'
 
 -------------------------------------------------------------------------------
 -- * Misc
