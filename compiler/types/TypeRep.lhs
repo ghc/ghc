@@ -473,7 +473,6 @@ This invariant has several crucial consequences:
   the TvSubstEnv is enough
 
 * In substTy, substTheta, we can short-circuit when the TvSubstEnv is empty
-\end{code}
 
 
 
@@ -585,7 +584,7 @@ ppr_type p (LitTy l)          = ppr_tylit p l
 ppr_type p ty@(ForAllTy {})   = ppr_forall_type p ty
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
-			   pprType t1 <+> ppr_type TyConPrec t2
+			   ppr_type FunPrec t1 <+> ppr_type TyConPrec t2
 
 ppr_type p fun_ty@(FunTy ty1 ty2)
   | isPredTy ty1
@@ -601,7 +600,7 @@ ppr_type p fun_ty@(FunTy ty1 ty2)
 
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
-  = maybeParen p FunPrec $ (ppr_sigma_type True ty)
+  = maybeParen p FunPrec $ ppr_sigma_type True ty
 
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
