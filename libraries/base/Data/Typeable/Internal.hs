@@ -60,6 +60,7 @@ import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
 -- import GHC.Stable
 import GHC.Arr          ( Array, STArray )
+import Data.Type.Coercion
 import Data.Type.Equality
 -- import Data.Int
 
@@ -335,4 +336,5 @@ deriving instance Typeable TypeRep
 
 deriving instance Typeable RealWorld
 deriving instance Typeable Proxy
-deriving instance Typeable (:=:)
+deriving instance Typeable (:~:)
+deriving instance Typeable Coercion

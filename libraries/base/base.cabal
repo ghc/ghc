@@ -142,6 +142,7 @@ Library
         Data.String
         Data.Traversable
         Data.Tuple
+        Data.Type.Coercion
         Data.Type.Equality
         Data.Typeable
         Data.Typeable.Internal

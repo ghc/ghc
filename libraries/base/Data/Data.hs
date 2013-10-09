@@ -115,9 +115,11 @@ import Control.Monad
 
 -- Imports for the instances
 import Data.Int              -- So we can give Data instance for Int8, ...
+import Data.Type.Coercion
 import Data.Word             -- So we can give Data instance for Word8, ...
 import GHC.Real( Ratio(..) ) -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
+import GHC.Prim
 import GHC.Ptr               -- So we can give Data instance for Ptr
 import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
 --import GHC.Stable            -- So we can give Data instance for StablePtr
@@ -1310,21 +1312,39 @@ instance (Data t) => Data (Proxy t) where
   dataCast1 f  = gcast1 f
 
 -----------------------------------------------------------------------
--- instance for (:=:)
+-- instance for (:~:)
 
 reflConstr :: Constr
 reflConstr = mkConstr equalityDataType "Refl" [] Prefix
 
 equalityDataType :: DataType
-equalityDataType = mkDataType "Data.Type.Equality.(:=:)" [reflConstr]
+equalityDataType = mkDataType "Data.Type.Equality.(:~:)" [reflConstr]
 
-instance (Typeable a, Data a) => Data (a :=: a) where
+instance (a ~ b, Data a) => Data (a :~: b) where
   gfoldl _ z Refl = z Refl
   toConstr Refl   = reflConstr
   gunfold _ z c   = case constrIndex c of
                       1 -> z Refl
-                      _ -> error "Data.Data.gunfold(:=:)"
+                      _ -> error "Data.Data.gunfold(:~:)"
   dataTypeOf _    = equalityDataType
+  dataCast2 f     = gcast2 f
+
+-----------------------------------------------------------------------
+-- instance for Coercion
+
+coercionConstr :: Constr
+coercionConstr = mkConstr equalityDataType "Coercion" [] Prefix
+
+coercionDataType :: DataType
+coercionDataType = mkDataType "Data.Type.Coercion.Coercion" [coercionConstr]
+
+instance (Coercible a b, Data a, Data b) => Data (Coercion a b) where
+  gfoldl _ z Coercion = z Coercion
+  toConstr Coercion = coercionConstr
+  gunfold _ z c   = case constrIndex c of
+                      1 -> z Coercion
+                      _ -> error "Data.Data.gunfold(Coercion)"
+  dataTypeOf _    = coercionDataType
   dataCast2 f     = gcast2 f
 
 -----------------------------------------------------------------------
