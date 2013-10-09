@@ -53,7 +53,7 @@ import Type             ( mkTyConTy )
 import RdrName          ( mkRdrQual )
 import OccName          ( mkVarOcc )
 import PrelNames        ( pluginTyConName )
-import DynamicLoading   ( forceLoadTyCon, lookupRdrNameInModule, getValueSafely )
+import DynamicLoading   ( forceLoadTyCon, lookupRdrNameInModuleForPlugins, getValueSafely )
 import Module           ( ModuleName )
 import Panic
 #endif
@@ -335,7 +335,7 @@ loadPlugin :: HscEnv -> ModuleName -> IO Plugin
 loadPlugin hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
              dflags = hsc_dflags hsc_env
-       ; mb_name <- lookupRdrNameInModule hsc_env mod_name plugin_rdr_name
+       ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name plugin_rdr_name
        ; case mb_name of {
             Nothing ->
                 throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep

@@ -505,10 +505,10 @@ lookupIfaceByModule dflags hpt pit mod
 -- of its own, but it doesn't seem worth the bother.
 
 
--- | Find all the instance declarations (of classes and families) that are in
--- modules imported by this one, directly or indirectly, and are in the Home
--- Package Table.  This ensures that we don't see instances from modules @--make@
--- compiled before this one, but which are not below this one.
+-- | Find all the instance declarations (of classes and families) from
+-- the Home Package Table filtered by the provided predicate function.
+-- Used in @tcRnImports@, to select the instances that are in the
+-- transitive closure of imports from the currently compiled module.
 hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do

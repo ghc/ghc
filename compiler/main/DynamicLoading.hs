@@ -7,7 +7,7 @@ module DynamicLoading (
         forceLoadTyCon,
         
         -- * Finding names
-        lookupRdrNameInModule,
+        lookupRdrNameInModuleForPlugins,
         
         -- * Loading values
         getValueSafely,
@@ -141,8 +141,11 @@ lessUnsafeCoerce dflags context what = do
 --
 -- * If the module could not be found
 -- * If we could not determine the imports of the module
-lookupRdrNameInModule :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
-lookupRdrNameInModule hsc_env mod_name rdr_name = do
+--
+-- Can only be used for lookuping up names while handling plugins.
+-- This was introduced by 57d6798.
+lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
+lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the package the module resides in by searching exposed packages and home modules
     found_module <- findImportedModule hsc_env mod_name Nothing
     case found_module of

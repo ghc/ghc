@@ -241,7 +241,7 @@ implicitPreludeWarn
 tcRnImports :: HscEnv -> Module
             -> [LImportDecl RdrName] -> TcM TcGblEnv
 tcRnImports hsc_env this_mod import_decls
-  = do  { (rn_imports, rdr_env, imports,hpc_info) <- rnImports import_decls ;
+  = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
                 -- Make sure we record the dependencies from the DynFlags in the EPS or we
@@ -257,7 +257,10 @@ tcRnImports hsc_env this_mod import_decls
                 -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
                 -- ourselves.  The 'except ourselves' is so that we don't
-                -- get the instances from this module's hs-boot file
+                -- get the instances from this module's hs-boot file.  This
+                -- filtering also ensures that we don't see instances from
+                -- modules batch (@--make@) compiled before this one, but
+                -- which are not below this one.
               ; want_instances :: ModuleName -> Bool
               ; want_instances mod = mod `elemUFM` dep_mods
                                    && mod /= moduleName this_mod
