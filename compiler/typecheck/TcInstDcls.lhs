@@ -1358,6 +1358,9 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 -- Notice that the dictionary bindings "..d1..d2.." must be generated
 -- by the constraint solver, since the <context> may be
 -- user-specified.
+--
+-- See also Note [Newtype deriving superclasses] in TcDeriv
+-- for why we don't just coerce the superclass
 
   = do { rep_d_stuff <- checkConstraints InstSkol tyvars dfun_ev_vars $
                         emitWanted ScOrigin rep_pred
