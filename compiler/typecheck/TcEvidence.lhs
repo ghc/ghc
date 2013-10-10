@@ -532,8 +532,8 @@ data EvTerm
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
 
-  | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
-                                 -- Note [SingI and EvLit]
+  | EvLit EvLit       -- Dictionary for KnownNat and KnownLit classes.
+                      -- Note [KnownNat & KnownSymbol and EvLit]
 
   | EvCoercible EvCoercible      -- Dictionary for "Coercible a b"
                                  -- Note [Coercible Instances]
@@ -606,40 +606,57 @@ Conclusion: a new wanted coercion variable should be made mutable.
  from super classes will be "given" and hence rigid]
 
 
-Note [SingI and EvLit]
-~~~~~~~~~~~~~~~~~~~~~~
-A part of the type-level literals implementation is the class "SingI",
-which provides a "smart" constructor for defining singleton values.
-Here is the key stuff from GHC.TypeLits
+Note [KnownNat & KnownSymbol and EvLit]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A part of the type-level literals implementation are the classes
+"KnownNat" and "KnownLit", which provide a "smart" constructor for
+defining singleton values.  Here is the key stuff from GHC.TypeLits
 
-  class SingI n where
-    sing :: Sing n
+  class KnownNat (n :: Nat) where
+    natSing :: SNat n
 
-  data family Sing (n::k)
-  newtype instance Sing (n :: Nat)    = SNat Integer
-  newtype instance Sing (s :: Symbol) = SSym String
+  newtype SNat (n :: Nat) = SNat Integer
 
 Conceptually, this class has infinitely many instances:
 
-  instance Sing 0       where sing = SNat 0
-  instance Sing 1       where sing = SNat 1
-  instance Sing 2       where sing = SNat 2
-  instance Sing "hello" where sing = SSym "hello"
+  instance KnownNat 0       where natSing = SNat 0
+  instance KnownNat 1       where natSing = SNat 1
+  instance KnownNat 2       where natSing = SNat 2
   ...
 
-In practice, we solve "SingI" predicates in the type-checker because we can't
-have infinately many instances.  The evidence (aka "dictionary")
-for "SingI (n :: Nat)" is of the form "EvLit (EvNum n)".
+In practice, we solve `KnownNat` predicates in the type-checker
+(see typecheck/TcInteract.hs) because we can't have infinately many instances.
+The evidence (aka "dictionary") for `KnownNat` is of the form `EvLit (EvNum n)`.
 
 We make the following assumptions about dictionaries in GHC:
-  1. The "dictionary" for classes with a single method---like SingI---is
+  1. The "dictionary" for classes with a single method---like `KnownNat`---is
      a newtype for the type of the method, so using a evidence amounts
      to a coercion, and
   2. Newtypes use the same representation as their definition types.
 
-So, the evidence for "SingI" is just a value of the representation type,
-wrapped in two newtype constructors: one to make it into a "Sing" value,
-and another to make it into "SingI" evidence.
+So, the evidence for `KnownNat` is just a value of the representation type,
+wrapped in two newtype constructors: one to make it into a `SNat` value,
+and another to make it into a `KnownNat` dictionary.
+
+Also note that `natSing` and `SNat` are never actually exposed from the
+library---they are just an implementation detail.  Instead, users see
+a more convenient function, defined in terms of `natSing`:
+
+  natVal :: KnownNat n => proxy n -> Integer
+
+The reason we don't use this directly in the class is that it is simpler
+and more efficient to pass around an integer rather than an entier function,
+especialy when the `KnowNat` evidence is packaged up in an existential.
+
+The story for kind `Symbol` is analogous:
+  * class KnownSymbol
+  * newypte SSymbol
+  * Evidence: EvLit (EvStr n)
+
+
+
+
+
 
 
 \begin{code}

@@ -20,12 +20,11 @@ module PrelRules ( primOpRules, builtinRules ) where
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import {-# SOURCE #-} MkId ( mkPrimOpId, magicSingIId )
+import {-# SOURCE #-} MkId ( mkPrimOpId, magicDictId )
 
 import CoreSyn
 import MkCore
 import Id
-import Var         (setVarType)
 import Literal
 import CoreSubst   ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
@@ -888,8 +887,8 @@ builtinRules
                    ru_nargs = 2, ru_try = \dflags _ _ -> match_eq_string dflags },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
-     BuiltinRule { ru_name = fsLit "MagicSingI", ru_fn = idName magicSingIId,
-                   ru_nargs = 3, ru_try = \_ _ _ -> match_magicSingI }
+     BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
+                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict }
      ]
  ++ builtinIntegerRules
 
@@ -1062,18 +1061,19 @@ match_inline (Type _ : e : _)
 match_inline _ = Nothing
 
 
--- See Note [magicSingIId magic] in `basicTypes/MkId.lhs`
+-- See Note [magicDictId magic] in `basicTypes/MkId.lhs`
 -- for a description of what is going on here.
-match_magicSingI :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicSingI (Type t : e : Lam b _ : _)
-  | ((_ : _ : fu : _),_)  <- splitFunTys t
-  , (sI_type,_)           <- splitFunTy fu
-  , Just (sI_tc,xs)       <- splitTyConApp_maybe sI_type
-  , Just (_,_,co)         <- unwrapNewTyCon_maybe sI_tc
-  = Just $ let f = setVarType b fu
-           in Lam f $ Var f `App` Cast e (mkSymCo (mkUnbranchedAxInstCo Representational co xs))
+match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
+  | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ idType wrap
+  , Just (dictTy, _)    <- splitFunTy_maybe fieldTy
+  , Just dictTc         <- tyConAppTyCon_maybe dictTy
+  , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc
+  = Just
+  $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a]))
+      `App` y
 
-match_magicSingI _ = Nothing
+match_magicDict _ = Nothing
 
 -------------------------------------------------
 -- Integer rules

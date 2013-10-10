@@ -13,19 +13,17 @@ module TcInteract (
 
 #include "HsVersions.h"
 
-
 import BasicTypes ()
 import TcCanonical
 import VarSet
 import Type
 import Unify
-import FamInstEnv
 import FamInst(TcBuiltInSynFamily(..))
 import InstEnv( lookupInstEnv, instanceDFunId )
 
 import Var
 import TcType
-import PrelNames (singIClassName, ipClassNameKey )
+import PrelNames (knownNatClassName, knownSymbolClassName, ipClassNameKey )
 import TysWiredIn ( coercibleClass )
 import Id( idType )
 import Class
@@ -1734,47 +1732,41 @@ instance Outputable LookupInstResult where
 
 matchClassInst :: InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
 
-matchClassInst _ clas [ k, ty ] _
-  | className clas == singIClassName
+matchClassInst _ clas [ ty ] _
+  | className clas == knownNatClassName
   , Just n <- isNumLitTy ty = makeDict (EvNum n)
 
-  | className clas == singIClassName
+  | className clas == knownSymbolClassName
   , Just s <- isStrLitTy ty = makeDict (EvStr s)
 
   where
   {- This adds a coercion that will convert the literal into a dictionary
-     of the appropriate type.  See Note [SingI and EvLit] in TcEvidence.
-     The coercion happens in 3 steps:
+     of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit]
+     in TcEvidence.  The coercion happens in 2 steps:
 
-     evLit    -> Sing_k_n   -- literal to representation of data family
-     Sing_k_n -> Sing k n   -- representation of data family to data family
-     Sing k n -> SingI k n   -- data family to class dictionary.
+     Integer -> SNat n     -- representation of literal to singleton
+     SNat n  -> KnownNat n -- singleton to dictionary
+
+     The process is mirrored for Symbols:
+     String    -> SSymbol n
+     SSymbol n -> KnownSymbol n
   -}
   makeDict evLit =
     case unwrapNewTyCon_maybe (classTyCon clas) of
-      Just (_,dictRep, axDict)
-        | Just tcSing <- tyConAppTyCon_maybe dictRep ->
-           do mbInst <- matchOpenFam tcSing [k,ty]
-              case mbInst of
-                Just FamInstMatch
-                  { fim_instance = FamInst { fi_axiom  = axDataFam
-                                           , fi_flavor = DataFamilyInst tcon
-                                           }
-                  , fim_tys = tys
-                  } | Just (_,_,axSing) <- unwrapNewTyCon_maybe tcon ->
-                    -- co1 and co3 are at role R, while co2 is at role N.
-                    -- BUT, when desugaring to Coercions, the roles get fixed.
-                  do let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axSing tys
-                         co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDataFam tys
-                         co3 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [k,ty]
-                     return $ GenInst [] $ EvCast (EvLit evLit) $
-                        mkTcTransCo co1 $ mkTcTransCo co2 co3
+      Just (_,_, axDict)
+        | [ meth ]   <- classMethods clas
+        , Just tcRep <- tyConAppTyCon_maybe -- SNat
+                      $ funResultTy         -- SNat n
+                      $ dropForAlls         -- KnownNat n => SNat n
+                      $ idType meth         -- forall n. KnownNat n => SNat n
+        , Just (_,_,axRep) <- unwrapNewTyCon_maybe tcRep
+        -> return $
+           let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axRep  [ty]
+               co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [ty]
+           in GenInst [] $ EvCast (EvLit evLit) (mkTcTransCo co1 co2)
 
-                _ -> unexpected
-
-      _ -> unexpected
-
-  unexpected = panicTcS (text "Unexpected evidence for SingI")
+      _ -> panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
+                     $$ vcat (map (ppr . idType) (classMethods clas)))
 
 matchClassInst _ clas [ ty1, ty2 ] _
   | clas == coercibleClass =  do
