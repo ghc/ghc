@@ -544,6 +544,14 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     // and then it runs again.  So to avoid this, if we squeezed *and*
     // there is still less than BLOCK_SIZE_W words free, then we enlarge
     // the stack anyway.
+    //
+    // NB: This reasoning only applies if the stack has been squeezed;
+    // if no squeezing has occurred, then BLOCK_SIZE_W free space does
+    // not mean there is enough stack to run; the thread may have
+    // requested a large amount of stack (see below).  If the amount
+    // we squeezed is not enough to run the thread, we'll come back
+    // here (no squeezing will have occurred and thus we'll enlarge the
+    // stack.)
     if ((tso->flags & TSO_SQUEEZED) && 
         ((W_)(tso->stackobj->sp - tso->stackobj->stack) >= BLOCK_SIZE_W)) {
         return;
