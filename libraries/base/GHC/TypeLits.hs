@@ -2,9 +2,8 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -22,7 +21,8 @@ module GHC.TypeLits
     Nat, Symbol
 
     -- * Linking type and value level
-  , KnownNat(..), KnownSymbol(..)
+  , KnownNat, natVal
+  , KnownSymbol, symbolVal
   , SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
 
@@ -36,7 +36,7 @@ import GHC.Num(Integer)
 import GHC.Base(String)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
-import GHC.Prim(magicSingI)
+import GHC.Prim(magicDict)
 import Data.Maybe(Maybe(..))
 import Data.Proxy(Proxy(..))
 
@@ -52,12 +52,22 @@ data Symbol
 -- | This class gives the integer associated with a type-level natural.
 -- There are instances of the class for every concrete literal: 0, 1, 2, etc.
 class KnownNat (n :: Nat) where
-  natVal :: proxy n -> Integer
+  natSing :: SNat n
 
 -- | This class gives the integer associated with a type-level symbol.
 -- There are instances of the class for every concrete literal: "hello", etc.
 class KnownSymbol (n :: Symbol) where
-  symbolVal :: proxy n -> String
+  symbolSing :: SSymbol n
+
+natVal :: forall n proxy. KnownNat n => proxy n -> Integer
+natVal _ = case natSing :: SNat n of
+             SNat x -> x
+
+symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
+symbolVal _ = case symbolSing :: SSymbol n of
+                SSymbol x -> x
+
+
 
 -- | This type represents unknown type-level natural numbers.
 data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
@@ -65,23 +75,19 @@ data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
 -- | This type represents unknown type-level symbols.
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
 
-instance SingI n => KnownNat n where
-  natVal _ = case sing :: Sing n of
-               SNat x -> x
-
-instance SingI n => KnownSymbol n where
-  symbolVal _ = case sing :: Sing n of
-                  SSym x -> x
-
 -- | Convert an integer into an unknown type-level natural.
+{-# NOINLINE someNatVal #-}
 someNatVal :: Integer -> Maybe SomeNat
 someNatVal n
-  | n >= 0        = Just (forgetSingNat (SNat n))
+  | n >= 0        = Just (withSNat SomeNat (SNat n) Proxy)
   | otherwise     = Nothing
 
 -- | Convert a string into an unknown type-level symbol.
+{-# NOINLINE someSymbolVal #-}
 someSymbolVal :: String -> SomeSymbol
-someSymbolVal n   = forgetSingSymbol (SSym n)
+someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
+
+
 
 instance Eq SomeNat where
   SomeNat x == SomeNat y = natVal x == natVal y
@@ -144,41 +150,19 @@ type family (m :: Nat) - (n :: Nat) :: Nat
 --------------------------------------------------------------------------------
 -- PRIVATE:
 
--- | This is an internal GHC class.  It has built-in instances in the compiler.
-class SingI a where
-  sing :: Sing a
+newtype SNat    (n :: Nat)    = SNat    Integer
+newtype SSymbol (s :: Symbol) = SSymbol String
 
--- | This is used only in the type of the internal `SingI` class.
-data family      Sing (n :: k)
-newtype instance Sing (n :: Nat)    = SNat Integer
-newtype instance Sing (n :: Symbol) = SSym String
+data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
+data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
 
+-- See Note [magicDictId magic] in "basicType/MkId.hs"
+withSNat :: (KnownNat a => Proxy a -> b)
+         -> SNat a      -> Proxy a -> b
+withSNat f x y = magicDict (WrapN f) x y
 
-{- PRIVATE:
-The functions below convert a value of type `Sing n` into a dictionary
-for `SingI` for `Nat` and `Symbol`.
-
-NOTE: The implementation is a bit of a hack at present,
-hence all the very special annotations.  See Note [magicSingIId magic]
-for more details.
--}
-forgetSingNat :: forall n. Sing (n :: Nat) -> SomeNat
-forgetSingNat x = withSingI x it Proxy
-  where
-  it :: SingI n => Proxy n -> SomeNat
-  it = SomeNat
-
-forgetSingSymbol :: forall n. Sing (n :: Symbol) -> SomeSymbol
-forgetSingSymbol x = withSingI x it Proxy
-  where
-  it :: SingI n => Proxy n -> SomeSymbol
-  it = SomeSymbol
-
--- | THIS IS NOT SUPPOSED TO MAKE SENSE.
--- See Note [magicSingIId magic]
-{-# NOINLINE withSingI #-}
-withSingI :: Sing n -> (SingI n => a) -> a
-withSingI x = magicSingI x ((\f -> f) :: () -> ())
-
-
+-- See Note [magicDictId magic] in "basicType/MkId.hs"
+withSSymbol :: (KnownSymbol a => Proxy a -> b)
+            -> SSymbol a      -> Proxy a -> b
+withSSymbol f x y = magicDict (WrapS f) x y
 
