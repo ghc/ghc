@@ -15,8 +15,8 @@ module PprBase (
 
 where
 
-import Data.Array.Unsafe( castSTUArray )
-import Data.Array.ST hiding( castSTUArray )
+import qualified Data.Array.Unsafe as U ( castSTUArray )
+import Data.Array.ST
 
 import Control.Monad.ST
 
@@ -28,10 +28,10 @@ import Data.Word
 -- Converting floating-point literals to integrals for printing
 
 castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
-castFloatToWord8Array = castSTUArray
+castFloatToWord8Array = U.castSTUArray
 
 castDoubleToWord8Array :: STUArray s Int Double -> ST s (STUArray s Int Word8)
-castDoubleToWord8Array = castSTUArray
+castDoubleToWord8Array = U.castSTUArray
 
 -- floatToBytes and doubleToBytes convert to the host's byte
 -- order.  Providing that we're not cross-compiling for a
