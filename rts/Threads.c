@@ -502,7 +502,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
         && !(tso->flags & TSO_BLOCKEX)) {
         // NB. never raise a StackOverflow exception if the thread is
-        // inside Control.Exceptino.block.  It is impractical to protect
+        // inside Control.Exception.mask.  It is impractical to protect
         // against stack overflow exceptions, since virtually anything
         // can raise one (even 'catch'), so this is the only sensible
         // thing to do here.  See bug #767.
