@@ -5,6 +5,7 @@ module Main(main) where
 import Data.Char
 import Control.Monad.ST
 import Data.Word
+import Data.Array.Unsafe ( castSTUArray )
 import Data.Array.ST
 
 #include "ghcconfig.h"
