@@ -33,9 +33,6 @@ static void removeFromQueues(Capability *cap, StgTSO *tso);
 
 static void removeFromMVarBlockedQueue (StgTSO *tso);
 
-static void blockedThrowTo (Capability *cap, 
-                            StgTSO *target, MessageThrowTo *msg);
-
 static void throwToSendMsg (Capability *cap USED_IF_THREADS,
                             Capability *target_cap USED_IF_THREADS, 
                             MessageThrowTo *msg USED_IF_THREADS);
@@ -467,7 +464,7 @@ throwToSendMsg (Capability *cap STG_UNUSED,
 // Block a throwTo message on the target TSO's blocked_exceptions
 // queue.  The current Capability must own the target TSO in order to
 // modify the blocked_exceptions queue.
-static void
+void
 blockedThrowTo (Capability *cap, StgTSO *target, MessageThrowTo *msg)
 {
     debugTraceCap(DEBUG_sched, cap, "throwTo: blocking on thread %lu",

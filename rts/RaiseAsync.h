@@ -16,6 +16,9 @@
 
 #include "BeginPrivate.h"
 
+void blockedThrowTo (Capability *cap, 
+                     StgTSO *target, MessageThrowTo *msg);
+
 void throwToSingleThreaded (Capability *cap,
 			    StgTSO *tso,
 			    StgClosure *exception);
