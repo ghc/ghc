@@ -49,9 +49,15 @@
  *
  */
 #ifdef PROFILING
-// When profiling, we cannot shortcut by checking the tag,
-// because LDV profiling relies on entering closures to mark them as
-// "used".
+/* When profiling, we cannot shortcut by checking the tag,
+ * because LDV profiling relies on entering closures to mark them as
+ * "used".
+ *
+ * Note [untag for prof]: when we enter a closure, the convention is
+ * that the closure pointer passed in the first argument is
+ * *untagged*.  Without profiling we don't have to worry about this,
+ * because we never enter a tagged pointer.
+ */
 #define NEED_EVAL(__x__) 1
 #else
 #define NEED_EVAL(__x__) GETTAG(__x__) == 0
@@ -61,7 +67,7 @@
   INFO_TABLE_SELECTOR(stg_sel_##offset##_upd, offset, THUNK_SELECTOR, "stg_sel_upd", "stg_sel_upd") \
       (P_ node)                                                         \
   {                                                                     \
-      P_ selectee, field;                                               \
+      P_ selectee, field, dest;                                         \
       TICK_ENT_DYN_THK();                                               \
       STK_CHK_NP(node);                                                 \
       UPD_BH_UPDATABLE(node);                                           \
@@ -71,7 +77,8 @@
         ENTER_CCS_THUNK(node);                                          \
         if (NEED_EVAL(selectee)) {                                      \
           SAVE_CCS;                                                     \
-          (P_ constr) = call %GET_ENTRY(UNTAG_IF_PROF(selectee)) (selectee); \
+          dest = UNTAG_IF_PROF(selectee); /* Note [untag for prof] */   \
+          (P_ constr) = call %GET_ENTRY(dest) (dest);                   \
           RESTORE_CCS;                                                  \
           selectee = constr;                                            \
         }                                                               \
@@ -105,7 +112,7 @@ SELECTOR_CODE_UPD(15)
   INFO_TABLE_SELECTOR(stg_sel_##offset##_noupd, offset, THUNK_SELECTOR, "stg_sel_noupd", "stg_sel_noupd") \
       (P_ node)                                                         \
   {                                                                     \
-      P_ selectee, field;                                               \
+      P_ selectee, field, dest;                                         \
       TICK_ENT_DYN_THK();                                               \
       STK_CHK_NP(node);                                                 \
       UPD_BH_UPDATABLE(node);                                           \
@@ -114,7 +121,8 @@ SELECTOR_CODE_UPD(15)
       ENTER_CCS_THUNK(node);                                            \
       if (NEED_EVAL(selectee)) {                                        \
           SAVE_CCS;                                                     \
-          (P_ constr) = call %GET_ENTRY(UNTAG_IF_PROF(selectee)) (selectee);           \
+          dest = UNTAG_IF_PROF(selectee); /* Note [untag for prof] */   \
+          (P_ constr) = call %GET_ENTRY(dest) (dest);                   \
           RESTORE_CCS;                                                  \
           selectee = constr;                                            \
       }                                                                 \

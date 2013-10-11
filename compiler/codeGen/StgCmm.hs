@@ -233,7 +233,12 @@ cgDataCon data_con
                              $ mk_code ticky_code
 
             mk_code ticky_code
-              =         -- NB: We don't set CC when entering data (WDP 94/06)
+              = -- NB: the closure pointer is assumed *untagged* on
+                -- entry to a constructor.  If the pointer is tagged,
+                -- then we should not be entering it.  This assumption
+                -- is used in ldvEnter and when tagging the pointer to
+                -- return it.
+                -- NB 2: We don't set CC when entering data (WDP 94/06)
                 do { _ <- ticky_code
                    ; ldvEnter (CmmReg nodeReg)
                    ; tickyReturnOldCon (length arg_things)
