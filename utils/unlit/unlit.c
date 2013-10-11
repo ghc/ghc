@@ -55,6 +55,7 @@
 #define CANNOTWRITESTDOUT "unlit: error writing standard output\n"
 #define DISTINCTNAMES  "unlit: input and output filenames must differ\n"
 #define MISSINGENDCODE "unlit: missing \\end{code}\n"
+#define SPURIOUSENDCODE "unlit: spurious \\end{code}\n"
 
 #define BEGINCODE "\\begin{code}"
 #define LENBEGINCODE 12
@@ -69,7 +70,7 @@
 #define LENENDPSEUDOCODE 16
 #endif
 
-typedef enum { START, BLANK, TEXT, DEFN, BEGIN, /*PSEUDO,*/ END, HASH, SHEBANG } line;
+typedef enum { START, BLANK, TEXT, DEFN, BEGIN, END, /*PSEUDO,*/ ENDFILE, HASH, SHEBANG } line;
 #define isWhitespace(c)  (c==' '  || c=='\t' || c=='\r')
 #define isLineTerm(c)    (c=='\n' || c==EOF)
 
@@ -160,7 +161,8 @@ egetc(FILE *istream)
  *     BEGIN (a \begin{code} line)
  *     PSEUDO (a \begin{pseodocode} line)
  *     HASH  (a preprocessor line)
- * or  END   (indicating an EOF).
+ *     END   (a (spurious) \end{code} line)
+ * or  ENDFILE (indicating an EOF).
  * Lines of type DEFN are copied to the output stream `ostream'
  * (without the leading DEFNCHAR).  BLANK and TEXT lines are
  * replaced by empty (i.e. blank lines) in the output stream, so
@@ -177,7 +179,7 @@ line readline(FILE *istream, FILE *ostream) {
     c = egetc(istream);
 
     if (c==EOF)
-        return END;
+        return ENDFILE;
   
     if ( c == '#' ) {
       if ( ignore_shebang ) {
@@ -224,6 +226,8 @@ line readline(FILE *istream, FILE *ostream) {
     buf[i] = 0;
     if (strcmp(buf, BEGINCODE) == 0)
 	return BEGIN;
+    if (strcmp(buf, ENDCODE) == 0)
+	return END;
 #ifdef PSEUDOCODE
     else if (strcmp(buf, BEGINPSEUDOCODE) == 0)
 	return PSEUDO;
@@ -258,6 +262,8 @@ void unlit(char *file, FILE *istream, FILE *ostream)
             complain(file, linesread-1, MISSINGBLANK);
         if (last==TEXT && this==DEFN)
             complain(file, linesread, MISSINGBLANK);
+        if (this==END)
+            complain(file, linesread, SPURIOUSENDCODE);
 	if (this == BEGIN) {
 	    /* start of code, copy to end */
 	    char lineb[1000];
@@ -291,7 +297,7 @@ void unlit(char *file, FILE *istream, FILE *ostream)
 	    }
 	}
 #endif
-    } while(this!=END);
+    } while(this!=ENDFILE);
 
     if (defnsread==0)
         complain(file,linesread,EMPTYSCRIPT);
