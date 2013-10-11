@@ -221,6 +221,7 @@ pprStmt stmt =
                         -- for a dynamic call, no declaration is necessary.
 
     CmmUnsafeForeignCall (PrimTarget MO_Touch) _results _args -> empty
+    CmmUnsafeForeignCall (PrimTarget (MO_Prefetch_Data _)) _results _args -> empty
 
     CmmUnsafeForeignCall target@(PrimTarget op) results args ->
         fn_call
