@@ -2265,7 +2265,7 @@ alternativeLayoutRuleToken t
                  [] ->
                      do let ls = if isALRopen u
                                     then [ALRNoLayout (containsCommas u) False]
-                                    else ls
+                                    else []
                         setALRContext ls
                         -- XXX This is an error in John's code, but
                         -- it looks reachable to me at first glance
