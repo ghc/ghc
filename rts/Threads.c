@@ -536,6 +536,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         } else {
             // Send this thread the StackOverflow exception
             throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
+            return;
         }
     }
 
