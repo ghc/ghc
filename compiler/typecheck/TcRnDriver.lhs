@@ -244,15 +244,7 @@ tcRnImports hsc_env this_mod import_decls
   = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
-                -- Make sure we record the dependencies from the DynFlags in the EPS or we
-                -- end up hitting the sanity check in LoadIface.loadInterface that
-                -- checks for unknown home-package modules being loaded. We put
-                -- these dependencies on the left so their (non-source) imports
-                -- take precedence over the (possibly-source) imports on the right.
-                -- We don't add them to any other field (e.g. the imp_dep_mods of
-                -- imports) because we don't want to load their instances etc.
-              ; dep_mods = listToUFM [(mod_nm, (mod_nm, False)) | mod_nm <- dynFlagDependencies (hsc_dflags hsc_env)]
-                                `plusUFM` imp_dep_mods imports
+              ; dep_mods = imp_dep_mods imports
 
                 -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
