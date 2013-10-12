@@ -265,7 +265,7 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
         -- Once that is settled, look for cases where the type of the
         -- entire overloaded literal matches the type of the underlying literal,
         -- and in that case take the short cut
-        -- NB: Watch out for wierd cases like Trac #3382
+        -- NB: Watch out for weird cases like Trac #3382
         --        f :: Int -> Int
         --        f "blah" = 4
         --     which might be ok if we hvae 'instance IsString Int'

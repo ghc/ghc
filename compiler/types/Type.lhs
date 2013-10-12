@@ -577,7 +577,7 @@ newTyConInstRhs tycon tys
 Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~
 The various "split" functions (splitFunTy, splitRhoTy, splitForAllTy) try
-to return type synonyms whereever possible. Thus
+to return type synonyms wherever possible. Thus
 
         type Foo a = a -> a
 

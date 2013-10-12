@@ -1600,7 +1600,7 @@ data PState = PState {
         -- This is the next token to be considered or, if it is Nothing,
         -- we need to get the next token from the input stream:
         alr_next_token :: Maybe (RealLocated Token),
-        -- This is what we consider to be the locatino of the last token
+        -- This is what we consider to be the location of the last token
         -- emitted:
         alr_last_loc :: RealSrcSpan,
         -- The stack of layout contexts:

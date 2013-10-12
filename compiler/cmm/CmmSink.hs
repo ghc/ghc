@@ -565,7 +565,7 @@ localRegistersConflict dflags expr node =
 --      We will attempt to sink { x = R1 } but we will detect conflict with
 --      { P64[Sp - 8]  = x } and hence we will drop { x = R1 } without even
 --      checking whether it conflicts with { call f() }. In this way we will
---      never need to check any assignment conflicts with CmmCall. Remeber
+--      never need to check any assignment conflicts with CmmCall. Remember
 --      that we still need to check for potential memory conflicts.
 --
 -- So the result is that we only need to worry about CmmUnsafeForeignCall nodes

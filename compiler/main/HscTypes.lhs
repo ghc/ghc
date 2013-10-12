@@ -1006,7 +1006,7 @@ data ModGuts
         -- ^ Class instance environment from /home-package/ modules (including
         -- this one); c.f. 'tcg_inst_env'
         mg_fam_inst_env :: FamInstEnv,
-        -- ^ Type-family instance enviroment for /home-package/ modules
+        -- ^ Type-family instance environment for /home-package/ modules
         -- (including this one); c.f. 'tcg_fam_inst_env'
         mg_safe_haskell :: SafeHaskellMode,
         -- ^ Safe Haskell mode

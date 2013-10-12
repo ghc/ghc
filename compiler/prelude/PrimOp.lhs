@@ -292,7 +292,7 @@ Invariants:
 -- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
 --   `the processor containing the expression v'; it is not evaluated
 
-These primops are pretty wierd.
+These primops are pretty weird.
 
         dataToTag# :: a -> Int    (arg must be an evaluated data type)
         tagToEnum# :: Int -> a    (result type must be an enumerated type)

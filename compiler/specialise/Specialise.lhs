@@ -488,7 +488,7 @@ Some Ids have types like
 This seems curious at first, because we usually only have dictionary
 args whose types are of the form (C a) where a is a type variable.
 But this doesn't hold for the functions arising from instance decls,
-which sometimes get arguements with types of form (C (T a)) for some
+which sometimes get arguments with types of form (C (T a)) for some
 type constructor T.
 
 Should we specialise wrt this compound-type dictionary?  We used to say

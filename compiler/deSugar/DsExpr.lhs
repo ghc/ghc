@@ -838,7 +838,7 @@ warnDiscardedDoBindings rhs rhs_ty
                               -> warnDs (wrongMonadBind rhs elt_ty)
            _ -> return () } }
 
-  | otherwise   -- RHS does have type of form (m ty), which is wierd
+  | otherwise   -- RHS does have type of form (m ty), which is weird
   = return ()   -- but at lesat this warning is irrelevant
 
 unusedMonadBind :: LHsExpr Id -> Type -> SDoc

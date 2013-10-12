@@ -412,7 +412,7 @@ type CustomTermPrinter m = TermPrinterM m
                          -> [Precedence -> Term -> (m (Maybe SDoc))]
 
 -- | Takes a list of custom printers with a explicit recursion knot and a term, 
--- and returns the output of the first succesful printer, or the default printer
+-- and returns the output of the first successful printer, or the default printer
 cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
 cPprTerm printers_ = go 0 where
   printers = printers_ go

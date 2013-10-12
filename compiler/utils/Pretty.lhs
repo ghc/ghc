@@ -71,7 +71,7 @@ Version 2.0     24 April 1997
         nest k empty = empty
     which wasn't true before.
 
-  * Fixed an obscure bug in sep that occassionally gave very wierd behaviour
+  * Fixed an obscure bug in sep that occasionally gave very weird behaviour
 
   * Added $+$
 

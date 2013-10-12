@@ -190,7 +190,7 @@ We put bindings {f = ef; g = eg } in a Rec group if "f uses g"
 and "g uses f", no matter how indirectly.  We do a SCC analysis
 with an edge f -> g if "f uses g".
 
-More precisely, "f uses g" iff g should be in scope whereever f is.
+More precisely, "f uses g" iff g should be in scope wherever f is.
 That is, g is free in:
   a) the rhs 'ef'
   b) or the RHS of a rule for f (Note [Rules are extra RHSs])
