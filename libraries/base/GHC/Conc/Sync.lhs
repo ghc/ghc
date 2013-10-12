@@ -334,11 +334,12 @@ killThread tid = throwTo tid ThreadKilled
 
 {- | 'throwTo' raises an arbitrary exception in the target thread (GHC only).
 
+Exception delivery synchronizes between the source and target thread:
 'throwTo' does not return until the exception has been raised in the
-target thread.
-The calling thread can thus be certain that the target
-thread has received the exception.  This is a useful property to know
-when dealing with race conditions: eg. if there are two threads that
+target thread. The calling thread can thus be certain that the target
+thread has received the exception.  Exception delivery is also atomic
+with respect to other exceptions. Atomicity is a useful property to have
+when dealing with race conditions: e.g. if there are two threads that
 can kill each other, it is guaranteed that only one of the threads
 will get to kill the other.
 
