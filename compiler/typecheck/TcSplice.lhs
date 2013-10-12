@@ -23,6 +23,7 @@ import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
 
+import HscTypes
 import HsSyn
 import Convert
 import RnExpr
@@ -93,6 +94,7 @@ import Data.Dynamic  ( fromDynamic, toDyn )
 import Data.Typeable ( typeOf )
 #endif
 
+import Data.Data (Data)
 import GHC.Exts         ( unsafeCoerce# )
 \end{code}
 
@@ -1043,10 +1045,11 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
                                   , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
                                   , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
 
-  qLookupName     = lookupName
-  qReify          = reify
-  qReifyInstances = reifyInstances
-  qReifyRoles     = reifyRoles
+  qLookupName       = lookupName
+  qReify            = reify
+  qReifyInstances   = reifyInstances
+  qReifyRoles       = reifyRoles
+  qReifyAnnotations = reifyAnnotations
 
         -- For qRecover, discard error messages if
         -- the recovery action is chosen.  Otherwise
@@ -1647,6 +1650,22 @@ reifyStrict (HsUserBang (Just True) True) = TH.Unpacked
 reifyStrict (HsUserBang _     True)       = TH.IsStrict
 reifyStrict HsStrict                      = TH.IsStrict
 reifyStrict (HsUnpack {})                 = TH.Unpacked
+
+------------------------------
+lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget
+lookupThAnnLookup (TH.AnnLookupName th_nm) = fmap NamedTarget (lookupThName th_nm)
+lookupThAnnLookup (TH.AnnLookupModule pn mn)
+  = return $ ModuleTarget $
+    mkModule (stringToPackageId $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
+
+reifyAnnotations :: Data a => TH.AnnLookup -> TcM [a]
+reifyAnnotations th_nm
+  = do { name <- lookupThAnnLookup th_nm
+       ; eps <- getEps
+       ; tcg <- getGblEnv
+       ; let epsAnns = findAnns deserializeWithData (eps_ann_env eps) name
+       ; let envAnns = findAnns deserializeWithData (tcg_ann_env tcg) name
+       ; return (envAnns ++ epsAnns) }
 
 ------------------------------
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type

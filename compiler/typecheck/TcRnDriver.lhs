@@ -78,6 +78,7 @@ import Type
 import Class
 import CoAxiom
 import Inst     ( tcGetInstEnvs, tcGetInsts )
+import Annotations
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
 import Data.Ord
@@ -1228,13 +1229,14 @@ tcTopSrcDecls boot_details
 
                 -- Extend the GblEnv with the (as yet un-zonked)
                 -- bindings, rules, foreign decls
-            ; tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` all_binds
-                                 , tcg_sigs  = tcg_sigs tcg_env `unionNameSets` sig_names
-                                 , tcg_rules = tcg_rules tcg_env ++ rules
-                                 , tcg_vects = tcg_vects tcg_env ++ vects
-                                 , tcg_anns  = tcg_anns tcg_env ++ annotations
-                                 , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls
-                                 , tcg_dus   = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
+            ; tcg_env' = tcg_env { tcg_binds   = tcg_binds tcg_env `unionBags` all_binds
+                                 , tcg_sigs    = tcg_sigs tcg_env `unionNameSets` sig_names
+                                 , tcg_rules   = tcg_rules tcg_env ++ rules
+                                 , tcg_vects   = tcg_vects tcg_env ++ vects
+                                 , tcg_anns    = tcg_anns tcg_env ++ annotations
+                                 , tcg_ann_env = extendAnnEnvList (tcg_ann_env tcg_env) annotations
+                                 , tcg_fords   = tcg_fords tcg_env ++ foe_decls ++ fi_decls
+                                 , tcg_dus     = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
         addUsedRdrNames fo_rdr_names ;

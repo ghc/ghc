@@ -232,6 +232,7 @@ data TcGblEnv
           -- ^ Instance envt for all /home-package/ modules;
           -- Includes the dfuns in tcg_insts
         tcg_fam_inst_env :: FamInstEnv, -- ^ Ditto for family instances
+        tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
 
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.

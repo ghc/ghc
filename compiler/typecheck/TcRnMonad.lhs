@@ -48,6 +48,7 @@ import StaticFlags
 import FastString
 import Panic
 import Util
+import Annotations
 
 import Control.Exception
 import Data.IORef
@@ -124,6 +125,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
+                tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
                 tcg_exports        = [],
