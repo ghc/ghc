@@ -299,4 +299,4 @@ test('T4124', normal, compile, ['-v0'])
 test('T4128', normal, compile, ['-v0'])
 test('T6062', normal, compile, ['-v0'])
 test('T4364', normal, compile, ['-v0'])
-
+test('T8412', normal, compile_fail, ['-v0'])
