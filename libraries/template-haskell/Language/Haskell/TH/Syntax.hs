@@ -53,7 +53,8 @@ class (Monad m, Applicative m) => Quasi m where
        -- Returns list of matching instance Decs
        --    (with empty sub-Decs)
        -- Works for classes and type functions
-  qReifyRoles     :: Name -> m [Role]
+  qReifyRoles       :: Name -> m [Role]
+  qReifyAnnotations :: Data a => AnnLookup -> m [a]
 
   qLocation :: m Loc
 
@@ -93,6 +94,7 @@ instance Quasi IO where
   qReify _            = badIO "reify"
   qReifyInstances _ _ = badIO "classInstances"
   qReifyRoles _       = badIO "reifyRoles"
+  qReifyAnnotations _ = badIO "reifyAnnotations"
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _ = badIO "addDependentFile"
@@ -324,6 +326,13 @@ The returned list should never contain 'InferR'.
 reifyRoles :: Name -> Q [Role]
 reifyRoles nm = Q (qReifyRoles nm)
 
+-- | @reifyAnnotations target@ returns the list of annotations
+-- associated with @target@.  Only the annotations that are
+-- appropriately typed is returned.  So if you have @Int@ and @String@
+-- annotations for the same target, you have to call this function twice.
+reifyAnnotations :: Data a => AnnLookup -> Q [a]
+reifyAnnotations an = Q (qReifyAnnotations an)
+
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
 isInstance :: Name -> [Type] -> Q Bool
 isInstance nm tys = do { decs <- reifyInstances nm tys
@@ -375,6 +384,7 @@ instance Quasi Q where
   qReify    	    = reify
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
+  qReifyAnnotations = reifyAnnotations
   qLookupName       = lookupName
   qLocation 	    = location
   qRunIO    	    = runIO
@@ -490,10 +500,10 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 -----------------------------------------------------
 
 newtype ModName = ModName String	-- Module name
- deriving (Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data)
 
 newtype PkgName = PkgName String	-- package name
- deriving (Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data)
 
 newtype OccName = OccName String
  deriving (Eq,Ord,Typeable,Data)
@@ -1337,6 +1347,11 @@ data Role = NominalR            -- ^ @nominal@
           | PhantomR            -- ^ @phantom@
           | InferR              -- ^ @_@
   deriving( Show, Eq, Data, Typeable )
+
+-- | Annotation target for reifyAnnotations
+data AnnLookup = AnnLookupModule PkgName ModName
+               | AnnLookupName Name
+               deriving( Show, Eq, Data, Typeable )
 
 -- | To avoid duplication between kinds and types, they
 -- are defined to be the same. Naturally, you would never

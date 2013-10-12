@@ -32,6 +32,8 @@ module Language.Haskell.TH(
 	isInstance,
         -- *** Roles lookup
         reifyRoles,
+        -- *** Annotation lookup
+        reifyAnnotations, AnnLookup(..),
 
 	-- * Typed expressions
 	TExp, unType,
