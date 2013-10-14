@@ -1053,22 +1053,15 @@ tName n = cvtName OccName.tvName n
 tconNameL n = wrapL (tconName n)
 tconName n = cvtName OccName.tcClsName n
 
+-- See Note [Checking name spaces]
 cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtName ctxt_ns (TH.Name occ flavour)
-  | not (okOcc ctxt_ns occ_str) = failWith (badOcc ctxt_ns occ_str)
-  | otherwise
   = do { loc <- getL
        ; let rdr_name = thRdrName loc ctxt_ns occ_str flavour
        ; force rdr_name
        ; return rdr_name }
   where
     occ_str = TH.occString occ
-
-okOcc :: OccName.NameSpace -> String -> Bool
-okOcc _  []      = False
-okOcc ns str@(c:_)
-  | OccName.isVarNameSpace ns = startsVarId c || startsVarSym c
-  | otherwise                 = startsConId c || startsConSym c || str == "[]"
 
 -- Determine the name space of a name in a type
 --
@@ -1077,11 +1070,6 @@ isVarName (TH.Name occ _)
   = case TH.occString occ of
       ""    -> False
       (c:_) -> startsVarId c || startsVarSym c
-
-badOcc :: OccName.NameSpace -> String -> SDoc
-badOcc ctxt_ns occ
-  = ptext (sLit "Illegal") <+> pprNameSpace ctxt_ns
-        <+> ptext (sLit "name:") <+> quotes (text occ)
 
 thRdrName :: SrcSpan -> OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- This turns a TH Name into a RdrName; used for both binders and occurrences
@@ -1216,3 +1204,15 @@ the way System Names are printed.
 
 There's a small complication of course; see Note [Looking up Exact
 RdrNames] in RnEnv.
+
+Note [Checking name spaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In cvtName, it's possible that the name we are converting doesn't
+match the namespace requested. For example, we might have a data
+constructor "foo" or a variable "Bar". We could check for these cases,
+but it seems difficult to guarantee identical behavior to the parser.
+Furthermore, a TH user might (somewhat dirtily) want to violate Haskell's
+naming expectations, and to use a name that couldn't be used in source
+code. So, according to the discussion in #7667, we just don't check.
+If you're thinking of changing this behavior, also please do see #7484,
+which is closely related.
