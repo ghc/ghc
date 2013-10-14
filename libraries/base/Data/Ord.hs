@@ -23,6 +23,8 @@ module Data.Ord (
  ) where
 
 import GHC.Base
+import GHC.Show
+import GHC.Read
 
 -- | 
 -- > comparing p x y = compare (p x) (p y)
@@ -42,7 +44,8 @@ comparing p x y = compare (p x) (p y)
 -- as in: @then sortWith by 'Down' x@
 --
 -- /Since: 4.6.0.0/
-newtype Down a = Down a deriving (Eq)
+-- Show and Read instances /Since: 4.7.0.0/
+newtype Down a = Down a deriving (Eq, Show, Read)
 
 instance Ord a => Ord (Down a) where
     compare (Down x) (Down y) = y `compare` x
