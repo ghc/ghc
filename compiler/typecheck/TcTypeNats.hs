@@ -345,13 +345,42 @@ interactTopAdd [s,t] r
   mbZ = isNumLitTy r
 interactTopAdd _ _ = []
 
+{- NOTE:
+A simpler interaction here might be:
+
+  `s - t ~ r` --> `t + r ~ s`
+
+This would enable us to reuse all the code for addition.
+Unfortunately, this works a little too well at the moment.
+Consider the following example:
+
+    0 - 5 ~ r --> 5 + r ~ 0 --> (5 = 0, r = 0)
+
+This (correctly) spots that the constraint cannot be solved.
+
+However, this may be a problem if the constraint did not
+need to be solved in the first place!  Consider the following example:
+
+f :: Proxy (If (5 <=? 0) (0 - 5) (5 - 0)) -> Proxy 5
+f = id
+
+Currently, GHC is strict while evaluating functions, so this does not
+work, because even though the `If` should evaluate to `5 - 0`, we
+also evaluate the "else" branch which generates the constraint `0 - 5 ~ r`,
+which fails.
+
+So, for the time being, we only add an improvement when the RHS is a constant,
+which happens to work OK for the moment, although clearly we need to do
+something more general.
+-}
 interactTopSub :: [Xi] -> Xi -> [Pair Type]
 interactTopSub [s,t] r
-  | Just 0 <- mbZ = [ s === t ]
-  | otherwise     = [ t .+. r === s ]
+  | Just z <- mbZ = [ s === (num z .+. t) ]
   where
   mbZ = isNumLitTy r
 interactTopSub _ _ = []
+
+
 
 
 
@@ -398,11 +427,11 @@ interactInertAdd [x1,y1] z1 [x2,y2] z2
   where sameZ = eqType z1 z2
 interactInertAdd _ _ _ _ = []
 
-{- XXX: Should we add some rules here?
-When `interactTopSub` sees `x - y ~ z`, it generates `z + y ~ x`.
-Hopefully, this should interact further and generate all additional
-needed facts that we might need. -}
 interactInertSub :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
+interactInertSub [x1,y1] z1 [x2,y2] z2
+  | sameZ && eqType x1 x2         = [ y1 === y2 ]
+  | sameZ && eqType y1 y2         = [ x1 === x2 ]
+  where sameZ = eqType z1 z2
 interactInertSub _ _ _ _ = []
 
 interactInertMul :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
