@@ -11131,13 +11131,13 @@ Here are some examples:</para>
   data T3 a b = MkT3 a     -- OK: nominal is higher than necessary, but safe
 
   type role T4 nominal
-  data T4 a = MkT4 (a Int)    -- OK, but N is higher than necessary
+  data T4 a = MkT4 (a Int) -- OK, but N is higher than necessary
 
   type role C representational _
   class C a b where ...    -- OK
 
   type role X nominal
-  type X a@N = ...           -- ERROR: role annotations not allowed for type synonyms
+  type X a = ...           -- ERROR: role annotations not allowed for type synonyms
 </programlisting>
 
 </sect2>
