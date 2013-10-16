@@ -1280,12 +1280,8 @@ tryNewCodeGen hsc_env this_mod data_tycons
 
       | otherwise
         = {-# SCC "cmmPipeline" #-}
-          let initTopSRT = initUs_ us emptySRT in
-  
-          let run_pipeline topSRT cmmgroup = do
-                (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT cmmgroup
-                return (topSRT,cmmgroup)
-  
+          let initTopSRT = initUs_ us emptySRT
+              run_pipeline = cmmPipeline hsc_env
           in do topSRT <- Stream.mapAccumL run_pipeline initTopSRT ppr_stream1
                 Stream.yield (srtToData topSRT)
 
