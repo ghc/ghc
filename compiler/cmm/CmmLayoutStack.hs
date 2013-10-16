@@ -147,7 +147,7 @@ layout :: DynFlags
           , [CmmBlock]                  -- [out] new blocks
           )
 
-layout dflags procpoints liveness entry entry_args final_stackmaps final_hwm blocks
+layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high blocks
   = go blocks init_stackmap entry_args []
   where
     (updfr, cont_info)  = collectContInfo blocks
@@ -204,14 +204,7 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_hwm blo
        --
        let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
 
-           sp_high = final_hwm - entry_args
-              -- The stack check value is adjusted by the Sp offset on
-              -- entry to the proc, which is entry_args.  We are
-              -- assuming that we only do a stack check at the
-              -- beginning of a proc, and we don't modify Sp before the
-              -- check.
-
-           final_blocks = manifestSp dflags final_stackmaps stack0 sp0 sp_high entry0
+           final_blocks = manifestSp dflags final_stackmaps stack0 sp0 final_sp_high entry0
                               middle_pre sp_off last1 fixup_blocks
 
            acc_stackmaps' = mapUnion acc_stackmaps out
@@ -1021,4 +1014,3 @@ insertReloads stackmap =
 
 stackSlotRegs :: StackMap -> [(LocalReg, StackLoc)]
 stackSlotRegs sm = eltsUFM (sm_regs sm)
-
