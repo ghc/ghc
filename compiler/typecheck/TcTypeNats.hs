@@ -336,16 +336,19 @@ Interact with axioms
 
 interactTopAdd :: [Xi] -> Xi -> [Pair Type]
 interactTopAdd [s,t] r
-  | Just 0 <- mbZ = [ s === num 0, t === num 0 ]
-  | Just x <- mbX, Just z <- mbZ, Just y <- minus z x = [t === num y]
-  | Just y <- mbY, Just z <- mbZ, Just x <- minus z y = [s === num x]
+  | Just 0 <- mbZ = [ s === num 0, t === num 0 ]                          -- (s + t ~ 0) => (s ~ 0, t ~ 0)
+  | Just x <- mbX, Just z <- mbZ, Just y <- minus z x = [t === num y]     -- (5 + t ~ 8) => (t ~ 3)
+  | Just y <- mbY, Just z <- mbZ, Just x <- minus z y = [s === num x]     -- (s + 5 ~ 8) => (s ~ 3)
   where
   mbX = isNumLitTy s
   mbY = isNumLitTy t
   mbZ = isNumLitTy r
 interactTopAdd _ _ = []
 
-{- NOTE:
+{-
+Note [Weakened interaction rule for subtraction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 A simpler interaction here might be:
 
   `s - t ~ r` --> `t + r ~ s`
@@ -366,7 +369,7 @@ f = id
 
 Currently, GHC is strict while evaluating functions, so this does not
 work, because even though the `If` should evaluate to `5 - 0`, we
-also evaluate the "else" branch which generates the constraint `0 - 5 ~ r`,
+also evaluate the "then" branch which generates the constraint `0 - 5 ~ r`,
 which fails.
 
 So, for the time being, we only add an improvement when the RHS is a constant,
@@ -375,7 +378,7 @@ something more general.
 -}
 interactTopSub :: [Xi] -> Xi -> [Pair Type]
 interactTopSub [s,t] r
-  | Just z <- mbZ = [ s === (num z .+. t) ]
+  | Just z <- mbZ = [ s === (num z .+. t) ]         -- (s - t ~ 5) => (5 + t ~ s)
   where
   mbZ = isNumLitTy r
 interactTopSub _ _ = []
@@ -386,9 +389,9 @@ interactTopSub _ _ = []
 
 interactTopMul :: [Xi] -> Xi -> [Pair Type]
 interactTopMul [s,t] r
-  | Just 1 <- mbZ = [ s === num 1, t === num 1 ]
-  | Just x <- mbX, Just z <- mbZ, Just y <- divide z x = [t === num y]
-  | Just y <- mbY, Just z <- mbZ, Just x <- divide z y = [s === num x]
+  | Just 1 <- mbZ = [ s === num 1, t === num 1 ]                        -- (s * t ~ 1)  => (s ~ 1, t ~ 1)
+  | Just x <- mbX, Just z <- mbZ, Just y <- divide z x = [t === num y]  -- (3 * t ~ 15) => (t ~ 5)
+  | Just y <- mbY, Just z <- mbZ, Just x <- divide z y = [s === num x]  -- (s * 3 ~ 15) => (s ~ 5)
   where
   mbX = isNumLitTy s
   mbY = isNumLitTy t
@@ -397,9 +400,9 @@ interactTopMul _ _ = []
 
 interactTopExp :: [Xi] -> Xi -> [Pair Type]
 interactTopExp [s,t] r
-  | Just 0 <- mbZ = [ s === num 0 ]
-  | Just x <- mbX, Just z <- mbZ, Just y <- logExact  z x = [t === num y]
-  | Just y <- mbY, Just z <- mbZ, Just x <- rootExact z y = [s === num x]
+  | Just 0 <- mbZ = [ s === num 0 ]                                       -- (s ^ t ~ 0) => (s ~ 0)
+  | Just x <- mbX, Just z <- mbZ, Just y <- logExact  z x = [t === num y] -- (2 ^ t ~ 8) => (t ~ 3)
+  | Just y <- mbY, Just z <- mbZ, Just x <- rootExact z y = [s === num x] -- (s ^ 2 ~ 9) => (s ~ 3)
   where
   mbX = isNumLitTy s
   mbY = isNumLitTy t
@@ -408,7 +411,7 @@ interactTopExp _ _ = []
 
 interactTopLeq :: [Xi] -> Xi -> [Pair Type]
 interactTopLeq [s,t] r
-  | Just 0 <- mbY, Just True <- mbZ = [ s === num 0 ]
+  | Just 0 <- mbY, Just True <- mbZ = [ s === num 0 ]                     -- (s <= 0) => (s ~ 0)
   where
   mbY = isNumLitTy t
   mbZ = isBoolLitTy r
