@@ -51,7 +51,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
       MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)
       MO_Not _   -> CmmLit (CmmInt (complement x) rep)
 
-        -- these are interesting: we must first narrow to the 
+        -- these are interesting: we must first narrow to the
         -- "from" type, in order to truncate to the correct size.
         -- The final narrow/widen to the destination type
         -- is implicit in the CmmLit.
@@ -87,7 +87,7 @@ cmmMachOpFoldM dflags conv_outer [CmmMachOp conv_inner [x]]
         | otherwise ->
             Nothing
   where
-        isIntConversion (MO_UU_Conv rep1 rep2) 
+        isIntConversion (MO_UU_Conv rep1 rep2)
           = Just (rep1,rep2,False)
         isIntConversion (MO_SS_Conv rep1 rep2)
           = Just (rep1,rep2,True)
@@ -318,7 +318,7 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
            | Just p <- exactLog2 n ->
                  Just (cmmMachOpFold dflags (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
         MO_S_Quot rep
-           | Just p <- exactLog2 n, 
+           | Just p <- exactLog2 n,
              CmmReg _ <- x ->   -- We duplicate x below, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
                 -- shift right is not the same as quot, because it rounds
@@ -362,7 +362,7 @@ cmmMachOpFoldM _ _ _ = Nothing
 -- This algorithm for determining the $\log_2$ of exact powers of 2 comes
 -- from GCC.  It requires bit manipulation primitives, and we use GHC
 -- extensions.  Tough.
--- 
+--
 -- Used to be in MachInstrs --SDM.
 -- ToDo: remove use of unboxery --SDM.
 
@@ -449,4 +449,3 @@ isComparisonExpr _                  = False
 isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
 isPicReg _ = False
-
