@@ -7872,8 +7872,8 @@ Wiki page</ulink>.
 		  <itemizedlist>
 		    <listitem><para> an expression; the spliced expression must
 		    have type <literal>Q Exp</literal></para></listitem>
-		    <listitem><para> an type; the spliced expression must
-		    have type <literal>Q Typ</literal></para></listitem>
+		    <listitem><para> a type; the spliced expression must
+		    have type <literal>Q Type</literal></para></listitem>
 		    <listitem><para> a list of top-level declarations; the spliced expression
                     must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
