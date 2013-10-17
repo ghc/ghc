@@ -955,9 +955,15 @@ selector_loop:
 #ifdef PROFILING
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
-              SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
-              OVERWRITING_CLOSURE((StgClosure*)p);
-              SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
+              if (era > 0) {
+                  // Only modify the info pointer when LDV profiling is
+                  // enabled.  Note that this is incompatible with parallel GC,
+                  // because it would allow other threads to start evaluating
+                  // the same selector thunk.
+                  SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
+                  OVERWRITING_CLOSURE((StgClosure*)p);
+                  SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
+              }
 #endif
 
               // the closure in val is now the "value" of the
