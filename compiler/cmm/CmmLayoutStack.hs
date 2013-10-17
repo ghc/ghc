@@ -773,24 +773,24 @@ areaToSp :: DynFlags -> ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> C
 areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n) =
   cmmOffset dflags (CmmReg spReg) (sp_old - area_off area - n)
 areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr dflags sp_hwm
-areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
+areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [Always false stack check]
                           [CmmMachOp (MO_Sub _)
-                                  [ CmmReg (CmmGlobal Sp)
-                                  , CmmLit (CmmInt 0 _)],
-                           CmmReg (CmmGlobal SpLim)]) = zeroExpr dflags
+                                  [ CmmRegOff (CmmGlobal Sp) off
+                                  , CmmLit (CmmInt lit _)],
+                           CmmReg (CmmGlobal SpLim)])
+                              | fromIntegral off == lit = zeroExpr dflags
 areaToSp _ _ _ _ other = other
 
--- -----------------------------------------------------------------------------
--- Note [null stack check]
+-- Note [Always false stack check]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- If the high-water Sp is zero, then we end up with
+-- We can optimise stack checks of the form
 --
---   if (Sp - 0 < SpLim) then .. else ..
+--   if ((Sp + x) - x < SpLim) then .. else ..
 --
--- and possibly some dead code for the failure case.  Optimising this
--- away depends on knowing that SpLim <= Sp, so it is really the job
--- of the stack layout algorithm, hence we do it now.  This is also
--- convenient because control-flow optimisation later will drop the
+-- where x is an integer offset. Optimising this away depends on knowing that
+-- SpLim <= Sp, so it is really the job of the stack layout algorithm, hence we
+-- do it now.  This is also convenient because sinking pass will later drop the
 -- dead code.
 
 optStackCheck :: CmmNode O C -> CmmNode O C
