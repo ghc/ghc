@@ -549,8 +549,7 @@ tc_iface_decl _parent ignore_prags
 
    tc_at cls (IfaceAT tc_decl defs_decls)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- forkM (mk_at_doc tc) $
-                  foldlM tc_ax_branches [] defs_decls
+          defs <- forkM (mk_at_doc tc) (tc_ax_branches tc defs_decls)
                   -- Must be done lazily in case the RHS of the defaults mention
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
@@ -573,7 +572,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                               , ifAxBranches = branches, ifRole = role })
   = do { tc_name     <- lookupIfaceTop ax_occ
        ; tc_tycon    <- tcIfaceTyCon tc
-       ; tc_branches <- foldlM tc_ax_branches [] branches
+       ; tc_branches <- tc_ax_branches tc_tycon branches
        ; let axiom = computeAxiomIncomps $
                      CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
@@ -583,12 +582,15 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
 
-tc_ax_branches :: [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
-tc_ax_branches prev_branches
-               (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs
-                              , ifaxbRoles = roles, ifaxbIncomps = incomps })
+tc_ax_branches :: TyCon -> [IfaceAxBranch] -> IfL [CoAxBranch]
+tc_ax_branches tc if_branches = foldlM (tc_ax_branch (tyConKind tc)) [] if_branches
+
+tc_ax_branch :: Kind -> [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
+tc_ax_branch tc_kind prev_branches
+             (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs
+                            , ifaxbRoles = roles, ifaxbIncomps = incomps })
   = bindIfaceTyVars tv_bndrs $ \ tvs -> do  -- Variables will all be fresh
-    { tc_lhs <- mapM tcIfaceType lhs
+    { tc_lhs <- tcIfaceTcArgs tc_kind lhs   -- See Note [Checking IfaceTypes vs IfaceKinds]
     ; tc_rhs <- tcIfaceType rhs
     ; let br = CoAxBranch { cab_loc     = noSrcSpan
                           , cab_tvs     = tvs
@@ -990,7 +992,7 @@ Instead we use context to distinguish, as in the source language.
                                  and M.T{d}  and promote it
     See tcIfaceKindCon and tcIfaceKTyCon respectively
 
-This context business is why we need tcIfaceTcArgs.
+This context business is why we need tcIfaceTcArgs, and tcIfaceApps
 
 
 %************************************************************************
@@ -1087,7 +1089,7 @@ tcIfaceExpr (IfaceLam bndr body)
     Lam bndr' <$> tcIfaceExpr body
 
 tcIfaceExpr (IfaceApp fun arg)
-  = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
+  = tcIfaceApps fun arg
 
 tcIfaceExpr (IfaceECase scrut ty) 
   = do { scrut' <- tcIfaceExpr scrut 
@@ -1142,6 +1144,31 @@ tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr
     tickish' <- tcIfaceTickish tickish
     return (Tick tickish' expr')
+
+-------------------------
+tcIfaceApps :: IfaceExpr -> IfaceExpr -> IfL CoreExpr
+-- See Note [Checking IfaceTypes vs IfaceKinds]
+tcIfaceApps fun arg
+  = go_down fun [arg]
+  where
+    go_down (IfaceApp fun arg) args = go_down fun (arg:args)
+    go_down fun args = do { fun' <- tcIfaceExpr fun
+                          ; go_up fun' (exprType fun') args }
+
+    go_up :: CoreExpr -> Type -> [IfaceExpr] -> IfL CoreExpr
+    go_up fun _ [] = return fun
+    go_up fun fun_ty (IfaceType t : args)
+       | Just (tv,body_ty) <- splitForAllTy_maybe fun_ty
+       = do { t' <- if isKindVar tv  -- See Note [Checking IfaceTypes vs IfaceKinds]
+                    then tcIfaceKind t
+                    else tcIfaceType t
+            ; let fun_ty' = substTyWith [tv] [t'] body_ty
+            ; go_up (App fun (Type t')) fun_ty' args }
+    go_up fun fun_ty (arg : args)
+       | Just (_, fun_ty') <- splitFunTy_maybe fun_ty
+       = do { arg' <- tcIfaceExpr arg
+            ; go_up (App fun arg') fun_ty' args }
+    go_up fun fun_ty args = pprPanic "tcIfaceApps" (ppr fun $$ ppr fun_ty $$ ppr args)
 
 -------------------------
 tcIfaceTickish :: IfaceTickish -> IfM lcl (Tickish Id)
