@@ -486,6 +486,20 @@
                     Template Haskell now supports annotation pragmas.
                </para>
            </listitem>
+           <listitem>
+             <para>
+                    Typed Template Haskell expressions are now supported. See
+                    <xref linkend="template-haskell"/> for more details.
+             </para>
+           </listitem>
+           <listitem>
+             <para>
+                    Template Haskell declarations, types, patterns, and
+                    <emphasis>untyped</emphasis> expressions are no longer
+                    typechecked at all. This is a backwards-compatible change
+                    since it allows strictly more programs to be typed.
+             </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
