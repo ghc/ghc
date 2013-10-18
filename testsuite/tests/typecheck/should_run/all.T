@@ -112,3 +112,4 @@ test('TcNullaryTC', when(compiler_lt('ghc', '7.7'), skip), compile_and_run, ['']
 test('T7861', exit_code(1), compile_and_run, [''])
 test('TcTypeNatSimpleRun', normal, compile_and_run, [''])
 test('TcCoercible', when(compiler_lt('ghc', '7.7'), skip), compile_and_run, [''])
+test('T8119', normal, ghci_script, ['T8119.script'])
