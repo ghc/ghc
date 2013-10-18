@@ -44,7 +44,7 @@ test('T1969',
              #            274932264 (x86/Linux)
              # 2012-10-08 303930948 (x86/Linux, new codegen)
              # 2013-02-10 322937684 (x86/OSX)
-           (wordsize(64), 658786936, 5)]),
+           (wordsize(64), 698612512, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -63,6 +63,8 @@ test('T1969',
              #            (^ UNKNOWN REASON )
              # 17/1/13:   667160192 (x86_64/Linux)
              #            (^ new demand analyser)
+             # 18/10/2013 698612512 (x86_64/Linux)
+             #            (fix for #8456)
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static')
@@ -177,7 +179,7 @@ test('T3064',
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
             # (amd64/Linux) 2013-04-03: 26
             # (amd64/Linux) 2013-09-11: 30; result of AMP patch
-            # Increased range to 20%.  peak-usage varies from 22 to 26, 
+            # Increased range to 20%.  peak-usage varies from 22 to 26,
             #  depending on whether the old .hi file exists
 
       compiler_stats_num_field('bytes allocated',
@@ -224,7 +226,7 @@ test('T5030',
              # ^ reason unknown
              # 2013-08-02 454498592  (amd64/Linux)
              # decrease from more aggressive coercion optimisations from roles
-   
+
        only_ways(['normal'])
       ],
      compile,
@@ -259,13 +261,15 @@ test('T783',
             # 2012-10-08: 226907420 (x86/Linux)
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
-           (wordsize(64), 640324528, 10)]),
+           (wordsize(64), 734038080, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
             # 12/11/2012: 640324528 (amd64/Linux)
             #   (OldCmm removed: not sure why this got worse, the
             #    other perf tests remained about the same)
+            # 18/10/2013: 734038080 (amd64/Linux)
+            #   (fix for #8456)
       extra_hc_opts('-static')
       ],
       compile,[''])
@@ -281,9 +285,9 @@ test('T5321Fun',
              # prev:       585521080
              # 29/08/2012: 713385808
              #  (increase due to new codegen)
-             # 15/05/2013: 628341952 
+             # 15/05/2013: 628341952
              #  (reason for decrease unknown)
-             # 24/06/2013: 694019152 
+             # 24/06/2013: 694019152
              #  (reason for re-increase unknown)
       ],
       compile,[''])
@@ -299,9 +303,9 @@ test('T5321FD',
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
-            # 15/05/2013: 406039584 
+            # 15/05/2013: 406039584
             #  (reason for decrease unknown)
-            # 08/06/2013: 476497048 
+            # 08/06/2013: 476497048
             #  (reason for increase unknown)
       ],
       compile,[''])
