@@ -1,11 +1,12 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 274, 10)
+          [(wordsize(64), 323, 10)
             # 2012-08-14: 240 (amd64/Linux)
             # 2012-09-18: 237 (amd64/Linux)
             # 2012-11-12: 249 (amd64/Linux)
             # 2013-01-29: 274 (amd64/Linux)
+            # 2013-10-18: 323 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 133, 1)
             # 2013-02-10:                     133 (x86/Windows)
           ,(wordsize(32), 139, 1)])
@@ -13,12 +14,13 @@ test('haddock.base',
             # 2012-10-30: 113 (x86/Windows)
             # 2013-02-10: 139 (x86/OSX)
      ,stats_num_field('max_bytes_used',
-          [(wordsize(64), 96022312, 10)
+          [(wordsize(64), 115113864, 10)
             # 2012-08-14: 87374568 (amd64/Linux)
             # 2012-08-21: 86428216 (amd64/Linux)
             # 2012-09-20: 84794136 (amd64/Linux)
             # 2012-11-12: 87265136 (amd64/Linux)
             # 2013-01-29: 96022312 (amd64/Linux)
+            # 2013-10-18: 115113864 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 47988488, 1)
             # 2013-02-10:                     47988488 (x86/Windows)
           ,(wordsize(32), 52237984, 1)])
@@ -90,12 +92,13 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 1250, 10)
+          [(wordsize(64), 1408, 10)
             # 2012-08-14: 1203 (amd64/Linux)
             # 2012-08-21: 1199 (amd64/Linux)
             # 2012-09-20: 1228 (amd64/Linux)
             # 2012-10-08: 1240 (amd64/Linux)
             # 2013-08-26: 1250 (amd64/Linux) Cabal updated
+            # 2013-10-18: 1408 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 653, 1)
             # 2012-10-30:                     606 (x86/Windows)
             # 2013-02-10:                     653 (x86/Windows)
@@ -129,4 +132,3 @@ test('haddock.compiler',
       ],
      stats,
      ['../../../../compiler/stage2/doc/html/ghc/ghc.haddock.t'])
-
