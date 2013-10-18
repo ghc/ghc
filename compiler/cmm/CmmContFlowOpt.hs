@@ -56,24 +56,25 @@ cmmCfgOptsProc _ top = top
 -- This optimisation does three things:
 --
 --   - If a block finishes with an unconditional branch, then we may
---     be able to concatenate the block it points to and remove the
---     branch.  We do this either if the destination block is small
---     (e.g. just another branch), or if this is the only jump to
---     this particular destination block.
+--     be able to duplicate the block it points to and remove the
+--     branch.  We do this if either
+--        a) the destination block is small (e.g. just another branch), or
+--        b) this is the only jump to this particular destination block.
 --
 --   - If a block finishes in a call whose continuation block is a
 --     goto, then we can shortcut the destination, making the
---     continuation block the destination of the goto.
+--     destination of the goto into the continuation.  E.g.
+--             call g returns to L    ==>     call g returns to M
+--          L: goto M                      M: ...blah...
+--          M: ...blah...
 --     (but see Note [shortcut call returns])
 --
---   - removes any unreachable blocks from the graph.  This is a side
+--   - Remove any unreachable blocks from the graph.  This is a side
 --     effect of starting with a postorder DFS traversal of the graph
---
 
 -- Both transformations are improved by working from the end of the
 -- graph towards the beginning, because we may be able to perform many
 -- shortcuts in one go.
-
 
 -- We need to walk over the blocks from the end back to the
 -- beginning.  We are going to maintain the "current" graph
