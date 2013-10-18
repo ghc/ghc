@@ -323,8 +323,7 @@ test('dynHelloWorld',
      [''])
 
 test('T5313',
-     [extra_run_opts('"' + config.libdir + '"'),
-      expect_broken(7774)],
+     extra_run_opts('"' + config.libdir + '"'),
      compile_and_run,
      ['-package ghc'])
 
