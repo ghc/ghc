@@ -32,3 +32,9 @@ T7438:
 	$(RM) -f T7438.hi T7438.o T7438a.hi T7438a.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7438a.hs
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T7438.hs
+
+# Need to compile separately so that the interface files get read
+T8449:
+	$(RM) -f T8449.hi T8449.o T8449a.hi T8449a.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8449a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8449.hs
