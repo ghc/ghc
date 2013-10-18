@@ -113,10 +113,8 @@
 
         <listitem>
             <para>
-                The LLVM backend now supports 128bit SIMD
-                operations. This is now exploited in both the
-                <literal>vector</literal> and <literal>dph</literal>
-                packages, exposing a high level interface.
+                The LLVM backend now supports 128- and 256-bit SIMD
+                operations.
 
                 TODO FIXME: reference.
            </para>
@@ -487,6 +485,20 @@
                 <para>
                     Template Haskell now supports annotation pragmas.
                </para>
+           </listitem>
+           <listitem>
+             <para>
+                    Typed Template Haskell expressions are now supported. See
+                    <xref linkend="template-haskell"/> for more details.
+             </para>
+           </listitem>
+           <listitem>
+             <para>
+                    Template Haskell declarations, types, patterns, and
+                    <emphasis>untyped</emphasis> expressions are no longer
+                    typechecked at all. This is a backwards-compatible change
+                    since it allows strictly more programs to be typed.
+             </para>
            </listitem>
        </itemizedlist>
     </sect3>

@@ -7872,12 +7872,13 @@ Wiki page</ulink>.
 		  <itemizedlist>
 		    <listitem><para> an expression; the spliced expression must
 		    have type <literal>Q Exp</literal></para></listitem>
-		    <listitem><para> an type; the spliced expression must
-		    have type <literal>Q Typ</literal></para></listitem>
-		    <listitem><para> a list of top-level declarations; the spliced expression
+		    <listitem><para> a pattern; the spliced pattern must
+		    have type <literal>Q Pat</literal></para></listitem>
+		    <listitem><para> a type; the spliced expression must
+		    have type <literal>Q Type</literal></para></listitem>
+		    <listitem><para> a list of declarations; the spliced expression
                     must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
-            Note that pattern splices are not supported.
             Inside a splice you can only call functions defined in imported modules,
 	    not functions defined elsewhere in the same module.</para></listitem>
 
@@ -7894,6 +7895,36 @@ Wiki page</ulink>.
 		    <listitem><para> <literal>[p| ... |]</literal>, where the "..." is a pattern;
                              the quotation has type <literal>Q Pat</literal>.</para></listitem>
 		  </itemizedlist></para></listitem>
+
+	      <listitem>
+		<para>
+		  A <emphasis>typed</emphasis> expression splice is written
+		  <literal>$$x</literal>, where <literal>x</literal> is an
+		  identifier, or <literal>$$(...)</literal>, where the "..." is
+		  an arbitrary expression.
+		</para>
+		<para>
+		  A typed expression splice can occur in place of an
+		  expression; the spliced expression must have type <literal>Q
+		  (TExp a)</literal>
+		</para>
+	      </listitem>
+
+	      <listitem>
+		<para>
+		  A <emphasis>typed</emphasis> expression quotation is written
+		  as <literal>[|| ... ||]</literal>, or <literal>[e||
+		  ... ||]</literal>, where the "..." is an expression; if the
+		  "..." expression has type <literal>a</literal>, then the
+		  quotation has type <literal>Q (TExp a)</literal>.
+		</para>
+
+		<para>
+		  Values of type <literal>TExp a</literal> may be converted to
+		  values of type <literal>Exp</literal> using the function
+		  <literal>unType :: TExp a -> Exp</literal>.
+		</para>
+	      </listitem>
 
 	      <listitem><para>
 		  A quasi-quotation can appear in either a pattern context or an
@@ -7950,13 +7981,117 @@ h z = z-1
 </programlisting>
             This abbreviation makes top-level declaration slices quieter and less intimidating.
 	    </para></listitem>
+	    
+	    <listitem>
+	      <para>
+		Binders are lexically scoped. For example, consider the
+		following code, where a value <literal>g</literal> of type
+		<literal>Bool -> Q Pat</literal> is in scope, having been
+		imported from another module
+<programlisting>
+y :: Int
+y = 7
+
+f :: Int -> Int -> Int
+f n = \ $(g True) -> y+n
+</programlisting>
+                The <literal>y</literal> in the right-hand side of
+                <literal>f</literal> refers to the top-level <literal>y =
+                7</literal>, even if the pattern splice <literal>$(g
+                n)</literal> also generates a binder <literal>y</literal>.
+	      </para>
+
+	      <para>
+		Note that a pattern quasiquoter <emphasis>may</emphasis>
+		generate binders that scope over the right-hand side of a
+		definition because these binders are in scope lexically. For
+		example, given a quasiquoter <literal>haskell</literal> that
+		parses Haskell, in the following code, the <literal>y</literal>
+		in the right-hand side of <literal>f</literal> refers to the
+		<literal>y</literal> bound by the <literal>haskell</literal>
+		pattern quasiquoter, <emphasis>not</emphasis> the top-level
+		<literal>y = 7</literal>.
+<programlisting>
+y :: Int
+y = 7
+
+f :: Int -> Int -> Int
+f n = \ [haskell|y|] -> y+n
+</programlisting>
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+		The type environment seen by <literal>reify</literal> includes
+		all the top-level declaration up to the end of the immediately
+		preceding <emphasis>declaration group</emphasis>, but no more.
+	      </para>
+
+	      <para>
+		A <emphasis>declaration group</emphasis> is the group of
+		declarations created by a top-level declaration splice, plus
+		those following it, down to but not including the next top-level
+		declaration splice. The first declaration group in a module
+		includes all top-level definitions down to but not including the
+		first top-level declaration splice.
+	      </para>
+
+
+	      <para>
+		Concretely, consider the following code
+<programlisting>
+module M where
+   import ...
+   f x = x
+   $(th1 4)
+   h y = k y y $(blah1)
+   $(th2 10)
+   w z = $(blah2)
+</programlisting>
+
+              In this example
+              <orderedlist>
+		<listitem>
+		  <para>
+		    A <literal>reify</literal> inside the splice <literal>$(th1
+		    ..)</literal> would see the definition of
+		    <literal>f</literal>.
+		  </para>
+		</listitem>
+		<listitem>
+		  <para>
+		    A <literal>reify</literal> inside the splice
+		    <literal>$(blah1)</literal> would see the definition of
+		    <literal>f</literal>, but would not see the definition of
+		    <literal>h</literal>.
+		  </para>
+		</listitem>
+		<listitem>
+		  <para>
+		    A <literal>reify</literal> inside the splice
+		    <literal>$(th2..)</literal> would see the definition of
+		    <literal>f</literal>, all the bindings created by
+		    <literal>$(th1..)</literal>, and the definition of
+		    <literal>h</literal>.
+		  </para>
+		</listitem>
+		<listitem>
+		  <para>
+		    A <literal>reify</literal> inside the splice
+		    <literal>$(blah2)</literal> would see the same definitions
+		    as the splice <literal>$(th2...)</literal>.
+		  </para>
+		</listitem>
+              </orderedlist>
+	      </para>
+	    </listitem>
 
 
 	</itemizedlist>
 (Compared to the original paper, there are many differences of detail.
 The syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>".
 The type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>.
-Pattern splices and quotations are not implemented.)
+Typed expression splices and quotations are supported.)
 
 </sect2>
 
@@ -11131,13 +11266,13 @@ Here are some examples:</para>
   data T3 a b = MkT3 a     -- OK: nominal is higher than necessary, but safe
 
   type role T4 nominal
-  data T4 a = MkT4 (a Int)    -- OK, but N is higher than necessary
+  data T4 a = MkT4 (a Int) -- OK, but N is higher than necessary
 
   type role C representational _
   class C a b where ...    -- OK
 
   type role X nominal
-  type X a@N = ...           -- ERROR: role annotations not allowed for type synonyms
+  type X a = ...           -- ERROR: role annotations not allowed for type synonyms
 </programlisting>
 
 </sect2>

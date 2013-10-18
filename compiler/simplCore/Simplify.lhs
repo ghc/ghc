@@ -2609,32 +2609,40 @@ type varaibles as well as term variables.
         case (case e of ...) of
             C t xs::[t] -> j t xs
 
-Note [Join point abstaction]
+Note [Join point abstraction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we try to lift a primitive-typed something out
-for let-binding-purposes, we will *caseify* it (!),
-with potentially-disastrous strictness results.  So
-instead we turn it into a function: \v -> e
-where v::State# RealWorld#.  The value passed to this function
-is realworld#, which generates (almost) no code.
+Join points always have at least one value argument,
+for several reasons
 
-There's a slight infelicity here: we pass the overall
-case_bndr to all the join points if it's used in *any* RHS,
-because we don't know its usage in each RHS separately
+* If we try to lift a primitive-typed something out
+  for let-binding-purposes, we will *caseify* it (!),
+  with potentially-disastrous strictness results.  So
+  instead we turn it into a function: \v -> e
+  where v::State# RealWorld#.  The value passed to this function
+  is realworld#, which generates (almost) no code.
 
-We used to say "&& isUnLiftedType rhs_ty'" here, but now
-we make the join point into a function whenever used_bndrs'
-is empty.  This makes the join-point more CPR friendly.
-Consider:       let j = if .. then I# 3 else I# 4
-                in case .. of { A -> j; B -> j; C -> ... }
+* CPR.  We used to say "&& isUnLiftedType rhs_ty'" here, but now
+  we make the join point into a function whenever used_bndrs'
+  is empty.  This makes the join-point more CPR friendly.
+  Consider:       let j = if .. then I# 3 else I# 4
+                  in case .. of { A -> j; B -> j; C -> ... }
 
-Now CPR doesn't w/w j because it's a thunk, so
-that means that the enclosing function can't w/w either,
-which is a lose.  Here's the example that happened in practice:
-        kgmod :: Int -> Int -> Int
-        kgmod x y = if x > 0 && y < 0 || x < 0 && y > 0
-                    then 78
-                    else 5
+  Now CPR doesn't w/w j because it's a thunk, so
+  that means that the enclosing function can't w/w either,
+  which is a lose.  Here's the example that happened in practice:
+          kgmod :: Int -> Int -> Int
+          kgmod x y = if x > 0 && y < 0 || x < 0 && y > 0
+                      then 78
+                      else 5
+
+* Let-no-escape.  We want a join point to turn into a let-no-escape
+  so that it is implemented as a jump, and one of the conditions
+  for LNE is that it's not updatable.  In CoreToStg, see
+  Note [What is a non-escaping let]
+
+* Floating.  Since a join point will be entered once, no sharing is
+  gained by floating out, but something might be lost by doing
+  so because it might be allocated.
 
 I have seen a case alternative like this:
         True -> \v -> ...
@@ -2642,6 +2650,11 @@ It's a bit silly to add the realWorld dummy arg in this case, making
         $j = \s v -> ...
            True -> $j s
 (the \v alone is enough to make CPR happy) but I think it's rare
+
+There's a slight infelicity here: we pass the overall
+case_bndr to all the join points if it's used in *any* RHS,
+because we don't know its usage in each RHS separately
+
 
 Note [Duplicating StrictArg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

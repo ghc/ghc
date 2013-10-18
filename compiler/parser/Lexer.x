@@ -318,6 +318,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "[|"        / { ifExtension thEnabled } { token ITopenExpQuote }
   "[||"       / { ifExtension thEnabled } { token ITopenTExpQuote }
   "[e|"       / { ifExtension thEnabled } { token ITopenExpQuote }
+  "[e||"      / { ifExtension thEnabled } { token ITopenTExpQuote }
   "[p|"       / { ifExtension thEnabled } { token ITopenPatQuote }
   "[d|"       / { ifExtension thEnabled } { layout_token ITopenDecQuote }
   "[t|"       / { ifExtension thEnabled } { token ITopenTypQuote }
