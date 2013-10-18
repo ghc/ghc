@@ -76,14 +76,12 @@ data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
 
 -- | Convert an integer into an unknown type-level natural.
-{-# NOINLINE someNatVal #-}
 someNatVal :: Integer -> Maybe SomeNat
 someNatVal n
   | n >= 0        = Just (withSNat SomeNat (SNat n) Proxy)
   | otherwise     = Nothing
 
 -- | Convert a string into an unknown type-level symbol.
-{-# NOINLINE someSymbolVal #-}
 someSymbolVal :: String -> SomeSymbol
 someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
 
