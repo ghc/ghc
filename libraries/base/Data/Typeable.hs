@@ -39,9 +39,6 @@
 
 module Data.Typeable
   (
-        -- * A proxy type
-        Proxy (..),
-
         -- * The Typeable class
         Typeable,
         typeRep,
@@ -54,12 +51,16 @@ module Data.Typeable
 
         -- * Type-safe cast
         cast,
+        eqT,
         gcast,                  -- a generalisation of cast
 
         -- * Generalized casts for higher-order kinds
         gcast1,                 -- :: ... => c (t a) -> Maybe (c (t' a))
         gcast2,                 -- :: ... => c (t a b) -> Maybe (c (t' a b))
 
+        -- * A canonical proxy type
+        Proxy (..),
+        
         -- * Type representations
         TypeRep,        -- abstract, instance of: Eq, Show, Typeable
         showsTypeRep,
@@ -82,9 +83,6 @@ module Data.Typeable
         funResultTy,    -- :: TypeRep -> TypeRep   -> Maybe TypeRep
         typeRepTyCon,   -- :: TypeRep -> TyCon
         typeRepArgs,    -- :: TypeRep -> [TypeRep]
-
-        -- * Type-level reasoning with Typeable
-        -- eqTypeable, decideEqTypeable
   ) where
 
 import Data.Typeable.Internal hiding (mkTyCon)
