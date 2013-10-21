@@ -74,6 +74,8 @@ import Util
 import Control.Monad( when )
 import MonadUtils
 import Control.Monad(liftM)
+
+import TcRnMonad (traceIf) -- RAE
 \end{code}
 
 %************************************************************************
@@ -838,15 +840,18 @@ dsTcCoercion :: Role -> TcCoercion -> (Coercion -> CoreExpr) -> DsM CoreExpr
 --         k (trans g1# g2#)
 -- thing_inside will get a coercion at the role requested
 dsTcCoercion role co thing_inside
-  = do { us <- newUniqueSupply
+  = do { traceIf $ hang (text "dsTcCoercion {") 2 $ vcat [ppr role, ppr co] -- RAE
+       ; us <- newUniqueSupply
        ; let eqvs_covs :: [(EqVar,CoVar)]
              eqvs_covs = zipWith mk_co_var (varSetElems (coVarsOfTcCo co))
                                            (uniqsFromSupply us)
 
              subst = mkCvSubst emptyInScopeSet [(eqv, mkCoVarCo cov) | (eqv, cov) <- eqvs_covs]
-             result_expr = thing_inside (ds_tc_coercion subst role co)
+             ds_co = ds_tc_coercion subst role co -- RAE
+             result_expr = thing_inside ds_co
              result_ty   = exprType result_expr
 
+       ; traceIf $ hang (text "dsTcCoercion }") 2 (ppr ds_co) -- RAE
        ; return (foldr (wrap_in_case result_ty) result_expr eqvs_covs) }
   where
     mk_co_var :: Id -> Unique -> (Id, Id)
@@ -875,7 +880,9 @@ ds_tc_coercion subst role tc_co
 
     go r (TcRefl ty)            = Refl r (Coercion.substTy subst ty)
     go r (TcTyConAppCo tc cos)  = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) cos)
-    go r (TcAppCo co1 co2)      = mkAppCo (go r co1) (go Nominal co2)
+    go r (TcAppCo co1 co2)      = let leftCo    = go r co1
+                                      rightRole = nextRole leftCo in
+                                  mkAppCoFlexible leftCo rightRole (go rightRole co2)
     go r (TcForAllCo tv co)     = mkForAllCo tv' (ds_tc_coercion subst' r co)
                               where
                                 (subst', tv') = Coercion.substTyVarBndr subst tv

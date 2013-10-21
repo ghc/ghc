@@ -39,6 +39,7 @@ import Id( idType )
 import Class
 import Type
 import Kind( isKind )
+import Coercion ( tvUsedAtNominalRole )
 import ErrUtils
 import MkId
 import DataCon
@@ -1472,11 +1473,24 @@ mkNewTypeEqn orig dflags tvs
                -- currently generate type 'instance' decls; and cannot do
                -- so for 'data' instance decls
 
-        roles_ok = let cls_roles = tyConRoles (classTyCon cls) in
-                   not (null cls_roles) && last cls_roles /= Nominal
-               -- We must make sure that the class definition (and all its
-               -- members) never pattern-match on the last parameter.
-               -- See Trac #1496 and Note [Roles] in Coercion
+               -- We must make sure that all of the class's members
+               -- never pattern-match on the last parameter.
+               -- See Trac #1496 and Note [Roles] in Coercion.
+               -- Also see Note [Role checking in GND]
+        roles_ok = null role_errs
+        role_errs
+          = [ (id, substed_ty, is_specialized)
+            | id <- classMethods cls
+            , let ty = idType id
+                  (_, [cls_constraint], meth_ty) = tcSplitSigmaTy ty
+                  (_cls_tc, cls_args) = splitTyConApp cls_constraint
+                  ordered_tvs = map (getTyVar "mkNewTypeEqn") cls_args
+                  Just (other_tvs, gnd_tv) = snocView ordered_tvs
+                  subst = zipOpenTvSubst other_tvs cls_tys
+                  substed_ty = substTy subst meth_ty
+                  is_specialized = not (meth_ty `eqType` substed_ty)
+            , ASSERT( _cls_tc == classTyCon cls )
+              tvUsedAtNominalRole gnd_tv substed_ty ]
 
         cant_derive_err
            = vcat [ ppUnless arity_ok arity_msg
@@ -1488,9 +1502,15 @@ mkNewTypeEqn orig dflags tvs
         ats_msg   = ptext (sLit "the class has associated types")
         roles_msg = ptext (sLit "it is not type-safe to use") <+>
                     ptext (sLit "GeneralizedNewtypeDeriving on this class;") $$
-                    ptext (sLit "the last parameter of") <+>
-                    quotes (ppr (className cls)) <+>
-                    ptext (sLit "is at role Nominal")
+                    vcat [ quotes (ppr id) <> comma <+>
+                           specialized_doc <+>
+                           quotes (ppr ty) <> comma <+>
+                           text "cannot be converted safely"
+                         | (id, ty, is_specialized) <- role_errs
+                         , let specialized_doc
+                                 | is_specialized = text "specialized to type"
+                                 | otherwise      = text "at type"
+                         ]
 
 \end{code}
 
@@ -1509,6 +1529,34 @@ minded way of generating the instance decl:
    instance Eq [A] => Eq A      -- Makes typechecker loop!
 But now we require a simple context, so it's ok.
 
+Note [Role checking in GND]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When checking to see if GND (GeneralizedNewtypeDeriving) is possible, we
+do *not* look at the roles of the class being derived. Instead, we look
+at the uses of the last type variable to that class in all the methods of
+the class. (Why? Keep reading.) For example:
+
+  class Foo a b where
+    meth :: a b -> b
+
+  instance Foo Maybe Int where
+    meth = fromJust
+
+  newtype Age = MkAge Int
+    deriving (Foo Maybe)
+
+According to the role rules, the `b` parameter to Foo must be at nominal
+role -- after all, `a` could be a GADT. BUT, when deriving (Foo Maybe)
+for Age, we in fact know that `a` is *not* a GADT. So, instead of looking
+holistically at the roles for the parameters of Foo, we instead perform
+the substitution on the type variables that we know (in this case,
+[a |-> Maybe]) and then check each method individually.
+
+Why check only methods, and not other things? In GND, superclass constraints
+must be satisfied by the *newtype*, not the *base type*. So, we don't coerce
+the base type's superclass dictionaries in GND, and we don't need to check
+them here. For associated types, GND is impossible anyway, so we don't need
+to look. All that is left is methods.
 
 %************************************************************************
 %*                                                                      *
