@@ -923,7 +923,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    //
 	    sp = frame - 1;
 	    
-	    /* Ensure that async excpetions are blocked now, so we don't get
+	    /* Ensure that async exceptions are blocked now, so we don't get
 	     * a surprise exception before we get around to executing the
 	     * handler.
 	     */

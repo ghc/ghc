@@ -577,7 +577,7 @@ retry_pop_stack:
           Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
       }
 
-      /* Ensure that async excpetions are blocked when running the handler.
+      /* Ensure that async exceptions are blocked when running the handler.
       */
       StgTSO_flags(CurrentTSO) = %lobits32(
           TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
