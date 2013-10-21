@@ -849,8 +849,8 @@ repTy (HsTyLit lit) = do
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> DsM (Core TH.TyLitQ)
-repTyLit (HsNumTy i) = do dflags <- getDynFlags
-                          rep2 numTyLitName [mkIntExpr dflags i]
+repTyLit (HsNumTy i) = do iExpr <- mkIntegerExpr i
+                          rep2 numTyLitName [iExpr]
 repTyLit (HsStrTy s) = do { s' <- mkStringExprFS s
                          ; rep2 strTyLitName [s']
                          }
