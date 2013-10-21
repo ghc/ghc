@@ -27,7 +27,8 @@ module Data.Type.Coercion
   , coerceWith
   , sym
   , trans
-  , CoercionT(..)
+  , repr
+  , CoercionType(..)
   ) where
 
 import qualified Data.Type.Equality as Eq
@@ -65,6 +66,10 @@ sym Coercion = unsym (coerce (Sym Coercion :: Sym a a))
 trans :: Coercion a b -> Coercion b c -> Coercion a c
 trans c Coercion = coerce c
 
+-- | Convert propositional (nominal) equality to representational equality
+repr :: (a Eq.:~: b) -> Coercion a b
+repr Eq.Refl = Coercion
+
 deriving instance Eq   (Coercion a b)
 deriving instance Show (Coercion a b)
 deriving instance Ord  (Coercion a b)
@@ -85,12 +90,12 @@ instance Coercible a b => Bounded (Coercion a b) where
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
-class CoercionT f where
+class CoercionType f where
   -- | Conditionally prove the representational equality of @a@ and @b@.
-  coercionT :: f a -> f b -> Maybe (Coercion a b)
+  maybeCoercion :: f a -> f b -> Maybe (Coercion a b)
 
-instance CoercionT ((Eq.:~:) a) where
-  coercionT Eq.Refl Eq.Refl = Just Coercion
+instance CoercionType ((Eq.:~:) a) where
+  maybeCoercion Eq.Refl Eq.Refl = Just Coercion
 
-instance CoercionT (Coercion a) where
-  coercionT c Coercion = Just $ coerce (sym c)
+instance CoercionType (Coercion a) where
+  maybeCoercion c Coercion = Just $ coerce (sym c)
