@@ -3,5 +3,5 @@ T4846.hs:29:1:
     Can't make a derived instance of ‛B BOOL’
       (even with cunning newtype deriving):
       it is not type-safe to use GeneralizedNewtypeDeriving on this class;
-      the last parameter of ‛B’ is at role Nominal
+      ‛mkExpr’, at type ‛Expr a’, cannot be converted safely
     In the stand-alone deriving instance for ‛B BOOL’

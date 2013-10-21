@@ -2,7 +2,6 @@ test('Roles5', normal, compile_fail, [''])
 test('Roles6', normal, compile_fail, [''])
 test('Roles7', normal, compile_fail, [''])
 test('Roles8', normal, compile_fail, [''])
-test('Roles9', normal, compile_fail, [''])
 test('Roles10', normal, compile_fail, [''])
 test('Roles11', normal, compile_fail, [''])
 test('Roles12',

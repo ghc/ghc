@@ -3,5 +3,6 @@ T1496.hs:10:32:
     Can't make a derived instance of ‛IsInt Moo’
       (even with cunning newtype deriving):
       it is not type-safe to use GeneralizedNewtypeDeriving on this class;
-      the last parameter of ‛IsInt’ is at role Nominal
+      ‛isInt’, at type ‛forall (c :: * -> *).
+                        c Int -> c t’, cannot be converted safely
     In the newtype declaration for ‛Moo’
