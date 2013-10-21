@@ -1,10 +1,15 @@
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE TypeOperators      #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE PolyKinds          #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
+{-# LANGUAGE PolyKinds            #-}
+{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ExplicitNamespaces   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,7 +28,19 @@
 
 
 
-module Data.Type.Equality where
+module Data.Type.Equality (
+  -- * The equality type
+  (:~:)(..),
+  
+  -- * Working with equality
+  sym, trans, castWith, gcastWith, apply, inner, outer,
+
+  -- * Inferring equality from other types
+  EqualityType(..),
+
+  -- * Boolean type-level equality
+  type (==)
+  ) where
 
 import Data.Maybe
 import GHC.Enum
@@ -55,8 +72,12 @@ trans :: (a :~: b) -> (b :~: c) -> (a :~: c)
 trans Refl Refl = Refl
 
 -- | Type-safe cast, using propositional equality
-subst :: (a :~: b) -> a -> b
-subst Refl x = x
+castWith :: (a :~: b) -> a -> b
+castWith Refl x = x
+
+-- | Generalized form of type-safe cast using propositional equality
+gcastWith :: (a :~: b) -> ((a ~ b) => r) -> r
+gcastWith Refl x = x
 
 -- | Lift equality into a unary type constructor
 liftEq :: (a :~: b) -> (f a :~: f b)
@@ -99,10 +120,125 @@ instance a ~ b => Bounded (a :~: b) where
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
-class EqualityT f where
+class EqualityType f where
   -- | Conditionally prove the equality of @a@ and @b@.
-  equalsT :: f a -> f b -> Maybe (a :~: b)
+  maybeEquality :: f a -> f b -> Maybe (a :~: b)
 
-instance EqualityT ((:~:) a) where
-  equalsT Refl Refl = Just Refl
+instance EqualityType ((:~:) a) where
+  maybeEquality Refl Refl = Just Refl
 
+-- | A type family to compute Boolean equality. Instances are provided
+-- only for /open/ kinds, such as @*@ and function kinds. Instances are
+-- also provided for datatypes exported from base. A poly-kinded instance
+-- is /not/ provided, as a recursive definition for algebraic kinds is
+-- generally more useful.
+type family (a :: k) == (b :: k) :: Bool
+infix 4 ==
+
+-- all of the following closed type families are local to this module
+type family EqStar (a :: *) (b :: *) where
+  EqStar a a = True
+  EqStar a b = False
+
+-- This looks dangerous, but it isn't. This allows == to be defined
+-- over arbitrary type constructors.
+type family EqArrow (a :: k1 -> k2) (b :: k1 -> k2) where
+  EqArrow a a = True
+  EqArrow a b = False
+
+type family EqBool a b where
+  EqBool True  True  = True
+  EqBool False False = True
+  EqBool a     b     = False
+
+type family EqOrdering a b where
+  EqOrdering LT LT = True
+  EqOrdering EQ EQ = True
+  EqOrdering GT GT = True
+  EqOrdering a  b  = False
+
+type EqUnit (a :: ()) (b :: ()) = True
+
+-- more complicated types need a type-level And:
+type family a && b where
+  False && x = False
+  True  && x = x
+  x && False = False
+  x && True  = x
+  x && x     = x
+infixr 3 &&
+
+type family EqList a b where
+  EqList '[]        '[]        = True
+  EqList (h1 ': t1) (h2 ': t2) = (h1 == h2) && (t1 == t2)
+  EqList a          b          = False
+
+type family EqMaybe a b where
+  EqMaybe Nothing  Nothing  = True
+  EqMaybe (Just x) (Just y) = x == y
+  EqMaybe a        b        = False
+
+type family Eq2 a b where
+  Eq2 '(a1, b1) '(a2, b2) = a1 == a2 && b1 == b2
+
+type family Eq3 a b where
+  Eq3 '(a1, b1, c1) '(a2, b2, c2) = a1 == a2 && b1 == b2 && c1 == c2
+
+type family Eq4 a b where
+  Eq4 '(a1, b1, c1, d1) '(a2, b2, c2, d2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2
+
+type family Eq5 a b where
+  Eq5 '(a1, b1, c1, d1, e1) '(a2, b2, c2, d2, e2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2
+
+type family Eq6 a b where
+  Eq6 '(a1, b1, c1, d1, e1, f1) '(a2, b2, c2, d2, e2, f2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2
+
+type family Eq7 a b where
+  Eq7 '(a1, b1, c1, d1, e1, f1, g1) '(a2, b2, c2, d2, e2, f2, g2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2
+
+type family Eq8 a b where
+  Eq8 '(a1, b1, c1, d1, e1, f1, g1, h1) '(a2, b2, c2, d2, e2, f2, g2, h2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2
+
+type family Eq9 a b where
+  Eq9 '(a1, b1, c1, d1, e1, f1, g1, h1, i1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2
+
+type family Eq10 a b where
+  Eq10 '(a1, b1, c1, d1, e1, f1, g1, h1, i1, j1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2, j2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2 && j1 == j2
+
+type family Eq11 a b where
+  Eq11 '(a1, b1, c1, d1, e1, f1, g1, h1, i1, j1, k1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2, j2, k2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2 && j1 == j2 && k1 == k2
+
+type family Eq12 a b where
+  Eq12 '(a1, b1, c1, d1, e1, f1, g1, h1, i1, j1, k1, l1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2, j2, k2, l2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2 && j1 == j2 && k1 == k2 && l1 == l2
+
+type family Eq13 a b where
+  Eq13 '(a1, b1, c1, d1, e1, f1, g1, h1, i1, j1, k1, l1, m1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2, j2, k2, l2, m2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2 && j1 == j2 && k1 == k2 && l1 == l2 && m1 == m2
+
+type family Eq14 a b where
+  Eq14 '(a1, b1, c1, d1, e1, f1, g1, h1, i1, j1, k1, l1, m1, n1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2, j2, k2, l2, m2, n2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2 && j1 == j2 && k1 == k2 && l1 == l2 && m1 == m2 && n1 == n2
+
+type family Eq15 a b where
+  Eq15 '(a1, b1, c1, d1, e1, f1, g1, h1, i1, j1, k1, l1, m1, n1, o1) '(a2, b2, c2, d2, e2, f2, g2, h2, i2, j2, k2, l2, m2, n2, o2) = a1 == a2 && b1 == b2 && c1 == c2 && d1 == d2 && e1 == e2 && f1 == f2 && g1 == g2 && h1 == h2 && i1 == i2 && j1 == j2 && k1 == k2 && l1 == l2 && m1 == m2 && n1 == n2 && o1 == o2
+
+-- these all look to be overlapping, but they are differentiated by their kinds
+type instance a == b = EqStar a b
+type instance a == b = EqArrow a b
+type instance a == b = EqBool a b
+type instance a == b = EqOrdering a b
+type instance a == b = EqUnit a b
+type instance a == b = EqList a b
+type instance a == b = EqMaybe a b
+type instance a == b = Eq2 a b
+type instance a == b = Eq3 a b
+type instance a == b = Eq4 a b
+type instance a == b = Eq5 a b
+type instance a == b = Eq6 a b
+type instance a == b = Eq7 a b
+type instance a == b = Eq8 a b
+type instance a == b = Eq9 a b
+type instance a == b = Eq10 a b
+type instance a == b = Eq11 a b
+type instance a == b = Eq12 a b
+type instance a == b = Eq13 a b
+type instance a == b = Eq14 a b
+type instance a == b = Eq15 a b

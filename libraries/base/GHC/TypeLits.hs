@@ -8,6 +8,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -31,7 +32,7 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Bool(True), otherwise)
+import GHC.Base(Eq(..), Ord(..), Bool(True,False), otherwise)
 import GHC.Num(Integer)
 import GHC.Base(String)
 import GHC.Show(Show(..))
@@ -39,6 +40,7 @@ import GHC.Read(Read(..))
 import GHC.Prim(magicDict)
 import Data.Maybe(Maybe(..))
 import Data.Proxy(Proxy(..))
+import Data.Type.Equality(type (==))
 
 -- | (Kind) This is the kind of type-level natural numbers.
 data Nat
@@ -115,6 +117,15 @@ instance Show SomeSymbol where
 instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
 
+type family EqNat (a :: Nat) (b :: Nat) where
+  EqNat a a = True
+  EqNat a b = False
+type instance a == b = EqNat a b
+
+type family EqSymbol (a :: Symbol) (b :: Symbol) where
+  EqSymbol a a = True
+  EqSymbol a b = False
+type instance a == b = EqSymbol a b
 
 --------------------------------------------------------------------------------
 

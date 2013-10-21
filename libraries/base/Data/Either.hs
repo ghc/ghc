@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE DataKinds, TypeFamilies, TypeOperators, UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,6 +32,7 @@ import GHC.Show
 import GHC.Read
 
 import Data.Typeable
+import Data.Type.Equality
 
 {-
 -- just for testing
@@ -102,6 +104,13 @@ isLeft (Right _) = False
 isRight :: Either a b -> Bool
 isRight (Left  _) = False
 isRight (Right _) = True
+
+-- instance for the == Boolean type-level equality operator
+type family EqEither a b where
+  EqEither (Left x)  (Left y)  = x == y
+  EqEither (Right x) (Right y) = x == y
+  EqEither a         b         = False
+type instance a == b = EqEither a b
 
 {-
 {--------------------------------------------------------------------
