@@ -7,24 +7,24 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   Q :: * -> * -> * -> *
   data Q s a chain
-      No C type associated
-      Roles: [representational, representational, representational]
-      RecFlag NonRecursive, Promotable
-      = Node :: forall s a chain. s -> a -> chain -> Q s a chain
-            Stricts: _ _ _
-      FamilyInstance: none
+    No C type associated
+    Roles: [representational, representational, representational]
+    RecFlag NonRecursive, Promotable
+    = Node :: forall s a chain. s -> a -> chain -> Q s a chain
+        Stricts: _ _ _
+    FamilyInstance: none
   Z :: * -> *
   data Z a
-      No C type associated
-      Roles: [representational]
-      RecFlag NonRecursive, Promotable
-      = Z :: forall a. a -> Z a Stricts: _
-      FamilyInstance: none
+    No C type associated
+    Roles: [representational]
+    RecFlag NonRecursive, Promotable
+    = Z :: forall a. a -> Z a Stricts: _
+    FamilyInstance: none
   Zork :: * -> * -> * -> Constraint
   class Zork s a b | a -> b
-      Roles: [nominal, representational, phantom]
-      RecFlag NonRecursive
-      huh :: forall chain. Q s a chain -> ST s ()
+    Roles: [nominal, nominal, nominal]
+    RecFlag NonRecursive
+    huh :: forall chain. Q s a chain -> ST s ()
 COERCION AXIOMS
   axiom ShouldCompile.NTCo:Zork ::
       Zork s a b = forall chain. Q s a chain -> ST s ()

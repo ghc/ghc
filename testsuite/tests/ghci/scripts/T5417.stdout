@@ -3,7 +3,6 @@ type role T5417.R:FB1 nominal
 data instance C.F (B1 a) = B2 a
 type role D nominal
 data family D a
-type role C.C1 nominal
 class C.C1 a where
   type role C.F nominal
   data family C.F a

@@ -1,31 +1,21 @@
-type role Foo nominal
 class Foo (a :: k) where
-  type role Bar nominal nominal
   type family Bar (a :: k) b :: *
   	-- Defined at T7939.hs:6:4
 Bar :: k -> * -> *
-type role F nominal
-type family F a :: *
-  	-- Defined at T7939.hs:8:1
+type family F a :: * 	-- Defined at T7939.hs:8:1
 type instance F Int -- Defined at T7939.hs:9:1
 F :: * -> *
-type role G nominal
-type family G a :: * where
-    G Int = Bool
+type family G a :: * where G Int = Bool
   	-- Defined at T7939.hs:11:1
 G :: * -> *
-type role H nominal
-type family H (a :: Bool) :: Bool where
-    H 'False = 'True
+type family H (a :: Bool) :: Bool where H 'False = 'True
   	-- Defined at T7939.hs:14:1
 H :: Bool -> Bool
-type role J nominal
 type family J (a :: [k]) :: Bool where
     J '[] = 'False
     J (h : t) = 'True
   	-- Defined at T7939.hs:17:1
 J :: [k] -> Bool
-type role K nominal
 type family K (a :: [k]) :: Maybe k where
     K '[] = 'Nothing
     K (h : t) = 'Just h

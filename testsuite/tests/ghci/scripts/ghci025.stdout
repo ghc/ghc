@@ -2,9 +2,7 @@
 :browse! *T
 -- defined locally
 T.length :: T.Integer
-type role N phantom
 class N a
-type role S phantom
 class S a
 class C a b where
   c1 :: N b => a -> b
@@ -62,9 +60,7 @@ T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally
 T.length :: T.Integer
-type role N phantom
 class N a
-type role S phantom
 class S a
 class C a b where
   c1 :: N b => a -> b
@@ -78,9 +74,7 @@ c4 :: C a b => forall a1. a1 -> b
 :browse! T -- with -fprint-explicit-foralls
 -- defined locally
 T.length :: T.Integer
-type role N phantom
 class N a
-type role S phantom
 class S a
 class C a b where
   c1 :: N b => a -> b

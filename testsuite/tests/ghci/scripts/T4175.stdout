@@ -1,20 +1,15 @@
-type role A nominal nominal
-type family A a b :: *
-  	-- Defined at T4175.hs:4:1
+type family A a b :: * 	-- Defined at T4175.hs:4:1
 type instance A (Maybe a) a -- Defined at T4175.hs:6:1
 type instance A Int Int -- Defined at T4175.hs:5:1
 type role B nominal
 data family B a
   	-- Defined at T4175.hs:8:1
 data instance B () -- Defined at T4175.hs:9:15
-type role C nominal
 class C a where
-  type role D nominal nominal
   type family D a b :: *
   	-- Defined at T4175.hs:12:5
 type D () () -- Defined at T4175.hs:18:5
 type D Int () -- Defined at T4175.hs:15:5
-type role E nominal
 type family E a :: * where
     E () = Bool
     E Int = String

@@ -2,7 +2,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   C1 :: * -> Constraint
   class C1 a
-    Roles: [representational]
+    Roles: [nominal]
     RecFlag NonRecursive
     meth1 :: a -> a
   C2 :: * -> * -> Constraint
@@ -12,13 +12,13 @@ TYPE CONSTRUCTORS
     meth2 :: (~) * a b -> a -> b
   C3 :: * -> * -> Constraint
   class C3 a b
-    Roles: [representational, nominal]
+    Roles: [nominal, nominal]
     RecFlag NonRecursive
     type family F3 b :: * (open)
     meth3 :: a -> F3 b -> F3 b
   C4 :: * -> * -> Constraint
   class C4 a b
-    Roles: [representational, nominal]
+    Roles: [nominal, nominal]
     RecFlag NonRecursive
     meth4 :: a -> F4 b -> F4 b
   F4 :: * -> *
