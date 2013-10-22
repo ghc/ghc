@@ -36,7 +36,7 @@ module Data.Type.Equality (
   sym, trans, castWith, gcastWith, apply, inner, outer,
 
   -- * Inferring equality from other types
-  EqualityType(..),
+  TestEquality(..),
 
   -- * Boolean type-level equality
   type (==)
@@ -79,26 +79,17 @@ castWith Refl x = x
 gcastWith :: (a :~: b) -> ((a ~ b) => r) -> r
 gcastWith Refl x = x
 
--- | Lift equality into a unary type constructor
-liftEq :: (a :~: b) -> (f a :~: f b)
-liftEq Refl = Refl
+-- | Apply one equality to another, respectively
+apply :: (f :~: g) -> (a :~: b) -> (f a :~: g b)
+apply Refl Refl = Refl
 
--- | Lift equality into a binary type constructor
-liftEq2 :: (a :~: a') -> (b :~: b') -> (f a b :~: f a' b')
-liftEq2 Refl Refl = Refl
+-- | Extract equality of the arguments from an equality of a applied types
+inner :: (f a :~: g b) -> (a :~: b)
+inner Refl = Refl
 
--- | Lift equality into a ternary type constructor
-liftEq3 :: (a :~: a') -> (b :~: b') -> (c :~: c') -> (f a b c :~: f a' b' c')
-liftEq3 Refl Refl Refl = Refl
-
--- | Lift equality into a quaternary type constructor
-liftEq4 :: (a :~: a') -> (b :~: b') -> (c :~: c') -> (d :~: d')
-        -> (f a b c d :~: f a' b' c' d')
-liftEq4 Refl Refl Refl Refl = Refl
-
--- | Lower equality from a parameterized type into the parameters
-lower :: (f a :~: f b) -> a :~: b
-lower Refl = Refl
+-- | Extract equality of type constructors from an equality of applied types
+outer :: (f a :~: g b) -> (f :~: g)
+outer Refl = Refl
 
 deriving instance Eq   (a :~: b)
 deriving instance Show (a :~: b)
@@ -120,12 +111,12 @@ instance a ~ b => Bounded (a :~: b) where
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
-class EqualityType f where
+class TestEquality f where
   -- | Conditionally prove the equality of @a@ and @b@.
-  maybeEquality :: f a -> f b -> Maybe (a :~: b)
+  testEquality :: f a -> f b -> Maybe (a :~: b)
 
-instance EqualityType ((:~:) a) where
-  maybeEquality Refl Refl = Just Refl
+instance TestEquality ((:~:) a) where
+  testEquality Refl Refl = Just Refl
 
 -- | A type family to compute Boolean equality. Instances are provided
 -- only for /open/ kinds, such as @*@ and function kinds. Instances are
