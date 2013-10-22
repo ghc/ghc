@@ -191,12 +191,14 @@ findExposedPackageModule hsc_env mod_name mb_pkg
         -- not found in any package:
   = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name of
        Left suggest -> return (NotFound { fr_paths = [], fr_pkg = Nothing
-                                        , fr_pkgs_hidden = [], fr_mods_hidden = []
+                                        , fr_pkgs_hidden = []
+                                        , fr_mods_hidden = []
                                         , fr_suggestions = suggest })
        Right found
          | null found_exposed   -- Found, but with no exposed copies
           -> return (NotFound { fr_paths = [], fr_pkg = Nothing
-                              , fr_pkgs_hidden = pkg_hiddens, fr_mods_hidden = mod_hiddens
+                              , fr_pkgs_hidden = pkg_hiddens
+                              , fr_mods_hidden = mod_hiddens
                               , fr_suggestions = [] })
 
          | [(pkg_conf,_)] <- found_exposed     -- Found uniquely
