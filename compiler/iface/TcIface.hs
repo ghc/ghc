@@ -1009,8 +1009,14 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
 
 tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr
-    tickish' <- tcIfaceTickish tickish
-    return (Tick tickish' expr')
+    -- If debug flag is not set: Ignore source notes
+    dbgFlag <- fmap (gopt Opt_Debug) getDynFlags
+    case tickish of
+      IfaceSource{} | not dbgFlag
+                    -> return expr'
+      _otherwise    -> do
+        tickish' <- tcIfaceTickish tickish
+        return (Tick tickish' expr')
 
 -------------------------
 tcIfaceApps :: IfaceExpr -> IfaceExpr -> IfL CoreExpr
