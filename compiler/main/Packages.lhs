@@ -959,8 +959,9 @@ lookupModuleWithSuggestions dflags m
   where
     pkg_state = pkgState dflags
     suggestions
-      | gopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
-      | otherwise                     = []
+      | gopt Opt_HelpfulErrors dflags =
+           fuzzyLookup (moduleNameString m) all_mods
+      | otherwise = []
 
     all_mods :: [(String, Module)]     -- All modules
     all_mods = [ (moduleNameString mod_nm, mkModule pkg_id mod_nm)
