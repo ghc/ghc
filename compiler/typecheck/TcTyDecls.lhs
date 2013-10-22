@@ -557,27 +557,27 @@ emptyRoleAnnots = emptyNameEnv
 
 Note [Role inference]
 ~~~~~~~~~~~~~~~~~~~~~
-The role inference algorithm uses class, datatype, and synonym definitions
-to infer the roles on the parameters. Although these roles are stored in the
-tycons, we can perform this algorithm on the built tycons, as long as we
-don't peek at an as-yet-unknown roles field! Ah, the magic of laziness.
+The role inference algorithm datatype definitions to infer the roles on the
+parameters. Although these roles are stored in the tycons, we can perform this
+algorithm on the built tycons, as long as we don't peek at an as-yet-unknown
+roles field! Ah, the magic of laziness.
 
-First, we choose appropriate initial roles. For families, roles (including
-initial roles) are N. For all other types, we start with the role in the
+First, we choose appropriate initial roles. For families and classes, roles
+(including initial roles) are N. For datatypes, we start with the role in the
 role annotation (if any), or otherwise use Phantom. This is done in
 initialRoleEnv1.
 
 The function irGroup then propagates role information until it reaches a
-fixpoint, preferring N over R, P and R over P. To aid in this, we have a monad
-RoleM, which is a combination reader and state monad. In its state are the
-current RoleEnv, which gets updated by role propagation, and an update bit,
-which we use to know whether or not we've reached the fixpoint. The
+fixpoint, preferring N over (R or P) and R over P. To aid in this, we have a
+monad RoleM, which is a combination reader and state monad. In its state are
+the current RoleEnv, which gets updated by role propagation, and an update
+bit, which we use to know whether or not we've reached the fixpoint. The
 environment of RoleM contains the tycon whose parameters we are inferring, and
 a VarEnv from parameters to their positions, so we can update the RoleEnv.
 Between tycons, this reader information is missing; it is added by
 addRoleInferenceInfo.
 
-There are two kinds of tycons to consider: algebraic ones (including classes)
+There are two kinds of tycons to consider: algebraic ones (excluding classes)
 and type synonyms. (Remember, families don't participate -- all their parameters
 are N.) An algebraic tycon processes each of its datacons, in turn. Note that
 a datacon's universally quantified parameters might be different from the parent
@@ -687,7 +687,10 @@ initialRoleEnv1 is_boot annots_env tc
         default_roles = map (const Nominal) kvs ++
                         zipWith orElse role_annots (repeat default_role)
 
-        default_role = if is_boot then Representational else Phantom
+        default_role
+          | isClassTyCon tc = Nominal
+          | is_boot         = Representational
+          | otherwise       = Phantom
 
 irGroup :: RoleEnv -> [TyCon] -> RoleEnv
 irGroup env tcs
