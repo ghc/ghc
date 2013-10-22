@@ -1,4 +1,4 @@
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples, RoleAnnotations #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -156,6 +156,7 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
+type role TExp nominal   -- See Note [Role of TExp]
 newtype TExp a = TExp { unType :: Exp }
 
 unTypeQ :: Q (TExp a) -> Q Exp
@@ -165,6 +166,19 @@ unTypeQ m = do { TExp e <- m
 unsafeTExpCoerce :: Q Exp -> Q (TExp a)
 unsafeTExpCoerce m = do { e <- m
                         ; return (TExp e) }
+
+{- Note [Role of TExp]
+~~~~~~~~~~~~~~~~~~~~~~
+TExp's argument must have a nominal role, not phantom as would
+be inferred (Trac #8459).  Consider
+
+  e :: TExp Age
+  e = MkAge 3
+
+  foo = $(coerce e) + 4::Int
+
+The splice will evaluate to (MkAge 3) and you can't add that to
+4::Int. So you can't coerce a (TExp Age) to a (TExp Int). -}
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
