@@ -19,7 +19,7 @@ module DsMonad (
         mkPrintUnqualifiedDs,
         newUnique, 
         UniqSupply, newUniqueSupply,
-        getGhcModeDs,
+        getGhcModeDs, dsGetFamInstEnvs,
         dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
         
         PArrBuiltin(..), 
@@ -38,6 +38,7 @@ module DsMonad (
     ) where
 
 import TcRnMonad
+import FamInstEnv
 import CoreSyn
 import HsSyn
 import TcIface
@@ -154,7 +155,8 @@ data PArrBuiltin
 
 data DsGblEnv 
         = DsGblEnv
-        { ds_mod     :: Module                  -- For SCC profiling
+        { ds_mod          :: Module             -- For SCC profiling
+        , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
         , ds_unqual  :: PrintUnqualified
         , ds_msgs    :: IORef Messages          -- Warning messages
         , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global, 
@@ -187,15 +189,15 @@ data DsMetaVal
                         -- the PendingSplices on a HsBracketOut
 
 initDs :: HscEnv
-       -> Module -> GlobalRdrEnv -> TypeEnv
+       -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
        -> DsM a
        -> IO (Messages, Maybe a)
 -- Print errors and warnings, if any arise
 
-initDs hsc_env mod rdr_env type_env thing_inside
+initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
   = do  { msg_var <- newIORef (emptyBag, emptyBag)
         ; let dflags                   = hsc_dflags hsc_env
-              (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env msg_var
+              (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var
 
         ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
                           loadDAP $
@@ -272,15 +274,17 @@ initDsTc thing_inside
         ; dflags   <- getDynFlags
         ; let type_env = tcg_type_env tcg_env
               rdr_env  = tcg_rdr_env tcg_env
-              ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env msg_var
+              fam_inst_env = tcg_fam_inst_env tcg_env
+              ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env msg_var
         ; setEnvs ds_envs thing_inside
         }
 
-mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env msg_var
+mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv -> IORef Messages -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var
   = let if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (ptext (sLit "GHC error in desugarer lookup in") <+> ppr mod)
         gbl_env = DsGblEnv { ds_mod     = mod
+                           , ds_fam_inst_env = fam_inst_env
                            , ds_if_env  = (if_genv, if_lenv)
                            , ds_unqual  = mkPrintUnqualified dflags rdr_env
                            , ds_msgs    = msg_var
@@ -470,11 +474,18 @@ dsInitPArrBuiltin thing_inside
   where
     externalVar :: FastString -> DsM Var
     externalVar fs = dsLookupDPHRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
-    
+
     arithErr = panic "Arithmetic sequences have to wait until we support type classes"
 \end{code}
 
 \begin{code}
+dsGetFamInstEnvs :: DsM FamInstEnvs
+-- Gets both the external-package inst-env
+-- and the home-pkg inst env (includes module being compiled)
+dsGetFamInstEnvs
+  = do { eps <- getEps; env <- getGblEnv
+       ; return (eps_fam_inst_env eps, ds_fam_inst_env env) }
+
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (ds_meta env) }
 
