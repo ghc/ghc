@@ -526,8 +526,6 @@ tc_rn_src_decls boot_details ds
       ; setEnvs (tcg_env, tcl_env) $
         case group_tail of
           { Nothing -> do { tcg_env <- checkMain       -- Check for `main'
-                          ; traceTc "returning from tc_rn_src_decls: " $
-                            ppr $ nameEnvElts $ tcg_type_env tcg_env -- RAE
 #ifdef GHCI
                             -- Run all module finalizers
                           ; th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv

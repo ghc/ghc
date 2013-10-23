@@ -1113,10 +1113,7 @@ ltRole Nominal          _       = True
 -- Is the given tyvar used in a nominal position anywhere?
 -- This is used in the GeneralizedNewtypeDeriving check.
 tvUsedAtNominalRole :: TyVar -> Type -> Bool
-tvUsedAtNominalRole tv typ = let result = go Representational typ in
-  pprTrace "RAE1" (vcat [ppr tv, ppr typ]) $
-  pprTrace "RAE2" (ppr result) $
-  result
+tvUsedAtNominalRole tv = go Representational
   where go r (TyVarTy tv')
           | tv == tv' = (r == Nominal)
           | otherwise = False

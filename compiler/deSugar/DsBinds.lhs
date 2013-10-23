@@ -74,8 +74,6 @@ import Util
 import Control.Monad( when )
 import MonadUtils
 import Control.Monad(liftM)
-
-import TcRnMonad (traceIf) -- RAE
 \end{code}
 
 %************************************************************************
@@ -840,18 +838,15 @@ dsTcCoercion :: Role -> TcCoercion -> (Coercion -> CoreExpr) -> DsM CoreExpr
 --         k (trans g1# g2#)
 -- thing_inside will get a coercion at the role requested
 dsTcCoercion role co thing_inside
-  = do { traceIf $ hang (text "dsTcCoercion {") 2 $ vcat [ppr role, ppr co] -- RAE
-       ; us <- newUniqueSupply
+  = do { us <- newUniqueSupply
        ; let eqvs_covs :: [(EqVar,CoVar)]
              eqvs_covs = zipWith mk_co_var (varSetElems (coVarsOfTcCo co))
                                            (uniqsFromSupply us)
 
              subst = mkCvSubst emptyInScopeSet [(eqv, mkCoVarCo cov) | (eqv, cov) <- eqvs_covs]
-             ds_co = ds_tc_coercion subst role co -- RAE
-             result_expr = thing_inside ds_co
+             result_expr = thing_inside (ds_tc_coercion subst role co) 
              result_ty   = exprType result_expr
 
-       ; traceIf $ hang (text "dsTcCoercion }") 2 (ppr ds_co) -- RAE
        ; return (foldr (wrap_in_case result_ty) result_expr eqvs_covs) }
   where
     mk_co_var :: Id -> Unique -> (Id, Id)
