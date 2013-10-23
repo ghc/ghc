@@ -102,3 +102,4 @@ test('T5252Take2',
      ['$MAKE -s --no-print-directory T5252Take2'])
 test('T2431', normal, compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T7669', normal, compile, [''])
+test('T8470', normal, compile, [''])
