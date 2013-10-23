@@ -5,4 +5,4 @@ test    ('dph-ExportList-vseg-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile
         , [ 'ExportList'
-          , '-O -fno-enable-rewrite-rules -package dph-lifted-vseg'])
+          , '-O0 -package dph-lifted-vseg'])

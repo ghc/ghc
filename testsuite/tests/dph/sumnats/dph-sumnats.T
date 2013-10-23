@@ -6,7 +6,7 @@ test    ('dph-sumnats-copy'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -package dph-lifted-copy'])
+          , '-O0 -package dph-lifted-copy'])
 
 test    ('dph-sumnats-vseg' 
         , [ outputdir('vseg')
@@ -15,5 +15,5 @@ test    ('dph-sumnats-vseg'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -package dph-lifted-vseg'])
+          , '-O0 -package dph-lifted-vseg'])
 

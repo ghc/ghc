@@ -26,7 +26,7 @@ test    ('dph-dotp-copy-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -package dph-lifted-copy -package dph-prim-par'])
+          , '-O0 -package dph-lifted-copy -package dph-prim-par'])
 
 test    ('dph-dotp-vseg-fast' 
         , [ outputdir('vseg-fast')
@@ -35,5 +35,5 @@ test    ('dph-dotp-vseg-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -package dph-lifted-vseg -package dph-prim-par'])
+          , '-O0 -package dph-lifted-vseg -package dph-prim-par'])
 

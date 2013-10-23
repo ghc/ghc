@@ -6,4 +6,4 @@ test    ('EnumFromToP'
           , expect_broken(7736)
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , compile_fail
-        , [ '-O -fno-enable-rewrite-rules -package dph-lifted-vseg'])
+        , [ '-O0 -package dph-lifted-vseg'])
