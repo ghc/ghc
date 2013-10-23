@@ -329,15 +329,19 @@ familyInstances (pkg_fie, home_fie) fam
                 Nothing                      -> []
 
 -- | Collects the names of the concrete types and type constructors that
--- make up the LHS of a type family instance. For instance,
--- given `type family Foo a b`:
+-- make up the LHS of a type family instance, including the family
+-- name itself. 
 --
--- `type instance Foo (F (G (H a))) b = ...` would yield [F,G,H]
+-- For instance, given `type family Foo a b`:
+-- `type instance Foo (F (G (H a))) b = ...` would yield [Foo,F,G,H]
 --
 -- Used in the implementation of ":info" in GHCi.
 orphNamesOfFamInst :: FamInst -> NameSet
-orphNamesOfFamInst
-    = orphNamesOfTypes . concat . brListMap cab_lhs . coAxiomBranches . fi_axiom
+orphNamesOfFamInst fam_inst
+  = orphNamesOfTypes (concat (brListMap cab_lhs (coAxiomBranches axiom)))
+    `addOneToNameSet` getName (coAxiomTyCon axiom)
+  where
+    axiom = fi_axiom fam_inst
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
@@ -376,7 +380,6 @@ identicalFamInst (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
             lhs1 = coAxBranchLHS br1
             lhs2 = coAxBranchLHS br2
             rn_env = rnBndrs2 (mkRnEnv2 emptyInScopeSet) tvs1 tvs2
-
 \end{code}
 
 %************************************************************************
