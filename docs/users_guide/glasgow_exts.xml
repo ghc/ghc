@@ -3747,7 +3747,10 @@ where
 		via this new mechanism.
 </para></listitem>
 <listitem><para>
-  The role of the last parameter of each of the <literal>ci</literal> is <emphasis>not</emphasis> <literal>nominal</literal>. (See <xref linkend="roles"/>.)</para></listitem>
+  It is safe to coerce each of the methods of <literal>ci</literal>. That is,
+  the missing last argument to each of the <literal>ci</literal> is not used
+  at a nominal role in any of the <literal>ci</literal>'s methods.
+  (See <xref linkend="roles"/>.)</para></listitem>
 </itemizedlist>
 Then, for each <literal>ci</literal>, the derived instance
 declaration is:
@@ -11148,16 +11151,24 @@ inference to determine the correct role for every parameter. It starts with a
 few base facts: <literal>(->)</literal> has two representational parameters;
 <literal>(~)</literal> has two nominal parameters; all type families'
 parameters are nominal; and all GADT-like parameters are nominal. Then, these
-facts are propagated to all places where these types are used. By defaulting
-parameters to role phnatom, any parameters unused in the right-hand side (or
-used only in other types in phantom positions) will be phantom. Whenever a
-parameter is used in a representational position (that is, used as a type
-argument to a constructor whose corresponding variable is at role
-representational), we raise its role from phantom to representational.
+facts are propagated to all places where these types are used. The default
+role for datatypes and synonyms is phantom; the default role for classes is
+nominal. Thus, for datatypes and synonyms, any parameters unused in the
+right-hand side (or used only in other types in phantom positions) will be
+phantom. Whenever a parameter is used in a representational position (that is,
+used as a type argument to a constructor whose corresponding variable is at
+role representational), we raise its role from phantom to representational.
 Similarly, when a parameter is used in a nominal position, its role is
 upgraded to nominal. We never downgrade a role from nominal to phantom or
 representational, or from representational to phantom. In this way, we infer
 the most-general role for each parameter.
+</para>
+
+<para>
+Classes have their roles default to nominal to promote coherence of class
+instances. If a <literal>C Int</literal> were stored in a datatype, it would
+be quite bad if that were somehow changed into a <literal>C Age</literal>
+somewhere, especially if another <literal>C Age</literal> had been declared!
 </para>
 
 <para>There is one particularly tricky case that should be explained:</para>
@@ -11234,6 +11245,9 @@ to be at role nominal. This would be done with a declaration</para>
   type role Set nominal
 </programlisting>
 
+<para>Role annotations can also be used should a programmer wish to write
+a class with a representational (or phantom) role.</para>
+
 <para>The other place where role annotations may be necessary are in
 <literal>hs-boot</literal> files (<xref linkend="mutual-recursion"/>), where
 the right-hand sides of definitions can be omitted. As usual, the
@@ -11266,10 +11280,10 @@ Here are some examples:</para>
   data T3 a b = MkT3 a     -- OK: nominal is higher than necessary, but safe
 
   type role T4 nominal
-  data T4 a = MkT4 (a Int) -- OK, but N is higher than necessary
+  data T4 a = MkT4 (a Int) -- OK, but nominal is higher than necessary
 
   type role C representational _
-  class C a b where ...    -- OK
+  class C a b where ...    -- OK, b will get a nominal role
 
   type role X nominal
   type X a = ...           -- ERROR: role annotations not allowed for type synonyms

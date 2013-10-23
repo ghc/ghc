@@ -28,7 +28,8 @@ module FamInstEnv (
         isDominatedBy,
         
         -- Normalisation
-        chooseBranch, topNormaliseType, normaliseType, normaliseTcApp,
+        chooseBranch, topNormaliseType, topNormaliseType_maybe,
+        normaliseType, normaliseTcApp,
 
         -- Flattening
         flattenTys
@@ -835,9 +836,14 @@ findBranch [] _ _ = Nothing
 %************************************************************************
 
 \begin{code}
-topNormaliseType :: FamInstEnvs
-                 -> Type
-                 -> Maybe (Coercion, Type)
+topNormaliseType :: FamInstEnvs -> Type -> Type
+topNormaliseType env ty = case topNormaliseType_maybe env ty of
+                            Just (_co, ty') -> ty'
+                            Nothing         -> ty
+
+topNormaliseType_maybe :: FamInstEnvs
+                       -> Type
+                       -> Maybe (Coercion, Type)
 
 -- Get rid of *outermost* (or toplevel) 
 --      * type functions 
@@ -851,7 +857,7 @@ topNormaliseType :: FamInstEnvs
 -- Its a bit like Type.repType, but handles type families too
 -- The coercion returned is always an R coercion
 
-topNormaliseType env ty
+topNormaliseType_maybe env ty
   = go initRecTc ty
   where
     go :: RecTcChecker -> Type -> Maybe (Coercion, Type)

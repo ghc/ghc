@@ -605,7 +605,7 @@ dataConArgRep dflags fam_envs arg_ty
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily, 
           -- we use -fomit-iface-pragmas as the indication
-  , let mb_co   = topNormaliseType fam_envs arg_ty
+  , let mb_co   = topNormaliseType_maybe fam_envs arg_ty
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> ty; Nothing -> arg_ty }
   , isUnpackableType fam_envs arg_ty'
@@ -712,9 +712,7 @@ isUnpackableType fam_envs ty
   where
     ok_arg tcs (ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
         where
-          norm_ty = case topNormaliseType fam_envs ty of
-                      Just (_, ty) -> ty
-                      Nothing      -> ty
+          norm_ty = topNormaliseType fam_envs ty
     ok_ty tcs ty
       | Just (tc, _) <- splitTyConApp_maybe ty
       , let tc_name = getName tc

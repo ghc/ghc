@@ -197,18 +197,22 @@ pprTyCon ss tyCon
 
                                                  -- e.g. type T = forall a. a->a
   | Just cls <- tyConClass_maybe tyCon
-  = pp_roles $$ pprClass ss cls
+  = (pp_roles (== Nominal)) $$ pprClass ss cls
 
   | otherwise
-  = pp_roles $$ pprAlgTyCon ss tyCon
+  = (pp_roles (== Representational)) $$ pprAlgTyCon ss tyCon
 
   where
-    pp_roles = sdocWithDynFlags $ \dflags ->
-               let roles = suppressKinds dflags (tyConKind tyCon) (tyConRoles tyCon)
-               in ppUnless (all (== Representational) roles) $
-                  ptext (sLit "type role") <+> ppr tyCon <+> hsep (map ppr roles)
+      -- if, for each role, suppress_if role is True, then suppress the role
+      -- output
+    pp_roles :: (Role -> Bool) -> SDoc
+    pp_roles suppress_if
+      = sdocWithDynFlags $ \dflags ->
+        let roles = suppressKinds dflags (tyConKind tyCon) (tyConRoles tyCon)
+        in ppUnless (all suppress_if roles) $
+           ptext (sLit "type role") <+> ppr tyCon <+> hsep (map ppr roles)
 
-    pp_tc_with_kind = vcat [ pp_roles
+    pp_tc_with_kind = vcat [ pp_roles (const True)
                            , pprTyConHdr tyCon <+> dcolon
                              <+> pprTypeForUser (synTyConResKind tyCon) ]
     closed_family_header

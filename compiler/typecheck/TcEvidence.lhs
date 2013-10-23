@@ -536,7 +536,7 @@ data EvTerm
                       -- Note [KnownNat & KnownSymbol and EvLit]
 
   | EvCoercible EvCoercible      -- Dictionary for "Coercible a b"
-                                 -- Note [Coercible Instances]
+                                 -- Note [Coercible Instances] in TcInteract
 
   deriving( Data.Data, Data.Typeable)
 

@@ -144,7 +144,8 @@ import Control.Monad (liftM, ap)
 -- to the code for `x'.
 --
 -- All of this is provided x is:
---   1. non-updatable;
+--   1. non-updatable - it must have at least one parameter (see Note
+--      [Join point abstraction]);
 --   2. guaranteed to be entered before the stack retreats -- ie x is not
 --      buried in a heap-allocated closure, or passed as an argument to
 --      something;

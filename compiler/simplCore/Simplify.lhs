@@ -22,7 +22,7 @@ import IdInfo
 import Name             ( mkSystemVarName, isExternalName )
 import Coercion hiding  ( substCo, substTy, substCoVar, extendTvSubst )
 import OptCoercion      ( optCoercion )
-import FamInstEnv       ( topNormaliseType )
+import FamInstEnv       ( topNormaliseType_maybe )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
                         , isMarkedStrict ) --, dataConTyCon, dataConTag, fIRST_TAG )
 --import TyCon            ( isEnumerationTyCon ) -- temporalily commented out. See #8326
@@ -1451,7 +1451,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
-rebuildCall env info (CoerceIt co cont) 
+rebuildCall env info (CoerceIt co cont)
   = rebuildCall env (addCastTo info co) cont
 
 rebuildCall env info (ApplyTo dup_flag (Type arg_ty) se cont)
@@ -1574,28 +1574,28 @@ tryRules env rules fn args call_cont
        ; let enum_to_tag :: CoreAlt -> CoreAlt
                 -- Takes   K -> e  into   tagK# -> e
                 -- where tagK# is the tag of constructor K
-             enum_to_tag (DataAlt con, [], rhs) 
+             enum_to_tag (DataAlt con, [], rhs)
                = ASSERT( isEnumerationTyCon (dataConTyCon con) )
                 (LitAlt tag, [], rhs)
               where
                 tag = mkMachInt dflags (toInteger (dataConTag con - fIRST_TAG))
              enum_to_tag alt = pprPanic "tryRules: tagToEnum" (ppr alt)
- 
+
              new_alts = (DEFAULT, [], rhs1) : map enum_to_tag rest_alts
-             new_bndr = setIdType bndr intPrimTy   
+             new_bndr = setIdType bndr intPrimTy
                  -- The binder is dead, but should have the right type
       ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
 -}
   | otherwise
   = do { dflags <- getDynFlags
-       ; case lookupRule dflags (getUnfoldingInRuleMatch env) (activeRule env) 
+       ; case lookupRule dflags (getUnfoldingInRuleMatch env) (activeRule env)
                          fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
              do { checkedTick (RuleFired (ru_name rule))
                 ; dump dflags rule rule_rhs
                 ; let cont' = pushSimplifiedArgs env
-                                                 (drop (ruleArity rule) args) 
+                                                 (drop (ruleArity rule) args)
                                                  call_cont
                       -- (ruleArity rule) says how many args the rule consumed
                 ; return (Just (rule_rhs, cont')) }}}
@@ -1727,7 +1727,7 @@ because that builds an unnecessary thunk.
 
 Note [Case binder next]
 ~~~~~~~~~~~~~~~~~~~~~~~
-If we have 
+If we have
    case e of f { _ -> f e1 e2 }
 then we can safely do CaseElim.   The main criterion is that the
 case-binder is evaluated *next*.  Previously we just asked that
@@ -1736,7 +1736,7 @@ the case-binder is used strictly; but that can change
     --> error "bad"
 which is very puzzling if 'x' is later bound to (error "good").
 Where the order of evaluation is specified (via seq or case)
-we should respect it.  
+we should respect it.
 See also Note [Empty case alternatives] in CoreSyn.
 
 So instead we use case_bndr_evald_next to see when f is the *next*
@@ -1970,7 +1970,7 @@ Note [Case alternative occ info]
 When we are simply reconstructing a case (the common case), we always
 zap the occurrence info on the binders in the alternatives.  Even
 if the case binder is dead, the scrutinee is usually a variable, and *that*
-can bring the case-alternative binders back to life.  
+can bring the case-alternative binders back to life.
 See Note [Add unfolding for scrutinee]
 
 Note [Improving seq]
@@ -2060,7 +2060,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
   | not (isDeadBinder case_bndr) -- Not a pure seq!  See Note [Improving seq]
-  , Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
+  , Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co)
               env2 = extendIdSubst env case_bndr rhs
@@ -2146,15 +2146,15 @@ addAltUnfoldings env scrut case_bndr con_app
                       Just (Cast (Var v) co) -> addBinderUnfolding env1 v $
                                                 mkSimpleUnfolding dflags (Cast con_app (mkSymCo co))
                       _                      -> env1
-              
+
        ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
        ; return env2 }
 
 addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
   | debugIsOn, Just tmpl <- maybeUnfoldingTemplate unf
-  = WARN( not (eqType (idType bndr) (exprType tmpl)), 
-          ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl) ) 
+  = WARN( not (eqType (idType bndr) (exprType tmpl)),
+          ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl) )
     modifyInScope env (bndr `setIdUnfolding` unf)
 
   | otherwise
@@ -2198,7 +2198,7 @@ HOWEVER, given
 we do not want to add the unfolding x -> y to 'x', which might seem cool,
 since 'y' itself has different unfoldings in r1 and r2.  Reason: if we
 did that, we'd have to zap y's deadness info and that is a very useful
-piece of information.  
+piece of information.
 
 So instead we add the unfolding x -> Just a, and x -> Nothing in the
 respective RHSs.
@@ -2666,6 +2666,7 @@ e.g.    f E [..hole..]
 But this is terrible! Here's an example:
         && E (case x of { T -> F; F -> T })
 Now, && is strict so we end up simplifying the case with
+
 an ArgOf continuation.  If we let-bind it, we get
         let $j = \v -> && E v
         in simplExpr (case x of { T -> F; F -> T })

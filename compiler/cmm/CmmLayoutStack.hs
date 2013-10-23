@@ -770,28 +770,40 @@ arguments.
 -}
 
 areaToSp :: DynFlags -> ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
-areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n) =
-  cmmOffset dflags (CmmReg spReg) (sp_old - area_off area - n)
-areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr dflags sp_hwm
-areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [Always false stack check]
+
+areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n)
+  = cmmOffset dflags (CmmReg spReg) (sp_old - area_off area - n)
+    -- Replace (CmmStackSlot area n) with an offset from Sp
+
+areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark) 
+  = mkIntExpr dflags sp_hwm
+    -- Replace CmmHighStackMark with the number of bytes of stack used, 
+    -- the sp_hwm.   See Note [Stack usage] in StgCmmHeap
+
+areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _)  
                           [CmmMachOp (MO_Sub _)
-                                  [ CmmRegOff (CmmGlobal Sp) off
-                                  , CmmLit (CmmInt lit _)],
+                                  [ CmmRegOff (CmmGlobal Sp) x_off
+                                  , CmmLit (CmmInt y_lit _)],
                            CmmReg (CmmGlobal SpLim)])
-                              | fromIntegral off == lit = zeroExpr dflags
+  | fromIntegral x_off >= y_lit 
+  = zeroExpr dflags
+    -- Replace a stack-overflow test that cannot fail with a no-op
+    -- See Note [Always false stack check]
+
 areaToSp _ _ _ _ other = other
 
 -- Note [Always false stack check]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- We can optimise stack checks of the form
 --
---   if ((Sp + x) - x < SpLim) then .. else ..
+--   if ((Sp + x) - y < SpLim) then .. else ..
 --
--- where x is an integer offset. Optimising this away depends on knowing that
--- SpLim <= Sp, so it is really the job of the stack layout algorithm, hence we
--- do it now.  This is also convenient because sinking pass will later drop the
--- dead code.
+-- where are non-negative integer byte offsets.  Since we know that
+-- SpLim <= Sp (remember the stack grows downwards), this test must
+-- yield False if (x >= y), so we can rewrite the comparison to False.
+-- A subsequent sinking pass will later drop the dead code.
+-- Optimising this away depends on knowing that SpLim <= Sp, so it is
+-- really the job of the stack layout algorithm, hence we do it now.
 
 optStackCheck :: CmmNode O C -> CmmNode O C
 optStackCheck n = -- Note [null stack check]

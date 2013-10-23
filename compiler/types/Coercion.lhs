@@ -32,7 +32,7 @@ module Coercion (
         mkUnbranchedAxInstRHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkNthCo, mkNthCoRole, mkLRCo,
-	mkInstCo, mkAppCo, mkTyConAppCo, mkFunCo,
+	mkInstCo, mkAppCo, mkAppCoFlexible, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo, mkUnivCo, mkSubCo, mkPhantomCo,
         mkNewTypeCo, maybeSubCo, maybeSubCo2,
         mkAxiomRuleCo,
@@ -45,6 +45,7 @@ module Coercion (
         splitAppCo_maybe,
         splitForAllCo_maybe,
         nthRole, tyConRolesX,
+        tvUsedAtNominalRole, nextRole,
 
 	-- ** Coercion variables
 	mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
@@ -894,26 +895,35 @@ mkUnbranchedAxInstRHS ax = mkAxInstRHS ax 0
 -- The second coercion must be Nominal, unless the first is Phantom.
 -- If the first is Phantom, then the second can be either Phantom or Nominal.
 mkAppCo :: Coercion -> Coercion -> Coercion
-mkAppCo (Refl r ty1) (Refl _ ty2)
-  = Refl r (mkAppTy ty1 ty2)
-mkAppCo (Refl r (TyConApp tc tys)) co2
-  = TyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
-  where
-    zip_roles (r1:_)  []        = [applyRole r1 co2]
-    zip_roles (r1:rs) (ty1:tys) = mkReflCo r1 ty1 : zip_roles rs tys
-    zip_roles _       _         = panic "zip_roles" -- but the roles are infinite...
-mkAppCo (TyConAppCo r tc cos) co
-  = case r of
-      Nominal          -> TyConAppCo Nominal tc (cos ++ [co])
-      Representational -> TyConAppCo Representational tc (cos ++ [co'])
-        where new_role = (tyConRolesX Representational tc) !! (length cos)
-              co'      = applyRole new_role co
-      Phantom          -> TyConAppCo Phantom tc (cos ++ [mkPhantomCo co])
-
-mkAppCo co1 co2 = AppCo co1 co2
+mkAppCo co1 co2 = mkAppCoFlexible co1 Nominal co2
 -- Note, mkAppCo is careful to maintain invariants regarding
 -- where Refl constructors appear; see the comments in the definition
 -- of Coercion and the Note [Refl invariant] in types/TypeRep.lhs.
+
+-- | Apply a 'Coercion' to another 'Coercion'.
+-- The second 'Coercion's role is given, making this more flexible than
+-- 'mkAppCo'.
+mkAppCoFlexible :: Coercion -> Role -> Coercion -> Coercion
+mkAppCoFlexible (Refl r ty1) _ (Refl _ ty2)
+  = Refl r (mkAppTy ty1 ty2)
+mkAppCoFlexible (Refl r (TyConApp tc tys)) r2 co2
+  = TyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
+  where
+    zip_roles (r1:_)  []        = [maybeSubCo2 r1 r2 co2]
+    zip_roles (r1:rs) (ty1:tys) = mkReflCo r1 ty1 : zip_roles rs tys
+    zip_roles _       _         = panic "zip_roles" -- but the roles are infinite...
+mkAppCoFlexible (TyConAppCo r tc cos) r2 co
+  = case r of
+      Nominal          -> ASSERT( r2 == Nominal )
+                          TyConAppCo Nominal tc (cos ++ [co])
+      Representational -> TyConAppCo Representational tc (cos ++ [co'])
+        where new_role = (tyConRolesX Representational tc) !! (length cos)
+              co'      = maybeSubCo2 new_role r2 co
+      Phantom          -> TyConAppCo Phantom tc (cos ++ [mkPhantomCo co])
+
+mkAppCoFlexible co1 _r2 co2 = ASSERT( _r2 == Nominal )
+                              AppCo co1 co2
+
 
 -- | Applies multiple 'Coercion's to another 'Coercion', from left to right.
 -- See also 'mkAppCo'. 
@@ -1099,6 +1109,31 @@ ltRole Representational Phantom = True
 ltRole Representational _       = False
 ltRole Nominal          Nominal = False
 ltRole Nominal          _       = True
+
+-- Is the given tyvar used in a nominal position anywhere?
+-- This is used in the GeneralizedNewtypeDeriving check.
+tvUsedAtNominalRole :: TyVar -> Type -> Bool
+tvUsedAtNominalRole tv typ = let result = go Representational typ in
+  pprTrace "RAE1" (vcat [ppr tv, ppr typ]) $
+  pprTrace "RAE2" (ppr result) $
+  result
+  where go r (TyVarTy tv')
+          | tv == tv' = (r == Nominal)
+          | otherwise = False
+        go r (AppTy t1 t2)      = go r t1 || go Nominal t2
+        go r (TyConApp tc args) = or $ zipWith go (tyConRolesX r tc) args
+        go r (FunTy t1 t2)      = go r t1 || go r t2
+        go r (ForAllTy qtv ty)
+          | tv == qtv  = False -- shadowed
+          | otherwise  = go r ty
+        go _ (LitTy _) = False
+
+-- if we wish to apply `co` to some other coercion, what would be its best
+-- role?
+nextRole :: Coercion -> Role
+nextRole (Refl r (TyConApp tc tys)) = head $ dropList tys (tyConRolesX r tc)
+nextRole (TyConAppCo r tc cos)      = head $ dropList cos (tyConRolesX r tc)
+nextRole _                          = Nominal
 
 -- See note [Newtype coercions] in TyCon
 

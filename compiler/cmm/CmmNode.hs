@@ -421,8 +421,10 @@ mapForeignTarget :: (CmmExpr -> CmmExpr) -> ForeignTarget -> ForeignTarget
 mapForeignTarget exp   (ForeignTarget e c) = ForeignTarget (exp e) c
 mapForeignTarget _   m@(PrimTarget _)      = m
 
--- Take a transformer on expressions and apply it recursively.
 wrapRecExp :: (CmmExpr -> CmmExpr) -> CmmExpr -> CmmExpr
+-- Take a transformer on expressions and apply it recursively.
+-- (wrapRecExp f e) first recursively applies itself to sub-expressions of e
+--                  then  uses f to rewrite the resulting expression
 wrapRecExp f (CmmMachOp op es)    = f (CmmMachOp op $ map (wrapRecExp f) es)
 wrapRecExp f (CmmLoad addr ty)    = f (CmmLoad (wrapRecExp f addr) ty)
 wrapRecExp f e                    = f e
@@ -450,6 +452,8 @@ mapForeignTargetM f (ForeignTarget e c) = (\x -> ForeignTarget x c) `fmap` f e
 mapForeignTargetM _ (PrimTarget _)      = Nothing
 
 wrapRecExpM :: (CmmExpr -> Maybe CmmExpr) -> (CmmExpr -> Maybe CmmExpr)
+-- (wrapRecExpM f e) first recursively applies itself to sub-expressions of e
+--                   then  gives f a chance to rewrite the resulting expression
 wrapRecExpM f n@(CmmMachOp op es)  = maybe (f n) (f . CmmMachOp op)    (mapListM (wrapRecExpM f) es)
 wrapRecExpM f n@(CmmLoad addr ty)  = maybe (f n) (f . flip CmmLoad ty) (wrapRecExpM f addr)
 wrapRecExpM f e                    = f e

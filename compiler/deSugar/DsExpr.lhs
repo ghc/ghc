@@ -20,6 +20,7 @@ import DsArrows
 import DsMonad
 import Name
 import NameEnv
+import FamInstEnv( topNormaliseType )
 
 #ifdef GHCI
         -- Template Haskell stuff iff bootstrapped
@@ -825,31 +826,36 @@ mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
 warnDiscardedDoBindings :: LHsExpr Id -> Type -> DsM ()
 warnDiscardedDoBindings rhs rhs_ty
   | Just (m_ty, elt_ty) <- tcSplitAppTy_maybe rhs_ty
-  = do {  -- Warn about discarding non-() things in 'monadic' binding
-       ; warn_unused <- woptM Opt_WarnUnusedDoBind
-       ; if warn_unused && not (isUnitTy elt_ty)
-         then warnDs (unusedMonadBind rhs elt_ty)
-         else 
-         -- Warn about discarding m a things in 'monadic' binding of the same type,
-         -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
-    do { warn_wrong <- woptM Opt_WarnWrongDoBind
-       ; case tcSplitAppTy_maybe elt_ty of
-           Just (elt_m_ty, _) | warn_wrong, m_ty `eqType` elt_m_ty
-                              -> warnDs (wrongMonadBind rhs elt_ty)
-           _ -> return () } }
+  = do { warn_unused <- woptM Opt_WarnUnusedDoBind
+       ; warn_wrong <- woptM Opt_WarnWrongDoBind
+       ; when (warn_unused || warn_wrong) $
+    do { fam_inst_envs <- dsGetFamInstEnvs
+       ; let norm_elt_ty = topNormaliseType fam_inst_envs elt_ty
+
+           -- Warn about discarding non-() things in 'monadic' binding
+       ; if warn_unused && not (isUnitTy norm_elt_ty)
+         then warnDs (badMonadBind rhs elt_ty
+                           (ptext (sLit "-fno-warn-unused-do-bind")))
+         else
+
+           -- Warn about discarding m a things in 'monadic' binding of the same type,
+           -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
+           when warn_wrong $
+                do { case tcSplitAppTy_maybe norm_elt_ty of
+                         Just (elt_m_ty, _)
+                            | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
+                            -> warnDs (badMonadBind rhs elt_ty
+                                           (ptext (sLit "-fno-warn-wrong-do-bind")))
+                         _ -> return () } } }
 
   | otherwise   -- RHS does have type of form (m ty), which is weird
   = return ()   -- but at lesat this warning is irrelevant
 
-unusedMonadBind :: LHsExpr Id -> Type -> SDoc
-unusedMonadBind rhs elt_ty
-  = ptext (sLit "A do-notation statement discarded a result of type") <+> ppr elt_ty <> dot $$
-    ptext (sLit "Suppress this warning by saying \"_ <- ") <> ppr rhs <> ptext (sLit "\",") $$
-    ptext (sLit "or by using the flag -fno-warn-unused-do-bind")
-
-wrongMonadBind :: LHsExpr Id -> Type -> SDoc
-wrongMonadBind rhs elt_ty
-  = ptext (sLit "A do-notation statement discarded a result of type") <+> ppr elt_ty <> dot $$
-    ptext (sLit "Suppress this warning by saying \"_ <- ") <> ppr rhs <> ptext (sLit "\",") $$
-    ptext (sLit "or by using the flag -fno-warn-wrong-do-bind")
+badMonadBind :: LHsExpr Id -> Type -> SDoc -> SDoc
+badMonadBind rhs elt_ty flag_doc
+  = vcat [ hang (ptext (sLit "A do-notation statement discarded a result of type"))
+              2 (quotes (ppr elt_ty))
+         , hang (ptext (sLit "Suppress this warning by saying"))
+              2 (quotes $ ptext (sLit "_ <-") <+> ppr rhs)
+         , ptext (sLit "or by using the flag") <+>  flag_doc ]
 \end{code}

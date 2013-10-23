@@ -1773,7 +1773,7 @@ matchClassInst _ clas [ ty1, ty2 ] _
       traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2
       rdr_env <- getGlobalRdrEnvTcS
       safeMode <- safeLanguageOn `fmap` getDynFlags
-      ev <- getCoericbleInst safeMode rdr_env ty1 ty2
+      ev <- getCoercibleInst safeMode rdr_env ty1 ty2
       traceTcS "matchClassInst returned" $ ppr ev
       return ev
 
@@ -1860,8 +1860,8 @@ matchClassInst inerts clas tys loc
 
 -- See Note [Coercible Instances]
 -- Changes to this logic should likely be reflected in coercible_msg in TcErrors.
-getCoericbleInst :: Bool -> GlobalRdrEnv -> TcType -> TcType -> TcS LookupInstResult
-getCoericbleInst safeMode rdr_env ty1 ty2
+getCoercibleInst :: Bool -> GlobalRdrEnv -> TcType -> TcType -> TcS LookupInstResult
+getCoercibleInst safeMode rdr_env ty1 ty2
   | ty1 `eqType` ty2
   = do return $ GenInst []
               $ EvCoercible (EvCoercibleRefl ty1)
@@ -1939,7 +1939,7 @@ Note [Coercible Instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 The class Coercible is special: There are no regular instances, and the user
 cannot even define them. Instead, the type checker will create instances and
-their evidence out of thin air, in getCoericbleInst. The following “instances”
+their evidence out of thin air, in getCoercibleInst. The following “instances”
 are present:
 
  1. instance Coercible a a
