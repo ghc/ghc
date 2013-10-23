@@ -1,3 +1,4 @@
+
 test    ('dph-classes-vseg-fast' 
         , [ normal
           , extra_clean(['Main.o', 'Main.hi', 'DefsVect.hi', 'DefsVect.o'])

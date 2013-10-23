@@ -8,6 +8,7 @@ test    ('dph-sumnats-copy'
         , [ 'Main'
           , '-O0 -package dph-lifted-copy'])
 
+
 test    ('dph-sumnats-vseg' 
         , [ outputdir('vseg')
           , reqlib('dph-lifted-vseg')

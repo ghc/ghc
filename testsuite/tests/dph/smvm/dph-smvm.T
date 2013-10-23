@@ -25,7 +25,7 @@ if testFile != 'nothing':
           ]
         , multimod_compile_and_run
         , [ 'Main'
-          , '-Odph -package dph-lifted-copy -package dph-prim-par'])
+          , '-O0 -package dph-lifted-copy -package dph-prim-par'])
 
  test   ('dph-smvm-vseg'
         , [ outputdir('vseg')
@@ -37,5 +37,5 @@ if testFile != 'nothing':
           ]
         , multimod_compile_and_run
         , [ 'Main'
-          , '-Odph -package dph-lifted-vseg -package dph-prim-par'])
+          , '-O0 -package dph-lifted-vseg -package dph-prim-par'])
 
