@@ -75,7 +75,8 @@ OK:
 	  This is used to import functions written in Cmm code that follow an
 	  internal GHC calling convention. This feature is not intended for
 	  use outside of the core libraries that come with GHC. For more
-	  details see the GHC developer wiki.
+	  details see the <ulink linkend="http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps">
+          GHC developer wiki</ulink>.
 	</para>
       </sect2>
 
