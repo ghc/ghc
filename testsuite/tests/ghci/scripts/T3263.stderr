@@ -1,5 +1,5 @@
 
 T3263.hs:8:12: Warning:
-    A do-notation statement discarded a result of type Char.
-    Suppress this warning by saying "_ <- getChar",
+    A do-notation statement discarded a result of type ‛Char’
+    Suppress this warning by saying ‛_ <- getChar’
     or by using the flag -fno-warn-unused-do-bind

@@ -1,10 +1,10 @@
 
-T3263-1.hs:25:3:
-    Warning: A do-notation statement discarded a result of type Int.
-             Suppress this warning by saying "_ <- nonNullM",
-             or by using the flag -fno-warn-unused-do-bind
+T3263-1.hs:25:3: Warning:
+    A do-notation statement discarded a result of type ‛Int’
+    Suppress this warning by saying ‛_ <- nonNullM’
+    or by using the flag -fno-warn-unused-do-bind
 
-T3263-1.hs:35:3:
-    Warning: A do-notation statement discarded a result of type Int.
-             Suppress this warning by saying "_ <- nonNullM",
-             or by using the flag -fno-warn-unused-do-bind
+T3263-1.hs:35:3: Warning:
+    A do-notation statement discarded a result of type ‛Int’
+    Suppress this warning by saying ‛_ <- nonNullM’
+    or by using the flag -fno-warn-unused-do-bind
