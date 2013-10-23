@@ -53,6 +53,9 @@ import RnEnv
 import RnTypes
 import DynFlags
 import PrelNames
+import TyCon               ( tyConName )
+import DataCon             ( dataConTyCon )
+import TypeRep             ( TyThing(..) )
 import Name
 import NameSet
 import RdrName
@@ -609,9 +612,14 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
     -- That is, the parent of the data constructor.  
     -- That's the parent to use for looking up record fields.
     find_tycon env con 
-      = case lookupGRE_Name env con of
-          [GRE { gre_par = ParentIs p }] -> p
-          gres  -> pprPanic "find_tycon" (ppr con $$ ppr gres)
+      | Just (ADataCon dc) <- wiredInNameTyThing_maybe con
+      = tyConName (dataConTyCon dc)   -- Special case for [], which is built-in syntax
+                                      -- and not in the GlobalRdrEnv (Trac #8448)
+      | [GRE { gre_par = ParentIs p }] <- lookupGRE_Name env con
+      = p
+
+      | otherwise
+      = pprPanic "find_tycon" (ppr con $$ ppr (lookupGRE_Name env con))
 
     dup_flds :: [[RdrName]]
         -- Each list represents a RdrName that occurred more than once
