@@ -674,7 +674,8 @@ simpl_loop n implics
   | n > 10 
   = traceTcS "solveWanteds: loop!" empty >> return implics
   | otherwise 
-  = do { (floated_eqs, unsolved_implics) <- solveNestedImplications implics
+  = do { traceTcS "simpl_loop, iteration" (int n)
+       ; (floated_eqs, unsolved_implics) <- solveNestedImplications implics
        ; if isEmptyBag floated_eqs 
          then return unsolved_implics 
          else 
