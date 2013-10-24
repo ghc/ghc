@@ -942,17 +942,31 @@ rnTopSrcDecls extra_deps group
 %************************************************************************
 %*                                                                      *
                 AMP warnings
-     The functions defined here issue warnings according to 
+     The functions defined here issue warnings according to
      the 2013 Applicative-Monad proposal. (Trac #8004)
 %*                                                                      *
 %************************************************************************
+
+Note [No AMP warning with NoImplicitPrelude]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If you have -XNoImplicitPrelude, then we suppress the AMP warnings.
+The AMP warnings need access to Monad, Applicative, etc, and they
+are defined in 'base'. If, when compiling package 'ghc-prim' (say),
+you try to load Monad (from 'base'), chaos results because 'base'
+depends on 'ghc-prim'.  See Note [Home module load error] in LoadIface,
+and Trac #8320.
+
+Using -XNoImplicitPrelude is a proxy for ensuring that all the
+'base' modules are below the home module in the dependency tree.
 
 \begin{code}
 -- | Main entry point for generating AMP warnings
 tcAmpWarn :: TcM ()
 tcAmpWarn =
-    do { warnFlag <- woptM Opt_WarnAMP
-       ; when warnFlag $ do {
+    do { implicit_prel <- xoptM Opt_ImplicitPrelude
+       ; warnFlag <- woptM Opt_WarnAMP
+       ; when (warnFlag && implicit_prel) $ do {
+              -- See Note [No AMP warning with NoImplicitPrelude]
 
          -- Monad without Applicative
        ; tcAmpMissingParentClassWarn monadClassName
