@@ -197,5 +197,5 @@ test('linker_unload',
 test('T8209', [ only_ways(threaded_ways), ignore_output ],
               compile_and_run, [''])
 
-test('T8242', [ when(opsys('mingw32'), expect_broken(8242)), only_ways(threaded_ways), ignore_output ],
+test('T8242', [ only_ways(threaded_ways), ignore_output ],
               compile_and_run, [''])
