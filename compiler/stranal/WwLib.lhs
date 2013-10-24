@@ -112,7 +112,7 @@ the unusable strictness-info into the interfaces.
 
 \begin{code}
 mkWwBodies :: DynFlags
-       -> Type				-- Type of original function
+           -> Type				-- Type of original function
 	   -> [Demand]				-- Strictness of original function
 	   -> DmdResult				-- Info about function result
 	   -> [Bool]				-- One-shot-ness of the function
@@ -285,41 +285,8 @@ mkWWargs :: TvSubst		-- Freshening substitution to apply to the type
 		     Type)			-- Type of wrapper body
 
 mkWWargs subst fun_ty arg_info
-  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe fun_ty
-   	-- The newtype case is for when the function has
-	-- a recursive newtype after the arrow (rare)
-	-- We check for arity >= 0 to avoid looping in the case
-	-- of a function whose type is, in effect, infinite
-	-- [Arity is driven by looking at the term, not just the type.]
-	--
-	-- It's also important when we have a function returning (say) a pair
-	-- wrapped in a recursive newtype, at least if CPR analysis can look 
-	-- through such newtypes, which it probably can since they are 
-	-- simply coerces.
-	--
-	-- Note (Sept 08): This case applies even if demands is empty.
-	--		   I'm not quite sure why; perhaps it makes it
-	--		   easier for CPR
-  = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-	    <-  mkWWargs subst rep_ty arg_info
- 	; return (wrap_args,
-	     	  \e -> Cast (wrap_fn_args e) (mkSymCo co),
-     		  \e -> work_fn_args (Cast e co),
-     		  res_ty) } 
-
   | null arg_info
   = return ([], id, id, substTy subst fun_ty)
-
-  | Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty
-  = do 	{ let (subst', tv') = substTyVarBndr subst tv
-		-- This substTyVarBndr clones the type variable when necy
-		-- See Note [Freshen type variables]
-  	; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-	     <- mkWWargs subst' fun_ty' arg_info
-	; return (tv' : wrap_args,
-        	  Lam tv' . wrap_fn_args,
-        	  work_fn_args . (`App` Type (mkTyVarTy tv')),
-        	  res_ty) }
 
   | ((dmd,one_shot):arg_info') <- arg_info
   , Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
@@ -332,6 +299,33 @@ mkWWargs subst fun_ty arg_info
 	          Lam id . wrap_fn_args,
         	  work_fn_args . (`App` varToCoreExpr id),
         	  res_ty) }
+
+  | Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty
+  = do 	{ let (subst', tv') = substTyVarBndr subst tv
+		-- This substTyVarBndr clones the type variable when necy
+		-- See Note [Freshen type variables]
+  	; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+	     <- mkWWargs subst' fun_ty' arg_info
+	; return (tv' : wrap_args,
+        	  Lam tv' . wrap_fn_args,
+        	  work_fn_args . (`App` Type (mkTyVarTy tv')),
+        	  res_ty) }
+
+  | Just (co, rep_ty) <- topNormaliseNewType_maybe fun_ty
+   	-- The newtype case is for when the function has
+	-- a newtype after the arrow (rare)
+	--
+	-- It's also important when we have a function returning (say) a pair
+	-- wrapped in a  newtype, at least if CPR analysis can look
+	-- through such newtypes, which it probably can since they are
+	-- simply coerces.
+
+  = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+	    <-  mkWWargs subst rep_ty arg_info
+ 	; return (wrap_args,
+	     	  \e -> Cast (wrap_fn_args e) (mkSymCo co),
+     		  \e -> work_fn_args (Cast e co),
+     		  res_ty) } 
 
   | otherwise
   = WARN( True, ppr fun_ty )			-- Should not happen: if there is a demand
@@ -455,14 +449,14 @@ mkWWstr_one dflags arg
   | isStrictDmd dmd
   , Just cs <- splitProdDmd_maybe dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
-  , Just (data_con, inst_tys, inst_con_arg_tys, co) 
+  , Just (data_con, inst_tys, inst_con_arg_tys, co)
              <- deepSplitProductType_maybe (idType arg)
   =  do { (uniq1:uniqs) <- getUniquesM
 	; let   unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
 	        unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
-	        unbox_fn       = mkUnpackCase (Var arg `mkCast` co) uniq1
+	        unbox_fn       = mkUnpackCase (Var arg) co uniq1
                                               data_con unpk_args
-	        rebox_fn       = Let (NonRec arg con_app) 
+	        rebox_fn       = Let (NonRec arg con_app)
 	        con_app        = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
 	 ; (worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
 	 ; return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
@@ -489,17 +483,21 @@ nop_fn body = body
 \begin{code}
 deepSplitProductType_maybe :: Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
--- then  dc @ tys (args::arg_tys)  |> co :: ty
+-- then  dc @ tys (args::arg_tys) :: rep_ty
+--       co :: ty ~ rep_ty
 deepSplitProductType_maybe ty
-  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo Representational ty)
+  | let (co, ty1) = topNormaliseNewType_maybe ty `orElse` (mkReflCo Representational ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
 deepSplitProductType_maybe _ = Nothing
 
 deepSplitCprType_maybe :: ConTag -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
+-- If    deepSplitCprType_maybe n ty = Just (dc, tys, arg_tys, co)
+-- then  dc @ tys (args::arg_tys) :: rep_ty
+--       co :: ty ~ rep_ty
 deepSplitCprType_maybe con_tag ty
-  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo Representational ty)
+  | let (co, ty1) = topNormaliseNewType_maybe ty `orElse` (mkReflCo Representational ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , isDataTyCon tc
   , let cons = tyConDataCons tc
@@ -540,7 +538,7 @@ mkWWcpr body_ty res
                     |  otherwise
                     -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
                        return (id, id, body_ty)
-          
+
 mkWWcpr_help :: (DataCon, [Type], [Type], Coercion)
              -> UniqSM (CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
@@ -553,10 +551,10 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
 	-- Worker:	case (   ..body..    ) of C x -> x
   = do { (work_uniq : arg_uniq : _) <- getUniquesM
        ; let arg       = mk_ww_local arg_uniq  arg_ty1
-	     con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` co
+	     con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
        ; return ( \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
-                , \ body     -> mkUnpackCase body work_uniq data_con [arg] (Var arg)
+                , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (Var arg)
                 , arg_ty1 ) }
 
   | otherwise 	-- The general case
@@ -567,25 +565,25 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
 	     ubx_tup_con  = tupleCon UnboxedTuple (length arg_tys)
 	     ubx_tup_ty	  = exprType ubx_tup_app
 	     ubx_tup_app  = mkConApp2 ubx_tup_con arg_tys args
-             con_app	  = mkConApp2 data_con inst_tys args `mkCast` co
+             con_app	  = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return ( \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)]
-		, \ body     -> mkUnpackCase body work_uniq data_con args ubx_tup_app
+		, \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
 		, ubx_tup_ty ) }
 
-mkUnpackCase ::  CoreExpr -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
--- (mkUnpackCase e bndr Con args body)
+mkUnpackCase ::  CoreExpr -> Coercion -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
+-- (mkUnpackCase e co uniq Con args body)
 --      returns
--- case e of bndr { Con args -> body }
--- 
--- the type of the bndr passed in is irrelevent
+-- case e |> co of bndr { Con args -> body }
 
-mkUnpackCase (Tick tickish e) uniq con args body   -- See Note [Profiling and unpacking]
-  = Tick tickish (mkUnpackCase e uniq con args body)
-mkUnpackCase scrut uniq boxing_con unpk_args body
-  = Case scrut 
-         (mk_ww_local uniq (exprType scrut)) (exprType body) 
+mkUnpackCase (Tick tickish e) co uniq con args body   -- See Note [Profiling and unpacking]
+  = Tick tickish (mkUnpackCase e co uniq con args body)
+mkUnpackCase scrut co uniq boxing_con unpk_args body
+  = Case casted_scrut bndr (exprType body)
          [(DataAlt boxing_con, unpk_args, body)]
+  where
+    casted_scrut = scrut `mkCast` co
+    bndr = mk_ww_local uniq (exprType casted_scrut)
 \end{code}
 
 Note [Profiling and unpacking]

@@ -902,7 +902,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
        				   
-       | Just(ty',co) <- splitNewTypeRepCo_maybe ty
+       | Just (co, ty') <- topNormaliseNewType_maybe ty
        = 	-- Given this:
        		-- 	newtype T = MkT ([T] -> Int)
        		-- Consider eta-expanding this

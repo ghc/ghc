@@ -38,8 +38,8 @@ module Coercion (
         mkAxiomRuleCo,
 
         -- ** Decomposition
-        splitNewTypeRepCo_maybe, instNewTyCon_maybe, 
-        topNormaliseNewType, topNormaliseNewTypeX,
+        instNewTyCon_maybe, 
+        topNormaliseNewType_maybe, 
 
         decomposeCo, getCoVar_maybe,
         splitAppCo_maybe,
@@ -1194,42 +1194,39 @@ instNewTyCon_maybe tc tys
   | otherwise
   = Nothing
 
-splitNewTypeRepCo_maybe :: Type -> Maybe (Type, Coercion)  
+topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 -- ^ Sometimes we want to look through a @newtype@ and get its associated coercion.
--- This function only strips *one layer* of @newtype@ off, so the caller will usually call
--- itself recursively. If
+-- This function strips off @newtype@ layers enough to reveal something that isn't
+-- a @newtype@.  Specifically, here's the invariant:
 --
--- > splitNewTypeRepCo_maybe ty = Just (ty', co)
+-- > topNormaliseNewType_maybe rec_nts ty = Just (co, ty')
 --
--- then  @co : ty ~ ty'@.  The function returns @Nothing@ for non-@newtypes@, 
+-- then (a)  @co : ty0 ~ ty'@.
+--      (b)  ty' is not a newtype.
+--
+-- The function returns @Nothing@ for non-@newtypes@,
 -- or unsaturated applications
-splitNewTypeRepCo_maybe ty 
-  | Just ty' <- coreView ty 
-  = splitNewTypeRepCo_maybe ty'
-splitNewTypeRepCo_maybe (TyConApp tc tys)
-  = instNewTyCon_maybe tc tys
-splitNewTypeRepCo_maybe _
-  = Nothing
+topNormaliseNewType_maybe ty
+  = go initRecTc Nothing ty
+  where
+    go rec_nts mb_co1 ty
+       | Just (tc, tys) <- splitTyConApp_maybe ty
+       , Just (ty', co2) <- instNewTyCon_maybe tc tys
+       , let co' = case mb_co1 of
+                      Nothing  -> co2
+                      Just co1 -> mkTransCo co1 co2
+       = case checkRecTc rec_nts tc of
+           Just rec_nts' -> go rec_nts' (Just co') ty'
+           Nothing       -> Nothing
+                  -- Return Nothing overall if we get stuck
+                  -- so that the return invariant is satisfied
+                  -- See Note [Expanding newtypes] in TyCon
 
-topNormaliseNewType :: Type -> Maybe (Type, Coercion)
-topNormaliseNewType ty
-  = case topNormaliseNewTypeX initRecTc ty of
-      Just (_, co, ty) -> Just (ty, co)
-      Nothing          -> Nothing
+       | Just co1 <- mb_co1     -- Progress, but stopped on a non-newtype
+       = Just (co1, ty)
 
-topNormaliseNewTypeX :: RecTcChecker -> Type -> Maybe (RecTcChecker, Coercion, Type)
-topNormaliseNewTypeX rec_nts ty
-  | Just ty' <- coreView ty         -- Expand predicates and synonyms
-  = topNormaliseNewTypeX rec_nts ty'
-
-topNormaliseNewTypeX rec_nts (TyConApp tc tys)
-  | Just rec_nts'     <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes] in TyCon
-  , Just (rep_ty, co) <- instNewTyCon_maybe tc tys
-  = case topNormaliseNewTypeX rec_nts' rep_ty of
-       Nothing                       -> Just (rec_nts', co,                 rep_ty)
-       Just (rec_nts', co', rep_ty') -> Just (rec_nts', co `mkTransCo` co', rep_ty')
-
-topNormaliseNewTypeX _ _ = Nothing
+       | otherwise              -- No progress
+       = Nothing
 \end{code}
 
 
