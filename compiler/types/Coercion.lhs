@@ -19,13 +19,13 @@ module Coercion (
         isReflCo_maybe, coercionRole,
         mkCoercionType,
 
-	-- ** Constructing coercions
+        -- ** Constructing coercions
         mkReflCo, mkCoVarCo,
         mkAxInstCo, mkUnbranchedAxInstCo, mkAxInstLHS, mkAxInstRHS,
         mkUnbranchedAxInstRHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkNthCo, mkNthCoRole, mkLRCo,
-	mkInstCo, mkAppCo, mkAppCoFlexible, mkTyConAppCo, mkFunCo,
+        mkInstCo, mkAppCo, mkAppCoFlexible, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo, mkUnivCo, mkSubCo, mkPhantomCo,
         mkNewTypeCo, maybeSubCo, maybeSubCo2,
         mkAxiomRuleCo,
@@ -40,25 +40,25 @@ module Coercion (
         nthRole, tyConRolesX,
         tvUsedAtNominalRole, nextRole,
 
-	-- ** Coercion variables
-	mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
+        -- ** Coercion variables
+        mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo, coercionSize,
 
         -- ** Substitution
         CvSubstEnv, emptyCvSubstEnv,
- 	CvSubst(..), emptyCvSubst, Coercion.lookupTyVar, lookupCoVar,
-	isEmptyCvSubst, zapCvSubstEnv, getCvInScope,
+        CvSubst(..), emptyCvSubst, Coercion.lookupTyVar, lookupCoVar,
+        isEmptyCvSubst, zapCvSubstEnv, getCvInScope,
         substCo, substCos, substCoVar, substCoVars,
         substCoWithTy, substCoWithTys,
-	cvTvSubst, tvCvSubst, mkCvSubst, zipOpenCvSubst,
+        cvTvSubst, tvCvSubst, mkCvSubst, zipOpenCvSubst,
         substTy, extendTvSubst,
         extendCvSubstAndInScope, extendTvSubstAndInScope,
-	substTyVarBndr, substCoVarBndr,
+        substTyVarBndr, substCoVarBndr,
 
-	-- ** Lifting
-	liftCoMatch, liftCoSubstTyVar, liftCoSubstWith,
+        -- ** Lifting
+        liftCoMatch, liftCoSubstTyVar, liftCoSubstWith,
 
         -- ** Comparison
         coreEqCoercion, coreEqCoercion2,
@@ -79,7 +79,7 @@ module Coercion (
 
 #include "HsVersions.h"
 
-import Unify	( MatchEnv(..), matchList )
+import Unify    ( MatchEnv(..), matchList )
 import TypeRep
 import qualified Type
 import Type hiding( substTy, substTyVarBndr, extendTvSubst )
@@ -90,15 +90,15 @@ import VarEnv
 import VarSet
 import Binary
 import Maybes   ( orElse )
-import Name	( Name, NamedThing(..), nameUnique, nameModule, getSrcSpan )
-import OccName 	( parenSymOcc )
+import Name     ( Name, NamedThing(..), nameUnique, nameModule, getSrcSpan )
+import OccName  ( parenSymOcc )
 import Util
 import BasicTypes
 import Outputable
 import Unique
 import Pair
 import SrcLoc
-import PrelNames	( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
+import PrelNames        ( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
 import Control.Applicative
 import Data.Traversable (traverse, sequenceA)
 import FastString
@@ -107,9 +107,9 @@ import qualified Data.Data as Data hiding ( TyCon )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
             Coercions
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -147,9 +147,9 @@ data Coercion
   -- TyConAppCo :: "e" -> _ -> ?? -> e
   -- See Note [TyConAppCo roles]
   | TyConAppCo Role TyCon [Coercion]    -- lift TyConApp
-    	       -- The TyCon is never a synonym;
-	       -- we expand synonyms eagerly
-	       -- But it can be a type function
+               -- The TyCon is never a synonym;
+               -- we expand synonyms eagerly
+               -- But it can be a type function
 
   | AppCo Coercion Coercion        -- lift AppTy
           -- AppCo :: e -> N -> e
@@ -485,9 +485,9 @@ necessary for soundness, but this choice removes ambiguity.
 The rules here also dictate what the parameters to mkTyConAppCo.
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Coercion variables}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -504,7 +504,7 @@ isCoVar :: Var -> Bool
 isCoVar v = isCoVarType (varType v)
 
 isCoVarType :: Type -> Bool
-isCoVarType ty 	    -- Tests for t1 ~# t2, the unboxed equality
+isCoVarType ty      -- Tests for t1 ~# t2, the unboxed equality
   = case splitTyConApp_maybe ty of
       Just (tc,tys) -> (tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey)
                        && tys `lengthAtLeast` 2
@@ -572,9 +572,9 @@ coercionSize (AxiomRuleCo _ tys cos) = 1 + sum (map typeSize tys)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                             Tidying coercions
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -613,7 +613,7 @@ tidyCos env = map (tidyCo env)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                    Pretty-printing coercions
 %*                                                                      *
 %************************************************************************
@@ -743,9 +743,9 @@ pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
 \end{code}
 
 %************************************************************************
-%*									*
-	Functions over Kinds
-%*									*
+%*                                                                      *
+        Functions over Kinds
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -824,9 +824,9 @@ isReflCo_maybe _                 = Nothing
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
             Building coercions
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -927,12 +927,12 @@ mkAppCos co1 cos = foldl mkAppCo co1 cos
 -- caller's responsibility to get the roles correct on argument coercions.
 mkTyConAppCo :: Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
-	       -- Expand type synonyms
+               -- Expand type synonyms
   | Just (tv_co_prs, rhs_ty, leftover_cos) <- tcExpandTyCon_maybe tc cos
   = mkAppCos (liftCoSubst r tv_co_prs rhs_ty) leftover_cos
 
   | Just tys <- traverse isReflCo_maybe cos
-  = Refl r (mkTyConApp tc tys)	-- See Note [Refl invariant]
+  = Refl r (mkTyConApp tc tys)  -- See Note [Refl invariant]
 
   | otherwise = TyConAppCo r tc cos
 
@@ -1169,9 +1169,9 @@ mkCoCast c g
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
             Newtypes
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1224,7 +1224,7 @@ topNormaliseNewType_maybe ty
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                    Equality of coercions
 %*                                                                      *
 %************************************************************************
@@ -1281,7 +1281,7 @@ coreEqCoercion2 _ _ _ = False
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                    Substitution of coercions
 %*                                                                      *
 %************************************************************************
@@ -1295,16 +1295,16 @@ emptyCvSubstEnv :: CvSubstEnv
 emptyCvSubstEnv = emptyVarEnv
 
 data CvSubst
-  = CvSubst InScopeSet 	-- The in-scope type variables
-	    TvSubstEnv	-- Substitution of types
+  = CvSubst InScopeSet  -- The in-scope type variables
+            TvSubstEnv  -- Substitution of types
             CvSubstEnv  -- Substitution of coercions
 
 instance Outputable CvSubst where
   ppr (CvSubst ins tenv cenv)
     = brackets $ sep[ ptext (sLit "CvSubst"),
-		      nest 2 (ptext (sLit "In scope:") <+> ppr ins),
-		      nest 2 (ptext (sLit "Type env:") <+> ppr tenv),
-		      nest 2 (ptext (sLit "Coercion env:") <+> ppr cenv) ]
+                      nest 2 (ptext (sLit "In scope:") <+> ppr ins),
+                      nest 2 (ptext (sLit "Type env:") <+> ppr tenv),
+                      nest 2 (ptext (sLit "Coercion env:") <+> ppr cenv) ]
 
 emptyCvSubst :: CvSubst
 emptyCvSubst = CvSubst emptyInScopeSet emptyVarEnv emptyVarEnv
@@ -1357,8 +1357,8 @@ substCoVarBndr subst@(CvSubst in_scope tenv cenv) old_var
 
     new_var = uniqAway in_scope subst_old_var
     subst_old_var = mkCoVar (varName old_var) (substTy subst (varType old_var))
-		  -- It's important to do the substitution for coercions,
-		  -- because they can have free type variables
+                  -- It's important to do the substitution for coercions,
+                  -- because they can have free type variables
 
 substTyVarBndr :: CvSubst -> TyVar -> (CvSubst, TyVar)
 substTyVarBndr (CvSubst in_scope tenv cenv) old_var
@@ -1448,9 +1448,9 @@ lookupCoVar (CvSubst _ _ cenv) v = lookupVarEnv cenv v
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                    "Lifting" substitution
-	   [(TyVar,Coercion)] -> Type -> Coercion
+           [(TyVar,Coercion)] -> Type -> Coercion
 %*                                                                      *
 %************************************************************************
 
@@ -1530,8 +1530,8 @@ ty_co_subst subst role ty
     go Phantom ty             = lift_phantom ty
     go role (TyVarTy tv)      = liftCoSubstTyVar subst role tv
                                 `orElse` Refl role (TyVarTy tv)
-       			     -- A type variable from a non-cloned forall
-			     -- won't be in the substitution
+                             -- A type variable from a non-cloned forall
+                             -- won't be in the substitution
     go role (AppTy ty1 ty2)   = mkAppCo (go role ty1) (go Nominal ty2)
     go role (TyConApp tc tys) = mkTyConAppCo role tc
                                            (zipWith go (tyConRolesX role tc) tys)
@@ -1581,7 +1581,7 @@ liftCoSubstTyVarBndr subst@(LCS in_scope cenv) old_var
   = (LCS (in_scope `extendInScopeSet` new_var) new_cenv, new_var)
   where
     new_cenv | no_change = delVarEnv cenv old_var
-	     | otherwise = extendVarEnv cenv old_var (Refl Nominal (TyVarTy new_var))
+             | otherwise = extendVarEnv cenv old_var (Refl Nominal (TyVarTy new_var))
 
     no_change = no_kind_change && (new_var == old_var)
 
@@ -1665,7 +1665,7 @@ ty_co_match menv cenv (TyVarTy tv1) co
 
   | otherwise    -- tv1 is not a template ty var, so the only thing it
                  -- can match is a reflexivity coercion for itself.
-		 -- But that case is dealt with already
+                 -- But that case is dealt with already
   = Nothing
 
   where
@@ -1673,7 +1673,7 @@ ty_co_match menv cenv (TyVarTy tv1) co
     tv1' = rnOccL rn_env tv1
 
 ty_co_match menv subst (AppTy ty1 ty2) co
-  | Just (co1, co2) <- splitAppCo_maybe co	-- c.f. Unify.match on AppTy
+  | Just (co1, co2) <- splitAppCo_maybe co      -- c.f. Unify.match on AppTy
   = do { subst' <- ty_co_match menv subst ty1 co1
        ; ty_co_match menv subst' ty2 co2 }
 
@@ -1707,9 +1707,9 @@ pushRefl _                          = Nothing
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
             Sequencing on coercions
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1736,9 +1736,9 @@ seqCos (co:cos) = seqCo co `seq` seqCos cos
 
 
 %************************************************************************
-%*									*
-	     The kind of a type, and of a coercion
-%*									*
+%*                                                                      *
+             The kind of a type, and of a coercion
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
