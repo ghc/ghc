@@ -16,6 +16,7 @@ build-type:     Configure
 
 extra-tmp-files:
     autom4te.cache
+    base.buildinfo
     config.log
     config.status
     include/EventConfig.h
@@ -290,8 +291,6 @@ Library
         HsBase.h
     install-includes:
         HsBase.h
-        HsBaseConfig.h
-        EventConfig.h
         WCsubst.h
         consUtils.h
         Typeable.h
