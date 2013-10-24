@@ -261,7 +261,7 @@ test('T783',
             # 2012-10-08: 226907420 (x86/Linux)
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
-           (wordsize(64), 734038080, 10)]),
+           (wordsize(64), 654804144, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -270,6 +270,8 @@ test('T783',
             #    other perf tests remained about the same)
             # 18/10/2013: 734038080 (amd64/Linux)
             #   (fix for #8456)
+            # 24/10/2013: 654804144 (amd64/Linux)
+            #   (fix previous fix for #8456)
       extra_hc_opts('-static')
       ],
       compile,[''])
