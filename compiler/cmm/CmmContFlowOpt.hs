@@ -198,9 +198,8 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      maybe_concat block (blocks, shortcut_map, backEdges)
         -- If:
         --   (1) current block ends with unconditional branch to b' and
-        --   (2) it has exactly one predecessor (namely, current block) and
-        --   (3) we have not mapped any other label to b'
-        --       (see Note [Shortcut call returns]).
+        --   (2) it has exactly one predecessor (namely, current block)
+        --
         -- Then:
         --   (1) append b' block at the end of current block
         --   (2) remove b' from the map of blocks
@@ -211,10 +210,12 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         -- shorcutable and has only one predecessor and attempted to shortcut it
         -- first we would make that block unreachable but would not remove it
         -- from the graph.
+        --
+        -- Note that we always maintain an up-to-date list of predecessors, so
+        -- we can ignore the contents of shortcut_map
         | CmmBranch b' <- last
-        , Just blk' <- mapLookup b' blocks
         , hasOnePredecessor b'
-        , hasNotBeenMappedTo b' shortcut_map
+        , Just blk' <- mapLookup b' blocks
         = let bid' = entryLabel blk'
           in ( mapDelete bid' $ mapInsert bid (splice head blk') blocks
              , shortcut_map
@@ -314,9 +315,6 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
           numPreds bid = mapLookup bid backEdges `orElse` 0
 
           hasOnePredecessor b = numPreds b == 1
-
-          hasNotBeenMappedTo :: BlockId -> BlockEnv BlockId -> Bool
-          hasNotBeenMappedTo b successor_map = mapMember b successor_map
 
 -- Functions for incrementing and decrementing number of predecessors. If
 -- decrementing would set the predecessor count to 0, we remove entry from the
