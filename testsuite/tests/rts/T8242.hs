@@ -13,7 +13,8 @@ import GHC.Exts
 foreign import ccall unsafe "&puts" puts :: FunPtr (Ptr CChar -> IO ())
 
 main :: IO ()
-main = alloca $ \ptr@(Ptr p) -> do
+main = do
+  ptr@(Ptr p) <- malloc
   poke (ptr :: Ptr CChar) 0
   setNumCapabilities 2
   let !(FunPtr puts#) = puts
