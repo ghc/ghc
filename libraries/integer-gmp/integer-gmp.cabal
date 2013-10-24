@@ -3,35 +3,67 @@ version:        0.5.1.0
 -- GHC 7.6.1 released with 0.5.0.0
 license:        BSD3
 license-file:   LICENSE
+category:       Numerical
 maintainer:     libraries@haskell.org
-bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29
+bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29&keywords=integer-gmp
 synopsis:       Integer library based on GMP
 description:
     This package contains an Integer library based on GMP.
-cabal-version:  >=1.6
-build-type: Configure
+build-type:     Configure
+cabal-version:  >=1.10
 
 extra-source-files:
-  cbits/float.c
-  cbits/alloc.c
-  cbits/longlong.c
+    aclocal.m4
+    cbits/alloc.c
+    cbits/float.c
+    cbits/gmp-wrappers.cmm
+    cbits/longlong.c
+    config.guess
+    config.sub
+    configure
+    configure.ac
+    gmp/config.mk.in
+    install-sh
+    integer-gmp.buildinfo.in
+
+extra-tmp-files:
+    autom4te.cache
+    config.log
+    config.status
 
 source-repository head
     type:     git
     location: http://git.haskell.org/packages/integer-gmp.git
 
-Library {
-    build-depends: ghc-prim
-    exposed-modules: GHC.Integer
-                     GHC.Integer.GMP.Internals
-                     GHC.Integer.GMP.Prim
-                     GHC.Integer.Logarithms
-                     GHC.Integer.Logarithms.Internals
-    other-modules: GHC.Integer.Type
-    extensions: CPP, MagicHash, UnboxedTuples, NoImplicitPrelude,
-                ForeignFunctionInterface, UnliftedFFITypes
+source-repository this
+    type:     git
+    location: http://git.haskell.org/packages/integer-gmp.git
+    tag:      integer-gmp-0.5.1.0-release
+
+Library
+    default-language: Haskell2010
+    other-extensions:
+        BangPatterns
+        CPP
+        GHCForeignImportPrim
+        MagicHash
+        NoImplicitPrelude
+        UnboxedTuples
+        UnliftedFFITypes
+
+    exposed-modules:
+        GHC.Integer
+        GHC.Integer.GMP.Internals
+        GHC.Integer.GMP.Prim
+        GHC.Integer.Logarithms
+        GHC.Integer.Logarithms.Internals
+    other-modules:
+        GHC.Integer.Type
+
     c-sources: cbits/cbits.c
+
+    build-depends: ghc-prim >= 0.3.1 && < 0.4
+
     -- We need to set the package name to integer-gmp
     -- (without a version number) as it's magic.
-    ghc-options: -package-name integer-gmp
-}
+    ghc-options: -Wall -package-name integer-gmp

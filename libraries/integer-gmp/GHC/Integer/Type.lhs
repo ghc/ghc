@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE BangPatterns, CPP, MagicHash, NoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns, CPP, UnboxedTuples, UnliftedFFITypes, MagicHash, NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -- Commentary of Integer library is located on the wiki:

@@ -1,6 +1,5 @@
-{-# LANGUAGE ForeignFunctionInterface, GHCForeignImportPrim, CPP,
-             MagicHash, UnboxedTuples, UnliftedFFITypes, BangPatterns #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns, CPP, MagicHash, NoImplicitPrelude, UnboxedTuples
+           , UnliftedFFITypes, GHCForeignImportPrim #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 #include "MachDeps.h"
