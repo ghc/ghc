@@ -1,4 +1,4 @@
-{-# LANGUAGE UnboxedTuples, RoleAnnotations #-}
+{-# LANGUAGE DeriveDataTypeable, MagicHash, PolymorphicComponents, RoleAnnotations, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |

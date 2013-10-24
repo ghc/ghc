@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, MagicHash #-}
 
 -- | Monadic front-end to Text.PrettyPrint
 
