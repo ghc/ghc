@@ -30,6 +30,8 @@ extra-tmp-files:
     autom4te.cache
     config.log
     config.status
+    gmp/config.mk
+    integer-gmp.buildinfo
 
 source-repository head
     type:     git
