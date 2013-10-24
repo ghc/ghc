@@ -10,12 +10,12 @@ FamInstEnv: Type checked family instance declarations
 
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
-        famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon, 
-        pprFamInst, pprFamInstHdr, pprFamInsts, 
+        famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
+        pprFamInst, pprFamInstHdr, pprFamInsts,
         mkImportedFamInst,
 
-        FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs, 
-        extendFamInstEnv, deleteFromFamInstEnv, extendFamInstEnvList, 
+        FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
+        extendFamInstEnv, deleteFromFamInstEnv, extendFamInstEnvList,
         identicalFamInst, famInstEnvElts, familyInstances, orphNamesOfFamInst,
 
         -- * CoAxioms
@@ -26,7 +26,7 @@ module FamInstEnv (
         lookupFamInstEnv, lookupFamInstEnvConflicts,
 
         isDominatedBy,
-        
+
         -- Normalisation
         chooseBranch, topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
@@ -75,7 +75,7 @@ Note [FamInsts and CoAxioms]
 * A CoAxiom is a System-FC thing: it can relate any two types
 
 * A FamInst is a Haskell source-language thing, corresponding
-  to a type/data family instance declaration.  
+  to a type/data family instance declaration.
     - The FamInst contains a CoAxiom, which is the evidence
       for the instance
 
@@ -88,9 +88,9 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
                                                -- by this family instance
             , fi_flavor :: FamFlavor
 
-            -- Everything below here is a redundant, 
+            -- Everything below here is a redundant,
             -- cached version of the two things above
-            -- except that the TyVars are freshened 
+            -- except that the TyVars are freshened
             , fi_fam   :: Name          -- Family name
 
                 -- Used for "rough matching"; same idea as for class instances
@@ -110,7 +110,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             , fi_rhs    :: Type         --   the RHS, with its freshened vars
             }
 
-data FamFlavor 
+data FamFlavor
   = SynFamilyInst         -- A synonym family
   | DataFamilyInst TyCon  -- A data family, with its representation TyCon
 \end{code}
@@ -140,13 +140,13 @@ famInstsRepTyCons fis = [tc | FamInst { fi_flavor = DataFamilyInst tc } <- fis]
 
 -- Extracts the TyCon for this *data* (or newtype) instance
 famInstRepTyCon_maybe :: FamInst -> Maybe TyCon
-famInstRepTyCon_maybe fi 
+famInstRepTyCon_maybe fi
   = case fi_flavor fi of
        DataFamilyInst tycon -> Just tycon
        SynFamilyInst        -> Nothing
 
 dataFamInstRepTyCon :: FamInst -> TyCon
-dataFamInstRepTyCon fi 
+dataFamInstRepTyCon fi
   = case fi_flavor fi of
        DataFamilyInst tycon -> tycon
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
@@ -180,10 +180,10 @@ pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
   = pprTyConSort <+> pp_instance <+> pprHead
   where
     (fam_tc, tys) = famInstSplitLHS fi
-    
-    -- For *associated* types, say "type T Int = blah" 
+
+    -- For *associated* types, say "type T Int = blah"
     -- For *top level* type instances, say "type instance T Int = blah"
-    pp_instance 
+    pp_instance
       | isTyConAssoc fam_tc = empty
       | otherwise           = ptext (sLit "instance")
 
@@ -233,7 +233,7 @@ mkImportedFamInst fam mb_tcs axiom
       fi_rhs    = rhs,
       fi_axiom  = axiom,
       fi_flavor = flavor }
-  where 
+  where
      -- See Note [Lazy axiom match]
      ~(CoAxiom { co_ax_branches =
        ~(FirstBranch ~(CoAxBranch { cab_lhs = tys
@@ -272,7 +272,7 @@ Neverthless it is still useful to have data families in the FamInstEnv:
  - For finding the representation type...see FamInstEnv.topNormaliseType
    and its call site in Simplify
 
- - In standalone deriving instance Eq (T [Int]) we need to find the 
+ - In standalone deriving instance Eq (T [Int]) we need to find the
    representation type for T [Int]
 
 Note [Varying number of patterns for data family axioms]
@@ -330,7 +330,7 @@ familyInstances (pkg_fie, home_fie) fam
 
 -- | Collects the names of the concrete types and type constructors that
 -- make up the LHS of a type family instance, including the family
--- name itself. 
+-- name itself.
 --
 -- For instance, given `type family Foo a b`:
 -- `type instance Foo (F (G (H a))) b = ...` would yield [Foo,F,G,H]
@@ -616,7 +616,7 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
   = lookup_fam_inst_env my_unify envs fam tys
   where
     (fam, tys) = famInstSplitLHS fam_inst
-        -- In example above,   fam tys' = F [b]   
+        -- In example above,   fam tys' = F [b]
 
     my_unify (FamInst { fi_axiom = old_axiom }) tpl_tvs tpl_tys _
        = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
@@ -643,7 +643,7 @@ Note [Family instance overlap conflicts]
   overlap substitution.  eg
        type instance F a Int = a
        type instance F Int b = b
-  These two overlap on (F Int Int) but then both RHSs are Int, 
+  These two overlap on (F Int Int) but then both RHSs are Int,
   so all is well. We require that they are syntactically equal;
   anything else would be difficult to test for at this stage.
 
@@ -668,7 +668,7 @@ lookup_fam_inst_env' match_fun ie fam match_tys
   where
 
     find [] = []
-    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, 
+    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs,
                           fi_tys = tpl_tys }) : rest)
         -- Fast check for no match, uses the "rough match" fields
       | instanceCantMatch rough_tcs mb_tcs
@@ -686,7 +686,7 @@ lookup_fam_inst_env' match_fun ie fam match_tys
 
       where
         (rough_tcs, match_tys1, match_tys2) = split_tys tpl_tys
-      
+
       -- Precondition: the tycon is saturated (or over-saturated)
 
     -- Deal with over-saturation
@@ -712,7 +712,7 @@ lookup_fam_inst_env           -- The worker, local to this module
 
 -- Precondition: the tycon is saturated (or over-saturated)
 
-lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys = 
+lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys =
     lookup_fam_inst_env' match_fun home_ie fam tys ++
     lookup_fam_inst_env' match_fun pkg_ie  fam tys
 
@@ -728,12 +728,12 @@ The type instance gives rise to a newtype TyCon (at a higher kind
 which you can't do in Haskell!):
      newtype FPair a b = FP (Either (a->b))
 
-Then looking up (F (Int,Bool) Char) will return a FamInstMatch 
+Then looking up (F (Int,Bool) Char) will return a FamInstMatch
      (FPair, [Int,Bool,Char])
 
 The "extra" type argument [Char] just stays on the end.
 
-Because of eta-reduction of data family instances (see 
+Because of eta-reduction of data family instances (see
 Note [Eta reduction for data family axioms] in TcInstDecls), we must
 handle data families and type families separately here. All instances
 of a type family must have the same arity, so we can precompute the split
@@ -938,8 +938,8 @@ normaliseType :: FamInstEnvs            -- environment with family instances
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- Returns with Refl if nothing happens
 
-normaliseType env role ty 
-  | Just ty' <- coreView ty = normaliseType env role ty' 
+normaliseType env role ty
+  | Just ty' <- coreView ty = normaliseType env role ty'
 normaliseType env role (TyConApp tc tys)
   = normaliseTcApp env role tc tys
 normaliseType _env role ty@(LitTy {}) = (Refl role ty, ty)
@@ -989,7 +989,7 @@ flattenTys in_scope tys = snd $ coreFlattenTys all_in_scope emptyTypeMap tys
     -- *anywhere* in the types we're flattening, even if locally-bound in
     -- a forall. That way, we can ensure consistency both within and outside
     -- of that forall.
-    all_in_scope = in_scope `extendInScopeSetSet` allTyVarsInTys tys 
+    all_in_scope = in_scope `extendInScopeSetSet` allTyVarsInTys tys
 
 coreFlattenTys :: InScopeSet -> FlattenMap -> [Type] -> (FlattenMap, [Type])
 coreFlattenTys in_scope = go []
