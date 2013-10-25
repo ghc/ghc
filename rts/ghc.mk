@@ -116,6 +116,9 @@ else
 # depend on libffi.so, but copy libffi.so*
 rts/dist/build/lib$(LIBFFI_NAME)$(soext): libffi/build/inst/lib/lib$(LIBFFI_NAME)$(soext)
 	cp libffi/build/inst/lib/lib$(LIBFFI_NAME)$(soext)* rts/dist/build
+ifeq "$(TargetOS_CPP)" "darwin"
+	install_name_tool -id @rpath/rts-$(rts_VERSION)/lib$(LIBFFI_NAME)$(soext) rts/dist/build/lib$(LIBFFI_NAME)$(soext)
+endif
 endif
 endif
 endif
@@ -204,7 +207,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/dist/libs.depend $$(
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages $$(LIBFFI_LIBS) `cat rts/dist/libs.depend` $$(rts_$1_OBJS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
-	$(call relative-dynlib-references,rts,dist,1)
+	$(call relative-dynlib-references,rts,dist,1,$1)
 endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)

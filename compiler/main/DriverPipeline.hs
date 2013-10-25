@@ -1900,6 +1900,13 @@ linkBinary' staticLink dflags o_files dep_packages = do
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
+                      ++ (if platformOS platform == OSDarwin &&
+                             not staticLink &&
+                             not (gopt Opt_Static dflags) &&
+                             gopt Opt_RPath dflags
+                          then ["-Wl,-rpath","-Wl," ++ topDir dflags]
+                          else [])
+
                       ++ o_files
                       ++ lib_path_opts)
                       ++ extra_ld_inputs
