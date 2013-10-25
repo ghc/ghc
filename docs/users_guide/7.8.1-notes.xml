@@ -779,6 +779,23 @@
                     Version number XXXX (was XXXX)
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    The function <literal>findExecutables</literal>
+                    now correctly checks to see if the execute bit is
+                    set on Linux, rather than just looking in
+                    <literal>$PATH</literal>.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    There are several new functions for finding files,
+                    including <literal>findFiles</literal> and
+                    <literal>findFilesWith</literal>, which allow you
+                    to search for a file given a set of filepaths, and
+                    run a predicate over them.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
