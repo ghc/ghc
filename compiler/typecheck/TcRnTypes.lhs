@@ -66,7 +66,7 @@ module TcRnTypes(
         CtEvidence(..),
         mkGivenLoc,
         isWanted, isGiven,
-        isDerived, canSolve, canRewrite,
+        isDerived, canRewrite,
         CtFlavour(..), ctEvFlavour, ctFlavour,
 
         -- Pretty printing
@@ -1249,6 +1249,7 @@ data Implication
 
       ic_given  :: [EvVar],      -- Given evidence variables
                                  --   (order does not matter)
+                                 -- See Invariant (GivenInv) in TcType
 
       ic_env   :: TcLclEnv,      -- Gives the source location and error context
                                  -- for the implicatdion, and hence for all the
@@ -1428,8 +1429,8 @@ isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
 
-canSolve :: CtFlavour -> CtFlavour -> Bool
--- canSolve ctid1 ctid2
+canRewrite :: CtFlavour -> CtFlavour -> Bool
+-- canRewrite ctid1 ctid2
 -- The constraint ctid1 can be used to solve ctid2
 -- "to solve" means a reaction where the active parts of the two constraints match.
 --  active(F xis ~ xi) = F xis
@@ -1437,18 +1438,13 @@ canSolve :: CtFlavour -> CtFlavour -> Bool
 --  active(D xis)      = D xis
 --  active(IP nm ty)   = nm
 --
--- NB:  either (a `canSolve` b) or (b `canSolve` a) must hold
+-- NB:  either (a `canRewrite` b) or (b `canRewrite` a) must hold
 -----------------------------------------
-canSolve Given   _       = True
-canSolve Wanted  Derived = True
-canSolve Wanted  Wanted  = True
-canSolve Derived Derived = True  -- Derived can't solve wanted/given
-canSolve _ _ = False                       -- No evidence for a derived, anyway
-
-canRewrite :: CtFlavour -> CtFlavour -> Bool
--- canRewrite ct1 ct2
--- The equality constraint ct1 can be used to rewrite inside ct2
-canRewrite = canSolve
+canRewrite Given   _       = True
+canRewrite Wanted  Derived = True
+canRewrite Wanted  Wanted  = True
+canRewrite Derived Derived = True  -- Derived can't solve wanted/given
+canRewrite _ _ = False             -- No evidence for a derived, anyway
 \end{code}
 
 %************************************************************************

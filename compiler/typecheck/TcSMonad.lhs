@@ -28,7 +28,7 @@ module TcSMonad (
     isWanted, isDerived, 
     isGivenCt, isWantedCt, isDerivedCt, 
 
-    canRewrite, canSolve,
+    canRewrite, 
     mkGivenLoc, 
 
     TcS, runTcS, runTcSWithEvBinds, failTcS, panicTcS, traceTcS, -- Basic functionality 

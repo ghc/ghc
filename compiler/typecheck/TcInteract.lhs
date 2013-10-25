@@ -275,6 +275,7 @@ ppr_kicked :: Int -> SDoc
 ppr_kicked 0 = empty
 ppr_kicked n = parens (int n <+> ptext (sLit "kicked out")) 
 \end{code}
+
 Note [Spontaneously solved in TyBinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we encounter a constraint ([W] alpha ~ tau) which can be spontaneously solved,
@@ -698,7 +699,7 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
        ; emitWorkNC d2 ctevs 
        ; return (IRWorkItemConsumed "FunEq/FunEq") }
 
-  | fl2 `canSolve` fl1
+  | w_solves_i
   = ASSERT( lhss_match )   -- extractRelevantInerts ensures this
     do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
@@ -724,9 +725,9 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
     fl1 = ctEvFlavour ev1
     fl2 = ctEvFlavour ev2
 
-    i_solves_w = fl1 `canSolve` fl2 
-    w_solves_i = fl2 `canSolve` fl1 
-    
+    i_solves_w = fl1 `canRewrite` fl2 
+    w_solves_i = fl2 `canRewrite` fl1 
+
 
 doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 \end{code}

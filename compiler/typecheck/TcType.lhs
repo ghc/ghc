@@ -404,6 +404,12 @@ Note [Untouchable type variables]
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication.
 
+* INVARIANT
+    (GivenInv)  The free variables of the ic_given of an
+                implication are all untouchable; ie their level
+                numbers are LESS THAN the ic_untch of the implication
+
+
 Note [Skolem escape prevention]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We only unify touchable unification variables.  Because of
