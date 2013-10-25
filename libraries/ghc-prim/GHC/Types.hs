@@ -155,5 +155,11 @@ isTrue# x = tagToEnum# x
 -- you're reading this in 2023 then things went wrong). See #8326.
 --
 
--- | Lorem ipsum...
+-- | SPEC is used by GHC in the @SpecConstr@ pass in order to inform
+-- the compiler when to be particularly aggressive. In particular, it
+-- tells GHC to specialize regardless of size or the number of
+-- specializations. However, not all loops fall into this category.
+--
+-- Libraries can specify this by using 'SPEC' data type to inform which
+-- loops should be aggressively specialized.
 data SPEC = SPEC | SPEC2
