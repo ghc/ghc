@@ -810,7 +810,7 @@ wrapInEqRCase e mkBody = do
   cov <- newSysLocalDs (mkCoercionType Representational ty1 ty2)
   body' <- mkBody (mkCoVarCo cov)
   return $
-        ASSERT (tc == coercibleTyCon)
+        ASSERT(tc == coercibleTyCon)
         mkWildCase
                 e
                 (exprType e)

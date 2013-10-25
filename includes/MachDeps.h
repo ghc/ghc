@@ -100,8 +100,10 @@
 #ifndef WORD_SIZE_IN_BITS
 #if SIZEOF_HSWORD == 4
 #define WORD_SIZE_IN_BITS       32
+#define WORD_SIZE_IN_BITS_FLOAT 32.0
 #else 
 #define WORD_SIZE_IN_BITS       64
+#define WORD_SIZE_IN_BITS_FLOAT 64.0
 #endif
 #endif
 

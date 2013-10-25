@@ -241,7 +241,7 @@ string_table = unsafePerformIO $ do
   tab <- IO $ \s1# -> case newArray# hASH_TBL_SIZE_UNBOXED (panic "string_table") s1# of
                           (# s2#, arr# #) ->
                               (# s2#, FastStringTable uid arr# #)
-  forM_ [0..hASH_TBL_SIZE-1] $ \i -> do
+  forM_ [0.. hASH_TBL_SIZE-1] $ \i -> do
      bucket <- newIORef []
      updTbl tab i bucket
 
@@ -544,7 +544,7 @@ nilFS = mkFastString ""
 
 getFastStringTable :: IO [[FastString]]
 getFastStringTable = do
-  buckets <- forM [0..hASH_TBL_SIZE-1] $ \idx -> do
+  buckets <- forM [0.. hASH_TBL_SIZE-1] $ \idx -> do
     bucket <- lookupTbl string_table idx
     readIORef bucket
   return buckets
