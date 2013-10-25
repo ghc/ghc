@@ -54,10 +54,12 @@ test('char002', 	normal, compile_and_run, [''])
 test('cstring001', 	normal, compile_and_run, [''])
 
 test('length001',
-     # This fails without -O, as it relies on a RULE being applied
-     expect_fail_for(['normal', 'threaded1', 'llvm']),
-     compile_and_run,
-     [''])
+     # length001 depends on a RULE being applied, and without -O takes
+     # excessive amounts of stack space. So we specifically set a low
+     # stack limit and mark it as failing under a few conditions.
+     [extra_run_opts('+RTS -K8m -RTS'),
+     expect_fail_for(['normal', 'threaded1', 'llvm'])],
+     compile_and_run, [''])
 
 test('ratio001', 	normal, compile_and_run, [''])
 
