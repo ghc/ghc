@@ -29,6 +29,7 @@
 #include "StgPrimFloat.h" // for __int_encodeFloat etc.
 #include "Proftimer.h"
 #include "GetEnv.h"
+#include "Stable.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
