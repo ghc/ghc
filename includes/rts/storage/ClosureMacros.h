@@ -485,7 +485,10 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
    -------------------------------------------------------------------------- */
 
-#if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
+#define ZERO_SLOP_FOR_LDV_PROF     (defined(PROFILING))
+#define ZERO_SLOP_FOR_SANITY_CHECK (defined(DEBUG) && !defined(THREADED_RTS))
+
+#if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
 #define OVERWRITING_CLOSURE(c) overwritingClosure(c)
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
@@ -500,8 +503,8 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
     nat size, i;
 
-#if defined(PROFILING) && !defined(DEBUG)
-    // see Note [zeroing slop]
+#if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
+    // see Note [zeroing slop], also #8402
     if (era <= 0) return;
 #endif
 
