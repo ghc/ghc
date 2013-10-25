@@ -366,7 +366,7 @@ We gather two sorts of usage information
                (see RnNames.reportUnusedNames)
            (b) to generate version-tracking usage info in interface
                files (see MkIface.mkUsedNames)
-   This usage info is mainly gathered by the renamer's 
+   This usage info is mainly gathered by the renamer's
    gathering of free-variables
 
  * tcg_used_rdrnames
@@ -374,7 +374,7 @@ We gather two sorts of usage information
       Used only to report unused import declarations
       Notice that they are RdrNames, not Names, so we can
       tell whether the reference was qualified or unqualified, which
-      is esssential in deciding whether a particular import decl 
+      is esssential in deciding whether a particular import decl
       is unnecessary.  This info isn't present in Names.
 
 
@@ -484,9 +484,9 @@ data TcLclEnv           -- Changes as we move inside an expression
 
 type TcTypeEnv = NameEnv TcTyThing
 
-data TcIdBinder 
-  = TcIdBndr 
-       TcId 
+data TcIdBinder
+  = TcIdBndr
+       TcId
        TopLevelFlag    -- Tells whether the bindind is syntactically top-level
                        -- (The monomorphic Ids for a recursive group count
                        --  as not-top-level for this purpose.)
@@ -869,7 +869,7 @@ The @WhereFrom@ type controls where the renamer looks for an interface file
 data WhereFrom
   = ImportByUser IsBootInterface        -- Ordinary user import (perhaps {-# SOURCE #-})
   | ImportBySystem                      -- Non user import.
-  | ImportByPlugin                      -- Importing a plugin; 
+  | ImportByPlugin                      -- Importing a plugin;
                                         -- See Note [Care with plugin imports] in LoadIface
 
 instance Outputable WhereFrom where
@@ -914,7 +914,7 @@ data Ct
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
       cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
-        -- The ctev_pred of the evidence is 
+        -- The ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)
         --      or   (tv1 ~ ty2)   where the CTyEqCan  kind invariant fails
         --      or   (F tys ~ ty)  where the CFunEqCan kind invariant fails
@@ -993,14 +993,14 @@ Eg wanted1 rewrites wanted2; if both were compatible kinds before,
    wanted2 will be afterwards.  Similarly givens.
 
 Caveat:
-  - Givens from higher-rank, such as: 
-          type family T b :: * -> * -> * 
-          type instance T Bool = (->) 
+  - Givens from higher-rank, such as:
+          type family T b :: * -> * -> *
+          type instance T Bool = (->)
 
-          f :: forall a. ((T a ~ (->)) => ...) -> a -> ... 
-          flop = f (...) True 
-     Whereas we would be able to apply the type instance, we would not be able to 
-     use the given (T Bool ~ (->)) in the body of 'flop' 
+          f :: forall a. ((T a ~ (->)) => ...) -> a -> ...
+          flop = f (...) True
+     Whereas we would be able to apply the type instance, we would not be able to
+     use the given (T Bool ~ (->)) in the body of 'flop'
 
 
 Note [CIrredEvCan constraints]
@@ -1011,12 +1011,12 @@ CIrredEvCan constraints are used for constraints that are "stuck"
    - but they may become soluble if we substitute for some
      of the type variables in the constraint
 
-Example 1:  (c Int), where c :: * -> Constraint.  We can't do anything 
+Example 1:  (c Int), where c :: * -> Constraint.  We can't do anything
             with this yet, but if later c := Num, *then* we can solve it
 
 Example 2:  a ~ b, where a :: *, b :: k, where k is a kind variable
             We don't want to use this to substitute 'b' for 'a', in case
-            'k' is subequently unifed with (say) *->*, because then 
+            'k' is subequently unifed with (say) *->*, because then
             we'd have ill-kinded types floating about.  Rather we want
             to defer using the equality altogether until 'k' get resolved.
 
@@ -1058,15 +1058,15 @@ dropDerivedWC wc@(WC { wc_flat = flats, wc_insol = insols })
 Note [Insoluble derived constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we discard derived constraints at the end of constraint solving;
-see dropDerivedWC.  For example, 
+see dropDerivedWC.  For example,
 
- * If we have an unsolved (Ord a), we don't want to complain about 
+ * If we have an unsolved (Ord a), we don't want to complain about
    an unsolved (Eq a) as well.
- * If we have kind-incompatible (a::* ~ Int#::#) equality, we 
-   don't want to complain about the kind error twice.  
+ * If we have kind-incompatible (a::* ~ Int#::#) equality, we
+   don't want to complain about the kind error twice.
 
-Arguably, for *some* derived constraints we might want to report errors. 
-Notably, functional dependencies.  If we have  
+Arguably, for *some* derived constraints we might want to report errors.
+Notably, functional dependencies.  If we have
     class C a b | a -> b
 and we have
     [W] C a b, [W] C a c
@@ -1652,7 +1652,7 @@ data CtOrigin
   | HoleOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
-  
+
 pprO :: CtOrigin -> SDoc
 pprO (GivenOrigin sk)      = ppr sk
 pprO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
@@ -1660,8 +1660,8 @@ pprO AppOrigin             = ptext (sLit "an application")
 pprO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
 pprO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
 pprO RecordUpdOrigin       = ptext (sLit "a record update")
-pprO (AmbigOrigin ctxt)    = ptext (sLit "the ambiguity check for") 
-                             <+> case ctxt of 
+pprO (AmbigOrigin ctxt)    = ptext (sLit "the ambiguity check for")
+                             <+> case ctxt of
                                     FunSigCtxt name -> quotes (ppr name)
                                     InfSigCtxt name -> quotes (ppr name)
                                     _               -> pprUserTypeCtxt ctxt
