@@ -260,10 +260,10 @@ split_free_block (bdescr *bd, W_ n, nat ln)
 }
 
 static bdescr *
-alloc_mega_group (nat mblocks)
+alloc_mega_group (StgWord mblocks)
 {
     bdescr *best, *bd, *prev;
-    nat n;
+    StgWord n;
 
     n = MBLOCK_GROUP_BLOCKS(mblocks);
 
@@ -314,13 +314,13 @@ bdescr *
 allocGroup (W_ n)
 {
     bdescr *bd, *rem;
-    nat ln;
+    StgWord ln;
 
     if (n == 0) barf("allocGroup: requested zero blocks");
     
     if (n >= BLOCKS_PER_MBLOCK)
     {
-        nat mblocks;
+        StgWord mblocks;
 
         mblocks = BLOCKS_TO_MBLOCKS(n);
 
@@ -409,7 +409,7 @@ bdescr *
 allocLargeChunk (W_ min, W_ max)
 {
     bdescr *bd;
-    nat ln, lnmax;
+    StgWord ln, lnmax;
 
     if (min >= BLOCKS_PER_MBLOCK) {
         return allocGroup(max);
@@ -531,7 +531,7 @@ free_mega_group (bdescr *mg)
 void
 freeGroup(bdescr *p)
 {
-  nat ln;
+  StgWord ln;
 
   // Todo: not true in multithreaded GC
   // ASSERT_SM_LOCK();
@@ -548,7 +548,7 @@ freeGroup(bdescr *p)
 
   if (p->blocks >= BLOCKS_PER_MBLOCK)
   {
-      nat mblocks;
+      StgWord mblocks;
 
       mblocks = BLOCKS_TO_MBLOCKS(p->blocks);
       // If this is an mgroup, make sure it has the right number of blocks
@@ -692,13 +692,13 @@ countAllocdBlocks(bdescr *bd)
 void returnMemoryToOS(nat n /* megablocks */)
 {
     static bdescr *bd;
-    nat size;
+    StgWord size;
 
     bd = free_mblock_list;
     while ((n > 0) && (bd != NULL)) {
         size = BLOCKS_TO_MBLOCKS(bd->blocks);
         if (size > n) {
-            nat newSize = size - n;
+            StgWord newSize = size - n;
             char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
             freeAddr += newSize * MBLOCK_SIZE;
             bd->blocks = MBLOCK_GROUP_BLOCKS(newSize);
@@ -746,12 +746,13 @@ void
 checkFreeListSanity(void)
 {
     bdescr *bd, *prev;
-    nat ln, min;
+    StgWord ln, min;
 
 
     min = 1;
     for (ln = 0; ln < MAX_FREE_LIST; ln++) {
-        IF_DEBUG(block_alloc, debugBelch("free block list [%d]:\n", ln));
+        IF_DEBUG(block_alloc,
+                 debugBelch("free block list [%" FMT_Word "]:\n", ln));
 
         prev = NULL;
         for (bd = free_list[ln]; bd != NULL; prev = bd, bd = bd->link)
@@ -817,7 +818,7 @@ countFreeList(void)
 {
   bdescr *bd;
   W_ total_blocks = 0;
-  nat ln;
+  StgWord ln;
 
   for (ln=0; ln < MAX_FREE_LIST; ln++) {
       for (bd = free_list[ln]; bd != NULL; bd = bd->link) {
