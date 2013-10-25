@@ -19,7 +19,8 @@ module GHC.Types (
         Bool(..), Char(..), Int(..), Word(..),
         Float(..), Double(..),
         Ordering(..), IO(..),
-        isTrue#
+        isTrue#,
+        SPEC(..)
     ) where
 
 import GHC.Prim
@@ -153,3 +154,6 @@ isTrue# x = tagToEnum# x
 -- just make isTrue# an alias to tagToEnum#. This is a temporary solution (if
 -- you're reading this in 2023 then things went wrong). See #8326.
 --
+
+-- | Lorem ipsum...
+data SPEC = SPEC | SPEC2
