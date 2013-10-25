@@ -295,8 +295,8 @@ walk :: DynFlags
 
      -> Assignments                     -- The current list of
                                         -- assignments we are sinking.
-                                        -- Later assignments may refer
-                                        -- to earlier ones.
+                                        -- Earlier assignments may refer
+                                        -- to later ones.
 
      -> ( Block CmmNode O O             -- The new block
         , Assignments                   -- Assignments to sink further
@@ -405,12 +405,15 @@ tryToInline dflags live node assigs = go usages node [] assigs
 
   go usages node skipped (a@(l,rhs,_) : rest)
    | cannot_inline           = dont_inline
+   | occurs_none             = discard  -- Note [discard during inlining]
    | occurs_once             = inline_and_discard
    | isTrivial rhs           = inline_and_keep
    | otherwise               = dont_inline
    where
         inline_and_discard = go usages' inl_node skipped rest
           where usages' = foldLocalRegsUsed dflags addUsage usages rhs
+
+        discard = go usages node skipped rest
 
         dont_inline        = keep node  -- don't inline the assignment, keep it
         inline_and_keep    = keep inl_node -- inline the assignment, keep it
@@ -427,8 +430,11 @@ tryToInline dflags live node assigs = go usages node [] assigs
                         || l `elem` skipped
                         || not (okToInline dflags rhs node)
 
-        occurs_once = not (l `elemRegSet` live)
-                      && lookupUFM usages l == Just 1
+        l_usages = lookupUFM usages l
+        l_live   = l `elemRegSet` live
+
+        occurs_once = not l_live && l_usages == Just 1
+        occurs_none = not l_live && l_usages == Nothing
 
         inl_node = mapExpDeep inline node
                    -- mapExpDeep is where the inlining actually takes place!
@@ -467,6 +473,22 @@ tryToInline dflags live node assigs = go usages node [] assigs
 -- might still be tempted to inline y = z (because we always inline
 -- trivial rhs's).  But of course we can't, because y is equal to e,
 -- not z.
+
+-- Note [discard during inlining]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Opportunities to discard assignments sometimes appear after we've
+-- done some inlining.  Here's an example:
+--
+--      x = R1;
+--      y = P64[x + 7];
+--      z = P64[x + 15];
+--      /* z is dead */
+--      R1 = y & (-8);
+--
+-- The x assignment is trivial, so we inline it in the RHS of y, and
+-- keep both x and y.  z gets dropped because it is dead, then we
+-- inline y, and we have a dead assignment to x.  If we don't notice
+-- that x is dead in tryToInline, we end up retaining it.
 
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
