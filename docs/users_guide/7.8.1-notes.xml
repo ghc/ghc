@@ -809,6 +809,17 @@
                      pragma.
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    There is a new type exposed by
+                    <literal>GHC.Types</literal>, called
+                    <literal>SPEC</literal>, which can be used to
+                    inform GHC to perform call-pattern specialisation
+                    extremely aggressively. See <xref
+                    linkend="options-optimise"/> for more details
+                    concerning <literal>-fspec-constr</literal>.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

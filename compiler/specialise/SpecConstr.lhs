@@ -1,6 +1,6 @@
-ToDo [Nov 2010]
+ToDo [Oct 2013]
 ~~~~~~~~~~~~~~~
-1. Use a library type rather than an annotation for ForceSpecConstr
+1. Nuke ForceSpecConstr for good (it is subsumed by GHC.Types.SPEC in ghc-prim)
 2. Nuke NoSpecConstr
 
 %
@@ -56,7 +56,7 @@ import Data.List
 import TyCon            ( TyCon, tyConName )
 import PrelNames        ( specTyConName )
 
--- See Note [SpecConstrAnnotation]
+-- See Note [Forcing specialisation]
 #ifndef GHCI
 type SpecConstrAnnotation = ()
 #else
@@ -423,27 +423,39 @@ But fspec doesn't have decent strictness info.  As it happened,
 and hence f.  But now f's strictness is less than its arity, which
 breaks an invariant.
 
-Note [SpecConstrAnnotation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-SpecConstrAnnotation is defined in GHC.Exts, and is only guaranteed to
-be available in stage 2 (well, until the bootstrap compiler can be
-guaranteed to have it)
-
-So we define it to be () in stage1 (ie when GHCI is undefined), and
-'#ifdef' out the code that uses it.
-
-See also Note [Forcing specialisation]
 
 Note [Forcing specialisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With stream fusion and in other similar cases, we want to fully specialise
-some (but not necessarily all!) loops regardless of their size and the
-number of specialisations. We allow a library to specify this by annotating
-a type with ForceSpecConstr and then adding a parameter of that type to the
-loop. Here is a (simplified) example from the vector library:
+
+With stream fusion and in other similar cases, we want to fully
+specialise some (but not necessarily all!) loops regardless of their
+size and the number of specialisations.
+
+We allow a library to do this, in one of two ways (one which is
+deprecated):
+
+  1) Add a parameter of type GHC.Types.SPEC (from ghc-prim) to the loop body.
+
+  2) (Deprecated) Annotate a type with ForceSpecConstr from GHC.Exts,
+     and then add *that* type as a parameter to the loop body
+
+The reason #2 is deprecated is because it requires GHCi, which isn't
+available for things like a cross compiler using stage1.
+
+Here's a (simplified) example from the `vector` package. You may bring
+the special 'force specialization' type into scope by saying:
+
+  import GHC.Types (SPEC(..))
+
+or by defining your own type (again, deprecated):
 
   data SPEC = SPEC | SPEC2
   {-# ANN type SPEC ForceSpecConstr #-}
+
+(Note this is the exact same definition of GHC.Types.SPEC, just
+without the annotation.)
+
+After that, you say:
 
   foldl :: (a -> b -> a) -> a -> Stream b -> a
   {-# INLINE foldl #-}
@@ -493,12 +505,6 @@ or tuples here, (b) we don't want to restrict the set of types that
 can be used in Stream states and (c) some types are fixed by the user
 (e.g., the accumulator here) but we still want to specialise as much
 as possible.
-
-ForceSpecConstr is done by way of an annotation:
-  data SPEC = SPEC | SPEC2
-  {-# ANN type SPEC ForceSpecConstr #-}
-But SPEC is the *only* type so annotated, so it'd be better to
-use a particular library type.
 
 Alternatives to ForceSpecConstr
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -906,7 +912,7 @@ decreaseSpecCount env n_specs
         -- See Note [Avoiding exponential blowup]
 
 ---------------------------------------------------
--- See Note [SpecConstrAnnotation]
+-- See Note [Forcing specialisation]
 ignoreType    :: ScEnv -> Type   -> Bool
 ignoreDataCon  :: ScEnv -> DataCon -> Bool
 forceSpecBndr :: ScEnv -> Var    -> Bool

@@ -1616,7 +1616,7 @@ module M where
             orphan rules or instances.  The flag <option>-fwarn-auto-orphans</option>
             warns about automatically-generated orphan rules, notably as a result of
             specialising functions, for type classes (<literal>Specialise</literal>)
-            or argument values (<literal>SpecConstr</literal>).</para>
+            or argument values (<literal>-fspec-constr</literal>).</para>
         </listitem>
       </varlistentry>
 
@@ -2187,7 +2187,7 @@ f "2"    = 2
             <para><emphasis>Off by default.</emphasis>Run demand analysis
             again, at the end of the simplification pipeline.  We found some opportunities
             for discovering strictness that were not visible earlier; and optimisations like
-            <literal>SpecConstr</literal> can create functions with unused arguments which
+            <literal>-fspec-constr</literal> can create functions with unused arguments which
             are eliminated by late demand analysis.  Improvements are modest, but so is the
             cost.  See notes on the <ulink href="http://ghc.haskell.org/trac/ghc/wiki/LateDmd">Trac wiki page</ulink>.
             </para>
@@ -2475,6 +2475,44 @@ last (x : xs) = last' x xs
             strict recursive branch of the function is created similar to the
             above example.
             </para>
+
+            <para>It is also possible for library writers to instruct
+            GHC to perform call-pattern specialisation extremely
+            aggressively. This is necessary for some highly optimized
+            libraries, where we may want to specialize regardless of
+            the number of specialisations, or the size of the code. As
+            an example, consider a simplified use-case from the
+            <literal>vector</literal> library:</para>
+<programlisting>
+import GHC.Types (SPEC(..))
+
+foldl :: (a -> b -> a) -> a -> Stream b -> a
+{-# INLINE foldl #-}
+foldl f z (Stream step s _) = foldl_loop SPEC z s
+  where
+    foldl_loop !sPEC z s = case step s of
+                            Yield x s' -> foldl_loop sPEC (f z x) s'
+                            Skip       -> foldl_loop sPEC z s'
+                            Done       -> z
+</programlisting>
+
+            <para>Here, after GHC inlines the body of
+            <literal>foldl</literal> to a call site, it will perform
+            call-pattern specialization very aggressively on
+            <literal>foldl_loop</literal> due to the use of
+            <literal>SPEC</literal> in the argument of the loop
+            body. <literal>SPEC</literal> from
+            <literal>GHC.Types</literal> is specifically recognized by
+            the compiler.</para>
+
+            <para>(NB: it is extremely important you use
+            <literal>seq</literal> or a bang pattern on the
+            <literal>SPEC</literal> argument!)</para>
+
+            <para>In particular, after inlining this will
+            expose <literal>f</literal> to the loop body directly,
+            allowing heavy specialisation over the recursive
+            cases.</para>
           </listitem>
         </varlistentry>
 
