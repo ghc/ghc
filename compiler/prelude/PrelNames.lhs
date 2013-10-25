@@ -305,6 +305,9 @@ basicKnownKeyNames
         -- The Ordering type
         , orderingTyConName, ltDataConName, eqDataConName, gtDataConName
 
+        -- The SPEC type for SpecConstr
+        , specTyConName
+
         -- The Either type
         , eitherTyConName, leftDataConName, rightDataConName
 
@@ -743,9 +746,12 @@ runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
 orderingTyConName, ltDataConName, eqDataConName, gtDataConName :: Name
 orderingTyConName = tcQual   gHC_TYPES (fsLit "Ordering") orderingTyConKey
-ltDataConName = conName gHC_TYPES (fsLit "LT") ltDataConKey
-eqDataConName = conName gHC_TYPES (fsLit "EQ") eqDataConKey
-gtDataConName = conName gHC_TYPES (fsLit "GT") gtDataConKey
+ltDataConName     = conName gHC_TYPES (fsLit "LT") ltDataConKey
+eqDataConName     = conName gHC_TYPES (fsLit "EQ") eqDataConKey
+gtDataConName     = conName gHC_TYPES (fsLit "GT") gtDataConKey
+
+specTyConName :: Name
+specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
 
 eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
@@ -838,7 +844,6 @@ joinMIdKey          = mkPreludeMiscIdUnique 750
 apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
 pureAClassOpKey     = mkPreludeMiscIdUnique 752
 alternativeClassKey = mkPreludeMiscIdUnique 753
-
 
 
 -- Functions for GHC extensions
@@ -1488,6 +1493,9 @@ coercibleTyConKey = mkPreludeTyConUnique 175
 
 proxyPrimTyConKey :: Unique
 proxyPrimTyConKey = mkPreludeTyConUnique 176
+
+specTyConKey :: Unique
+specTyConKey = mkPreludeTyConUnique 177
 
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299

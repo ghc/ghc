@@ -53,13 +53,13 @@ import UniqFM
 import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
-
+import TyCon            ( TyCon, tyConName )
+import PrelNames        ( specTyConName )
 
 -- See Note [SpecConstrAnnotation]
 #ifndef GHCI
 type SpecConstrAnnotation = ()
 #else
-import TyCon            ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 #endif
 \end{code}
@@ -910,11 +910,10 @@ decreaseSpecCount env n_specs
 ignoreType    :: ScEnv -> Type   -> Bool
 ignoreDataCon  :: ScEnv -> DataCon -> Bool
 forceSpecBndr :: ScEnv -> Var    -> Bool
+
 #ifndef GHCI
 ignoreType    _ _  = False
 ignoreDataCon  _ _ = False
-forceSpecBndr _ _  = False
-
 #else /* GHCI */
 
 ignoreDataCon env dc = ignoreTyCon env (dataConTyCon dc)
@@ -927,6 +926,7 @@ ignoreType env ty
 ignoreTyCon :: ScEnv -> TyCon -> Bool
 ignoreTyCon env tycon
   = lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
+#endif /* GHCI */
 
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
@@ -940,11 +940,13 @@ forceSpecArgTy env ty
 forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
   , tycon /= funTyCon
-      = lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
+      = tyConName tycon == specTyConName
+#ifdef GHCI
+        || lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
+#endif
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False
-#endif /* GHCI */
 \end{code}
 
 Note [Add scrutinee to ValueEnv too]
