@@ -671,18 +671,23 @@ simpl_loop :: Int
            -> Bag Implication
            -> TcS (Bag Implication)
 simpl_loop n implics
-  | n > 10 
+  | n > 10
   = traceTcS "solveWanteds: loop!" empty >> return implics
-  | otherwise 
+  | otherwise
   = do { traceTcS "simpl_loop, iteration" (int n)
        ; (floated_eqs, unsolved_implics) <- solveNestedImplications implics
-       ; if isEmptyBag floated_eqs 
-         then return unsolved_implics 
-         else 
+       ; if isEmptyBag floated_eqs
+         then return unsolved_implics
+         else
     do {   -- Put floated_eqs into the current inert set before looping
-         impls_from_eqs <- solveInteract floated_eqs
-       ; simpl_loop (n+1) (unsolved_implics `unionBags` impls_from_eqs)} }
-
+         (unifs_happened, impls_from_eqs) <- reportUnifications $
+                                             solveInteract floated_eqs
+       ; if   -- See Note [Cutting off simpl_loop]
+              isEmptyBag impls_from_eqs &&
+              not unifs_happened &&                 -- (a)
+              not (anyBag isCFunEqCan floated_eqs)  -- (b)
+         then return unsolved_implics
+         else simpl_loop (n+1) (unsolved_implics `unionBags` impls_from_eqs) } }
 
 solveNestedImplications :: Bag Implication
                         -> TcS (Cts, Bag Implication)
@@ -761,6 +766,43 @@ solveImplication inerts
        ; return (floated_eqs, res_implic) }
 \end{code}
 
+Note [Cutting off simpl_loop]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is very important not to iterate in simpl_loop unless there is a chance
+of progress.  Trac #8474 is a classic example:
+
+  * There's a deeply-nested chain of implication constraints.
+       ?x:alpha => ?y1:beta1 => ... ?yn:betan => [W] ?x:Int
+
+  * From the innermost one we get a [D] alpha ~ Int,
+    but alpha is untouchable until we get out to the outermost one
+
+  * We float [D] alpha~Int out (it is in floated_eqs), but since alpha
+    is untouchable, the solveInteract in simpl_loop makes no progress
+
+  * So there is no point in attempting to re-solve
+       ?yn:betan => [W] ?x:Int
+    because we'll just get the same [D] again
+
+  * If we *do* re-solve, we'll get an ininite loop. It is cut off by
+    the fixed bound of 10, but solving the next takes 10*10*...*10 (ie
+    exponentially many) iterations!
+
+Conclusion: we should iterate simpl_loop iff we will get more 'givens'
+in the inert set when solving the nested implications.  That is the
+result of prepareInertsForImplications is larger.  How can we tell
+this?
+
+Consider floated_eqs (all wanted or derived):
+
+(a) [W/D] CTyEqCan (a ~ ty).  This can give rise to a new given only by causing
+    a unification. So we count those unifications.
+
+(b) [W] CFunEqCan (F tys ~ xi).  Even though these are wanted, they
+    are pushed in as givens by prepareInertsForImplications.  See Note
+    [Preparing inert set for implications] in TcSMonad.  But because
+    of that very fact, we won't generate another copy if we iterate
+    simpl_loop.  So we iterate if there any of these
 
 \begin{code}
 floatEqualities :: [TcTyVar] -> [EvVar] -> WantedConstraints 

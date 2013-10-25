@@ -54,11 +54,11 @@ module TcSMonad (
     newDerived,
     
        -- Creation of evidence variables
-    setWantedTyBind,
+    setWantedTyBind, reportUnifications,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
-    getTcEvBindsMap, getTcSTyBinds, getTcSTyBindsMap,
+    getTcEvBindsMap, getTcSTyBindsMap,
 
 
     lookupFlatEqn, newFlattenSkolem,            -- Flatten skolems 
@@ -552,6 +552,9 @@ data InertCans
               --   a |-> ct,co
               -- Then ct = CTyEqCan { cc_tyvar = a, cc_rhs = xi } 
               -- And  co : a ~ xi
+              -- Some Refl equalities are also in tcs_ty_binds
+              -- see Note [Spontaneously solved in TyBinds] in TcInteract
+
        , inert_dicts :: CCanMap Class
               -- Dictionaries only, index is the class
               -- NB: index is /not/ the whole type because FD reactions 
@@ -964,18 +967,20 @@ added.  This is initialised from the innermost implication constraint.
 
 \begin{code}
 data TcSEnv
-  = TcSEnv { 
+  = TcSEnv {
       tcs_ev_binds    :: EvBindsVar,
-      
-      tcs_ty_binds :: IORef (TyVarEnv (TcTyVar, TcType)),
-          -- Global type bindings
-                     
-      tcs_count      :: IORef Int, -- Global step count
+
+      tcs_ty_binds :: IORef (Bool, TyVarEnv (TcTyVar, TcType)),
+          -- Global type bindings for unification variables
+          -- See Note [Spontaneously solved in TyBinds] in TcInteract
+          -- The "dirty-flag" Bool is set True when we add a binding
+
+      tcs_count    :: IORef Int, -- Global step count
 
       tcs_inerts   :: IORef InertSet, -- Current inert set
       tcs_worklist :: IORef WorkList, -- Current worklist
-      
-      -- Residual implication constraints that are generated 
+
+      -- Residual implication constraints that are generated
       -- while solving or canonicalising the current worklist.
       -- Specifically, when canonicalising (forall a. t1 ~ forall a. t2)
       -- from which we get the implication (forall a. t1 ~ t2)
@@ -1053,7 +1058,7 @@ runTcSWithEvBinds :: EvBindsVar
                   -> TcS a 
                   -> TcM a
 runTcSWithEvBinds ev_binds_var tcs
-  = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
+  = do { ty_binds_var <- TcM.newTcRef (False, emptyVarEnv)
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is 
 
@@ -1068,7 +1073,7 @@ runTcSWithEvBinds ev_binds_var tcs
 	     -- Run the computation
        ; res <- unTcS tcs env
 	     -- Perform the type unifications required
-       ; ty_binds <- TcM.readTcRef ty_binds_var
+       ; (_, ty_binds) <- TcM.readTcRef ty_binds_var
        ; mapM_ do_unification (varEnvElts ty_binds)
 
 #ifdef DEBUG
@@ -1148,13 +1153,15 @@ nestTcS (TcS thing_inside)
        ; thing_inside nest_env }
 
 tryTcS :: TcS a -> TcS a
--- Like runTcS, but from within the TcS monad 
--- Completely afresh inerts and worklist, be careful! 
--- Moreover, we will simply throw away all the evidence generated. 
+-- Like runTcS, but from within the TcS monad
+-- Completely fresh inerts and worklist, be careful!
+-- Moreover, we will simply throw away all the evidence generated.
+-- We have a completely empty tcs_ty_binds too, so make sure the
+-- input stuff is fully rewritten wrt any outer inerts
 tryTcS (TcS thing_inside)
-  = TcS $ \env -> 
+  = TcS $ \env ->
     do { is_var <- TcM.newTcRef emptyInert
-       ; ty_binds_var <- TcM.newTcRef emptyVarEnv
+       ; ty_binds_var <- TcM.newTcRef (False, emptyVarEnv)
        ; ev_binds_var <- TcM.newTcEvBinds
 
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
@@ -1243,11 +1250,13 @@ getUntouchables = wrapTcS TcM.getUntouchables
 getFlattenSkols :: TcS [TcTyVar]
 getFlattenSkols = do { is <- getTcSInerts; return (inert_fsks is) }
 
-getTcSTyBinds :: TcS (IORef (TyVarEnv (TcTyVar, TcType)))
+getTcSTyBinds :: TcS (IORef (Bool, TyVarEnv (TcTyVar, TcType)))
 getTcSTyBinds = TcS (return . tcs_ty_binds)
 
 getTcSTyBindsMap :: TcS (TyVarEnv (TcTyVar, TcType))
-getTcSTyBindsMap = getTcSTyBinds >>= wrapTcS . (TcM.readTcRef) 
+getTcSTyBindsMap = do { ref <- getTcSTyBinds
+                      ; wrapTcS $ do { (_, binds) <- TcM.readTcRef ref
+                                     ; return binds } }
 
 getTcEvBindsMap :: TcS EvBindMap
 getTcEvBindsMap
@@ -1261,14 +1270,30 @@ setWantedTyBind tv ty
   = ASSERT2( isMetaTyVar tv, ppr tv )
     do { ref <- getTcSTyBinds
        ; wrapTcS $ 
-         do { ty_binds <- TcM.readTcRef ref
+         do { (_dirty, ty_binds) <- TcM.readTcRef ref
             ; when debugIsOn $
                   TcM.checkErr (not (tv `elemVarEnv` ty_binds)) $
                   vcat [ text "TERRIBLE ERROR: double set of meta type variable"
                        , ppr tv <+> text ":=" <+> ppr ty
                        , text "Old value =" <+> ppr (lookupVarEnv_NF ty_binds tv)]
             ; TcM.traceTc "setWantedTyBind" (ppr tv <+> text ":=" <+> ppr ty)
-            ; TcM.writeTcRef ref (extendVarEnv ty_binds tv (tv,ty)) } }
+            ; TcM.writeTcRef ref (True, extendVarEnv ty_binds tv (tv,ty)) } }
+
+reportUnifications :: TcS a -> TcS (Bool, a)
+reportUnifications thing_inside
+  = do { ty_binds_var <- getTcSTyBinds
+       ; outer_dirty <- wrapTcS $
+            do { (outer_dirty, binds1) <- TcM.readTcRef ty_binds_var
+               ; TcM.writeTcRef ty_binds_var (False, binds1)
+               ; return outer_dirty }
+      ; res <- thing_inside
+      ; wrapTcS $
+        do { (inner_dirty, binds2) <- TcM.readTcRef ty_binds_var
+           ; if inner_dirty then
+                 return (True, res)
+             else
+                do { TcM.writeTcRef ty_binds_var (outer_dirty, binds2)
+                   ; return (False, res) } } }
 \end{code}
 
 \begin{code}
