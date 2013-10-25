@@ -966,7 +966,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(UPD_PAP_IN_PLACE_ctr)               \
       SymI_HasProto(ALLOC_HEAP_ctr)                     \
       SymI_HasProto(ALLOC_HEAP_tot)                     \
-      SymI_HasProto(HEAP_CHK_ctr)			\
+      SymI_HasProto(HEAP_CHK_ctr)                       \
       SymI_HasProto(STK_CHK_ctr)                        \
       SymI_HasProto(ALLOC_RTS_ctr)                      \
       SymI_HasProto(ALLOC_RTS_tot)                      \
@@ -1950,12 +1950,12 @@ lookupSymbol( char *lbl )
            HACK: On OS X, all symbols are prefixed with an underscore.
                  However, dlsym wants us to omit the leading underscore from the
                  symbol name -- the dlsym routine puts it back on before searching
-		 for the symbol. For now, we simply strip it off here (and ONLY
+                 for the symbol. For now, we simply strip it off here (and ONLY
                  here).
         */
         IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n", lbl));
-	ASSERT(lbl[0] == '_');
-	return internal_dlsym(dl_prog_handle, lbl + 1);
+        ASSERT(lbl[0] == '_');
+        return internal_dlsym(dl_prog_handle, lbl + 1);
 #       else
         if (NSIsSymbolNameDefined(lbl)) {
             NSSymbol symbol = NSLookupAndBindSymbol(lbl);
@@ -5901,8 +5901,8 @@ resolveImports(
 
         if (addr == NULL)
         {
-	    errorBelch("\nlookupSymbol failed in resolveImports\n"
-		       "%s: unknown symbol `%s'", oc->fileName, nm);
+            errorBelch("\nlookupSymbol failed in resolveImports\n"
+                       "%s: unknown symbol `%s'", oc->fileName, nm);
             return 0;
         }
         ASSERT(addr);
@@ -5992,14 +5992,14 @@ relocateSection(
         uint64_t baseValue;
         int type = reloc->r_type;
 
-	IF_DEBUG(linker, debugBelch("relocateSection: relocation %d\n", i));
-	IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
-	IF_DEBUG(linker, debugBelch("               : address   = %d\n", reloc->r_address));
-	IF_DEBUG(linker, debugBelch("               : symbolnum = %u\n", reloc->r_symbolnum));
-	IF_DEBUG(linker, debugBelch("               : pcrel     = %d\n", reloc->r_pcrel));
-	IF_DEBUG(linker, debugBelch("               : length    = %d\n", reloc->r_length));
-	IF_DEBUG(linker, debugBelch("               : extern    = %d\n", reloc->r_extern));
-	IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
+        IF_DEBUG(linker, debugBelch("relocateSection: relocation %d\n", i));
+        IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
+        IF_DEBUG(linker, debugBelch("               : address   = %d\n", reloc->r_address));
+        IF_DEBUG(linker, debugBelch("               : symbolnum = %u\n", reloc->r_symbolnum));
+        IF_DEBUG(linker, debugBelch("               : pcrel     = %d\n", reloc->r_pcrel));
+        IF_DEBUG(linker, debugBelch("               : length    = %d\n", reloc->r_length));
+        IF_DEBUG(linker, debugBelch("               : extern    = %d\n", reloc->r_extern));
+        IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
 
         switch(reloc->r_length)
         {
@@ -6036,50 +6036,50 @@ relocateSection(
         {
             struct nlist *symbol = &nlist[reloc->r_symbolnum];
             char *nm = image + symLC->stroff + symbol->n_un.n_strx;
-	    void *addr = NULL;
+            void *addr = NULL;
 
             IF_DEBUG(linker, debugBelch("relocateSection: making jump island for %s, extern = %d, X86_64_RELOC_GOT\n", nm, reloc->r_extern));
 
             ASSERT(reloc->r_extern);
-	    if (reloc->r_extern == 0) {
-		    errorBelch("\nrelocateSection: global offset table relocation for symbol with r_extern == 0\n");
-	    }
+            if (reloc->r_extern == 0) {
+                    errorBelch("\nrelocateSection: global offset table relocation for symbol with r_extern == 0\n");
+            }
 
-	    if (symbol->n_type & N_EXT) {
-		    // The external bit is set, meaning the symbol is exported,
-		    // and therefore can be looked up in this object module's
-		    // symtab, or it is undefined, meaning dlsym must be used
-		    // to resolve it.
+            if (symbol->n_type & N_EXT) {
+                    // The external bit is set, meaning the symbol is exported,
+                    // and therefore can be looked up in this object module's
+                    // symtab, or it is undefined, meaning dlsym must be used
+                    // to resolve it.
 
-		    addr = lookupSymbol(nm);
-		    IF_DEBUG(linker, debugBelch("relocateSection: looked up %s, "
-						"external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n", nm));
-		    IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
+                    addr = lookupSymbol(nm);
+                    IF_DEBUG(linker, debugBelch("relocateSection: looked up %s, "
+                                                "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n", nm));
+                    IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
 
-		    if (addr == NULL) {
-			    errorBelch("\nlookupSymbol failed in relocateSection (RELOC_GOT)\n"
-				       "%s: unknown symbol `%s'", oc->fileName, nm);
-			    return 0;
-		    }
-	    } else {
-		    IF_DEBUG(linker, debugBelch("relocateSection: %s is not an exported symbol\n", nm));
+                    if (addr == NULL) {
+                            errorBelch("\nlookupSymbol failed in relocateSection (RELOC_GOT)\n"
+                                       "%s: unknown symbol `%s'", oc->fileName, nm);
+                            return 0;
+                    }
+            } else {
+                    IF_DEBUG(linker, debugBelch("relocateSection: %s is not an exported symbol\n", nm));
 
-		    // The symbol is not exported, or defined in another
-		    // module, so it must be in the current object module,
-		    // at the location given by the section index and
-		    // symbol address (symbol->n_value)
+                    // The symbol is not exported, or defined in another
+                    // module, so it must be in the current object module,
+                    // at the location given by the section index and
+                    // symbol address (symbol->n_value)
 
-		    if ((symbol->n_type & N_TYPE) == N_SECT) {
-			    addr = (void *)relocateAddress(oc, nSections, sections, symbol->n_value);
-			    IF_DEBUG(linker, debugBelch("relocateSection: calculated relocation %p of "
-							"non-external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n",
-							(void *)symbol->n_value));
-			    IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
-		    } else {
-			    errorBelch("\nrelocateSection: %s is not exported,"
-				       " and should be defined in a section, but isn't!\n", nm);
-		    }
-	    }
+                    if ((symbol->n_type & N_TYPE) == N_SECT) {
+                            addr = (void *)relocateAddress(oc, nSections, sections, symbol->n_value);
+                            IF_DEBUG(linker, debugBelch("relocateSection: calculated relocation %p of "
+                                                        "non-external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n",
+                                                        (void *)symbol->n_value));
+                            IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
+                    } else {
+                            errorBelch("\nrelocateSection: %s is not exported,"
+                                       " and should be defined in a section, but isn't!\n", nm);
+                    }
+            }
 
             value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, (unsigned long)addr)->addr;
 
@@ -6089,7 +6089,7 @@ relocateSection(
         {
             struct nlist *symbol = &nlist[reloc->r_symbolnum];
             char *nm = image + symLC->stroff + symbol->n_un.n_strx;
-	    void *addr = NULL;
+            void *addr = NULL;
 
             IF_DEBUG(linker, debugBelch("relocateSection: looking up external symbol %s\n", nm));
             IF_DEBUG(linker, debugBelch("               : type  = %d\n", symbol->n_type));
@@ -6104,25 +6104,25 @@ relocateSection(
             }
             else {
                 addr = lookupSymbol(nm);
-		if (addr == NULL)
-		{
-		     errorBelch("\nlookupSymbol failed in relocateSection (relocate external)\n"
-				"%s: unknown symbol `%s'", oc->fileName, nm);
-		     return 0;
-		}
+                if (addr == NULL)
+                {
+                     errorBelch("\nlookupSymbol failed in relocateSection (relocate external)\n"
+                                "%s: unknown symbol `%s'", oc->fileName, nm);
+                     return 0;
+                }
 
-		value = (uint64_t) addr;
+                value = (uint64_t) addr;
                 IF_DEBUG(linker, debugBelch("relocateSection: external symbol %s, address %p\n", nm, (void *)value));
             }
         }
         else
         {
-	    // If the relocation is not through the global offset table
-	    // or external, then set the value to the baseValue.  This
-	    // will leave displacements into the __const section
-	    // unchanged (as they ought to be).
+            // If the relocation is not through the global offset table
+            // or external, then set the value to the baseValue.  This
+            // will leave displacements into the __const section
+            // unchanged (as they ought to be).
 
-	    value = baseValue;
+            value = baseValue;
         }
 
         IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", (void *)value));
