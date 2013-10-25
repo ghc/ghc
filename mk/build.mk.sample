@@ -20,6 +20,9 @@
 # Fast build with optimised libraries, no profiling, with LLVM:
 #BuildFlavour = quick-llvm
 
+# Fast build configured for a cross compiler
+#BuildFlavour  = quick-cross
+
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
 # (including stage2) will run very slowly:
@@ -131,6 +134,27 @@ HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
+
+DYNAMIC_BY_DEFAULT   = NO
+DYNAMIC_GHC_PROGRAMS = NO
+
+endif
+
+# -------- A Fast build configured for cross-compilation ----------------------
+
+ifeq "$(BuildFlavour)" "quick-cross"
+
+SRC_HC_OPTS        = -H64m -O0
+GhcStage1HcOpts    = -O -fllvm
+GhcStage2HcOpts    = -O0 -fllvm
+GhcLibHcOpts       = -O -fllvm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+INTEGER_LIBRARY    = integer-simple
+Stage1Only         = YES
 
 DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
