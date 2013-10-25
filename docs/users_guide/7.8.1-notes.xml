@@ -197,7 +197,10 @@
                 compiling with <literal>--make</literal> (which is on
                 by default,) you may also specify
                 <literal>-jN</literal> in order to compile
-                <replaceable>N</replaceable> modules in parallel.
+                <replaceable>N</replaceable> modules in
+                parallel. (Note: this will automatically scale on
+                multicore machines without specifying <literal>+RTS
+                -N</literal> to the compiler.)
            </para>
        </listitem>
 
