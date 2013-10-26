@@ -460,11 +460,17 @@
                </para>
            </listitem>
 
+           <listitem>
+                <para>
+                    On Linux, the static GHCi linker now supports weak symbols.
+               </para>
+           </listitem>
+
             <listitem>
                 <para>
-                    The GHCi linker now runs constructors for linked
-                    libraries. This means for example that C code
-                    using
+                    The (static) GHCi linker now runs constructors for
+                    linked libraries. This means for example that C
+                    code using
                     <literal>__attribute__((constructor))</literal>
                     can now properly be loaded into GHCi.
                </para>
