@@ -917,7 +917,7 @@ memInventory (rtsBool show)
                  live_blocks + free_blocks, MB(live_blocks+free_blocks));
       if (leak) {
           debugBelch("\n  in system    : %5" FMT_Word " blocks (%" FMT_Word " MB)\n", 
-                     mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
+                     (W_)(mblocks_allocated * BLOCKS_PER_MBLOCK), mblocks_allocated);
       }
   }
 
