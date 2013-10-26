@@ -188,7 +188,6 @@ slowCall fun stg_args
                                       " with pat " ++ unpackFS rts_fun)
            return r
 
-        -- Note [avoid intermediate PAPs]
         let n_args = length stg_args
         if n_args > arity && optLevel dflags >= 2
            then do
@@ -223,32 +222,6 @@ slowCall fun stg_args
            else do
              emit slow_code
              return r
-
-
--- Note [avoid intermediate PAPs]
---
--- A slow call which needs multiple generic apply patterns will be
--- almost guaranteed to create one or more intermediate PAPs when
--- applied to a function that takes the correct number of arguments.
--- We try to avoid this situation by generating code to test whether
--- we are calling a function with the correct number of arguments
--- first, i.e.:
---
---   if (TAG(f) != 0} {  // f is not a thunk
---      if (f->info.arity == n) {
---         ... make a fast call to f ...
---      }
---   }
---   ... otherwise make the slow call ...
---
--- We *only* do this when the call requires multiple generic apply
--- functions, which requires pushing extra stack frames and probably
--- results in intermediate PAPs.  (I say probably, because it might be
--- that we're over-applying a function, but that seems even less
--- likely).
---
--- This very rarely applies, but if it does happen in an inner loop it
--- can have a severe impact on performance (#6084).
 
 
 --------------
