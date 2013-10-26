@@ -31,7 +31,6 @@ module CmmUtils(
         cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
         cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
         cmmUShrWord, cmmAddWord, cmmMulWord, cmmQuotWord,
-        cmmToWord,
 
         isTrivialCmmExpr, hasNoGlobalRegs,
 
@@ -331,14 +330,6 @@ cmmNegate dflags e                       = CmmMachOp (MO_S_Neg (cmmExprWidth dfl
 
 blankWord :: DynFlags -> CmmStatic
 blankWord dflags = CmmUninitialised (wORD_SIZE dflags)
-
-cmmToWord :: DynFlags -> CmmExpr -> CmmExpr
-cmmToWord dflags e
-  | w == word  = e
-  | otherwise  = CmmMachOp (MO_UU_Conv w word) [e]
-  where
-    w = cmmExprWidth dflags e
-    word = wordWidth dflags
 
 ---------------------------------------------------
 --

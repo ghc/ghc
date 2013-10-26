@@ -538,13 +538,13 @@ wanteds = concat
           ,structSize   C "StgFunInfoExtraFwd"
           ,structField  C "StgFunInfoExtraFwd" "slow_apply"
           ,structField  C "StgFunInfoExtraFwd" "fun_type"
-          ,structFieldH Both "StgFunInfoExtraFwd" "arity"
+          ,structField  C "StgFunInfoExtraFwd" "arity"
           ,structField_ C "StgFunInfoExtraFwd_bitmap" "StgFunInfoExtraFwd" "b.bitmap"
 
           ,structSize   Both "StgFunInfoExtraRev"
           ,structField  C    "StgFunInfoExtraRev" "slow_apply_offset"
           ,structField  C    "StgFunInfoExtraRev" "fun_type"
-          ,structFieldH Both "StgFunInfoExtraRev" "arity"
+          ,structField  C    "StgFunInfoExtraRev" "arity"
           ,structField_ C    "StgFunInfoExtraRev_bitmap" "StgFunInfoExtraRev" "b.bitmap"
 
           ,structField C "StgLargeBitmap" "size"
