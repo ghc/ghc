@@ -854,7 +854,7 @@ doubleFromPositive None = 0.0##
 doubleFromPositive (Some w ds)
     = case splitHalves w of
       (# h, l #) ->
-       (doubleFromPositive ds *## (2.0## **## WORD_SIZE_IN_BITS.0##))
+       (doubleFromPositive ds *## (2.0## **## WORD_SIZE_IN_BITS_FLOAT##))
        +## (int2Double# (word2Int# h) *##
               (2.0## **## int2Double# (highHalfShift ())))
        +## int2Double# (word2Int# l)
@@ -865,7 +865,7 @@ floatFromPositive None = 0.0#
 floatFromPositive (Some w ds)
     = case splitHalves w of
       (# h, l #) ->
-       (floatFromPositive ds `timesFloat#` (2.0# `powerFloat#` WORD_SIZE_IN_BITS.0#))
+       (floatFromPositive ds `timesFloat#` (2.0# `powerFloat#` WORD_SIZE_IN_BITS_FLOAT#))
        `plusFloat#` (int2Float# (word2Int# h) `timesFloat#`
              (2.0# `powerFloat#` int2Float# (highHalfShift ())))
        `plusFloat#` int2Float# (word2Int# l)
