@@ -35,6 +35,7 @@
 #if darwin_HOST_OS
 #include <mach/mach.h>
 #include <mach/vm_map.h>
+#include <sys/sysctl.h>
 #endif
 
 static caddr_t next_request = 0;
@@ -268,10 +269,24 @@ StgWord64 getPhysicalMemorySize (void)
 {
     static StgWord64 physMemSize = 0;
     if (!physMemSize) {
-        long ret;
-        W_ pageSize = getPageSize();
+#ifdef darwin_HOST_OS
+        /* So, darwin doesn't support _SC_PHYS_PAGES, but it does
+           support getting the raw memory size in bytes through
+           sysctlbyname(hw.memsize); */
+        size_t len = sizeof(physMemSize);
+        int ret = -1;
 
-        ret = sysconf(_SC_PHYS_PAGES);
+        /* Note hw.memsize is in bytes, so no need to multiply by page size. */
+        ret = sysctlbyname("hw.memsize", &physMemSize, &len, NULL, 0);
+        if (ret == -1) {
+            physMemSize = 0;
+            return 0;
+        }
+#else
+        /* We'll politely assume we have a system supporting _SC_PHYS_PAGES
+         * otherwise.  */
+        W_ pageSize = getPageSize();
+        long ret = sysconf(_SC_PHYS_PAGES);
         if (ret == -1) {
 #if defined(DEBUG)
             errorBelch("warning: getPhysicsMemorySize: cannot get physical memory size");
@@ -279,6 +294,7 @@ StgWord64 getPhysicalMemorySize (void)
             return 0;
         }
         physMemSize = ret * pageSize;
+#endif /* darwin_HOST_OS */
     }
     return physMemSize;
 }
