@@ -80,7 +80,7 @@ testsuite                    testsuite   testsuite.git                   -
 nofib                        nofib       nofib.git                       -
 libraries/parallel           extra       packages/parallel.git           -
 libraries/stm                extra       packages/stm.git                -
-libraries/random             dph         -                               -
+libraries/random             dph         -                               https://github.com/haskell/random.git
 libraries/primitive          dph         -                               https://github.com/haskell/primitive.git
 libraries/vector             dph         -                               https://github.com/haskell/vector.git
 libraries/dph                dph         packages/dph.git                -
