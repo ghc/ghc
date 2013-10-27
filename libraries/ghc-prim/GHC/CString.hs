@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, BangPatterns #-}
+{-# LANGUAGE MagicHash, NoImplicitPrelude, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.CString

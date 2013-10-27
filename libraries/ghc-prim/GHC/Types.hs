@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, TypeFamilies #-}
+{-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
