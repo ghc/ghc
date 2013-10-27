@@ -963,6 +963,11 @@
                     Version number XXXX (was XXXX)
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    There is now support for annotation pragmas.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -972,11 +977,6 @@
             <listitem>
                 <para>
                     Version number XXXX (was XXXX)
-               </para>
-           </listitem>
-            <listitem>
-                <para>
-                    There is now support for annotation pragmas.
                </para>
            </listitem>
        </itemizedlist>
