@@ -538,6 +538,17 @@
                     <literal>StableName</literal>s has been improved.
                </para>
            </listitem>
+
+            <listitem>
+                <para>
+                    The default maximum stack size has
+                    increased. Previously, it defaulted to 8m
+                    (equivalent to passing <literal>+RTS
+                    -K8m</literal>. Now, GHC will use up-to 80% of the
+                    <emphasis>physical memory</emphasis> available at
+                    runtime your machine.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
