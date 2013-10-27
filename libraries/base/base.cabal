@@ -4,11 +4,11 @@ version:        4.7.0.0
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
-bug-reports:    http://hackage.haskell.org/trac/ghc/newticket?component=libraries/base
+bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/base
 synopsis:       Basic libraries
-category:       Unclassified
+category:       Prelude
 description:
-    This package contains the Prelude and its support libraries,
+    This package contains the "Prelude" and its support libraries,
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
 cabal-version:  >=1.10
@@ -85,11 +85,11 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts, ghc-prim
+    build-depends: rts == 1.0.*, ghc-prim >= 0.3.1 && < 0.4
     if flag(integer-simple)
-        build-depends: integer-simple
+        build-depends: integer-simple >= 0.1.1 && < 0.2
     else
-        build-depends: integer-gmp
+        build-depends: integer-gmp >= 0.5.1 && < 0.6
         cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
 
     exposed-modules:
