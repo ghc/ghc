@@ -546,7 +546,7 @@
                     (equivalent to passing <literal>+RTS
                     -K8m</literal>. Now, GHC will use up-to 80% of the
                     <emphasis>physical memory</emphasis> available at
-                    runtime your machine.
+                    runtime.
                </para>
            </listitem>
        </itemizedlist>
