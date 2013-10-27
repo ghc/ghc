@@ -244,7 +244,7 @@ gen_hs_source (Info defaults entries) =
         ++ "-- module directly.\n"
         ++ "--\n" 
         ++ "-----------------------------------------------------------------------------\n"
-        ++ "{-# LANGUAGE MultiParamTypeClasses #-}\n"
+        ++ "{-# LANGUAGE MagicHash, MultiParamTypeClasses, NoImplicitPrelude, UnboxedTuples #-}\n"
         ++ "module GHC.Prim (\n"
         ++ unlines (map (("\t" ++) . hdr) entries')
         ++ ") where\n"
@@ -649,7 +649,7 @@ gen_latex_doc (Info defaults entries)
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
-   = "{-# LANGUAGE CPP, MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
+   = "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
