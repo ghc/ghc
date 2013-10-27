@@ -23,8 +23,6 @@ main = do let hooks = simpleUserHooks {
                           $ regHook simpleUserHooks,
                   buildHook = build_primitive_sources
                             $ buildHook simpleUserHooks,
-                  makefileHook = build_primitive_sources
-                               $ makefileHook simpleUserHooks,
                   haddockHook = addPrimModuleForHaddock
                               $ build_primitive_sources
                               $ haddockHook simpleUserHooks }
