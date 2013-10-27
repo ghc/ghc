@@ -45,7 +45,7 @@ import GHC.Integer.GMP.Prim (
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
     testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
-    powInteger#, powModInteger#, recipModInteger#,
+    powInteger#, powModInteger#, powModSecInteger#, recipModInteger#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -615,6 +615,20 @@ powModInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
     case powModInteger# s1 d1 s2 d2 s3 d3 of
         (# s', d' #) -> J# s' d'
 powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
+
+-- | @powModSecInteger b e m@ computes base @b@ raised to exponent @e@
+-- modulo @m@. It is required that @e@ > 0 and @m@ is odd.
+--
+-- This is a \"secure\" variant of 'powModInteger' using the
+-- @mpz_powm_sec()@ function which is designed to be resilient to side
+-- channel attacks and is therefore intended for cryptographic
+-- applications.
+{-# NOINLINE powModSecInteger #-}
+powModSecInteger :: Integer -> Integer -> Integer -> Integer
+powModSecInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
+    case powModSecInteger# s1 d1 s2 d2 s3 d3 of
+        (# s', d' #) -> J# s' d'
+powModSecInteger b e m = powModSecInteger (toBig b) (toBig e) (toBig m)
 
 -- | @recipModInteger x m@ computes the inverse of @x@ modulo @m@. If
 -- the inverse exists, the return value @y@ will satisfy @0 < y <

@@ -43,6 +43,7 @@ module GHC.Integer.GMP.Prim (
 
     powInteger#,
     powModInteger#,
+    powModSecInteger#,
     recipModInteger#,
 
 #if WORD_SIZE_IN_BITS < 64
@@ -194,6 +195,11 @@ foreign import prim "integer_cmm_powIntegerzh" powInteger#
 -- |
 --
 foreign import prim "integer_cmm_powModIntegerzh" powModInteger#
+  :: Int# -> ByteArray# -> Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_powModSecIntegerzh" powModSecInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
 
 -- |
