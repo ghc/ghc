@@ -2,6 +2,8 @@
 
 module Main (main) where
 
+import Data.List (group)
+
 import GHC.Base
 import GHC.Integer
 import GHC.Integer.GMP.Internals
@@ -32,6 +34,8 @@ powModIntegerHs b0 e0 m
 main :: IO ()
 main = do
     print $ powModInteger b e m
+    print $ powModInteger b e (m-1)
+    print $ powModSecInteger b e (m-1)
     print $ gcdExtInteger' b e
     print $ gcdExtInteger' e b
     print $ gcdExtInteger' x y
@@ -40,6 +44,11 @@ main = do
     print $ powInteger' 12345 1
     print $ powInteger' 12345 30
     print $ [ (x,i) | x <- [0..71], let i = recipModInteger x (2*3*11*11*17*17), i /= 0 ]
+    print $ nextPrimeInteger b
+    print $ nextPrimeInteger e
+    print $ [ k | k <- [ 0 .. 200 ], S# (testPrimeInteger k 25#) `elem` [1,2] ]
+    print $ rle [ S# (testPrimeInteger k 25#) | k <- [ x .. x + 1000 ] ]
+    print $ rle [ S# (testPrimeInteger k 25#) | k <- [ e .. e + 1000 ] ]
     return ()
   where
     b = 2988348162058574136915891421498819466320163312926952423791023078876139
@@ -48,3 +57,5 @@ main = do
 
     x = 5328841272400314897981163497728751426
     y = 32052182750761975518649228050096851724
+
+    rle = map (\x -> (length x, head x)) . group
