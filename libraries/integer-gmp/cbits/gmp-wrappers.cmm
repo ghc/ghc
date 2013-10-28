@@ -54,6 +54,8 @@ import "integer-gmp" __gmpz_pow_ui;
 import "integer-gmp" __gmpz_powm;
 import "integer-gmp" __gmpz_powm_sec;
 import "integer-gmp" __gmpz_invert;
+import "integer-gmp" __gmpz_nextprime;
+import "integer-gmp" __gmpz_probab_prime_p;
 
 import "integer-gmp" integer_cbits_decodeDouble;
 
@@ -323,8 +325,32 @@ again:                                                          \
          MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);         \
 }
 
+#define GMP_TAKE1_I1_RETI1(name,mp_fun)                         \
+name (W_ ws1, P_ d1, W_ wi)                                     \
+{                                                               \
+  CInt s1, res, i;                                              \
+  W_ mp_tmp;                                                    \
+                                                                \
+again:                                                          \
+  STK_CHK_GEN_N (SIZEOF_MP_INT);                                \
+  MAYBE_GC(again);                                              \
+                                                                \
+  s1 = W_TO_INT(ws1);                                           \
+  i  = W_TO_INT(wi);                                            \
+                                                                \
+  mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                          \
+  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));        \
+  MP_INT__mp_size(mp_tmp)  = (s1);                              \
+  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                  \
+                                                                \
+  /* Perform the operation */                                   \
+  (res) = ccall mp_fun(mp_tmp "ptr", i);                        \
+                                                                \
+  return (TO_W_(res));                                          \
+}
+
 #define GMP_TAKE1_UL1_RETI1(name,mp_fun)                        \
-name (W_ ws1, P_ d1, W_ wul)                                     \
+name (W_ ws1, P_ d1, W_ wul)                                    \
 {                                                               \
   CInt s1, res;                                                 \
   CLong ul;                                                     \
@@ -441,6 +467,9 @@ GMP_TAKE3_RET1(integer_cmm_powModIntegerzh,         __gmpz_powm)
 GMP_TAKE3_RET1(integer_cmm_powModSecIntegerzh,      __gmpz_powm_sec)
 GMP_TAKE2_RET1(integer_cmm_recipModIntegerzh,       __gmpz_invert)
 GMP_TAKE1_UL1_RET1(integer_cmm_powIntegerzh,        __gmpz_pow_ui)
+
+GMP_TAKE1_RET1(integer_cmm_nextPrimeIntegerzh,      __gmpz_nextprime)
+GMP_TAKE1_I1_RETI1(integer_cmm_testPrimeIntegerzh,  __gmpz_probab_prime_p)
 
 integer_cmm_gcdIntzh (W_ int1, W_ int2)
 {

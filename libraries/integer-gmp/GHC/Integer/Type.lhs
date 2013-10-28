@@ -46,6 +46,7 @@ import GHC.Integer.GMP.Prim (
     andInteger#, orInteger#, xorInteger#, complementInteger#,
     testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
     powInteger#, powModInteger#, powModSecInteger#, recipModInteger#,
+    nextPrimeInteger#, testPrimeInteger#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -644,8 +645,38 @@ recipModInteger j@(S# _) m@(J# _ _) = recipModInteger (toBig j) m
 recipModInteger j@(J# _ _) m@(S# _) = recipModInteger j (toBig m)
 recipModInteger (J# s d) (J# ms md) = case recipModInteger# s d ms md of
                            (# s', d' #) -> J# s' d'
-\end{code}
 
+-- | Probalistic Miller-Rabin primality test.
+--
+-- @testPrimeInteger n k@ determines whether @n@ is prime and
+-- returns one of the following results:
+--
+-- * @2#@ is returned if @n@ is definitely prime,
+--
+-- * @1#@ if @n@ is a /probable prime/, or
+--
+-- * @0#@ if @n@ is definitely not a prime.
+--
+-- The @k@ argument controls how many test rounds are performed for
+-- determining a /probable prime/. For more details, see
+-- <http://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fprobab_005fprime_005fp-360 GMP documentation for `mpz_probab_prime_p()`>.
+{-# NOINLINE testPrimeInteger #-}
+testPrimeInteger :: Integer -> Int# -> Int#
+testPrimeInteger j@(S# _) reps = testPrimeInteger (toBig j) reps
+testPrimeInteger (J# s d) reps = testPrimeInteger# s d reps
+
+-- | Compute next prime greater than @n@ probalistically.
+--
+-- According to the GMP documentation, the underlying function
+-- @mpz_nextprime()@ \"uses a probabilistic algorithm to identify
+-- primes. For practical purposes it's adequate, the chance of a
+-- composite passing will be extremely small.\"
+{-# NOINLINE nextPrimeInteger #-}
+nextPrimeInteger :: Integer -> Integer
+nextPrimeInteger j@(S# _) = nextPrimeInteger (toBig j)
+nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> J# s' d'
+
+\end{code}
 
 %*********************************************************
 %*                                                      *
