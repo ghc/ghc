@@ -22,7 +22,7 @@ module RnEnv (
         lookupSubBndrGREs, lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreRn, lookupGreRn_maybe,
-        lookupGlobalOccInThisModule, lookupGreLocalRn_maybe, 
+        lookupGreLocalRn_maybe, 
         getLookupOccRn, addUsedRdrNames,
 
         newLocalBndrRn, newLocalBndrsRn,
@@ -703,19 +703,6 @@ lookupGreLocalRn_maybe rdr_name
   = lookupGreRn_help rdr_name lookup_fn
   where
     lookup_fn env = filter isLocalGRE (lookupGRE_RdrName rdr_name env)
-
-lookupGlobalOccInThisModule :: RdrName -> RnM Name
--- If not found, add error message
-lookupGlobalOccInThisModule rdr_name
-  | Just n <- isExact_maybe rdr_name
-  = do { n' <- lookupExactOcc n; return n' }
-
-  | otherwise
-  = do { mb_gre <- lookupGreLocalRn_maybe rdr_name
-       ; case mb_gre of
-           Just gre -> return $ gre_name gre
-           Nothing -> do { traceRn (text "lookupGlobalInThisModule" <+> ppr rdr_name)
-                         ; unboundName WL_LocalTop rdr_name } }
 
 lookupGreRn_help :: RdrName                     -- Only used in error message
                  -> (GlobalRdrEnv -> [GlobalRdrElt])    -- Lookup function

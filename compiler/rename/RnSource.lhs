@@ -892,12 +892,21 @@ rnTyClDecls extra_deps tycl_ds
 
              raw_groups = map flattenSCC sccs
              -- See Note [Role annotations in the renamer]
-             groups = [ TyClGroup { group_tyclds = gp
-                                  , group_roles = roles }
-                      | gp <- raw_groups
-                      , let roles = mapMaybe ( lookupNameEnv role_annot_env
-                                             . tcdName
-                                             . unLoc ) gp ]
+             (groups, orphan_roles)
+               = foldr (\group (groups_acc, orphans_acc) ->
+                         let names = map (tcdName . unLoc) group
+                             roles = mapMaybe (lookupNameEnv orphans_acc) names
+                             orphans' = delListFromNameEnv orphans_acc names
+                              -- there doesn't seem to be an interface to
+                              -- do the above more efficiently
+                         in ( TyClGroup { group_tyclds = group
+                                        , group_roles  = roles } : groups_acc
+                            , orphans' )
+                       )
+                       ([], role_annot_env)
+                       raw_groups
+                 
+       ; mapM_ orphanRoleAnnotErr (nameEnvElts orphan_roles)
        ; traceRn (text "rnTycl"  <+> (ppr ds_w_fvs $$ ppr sccs))
        ; return (groups, all_fvs) }
 
@@ -1031,7 +1040,7 @@ rnRoleAnnots role_annots
   where
     rn_role_annot1 (RoleAnnotDecl tycon roles)
       = do {  -- the name is an *occurrence*
-             tycon' <- wrapLocM lookupGlobalOccInThisModule tycon
+             tycon' <- wrapLocM lookupGlobalOccRn tycon
            ; return $ RoleAnnotDecl tycon' roles }
 
 dupRoleAnnotErr :: [LRoleAnnotDecl RdrName] -> RnM ()
@@ -1049,6 +1058,15 @@ dupRoleAnnotErr list
                                       4 (text "-- written at" <+> ppr loc)
 
       cmp_annot (L loc1 _) (L loc2 _) = loc1 `compare` loc2
+
+orphanRoleAnnotErr :: LRoleAnnotDecl Name -> RnM ()
+orphanRoleAnnotErr (L loc decl)
+  = addErrAt loc $
+    hang (text "Role annotation for a type previously declared:")
+       2 (ppr decl) $$
+    parens (text "The role annotation must be given where" <+>
+            quotes (ppr $ roleAnnotDeclName decl) <+>
+            text "is declared.")
 
 rnDataDefn :: HsDocContext -> HsDataDefn RdrName -> RnM (HsDataDefn Name, FreeVars)
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
@@ -1186,14 +1204,25 @@ type, if any. Then, this map can be used to add the role annotations to the
 groups after dependency analysis.
 
 This process checks for duplicate role annotations, where we must be careful
-to filter out the unbound annotations to avoid reporting spurious duplicates.
-We hold off doing other checks until validity checking in the type checker.
+to do the check *before* renaming to avoid calling all unbound names duplicates
+of one another.
 
-Also, note that the tycon in a role annotation is renamed with
-lookupGlobalInThisModule. We want only annotations for local declarations.
-Because all of these are in scope by this point, this renaming technique
-also effectively identifies any orphan role annotations. Annotations on
-declarations that don't support them is checked for in the type-checker.
+The renaming process, as usual, might identify and report errors for unbound
+names. We exclude the annotations for unbound names in the annotation
+environment to avoid spurious errors for orphaned annotations.
+
+We then (in rnTyClDecls) do a check for orphan role annotations (role
+annotations without an accompanying type decl). The check works by folding
+over raw_groups (of type [[TyClDecl Name]]), selecting out the relevant
+role declarations for each group, as well as diminishing the annotation
+environment. After the fold is complete, anything left over in the name
+environment must be an orphan, and errors are generated.
+
+An earlier version of this algorithm short-cut the orphan check by renaming
+only with names declared in this module. But, this check is insufficient in
+the case of staged module compilation (Template Haskell, GHCi).
+See #8485. With the new lookup process (which includes types declared in other
+modules), we get better error messages, too.
 
 %*********************************************************
 %*                                                      *
