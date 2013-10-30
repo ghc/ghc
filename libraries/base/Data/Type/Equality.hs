@@ -47,6 +47,7 @@ import GHC.Enum
 import GHC.Show
 import GHC.Read
 import GHC.Base
+import Data.Type.Bool
 
 infix 4 :~:
 
@@ -149,15 +150,6 @@ type family EqOrdering a b where
   EqOrdering a  b  = False
 
 type EqUnit (a :: ()) (b :: ()) = True
-
--- more complicated types need a type-level And:
-type family a && b where
-  False && x = False
-  True  && x = x
-  x && False = False
-  x && True  = x
-  x && x     = x
-infixr 3 &&
 
 type family EqList a b where
   EqList '[]        '[]        = True

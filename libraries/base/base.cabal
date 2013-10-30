@@ -143,6 +143,7 @@ Library
         Data.String
         Data.Traversable
         Data.Tuple
+        Data.Type.Bool
         Data.Type.Coercion
         Data.Type.Equality
         Data.Typeable
