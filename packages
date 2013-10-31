@@ -58,7 +58,7 @@ libraries/deepseq            -           packages/deepseq.git            -
 libraries/directory          -           packages/directory.git          -
 libraries/filepath           -           packages/filepath.git           -
 libraries/ghc-prim           -           packages/ghc-prim.git           -
-libraries/haskeline          -           -                               http://git.haskell.org/darcs-mirrors/haskeline.git
+libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
 libraries/haskell98          -           packages/haskell98.git          -
 libraries/haskell2010        -           packages/haskell2010.git        -
 libraries/hoopl              -           packages/hoopl.git              -
