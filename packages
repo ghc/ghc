@@ -70,7 +70,7 @@ libraries/old-time           -           packages/old-time.git           -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           packages/process.git            -
 libraries/template-haskell   -           packages/template-haskell.git   -
-libraries/terminfo           -           -                               http://git.haskell.org/darcs-mirrors/terminfo.git
+libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
 libraries/time               -           -                               http://git.haskell.org/darcs-mirrors/time.git
 libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
 libraries/unix               -           packages/unix.git               -
