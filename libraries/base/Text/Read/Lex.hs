@@ -17,7 +17,7 @@
 
 module Text.Read.Lex
   -- lexing types
-  ( Lexeme(..)
+  ( Lexeme(..), Number
 
   , numberToInteger, numberToFixed, numberToRational, numberToRangedRational
 
@@ -61,7 +61,7 @@ data Lexeme
   | EOF
  deriving (Eq, Show)
 
--- | /Since: 4.6.0.0/
+-- | /Since: 4.7.0.0/
 data Number = MkNumber Int              -- Base
                        Digits           -- Integral part
             | MkDecimal Digits          -- Integral part
