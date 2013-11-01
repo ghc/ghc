@@ -466,8 +466,7 @@ checkInstCoverage be_liberal clas theta inst_taus
        | if be_liberal then liberal_ok else conservative_ok
        = Nothing
        | otherwise
-       = pprTrace "cic" (vcat [ppr clas <+> ppr inst_taus, ppr fd, ppr ls_tvs, ppr rs_tvs, ppr (oclose theta ls_tvs), ppr theta]) $
-         Just msg
+       = Just msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = closeOverKinds (tyVarsOfTypes ls)  -- See Note [Closing over kinds in coverage]
