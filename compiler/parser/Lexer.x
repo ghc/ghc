@@ -469,7 +469,6 @@ data Token
   | ITthen
   | ITtype
   | ITwhere
-  | ITscc                       -- ToDo: remove (we use {-# SCC "..." #-} now)
 
   | ITforall                    -- GHC extension keywords
   | ITforeign
