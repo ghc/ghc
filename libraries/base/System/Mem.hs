@@ -26,7 +26,11 @@ performGC :: IO ()
 performGC = performMajorGC
 
 -- | Triggers an immediate garbage collection.
+--
+-- /Since: 4.7.0.0/
 foreign import ccall "performMajorGC" performMajorGC :: IO ()
 
 -- | Triggers an immediate minor garbage collection.
+--
+-- /Since: 4.7.0.0/
 foreign import ccall "performGC" performMinorGC :: IO ()

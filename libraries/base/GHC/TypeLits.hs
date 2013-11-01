@@ -53,18 +53,24 @@ data Symbol
 
 -- | This class gives the integer associated with a type-level natural.
 -- There are instances of the class for every concrete literal: 0, 1, 2, etc.
+--
+-- /Since: 4.7.0.0/
 class KnownNat (n :: Nat) where
   natSing :: SNat n
 
 -- | This class gives the integer associated with a type-level symbol.
 -- There are instances of the class for every concrete literal: "hello", etc.
+--
+-- /Since: 4.7.0.0/
 class KnownSymbol (n :: Symbol) where
   symbolSing :: SSymbol n
 
+-- | /Since: 4.7.0.0/
 natVal :: forall n proxy. KnownNat n => proxy n -> Integer
 natVal _ = case natSing :: SNat n of
              SNat x -> x
 
+-- | /Since: 4.7.0.0/
 symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
@@ -73,17 +79,23 @@ symbolVal _ = case symbolSing :: SSymbol n of
 
 -- | This type represents unknown type-level natural numbers.
 data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
+                  -- ^ /Since: 4.7.0.0/
 
 -- | This type represents unknown type-level symbols.
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
+                  -- ^ /Since: 4.7.0.0/
 
 -- | Convert an integer into an unknown type-level natural.
+--
+-- /Since: 4.7.0.0/
 someNatVal :: Integer -> Maybe SomeNat
 someNatVal n
   | n >= 0        = Just (withSNat SomeNat (SNat n) Proxy)
   | otherwise     = Nothing
 
 -- | Convert a string into an unknown type-level symbol.
+--
+-- /Since: 4.7.0.0/
 someSymbolVal :: String -> SomeSymbol
 someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
 
