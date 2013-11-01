@@ -7,7 +7,7 @@
  * --------
  *
  * See the PPoPP 2005 paper "Composable memory transactions".  In summary, 
- * each transcation has a TRec (transaction record) holding entries for each of the
+ * each transaction has a TRec (transaction record) holding entries for each of the
  * TVars (transactional variables) that it has accessed.  Each entry records
  * (a) the TVar, (b) the expected value seen in the TVar, (c) the new value that
  * the transaction wants to write to the TVar, (d) during commit, the identity of
@@ -54,7 +54,7 @@
  *
  * lock_tvar / cond_lock_tvar and unlock_tvar are more complex because they 
  * have other effects (present in STM_UNIPROC and STM_CG_LOCK builds) as well
- * as the actual business of maniupultaing a lock (present only in STM_FG_LOCKS
+ * as the actual business of manipulating a lock (present only in STM_FG_LOCKS
  * builds).  This is because locking a TVar is implemented by writing the lock
  * holder's TRec into the TVar's current_value field:
  *
@@ -68,7 +68,7 @@
  *   unlock_tvar - release the lock on a specified TVar (STM_FG_LOCKS only),
  *               storing a specified value in place of the lock entry.
  *
- * Using these operations, the typcial pattern of a commit/validate/wait operation
+ * Using these operations, the typical pattern of a commit/validate/wait operation
  * is to (a) lock the STM, (b) lock all the TVars being updated, (c) check that 
  * the TVars that were only read from still contain their expected values, 
  * (d) release the locks on the TVars, writing updates to them in the case of a 
