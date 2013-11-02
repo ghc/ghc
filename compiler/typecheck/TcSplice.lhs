@@ -55,6 +55,7 @@ import Var
 import Module
 import Annotations
 import TcRnMonad
+import LoadIface
 import Class
 import Inst
 import TyCon
@@ -1050,6 +1051,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
+  qReifyModule      = reifyModule
 
         -- For qRecover, discard error messages if
         -- the recovery action is chosen.  Otherwise
@@ -1654,7 +1656,7 @@ reifyStrict (HsUnpack {})                 = TH.Unpacked
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget
 lookupThAnnLookup (TH.AnnLookupName th_nm) = fmap NamedTarget (lookupThName th_nm)
-lookupThAnnLookup (TH.AnnLookupModule pn mn)
+lookupThAnnLookup (TH.AnnLookupModule (TH.Module pn mn))
   = return $ ModuleTarget $
     mkModule (stringToPackageId $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
 
@@ -1666,6 +1668,32 @@ reifyAnnotations th_nm
        ; let epsAnns = findAnns deserializeWithData (eps_ann_env eps) name
        ; let envAnns = findAnns deserializeWithData (tcg_ann_env tcg) name
        ; return (envAnns ++ epsAnns) }
+
+------------------------------
+modToTHMod :: Module -> TH.Module
+modToTHMod m = TH.Module (TH.PkgName $ packageIdString  $ modulePackageId m)
+                         (TH.ModName $ moduleNameString $ moduleName m)
+
+reifyModule :: TH.Module -> TcM TH.ModuleInfo
+reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
+  this_mod <- getModule
+  let reifMod = mkModule (stringToPackageId pkgString) (mkModuleName mString)
+  if (reifMod == this_mod) then reifyThisModule else reifyFromIface reifMod
+    where
+      reifyThisModule = do
+        usages <- fmap (map modToTHMod . moduleEnvKeys . imp_mods) getImports
+        return $ TH.ModuleInfo usages
+
+      reifyFromIface reifMod = do
+        iface <- loadInterfaceForModule (ptext (sLit "reifying module from TH for") <+> ppr reifMod) reifMod
+        let usages = [modToTHMod m | usage <- mi_usages iface,
+                                     Just m <- [usageToModule (modulePackageId reifMod) usage] ]
+        return $ TH.ModuleInfo usages
+
+      usageToModule :: PackageId -> Usage -> Maybe Module
+      usageToModule _ (UsageFile {}) = Nothing
+      usageToModule this_pkg (UsageHomeModule { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
+      usageToModule _ (UsagePackageModule { usg_mod = m }) = Just m
 
 ------------------------------
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type

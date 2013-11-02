@@ -10,7 +10,7 @@ Loading interface files
 module LoadIface (
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces, 
-        loadSrcInterface, loadInterfaceForName, 
+        loadSrcInterface, loadInterfaceForName, loadInterfaceForModule,
 
         -- IfM functions
         loadInterface, loadWiredInHomeIface, 
@@ -126,6 +126,16 @@ loadInterfaceForName doc name
   ; ASSERT2( isExternalName name, ppr name ) 
     initIfaceTcRn $ loadSysInterface doc (nameModule name)
   }
+
+-- | Loads the interface for a given Module.
+loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface
+loadInterfaceForModule doc m
+  = do
+    -- Should not be called with this module
+    when debugIsOn $ do
+      this_mod <- getModule
+      MASSERT2( this_mod /= m, ppr m <+> parens doc )
+    initIfaceTcRn $ loadSysInterface doc m
 \end{code}
 
 
