@@ -198,11 +198,9 @@ rts_apply (Capability *cap, HaskellObj f, HaskellObj arg)
     StgThunk *ap;
 
     ap = (StgThunk *)allocate(cap,sizeofW(StgThunk) + 2);
-#ifdef PROFILING
     // Here we don't want to use CCS_SYSTEM, because it's a hidden cost centre,
     // and evaluating Haskell code under a hidden cost centre leads to
     // confusing profiling output. (#7753)
-#endif
     SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_MAIN);
     ap->payload[0] = f;
     ap->payload[1] = arg;
