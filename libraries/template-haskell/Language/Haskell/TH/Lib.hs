@@ -655,3 +655,9 @@ appsE [] = error "appsE []"
 appsE [x] = x
 appsE (x:y:zs) = appsE ( (appE x y) : zs )
 
+-- | Return the Module at the place of splicing.  Can be used as an
+-- input for 'reifyModule'.
+thisModule :: Q Module
+thisModule = do
+  loc <- location
+  return $ Module (mkPkgName $ loc_package loc) (mkModName $ loc_module loc)

@@ -19,7 +19,9 @@ module Language.Haskell.TH(
 	-- ** Querying the compiler
 	-- *** Reify
 	reify, 		  -- :: Name -> Q Info
-	Info(..),
+	reifyModule,
+	thisModule,
+	Info(..), ModuleInfo(..),
 	InstanceDec,
 	ParentName,
 	Arity,

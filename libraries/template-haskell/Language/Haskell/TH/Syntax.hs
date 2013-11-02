@@ -55,6 +55,7 @@ class (Monad m, Applicative m) => Quasi m where
        -- Works for classes and type functions
   qReifyRoles       :: Name -> m [Role]
   qReifyAnnotations :: Data a => AnnLookup -> m [a]
+  qReifyModule      :: Module -> m ModuleInfo
 
   qLocation :: m Loc
 
@@ -92,9 +93,10 @@ instance Quasi IO where
 
   qLookupName _ _     = badIO "lookupName"
   qReify _            = badIO "reify"
-  qReifyInstances _ _ = badIO "classInstances"
+  qReifyInstances _ _ = badIO "reifyInstances"
   qReifyRoles _       = badIO "reifyRoles"
   qReifyAnnotations _ = badIO "reifyAnnotations"
+  qReifyModule _      = badIO "reifyModule"
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _ = badIO "addDependentFile"
@@ -347,6 +349,12 @@ reifyRoles nm = Q (qReifyRoles nm)
 reifyAnnotations :: Data a => AnnLookup -> Q [a]
 reifyAnnotations an = Q (qReifyAnnotations an)
 
+-- | @reifyModule mod@ looks up information about module @mod@.  To
+-- look up the current module, call this function with the return
+-- value of @thisModule@.
+reifyModule :: Module -> Q ModuleInfo
+reifyModule m = Q (qReifyModule m)
+
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
 isInstance :: Name -> [Type] -> Q Bool
 isInstance nm tys = do { decs <- reifyInstances nm tys
@@ -399,6 +407,7 @@ instance Quasi Q where
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
+  qReifyModule      = reifyModule
   qLookupName       = lookupName
   qLocation 	    = location
   qRunIO    	    = runIO
@@ -519,8 +528,12 @@ newtype ModName = ModName String	-- Module name
 newtype PkgName = PkgName String	-- package name
  deriving (Show,Eq,Ord,Typeable,Data)
 
+-- | Obtained from 'reifyModule' and 'thisModule'.
+data Module = Module PkgName ModName -- package qualified module name
+ deriving (Show,Eq,Ord,Typeable,Data)
+
 newtype OccName = OccName String
- deriving (Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data)
 
 mkModName :: String -> ModName
 mkModName s = ModName s
@@ -986,6 +999,12 @@ data Info
 	Type	-- What it is bound to
   deriving( Show, Data, Typeable )
 
+-- | Obtained from 'reifyModule' in the 'Q' Monad.
+data ModuleInfo =
+  -- | Contains the import list of the module.
+  ModuleInfo [Module]
+  deriving( Show, Data, Typeable )
+
 {- |
 In 'ClassOpI' and 'DataConI', name of the parent class or type
 -}
@@ -1363,7 +1382,7 @@ data Role = NominalR            -- ^ @nominal@
   deriving( Show, Eq, Data, Typeable )
 
 -- | Annotation target for reifyAnnotations
-data AnnLookup = AnnLookupModule PkgName ModName
+data AnnLookup = AnnLookupModule Module
                | AnnLookupName Name
                deriving( Show, Eq, Data, Typeable )
 
