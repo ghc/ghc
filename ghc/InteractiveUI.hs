@@ -986,15 +986,23 @@ lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
   macros    <- liftIO $ readIORef macros_ref
   ghci_cmds <- ghci_commands `fmap` getGHCiState
-  let{ (str, cmds) = case str' of
-      ':' : rest -> (rest, ghci_cmds) -- "::" selects a builtin command
-      _ -> (str', macros ++ ghci_cmds) } -- otherwise prefer macros
-  -- look for exact match first, then the first prefix match
-  return $ case [ c | c <- cmds, str == cmdName c ] of
-           c:_ -> Just c
-           [] -> case [ c | c@(s,_,_) <- cmds, str `isPrefixOf` s ] of
-                 [] -> Nothing
-                 c:_ -> Just c
+  let (str, xcmds) = case str' of
+          ':' : rest -> (rest, [])     -- "::" selects a builtin command
+          _          -> (str', macros) -- otherwise include macros in lookup
+
+      lookupExact  s = find $ (s ==)           . cmdName
+      lookupPrefix s = find $ (s `isPrefixOf`) . cmdName
+
+      builtinPfxMatch = lookupPrefix str ghci_cmds
+
+  -- first, look for exact match (while preferring macros); then, look
+  -- for first prefix match (preferring builtins), *unless* a macro
+  -- overrides the builtin; see #8305 for motivation
+  return $ lookupExact str xcmds <|>
+           lookupExact str ghci_cmds <|>
+           (builtinPfxMatch >>= \c -> lookupExact (cmdName c) xcmds) <|>
+           builtinPfxMatch <|>
+           lookupPrefix str xcmds
 
 getCurrentBreakSpan :: GHCi (Maybe SrcSpan)
 getCurrentBreakSpan = do
