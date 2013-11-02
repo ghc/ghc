@@ -2390,7 +2390,7 @@ primclass Coercible a b
    }
 
 ------------------------------------------------------------------------
-section "SIMD Vectors" 
+section "SIMD Vectors"
 	{Operations on SIMD vectors.}
 ------------------------------------------------------------------------
 
@@ -2609,10 +2609,10 @@ section "Prefetch"
   in the GCC and Clang C compilers.
 
   The prefetch primops are all marked with the can_fail=True attribute, but
-  they will never fail. The motivation for enabling the can_fail attribute is 
+  they will never fail. The motivation for enabling the can_fail attribute is
   so that prefetches are not hoisted/let floated out. This is because prefetch
   is a tool for optimizing usage of system memory bandwidth, and preventing let
-  hoising makes *WHEN* the prefetch happens a bit more predictable. 
+  hoising makes *WHEN* the prefetch happens a bit more predictable.
 
 
   On the LLVM backend, prefetch*N# uses the LLVM prefetch intrinsic
@@ -2630,17 +2630,17 @@ section "Prefetch"
   prefetch*3 operations are recommended.
 
   For further reading about prefetch and associated systems performance optimization,
-  the instruction set and optimization manuals by Intel and other CPU vendors are 
+  the instruction set and optimization manuals by Intel and other CPU vendors are
   excellent starting place.
 
 
-  The "Intel 64 and IA-32 Architectures Optimization Reference Manual" is 
-  especially a helpful read, even if your software is meant for other CPU 
+  The "Intel 64 and IA-32 Architectures Optimization Reference Manual" is
+  especially a helpful read, even if your software is meant for other CPU
   architectures or vendor hardware.
-  
+
   http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html
 
-  
+
 
    }
 ------------------------------------------------------------------------
