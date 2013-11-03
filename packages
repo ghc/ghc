@@ -28,12 +28,12 @@
 #   * 'upstreamurl' is the upstream Git repo location for packages
 #     maintained outside of GHC HQ.
 #
-#   * The 'tag' determines when "darcs-all get" will get the
+#   * The 'tag' determines when "sync-all get" will get the
 #     repo. If the tag is "-" then it will always get it, but if there
-#     is a tag then a corresponding flag must be given to darcs-all, e.g.
+#     is a tag then a corresponding flag must be given to "sync-all", e.g.
 #     if you want to get the packages with an "extralibs" or "testsuite"
-#     tag then you need to use "darcs-all --extra --testsuite get".
-#     Support for new tags must be manually added to the darcs-all script.
+#     tag then you need to use "sync-all --extra --testsuite get".
+#     Support for new tags must be manually added to the "sync-all" script.
 #
 #     'tag' is also used to determine which packages the build system
 #     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra'
