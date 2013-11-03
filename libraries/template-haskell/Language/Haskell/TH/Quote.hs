@@ -75,7 +75,7 @@ dataToPatQ = dataToQa id litP conP
 -- the data out of a file.  For example, suppose 'asmq' is an 
 -- assembly-language quoter, so that you can write [asmq| ld r1, r2 |]
 -- as an expression. Then if you define @asmq_f = quoteFile asmq@, then
--- the quote [asmq_f| foo.s |] will take input from file "foo.s" instead
+-- the quote [asmq_f|foo.s|] will take input from file @"foo.s"@ instead
 -- of the inline text
 quoteFile :: QuasiQuoter -> QuasiQuoter
 quoteFile (QuasiQuoter { quoteExp = qe, quotePat = qp, quoteType = qt, quoteDec = qd }) 
@@ -83,4 +83,5 @@ quoteFile (QuasiQuoter { quoteExp = qe, quotePat = qp, quoteType = qt, quoteDec 
   where
    get :: (String -> Q a) -> String -> Q a
    get old_quoter file_name = do { file_cts <- runIO (readFile file_name) 
+                                 ; addDependentFile file_name
                                  ; old_quoter file_cts }
