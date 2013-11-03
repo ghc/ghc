@@ -158,7 +158,7 @@ I am unsure of the proper DocBook elements.
     <para>Formal static and dynamic semantics in the form of an executable
     typechecker and interpreter are available separately in the GHC
     source tree
-    <footnote><ulink url="http://darcs.haskell.org/ghc">http://darcs.haskell.org/ghc</ulink></footnote>
+    <footnote><ulink url="http://git.haskell.org/ghc.git/tree">http://git.haskell.org/ghc.git</ulink></footnote>
     under <code>utils/ext-core</code>.</para>
 
   </section>

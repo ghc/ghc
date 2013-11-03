@@ -30,7 +30,7 @@ find an overview here:
 Next, clone the repository and all the associated libraries:
 
 ```
-$ git clone http://darcs.haskell.org/ghc.git/
+$ git clone http://git.haskell.org/ghc.git
 $ cd ghc
 $ ./sync-all --testsuite get
 ```

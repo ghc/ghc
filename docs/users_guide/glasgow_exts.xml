@@ -8966,7 +8966,7 @@ Because the preprocessor targets Haskell (rather than Core),
 patterns</emphasis>, written <literal>!<replaceable>pat</replaceable></literal>.
 Bang patterns are under consideration for Haskell Prime.
 The <ulink
-url="http://hackage.haskell.org/trac/haskell-prime/wiki/BangPatterns">Haskell
+url="http://ghc.haskell.org/trac/haskell-prime/wiki/BangPatterns">Haskell
 prime feature description</ulink> contains more discussion and examples
 than the material below.
 </para>
