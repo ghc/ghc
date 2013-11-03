@@ -27,10 +27,14 @@ import Compiler.Hoopl hiding (Unique, (<*>), mkFirst, mkMiddle, mkLast, mkLabel,
 import DynFlags
 import FastString
 import ForeignCall
-import Prelude hiding (succ)
 import SMRep (ByteOff)
 import UniqSupply
 import OrdList
+
+import Control.Monad
+import Data.List
+import Data.Maybe
+import Prelude (($),Int,Eq(..)) -- avoid importing (<*>)
 
 #include "HsVersions.h"
 

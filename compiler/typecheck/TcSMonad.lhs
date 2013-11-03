@@ -133,7 +133,7 @@ import UniqFM
 import Maybes ( orElse, catMaybes, firstJust )
 import Pair ( pSnd )
 
-import Control.Monad( when, zipWithM )
+import Control.Monad( ap, when, zipWithM )
 import Data.IORef
 import TrieMap
 
@@ -988,6 +988,10 @@ newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
 
 instance Functor TcS where
   fmap f m = TcS $ fmap f . unTcS m
+
+instance Applicative TcS where
+  pure  = return
+  (<*>) = ap
 
 instance Monad TcS where
   return x  = TcS (\_ -> return x)
