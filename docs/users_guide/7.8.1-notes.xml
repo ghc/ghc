@@ -631,23 +631,38 @@
                     The <literal>Control.Category</literal> module now has the
                     <literal>PolyKinds</literal> extension enabled, meaning
                     that instances of <literal>Category</literal> no longer
-                    need be of kind <literal>* -> * -> *</literal>
+                    need be of kind <literal>* -> * -> *</literal>.
                </para>
            </listitem>
             <listitem>
                 <para>
                     There are now <literal>Foldable</literal> and <literal>Traversable</literal>
-                    instances for <literal>Either a</literal>, <literal>Const r</literal>, and <literal>(,) a</literal>
+                    instances for <literal>Either a</literal>, <literal>Const r</literal>, and <literal>(,) a</literal>.
                </para>
            </listitem>
             <listitem>
                 <para>
-                    There is now a <literal>Monoid</literal> instance for <literal>Const</literal>
+                    There is now a <literal>Monoid</literal> instance for <literal>Const</literal>.
                </para>
            </listitem>
              <listitem>
                 <para>
-                    There is now a <literal>Data</literal> instance for <literal>Data.Version</literal>
+                    There is now a <literal>Data</literal> instance for <literal>Data.Version</literal>.
+               </para>
+           </listitem>
+             <listitem>
+                <para>
+                    There are now <literal>Eq</literal>, <literal>Ord</literal>, <literal>Show</literal> and <literal>Read</literal> instances for <literal>ZipList</literal>.
+               </para>
+           </listitem>
+             <listitem>
+                <para>
+                    There are now <literal>Eq</literal>, <literal>Ord</literal>, <literal>Show</literal> and <literal>Read</literal> instances for <literal>Down</literal>.
+               </para>
+           </listitem>
+             <listitem>
+                <para>
+                    There are now <literal>Eq</literal>, <literal>Ord</literal>, <literal>Show</literal>, <literal>Read</literal> and <literal>Generic</literal> instances for types in GHC.Generics (<literal>U1</literal>, <literal>Par1</literal>, <literal>Rec1</literal>, <literal>K1</literal>, <literal>M1</literal>, <literal>(:+:)</literal>, <literal>(:*:)</literal>, <literal>(:.:)</literal>).
                </para>
            </listitem>
             <listitem>
