@@ -170,7 +170,10 @@ because it omits the check that the IO is only being performed by a
 single thread.  Hence, when you use 'unsafeDupablePerformIO',
 there is a possibility that the IO action may be performed multiple
 times (on a multiprocessor), and you should therefore ensure that
-it gives the same results each time.
+it gives the same results each time. It may even happen that one
+of the duplicated IO actions is only run partially, and then interrupted
+in the middle without an exception being raised. Therefore, functions
+like 'bracket' cannot be used safely within 'unsafeDupablePerformIO'.
 
 /Since: 4.4.0.0/
 -}
