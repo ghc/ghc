@@ -27,7 +27,7 @@ module VarEnv (
 	modifyVarEnv, modifyVarEnv_Directly,
 	isEmptyVarEnv, foldVarEnv, 
 	elemVarEnvByKey, lookupVarEnv_Directly,
-	filterVarEnv_Directly, restrictVarEnv, 
+	filterVarEnv, filterVarEnv_Directly, restrictVarEnv, 
         partitionVarEnv,
 
 	-- * The InScopeSet type
@@ -399,6 +399,7 @@ varEnvKeys	  :: VarEnv a -> [Unique]
 		  
 isEmptyVarEnv	  :: VarEnv a -> Bool
 lookupVarEnv	  :: VarEnv a -> Var -> Maybe a
+filterVarEnv      :: (a -> Bool) -> VarEnv a -> VarEnv a
 lookupVarEnv_NF   :: VarEnv a -> Var -> a
 lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv	  :: Var -> VarEnv a -> Bool
@@ -421,6 +422,7 @@ minusVarEnv      = minusUFM
 intersectsVarEnv e1 e2 = not (isEmptyVarEnv (e1 `intersectUFM` e2))
 plusVarEnv	 = plusUFM
 lookupVarEnv	 = lookupUFM
+filterVarEnv     = filterUFM
 lookupWithDefaultVarEnv = lookupWithDefaultUFM
 mapVarEnv	 = mapUFM
 mkVarEnv	 = listToUFM
