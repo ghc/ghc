@@ -53,7 +53,6 @@ module TcSMonad (
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
     getTcEvBindsMap, getTcSTyBindsMap,
 
-
     lookupFlatEqn, newFlattenSkolem,            -- Flatten skolems
 
         -- Deque
@@ -62,17 +61,17 @@ module TcSMonad (
         -- Inerts
     InertSet(..), InertCans(..),
     getInertEqs,
-    emptyInert, getTcSInerts, lookupInInerts,
+    emptyInert, getTcSInerts, setTcSInerts,
     getInertUnsolved, checkAllSolved,
     prepareInertsForImplications,
-    modifyInertTcS,
-    insertInertItemTcS, partitionCCanMap, partitionEqMap,
-    getRelevantCts, extractRelevantInerts,
-    getInertsFunEqTyCon,
-    CCanMap(..), CtTypeMap, CtFamHeadMap, CtPredMap,
+    addInertCan, insertInertItemTcS,
+    CCanMap(..), CtTypeMap, CtPredMap, EqualCtList,
     PredMap, FamHeadMap,
-    partCtFamHeadMap, lookupFamHead, lookupSolvedDict,
-    filterSolved,
+    lookupFamHead, lookupSolvedDict,
+
+    findTyEqs,
+    findDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
+    findFunEqsByTyCon, findFunEqs, addFunEq, replaceFunEqs, partitionFunEqs,
 
     instDFunType,                              -- Instantiation
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
@@ -133,12 +132,12 @@ import UniqFM
 import Maybes ( orElse, catMaybes, firstJust )
 import Pair ( pSnd )
 
+import TrieMap
 import Control.Monad( ap, when, zipWithM )
 import Data.IORef
-import TrieMap
+import Data.List( partition )
 
 #ifdef DEBUG
-import StaticFlags( opt_PprStyle_Debug )
 import VarSet
 import Digraph
 #endif
@@ -300,94 +299,15 @@ data CCanMap a
             , cts_derived :: UniqFM Cts   -- All Derived
             , cts_wanted  :: UniqFM Cts } -- All Wanted
 
-keepGivenCMap :: CCanMap a -> CCanMap a
-keepGivenCMap cc = emptyCCanMap { cts_given = cts_given cc }
-
 instance Outputable (CCanMap a) where
   ppr (CCanMap given derived wanted) = ptext (sLit "CCanMap") <+> (ppr given) <+> (ppr derived) <+> (ppr wanted)
-
-cCanMapToBag :: CCanMap a -> Cts
-cCanMapToBag cmap = foldUFM unionBags rest_wder (cts_given cmap)
-  where rest_wder = foldUFM unionBags rest_der  (cts_wanted cmap)
-        rest_der  = foldUFM unionBags emptyCts  (cts_derived cmap)
-
-emptyCCanMap :: CCanMap a
-emptyCCanMap = CCanMap { cts_given = emptyUFM, cts_derived = emptyUFM, cts_wanted = emptyUFM }
-
-updCCanMap:: Uniquable a => (a,Ct) -> CCanMap a -> CCanMap a
-updCCanMap (a,ct) cmap
-  = case cc_ev ct of
-      CtWanted {}  -> cmap { cts_wanted  = insert_into (cts_wanted cmap)  }
-      CtGiven {}   -> cmap { cts_given   = insert_into (cts_given cmap)   }
-      CtDerived {} -> cmap { cts_derived = insert_into (cts_derived cmap) }
-  where
-    insert_into m = addToUFM_C unionBags m a (singleCt ct)
-
-getRelevantCts :: Uniquable a => a -> CCanMap a -> (Cts, CCanMap a)
--- Gets the relevant constraints and returns the rest of the CCanMap
-getRelevantCts a cmap
-    = let relevant = lookup (cts_wanted cmap) `unionBags`
-                     lookup (cts_given cmap)  `unionBags`
-                     lookup (cts_derived cmap)
-          residual_map = cmap { cts_wanted  = delFromUFM (cts_wanted cmap) a
-                              , cts_given   = delFromUFM (cts_given cmap) a
-                              , cts_derived = delFromUFM (cts_derived cmap) a }
-      in (relevant, residual_map)
-  where
-    lookup map = lookupUFM map a `orElse` emptyCts
-
-lookupCCanMap :: Uniquable a => a -> (CtEvidence -> Bool) -> CCanMap a -> Maybe CtEvidence
-lookupCCanMap a pick_me map
-  = findEvidence pick_me possible_cts
-  where
-     possible_cts = lookupUFM (cts_given map)   a `plus` (
-                    lookupUFM (cts_wanted map)  a `plus` (
-                    lookupUFM (cts_derived map) a `plus` emptyCts))
-
-     plus Nothing     cts2 = cts2
-     plus (Just cts1) cts2 = cts1 `unionBags` cts2
-
-findEvidence :: (CtEvidence -> Bool) -> Cts -> Maybe CtEvidence
-findEvidence pick_me cts
-  = foldrBag pick Nothing cts
-  where
-     pick :: Ct -> Maybe CtEvidence -> Maybe CtEvidence
-     pick ct deflt | let ctev = cc_ev ct, pick_me ctev = Just ctev
-                   | otherwise                             = deflt
-
-partitionCCanMap :: (Ct -> Bool) -> CCanMap a -> (Cts,CCanMap a)
--- All constraints that /match/ the predicate go in the bag, the rest remain in the map
-partitionCCanMap pred cmap
-  = let (ws_map,ws) = foldUFM_Directly aux (emptyUFM,emptyCts) (cts_wanted cmap)
-        (ds_map,ds) = foldUFM_Directly aux (emptyUFM,emptyCts) (cts_derived cmap)
-        (gs_map,gs) = foldUFM_Directly aux (emptyUFM,emptyCts) (cts_given cmap)
-    in (ws `andCts` ds `andCts` gs, cmap { cts_wanted  = ws_map
-                                         , cts_given   = gs_map
-                                         , cts_derived = ds_map })
-  where aux k this_cts (mp,acc_cts) = (new_mp, new_acc_cts)
-                                    where new_mp      = addToUFM mp k cts_keep
-                                          new_acc_cts = acc_cts `andCts` cts_out
-                                          (cts_out, cts_keep) = partitionBag pred this_cts
-
-partitionEqMap :: (Ct -> Bool) -> TyVarEnv (Ct,TcCoercion) -> ([Ct], TyVarEnv (Ct,TcCoercion))
-partitionEqMap pred isubst
-  = let eqs_out = foldVarEnv extend_if_pred [] isubst
-        eqs_in  = filterVarEnv_Directly (\_ (ct,_) -> not (pred ct)) isubst
-    in (eqs_out, eqs_in)
-  where extend_if_pred (ct,_) cts = if pred ct then ct : cts else cts
-
-extractUnsolvedCMap :: CCanMap a -> Cts
--- Gets the wanted or derived constraints
-extractUnsolvedCMap cmap = foldUFM unionBags emptyCts (cts_wanted cmap)
-              `unionBags`  foldUFM unionBags emptyCts (cts_derived cmap)
 
 -- Maps from PredTypes to Constraints
 type CtTypeMap    = TypeMap    Ct
 type CtPredMap    = PredMap    Ct
-type CtFamHeadMap = FamHeadMap Ct
 
 newtype PredMap    a = PredMap    { unPredMap    :: TypeMap a } -- Indexed by TcPredType
-newtype FamHeadMap a = FamHeadMap { unFamHeadMap :: TypeMap a } -- Indexed by family head
+newtype FamHeadMap a = FamHeadMap (TypeMap a) -- Indexed by family head
 
 instance Outputable a => Outputable (PredMap a) where
    ppr (PredMap m) = ppr (foldTM (:) m [])
@@ -404,43 +324,11 @@ emptyFamHeadMap = FamHeadMap emptyTM
 sizeFamHeadMap :: FamHeadMap a -> Int
 sizeFamHeadMap (FamHeadMap m) = foldTypeMap (\_ x -> x+1) 0 m
 
-ctTypeMapCts :: TypeMap Ct -> Cts
-ctTypeMapCts ctmap = foldTM (\ct cts -> extendCts cts ct) ctmap emptyCts
-
 lookupFamHead :: FamHeadMap a -> TcType -> Maybe a
 lookupFamHead (FamHeadMap m) key = lookupTM key m
 
 insertFamHead :: FamHeadMap a -> TcType -> a -> FamHeadMap a
 insertFamHead (FamHeadMap m) key value = FamHeadMap (insertTM key value m)
-
-delFamHead :: FamHeadMap a -> TcType -> FamHeadMap a
-delFamHead (FamHeadMap m) key = FamHeadMap (deleteTM key m)
-
-anyFamHeadMap :: (Ct -> Bool) -> CtFamHeadMap -> Bool
-anyFamHeadMap f ctmap = foldTM ((||) . f) (unFamHeadMap ctmap) False
-
-partCtFamHeadMap :: (Ct -> Bool)
-                 -> CtFamHeadMap
-                 -> (Cts, CtFamHeadMap)
-partCtFamHeadMap f (FamHeadMap ctmap)
-  = let (cts, tymap_final) = foldTM upd_acc ctmap (emptyBag, ctmap)
-    in (cts, FamHeadMap tymap_final)
-  where
-    upd_acc ct (cts,acc_map)
-         | f ct      = (extendCts cts ct, deleteTM fam_head acc_map)
-         | otherwise = (cts,acc_map)
-         where
-           fam_head = funEqHead ct
-
-funEqHead :: Ct -> Type
-funEqHead ct = case isCFunEqCan_maybe ct of
-                 Just (tc,tys) -> mkTyConApp tc tys
-                 Nothing       -> pprPanic "funEqHead" (ppr ct)
-
-filterSolved :: (CtEvidence -> Bool) -> PredMap CtEvidence -> PredMap CtEvidence
-filterSolved p (PredMap mp) = PredMap (foldTM upd mp emptyTM)
-  where upd a m = if p a then insertTM (ctEvPred a) a m
-                         else m
 \end{code}
 
 %************************************************************************
@@ -453,18 +341,25 @@ filterSolved p (PredMap mp) = PredMap (foldTM upd mp emptyTM)
 Note [Detailed InertCans Invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The InertCans represents a collection of constraints with the following properties:
-  1 All canonical
-  2 All Given or Wanted or Derived. No (partially) Solved
-  3 No two dictionaries with the same head
-  4 No two family equations with the same head
-      NB: This is enforced by construction since we use a CtFamHeadMap for inert_funeqs
-  5 Family equations inert wrt top-level family axioms
-  6 Dictionaries have no matching top-level instance
 
-  7 Non-equality constraints are fully rewritten with respect to the equalities (CTyEqCan)
+  * All canonical
 
-  8 Equalities _do_not_ form an idempotent substitution, but they are
-    guaranteed to not have any occurs errors. Additional notes:
+  * No two dictionaries with the same head
+  * No two CIrreds with the same type
+
+  * Family equations inert wrt top-level family axioms
+
+  * Dictionaries have no matching top-level instance
+
+  * Given family or dictionary constraints don't mention touchable
+    unification variables
+
+  * Non-CTyEqCan constraints are fully rewritten with respect
+    to the CTyEqCan equalities (modulo canRewrite of course;
+    eg a wanted cannot rewrite a given)
+
+  * CTyEqCan equalities _do_not_ form an idempotent substitution, but
+    they are guaranteed to not have any occurs errors. Additional notes:
 
        - The lack of idempotence of the inert substitution implies
          that we must make sure that when we rewrite a constraint we
@@ -492,7 +387,6 @@ The InertCans represents a collection of constraints with the following properti
          equalities can safely stay in the inert set and which must be
          kicked out to be rewritten and re-checked for occurs errors.
 
-  9 Given family or dictionary constraints don't mention touchable unification variables
 
 Note [Solved constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -540,20 +434,19 @@ Type-family equations, of form (ev : F tys ~ ty), live in four places
 -- All Given (fully known) or Wanted or Derived
 -- See Note [Detailed InertCans Invariants] for more
 data InertCans
-  = IC { inert_eqs :: TyVarEnv Ct
-              -- Must all be CTyEqCans! If an entry exists of the form:
-              --   a |-> ct,co
-              -- Then ct = CTyEqCan { cc_tyvar = a, cc_rhs = xi }
-              -- And  co : a ~ xi
+  = IC { inert_eqs :: TyVarEnv EqualCtList
+              -- All CTyEqCans; index is the LHS tyvar
               -- Some Refl equalities are also in tcs_ty_binds
               -- see Note [Spontaneously solved in TyBinds] in TcInteract
 
-       , inert_dicts :: CCanMap Class
+       , inert_funeqs :: FunEqMap EqualCtList
+              -- All CFunEqCans; index is the whole family head type.
+
+       , inert_dicts :: DictMap Ct
               -- Dictionaries only, index is the class
               -- NB: index is /not/ the whole type because FD reactions
               -- need to match the class but not necessarily the whole type.
-       , inert_funeqs :: CtFamHeadMap
-              -- Family equations, index is the whole family head type.
+
        , inert_irreds :: Cts
               -- Irreducible predicates
 
@@ -561,6 +454,17 @@ data InertCans
               -- Frozen errors (as non-canonicals)
        }
 
+type EqualCtList = [Ct]
+-- EqualCtList invariants:
+--    * All are equalities
+--    * All these equalities have the same LHS
+--    * The list is never empty
+--    * No element of the list can rewrite any other
+--
+-- From the fourth invariant it follows that the list is
+--   - A single Given, or
+--   - Multiple Wanteds, or
+--   - Multiple Deriveds
 
 -- The Inert Set
 data InertSet
@@ -602,10 +506,9 @@ instance Outputable InertCans where
   ppr ics = vcat [ ptext (sLit "Equalities:")
                    <+> vcat (map ppr (varEnvElts (inert_eqs ics)))
                  , ptext (sLit "Type-function equalities:")
-                   <+> vcat (map ppr (Bag.bagToList $
-                                  ctTypeMapCts (unFamHeadMap $ inert_funeqs ics)))
+                   <+> vcat (map ppr (funEqsToList (inert_funeqs ics)))
                  , ptext (sLit "Dictionaries:")
-                   <+> vcat (map ppr (Bag.bagToList $ cCanMapToBag (inert_dicts ics)))
+                   <+> vcat (map ppr (Bag.bagToList $ dictsToBag (inert_dicts ics)))
                  , ptext (sLit "Irreds:")
                    <+> vcat (map ppr (Bag.bagToList $ inert_irreds ics))
                  , text "Insolubles =" <+> -- Clearly print frozen errors
@@ -620,8 +523,8 @@ instance Outputable InertSet where
 emptyInert :: InertSet
 emptyInert
   = IS { inert_cans = IC { inert_eqs    = emptyVarEnv
-                         , inert_dicts  = emptyCCanMap
-                         , inert_funeqs = emptyFamHeadMap
+                         , inert_dicts  = emptyDicts
+                         , inert_funeqs = emptyFunEqs
                          , inert_irreds = emptyCts
                          , inert_insols = emptyCts }
        , inert_fsks          = []
@@ -629,53 +532,37 @@ emptyInert
        , inert_solved_dicts  = PredMap emptyTM
        , inert_solved_funeqs = emptyFamHeadMap }
 
-insertInertItem :: Ct -> InertSet -> InertSet
--- Add a new inert element to the inert set.
-insertInertItem item is
-  = -- A canonical Given, Wanted, or Derived
-    is { inert_cans = upd_inert_cans (inert_cans is) item }
 
-  where upd_inert_cans :: InertCans -> Ct -> InertCans
-        -- Precondition: item /is/ canonical
-        upd_inert_cans ics item
-          | isCTyEqCan item
-          = let upd_err a b = pprPanic "insertInertItem" $
-                              vcat [ text "Multiple inert equalities:"
-                                   , text "Old (already inert):" <+> ppr a
-                                   , text "Trying to insert   :" <+> ppr b ]
+---------------
+addInertCan :: InertCans -> Ct -> InertCans
+-- Precondition: item /is/ canonical
+addInertCan ics item@(CTyEqCan {})
+  = ics { inert_eqs = extendVarEnv_C (\eqs _ -> item : eqs)
+                              (inert_eqs ics)
+                              (cc_tyvar item) [item] }
 
-                eqs'     = extendVarEnv_C upd_err (inert_eqs ics)
-                                                  (cc_tyvar item) item
+addInertCan ics item@(CIrredEvCan {})
+  = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item }
 
-            in ics { inert_eqs = eqs' }
+addInertCan ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
+  = ics { inert_dicts = addDict (inert_dicts ics) cls tys item }
 
-          | isCIrredEvCan item                  -- Presently-irreducible evidence
-          = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item }
+addInertCan ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
+  = ics { inert_funeqs = addFunEq (inert_funeqs ics) tc tys item }
 
-          | Just cls <- isCDictCan_Maybe item   -- Dictionary
-          = ics { inert_dicts = updCCanMap (cls,item) (inert_dicts ics) }
+addInertCan _ item
+  = pprPanic "upd_inert set: can't happen! Inserting " $
+    ppr item   -- Can't be CNonCanonical, CHoleCan,
+               -- because they only land in inert_insols
 
-          | Just (tc,tys) <- isCFunEqCan_maybe item  -- Function equality
-          = let fam_head = mkTyConApp tc tys
-                upd_funeqs Nothing = Just item
-                upd_funeqs (Just _already_there)
-                  = panic "insertInertItem: item already there!"
-            in ics { inert_funeqs = FamHeadMap
-                                      (alterTM fam_head upd_funeqs $
-                                         (unFamHeadMap $ inert_funeqs ics)) }
-          | otherwise
-          = pprPanic "upd_inert set: can't happen! Inserting " $
-            ppr item   -- Can't be CNonCanonical, CHoleCan,
-                       -- because they only land in inert_insols
-
-
+--------------
 insertInertItemTcS :: Ct -> TcS ()
 -- Add a new item in the inerts of the monad
 insertInertItemTcS item
   = do { traceTcS "insertInertItemTcS {" $
          text "Trying to insert new inert item:" <+> ppr item
 
-       ; updInertTcS (insertInertItem item)
+       ; updInertTcS (\ics -> ics { inert_cans = addInertCan (inert_cans ics) item })
 
        ; traceTcS "insertInertItemTcS }" $ empty }
 
@@ -699,15 +586,6 @@ addSolvedFunEq fam_ty ev rhs_ty
     inert { inert_solved_funeqs = insertFamHead (inert_solved_funeqs inert)
                                                 fam_ty (ev, rhs_ty) }
 
-modifyInertTcS :: (InertSet -> (a,InertSet)) -> TcS a
--- Modify the inert set with the supplied function
-modifyInertTcS upd
-  = do { is_var <- getTcSInertsRef
-       ; curr_inert <- wrapTcS (TcM.readTcRef is_var)
-       ; let (a, new_inert) = upd curr_inert
-       ; wrapTcS (TcM.writeTcRef is_var new_inert)
-       ; return a }
-
 updInertTcS :: (InertSet -> InertSet) -> TcS ()
 -- Modify the inert set with the supplied function
 updInertTcS upd
@@ -725,28 +603,37 @@ prepareInertsForImplications is
   where
     getGivens (IC { inert_eqs    = eqs
                   , inert_irreds = irreds
-                  , inert_funeqs = FamHeadMap funeqs
+                  , inert_funeqs = funeqs
                   , inert_dicts  = dicts })
-      = IC { inert_eqs    = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs
-           , inert_funeqs = FamHeadMap (foldTM given_from_wanted funeqs emptyTM)
+      = IC { inert_eqs    = filterVarEnv is_given_eq eqs
+           , inert_funeqs = foldFunEqs given_from_wanted funeqs emptyFunEqs
            , inert_irreds = Bag.filterBag isGivenCt irreds
-           , inert_dicts  = keepGivenCMap dicts
+           , inert_dicts  = filterDicts isGivenCt dicts
            , inert_insols = emptyCts }
 
-    given_from_wanted :: Ct -> TypeMap Ct -> TypeMap Ct
-    given_from_wanted funeq fhm   -- This is where the magic processing happens
-                                  -- for type-function equalities
-                                  -- See Note [Preparing inert set for implications]
+    is_given_eq :: [Ct] -> Bool
+    is_given_eq (ct:rest) | isGivenCt ct = ASSERT( null rest ) True
+    is_given_eq _                        = False
+
+    given_from_wanted :: EqualCtList -> FunEqMap EqualCtList -> FunEqMap EqualCtList
+    given_from_wanted (funeq:_) fhm  -- This is where the magic processing happens
+                                     -- for type-function equalities
+                                     -- Pick just the first
+                                     -- See Note [Preparing inert set for implications]
+
       | isWanted ev  = insert_one (funeq { cc_ev = given_ev }) fhm
       | isGiven ev   = insert_one funeq fhm
-      | otherwise    = fhm  -- Drop derived constraints
       where
         ev = ctEvidence funeq
         given_ev = CtGiven { ctev_evtm = EvId (ctev_evar ev)
                            , ctev_pred = ctev_pred ev }
 
-    insert_one :: Ct -> TypeMap Ct -> TypeMap Ct
-    insert_one funeq fhm = insertTM (funEqHead funeq) funeq fhm
+    given_from_wanted _ fhm = fhm -- Drop derived constraints
+
+    insert_one :: Ct -> FunEqMap EqualCtList -> FunEqMap EqualCtList
+    insert_one item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys }) fhm
+       = addFunEq fhm tc tys item
+    insert_one item _ = pprPanic "insert_one" (ppr item)
 \end{code}
 
 Note [Preparing inert set for implications]
@@ -795,7 +682,7 @@ For Derived constraints we don't have evidence, so we do not turn
 them into Givens.  There can *be* deriving CFunEqCans; see Trac #8129.
 
 \begin{code}
-getInertEqs :: TcS (TyVarEnv Ct)
+getInertEqs :: TcS (TyVarEnv [Ct])
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs (inert_cans inert)) }
 
@@ -806,19 +693,22 @@ getInertUnsolved
  = do { is <- getTcSInerts
 
       ; let icans = inert_cans is
-            unsolved_irreds = Bag.filterBag is_unsolved (inert_irreds icans)
-            unsolved_dicts  = extractUnsolvedCMap (inert_dicts icans)
-            (unsolved_funeqs,_) = partCtFamHeadMap is_unsolved (inert_funeqs icans)
-            unsolved_eqs = foldVarEnv add_if_unsolved emptyCts (inert_eqs icans)
+            unsolved_irreds = Bag.filterBag is_unsolved  (inert_irreds icans)
+            unsolved_dicts  = foldDicts  add_if_unsolved  (inert_dicts icans)  emptyCts
+            unsolved_funeqs = foldFunEqs add_if_unsolveds (inert_funeqs icans) emptyCts
+            unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts (inert_eqs icans)
 
             unsolved_flats = unsolved_eqs `unionBags` unsolved_irreds `unionBags`
                              unsolved_dicts `unionBags` unsolved_funeqs
 
       ; return (unsolved_flats, inert_insols icans) }
   where
-    add_if_unsolved ct cts
-      | is_unsolved ct = cts `extendCts` ct
-      | otherwise      = cts
+    add_if_unsolved :: Ct -> Cts -> Cts
+    add_if_unsolved ct cts | is_unsolved ct = cts `extendCts` ct
+                           | otherwise      = cts
+
+    add_if_unsolveds :: [Ct] -> Cts -> Cts
+    add_if_unsolveds eqs cts = foldr add_if_unsolved cts eqs
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
@@ -830,73 +720,29 @@ checkAllSolved
 
       ; let icans = inert_cans is
             unsolved_irreds = Bag.anyBag isWantedCt (inert_irreds icans)
-            unsolved_dicts  = not (isNullUFM (cts_wanted (inert_dicts icans)))
-            unsolved_funeqs = anyFamHeadMap isWantedCt (inert_funeqs icans)
-            unsolved_eqs    = foldVarEnv ((||) . isWantedCt) False (inert_eqs icans)
+            unsolved_dicts  = foldDicts ((||)  . isWantedCt)     (inert_dicts icans)  False
+            unsolved_funeqs = foldFunEqs ((||) . any isWantedCt) (inert_funeqs icans) False
+            unsolved_eqs    = foldVarEnv ((||) . any isWantedCt) False (inert_eqs icans)
 
       ; return (not (unsolved_eqs || unsolved_irreds
                      || unsolved_dicts || unsolved_funeqs
                      || not (isEmptyBag (inert_insols icans)))) }
 
-
-{- Get inert function equation constraints that have the given tycon
-in their head.  Not that the constraints remain in the inert set.
-We use this to check for derived interactions with built-in type-function
-constructors. -}
-getInertsFunEqTyCon :: TyCon -> TcS [Ct]
-getInertsFunEqTyCon tc =
-  do is <- getTcSInerts
-     let mp = unFamHeadMap $ inert_funeqs $ inert_cans is
-     return $ lookupTypeMapTyCon mp tc
-
-
-extractRelevantInerts :: Ct -> TcS Cts
--- Returns the constraints from the inert set that are 'relevant' to react with
--- this constraint. The monad is left with the 'thinner' inerts.
--- NB: This function contains logic specific to the constraint solver, maybe move there?
-extractRelevantInerts wi
-  = modifyInertTcS (extract_relevants wi)
-  where
-        extract_relevants :: Ct -> InertSet -> (Cts,InertSet)
-        extract_relevants wi is
-          = let (cts,ics') = extract_ics_relevants wi (inert_cans is)
-            in (cts, is { inert_cans = ics' })
-
-        extract_ics_relevants :: Ct -> InertCans -> (Cts, InertCans)
-        extract_ics_relevants (CDictCan {cc_class = cl}) ics =
-            let (cts,dict_map) = getRelevantCts cl (inert_dicts ics)
-            in (cts, ics { inert_dicts = dict_map })
-
-        extract_ics_relevants (CFunEqCan { cc_fun = tc, cc_tyargs = tys })
-                              ics@(IC { inert_funeqs = funeq_map })
-            | let fam_head = mkTyConApp tc tys
-            , Just ct <- lookupFamHead funeq_map fam_head
-            = (singleCt ct, ics { inert_funeqs = delFamHead funeq_map fam_head })
-
-        extract_ics_relevants (CHoleCan {}) _
-            = pprPanic "extractRelevantInerts" (ppr wi)
-              -- Holes are put straight into inert_frozen, so never get here
-
-        extract_ics_relevants (CIrredEvCan { }) ics =
-            let cts = inert_irreds ics
-            in (cts, ics { inert_irreds = emptyCts })
-
-        extract_ics_relevants _ ics = (emptyCts,ics)
-
-
-lookupFlatEqn :: TcType -> TcS (Maybe (CtEvidence, TcType))
-lookupFlatEqn fam_ty
+lookupFlatEqn :: TyCon -> [Type] -> TcS (Maybe (CtEvidence, TcType))
+lookupFlatEqn fam_tc tys
   = do { IS { inert_solved_funeqs = solved_funeqs
             , inert_flat_cache = flat_cache
             , inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
-       ; return (lookupFamHead solved_funeqs fam_ty `firstJust`
-                 lookup_in_inerts inert_funeqs    `firstJust`
+       ; return (lookupFamHead solved_funeqs fam_ty  `firstJust`
+                 lookup_inerts inert_funeqs          `firstJust`
                  lookupFamHead flat_cache fam_ty) }
   where
-    lookup_in_inerts inert_funeqs
-        = case lookupFamHead inert_funeqs fam_ty of
-            Nothing -> Nothing
-            Just ct -> Just (ctEvidence ct, cc_rhs ct)
+    fam_ty = mkTyConApp fam_tc tys
+    lookup_inerts inert_funeqs
+      | (ct:_) <- findFunEqs inert_funeqs fam_tc tys
+      = Just (ctEvidence ct, cc_rhs ct)
+      | otherwise
+      = Nothing
 
 lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet
@@ -915,28 +761,174 @@ lookupInInertCans :: InertSet -> TcPredType -> Maybe CtEvidence
 -- Returns Just if exactly this pred type exists in the inert canonicals
 lookupInInertCans (IS { inert_cans = ics }) pty
   = case (classifyPredType pty) of
-      ClassPred cls _
-         -> lookupCCanMap cls (\ct -> ctEvPred ct `eqType` pty) (inert_dicts ics)
+      ClassPred cls tys
+         | Just ct <- findDict (inert_dicts ics) cls tys
+         -> Just (ctEvidence ct)
 
       EqPred ty1 _ty2
          | Just tv <- getTyVar_maybe ty1      -- Tyvar equation
-         , Just ct <- lookupVarEnv (inert_eqs ics) tv
-         , let ctev = ctEvidence ct
-         , ctEvPred ctev `eqType` pty
-         -> Just ctev
+         -> foldr exact_match Nothing (findTyEqs (inert_eqs ics) tv)
 
-         | Just _ <- splitTyConApp_maybe ty1  -- Family equation
-         , Just ct <- lookupTM ty1 (unFamHeadMap $ inert_funeqs ics)
-         , let ctev = ctEvidence ct
-         , ctEvPred ctev `eqType` pty
-         -> Just ctev
+         | Just (tc, tys) <- splitTyConApp_maybe ty1  -- Family equation
+         -> foldr exact_match Nothing (findFunEqs (inert_funeqs ics) tc tys)
 
-      IrredPred {} -> findEvidence (\ct -> ctEvPred ct `eqType` pty) (inert_irreds ics)
+      IrredPred {} -> foldrBag exact_match Nothing (inert_irreds ics)
 
       _other -> Nothing -- NB: No caching for IPs or holes
+  where
+    exact_match :: Ct -> Maybe CtEvidence -> Maybe CtEvidence
+    exact_match ct deflt | let ctev = ctEvidence ct
+                         , ctEvPred ctev `eqType` pty
+                         = Just ctev
+                         | otherwise
+                         = deflt
 \end{code}
 
 
+%************************************************************************
+%*                                                                      *
+                   TyEqMap
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+type TyEqMap a = TyVarEnv a
+
+findTyEqs :: TyEqMap EqualCtList -> TyVar -> EqualCtList
+findTyEqs m tv = lookupVarEnv m tv `orElse` []
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+                   TcAppMap, DictMap, FunEqMap
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+type TcAppMap a = UniqFM (ListMap TypeMap a)   -- Indexed by tycon then the arg types
+
+emptyTcAppMap :: TcAppMap a
+emptyTcAppMap = emptyUFM
+
+findTcApp :: TcAppMap a -> Unique -> [Type] -> Maybe a
+findTcApp m u tys = do { tys_map <- lookupUFM m u
+                       ; lookupTM tys tys_map }
+
+delTcApp :: TcAppMap a -> Unique -> [Type] -> TcAppMap a
+delTcApp m cls tys = adjustUFM (deleteTM tys) m cls
+
+addTcApp :: TcAppMap a -> Unique -> [Type] -> a -> TcAppMap a
+addTcApp m cls tys ct = alterUFM alter_tm m cls
+  where
+    alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
+
+tcAppMapToBag :: TcAppMap a -> Bag a
+tcAppMapToBag m = foldTcAppMap consBag m emptyBag
+
+foldTcAppMap :: (a -> b -> b) -> TcAppMap a -> b -> b
+foldTcAppMap k m z = foldUFM (foldTM k) z m
+
+-------------------------
+type DictMap a = TcAppMap a
+
+findDict :: DictMap a -> Class -> [Type] -> Maybe a
+findDict m cls tys = findTcApp m (getUnique cls) tys
+
+findDictsByClass :: DictMap a -> Class -> Bag a
+findDictsByClass m cls
+  | Just tm <- lookupUFM m cls = foldTM consBag tm emptyBag
+  | otherwise                  = emptyBag
+
+delDict :: DictMap a -> Class -> [Type] -> DictMap a
+delDict m cls tys = delTcApp m (getUnique cls) tys
+
+addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
+addDict m cls tys item = addTcApp m (getUnique cls) tys item
+
+addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
+addDictsByClass m cls items
+  = addToUFM m cls (foldrBag add emptyTM items)
+  where
+    add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
+    add ct _ = pprPanic "addDictsByClass" (ppr ct)
+
+filterDicts :: (Ct -> Bool) -> DictMap Ct -> DictMap Ct
+filterDicts f m = mapUFM do_tm m
+  where
+    do_tm tm = foldTM insert_mb tm emptyTM
+    insert_mb ct@(CDictCan { cc_tyargs = tys }) tm
+       | f ct      = insertTM tys ct tm
+       | otherwise = tm
+    insert_mb ct _ = pprPanic "filterDicts" (ppr ct)
+
+partitionDicts :: (Ct -> Bool) -> DictMap Ct -> (Bag Ct, DictMap Ct)
+partitionDicts f m = foldTcAppMap k m (emptyBag, emptyDicts)
+  where
+    k ct (yeses, noes) | f ct      = (ct `consBag` yeses, noes)
+                       | otherwise = (yeses,              add ct noes)
+    add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) m
+      = addDict m cls tys ct
+    add ct _ = pprPanic "partitionDicts" (ppr ct)
+
+dictsToBag :: DictMap a -> Bag a
+dictsToBag = tcAppMapToBag
+
+foldDicts :: (a -> b -> b) -> DictMap a -> b -> b
+foldDicts = foldTcAppMap
+
+emptyDicts :: DictMap a
+emptyDicts = emptyTcAppMap
+
+------------------------
+type FunEqMap a = TcAppMap a
+
+emptyFunEqs :: TcAppMap a
+emptyFunEqs = emptyTcAppMap
+
+findFunEqs :: FunEqMap [a] -> TyCon -> [Type] -> [a]
+findFunEqs m tc tys = findTcApp m (getUnique tc) tys `orElse` []
+
+funEqsToList :: FunEqMap [a] -> [a]
+funEqsToList m = foldTcAppMap (++) m []
+
+findFunEqsByTyCon :: FunEqMap [a] -> TyCon -> [a]
+-- Get inert function equation constraints that have the given tycon
+-- in their head.  Not that the constraints remain in the inert set.
+-- We use this to check for derived interactions with built-in type-function
+-- constructors.
+findFunEqsByTyCon m tc
+  | Just tm <- lookupUFM m tc = foldTM (++) tm []
+  | otherwise                 = []
+
+foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
+foldFunEqs = foldTcAppMap
+
+addFunEq :: FunEqMap EqualCtList -> TyCon -> [Type] -> Ct -> FunEqMap EqualCtList
+addFunEq m tc tys item
+  = alterUFM alter_tm m (getUnique tc)
+  where
+    alter_tm mb_tm = Just (alterTM tys alter_cts (mb_tm `orElse` emptyTM))
+    alter_cts Nothing       = Just [item]
+    alter_cts (Just funeqs) = Just (item : funeqs)
+
+replaceFunEqs :: FunEqMap EqualCtList -> TyCon -> [Type] -> Ct -> FunEqMap EqualCtList
+replaceFunEqs m tc tys ct = addTcApp m (getUnique tc) tys [ct]
+
+partitionFunEqs :: (Ct -> Bool) -> FunEqMap EqualCtList -> (Bag Ct, FunEqMap EqualCtList)
+partitionFunEqs f m = foldTcAppMap k m (emptyBag, emptyFunEqs)
+  where
+    k cts (yeses, noes)
+      = ( case eqs_out of
+            [] -> yeses
+            _  -> yeses `unionBags` listToBag eqs_out
+        , case eqs_in of
+            CFunEqCan { cc_fun = tc, cc_tyargs = tys } : _
+                -> addTcApp noes (getUnique tc) tys eqs_in
+            _  -> noes )
+      where
+        (eqs_out, eqs_in) = partition f cts
+\end{code}
 
 
 %************************************************************************
@@ -1038,10 +1030,12 @@ traceFireTcS :: Ct -> SDoc -> TcS ()
 -- Dump a rule-firing trace
 traceFireTcS ct doc
   = TcS $ \env ->
-    TcM.whenDOptM Opt_D_dump_cs_trace $
+    do { dflags <- getDynFlags
+       ; when (dopt Opt_D_dump_cs_trace dflags && traceLevel dflags >= 1) $
     do { n <- TcM.readTcRef (tcs_count env)
-       ; let msg = int n <> brackets (int (ctLocDepth (cc_loc ct))) <+> doc
-       ; TcM.dumpTcRn msg }
+       ; let msg = int n <> brackets (int (ctLocDepth (cc_loc ct)))
+                   <+> ppr (ctEvidence ct) <> colon <+> doc
+       ; TcM.debugDumpTcRn msg } }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, Bag EvBind)
@@ -1073,11 +1067,12 @@ runTcSWithEvBinds ev_binds_var tcs
        ; (_, ty_binds) <- TcM.readTcRef ty_binds_var
        ; mapM_ do_unification (varEnvElts ty_binds)
 
-#ifdef DEBUG
-       ; count <- TcM.readTcRef step_count
-       ; when (opt_PprStyle_Debug && count > 0) $
-         TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count )
+       ; TcM.whenDOptM Opt_D_dump_cs_trace $
+         do { count <- TcM.readTcRef step_count
+            ; when (count > 0) $
+              TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count ) }
 
+#ifdef DEBUG
        ; ev_binds <- TcM.getTcEvBinds ev_binds_var
        ; checkForCyclicBinds ev_binds
 #endif
@@ -1180,6 +1175,9 @@ getTcSWorkListRef = TcS (return . tcs_worklist)
 
 getTcSInerts :: TcS InertSet
 getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef)
+
+setTcSInerts :: InertSet -> TcS ()
+setTcSInerts ics = do { r <- getTcSInertsRef; wrapTcS (TcM.writeTcRef r ics) }
 
 updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
 updWorkListTcS f
@@ -1407,11 +1405,12 @@ which will result in two Deriveds to end up in the insoluble set:
 \begin{code}
 -- Flatten skolems
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-newFlattenSkolem :: CtFlavour
+newFlattenSkolem :: CtEvidence
                  -> TcType                      -- F xis
                  -> TcS (CtEvidence, TcType)    -- co :: F xis ~ ty
 -- We have already looked up in the cache; no need to so so again
-newFlattenSkolem Given fam_ty
+newFlattenSkolem ev fam_ty
+  | isGiven ev
   = do { tv <- wrapTcS $
                do { uniq <- TcM.newUnique
                   ; let name = TcM.mkTcTyVarName uniq (fsLit "f")
@@ -1429,7 +1428,7 @@ newFlattenSkolem Given fam_ty
 
        ; return (ctev, rhs_ty) }
 
-newFlattenSkolem _ fam_ty  -- Wanted or Derived: make new unification variable
+  | otherwise  -- Wanted or Derived: make new unification variable
   = do { rhs_ty <- newFlexiTcSTy (typeKind fam_ty)
        ; ctev <- newWantedEvVarNC (mkTcEqPred fam_ty rhs_ty)
                                    -- NC (no-cache) version because we've already

@@ -246,7 +246,7 @@ canClassNC d ev cls tys
     `andWhenContinue` emitSuperclasses
 
 canClass d ev cls tys
-  = do { (xis, cos) <- flattenMany d FMFullFlatten (ctEvFlavour ev) tys
+  = do { (xis, cos) <- flattenMany d FMFullFlatten ev tys
        ; let co = mkTcTyConAppCo (classTyCon cls) cos 
              xi = mkClassPred cls xis
        ; mb <- rewriteCtFlavor ev xi co
@@ -387,7 +387,7 @@ canIrred :: CtLoc -> CtEvidence -> TcS StopOrContinue
 canIrred d ev
   = do { let ty = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr ty) 
-       ; (xi,co) <- flatten d FMFullFlatten (ctEvFlavour ev) ty -- co :: xi ~ ty
+       ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
        ; let no_flattening = xi `eqType` ty 
              -- We can't use isTcReflCo, because even if the coercion is
              -- Refl, the output type might have had a substitution 
@@ -405,7 +405,7 @@ canIrred d ev
 canHole :: CtLoc -> CtEvidence -> OccName -> TcS StopOrContinue
 canHole d ev occ
   = do { let ty = ctEvPred ev
-       ; (xi,co) <- flatten d FMFullFlatten (ctEvFlavour ev) ty -- co :: xi ~ ty
+       ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
        ; mb <- rewriteCtFlavor ev xi co 
        ; case mb of
              Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_loc = d, cc_occ = occ })
@@ -465,7 +465,8 @@ data FlattenMode = FMSubstOnly | FMFullFlatten
 
 -- Flatten a bunch of types all at once.
 flattenMany :: CtLoc -> FlattenMode
-            -> CtFlavour -> [Type] -> TcS ([Xi], [TcCoercion])
+            -> CtEvidence 
+            -> [Type] -> TcS ([Xi], [TcCoercion])
 -- Coercions :: Xi ~ Type 
 -- Returns True iff (no flattening happened)
 -- NB: The EvVar inside the 'ctxt :: CtEvidence' is unused, 
@@ -483,7 +484,7 @@ flattenMany d f ctxt tys
 -- the new type-function-free type, and a collection of new equality
 -- constraints.  See Note [Flattening] for more detail.
 flatten :: CtLoc -> FlattenMode 
-        -> CtFlavour -> TcType -> TcS (Xi, TcCoercion)
+        -> CtEvidence -> TcType -> TcS (Xi, TcCoercion)
 -- Postcondition: Coercion :: Xi ~ TcType
 flatten loc f ctxt ty 
   | Just ty' <- tcView ty
@@ -525,31 +526,30 @@ flatten loc f ctxt (TyConApp tc tys)
 		 -- in which case the remaining arguments should
 		 -- be dealt with by AppTys
                fam_ty = mkTyConApp tc xi_args
-               
+
          ; (ret_co, rhs_xi) <-
-             case f of 
-               FMSubstOnly -> 
+             case f of
+               FMSubstOnly ->
                  return (mkTcReflCo fam_ty, fam_ty)
-               FMFullFlatten -> 
-                 do { mb_ct <- lookupFlatEqn fam_ty
+               FMFullFlatten ->
+                 do { mb_ct <- lookupFlatEqn tc xi_args
                     ; case mb_ct of
                         Just (ctev, rhs_ty)
-                          | let flav = ctEvFlavour ctev
-                          , flav `canRewrite` ctxt 
-                          -> -- You may think that we can just return (cc_rhs ct) but not so. 
-                             --            return (mkTcCoVarCo (ctId ct), cc_rhs ct, []) 
-                             -- The cached constraint resides in the cache so we have to flatten 
+                          | ctev `canRewriteOrSame `ctxt    -- Must allows [W]/[W]
+                          -> -- You may think that we can just return (cc_rhs ct) but not so.
+                             --            return (mkTcCoVarCo (ctId ct), cc_rhs ct, [])
+                             -- The cached constraint resides in the cache so we have to flatten
                              -- the rhs to make sure we have applied any inert substitution to it.
-                             -- Alternatively we could be applying the inert substitution to the 
-                             -- cache as well when we interact an equality with the inert. 
+                             -- Alternatively we could be applying the inert substitution to the
+                             -- cache as well when we interact an equality with the inert.
                              -- The design choice is: do we keep the flat cache rewritten or not?
                              -- For now I say we don't keep it fully rewritten.
-                            do { (rhs_xi,co) <- flatten loc f flav rhs_ty
+                            do { (rhs_xi,co) <- flatten loc f ctev rhs_ty
                                ; let final_co = evTermCoercion (ctEvTerm ctev)
                                                 `mkTcTransCo` mkTcSymCo co
                                ; traceTcS "flatten/flat-cache hit" $ (ppr ctev $$ ppr rhs_xi $$ ppr final_co)
                                ; return (final_co, rhs_xi) }
-                          
+
                         _ -> do { (ctev, rhs_xi) <- newFlattenSkolem ctxt fam_ty
                                 ; let ct = CFunEqCan { cc_ev     = ctev
                                                      , cc_fun    = tc
@@ -565,14 +565,14 @@ flatten loc f ctxt (TyConApp tc tys)
                                             --    cf Trac #5655
                   , mkTcAppCos (mkTcSymCo ret_co `mkTcTransCo` mkTcTyConAppCo tc cos_args) $
                     cos_rest
-                  ) 
+                  )
          }
 
 flatten loc _f ctxt ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; (rho', co) <- flatten loc FMSubstOnly ctxt rho   
+       ; (rho', co) <- flatten loc FMSubstOnly ctxt rho
                          -- Substitute only under a forall
                          -- See Note [Flattening under a forall]
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
@@ -598,7 +598,7 @@ and we have not begun to think about how to make that work!
 \begin{code}
 flattenTyVar, flattenFinalTyVar
         :: CtLoc -> FlattenMode 
-        -> CtFlavour -> TcTyVar -> TcS (Xi, TcCoercion)
+        -> CtEvidence -> TcTyVar -> TcS (Xi, TcCoercion)
 -- "Flattening" a type variable means to apply the substitution to it
 -- The substitution is actually the union of the substitution in the TyBinds
 -- for the unification variables that have been unified already with the inert
@@ -640,10 +640,10 @@ flattenTyVar loc f ctxt tv
     } } } } } } 
   where
     tv_eq_subst subst tv
-       | Just ct <- lookupVarEnv subst tv
-       , let ctev = cc_ev ct
+       | Just (ct:_) <- lookupVarEnv subst tv   -- If the first doesn't work, the 
+       , let ctev = cc_ev ct                    -- subsequent ones won't either
              rhs  = cc_rhs ct
-       , ctEvFlavour ctev `canRewrite` ctxt
+       , ctev `canRewrite` ctxt
        = Just (evTermCoercion (ctEvTerm ctev), rhs)
               -- NB: even if ct is Derived we are not going to 
               -- touch the actual coercion so we are fine. 
@@ -766,9 +766,8 @@ canEqNC loc ev s1@(ForAllTy {}) s2@(ForAllTy {})
 -- See Note [Equality between type applications]
 --     Note [Care with type applications] in TcUnify
 canEqNC loc ev ty1 ty2 
- =  do { let flav = ctEvFlavour ev
-       ; (s1, co1) <- flatten loc FMSubstOnly flav ty1
-       ; (s2, co2) <- flatten loc FMSubstOnly flav ty2
+ =  do { (s1, co1) <- flatten loc FMSubstOnly ev ty1
+       ; (s2, co2) <- flatten loc FMSubstOnly ev ty2
        ; mb_ct <- rewriteCtFlavor ev (mkTcEqPred s1 s2) (mkHdEqPred s2 co1 co2)
        ; case mb_ct of
            Nothing     -> return Stop
@@ -812,9 +811,8 @@ canDecomposableTyConApp loc ev tc1 tys1 tc2 tys2
 canEqFailure :: CtLoc -> CtEvidence -> TcType -> TcType -> TcS StopOrContinue
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqFailure loc ev ty1 ty2
-  = do { let flav = ctEvFlavour ev
-       ; (s1, co1) <- flatten loc FMSubstOnly flav ty1
-       ; (s2, co2) <- flatten loc FMSubstOnly flav ty2
+  = do { (s1, co1) <- flatten loc FMSubstOnly ev ty1
+       ; (s2, co2) <- flatten loc FMSubstOnly ev ty2
        ; mb_ct <- rewriteCtFlavor ev (mkTcEqPred s1 s2)
                                      (mkHdEqPred s2 co1 co2)
        ; case mb_ct of
@@ -1076,13 +1074,12 @@ canEqLeafFun :: CtLoc -> CtEvidence
              -> TyCon -> [TcType] -> TcType -> TcS StopOrContinue
 canEqLeafFun loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
   = do { traceTcS "canEqLeafFun" $ pprEq (mkTyConApp fn tys1) ty2
-       ; let flav = ctEvFlavour ev
 
             -- Flatten type function arguments
             -- cos1 :: xis1 ~ tys1
             -- co2  :: xi2 ~ ty2
-      ; (xis1,cos1) <- flattenMany loc FMFullFlatten flav tys1 
-      ; (xi2, co2)  <- flatten     loc FMFullFlatten flav ty2
+      ; (xis1,cos1) <- flattenMany loc FMFullFlatten ev tys1 
+      ; (xi2, co2)  <- flatten     loc FMFullFlatten ev ty2
            
           -- Fancy higher-dimensional coercion between equalities!
           -- SPJ asks why?  Why not just co : F xis1 ~ F tys1?
@@ -1104,9 +1101,8 @@ canEqLeafTyVar :: CtLoc -> CtEvidence
                -> TcTyVar -> TcType -> TcS StopOrContinue
 canEqLeafTyVar loc ev tv s2              -- ev :: tv ~ s2
   = do { traceTcS "canEqLeafTyVar 1" $ pprEq (mkTyVarTy tv) s2
-       ; let flav = ctEvFlavour ev
-       ; (xi1,co1) <- flattenTyVar loc FMFullFlatten flav tv -- co1 :: xi1 ~ tv
-       ; (xi2,co2) <- flatten      loc FMFullFlatten flav s2 -- co2 :: xi2 ~ s2 
+       ; (xi1,co1) <- flattenTyVar loc FMFullFlatten ev tv -- co1 :: xi1 ~ tv
+       ; (xi2,co2) <- flatten      loc FMFullFlatten ev s2 -- co2 :: xi2 ~ s2 
        ; let co = mkHdEqPred s2 co1 co2
              -- co :: (xi1 ~ xi2) ~ (tv ~ s2)
        

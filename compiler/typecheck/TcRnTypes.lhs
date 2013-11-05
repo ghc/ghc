@@ -43,7 +43,8 @@ module TcRnTypes(
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
-        singleCt, extendCts, isEmptyCts, isCTyEqCan, isCFunEqCan,
+        singleCt, listToCts, ctsElts, extendCts, extendCtsList, 
+        isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt,
@@ -65,9 +66,8 @@ module TcRnTypes(
 
         CtEvidence(..),
         mkGivenLoc,
-        isWanted, isGiven,
-        isDerived, canRewrite,
-        CtFlavour(..), ctEvFlavour, ctFlavour,
+        isWanted, isGiven, isDerived,
+        canRewrite, canRewriteOrSame,
 
         -- Pretty printing
         pprEvVarTheta, pprWantedsWithLocs,
@@ -1142,8 +1142,18 @@ singleCt = unitBag
 andCts :: Cts -> Cts -> Cts
 andCts = unionBags
 
+listToCts :: [Ct] -> Cts
+listToCts = listToBag
+
+ctsElts :: Cts -> [Ct]
+ctsElts = bagToList
+
 extendCts :: Cts -> Ct -> Cts
 extendCts = snocBag
+
+extendCtsList :: Cts -> [Ct] -> Cts
+extendCtsList cts xs | null xs   = cts
+                     | otherwise = cts `unionBags` listToBag xs
 
 andManyCts :: [Cts] -> Cts
 andManyCts = unionManyBags
@@ -1381,15 +1391,6 @@ data CtEvidence
     -- rewrite anything other than a derived (there's no evidence!)
     -- but if we do manage to solve it may help in solving other goals.
 
-data CtFlavour = Given | Wanted | Derived
-
-ctFlavour :: Ct -> CtFlavour
-ctFlavour ct = ctEvFlavour (cc_ev ct)
-
-ctEvFlavour :: CtEvidence -> CtFlavour
-ctEvFlavour (CtGiven {})   = Given
-ctEvFlavour (CtWanted {})  = Wanted
-ctEvFlavour (CtDerived {}) = Derived
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
@@ -1404,11 +1405,6 @@ ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot hav
 ctEvId :: CtEvidence -> TcId
 ctEvId (CtWanted  { ctev_evar = ev }) = ev
 ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
-
-instance Outputable CtFlavour where
-  ppr Given   = ptext (sLit "[G]")
-  ppr Wanted  = ptext (sLit "[W]")
-  ppr Derived = ptext (sLit "[D]")
 
 instance Outputable CtEvidence where
   ppr fl = case fl of
@@ -1429,23 +1425,49 @@ isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
 
-canRewrite :: CtFlavour -> CtFlavour -> Bool
--- canRewrite ctid1 ctid2
--- The constraint ctid1 can be used to solve ctid2
--- "to solve" means a reaction where the active parts of the two constraints match.
---  active(F xis ~ xi) = F xis
---  active(tv ~ xi)    = tv
---  active(D xis)      = D xis
---  active(IP nm ty)   = nm
---
--- NB:  either (a `canRewrite` b) or (b `canRewrite` a) must hold
 -----------------------------------------
-canRewrite Given   _       = True
-canRewrite Wanted  Derived = True
-canRewrite Wanted  Wanted  = True
-canRewrite Derived Derived = True  -- Derived can't solve wanted/given
+canRewrite :: CtEvidence -> CtEvidence -> Bool
+-- Very important function!
+-- See Note [canRewrite and canRewriteOrSame]
+canRewrite (CtGiven {})   _              = True
+canRewrite (CtWanted {})  (CtDerived {}) = True
+canRewrite (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
 canRewrite _ _ = False             -- No evidence for a derived, anyway
+
+canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
+canRewriteOrSame (CtGiven {})   _              = True
+canRewriteOrSame (CtWanted {})  (CtWanted {})  = True
+canRewriteOrSame (CtWanted {})  (CtDerived {}) = True
+canRewriteOrSame (CtDerived {}) (CtDerived {}) = True
+canRewriteOrSame _ _ = False
 \end{code}
+
+See Note [canRewrite and canRewriteOrSame]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(canRewrite ct1 ct2) holds if the constraint ct1 can be used to solve ct2.
+"To solve" means a reaction where the active parts of the two constraints match.
+   active(F xis ~ xi) = F xis
+   active(tv ~ xi)    = tv
+   active(D xis)      = D xis
+   active(IP nm ty)   = nm
+
+At the moment we don't allow Wanteds to rewrite Wanteds, because that can give
+rise to very confusing type error messages.  A good example is Trac #8450.
+Here's another
+   f :: a -> Bool
+   f x = ( [x,'c'], [x,True] ) `seq` True
+Here we get
+  [W] a ~ Char
+  [W] a ~ Bool
+but we do not want to complain about Bool ~ Char!
+
+NB:  either (a `canRewrite` b) or (b `canRewrite` a)
+         or a==b
+     must hold
+
+canRewriteOrSame is similar but returns True for Wanted/Wanted.
+See the call sites for explanations.
+
 
 %************************************************************************
 %*                                                                      *

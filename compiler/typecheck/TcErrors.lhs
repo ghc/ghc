@@ -45,6 +45,7 @@ import FastString
 import Outputable
 import SrcLoc
 import DynFlags
+import ListSetOps       ( equivClasses )
 import Data.List        ( partition, mapAccumL, zip4 )
 \end{code}
 
@@ -225,40 +226,64 @@ reportWanteds ctxt wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = im
 
 reportFlats :: ReportErrCtxt -> Cts -> TcM ()
 reportFlats ctxt flats    -- Here 'flats' includes insolble goals
-  = traceTc "reportFlats" (vcat [ ptext (sLit "Flats =") <+> ppr flats
-                                , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)]) >>
-    tryReporters 
+  =  traceTc "reportFlats" (vcat [ ptext (sLit "Flats =") <+> ppr flats
+                                 , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)])
+  >> tryReporters
       [ -- First deal with things that are utterly wrong
         -- Like Int ~ Bool (incl nullary TyCons)
         -- or  Int ~ t a   (AppTy on one side)
-        ("Utterly wrong",  utterly_wrong,   mkGroupReporter mkEqErr)
-      , ("Holes",          is_hole,         mkUniReporter mkHoleError)
+        ("Utterly wrong",  utterly_wrong,   True, mkGroupReporter mkEqErr)
+      , ("Holes",          is_hole,         True, mkUniReporter mkHoleError)
 
         -- Report equalities of form (a~ty).  They are usually
-        -- skolem-equalities, and they cause confusing knock-on 
+        -- skolem-equalities, and they cause confusing knock-on
         -- effects in other errors; see test T4093b.
-      , ("Skolem equalities",    skolem_eq,   mkUniReporter mkEqErr1) ]
-      reportFlatErrs
-      ctxt (bagToList flats)
+      , ("Skolem equalities", skolem_eq,  True,  mkSkolReporter)
+
+        -- Other equalities; also confusing knock on effects
+      , ("Equalities",      is_equality, True,  mkGroupReporter mkEqErr)
+
+      , ("Implicit params", is_ip,       False, mkGroupReporter mkIPErr)
+      , ("Irreds",          is_irred,    False, mkGroupReporter mkIrredErr)
+      , ("Dicts",           is_dict,     False, mkGroupReporter mkDictErr)
+      ]
+      panicReporter ctxt (bagToList flats)
+          -- TuplePreds should have been expanded away by the constraint
+          -- simplifier, so they shouldn't show up at this point
   where
-    utterly_wrong, skolem_eq :: Ct -> PredTree -> Bool
-    utterly_wrong _ (EqPred ty1 ty2) = isRigid ty1 && isRigid ty2 
+    utterly_wrong, skolem_eq, is_hole, is_dict,
+      is_equality, is_ip, is_irred :: Ct -> PredTree -> Bool
+
+    utterly_wrong _ (EqPred ty1 ty2) = isRigid ty1 && isRigid ty2
     utterly_wrong _ _ = False
 
     is_hole ct _ = isHoleCt ct
 
-    skolem_eq _ (EqPred ty1 ty2) = isRigidOrSkol ty1 && isRigidOrSkol ty2 
+    skolem_eq _ (EqPred ty1 ty2) = isRigidOrSkol ty1 && isRigidOrSkol ty2
     skolem_eq _ _ = False
+
+    is_equality _ (EqPred {}) = True
+    is_equality _ _           = False
+
+    is_dict _ (ClassPred {}) = True
+    is_dict _ _              = False
+
+    is_ip _ (ClassPred cls _) = isIPClass cls
+    is_ip _ _                 = False
+
+    is_irred _ (IrredPred {}) = True
+    is_irred _ _              = False
+
 
 ---------------
 isRigid, isRigidOrSkol :: Type -> Bool
-isRigid ty 
+isRigid ty
   | Just (tc,_) <- tcSplitTyConApp_maybe ty = isDecomposableTyCon tc
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | isForAllTy ty                           = True
   | otherwise                               = False
 
-isRigidOrSkol ty 
+isRigidOrSkol ty
   | Just tv <- getTyVar_maybe ty = isSkolemTyVar tv
   | otherwise                    = isRigid ty
 
@@ -267,48 +292,38 @@ isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
                       Just (tc,_) | isSynFamilyTyCon tc -> Just tc
                       _ -> Nothing
 
------------------
-reportFlatErrs :: Reporter
--- Called once for non-ambigs, once for ambigs
--- Report equality errors, and others only if we've done all 
--- the equalities.  The equality errors are more basic, and
--- can lead to knock on type-class errors
-reportFlatErrs
-  = tryReporters
-      [ ("Equalities", is_equality, mkGroupReporter mkEqErr) ]
-      (\ctxt cts -> do { let (dicts, ips, irreds) = go cts [] [] []
-                       ; mkGroupReporter mkIPErr    ctxt ips   
-                       ; mkGroupReporter mkIrredErr ctxt irreds
-                       ; mkGroupReporter mkDictErr  ctxt dicts })
-  where
-    is_equality _ (EqPred {}) = True
-    is_equality _ _           = False
-
-    go [] dicts ips irreds
-      = (dicts, ips, irreds)
-    go (ct:cts) dicts ips irreds
-      | isIPPred (ctPred ct) 
-      = go cts dicts (ct:ips) irreds
-      | otherwise
-      = case classifyPredType (ctPred ct) of
-          ClassPred {}  -> go cts (ct:dicts) ips irreds
-          IrredPred {}  -> go cts dicts ips (ct:irreds)
-          _             -> panic "reportFlatErrs"
-    -- TuplePreds should have been expanded away by the constraint
-    -- simplifier, so they shouldn't show up at this point
-    -- And EqPreds are dealt with by the is_equality test
-
 
 --------------------------------------------
 --      Reporters
 --------------------------------------------
 
-type Reporter = ReportErrCtxt -> [Ct] -> TcM ()
+type Reporter
+  = ReportErrCtxt -> [Ct] -> TcM ()
+type ReporterSpec
+  = ( String                     -- Name
+    , Ct -> PredTree -> Bool     -- Pick these ones
+    , Bool                       -- True <=> suppress subsequent reporters
+    , Reporter)                  -- The reporter itself
+
+panicReporter :: Reporter
+panicReporter _ cts
+  | null cts  = return ()
+  | otherwise =  pprPanic "reportFlats" (ppr cts)
+
+mkSkolReporter :: Reporter
+-- Suppress duplicates with the same LHS
+mkSkolReporter ctxt cts
+  = mapM_ (reportGroup mkEqErr ctxt) (equivClasses cmp_lhs_type cts)
+  where
+    cmp_lhs_type ct1 ct2
+      = case (classifyPredType (ctPred ct1), classifyPredType (ctPred ct2)) of
+           (EqPred ty1 _, EqPred ty2 _) -> ty1 `cmpType` ty2
+           _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
 
 mkUniReporter :: (ReportErrCtxt -> Ct -> TcM ErrMsg) -> Reporter
 -- Reports errors one at a time
-mkUniReporter mk_err ctxt 
-  = mapM_ $ \ct -> 
+mkUniReporter mk_err ctxt
+  = mapM_ $ \ct ->
     do { err <- mk_err ctxt ct
        ; maybeReportError ctxt err
        ; maybeAddDeferredBinding ctxt err ct }
@@ -316,26 +331,21 @@ mkUniReporter mk_err ctxt
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
                              -- Make error message for a group
                 -> Reporter  -- Deal with lots of constraints
--- Group together insts from same location
--- We want to report them together in error messages
+-- Group together errors from same location,
+-- and report only the first (to avoid a cascade)
+mkGroupReporter mk_err ctxt cts
+  = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
+  where
+    cmp_loc ct1 ct2 = ctLocSpan (cc_loc ct1) `compare` ctLocSpan (cc_loc ct2)
 
-mkGroupReporter _ _ [] 
-  = return ()
-mkGroupReporter mk_err ctxt (ct1 : rest)
-  = do { err <- mk_err ctxt first_group
+reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
+            -> [Ct] -> TcM ()
+reportGroup mk_err ctxt cts
+  = do { err <- mk_err ctxt cts
        ; maybeReportError ctxt err
-       ; mapM_ (maybeAddDeferredBinding ctxt err) first_group
+       ; mapM_ (maybeAddDeferredBinding ctxt err) cts }
                -- Add deferred bindings for all
                -- But see Note [Always warn with -fdefer-type-errors]
-       ; mkGroupReporter mk_err ctxt others }
-  where
-   loc               = cc_loc ct1
-   first_group       = ct1 : friends
-   (friends, others) = partition is_friend rest
-   is_friend friend  = cc_loc friend `same_loc` loc
-
-   same_loc :: CtLoc -> CtLoc -> Bool
-   same_loc l1 l2 = ctLocSpan l1 == ctLocSpan l2
 
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
@@ -363,25 +373,25 @@ maybeAddDeferredBinding ctxt err ct
        ; addTcEvBind ev_binds_var ev_id (EvDelayedError pred err_fs) }
 
   | otherwise   -- Do not set any evidence for Given/Derived
-  = return ()   
+  = return ()
 
-tryReporters :: [(String, Ct -> PredTree -> Bool, Reporter)] 
-             -> Reporter -> Reporter
+tryReporters :: [ReporterSpec] -> Reporter -> Reporter
 -- Use the first reporter in the list whose predicate says True
 tryReporters reporters deflt ctxt cts
-  = do { traceTc "tryReporters {" (ppr cts) 
+  = do { traceTc "tryReporters {" (ppr cts)
        ; go ctxt reporters cts
        ; traceTc "tryReporters }" empty }
   where
-    go ctxt [] cts = deflt ctxt cts 
-    go ctxt ((str, pred, reporter) : rs) cts
+    go ctxt [] cts = deflt ctxt cts
+    go ctxt ((str, pred, suppress_after, reporter) : rs) cts
       | null yeses  = do { traceTc "tryReporters: no" (text str)
                          ; go ctxt rs cts }
       | otherwise   = do { traceTc "tryReporters: yes" (text str <+> ppr yeses)
                          ; reporter ctxt yeses :: TcM ()
-                         ; go (ctxt { cec_suppress = True }) rs nos }
+                         ; let ctxt' = ctxt { cec_suppress = suppress_after || cec_suppress ctxt }
+                         ; go ctxt' rs nos }
                          -- Carry on with the rest, because we must make
-                         -- deferred bindings for them if we have 
+                         -- deferred bindings for them if we have
                          -- -fdefer-type-errors
                          -- But suppress their error messages
       where
@@ -914,19 +924,30 @@ mkDictErr ctxt cts
        ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorMsg ctxt ct1 err }
   where
-    ct1:_ = cts
+    ct1:_ = elim_superclasses cts
+
     no_givens = null (getUserGivens ctxt)
+
     is_no_inst (ct, (matches, unifiers, _))
-      =  no_givens 
-      && null matches 
+      =  no_givens
+      && null matches
       && (null unifiers || all (not . isAmbiguousTyVar) (varSetElems (tyVarsOfCt ct)))
-           
+
     lookup_cls_inst inst_envs ct
       = do { tys_flat <- mapM quickFlattenTy tys
                 -- Note [Flattening in error message generation]
            ; return (ct, lookupInstEnv inst_envs clas tys_flat) }
       where
         (clas, tys) = getClassPredTys (ctPred ct)
+
+
+    -- When simplifying [W] Ord (Set a), we need
+    --    [W] Eq a, [W] Ord a
+    -- but we really only want to report the latter
+    elim_superclasses cts
+      = filter (\ct -> any (eqPred (ctPred ct)) min_preds) cts
+      where
+        min_preds = mkMinimalBySCs (map ctPred cts)
 
 mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)
