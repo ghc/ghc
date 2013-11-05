@@ -23,7 +23,7 @@ module GHC.Integer.Type where
 
 import GHC.Prim (
     -- Other types we use, convert from, or convert to
-    Int#, Word#, Double#, Float#, ByteArray#,
+    Int#, Word#, Double#, Float#, ByteArray#, MutableByteArray#, State#,
     -- Conversions between those types
     int2Word#, int2Double#, int2Float#, word2Int#,
     -- Operations on Int# that we use for operations on S#
@@ -47,6 +47,7 @@ import GHC.Integer.GMP.Prim (
     testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
     powInteger#, powModInteger#, powModSecInteger#, recipModInteger#,
     nextPrimeInteger#, testPrimeInteger#,
+    sizeInBaseInteger#, exportInteger#, importInteger#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -675,6 +676,76 @@ testPrimeInteger (J# s d) reps = testPrimeInteger# s d reps
 nextPrimeInteger :: Integer -> Integer
 nextPrimeInteger j@(S# _) = nextPrimeInteger (toBig j)
 nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> J# s' d'
+
+-- | Compute number of digits (without sign) in given @base@.
+--
+-- It's recommended to avoid calling 'sizeInBaseInteger' for small
+-- integers as this function would currently convert those to big
+-- integers in order to call @mpz_sizeinbase()@.
+--
+-- This function wraps @mpz_sizeinbase()@ which has some
+-- implementation pecularities to take into account:
+--
+-- * @sizeInBaseInteger 0 base = 1@ (see also comment in 'exportInteger').
+--
+-- * This function is only defined if @base >= 2#@ and @base <= 256#@
+--   (Note: the documentation claims that only @base <= 62#@ is
+--   supported, however the actual implementation supports up to base 256).
+--
+-- * If @base@ is a power of 2, the result will be exact. In other
+--   cases (e.g. for @base = 10#@), the result /may/ be 1 digit too large
+--   sometimes.
+--
+-- * @sizeInBaseInteger i 2#@ can be used to determine the most
+--   significant bit of @i@.
+{-# NOINLINE sizeInBaseInteger #-}
+sizeInBaseInteger :: Integer -> Int# -> Word#
+sizeInBaseInteger j@(S# _) b = sizeInBaseInteger (toBig j) b -- TODO
+sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
+
+-- | Dump 'Integer' (without sign) to mutable byte-array in base-256 representation.
+--
+-- The call @exportInteger i mba offset order@ writes
+--
+-- * the 'Integer' @i@
+--
+-- * into the 'MutableByteArray#' @mba@ starting at @offset@
+--
+-- * with most significant byte first if @order@ is @1#@ or least
+--   significant byte first if @order@ is @-1#@, and
+--
+-- * returns number of bytes written.
+--
+-- Use @sizeInBaseInteger i 256#@ to compute the exact number of bytes
+-- written in advance for @i /= 0@. In case of @i == 0@,
+-- 'exportInteger' will write and report zero bytes written, whereas
+-- 'sizeInBaseInteger' report one byte.
+--
+-- It's recommended to avoid calling 'exportInteger' for small
+-- integers as this function would currently convert those to big
+-- integers in order to call @mpz_export()@.
+{-# NOINLINE exportInteger #-}
+exportInteger :: Integer -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #)
+exportInteger j@(S# _) mba o e = exportInteger (toBig j) mba o e -- TODO
+exportInteger (J# s d) mba o e = exportInteger# s d mba o e
+
+-- | Read 'Integer' (without sign) from byte-array in base-256 representation.
+--
+-- The call @importInteger ba offset size order@ reads
+--
+-- * @size@ bytes from the 'ByteArray#' @mba@ starting at @offset@
+--
+-- * with most significant byte first if @order@ is @1#@ or least
+--   significant byte first if @order@ is @-1#@, and
+--
+-- * returns a new 'Integer'
+--
+-- It's recommended to avoid calling 'importInteger' for known to be
+-- small integers as this function currently always returns a big
+-- integer even if it would fit into a small integer.
+{-# NOINLINE importInteger #-}
+importInteger :: ByteArray# -> Word# -> Word# -> Int# -> Integer
+importInteger ba o l e = case importInteger# ba o l e of (# s', d' #) -> J# s' d'
 
 \end{code}
 
