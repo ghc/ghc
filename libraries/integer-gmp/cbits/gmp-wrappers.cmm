@@ -71,47 +71,48 @@ import "integer-gmp" integer_cbits_decodeDouble;
 
 integer_cmm_importIntegerzh (P_ ba, W_ of, W_ sz, W_ e)
 {
-  P_ p;
-  W_ mp_result1;
+  W_ src_ptr;
+  W_ mp_result;
 
 again:
   STK_CHK_GEN_N (SIZEOF_MP_INT);
   MAYBE_GC(again);
 
-  p = ba + SIZEOF_StgArrWords + of;
+  mp_result = Sp - SIZEOF_MP_INT;
 
-  mp_result1 = Sp - SIZEOF_MP_INT;
+  src_ptr = BYTE_ARR_CTS(ba) + of;
 
-  ccall __gmpz_init(mp_result1 "ptr");
-  ccall __gmpz_import(mp_result1 "ptr", sz, W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, p "ptr");
+  ccall __gmpz_init(mp_result "ptr");
+  ccall __gmpz_import(mp_result "ptr", sz, W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, src_ptr "ptr");
 
-  return(TO_W_(MP_INT__mp_size(mp_result1)),
-         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);
+  return(TO_W_(MP_INT__mp_size(mp_result)),
+         MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);
 }
 
+/* :: Int# -> ByteArray# -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #) */
 integer_cmm_exportIntegerzh (W_ s1, P_ d1, P_ mba, W_ of, W_ e)
 {
-  P_ dst;
+  W_ dst_ptr;
   W_ mp_tmp;
-  W_ cnt_result1;
+  W_ cnt_result;
 
 again:
   STK_CHK_GEN_N (SIZEOF_MP_INT + SIZEOF_W);
   MAYBE_GC(again);
 
-  mp_tmp     = Sp - SIZEOF_MP_INT;
+  mp_tmp = Sp - SIZEOF_MP_INT;
   MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));
   MP_INT__mp_size(mp_tmp)  = (s1);
   MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);
 
-  cnt_result1 = Sp - (SIZEOF_MP_INT + SIZEOF_W);
-  W_[cnt_result1] = 0;
+  cnt_result = Sp - (SIZEOF_MP_INT + SIZEOF_W);
+  W_[cnt_result] = 0;
 
-  dst = mba + SIZEOF_StgArrWords + of;
+  dst_ptr = BYTE_ARR_CTS(mba) + of;
 
-  ccall __gmpz_export(dst "ptr", cnt_result1 "ptr", W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, mp_tmp "ptr");
+  ccall __gmpz_export(dst_ptr "ptr", cnt_result "ptr", W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, mp_tmp "ptr");
 
-  return (W_[cnt_result1]);
+  return (W_[cnt_result]);
 }
 
 integer_cmm_int2Integerzh (W_ val)
