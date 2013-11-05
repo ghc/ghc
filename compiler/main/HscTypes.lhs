@@ -1776,7 +1776,7 @@ type WhetherHasFamInst = Bool
 -- | Did this module originate from a *-boot file?
 type IsBootInterface = Bool
 
--- | Dependency information about modules and packages below this one
+-- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy.
 --
 -- Invariant: the dependencies of a module @M@ never includes @M@.
@@ -1784,16 +1784,23 @@ type IsBootInterface = Bool
 -- Invariant: none of the lists contain duplicates.
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
-                        -- ^ Home-package module dependencies
+                        -- ^ All home-package modules transitively below this one
+                        -- I.e. modules that this one imports, or that are in the
+                        --      dep_mods of those directly-imported modules
+
          , dep_pkgs   :: [(PackageId, Bool)]
-                       -- ^ External package dependencies. The bool indicates
-                        -- if the package is required to be trusted when the
-                        -- module is imported as a safe import (Safe Haskell).
-                        -- See Note [RnNames . Tracking Trust Transitively]
+                        -- ^ All packages transitively below this module
+                        -- I.e. packages to which this module's direct imports belong,
+                        --      or that are in the dep_pkgs of those modules
+                        -- The bool indicates if the package is required to be
+                        -- trusted when the module is imported as a safe import
+                        -- (Safe Haskell). See Note [RnNames . Tracking Trust Transitively]
+
          , dep_orphs  :: [Module]
                         -- ^ Orphan modules (whether home or external pkg),
                         -- *not* including family instance orphans as they
                         -- are anyway included in 'dep_finsts'
+
          , dep_finsts :: [Module]
                         -- ^ Modules that contain family instances (whether the
                         -- instances are from the home or an external package)
@@ -1818,10 +1825,12 @@ instance Binary Dependencies where
 noDependencies :: Dependencies
 noDependencies = Deps [] [] [] []
 
--- | Records modules that we depend on, either by direct import,
--- or because we have inlined something from a direct import, and
--- hence now rely on the things mentioned in the inlining
+-- | Records modules for which changes may force recompilation of this module
 -- See wiki: http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+--
+-- This differs from Dependencies.  A module X may be in the dep_mods of this
+-- module (via an import chain) but if we don't use anything from X it won't
+-- appear in our Usage
 data Usage
   -- | Module from another package
   = UsagePackageModule {
