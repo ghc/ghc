@@ -2317,7 +2317,8 @@ dynamic_flags = [
   , Flag "ddump-rn-trace"          (setDumpFlag Opt_D_dump_rn_trace)
   , Flag "ddump-if-trace"          (setDumpFlag Opt_D_dump_if_trace)
   , Flag "ddump-cs-trace"          (setDumpFlag Opt_D_dump_cs_trace)
-  , Flag "ddump-tc-trace"          (setDumpFlag Opt_D_dump_tc_trace)
+  , Flag "ddump-tc-trace"          (NoArg (do { setDumpFlag' Opt_D_dump_tc_trace
+                                              ; setDumpFlag' Opt_D_dump_cs_trace }))
   , Flag "ddump-vt-trace"          (setDumpFlag Opt_D_dump_vt_trace)
   , Flag "ddump-splices"           (setDumpFlag Opt_D_dump_splices)
   , Flag "ddump-rn-stats"          (setDumpFlag Opt_D_dump_rn_stats)
@@ -3248,7 +3249,6 @@ forceRecompile = do dfs <- liftEwM getCmdLineState
                     when (force_recomp dfs) (setGeneralFlag Opt_ForceRecomp)
         where
           force_recomp dfs = isOneShot (ghcMode dfs)
-
 setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do setDumpFlag' Opt_D_verbose_core2core
                          upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
