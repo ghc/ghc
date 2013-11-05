@@ -1513,7 +1513,9 @@ coAxBranchToIfaceBranch' env0
                   , ifaxbRHS    = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
-    (env1, tv_bndrs) = tidyTyVarBndrs env0 tvs
+    (env1, tv_bndrs) = tidyTyClTyVarBndrs env0 tvs
+    -- Don't re-bind in-scope tyvars
+    -- See Note [CoAxBranch type variables] in CoAxiom
 
 -----------------
 tyConToIfaceDecl :: TidyEnv -> TyCon -> IfaceDecl

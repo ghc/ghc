@@ -589,7 +589,8 @@ tc_ax_branch :: Kind -> [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
 tc_ax_branch tc_kind prev_branches
              (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs
                             , ifaxbRoles = roles, ifaxbIncomps = incomps })
-  = bindIfaceTyVars tv_bndrs $ \ tvs -> do  -- Variables will all be fresh
+  = bindIfaceTyVars_AT tv_bndrs $ \ tvs -> do
+         -- The _AT variant is needed here; see Note [CoAxBranch type variables] in CoAxiom
     { tc_lhs <- tcIfaceTcArgs tc_kind lhs   -- See Note [Checking IfaceTypes vs IfaceKinds]
     ; tc_rhs <- tcIfaceType rhs
     ; let br = CoAxBranch { cab_loc     = noSrcSpan
