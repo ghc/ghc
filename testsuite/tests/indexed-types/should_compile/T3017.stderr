@@ -1,7 +1,7 @@
 TYPE SIGNATURES
   emptyL :: forall a. ListColl a
   test2 ::
-    forall c t t1. (Num t, Num t1, Coll c, Elem c ~ (t, t1)) => c -> c
+    forall c t t1. (Coll c, Num t1, Num t, Elem c ~ (t, t1)) => c -> c
 TYPE CONSTRUCTORS
   Coll :: * -> Constraint
   class Coll c

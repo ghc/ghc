@@ -28,16 +28,16 @@ T7453.hs:16:33:
     In the expression: const v
 
 T7453.hs:21:15:
-    Couldn't match expected type ‛t2’ with actual type ‛t’
-      because type variable ‛t2’ would escape its scope
+    Couldn't match expected type ‛t1’ with actual type ‛a’
+      because type variable ‛t1’ would escape its scope
     This (rigid, skolem) type variable is bound by
-      the type signature for z :: t2
+      the type signature for z :: t1
       at T7453.hs:20:16
     Relevant bindings include
-      aux :: forall b. b -> t2 (bound at T7453.hs:22:21)
-      z :: t2 (bound at T7453.hs:21:11)
-      v :: t (bound at T7453.hs:19:7)
-      cast3 :: t -> t1 (bound at T7453.hs:19:1)
+      aux :: forall b. b -> a (bound at T7453.hs:22:21)
+      z :: t1 (bound at T7453.hs:21:11)
+      v :: a (bound at T7453.hs:19:7)
+      cast3 :: a -> t (bound at T7453.hs:19:1)
     In the expression: v
     In an equation for ‛z’:
         z = v

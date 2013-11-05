@@ -1,7 +1,17 @@
 
-T7729a.hs:28:31:
-    Occurs check: cannot construct the infinite type: m0 ~ t0 m0
-    Expected type: m0 a
-      Actual type: BasePrimMonad (Rand m) a
-    In the first argument of ‛lift’, namely ‛x’
+T7729a.hs:28:26:
+    Could not deduce (BasePrimMonad (Rand m)
+                      ~ t0 (BasePrimMonad (Rand m)))
+    from the context (PrimMonad (BasePrimMonad (Rand m)),
+                      Monad (Rand m),
+                      MonadPrim m)
+      bound by the instance declaration at T7729a.hs:26:10-42
+    The type variable ‛t0’ is ambiguous
+    Expected type: BasePrimMonad (Rand m) a
+      Actual type: t0 (BasePrimMonad (Rand m)) a
+    Relevant bindings include
+      x :: BasePrimMonad (Rand m) a (bound at T7729a.hs:28:12)
+      liftPrim :: BasePrimMonad (Rand m) a -> Rand m a
+        (bound at T7729a.hs:28:3)
     In the first argument of ‛liftPrim’, namely ‛(lift x)’
+    In the expression: liftPrim (lift x)

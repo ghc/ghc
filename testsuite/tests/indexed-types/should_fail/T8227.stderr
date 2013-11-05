@@ -1,7 +1,15 @@
 
-T8227.hs:16:44:
-    Occurs check: cannot construct the infinite type: t0 ~ t0 -> t0
-    Expected type: Scalar (V (t0 -> t0))
-      Actual type: Scalar (V a)
-    In the first argument of ‛arcLengthToParam’, namely ‛eps’
+T8227.hs:16:27:
+    Couldn't match type ‛Scalar (V (Scalar (V a)))’ with ‛Scalar (V a)’
+    NB: ‛Scalar’ is a type function, and may not be injective
+    Expected type: Scalar (V a)
+      Actual type: Scalar (V (Scalar (V a)))
+                   -> Scalar (V (Scalar (V a)))
+    Relevant bindings include
+      seg :: a (bound at T8227.hs:16:21)
+      eps :: Scalar (V a) (bound at T8227.hs:16:17)
+      absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
+        (bound at T8227.hs:16:1)
     In the expression: arcLengthToParam eps eps
+    In an equation for ‛absoluteToParam’:
+        absoluteToParam eps seg = arcLengthToParam eps eps
