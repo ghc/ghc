@@ -1818,7 +1818,10 @@ instance Binary Dependencies where
 noDependencies :: Dependencies
 noDependencies = Deps [] [] [] []
 
--- | Records modules that we depend on by making a direct import from
+-- | Records modules that we depend on, either by direct import,
+-- or because we have inlined something from a direct import, and
+-- hence now rely on the things mentioned in the inlining
+-- See wiki: http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
 data Usage
   -- | Module from another package
   = UsagePackageModule {
@@ -1840,8 +1843,8 @@ data Usage
             -- NB: usages are for parent names only, e.g. type constructors
             -- but not the associated data constructors.
         usg_exports  :: Maybe Fingerprint,
-            -- ^ Fingerprint for the export list we used to depend on this module,
-            -- if we depend on the export list
+            -- ^ Fingerprint for the export list of this module,
+            -- if we directly imported it (and hence we depend on its export list)
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from the current package
