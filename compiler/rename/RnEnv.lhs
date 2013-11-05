@@ -1323,39 +1323,45 @@ check_dup_names names
 checkShadowedRdrNames :: [Located RdrName] -> RnM ()
 checkShadowedRdrNames loc_rdr_names
   = do { envs <- getRdrEnvs
-       ; checkShadowedOccs envs loc_occs }
+       ; checkShadowedOccs envs get_loc_occ filtered_rdrs }
   where
-    loc_occs = [(loc,rdrNameOcc rdr) | L loc rdr <- loc_rdr_names]
+    filtered_rdrs = filterOut (isExact . unLoc) loc_rdr_names
+                -- See Note [Binders in Template Haskell] in Convert
+    get_loc_occ (L loc rdr) = (loc,rdrNameOcc rdr)
 
 checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
 checkDupAndShadowedNames envs names
   = do { check_dup_names filtered_names
-       ; checkShadowedOccs envs loc_occs }
+       ; checkShadowedOccs envs get_loc_occ filtered_names }
   where
     filtered_names = filterOut isSystemName names
                 -- See Note [Binders in Template Haskell] in Convert
-    loc_occs = [(nameSrcSpan name, nameOccName name) | name <- filtered_names]
+    get_loc_occ name = (nameSrcSpan name, nameOccName name)
 
 -------------------------------------
-checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
-checkShadowedOccs (global_env,local_env) loc_occs
+checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv)
+                  -> (a -> (SrcSpan, OccName))
+                  -> [a] -> RnM ()
+checkShadowedOccs (global_env,local_env) get_loc_occ ns
   = whenWOptM Opt_WarnNameShadowing $
-    do  { traceRn (text "shadow" <+> ppr loc_occs)
-        ; mapM_ check_shadow loc_occs }
+    do  { traceRn (text "shadow" <+> ppr (map get_loc_occ ns))
+        ; mapM_ check_shadow ns }
   where
-    check_shadow (loc, occ)
+    check_shadow n
         | startsWithUnderscore occ = return ()  -- Do not report shadowing for "_x"
                                                 -- See Trac #3262
         | Just n <- mb_local = complain [ptext (sLit "bound at") <+> ppr (nameSrcLoc n)]
         | otherwise = do { gres' <- filterM is_shadowed_gre gres
                          ; complain (map pprNameProvenance gres') }
         where
-          complain []      = return ()
-          complain pp_locs = addWarnAt loc (shadowedNameWarn occ pp_locs)
-          mb_local = lookupLocalRdrOcc local_env occ
-          gres     = lookupGRE_RdrName (mkRdrUnqual occ) global_env
+          (loc,occ) = get_loc_occ n
+          mb_local  = lookupLocalRdrOcc local_env occ
+          gres      = lookupGRE_RdrName (mkRdrUnqual occ) global_env
                 -- Make an Unqualified RdrName and look that up, so that
                 -- we don't find any GREs that are in scope qualified-only
+
+          complain []      = return ()
+          complain pp_locs = addWarnAt loc (shadowedNameWarn occ pp_locs)
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
