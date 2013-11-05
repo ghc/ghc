@@ -8675,7 +8675,7 @@ proc (x,y) ->
 which is translated to
 <screen>
 arr (\ (x,y) -> if f x y then Left x else Right y) >>>
-        (arr (\x -> x+1) >>> f) ||| (arr (\y -> y+2) >>> g)
+        (arr (\x -> x+1) >>> g) ||| (arr (\y -> y+2) >>> h)
 </screen>
 Since the translation uses <function>|||</function>,
 the arrow concerned must belong to the <literal>ArrowChoice</literal> class.
