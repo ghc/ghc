@@ -260,9 +260,9 @@ instance Binary IfaceClassOp where
         occ <- return $! mkOccNameFS varName n
         return (IfaceClassOp occ def ty)
 
-data IfaceAT = IfaceAT IfaceDecl [IfaceAxBranch]
-        -- Nothing => no default associated type instance
-        -- Just ds => default associated type instance from these templates
+data IfaceAT = IfaceAT
+                  IfaceDecl        -- The associated type declaration
+                  [IfaceAxBranch]  -- Default associated type instances, if any
 
 instance Binary IfaceAT where
     put_ bh (IfaceAT dec defs) = do
@@ -1082,7 +1082,10 @@ instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
 
 instance Outputable IfaceAT where
-   ppr (IfaceAT d defs) = hang (ppr d) 2 (vcat (map ppr defs))
+   ppr (IfaceAT d defs) 
+      = vcat [ ppr d
+             , ppUnless (null defs) $ nest 2 $
+               ptext (sLit "Defaults:") <+> vcat (map ppr defs) ]
 
 pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pprIfaceDeclHead context thing tyvars
