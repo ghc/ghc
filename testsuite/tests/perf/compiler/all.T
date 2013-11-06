@@ -13,7 +13,7 @@ test('T1969',
              #            19 (x86/OS X)
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
-           (wordsize(64), 30, 10)]),
+           (wordsize(64), 30, 15)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
