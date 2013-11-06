@@ -235,7 +235,8 @@ test('T5883', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T5882', normal, compile, ['-v0'])
 test('T5886', extra_clean(['T5886a.hi','T5886a.o']),
               multimod_compile, ['T5886','-v0 ' + config.ghc_th_way_flags])
-test('T4135', normal, compile, ['-v0'])
+test('T4135',  normal, compile, ['-v0'])
+test('T4135a', normal, compile, ['-v0'])
 test('T5971', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('T5968', normal, compile, ['-v0'])
 test('T5984', extra_clean(['T5984_Lib.hi', 'T5984_Lib.o']),
