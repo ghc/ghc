@@ -3115,10 +3115,10 @@ checkTemplateHaskellOk turn_on
   | otherwise
   = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
 #else
--- In stage 1 we don't know that the RTS has rts_isProfiled,
--- so we simply say "ok".  It doesn't matter because TH isn't
--- available in stage 1 anyway.
-checkTemplateHaskellOk _ = return ()
+-- In stage 1, Template Haskell is simply illegal
+checkTemplateHaskellOk turn_on
+  | turn_on   = addWarn "Template Haskell requires GHC with interpreter support\nPerhaps you are using a stage-1 compiler?"
+  | otherwise = return ()
 #endif
 
 {- **********************************************************************
