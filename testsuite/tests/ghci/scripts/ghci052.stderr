@@ -1,24 +1,32 @@
 
-<interactive>:7:4:
-    Couldn't match expected type ‛main::Interactive.Planet’
-                with actual type ‛Planet’
-    In the first argument of ‛pn’, namely ‛Mercury’
-    In the expression: pn Mercury
-
-<interactive>:8:4:
-    Couldn't match expected type ‛main::Interactive.Planet’
-                with actual type ‛Planet’
-    In the first argument of ‛pn’, namely ‛Venus’
-    In the expression: pn Venus
-
 <interactive>:9:4:
     Couldn't match expected type ‛main::Interactive.Planet’
                 with actual type ‛Planet’
+    NB: ‛main::Interactive.Planet’ is defined in ‛:Interactive’
+        ‛Planet’ is defined in ‛:Interactive’
+    In the first argument of ‛pn’, namely ‛Mercury’
+    In the expression: pn Mercury
+
+<interactive>:10:4:
+    Couldn't match expected type ‛main::Interactive.Planet’
+                with actual type ‛Planet’
+    NB: ‛main::Interactive.Planet’ is defined in ‛:Interactive’
+        ‛Planet’ is defined in ‛:Interactive’
+    In the first argument of ‛pn’, namely ‛Venus’
+    In the expression: pn Venus
+
+<interactive>:11:4:
+    Couldn't match expected type ‛main::Interactive.Planet’
+                with actual type ‛Planet’
+    NB: ‛main::Interactive.Planet’ is defined in ‛:Interactive’
+        ‛Planet’ is defined in ‛:Interactive’
     In the first argument of ‛pn’, namely ‛Mars’
     In the expression: pn Mars
 
-<interactive>:11:44:
+<interactive>:13:44:
     Couldn't match expected type ‛Planet’
                 with actual type ‛main::Interactive.Planet’
+    NB: ‛Planet’ is defined in ‛:Interactive’
+        ‛main::Interactive.Planet’ is defined in ‛:Interactive’
     In the pattern: Earth
     In an equation for ‛pn’: pn Earth = "E"

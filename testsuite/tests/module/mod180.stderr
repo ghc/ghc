@@ -1,5 +1,8 @@
 
 mod180.hs:8:5:
-    Couldn't match expected type ‛T’ with actual type ‛main:Mod180_A.T’
+    Couldn't match expected type ‛T’
+                with actual type ‛main:Mod180_A.T’
+    NB: ‛T’ is defined in ‛Mod180_B’
+        ‛main:Mod180_A.T’ is defined in ‛Mod180_A’
     In the expression: x
     In an equation for ‛z’: z = x

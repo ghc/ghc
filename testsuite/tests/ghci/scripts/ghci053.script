@@ -1,4 +1,6 @@
 --Testing deriving in the presence of shadowing
+-- Very unsatisfactory error messages
+
 data Planet = Mercury | Venus | Earth deriving Eq
 let mercury = Mercury
 Venus == Earth

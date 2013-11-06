@@ -1,4 +1,6 @@
 --Testing data type and constructor shadowing with functions
+-- Very unsatisfactory error messages
+
 data Planet = Mercury | Venus | Earth
 let pn Mercury = "M" ; pn Venus = "V" ; pn Earth = "E"
 pn Mercury

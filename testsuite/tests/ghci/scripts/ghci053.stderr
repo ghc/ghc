@@ -1,12 +1,16 @@
 
-<interactive>:8:12:
+<interactive>:10:12:
     Couldn't match expected type ‛main::Interactive.Planet’
                 with actual type ‛Planet’
+    NB: ‛main::Interactive.Planet’ is defined in ‛:Interactive’
+        ‛Planet’ is defined in ‛:Interactive’
     In the second argument of ‛(==)’, namely ‛Mercury’
     In the expression: mercury == Mercury
 
-<interactive>:10:10:
+<interactive>:12:10:
     Couldn't match expected type ‛Planet’
                 with actual type ‛main::Interactive.Planet’
+    NB: ‛Planet’ is defined in ‛:Interactive’
+        ‛main::Interactive.Planet’ is defined in ‛:Interactive’
     In the second argument of ‛(==)’, namely ‛Earth’
     In the expression: Venus == Earth

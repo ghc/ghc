@@ -2,6 +2,8 @@
 tcfail182.hs:9:3:
     Couldn't match expected type ‛Prelude.Maybe a’
                 with actual type ‛Maybe t0’
+    NB: ‛Prelude.Maybe’ is defined in ‛Data.Maybe’ in package ‛base’
+        ‛Maybe’ is defined in ‛Foo’
     Relevant bindings include
       f :: Prelude.Maybe a -> Int (bound at tcfail182.hs:9:1)
     In the pattern: Foo
