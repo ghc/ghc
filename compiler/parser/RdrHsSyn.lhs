@@ -36,7 +36,6 @@ module RdrHsSyn (
         -- checking and constructing values
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
-        checkTyVars,          -- [LHsType RdrName] -> P ()
         checkPattern,         -- HsExp -> P HsPat
         bang_RDR,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -119,7 +118,7 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
   = do { let (binds, sigs, ats, at_defs, _, docs) = cvBindsAndSigs (unLoc where_cls)
              cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
-       ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
+       ; tyvars <- checkTyVars "class" cls tparams      -- Only type vars allowed
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = reLocate loc cls, tcdTyVars = tyvars,
                                     tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
                                     tcdATs = ats, tcdATDefs = at_defs, tcdDocs  = docs,
@@ -135,7 +134,7 @@ mkTyData :: SrcSpan
          -> P (LTyClDecl RdrName)
 mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
-       ; tyvars <- checkTyVars tycl_hdr tparams
+       ; tyvars <- checkTyVars "data" tc tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdLName = reLocate loc tc, tcdTyVars = tyvars,
                                    tcdDataDefn = defn,
@@ -177,7 +176,7 @@ mkTySynonym :: SrcSpan
             -> P (LTyClDecl RdrName)
 mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; tyvars <- checkTyVars lhs tparams
+       ; tyvars <- checkTyVars "type" tc tparams
        ; return (L loc (SynDecl { tcdLName = reLocate loc tc, tcdTyVars = tyvars
                                 , tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
@@ -204,7 +203,7 @@ mkFamDecl :: SrcSpan
           -> P (LFamilyDecl RdrName)
 mkFamDecl loc info lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; tyvars <- checkTyVars lhs tparams
+       ; tyvars <- checkTyVars "type family" tc tparams
        ; return (L loc (FamilyDecl { fdInfo = info, fdLName = reLocate loc tc
                                    , fdTyVars = tyvars, fdKindSig = ksig })) }
 
@@ -492,13 +491,10 @@ we can bring x,y into scope.  So:
    * For RecCon we do not
 
 \begin{code}
-checkTyVars :: LHsType RdrName -> [LHsType RdrName] -> P (LHsTyVarBndrs RdrName)
+checkTyVars :: String -> Located RdrName -> [LHsType RdrName] -> P (LHsTyVarBndrs RdrName)
 -- Check whether the given list of type parameters are all type variables
--- (possibly with a kind signature).  If the second argument is `False',
--- only type variables are allowed and we raise an error on encountering a
--- non-variable; otherwise, we allow non-variable arguments and return the
--- entire list of parameters.
-checkTyVars tycl_hdr tparms = do { tvs <- mapM chk tparms
+-- (possibly with a kind signature).
+checkTyVars what tc tparms = do { tvs <- mapM chk tparms
                                  ; return (mkHsQTvs tvs) }
   where
         -- Check that the name space is correct!
@@ -508,9 +504,16 @@ checkTyVars tycl_hdr tparms = do { tvs <- mapM chk tparms
         | isRdrTyVar tv    = return (L l (UserTyVar tv))
     chk t@(L l _)
         = parseErrorSDoc l $
-          vcat [ sep [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
-                     , ptext (sLit "where type variable expected") ]
-               , ptext (sLit "In the declaration of") <+> quotes (ppr tycl_hdr) ]
+          vcat [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
+               , ptext (sLit "In the") <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
+               , vcat[ (ptext (sLit "A") <+> pp_what <+> ptext (sLit "declaration should have form"))
+                     , nest 2 (pp_what <+> ppr tc <+> ptext (sLit "a b c")
+                               <+> equals_or_where <+> ptext (sLit "...")) ] ]
+
+    pp_what = text what
+    equals_or_where = case what of
+                         "class" -> ptext (sLit "where")
+                         _       -> equals
 
 checkDatatypeContext :: Maybe (LHsContext RdrName) -> P ()
 checkDatatypeContext Nothing = return ()
