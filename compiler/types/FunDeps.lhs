@@ -42,74 +42,6 @@ import Data.Maybe       ( isJust )
 %*                                                                      *
 %************************************************************************
 
-  oclose(vs,C)  The result of extending the set of tyvars vs
-                using the functional dependencies from C
-
-  growThetaTyVars(C,vs)  The result of extend the set of tyvars vs
-                         using all conceivable links from C.
-
-                E.g. vs = {a}, C = {H [a] b, K (b,Int) c, Eq e}
-                Then grow(vs,C) = {a,b,c}
-
-                Note that grow(vs,C) `superset` grow(vs,simplify(C))
-                That is, simplfication can only shrink the result of grow.
-
-Notice that
-   oclose is conservative                v `elem` oclose(vs,C)
-          one way:                        => v is definitely fixed by vs
-
-   growThetaTyVars is conservative       if v might be fixed by vs
-          the other way:                 => v `elem` grow(vs,C)
-
-----------------------------------------------------------
-(oclose preds tvs) closes the set of type variables tvs,
-wrt functional dependencies in preds.  The result is a superset
-of the argument set.  For example, if we have
-        class C a b | a->b where ...
-then
-        oclose [C (x,y) z, C (x,p) q] {x,y} = {x,y,z}
-because if we know x and y then that fixes z.
-
-We also use equality predicates in the predicates; if we have an
-assumption `t1 ~ t2`, then we use the fact that if we know `t1` we
-also know `t2` and the other way.
-  eg    oclose [C (x,y) z, a ~ x] {a,y} = {a,y,z,x}
-
-oclose is used (only) when checking functional dependencies
-
-\begin{code}
-oclose :: [PredType] -> TyVarSet -> TyVarSet
-oclose preds fixed_tvs
-  | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = loop fixed_tvs
-  where
-    loop fixed_tvs
-      | new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
-      | otherwise                           = loop new_fixed_tvs
-      where new_fixed_tvs = foldl extend fixed_tvs tv_fds
-
-    extend fixed_tvs (ls,rs)
-        | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
-        | otherwise                = fixed_tvs
-
-    tv_fds  :: [(TyVarSet,TyVarSet)]
-    tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-              | (xs, ys) <- concatMap determined preds
-              ]
-
-    determined :: PredType -> [([Type],[Type])]
-    determined pred
-       = case classifyPredType pred of
-            ClassPred cls tys ->
-               do let (cls_tvs, cls_fds) = classTvsFds cls
-                  fd <- cls_fds
-                  return (instFD fd cls_tvs tys)
-            EqPred t1 t2      -> [([t1],[t2]), ([t2],[t1])]
-            TuplePred ts      -> concatMap determined ts
-            _                 -> []
-
-\end{code}
-
 Note [Growing the tau-tvs using constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (growThetaTyVars insts tvs) is the result of extending the set
@@ -117,6 +49,10 @@ Note [Growing the tau-tvs using constraints]
 
 E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
 Then growThetaTyVars preds tvs = {a,b,c}
+
+Notice that
+   growThetaTyVars is conservative       if v might be fixed by vs
+                                         => v `elem` grow(vs,C)
 
 \begin{code}
 growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
@@ -244,6 +180,14 @@ NOTA BENE:
 
 
 \begin{code}
+instFD :: FunDep TyVar -> [TyVar] -> [Type] -> FunDep Type
+-- A simpler version of instFD_WithPos to be used in checking instance coverage etc.
+instFD (ls,rs) tvs tys
+  = (map lookup ls, map lookup rs)
+  where
+    env       = zipVarEnv tvs tys
+    lookup tv = lookupVarEnv_NF env tv
+
 instFD_WithPos :: FunDep TyVar -> [TyVar] -> [Type] -> ([Type], [(Int,Type)])
 -- Returns a FunDep between the types accompanied along with their
 -- position (<=0) in the types argument list.
@@ -439,15 +383,41 @@ checkClsFD fd clas_tvs
 \end{code}
 
 
-\begin{code}
-instFD :: FunDep TyVar -> [TyVar] -> [Type] -> FunDep Type
--- A simpler version of instFD_WithPos to be used in checking instance coverage etc.
-instFD (ls,rs) tvs tys
-  = (map lookup ls, map lookup rs)
-  where
-    env       = zipVarEnv tvs tys
-    lookup tv = lookupVarEnv_NF env tv
+%************************************************************************
+%*                                                                      *
+        The Coverage condition for instance declarations
+%*                                                                      *
+%************************************************************************
 
+Note [Coverage condition]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Example
+      class C a b | a -> b
+      instance theta => C t1 t2
+
+For the coverage condition, we check
+   (normal)    fv(t2) `subset` fv(t1)
+   (liberal)   fv(t2) `subset` oclose(fv(t1), theta)
+
+The liberal version  ensures the self-consistency of the instance, but
+it does not guarantee termination. Example:
+
+   class Mul a b c | a b -> c where
+        (.*.) :: a -> b -> c
+
+   instance Mul Int Int Int where (.*.) = (*)
+   instance Mul Int Float Float where x .*. y = fromIntegral x * y
+   instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
+
+In the third instance, it's not the case that fv([c]) `subset` fv(a,[b]).
+But it is the case that fv([c]) `subset` oclose( theta, fv(a,[b]) )
+
+But it is a mistake to accept the instance because then this defn:
+        f = \ b x y -> if b then x .*. [y] else y
+makes instance inference go into a loop, because it requires the constraint
+        Mul a [b] b
+
+\begin{code}
 checkInstCoverage :: Bool   -- Be liberal
                   -> Class -> [PredType] -> [Type]
                   -> Maybe SDoc
@@ -508,34 +478,56 @@ Example (Trac #8391), using liberal coverage
 In the instance decl, (a:k) does fix (Foo k a), but only if we notice
 that (a:k) fixes k.
 
-Note [Coverage condition]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Example
-      class C a b | a -> b
-      instance theta => C t1 t2
+Note [The liberal coverage condition]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(oclose preds tvs) closes the set of type variables tvs,
+wrt functional dependencies in preds.  The result is a superset
+of the argument set.  For example, if we have
+        class C a b | a->b where ...
+then
+        oclose [C (x,y) z, C (x,p) q] {x,y} = {x,y,z}
+because if we know x and y then that fixes z.
 
-For the coverage condition, we check
-   (normal)    fv(t2) `subset` fv(t1)
-   (liberal)   fv(t2) `subset` oclose(fv(t1), theta)
+We also use equality predicates in the predicates; if we have an
+assumption `t1 ~ t2`, then we use the fact that if we know `t1` we
+also know `t2` and the other way.
+  eg    oclose [C (x,y) z, a ~ x] {a,y} = {a,y,z,x}
 
-The liberal version  ensures the self-consistency of the instance, but
-it does not guarantee termination. Example:
+oclose is used (only) when checking the coverage condition for 
+an instance declaration
 
-   class Mul a b c | a b -> c where
-        (.*.) :: a -> b -> c
+\begin{code}
+oclose :: [PredType] -> TyVarSet -> TyVarSet
+-- See Note [The liberal coverage condition]
+oclose preds fixed_tvs
+  | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
+  | otherwise   = loop fixed_tvs
+  where
+    loop fixed_tvs
+      | new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
+      | otherwise                           = loop new_fixed_tvs
+      where new_fixed_tvs = foldl extend fixed_tvs tv_fds
 
-   instance Mul Int Int Int where (.*.) = (*)
-   instance Mul Int Float Float where x .*. y = fromIntegral x * y
-   instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
+    extend fixed_tvs (ls,rs)
+        | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
+        | otherwise                = fixed_tvs
 
-In the third instance, it's not the case that fv([c]) `subset` fv(a,[b]).
-But it is the case that fv([c]) `subset` oclose( theta, fv(a,[b]) )
+    tv_fds  :: [(TyVarSet,TyVarSet)]
+    tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
+              | (xs, ys) <- concatMap determined preds
+              ]
 
-But it is a mistake to accept the instance because then this defn:
-        f = \ b x y -> if b then x .*. [y] else y
-makes instance inference go into a loop, because it requires the constraint
-        Mul a [b] b
-
+    determined :: PredType -> [([Type],[Type])]
+    determined pred
+       = case classifyPredType pred of
+            ClassPred cls tys ->
+               do let (cls_tvs, cls_fds) = classTvsFds cls
+                  fd <- cls_fds
+                  return (instFD fd cls_tvs tys)
+            EqPred t1 t2      -> [([t1],[t2]), ([t2],[t1])]
+            TuplePred ts      -> concatMap determined ts
+            _                 -> []
+\end{code}
 
 %************************************************************************
 %*                                                                      *
