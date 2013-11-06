@@ -1171,16 +1171,22 @@ reifyInstances th_nm th_tys
         ; (rn_ty, _fvs) <- checkNoErrs $ rnLHsType doc rdr_ty   -- Rename  to HsType Name
                          -- checkNoErrs: see Note [Renamer errors]
         ; (ty, _kind)  <- tcLHsType rn_ty
+        ; ty <- zonkTcTypeToType emptyZonkEnv ty   -- Substitute out the meta type variables
+                                                   -- In particular, the type might have kind
+                                                   -- variables inside it (Trac #7477)
 
+        ; traceTc "reifyInstances" (ppr ty $$ ppr (typeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See Trac #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
                      ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
+                     ; traceTc "reifyInstances1" (ppr matches)
                      ; mapM reifyClassInstance (map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc
                -> do { inst_envs <- tcGetFamInstEnvs
                      ; let matches = lookupFamInstEnv inst_envs tc tys
+                     ; traceTc "reifyInstances2" (ppr matches)
                      ; mapM (reifyFamilyInstance . fim_instance) matches }
             _  -> bale_out (hang (ptext (sLit "reifyInstances:") <+> quotes (ppr ty)) 
                                2 (ptext (sLit "is not a class constraint or type family application"))) }
