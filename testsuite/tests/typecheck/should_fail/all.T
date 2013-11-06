@@ -322,3 +322,4 @@ test('TcCoercibleFail2', when(compiler_lt('ghc', '7.7'), skip), compile_fail, ['
 test('T8306', normal, compile_fail, [''])
 test('T8392a', normal, compile_fail, [''])
 test('T8428', normal, compile_fail, [''])
+test('T8450', normal, compile_fail, [''])
