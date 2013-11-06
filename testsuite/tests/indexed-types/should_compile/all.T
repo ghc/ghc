@@ -226,6 +226,12 @@ test('T8011',
      run_command,
      ['$MAKE -s --no-print-directory T8011'])
 
+# Marshalling of assocatiated types
+test('T8500',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T8500'])
+
 test('T8018', normal, compile, [''])
 test('T8020', normal, compile, [''])
 test('ClosedFam1', extra_clean(['ClosedFam1.o-boot', 'ClosedFam1.hi-boot']),
