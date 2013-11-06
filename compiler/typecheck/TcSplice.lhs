@@ -9,26 +9,40 @@ TcSplice: Template Haskell splices
 \begin{code}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module TcSplice( tcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
-                 tcTopSpliceExpr,
-                 lookupThName_maybe,
-                 runQuasiQuoteExpr, runQuasiQuotePat,
-                 runQuasiQuoteDecl, runQuasiQuoteType,
-                 runAnnotation,
-                 runQuasi, runMetaE, runMetaP, runMetaT, runMetaD ) where
+module TcSplice(
+     -- These functions are defined in stage1 and stage2
+     -- The raise civilised errors in stage1
+     tcSpliceExpr, tcSpliceDecls, tcBracket,
+     runQuasiQuoteExpr, runQuasiQuotePat,
+     runQuasiQuoteDecl, runQuasiQuoteType,
+     runAnnotation,
+
+#ifdef GHCI
+     -- These ones are defined only in stage2, and are
+     -- called only in stage2 (ie GHCI is on)
+     runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
+     tcTopSpliceExpr, lookupThName_maybe,
+#endif
+      ) where
 
 #include "HsVersions.h"
 
+import HsSyn
+import Annotations
+import Name
+import TcRnMonad
+import RdrName
+import TcType
+
+#ifdef GHCI
 import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
 
 import HscTypes
-import HsSyn
 import Convert
 import RnExpr
 import RnEnv
-import RdrName
 import RnTypes
 import TcExpr
 import TcHsSyn
@@ -36,7 +50,7 @@ import TcSimplify
 import TcUnify
 import Type
 import Kind
-import TcType
+import NameSet
 import TcEnv
 import TcMType
 import TcHsType
@@ -45,16 +59,12 @@ import TypeRep
 import FamInst
 import FamInstEnv
 import InstEnv
-import Name
 import NameEnv
-import NameSet
 import PrelNames
 import OccName
 import Hooks
 import Var
 import Module
-import Annotations
-import TcRnMonad
 import LoadIface
 import Class
 import Inst
@@ -64,13 +74,11 @@ import DataCon
 import TcEvidence( TcEvBinds(..) )
 import Id
 import IdInfo
-import DsMeta
 import DsExpr
 import DsMonad hiding (Splice)
 import Serialized
 import ErrUtils
 import SrcLoc
-import Outputable
 import Util
 import Data.List        ( mapAccumL )
 import Unique
@@ -80,24 +88,59 @@ import Maybes( MaybeErr(..) )
 import DynFlags
 import Panic
 import FastString
+import Outputable
 import Control.Monad    ( when )
 
+import DsMeta
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
 
-#ifdef GHCI
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
 import GHC.Desugar      ( AnnotationWrapper(..) )
 
 import qualified Data.Map as Map
 import Data.Dynamic  ( fromDynamic, toDyn )
 import Data.Typeable ( typeOf )
-#endif
-
 import Data.Data (Data)
 import GHC.Exts         ( unsafeCoerce# )
+#endif
 \end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Main interface + stubs for the non-GHCI case
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+tcBracket     :: HsBracket Name -> [PendingSplice] -> TcRhoType -> TcM (HsExpr TcId)
+tcSpliceDecls :: HsSplice Name -> TcM [LHsDecl RdrName]
+tcSpliceExpr  :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
+        -- None of these functions add constraints to the LIE
+
+runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)
+runQuasiQuotePat  :: HsQuasiQuote RdrName -> RnM (LPat RdrName)
+runQuasiQuoteType :: HsQuasiQuote RdrName -> RnM (LHsType RdrName)
+runQuasiQuoteDecl :: HsQuasiQuote RdrName -> RnM [LHsDecl RdrName]
+
+runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
+
+#ifndef GHCI
+tcBracket     x _ _ = failTH x "Template Haskell bracket"
+tcSpliceExpr  e _   = failTH e "Template Haskell splice"
+tcSpliceDecls x     = failTH x "Template Haskell declaration splice"
+
+runQuasiQuoteExpr q = failTH q "quasiquote"
+runQuasiQuotePat  q = failTH q "pattern quasiquote"
+runQuasiQuoteType q = failTH q "type quasiquote"
+runQuasiQuoteDecl q = failTH q "declaration quasiquote"
+runAnnotation   _ q = failTH q "annotation"
+
+#else
+  -- The whole of the rest of the file is the else-branch (ie stage2 only)
+\end{code}
+
 
 Note [How top-level splices are handled]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -285,46 +328,6 @@ Note [Interactively-bound Ids in GHCi] in TcRnDriver.)
 
 The predicate we use is TcEnv.thTopLevelId.
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Main interface + stubs for the non-GHCI case
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-tcBracket     :: HsBracket Name -> [PendingSplice] -> TcRhoType -> TcM (HsExpr TcId)
-tcSpliceDecls :: HsSplice Name -> TcM [LHsDecl RdrName]
-tcSpliceExpr  :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
-tcSplicePat   :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
-tcSpliceType  :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
-        -- None of these functions add constraints to the LIE
-
-lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
-
-runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)
-runQuasiQuotePat  :: HsQuasiQuote RdrName -> RnM (LPat RdrName)
-runQuasiQuoteType :: HsQuasiQuote RdrName -> RnM (LHsType RdrName)
-runQuasiQuoteDecl :: HsQuasiQuote RdrName -> RnM [LHsDecl RdrName]
-
-runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
-
-#ifndef GHCI
-tcBracket     x _ _ = pprPanic "Cant do tcBracket without GHCi"     (ppr x)
-tcSpliceExpr  e     = pprPanic "Cant do tcSpliceExpr without GHCi"  (ppr e)
-tcSplicePat   e     = pprPanic "Cant do tcSplicePat without GHCi"  (ppr e)
-tcSpliceDecls x     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr x)
-tcSpliceType  x fvs = pprPanic "Cant do kcSpliceType without GHCi"  (ppr x)
-
-lookupThName_maybe n = pprPanic "Cant do lookupThName_maybe without GHCi" (ppr n)
-
-runQuasiQuoteExpr q = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
-runQuasiQuotePat  q = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
-runQuasiQuoteType q = pprPanic "Cant do runQuasiQuoteType without GHCi" (ppr q)
-runQuasiQuoteDecl q = pprPanic "Cant do runQuasiQuoteDecl without GHCi" (ppr q)
-runAnnotation   _ q = pprPanic "Cant do runAnnotation without GHCi" (ppr q)
-#else
-\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -526,6 +529,7 @@ tcTopSplice expr res_ty
 %************************************************************************
 
 \begin{code}
+tcSplicePat   :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
 tcSplicePat splice@(HsSplice True  _ _) _
   = pprPanic "tcSplicePat: encountered typed pattern splice" (ppr splice)
 
@@ -623,6 +627,7 @@ We don't want the type checker to see these bogus unbound variables.
 Very like splicing an expression, but we don't yet share code.
 
 \begin{code}
+tcSpliceType  :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
 tcSpliceType splice@(HsSplice True _ _) _
   = pprPanic "tcSpliceType: encountered a typed type splice" (ppr splice)
 
@@ -1151,7 +1156,6 @@ illegalTypedSplice = ptext (sLit "Typed splices may not appear in untyped bracke
 
 illegalUntypedSplice :: SDoc
 illegalUntypedSplice = ptext (sLit "Untyped splices may not appear in typed brackets")
-#endif  /* GHCI */
 \end{code}
 
 
@@ -1261,6 +1265,7 @@ lookupThName th_name = do
         Nothing   -> failWithTc (notInScope th_name)
         Just name -> return name
 
+lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 lookupThName_maybe th_name
   =  do { names <- mapMaybeM lookup (thRdrNameGuesses th_name)
           -- Pick the first that works
@@ -1729,3 +1734,6 @@ will appear in TH syntax like this
   data T a = forall b. (a ~ [b]) => MkT1 b
            | (a ~ Int) => MkT2
 
+\begin{code}
+#endif  /* GHCI */
+\end{code}

@@ -41,10 +41,6 @@ module TcHsType (
 
 #include "HsVersions.h"
 
-#ifdef GHCI 	/* Only if bootstrapped */
-import {-# SOURCE #-}	TcSplice( tcSpliceType )
-#endif
-
 import HsSyn
 import TcRnMonad
 import TcEvidence( HsWrapper )
@@ -509,31 +505,19 @@ tc_hs_type (HsCoreTy ty) exp_kind
        ; return ty }
 
 
-#ifdef GHCI	/* Only if bootstrapped */
--- This looks highly suspect to me
--- It will really only be fixed properly when we do the TH
--- reorganisation so that type splices happen in the renamer
-tc_hs_type hs_ty@(HsSpliceTy sp fvs _) exp_kind 
-  = do { s <- getStage
-       ; traceTc "tc_hs_type: splice" (ppr sp $$ ppr s) 
-       ; (ty, kind) <- tcSpliceType sp fvs
-       ; checkExpectedKind hs_ty kind exp_kind
---                     -- See Note [Kind of a type splice]
-       ; return ty }
-#else
-tc_hs_type ty@(HsSpliceTy {}) _exp_kind 
+-- This should never happen; type splices are expanded by the renamer
+tc_hs_type ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
-#endif
 
-tc_hs_type (HsWrapTy {}) _exp_kind 
+tc_hs_type (HsWrapTy {}) _exp_kind
   = panic "tc_hs_type HsWrapTy"  -- We kind checked something twice
 
-tc_hs_type hs_ty@(HsTyLit (HsNumTy n)) exp_kind 
+tc_hs_type hs_ty@(HsTyLit (HsNumTy n)) exp_kind
   = do { checkExpectedKind hs_ty typeNatKind exp_kind
        ; checkWiredInTyCon typeNatKindCon
        ; return (mkNumLitTy n) }
 
-tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind 
+tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind
   = do { checkExpectedKind hs_ty typeSymbolKind exp_kind
        ; checkWiredInTyCon typeSymbolKindCon
        ; return (mkStrLitTy s) }

@@ -12,9 +12,9 @@ module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
 
 #include "HsVersions.h"
 
-#ifdef GHCI     /* Only if bootstrapped */
 import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcBracket )
-import qualified DsMeta
+#ifdef GHCI
+import DsMeta( liftStringName, liftName )
 #endif
 
 import HsSyn
@@ -797,7 +797,6 @@ tcExpr (PArrSeq _ _) _
 %************************************************************************
 
 \begin{code}
-#ifdef GHCI     /* Only if bootstrapped */
         -- Rename excludes these cases otherwise
 tcExpr (HsSpliceE splice)        res_ty = tcSpliceExpr splice res_ty
 tcExpr (HsRnBracketOut brack ps) res_ty = tcBracket brack ps res_ty
@@ -805,7 +804,6 @@ tcExpr e@(HsBracketOut _ _) _ =
     pprPanic "Should never see HsBracketOut in type checker" (ppr e)
 tcExpr e@(HsQuasiQuoteE _) _ =
     pprPanic "Should never see HsQuasiQuoteE in type checker" (ppr e)
-#endif /* GHCI */
 \end{code}
 
 
@@ -1339,6 +1337,10 @@ checkCrossStageLifting id _ (Brack _ _ ps_var lie_var)
         ; writeMutVar ps_var (PendingTcSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id)) : ps)
 
         ; return () }
+
+polySpliceErr :: Id -> SDoc
+polySpliceErr id
+  = ptext (sLit "Can't splice the polymorphic local variable") <+> quotes (ppr id)
 #endif /* GHCI */
 \end{code}
 
@@ -1616,10 +1618,4 @@ missingFields con fields
         <+> pprWithCommas ppr fields
 
 -- callCtxt fun args = ptext (sLit "In the call") <+> parens (ppr (foldl mkHsApp fun args))
-
-#ifdef GHCI
-polySpliceErr :: Id -> SDoc
-polySpliceErr id
-  = ptext (sLit "Can't splice the polymorphic local variable") <+> quotes (ppr id)
-#endif
 \end{code}

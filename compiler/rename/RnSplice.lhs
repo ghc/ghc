@@ -5,11 +5,10 @@ module RnSplice (
         checkThLocalName
   ) where
 
-import FastString
+
 import Name
 import NameSet
 import HsSyn
-import Outputable
 import RdrName
 import TcRnMonad
 
@@ -25,6 +24,8 @@ import RnSource         ( rnSrcDecls, findSplice )
 import RnTypes
 import SrcLoc
 import TcEnv            ( checkWellStaged, tcLookup, tcMetaTy, thTopLevelId )
+import Outputable
+import FastString
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
@@ -35,29 +36,22 @@ import {-# SOURCE #-} TcSplice ( runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 \begin{code}
 #ifndef GHCI
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
-rnBracket e _ = failTH e "bracket"
+rnBracket e _ = failTH e "Template Haskell bracket"
 
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
-rnSplice e = failTH e "splice"
+rnSplice e = failTH e "Template Haskell splice"
 
 rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
-rnSpliceType e _ = failTH e "splice"
+rnSpliceType e _ = failTH e "Template Haskell type splice"
 
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
-rnSpliceExpr e = failTH e "splice"
+rnSpliceExpr e = failTH e "Template Haskell splice"
 
 rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
-rnSplicePat e = failTH e "splice"
+rnSplicePat e = failTH e "Template Haskell pattern splice"
 
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
-rnSpliceDecl e = failTH e "splice"
-
-failTH :: Outputable a => a -> String -> RnM b
-failTH e what  -- Raise an error in a stage-1 compiler
-  = failWithTc (vcat [ptext (sLit "Template Haskell") <+> text what <+>
-                      ptext (sLit "requires GHC with interpreter support"),
-                      ptext (sLit "Perhaps you are using a stage-1 compiler?"),
-                      nest 2 (ppr e)])
+rnSpliceDecl e = failTH e "Template Haskell declaration splice"
 #else
 \end{code}
 
@@ -89,7 +83,7 @@ type checker.  Not very satisfactory really.
 \begin{code}
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
 rnSplice (HsSplice isTyped n expr)
-  = do  { checkTH expr "splice"
+  = do  { checkTH expr "Template Haskell splice"
         ; loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L loc n)
         ; (expr', fvs) <- rnLExpr expr
@@ -124,13 +118,13 @@ rnSpliceType splice@(HsSplice isTypedSplice _ expr) k
                  -- ToDo: deal with fvs
                ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
                                                            rnSplice splice
-           
+
                ; ps <- readMutVar ps_var
                ; writeMutVar ps_var (PendingRnTypeSplice name expr' : ps)
 
                ; return (HsSpliceTy splice' fvs k, fvs)
                }
-        ; _ -> 
+        ; _ ->
             do { -- ToDo: deal with fvs
                  (splice', fvs) <- addErrCtxt (spliceResultDoc expr) $
                                    setStage (Splice isTypedSplice) $
@@ -144,7 +138,7 @@ rnSpliceType splice@(HsSplice isTypedSplice _ expr) k
     maybeExpandTopSplice splice@(HsSplice True _ _) fvs
       = return (HsSpliceTy splice fvs k, fvs)
 
-    maybeExpandTopSplice (HsSplice False _ expr) _ 
+    maybeExpandTopSplice (HsSplice False _ expr) _
       = do { -- The splice must have type TypeQ
            ; meta_exp_ty <- tcMetaTy typeQTyConName
 
@@ -180,13 +174,13 @@ rnSpliceExpr splice@(HsSplice isTypedSplice _ expr)
 
                ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
                                                            rnSplice splice
-           
+
                ; ps <- readMutVar ps_var
                ; writeMutVar ps_var (PendingRnExpSplice name expr' : ps)
 
                ; return (HsSpliceE splice', fvs)
                }
-        ; _ -> 
+        ; _ ->
             do { (splice', fvs) <- addErrCtxt (spliceResultDoc expr) $
                                    setStage (Splice isTypedSplice) $
                                    rnSplice splice
@@ -199,7 +193,7 @@ rnSpliceExpr splice@(HsSplice isTypedSplice _ expr)
     maybeExpandTopSplice splice@(HsSplice True _ _) fvs
       = return (HsSpliceE splice, fvs)
 
-    maybeExpandTopSplice (HsSplice False _ expr) _ 
+    maybeExpandTopSplice (HsSplice False _ expr) _
       = do { -- The splice must have type ExpQ
            ; meta_exp_ty <- tcMetaTy expQTyConName
 
@@ -307,7 +301,7 @@ rnBracket e br_body
        ; unless thEnabled $
            failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
                            , ptext (sLit "Perhaps you intended to use TemplateHaskell") ] )
-       ; checkTH e "bracket"
+       ; checkTH e "Template Haskell bracket"
 
          -- Check for nested brackets
        ; cur_stage <- getStage
@@ -466,19 +460,6 @@ spliceResultDoc expr
   = sep [ ptext (sLit "In the result of the splice:")
         , nest 2 (char '$' <> pprParendExpr expr)
         , ptext (sLit "To see what the splice expanded to, use -ddump-splices")]
-#endif
-\end{code}
-
-\begin{code}
-checkTH :: Outputable a => a -> String -> RnM ()
-#ifdef GHCI
-checkTH _ _ = return () -- OK
-#else
-checkTH e what  -- Raise an error in a stage-1 compiler
-  = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>
-                  ptext (sLit "requires GHC with interpreter support"),
-                  ptext (sLit "Perhaps you are using a stage-1 compiler?"),
-                  nest 2 (ppr e)])
 #endif
 \end{code}
 

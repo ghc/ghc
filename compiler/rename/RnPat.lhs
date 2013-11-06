@@ -39,10 +39,8 @@ module RnPat (-- main entry points
 -- ENH: thin imports to only what is necessary for patterns
 
 import {-# SOURCE #-} RnExpr ( rnLExpr )
-#ifdef GHCI
 import {-# SOURCE #-} RnSplice ( rnSplicePat )
 import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
-#endif  /* GHCI */
 
 #include "HsVersions.h"
 
@@ -424,22 +422,15 @@ rnPatAndThen mk (TuplePat pats boxed _)
        ; pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat pats' boxed placeHolderType) }
 
-#ifndef GHCI
-rnPatAndThen _ p@(SplicePat {})
-  = pprPanic "Can't do SplicePat without GHCi" (ppr p)
-rnPatAndThen _ p@(QuasiQuotePat {}) 
-  = pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
-#else
 rnPatAndThen _ (SplicePat splice)
   = do { -- XXX How to deal with free variables?
-         (pat, _) <- liftCps $ rnSplicePat splice
+       ; (pat, _) <- liftCps $ rnSplicePat splice
        ; return pat }
 rnPatAndThen mk (QuasiQuotePat qq)
   = do { pat <- liftCps $ runQuasiQuotePat qq
          -- Wrap the result of the quasi-quoter in parens so that we don't
          -- lose the outermost location set by runQuasiQuote (#7918) 
        ; rnPatAndThen mk (ParPat pat) }
-#endif  /* GHCI */
 
 rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 

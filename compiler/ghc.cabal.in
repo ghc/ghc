@@ -387,6 +387,7 @@ Library
         TcCanonical
         TcSMonad
         TcTypeNats
+        TcSplice
         Class
         Coercion
         FamInstEnv
@@ -532,7 +533,6 @@ Library
     if flag(ghci)
         Exposed-Modules:
             DsMeta
-            TcSplice
             Convert
             ByteCodeAsm
             ByteCodeGen

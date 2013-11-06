@@ -828,6 +828,20 @@ ifErrsM bale_out normal
 failIfErrsM :: TcRn ()
 -- Useful to avoid error cascades
 failIfErrsM = ifErrsM failM (return ())
+
+checkTH :: Outputable a => a -> String -> TcRn ()
+#ifdef GHCI
+checkTH _ _ = return () -- OK
+#else
+checkTH e what = failTH e what  -- Raise an error in a stage-1 compiler
+#endif
+
+failTH :: Outputable a => a -> String -> TcRn x
+failTH e what  -- Raise an error in a stage-1 compiler
+  = failWithTc (vcat [ text what
+                       <+> ptext (sLit "requires GHC with interpreter support")
+                     , ptext (sLit "Perhaps you are using a stage-1 compiler?")
+                     , nest 2 (ppr e)])
 \end{code}
 
 

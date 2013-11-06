@@ -12,9 +12,7 @@ module RnSource (
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSpliceDecl )
-#ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
-#endif /* GHCI */
 
 import HsSyn
 import RdrName
@@ -1475,14 +1473,9 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
   where
     badImplicitSplice = ptext (sLit "Parse error: naked expression at top level")
 
-#ifndef GHCI
-add _ _ (QuasiQuoteD qq) _
-  = pprPanic "Can't do QuasiQuote declarations without GHCi" (ppr qq)
-#else
 add gp _ (QuasiQuoteD qq) ds            -- Expand quasiquotes
   = do { ds' <- runQuasiQuoteDecl qq
        ; addl gp (ds' ++ ds) }
-#endif
 
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds

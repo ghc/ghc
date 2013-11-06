@@ -7,8 +7,6 @@ import RdrName
 import Name
 import NameSet
 
-import Outputable
-
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 
 rnSplice     :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
@@ -16,6 +14,4 @@ rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
 rnSplicePat  :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
-
-checkTH :: Outputable a => a -> String -> RnM ()
 \end{code}

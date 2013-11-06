@@ -16,9 +16,7 @@ module RnExpr (
 
 #include "HsVersions.h"
 
-#ifdef GHCI
 import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
-#endif  /* GHCI */
 
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, rnGRHS, makeMiniFixityEnv)
@@ -179,15 +177,12 @@ rnExpr e@(HsBracket br_body) = rnBracket e br_body
 
 rnExpr (HsSpliceE splice) = rnSpliceExpr splice
 
-#ifndef GHCI
-rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
-#else
+
 rnExpr (HsQuasiQuoteE qq)
   = runQuasiQuoteExpr qq        `thenM` \ lexpr' ->
     -- Wrap the result of the quasi-quoter in parens so that we don't
     -- lose the outermost location set by runQuasiQuote (#7918) 
     rnExpr (HsPar lexpr')
-#endif  /* GHCI */
 
 ---------------------------------------------
 --      Sections
