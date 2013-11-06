@@ -3117,7 +3117,7 @@ checkTemplateHaskellOk turn_on
 #else
 -- In stage 1, Template Haskell is simply illegal
 checkTemplateHaskellOk turn_on
-  | turn_on   = addWarn "Template Haskell requires GHC with interpreter support\nPerhaps you are using a stage-1 compiler?"
+  | turn_on   = addWarn "Template Haskell requires GHC with interpreter support\n    Perhaps you are using a stage-1 compiler?"
   | otherwise = return ()
 #endif
 

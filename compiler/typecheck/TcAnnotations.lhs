@@ -17,7 +17,6 @@ import SrcLoc
 import Outputable
 
 import Module
-import TcExpr
 import FastString
 \end{code}
 
@@ -32,7 +31,7 @@ tcAnnotation ann@(L loc (HsAnnotation provenance expr)) = do
     let target = annProvenanceToTarget mod provenance
 
     -- Run that annotation and construct the full Annotation data structure
-    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ addExprErrCtxt expr $ runAnnotation target expr
+    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ runAnnotation target expr
 
 annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance name) = NamedTarget name

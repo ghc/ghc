@@ -838,10 +838,10 @@ checkTH e what = failTH e what  -- Raise an error in a stage-1 compiler
 
 failTH :: Outputable a => a -> String -> TcRn x
 failTH e what  -- Raise an error in a stage-1 compiler
-  = failWithTc (vcat [ text what
-                       <+> ptext (sLit "requires GHC with interpreter support")
-                     , ptext (sLit "Perhaps you are using a stage-1 compiler?")
-                     , nest 2 (ppr e)])
+  = failWithTc (vcat [ hang (char 'A' <+> text what
+                             <+> ptext (sLit "requires GHC with interpreter support:"))
+                          2 (ppr e)
+                     , ptext (sLit "Perhaps you are using a stage-1 compiler?") ])
 \end{code}
 
 
