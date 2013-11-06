@@ -24,6 +24,7 @@ import TypeRep
 import Type
 import Kind ( isKind )
 import Unify            ( tcMatchTys )
+import Module
 import Inst
 import InstEnv
 import TyCon
@@ -852,7 +853,8 @@ misMatchMsg oriented ty1 ty2
   = misMatchMsg (Just NotSwapped) ty2 ty1
   | Just NotSwapped <- oriented
   = sep [ ptext (sLit "Couldn't match expected") <+> what <+> quotes (ppr ty2)
-        , nest 12 $   ptext (sLit "with actual") <+> what <+> quotes (ppr ty1) ]
+        , nest 12 $   ptext (sLit "with actual") <+> what <+> quotes (ppr ty1)
+        , sameOccExtra ty2 ty1 ]
   | otherwise
   = sep [ ptext (sLit "Couldn't match") <+> what <+> quotes (ppr ty1)
         , nest 14 $ ptext (sLit "with") <+> quotes (ppr ty2) ]
@@ -871,6 +873,29 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act, uo_expected = exp }
                , text "  Actual type:" <+> ppr act ]
 
 mkExpectedActualMsg _ _ _ = panic "mkExprectedAcutalMsg"
+
+sameOccExtra :: TcType -> TcType -> SDoc
+sameOccExtra ty1 ty2
+  | Just (tc1, _) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2, _) <- tcSplitTyConApp_maybe ty2
+  , let n1 = tyConName tc1
+        n2 = tyConName tc2
+        same_occ = nameOccName n1                  == nameOccName n2
+        same_pkg = modulePackageId (nameModule n1) == modulePackageId (nameModule n2)
+  , n1 /= n2   -- Different Names
+  , same_occ   -- but same OccName
+  = ptext (sLit "NB:") <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
+  | otherwise
+  = empty
+  where
+    ppr_from same_pkg nm
+      = hang (quotes (ppr nm))
+           2 (sep [ ptext (sLit "is defined in") <+> quotes (ppr (moduleName mod))
+                  , ppUnless (same_pkg || pkg == mainPackageId) $
+                    nest 4 $ ptext (sLit "in package") <+> quotes (ppr pkg) ])
+       where
+         pkg = modulePackageId mod
+         mod = nameModule nm
 \end{code}
 
 Note [Reporting occurs-check errors]
