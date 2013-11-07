@@ -702,8 +702,8 @@ nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> J# s' 
 --   significant bit of @i@.
 {-# NOINLINE sizeInBaseInteger #-}
 sizeInBaseInteger :: Integer -> Int# -> Word#
-sizeInBaseInteger j@(S# _) b = sizeInBaseInteger (toBig j) b -- TODO
 sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
+sizeInBaseInteger j@(S# _) b = sizeInBaseInteger (toBig j) b -- TODO
 
 -- | Dump 'Integer' (without sign) to mutable byte-array in base-256 representation.
 --
@@ -728,8 +728,8 @@ sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
 -- integers in order to call @mpz_export()@.
 {-# NOINLINE exportIntegerToMutableByteArray #-}
 exportIntegerToMutableByteArray :: Integer -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #)
-exportIntegerToMutableByteArray j@(S# _) mba o e = exportIntegerToMutableByteArray (toBig j) mba o e -- TODO
 exportIntegerToMutableByteArray (J# s d) mba o e = exportIntegerToMutableByteArray# s d mba o e
+exportIntegerToMutableByteArray j@(S# _) mba o e = exportIntegerToMutableByteArray (toBig j) mba o e -- TODO
 
 -- | Dump 'Integer' (without sign) to 'Addr#' in base-256 representation.
 --
