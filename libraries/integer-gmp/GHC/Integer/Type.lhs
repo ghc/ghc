@@ -47,7 +47,7 @@ import GHC.Integer.GMP.Prim (
     testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
     powInteger#, powModInteger#, powModSecInteger#, recipModInteger#,
     nextPrimeInteger#, testPrimeInteger#,
-    sizeInBaseInteger#, exportInteger#, importInteger#,
+    sizeInBaseInteger#, exportIntegerToMutableByteArray#, importIntegerFromByteArray#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -686,7 +686,7 @@ nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> J# s' 
 -- This function wraps @mpz_sizeinbase()@ which has some
 -- implementation pecularities to take into account:
 --
--- * @sizeInBaseInteger 0 base = 1@ (see also comment in 'exportInteger').
+-- * @sizeInBaseInteger 0 base = 1@ (see also comment in 'exportIntegerToMutableByteArray').
 --
 -- * This function is only defined if @base >= 2#@ and @base <= 256#@
 --   (Note: the documentation claims that only @base <= 62#@ is
@@ -705,7 +705,7 @@ sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
 
 -- | Dump 'Integer' (without sign) to mutable byte-array in base-256 representation.
 --
--- The call @exportInteger i mba offset order@ writes
+-- The call @exportIntegerToMutableByteArray i mba offset order@ writes
 --
 -- * the 'Integer' @i@
 --
@@ -718,20 +718,20 @@ sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
 --
 -- Use @sizeInBaseInteger i 256#@ to compute the exact number of bytes
 -- written in advance for @i /= 0@. In case of @i == 0@,
--- 'exportInteger' will write and report zero bytes written, whereas
+-- 'exportIntegerToMutableByteArray' will write and report zero bytes written, whereas
 -- 'sizeInBaseInteger' report one byte.
 --
--- It's recommended to avoid calling 'exportInteger' for small
+-- It's recommended to avoid calling 'exportIntegerToMutableByteArray' for small
 -- integers as this function would currently convert those to big
 -- integers in order to call @mpz_export()@.
-{-# NOINLINE exportInteger #-}
-exportInteger :: Integer -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #)
-exportInteger j@(S# _) mba o e = exportInteger (toBig j) mba o e -- TODO
-exportInteger (J# s d) mba o e = exportInteger# s d mba o e
+{-# NOINLINE exportIntegerToMutableByteArray #-}
+exportIntegerToMutableByteArray :: Integer -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #)
+exportIntegerToMutableByteArray j@(S# _) mba o e = exportIntegerToMutableByteArray (toBig j) mba o e -- TODO
+exportIntegerToMutableByteArray (J# s d) mba o e = exportIntegerToMutableByteArray# s d mba o e
 
 -- | Read 'Integer' (without sign) from byte-array in base-256 representation.
 --
--- The call @importInteger ba offset size order@ reads
+-- The call @importIntegerFromByteArray ba offset size order@ reads
 --
 -- * @size@ bytes from the 'ByteArray#' @mba@ starting at @offset@
 --
@@ -740,12 +740,12 @@ exportInteger (J# s d) mba o e = exportInteger# s d mba o e
 --
 -- * returns a new 'Integer'
 --
--- It's recommended to avoid calling 'importInteger' for known to be
+-- It's recommended to avoid calling 'importIntegerFromByteArray' for known to be
 -- small integers as this function currently always returns a big
 -- integer even if it would fit into a small integer.
-{-# NOINLINE importInteger #-}
-importInteger :: ByteArray# -> Word# -> Word# -> Int# -> Integer
-importInteger ba o l e = case importInteger# ba o l e of (# s', d' #) -> J# s' d'
+{-# NOINLINE importIntegerFromByteArray #-}
+importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
+importIntegerFromByteArray ba o l e = case importIntegerFromByteArray# ba o l e of (# s', d' #) -> J# s' d'
 
 \end{code}
 

@@ -69,7 +69,7 @@ import "integer-gmp" integer_cbits_decodeDouble;
    the case for all the platforms that GHC supports, currently.
    -------------------------------------------------------------------------- */
 
-integer_cmm_importIntegerzh (P_ ba, W_ of, W_ sz, W_ e)
+integer_cmm_importIntegerFromByteArrayzh (P_ ba, W_ of, W_ sz, W_ e)
 {
   W_ src_ptr;
   W_ mp_result;
@@ -90,7 +90,7 @@ again:
 }
 
 /* :: Int# -> ByteArray# -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #) */
-integer_cmm_exportIntegerzh (W_ s1, P_ d1, P_ mba, W_ of, W_ e)
+integer_cmm_exportIntegerToMutableByteArrayzh (W_ s1, P_ d1, P_ mba, W_ of, W_ e)
 {
   W_ dst_ptr;
   W_ mp_tmp;
