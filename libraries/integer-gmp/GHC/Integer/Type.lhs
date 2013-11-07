@@ -258,8 +258,7 @@ divInteger (J# sa a) (J# sb b)
 
 
 \begin{code}
--- We can't throw an error here, so it is up to our caller to
--- not call us with both arguments being 0.
+-- | Compute greatest common divisor.
 {-# NOINLINE gcdInteger #-}
 gcdInteger :: Integer -> Integer -> Integer
 -- SUP: Do we really need the first two cases?
@@ -276,8 +275,10 @@ gcdInteger ia@(J# _ _) ib@(S# _) = gcdInteger ib ia
 gcdInteger (J# sa a) (J# sb b)
   = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
 
--- | For a and b, compute their greatest common divisor g and the
--- coefficient s satisfying @a*s + b*t = g@.
+-- | Extended euclidean algorithm.
+--
+-- For @/a/@ and @/b/@, compute their greatest common divisor @/g/@
+-- and the coefficient @/s/@ satisfying @/a//s/ + /b//t/ = /g/@.
 {-# NOINLINE gcdExtInteger #-}
 gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
 gcdExtInteger a@(S# _)   b@(S# _) = gcdExtInteger (toBig a) (toBig b)
@@ -287,6 +288,7 @@ gcdExtInteger (J# sa a) (J# sb b)
   = case gcdExtInteger# sa a sb b of
       (# sg, g, ss, s #) -> (# J# sg g, J# ss s #)
 
+-- | Compute least common multiple.
 {-# NOINLINE lcmInteger #-}
 lcmInteger :: Integer -> Integer -> Integer
 lcmInteger a b =      if a `eqInteger` S# 0# then S# 0#
@@ -295,6 +297,7 @@ lcmInteger a b =      if a `eqInteger` S# 0# then S# 0#
   where aa = absInteger a
         ab = absInteger b
 
+-- | Compute greatest common divisor.
 gcdInt :: Int# -> Int# -> Int#
 gcdInt 0# y  = absInt y
 gcdInt x  0# = absInt x
@@ -598,17 +601,17 @@ testBitInteger :: Integer -> Int# -> Bool
 testBitInteger j@(S# _) i = testBitInteger (toBig j) i
 testBitInteger (J# s d) i = isTrue# (testBitInteger# s d i /=# 0#)
 
--- | @powInteger b e@ computes base @b@ raised to exponent @e@.
+-- | \"@'powInteger' /b/ /e/@\" computes base @/b/@ raised to exponent @/e/@.
 {-# NOINLINE powInteger #-}
 powInteger :: Integer -> Word# -> Integer
 powInteger j@(S# _) e = powInteger (toBig j) e
 powInteger (J# s d) e = case powInteger# s d e of
                             (# s', d' #) -> J# s' d'
 
--- | @powModInteger b e m@ computes base @b@ raised to exponent @e@
--- modulo @m@.
+-- | \"@'powModInteger' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@.
 --
--- Negative exponents are supported if an inverse modulo @m@
+-- Negative exponents are supported if an inverse modulo @/m/@
 -- exists. It's advised to avoid calling this primitive with negative
 -- exponents unless it is guaranteed the inverse exists, as failure to
 -- do so will likely cause program abortion due to a divide-by-zero
@@ -620,8 +623,9 @@ powModInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
         (# s', d' #) -> J# s' d'
 powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
 
--- | @powModSecInteger b e m@ computes base @b@ raised to exponent @e@
--- modulo @m@. It is required that @e@ > 0 and @m@ is odd.
+-- | \"@'powModSecInteger' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@. It is required that @/e/ > 0@ and
+-- @/m/@ is odd.
 --
 -- This is a \"secure\" variant of 'powModInteger' using the
 -- @mpz_powm_sec()@ function which is designed to be resilient to side
@@ -634,9 +638,9 @@ powModSecInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
         (# s', d' #) -> J# s' d'
 powModSecInteger b e m = powModSecInteger (toBig b) (toBig e) (toBig m)
 
--- | @recipModInteger x m@ computes the inverse of @x@ modulo @m@. If
--- the inverse exists, the return value @y@ will satisfy @0 < y <
--- abs(m)@, otherwise the result is 0.
+-- | \"@'recipModInteger' /x/ /m/@\" computes the inverse of @/x/@ modulo @/m/@. If
+-- the inverse exists, the return value @/y/@ will satisfy @0 < /y/ <
+-- abs(/m/)@, otherwise the result is @0@.
 --
 -- Note: The implementation exploits the undocumented property of
 -- @mpz_invert()@ to not mangle the result operand (which is initialized
@@ -651,16 +655,16 @@ recipModInteger (J# s d) (J# ms md) = case recipModInteger# s d ms md of
 
 -- | Probalistic Miller-Rabin primality test.
 --
--- @testPrimeInteger n k@ determines whether @n@ is prime and
--- returns one of the following results:
+-- \"@'testPrimeInteger' /n/ /k/@\" determines whether @/n/@ is prime
+-- and returns one of the following results:
 --
--- * @2#@ is returned if @n@ is definitely prime,
+-- * @2#@ is returned if @/n/@ is definitely prime,
 --
--- * @1#@ if @n@ is a /probable prime/, or
+-- * @1#@ if @/n/@ is a /probable prime/, or
 --
--- * @0#@ if @n@ is definitely not a prime.
+-- * @0#@ if @/n/@ is definitely not a prime.
 --
--- The @k@ argument controls how many test rounds are performed for
+-- The @/k/@ argument controls how many test rounds are performed for
 -- determining a /probable prime/. For more details, see
 -- <http://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fprobab_005fprime_005fp-360 GMP documentation for `mpz_probab_prime_p()`>.
 {-# NOINLINE testPrimeInteger #-}
@@ -668,7 +672,7 @@ testPrimeInteger :: Integer -> Int# -> Int#
 testPrimeInteger j@(S# _) reps = testPrimeInteger (toBig j) reps
 testPrimeInteger (J# s d) reps = testPrimeInteger# s d reps
 
--- | Compute next prime greater than @n@ probalistically.
+-- | Compute next prime greater than @/n/@ probalistically.
 --
 -- According to the GMP documentation, the underlying function
 -- @mpz_nextprime()@ \"uses a probabilistic algorithm to identify
@@ -679,7 +683,7 @@ nextPrimeInteger :: Integer -> Integer
 nextPrimeInteger j@(S# _) = nextPrimeInteger (toBig j)
 nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> J# s' d'
 
--- | Compute number of digits (without sign) in given @base@.
+-- | Compute number of digits (without sign) in given @/base/@.
 --
 -- It's recommended to avoid calling 'sizeInBaseInteger' for small
 -- integers as this function would currently convert those to big
@@ -688,18 +692,18 @@ nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> J# s' 
 -- This function wraps @mpz_sizeinbase()@ which has some
 -- implementation pecularities to take into account:
 --
--- * @sizeInBaseInteger 0 base = 1@ (see also comment in 'exportIntegerToMutableByteArray').
+-- * \"@'sizeInBaseInteger' 0 /base/ = 1@\" (see also comment in 'exportIntegerToMutableByteArray').
 --
--- * This function is only defined if @base >= 2#@ and @base <= 256#@
---   (Note: the documentation claims that only @base <= 62#@ is
+-- * This function is only defined if @/base/ >= 2#@ and @/base/ <= 256#@
+--   (Note: the documentation claims that only @/base/ <= 62#@ is
 --   supported, however the actual implementation supports up to base 256).
 --
--- * If @base@ is a power of 2, the result will be exact. In other
---   cases (e.g. for @base = 10#@), the result /may/ be 1 digit too large
+-- * If @/base/@ is a power of 2, the result will be exact. In other
+--   cases (e.g. for @/base/ = 10#@), the result /may/ be 1 digit too large
 --   sometimes.
 --
--- * @sizeInBaseInteger i 2#@ can be used to determine the most
---   significant bit of @i@.
+-- * \"@'sizeInBaseInteger' /i/ 2#@\" can be used to determine the most
+--   significant bit of @/i/@.
 {-# NOINLINE sizeInBaseInteger #-}
 sizeInBaseInteger :: Integer -> Int# -> Word#
 sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
@@ -707,21 +711,27 @@ sizeInBaseInteger j@(S# _) b = sizeInBaseInteger (toBig j) b -- TODO
 
 -- | Dump 'Integer' (without sign) to mutable byte-array in base-256 representation.
 --
--- The call @exportIntegerToMutableByteArray i mba offset order@ writes
+-- The call
 --
--- * the 'Integer' @i@
+-- @
+-- 'exportIntegerToMutableByteArray' /i/ /mba/ /offset/ /order/
+-- @
 --
--- * into the 'MutableByteArray#' @mba@ starting at @offset@
+-- writes
+--
+-- * the 'Integer' @/i/@
+--
+-- * into the 'MutableByteArray#' @/mba/@ starting at @/offset/@
 --
 -- * with most significant byte first if @order@ is @1#@ or least
 --   significant byte first if @order@ is @-1#@, and
 --
 -- * returns number of bytes written.
 --
--- Use @sizeInBaseInteger i 256#@ to compute the exact number of bytes
--- written in advance for @i /= 0@. In case of @i == 0@,
--- 'exportIntegerToMutableByteArray' will write and report zero bytes written, whereas
--- 'sizeInBaseInteger' report one byte.
+-- Use \"@'sizeInBaseInteger' /i/ 256#@\" to compute the exact number of
+-- bytes written in advance for @/i/ /= 0@. In case of @/i/ == 0@,
+-- 'exportIntegerToMutableByteArray' will write and report zero bytes
+-- written, whereas 'sizeInBaseInteger' report one byte.
 --
 -- It's recommended to avoid calling 'exportIntegerToMutableByteArray' for small
 -- integers as this function would currently convert those to big
@@ -731,7 +741,11 @@ exportIntegerToMutableByteArray :: Integer -> MutableByteArray# s -> Word# -> In
 exportIntegerToMutableByteArray (J# s d) mba o e = exportIntegerToMutableByteArray# s d mba o e
 exportIntegerToMutableByteArray j@(S# _) mba o e = exportIntegerToMutableByteArray (toBig j) mba o e -- TODO
 
--- | Dump 'Integer' (without sign) to 'Addr#' in base-256 representation.
+-- | Dump 'Integer' (without sign) to @/addr/@ in base-256 representation.
+--
+-- @
+-- 'exportIntegerToAddr' /addr/ /o/ /e/
+-- @
 --
 -- See description of 'exportIntegerToMutableByteArray' for more details.
 {-# NOINLINE exportIntegerToAddr #-}
@@ -741,24 +755,34 @@ exportIntegerToAddr j@(S# _) addr o e = exportIntegerToAddr (toBig j) addr o e -
 
 -- | Read 'Integer' (without sign) from byte-array in base-256 representation.
 --
--- The call @importIntegerFromByteArray ba offset size order@ reads
+-- The call
 --
--- * @size@ bytes from the 'ByteArray#' @mba@ starting at @offset@
+-- @
+-- 'importIntegerFromByteArray' /ba/ /offset/ /size/ /order/
+-- @
 --
--- * with most significant byte first if @order@ is @1#@ or least
---   significant byte first if @order@ is @-1#@, and
+-- reads
+--
+-- * @/size/@ bytes from the 'ByteArray#' @/ba/@ starting at @/offset/@
+--
+-- * with most significant byte first if @/order/@ is @1#@ or least
+--   significant byte first if @/order/@ is @-1#@, and
 --
 -- * returns a new 'Integer'
 --
--- It's recommended to avoid calling 'importIntegerFromByteArray' for known to be
--- small integers as this function currently always returns a big
--- integer even if it would fit into a small integer.
+-- It's recommended to avoid calling 'importIntegerFromByteArray' for
+-- known to be small integers as this function currently always
+-- returns a big integer even if it would fit into a small integer.
 {-# NOINLINE importIntegerFromByteArray #-}
 importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
 importIntegerFromByteArray ba o l e = case importIntegerFromByteArray# ba o l e of (# s', d' #) -> J# s' d'
 
--- | Read 'Integer' (without sign) from memory location at 'Addr#' in
+-- | Read 'Integer' (without sign) from memory location at @/addr/@ in
 -- base-256 representation.
+--
+-- @
+-- 'importIntegerFromAddr' /addr/ /size/ /order/
+-- @
 --
 -- See description of 'importIntegerFromByteArray' for more details.
 {-# NOINLINE importIntegerFromAddr #-}
