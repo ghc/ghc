@@ -629,8 +629,7 @@ ty_decl :: { LTyClDecl RdrName }
         | 'type' 'family' type opt_kind_sig where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% do { L loc decl <- mkFamDecl (comb4 $1 $3 $4 $5) (unLoc $5) $3 (unLoc $4)
-                      ; return (L loc (FamDecl decl)) } }
+                {% mkFamDecl (comb4 $1 $3 $4 $5) (unLoc $5) $3 (unLoc $4) }
 
           -- ordinary data type or newtype declaration
         | data_or_newtype capi_ctype tycl_hdr constrs deriving
@@ -650,8 +649,7 @@ ty_decl :: { LTyClDecl RdrName }
 
           -- data/newtype family
         | 'data' 'family' type opt_kind_sig
-                {% do { L loc decl <- mkFamDecl (comb3 $1 $2 $4) DataFamily $3 (unLoc $4)
-                      ; return (L loc (FamDecl decl)) } }
+                {% mkFamDecl (comb3 $1 $2 $4) DataFamily $3 (unLoc $4) }
 
 inst_decl :: { LInstDecl RdrName }
         : 'instance' inst_type where_inst
@@ -663,22 +661,19 @@ inst_decl :: { LInstDecl RdrName }
 
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
-                {% do { L loc tfi <- mkTyFamInst (comb2 $1 $3) $3
-                      ; return (L loc (TyFamInstD { tfid_inst = tfi })) } }
+                {% mkTyFamInst (comb2 $1 $3) $3 }
 
           -- data/newtype instance declaration
-        | data_or_newtype 'instance' tycl_hdr constrs deriving
-                {% do { L loc d <- mkFamInstData (comb4 $1 $3 $4 $5) (unLoc $1) Nothing $3
-                                      Nothing (reverse (unLoc $4)) (unLoc $5)
-                      ; return (L loc (DataFamInstD { dfid_inst = d })) } }
+        | data_or_newtype 'instance' capi_ctype tycl_hdr constrs deriving
+                {% mkDataFamInst (comb4 $1 $4 $5 $6) (unLoc $1) $3 $4
+                                      Nothing (reverse (unLoc $5)) (unLoc $6) }
 
           -- GADT instance declaration
-        | data_or_newtype 'instance' tycl_hdr opt_kind_sig
+        | data_or_newtype 'instance' capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  deriving
-                {% do { L loc d <- mkFamInstData (comb4 $1 $3 $5 $6) (unLoc $1) Nothing $3
-                                            (unLoc $4) (unLoc $5) (unLoc $6)
-                      ; return (L loc (DataFamInstD { dfid_inst = d })) } }
+                {% mkDataFamInst (comb4 $1 $4 $6 $7) (unLoc $1) $3 $4
+                                     (unLoc $5) (unLoc $6) (unLoc $7) }
 
 -- Closed type families
 
@@ -715,44 +710,46 @@ ty_fam_inst_eqn :: { LTyFamInstEqn RdrName }
 --   data declarations.
 --
 at_decl_cls :: { LHsDecl RdrName }
-           -- family declarations
-        : 'type' type opt_kind_sig
-                -- Note the use of type for the head; this allows
-                -- infix type constructors to be declared.
-                {% do { L loc decl <- mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily $2 (unLoc $3)
-                      ; return (L loc (TyClD (FamDecl decl))) } }
+        :  -- data family declarations, with optional 'family' keyword
+          'data' opt_family type opt_kind_sig
+                {% liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3 (unLoc $4)) }
 
-        | 'data' type opt_kind_sig
-                {% do { L loc decl <- mkFamDecl (comb3 $1 $2 $3) DataFamily $2 (unLoc $3)
-                      ; return (L loc (TyClD (FamDecl decl))) } }
+           -- type family declarations, with optional 'family' keyword
+           -- (can't use opt_instance because you get shift/reduce errors
+        | 'type' type opt_kind_sig
+                {% liftM mkTyClD (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily $2 (unLoc $3)) }
+        | 'type' 'family' type opt_kind_sig
+                {% liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily $3 (unLoc $4)) }
 
-           -- default type instance
+           -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
-                -- Note the use of type for the head; this allows
-                -- infix type constructors and type patterns
-                {% do { L loc tfi <- mkTyFamInst (comb2 $1 $2) $2
-                      ; return (L loc (InstD (TyFamInstD { tfid_inst = tfi }))) } }
+                {% liftM mkInstD (mkTyFamInst (comb2 $1 $2) $2) }
+        | 'type' 'instance' ty_fam_inst_eqn
+                {% liftM mkInstD (mkTyFamInst (comb2 $1 $3) $3) }
+
+opt_family   :: { () }
+              : {- empty -}   { () }
+              | 'family'      { () }
 
 -- Associated type instances
 --
-at_decl_inst :: { LTyFamInstDecl RdrName }
+at_decl_inst :: { LInstDecl RdrName }
            -- type instance declarations
         : 'type' ty_fam_inst_eqn
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
                 {% mkTyFamInst (comb2 $1 $2) $2 }
 
-adt_decl_inst :: { LDataFamInstDecl RdrName }
         -- data/newtype instance declaration
-        : data_or_newtype capi_ctype tycl_hdr constrs deriving
-                {% mkFamInstData (comb4 $1 $3 $4 $5) (unLoc $1) $2 $3
+        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+                {% mkDataFamInst (comb4 $1 $3 $4 $5) (unLoc $1) $2 $3
                                  Nothing (reverse (unLoc $4)) (unLoc $5) }
 
         -- GADT instance declaration
         | data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  deriving
-                {% mkFamInstData (comb4 $1 $3 $5 $6) (unLoc $1) $2 $3
+                {% mkDataFamInst (comb4 $1 $3 $5 $6) (unLoc $1) $2 $3
                                  (unLoc $4) (unLoc $5) (unLoc $6) }
 
 data_or_newtype :: { Located NewOrData }
@@ -844,8 +841,7 @@ where_cls :: { Located (OrdList (LHsDecl RdrName)) }    -- Reversed
 -- Declarations in instance bodies
 --
 decl_inst  :: { Located (OrdList (LHsDecl RdrName)) }
-decl_inst  : at_decl_inst               { LL (unitOL (L1 (InstD (TyFamInstD { tfid_inst = unLoc $1 })))) }
-           | adt_decl_inst              { LL (unitOL (L1 (InstD (DataFamInstD { dfid_inst = unLoc $1 })))) }
+decl_inst  : at_decl_inst               { LL (unitOL (L1 (InstD (unLoc $1)))) }
            | decl                       { $1 }
 
 decls_inst :: { Located (OrdList (LHsDecl RdrName)) }   -- Reversed

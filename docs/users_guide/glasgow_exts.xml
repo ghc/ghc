@@ -5554,7 +5554,7 @@ class Collects ce where
   type Elem ce :: *
   ...
 </programlisting>
-When doing so, we drop the "<literal>family</literal>" keyword.
+When doing so, we (optionally) may drop the "<literal>family</literal>" keyword.
 </para>
 <para>
 	The type parameters must all be type variables, of course,
@@ -5575,7 +5575,7 @@ When doing so, we drop the "<literal>family</literal>" keyword.
       <title>Associated instances</title>
       <para>
 	When an associated data or type synonym family instance is declared within a type
-	class instance, we drop the <literal>instance</literal> keyword in the
+	class instance, we (optionally) may drop the <literal>instance</literal> keyword in the
 	family instance:
 <programlisting>
 instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
@@ -5629,14 +5629,16 @@ instance GMapKey Flob where
 <programlisting>
 class IsBoolMap v where
   type Key v
-  type Key v = Int
+  type instance Key v = Int
 
   lookupKey :: Key v -> v -> Maybe Bool
 
 instance IsBoolMap [(Int, Bool)] where
   lookupKey = lookup
 </programlisting>
-
+The <literal>instance</literal> keyword is optional.
+      </para>
+<para>
 There can also be multiple defaults for a single type, as long as they do not
 overlap:
 <programlisting>
