@@ -2,7 +2,5 @@
 annfail12.hs:5:1:
     Exception when trying to run compile-time code:
       You were meant to see this error!
-    In the expression:
-        (error "You were meant to see this error!" :: Int)
     In the annotation:
-        {-# ANN f (error "You were meant to see this error!" :: Int) #-}
+      {-# ANN f (error "You were meant to see this error!" :: Int) #-}

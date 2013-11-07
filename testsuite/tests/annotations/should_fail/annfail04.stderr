@@ -4,5 +4,4 @@ annfail04.hs:14:12:
       instance for ‛Thing
                       Int’ is used in a top-level splice or annotation,
       and must be imported, not defined locally
-    In the expression: (thing :: Int)
     In the annotation: {-# ANN f (thing :: Int) #-}
