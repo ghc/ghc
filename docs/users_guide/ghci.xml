@@ -3420,6 +3420,61 @@ warning settings:
       </varlistentry>
     </variablelist>
 
+    <para>
+      When defining GHCi macros, there is some important behavior you
+      should be aware of when names may conflict with built-in
+      commands, especially regarding tab completion.
+    </para>
+    <para>
+      For example, consider if you had a macro named
+      <literal>:time</literal> and in the shell, typed <literal>:t
+      3</literal> - what should happen? The current algorithm we use
+      for completing commands is:
+
+      <orderedlist>
+        <listitem>
+          <para>First, look up an exact match on the name from the defined macros.</para>
+        </listitem>
+        <listitem>
+          <para>Look for the exact match on the name in the built-in command list.</para>
+        </listitem>
+        <listitem>
+          <para>Do a prefix lookup on the list of built-in commands -
+          if a built-in command matches, but a macro is defined with
+          the same name as the built-in defined, pick the
+          macro.</para>
+        </listitem>
+        <listitem>
+          <para>Do a prefix lookup on the list of built-in commands.</para>
+        </listitem>
+        <listitem>
+          <para>Do a prefix lookup on the list of defined macros.</para>
+        </listitem>
+      </orderedlist>
+    </para>
+
+    <para>
+      Here are some examples:
+
+      <orderedlist>
+        <listitem>
+          <para>You have a macro <literal>:time</literal> and enter <literal>:t 3</literal></para>
+          <para>You get <literal>:type 3</literal></para>
+        </listitem>
+
+        <listitem>
+          <para>You have a macro <literal>:type</literal> and enter <literal>:t 3</literal></para>
+          <para>You get <literal>:type 3</literal> with your defined macro, not the builtin.</para>
+        </listitem>
+
+        <listitem>
+          <para>You have a macro <literal>:time</literal> and a macro
+          <literal>:type</literal>, and enter <literal>:t
+          3</literal></para>
+          <para>You get <literal>:type 3</literal> with your defined macro.</para>
+        </listitem>
+      </orderedlist>
+    </para>
   </sect1>
 
   <sect1 id="ghci-obj">
