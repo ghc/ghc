@@ -23,7 +23,7 @@ module GHC.Integer.Type where
 
 import GHC.Prim (
     -- Other types we use, convert from, or convert to
-    Int#, Word#, Double#, Float#, ByteArray#, MutableByteArray#, State#,
+    Int#, Word#, Double#, Float#, ByteArray#, MutableByteArray#, Addr#, State#,
     -- Conversions between those types
     int2Word#, int2Double#, int2Float#, word2Int#,
     -- Operations on Int# that we use for operations on S#
@@ -47,7 +47,9 @@ import GHC.Integer.GMP.Prim (
     testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
     powInteger#, powModInteger#, powModSecInteger#, recipModInteger#,
     nextPrimeInteger#, testPrimeInteger#,
-    sizeInBaseInteger#, exportIntegerToMutableByteArray#, importIntegerFromByteArray#,
+    sizeInBaseInteger#,
+    importIntegerFromByteArray#, importIntegerFromAddr#,
+    exportIntegerToMutableByteArray#, exportIntegerToAddr#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -729,6 +731,14 @@ exportIntegerToMutableByteArray :: Integer -> MutableByteArray# s -> Word# -> In
 exportIntegerToMutableByteArray j@(S# _) mba o e = exportIntegerToMutableByteArray (toBig j) mba o e -- TODO
 exportIntegerToMutableByteArray (J# s d) mba o e = exportIntegerToMutableByteArray# s d mba o e
 
+-- | Dump 'Integer' (without sign) to 'Addr#' in base-256 representation.
+--
+-- See description of 'exportIntegerToMutableByteArray' for more details.
+{-# NOINLINE exportIntegerToAddr #-}
+exportIntegerToAddr :: Integer -> Addr# -> Int# -> State# s -> (# State# s, Word# #)
+exportIntegerToAddr (J# s d) addr o e = exportIntegerToAddr# s d addr o e
+exportIntegerToAddr j@(S# _) addr o e = exportIntegerToAddr (toBig j) addr o e -- TODO
+
 -- | Read 'Integer' (without sign) from byte-array in base-256 representation.
 --
 -- The call @importIntegerFromByteArray ba offset size order@ reads
@@ -746,6 +756,15 @@ exportIntegerToMutableByteArray (J# s d) mba o e = exportIntegerToMutableByteArr
 {-# NOINLINE importIntegerFromByteArray #-}
 importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
 importIntegerFromByteArray ba o l e = case importIntegerFromByteArray# ba o l e of (# s', d' #) -> J# s' d'
+
+-- | Read 'Integer' (without sign) from memory location at 'Addr#' in
+-- base-256 representation.
+--
+-- See description of 'importIntegerFromByteArray' for more details.
+{-# NOINLINE importIntegerFromAddr #-}
+importIntegerFromAddr :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Integer #)
+importIntegerFromAddr addr l e st = case importIntegerFromAddr# addr l e st of
+                                      (# st', s', d' #) -> (# st', J# s' d' #)
 
 \end{code}
 

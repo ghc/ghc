@@ -50,8 +50,10 @@ module GHC.Integer.GMP.Prim (
     testPrimeInteger#,
 
     sizeInBaseInteger#,
-    exportIntegerToMutableByteArray#,
     importIntegerFromByteArray#,
+    importIntegerFromAddr#,
+    exportIntegerToMutableByteArray#,
+    exportIntegerToAddr#,
 
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
@@ -231,13 +233,23 @@ foreign import prim "integer_cmm_sizeInBasezh" sizeInBaseInteger#
 
 -- |
 --
+foreign import prim "integer_cmm_importIntegerFromByteArrayzh" importIntegerFromByteArray#
+  :: ByteArray# -> Word# -> Word# -> Int# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_importIntegerFromAddrzh" importIntegerFromAddr#
+  :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Int#, ByteArray# #)
+
+-- |
+--
 foreign import prim "integer_cmm_exportIntegerToMutableByteArrayzh" exportIntegerToMutableByteArray#
   :: Int# -> ByteArray# -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #)
 
 -- |
 --
-foreign import prim "integer_cmm_importIntegerFromByteArrayzh" importIntegerFromByteArray#
-  :: ByteArray# -> Word# -> Word# -> Int# -> (# Int#, ByteArray# #)
+foreign import prim "integer_cmm_exportIntegerToAddrzh" exportIntegerToAddr#
+  :: Int# -> ByteArray# -> Addr# -> Int# -> State# s -> (# State# s, Word# #)
 
 -- |
 --
