@@ -37,7 +37,6 @@ module NameSet (
     ) where
 
 #include "HsVersions.h"
-#include "Typeable.h"
 
 import Name
 import UniqSet

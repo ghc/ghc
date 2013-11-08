@@ -28,7 +28,6 @@ module Class (
         classAllSelIds, classSCSelId, classMinimalDef
     ) where
 
-#include "Typeable.h"
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon, tyConName, tyConUnique )

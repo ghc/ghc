@@ -70,8 +70,6 @@ module Name (
         module OccName
     ) where
 
-#include "Typeable.h"
-
 import {-# SOURCE #-} TypeRep( TyThing )
 import {-# SOURCE #-} PrelNames( liftedTypeKindTyConKey )
 

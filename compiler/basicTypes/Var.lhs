@@ -73,7 +73,6 @@ module Var (
     ) where
 
 #include "HsVersions.h"
-#include "Typeable.h"
 
 import {-# SOURCE #-}	TypeRep( Type, Kind, SuperKind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )

@@ -105,8 +105,6 @@ module OccName (
 	startsVarSym, startsVarId, startsConSym, startsConId
     ) where
 
-#include "Typeable.h"
-
 import Util
 import Unique
 import BasicTypes

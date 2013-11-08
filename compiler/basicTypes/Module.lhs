@@ -73,8 +73,6 @@ module Module
         emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
 
-#include "Typeable.h"
-
 import Config
 import Outputable
 import Unique
