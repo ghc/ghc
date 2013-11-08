@@ -910,7 +910,7 @@ getTempDir dflags = do
             Just dir -> do
                 removeDirectory our_dir
                 return dir
-      `catchIO` \e -> if isAlreadyExistsError e || isDoesNotExistError e
+      `catchIO` \e -> if isAlreadyExistsError e
                       then mkTempDir prefix else ioError e
 
 addFilesToClean :: DynFlags -> [FilePath] -> IO ()
