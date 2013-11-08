@@ -444,6 +444,8 @@ mkWWstr_one dflags arg
       -- See Note [Unpacking arguments with product and polymorphic demands]
   , Just (data_con, inst_tys, inst_con_arg_tys, co)
              <- deepSplitProductType_maybe (idType arg)
+  , cs `equalLength` inst_con_arg_tys
+      -- See Note [mkWWstr and unsafeCore]
   =  do { (uniq1:uniqs) <- getUniquesM
         ; let   unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
                 unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
@@ -472,6 +474,13 @@ mkWWstr_one dflags arg
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 \end{code}
+
+Note [mkWWstr and unsafeCoerce]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Byy using usafeCoerce, it is possible to make the number of demands fail to
+match the number of constructor arguments; this happened in Trac #8037.
+If so, the worker/wrapper split doesn't work right and we get a Core Lint
+bug.  The fix here is simply to decline to do w/w if that happens.
 
 \begin{code}
 deepSplitProductType_maybe :: Type -> Maybe (DataCon, [Type], [Type], Coercion)
