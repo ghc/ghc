@@ -105,7 +105,7 @@ poll p mtout f = do
   return (fromIntegral n)
   where
     -- The poll timeout is specified as an Int, but c_poll takes a CInt. These
-    -- can't be safely coerced as on many systems (e.g. x86_64) CInt has a a
+    -- can't be safely coerced as on many systems (e.g. x86_64) CInt has a
     -- maxBound of (2^32 - 1), even though Int may have a significantly higher
     -- bound.
     --
@@ -132,7 +132,7 @@ poll p mtout f = do
     -- which is the largest value accepted by c_poll. This will result in
     -- c_pollLoop recursing if the provided timeout is larger.
     --
-    -- In case 3, "fromIntegral (maxBound :: CInt) :: Int" wil result in a
+    -- In case 3, "fromIntegral (maxBound :: CInt) :: Int" will result in a
     -- negative Int, max will thus return maxBound :: Int. Since poll doesn't
     -- accept values bigger than maxBound :: Int and CInt is larger than Int,
     -- there is no problem converting Int to CInt for the c_poll call.
