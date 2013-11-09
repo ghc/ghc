@@ -235,7 +235,7 @@ updNameCache upd_fn = do
 -- | A function that atomically updates the name cache given a modifier
 -- function.  The second result of the modifier function will be the result
 -- of the IO action.
-data NameCacheUpdater = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
+newtype NameCacheUpdater = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
 
 -- | Return a function to atomically update the name cache.
 mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
