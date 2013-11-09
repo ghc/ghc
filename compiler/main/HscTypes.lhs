@@ -2033,9 +2033,9 @@ its binding site, we fix it up.
 -- each original name; i.e. (module-name, occ-name) pair and provides
 -- something of a lookup mechanism for those names.
 data NameCache
- = NameCache {  nsUniqs :: UniqSupply,
+ = NameCache {  nsUniqs :: !UniqSupply,
                 -- ^ Supply of uniques
-                nsNames :: OrigNameCache
+                nsNames :: !OrigNameCache
                 -- ^ Ensures that one original name gets one unique
    }
 
