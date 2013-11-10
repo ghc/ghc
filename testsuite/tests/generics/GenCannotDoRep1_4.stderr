@@ -1,5 +1,6 @@
 
 GenCannotDoRep1_4.hs:8:34:
     Can't make a derived instance of ‛Generic1 T’:
-      Constructor ‛T’ must use the last type parameter only as the last argument of a data type, newtype, or (->)
+      Constructor ‛T’ applies a type to an argument involving the last parameter
+                      but the applied type is not of kind * -> *
     In the data declaration for ‛T’

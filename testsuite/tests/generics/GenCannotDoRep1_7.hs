@@ -4,8 +4,6 @@ module GenCannotDoRep1_7 where
 
 import GHC.Generics
 
--- We do not support contravariant occurrences of the type variable
-data B a = B (a -> Int)
-
--- so this fails because B is not representable
-data T a = T (B a) deriving Generic1
+-- We do not support occurrences of the type variable except as the last
+-- argument
+data I a = I (a, Int) deriving Generic1

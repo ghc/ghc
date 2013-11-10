@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, DatatypeContexts #-}
 
-module CannotDoRep1 where
+module CannotDoRep0_1 where
 
 import GHC.Generics
 

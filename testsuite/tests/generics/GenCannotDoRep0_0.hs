@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE DatatypeContexts           #-}
 
-module CannotDoRep0 where
+module CannotDoRep0_0 where
 
 import GHC.Generics hiding (P, D)
 

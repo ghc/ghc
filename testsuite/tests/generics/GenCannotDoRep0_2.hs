@@ -2,7 +2,7 @@
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE GADTs               #-}
 
-module CannotDoRep2 where
+module CannotDoRep0_2 where
 
 import GHC.Generics
 
