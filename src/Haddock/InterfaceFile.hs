@@ -74,21 +74,11 @@ binaryInterfaceMagic = 0xD0Cface
 -- (2) set `binaryInterfaceVersionCompatibility` to [binaryInterfaceVersion]
 --
 binaryInterfaceVersion :: Word16
-#if __GLASGOW_HASKELL__ == 702
-binaryInterfaceVersion = 20
-#elif __GLASGOW_HASKELL__ == 703
-binaryInterfaceVersion = 20
-#elif __GLASGOW_HASKELL__ == 704
-binaryInterfaceVersion = 20
-#elif __GLASGOW_HASKELL__ == 705
-binaryInterfaceVersion = 20
-#elif __GLASGOW_HASKELL__ == 706
-binaryInterfaceVersion = 20
-#elif __GLASGOW_HASKELL__ == 707
+#if __GLASGOW_HASKELL__ == 707
 binaryInterfaceVersion = 23
 
 binaryInterfaceVersionCompatibility :: [Word16]
-binaryInterfaceVersionCompatibility = [23]
+binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
 #else
 #error Unsupported GHC version
 #endif

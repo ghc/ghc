@@ -1,6 +1,20 @@
+Changes in version 2.14.0
+
+ * Print entities with missing documentation (#258)
+
+ * Print a warning message when given `-optghc` instead of `--optghc` (#5)
+
+ * Add `--compatible-interface-versions` (#231)
+
+ * Allow to generate latex documentation for FFI declarations (#247)
+
+ * Add copyright and license information to generated documentation
+
+ * Improved to Unicode support
+
 Changes in version 2.13.2
 
- * Handle HsExplicitListTy in renameer (#213)
+ * Handle HsExplicitListTy in renamer (#213)
 
  * Allow haddock markup in deprecation messages
 

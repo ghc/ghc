@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.13.2
+version:              2.14.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -84,7 +84,7 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
-      ghc >= 7.4 && < 7.8
+      ghc >= 7.7 && < 7.10
     other-modules:
       Documentation.Haddock
       Haddock
