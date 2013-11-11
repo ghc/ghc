@@ -1152,7 +1152,16 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
     return (ret + 1);
 }
 
-// freeExec gets passed the executable address, not the writable address. 
+void flushExec (W_ len, AdjustorExecutable exec_addr)
+{
+  /* On ARM and other platforms, we need to flush the cache after
+     writing code into memory, so the processor reliably sees it. */
+  unsigned char* begin = (unsigned char*)exec_addr;
+  unsigned char* end   = begin + len;
+  __builtin___clear_cache(begin, end);
+}
+
+// freeExec gets passed the executable address, not the writable address.
 void freeExec (AdjustorExecutable addr)
 {
     AdjustorWritable writable;
@@ -1198,6 +1207,15 @@ AdjustorWritable execToWritable(AdjustorExecutable exec)
     return writ;
 }
 
+void flushExec (W_ len, AdjustorExecutable exec_addr)
+{
+  /* On ARM and other platforms, we need to flush the cache after
+     writing code into memory, so the processor reliably sees it. */
+  unsigned char* begin = (unsigned char*)exec_addr;
+  unsigned char* end   = begin + len;
+  __builtin___clear_cache(begin, end);
+}
+
 void freeExec(AdjustorExecutable exec)
 {
     AdjustorWritable writ;
@@ -1225,7 +1243,7 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
         barf("allocateExec: can't handle large objects");
     }
 
-    if (exec_block == NULL || 
+    if (exec_block == NULL ||
         exec_block->free + n + 1 > exec_block->start + BLOCK_SIZE_W) {
         bdescr *bd;
         W_ pagesize = getPageSize();
@@ -1249,6 +1267,15 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
     RELEASE_SM_LOCK
     *exec_ret = ret;
     return ret;
+}
+
+void flushExec (W_ len, AdjustorExecutable exec_addr)
+{
+  /* On ARM and other platforms, we need to flush the cache after
+     writing code into memory, so the processor reliably sees it. */
+  unsigned char* begin = (unsigned char*)exec_addr;
+  unsigned char* end   = begin + len;
+  __builtin___clear_cache(begin, end);
 }
 
 void freeExec (void *addr)
@@ -1283,7 +1310,7 @@ void freeExec (void *addr)
     }
 
     RELEASE_SM_LOCK
-}    
+}
 
 #endif /* mingw32_HOST_OS */
 

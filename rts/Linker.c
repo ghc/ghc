@@ -1350,6 +1350,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(g0)                                                 \
       SymI_HasProto(allocate)                                           \
       SymI_HasProto(allocateExec)                                       \
+      SymI_HasProto(flushExec)                                          \
       SymI_HasProto(freeExec)                                           \
       SymI_HasProto(getAllocations)                                     \
       SymI_HasProto(revertCAFs)                                         \

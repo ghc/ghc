@@ -226,6 +226,20 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
                  , 0x47ff041f      -- nop
                  , fromIntegral (w64 .&. 0x0000FFFF)
                  , fromIntegral ((w64 `shiftR` 32) .&. 0x0000FFFF) ]
+    
+    ArchARM { } ->
+        -- Generates Thumb sequence,
+        --      ldr r1, [pc, #0]
+        --      bx r1
+        -- 
+        -- which looks like:
+        --     00000000 <.addr-0x8>:
+        --     0:	4900        ldr    r1, [pc]      ; 8 <.addr>
+        --     4:	4708        bx     r1
+        let w32 = fromIntegral (ptrToInt a) :: Word32
+        in Left [ 0x49, 0x00
+                , 0x47, 0x08
+                , byte0 w32, byte1 w32, byte2 w32, byte3 w32]
 
     arch ->
         panic ("mkJumpToAddr not defined for " ++ show arch)
@@ -374,11 +388,16 @@ load = do addr <- advance
 newExecConItbl :: DynFlags -> StgConInfoTable -> IO (FunPtr ())
 newExecConItbl dflags obj
    = alloca $ \pcode -> do
-        wr_ptr <- _allocateExec (fromIntegral (sizeOfConItbl dflags obj)) pcode
+        let sz = fromIntegral (sizeOfConItbl dflags obj)
+        wr_ptr <- _allocateExec sz pcode
         ex_ptr <- peek pcode
         pokeConItbl dflags wr_ptr ex_ptr obj
+        _flushExec sz ex_ptr -- Cache flush (if needed)
         return (castPtrToFunPtr ex_ptr)
 
 foreign import ccall unsafe "allocateExec"
-  _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)  
+  _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)
+
+foreign import ccall unsafe "flushExec"
+  _flushExec :: CUInt -> Ptr a -> IO ()
 \end{code}
