@@ -12,7 +12,7 @@ module ParserCore ( parseCore ) where
 import IfaceSyn
 import ForeignCall
 import RdrHsSyn
-import HsSyn
+import HsSyn hiding (toHsType, toHsKind)
 import RdrName
 import OccName
 import TypeRep ( TyThing(..) )

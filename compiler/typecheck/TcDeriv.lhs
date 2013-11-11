@@ -28,7 +28,6 @@ import FamInstEnv
 import TcHsType
 import TcMType
 import TcSimplify
-import TcEvidence
 
 import RnBinds
 import RnEnv
@@ -40,7 +39,6 @@ import Id( idType )
 import Class
 import Type
 import Kind( isKind )
-import Coercion ( tvUsedAtNominalRole )
 import ErrUtils
 import MkId
 import DataCon
@@ -329,12 +327,12 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
         -- the stand-alone derived instances (@insts1@) are used when inferring
         -- the contexts for "deriving" clauses' instances (@infer_specs@)
-        ; final_specs <- extendLocalInstEnv (map (iSpec . fst) insts1) $
+        ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
                          inferInstanceContexts overlap_flag infer_specs
 
         ; insts2 <- mapM (genInst False overlap_flag commonAuxs) final_specs
 
-        ; let (inst_infos, deriv_stuff) = unzip (insts1 ++ insts2)
+        ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
         ; let (binds, newTyCons, famInsts, extraInstances) =
                 genAuxBinds loc (unionManyBags (auxDerivStuff : deriv_stuff))
@@ -352,8 +350,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
                      tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
                      tcExtendLocalFamInstEnv (bagToList famInsts) $
                      tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
-
-        ; return (addTcgDUs gbl_env rn_dus, inst_info, rn_binds) }
+        ; let all_dus = rn_dus `plusDU` usesOnly (mkFVs $ catMaybes maybe_fvs)
+        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
                    -> Bag TyCon                 -- ^ Empty data constructors
@@ -409,6 +407,8 @@ renameDeriv is_boot inst_infos bagBinds
   = discardWarnings $         -- Discard warnings about unused bindings etc
     setXOptM Opt_EmptyCase $  -- Derived decls (for empty types) can have
                               --    case x of {}
+    setXOptM Opt_ScopedTypeVariables $  -- Derived decls (for newtype-deriving) can
+    setXOptM Opt_KindSignatures $       -- used ScopedTypeVariables & KindSignatures
     do  {
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
@@ -424,18 +424,19 @@ renameDeriv is_boot inst_infos bagBinds
 
   where
     rn_inst_info :: InstInfo RdrName -> TcM (InstInfo Name, FreeVars)
-    rn_inst_info info@(InstInfo { iBinds = NewTypeDerived coi tc })
-        = return ( info { iBinds = NewTypeDerived coi tc }
-                 , mkFVs (map dataConName (tyConDataCons tc)))
-          -- See Note [Newtype deriving and unused constructors]
-
-    rn_inst_info inst_info@(InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs standalone_deriv })
+    rn_inst_info inst_info@(InstInfo { iSpec = inst
+                                     , iBinds = InstBindings
+                                                  { ib_binds = binds
+                                                  , ib_pragmas = sigs
+                                                  , ib_standalone_deriving = sa } })
         =       -- Bring the right type variables into
                 -- scope (yuk), and rename the method binds
            ASSERT( null sigs )
            bindLocalNames (map Var.varName tyvars) $
            do { (rn_binds, fvs) <- rnMethodBinds (is_cls_nm inst) (\_ -> []) binds
-              ; let binds' = VanillaInst rn_binds [] standalone_deriv
+              ; let binds' = InstBindings { ib_binds = rn_binds
+                                           , ib_pragmas = []
+                                           , ib_standalone_deriving = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
         where
           (tyvars, _) = tcSplitForAllTys (idType (instanceDFunId inst))
@@ -456,10 +457,9 @@ had written
      return x = MkP (return x)
      ...etc...
 
-So we want to signal a user of the data constructor 'MkP'.  That's
-what we do in rn_inst_info, and it's the only reason we have the TyCon
-stored in NewTypeDerived.
-
+So we want to signal a user of the data constructor 'MkP'.
+This is the reason behind the (Maybe Name) part of the return type
+of genInst.
 
 %************************************************************************
 %*                                                                      *
@@ -1340,9 +1340,13 @@ std_class_via_iso clas
 non_iso_class :: Class -> Bool
 -- *Never* derive Read, Show, Typeable, Data, Generic, Generic1 by isomorphism,
 -- even with -XGeneralizedNewtypeDeriving
+-- Also, avoid Traversable, as the iso-derived instance and the "normal"-derived
+-- instance behave differently if there's a non-lawful Applicative out there.
+-- Besides, with roles, iso-deriving Traversable is ill-roled.
 non_iso_class cls
   = classKey cls `elem` ([ readClassKey, showClassKey, dataClassKey
-                         , genClassKey, gen1ClassKey, typeableClassKey]
+                         , genClassKey, gen1ClassKey, typeableClassKey
+                         , traversableClassKey ]
                          ++ oldTypeableClassKeys)
 
 oldTypeableClassKeys :: [Unique]
@@ -1398,7 +1402,7 @@ mkNewTypeEqn :: CtOrigin -> DynFlags -> [Var] -> Class
 mkNewTypeEqn orig dflags tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  | can_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
+  | might_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
   = do  { traceTc "newtype deriving:" (ppr tycon <+> ppr rep_tys <+> ppr all_preds)
         ; dfun_name <- new_dfun_name cls tycon
         ; loc <- getSrcSpanM
@@ -1415,12 +1419,12 @@ mkNewTypeEqn orig dflags tvs
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
       CanDerive -> go_for_it    -- Use the standard H98 method
       DerivableClassError msg   -- Error with standard class
-        | can_derive_via_isomorphism -> bale_out (msg $$ suggest_nd)
-        | otherwise                  -> bale_out msg
+        | might_derive_via_isomorphism -> bale_out (msg $$ suggest_nd)
+        | otherwise                    -> bale_out msg
       NonDerivableClass         -- Must use newtype deriving
-        | newtype_deriving           -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
-        | can_derive_via_isomorphism -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
-        | otherwise                  -> bale_out non_std
+        | newtype_deriving             -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
+        | might_derive_via_isomorphism -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
+        | otherwise                    -> bale_out non_std
   where
         newtype_deriving = xopt Opt_GeneralizedNewtypeDeriving dflags
         go_for_it        = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
@@ -1504,12 +1508,12 @@ mkNewTypeEqn orig dflags tvs
         -------------------------------------------------------------------
         --  Figuring out whether we can only do this newtype-deriving thing
 
-        can_derive_via_isomorphism
+        -- See Note [Determining whether newtype-deriving is appropriate]
+        might_derive_via_isomorphism
            =  not (non_iso_class cls)
            && arity_ok
            && eta_ok
            && ats_ok
-           && roles_ok
 --         && not (isRecursiveTyCon tycon)      -- Note [Recursive newtypes]
 
         arity_ok = length cls_tys + 1 == classArity cls
@@ -1530,44 +1534,13 @@ mkNewTypeEqn orig dflags tvs
                -- currently generate type 'instance' decls; and cannot do
                -- so for 'data' instance decls
 
-               -- We must make sure that all of the class's members
-               -- never pattern-match on the last parameter.
-               -- See Trac #1496 and Note [Roles] in Coercion.
-               -- Also see Note [Role checking in GND]
-        roles_ok = null role_errs
-        role_errs
-          = [ (id, substed_ty, is_specialized)
-            | id <- classMethods cls
-            , let ty = idType id
-                  (_, [cls_constraint], meth_ty) = tcSplitSigmaTy ty
-                  (_cls_tc, cls_args) = splitTyConApp cls_constraint
-                  ordered_tvs = map (getTyVar "mkNewTypeEqn") cls_args
-                  Just (other_tvs, gnd_tv) = snocView ordered_tvs
-                  subst = zipOpenTvSubst other_tvs cls_tys
-                  substed_ty = substTy subst meth_ty
-                  is_specialized = not (meth_ty `eqType` substed_ty)
-            , ASSERT( _cls_tc == classTyCon cls )
-              tvUsedAtNominalRole gnd_tv substed_ty ]
-
         cant_derive_err
            = vcat [ ppUnless arity_ok arity_msg
                   , ppUnless eta_ok eta_msg
-                  , ppUnless ats_ok ats_msg
-                  , ppUnless roles_ok roles_msg ]
+                  , ppUnless ats_ok ats_msg ]
         arity_msg = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
         eta_msg   = ptext (sLit "cannot eta-reduce the representation type enough")
         ats_msg   = ptext (sLit "the class has associated types")
-        roles_msg = ptext (sLit "it is not type-safe to use") <+>
-                    ptext (sLit "GeneralizedNewtypeDeriving on this class;") $$
-                    vcat [ quotes (ppr id) <> comma <+>
-                           specialized_doc <+>
-                           quotes (ppr ty) <> comma <+>
-                           text "cannot be converted safely"
-                         | (id, ty, is_specialized) <- role_errs
-                         , let specialized_doc
-                                 | is_specialized = text "specialized to type"
-                                 | otherwise      = text "at type"
-                         ]
 
 \end{code}
 
@@ -1614,6 +1587,21 @@ must be satisfied by the *newtype*, not the *base type*. So, we don't coerce
 the base type's superclass dictionaries in GND, and we don't need to check
 them here. For associated types, GND is impossible anyway, so we don't need
 to look. All that is left is methods.
+
+Note [Determining whether newtype-deriving is appropriate]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we see
+  newtype NT = MkNT Foo
+    deriving C
+we have to decide how to perform the deriving. Do we do newtype deriving,
+or do we do normal deriving? In general, we prefer to do newtype deriving
+wherever possible. So, we try newtype deriving unless there's a glaring
+reason not to.
+
+Note that newtype deriving might fail, even after we commit to it. This
+is because the derived instance uses `coerce`, which must satisfy its
+`Coercible` constraint. This is different than other deriving scenarios,
+where we're sure that the resulting instance will type-check.
 
 %************************************************************************
 %*                                                                      *
@@ -1924,15 +1912,22 @@ the renamer.  What a great hack!
 genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
         -> CommonAuxiliaries
-        -> DerivSpec -> TcM (InstInfo RdrName, BagDerivStuff)
+        -> DerivSpec -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
 genInst standalone_deriv oflag comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
-                 , ds_theta = theta, ds_newtype = is_newtype
-                 , ds_name = name, ds_cls = clas })
+                 , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
+                 , ds_name = name, ds_cls = clas, ds_loc = loc })
   | is_newtype
   = do { inst_spec <- mkInstance oflag theta spec
-       ; return (InstInfo { iSpec   = inst_spec
-                          , iBinds  = NewTypeDerived co rep_tycon }, emptyBag) }
+       ; return ( InstInfo
+                    { iSpec   = inst_spec
+                    , iBinds  = InstBindings
+                        { ib_binds = gen_Newtype_binds loc clas tvs tys rhs_ty
+                        , ib_pragmas = []
+                        , ib_standalone_deriving = standalone_deriv } }
+                , emptyBag
+                , Just $ getName $ head $ tyConDataCons rep_tycon ) }
+              -- See Note [Newtype deriving and unused constructors]
 
   | otherwise
   = do { fix_env <- getFixityEnv
@@ -1941,25 +1936,17 @@ genInst standalone_deriv oflag comauxs
                                         (lookup rep_tycon comauxs)
        ; inst_spec <- mkInstance oflag theta spec
        ; let inst_info = InstInfo { iSpec   = inst_spec
-                                  , iBinds  = VanillaInst meth_binds []
-                                                standalone_deriv }
-       ; return ( inst_info, deriv_stuff) }
+                                  , iBinds  = InstBindings
+                                                { ib_binds = meth_binds
+                                                , ib_pragmas = []
+                                                , ib_standalone_deriving = standalone_deriv } }
+       ; return ( inst_info, deriv_stuff, Nothing ) }
   where
-    co1 = case tyConFamilyCoercion_maybe rep_tycon of
-              Just co_con -> mkTcUnbranchedAxInstCo co_con rep_tc_args
-              Nothing     -> id_co
-              -- Not a family => rep_tycon = main tycon
-    co2 = mkTcUnbranchedAxInstCo (newTyConCo rep_tycon) rep_tc_args
-    co  = mkTcForAllCos tvs (co1 `mkTcTransCo` co2)
-    id_co = mkTcReflCo (mkTyConApp rep_tycon rep_tc_args)
-
--- Example: newtype instance N [a] = N1 (Tree a)
---          deriving instance Eq b => Eq (N [(b,b)])
--- From the instance, we get an implicit newtype R1:N a = N1 (Tree a)
--- When dealing with the deriving clause
---    co1 : N [(b,b)] ~ R1:N (b,b)
---    co2 : R1:N (b,b) ~ Tree (b,b)
---    co  : N [(b,b)] ~ Tree (b,b)
+    (etad_tvs, etad_rhs) = newTyConEtadRhs rep_tycon
+      -- it's possible the eta-reduced rhs is overly-reduced.
+      -- pad as necessary
+    pad_tys = dropList etad_tvs rep_tc_args
+    rhs_ty = mkAppTys etad_rhs pad_tys
 
 genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon
               -> Maybe CommonAuxiliary

@@ -139,14 +139,19 @@ metaTyConsToDerivStuff tc metaDts =
         -- Datatype
         d_metaTycon = metaD metaDts
         d_inst   = mk_inst dClas d_metaTycon d_dfun_name
-        d_binds  = VanillaInst dBinds [] False
+        d_binds  = InstBindings { ib_binds = dBinds
+                                , ib_pragmas = []
+                                , ib_standalone_deriving = False }
         d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
         
         -- Constructor
         c_metaTycons = metaC metaDts
         c_insts = [ mk_inst cClas c ds
                   | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
-        c_binds = [ VanillaInst c [] False | c <- cBinds ]
+        c_binds = [ InstBindings { ib_binds = c
+                                 , ib_pragmas = []
+                                 , ib_standalone_deriving = False }
+                  | c <- cBinds ]
         c_mkInst = [ DerivInst (InstInfo { iSpec = is, iBinds = bs })
                    | (is,bs) <- myZip1 c_insts c_binds ]
         
@@ -154,7 +159,10 @@ metaTyConsToDerivStuff tc metaDts =
         s_metaTycons = metaS metaDts
         s_insts = map (map (\(s,ds) -> mk_inst sClas s ds))
                       (myZip2 s_metaTycons s_dfun_names)
-        s_binds = [ [ VanillaInst s [] False | s <- ss ] | ss <- sBinds ]
+        s_binds = [ [ InstBindings { ib_binds = s
+                                   , ib_pragmas = []
+                                   , ib_standalone_deriving = False }
+                    | s <- ss ] | ss <- sBinds ]
         s_mkInst = map (map (\(is,bs) -> DerivInst (InstInfo { iSpec  = is
                                                              , iBinds = bs})))
                        (myZip2 s_insts s_binds)

@@ -65,7 +65,6 @@ import TcIface
 import PrelNames
 import TysWiredIn
 import Id
-import TcEvidence
 import Var
 import VarSet
 import RdrName
@@ -652,27 +651,15 @@ iDFunId :: InstInfo a -> DFunId
 iDFunId info = instanceDFunId (iSpec info)
 
 data InstBindings a
-  = VanillaInst                 -- The normal case
-        (LHsBinds a)            -- Bindings for the instance methods
-        [LSig a]                -- User pragmas recorded for generating 
-                                -- specialised instances
-        Bool                    -- True <=> This code came from a standalone deriving clause
-                                --          Used only to improve error messages
-
-  | NewTypeDerived      -- Used for deriving instances of newtypes, where the
-                        -- witness dictionary is identical to the argument 
-                        -- dictionary.  Hence no bindings, no pragmas.
-
-        TcCoercion      -- The coercion maps from newtype to the representation type
-                        -- (quantified over type variables bound by the forall'd iSpec variables)
-                        -- E.g.   newtype instance N [a] = N1 (Tree a)
-                        --        co : forall a. N [a] ~ Tree a
-
-        TyCon           -- The TyCon is the newtype N.  If it's indexed, then it's the 
-                        -- representation TyCon, so that tyConDataCons returns [N1], 
-                        -- the "data constructor".
-                        -- See Note [Newtype deriving and unused constructors]
-                        -- in TcDeriv
+  = InstBindings
+      { ib_binds :: (LHsBinds a)  -- Bindings for the instance methods
+      , ib_pragmas :: [LSig a]    -- User pragmas recorded for generating 
+                                  -- specialised instances
+                      
+      , ib_standalone_deriving :: Bool
+           -- True <=> This code came from a standalone deriving clause
+           --          Used only to improve error messages
+      }
 
 instance OutputableBndr a => Outputable (InstInfo a) where
     ppr = pprInstInfoDetails
@@ -682,8 +669,7 @@ pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> ptext (sLit "where"))
         2 (details (iBinds info))
   where
-    details (VanillaInst b _ _) = pprLHsBinds b
-    details (NewTypeDerived {}) = text "Derived from the representation type"
+    details (InstBindings { ib_binds = b }) = pprLHsBinds b
 
 simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of

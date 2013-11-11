@@ -21,7 +21,7 @@ import HsSyn
 import TcBinds
 import TcTyClsDecls
 import TcClassDcl( tcClassDecl2, 
-                   HsSigFun, lookupHsSig, mkHsSigFun, emptyHsSigs,
+                   HsSigFun, lookupHsSig, mkHsSigFun,
                    findMethodBind, instantiateMethod, tcInstanceMethodBody )
 import TcPat      ( addInlinePrags )
 import TcRnMonad
@@ -49,7 +49,6 @@ import Class
 import Var
 import VarEnv
 import VarSet 
-import Pair
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
 import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, oldTypeableClassNames )
@@ -70,7 +69,7 @@ import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
-import Maybes     ( orElse, isNothing, isJust, whenIsJust )
+import Maybes     ( isNothing, isJust, whenIsJust )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -571,7 +570,11 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
               ispec 	= mkLocalInstance dfun overlap_flag tyvars' clas (substTys subst inst_tys)
                             -- Be sure to freshen those type variables, 
                             -- so they are sure not to appear in any lookup
-              inst_info = InstInfo { iSpec  = ispec, iBinds = VanillaInst binds uprags False }
+              inst_info = InstInfo { iSpec  = ispec
+                                   , iBinds = InstBindings
+                                     { ib_binds = binds
+                                     , ib_pragmas = uprags
+                                     , ib_standalone_deriving = False } }
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts) }
 
@@ -1004,9 +1007,7 @@ misplacedInstSig name hs_ty
 ------------------------------
 tcSpecInstPrags :: DFunId -> InstBindings Name
                 -> TcM ([Located TcSpecPrag], PragFun)
-tcSpecInstPrags _ (NewTypeDerived {})
-  = return ([], \_ -> [])
-tcSpecInstPrags dfun_id (VanillaInst binds uprags _)
+tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
   = do { spec_inst_prags <- mapM (wrapLocM (tcSpecInst dfun_id)) $
                             filter isSpecInstLSig uprags
              -- The filter removes the pragmas for methods
@@ -1192,7 +1193,10 @@ tcInstanceMethods :: DFunId -> Class -> [TcTyVar]
         --      forall tvs. theta => ...
 tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   (spec_inst_prags, prag_fn)
-                  op_items (VanillaInst binds sigs standalone_deriv)
+                  op_items (InstBindings { ib_binds = binds
+                                         , ib_pragmas = sigs
+                                         , ib_standalone_deriving
+                                              = standalone_deriv })
   = do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; let hs_sig_fn = mkHsSigFun sigs
        ; checkMinimalDefinition
@@ -1328,83 +1332,6 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
           warnUnsatisifiedMinimalDefinition
       where
       methodExists meth = isJust (findMethodBind meth binds)
-
-
-tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
-                  _ op_items (NewTypeDerived coi _)
-
--- Running example:
---   class Show b => Foo a b where
---     op :: a -> b -> b
---   newtype N a = MkN (Tree [a])
---   deriving instance (Show p, Foo Int p) => Foo Int (N p)
---               -- NB: standalone deriving clause means
---               --     that the contex is user-specified
--- Hence op :: forall a b. Foo a b => a -> b -> b
---
--- We're going to make an instance like
---   instance (Show p, Foo Int p) => Foo Int (N p)
---      op = $copT
---
---   $copT :: forall p. (Show p, Foo Int p) => Int -> N p -> N p
---   $copT p (d1:Show p) (d2:Foo Int p)
---     = op Int (Tree [p]) rep_d |> op_co
---     where
---       rep_d :: Foo Int (Tree [p]) = ...d1...d2...
---       op_co :: (Int -> Tree [p] -> Tree [p]) ~ (Int -> T p -> T p)
--- We get op_co by substituting [Int/a] and [co/b] in type for op
--- where co : [p] ~ T p
---
--- Notice that the dictionary bindings "..d1..d2.." must be generated
--- by the constraint solver, since the <context> may be
--- user-specified.
---
--- See also Note [Newtype deriving superclasses] in TcDeriv
--- for why we don't just coerce the superclass
-
-  = do { rep_d_stuff <- checkConstraints InstSkol tyvars dfun_ev_vars $
-                        emitWanted ScOrigin rep_pred
-
-       ; mapAndUnzipM (tc_item rep_d_stuff) op_items }
-  where
-     loc = getSrcSpan dfun_id
-     Just (init_inst_tys, _) = snocView inst_tys
-     rep_ty   = pFst (tcCoercionKind co)  -- [p]
-     rep_pred = mkClassPred clas (init_inst_tys ++ [rep_ty])
-
-     -- co : [p] ~ T p
-     co = mkTcSymCo (mkTcInstCos coi (mkTyVarTys tyvars))
-     sig_fn = emptyHsSigs
-
-     ----------------
-     tc_item :: (TcEvBinds, EvVar) -> (Id, DefMeth) -> TcM (TcId, LHsBind TcId)
-     tc_item (rep_ev_binds, rep_d) (sel_id, _)
-       = do { (meth_id, local_meth_sig) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
-                                                     inst_tys sel_id
-
-            ; let meth_rhs      = wrapId (mk_op_wrapper sel_id rep_d) sel_id
-                  local_meth_id = sig_id local_meth_sig
-                  meth_bind = mkVarBind local_meth_id (L loc meth_rhs)
-                  export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
-                               , abe_mono = local_meth_id, abe_prags = noSpecPrags }
-                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
-                                   , abs_exports = [export]
-                                   , abs_ev_binds = rep_ev_binds
-                                   , abs_binds = unitBag $ meth_bind }
-
-            ; return (meth_id, L loc bind) }
-
-     ----------------
-     mk_op_wrapper :: Id -> EvVar -> HsWrapper
-     mk_op_wrapper sel_id rep_d
-       = WpCast (liftTcCoSubstWith sel_tvs (map mkTcReflCo init_inst_tys ++ [co])
-                                   local_meth_ty)
-         <.> WpEvApp (EvId rep_d)
-         <.> mkWpTyApps (init_inst_tys ++ [rep_ty])
-       where
-         (sel_tvs, sel_rho) = tcSplitForAllTys (idType sel_id)
-         (_, local_meth_ty) = tcSplitPredFunTy_maybe sel_rho
-                              `orElse` pprPanic "tcInstanceMethods" (ppr sel_id)
 
 ------------------
 mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
