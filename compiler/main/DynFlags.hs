@@ -3115,10 +3115,18 @@ checkTemplateHaskellOk turn_on
   | otherwise
   = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
 #else
--- In stage 1, Template Haskell is simply illegal
+-- In stage 1, Template Haskell is simply illegal, except with -M
+-- We don't bleat with -M because there's no problem with TH there,
+-- and in fact GHC's build system does ghc -M of the DPH libraries
+-- with a stage1 compiler
 checkTemplateHaskellOk turn_on
-  | turn_on   = addWarn "Template Haskell requires GHC with interpreter support\n    Perhaps you are using a stage-1 compiler?"
+  | turn_on = do dfs <- liftEwM getCmdLineState
+                 case ghcMode dfs of
+                    MkDepend -> return ()
+                    _        -> addErr msg
   | otherwise = return ()
+  where
+    msg = "Template Haskell requires GHC with interpreter support\n    Perhaps you are using a stage-1 compiler?"
 #endif
 
 {- **********************************************************************
