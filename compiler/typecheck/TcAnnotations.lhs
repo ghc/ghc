@@ -7,7 +7,10 @@
 \begin{code}
 module TcAnnotations ( tcAnnotations ) where
 
+#ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runAnnotation )
+import Module
+#endif
 
 import HsSyn
 import Annotations
@@ -16,13 +19,27 @@ import TcRnMonad
 import SrcLoc
 import Outputable
 
-import Module
 import FastString
 \end{code}
 
 \begin{code}
+
+#ifndef GHCI
+
 tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
-tcAnnotations = mapM tcAnnotation
+-- No GHCI; emit a warning (not an error) and ignore. cf Trac #4268
+tcAnnotations [] = return []
+tcAnnotations anns@(L loc _ : _)
+  = do { setSrcSpan loc $ addWarnTc $
+             (ptext (sLit "Ignoring ANN annotation") <> plural anns <> comma
+             <+> ptext (sLit "because this is a stage-1 compiler"))
+       ; return [] }
+
+#else
+
+tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
+-- GHCI exists, typecheck the annotations
+tcAnnotations anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl Name -> TcM Annotation
 tcAnnotation ann@(L loc (HsAnnotation provenance expr)) = do
@@ -41,4 +58,6 @@ annProvenanceToTarget mod ModuleAnnProvenance       = ModuleTarget mod
 annCtxt :: OutputableBndr id => LAnnDecl id -> SDoc
 annCtxt ann
   = hang (ptext (sLit "In the annotation:")) 2 (ppr ann)
+
+#endif
 \end{code}
