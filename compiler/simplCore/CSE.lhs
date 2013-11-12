@@ -186,8 +186,16 @@ cseBind env (Rec pairs)
 cseRhs :: CSEnv -> (OutBndr, InExpr) -> (CSEnv, OutExpr)
 cseRhs env (id',rhs)
   = case lookupCSEnv env rhs' of
-        Just other_expr     -> (env,                             other_expr)
-        Nothing             -> (addCSEnvItem env rhs' (Var id'), rhs')
+        Nothing -> (extendCSEnv env rhs' id', rhs')
+        Just id -> (extendCSSubst env id' id, Var id)
+          -- In the Just case, we have
+          --        x = rhs
+          --        ...
+          --        x' = rhs
+          -- We are replacing the second binding with x'=x
+          -- and so must record that in the substitution so
+          -- that subsequent uses of x' are replaced with x,
+          -- See Trac #5996
   where
     rhs' | isAlwaysActive (idInlineActivation id') = cseExpr env rhs
          | otherwise                               = rhs
@@ -196,7 +204,7 @@ cseRhs env (id',rhs)
 tryForCSE :: CSEnv -> InExpr -> OutExpr
 tryForCSE env expr
   | exprIsTrivial expr'                   = expr'       -- No point
-  | Just smaller <- lookupCSEnv env expr' = smaller
+  | Just smaller <- lookupCSEnv env expr' = Var smaller
   | otherwise                             = expr'
   where
     expr' = cseExpr env expr
@@ -231,11 +239,11 @@ cseAlts env scrut' bndr bndr' alts
   where
     (con_target, alt_env)
         = case scrut' of
-            Var v' -> (v',     extendCSSubst env bndr v')       -- See Note [Case binders 1]
-                                                                -- map: bndr -> v'
+            Var v' -> (v',     extendCSSubst env bndr v')    -- See Note [Case binders 1]
+                                                             -- map: bndr -> v'
 
-            _      ->  (bndr', extendCSEnv env scrut' (Var  bndr')) -- See Note [Case binders 2]
-                                                                    -- map: scrut' -> bndr'
+            _      ->  (bndr', extendCSEnv env scrut' bndr') -- See Note [Case binders 2]
+                                                             -- map: scrut' -> bndr'
 
     arg_tys = tyConAppArgs (idType bndr)
 
@@ -250,7 +258,7 @@ cseAlts env scrut' bndr bndr' alts
         where
           (env', args') = addBinders alt_env args
           new_env       = extendCSEnv env' (mkAltExpr (DataAlt con) args' arg_tys)
-                                           (Var con_target)
+                                           con_target
 
     cse_alt (con, args, rhs)
         = (con, args', tryForCSE env' rhs)
@@ -274,29 +282,21 @@ type OutExpr  = CoreExpr        -- Post-cloning
 type OutBndr  = CoreBndr
 type OutAlt   = CoreAlt
 
-data CSEnv  = CS { cs_map    :: CoreMap (OutExpr, OutExpr)   -- Key, value
+data CSEnv  = CS { cs_map    :: CoreMap (OutExpr, Id)   -- Key, value
                  , cs_subst  :: Subst }
 
 emptyCSEnv :: CSEnv
 emptyCSEnv = CS { cs_map = emptyCoreMap, cs_subst = emptySubst }
 
-lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
+lookupCSEnv :: CSEnv -> OutExpr -> Maybe Id
 lookupCSEnv (CS { cs_map = csmap }) expr
   = case lookupCoreMap csmap expr of
       Just (_,e) -> Just e
       Nothing    -> Nothing
 
-addCSEnvItem :: CSEnv -> OutExpr -> OutExpr -> CSEnv
-addCSEnvItem = extendCSEnv
-   -- We used to avoid trying to CSE big expressions, on the grounds
-   -- that they are expensive to compare.  But now we have CoreMaps
-   -- we can happily insert them and laziness will mean that the
-   -- insertions only get fully done if we look up in that part
-   -- of the trie. No need for a size test.
-
-extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
-extendCSEnv cse expr expr'
-  = cse { cs_map = extendCoreMap (cs_map cse) expr (expr,expr') }
+extendCSEnv :: CSEnv -> OutExpr -> Id -> CSEnv
+extendCSEnv cse expr id
+  = cse { cs_map = extendCoreMap (cs_map cse) expr (expr,id) }
 
 csEnvSubst :: CSEnv -> Subst
 csEnvSubst = cs_subst
