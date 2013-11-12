@@ -417,33 +417,42 @@ tc_hs_type hs_ty@(HsPArrTy elt_ty) exp_kind
 
 -- See Note [Distinguishing tuple kinds] in HsTypes
 -- See Note [Inferring tuple kinds]
-tc_hs_type hs_ty@(HsTupleTy HsBoxedOrConstraintTuple tys) exp_kind@(EK exp_k _ctxt)
+tc_hs_type hs_ty@(HsTupleTy HsBoxedOrConstraintTuple hs_tys) exp_kind@(EK exp_k _ctxt)
      -- (NB: not zonking before looking at exp_k, to avoid left-right bias)
   | Just tup_sort <- tupKindSort_maybe exp_k
-  = tc_tuple hs_ty tup_sort tys exp_kind
+  = tc_tuple hs_ty tup_sort hs_tys exp_kind
   | otherwise
-  = do { (tys, kinds) <- mapAndUnzipM tc_infer_lhs_type tys
+  = do { (tys, kinds) <- mapAndUnzipM tc_infer_lhs_type hs_tys
        ; kinds <- mapM zonkTcKind kinds
-       ; let (arg_kind, tup_sort) 
+           -- Infer each arg type separately, because errors can be
+           -- confusing if we give them a shared kind.  Eg Trac #7410
+           -- (Either Int, Int), we do not want to get an error saying
+           -- "the second argument of a tuple should have kind *->*"
+
+       ; let (arg_kind, tup_sort)
                = case [ (k,s) | k <- kinds
                               , Just s <- [tupKindSort_maybe k] ] of
                     ((k,s) : _) -> (k,s)
-                    [] -> (liftedTypeKind, HsBoxedTuple)
+                    [] -> (liftedTypeKind, BoxedTuple)
          -- In the [] case, it's not clear what the kind is, so guess *
 
-       ; sequence_ [ checkExpectedKind ty kind 
+       ; sequence_ [ setSrcSpan loc $
+                     checkExpectedKind ty kind
                         (expArgKind (ptext (sLit "a tuple")) arg_kind n)
-                   | (ty,kind,n) <- zip3 tys kinds [1..] ]
-
-           -- Do the experiment inside a 'tryTc' because errors can be
-           -- confusing.  Eg Trac #7410 (Either Int, Int), we do not want to get
-           -- an error saying "the second argument of a tuple should have kind *->*"
+                   | (ty@(L loc _),kind,n) <- zip3 hs_tys kinds [1..] ]
 
        ; finish_tuple hs_ty tup_sort tys exp_kind }
 
 
-tc_hs_type hs_ty@(HsTupleTy tup_sort tys) exp_kind
+tc_hs_type hs_ty@(HsTupleTy hs_tup_sort tys) exp_kind
   = tc_tuple hs_ty tup_sort tys exp_kind
+  where
+    tup_sort = case hs_tup_sort of  -- Fourth case dealt with above
+                  HsUnboxedTuple    -> UnboxedTuple
+                  HsBoxedTuple      -> BoxedTuple
+                  HsConstraintTuple -> ConstraintTuple
+                  _                 -> panic "tc_hs_type HsTupleTy"
+
 
 --------- Promoted lists and tuples
 tc_hs_type hs_ty@(HsExplicitListTy _k tys) exp_kind
@@ -518,47 +527,37 @@ tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind
        ; return (mkStrLitTy s) }
 
 ---------------------------
-tupKindSort_maybe :: TcKind -> Maybe HsTupleSort
+tupKindSort_maybe :: TcKind -> Maybe TupleSort
 tupKindSort_maybe k
-  | isConstraintKind k = Just HsConstraintTuple
-  | isLiftedTypeKind k = Just HsBoxedTuple
+  | isConstraintKind k = Just ConstraintTuple
+  | isLiftedTypeKind k = Just BoxedTuple
   | otherwise          = Nothing
 
-tc_tuple :: HsType Name -> HsTupleSort -> [LHsType Name] -> ExpKind -> TcM TcType
--- Invariant: tup_sort is not HsBoxedOrConstraintTuple
+tc_tuple :: HsType Name -> TupleSort -> [LHsType Name] -> ExpKind -> TcM TcType
 tc_tuple hs_ty tup_sort tys exp_kind
   = do { tau_tys <- tc_hs_arg_tys cxt_doc tys (repeat arg_kind)
        ; finish_tuple hs_ty tup_sort tau_tys exp_kind }
   where
     arg_kind = case tup_sort of
-                 HsBoxedTuple      -> liftedTypeKind
-                 HsUnboxedTuple    -> openTypeKind
-                 HsConstraintTuple -> constraintKind
-                 _                 -> panic "tc_hs_type arg_kind"
+                 BoxedTuple      -> liftedTypeKind
+                 UnboxedTuple    -> openTypeKind
+                 ConstraintTuple -> constraintKind
     cxt_doc = case tup_sort of
-                 HsBoxedTuple      -> ptext (sLit "a tuple")
-                 HsUnboxedTuple    -> ptext (sLit "an unboxed tuple")
-                 HsConstraintTuple -> ptext (sLit "a constraint tuple")
-                 _                 -> panic "tc_hs_type tup_sort"
+                 BoxedTuple      -> ptext (sLit "a tuple")
+                 UnboxedTuple    -> ptext (sLit "an unboxed tuple")
+                 ConstraintTuple -> ptext (sLit "a constraint tuple")
 
-finish_tuple :: HsType Name -> HsTupleSort -> [TcType] -> ExpKind -> TcM TcType
+finish_tuple :: HsType Name -> TupleSort -> [TcType] -> ExpKind -> TcM TcType
 finish_tuple hs_ty tup_sort tau_tys exp_kind
   = do { checkExpectedKind hs_ty res_kind exp_kind
        ; checkWiredInTyCon tycon
        ; return (mkTyConApp tycon tau_tys) }
   where
-    tycon = tupleTyCon con (length tau_tys)
-    con = case tup_sort of
-            HsUnboxedTuple    -> UnboxedTuple
-            HsBoxedTuple      -> BoxedTuple
-            HsConstraintTuple -> ConstraintTuple
-            _                 -> panic "tc_hs_type HsTupleTy"
-
+    tycon = tupleTyCon tup_sort (length tau_tys)
     res_kind = case tup_sort of
-                 HsUnboxedTuple    -> unliftedTypeKind
-                 HsBoxedTuple      -> liftedTypeKind
-                 HsConstraintTuple -> constraintKind
-                 _                 -> panic "tc_hs_type arg_kind"
+                 UnboxedTuple    -> unliftedTypeKind
+                 BoxedTuple      -> liftedTypeKind
+                 ConstraintTuple -> constraintKind
 
 ---------------------------
 tcInferApps :: Outputable a
