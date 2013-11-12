@@ -1,5 +1,5 @@
 test('T7478',
-  [ unless(have_dynamic(),skip),
+  [ unless(have_dynamic(),skip)
   , extra_clean(['A','A.exe','B.o','B.hi','C.o','C.hi'])
   , when(opsys('darwin'), expect_broken(8294))
   ],
