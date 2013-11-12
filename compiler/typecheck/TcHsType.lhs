@@ -64,7 +64,6 @@ import NameEnv
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import ErrUtils ( isEmptyMessages )
 import DynFlags ( ExtensionFlag( Opt_DataKinds ), getDynFlags )
 import Unique
 import UniqSupply
@@ -420,32 +419,28 @@ tc_hs_type hs_ty@(HsPArrTy elt_ty) exp_kind
 -- See Note [Inferring tuple kinds]
 tc_hs_type hs_ty@(HsTupleTy HsBoxedOrConstraintTuple tys) exp_kind@(EK exp_k _ctxt)
      -- (NB: not zonking before looking at exp_k, to avoid left-right bias)
-  | isConstraintKind exp_k = tc_tuple hs_ty HsConstraintTuple tys exp_kind
-  | isLiftedTypeKind exp_k = tc_tuple hs_ty HsBoxedTuple      tys exp_kind
+  | Just tup_sort <- tupKindSort_maybe exp_k
+  = tc_tuple hs_ty tup_sort tys exp_kind
   | otherwise
-  = do { k <- newMetaKindVar
-       ; (msgs, mb_tau_tys) <- tryTc (tc_hs_arg_tys (ptext (sLit "a tuple")) tys (repeat k))
-       ; k <- zonkTcKind k
+  = do { (tys, kinds) <- mapAndUnzipM tc_infer_lhs_type tys
+       ; kinds <- mapM zonkTcKind kinds
+       ; let (arg_kind, tup_sort) 
+               = case [ (k,s) | k <- kinds
+                              , Just s <- [tupKindSort_maybe k] ] of
+                    ((k,s) : _) -> (k,s)
+                    [] -> (liftedTypeKind, HsBoxedTuple)
+         -- In the [] case, it's not clear what the kind is, so guess *
+
+       ; sequence_ [ checkExpectedKind ty kind 
+                        (expArgKind (ptext (sLit "a tuple")) arg_kind n)
+                   | (ty,kind,n) <- zip3 tys kinds [1..] ]
+
            -- Do the experiment inside a 'tryTc' because errors can be
            -- confusing.  Eg Trac #7410 (Either Int, Int), we do not want to get
            -- an error saying "the second argument of a tuple should have kind *->*"
 
-       ; case mb_tau_tys of
-           Just tau_tys 
-             | not (isEmptyMessages msgs) -> try_again k
-             | isConstraintKind k         -> go_for HsConstraintTuple tau_tys
-             | isLiftedTypeKind k         -> go_for HsBoxedTuple      tau_tys
-             | otherwise                  -> try_again k
-           Nothing                        -> try_again k }
-   where
-     go_for sort tau_tys = finish_tuple hs_ty sort tau_tys exp_kind
+       ; finish_tuple hs_ty tup_sort tys exp_kind }
 
-     try_again k
-       | isConstraintKind k = tc_tuple hs_ty HsConstraintTuple tys exp_kind
-       | otherwise          = tc_tuple hs_ty HsBoxedTuple      tys exp_kind
-         -- It's not clear what the kind is, so make best guess and
-         -- check the arguments again to give good error messages
-         -- in eg. `(Maybe, Maybe)`
 
 tc_hs_type hs_ty@(HsTupleTy tup_sort tys) exp_kind
   = tc_tuple hs_ty tup_sort tys exp_kind
@@ -523,6 +518,12 @@ tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind
        ; return (mkStrLitTy s) }
 
 ---------------------------
+tupKindSort_maybe :: TcKind -> Maybe HsTupleSort
+tupKindSort_maybe k
+  | isConstraintKind k = Just HsConstraintTuple
+  | isLiftedTypeKind k = Just HsBoxedTuple
+  | otherwise          = Nothing
+
 tc_tuple :: HsType Name -> HsTupleSort -> [LHsType Name] -> ExpKind -> TcM TcType
 -- Invariant: tup_sort is not HsBoxedOrConstraintTuple
 tc_tuple hs_ty tup_sort tys exp_kind
