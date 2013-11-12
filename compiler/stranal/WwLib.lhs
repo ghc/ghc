@@ -477,7 +477,7 @@ nop_fn body = body
 
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Byy using usafeCoerce, it is possible to make the number of demands fail to
+By using unsafeCoerce, it is possible to make the number of demands fail to
 match the number of constructor arguments; this happened in Trac #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
