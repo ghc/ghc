@@ -219,7 +219,7 @@ test('T5030',
           [(wordsize(32), 259547660, 10),
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
-           (wordsize(64), 454498592, 10)]),
+           (wordsize(64), 397672152, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
