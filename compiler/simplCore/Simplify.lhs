@@ -342,16 +342,15 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 -- See Note [Floating and type abstraction] in SimplUtils
 
         -- Simplify the RHS
-        ; let   body_out_ty :: OutType
-                body_out_ty = substTy body_env (exprType body)
-        ; (body_env1, body1) <- simplExprF body_env body (mkRhsStop body_out_ty)
+        ; let   rhs_cont = mkRhsStop (substTy body_env (exprType body))
+        ; (body_env1, body1) <- simplExprF body_env body rhs_cont
         -- ANF-ise a constructor or PAP rhs
         ; (body_env2, body2) <- prepareRhs top_lvl body_env1 bndr1 body1
 
         ; (env', rhs')
             <-  if not (doFloatFromRhs top_lvl is_rec False body2 body_env2)
                 then                            -- No floating, revert to body1
-                     do { rhs' <- mkLam env tvs' (wrapFloats body_env1 body1)
+                     do { rhs' <- mkLam tvs' (wrapFloats body_env1 body1) rhs_cont
                         ; return (env, rhs') }
 
                 else if null tvs then           -- Simple floating
@@ -361,7 +360,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 else                            -- Do type-abstraction first
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats tvs' body_env2 body2
-                        ; rhs' <- mkLam env tvs' body3
+                        ; rhs' <- mkLam tvs' body3 rhs_cont
                         ; env' <- foldlM (addPolyBind top_lvl) env poly_binds
                         ; return (env', rhs') }
 
@@ -383,7 +382,8 @@ simplNonRecX env bndr new_rhs
                         --               the binding c = (a,b)
   | Coercion co <- new_rhs
   = return (extendCvSubst env bndr co)
-  | otherwise           --               the binding b = (a,b)
+
+  | otherwise
   = do  { (env', bndr') <- simplBinder env bndr
         ; completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
                 -- simplNonRecX is only used for NotTopLevel things
@@ -656,7 +656,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 
         -- Do eta-expansion on the RHS of the binding
         -- See Note [Eta-expanding at let bindings] in SimplUtils
-      ; (new_arity, final_rhs) <- tryEtaExpand env new_bndr new_rhs
+      ; (new_arity, final_rhs) <- tryEtaExpandRhs env new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplUnfolding env top_lvl old_bndr final_rhs old_unf
@@ -1306,7 +1306,7 @@ simplLam env bndrs body (TickIt tickish cont)
 simplLam env bndrs body cont
   = do  { (env', bndrs') <- simplLamBndrs env bndrs
         ; body' <- simplExpr env' body
-        ; new_lam <- mkLam env' bndrs' body'
+        ; new_lam <- mkLam bndrs' body' cont
         ; rebuild env' new_lam cont }
 
 ------------------
@@ -1481,8 +1481,9 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         ; rebuildCall env (addArgTo info' arg') cont }
   where
     info' = info { ai_strs = strs, ai_discs = discs }
-    cci | encl_rules || disc > 0 = ArgCtxt encl_rules  -- Be keener here
-        | otherwise              = BoringCtxt          -- Nothing interesting
+    cci | encl_rules = RuleArgCtxt
+        | disc > 0   = DiscArgCtxt  -- Be keener here
+        | otherwise  = BoringCtxt   -- Nothing interesting
 
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
   | null rules

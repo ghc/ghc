@@ -16,7 +16,7 @@
 -- | Arit and eta expansion
 module CoreArity (
 	manifestArity, exprArity, exprBotStrictness_maybe,
-	exprEtaExpandArity, CheapFun, etaExpand
+	exprEtaExpandArity, findRhsArity, CheapFun, etaExpand
     ) where
 
 #include "HsVersions.h"
@@ -38,6 +38,7 @@ import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
 import Pair
+import Util     ( debugIsOn )
 \end{code}
 
 %************************************************************************
@@ -490,24 +491,17 @@ vanillaArityType = ATop []	-- Totally uninformative
 
 -- ^ The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
-exprEtaExpandArity :: DynFlags -> CheapAppFun -> CoreExpr -> Arity
+exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
 -- 	e  ==>  \xy -> e x y
-exprEtaExpandArity dflags cheap_app e
+exprEtaExpandArity dflags e
   = case (arityType env e) of
-      ATop (os:oss) 
-        | os || has_lam e -> 1 + length oss	-- Note [Eta expanding thunks]
-        | otherwise       -> 0
-      ATop []             -> 0
-      ABot n              -> n
+      ATop oss -> length oss
+      ABot n   -> n
   where
     env = AE { ae_bndrs    = []
-             , ae_cheap_fn = mk_cheap_fn dflags cheap_app
+             , ae_cheap_fn = mk_cheap_fn dflags isCheapApp
              , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
-
-    has_lam (Tick _ e) = has_lam e
-    has_lam (Lam b e)  = isId b || has_lam e
-    has_lam _          = False
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -523,7 +517,93 @@ mk_cheap_fn dflags cheap_app
              || case mb_ty of
                   Nothing -> False
                   Just ty -> isDictLikeTy ty
+
+
+----------------------
+findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> Arity
+-- This implements the fixpoint loop for arity analysis
+-- See Note [Arity analysis]
+findRhsArity dflags bndr rhs old_arity
+  = go (rhsEtaExpandArity dflags init_cheap_app rhs)
+       -- We always call exprEtaExpandArity once, but usually
+       -- that produces a result equal to old_arity, and then
+       -- we stop right away (since arities should not decrease)
+       -- Result: the common case is that there is just one iteration
+  where
+    init_cheap_app :: CheapAppFun
+    init_cheap_app fn n_val_args
+      | fn == bndr = True   -- On the first pass, this binder gets infinite arity
+      | otherwise  = isCheapApp fn n_val_args
+
+    go :: Arity -> Arity
+    go cur_arity
+      | cur_arity <= old_arity = cur_arity
+      | new_arity == cur_arity = cur_arity
+      | otherwise = ASSERT( new_arity < cur_arity )
+#ifdef DEBUG
+                    pprTrace "Exciting arity"
+                       (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
+                             , ppr rhs])
+#endif
+                    go new_arity
+      where
+        new_arity = rhsEtaExpandArity dflags cheap_app rhs
+
+        cheap_app :: CheapAppFun
+        cheap_app fn n_val_args
+          | fn == bndr = n_val_args < cur_arity
+          | otherwise  = isCheapApp fn n_val_args
+
+-- ^ The Arity returned is the number of value args the
+-- expression can be applied to without doing much work
+rhsEtaExpandArity :: DynFlags -> CheapAppFun -> CoreExpr -> Arity
+-- exprEtaExpandArity is used when eta expanding
+-- 	e  ==>  \xy -> e x y
+rhsEtaExpandArity dflags cheap_app e
+  = case (arityType env e) of
+      ATop (os:oss)
+        | os || has_lam e -> 1 + length oss  -- Don't expand PAPs/thunks
+                                             -- Note [Eta expanding thunks]
+        | otherwise       -> 0
+      ATop []             -> 0
+      ABot n              -> n
+  where
+    env = AE { ae_bndrs    = []
+             , ae_cheap_fn = mk_cheap_fn dflags cheap_app
+             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
+
+    has_lam (Tick _ e) = has_lam e
+    has_lam (Lam b e)  = isId b || has_lam e
+    has_lam _          = False
 \end{code}
+
+Note [Arity analysis]
+~~~~~~~~~~~~~~~~~~~~~
+The motivating example for arity analysis is this:
+
+  f = \x. let g = f (x+1)
+          in \y. ...g...
+
+What arity does f have?  Really it should have arity 2, but a naive
+look at the RHS won't see that.  You need a fixpoint analysis which
+says it has arity "infinity" the first time round.
+
+This example happens a lot; it first showed up in Andy Gill's thesis,
+fifteen years ago!  It also shows up in the code for 'rnf' on lists
+in Trac #4138.
+
+The analysis is easy to achieve because exprEtaExpandArity takes an
+argument
+     type CheapFun = CoreExpr -> Maybe Type -> Bool
+used to decide if an expression is cheap enough to push inside a
+lambda.  And exprIsCheap' in turn takes an argument
+     type CheapAppFun = Id -> Int -> Bool
+which tells when an application is cheap. This makes it easy to
+write the analysis loop.
+
+The analysis is cheap-and-cheerful because it doesn't deal with
+mutual recursion.  But the self-recursive case is the important one.
+
 
 Note [Eta expanding through dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -549,6 +629,11 @@ isDictLikeTy here rather than isDictTy
 
 Note [Eta expanding thunks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't eta-expand
+   * Trivial RHSs     x = y
+   * PAPs             x = map g
+   * Thunks           f = case y of p -> \x -> blah
+
 When we see
      f = case y of p -> \x -> blah
 should we eta-expand it? Well, if 'x' is a one-shot state token 

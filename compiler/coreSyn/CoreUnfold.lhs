@@ -25,7 +25,7 @@ find, unsurprisingly, a Core expression.
 module CoreUnfold (
 	Unfolding, UnfoldingGuidance,	-- Abstract types
 
-	noUnfolding, mkImplicitUnfolding, 
+	noUnfolding, mkImplicitUnfolding,
         mkUnfolding, mkCoreUnfolding,
 	mkTopUnfolding, mkSimpleUnfolding,
 	mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
@@ -881,28 +881,26 @@ instance Outputable ArgSummary where
   ppr NonTrivArg = ptext (sLit "NonTrivArg")
   ppr ValueArg   = ptext (sLit "ValueArg")
 
-data CallCtxt = BoringCtxt
+data CallCtxt
+  = BoringCtxt
+  | RhsCtxt             -- Rhs of a let-binding; see Note [RHS of lets]
+  | DiscArgCtxt         -- Argument of a fuction with non-zero arg discount
+  | RuleArgCtxt		-- We are somewhere in the argument of a function with rules
 
-	      | ArgCtxt		-- We are somewhere in the argument of a function
-                        Bool	-- True  <=> we're somewhere in the RHS of function with rules
-				-- False <=> we *are* the argument of a function with non-zero
-				-- 	     arg discount
-                                --        OR 
-                                --           we *are* the RHS of a let  Note [RHS of lets]
-                                -- In both cases, be a little keener to inline
+  | ValAppCtxt 	        -- We're applied to at least one value arg
+		        -- This arises when we have ((f x |> co) y)
+		        -- Then the (f x) has argument 'x' but in a ValAppCtxt
 
-	      | ValAppCtxt 	-- We're applied to at least one value arg
-				-- This arises when we have ((f x |> co) y)
-				-- Then the (f x) has argument 'x' but in a ValAppCtxt
-
-	      | CaseCtxt	-- We're the scrutinee of a case
-				-- that decomposes its scrutinee
+  | CaseCtxt	        -- We're the scrutinee of a case
+		        -- that decomposes its scrutinee
 
 instance Outputable CallCtxt where
-  ppr BoringCtxt      = ptext (sLit "BoringCtxt")
-  ppr (ArgCtxt rules) = ptext (sLit "ArgCtxt") <+> ppr rules
-  ppr CaseCtxt 	      = ptext (sLit "CaseCtxt")
-  ppr ValAppCtxt      = ptext (sLit "ValAppCtxt")
+  ppr CaseCtxt 	  = ptext (sLit "CaseCtxt")
+  ppr ValAppCtxt  = ptext (sLit "ValAppCtxt")
+  ppr BoringCtxt  = ptext (sLit "BoringCtxt")
+  ppr RhsCtxt     = ptext (sLit "RhsCtxt")
+  ppr DiscArgCtxt = ptext (sLit "DiscArgCtxt")
+  ppr RuleArgCtxt = ptext (sLit "RuleArgCtxt")
 
 callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of 
@@ -971,10 +969,13 @@ tryUnfolding dflags id lone_variable
 
     interesting_call 
       = case cont_info' of
-          BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
-          CaseCtxt   -> not (lone_variable && is_wf)      -- Note [Lone variables]
-          ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
-          ValAppCtxt -> True			          -- Note [Cast then apply]
+          CaseCtxt   -> not (lone_variable && is_wf)  -- Note [Lone variables]
+          ValAppCtxt -> True			      -- Note [Cast then apply]
+          RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
+          DiscArgCtxt -> uf_arity > 0  --
+          RhsCtxt     -> uf_arity > 0  --
+          _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
+                                                      -- Note [Inlining in ArgCtxt]
 
     (yes_or_no, extra_doc)
       = case guidance of
@@ -995,15 +996,20 @@ tryUnfolding dflags id lone_variable
     	         		          res_discount arg_infos cont_info'
 \end{code}
 
-Note [RHS of lets]
-~~~~~~~~~~~~~~~~~~
-Be a tiny bit keener to inline in the RHS of a let, because that might
-lead to good thing later
+Note [Unfold into lazy contexts], Note [RHS of lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the call is the argument of a function with a RULE, or the RHS of a let,
+we are a little bit keener to inline.  For example
      f y = (y,y,y)
      g y = let x = f y in ...(case x of (a,b,c) -> ...) ...
 We'd inline 'f' if the call was in a case context, and it kind-of-is,
-only we can't see it.  So we treat the RHS of a let as not-totally-boring.
-    
+only we can't see it.  Also
+     x = f v
+could be expensive whereas
+     x = case v of (a,b) -> a
+is patently cheap and may allow more eta expansion.
+So we treat the RHS of a let as not-totally-boring.
+
 Note [Unsaturated applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When a call is not saturated, we *still* inline if one of the
@@ -1212,7 +1218,15 @@ computeDiscount dflags uf_arity arg_discounts res_discount arg_infos cont_info
 			BoringCtxt  -> 0
 			CaseCtxt    -> res_discount  -- Presumably a constructor
 			ValAppCtxt  -> res_discount  -- Presumably a function
-                        ArgCtxt {}  -> 40 `min` res_discount
+			_           -> 40 `min` res_discount
+                -- ToDo: this 40 `min` res_dicount doesn't seem right
+                --   for DiscArgCtxt it shouldn't matter because the function will
+                --    get the arg discount for any non-triv arg
+                --   for RuleArgCtxt we do want to be keener to inline; but not only
+                --    constructor results
+                --   for RhsCtxt I suppose that exposing a data con is good in general
+                --   And 40 seems very arbitrary
+                --
 		-- res_discount can be very large when a function returns
 		-- constructors; but we only want to invoke that large discount
 		-- when there's a case continuation.
