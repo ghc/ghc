@@ -285,12 +285,6 @@ $1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_L
 endif
 endif
 endif
-endif
-
-ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$(call all-target,$1_$2,$$($1_$2_INPLACE))
-endif
-$(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 # INPLACE_BIN might be empty if we're distcleaning
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
@@ -299,6 +293,13 @@ $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
 	"$$(CP)" -p $$< $$@
 endif
 endif
+
+endif
+
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
+$(call all-target,$1_$2,$$($1_$2_INPLACE))
+endif
+$(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 ifeq "$$($1_$2_INSTALL)" "YES"
 ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
