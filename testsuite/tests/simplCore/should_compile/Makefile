@@ -111,3 +111,7 @@ T7995:
 T8221:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T8221.hs
+
+T5996:
+	$(RM) -f T5996.o T5996.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5996.hs -ddump-simpl -dsuppress-uniques -dsuppress-all | grep y2

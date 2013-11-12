@@ -193,3 +193,7 @@ test('T8221',
      run_command,
      ['$MAKE -s --no-print-directory T8221'])
 test('T8329', only_ways(['optasm']), multimod_compile, ['T8329','-v0 -O'])
+test('T5996',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T5996'])
