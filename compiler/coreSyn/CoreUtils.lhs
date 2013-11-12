@@ -86,7 +86,10 @@ exprType :: CoreExpr -> Type
 exprType (Var var)           = idType var
 exprType (Lit lit)           = literalType lit
 exprType (Coercion co)       = coercionType co
-exprType (Let _ body)        = exprType body
+exprType (Let bind body)     
+  | NonRec tv rhs <- bind    -- See Note [Type bindings]
+  , Type ty <- rhs           = substTyWith [tv] [ty] (exprType body)
+  | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
 exprType (Cast _ co)         = pSnd (coercionKind co)
 exprType (Tick _ e)          = exprType e
@@ -112,6 +115,15 @@ coreAltsType :: [CoreAlt] -> Type
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []      = panic "corAltsType"
 \end{code}
+
+Note [Type bindings]
+~~~~~~~~~~~~~~~~~~~~
+Core does allow type bindings, although such bindings are
+not much used, except in the output of the desuguarer.
+Example:
+     let a = Int in (\x:a. x)
+Given this, exprType must be careful to substitute 'a' in the 
+result type (Trac #8522).
 
 Note [Existential variables and silly type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
