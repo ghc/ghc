@@ -173,7 +173,7 @@ test('T3064',
       compiler_stats_num_field('peak_megabytes_allocated',
           [(wordsize(32), 14, 1),
         # expected value: 14 (x86/Linux 28-06-2012):
-           (wordsize(64), 30, 20)]),
+           (wordsize(64), 37, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -181,6 +181,7 @@ test('T3064',
             # (amd64/Linux) 2013-09-11: 30; result of AMP patch
             # Increased range to 20%.  peak-usage varies from 22 to 26,
             #  depending on whether the old .hi file exists
+            # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 111189536, 10),
@@ -226,6 +227,8 @@ test('T5030',
              # ^ reason unknown
              # 2013-08-02 454498592  (amd64/Linux)
              # decrease from more aggressive coercion optimisations from roles
+             # 2013-11-12 397672152  (amd64/Linux)
+             # big decrease following better CSE and arity
 
        only_ways(['normal'])
       ],
