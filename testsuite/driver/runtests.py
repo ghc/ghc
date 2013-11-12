@@ -132,13 +132,16 @@ if config.use_threads == 1:
 
 config.cygwin = False
 config.msys = False
+
 if windows:
     h = os.popen('uname -s', 'r')
     v = h.read()
     h.close()
     if v.startswith("CYGWIN"):
         config.cygwin = True
-    elif v.startswith("MINGW32"):
+    elif v.startswith("MINGW"):
+# msys gives "MINGW32"
+# msys2 gives "MINGW_NT-6.2"
         config.msys = True
     else:
         raise Exception("Can't detect Windows terminal type")
