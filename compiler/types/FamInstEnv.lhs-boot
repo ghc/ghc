@@ -1,5 +1,5 @@
 \begin{code}
-module FamInst where
+module FamInstEnv where
 
 data TcBuiltInSynFamily
 \end{code}

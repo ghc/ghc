@@ -11,7 +11,7 @@ import TcCanonical
 import VarSet
 import Type
 import Unify
-import FamInst(TcBuiltInSynFamily(..))
+import FamInstEnv(TcBuiltInSynFamily(..))
 import InstEnv( lookupInstEnv, instanceDFunId )
 
 import Var

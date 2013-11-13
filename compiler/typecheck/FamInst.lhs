@@ -13,11 +13,9 @@ module FamInst (
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
 	tcLookupFamInst, 
         tcGetFamInstEnvs,
-        newFamInst,
-        TcBuiltInSynFamily(..), trivialBuiltInFamily
+        newFamInst
     ) where
 
-import Pair(Pair)
 import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )
@@ -41,7 +39,6 @@ import VarSet
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
-import TcEvidence(TcCoercion)
 
 #include "HsVersions.h"
 \end{code}
@@ -334,26 +331,4 @@ tcGetFamInstEnvs
   = do { eps <- getEps; env <- getGblEnv
        ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
 \end{code}
-
-
-Type checking of built-in families
-==================================
-
-\begin{code}
-data TcBuiltInSynFamily = TcBuiltInSynFamily
-  { sfMatchFam      :: [Type] -> Maybe (TcCoercion, TcType)
-  , sfInteractTop   :: [Type] -> Type -> [Pair TcType]
-  , sfInteractInert :: [Type] -> Type ->
-                       [Type] -> Type -> [Pair TcType]
-  }
-
--- Provides default implementations that do nothing.
-trivialBuiltInFamily :: TcBuiltInSynFamily
-trivialBuiltInFamily = TcBuiltInSynFamily
-  { sfMatchFam      = \_ -> Nothing
-  , sfInteractTop   = \_ _ -> []
-  , sfInteractInert = \_ _ _ _ -> []
-  }
-\end{code}
-
 

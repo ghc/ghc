@@ -25,7 +25,7 @@ import PrelNames  ( gHC_TYPELITS
                   , typeNatLeqTyFamNameKey
                   , typeNatSubTyFamNameKey
                   )
-import FamInst    ( TcBuiltInSynFamily(..) )
+import FamInstEnv ( TcBuiltInSynFamily(..) )
 import FastString ( FastString, fsLit )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
