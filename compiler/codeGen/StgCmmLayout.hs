@@ -120,15 +120,15 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
 
 
 adjustHpBackwards :: FCode ()
--- This function adjusts and heap pointers just before a tail call or
+-- This function adjusts the heap pointer just before a tail call or
 -- return.  At a call or return, the virtual heap pointer may be less
 -- than the real Hp, because the latter was advanced to deal with
 -- the worst-case branch of the code, and we may be in a better-case
 -- branch.  In that case, move the real Hp *back* and retract some
 -- ticky allocation count.
 --
--- It *does not* deal with high-water-mark adjustment.
--- That's done by functions which allocate heap.
+-- It *does not* deal with high-water-mark adjustment.  That's done by
+-- functions which allocate heap.
 adjustHpBackwards
   = do  { hp_usg <- getHpUsage
         ; let rHp = realHp hp_usg
@@ -138,9 +138,9 @@ adjustHpBackwards
 
         ; emit (if adjust_words == 0
                 then mkNop
-                else mkAssign hpReg new_hp)        -- Generates nothing when vHp==rHp
+                else mkAssign hpReg new_hp) -- Generates nothing when vHp==rHp
 
-        ; tickyAllocHeap False adjust_words                -- ...ditto
+        ; tickyAllocHeap False adjust_words -- ...ditto
 
         ; setRealHp vHp
         }
