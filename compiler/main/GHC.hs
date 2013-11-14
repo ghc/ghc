@@ -344,7 +344,10 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
                 Just (ioe :: IOException) ->
                   fatalErrorMsg'' fm (show ioe)
                 _ -> case fromException exception of
-                     Just UserInterrupt -> exitWith (ExitFailure 1)
+                     Just UserInterrupt ->
+                         -- Important to let this one propagate out so our
+                         -- calling process knows we were interrupted by ^C
+                         liftIO $ throwIO UserInterrupt
                      Just StackOverflow ->
                          fatalErrorMsg'' fm "stack overflow: use +RTS -K<size> to increase it"
                      _ -> case fromException exception of
