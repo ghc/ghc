@@ -1658,7 +1658,8 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                 -- behaviour.
 
                 -- return the cached summary if the source didn't change
-        if ms_hs_date old_summary == src_timestamp
+        if ms_hs_date old_summary == src_timestamp &&
+           not (gopt Opt_ForceRecomp (hsc_dflags hsc_env))
            then do -- update the object-file timestamp
                   obj_timestamp <-
                     if isObjectTarget (hscTarget (hsc_dflags hsc_env))
@@ -1758,7 +1759,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
     hsc_src = if is_boot then HsBootFile else HsSrcFile
 
     check_timestamp old_summary location src_fn src_timestamp
-        | ms_hs_date old_summary == src_timestamp = do
+        | ms_hs_date old_summary == src_timestamp &&
+          not (gopt Opt_ForceRecomp dflags) = do
                 -- update the object-file timestamp
                 obj_timestamp <-
                     if isObjectTarget (hscTarget (hsc_dflags hsc_env))
