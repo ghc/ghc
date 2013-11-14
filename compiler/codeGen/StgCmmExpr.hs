@@ -432,17 +432,25 @@ cgCase scrut bndr alt_type alts
 
        ; mb_cc <- maybeSaveCostCentre simple_scrut
 
-       -- if do_gc then our sequel will be ReturnTo
-       --   - generate code for the sequel now
-       --   - pass info about the sequel to cgAlts for use in the heap check
-       -- else sequel will be AssignTo
-
-       ; ret_kind <- withSequel (AssignTo alt_regs False) (cgExpr scrut)
+       ; let sequel = AssignTo alt_regs do_gc{- Note [scrut sequel] -}
+       ; ret_kind <- withSequel sequel (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; _ <- bindArgsToRegs ret_bndrs
        ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
        }
 
+
+{-
+Note [scrut sequel]
+
+The job of the scrutinee is to assign its value(s) to alt_regs.
+Additionally, if we plan to do a heap-check in the alternatives (see
+Note [Compiling case expressions]), then we *must* retreat Hp to
+recover any unused heap before passing control to the sequel.  If we
+don't do this, then any unused heap will become slop because the heap
+check will reset the heap usage. Slop in the heap breaks LDV profiling
+(+RTS -hb) which needs to do a linear sweep through the nursery.
+-}
 
 -----------------
 maybeSaveCostCentre :: Bool -> FCode (Maybe LocalReg)
