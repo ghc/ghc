@@ -134,3 +134,8 @@ test('CatEntail', normal, compile, [''])
 
 test('T7653', normal, compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
+
+test('topHandler01', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('topHandler02', [ when(opsys('mingw32'), skip), exit_code(130), omit_ways(['ghci']) ], compile_and_run, [''])
+test('topHandler03', [ when(opsys('mingw32'), skip), exit_code(143) ], compile_and_run, [''])
+
