@@ -2055,15 +2055,6 @@ tcRnGetInfo hsc_env name
 
 lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
-  | Just cls <- tyConClass_maybe tc
-  = do  { inst_envs <- tcGetInstEnvs
-        ; return (classInstances inst_envs cls, []) }
-
-  | isOpenFamilyTyCon tc || isTyConAssoc tc
-  = do  { inst_envs <- tcGetFamInstEnvs
-        ; return ([], familyInstances inst_envs tc) }
-
-  | otherwise
   = do  { (pkg_ie, home_ie) <- tcGetInstEnvs
         ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
                 -- Load all instances for all classes that are
