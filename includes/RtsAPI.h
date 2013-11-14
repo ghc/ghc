@@ -94,14 +94,12 @@ extern void hs_init_with_rtsopts (int *argc, char **argv[]);
 extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
                          RtsConfig rts_config);      // RTS configuration
 
-extern void shutdownHaskellAndExit ( int exitCode )
-#if __GNUC__ >= 3
-    __attribute__((__noreturn__))
-#endif
-    ;
+extern void shutdownHaskellAndExit (int exitCode, int fastExit)
+    GNUC3_ATTRIBUTE(__noreturn__);
 
 #ifndef mingw32_HOST_OS
-extern void shutdownHaskellAndSignal (int sig);
+extern void shutdownHaskellAndSignal (int sig, int fastExit)
+     GNUC3_ATTRIBUTE(__noreturn__);
 #endif
 
 extern void getProgArgv            ( int *argc, char **argv[] );
