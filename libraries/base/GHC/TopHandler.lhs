@@ -177,10 +177,32 @@ flushStdHandles = do
   hFlush stdout `catchAny` \_ -> return ()
   hFlush stderr `catchAny` \_ -> return ()
 
+safeExit, fastExit :: Int -> IO a
+safeExit = exitHelper useSafeExit
+fastExit = exitHelper useFastExit
+
+exitHelper :: CInt -> Int -> IO a
 -- we have to use unsafeCoerce# to get the 'IO a' result type, since the
 -- compiler doesn't let us declare that as the result type of a foreign export.
-safeExit :: Int -> IO a
-safeExit r = unsafeCoerce# (shutdownHaskellAndExit $ fromIntegral r)
+#ifdef mingw32_HOST_OS
+exitHelper exitKind r =
+  unsafeCoerce# (shutdownHaskellAndExit (fromIntegral r) exitKind)
+#else
+-- On Unix we use an encoding for the ExitCode:
+--      0 -- 255  normal exit code
+--   -127 -- -1   exit by signal
+-- For any invalid encoding we just use a replacement (0xff).
+exitHelper exitKind r
+  | r >= 0 && r <= 255
+  = unsafeCoerce# (shutdownHaskellAndExit   (fromIntegral   r)  exitKind)
+  | r >= -127 && r <= -1
+  = unsafeCoerce# (shutdownHaskellAndSignal (fromIntegral (-r)) exitKind)
+  | otherwise
+  = unsafeCoerce# (shutdownHaskellAndExit   0xff                exitKind)
+
+foreign import ccall "shutdownHaskellAndSignal"
+  shutdownHaskellAndSignal :: CInt -> CInt -> IO ()
+#endif
 
 exitInterrupted :: IO a
 exitInterrupted = 
@@ -189,20 +211,16 @@ exitInterrupted =
 #else
   -- we must exit via the default action for SIGINT, so that the
   -- parent of this process can take appropriate action (see #2301)
-  unsafeCoerce# (shutdownHaskellAndSignal CONST_SIGINT)
-
-foreign import ccall "shutdownHaskellAndSignal"
-  shutdownHaskellAndSignal :: CInt -> IO ()
+  safeExit (-CONST_SIGINT)
 #endif
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
 -- re-enter Haskell land through finalizers.
 foreign import ccall "Rts.h shutdownHaskellAndExit"
-  shutdownHaskellAndExit :: CInt -> IO ()
+  shutdownHaskellAndExit :: CInt -> CInt -> IO ()
 
-fastExit :: Int -> IO a
-fastExit r = unsafeCoerce# (stg_exit (fromIntegral r))
+useFastExit, useSafeExit :: CInt
+useFastExit = 1
+useSafeExit = 0
 
-foreign import ccall "Rts.h stg_exit"
-  stg_exit :: CInt -> IO ()
 \end{code}
