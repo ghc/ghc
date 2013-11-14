@@ -11,8 +11,8 @@ import TcCanonical
 import VarSet
 import Type
 import Unify
-import FamInstEnv(TcBuiltInSynFamily(..))
 import InstEnv( lookupInstEnv, instanceDFunId )
+import CoAxiom(sfInteractTop, sfInteractInert)
 
 import Var
 import TcType

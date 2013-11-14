@@ -1,7 +1,7 @@
 module TcTypeNats
   ( typeNatTyCons
   , typeNatCoAxiomRules
-  , TcBuiltInSynFamily(..)
+  , BuiltInSynFamily(..)
   ) where
 
 import Type
@@ -10,8 +10,7 @@ import TcType     ( TcType )
 import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
-import TcEvidence ( mkTcAxiomRuleCo, TcCoercion )
-import CoAxiom    ( CoAxiomRule(..) )
+import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
 import Name       ( Name, BuiltInSyntax(..) )
 import TysWiredIn ( typeNatKind, mkWiredInTyConName
                   , promotedBoolTyCon
@@ -25,7 +24,6 @@ import PrelNames  ( gHC_TYPELITS
                   , typeNatLeqTyFamNameKey
                   , typeNatSubTyFamNameKey
                   )
-import FamInstEnv ( TcBuiltInSynFamily(..) )
 import FastString ( FastString, fsLit )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
@@ -45,7 +43,7 @@ typeNatTyCons =
 
 typeNatAddTyCon :: TyCon
 typeNatAddTyCon = mkTypeNatFunTyCon2 name
-  TcBuiltInSynFamily
+  BuiltInSynFamily
     { sfMatchFam      = matchFamAdd
     , sfInteractTop   = interactTopAdd
     , sfInteractInert = interactInertAdd
@@ -56,7 +54,7 @@ typeNatAddTyCon = mkTypeNatFunTyCon2 name
 
 typeNatSubTyCon :: TyCon
 typeNatSubTyCon = mkTypeNatFunTyCon2 name
-  TcBuiltInSynFamily
+  BuiltInSynFamily
     { sfMatchFam      = matchFamSub
     , sfInteractTop   = interactTopSub
     , sfInteractInert = interactInertSub
@@ -67,7 +65,7 @@ typeNatSubTyCon = mkTypeNatFunTyCon2 name
 
 typeNatMulTyCon :: TyCon
 typeNatMulTyCon = mkTypeNatFunTyCon2 name
-  TcBuiltInSynFamily
+  BuiltInSynFamily
     { sfMatchFam      = matchFamMul
     , sfInteractTop   = interactTopMul
     , sfInteractInert = interactInertMul
@@ -78,7 +76,7 @@ typeNatMulTyCon = mkTypeNatFunTyCon2 name
 
 typeNatExpTyCon :: TyCon
 typeNatExpTyCon = mkTypeNatFunTyCon2 name
-  TcBuiltInSynFamily
+  BuiltInSynFamily
     { sfMatchFam      = matchFamExp
     , sfInteractTop   = interactTopExp
     , sfInteractInert = interactInertExp
@@ -99,7 +97,7 @@ typeNatLeqTyCon =
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "<=?")
                 typeNatLeqTyFamNameKey typeNatLeqTyCon
-  ops = TcBuiltInSynFamily
+  ops = BuiltInSynFamily
     { sfMatchFam      = matchFamLeq
     , sfInteractTop   = interactTopLeq
     , sfInteractInert = interactInertLeq
@@ -107,7 +105,7 @@ typeNatLeqTyCon =
 
 
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
-mkTypeNatFunTyCon2 :: Name -> TcBuiltInSynFamily -> TyCon
+mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkSynTyCon op
     (mkArrowKinds [ typeNatKind, typeNatKind ] typeNatKind)
@@ -278,54 +276,54 @@ mkAxiom1 str f =
 Evaluation
 -------------------------------------------------------------------------------}
 
-matchFamAdd :: [Type] -> Maybe (TcCoercion, TcType)
+matchFamAdd :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamAdd [s,t]
-  | Just 0 <- mbX = Just (mkTcAxiomRuleCo axAdd0L [t] [], t)
-  | Just 0 <- mbY = Just (mkTcAxiomRuleCo axAdd0R [s] [], s)
+  | Just 0 <- mbX = Just (axAdd0L, [t], t)
+  | Just 0 <- mbY = Just (axAdd0R, [s], s)
   | Just x <- mbX, Just y <- mbY =
-    Just (mkTcAxiomRuleCo axAddDef [s,t] [], num (x + y))
+    Just (axAddDef, [s,t], num (x + y))
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamAdd _ = Nothing
 
-matchFamSub :: [Type] -> Maybe (TcCoercion, TcType)
+matchFamSub :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamSub [s,t]
-  | Just 0 <- mbY = Just (mkTcAxiomRuleCo axSub0R [s] [], s)
+  | Just 0 <- mbY = Just (axSub0R, [s], s)
   | Just x <- mbX, Just y <- mbY, Just z <- minus x y =
-    Just (mkTcAxiomRuleCo axSubDef [s,t] [], num z)
+    Just (axSubDef, [s,t], num z)
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamSub _ = Nothing
 
-matchFamMul :: [Xi] -> Maybe (TcCoercion, Xi)
+matchFamMul :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamMul [s,t]
-  | Just 0 <- mbX = Just (mkTcAxiomRuleCo axMul0L [t] [], num 0)
-  | Just 0 <- mbY = Just (mkTcAxiomRuleCo axMul0R [s] [], num 0)
-  | Just 1 <- mbX = Just (mkTcAxiomRuleCo axMul1L [t] [], t)
-  | Just 1 <- mbY = Just (mkTcAxiomRuleCo axMul1R [s] [], s)
+  | Just 0 <- mbX = Just (axMul0L, [t], num 0)
+  | Just 0 <- mbY = Just (axMul0R, [s], num 0)
+  | Just 1 <- mbX = Just (axMul1L, [t], t)
+  | Just 1 <- mbY = Just (axMul1R, [s], s)
   | Just x <- mbX, Just y <- mbY =
-    Just (mkTcAxiomRuleCo axMulDef [s,t] [], num (x * y))
+    Just (axMulDef, [s,t], num (x * y))
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamMul _ = Nothing
 
-matchFamExp :: [Xi] -> Maybe (TcCoercion, Xi)
+matchFamExp :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamExp [s,t]
-  | Just 0 <- mbY = Just (mkTcAxiomRuleCo axExp0R [s] [], num 1)
-  | Just 1 <- mbX = Just (mkTcAxiomRuleCo axExp1L [t] [], num 1)
-  | Just 1 <- mbY = Just (mkTcAxiomRuleCo axExp1R [s] [], s)
+  | Just 0 <- mbY = Just (axExp0R, [s], num 1)
+  | Just 1 <- mbX = Just (axExp1L, [t], num 1)
+  | Just 1 <- mbY = Just (axExp1R, [s], s)
   | Just x <- mbX, Just y <- mbY =
-    Just (mkTcAxiomRuleCo axExpDef [s,t] [], num (x ^ y))
+    Just (axExpDef, [s,t], num (x ^ y))
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamExp _ = Nothing
 
-matchFamLeq :: [Xi] -> Maybe (TcCoercion, Xi)
+matchFamLeq :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamLeq [s,t]
-  | Just 0 <- mbX = Just (mkTcAxiomRuleCo axLeq0L [t] [], bool True)
+  | Just 0 <- mbX = Just (axLeq0L, [t], bool True)
   | Just x <- mbX, Just y <- mbY =
-    Just (mkTcAxiomRuleCo axLeqDef [s,t] [], bool (x <= y))
-  | eqType s t  = Just (mkTcAxiomRuleCo axLeqRefl [s] [], bool True)
+    Just (axLeqDef, [s,t], bool (x <= y))
+  | eqType s t  = Just (axLeqRefl, [s], bool True)
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamLeq _ = Nothing

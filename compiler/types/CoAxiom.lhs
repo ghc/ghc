@@ -28,7 +28,8 @@ module CoAxiom (
 
        Role(..), fsFromRole,
 
-       CoAxiomRule(..), Eqn
+       CoAxiomRule(..), Eqn,
+       BuiltInSynFamily(..), trivialBuiltInFamily
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
@@ -520,5 +521,23 @@ instance Ord CoAxiomRule where
 
 instance Outputable CoAxiomRule where
   ppr = ppr . coaxrName
+
+
+-- Type checking of built-in families
+data BuiltInSynFamily = BuiltInSynFamily
+  { sfMatchFam      :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+  , sfInteractTop   :: [Type] -> Type -> [Eqn]
+  , sfInteractInert :: [Type] -> Type ->
+                       [Type] -> Type -> [Eqn]
+  }
+
+-- Provides default implementations that do nothing.
+trivialBuiltInFamily :: BuiltInSynFamily
+trivialBuiltInFamily = BuiltInSynFamily
+  { sfMatchFam      = \_ -> Nothing
+  , sfInteractTop   = \_ _ -> []
+  , sfInteractInert = \_ _ _ _ -> []
+  }
+
 \end{code}
 

@@ -96,7 +96,6 @@ module TyCon(
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
-import {-# SOURCE #-} FamInstEnv ( TcBuiltInSynFamily )
 
 import Var
 import Class
@@ -633,7 +632,7 @@ data SynTyConRhs
    -- type family F a where ..
    | AbstractClosedSynFamilyTyCon
 
-   | BuiltInSynFamTyCon TcBuiltInSynFamily
+   | BuiltInSynFamTyCon BuiltInSynFamily
 \end{code}
 
 Note [Closed type families]
@@ -1242,7 +1241,7 @@ isClosedSynFamilyTyCon_maybe
   (SynTyCon {synTcRhs = ClosedSynFamilyTyCon ax}) = Just ax
 isClosedSynFamilyTyCon_maybe _ = Nothing
 
-isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe TcBuiltInSynFamily
+isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe
   SynTyCon {synTcRhs = BuiltInSynFamTyCon ops } = Just ops
 isBuiltInSynFamTyCon_maybe _ = Nothing

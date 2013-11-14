@@ -32,10 +32,7 @@ module FamInstEnv (
         normaliseType, normaliseTcApp,
 
         -- Flattening
-        flattenTys,
-
-        -- Built-in type families
-        TcBuiltInSynFamily(..), trivialBuiltInFamily
+        flattenTys
     ) where
 
 #include "HsVersions.h"
@@ -43,8 +40,7 @@ module FamInstEnv (
 import InstEnv
 import Unify
 import Type
-import TcType ( TcType, orphNamesOfTypes )
-import TcEvidence (TcCoercion(TcAxiomRuleCo))
+import TcType ( orphNamesOfTypes )
 import TypeRep
 import TyCon
 import Coercion
@@ -800,15 +796,10 @@ reduceTyFamApp_maybe envs role tc tys
         ty     = pSnd (coercionKind co)
     in Just (args_co `mkTransCo` co, ty)
 
-  | Just ax        <- isBuiltInSynFamTyCon_maybe tc
-  , Just (tcco,ty) <- sfMatchFam ax ntys
-  -- XXX: we have a TcCoercion, but we need a Coercion.
-  -- For the time being, we convert coercions in just this one special case
-  -- but something more general might be nice.
-  , TcAxiomRuleCo coax ts [] <- tcco
+  | Just ax           <- isBuiltInSynFamTyCon_maybe tc
+  , Just (coax,ts,ty) <- sfMatchFam ax ntys
   = let co = mkAxiomRuleCo coax ts []
     in Just (args_co `mkTransCo` co, ty)
-
 
   | otherwise
   = Nothing
@@ -1073,28 +1064,3 @@ allTyVarsInTy = go
     go (LitTy {})        = emptyVarSet
 
 \end{code}
-
-
-
-
-Type checking of built-in families
-==================================
-
-\begin{code}
-data TcBuiltInSynFamily = TcBuiltInSynFamily
-  { sfMatchFam      :: [Type] -> Maybe (TcCoercion, TcType)
-  , sfInteractTop   :: [Type] -> Type -> [Pair TcType]
-  , sfInteractInert :: [Type] -> Type ->
-                       [Type] -> Type -> [Pair TcType]
-  }
-
--- Provides default implementations that do nothing.
-trivialBuiltInFamily :: TcBuiltInSynFamily
-trivialBuiltInFamily = TcBuiltInSynFamily
-  { sfMatchFam      = \_ -> Nothing
-  , sfInteractTop   = \_ _ -> []
-  , sfInteractInert = \_ _ _ _ -> []
-  }
-\end{code}
-
-

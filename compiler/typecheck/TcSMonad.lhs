@@ -108,6 +108,7 @@ import Kind
 import TcType
 import DynFlags
 import Type
+import CoAxiom(sfMatchFam)
 
 import TcEvidence
 import Class
@@ -1715,7 +1716,9 @@ matchFam tycon args
         ty = pSnd (tcCoercionKind co)
     in return $ Just (co, ty)
 
-  | Just ops <- isBuiltInSynFamTyCon_maybe tycon = return (sfMatchFam ops args)
+  | Just ops <- isBuiltInSynFamTyCon_maybe tycon =
+    return $ do (r,ts,ty) <- sfMatchFam ops args
+                return (mkTcAxiomRuleCo r ts [], ty)
 
   | otherwise
   = return Nothing
