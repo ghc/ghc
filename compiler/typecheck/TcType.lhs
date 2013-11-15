@@ -1312,13 +1312,15 @@ orphNamesOfTyCon tycon = unitNameSet (getName tycon) `unionNameSets` case tyConC
 orphNamesOfType :: Type -> NameSet
 orphNamesOfType ty | Just ty' <- tcView ty = orphNamesOfType ty'
                 -- Look through type synonyms (Trac #4912)
-orphNamesOfType (TyVarTy _)                = emptyNameSet
-orphNamesOfType (TyConApp tycon tys)       = orphNamesOfTyCon tycon
-                                             `unionNameSets` orphNamesOfTypes tys
-orphNamesOfType (LitTy {})          = emptyNameSet
-orphNamesOfType (FunTy arg res)     = orphNamesOfType arg `unionNameSets` orphNamesOfType res
-orphNamesOfType (AppTy fun arg)     = orphNamesOfType fun `unionNameSets` orphNamesOfType arg
-orphNamesOfType (ForAllTy _ ty)     = orphNamesOfType ty
+orphNamesOfType (TyVarTy _)          = emptyNameSet
+orphNamesOfType (LitTy {})           = emptyNameSet
+orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
+                                       `unionNameSets` orphNamesOfTypes tys
+orphNamesOfType (FunTy arg res)      = orphNamesOfTyCon funTyCon   -- NB!  See Trac #8535
+                                       `unionNameSets` orphNamesOfType arg
+                                       `unionNameSets` orphNamesOfType res
+orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSets` orphNamesOfType arg
+orphNamesOfType (ForAllTy _ ty)      = orphNamesOfType ty
 
 orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
 orphNamesOfThings f = foldr (unionNameSets . f) emptyNameSet
