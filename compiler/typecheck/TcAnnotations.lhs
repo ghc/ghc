@@ -32,7 +32,7 @@ tcAnnotations [] = return []
 tcAnnotations anns@(L loc _ : _)
   = do { setSrcSpan loc $ addWarnTc $
              (ptext (sLit "Ignoring ANN annotation") <> plural anns <> comma
-             <+> ptext (sLit "because this is a stage-1 compiler"))
+             <+> ptext (sLit "because this is a stage-1 compiler or doesn't support GHCi"))
        ; return [] }
 
 #else
