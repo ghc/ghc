@@ -1008,15 +1008,18 @@ reOrient (FunCls {}) _      = False             -- Fun/Other on rhs
 reOrient (VarCls {})   (FunCls {})           = True
 reOrient (VarCls {})   (OtherCls {})         = False
 reOrient (VarCls tv1)  (VarCls tv2)
-  | not (k2 `isSubKind` k1),   k1 `isSubKind` k2   = True  -- Note [Kind orientation for CTyEqCan]
-                                                           -- in TcRnTypes
-  | not (isMetaTyVar tv1),     isMetaTyVar     tv2 = True
-  | not (isFlatSkolTyVar tv1), isFlatSkolTyVar tv2 = True  -- Note [Eliminate flat-skols]
-  | otherwise                                      = False
+  | k1 `eqKind` k2      = tv2 `better_than` tv1
+  | k1 `isSubKind` k2   = True  -- Note [Kind orientation for CTyEqCan]
+  | otherwise           = False -- in TcRnTypes
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
-  -- Just for efficiency, see CTyEqCan invariants
+
+    tv2 `better_than` tv1
+      | isMetaTyVar tv1     = False   -- Never swap a meta-tyvar
+      | isFlatSkolTyVar tv1 = isMetaTyVar tv2
+      | otherwise           = isMetaTyVar tv1 || isFlatSkolTyVar tv2
+                                      -- Note [Eliminate flat-skols]
 
 ------------------
 
