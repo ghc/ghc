@@ -377,22 +377,35 @@ is_improvement_pty ty = go (classifyPredType ty)
 \begin{code}
 canIrred :: CtLoc -> CtEvidence -> TcS StopOrContinue
 -- Precondition: ty not a tuple and no other evidence form
-canIrred d ev
-  = do { let ty = ctEvPred ev
-       ; traceTcS "can_pred" (text "IrredPred = " <+> ppr ty)
-       ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
-       ; mb <- rewriteCtFlavor ev xi co
+canIrred d old_ev
+  = do { let old_ty = ctEvPred old_ev
+       ; traceTcS "can_pred" (text "IrredPred = " <+> ppr old_ty)
+       ; (xi,co) <- flatten d FMFullFlatten old_ev old_ty -- co :: xi ~ old_ty
+       ; mb <- rewriteCtFlavor old_ev xi co
        ; case mb of {
              Nothing     -> return Stop ;
-             Just new_ev -> 
+             Just new_ev ->
 
     do { -- Re-classify, in case flattening has improved its shape
        ; case classifyPredType (ctEvPred new_ev) of
-           ClassPred cls tys -> canClassNC d ev cls tys
-           EqPred ty1 ty2    -> canEqNC    d ev ty1 ty2
-           TuplePred tys     -> canTuple   d ev tys
-           IrredPred {}      -> continueWith $
-                                CIrredEvCan { cc_ev = new_ev, cc_loc = d } } } }
+           ClassPred cls tys -> canClassNC d new_ev cls tys
+           TuplePred tys     -> canTuple   d new_ev tys
+           EqPred ty1 ty2
+              | something_changed old_ty ty1 ty2 -> canEqNC d new_ev ty1 ty2
+           _  -> continueWith $
+                 CIrredEvCan { cc_ev = new_ev, cc_loc = d } } } }
+  where
+    -- If the constraint was a kind-mis-matched equality, we must
+    -- retry canEqNC only if something has changed, otherwise we
+    -- get an infinite loop
+    something_changed old_ty new_ty1 new_ty2
+       | EqPred old_ty1 old_ty2 <- classifyPredType old_ty
+       = not (            new_ty1 `eqType`          old_ty1
+              && typeKind new_ty1 `eqKind` typeKind old_ty1
+              &&          new_ty2 `eqType`          old_ty2
+              && typeKind new_ty2 `eqKind` typeKind old_ty2)
+       | otherwise
+       = True
 
 canHole :: CtLoc -> CtEvidence -> OccName -> TcS StopOrContinue
 canHole d ev occ
