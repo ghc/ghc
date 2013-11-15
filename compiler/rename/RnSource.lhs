@@ -1475,6 +1475,7 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
        ; return (gp, Just (splice, ds)) }
   where
     badImplicitSplice = ptext (sLit "Parse error: naked expression at top level")
+                     $$ ptext (sLit "Perhaps you intended to use TemplateHaskell")
 
 add gp _ (QuasiQuoteD qq) ds            -- Expand quasiquotes
   = do { ds' <- runQuasiQuoteDecl qq
