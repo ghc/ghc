@@ -14,7 +14,7 @@ my $binPath = $FindBin::Bin;
 foreach $f ( @ARGV ) {
 
     if ( $f =~ /\.lhs$/ ) {
-        open(INF, "$binPath/../../../inplace/lib/unlit $f - |") || die "Couldn't unlit $f!\n";
+        open(INF, "$binPath/../../inplace/lib/unlit $f - |") || die "Couldn't unlit $f!\n";
     } else {
         open(INF, "< $f") || die "Couldn't open $f!\n";
     }
