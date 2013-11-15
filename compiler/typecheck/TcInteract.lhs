@@ -770,22 +770,21 @@ kickOutRewritable new_ev new_tv
                                                    `andCts` insols_out) }
 
     (tv_eqs_out,  tv_eqs_in) = foldVarEnv kick_out_eqs ([], emptyVarEnv) tv_eqs
-    (feqs_out,   feqs_in)    = partitionFunEqs  kick_out_ct funeqmap
-    (dicts_out,  dicts_in)   = partitionDicts   kick_out_ct dictmap
-    (irs_out,    irs_in)     = partitionBag     kick_out_ct irreds
-    (insols_out, insols_in)  = partitionBag     kick_out_ct insols
+    (feqs_out,   feqs_in)    = partitionFunEqs  kick_out_ct    funeqmap
+    (dicts_out,  dicts_in)   = partitionDicts   kick_out_ct    dictmap
+    (irs_out,    irs_in)     = partitionBag     kick_out_irred irreds
+    (insols_out, insols_in)  = partitionBag     kick_out_ct    insols
       -- Kick out even insolubles; see Note [Kick out insolubles]
 
-    kick_out_ct inert_ct = new_ev `canRewrite` ctEvidence inert_ct &&
-                          (new_tv `elemVarSet` tyVarsOfCt inert_ct)
-                    -- NB: tyVarsOfCt will return the type
-                    --     variables /and the kind variables/ that are
-                    --     directly visible in the type. Hence we will
-                    --     have exposed all the rewriting we care about
-                    --     to make the most precise kinds visible for
-                    --     matching classes etc. No need to kick out
-                    --     constraints that mention type variables whose
-                    --     kinds could contain this variable!
+    kick_out_ct :: Ct -> Bool
+    kick_out_ct ct =  new_ev `canRewrite` ctEvidence ct
+                   && new_tv `elemVarSet` tyVarsOfCt ct
+         -- See Note [Kicking out inert constraints]
+
+    kick_out_irred :: Ct -> Bool
+    kick_out_irred ct =  new_ev `canRewrite` ctEvidence ct
+                      && new_tv `elemVarSet` closeOverKinds (tyVarsOfCt ct)
+          -- See Note [Kicking out Irreds]
 
     kick_out_eqs :: EqualCtList -> ([Ct], TyVarEnv EqualCtList) 
                  -> ([Ct], TyVarEnv EqualCtList)
@@ -809,6 +808,37 @@ kickOutRewritable new_ev new_tv
 
     kick_out_eq other_ct = pprPanic "kick_out_eq" (ppr other_ct)
 \end{code}
+
+Note [Kicking out inert constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a new (a -> ty) inert, wewant to kick out an existing inert
+constraint if
+  a) the new constraint can rewrite the inert one
+  b) 'a' is free in the inert constraint (so that it *will*)
+     rewrite it if we kick it out.
+
+For (b) we use tyVarsOfCt, which returns the type variables /and
+the kind variables/ that are directly visible in the type. Hence we
+will have exposed all the rewriting we care about to make the most
+precise kinds visible for matching classes etc. No need to kick out
+constraints that mention type variables whose kinds contain this
+variable!  (Except see Note [Kicking out Irreds].)
+
+Note [Kicking out Irreds]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+There is an awkward special case for Irreds.  When we have a
+kind-mis-matched equality constraint (a:k1) ~ (ty:k2), we turn it into
+an Irred (see Note [Equalities with incompatible kinds] in
+TcCanonical). So in this case the free kind variables of k1 and k2
+are not visible.  More precisely, the type looks like
+   (~) k1 (a:k1) (ty:k2)
+because (~) has kind forall k. k -> k -> Constraint.  So the constraint
+itself is ill-kinded.  We can "see" k1 but not k2.  That's why we use
+closeOverKinds to make sure we see k2.
+
+This is not pretty. Maybe (~) should have kind 
+   (~) :: forall k1 k1. k1 -> k2 -> Constraint
+
 
 Note [Kick out insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -381,19 +381,18 @@ canIrred d ev
   = do { let ty = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr ty)
        ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
-       ; let no_flattening = xi `eqType` ty
-             -- We can't use isTcReflCo, because even if the coercion is
-             -- Refl, the output type might have had a substitution
-             -- applied to it.  For example  'a' might now be 'C b'
+       ; mb <- rewriteCtFlavor ev xi co
+       ; case mb of {
+             Nothing     -> return Stop ;
+             Just new_ev -> 
 
-       ; if no_flattening then
-           continueWith $
-           CIrredEvCan { cc_ev = ev, cc_loc = d }
-         else do
-       { mb <- rewriteCtFlavor ev xi co
-       ; case mb of
-             Just new_ev -> canEvNC d new_ev  -- Re-classify and try again
-             Nothing     -> return Stop } }   -- Found a cached copy
+    do { -- Re-classify, in case flattening has improved its shape
+       ; case classifyPredType (ctEvPred new_ev) of
+           ClassPred cls tys -> canClassNC d ev cls tys
+           EqPred ty1 ty2    -> canEqNC    d ev ty1 ty2
+           TuplePred tys     -> canTuple   d ev tys
+           IrredPred {}      -> continueWith $
+                                CIrredEvCan { cc_ev = new_ev, cc_loc = d } } } }
 
 canHole :: CtLoc -> CtEvidence -> OccName -> TcS StopOrContinue
 canHole d ev occ
