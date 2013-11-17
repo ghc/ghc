@@ -291,7 +291,7 @@ languagePragParseError dflags loc =
        vcat [ text "Cannot parse LANGUAGE pragma"
             , text "Expecting comma-separated list of language options,"
             , text "each starting with a capital letter"
-            , nest 2 (text "E.g. {-# LANGUAGE RecordPuns, Generics #-}") ])
+            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ])
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
