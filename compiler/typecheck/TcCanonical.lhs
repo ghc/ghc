@@ -1031,8 +1031,8 @@ reOrient (VarCls tv1)  (VarCls tv2)
     tv2 `better_than` tv1
       | isMetaTyVar tv1     = False   -- Never swap a meta-tyvar
       | isFlatSkolTyVar tv1 = isMetaTyVar tv2
-      | otherwise           = isMetaTyVar tv1 || isFlatSkolTyVar tv2
-                                      -- Note [Eliminate flat-skols]
+      | otherwise           = isMetaTyVar tv2 || isFlatSkolTyVar tv2
+                            -- Note [Eliminate flat-skols]
 
 ------------------
 
