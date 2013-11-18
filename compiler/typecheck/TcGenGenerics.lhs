@@ -315,7 +315,7 @@ even though a is occurring covariantly.
 In fact, our rule is harsh: a is simply not allowed to occur within the first
 argument of (->). We treat (->) the same as any other non-tuple tycon.
 
-Unfortunately, this means we have to track "the paramter occurs in this type"
+Unfortunately, this means we have to track "the parameter occurs in this type"
 explicitly, even though foldDataConArgs is also doing this internally.
 
 -}
@@ -363,7 +363,9 @@ canDoGenerics1 rep_tc tc_args =
       , ft_var = caseVar, ft_co_var = caseVar
 
       -- (component_0,component_1,...,component_n)
-      , ft_tup = \_ components -> foldr bmplus bmzero components
+      , ft_tup = \_ components -> if any _ccdg1_hasParam (init components)
+                                  then bmbad con wrong_arg
+                                  else foldr bmplus bmzero components
 
       -- (dom -> rng), where the head of ty is not a tuple tycon
       , ft_fun = \dom rng -> -- cf #8516
@@ -382,8 +384,9 @@ canDoGenerics1 rep_tc tc_args =
         caseVar = CCDG1 True Nothing
 
 
-    existential = (ptext . sLit) "must not have existential arguments"
-    wrong_arg   = (ptext . sLit) "applies a type to an argument involving the last parameter but the applied type is not of kind *->*"
+    existential = text "must not have existential arguments"
+    wrong_arg   = text "applies a type to an argument involving the last parameter"
+               $$ text "but the applied type is not of kind * -> *"
 
 \end{code}
 
