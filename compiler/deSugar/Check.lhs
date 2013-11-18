@@ -545,7 +545,7 @@ You can see if one constructor is infix with this clearer code :-))))))))))
 
 
 We don't mind the @nilDataCon@ because it doesn't change the way to
-print the messsage, we are searching only for things like: @[1,2,3]@,
+print the message, we are searching only for things like: @[1,2,3]@,
 not @x:xs@ ....
 
 In @reconstruct_pat@ we want to ``undo'' the work

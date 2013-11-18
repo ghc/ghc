@@ -140,7 +140,7 @@ warnAboutIdentities dflags (Var conv_fn) type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = warnDs (vcat [ ptext (sLit "Call of") <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
                  , nest 2 $ ptext (sLit "can probably be omitted")
-                 , parens (ptext (sLit "Use -fno-warn-identities to suppress this messsage)"))
+                 , parens (ptext (sLit "Use -fno-warn-identities to suppress this message"))
            ])
 warnAboutIdentities _ _ _ = return ()
 
