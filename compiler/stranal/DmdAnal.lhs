@@ -825,8 +825,8 @@ which messed it all up.  Example
 If we w/w this we get
    let j' = \x. ....
    in case y of
-        True -> case j False of { (# a #) -> Just a }
-        True -> case j True of { (# a #) -> Just a }
+        True  -> case j' False of { (# a #) -> Just a }
+        False -> case j' True of { (# a #) -> Just a }
 Notice that j' is not a let-no-escape any more.
 
 However this means in turn that the *enclosing* function
