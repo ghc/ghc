@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving, DeriveDataTypeable #-}
 
 module Annfail06 where
 -- Testing that we don't accept Typeable or Data instances defined in the same module
