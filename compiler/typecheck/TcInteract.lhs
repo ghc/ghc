@@ -2018,7 +2018,8 @@ their evidence out of thin air, in getCoercibleInst. The following â€œinstancesâ
 are present:
 
  1. instance Coercible a a
-    for any type a.
+    for any type a at any kind k.
+
  2. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
        Coercible (C t1_r  t2_r  ... t1_p  t2_p  ... t1_n t2_n ...)
                  (C t1_r' t2_r' ... t1_p' t2_p' ... t1_n t2_n ...)
@@ -2026,17 +2027,30 @@ are present:
      * the nominal type arguments are not changed,
      * the phantom type arguments may change arbitrarily
      * the representational type arguments are again Coercible
+
+    The type constructor can be used undersaturated; then the Coercible
+    instance is at a higher kind. This does not cause problems.
+
     Furthermore in Safe Haskell code, we check that
      * the data constructors of C are in scope and
      * the data constructors of all type constructors used in the definition of C are in scope.
        This is required as otherwise the previous check can be circumvented by
        just adding a local data type around C.
+
  3. instance Coercible r b => Coercible (NT t1 t2 ...) b
     instance Coercible a r => Coercible a (NT t1 t2 ...)
     for a newtype constructor NT where
      * NT is not recursive
      * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
      * the data constructors of NT are in scope.
+
+    Again, the newtype TyCon can appear undersaturated, but only if it has
+    enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
+      newtype NT a = NT (Either a Int)
+      Coercible (NT Int) (Either Int Int) -- ok
+      newtype NT2 a b = NT2 (b -> a)
+      newtype NT3 a b = NT3 (b -> a)
+      Coercible (NT2 Int) (NT3 Int) -- cannot be derived
 
 These three shapes of instances correspond to the three constructors of
 EvCoercible (defined in EvEvidence). They are assembled here and turned to Core
