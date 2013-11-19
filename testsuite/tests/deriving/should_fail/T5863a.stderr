@@ -1,12 +1,10 @@
 
 T5863a.hs:9:31:
-    Can't make a derived instance of ‛Typeable (T Int)’:
-      Deriving Typeable is not allowed for family instances;
-      derive Typeable for ‛T’ alone
+    Cannot eta-reduce to an instance of form
+      instance (...) => Typeable T
     In the data instance declaration for ‛T’
 
 T5863a.hs:12:32:
-    Can't make a derived instance of ‛Typeable (T Bool)’:
-      Deriving Typeable is not allowed for family instances;
-      derive Typeable for ‛T’ alone
+    Cannot eta-reduce to an instance of form
+      instance (...) => Typeable T
     In the data instance declaration for ‛T’
