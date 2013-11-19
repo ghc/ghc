@@ -52,3 +52,4 @@ class GFunctor f where
 -- Base types instances
 instance GFunctor Maybe
 instance GFunctor []
+instance GFunctor ((,) a)

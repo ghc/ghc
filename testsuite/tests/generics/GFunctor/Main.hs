@@ -21,6 +21,9 @@ d2 = D1 (3,0.14) D0
 instance GFunctor D
 
 -- Tests
-main = print ( gmap undefined d0 :: D ()
+main = print ( gmap (+1) (Just 2)
+             , gmap (+1) [0,1,2]
+             , gmap (+1) (0,0)
+             , gmap undefined d0 :: D ()
              , gmap (const 'q') d1
              , gmap (\(a,b) -> a + b) d2 :: D Float)
