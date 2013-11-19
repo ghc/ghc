@@ -1,0 +1,8 @@
+
+T8542.hs:6:6: Warning:
+    Literal 128 of type Int8 overflows
+    If you are attempting to write a negative literal, use NegativeLiterals
+
+T8542.hs:9:5: Warning:
+    Literal 128 of type Int8 overflows
+    If you are attempting to write a negative literal, use NegativeLiterals
