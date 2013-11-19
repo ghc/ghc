@@ -1141,13 +1141,17 @@ coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-    eqRTy = mkTyConApp coercibleTyCon [alphaTy, betaTy]
-    eqRPrimTy = mkTyConApp eqReprPrimTyCon [liftedTypeKind, alphaTy, betaTy]
-    ty   = mkForAllTys [alphaTyVar, betaTyVar] (mkFunTys [eqRTy, alphaTy] betaTy)
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+    [aTy,bTy] = map mkTyVarTy [a,b]
+    eqRTy     = mkTyConApp coercibleTyCon  [k, aTy, bTy]
+    eqRPrimTy = mkTyConApp eqReprPrimTyCon [k, aTy, bTy]
+    ty   = mkForAllTys [kv, a, b] (mkFunTys [eqRTy, aTy] bTy)
 
-    [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy,eqRPrimTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,eqR,x] $
-          mkWildCase (Var eqR) eqRTy betaTy $
+    [eqR,x,eq] = mkTemplateLocals [eqRTy, aTy,eqRPrimTy]
+    rhs = mkLams [kv,a,b,eqR,x] $
+          mkWildCase (Var eqR) eqRTy bTy $
 	  [(DataAlt coercibleDataCon, [eq], Cast (Var x) (CoVarCo eq))]
 \end{code}
 

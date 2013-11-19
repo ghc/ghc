@@ -310,7 +310,7 @@ mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ p
 
 mkCoercible :: Coercion -> CoreExpr
 mkCoercible co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
-             Var (dataConWorkId coercibleDataCon) `mkTyApps` [ty1, ty2] `App` Coercion co
+             Var (dataConWorkId coercibleDataCon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
   where Pair ty1 ty2 = coercionKind co
         k = typeKind ty1
 \end{code}

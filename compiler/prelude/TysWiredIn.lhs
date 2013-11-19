@@ -466,18 +466,22 @@ eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVa
 
 coercibleTyCon :: TyCon
 coercibleTyCon = mkClassTyCon
-    coercibleTyConName kind tvs [Representational, Representational]
+    coercibleTyConName kind tvs [Nominal, Representational, Representational]
     rhs coercibleClass NonRecursive
-  where kind = mkArrowKinds [liftedTypeKind, liftedTypeKind] constraintKind
-        a:b:_ = tyVarList liftedTypeKind
-        tvs = [a, b]
+  where kind = (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
+        kv = kKiVar
+        k = mkTyVarTy kv
+        a:b:_ = tyVarList k
+        tvs = [kv, a, b]
         rhs = DataTyCon [coercibleDataCon] False
 
 coercibleDataCon :: DataCon
-coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (liftedTypeKind : map mkTyVarTy args)] coercibleTyCon
+coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (map mkTyVarTy args)] coercibleTyCon
   where
-    a:b:_ = tyVarList liftedTypeKind
-    args = [a, b]
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+    args = [kv, a, b]
 
 coercibleClass :: Class
 coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon

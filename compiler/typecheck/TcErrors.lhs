@@ -1161,7 +1161,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                         ptext $ sLit "and", quotes (ppr ty2),
                         ptext $ sLit "are different types." ]
       where
-        (clas, ~[ty1,ty2]) = getClassPredTys (ctPred ct)
+        (clas, ~[_k, ty1,ty2]) = getClassPredTys (ctPred ct)
 
     dataConMissing rdr_env tc =
         all (null . lookupGRE_Name rdr_env) (map dataConName (tyConDataCons tc))

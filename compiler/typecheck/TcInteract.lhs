@@ -1841,7 +1841,7 @@ matchClassInst _ clas [ ty ] _
       _ -> panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
 
-matchClassInst _ clas [ ty1, ty2 ] _
+matchClassInst _ clas [ _k, ty1, ty2 ] _
   | clas == coercibleClass =  do
       traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2
       rdr_env <- getGlobalRdrEnvTcS
@@ -2003,7 +2003,9 @@ markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
   , Imported (imp_spec:_) <- [gre_prov (head gres)] ]
 
 requestCoercible :: TcType -> TcType -> TcS MaybeNew
-requestCoercible ty1 ty2 = newWantedEvVar (coercibleClass `mkClassPred` [ty1, ty2])
+requestCoercible ty1 ty2 =
+    ASSERT2( typeKind ty1 `eqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
+    newWantedEvVar (coercibleClass `mkClassPred` [typeKind ty1, ty1, ty2])
 
 \end{code}
 

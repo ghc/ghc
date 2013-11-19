@@ -817,7 +817,7 @@ wrapInEqRCase e mkBody = do
                 (exprType body')
                 [(DataAlt coercibleDataCon, [cov], body')]
   where
-  Just (tc, [ty1, ty2]) = splitTyConApp_maybe (exprType e)
+  Just (tc, [_k, ty1, ty2]) = splitTyConApp_maybe (exprType e)
 
 wrapInEqRCases :: [EvCoercibleArg CoreExpr] -> ([Coercion] -> DsM CoreExpr) -> DsM CoreExpr
 wrapInEqRCases (EvCoercibleArgN t:es) mkBody =
