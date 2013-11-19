@@ -7,3 +7,7 @@ Foo (Age 1)
 Map 1 (Age 1)
 First {getFirst = Just 1}
 Last {getLast = Nothing}
+Left 1
+Left (Age 1)
+List [1]
+[1]
