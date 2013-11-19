@@ -73,7 +73,7 @@ module TyCon(
         synTyConDefn_maybe, synTyConRhs_maybe, 
         tyConExtName,           -- External name for foreign types
         algTyConRhs,
-        newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe,
+        newTyConRhs, newTyConEtadArity, newTyConEtadRhs, unwrapNewTyCon_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
 
         -- ** Manipulating TyCons
@@ -1479,6 +1479,12 @@ tyConRoles tc
 newTyConRhs :: TyCon -> ([TyVar], Type)
 newTyConRhs (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rhs = rhs }}) = (tvs, rhs)
 newTyConRhs tycon = pprPanic "newTyConRhs" (ppr tycon)
+
+-- | The number of type parameters that need to be passed to a newtype to resolve it. May be less than in the definition if it can be eta-contracted.
+newTyConEtadArity :: TyCon -> Int
+newTyConEtadArity (AlgTyCon {algTcRhs = NewTyCon { nt_etad_rhs = tvs_rhs }})
+        = length (fst tvs_rhs)
+newTyConEtadArity tycon = pprPanic "newTyConEtadArity" (ppr tycon)
 
 -- | Extract the bound type variables and type expansion of an eta-contracted type synonym 'TyCon'.
 -- Panics if the 'TyCon' is not a synonym

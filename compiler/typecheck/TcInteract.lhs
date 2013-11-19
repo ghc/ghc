@@ -1959,6 +1959,7 @@ getCoercibleInst safeMode rdr_env ty1 ty2
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
     Just (_, _, _) <- unwrapNewTyCon_maybe tc,
     not (isRecursiveTyCon tc),
+    newTyConEtadArity tc <= length tyArgs,
     dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
   = do markDataConsAsUsed rdr_env tc
        let concTy = newTyConInstRhs tc tyArgs
@@ -1969,6 +1970,7 @@ getCoercibleInst safeMode rdr_env ty1 ty2
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
     Just (_, _, _) <- unwrapNewTyCon_maybe tc,
     not (isRecursiveTyCon tc),
+    newTyConEtadArity tc <= length tyArgs,
     dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
   = do markDataConsAsUsed rdr_env tc
        let concTy = newTyConInstRhs tc tyArgs
@@ -1978,7 +1980,6 @@ getCoercibleInst safeMode rdr_env ty1 ty2
 
   | otherwise
   = return NoInstance
-
 
 nominalArgsAgree :: TyCon -> [Type] -> [Type] -> Bool
 nominalArgsAgree tc tys1 tys2 = all ok $ zip3 (tyConRoles tc) tys1 tys2

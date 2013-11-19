@@ -560,7 +560,8 @@ splitTyConApp_maybe _                 = Nothing
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
--- arguments, using an eta-reduced version of the @newtype@ if possible
+-- arguments, using an eta-reduced version of the @newtype@ if possible.
+-- This requires tys to have at least @newTyConInstArity tycon@ elements.
 newTyConInstRhs tycon tys
     = ASSERT2( equalLength tvs tys1, ppr tycon $$ ppr tys $$ ppr tvs )
       mkAppTys (substTyWith tvs tys1 ty) tys2
