@@ -1396,8 +1396,8 @@ are created by in RtClosureInspect.zonkRTTIType.
 %************************************************************************
 
 \begin{code}
-solverDepthErrorTcS :: Ct -> TcM a
-solverDepthErrorTcS ct
+solverDepthErrorTcS :: SubGoalCounter -> Ct -> TcM a
+solverDepthErrorTcS cnt ct
   = setCtLoc loc $
     do { pred <- zonkTcType (ctPred ct)
        ; env0 <- tcInitTidyEnv
@@ -1407,7 +1407,7 @@ solverDepthErrorTcS ct
   where
     loc   = cc_loc ct
     depth = ctLocDepth loc
-    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> ppr depth
+    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int (subGoalCounterValue cnt depth)
                , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
 \end{code}
 

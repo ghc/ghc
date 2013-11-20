@@ -124,8 +124,8 @@ solveInteract cts
            ; case sel of
               NoWorkRemaining     -- Done, successfuly (modulo frozen)
                 -> return ()
-              MaxDepthExceeded ct -- Failure, depth exceeded
-                -> wrapErrTcS $ solverDepthErrorTcS ct
+              MaxDepthExceeded cnt ct -- Failure, depth exceeded
+                -> wrapErrTcS $ solverDepthErrorTcS cnt ct
               NextWorkItem ct     -- More work, loop around!
                 -> do { runSolverPipeline thePipeline ct; solve_loop max_depth } }
 
@@ -134,8 +134,10 @@ type SimplifierStage = WorkItem -> TcS StopOrContinue
 
 data SelectWorkItem
        = NoWorkRemaining      -- No more work left (effectively we're done!)
-       | MaxDepthExceeded Ct  -- More work left to do but this constraint has exceeded
-                              -- the max subgoal depth and we must stop
+       | MaxDepthExceeded SubGoalCounter Ct
+                              -- More work left to do but this constraint has exceeded
+                              -- the maximum depth for one of the subgoal counters and we
+                              -- must stop
        | NextWorkItem Ct      -- More work left, here's the next item to look at
 
 selectNextWorkItem :: Int -- Max depth allowed
@@ -149,8 +151,8 @@ selectNextWorkItem max_depth
           (Nothing,_)
               -> (NoWorkRemaining,wl)           -- No more work
           (Just ct, new_wl)
-              | subGoalDepthExceeded max_depth (ctLocDepth (cc_loc ct)) -- Depth exceeded
-              -> (MaxDepthExceeded ct,new_wl)
+              | Just cnt <- subGoalDepthExceeded max_depth (ctLocDepth (cc_loc ct)) -- Depth exceeded
+              -> (MaxDepthExceeded cnt ct,new_wl)
           (Just ct, new_wl)
               -> (NextWorkItem ct, new_wl)      -- New workitem and worklist
 
@@ -1437,8 +1439,9 @@ doTopReact inerts workItem
 --------------------
 doTopReactDict :: InertSet -> CtEvidence -> Class -> [Xi]
                -> CtLoc -> TcS TopInteractResult
+-- Try to use type-class instance declarations to simplify the constraint
 doTopReactDict inerts fl cls xis loc
-  | not (isWanted fl)
+  | not (isWanted fl)   -- Never use instances for Given or Derived constraints
   = try_fundeps_and_return
 
   | Just ev <- lookupSolvedDict inerts pred   -- Cached
@@ -1473,7 +1476,7 @@ doTopReactDict inerts fl cls xis loc
              ; setEvBind dict_id ev_term
              ; let mk_new_wanted ev
                        = CNonCanonical { cc_ev  = ev
-                                       , cc_loc = bumpCtLocDepth loc }
+                                       , cc_loc = bumpCtLocDepth CountConstraints loc }
              ; updWorkListTcS (extendWorkListCts (map mk_new_wanted evs))
              ; return $
                SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
@@ -1537,7 +1540,7 @@ doTopReactFunEq _ct fl fun_tc args xi loc
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $
                          CNonCanonical { cc_ev = ctev
-                                       , cc_loc  = bumpCtLocDepth loc }
+                                       , cc_loc  = bumpCtLocDepth CountTyFunApps loc }
                ctevs -> -- No subgoal (because it's cached)
                         ASSERT( null ctevs) return ()
            ; return $ SomeTopInt { tir_rule = str

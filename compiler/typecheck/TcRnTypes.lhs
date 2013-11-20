@@ -55,8 +55,9 @@ module TcRnTypes(
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
 
         Implication(..),
+        SubGoalCounter(..),
         SubGoalDepth, initialSubGoalDepth, bumpSubGoalDepth,
-        subGoalDepthExceeded,
+        subGoalCounterValue, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv,
@@ -1473,6 +1474,78 @@ NB:  either (a `canRewrite` b) or (b `canRewrite` a)
 canRewriteOrSame is similar but returns True for Wanted/Wanted.
 See the call sites for explanations.
 
+%************************************************************************
+%*                                                                      *
+            SubGoalDepth
+%*                                                                      *
+%************************************************************************
+
+Note [SubGoalDepth]
+~~~~~~~~~~~~~~~~~~~
+The 'SubGoalCounter' takes care of stopping the constraint solver from looping.
+Because of the different use-cases of regular constaints and type function
+applications, there are two independent counters. Therefore, this datatype is
+abstract. See Note [WorkList]
+
+Each counter starts at zero and increases.
+
+* The "dictionary constraint counter" counts the depth of type class
+  instance declarations.  Example:
+     [W] d{7} : Eq [Int]
+  That is d's dictionary-constraint depth is 7.  If we use the instance
+     $dfEqList :: Eq a => Eq [a]
+  to simplify it, we get
+     d{7} = $dfEqList d'{8}
+  where d'{8} : Eq Int, and d' has dictionary-constraint depth 8.
+
+  For civilised (decidable) instance declarations, each increase of
+  depth removes a type constructor from the type, so the depth never
+  gets big; i.e. is bounded by the structural depth of the type.
+
+  The flag -fcontext-stack=n (not very well named!) fixes the maximium
+  level.
+
+* The "type function reduction counter" does the same thing when resolving
+* qualities involving type functions. Example:
+  Assume we have a wanted at depth 7:
+    [W] d{7} : F () ~ a
+  If thre is an type function equation "F () = Int", this would be rewritten to
+    [W] d{8} : Int ~ a
+  and remembered as having depth 8.
+
+\begin{code}
+data SubGoalCounter = CountConstraints | CountTyFunApps
+
+data SubGoalDepth  -- See Note [SubGoalDepth]
+   = SubGoalDepth
+         {-# UNPACK #-} !Int      -- Dictionary constraints
+         {-# UNPACK #-} !Int      -- Type function reductions
+  deriving (Eq, Ord)
+
+instance Outputable SubGoalDepth where
+ ppr (SubGoalDepth c f) =  angleBrackets $
+        char 'C' <> colon <> int c <> comma <>
+        char 'F' <> colon <> int f
+
+initialSubGoalDepth :: SubGoalDepth
+initialSubGoalDepth = SubGoalDepth 0 0
+
+
+bumpSubGoalDepth :: SubGoalCounter -> SubGoalDepth -> SubGoalDepth
+bumpSubGoalDepth CountConstraints (SubGoalDepth c f) = SubGoalDepth (c+1) f
+bumpSubGoalDepth CountTyFunApps   (SubGoalDepth c f) = SubGoalDepth c (f+1)
+
+subGoalCounterValue :: SubGoalCounter -> SubGoalDepth -> Int
+subGoalCounterValue CountConstraints (SubGoalDepth c _) = c
+subGoalCounterValue CountTyFunApps   (SubGoalDepth _ f) = f
+
+subGoalDepthExceeded :: Int -> SubGoalDepth -> Maybe SubGoalCounter
+subGoalDepthExceeded max_depth (SubGoalDepth c f)
+        | c > max_depth = Just CountConstraints
+        | f > max_depth = Just CountTyFunApps
+        | otherwise     = Nothing
+\end{code}
+
 
 %************************************************************************
 %*                                                                      *
@@ -1487,30 +1560,12 @@ type will evolve...
 
 \begin{code}
 data CtLoc = CtLoc { ctl_origin :: CtOrigin
-                   , ctl_env ::  TcLclEnv
-                   , ctl_depth :: SubGoalDepth }
+                   , ctl_env    :: TcLclEnv
+                   , ctl_depth  :: !SubGoalDepth }
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: SrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
-
-newtype SubGoalDepth = SubGoalDepth Int
- -- An ever increasing number used to restrict
- -- simplifier iterations. Bounded by -fcontext-stack.
- -- See Note [WorkList]
-
-instance Outputable SubGoalDepth where
- ppr (SubGoalDepth n) = int n
-
-initialSubGoalDepth :: SubGoalDepth
-initialSubGoalDepth = SubGoalDepth 0
-
-bumpSubGoalDepth :: SubGoalDepth -> SubGoalDepth
-bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n+1)
-
-subGoalDepthExceeded :: Int -> SubGoalDepth -> Bool
-subGoalDepthExceeded max_depth (SubGoalDepth d) = d > max_depth
-
 
 mkGivenLoc :: SkolemInfo -> TcLclEnv -> CtLoc
 mkGivenLoc skol_info env = CtLoc { ctl_origin = GivenOrigin skol_info
@@ -1529,8 +1584,8 @@ ctLocOrigin = ctl_origin
 ctLocSpan :: CtLoc -> SrcSpan
 ctLocSpan (CtLoc { ctl_env = lcl}) = tcl_loc lcl
 
-bumpCtLocDepth :: CtLoc -> CtLoc
-bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }
+bumpCtLocDepth :: SubGoalCounter -> CtLoc -> CtLoc
+bumpCtLocDepth cnt loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth cnt d }
 
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
