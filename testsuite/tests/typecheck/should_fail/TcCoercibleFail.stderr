@@ -35,9 +35,25 @@ TcCoercibleFail.hs:18:8:
     In the expression: coerce $ one :: Down Int
     In an equation for ‛foo4’: foo4 = coerce $ one :: Down Int
 
-TcCoercibleFail.hs:22:8:
-    No instance for (Coercible (Void ()) ())
-      because ‛Void’ is a recursive type constuctor
+TcCoercibleFail.hs:21:8:
+    Context reduction stack overflow; size = 21
+    Use -fcontext-stack=N to increase stack size to N
+      Coercible Void ()
+    In the expression: coerce :: Void -> ()
+    In an equation for ‛foo5’: foo5 = coerce :: Void -> ()
+
+TcCoercibleFail.hs:30:8:
+    Context reduction stack overflow; size = 21
+    Use -fcontext-stack=N to increase stack size to N
+      Coercible Int Age
+    In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
+    In an equation for ‛foo6’:
+        foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
+
+TcCoercibleFail.hs:31:8:
+    No instance for (Coercible (Either Int (Fix (Either Int))) ())
+      because ‛Either
+                 Int (Fix (Either Int))’ and ‛()’ are different types.
       arising from a use of ‛coerce’
-    In the expression: coerce :: (Void ()) -> ()
-    In an equation for ‛foo5’: foo5 = coerce :: (Void ()) -> ()
+    In the expression: coerce :: Fix (Either Int) -> ()
+    In an equation for ‛foo7’: foo7 = coerce :: Fix (Either Int) -> ()

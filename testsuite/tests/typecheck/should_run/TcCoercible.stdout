@@ -12,3 +12,7 @@ Left (Age 1)
 List [1]
 [1]
 NonEtad (Right 1)
+Left ()
+Fix (Left ())
+Left 1
+FixEither (Left (Age 1))
