@@ -582,7 +582,7 @@ CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
 
    ___________________________
    | Info | No. of | data....
-        |  Ptr | Words  |
+   |  Ptr | Words  |
    ---------------------------
 
    These are *unpointed* objects: i.e. they cannot be entered.
