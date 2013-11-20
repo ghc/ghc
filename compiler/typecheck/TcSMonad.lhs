@@ -43,7 +43,7 @@ module TcSMonad (
 
     xCtFlavor,        -- Transform a CtEvidence during a step
     rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
-    newWantedEvVar, newWantedEvVarNC, instDFunConstraints,
+    newWantedEvVar, newWantedEvVarNC, newWantedEvVarNonrec, instDFunConstraints,
     newDerived,
 
        -- Creation of evidence variables
@@ -1548,6 +1548,19 @@ newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newWantedEvVarNC loc pty
   = do { new_ev <- wrapTcS $ TcM.newEvVar pty
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
+
+-- | Variant of newGivenEvVar that has a lower bound on the depth of the result
+--   (see Note [Preventing recursive dictionaries])
+newWantedEvVarNonrec :: CtLoc -> TcPredType -> TcS MaybeNew
+newWantedEvVarNonrec loc pty
+  = do { mb_ct <- lookupInInerts pty
+       ; case mb_ct of
+            Just ctev | not (isDerived ctev) && ctEvCheckDepth (ctLocDepth loc) ctev
+                      -> do { traceTcS "newWantedEvVarNonrec/cache hit" $ ppr ctev
+                            ; return (Cached (ctEvTerm ctev)) }
+            _ -> do { ctev <- newWantedEvVarNC loc pty
+                    ; traceTcS "newWantedEvVarNonrec/cache miss" $ ppr ctev
+                    ; return (Fresh ctev) } }
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS MaybeNew
 newWantedEvVar loc pty

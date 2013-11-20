@@ -1443,6 +1443,7 @@ doTopReactDict inerts fl cls xis
   = try_fundeps_and_return
 
   | Just ev <- lookupSolvedDict inerts pred   -- Cached
+  , ctEvCheckDepth (ctLocDepth (ctev_loc fl)) ev
   = do { setEvBind dict_id (ctEvTerm ev);
        ; return $ SomeTopInt { tir_rule = "Dict/Top (cached)"
                              , tir_new_item = Stop } }
@@ -1842,7 +1843,7 @@ matchClassInst _ clas [ ty ] _
 
 matchClassInst _ clas [ _k, ty1, ty2 ] loc
   | clas == coercibleClass =  do
-      traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2
+      traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2 <+> text "at depth" <+> ppr (ctLocDepth loc)
       rdr_env <- getGlobalRdrEnvTcS
       safeMode <- safeLanguageOn `fmap` getDynFlags
       ev <- getCoercibleInst safeMode rdr_env loc ty1 ty2
@@ -1957,7 +1958,6 @@ getCoercibleInst safeMode rdr_env loc ty1 ty2
 
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
     Just (_, _, _) <- unwrapNewTyCon_maybe tc,
-    not (isRecursiveTyCon tc),
     newTyConEtadArity tc <= length tyArgs,
     dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
   = do markDataConsAsUsed rdr_env tc
@@ -1968,7 +1968,6 @@ getCoercibleInst safeMode rdr_env loc ty1 ty2
 
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
     Just (_, _, _) <- unwrapNewTyCon_maybe tc,
-    not (isRecursiveTyCon tc),
     newTyConEtadArity tc <= length tyArgs,
     dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
   = do markDataConsAsUsed rdr_env tc
@@ -2005,7 +2004,8 @@ markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
 requestCoercible :: CtLoc -> TcType -> TcType -> TcS MaybeNew
 requestCoercible loc ty1 ty2 =
     ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
-    newWantedEvVar loc (coercibleClass `mkClassPred` [typeKind ty1, ty1, ty2])
+    newWantedEvVarNonrec loc' (coercibleClass `mkClassPred` [typeKind ty1, ty1, ty2])
+  where loc' = bumpCtLocDepth CountConstraints loc
 
 \end{code}
 
@@ -2039,7 +2039,6 @@ are present:
  3. instance Coercible r b => Coercible (NT t1 t2 ...) b
     instance Coercible a r => Coercible a (NT t1 t2 ...)
     for a newtype constructor NT where
-     * NT is not recursive
      * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
      * the data constructors of NT are in scope.
 

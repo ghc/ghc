@@ -50,7 +50,7 @@ module TcRnTypes(
         isGivenCt, isHoleCt,
         ctEvidence, ctLoc, ctPred,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvTerm, ctEvId,
+        ctEvPred, ctEvTerm, ctEvId, ctEvCheckDepth,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
@@ -1396,7 +1396,6 @@ data CtEvidence
     -- rewrite anything other than a derived (there's no evidence!)
     -- but if we do manage to solve it may help in solving other goals.
 
-
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
 ctEvPred = ctev_pred
@@ -1406,6 +1405,12 @@ ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
 ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
 ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot have id"
                                       (ppr ctev)
+
+-- | Checks whether the evidence can be used to solve a goal with the given minimum depth
+ctEvCheckDepth :: SubGoalDepth -> CtEvidence -> Bool
+ctEvCheckDepth _      (CtGiven {})   = True -- Given evidence has infinite depth
+ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctev_loc ev)
+ctEvCheckDepth _   ev@(CtDerived {}) = pprPanic "ctEvCheckDepth: cannot consider derived evidence" (ppr ev)
 
 ctEvId :: CtEvidence -> TcId
 ctEvId (CtWanted  { ctev_evar = ev }) = ev
@@ -1553,6 +1558,27 @@ subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
         | f > mf    = Just CountTyFunApps
         | otherwise = Nothing
 \end{code}
+
+Note [Preventing recursive dictionaries]
+
+We have some classes where it is not very useful to build recursive
+dictionaries (Coercible, at the moment). So we need the constraint solver to
+prevent that. We conservativey ensure this property using the subgoal depth of
+the constraints: When solving a Coercible constraint at depth d, we do not
+consider evicence from a depth <= d as suitable.
+
+Therefore we need to record the minimum depth allowed to solve a CtWanted. This
+is done in the SubGoalDepth field of CtWanted. Most code now uses mkCtWanted,
+which initializes it to initialSubGoalDepth (i.e. 0); but when requesting a
+Coercible instance (requestCoercible in TcInteract), we bump the current depth
+by one and use that.
+
+There are two spots where wanted contraints attempted to be solved using
+existing constraints; doTopReactDict in TcInteract (in the general solver) and
+newWantedEvVarNonrec (only used by requestCoercible) in TcSMonad. Both use
+ctEvCheckDepth to make the check. That function ensures that a Given constraint
+can always be used to solve a goal (i.e. they are at depth infinity, for our
+purposes)
 
 
 %************************************************************************

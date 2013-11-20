@@ -1168,9 +1168,6 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
         all (null . lookupGRE_Name rdr_env) (map dataConName (tyConDataCons tc))
 
     coercible_msg_for_tycon rdr_env tc
-        | isRecursiveTyCon tc
-        = Just $ nest 2 $ hsep [ ptext $ sLit "because", quotes (ppr tc)
-                               , ptext $ sLit "is a recursive type constuctor" ]
         | isNewTyCon tc
         = tyConAbstractMsg rdr_env tc empty
         | otherwise
