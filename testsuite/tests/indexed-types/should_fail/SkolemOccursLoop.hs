@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fcontext-stack=3 #-}
+{-# OPTIONS_GHC -ftype-function-depth=3 #-}
 {-# LANGUAGE TypeFamilies, FlexibleContexts, EmptyDataDecls #-}
 
 module SkolemOccursLoop where
