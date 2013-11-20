@@ -138,7 +138,7 @@ data SelectWorkItem
                               -- the max subgoal depth and we must stop
        | NextWorkItem Ct      -- More work left, here's the next item to look at
 
-selectNextWorkItem :: SubGoalDepth -- Max depth allowed
+selectNextWorkItem :: Int -- Max depth allowed
                    -> TcS SelectWorkItem
 selectNextWorkItem max_depth
   = updWorkListTcS_return pick_next
@@ -149,7 +149,7 @@ selectNextWorkItem max_depth
           (Nothing,_)
               -> (NoWorkRemaining,wl)           -- No more work
           (Just ct, new_wl)
-              | ctLocDepth (cc_loc ct) > max_depth  -- Depth exceeded
+              | subGoalDepthExceeded max_depth (ctLocDepth (cc_loc ct)) -- Depth exceeded
               -> (MaxDepthExceeded ct,new_wl)
           (Just ct, new_wl)
               -> (NextWorkItem ct, new_wl)      -- New workitem and worklist

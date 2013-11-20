@@ -1034,7 +1034,7 @@ traceFireTcS ct doc
     do { dflags <- getDynFlags
        ; when (dopt Opt_D_dump_cs_trace dflags && traceLevel dflags >= 1) $
     do { n <- TcM.readTcRef (tcs_count env)
-       ; let msg = int n <> brackets (int (ctLocDepth (cc_loc ct)))
+       ; let msg = int n <> brackets (ppr (ctLocDepth (cc_loc ct)))
                    <+> ppr (ctEvidence ct) <> colon <+> doc
        ; TcM.debugDumpTcRn msg } }
 

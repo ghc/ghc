@@ -1407,7 +1407,7 @@ solverDepthErrorTcS ct
   where
     loc   = cc_loc ct
     depth = ctLocDepth loc
-    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int depth
+    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> ppr depth
                , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
 \end{code}
 

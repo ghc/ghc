@@ -880,7 +880,9 @@ popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 getCtLoc :: CtOrigin -> TcM CtLoc
 getCtLoc origin
   = do { env <- getLclEnv 
-       ; return (CtLoc { ctl_origin = origin, ctl_env =  env, ctl_depth = 0 }) }
+       ; return (CtLoc { ctl_origin = origin
+                       , ctl_env = env
+                       , ctl_depth = initialSubGoalDepth }) }
 
 setCtLoc :: CtLoc -> TcM a -> TcM a
 -- Set the SrcSpan and error context from the CtLoc

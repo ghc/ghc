@@ -48,14 +48,15 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt,
-        ctEvidence,
-        SubGoalDepth, mkNonCanonical, mkNonCanonicalCt,
+        ctEvidence, mkNonCanonical, mkNonCanonicalCt,
         ctPred, ctEvPred, ctEvTerm, ctEvId,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
 
         Implication(..),
+        SubGoalDepth, initialSubGoalDepth, bumpSubGoalDepth,
+        subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv,
@@ -1493,14 +1494,28 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
 
-type SubGoalDepth = Int -- An ever increasing number used to restrict
-                        -- simplifier iterations. Bounded by -fcontext-stack.
-                        -- See Note [WorkList]
+newtype SubGoalDepth = SubGoalDepth Int
+ -- An ever increasing number used to restrict
+ -- simplifier iterations. Bounded by -fcontext-stack.
+ -- See Note [WorkList]
+
+instance Outputable SubGoalDepth where
+ ppr (SubGoalDepth n) = int n
+
+initialSubGoalDepth :: SubGoalDepth
+initialSubGoalDepth = SubGoalDepth 0
+
+bumpSubGoalDepth :: SubGoalDepth -> SubGoalDepth
+bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n+1)
+
+subGoalDepthExceeded :: Int -> SubGoalDepth -> Bool
+subGoalDepthExceeded max_depth (SubGoalDepth d) = d > max_depth
+
 
 mkGivenLoc :: SkolemInfo -> TcLclEnv -> CtLoc
 mkGivenLoc skol_info env = CtLoc { ctl_origin = GivenOrigin skol_info
                                  , ctl_env = env
-                                 , ctl_depth = 0 }
+                                 , ctl_depth = initialSubGoalDepth }
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env
@@ -1515,7 +1530,7 @@ ctLocSpan :: CtLoc -> SrcSpan
 ctLocSpan (CtLoc { ctl_env = lcl}) = tcl_loc lcl
 
 bumpCtLocDepth :: CtLoc -> CtLoc
-bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = d+1 }
+bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }
 
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
