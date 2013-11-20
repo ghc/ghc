@@ -18,8 +18,11 @@ mAX_TUPLE_SIZE = 62 -- Should really match the number
                     -- of decls in Data.Tuple
 
 mAX_CONTEXT_REDUCTION_DEPTH :: Int
-mAX_CONTEXT_REDUCTION_DEPTH = 200
-  -- Increase to 200; see Trac #5395
+mAX_CONTEXT_REDUCTION_DEPTH = 20
+
+mAX_TYPE_FUNCTION_REDUCTION_DEPTH :: Int
+mAX_TYPE_FUNCTION_REDUCTION_DEPTH = 200
+  -- Needs to be much higher than mAX_CONTEXT_REDUCTION_DEPTH; see Trac #5395
 
 wORD64_SIZE :: Int
 wORD64_SIZE = 8

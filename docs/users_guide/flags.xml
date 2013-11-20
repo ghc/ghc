@@ -723,6 +723,12 @@
             <entry></entry>
           </row>
           <row>
+            <entry><option>-ftype-function-depth=N</option><replaceable>n</replaceable></entry>
+            <entry>set the <link linkend="type-families">limit for type function reductions</link>. Default is 200.</entry>
+            <entry>dynamic</entry>
+            <entry></entry>
+          </row>
+          <row>
             <entry><option>-XAllowAmbiguousTypes</option></entry>
             <entry>Allow the user to write <link linkend="ambiguity">ambiguous types</link>,
                    and the type inference engine to infer them.

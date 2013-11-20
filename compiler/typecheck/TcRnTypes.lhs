@@ -56,8 +56,8 @@ module TcRnTypes(
 
         Implication(..),
         SubGoalCounter(..),
-        SubGoalDepth, initialSubGoalDepth, bumpSubGoalDepth,
-        subGoalCounterValue, subGoalDepthExceeded,
+        SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
+        bumpSubGoalDepth, subGoalCounterValue, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv,
@@ -1513,6 +1513,13 @@ Each counter starts at zero and increases.
     [W] d{8} : Int ~ a
   and remembered as having depth 8.
 
+  Again, without UndecidableInstances, this counter is bounded, but without it
+  can resolve things ad infinitum. Hence there is a maximum level. But we use a
+  different maximum, as we expect possibly many more type function reductions
+  in sensible programs than type class constraints.
+
+  The flag -ftype-function-depth=n fixes the maximium level.
+
 \begin{code}
 data SubGoalCounter = CountConstraints | CountTyFunApps
 
@@ -1530,6 +1537,8 @@ instance Outputable SubGoalDepth where
 initialSubGoalDepth :: SubGoalDepth
 initialSubGoalDepth = SubGoalDepth 0 0
 
+maxSubGoalDepth :: DynFlags -> SubGoalDepth
+maxSubGoalDepth dflags = SubGoalDepth (ctxtStkDepth dflags) (tyFunStkDepth dflags)
 
 bumpSubGoalDepth :: SubGoalCounter -> SubGoalDepth -> SubGoalDepth
 bumpSubGoalDepth CountConstraints (SubGoalDepth c f) = SubGoalDepth (c+1) f
@@ -1539,11 +1548,11 @@ subGoalCounterValue :: SubGoalCounter -> SubGoalDepth -> Int
 subGoalCounterValue CountConstraints (SubGoalDepth c _) = c
 subGoalCounterValue CountTyFunApps   (SubGoalDepth _ f) = f
 
-subGoalDepthExceeded :: Int -> SubGoalDepth -> Maybe SubGoalCounter
-subGoalDepthExceeded max_depth (SubGoalDepth c f)
-        | c > max_depth = Just CountConstraints
-        | f > max_depth = Just CountTyFunApps
-        | otherwise     = Nothing
+subGoalDepthExceeded :: SubGoalDepth -> SubGoalDepth -> Maybe SubGoalCounter
+subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
+        | c > mc    = Just CountConstraints
+        | f > mf    = Just CountTyFunApps
+        | otherwise = Nothing
 \end{code}
 
 

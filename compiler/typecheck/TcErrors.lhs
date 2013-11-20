@@ -1403,12 +1403,17 @@ solverDepthErrorTcS cnt ct
        ; env0 <- tcInitTidyEnv
        ; let tidy_env  = tidyFreeTyVars env0 (tyVarsOfType pred)
              tidy_pred = tidyType tidy_env pred
-       ; failWithTcM (tidy_env, hang msg 2 (ppr tidy_pred)) }
+       ; failWithTcM (tidy_env, hang (msg cnt) 2 (ppr tidy_pred)) }
   where
     loc   = cc_loc ct
     depth = ctLocDepth loc
-    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int (subGoalCounterValue cnt depth)
-               , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
+    value = subGoalCounterValue cnt depth
+    msg CountConstraints =
+        vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int value
+             , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
+    msg CountTyFunApps =
+        vcat [ ptext (sLit "Type function application stack overflow; size =") <+> int value
+             , ptext (sLit "Use -ftype-function-depth=N to increase stack size to N") ]
 \end{code}
 
 %************************************************************************

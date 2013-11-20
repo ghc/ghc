@@ -116,7 +116,7 @@ solveInteract cts
   = {-# SCC "solveInteract" #-}
     withWorkList cts $
     do { dyn_flags <- getDynFlags
-       ; solve_loop (ctxtStkDepth dyn_flags) }
+       ; solve_loop (maxSubGoalDepth dyn_flags) }
   where
     solve_loop max_depth
       = {-# SCC "solve_loop" #-}
@@ -140,7 +140,7 @@ data SelectWorkItem
                               -- must stop
        | NextWorkItem Ct      -- More work left, here's the next item to look at
 
-selectNextWorkItem :: Int -- Max depth allowed
+selectNextWorkItem :: SubGoalDepth -- Max depth allowed
                    -> TcS SelectWorkItem
 selectNextWorkItem max_depth
   = updWorkListTcS_return pick_next

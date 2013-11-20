@@ -623,6 +623,7 @@ data DynFlags = DynFlags {
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
   ctxtStkDepth          :: Int,         -- ^ Typechecker context stack depth
+  tyFunStkDepth         :: Int,         -- ^ Typechecker type function stack depth
 
   thisPackage           :: PackageId,   -- ^ name of package currently being compiled
 
@@ -1326,6 +1327,7 @@ defaultDynFlags mySettings =
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
         ctxtStkDepth            = mAX_CONTEXT_REDUCTION_DEPTH,
+        tyFunStkDepth           = mAX_TYPE_FUNCTION_REDUCTION_DEPTH,
 
         thisPackage             = mainPackageId,
 
@@ -2397,6 +2399,7 @@ dynamic_flags = [
   , Flag "fno-liberate-case-threshold" (noArg (\d -> d{ liberateCaseThreshold = Nothing }))
   , Flag "frule-check"                 (sepArg (\s d -> d{ ruleCheck = Just s }))
   , Flag "fcontext-stack"              (intSuffix (\n d -> d{ ctxtStkDepth = n }))
+  , Flag "ftype-function-depth"        (intSuffix (\n d -> d{ tyFunStkDepth = n }))
   , Flag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
   , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
