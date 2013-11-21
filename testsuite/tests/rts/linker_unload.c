@@ -30,7 +30,7 @@ int main (int argc, char *argv[])
 
     hs_init(&argc, &argv);
 
-    initLinker();
+    initLinker_(0);
 
     for (i=1; i < argc; i++) {
 #if defined(mingw32_HOST_OS)
