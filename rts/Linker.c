@@ -1133,6 +1133,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(hs_hpc_rootModule)                                  \
       SymI_HasProto(hs_hpc_module)                                      \
       SymI_HasProto(initLinker)                                         \
+      SymI_HasProto(initLinker_)                                        \
       SymI_HasProto(stg_unpackClosurezh)                                \
       SymI_HasProto(stg_getApStackValzh)                                \
       SymI_HasProto(stg_getSparkzh)                                     \
@@ -1155,7 +1156,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \
       SymI_HasProto(stg_fetchAddIntArrayzh)                             \
-      SymI_HasProto_redirect(newCAF, newDynCAF)                         \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
@@ -1558,8 +1558,16 @@ static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
 #endif
 
+void initLinker (void)
+{
+    // default to retaining CAFs for backwards compatibility.  Most
+    // users will want initLinker_(0): otherwise unloadObj() will not
+    // be able to object files when they contain CAFs.
+    initLinker_(1);
+}
+
 void
-initLinker( void )
+initLinker_ (int retain_cafs)
 {
     RtsSymbolVal *sym;
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
@@ -1602,6 +1610,12 @@ initLinker( void )
     */
     ghciInsertSymbolTable(WSTR("(GHCi special symbols)"),
         symhash, "__dso_handle", (void *)0x12345687, HS_BOOL_FALSE, NULL);
+
+    // Redurect newCAF to newDynCAF if retain_cafs is true.
+    ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
+                          MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
+                          retain_cafs ? newDynCAF : newCAF,
+                          HS_BOOL_FALSE, NULL);
 
 #   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 #   if defined(RTLD_DEFAULT)
