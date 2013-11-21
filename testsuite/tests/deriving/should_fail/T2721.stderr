@@ -3,6 +3,4 @@ T2721.hs:15:28:
     Can't make a derived instance of ‛C N’
       (even with cunning newtype deriving):
       the class has associated types
-      it is not type-safe to use GeneralizedNewtypeDeriving on this class;
-      ‛foo’, at type ‛a -> T a’, cannot be converted safely
     In the newtype declaration for ‛N’

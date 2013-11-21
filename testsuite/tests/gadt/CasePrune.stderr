@@ -1,7 +1,9 @@
 
 CasePrune.hs:14:31:
-    Can't make a derived instance of ‛C A’
-      (even with cunning newtype deriving):
-      it is not type-safe to use GeneralizedNewtypeDeriving on this class;
-      ‛ic’, at type ‛T a’, cannot be converted safely
-    In the newtype declaration for ‛A’
+    No instance for (GHC.Types.Coercible (T Int) (T A))
+      because the first type argument of ‛T’ has role Nominal,
+      but the arguments ‛Int’ and ‛A’ differ
+      arising from a use of ‛GHC.Prim.coerce’
+    In the expression: GHC.Prim.coerce (ic :: T Int) :: T A
+    In an equation for ‛ic’: ic = GHC.Prim.coerce (ic :: T Int) :: T A
+    In the instance declaration for ‛C A’
