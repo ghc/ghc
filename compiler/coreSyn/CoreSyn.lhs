@@ -505,7 +505,7 @@ mkNoCount HpcTick{}    = panic "mkNoCount: HpcTick"
 mkNoScope :: Tickish id -> Tickish id
 mkNoScope n@ProfNote{} = n {profNoteScope = False}
 mkNoScope Breakpoint{} = panic "mkNoScope: Breakpoint" -- cannot split a BP
-mkNoScope t = t
+mkNoScope HpcTick{}    = panic "mkNoScope: HpcTick"
 
 -- | Return True if this source annotation compiles to some code, or will
 -- disappear before the backend.
