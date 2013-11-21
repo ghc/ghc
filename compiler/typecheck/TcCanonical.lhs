@@ -1053,7 +1053,7 @@ canEqLeaf :: CtLoc -> CtEvidence
 
 canEqLeaf loc ev s1 s2
   | cls1 `reOrient` cls2
-  = do { traceTcS "canEqLeaf (reorienting)" $ ppr ev <+> dcolon <+> pprEq s1 s2
+  = do { traceTcS "canEqLeaf (reorienting)" doc
        ; let xcomp [x] = EvCoercion (mkTcSymCo (evTermCoercion x))
              xcomp _ = panic "canEqLeaf: can't happen"
              xdecomp x = [EvCoercion (mkTcSymCo (evTermCoercion x))]
@@ -1065,11 +1065,14 @@ canEqLeaf loc ev s1 s2
            _      -> panic "canEqLeaf" }
 
   | otherwise
-  = do { traceTcS "canEqLeaf" $ ppr (mkTcEqPred s1 s2)
+  = do { traceTcS "canEqLeaf" doc
        ; canEqLeafOriented loc ev cls1 s2 }
   where
     cls1 = classify s1
     cls2 = classify s2
+    doc =  vcat [ ppr ev
+                , hang (ppr s1) 2 (dcolon  <+> ppr (typeKind s1))
+                , hang (ppr s2) 2 (dcolon  <+> ppr (typeKind s2)) ]
 
 canEqLeafOriented :: CtLoc -> CtEvidence
                   -> TypeClassifier -> TcType -> TcS StopOrContinue
