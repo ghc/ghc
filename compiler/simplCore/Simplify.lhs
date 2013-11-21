@@ -1051,9 +1051,8 @@ simplTick env tickish expr cont
                         _ -> False
 
   push_tick_inside t expr0
-     | not (tickishCanSplit t) = Nothing
-     | otherwise
-       = case expr0 of
+       = ASSERT(tickishScoped t)
+         case expr0 of
            Tick t' expr
               -- scc t (tick t' E)
               --   Pull the tick to the outside
@@ -1070,9 +1069,11 @@ simplTick env tickish expr cont
               | otherwise -> Nothing
 
            Case scrut bndr ty alts
-              -> Just (Case (mkTick t scrut) bndr ty alts')
+              | not (tickishCanSplit t) -> Nothing
+              | otherwise -> Just (Case (mkTick t scrut) bndr ty alts')
              where t_scope = mkNoCount t -- drop the tick on the dup'd ones
                    alts'   = [ (c,bs, mkTick t_scope e) | (c,bs,e) <- alts]
+
            _other -> Nothing
     where
 
