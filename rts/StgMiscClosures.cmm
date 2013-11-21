@@ -556,6 +556,13 @@ INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","E
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 
 /* ----------------------------------------------------------------------------
+   GCD_CAF
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF_STATIC,"GCD_CAF","GCD_CAF")
+{ foreign "C" barf("Evaluated a CAF that was GC'd!") never returns; }
+
+/* ----------------------------------------------------------------------------
    STM_AWOKEN
 
    This is a static nullary constructor (like []) that we use to mark a

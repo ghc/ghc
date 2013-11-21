@@ -180,8 +180,8 @@ void performMajorGC(void);
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-StgWord newCAF    (StgRegTable *reg, StgClosure *caf, StgClosure *bh);
-StgWord newDynCAF (StgRegTable *reg, StgClosure *caf, StgClosure *bh);
+StgWord newCAF    (StgRegTable *reg, StgIndStatic *caf, StgClosure *bh);
+StgWord newDynCAF (StgRegTable *reg, StgIndStatic *caf, StgClosure *bh);
 void revertCAFs (void);
 
 // Request that all CAFs are retained indefinitely.

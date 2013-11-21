@@ -115,8 +115,28 @@ extern bdescr *exec_block;
 
 void move_STACK  (StgStack *src, StgStack *dest);
 
-extern StgClosure * caf_list;
-extern StgClosure * revertible_caf_list;
+/* -----------------------------------------------------------------------------
+   CAF lists
+   
+   dyn_caf_list  (CAFs chained through static_link)
+      This is a chain of all CAFs in the program, used for
+      dynamically-linked GHCi.
+      See Note [dyn_caf_list].
+
+   debug_caf_list  (CAFs chained through saved_info)
+      A chain of all *live* CAFs in the program, that does not keep
+      the CAFs alive.  Used for detecting when we enter a GC'd CAF,
+      and to give diagnostics with +RTS -DG.
+
+   revertible_caf_list  (CAFs chained through static_link)
+      A chain of CAFs in object code loaded with the RTS linker.
+      These CAFs can be reverted to their unevaluated state using
+      revertCAFs.
+ --------------------------------------------------------------------------- */
+
+extern StgIndStatic * dyn_caf_list;
+extern StgIndStatic * debug_caf_list;
+extern StgIndStatic * revertible_caf_list;
 
 #include "EndPrivate.h"
 
