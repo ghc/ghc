@@ -267,6 +267,13 @@ void checkUnload (StgClosure *static_objects)
       link = *STATIC_LINK(info, p);
   }
 
+  // CAFs on revertible_caf_list are not on static_objects
+  for (p = (StgClosure*)revertible_caf_list;
+       p != END_OF_STATIC_LIST;
+       p = ((StgIndStatic *)p)->static_link) {
+      checkAddress(addrs, p);
+  }
+
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       searchHeapBlocks (addrs, generations[g].blocks);
       searchHeapBlocks (addrs, generations[g].large_objects);
