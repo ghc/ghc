@@ -366,6 +366,8 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 
               inline_shadows_rule   -- Function can be inlined before rule fires
                 | wopt Opt_WarnInlineRuleShadowing dflags
+                , isLocalId fn_id || hasSomeUnfolding (idUnfolding fn_id)   
+                       -- If imported with no unfolding, no worries
                 = case (idInlineActivation fn_id, act) of
                     (NeverActive, _)    -> False
                     (AlwaysActive, _)   -> True
