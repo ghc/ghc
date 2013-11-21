@@ -634,6 +634,9 @@ hscCompileOneShot' hsc_env extCore_filename mod_summary src_changed
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return $ HscRecomp cgguts mod_summary
 
+        -- XXX This is always False, because in one-shot mode the
+        -- concept of stability does not exist.  The driver never
+        -- passes SourceUnmodifiedAndStable in here.
         stable = case src_changed of
                      SourceUnmodifiedAndStable -> True
                      _                         -> False
