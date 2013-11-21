@@ -94,6 +94,20 @@ else
 TargetElf = YES
 endif
 
+# Currently, on Windows, we artificially limit the unfolding creation
+# threshold to minimize the number of exported symbols on Windows
+# platforms in the stage2 DLL. This avoids a hard limit of 2^16
+# exported symbols in the windows dynamic linker.
+#
+# This is a pitifully low threshold (the default is 750,) but it
+# reduced the symbol count by about ~7,000, bringing us back under the
+# limit (for now.)
+#
+# See #5987
+ifeq "$(TargetOS_CPP)" "mingw32"
+GhcStage2HcOpts += -funfolding-creation-threshold=300
+endif
+
 # Some platforms don't support shared libraries
 NoSharedLibsPlatformList = arm-unknown-linux powerpc-unknown-linux
 
