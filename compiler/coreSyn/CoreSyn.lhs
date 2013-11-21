@@ -516,6 +516,7 @@ tickishIsCode _tickish = True  -- all of them for now
 -- 'mkNoScope' and 'mkNoCount' respectively.
 tickishCanSplit :: Tickish Id -> Bool
 tickishCanSplit Breakpoint{} = False
+tickishCanSplit HpcTick{}    = False
 tickishCanSplit _ = True
 \end{code}
 
