@@ -44,7 +44,7 @@ module CoreSyn (
         isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
 
-        tickishCounts, tickishScoped, tickishIsCode, mkNoTick, mkNoScope,
+        tickishCounts, tickishScoped, tickishIsCode, mkNoCount, mkNoScope,
         tickishCanSplit,
 
         -- * Unfolding data types
@@ -475,9 +475,10 @@ data Tickish id =
   deriving (Eq, Ord, Data, Typeable)
 
 
--- | A "tick" note is one that counts evaluations in some way.  We
--- cannot discard a tick, and the compiler should preserve the number
--- of ticks as far as possible.
+-- | A "counting tick" (where tickishCounts is True) is one that
+-- counts evaluations in some way.  We cannot discard a counting tick,
+-- and the compiler should preserve the number of counting ticks as
+-- far as possible.
 --
 -- However, we still allow the simplifier to increase or decrease
 -- sharing, so in practice the actual number of ticks may vary, except
@@ -496,10 +497,10 @@ tickishScoped Breakpoint{} = True
    -- stacks, but also this helps prevent the simplifier from moving
    -- breakpoints around and changing their result type (see #1531).
 
-mkNoTick :: Tickish id -> Tickish id
-mkNoTick n@ProfNote{} = n {profNoteCount = False}
-mkNoTick Breakpoint{} = panic "mkNoTick: Breakpoint" -- cannot split a BP
-mkNoTick t = t
+mkNoCount :: Tickish id -> Tickish id
+mkNoCount n@ProfNote{} = n {profNoteCount = False}
+mkNoCount Breakpoint{} = panic "mkNoCount: Breakpoint" -- cannot split a BP
+mkNoCount HpcTick{}    = panic "mkNoCount: HpcTick"
 
 mkNoScope :: Tickish id -> Tickish id
 mkNoScope n@ProfNote{} = n {profNoteScope = False}
@@ -512,7 +513,7 @@ tickishIsCode :: Tickish id -> Bool
 tickishIsCode _tickish = True  -- all of them for now
 
 -- | Return True if this Tick can be split into (tick,scope) parts with
--- 'mkNoScope' and 'mkNoTick' respectively.
+-- 'mkNoScope' and 'mkNoCount' respectively.
 tickishCanSplit :: Tickish Id -> Bool
 tickishCanSplit Breakpoint{} = False
 tickishCanSplit _ = True

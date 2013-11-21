@@ -290,7 +290,7 @@ floatExpr (Tick tickish expr)
     let
 	-- Annotate bindings floated outwards past an scc expression
 	-- with the cc.  We mark that cc as "duplicated", though.
-        annotated_defns = wrapTick (mkNoTick tickish) floating_defns
+        annotated_defns = wrapTick (mkNoCount tickish) floating_defns
     in
     (fs, annotated_defns, Tick tickish expr') }
 

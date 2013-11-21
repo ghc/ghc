@@ -1071,7 +1071,7 @@ simplTick env tickish expr cont
 
            Case scrut bndr ty alts
               -> Just (Case (mkTick t scrut) bndr ty alts')
-             where t_scope = mkNoTick t -- drop the tick on the dup'd ones
+             where t_scope = mkNoCount t -- drop the tick on the dup'd ones
                    alts'   = [ (c,bs, mkTick t_scope e) | (c,bs,e) <- alts]
            _other -> Nothing
     where
@@ -1098,7 +1098,7 @@ simplTick env tickish expr cont
 --       ; (env', expr') <- simplExprF (zapFloats env) expr inc
 --       ; let tickish' = simplTickish env tickish
 --       ; let wrap_float (b,rhs) = (zapIdStrictness (setIdArity b 0),
---                                   mkTick (mkNoTick tickish') rhs)
+--                                   mkTick (mkNoCount tickish') rhs)
 --              -- when wrapping a float with mkTick, we better zap the Id's
 --              -- strictness info and arity, because it might be wrong now.
 --       ; let env'' = addFloats env (mapFloats env' wrap_float)

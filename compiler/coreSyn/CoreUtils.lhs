@@ -245,7 +245,7 @@ mkTick t expr@(App f arg)
     = if not (tickishCounts t)
          then tickHNFArgs t expr
          else if tickishScoped t && tickishCanSplit t
-                 then Tick (mkNoScope t) (tickHNFArgs (mkNoTick t) expr)
+                 then Tick (mkNoScope t) (tickHNFArgs (mkNoCount t) expr)
                  else Tick t expr
 
 mkTick t (Lam x e)
@@ -258,7 +258,7 @@ mkTick t (Lam x e)
      -- counting tick can probably be floated, and the lambda may then be
      -- in a position to be beta-reduced.
   | tickishScoped t && tickishCanSplit t
-         = Tick (mkNoScope t) (Lam x (mkTick (mkNoTick t) e))
+         = Tick (mkNoScope t) (Lam x (mkTick (mkNoCount t) e))
      -- just a counting tick: leave it on the outside
   | otherwise        = Tick t (Lam x e)
 
