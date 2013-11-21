@@ -83,6 +83,7 @@ cpsTop hsc_env proc =
                   minimalProcPointSet (targetPlatform dflags) call_pps g
              else
                   return call_pps
+       dumpIfSet_dyn dflags Opt_D_dump_cmm "Proc points" (ppr l $$ ppr proc_points $$ ppr g)
 
        let noncall_pps = proc_points `setDifference` call_pps
        when (not (setNull noncall_pps) && dopt Opt_D_dump_cmm dflags) $
