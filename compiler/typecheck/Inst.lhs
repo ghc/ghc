@@ -83,7 +83,8 @@ emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred 
   = do { loc <- getCtLoc origin
        ; ev  <- newWantedEvVar pred
-       ; emitFlat (mkNonCanonical loc (CtWanted { ctev_pred = pred, ctev_evar = ev }))
+       ; emitFlat $ mkNonCanonical $
+             CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
        ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -568,8 +569,7 @@ tidyCt env ct
   = case ct of
      CHoleCan { cc_ev = ev }
        -> ct { cc_ev = tidy_ev env ev }
-     _ -> CNonCanonical { cc_ev = tidy_ev env (cc_ev ct)
-                        , cc_loc  = cc_loc ct }
+     _ -> mkNonCanonical (tidy_ev env (ctEvidence ct))
   where 
     tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evtm/var field because we don't 

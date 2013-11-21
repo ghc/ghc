@@ -913,19 +913,16 @@ data Ct
   = CDictCan {  -- e.g.  Num xi
       cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
       cc_class  :: Class,
-      cc_tyargs :: [Xi],
-
-      cc_loc  :: CtLoc
+      cc_tyargs :: [Xi]
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
-      cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
+      cc_ev :: CtEvidence   -- See Note [Ct/evidence invariant]
         -- The ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)
         --      or   (tv1 ~ ty2)   where the CTyEqCan  kind invariant fails
         --      or   (F tys ~ ty)  where the CFunEqCan kind invariant fails
         -- See Note [CIrredEvCan constraints]
-      cc_loc :: CtLoc
     }
 
   | CTyEqCan {  -- tv ~ xi      (recall xi means function free)
@@ -936,8 +933,7 @@ data Ct
        --   * We prefer unification variables on the left *JUST* for efficiency
       cc_ev :: CtEvidence,    -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
-      cc_rhs    :: Xi,
-      cc_loc    :: CtLoc
+      cc_rhs    :: Xi
     }
 
   | CFunEqCan {  -- F xis ~ xi
@@ -947,21 +943,17 @@ data Ct
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
       cc_tyargs :: [Xi],        -- Either under-saturated or exactly saturated
-      cc_rhs    :: Xi,          --    *never* over-saturated (because if so
+      cc_rhs    :: Xi           --    *never* over-saturated (because if so
                                 --    we should have decomposed)
-
-      cc_loc  :: CtLoc
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics]
-      cc_ev  :: CtEvidence,
-      cc_loc :: CtLoc
+      cc_ev  :: CtEvidence
     }
 
   | CHoleCan {             -- Treated as an "insoluble" constraint
                            -- See Note [Insoluble constraints]
       cc_ev  :: CtEvidence,
-      cc_loc :: CtLoc,
       cc_occ :: OccName    -- The name of this hole
     }
 \end{code}
@@ -1039,11 +1031,11 @@ the evidence may *not* be fully zonked; we are careful not to look at it
 during constraint solving.  See Note [Evidence field of CtEvidence]
 
 \begin{code}
-mkNonCanonical :: CtLoc -> CtEvidence -> Ct
-mkNonCanonical loc ev = CNonCanonical { cc_ev = ev, cc_loc = loc }
+mkNonCanonical :: CtEvidence -> Ct
+mkNonCanonical ev = CNonCanonical { cc_ev = ev }
 
 mkNonCanonicalCt :: Ct -> Ct
-mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct, cc_loc = cc_loc ct }
+mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
@@ -1384,15 +1376,18 @@ may be un-zonked.
 \begin{code}
 data CtEvidence
   = CtGiven { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-            , ctev_evtm :: EvTerm }        -- See Note [Evidence field of CtEvidence]
+            , ctev_evtm :: EvTerm          -- See Note [Evidence field of CtEvidence]
+            , ctev_loc  :: CtLoc }
     -- Truly given, not depending on subgoals
     -- NB: Spontaneous unifications belong here
 
   | CtWanted { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
-             , ctev_evar :: EvVar }        -- See Note [Evidence field of CtEvidence]
+             , ctev_evar :: EvVar          -- See Note [Evidence field of CtEvidence]
+             , ctev_loc  :: CtLoc }
     -- Wanted goal
 
-  | CtDerived { ctev_pred :: TcPredType }
+  | CtDerived { ctev_pred :: TcPredType
+              , ctev_loc  :: CtLoc }
     -- A goal that we don't really have to solve and can't immediately
     -- rewrite anything other than a derived (there's no evidence!)
     -- but if we do manage to solve it may help in solving other goals.

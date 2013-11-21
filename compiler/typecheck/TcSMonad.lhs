@@ -627,7 +627,8 @@ prepareInertsForImplications is
       where
         ev = ctEvidence funeq
         given_ev = CtGiven { ctev_evtm = EvId (ctev_evar ev)
-                           , ctev_pred = ctev_pred ev }
+                           , ctev_pred = ctev_pred ev
+                           , ctev_loc  = ctev_loc ev }
 
     given_from_wanted _ fhm = fhm -- Drop derived constraints
 
@@ -1034,9 +1035,10 @@ traceFireTcS ct doc
     do { dflags <- getDynFlags
        ; when (dopt Opt_D_dump_cs_trace dflags && traceLevel dflags >= 1) $
     do { n <- TcM.readTcRef (tcs_count env)
-       ; let msg = int n <> brackets (ppr (ctLocDepth (cc_loc ct)))
-                   <+> ppr (ctEvidence ct) <> colon <+> doc
+       ; let msg = int n <> brackets (ppr (ctLocDepth (ctev_loc ev)))
+                   <+> ppr ev <> colon <+> doc
        ; TcM.debugDumpTcRn msg } }
+  where ev = cc_ev ct
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, Bag EvBind)
@@ -1421,7 +1423,8 @@ newFlattenSkolem ev fam_ty
 
        ; let rhs_ty = mkTyVarTy tv
              ctev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
-                            , ctev_evtm = EvCoercion (mkTcReflCo fam_ty) }
+                            , ctev_evtm = EvCoercion (mkTcReflCo fam_ty)
+                            , ctev_loc =  ctev_loc ev }
        ; dflags <- getDynFlags
        ; updInertTcS $ \ is@(IS { inert_fsks = fsks }) ->
             extendFlatCache dflags fam_ty ctev rhs_ty
@@ -1431,7 +1434,7 @@ newFlattenSkolem ev fam_ty
 
   | otherwise  -- Wanted or Derived: make new unification variable
   = do { rhs_ty <- newFlexiTcSTy (typeKind fam_ty)
-       ; ctev <- newWantedEvVarNC (mkTcEqPred fam_ty rhs_ty)
+       ; ctev <- newWantedEvVarNC (ctev_loc ev) (mkTcEqPred fam_ty rhs_ty)
                                    -- NC (no-cache) version because we've already
                                    -- looked in the solved goals an inerts (lookupFlatEqn)
        ; dflags <- getDynFlags
@@ -1531,43 +1534,43 @@ setEvBind the_ev tm
        ; tc_evbinds <- getTcEvBinds
        ; wrapTcS $ TcM.addTcEvBind tc_evbinds the_ev tm }
 
-newGivenEvVar :: TcPredType -> EvTerm -> TcS CtEvidence
+newGivenEvVar :: CtLoc -> TcPredType -> EvTerm -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
-newGivenEvVar pred rhs
+newGivenEvVar loc pred rhs
   = do { new_ev <- wrapTcS $ TcM.newEvVar pred
        ; setEvBind new_ev rhs
-       ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev }) }
+       ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev, ctev_loc = loc }) }
 
-newWantedEvVarNC :: TcPredType -> TcS CtEvidence
+newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
-newWantedEvVarNC pty
+newWantedEvVarNC loc pty
   = do { new_ev <- wrapTcS $ TcM.newEvVar pty
-       ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev })}
+       ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
-newWantedEvVar :: TcPredType -> TcS MaybeNew
-newWantedEvVar pty
+newWantedEvVar :: CtLoc -> TcPredType -> TcS MaybeNew
+newWantedEvVar loc pty
   = do { mb_ct <- lookupInInerts pty
        ; case mb_ct of
             Just ctev | not (isDerived ctev)
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                             ; return (Cached (ctEvTerm ctev)) }
-            _ -> do { ctev <- newWantedEvVarNC pty
+            _ -> do { ctev <- newWantedEvVarNC loc pty
                     ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (Fresh ctev) } }
 
-newDerived :: TcPredType -> TcS (Maybe CtEvidence)
+newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Returns Nothing    if cached,
 --         Just pred  if not cached
-newDerived pty
+newDerived loc pty
   = do { mb_ct <- lookupInInerts pty
        ; return (case mb_ct of
                     Just {} -> Nothing
-                    Nothing -> Just (CtDerived { ctev_pred = pty })) }
+                    Nothing -> Just (CtDerived { ctev_pred = pty, ctev_loc = loc })) }
 
-instDFunConstraints :: TcThetaType -> TcS [MaybeNew]
-instDFunConstraints = mapM newWantedEvVar
+instDFunConstraints :: CtLoc -> TcThetaType -> TcS [MaybeNew]
+instDFunConstraints loc = mapM (newWantedEvVar loc)
 \end{code}
 
 
@@ -1616,18 +1619,18 @@ xCtFlavor :: CtEvidence            -- Original flavor
           -> XEvTerm               -- Instructions about how to manipulate evidence
           -> TcS [CtEvidence]
 
-xCtFlavor (CtGiven { ctev_evtm = tm }) ptys xev
+xCtFlavor (CtGiven { ctev_evtm = tm, ctev_loc = loc }) ptys xev
   = ASSERT( equalLength ptys (ev_decomp xev tm) )
-    zipWithM newGivenEvVar ptys (ev_decomp xev tm)
+    zipWithM (newGivenEvVar loc) ptys (ev_decomp xev tm)
     -- See Note [Bind new Givens immediately]
 
-xCtFlavor (CtWanted { ctev_evar = evar }) ptys xev
-  = do { new_evars <- mapM newWantedEvVar ptys
+xCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) ptys xev
+  = do { new_evars <- mapM (newWantedEvVar loc) ptys
        ; setEvBind evar (ev_comp xev (getEvTerms new_evars))
        ; return (freshGoals new_evars) }
 
-xCtFlavor (CtDerived {}) ptys _xev
-  = do { ders <- mapM newDerived ptys
+xCtFlavor (CtDerived { ctev_loc = loc }) ptys _xev
+  = do { ders <- mapM (newDerived loc) ptys
        ; return (catMaybes ders) }
 
 -----------------------------
@@ -1659,7 +1662,7 @@ Main purpose: create new evidence for new_pred;
 -}
 
 
-rewriteCtFlavor (CtDerived {}) new_pred _co
+rewriteCtFlavor (CtDerived { ctev_loc = loc }) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteCtFlavor to put the isTcReflCo test first!
@@ -1667,7 +1670,7 @@ rewriteCtFlavor (CtDerived {}) new_pred _co
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvTerm c), which fails for Derived constraints.
     -- (Getting this wrong caused Trac #7384.)
-    newDerived new_pred
+    newDerived loc new_pred
 
 rewriteCtFlavor old_ev new_pred co
   | isTcReflCo co -- If just reflexivity then you may re-use the same variable
@@ -1680,14 +1683,14 @@ rewriteCtFlavor old_ev new_pred co
        -- However, if they *do* look the same, we'd prefer to stick with old_pred
        -- then retain the old type, so that error messages come out mentioning synonyms
 
-rewriteCtFlavor (CtGiven { ctev_evtm = old_tm }) new_pred co
-  = do { new_ev <- newGivenEvVar new_pred new_tm  -- See Note [Bind new Givens immediately]
+rewriteCtFlavor (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
+  = do { new_ev <- newGivenEvVar loc new_pred new_tm  -- See Note [Bind new Givens immediately]
        ; return (Just new_ev) }
   where
     new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCast optimises ReflCo
 
-rewriteCtFlavor (CtWanted { ctev_evar = evar }) new_pred co
-  = do { new_evar <- newWantedEvVar new_pred
+rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
+  = do { new_evar <- newWantedEvVar loc new_pred
        ; setEvBind evar (mkEvCast (getEvTerm new_evar) co)
        ; case new_evar of
             Fresh ctev -> return (Just ctev)
@@ -1741,13 +1744,13 @@ deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
             phi1 = Type.substTy subst1 body1
             phi2 = Type.substTy (zipTopTvSubst tvs2 tys) body2
             skol_info = UnifyForAllSkol skol_tvs phi1
-        ; mev <- newWantedEvVar (mkTcEqPred phi1 phi2)
+        ; mev <- newWantedEvVar loc (mkTcEqPred phi1 phi2)
         ; coe_inside <- case mev of
             Cached ev_tm -> return (evTermCoercion ev_tm)
             Fresh ctev   -> do { ev_binds_var <- wrapTcS $ TcM.newTcEvBinds
                                ; env <- wrapTcS $ TcM.getLclEnv
                                ; let ev_binds = TcEvBinds ev_binds_var
-                                     new_ct = mkNonCanonical loc ctev
+                                     new_ct = mkNonCanonical ctev
                                      new_co = evTermCoercion (ctEvTerm ctev)
                                      new_untch = pushUntouchables (tcl_untch env)
                                ; let wc = WC { wc_flat  = singleCt new_ct

@@ -137,7 +137,7 @@ tcHole occ res_ty
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
       ; loc <- getCtLoc HoleOrigin
-      ; let can = CHoleCan { cc_ev = CtWanted ty ev, cc_loc = loc, cc_occ = occ }
+      ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ }
       ; emitInsoluble can
       ; tcWrapResult (HsVar ev) ty res_ty }
 \end{code}

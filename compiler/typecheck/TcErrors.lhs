@@ -337,7 +337,7 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
   where
-    cmp_loc ct1 ct2 = ctLocSpan (cc_loc ct1) `compare` ctLocSpan (cc_loc ct2)
+    cmp_loc ct1 ct2 = ctLocSpan (ctev_loc (ctEvidence ct1)) `compare` ctLocSpan (ctev_loc (ctEvidence ct2))
 
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
             -> [Ct] -> TcM ()
@@ -361,7 +361,7 @@ maybeReportError ctxt err
 maybeAddDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
 maybeAddDeferredBinding ctxt err ct
-  | CtWanted { ctev_pred = pred, ctev_evar = ev_id } <- cc_ev ct
+  | CtWanted { ctev_pred = pred, ctev_evar = ev_id } <- ctEvidence ct
     -- Only add deferred bindings for Wanted constraints
   , isHoleCt ct || cec_defer ctxt  -- And it's a hole or we have -fdefer-type-errors
   , Just ev_binds_var <- cec_binds ctxt  -- We have somewhere to put the bindings
@@ -418,13 +418,13 @@ pprWithArising (ct:cts)
   | otherwise
   = (loc, vcat (map ppr_one (ct:cts)))
   where
-    loc = cc_loc ct
+    loc = ctev_loc (ctEvidence ct)
     ppr_one ct = hang (parens (pprType (ctPred ct))) 
-                    2 (pprArisingAt (cc_loc ct))
+                    2 (pprArisingAt (ctev_loc (ctEvidence ct)))
 
 mkErrorMsg :: ReportErrCtxt -> Ct -> SDoc -> TcM ErrMsg
 mkErrorMsg ctxt ct msg 
-  = do { let tcl_env = ctLocEnv (cc_loc ct)
+  = do { let tcl_env = ctLocEnv (ctev_loc (ctEvidence ct))
        ; err_info <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkLongErrAt (tcl_loc tcl_env) msg err_info }
 
@@ -518,7 +518,7 @@ mkIrredErr ctxt cts
        ; mkErrorMsg ctxt ct1 (msg $$ binds_msg) }
   where
     (ct1:_) = cts
-    orig    = ctLocOrigin (cc_loc ct1)
+    orig    = ctLocOrigin (ctev_loc (ctEvidence ct1))
     givens  = getUserGivens ctxt
     msg = couldNotDeduce givens (map ctPred cts, orig)
 
@@ -528,7 +528,7 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ })
   = do { let tyvars = varSetElems (tyVarsOfCt ct)
              tyvars_msg = map loc_msg tyvars
              msg = vcat [ hang (ptext (sLit "Found hole") <+> quotes (ppr occ))
-                             2 (ptext (sLit "with type:") <+> pprType (ctEvPred (cc_ev ct)))
+                             2 (ptext (sLit "with type:") <+> pprType (ctEvPred (ctEvidence ct)))
                         , ppUnless (null tyvars_msg) (ptext (sLit "Where:") <+> vcat tyvars_msg) ]
        ; (ctxt, binds_doc) <- relevantBindings False ctxt ct
                -- The 'False' means "don't filter the bindings; see Trac #8191
@@ -551,7 +551,7 @@ mkIPErr ctxt cts
        ; mkErrorMsg ctxt ct1 (msg $$ bind_msg) }
   where
     (ct1:_) = cts
-    orig    = ctLocOrigin (cc_loc ct1)
+    orig    = ctLocOrigin (ctev_loc (ctEvidence ct1))
     preds   = map ctPred cts
     givens  = getUserGivens ctxt
     msg | null givens
@@ -602,25 +602,26 @@ mkEqErr1 ctxt ct
        ; let (given_loc, given_msg) = mk_given (cec_encl ctxt)
        ; dflags <- getDynFlags
        ; mkEqErr_help dflags ctxt (given_msg $$ binds_msg) 
-                      (ct { cc_loc = given_loc}) -- Note [Inaccessible code]
+                      (ct { cc_ev = ev {ctev_loc = given_loc}}) -- Note [Inaccessible code]
                       Nothing ty1 ty2 }
 
   | otherwise   -- Wanted or derived
   = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
-       ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin (cc_loc ct))
+       ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin loc)
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
        ; mkEqErr_help dflags ctxt (wanted_msg $$ binds_msg) 
                       ct is_oriented ty1 ty2 }
   where
-    ev         = cc_ev ct
+    ev         = ctEvidence ct
+    loc        = ctev_loc ev
     (ty1, ty2) = getEqPredTys (ctEvPred ev)
 
     mk_given :: [Implication] -> (CtLoc, SDoc)
     -- For given constraints we overwrite the env (and hence src-loc)
     -- with one from the implication.  See Note [Inaccessible code]
-    mk_given []           = (cc_loc ct, empty)
-    mk_given (implic : _) = (setCtLocEnv (cc_loc ct) (ic_env implic)
+    mk_given []           = (loc, empty)
+    mk_given (implic : _) = (setCtLocEnv loc (ic_env implic)
                             , hang (ptext (sLit "Inaccessible code in"))
                                  2 (ppr (ic_info implic)))
 
@@ -993,7 +994,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
   | otherwise
   = return (ctxt, safe_haskell_msg)
   where
-    orig        = ctLocOrigin (cc_loc ct)
+    orig        = ctLocOrigin (ctev_loc (ctEvidence ct))
     pred        = ctPred ct
     (clas, tys) = getClassPredTys pred
     ispecs      = [ispec | (ispec, _) <- matches]
@@ -1324,7 +1325,7 @@ relevantBindings want_filtering ctxt ct
          else do { traceTc "rb" doc
                  ; return (ctxt { cec_tidy = tidy_env' }, doc) } } 
   where
-    lcl_env = ctLocEnv (cc_loc ct)
+    lcl_env = ctLocEnv (ctev_loc (ctEvidence ct))
     ct_tvs = tyVarsOfCt ct
 
     run_out :: Maybe Int -> Bool
@@ -1396,16 +1397,16 @@ are created by in RtClosureInspect.zonkRTTIType.
 %************************************************************************
 
 \begin{code}
-solverDepthErrorTcS :: SubGoalCounter -> Ct -> TcM a
-solverDepthErrorTcS cnt ct
+solverDepthErrorTcS :: SubGoalCounter -> CtEvidence -> TcM a
+solverDepthErrorTcS cnt ev
   = setCtLoc loc $
-    do { pred <- zonkTcType (ctPred ct)
+    do { pred <- zonkTcType (ctEvPred ev)
        ; env0 <- tcInitTidyEnv
        ; let tidy_env  = tidyFreeTyVars env0 (tyVarsOfType pred)
              tidy_pred = tidyType tidy_env pred
        ; failWithTcM (tidy_env, hang (msg cnt) 2 (ppr tidy_pred)) }
   where
-    loc   = cc_loc ct
+    loc   = ctev_loc ev
     depth = ctLocDepth loc
     value = subGoalCounterValue cnt depth
     msg CountConstraints =

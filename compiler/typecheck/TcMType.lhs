@@ -170,9 +170,10 @@ newFlatWanteds orig theta
   where 
     inst_to_wanted loc pty 
           = do { v <- newWantedEvVar pty 
-               ; return $ mkNonCanonical loc $
+               ; return $ mkNonCanonical $
                  CtWanted { ctev_evar = v
-                          , ctev_pred = pty } }
+                          , ctev_pred = pty
+                          , ctev_loc = loc } }
 \end{code}
 
 %************************************************************************
@@ -874,8 +875,7 @@ zonkCt ct@(CHoleCan { cc_ev = ev })
        ; return $ ct { cc_ev = ev' } }
 zonkCt ct
   = do { fl' <- zonkCtEvidence (cc_ev ct)
-       ; return (CNonCanonical { cc_ev = fl'
-                               , cc_loc = cc_loc ct }) }
+       ; return (mkNonCanonical fl') }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
 zonkCtEvidence ctev@(CtGiven { ctev_pred = pred }) 

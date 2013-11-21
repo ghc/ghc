@@ -539,9 +539,10 @@ uType, uType_defer
 uType_defer origin ty1 ty2
   = do { eqv <- newEq ty1 ty2
        ; loc <- getCtLoc origin
-       ; let ctev = CtWanted { ctev_evar = eqv
-                             , ctev_pred = mkTcEqPred ty1 ty2 }
-       ; emitFlat $ mkNonCanonical loc ctev 
+       ; emitFlat $ mkNonCanonical $
+             CtWanted { ctev_evar = eqv
+                      , ctev_pred = mkTcEqPred ty1 ty2
+                      , ctev_loc = loc }
 
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on, because
