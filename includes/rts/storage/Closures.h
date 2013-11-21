@@ -135,11 +135,18 @@ typedef struct StgBlockingQueue_ {
     struct MessageBlackHole_ *queue;
 } StgBlockingQueue;
 
+/* This struct should be called StgArrBytes rather than StgArrWords.
+ *
+ * One might be very tempted to store the number of words in the bytes field,
+ * but the garbage collector will erase your data then.
+ *
+ * It's name is for historical reasons, see #3800
+ */
 typedef struct {
     StgHeader  header;
     StgWord    bytes;
     StgWord    payload[FLEXIBLE_ARRAY];
-} StgArrWords;
+} StgArrWords; // TODO: s/StgArrWords/StgArrBytes (#8552)
 
 typedef struct {
     StgHeader   header;
