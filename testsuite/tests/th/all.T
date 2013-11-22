@@ -307,3 +307,7 @@ test('T8455', normal, compile, ['-v0'])
 test('T8499', normal, compile, ['-v0'])
 test('T7477', normal, compile, ['-v0'])
 test('T8507', normal, compile, ['-v0'])
+test('T8540',
+     extra_clean(['T8540a.hi', 'T8540a.o']),
+     multimod_compile,
+     ['T8540', '-v0 ' + config.ghc_th_way_flags])
