@@ -1942,11 +1942,7 @@ genInst standalone_deriv oflag comauxs
                                                 , ib_standalone_deriving = standalone_deriv } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
-    (etad_tvs, etad_rhs) = newTyConEtadRhs rep_tycon
-      -- it's possible the eta-reduced rhs is overly-reduced.
-      -- pad as necessary
-    pad_tys = dropList etad_tvs rep_tc_args
-    rhs_ty = mkAppTys etad_rhs pad_tys
+    rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
 genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon
               -> Maybe CommonAuxiliary
