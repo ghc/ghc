@@ -48,8 +48,9 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt,
-        ctEvidence, mkNonCanonical, mkNonCanonicalCt,
-        ctPred, ctEvPred, ctEvTerm, ctEvId,
+        ctEvidence, ctLoc, ctPred,
+        mkNonCanonical, mkNonCanonicalCt,
+        ctEvPred, ctEvTerm, ctEvId,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
@@ -1039,6 +1040,9 @@ mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
+
+ctLoc :: Ct -> CtLoc
+ctLoc = ctev_loc . cc_ev
 
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]

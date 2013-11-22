@@ -153,7 +153,7 @@ selectNextWorkItem max_depth
           (Nothing,_)
               -> (NoWorkRemaining,wl)           -- No more work
           (Just ct, new_wl)
-              | Just cnt <- subGoalDepthExceeded max_depth (ctLocDepth (ctev_loc (ctEvidence ct))) -- Depth exceeded
+              | Just cnt <- subGoalDepthExceeded max_depth (ctLocDepth (ctLoc ct)) -- Depth exceeded
               -> (MaxDepthExceeded cnt ct,new_wl)
           (Just ct, new_wl)
               -> (NextWorkItem ct, new_wl)      -- New workitem and worklist
@@ -410,8 +410,8 @@ interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
 
 addFunDepWork :: Ct -> Ct -> TcS ()
 addFunDepWork work_ct inert_ct
-  = do { let work_loc           = ctev_loc (ctEvidence work_ct)
-             inert_loc          = ctev_loc (ctEvidence inert_ct)
+  = do { let work_loc           = ctLoc work_ct
+             inert_loc          = ctLoc inert_ct
              inert_pred_loc     = (ctPred inert_ct, pprArisingAt inert_loc)
              work_item_pred_loc = (ctPred work_ct,  pprArisingAt work_loc)
 

@@ -337,7 +337,7 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
   where
-    cmp_loc ct1 ct2 = ctLocSpan (ctev_loc (ctEvidence ct1)) `compare` ctLocSpan (ctev_loc (ctEvidence ct2))
+    cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
 
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
             -> [Ct] -> TcM ()
@@ -418,13 +418,13 @@ pprWithArising (ct:cts)
   | otherwise
   = (loc, vcat (map ppr_one (ct:cts)))
   where
-    loc = ctev_loc (ctEvidence ct)
-    ppr_one ct = hang (parens (pprType (ctPred ct))) 
-                    2 (pprArisingAt (ctev_loc (ctEvidence ct)))
+    loc = ctLoc ct
+    ppr_one ct' = hang (parens (pprType (ctPred ct'))) 
+                     2 (pprArisingAt (ctLoc ct'))
 
 mkErrorMsg :: ReportErrCtxt -> Ct -> SDoc -> TcM ErrMsg
 mkErrorMsg ctxt ct msg 
-  = do { let tcl_env = ctLocEnv (ctev_loc (ctEvidence ct))
+  = do { let tcl_env = ctLocEnv (ctLoc ct)
        ; err_info <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkLongErrAt (tcl_loc tcl_env) msg err_info }
 
@@ -518,7 +518,7 @@ mkIrredErr ctxt cts
        ; mkErrorMsg ctxt ct1 (msg $$ binds_msg) }
   where
     (ct1:_) = cts
-    orig    = ctLocOrigin (ctev_loc (ctEvidence ct1))
+    orig    = ctLocOrigin (ctLoc ct1)
     givens  = getUserGivens ctxt
     msg = couldNotDeduce givens (map ctPred cts, orig)
 
@@ -551,7 +551,7 @@ mkIPErr ctxt cts
        ; mkErrorMsg ctxt ct1 (msg $$ bind_msg) }
   where
     (ct1:_) = cts
-    orig    = ctLocOrigin (ctev_loc (ctEvidence ct1))
+    orig    = ctLocOrigin (ctLoc ct1)
     preds   = map ctPred cts
     givens  = getUserGivens ctxt
     msg | null givens
@@ -994,7 +994,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
   | otherwise
   = return (ctxt, safe_haskell_msg)
   where
-    orig        = ctLocOrigin (ctev_loc (ctEvidence ct))
+    orig        = ctLocOrigin (ctLoc ct)
     pred        = ctPred ct
     (clas, tys) = getClassPredTys pred
     ispecs      = [ispec | (ispec, _) <- matches]
@@ -1325,7 +1325,7 @@ relevantBindings want_filtering ctxt ct
          else do { traceTc "rb" doc
                  ; return (ctxt { cec_tidy = tidy_env' }, doc) } } 
   where
-    lcl_env = ctLocEnv (ctev_loc (ctEvidence ct))
+    lcl_env = ctLocEnv (ctLoc ct)
     ct_tvs = tyVarsOfCt ct
 
     run_out :: Maybe Int -> Bool
