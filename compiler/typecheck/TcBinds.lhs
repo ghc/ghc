@@ -701,15 +701,17 @@ tcSpecPrags poly_id prag_sigs
 
 --------------
 tcSpec :: TcId -> Sig Name -> TcM TcSpecPrag
-tcSpec poly_id prag@(SpecSig _ hs_ty inl) 
-  -- The Name in the SpecSig may not be the same as that of the poly_id
+tcSpec poly_id prag@(SpecSig fun_name hs_ty inl) 
+  -- The Name fun_name in the SpecSig may not be the same as that of the poly_id
   -- Example: SPECIALISE for a class method: the Name in the SpecSig is
   --          for the selector Id, but the poly_id is something like $cop
+  -- However we want to use fun_name in the error message, since that is
+  -- what the user wrote (Trac #8537)
   = addErrCtxt (spec_ctxt prag) $
     do  { spec_ty <- tcHsSigType sig_ctxt hs_ty
         ; warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
                  (ptext (sLit "SPECIALISE pragma for non-overloaded function") 
-                  <+> quotes (ppr poly_id))
+                  <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]
         ; wrap <- tcSubType origin sig_ctxt (idType poly_id) spec_ty
         ; return (SpecPrag poly_id wrap inl) }
