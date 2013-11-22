@@ -30,6 +30,7 @@ import SMRep
 import UniqSupply
 import Util
 
+import PprCmm()
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -301,7 +302,7 @@ bundle flatmap (env, decl@(CmmProc infos lbl _ g)) (closure_cafs, mb_lbl)
   get_cafs l _
     | l == entry = entry_cafs
     | otherwise  = if not (mapMember l env)
-                      then pprPanic "bundle" (ppr l <+> ppr lbl <+> ppr (info_tbls infos))
+                      then pprPanic "bundle" (ppr l <+> ppr lbl <+> ppr (info_tbls infos) $$ ppr env $$ ppr decl)
                       else flatten flatmap $ expectJust "bundle" $ mapLookup l env
 
 bundle _flatmap (_, decl) _
