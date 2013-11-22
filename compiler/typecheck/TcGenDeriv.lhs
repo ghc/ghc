@@ -1427,8 +1427,8 @@ gen_Data_binds dflags loc tycon
 
         ------------ gcast1/2
     tycon_kind = tyConKind tycon
-    gcast_binds | tycon_kind `eqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
-                | tycon_kind `eqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
+    gcast_binds | tycon_kind `tcEqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
+                | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
                 | otherwise                 = emptyBag
     mk_gcast dataCast_RDR gcast_RDR
       = unitBag (mk_easy_FunBind loc dataCast_RDR [nlVarPat f_RDR]

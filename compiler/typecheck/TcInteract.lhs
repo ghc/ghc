@@ -332,7 +332,7 @@ interactIrred :: InertCans -> Ct -> TcS (Maybe InertCans, StopNowFlag)
 
 interactIrred inerts workItem@(CIrredEvCan { cc_ev = ev_w })
   | let pred = ctEvPred ev_w
-        (matching_irreds, others) = partitionBag (\ct -> ctPred ct `eqType` pred)
+        (matching_irreds, others) = partitionBag (\ct -> ctPred ct `tcEqType` pred)
                                                  (inert_irreds inerts)
   , (ct_i : rest) <- bagToList matching_irreds
   , let ctev_i = ctEvidence ct_i
@@ -399,7 +399,7 @@ interactGivenIP inerts workItem@(CDictCan { cc_class = cls, cc_tyargs = tys@(ip_
 
     -- Pick out any Given constraints for the same implicit parameter
     is_this_ip (CDictCan { cc_ev = ev, cc_tyargs = ip_str':_ })
-       = isGiven ev && ip_str `eqType` ip_str'
+       = isGiven ev && ip_str `tcEqType` ip_str'
     is_this_ip _ = False
 
 interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
@@ -497,7 +497,7 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
        ; return (Nothing, True) }
 
   | (ev_i : _) <- [ ev_i | CFunEqCan { cc_ev = ev_i, cc_rhs = rhs_i } <- matching_inerts
-                         , rhs_i `eqType` rhs    -- Duplicates
+                         , rhs_i `tcEqType` rhs    -- Duplicates
                          , ev_i `canRewriteOrSame` ev ]
   = do { when (isWanted ev) (setEvBind (ctev_evar ev) (ctEvTerm ev_i))
        ; return (Nothing, True) }
@@ -667,7 +667,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs
   | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs (inert_eqs inerts) tv
                          , ev_i `canRewriteOrSame` ev
-                         , rhs_i `eqType` rhs ]
+                         , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ b
      -- Work item: a ~ b
     do { when (isWanted ev) (setEvBind (ctev_evar ev) (ctEvTerm ev_i))
@@ -678,7 +678,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs
   , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs (inert_eqs inerts) tv_rhs
                          , ev_i `canRewriteOrSame` ev
-                         , rhs_i `eqType` mkTyVarTy tv ]
+                         , rhs_i `tcEqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
     do { when (isWanted ev) (setEvBind (ctev_evar ev)
@@ -1356,7 +1356,7 @@ instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
     der_loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
 
     do_one subst ievs (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
-       | eqType sty1 sty2
+       | tcEqType sty1 sty2
        = return ievs -- Return no trivial equalities
        | otherwise
        = do { mb_eqv <- newDerived (mkTcEqPred sty1 sty2)
@@ -1934,7 +1934,7 @@ matchClassInst inerts clas tys loc
 -- Changes to this logic should likely be reflected in coercible_msg in TcErrors.
 getCoercibleInst :: Bool -> GlobalRdrEnv -> TcType -> TcType -> TcS LookupInstResult
 getCoercibleInst safeMode rdr_env ty1 ty2
-  | ty1 `eqType` ty2
+  | ty1 `tcEqType` ty2
   = do return $ GenInst []
               $ EvCoercible (EvCoercibleRefl ty1)
 
@@ -1983,7 +1983,7 @@ getCoercibleInst safeMode rdr_env ty1 ty2
 
 nominalArgsAgree :: TyCon -> [Type] -> [Type] -> Bool
 nominalArgsAgree tc tys1 tys2 = all ok $ zip3 (tyConRoles tc) tys1 tys2
-  where ok (r,t1,t2) = r /= Nominal || t1 `eqType` t2
+  where ok (r,t1,t2) = r /= Nominal || t1 `tcEqType` t2
 
 dataConsInScope :: GlobalRdrEnv -> TyCon -> Bool
 dataConsInScope rdr_env tc = not hidden_data_cons
@@ -2005,9 +2005,8 @@ markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
 
 requestCoercible :: TcType -> TcType -> TcS MaybeNew
 requestCoercible ty1 ty2 =
-    ASSERT2( typeKind ty1 `eqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
+    ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
     newWantedEvVar (coercibleClass `mkClassPred` [typeKind ty1, ty1, ty2])
-
 \end{code}
 
 Note [Coercible Instances]

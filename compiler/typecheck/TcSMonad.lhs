@@ -779,7 +779,7 @@ lookupInInertCans (IS { inert_cans = ics }) pty
   where
     exact_match :: Ct -> Maybe CtEvidence -> Maybe CtEvidence
     exact_match ct deflt | let ctev = ctEvidence ct
-                         , ctEvPred ctev `eqType` pty
+                         , ctEvPred ctev `tcEqType` pty
                          = Just ctev
                          | otherwise
                          = deflt
@@ -1231,7 +1231,7 @@ emitInsoluble ct
       | already_there = is
       | otherwise     = is { inert_cans = ics { inert_insols = extendCts old_insols ct } }
       where
-        already_there = not (isWantedCt ct) && anyBag (eqType this_pred . ctPred) old_insols
+        already_there = not (isWantedCt ct) && anyBag (tcEqType this_pred . ctPred) old_insols
              -- See Note [Do not add duplicate derived insolubles]
 
 getTcSImplicsRef :: TcS (IORef (Bag Implication))
@@ -1671,7 +1671,7 @@ rewriteCtFlavor (CtDerived {}) new_pred _co
 
 rewriteCtFlavor old_ev new_pred co
   | isTcReflCo co -- If just reflexivity then you may re-use the same variable
-  = return (Just (if ctEvPred old_ev `eqType` new_pred
+  = return (Just (if ctEvPred old_ev `tcEqType` new_pred
                   then old_ev
                   else old_ev { ctev_pred = new_pred }))
        -- Even if the coercion is Refl, it might reflect the result of unification alpha := ty

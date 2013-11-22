@@ -1160,11 +1160,13 @@ seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
 
 \begin{code}
 eqKind :: Kind -> Kind -> Bool
+-- Watch out for horrible hack: See Note [Comparison with OpenTypeKind]
 eqKind = eqType
 
 eqType :: Type -> Type -> Bool
 -- ^ Type equality on source types. Does not look through @newtypes@ or
 -- 'PredType's, but it does look through type synonyms.
+-- Watch out for horrible hack: See Note [Comparison with OpenTypeKind]
 eqType t1 t2 = isEqual $ cmpType t1 t2
 
 eqTypeX :: RnEnv2 -> Type -> Type -> Bool
@@ -1195,6 +1197,7 @@ Now here comes the real worker
 
 \begin{code}
 cmpType :: Type -> Type -> Ordering
+-- Watch out for horrible hack: See Note [Comparison with OpenTypeKind]
 cmpType t1 t2 = cmpTypeX rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfType t1 `unionVarSet` tyVarsOfType t2))

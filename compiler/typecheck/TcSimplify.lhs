@@ -519,7 +519,7 @@ simplifyRule name lhs_wanted rhs_wanted
 
              quantify_normal ct
                | EqPred t1 t2 <- classifyPredType (ctPred ct)
-               = not (t1 `eqType` t2)
+               = not (t1 `tcEqType` t2)
                | otherwise
                = True
 

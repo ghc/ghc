@@ -400,10 +400,10 @@ canIrred d old_ev
     -- get an infinite loop
     something_changed old_ty new_ty1 new_ty2
        | EqPred old_ty1 old_ty2 <- classifyPredType old_ty
-       = not (            new_ty1 `eqType`          old_ty1
-              && typeKind new_ty1 `eqKind` typeKind old_ty1
-              &&          new_ty2 `eqType`          old_ty2
-              && typeKind new_ty2 `eqKind` typeKind old_ty2)
+       = not (            new_ty1 `tcEqType`          old_ty1
+              && typeKind new_ty1 `tcEqKind` typeKind old_ty1
+              &&          new_ty2 `tcEqType`          old_ty2
+              && typeKind new_ty2 `tcEqKind` typeKind old_ty2)
        | otherwise
        = True
 
@@ -494,7 +494,7 @@ flatten :: CtLoc -> FlattenMode
 flatten loc f ctxt ty
   | Just ty' <- tcView ty
   = do { (xi, co) <- flatten loc f ctxt ty'
-       ; if eqType xi ty then return (ty,co) else return (xi,co) }
+       ; if tcEqType xi ty then return (ty,co) else return (xi,co) }
        -- Small tweak for better error messages
 
 flatten _ _ _ xi@(LitTy {}) = return (xi, mkTcReflCo xi)
@@ -717,8 +717,8 @@ emitWorkNC loc evs
 canEqNC :: CtLoc -> CtEvidence -> Type -> Type -> TcS StopOrContinue
 
 canEqNC _loc ev ty1 ty2
-  | eqType ty1 ty2      -- Dealing with equality here avoids
-                        -- later spurious occurs checks for a~a
+  | tcEqType ty1 ty2      -- Dealing with equality here avoids
+                          -- later spurious occurs checks for a~a
   = if isWanted ev then
       setEvBind (ctev_evar ev) (EvCoercion (mkTcReflCo ty1)) >> return Stop
     else
@@ -1021,7 +1021,7 @@ reOrient (FunCls {}) _      = False             -- Fun/Other on rhs
 reOrient (VarCls {})   (FunCls {})           = True
 reOrient (VarCls {})   (OtherCls {})         = False
 reOrient (VarCls tv1)  (VarCls tv2)
-  | k1 `eqKind` k2      = tv2 `better_than` tv1
+  | k1 `tcEqKind` k2    = tv2 `better_than` tv1
   | k1 `isSubKind` k2   = True  -- Note [Kind orientation for CTyEqCan]
   | otherwise           = False -- in TcRnTypes
   where
