@@ -815,7 +815,9 @@ lvlLamBndrs lvl bndrs
     new_lvl | any is_major bndrs = incMajorLvl lvl
             | otherwise          = incMinorLvl lvl
 
-    is_major bndr = isId bndr && not (isOneShotLambda bndr)
+    is_major bndr = isId bndr && not (isProbablyOneShotLambda bndr)
+       -- The "probably" part says "don't float things out of a
+       -- probable one-shot lambda"
 \end{code}
 
 \begin{code}

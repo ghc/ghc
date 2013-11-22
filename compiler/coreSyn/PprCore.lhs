@@ -296,16 +296,23 @@ pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
     case () of
     _
-      | not debug_on && isDeadBinder var       -> char '_'
-      | not debug_on, CaseBind <- bind_site    -> -- No parens, no kind info
-                                                  pprUntypedBinder var
-      | gopt Opt_SuppressTypeSignatures dflags -> -- Suppress the signature
-                                                  pprUntypedBinder var
-      | isTyVar var                            -> parens (pprKindedTyVarBndr var)
-      | otherwise ->
-            parens (hang (pprIdBndr var)
-                         2 (vcat [ dcolon <+> pprType (idType var), pp_unf]))
+      | not debug_on            -- Even dead binders can be one-shot
+      , isDeadBinder var        -> char '_' <+> ppWhen (isId var)
+                                                (pprIdBndrInfo (idInfo var))
+
+      | not debug_on            -- No parens, no kind info
+      , CaseBind <- bind_site   -> pprUntypedBinder var
+
+      | suppress_sigs dflags    -> pprUntypedBinder var
+
+      | isTyVar var  -> parens (pprKindedTyVarBndr var)
+
+      | otherwise    -> parens (hang (pprIdBndr var)
+                                   2 (vcat [ dcolon <+> pprType (idType var)
+                                           , pp_unf]))
   where
+    suppress_sigs = gopt Opt_SuppressTypeSignatures
+
     unf_info = unfoldingInfo (idInfo var)
     pp_unf | hasSomeUnfolding unf_info = ptext (sLit "Unf=") <> ppr unf_info
            | otherwise                 = empty
@@ -340,18 +347,18 @@ pprIdBndrInfo info
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
     dmd_info  = demandInfo info
-    lbv_info  = lbvarInfo info
+    lbv_info  = oneShotInfo info
 
     has_prag  = not (isDefaultInlinePragma prag_info)
     has_occ   = not (isNoOcc occ_info)
     has_dmd   = not $ isTopDmd dmd_info 
-    has_lbv   = not (hasNoLBVarInfo lbv_info)
+    has_lbv   = not (hasNoOneShotInfo lbv_info)
 
     doc = showAttributes
           [ (has_prag, ptext (sLit "InlPrag=") <> ppr prag_info)
           , (has_occ,  ptext (sLit "Occ=") <> ppr occ_info)
           , (has_dmd,  ptext (sLit "Dmd=") <> ppr dmd_info)
-          , (has_lbv , ptext (sLit "Lbv=") <> ppr lbv_info)
+          , (has_lbv , ptext (sLit "OS=") <> ppr lbv_info)
           ]
 \end{code}
 
@@ -374,7 +381,7 @@ ppIdInfo id info
     , (True,           ptext (sLit "Str=") <> pprStrictness str_info)
     , (has_unf,        ptext (sLit "Unf=") <> ppr unf_info)
     , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
-    ]   -- Inline pragma, occ, demand, lbvar info
+    ]   -- Inline pragma, occ, demand, one-shot info
         -- printed out with all binders (when debug is on);
         -- see PprCore.pprIdBndr
   where

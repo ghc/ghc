@@ -1319,7 +1319,8 @@ inlined.
 \begin{code}
 realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
-                     (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)    -- Note [evaldUnfoldings]
+                     (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
+                                  `setOneShotInfo` stateHackOneShot)
 
 voidPrimId :: Id     -- Global constant :: Void#
 voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy

@@ -24,9 +24,13 @@ module IdInfo (
 	vanillaIdInfo, noCafIdInfo,
 	seqIdInfo, megaSeqIdInfo,
 
+        -- ** The OneShotInfo type
+        OneShotInfo(..),
+        oneShotInfo, noOneShotInfo, hasNoOneShotInfo,
+        setOneShotInfo, 
+
 	-- ** Zapping various forms of Info
 	zapLamInfo, zapFragileInfo,
-
         zapDemandInfo,
 
 	-- ** The ArityInfo type
@@ -52,7 +56,7 @@ module IdInfo (
 
 	InsideLam, OneBranch,
 	insideLam, notInsideLam, oneBranch, notOneBranch,
-	
+
 	-- ** The SpecInfo type
 	SpecInfo(..),
 	emptySpecInfo,
@@ -64,11 +68,6 @@ module IdInfo (
 	CafInfo(..),
 	ppCafInfo, mayHaveCafRefs,
 	cafInfo, setCafInfo,
-
-        -- ** The LBVarInfo type
-        LBVarInfo(..),
-        noLBVarInfo, hasNoLBVarInfo,
-        lbvarInfo, setLBVarInfo,
 
         -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
@@ -94,7 +93,7 @@ infixl 	1 `setSpecInfo`,
 	  `setArityInfo`,
 	  `setInlinePragInfo`,
 	  `setUnfoldingInfo`,
-	  `setLBVarInfo`,
+	  `setOneShotInfo`,
 	  `setOccInfo`,
 	  `setCafInfo`,
 	  `setStrictnessInfo`,
@@ -191,7 +190,7 @@ pprIdDetails other     = brackets (pp other)
 -- 
 -- The 'IdInfo' gives information about the value, or definition, of the
 -- 'Id'.  It does not contain information about the 'Id''s usage,
--- except for 'demandInfo' and 'lbvarInfo'.
+-- except for 'demandInfo' and 'oneShotInfo'.
 data IdInfo
   = IdInfo {
 	arityInfo 	:: !ArityInfo,		-- ^ 'Id' arity
@@ -199,7 +198,7 @@ data IdInfo
 			   			-- See Note [Specialisations and RULES in IdInfo]
 	unfoldingInfo	:: Unfolding,		-- ^ The 'Id's unfolding
 	cafInfo		:: CafInfo,		-- ^ 'Id' CAF info
-        lbvarInfo	:: LBVarInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
+        oneShotInfo	:: OneShotInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
 	inlinePragInfo	:: InlinePragma,	-- ^ Any inline pragma atached to the 'Id'
 	occInfo		:: OccInfo,		-- ^ How the 'Id' occurs in the program
 
@@ -223,12 +222,14 @@ megaSeqIdInfo info
 -- some unfoldings are not calculated at all
 --    seqUnfolding (unfoldingInfo info)		`seq`
 
-    seqDemandInfo (demandInfo info)         `seq`
-    seqStrictnessInfo (strictnessInfo info) `seq`
-
+    seqDemandInfo (demandInfo info)             `seq`
+    seqStrictnessInfo (strictnessInfo info)     `seq`
     seqCaf (cafInfo info)			`seq`
-    seqLBVar (lbvarInfo info)			`seq`
-    seqOccInfo (occInfo info) 
+    seqOneShot (oneShotInfo info)		`seq`
+    seqOccInfo (occInfo info)
+
+seqOneShot :: OneShotInfo -> ()
+seqOneShot l = l `seq` ()
 
 seqStrictnessInfo :: StrictSig -> ()
 seqStrictnessInfo ty = seqStrictSig ty
@@ -266,8 +267,8 @@ setArityInfo	  info ar  = info { arityInfo = ar  }
 setCafInfo :: IdInfo -> CafInfo -> IdInfo
 setCafInfo        info caf = info { cafInfo = caf }
 
-setLBVarInfo :: IdInfo -> LBVarInfo -> IdInfo
-setLBVarInfo      info lb = {-lb `seq`-} info { lbvarInfo = lb }
+setOneShotInfo :: IdInfo -> OneShotInfo -> IdInfo
+setOneShotInfo      info lb = {-lb `seq`-} info { oneShotInfo = lb }
 
 setDemandInfo :: IdInfo -> Demand -> IdInfo
 setDemandInfo info dd = dd `seq` info { demandInfo = dd }
@@ -286,7 +287,7 @@ vanillaIdInfo
 	    arityInfo		= unknownArity,
 	    specInfo		= emptySpecInfo,
 	    unfoldingInfo	= noUnfolding,
-	    lbvarInfo		= NoLBVarInfo,
+	    oneShotInfo		= NoOneShotInfo,
 	    inlinePragInfo 	= defaultInlinePragma,
 	    occInfo		= NoOccInfo,
             demandInfo	        = topDmd,
@@ -462,43 +463,6 @@ ppCafInfo :: CafInfo -> SDoc
 ppCafInfo NoCafRefs = ptext (sLit "NoCafRefs")
 ppCafInfo MayHaveCafRefs = empty
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[lbvar-IdInfo]{Lambda-bound var info about an @Id@}
-%*									*
-%************************************************************************
-
-\begin{code}
--- | If the 'Id' is a lambda-bound variable then it may have lambda-bound
--- variable info. Sometimes we know whether the lambda binding this variable
--- is a \"one-shot\" lambda; that is, whether it is applied at most once.
---
--- This information may be useful in optimisation, as computations may
--- safely be floated inside such a lambda without risk of duplicating
--- work.
-data LBVarInfo = NoLBVarInfo            -- ^ No information
-	       | IsOneShotLambda	-- ^ The lambda is applied at most once).
-
--- | It is always safe to assume that an 'Id' has no lambda-bound variable information
-noLBVarInfo :: LBVarInfo
-noLBVarInfo = NoLBVarInfo
-
-hasNoLBVarInfo :: LBVarInfo -> Bool
-hasNoLBVarInfo NoLBVarInfo     = True
-hasNoLBVarInfo IsOneShotLambda = False
-
-seqLBVar :: LBVarInfo -> ()
-seqLBVar l = l `seq` ()
-
-pprLBVarInfo :: LBVarInfo -> SDoc
-pprLBVarInfo NoLBVarInfo     = empty
-pprLBVarInfo IsOneShotLambda = ptext (sLit "OneShot")
-
-instance Outputable LBVarInfo where
-    ppr = pprLBVarInfo
-\end{code}
-
 
 %************************************************************************
 %*									*

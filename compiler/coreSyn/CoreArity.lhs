@@ -102,7 +102,7 @@ exprArity e = go e
     trim_arity arity ty = arity `min` length (typeArity ty)
 
 ---------------
-typeArity :: Type -> [OneShot]
+typeArity :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
 -- See Note [exprArity invariant]
@@ -114,8 +114,7 @@ typeArity ty
       = go rec_nts ty'
 
       | Just (arg,res) <- splitFunTy_maybe ty    
-      = isStateHackType arg : go rec_nts res
-
+      = typeOneShot arg : go rec_nts res
       | Just (tc,tys) <- splitTyConApp_maybe ty 
       , Just (ty', _) <- instNewTyCon_maybe tc tys
       , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]
@@ -476,15 +475,9 @@ Then  f             :: AT [False,False] ATop
 -------------------- Main arity code ----------------------------
 \begin{code}
 -- See Note [ArityType]
-data ArityType = ATop [OneShot] | ABot Arity
+data ArityType = ATop [OneShotInfo] | ABot Arity
      -- There is always an explicit lambda
      -- to justify the [OneShot], or the Arity
-
-type OneShot = Bool    -- False <=> Know nothing
-                       -- True  <=> Can definitely float inside this lambda
-	               -- The 'True' case can arise either because a binder
-		       -- is marked one-shot, or because it's a state lambda
-		       -- and we have the state hack on
 
 vanillaArityType :: ArityType
 vanillaArityType = ATop []	-- Totally uninformative
@@ -543,7 +536,7 @@ findRhsArity dflags bndr rhs old_arity
 #ifdef DEBUG
                     pprTrace "Exciting arity"
                        (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
-                             , ppr rhs])
+                                                    , ppr rhs])
 #endif
                     go new_arity
       where
@@ -562,8 +555,9 @@ rhsEtaExpandArity :: DynFlags -> CheapAppFun -> CoreExpr -> Arity
 rhsEtaExpandArity dflags cheap_app e
   = case (arityType env e) of
       ATop (os:oss)
-        | os || has_lam e -> 1 + length oss  -- Don't expand PAPs/thunks
-                                             -- Note [Eta expanding thunks]
+        | isOneShotInfo os || has_lam e -> 1 + length oss  
+                                   -- Don't expand PAPs/thunks
+                                   -- Note [Eta expanding thunks]
         | otherwise       -> 0
       ATop []             -> 0
       ABot n              -> n
@@ -647,15 +641,15 @@ when saturated" so we don't want to be too gung-ho about saturating!
 
 \begin{code}
 arityLam :: Id -> ArityType -> ArityType
-arityLam id (ATop as) = ATop (isOneShotBndr id : as)
+arityLam id (ATop as) = ATop (idOneShotInfo id : as)
 arityLam _  (ABot n)  = ABot (n+1)
 
 floatIn :: Bool -> ArityType -> ArityType
--- We have something like (let x = E in b), 
--- where b has the given arity type.  
+-- We have something like (let x = E in b),
+-- where b has the given arity type.
 floatIn _     (ABot n)  = ABot n
 floatIn True  (ATop as) = ATop as
-floatIn False (ATop as) = ATop (takeWhile id as)
+floatIn False (ATop as) = ATop (takeWhile isOneShotInfo as)
    -- If E is not cheap, keep arity only for one-shots
 
 arityApp :: ArityType -> Bool -> ArityType
@@ -667,37 +661,34 @@ arityApp (ATop [])     _     = ATop []
 arityApp (ATop (_:as)) cheap = floatIn cheap (ATop as)
 
 andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
-andArityType (ABot n1) (ABot n2) 
+andArityType (ABot n1) (ABot n2)
   = ABot (n1 `min` n2)
 andArityType (ATop as)  (ABot _)  = ATop as
 andArityType (ABot _)   (ATop bs) = ATop bs
 andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
   where	     -- See Note [Combining case branches]
-    combine (a:as) (b:bs) = (a && b) : combine as bs
-    combine []     bs     = take_one_shots bs
-    combine as     []     = take_one_shots as
-
-    take_one_shots [] = []
-    take_one_shots (one_shot : as) 
-      | one_shot  = True : take_one_shots as
-      | otherwise = [] 
+    combine (a:as) (b:bs) = (a `bestOneShot` b) : combine as bs
+    combine []     bs     = takeWhile isOneShotInfo bs
+    combine as     []     = takeWhile isOneShotInfo as
 \end{code}
 
 Note [Combining case branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider    
+Consider
   go = \x. let z = go e0
                go2 = \x. case x of
                            True  -> z
                            False -> \s(one-shot). e1
            in go2 x
-We *really* want to eta-expand go and go2.  
+We *really* want to eta-expand go and go2.
 When combining the barnches of the case we have
-     ATop [] `andAT` ATop [True]
-and we want to get ATop [True].  But if the inner
+     ATop [] `andAT` ATop [OneShotLam]
+and we want to get ATop [OneShotLam].  But if the inner
 lambda wasn't one-shot we don't want to do this.
 (We need a proper arity analysis to justify that.)
 
+So we combine the best of the two branches, on the (slightly dodgy)
+basis that if we know one branch is one-shot, then they all must be.
 
 \begin{code}
 ---------------------------
@@ -738,7 +729,7 @@ arityType _ (Var v)
   | otherwise
   = ATop (take (idArity v) one_shots)
   where
-    one_shots :: [Bool]	    -- One-shot-ness derived from the type
+    one_shots :: [OneShotInfo]	-- One-shot-ness derived from the type
     one_shots = typeArity (idType v)
 
 	-- Lambdas; increase arity
@@ -778,7 +769,7 @@ arityType env (Case scrut _ _ alts)
      ATop as | not (ae_ped_bot env)    -- Check -fpedantic-bottoms
              , is_under scrut             -> ATop as
              | exprOkForSpeculation scrut -> ATop as
-             | otherwise                  -> ATop (takeWhile id as)	    
+             | otherwise                  -> ATop (takeWhile isOneShotInfo as)
   where
     -- is_under implements Note [Dealing with bottom (3)]
     is_under (Var f)           = f `elem` ae_bndrs env

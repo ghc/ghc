@@ -65,15 +65,17 @@ module Id (
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
         -- ** One-shot lambdas
-        isOneShotBndr, isOneShotLambda, isStateHackType,
-        setOneShotLambda, clearOneShotLambda,
+        isOneShotBndr, isOneShotLambda, isProbablyOneShotLambda,
+        setOneShotLambda, clearOneShotLambda, 
+        updOneShotInfo, setIdOneShotInfo,
+        isStateHackType, stateHackOneShot, typeOneShot,
 
         -- ** Reading 'IdInfo' fields
         idArity, 
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo,
-        idLBVarInfo,
+        idOneShotInfo,
         idOccInfo,
 
         -- ** Writing 'IdInfo' fields
@@ -130,6 +132,7 @@ infixl  1 `setIdUnfoldingLazily`,
           `setIdUnfolding`,
           `setIdArity`,
           `setIdOccInfo`,
+          `setIdOneShotInfo`,
 
           `setIdSpecialisation`,
           `setInlinePragma`,
@@ -236,7 +239,8 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
 mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
+mkLocalId name ty = mkLocalIdWithInfo name ty
+                         (vanillaIdInfo `setOneShotInfo` typeOneShot ty)
 
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
@@ -587,18 +591,27 @@ isConLikeId id = isDataConWorkId id || isConLike (idRuleMatchInfo id)
         ---------------------------------
         -- ONE-SHOT LAMBDAS
 \begin{code}
-idLBVarInfo :: Id -> LBVarInfo
-idLBVarInfo id = lbvarInfo (idInfo id)
+idOneShotInfo :: Id -> OneShotInfo
+idOneShotInfo id = oneShotInfo (idInfo id)
 
 -- | Returns whether the lambda associated with the 'Id' is certainly applied at most once
--- OR we are applying the \"state hack\" which makes it appear as if theis is the case for
--- lambdas used in @IO@. You should prefer using this over 'isOneShotLambda'
-isOneShotBndr :: Id -> Bool
 -- This one is the "business end", called externally.
+-- It works on type variables as well as Ids, returning True
 -- Its main purpose is to encapsulate the Horrible State Hack
-isOneShotBndr id = isOneShotLambda id || isStateHackType (idType id)
+isOneShotBndr :: Var -> Bool
+isOneShotBndr var
+  | isTyVar var = True
+  | otherwise   = isOneShotLambda var
 
 -- | Should we apply the state hack to values of this 'Type'?
+stateHackOneShot :: OneShotInfo
+stateHackOneShot = OneShotLam         -- Or maybe ProbOneShot?
+
+typeOneShot :: Type -> OneShotInfo
+typeOneShot ty
+   | isStateHackType ty = stateHackOneShot
+   | otherwise          = NoOneShotInfo
+
 isStateHackType :: Type -> Bool
 isStateHackType ty
   | opt_NoStateHack
@@ -629,17 +642,36 @@ isStateHackType ty
 -- | Returns whether the lambda associated with the 'Id' is certainly applied at most once.
 -- You probably want to use 'isOneShotBndr' instead
 isOneShotLambda :: Id -> Bool
-isOneShotLambda id = case idLBVarInfo id of
-                       IsOneShotLambda  -> True
-                       NoLBVarInfo      -> False
+isOneShotLambda id = case idOneShotInfo id of
+                       OneShotLam -> True
+                       _          -> False
+
+isProbablyOneShotLambda :: Id -> Bool
+isProbablyOneShotLambda id = case idOneShotInfo id of
+                               OneShotLam    -> True
+                               ProbOneShot   -> True
+                               NoOneShotInfo -> False
 
 setOneShotLambda :: Id -> Id
-setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
+setOneShotLambda id = modifyIdInfo (`setOneShotInfo` OneShotLam) id
 
 clearOneShotLambda :: Id -> Id
-clearOneShotLambda id
-  | isOneShotLambda id = modifyIdInfo (`setLBVarInfo` NoLBVarInfo) id
-  | otherwise          = id
+clearOneShotLambda id = modifyIdInfo (`setOneShotInfo` NoOneShotInfo) id
+
+setIdOneShotInfo :: Id -> OneShotInfo -> Id
+setIdOneShotInfo id one_shot = modifyIdInfo (`setOneShotInfo` one_shot) id
+
+updOneShotInfo :: Id -> OneShotInfo -> Id
+-- Combine the info in the Id with new info
+updOneShotInfo id one_shot
+  | do_upd    = setIdOneShotInfo id one_shot
+  | otherwise = id
+  where
+    do_upd = case (idOneShotInfo id, one_shot) of
+                (NoOneShotInfo, _) -> True
+                (OneShotLam,    _) -> False
+                (_, NoOneShotInfo) -> False
+                _                  -> True
 
 -- The OneShotLambda functions simply fiddle with the IdInfo flag
 -- But watch out: this may change the type of something else

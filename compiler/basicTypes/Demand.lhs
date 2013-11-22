@@ -1268,27 +1268,28 @@ botSig = StrictSig botDmdType
 cprProdSig :: StrictSig
 cprProdSig = StrictSig cprProdDmdType
 
-argsOneShots :: StrictSig -> Arity -> [[Bool]]
+argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
-  | arg_ds `lengthExceeds` n_val_args
-  = []   -- Too few arguments
-  | otherwise
   = go arg_ds
   where
+    good_one_shot
+      | arg_ds `lengthExceeds` n_val_args = ProbOneShot
+      | otherwise                         = OneShotLam
+
     go []               = []
-    go (arg_d : arg_ds) = argOneShots arg_d `cons` go arg_ds
-    
+    go (arg_d : arg_ds) = argOneShots good_one_shot arg_d `cons` go arg_ds
+
     cons [] [] = []
     cons a  as = a:as
 
-argOneShots :: JointDmd -> [Bool]
-argOneShots (JD { absd = usg })
+argOneShots :: OneShotInfo -> JointDmd -> [OneShotInfo]
+argOneShots one_shot_info (JD { absd = usg })
   = case usg of
       Use _ arg_usg -> go arg_usg
       _             -> []
   where
-    go (UCall One  u) = True  : go u
-    go (UCall Many u) = False : go u
+    go (UCall One  u) = one_shot_info : go u
+    go (UCall Many u) = NoOneShotInfo : go u
     go _              = []
 
 dmdTransformSig :: StrictSig -> CleanDemand -> DmdType
@@ -1304,7 +1305,7 @@ dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) cd
     --      a lazy demand for p!
 
 dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
--- Same as dmdTranformSig but for a data constructor (worker), 
+-- Same as dmdTransformSig but for a data constructor (worker), 
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on 
 -- the result into the constructor arguments.

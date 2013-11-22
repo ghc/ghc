@@ -47,9 +47,9 @@ analysis pass.
 \end{enumerate}
 
 and we return some ``plain'' bindings which have been
-worker/wrapper-ified, meaning: 
+worker/wrapper-ified, meaning:
 
-\begin{enumerate} 
+\begin{enumerate}
 
 \item Functions have been split into workers and wrappers where
 appropriate.  If a function has both strictness and CPR properties
@@ -156,13 +156,13 @@ It's very important to refrain from w/w-ing an INLINE function (ie one
 with an InlineRule) because the wrapper will then overwrite the
 InlineRule unfolding.
 
-Furthermore, if the programmer has marked something as INLINE, 
+Furthermore, if the programmer has marked something as INLINE,
 we may lose by w/w'ing it.
 
 If the strictness analyser is run twice, this test also prevents
 wrappers (which are INLINEd) from being re-done.  (You can end up with
 several liked-named Ids bouncing around at the same time---absolute
-mischief.)  
+mischief.)
 
 Notice that we refrain from w/w'ing an INLINE function even if it is
 in a recursive group.  It might not be the loop breaker.  (We could
@@ -179,7 +179,7 @@ one.  So we leave INLINABLE things alone too.
 
 This is a slight infelicity really, because it means that adding
 an INLINABLE pragma could make a program a bit less efficient,
-because you lose the worker/wrapper stuff.  But I don't see a way 
+because you lose the worker/wrapper stuff.  But I don't see a way
 to avoid that.
 
 Note [Don't w/w inline small non-loop-breaker things]
@@ -214,7 +214,7 @@ When should the wrapper inlining be active?  It must not be active
 earlier than the current Activation of the Id (eg it might have a
 NOINLINE pragma).  But in fact strictness analysis happens fairly
 late in the pipeline, and we want to prioritise specialisations over
-strictness.  Eg if we have 
+strictness.  Eg if we have
   module Foo where
     f :: Num a => a -> Int -> a
     f n 0 = n  	       	   -- Strict in the Int, hence wrapper
@@ -232,7 +232,7 @@ strictness.  Eg if we have
 Then we want the specialisation for 'f' to kick in before the wrapper does.
 
 Now in fact the 'gentle' simplification pass encourages this, by
-having rules on, but inlinings off.  But that's kind of lucky. It seems 
+having rules on, but inlinings off.  But that's kind of lucky. It seems
 more robust to give the wrapper an Activation of (ActiveAfter 0),
 so that it becomes active in an importing module at the same time that
 it appears in the first place in the defining module.
@@ -252,8 +252,8 @@ tryWW dflags is_rec fn_id rhs
   | isNeverActive inline_act
 	-- No point in worker/wrappering if the thing is never inlined!
 	-- Because the no-inline prag will prevent the wrapper ever
-	-- being inlined at a call site. 
-	-- 
+	-- being inlined at a call site.
+	--
 	-- Furthermore, don't even expose strictness info
   = return [ (fn_id, rhs) ]
 
@@ -286,7 +286,7 @@ tryWW dflags is_rec fn_id rhs
     strict_sig  = strictnessInfo fn_info
     StrictSig (DmdType env wrap_dmds res_info) = strict_sig
 
-	-- new_fn_id has the DmdEnv zapped.  
+	-- new_fn_id has the DmdEnv zapped.
 	--	(a) it is never used again
 	--	(b) it wastes space
 	--	(c) it becomes incorrect as things are cloned, because
@@ -323,14 +323,14 @@ checkSize dflags fn_id rhs thing_inside
 splitFun :: DynFlags -> Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fn_id fn_info wrap_dmds res_info rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) )
     (do {
 	-- The arity should match the signature
       (work_demands, wrap_fn, work_fn) <- mkWwBodies dflags fun_ty wrap_dmds res_info one_shots
     ; work_uniq <- getUniqueM
     ; let
 	work_rhs = work_fn rhs
-	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
+	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
 		        `setIdOccInfo` occInfo fn_info
 				-- Copy over occurrence info from parent
 				-- Notably whether it's a loop breaker
@@ -338,20 +338,20 @@ splitFun dflags fn_id fn_info wrap_dmds res_info rhs
 				-- seems right-er to do so
 
 			`setInlineActivation` (inlinePragmaActivation inl_prag)
-				-- Any inline activation (which sets when inlining is active) 
+				-- Any inline activation (which sets when inlining is active)
 				-- on the original function is duplicated on the worker
 				-- It *matters* that the pragma stays on the wrapper
 				-- It seems sensible to have it on the worker too, although we
-				-- can't think of a compelling reason. (In ptic, INLINE things are 
+				-- can't think of a compelling reason. (In ptic, INLINE things are
 				-- not w/wd). However, the RuleMatchInfo is not transferred since
                                 -- it does not make sense for workers to be constructorlike.
 
 			`setIdStrictness` mkClosedStrictSig work_demands work_res_info
-				-- Even though we may not be at top level, 
+				-- Even though we may not be at top level,
 				-- it's ok to give it an empty DmdEnv
 
                         `setIdArity` (exprArity work_rhs)
-                                -- Set the arity so that the Core Lint check that the 
+                                -- Set the arity so that the Core Lint check that the
                                 -- arity is consistent with the demand type goes through
 
 	wrap_rhs  = wrap_fn work_id
@@ -377,7 +377,7 @@ splitFun dflags fn_id fn_info wrap_dmds res_info rhs
     fun_ty          = idType fn_id
     inl_prag        = inlinePragInfo fn_info
     rule_match_info = inlinePragmaRuleMatchInfo inl_prag
-    arity           = arityInfo fn_info	
+    arity           = arityInfo fn_info
     		    -- The arity is set by the simplifier using exprEtaExpandArity
 		    -- So it may be more than the number of top-level-visible lambdas
 
@@ -390,15 +390,12 @@ splitFun dflags fn_id fn_info wrap_dmds res_info rhs
 -- make the wrapper and worker have corresponding one-shot arguments too.
 -- Otherwise we spuriously float stuff out of case-expression join points,
 -- which is very annoying.
-get_one_shots :: Expr Var -> [Bool]
+get_one_shots :: Expr Var -> [OneShotInfo]
 get_one_shots (Lam b e)
-  | isId b    = isOneShotLambda b : get_one_shots e
+  | isId b    = idOneShotInfo b : get_one_shots e
   | otherwise = get_one_shots e
 get_one_shots (Tick _ e) = get_one_shots e
-get_one_shots _    	 = noOneShotInfo
-
-noOneShotInfo :: [Bool]
-noOneShotInfo = repeat False
+get_one_shots _    	 = []
 \end{code}
 
 Note [Do not split void functions]
@@ -415,7 +412,7 @@ in w/w so that we don't pass the argument at all.
 Note [Thunk splitting]
 ~~~~~~~~~~~~~~~~~~~~~~
 Suppose x is used strictly (never mind whether it has the CPR
-property).  
+property).
 
       let
 	x* = x-rhs
@@ -429,8 +426,8 @@ splitThunk transforms like this:
 
 Now simplifier will transform to
 
-      case x-rhs of 
-	I# a ->	let x* = I# a 
+      case x-rhs of
+	I# a ->	let x* = I# a
 	        in body
 
 which is what we want. Now suppose x-rhs is itself a case:
@@ -442,7 +439,7 @@ what would have happened before) which is fine.
 
 Notice that x certainly has the CPR property now!
 
-In fact, splitThunk uses the function argument w/w splitting 
+In fact, splitThunk uses the function argument w/w splitting
 function, so that if x's demand is deeper (say U(U(L,L),L))
 then the splitting will go deeper too.
 
@@ -452,7 +449,7 @@ then the splitting will go deeper too.
 --	x = e
 -- into
 --	x = let x = e
---	    in case x of 
+--	    in case x of
 --		 I# y -> let x = I# y in x }
 -- See comments above. Is it not beautifully short?
 -- Moreover, it works just as well when there are

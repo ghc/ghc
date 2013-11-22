@@ -1084,7 +1084,7 @@ occAnalNonRecRhs env bndr rhs
   = occAnal rhs_env rhs
   where
     -- See Note [Use one-shot info]
-    env1 = env { occ_one_shots = argOneShots dmd }
+    env1 = env { occ_one_shots = argOneShots OneShotLam dmd }
 
     -- See Note [Cascading inlines]
     rhs_env | certainly_inline = env1
@@ -1234,13 +1234,14 @@ occAnal env expr@(Lam _ _)
         (final_usage, tagged_binders) = tagLamBinders body_usage binders'
                       -- Use binders' to put one-shot info on the lambdas
 
-        really_final_usage | linear    = final_usage
-                           | otherwise = mapVarEnv markInsideLam final_usage
+        really_final_usage
+          | all isOneShotBndr binders' = final_usage
+          | otherwise = mapVarEnv markInsideLam final_usage
     in
     (really_final_usage, mkLams tagged_binders body') }
   where
-    (binders, body)              = collectBinders expr
-    (env_body, binders', linear) = oneShotGroup env binders
+    (binders, body)      = collectBinders expr
+    (env_body, binders') = oneShotGroup env binders
 
 occAnal env (Case scrut bndr ty alts)
   = case occ_anal_scrut scrut alts     of { (scrut_usage, scrut') ->
@@ -1332,15 +1333,16 @@ occAnalApp env (Var fun, args)
     in
     (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
-    fun_uds  = mkOneOcc env fun (valArgCount args > 0)
-    is_exp = isExpandableApp fun (valArgCount args)
+    n_val_args = valArgCount args
+    fun_uds    = mkOneOcc env fun (n_val_args > 0)
+    is_exp     = isExpandableApp fun n_val_args
            -- See Note [CONLIKE pragma] in BasicTypes
            -- The definition of is_exp should match that in
            -- Simplify.prepareRhs
 
-    one_shots  = argsOneShots (idStrictness fun) (valArgCount args)
+    one_shots  = argsOneShots (idStrictness fun) n_val_args
                  -- See Note [Use one-shot info]
-        
+
     args_stuff = occAnalArgs env args one_shots
 
                         -- (foldr k z xs) may call k many times, but it never
@@ -1466,15 +1468,11 @@ instance Outputable OccEncl where
   ppr OccRhs     = ptext (sLit "occRhs")
   ppr OccVanilla = ptext (sLit "occVanilla")
 
-type OneShots = [Bool]
+type OneShots = [OneShotInfo]
         -- []           No info
         --
-        -- True:ctxt    Analysing a function-valued expression that will be
-        --                      applied just once
-        --
-        -- False:ctxt   Analysing a function-valued expression that may
-        --                      be applied many times; but when it is,
-        --                      the OneShots inside applies
+        -- one_shot_info:ctxt    Analysing a function-valued expression that
+        --                       will be applied as described by one_shot_info
 
 initOccEnv :: (Activation -> Bool) -> OccEnv
 initOccEnv active_rule
@@ -1502,38 +1500,37 @@ isRhsEnv (OccEnv { occ_encl = OccVanilla }) = False
 
 oneShotGroup :: OccEnv -> [CoreBndr] 
              -> ( OccEnv
-                , [CoreBndr]
-                , Bool )   -- True <=> all binders are one-shot
+                , [CoreBndr] )
         -- The result binders have one-shot-ness set that they might not have had originally.
         -- This happens in (build (\cn -> e)).  Here the occurrence analyser
         -- linearity context knows that c,n are one-shot, and it records that fact in
         -- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
 oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
-  = go ctxt bndrs [] True
+  = go ctxt bndrs []
   where
-    go ctxt [] rev_bndrs linear 
+    go ctxt [] rev_bndrs
       = ( env { occ_one_shots = ctxt, occ_encl = OccVanilla }
-        , reverse rev_bndrs
-        , linear )
+        , reverse rev_bndrs )
 
-    go ctxt (bndr:bndrs) rev_bndrs lin_acc
+    go [] bndrs rev_bndrs
+      = ( env { occ_one_shots = [], occ_encl = OccVanilla }
+        , reverse rev_bndrs ++ bndrs )
+
+    go ctxt (bndr:bndrs) rev_bndrs
       | isId bndr
+      
       = case ctxt of
-          []            -> go [] bndrs (bndr:rev_bndrs) (lin_acc && one_shot)
-          (linear : ctxt) 
-             | one_shot  -> go ctxt bndrs (bndr : rev_bndrs) lin_acc
-             | linear    -> go ctxt bndrs (bndr': rev_bndrs) lin_acc
-             | otherwise -> go ctxt bndrs (bndr : rev_bndrs) False
-      | otherwise
-      = go ctxt bndrs (bndr:rev_bndrs) lin_acc
-      where
-        one_shot = isOneShotBndr bndr
-        bndr'    = setOneShotLambda bndr
+          []                -> go []   bndrs (bndr : rev_bndrs)
+          (one_shot : ctxt) -> go ctxt bndrs (bndr': rev_bndrs)
+                            where
+                               bndr' = updOneShotInfo bndr one_shot
+       | otherwise
+      = go ctxt bndrs (bndr:rev_bndrs)
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
-  = env { occ_one_shots = replicate (valArgCount args) True ++ ctxt }
+  = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
 \end{code}
 
 
