@@ -49,6 +49,7 @@ import FastString
 import Panic
 import Util
 import Annotations
+import BasicTypes( TopLevelFlag )
 
 import Control.Exception
 import Data.IORef
@@ -163,6 +164,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
+                tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
@@ -1162,20 +1164,23 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
 
-keepAliveTc :: Id -> TcM ()     -- Record the name in the keep-alive set
-keepAliveTc id
-  | isLocalId id = do { env <- getGblEnv;
-                      ; updTcRef (tcg_keep env) (`addOneToNameSet` idName id) }
-  | otherwise = return ()
-
-keepAliveSetTc :: NameSet -> TcM ()     -- Record the name in the keep-alive set
-keepAliveSetTc ns = do { env <- getGblEnv;
-                       ; updTcRef (tcg_keep env) (`unionNameSets` ns) }
+keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
+keepAlive name
+  = do { env <- getGblEnv
+       ; traceRn (ptext (sLit "keep alive") <+> ppr name)
+       ; updTcRef (tcg_keep env) (`addOneToNameSet` name) }
 
 getStage :: TcM ThStage
 getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 
-setStage :: ThStage -> TcM a -> TcM a
+getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, ThLevel, ThStage))
+getStageAndBindLevel name
+  = do { env <- getLclEnv;
+       ; case lookupNameEnv (tcl_th_bndrs env) name of
+           Nothing                  -> return Nothing
+           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, bind_lvl, tcl_th_ctxt env)) }
+
+setStage :: ThStage -> TcM a -> TcRn a
 setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
 \end{code}
 

@@ -448,7 +448,11 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_loc        :: SrcSpan,         -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
         tcl_untch      :: Untouchables,    -- Birthplace for new unification variables
+
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
+        tcl_th_bndrs   :: ThBindEnv,       -- Binding level of in-scope Names
+                                           -- defined in this module (not imported)
+
         tcl_arrow_ctxt :: ArrowCtxt,       -- Arrow-notation context
 
         tcl_rdr :: LocalRdrEnv,         -- Local name envt
@@ -483,6 +487,15 @@ data TcLclEnv           -- Changes as we move inside an expression
     }
 
 type TcTypeEnv = NameEnv TcTyThing
+
+type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
+   -- Domain = all Ids bound in this module (ie not imported)
+   -- The TopLevelFlag tells if the binding is syntactically top level.
+   -- We need to know this, because the cross-stage persistence story allows
+   -- cross-stage at arbitrary types if the Id is bound at top level.
+   --
+   -- Nota bene: a ThLevel of 'outerLevel' is *not* the same as being
+   -- bound at top level!  See Note [Template Haskell levels] in TcSplice
 
 data TcIdBinder
   = TcIdBndr
@@ -536,22 +549,15 @@ instance Outputable ThStage where
    ppr (Brack _ s _ _) = text "Brack" <> parens (ppr s)
 
 type ThLevel = Int
-        -- See Note [Template Haskell levels] in TcSplice
-        -- Incremented when going inside a bracket,
-        -- decremented when going inside a splice
-        -- NB: ThLevel is one greater than the 'n' in Fig 2 of the
-        --     original "Template meta-programming for Haskell" paper
+    -- NB: see Note [Template Haskell levels] in TcSplice
+    -- Incremented when going inside a bracket,
+    -- decremented when going inside a splice
+    -- NB: ThLevel is one greater than the 'n' in Fig 2 of the
+    --     original "Template meta-programming for Haskell" paper
 
 impLevel, outerLevel :: ThLevel
 impLevel = 0    -- Imported things; they can be used inside a top level splice
 outerLevel = 1  -- Things defined outside brackets
--- NB: Things at level 0 are not *necessarily* imported.
---      eg  $( \b -> ... )   here b is bound at level 0
---
--- For example:
---      f = ...
---      g1 = $(map ...)         is OK
---      g2 = $(f ...)           is not OK; because we havn't compiled f yet
 
 thLevel :: ThStage -> ThLevel
 thLevel (Splice _)      = 0
@@ -613,8 +619,7 @@ data TcTyThing
 
   | ATcId   {           -- Ids defined in this module; may not be fully zonked
         tct_id     :: TcId,
-        tct_closed :: TopLevelFlag,   -- See Note [Bindings with closed types]
-        tct_level  :: ThLevel }
+        tct_closed :: TopLevelFlag }   -- See Note [Bindings with closed types]
 
   | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
                                 -- variable is bound. We only need the Name
@@ -645,8 +650,7 @@ instance Outputable TcTyThing where     -- Debugging only
    ppr elt@(ATcId {})   = text "Identifier" <>
                           brackets (ppr (tct_id elt) <> dcolon
                                  <> ppr (varType (tct_id elt)) <> comma
-                                 <+> ppr (tct_closed elt) <> comma
-                                 <+> ppr (tct_level elt))
+                                 <+> ppr (tct_closed elt))
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
    ppr (AThing k)       = text "AThing" <+> ppr k
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err

@@ -21,11 +21,11 @@ module TcEnv(
         tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
         
         -- Local environment
-        tcExtendKindEnv, tcExtendTcTyThingEnv,
+        tcExtendKindEnv, tcExtendKindEnv2,
         tcExtendTyVarEnv, tcExtendTyVarEnv2, 
-        tcExtendGhciEnv, tcExtendLetEnv,
+        tcExtendLetEnv,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
-        tcExtendIdBndrs,
+        tcExtendIdBndrs, tcExtendGlobalTyVars,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds, 
         tcLookupId, tcLookupTyVar, 
@@ -46,7 +46,7 @@ module TcEnv(
 
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel, 
-        topIdLvl, thTopLevelId, isBrackStage,
+        topIdLvl, isBrackStage,
 
         -- New Ids
         newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
@@ -320,12 +320,11 @@ tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- the same level as the lookup.  Only used in one place...
 tcLookupLocalIds ns 
   = do { env <- getLclEnv
-       ; return (map (lookup (tcl_env env) (thLevel (tcl_th_ctxt env))) ns) }
+       ; return (map (lookup (tcl_env env)) ns) }
   where
-    lookup lenv lvl name 
+    lookup lenv name 
         = case lookupNameEnv lenv name of
-                Just (ATcId { tct_id = id, tct_level = lvl1 }) 
-                        -> ASSERT( lvl == lvl1 ) id
+                Just (ATcId { tct_id = id }) ->  id
                 _ -> pprPanic "tcLookupLocalIds" (ppr name)
 
 getInLocalScope :: TcM (Name -> Bool)
@@ -335,15 +334,18 @@ getInLocalScope = do { lcl_env <- getLclTypeEnv
 \end{code}
 
 \begin{code}
-tcExtendTcTyThingEnv :: [(Name, TcTyThing)] -> TcM r -> TcM r
-tcExtendTcTyThingEnv things thing_inside
-  = do { stage <- getStage
-       ; updLclEnv (extend_local_env (thLevel stage) things) thing_inside
-       }
+tcExtendKindEnv2 :: [(Name, TcTyThing)] -> TcM r -> TcM r
+-- Used only during kind checking, for TcThings that are
+--      AThing or APromotionErr
+-- No need to update the global tyvars, or tcl_th_bndrs, or tcl_rdr
+tcExtendKindEnv2 things thing_inside
+  = updLclEnv upd_env thing_inside
+  where
+    upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
 
 tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
 tcExtendKindEnv name_kind_prs
-  = tcExtendTcTyThingEnv [(n, AThing k) | (n,k) <- name_kind_prs]
+  = tcExtendKindEnv2 [(n, AThing k) | (n,k) <- name_kind_prs]
 
 -----------------------
 -- Scoped type and kind variables
@@ -352,9 +354,10 @@ tcExtendTyVarEnv tvs thing_inside
   = tcExtendTyVarEnv2 [(tyVarName tv, tv) | tv <- tvs] thing_inside
 
 tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
-tcExtendTyVarEnv2 binds thing_inside 
+tcExtendTyVarEnv2 binds thing_inside
   = do { stage <- getStage
-       ; tc_extend_local_env (thLevel stage) [(name, ATyVar name tv) | (name, tv) <- binds] $
+       ; tc_extend_local_env (NotTopLevel, thLevel stage)
+                    [(name, ATyVar name tv) | (name, tv) <- binds] $
          do { env <- getLclEnv
             ; let env' = env { tcl_tidy = add_tidy_tvs (tcl_tidy env) }
             ; setLclEnv env' thing_inside }}
@@ -383,10 +386,9 @@ getScopedTyVarBinds
 tcExtendLetEnv :: TopLevelFlag -> TopLevelFlag -> [TcId] -> TcM a -> TcM a
 tcExtendLetEnv top_lvl closed ids thing_inside 
   = do  { stage <- getStage
-        ; tc_extend_local_env (thLevel stage)
+        ; tc_extend_local_env (top_lvl, thLevel stage)
                               [ (idName id, ATcId { tct_id = id 
-                                                  , tct_closed = closed
-                                                  , tct_level = thLevel stage })
+                                                  , tct_closed = closed })
                               | id <- ids] $
           tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] thing_inside }
 
@@ -408,39 +410,20 @@ tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 -- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
 tcExtendIdEnv2 names_w_ids thing_inside
   = do  { stage <- getStage
-        ; tc_extend_local_env (thLevel stage)
+        ; tc_extend_local_env (NotTopLevel, thLevel stage)
                               [ (name, ATcId { tct_id = id 
-                                             , tct_closed = NotTopLevel
-                                             , tct_level = thLevel stage })
+                                             , tct_closed = NotTopLevel })
                               | (name,id) <- names_w_ids] $
           thing_inside }
 
 tcExtendIdBndrs :: [TcIdBinder] -> TcM a -> TcM a
 tcExtendIdBndrs bndrs = updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
 
-tcExtendGhciEnv :: [TcId] -> TcM a -> TcM a
--- Used to bind Ids for GHCi identifiers bound earlier in the user interaction
--- Note especially that we bind them at 
---  * TH level 'impLevel'.  That's because it's OK to use a variable bound
---    earlier in the interaction in a splice, because
---    GHCi has already compiled it to bytecode
---  * Closedness flag is TopLevel.  The thing's type is closed
-
-tcExtendGhciEnv ids thing_inside
-  = tc_extend_local_env impLevel
-                        [ (idName id, ATcId { tct_id     = id 
-                                            , tct_closed = is_top id
-                                            , tct_level  = impLevel })
-                        | id <- ids]
-    thing_inside
-  where
-    is_top id | isEmptyVarSet (tyVarsOfType (idType id)) = TopLevel
-              | otherwise                                = NotTopLevel
-
-
-tc_extend_local_env :: ThLevel -> [(Name, TcTyThing)] -> TcM a -> TcM a
--- This is the guy who does the work
--- Invariant: the TcIds are fully zonked. Reasons:
+tc_extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcM a -> TcM a
+-- Precondition: the argument list extra_env has TcTyThings
+--               that ATcId or ATyVar, but nothing else
+--
+-- Invariant: the ATcIds are fully zonked. Reasons:
 --      (a) The kinds of the forall'd type variables are defaulted
 --          (see Kind.defaultKind, done in zonkQuantifiedTyVar)
 --      (b) There are no via-Indirect occurrences of the bound variables
@@ -449,32 +432,51 @@ tc_extend_local_env :: ThLevel -> [(Name, TcTyThing)] -> TcM a -> TcM a
 
 tc_extend_local_env thlvl extra_env thing_inside
   = do  { traceTc "env2" (ppr extra_env)
-        ; env1 <- getLclEnv
+        ; env1 <- tcExtendGlobalTyVars (map snd extra_env)
         ; let env2 = extend_local_env thlvl extra_env env1
-        ; env3 <- extend_gtvs env2
-        ; setLclEnv env3 thing_inside }
+        ; setLclEnv env2 thing_inside }
+
+extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
+-- Extend the local TcTypeEnv *and* the local LocalRdrEnv simultaneously
+-- Reason for extending LocalRdrEnv: after running a TH splice we need
+-- to do renaming.
+extend_local_env thlvl pairs env@(TcLclEnv { tcl_rdr = rdr_env
+                                           , tcl_env = type_env
+                                           , tcl_th_bndrs = th_bndrs })
+  = env { tcl_rdr      = extendLocalRdrEnvList rdr_env
+                            [ n | (n, _) <- pairs, isInternalName n ]
+                            -- The LocalRdrEnv contains only non-top-level names
+                            -- (GlobalRdrEnv handles the top level)
+        , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
+                             [(n, thlvl) | (n, ATcId {}) <- pairs]
+        , tcl_env      = extendNameEnvList type_env pairs }
+
+tcExtendGlobalTyVars :: [TcTyThing] -> TcM TcLclEnv
+tcExtendGlobalTyVars tc_ty_things
+  | isEmptyVarSet extra_tvs
+  = getLclEnv
+  | otherwise
+  = do { lcl_env <- getLclEnv
+       ; global_tvs <- readMutVar (tcl_tyvars lcl_env)
+       ; new_g_var  <- newMutVar (global_tvs `unionVarSet` extra_tvs)
+       ; return (lcl_env { tcl_tyvars = new_g_var }) }
   where
-    extend_gtvs env 
-      | isEmptyVarSet extra_tvs 
-      = return env
-      | otherwise               
-      = do { g_var <- tcExtendGlobalTyVars (tcl_tyvars env) extra_tvs
-           ; return (env { tcl_tyvars = g_var }) }
+    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things
 
-    extra_tvs = foldr (unionVarSet . get_tvs) emptyVarSet extra_env
-
-    get_tvs (_, ATcId { tct_id = id, tct_closed = closed })
+    get_tvs (ATcId { tct_id = id, tct_closed = closed }) tvs
       = case closed of
-          TopLevel    -> ASSERT2( isEmptyVarSet id_tvs, ppr id $$ ppr (idType id) ) 
-                         emptyVarSet
-          NotTopLevel -> id_tvs
-      where
-        id_tvs = tyVarsOfType (idType id)
-    get_tvs (_, ATyVar _ tv)                 -- See Note [Global TyVars]
-      = tyVarsOfType (tyVarKind tv) `extendVarSet` tv 
-      
-    get_tvs other = pprPanic "get_tvs" (ppr other)
-        
+          TopLevel    -> ASSERT2( isEmptyVarSet (tyVarsOfType (idType id)), ppr id $$ ppr (idType id) )
+                         tvs
+          NotTopLevel -> tvs `unionVarSet` tyVarsOfType (idType id)
+
+    get_tvs (ATyVar _ tv) tvs          -- See Note [Global TyVars]
+      = tvs `unionVarSet` tyVarsOfType (tyVarKind tv) `extendVarSet` tv
+
+    get_tvs (AThing k) tvs = tvs `unionVarSet` tyVarsOfType k
+
+    get_tvs (AGlobal {})       tvs = tvs
+    get_tvs (APromotionErr {}) tvs = tvs
+
         -- Note [Global TyVars]
         -- It's important to add the in-scope tyvars to the global tyvar set
         -- as well.  Consider
@@ -485,20 +487,9 @@ tc_extend_local_env thlvl extra_env thing_inside
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
-extend_local_env :: ThLevel -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
--- Extend the local TcTypeEnv *and* the local LocalRdrEnv simultaneously
-extend_local_env thlvl pairs env@(TcLclEnv { tcl_rdr = rdr_env, tcl_env = type_env })
-  = env { tcl_rdr = extendLocalRdrEnvList rdr_env thlvl (map fst pairs)
-        , tcl_env = extendNameEnvList type_env pairs }
-
-tcExtendGlobalTyVars :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
-tcExtendGlobalTyVars gtv_var extra_global_tvs
-  = do { global_tvs <- readMutVar gtv_var
-       ; newMutVar (global_tvs `unionVarSet` extra_global_tvs) }
-
 zapLclTypeEnv :: TcM a -> TcM a
 zapLclTypeEnv thing_inside
-  = do { tvs_var <- newTcRef emptyVarSet 
+  = do { tvs_var <- newTcRef emptyVarSet
        ; let upd env = env { tcl_env = emptyNameEnv
                            , tcl_rdr = emptyLocalRdrEnv
                            , tcl_tyvars = tvs_var }
@@ -581,10 +572,6 @@ tcMetaTy tc_name = do
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
 isBrackStage _other     = False
-
-thTopLevelId :: Id -> Bool
--- See Note [What is a top-level Id?] in TcSplice
-thTopLevelId id = isGlobalId id || isExternalName (idName id)
 \end{code}
 
 

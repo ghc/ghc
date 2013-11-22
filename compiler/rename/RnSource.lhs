@@ -21,6 +21,7 @@ import RnBinds
 import RnEnv
 import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
+import TcAnnotations    ( annCtxt )
 import TcRnMonad
 
 import ForeignCall      ( CCallTarget(..) )
@@ -338,10 +339,12 @@ dupWarnDecl (L loc _) rdr_name
 
 \begin{code}
 rnAnnDecl :: AnnDecl RdrName -> RnM (AnnDecl Name, FreeVars)
-rnAnnDecl (HsAnnotation provenance expr) = do
-    (provenance', provenance_fvs) <- rnAnnProvenance provenance
-    (expr', expr_fvs) <- rnLExpr expr
-    return (HsAnnotation provenance' expr', provenance_fvs `plusFV` expr_fvs)
+rnAnnDecl ann@(HsAnnotation provenance expr)
+  = addErrCtxt (annCtxt ann) $
+    do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
+       ; (expr', expr_fvs) <- setStage (Splice False) $
+                              rnLExpr expr
+       ; return (HsAnnotation provenance' expr', provenance_fvs `plusFV` expr_fvs) }
 
 rnAnnProvenance :: AnnProvenance RdrName -> RnM (AnnProvenance Name, FreeVars)
 rnAnnProvenance provenance = do

@@ -26,7 +26,7 @@ module RnEnv (
         getLookupOccRn, addUsedRdrNames,
 
         newLocalBndrRn, newLocalBndrsRn,
-        bindLocalName, bindLocalNames, bindLocalNamesFV,
+        bindLocalNames, bindLocalNamesFV,
         MiniFixityEnv, 
         addLocalFixities,
         bindLocatedLocalsFV, bindLocatedLocalsRn,
@@ -37,7 +37,7 @@ module RnEnv (
         addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
-        dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg,
+        dataTcOccs, kindSigErr, perhapsForallMsg,
         HsDocContext(..), docOfHsDocContext, 
 
         -- FsEnv
@@ -69,6 +69,7 @@ import SrcLoc
 import Outputable
 import Util
 import Maybes
+import BasicTypes       ( TopLevelFlag(..) )
 import ListSetOps       ( removeDups )
 import DynFlags
 import FastString
@@ -551,18 +552,18 @@ lookupLocalOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
        ; return (lookupLocalRdrEnv local_env rdr_name) }
 
-lookupLocalOccThLvl_maybe :: RdrName -> RnM (Maybe ThLevel)
+lookupLocalOccThLvl_maybe :: Name -> RnM (Maybe (TopLevelFlag, ThLevel))
 -- Just look in the local environment
-lookupLocalOccThLvl_maybe rdr_name
-  = do { local_env <- getLocalRdrEnv
-       ; return (lookupLocalRdrThLvl local_env rdr_name) }
+lookupLocalOccThLvl_maybe name
+  = do { lcl_env <- getLclEnv
+       ; return (lookupNameEnv (tcl_th_bndrs lcl_env) name) }
 
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnM Name
-lookupOccRn rdr_name 
+lookupOccRn rdr_name
   = do { mb_name <- lookupOccRn_maybe rdr_name
        ; case mb_name of
-           Just name -> return name 
+           Just name -> return name
            Nothing   -> reportUnboundName rdr_name }
 
 lookupKindOccRn :: RdrName -> RnM Name
@@ -619,8 +620,23 @@ The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
 
 \begin{code}
--- lookupOccRn looks up an occurrence of a RdrName
+--              Use this version to get tracing
+--
+-- lookupOccRn_maybe, lookupOccRn_maybe' :: RdrName -> RnM (Maybe Name)
+-- lookupOccRn_maybe rdr_name
+--  = do { mb_res <- lookupOccRn_maybe' rdr_name
+--       ; gbl_rdr_env   <- getGlobalRdrEnv
+--       ; local_rdr_env <- getLocalRdrEnv
+--       ; traceRn $ text "lookupOccRn_maybe" <+>
+--           vcat [ ppr rdr_name <+> ppr (getUnique (rdrNameOcc rdr_name))
+--                , ppr mb_res
+--                , text "Lcl env" <+> ppr local_rdr_env
+--                , text "Gbl env" <+> ppr [ (getUnique (nameOccName (gre_name (head gres'))),gres') | gres <- occEnvElts gbl_rdr_env
+--                                         , let gres' = filter isLocalGRE gres, not (null gres') ] ]
+--       ; return mb_res }
+
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
+-- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
        ; case lookupLocalRdrEnv local_env rdr_name of {
@@ -644,7 +660,7 @@ lookupOccRn_maybe rdr_name
                -- and only happens for failed lookups
        ; if isQual rdr_name && allow_qual && is_ghci
          then lookupQualifiedName rdr_name
-         else do { traceRn (text "lookupOccRn" <+> ppr rdr_name)
+         else do { traceRn (text "lookupOccRn failed" <+> ppr rdr_name)
                  ; return Nothing } } } } } }
 
 
@@ -1266,17 +1282,14 @@ bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope
-  = do { name_env <- getLocalRdrEnv
-       ; stage <- getStage
-       ; setLocalRdrEnv (extendLocalRdrEnvList name_env (thLevel stage) names)
-                        enclosed_scope }
-
-bindLocalName :: Name -> RnM a -> RnM a
-bindLocalName name enclosed_scope
-  = do { name_env <- getLocalRdrEnv
-       ; stage <- getStage
-       ; setLocalRdrEnv (extendLocalRdrEnv name_env (thLevel stage) name)
-                        enclosed_scope }
+  = do { lcl_env <- getLclEnv
+       ; let th_level  = thLevel (tcl_th_ctxt lcl_env)
+             th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
+                           [ (n, (NotTopLevel, th_level)) | n <- names ]
+             rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
+       ; setLclEnv (lcl_env { tcl_th_bndrs = th_bndrs'
+                            , tcl_rdr      = rdr_env' })
+                    enclosed_scope }
 
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
@@ -1407,7 +1420,6 @@ unboundNameX where_look rdr_name extra
           then addErr err
           else do { suggestions <- unknownNameSuggestErr where_look rdr_name
                   ; addErr (err $$ suggestions) }
-
         ; return (mkUnboundName rdr_name) }
 
 unknownNameErr :: SDoc -> RdrName -> SDoc

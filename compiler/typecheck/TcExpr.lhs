@@ -1063,9 +1063,9 @@ tcInferIdWithOrig orig id_name
     lookup_id
        = do { thing <- tcLookup id_name
             ; case thing of
-                 ATcId { tct_id = id, tct_level = lvl }
+                 ATcId { tct_id = id }
                    -> do { check_naughty id        -- Note [Local record selectors]
-                         ; checkThLocalId id lvl
+                         ; checkThLocalId id
                          ; return id }
 
                  AGlobal (AnId id)
@@ -1263,48 +1263,37 @@ tagToEnumError ty what
 %************************************************************************
 
 \begin{code}
-checkThLocalId :: Id -> ThLevel -> TcM ()
+checkThLocalId :: Id -> TcM ()
 #ifndef GHCI  /* GHCI and TH is off */
 --------------------------------------
 -- Check for cross-stage lifting
-checkThLocalId _id _bind_lvl
+checkThLocalId _id
   = return ()
 
 #else         /* GHCI and TH is on */
-checkThLocalId id bind_lvl
-  = do  { use_stage <- getStage -- TH case
-        ; let use_lvl = thLevel use_stage
-        ; checkWellStaged (quotes (ppr id)) bind_lvl use_lvl
-        ; traceTc "thLocalId" (ppr id <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
-        ; when (use_lvl > bind_lvl) $
-          checkCrossStageLifting id bind_lvl use_stage }
+checkThLocalId id
+  = do  { mb_local_use <- getStageAndBindLevel (idName id)
+        ; case mb_local_use of
+             Just (top_lvl, bind_lvl, use_stage)
+                | thLevel use_stage > bind_lvl
+                , isNotTopLevel top_lvl
+                -> checkCrossStageLifting id use_stage
+             _  -> return ()   -- Not a locally-bound thing, or
+                               -- no cross-stage link
+    }
 
 --------------------------------------
-checkCrossStageLifting :: Id -> ThLevel -> ThStage -> TcM ()
--- We are inside brackets, and (use_lvl > bind_lvl)
--- Now we must check whether there's a cross-stage lift to do
+checkCrossStageLifting :: Id -> ThStage -> TcM ()
+-- If we are inside brackets, and (use_lvl > bind_lvl)
+-- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [| x |]
 --            [| map |]
+-- There is no error-checking to do, because the renamer did that
 
-checkCrossStageLifting _ _ Comp      = return ()
-checkCrossStageLifting _ _ (Splice _) = return ()
+checkCrossStageLifting _ Comp      = return ()
+checkCrossStageLifting _ (Splice _) = return ()
 
-checkCrossStageLifting id _ (Brack _ _ ps_var lie_var)
-  | thTopLevelId id
-  =     -- Top-level identifiers in this module,
-        -- (which have External Names)
-        -- are just like the imported case:
-        -- no need for the 'lifting' treatment
-        -- E.g.  this is fine:
-        --   f x = x
-        --   g y = [| f 3 |]
-        -- But we do need to put f into the keep-alive
-        -- set, because after desugaring the code will
-        -- only mention f's *name*, not f itself.
-    keepAliveTc id
-
-  | otherwise   -- bind_lvl = outerLevel presumably,
-                -- but the Id is not bound at top level
+checkCrossStageLifting id (Brack _ _ ps_var lie_var)
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [| h x |]
         -- We must behave as if the reference to x was

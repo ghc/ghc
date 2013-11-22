@@ -22,6 +22,7 @@ import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import HsSyn
 import TcRnMonad
+import Module           ( getModule )
 import RnEnv
 import RnSplice
 import RnTypes
@@ -90,7 +91,11 @@ finishHsVar :: Name -> RnM (HsExpr Name, FreeVars)
 -- when renaming infix expressions
 -- See Note [Adding the implicit parameter to 'assert']
 finishHsVar name
- = do { ignore_asserts <- goptM Opt_IgnoreAsserts
+ = do { this_mod <- getModule
+      ; when (nameIsLocalOrFrom this_mod name) $
+        checkThLocalName name
+
+      ; ignore_asserts <- goptM Opt_IgnoreAsserts
       ; if ignore_asserts || not (name `hasKey` assertIdKey)
         then return (HsVar name, unitFV name)
         else do { e <- mkAssertErrorExpr
@@ -107,15 +112,9 @@ rnExpr (HsVar v)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
               -> rnExpr (ExplicitList placeHolderType Nothing [])
+
               | otherwise
-              -> do { mb_bind_lvl <- lookupLocalOccThLvl_maybe v
-                    ; case mb_bind_lvl of
-                        { Nothing -> return ()
-                        ; Just bind_lvl
-                            | isExternalName name -> return ()
-                            | otherwise -> checkThLocalName name bind_lvl
-                        }
-                    ; finishHsVar name }}}
+              -> finishHsVar name }}
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)

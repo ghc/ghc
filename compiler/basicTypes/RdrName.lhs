@@ -39,7 +39,7 @@ module RdrName (
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
-        lookupLocalRdrEnv, lookupLocalRdrThLvl, lookupLocalRdrOcc,
+        lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, delLocalRdrEnvList,
 
@@ -329,51 +329,47 @@ instance Ord RdrName where
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
 -- Reason: see Note [Splicing Exact Names] in RnEnv
-type ThLevel = Int
-type LocalRdrEnv = (OccEnv Name, OccEnv ThLevel, NameSet)
+type LocalRdrEnv = (OccEnv Name, NameSet)
 
 emptyLocalRdrEnv :: LocalRdrEnv
-emptyLocalRdrEnv = (emptyOccEnv, emptyOccEnv, emptyNameSet)
+emptyLocalRdrEnv = (emptyOccEnv, emptyNameSet)
 
-extendLocalRdrEnv :: LocalRdrEnv -> ThLevel -> Name -> LocalRdrEnv
-extendLocalRdrEnv (env, thenv, ns) thlvl name
-  = ( extendOccEnv env (nameOccName name) name
-    , extendOccEnv thenv (nameOccName name) thlvl
+extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
+-- The Name should be a non-top-level thing
+extendLocalRdrEnv (env, ns) name
+  = WARN( isExternalName name, ppr name )
+    ( extendOccEnv env (nameOccName name) name
     , addOneToNameSet ns name
     )
 
-extendLocalRdrEnvList :: LocalRdrEnv -> ThLevel -> [Name] -> LocalRdrEnv
-extendLocalRdrEnvList (env, thenv, ns) thlvl names
-  = ( extendOccEnvList env [(nameOccName n, n) | n <- names]
-    , extendOccEnvList thenv [(nameOccName n, thlvl) | n <- names]
+extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendLocalRdrEnvList (env, ns) names
+  = WARN( any isExternalName names, ppr names )
+    ( extendOccEnvList env [(nameOccName n, n) | n <- names]
     , addListToNameSet ns names
     )
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
-lookupLocalRdrEnv (env, _, _) (Unqual occ) = lookupOccEnv env occ
-lookupLocalRdrEnv _           _            = Nothing
-
-lookupLocalRdrThLvl :: LocalRdrEnv -> RdrName -> Maybe ThLevel
-lookupLocalRdrThLvl (_, thenv, _) (Unqual occ) = lookupOccEnv thenv occ
-lookupLocalRdrThLvl _             _            = Nothing
+lookupLocalRdrEnv (env, _) (Unqual occ) = lookupOccEnv env occ
+lookupLocalRdrEnv _        _            = Nothing
 
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
-lookupLocalRdrOcc (env, _, _) occ = lookupOccEnv env occ
+lookupLocalRdrOcc (env, _) occ = lookupOccEnv env occ
 
 elemLocalRdrEnv :: RdrName -> LocalRdrEnv -> Bool
-elemLocalRdrEnv rdr_name (env, _, _)
+elemLocalRdrEnv rdr_name (env, _)
   | isUnqual rdr_name = rdrNameOcc rdr_name `elemOccEnv` env
   | otherwise         = False
 
 localRdrEnvElts :: LocalRdrEnv -> [Name]
-localRdrEnvElts (env, _, _) = occEnvElts env
+localRdrEnvElts (env, _) = occEnvElts env
 
 inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 -- This is the point of the NameSet
-inLocalRdrEnvScope name (_, _, ns) = name `elemNameSet` ns
+inLocalRdrEnvScope name (_, ns) = name `elemNameSet` ns
 
 delLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
-delLocalRdrEnvList (env, thenv, ns) occs = (delListFromOccEnv env occs, delListFromOccEnv thenv occs, ns)
+delLocalRdrEnvList (env, ns) occs = (delListFromOccEnv env occs, ns)
 \end{code}
 
 %************************************************************************
@@ -544,9 +540,20 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- the locally-defined @f@, and a GRE for the imported @f@, with a /single/
 -- provenance, namely the one for @Baz(f)@.
 pickGREs rdr_name gres
+  | (_ : _ : _) <- candidates  -- This is usually false, so we don't have to
+                               -- even look at internal_candidates
+  , (gre : _)   <- internal_candidates
+  = [gre]  -- For this internal_candidate stuff,
+           -- see Note [Template Haskell binders in the GlobalRdrEnv]
+           -- If there are multiple Internal candidates, pick the
+           -- first one (ie with the (innermost binding)
+  | otherwise
   = ASSERT2( isSrcRdrName rdr_name, ppr rdr_name )
-    mapCatMaybes pick gres
+    candidates
   where
+    candidates = mapCatMaybes pick gres
+    internal_candidates = filter (isInternalName . gre_name) candidates
+
     rdr_is_unqual = isUnqual rdr_name
     rdr_is_qual   = isQual_maybe rdr_name
 
@@ -594,7 +601,7 @@ mkGlobalRdrEnv gres
                                    (nameOccName (gre_name gre))
                                    gre
 
-findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> [[Name]]
+findLocalDupsRdrEnv :: GlobalRdrEnv -> [Name] -> [[GlobalRdrElt]]
 -- ^ For each 'OccName', see if there are multiple local definitions
 -- for it; return a list of all such
 -- and return a list of the duplicate bindings
@@ -602,17 +609,24 @@ findLocalDupsRdrEnv rdr_env occs
   = go rdr_env [] occs
   where
     go _       dups [] = dups
-    go rdr_env dups (occ:occs)
-      = case filter isLocalGRE gres of
-          []       -> go rdr_env  dups                           occs
-          [_]      -> go rdr_env  dups                           occs   -- The common case
-          dup_gres -> go rdr_env' (map gre_name dup_gres : dups) occs
+    go rdr_env dups (name:names)
+      = case filter (pick name) gres of
+          []       -> go rdr_env  dups              names
+          [_]      -> go rdr_env  dups              names   -- The common case
+          dup_gres -> go rdr_env' (dup_gres : dups) names
       where
-        gres = lookupOccEnv rdr_env occ `orElse` []
+        occ      = nameOccName name
+        gres     = lookupOccEnv rdr_env occ `orElse` []
         rdr_env' = delFromOccEnv rdr_env occ
             -- The delFromOccEnv avoids repeating the same
-            -- complaint twice, when occs itself has a duplicate
+            -- complaint twice, when names itself has a duplicate
             -- which is a common case
+
+    -- See Note [Template Haskell binders in the GlobalRdrEnv]
+    pick name (GRE { gre_name = n, gre_prov = LocalDef })
+      | isInternalName name = isInternalName n
+      | otherwise           = True
+    pick _ _ = False
 
 insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
 insertGRE new_g [] = [new_g]
@@ -641,6 +655,13 @@ transformGREs trans_gre occs rdr_env
            Just gres -> extendOccEnv env occ (map trans_gre gres)
            Nothing   -> env
 \end{code}
+
+Note [Template Haskell binders in the GlobalRdrEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For reasons described in Note [Top-level Names in Template Haskell decl quotes]
+in RnNames, a GRE with an Internal gre_name (i.e. one generated by a TH decl
+quote) should *shadow* a GRE with an External gre_name.  Hence some faffing
+around in pickGREs and findLocalDupsRdrEnv
 
 %************************************************************************
 %*                                                                      *

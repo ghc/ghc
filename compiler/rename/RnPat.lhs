@@ -199,7 +199,7 @@ newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside -> 
         do { name <- newLocalBndrRn rdr_name
-           ; (res, fvs) <- bindLocalName name (thing_inside name)
+           ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
            ; return (res, name `delFV` fvs) })
 
@@ -208,12 +208,12 @@ newPatName (LetMk is_top fix_env) rdr_name
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
-           ; bindLocalName name $       -- Do *not* use bindLocalNameFV here
+           ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
                                         -- See Note [View pattern usage]
              addLocalFixities fix_env [name] $
              thing_inside name })
                           
-    -- Note: the bindLocalName is somewhat suspicious
+    -- Note: the bindLocalNames is somewhat suspicious
     --       because it binds a top-level name as a local name.
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
@@ -227,7 +227,7 @@ Consider
   let (r, (r -> x)) = x in ...
 Here the pattern binds 'r', and then uses it *only* in the view pattern.
 We want to "see" this use, and in let-bindings we collect all uses and
-report unused variables at the binding level. So we must use bindLocalName
+report unused variables at the binding level. So we must use bindLocalNames
 here, *not* bindLocalNameFV.  Trac #3943.
 
 %*********************************************************

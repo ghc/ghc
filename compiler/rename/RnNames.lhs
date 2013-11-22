@@ -31,6 +31,7 @@ import RdrName
 import Outputable
 import Maybes
 import SrcLoc
+import BasicTypes      ( TopLevelFlag(..) )
 import ErrUtils
 import Util
 import FastString
@@ -346,6 +347,8 @@ created by its bindings.
 
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also: Note [Interactively-bound Ids in GHCi] in TcRnDriver
+
 Consider a Template Haskell declaration quotation like this:
       module M where
         f x = h [d| f = 3 |]
@@ -396,36 +399,47 @@ extendGlobalRdrEnvRn avails new_fixities
   = do  { (gbl_env, lcl_env) <- getEnvs
         ; stage <- getStage
         ; isGHCi <- getIsGHCi
-        ; let rdr_env = tcg_rdr_env gbl_env
-              fix_env = tcg_fix_env gbl_env
+        ; let rdr_env  = tcg_rdr_env gbl_env
+              fix_env  = tcg_fix_env gbl_env
+              th_bndrs = tcl_th_bndrs lcl_env
+              th_lvl   = thLevel stage
 
               -- Delete new_occs from global and local envs
               -- If we are in a TemplateHaskell decl bracket,
               --    we are going to shadow them
               -- See Note [Top-level Names in Template Haskell decl quotes]
-              shadowP  = isBrackStage stage
-              new_occs = map (nameOccName . gre_name) gres
-              rdr_env_TH = transformGREs qual_gre new_occs rdr_env
-              rdr_env_GHCi = delListFromOccEnv rdr_env new_occs
+              inBracket = isBrackStage stage
+              lcl_env_TH = lcl_env { tcl_rdr = delLocalRdrEnvList (tcl_rdr lcl_env) new_occs }
 
-              lcl_env1 = lcl_env { tcl_rdr = delLocalRdrEnvList (tcl_rdr lcl_env) new_occs }
-              (rdr_env2, lcl_env2) | shadowP   = (rdr_env_TH,   lcl_env1)
-                                   | isGHCi    = (rdr_env_GHCi, lcl_env1)
+              rdr_env_GHCi = delListFromOccEnv rdr_env new_occs
+                     -- This seems a bit brutal.
+                     -- Mightn't we lose some qualified bindings that we want?
+                     -- e.g.   ghci> import Prelude as Q
+                     --        ghci> data Int = Mk Q.Int
+                     -- This fails because we expunge the binding for Prelude.Q
+
+              (rdr_env2, lcl_env2) | inBracket = (rdr_env,      lcl_env_TH)
+                                   | isGHCi    = (rdr_env_GHCi, lcl_env)
                                    | otherwise = (rdr_env,      lcl_env)
 
-              rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 gres
-              fix_env' = foldl extend_fix_env     fix_env  gres
-              dups = findLocalDupsRdrEnv rdr_env3 new_occs
+              rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 new_gres
+              lcl_env3 = lcl_env2 { tcl_th_bndrs = extendNameEnvList th_bndrs
+                                                       [ (n, (TopLevel, th_lvl))
+                                                       | n <- new_names ] }
+              fix_env' = foldl extend_fix_env fix_env new_gres
+              dups = findLocalDupsRdrEnv rdr_env3 new_names
 
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env3, tcg_fix_env = fix_env' }
 
         ; traceRn (text "extendGlobalRdrEnvRn dups" <+> (ppr dups))
-        ; mapM_ addDupDeclErr dups
+        ; mapM_ (addDupDeclErr . map gre_name) dups
 
         ; traceRn (text "extendGlobalRdrEnvRn" <+> (ppr new_fixities $$ ppr fix_env $$ ppr fix_env'))
-        ; return (gbl_env', lcl_env2) }
+        ; return (gbl_env', lcl_env3) }
   where
-    gres = gresFromAvails LocalDef avails
+    new_gres = gresFromAvails LocalDef avails
+    new_names = map gre_name new_gres
+    new_occs  = map nameOccName new_names
 
     -- If there is a fixity decl for the gre, add it to the fixity env
     extend_fix_env fix_env gre
@@ -436,35 +450,6 @@ extendGlobalRdrEnvRn avails new_fixities
       where
         name = gre_name gre
         occ  = nameOccName name
-
-    qual_gre :: GlobalRdrElt -> GlobalRdrElt
-    -- Transform top-level GREs from the module being compiled
-    -- so that they are out of the way of new definitions in a Template
-    -- Haskell bracket
-    -- See Note [Top-level Names in Template Haskell decl quotes]
-    -- Seems like 5 times as much work as it deserves!
-    --
-    -- For a LocalDef we make a (fake) qualified imported GRE for a
-    -- local GRE so that the original *qualified* name is still in scope
-    -- but the *unqualified* one no longer is.  What a hack!
-
-    qual_gre gre@(GRE { gre_prov = LocalDef, gre_name = name })
-        | isExternalName name = gre { gre_prov = Imported [imp_spec] }
-        | otherwise           = gre
-          -- Do not shadow Internal (ie Template Haskell) Names
-          -- See Note [Top-level Names in Template Haskell decl quotes]
-        where
-          mod = ASSERT2( isExternalName name, ppr name) moduleName (nameModule name)
-          imp_spec = ImpSpec { is_item = ImpAll, is_decl = decl_spec }
-          decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod,
-                                    is_qual = True,  -- Qualified only!
-                                    is_dloc = srcLocSpan (nameSrcLoc name) }
-
-    qual_gre gre@(GRE { gre_prov = Imported specs })
-        = gre { gre_prov = Imported (map qual_spec specs) }
-
-    qual_spec spec@(ImpSpec { is_decl = decl_spec })
-        = spec { is_decl = decl_spec { is_qual = True } }
 \end{code}
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's

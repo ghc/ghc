@@ -5,7 +5,7 @@
 \section[TcAnnotations]{Typechecking annotations}
 
 \begin{code}
-module TcAnnotations ( tcAnnotations ) where
+module TcAnnotations ( tcAnnotations, annCtxt ) where
 
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runAnnotation )
@@ -42,7 +42,7 @@ tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
 tcAnnotations anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl Name -> TcM Annotation
-tcAnnotation ann@(L loc (HsAnnotation provenance expr)) = do
+tcAnnotation (L loc ann@(HsAnnotation provenance expr)) = do
     -- Work out what the full target of this annotation was
     mod <- getModule
     let target = annProvenanceToTarget mod provenance
@@ -54,10 +54,9 @@ annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance name) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance name)  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance       = ModuleTarget mod
+#endif
 
-annCtxt :: OutputableBndr id => LAnnDecl id -> SDoc
+annCtxt :: OutputableBndr id => AnnDecl id -> SDoc
 annCtxt ann
   = hang (ptext (sLit "In the annotation:")) 2 (ppr ann)
-
-#endif
 \end{code}

@@ -273,7 +273,7 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
         ; traceTc "kcTyClGroup: initial kinds" (ppr initial_kinds)
 
         -- Step 2: Set initial envt, kind-check the synonyms
-        ; lcl_env <- tcExtendTcTyThingEnv initial_kinds $
+        ; lcl_env <- tcExtendKindEnv2 initial_kinds $
                      kcSynDecls (calcSynCycles syn_decls)
 
         -- Step 3: Set extended envt, kind-check the non-synonyms
@@ -337,7 +337,7 @@ mk_thing_env (decl : decls)
 
 getInitialKinds :: [LTyClDecl Name] -> TcM [(Name, TcTyThing)]
 getInitialKinds decls
-  = tcExtendTcTyThingEnv (mk_thing_env decls) $
+  = tcExtendKindEnv2 (mk_thing_env decls) $
     do { pairss <- mapM (addLocM getInitialKind) decls
        ; return (concat pairss) }
 
@@ -395,8 +395,8 @@ getInitialKind decl@(SynDecl {})
 ---------------------------------
 getFamDeclInitialKinds :: [LFamilyDecl Name] -> TcM [(Name, TcTyThing)]
 getFamDeclInitialKinds decls
-  = tcExtendTcTyThingEnv [ (n, APromotionErr TyConPE)
-                         | L _ (FamilyDecl { fdLName = L _ n }) <- decls] $
+  = tcExtendKindEnv2 [ (n, APromotionErr TyConPE)
+                     | L _ (FamilyDecl { fdLName = L _ n }) <- decls] $
     concatMapM (addLocM getFamDeclInitialKind) decls
 
 getFamDeclInitialKind :: FamilyDecl Name

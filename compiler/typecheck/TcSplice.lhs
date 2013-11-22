@@ -255,6 +255,9 @@ Note [Template Haskell levels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Imported things are impLevel (= 0)
 
+* However things at level 0 are not *necessarily* imported.
+      eg  $( \b -> ... )   here b is bound at level 0
+
 * In GHCi, variables bound by a previous command are treated
   as impLevel, because we have bytecode for them.
 
@@ -287,46 +290,12 @@ When a variable is used, we compare
     - Non-top-level     Only if there is a liftable instance
                                 h = \(x:Int) -> [| x |]
 
-See Note [What is a top-level Id?]
+  To track top-level-ness we use the ThBindEnv in TcLclEnv
 
-Note [Quoting names]
-~~~~~~~~~~~~~~~~~~~~
-A quoted name 'n is a bit like a quoted expression [| n |], except that we
-have no cross-stage lifting (c.f. TcExpr.thBrackId).  So, after incrementing
-the use-level to account for the brackets, the cases are:
-
-        bind > use                      Error
-        bind = use                      OK
-        bind < use
-                Imported things         OK
-                Top-level things        OK
-                Non-top-level           Error
-
-See Note [What is a top-level Id?] in TcEnv.  Examples:
-
-  f 'map        -- OK; also for top-level defns of this module
-
-  \x. f 'x      -- Not ok (whereas \x. f [| x |] might have been ok, by
-                --                               cross-stage lifting
-
-  \y. [| \x. $(f 'y) |] -- Not ok (same reason)
-
-  [| \x. $(f 'x) |]     -- OK
-
-
-Note [What is a top-level Id?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the level-control criteria above, we need to know what a "top level Id" is.
-There are three kinds:
-  * Imported from another module                (GlobalId, ExternalName)
-  * Bound at the top level of this module       (ExternalName)
-  * In GHCi, bound by a previous stmt           (GlobalId)
-It's strange that there is no one criterion tht picks out all three, but that's
-how it is right now.  (The obvious thing is to give an ExternalName to GHCi Ids
-bound in an earlier Stmt, but what module would you choose?  See
-Note [Interactively-bound Ids in GHCi] in TcRnDriver.)
-
-The predicate we use is TcEnv.thTopLevelId.
+  For example:
+           f = ...
+           g1 = $(map ...)         is OK
+           g2 = $(f ...)           is not OK; because we havn't compiled f yet
 
 
 %************************************************************************

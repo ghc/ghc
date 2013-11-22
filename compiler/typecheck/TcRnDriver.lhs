@@ -1279,8 +1279,8 @@ tcTyClsInstDecls :: ModDetails
                           HsValBinds Name)    -- Supporting bindings for derived instances
 
 tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls
- = tcExtendTcTyThingEnv [(con, APromotionErr FamDataConPE) 
-                        | lid <- inst_decls, con <- get_cons lid ] $
+ = tcExtendKindEnv2 [ (con, APromotionErr FamDataConPE) 
+                    | lid <- inst_decls, con <- get_cons lid ] $
       -- Note [AFamDataCon: not promoting data family constructors]
    do { tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
       ; setGblEnv tcg_env $

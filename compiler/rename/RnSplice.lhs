@@ -23,8 +23,9 @@ import RnPat
 import RnSource         ( rnSrcDecls, findSplice )
 import RnTypes
 import SrcLoc
-import TcEnv            ( checkWellStaged, tcLookup, tcMetaTy, thTopLevelId )
+import TcEnv            ( checkWellStaged, tcMetaTy )
 import Outputable
+import BasicTypes       ( TopLevelFlag, isTopLevel )
 import FastString
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
@@ -82,6 +83,7 @@ type checker.  Not very satisfactory really.
 
 \begin{code}
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
+-- Not exported...used for all
 rnSplice (HsSplice isTyped n expr)
   = do  { checkTH expr "Template Haskell splice"
         ; loc  <- getSrcSpanM
@@ -316,7 +318,9 @@ rnBracket e br_body
        ; recordThUse
 
        ; pending_splices <- newMutVar []
-       ; let brack_stage = Brack (isTypedBracket br_body) cur_stage pending_splices (error "rnBracket: don't neet lie")
+       ; let brack_stage = Brack (isTypedBracket br_body)
+                                 cur_stage pending_splices
+                                 (error "rnBracket: don't neet lie")
 
        ; (body', fvs_e) <- setStage brack_stage $
                            rn_bracket cur_stage br_body
@@ -326,45 +330,33 @@ rnBracket e br_body
        }
 
 rn_bracket :: ThStage -> HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
-rn_bracket outer_stage br@(VarBr flg n)
-  = do { name <- lookupOccRn n
+rn_bracket outer_stage br@(VarBr flg rdr_name)
+  = do { name <- lookupOccRn rdr_name
        ; this_mod <- getModule
-       
+
        ; case flg of
            { -- Type variables can be quoted in TH. See #5721.
              False -> return ()
            ; True | nameIsLocalOrFrom this_mod name ->
-                 do { mb_bind_lvl <- lookupLocalOccThLvl_maybe n
+                 do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
                     ; case mb_bind_lvl of
-                        { Nothing -> return ()
-                        ; Just bind_lvl
-                            | isExternalName name -> return ()
-                              -- Local non-external things can still be
-                              -- top-level in GHCi, so check for that here.
-                            | bind_lvl == impLevel -> return ()
-                            | otherwise -> checkTc (thLevel outer_stage + 1 == bind_lvl)
-                                                   (quotedNameStageErr br)
+                        { Nothing -> pprTrace "rn_bracket" (ppr name) $ -- Should not happen for local names
+                                     return ()
+
+                        ; Just (top_lvl, bind_lvl)  -- See Note [Quoting names]
+                             | isTopLevel top_lvl
+                             -> when (isExternalName name) (keepAlive name)
+                             | otherwise
+                             -> do { traceRn (text "rn_bracket VarBr" <+> ppr name <+> ppr bind_lvl <+> ppr outer_stage)
+                                   ; checkTc (thLevel outer_stage + 1 == bind_lvl)
+                                             (quotedNameStageErr br) }
                         }
                     }
-           ; True | otherwise -> 
-                 -- Reason: deprecation checking assumes
-                 -- the home interface is loaded, and
-                 -- this is the only way that is going
-                 -- to happen
-                 do { _ <- loadInterfaceForName msg name
-                    ; thing <- tcLookup name
-                    ; case thing of
-                        { AGlobal {} -> return ()
-                        ; ATyVar {}  -> return ()
-                        ; ATcId { tct_level = bind_lvl, tct_id = id }
-                            | thTopLevelId id       -- C.f TcExpr.checkCrossStageLifting
-                            -> keepAliveTc id
-                            | otherwise
-                            -> do { checkTc (thLevel outer_stage + 1 == bind_lvl)
-                                            (quotedNameStageErr br) }
-                        ; _ -> pprPanic "rh_bracket" (ppr name $$ ppr thing)
-                        }
-                    }
+           ; True | otherwise ->  -- Imported thing
+                 discardResult (loadInterfaceForName msg name)
+                     -- Reason for loadInterface: deprecation checking
+                     -- assumes that the home interface is loaded, and
+                     -- this is the only way that is going to happen
            }
        ; return (VarBr flg name, unitFV name) }
   where
@@ -457,32 +449,35 @@ quotationCtxtDoc br_body
 
 spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
 spliceResultDoc expr
-  = sep [ ptext (sLit "In the result of the splice:")
-        , nest 2 (char '$' <> pprParendExpr expr)
-        , ptext (sLit "To see what the splice expanded to, use -ddump-splices")]
+  = vcat [ hang (ptext (sLit "In the splice:"))
+              2 (char '$' <> pprParendExpr expr)
+        , ptext (sLit "To see what the splice expanded to, use -ddump-splices") ]
 #endif
 \end{code}
 
 \begin{code}
-checkThLocalName :: Name -> ThLevel -> RnM ()
+checkThLocalName :: Name -> RnM ()
 #ifndef GHCI  /* GHCI and TH is off */
 --------------------------------------
 -- Check for cross-stage lifting
-checkThLocalName _name _bind_lvl
+checkThLocalName _name
   = return ()
 
 #else         /* GHCI and TH is on */
-checkThLocalName name bind_lvl
-  = do  { use_stage <- getStage -- TH case
-        ; let use_lvl = thLevel use_stage
-        ; traceRn (text "checkThLocalName" <+> ppr name)
+checkThLocalName name 
+  = do  { traceRn (text "checkThLocalName" <+> ppr name)
+        ; mb_local_use <- getStageAndBindLevel name
+        ; case mb_local_use of {
+             Nothing -> return () ;  -- Not a locally-bound thing
+             Just (top_lvl, bind_lvl, use_stage) ->
+    do  { let use_lvl = thLevel use_stage
         ; checkWellStaged (quotes (ppr name)) bind_lvl use_lvl
-        ; traceTc "thLocalId" (ppr name <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
+        ; traceRn (text "checkThLocalName" <+> ppr name <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
         ; when (use_lvl > bind_lvl) $
-          checkCrossStageLifting name bind_lvl use_stage }
+          checkCrossStageLifting top_lvl name use_stage } } }
 
 --------------------------------------
-checkCrossStageLifting :: Name -> ThLevel -> ThStage -> TcM ()
+checkCrossStageLifting :: TopLevelFlag -> Name -> ThStage -> TcM ()
 -- We are inside brackets, and (use_lvl > bind_lvl)
 -- Now we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [| x |]
@@ -491,21 +486,18 @@ checkCrossStageLifting :: Name -> ThLevel -> ThStage -> TcM ()
 checkCrossStageLifting _ _ Comp      = return ()
 checkCrossStageLifting _ _ (Splice _) = return ()
 
-checkCrossStageLifting name _ (Brack _ _ ps_var _)
-  | isExternalName name
-  =     -- Top-level identifiers in this module,
+checkCrossStageLifting top_lvl name (Brack _ _ ps_var _)
+  | isTopLevel top_lvl
+        -- Top-level identifiers in this module,
         -- (which have External Names)
         -- are just like the imported case:
         -- no need for the 'lifting' treatment
         -- E.g.  this is fine:
         --   f x = x
         --   g y = [| f 3 |]
-        -- But we do need to put f into the keep-alive
-        -- set, because after desugaring the code will
-        -- only mention f's *name*, not f itself.
-        --
-        -- The type checker will put f into the keep-alive set.
-    return ()
+  = when (isExternalName name) (keepAlive name)
+    -- See Note [Keeping things alive for Template Haskell]
+
   | otherwise
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [| h x |]
@@ -523,3 +515,64 @@ checkCrossStageLifting name _ (Brack _ _ ps_var _)
         }
 #endif /* GHCI */
 \end{code}
+
+Note [Keeping things alive for Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f x = x+1
+  g y = [| f 3 |]
+
+Here 'f' is referred to from inside the bracket, which turns into data
+and mentions only f's *name*, not 'f' itself. So we need some other
+way to keep 'f' alive, lest it get dropped as dead code.  That's what
+keepAlive does. It puts it in the keep-alive set, which subsequently
+ensures that 'f' stays as a top level binding.
+
+This must be done by the renamer, not the type checker (as of old),
+because the type checker doesn't typecheck the body of untyped
+brackets (Trac #8540).
+
+A thing can have a bind_lvl of outerLevel, but have an internal name:
+   foo = [d| op = 3
+             bop = op + 1 |]
+Here the bind_lvl of 'op' is (bogusly) outerLevel, even though it is
+bound inside a bracket.  That is because we don't even even record
+binding levels for top-level things; the binding levels are in the
+LocalRdrEnv.
+
+So the occurrence of 'op' in the rhs of 'bop' looks a bit like a
+cross-stage thing, but it isn't really.  And in fact we never need
+to do anything here for top-level bound things, so all is fine, if
+a bit hacky.
+
+For these chaps (which have Internal Names) we don't want to put
+them in the keep-alive set.
+
+Note [Quoting names]
+~~~~~~~~~~~~~~~~~~~~
+A quoted name 'n is a bit like a quoted expression [| n |], except that we
+have no cross-stage lifting (c.f. TcExpr.thBrackId).  So, after incrementing
+the use-level to account for the brackets, the cases are:
+
+        bind > use                      Error
+        bind = use+1                    OK
+        bind < use
+                Imported things         OK
+                Top-level things        OK
+                Non-top-level           Error
+
+where 'use' is the binding level of the 'n quote. (So inside the implied
+bracket the level would be use+1.)
+
+Examples:
+
+  f 'map        -- OK; also for top-level defns of this module
+
+  \x. f 'x      -- Not ok (bind = 1, use = 1)
+                -- (whereas \x. f [| x |] might have been ok, by
+                --                               cross-stage lifting
+
+  \y. [| \x. $(f 'y) |] -- Not ok (bind =1, use = 1)
+
+  [| \x. $(f 'x) |]     -- OK (bind = 2, use = 1)
+
