@@ -638,7 +638,7 @@ cgConApp con stg_args
         ; emitReturn [idInfoToAmode idinfo] }
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
-cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
+cgIdApp fun_id [] | isVoidTy (idType fun_id) = emitReturn []
 cgIdApp fun_id args = do
     dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id

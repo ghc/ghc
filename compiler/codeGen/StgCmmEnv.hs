@@ -11,7 +11,7 @@ module StgCmmEnv (
         litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
         idInfoToAmode,
 
-        NonVoid(..), unsafe_stripNV, isVoidId, nonVoidIds,
+        NonVoid(..), unsafe_stripNV, nonVoidIds,
 
         addBindC, addBindsC,
 
@@ -59,9 +59,6 @@ unsafe_stripNV (NonVoid a) = a
 
 instance (Outputable a) => Outputable (NonVoid a) where
   ppr (NonVoid a) = ppr a
-
-isVoidId :: Id -> Bool
-isVoidId = isVoidRep . idPrimRep
 
 nonVoidIds :: [Id] -> [NonVoid Id]
 nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]

@@ -123,9 +123,10 @@ isKnownFun _ = False
 
 -- Why are these here?
 
--- NB: this is reliable because by StgCmm no Ids have unboxed tuple type
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)
+    -- NB: typePrimRep fails on unboxed tuples,
+    --     but by StgCmm no Ids have unboxed tuple type
 
 addIdReps :: [Id] -> [(PrimRep, Id)]
 addIdReps ids = [(idPrimRep id, id) | id <- ids]
@@ -135,14 +136,6 @@ addArgReps args = [(argPrimRep arg, arg) | arg <- args]
 
 argPrimRep :: StgArg -> PrimRep
 argPrimRep arg = typePrimRep (stgArgType arg)
-
-isVoidRep :: PrimRep -> Bool
-isVoidRep VoidRep = True
-isVoidRep _other  = False
-
-isGcPtrRep :: PrimRep -> Bool
-isGcPtrRep PtrRep = True
-isGcPtrRep _      = False
 
 
 -----------------------------------------------------------------------------

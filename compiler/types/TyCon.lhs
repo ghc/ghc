@@ -84,7 +84,7 @@ module TyCon(
 
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
-        tyConPrimRep,
+        tyConPrimRep, isVoidRep, isGcPtrRep,
         primRepSizeW, primElemRepSizeB,
 
         -- * Recursion breaking
@@ -856,6 +856,14 @@ instance Outputable PrimRep where
 
 instance Outputable PrimElemRep where
   ppr r = text (show r)
+
+isVoidRep :: PrimRep -> Bool
+isVoidRep VoidRep = True
+isVoidRep _other  = False
+
+isGcPtrRep :: PrimRep -> Bool
+isGcPtrRep PtrRep = True
+isGcPtrRep _      = False
 
 -- | Find the size of a 'PrimRep', in words
 primRepSizeW :: DynFlags -> PrimRep -> Int
