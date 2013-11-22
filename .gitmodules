@@ -1,42 +1,56 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
 	url = http://git.haskell.org/packages/binary.git
+	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
 	url = http://git.haskell.org/packages/bytestring.git
+	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
 	url = http://git.haskell.org/packages/Cabal.git
+	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
 	url = http://git.haskell.org/packages/containers.git
+	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
 	url = http://git.haskell.org/packages/haskeline.git
+	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
 	url = http://git.haskell.org/packages/pretty.git
+	ignore = untracked
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
 	url = http://git.haskell.org/packages/terminfo.git
+	ignore = untracked
 [submodule "libraries/transformers"]
 	path = libraries/transformers
 	url = http://git.haskell.org/packages/transformers.git
+	ignore = untracked
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
 	url = http://git.haskell.org/packages/xhtml.git
+	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
 	url = http://git.haskell.org/packages/Win32.git
+	ignore = untracked
 [submodule "libraries/primitive"]
 	path = libraries/primitive
 	url = http://git.haskell.org/packages/primitive.git
+	ignore = untracked
 [submodule "libraries/vector"]
 	path = libraries/vector
 	url = http://git.haskell.org/packages/vector.git
+	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
 	url = http://git.haskell.org/packages/time.git
+	ignore = untracked
 [submodule "libraries/random"]
 	path = libraries/random
 	url = http://git.haskell.org/packages/random.git
+	ignore = untracked
