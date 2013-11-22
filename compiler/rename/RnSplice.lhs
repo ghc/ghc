@@ -340,8 +340,8 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
            ; True | nameIsLocalOrFrom this_mod name ->
                  do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
                     ; case mb_bind_lvl of
-                        { Nothing -> pprTrace "rn_bracket" (ppr name) $ -- Should not happen for local names
-                                     return ()
+                        { Nothing -> return ()      -- Can happen for data constructors,
+                                                    -- but nothign needs doing for them
 
                         ; Just (top_lvl, bind_lvl)  -- See Note [Quoting names]
                              | isTopLevel top_lvl
