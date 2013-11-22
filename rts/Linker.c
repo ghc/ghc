@@ -1562,7 +1562,7 @@ void initLinker (void)
 {
     // default to retaining CAFs for backwards compatibility.  Most
     // users will want initLinker_(0): otherwise unloadObj() will not
-    // be able to object files when they contain CAFs.
+    // be able to unload object files when they contain CAFs.
     initLinker_(1);
 }
 

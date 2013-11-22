@@ -37,7 +37,7 @@ void initLinker (void);
  *   zero     => Do not retain CAFs.  Everything reachable from foreign
  *               exports will be retained, due to the StablePtrs
  *               created by the module initialisation code.  unloadObj
- *               free these StablePtrs, which will allow the CAFs to
+ *               frees these StablePtrs, which will allow the CAFs to
  *               be GC'd and the code to be removed.
  */
 void initLinker_ (int retain_cafs);
