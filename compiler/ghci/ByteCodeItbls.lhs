@@ -234,8 +234,8 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
         --
         -- which looks like:
         --     00000000 <.addr-0x8>:
-        --     0:	4900        ldr    r1, [pc]      ; 8 <.addr>
-        --     4:	4708        bx     r1
+        --     0:       4900        ldr    r1, [pc]      ; 8 <.addr>
+        --     4:       4708        bx     r1
         let w32 = fromIntegral (ptrToInt a) :: Word32
         in Left [ 0x49, 0x00
                 , 0x47, 0x08
