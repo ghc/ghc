@@ -4,7 +4,6 @@ module CmmContFlowOpt
     ( cmmCfgOpts
     , cmmCfgOptsProc
     , removeUnreachableBlocksProc
-    , removeUnreachableBlocks
     , replaceLabels
     )
 where
@@ -394,11 +393,25 @@ predMap blocks = foldr add_preds mapEmpty blocks
 
 -- Removing unreachable blocks
 removeUnreachableBlocksProc :: CmmDecl -> CmmDecl
-removeUnreachableBlocksProc (CmmProc info lbl live g)
-   = CmmProc info lbl live (removeUnreachableBlocks g)
+removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
+   | length used_blocks < mapSize (toBlockMap g) 
+   = CmmProc info' lbl live g' 
+   | otherwise
+   = proc
+   where
+     g'    = ofBlockList (g_entry g) used_blocks
+     info' = info { info_tbls = keep_used (info_tbls info) }
+             -- Remove any info_tbls for unreachable 
 
-removeUnreachableBlocks :: CmmGraph -> CmmGraph
-removeUnreachableBlocks g
-  | length blocks < mapSize (toBlockMap g) = ofBlockList (g_entry g) blocks
-  | otherwise = g
-  where blocks = postorderDfs g
+     keep_used :: BlockEnv CmmInfoTable -> BlockEnv CmmInfoTable
+     keep_used bs = mapFoldWithKey keep emptyBlockMap bs
+
+     keep :: Label -> CmmInfoTable -> BlockEnv CmmInfoTable -> BlockEnv CmmInfoTable
+     keep l i env | l `setMember` used_lbls = mapInsert l i env
+                  | otherwise               = env
+
+     used_blocks :: [CmmBlock]
+     used_blocks = postorderDfs g
+
+     used_lbls :: LabelSet
+     used_lbls = foldr (setInsert . entryLabel) setEmpty used_blocks
