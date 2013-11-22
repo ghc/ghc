@@ -266,9 +266,10 @@ test('T7436',
 
 test('T7797',
       [stats_num_field('bytes allocated',
-                      [(wordsize(32), 360940756, 5),
-                    # expected value: 2685858140 (x86/OS X)
+                      [(wordsize(32), 240044984, 5),
+                          # expected value: 2685858140 (x86/OS X)
                           # expected: 360940756 (x86/Linux)
+                          # expected: 240044984 (x86/Windows, 64bit machine)
                        (wordsize(64), 480050944, 5)]),
                           # expected: 480050944 (amd64/Linux)
       extra_clean(['T7797a.hi', 'T7797a.o']),
@@ -287,7 +288,9 @@ test('T7954',
      ['-O'])
 
 test('T7850',
-     [stats_num_field('peak_megabytes_allocated', (4, 1)),
+     [stats_num_field('peak_megabytes_allocated', 
+                      [(wordsize(32), 2, 10),
+                       (wordsize(64), 4, 10)]),
       only_ways(['normal'])],
      compile_and_run,
      ['-O'])
