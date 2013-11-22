@@ -33,8 +33,9 @@ module MkId (
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
-        unsafeCoerceName, unsafeCoerceId, realWorldPrimId, 
-        voidArgId, nullAddrId, seqId, lazyId, lazyIdKey,
+        unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
+        voidPrimId, voidArgId,
+        nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
 
 	-- Re-export error Ids
@@ -134,6 +135,7 @@ ghcPrimIds
   = [   -- These can't be defined in Haskell, but they have
         -- perfectly reasonable unfoldings in Core
     realWorldPrimId,
+    voidPrimId,
     unsafeCoerceId,
     nullAddrId,
     seqId,
@@ -1036,11 +1038,14 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
-lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName, coercionTokenName, magicDictName, coerceName, proxyName :: Name
+lazyIdName, unsafeCoerceName, nullAddrName, seqName,
+   realWorldName, voidPrimIdName, coercionTokenName,
+   magicDictName, coerceName, proxyName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPrimIdKey realWorldPrimId
+voidPrimIdName    = mkWiredInIdName gHC_PRIM (fsLit "void#")         voidPrimIdKey      voidPrimId
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")         lazyIdKey           lazyId
 coercionTokenName = mkWiredInIdName gHC_PRIM (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
 magicDictName     = mkWiredInIdName gHC_PRIM (fsLit "magicDict")     magicDictKey magicDictId
@@ -1299,27 +1304,29 @@ nasty as-is, change it back to a literal (@Literal@).
 voidArgId is a Local Id used simply as an argument in functions
 where we just want an arg to avoid having a thunk of unlifted type.
 E.g.
-        x = \ void :: State# RealWorld -> (# p, q #)
+        x = \ void :: Void# -> (# p, q #)
 
 This comes up in strictness analysis
 
-\begin{code}
-realWorldPrimId :: Id
-realWorldPrimId -- :: State# RealWorld
-  = pcMiscPrelId realWorldName realWorldStatePrimTy
-      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)  -- Note [evaldUnfoldings]
-
-{- Note [evaldUnfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [evaldUnfoldings]
+~~~~~~~~~~~~~~~~~~~~~~
 The evaldUnfolding makes it look that some primitive value is
 evaluated, which in turn makes Simplify.interestingArg return True,
 which in turn makes INLINE things applied to said value likely to be
 inlined.
--}
 
-voidArgId :: Id
-voidArgId       -- :: State# RealWorld
-  = mkSysLocal (fsLit "void") voidArgIdKey realWorldStatePrimTy
+
+\begin{code}
+realWorldPrimId :: Id   -- :: State# RealWorld
+realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
+                     (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)    -- Note [evaldUnfoldings]
+
+voidPrimId :: Id     -- Global constant :: Void#
+voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
+                (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)    -- Note [evaldUnfoldings]
+
+voidArgId :: Id       -- Local lambda-bound :: Void#
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
 
 coercionTokenId :: Id 	      -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG

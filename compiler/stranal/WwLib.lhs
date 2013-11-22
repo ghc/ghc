@@ -18,8 +18,8 @@ import IdInfo           ( vanillaIdInfo )
 import DataCon
 import Demand
 import MkCore           ( mkRuntimeErrorApp, aBSENT_ERROR_ID )
-import MkId             ( realWorldPrimId, voidArgId )
-import TysPrim          ( realWorldStatePrimTy )
+import MkId             ( voidArgId, voidPrimId )
+import TysPrim          ( voidPrimTy )
 import TysWiredIn       ( tupleCon )
 import Type
 import Coercion hiding  ( substTy, substTyVarBndr )
@@ -186,7 +186,7 @@ mkWorkerArgs dflags args all_one_shot res_ty
     | any isId args || not needsAValueLambda
     = (args, args)
     | otherwise
-    = (args ++ [newArg], args ++ [realWorldPrimId])
+    = (args ++ [newArg], args ++ [voidPrimId])
     where
       needsAValueLambda =
         isUnLiftedType res_ty
@@ -643,8 +643,8 @@ mk_absent_let dflags arg
   | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit)))
-  | arg_ty `eqType` realWorldStatePrimTy
-  = Just (Let (NonRec arg (Var realWorldPrimId)))
+  | arg_ty `eqType` voidPrimTy
+  = Just (Let (NonRec arg (Var voidPrimId)))
   | otherwise
   = WARN( True, ptext (sLit "No absent value for") <+> ppr arg_ty )
     Nothing

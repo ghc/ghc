@@ -23,7 +23,7 @@ import CoreUtils        ( exprIsTrivial, applyTypeToArgs )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars )
 import UniqSupply
 import Name
-import MkId             ( voidArgId, realWorldPrimId )
+import MkId             ( voidArgId, voidPrimId )
 import Maybes           ( catMaybes, isJust )
 import BasicTypes
 import HscTypes
@@ -1138,7 +1138,7 @@ specCalls env rules_for_me calls_for_me fn rhs
              let body_ty = applyTypeToArgs rhs fn_type inst_args
                  (lam_args, app_args)           -- Add a dummy argument if body_ty is unlifted
                    | isUnLiftedType body_ty     -- C.f. WwLib.mkWorkerArgs
-                   = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [realWorldPrimId])
+                   = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [voidPrimId])
                    | otherwise = (poly_tyvars, poly_tyvars)
                  spec_id_ty = mkPiTypes lam_args body_ty
 

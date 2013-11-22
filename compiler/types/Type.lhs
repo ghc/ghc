@@ -63,7 +63,7 @@ module Type (
 
         -- ** Predicates on types
         isTypeVar, isKindVar,
-        isTyVarTy, isFunTy, isDictTy, isPredTy, 
+        isTyVarTy, isFunTy, isDictTy, isPredTy, isVoidTy,
 
         -- (Lifting and boxity)
         isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
@@ -596,7 +596,7 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 Note [Nullary unboxed tuple]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We represent the nullary unboxed tuple as the unary (but void) type
-State# RealWorld.  The reason for this is that the ReprArity is never
+Void#.  The reason for this is that the ReprArity is never
 less than the Arity (as it would otherwise be for a function type like
 (# #) -> Int).
 
@@ -642,7 +642,7 @@ repType ty
 
       | isUnboxedTupleTyCon tc
       = if null tys
-         then UnaryRep realWorldStatePrimTy -- See Note [Nullary unboxed tuple]
+         then UnaryRep voidPrimTy -- See Note [Nullary unboxed tuple]
          else UbxTupleRep (concatMap (flattenRepType . go rec_nts) tys)
 
     go _ ty = UnaryRep ty
@@ -687,6 +687,12 @@ typeRepArity 0 _ = 0
 typeRepArity n ty = case repType ty of
   UnaryRep (FunTy ty1 ty2) -> length (flattenRepType (repType ty1)) + typeRepArity (n - 1) ty2
   _                        -> pprPanic "typeRepArity: arity greater than type can handle" (ppr (n, ty))
+
+isVoidTy :: Type -> Bool
+-- True if the type has zero width
+isVoidTy ty = case repType ty of
+                UnaryRep (TyConApp tc _) -> isVoidRep (tyConPrimRep tc)
+                _                        -> False
 \end{code}
 
 Note [AppTy rep]
