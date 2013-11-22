@@ -62,6 +62,7 @@ import CoreSyn
 import ErrUtils
 import Id
 import VarEnv
+import VarSet
 import Module
 import UniqFM
 import Name
@@ -82,6 +83,7 @@ import Annotations
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
 import Data.Ord
+import BasicTypes hiding( SuccessFlag(..) )
 
 #ifdef GHCI
 import TcType   ( isUnitTy, isTauTy )
@@ -90,7 +92,6 @@ import TcMatches
 import RnTypes
 import RnExpr
 import MkId
-import BasicTypes hiding( SuccessFlag(..) )
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 #endif
@@ -1450,74 +1451,41 @@ setInteractiveContext hsc_env icxt thing_inside
         -- This mimics the more selective call to hptInstances in tcRnImports
         (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
         (ic_insts, ic_finsts) = ic_instances icxt
+        ty_things = ic_tythings icxt
 
-        -- Note [GHCi temporary Ids]
-        -- Ideally we would just make a type_env from ic_tythings
-        -- and ic_sys_vars, adding in implicit things.  However, Ids
-        -- bound interactively might have some free type variables
-        -- (RuntimeUnk things), and if we don't register these free
-        -- TyVars as global TyVars then the typechecker will try to
-        -- quantify over them and fall over in zonkQuantifiedTyVar.
-        --
-        -- So we must add any free TyVars to the typechecker's global
-        -- TyVar set.  This is what happens when the local environment
-        -- is extended, so we use tcExtendGhciEnv below which extends
-        -- the local environment with the Ids.
-        --
-        -- However, any Ids bound this way will shadow other Ids in
-        -- the GlobalRdrEnv, so we have to be careful to only add Ids
-        -- which are visible in the GlobalRdrEnv.
-        --
-        -- Perhaps it would be better to just extend the global TyVar
-        -- list from the free tyvars in the Ids here?  Anyway, at least
-        -- this hack is localised.
-        --
-        -- Note [delete shadowed tcg_rdr_env entries]
-        -- We also *delete* entries from tcg_rdr_env that we have
-        -- shadowed in the local env (see above).  This isn't strictly
-        -- necessary, but in an out-of-scope error when GHC suggests
-        -- names it can be confusing to see multiple identical
-        -- entries. (#5564)
-        --
-        (tmp_ids, types_n_classes) = partitionWith sel_id (ic_tythings icxt)
-          where sel_id (AnId id) = Left id
-                sel_id other     = Right other
-
-        type_env = mkTypeEnvWithImplicits
-                       (map AnId (ic_sys_vars icxt) ++ types_n_classes)
-
-        visible_tmp_ids = filter visible tmp_ids
-          where visible id = not (null (lookupGRE_Name (ic_rn_gbl_env icxt)
-                                                       (idName id)))
+        type_env  = mkTypeEnvWithImplicits
+                       (map AnId (ic_sys_vars icxt) ++ ty_things)
 
         con_fields = [ (dataConName c, dataConFieldLabels c)
-                     | ATyCon t <- types_n_classes
+                     | ATyCon t <- ty_things
                      , c <- tyConDataCons t ]
     in
-    updGblEnv (\env -> env {
-          tcg_rdr_env      = delListFromOccEnv (ic_rn_gbl_env icxt)
-                                               (map getOccName visible_tmp_ids)
-                                 -- Note [delete shadowed tcg_rdr_env entries]
-        , tcg_type_env     = type_env
-        , tcg_insts        = ic_insts
-        , tcg_inst_env     = extendInstEnvList
-                              (extendInstEnvList (tcg_inst_env env) ic_insts)
-                              home_insts
-        , tcg_fam_insts    = ic_finsts
-        , tcg_fam_inst_env = extendFamInstEnvList
-                              (extendFamInstEnvList (tcg_fam_inst_env env)
-                                                    ic_finsts)
-                              home_fam_insts
-        , tcg_field_env    = RecFields (mkNameEnv con_fields)
-                                       (mkNameSet (concatMap snd con_fields))
-             -- setting tcg_field_env is necessary to make RecordWildCards work
-             -- (test: ghci049)
-        , tcg_fix_env      = ic_fix_env icxt
-        , tcg_default      = ic_default icxt
-        }) $
+    do { gbl_env <- getGblEnv
+       ; let gbl_env' = gbl_env {
+                           tcg_rdr_env      = ic_rn_gbl_env icxt
+                         , tcg_type_env     = type_env
+                         , tcg_insts        = ic_insts
+                         , tcg_fam_insts    = ic_finsts
+                         , tcg_inst_env     = extendInstEnvList
+                                               (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
+                                               home_insts
+                         , tcg_fam_inst_env = extendFamInstEnvList
+                                               (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
+                                                                     ic_finsts)
+                                               home_fam_insts
+                         , tcg_field_env    = RecFields (mkNameEnv con_fields)
+                                                        (mkNameSet (concatMap snd con_fields))
+                              -- setting tcg_field_env is necessary 
+                              -- to make RecordWildCards work (test: ghci049)
+                         , tcg_fix_env      = ic_fix_env icxt
+                         , tcg_default      = ic_default icxt }
 
-        tcExtendGhciEnv visible_tmp_ids $ -- Note [GHCi temporary Ids]
-          thing_inside
+       ; lcl_env' <- tcExtendGlobalTyVars [ ATcId { tct_id = id, tct_closed = NotTopLevel }
+                                          | AnId id <- ty_things
+                                          , not (isEmptyVarSet (tyVarsOfType (idType id))) ]
+                     -- See Note [Global tyvars]
+
+       ; setEnvs (gbl_env', lcl_env') thing_inside }
 
 #ifdef GHCI
 -- | The returned [Id] is the list of new Ids bound by this statement. It can
@@ -1574,6 +1542,16 @@ tcRnStmt hsc_env ictxt rdr_stmt
                                   nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 \end{code}
 
+Note [Global tyvars]
+~~~~~~~~~~~~~~~~~~~~
+Ids bound interactively (in ic_tythings) might have some free type
+variables (RuntimeUnk things), and if we don't register these free
+TyVars as global TyVars then the typechecker will try to quantify over
+them and fall over in zonkQuantifiedTyVar.
+
+So we must add any free TyVars to the typechecker's global
+TyVar set.
+
 Note [Interactively-bound Ids in GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Ids bound by previous Stmts in GHCi are currently
@@ -1592,6 +1570,11 @@ The Ids bound by previous Stmts in GHCi are currently
  (c) Their types are tidied. This is important, because :info may ask
      to look at them, and :info expects the things it looks up to have
      tidy types
+
+However note that TyCons, Classes, and even Ids bound by other top-level
+declarations in GHCi (eg foreign import, record selectors) currently get
+External Names, with :INTERACTIVE as the module name.  This seems 
+totally inconsistent to me.
 
 --------------------------------------------------------------------------
                 Typechecking Stmts in GHCi

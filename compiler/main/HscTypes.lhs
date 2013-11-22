@@ -1103,6 +1103,8 @@ data InteractiveContext
          ic_rn_gbl_env :: GlobalRdrEnv,
              -- ^ The cached 'GlobalRdrEnv', built by
              -- 'InteractiveEval.setContext' and updated regularly
+             -- It contains everything in scope at the command line,
+             -- including everything in ic_tythings and ic_sys_vars
 
          ic_tythings   :: [TyThing],
              -- ^ TyThings defined by the user, in reverse order of
@@ -1110,8 +1112,9 @@ data InteractiveContext
              -- local variables in scope at that point
 
          ic_sys_vars   :: [Id],
-             -- ^ Variables defined automatically by the system (e.g.
-             -- record field selectors).  See Notes [ic_sys_vars]
+             -- ^ Variables defined automatically from
+             -- ic_ty_things (e.g. record field selectors).
+             -- See Notes [ic_sys_vars]
 
          ic_instances  :: ([ClsInst], [FamInst]),
              -- ^ All instances and family instances created during
@@ -1144,7 +1147,7 @@ data InteractiveContext
 Note [ic_sys_vars]
 ~~~~~~~~~~~~~~~~~~
 This list constains any Ids that arise from TyCons, Classes or
-instances defined interactively, but that are not given by
+instances defined interactively, but that are *not* given by
 'implicitTyThings'.  This includes record selectors, default methods,
 and dfuns.
 
