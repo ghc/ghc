@@ -21,6 +21,7 @@ metavar alpha {{ tex \alpha }}, beta {{ tex \beta }} ::=
   {{ com Type-level variable names }}
 metavar N ::=   {{ com Type-level constructor names }}
 metavar K ::=   {{ com Term-level data constructor names }}
+metavar M ::=   {{ com Axiom rule names }}
 
 indexvar i, j, kk {{ tex k }}, aa {{ tex a }}, bb {{ tex b }}, cc {{ tex c }} ::= {{ com Indices to be used in lists }}
 
@@ -124,10 +125,13 @@ g {{ tex \gamma }} :: 'Coercion_' ::= {{ com Coercions, \coderef{types/Coercion.
   | t1 ==>! RA t2           ::   :: UnivCo        {{ com Universal coercion }}
   | sym g                   ::   :: SymCo         {{ com Symmetry }}
   | g1 ; g2                 ::   :: TransCo       {{ com Transitivity }}
+  | mu </ ti // i /> </ gj // j />
+                            ::   :: AxiomRuleCo   {{ com Axiom-rule application (for type-nats) }}
   | nth I g                 ::   :: NthCo         {{ com Projection (0-indexed) }}
     {{ tex \textsf{nth}_{[[I]]}\,[[g]] }}
   | LorR g                  ::   :: LRCo          {{ com Left/right projection }}
   | g t                     ::   :: InstCo        {{ com Type application }}
+  | sub g                   ::   :: SubCo         {{ com Sub-role --- convert nominal to representational }}
   | ( g )                   :: M :: Parens        {{ com Parentheses }}
   | t @ liftingsubst        :: M :: Lifted        {{ com Type lifted to coercion }}
 
@@ -151,6 +155,10 @@ R {{ tex \rho }} :: 'Role_' ::= {{ com Roles, \coderef{types/CoAxiom.lhs}{Role} 
 axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{types/TyCon.lhs}{CoAxBranch} }}
   | forall </ ni RAi // i /> . ( </ tj // j /> ~> s )  ::   :: CoAxBranch  {{ com Axiom branch }}
   | ( </ axBranchi // i /> ) [ ind ]                   :: M :: lookup      {{ com List lookup }}
+
+mu {{ tex \mu }} :: 'CoAxiomRule_' ::= {{ com CoAxiomRules, \coderef{types/CoAxiom.lhs}{CoAxiomRule} }}
+  | M ( I , role_list , R' )   ::  :: CoAxiomRule  {{ com Named rule, with parameter info }}
+    {{ tex {[[M]]}_{([[I]], [[ role_list ]], [[R']])} }}
 
 %% TYCONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -212,6 +220,7 @@ liftingsubst :: 'LiftSubst_' ::= {{ com List of lifting substitutions }}
 ind, I {{ tex i }} :: 'Ind_' ::= {{ com Indices, numbers }}
   | i                           ::   :: index
   | length </ ti // i />        :: M :: length_t
+  | length </ gi // i />        :: M :: length_g
   | length </ axBranchi // i /> :: M :: length_axBranch
   | tyConArity T                :: M :: tyConArity
   | ind - 1                     :: M :: decrement
@@ -225,14 +234,15 @@ type_list :: 'TypeList_' ::= {{ com List of types }}
 
 RA {{ tex {\!\!\!{}_{\rho} } }} :: 'RoleAnnot_' ::= {{ com Role annotation }}
   | _ R                    :: M :: annotation
-  {{ tex {}_{[[R]]} }}
+  {{ tex {\!\!\!{}_{[[R]]} } }}
 
-role_list :: 'RoleList_' ::= {{ com List of roles }}
-  | </ Ri // , // i />     ::   :: List
-  | tyConRolesX R T        :: M :: tyConRolesX
-  | tyConRoles T           :: M :: tyConRoles
-  | ( role_list )          :: M :: Parens
-  | { role_list }          :: M :: Braces
+role_list {{ tex {\overline{\rho_j} }^j }} :: 'RoleList_' ::= {{ com List of roles }}
+  | </ Ri // , // i />       ::   :: List
+  | tyConRolesX R T          :: M :: tyConRolesX
+  | tyConRoles T             :: M :: tyConRoles
+  | ( role_list )            :: M :: Parens
+  | { role_list }            :: M :: Braces
+  | take ( ind , role_list ) :: M :: Take
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Terminals  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -298,6 +308,9 @@ terminals :: 'terminals_' ::=
   | validDcRoles ::   :: validDcRoles     {{ tex \textsf{validDcRoles} }}
   | -->          ::   :: steps            {{ tex \longrightarrow }}
   | coercionKind ::   :: coercionKind     {{ tex \textsf{coercionKind} }}
+  | take         ::   :: take             {{ tex \textsf{take}\! }}
+  | coaxrProves  ::   :: coaxrProves      {{ tex \textsf{coaxrProves} }}
+  | Just         ::   :: Just             {{ tex \textsf{Just} }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -355,6 +368,9 @@ formula :: 'formula_' ::=
   | no other case matches              ::   :: no_other_case
     {{ tex \text{no other case matches} }}
   | t = coercionKind g                 ::   :: coercionKind
+  | Just ( t1 , t2 ) = coaxrProves mu </ si // i /> </ ( s'j , s''j ) // j />
+                                       ::   :: coaxrProves
+                          
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

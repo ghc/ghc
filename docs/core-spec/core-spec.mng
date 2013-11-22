@@ -30,7 +30,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 9 September, 2013
+\Large 21 November, 2013
 \end{center}
 
 \section{Introduction}
@@ -181,6 +181,19 @@ as that would unduly clutter this presentation. Instead, as the list
 of incompatible branches can be computed at any time, it is checked for
 in the judgment $[[no_conflict]]$. See Section~\ref{sec:no_conflict}.
 
+Axiom rules, produced by the type-nats solver:
+
+\gram{\ottmu}
+
+\label{sec:axiom_rule}
+An axiom rule $[[mu]] = [[M(I, role_list, R')]]$ is an axiom name $[[M]]$, with a
+type arity $[[I]]$, a list of roles $[[role_list]]$ for its coercion parameters,
+and an output role $[[R']]$. The definition within GHC also includes a field named
+$[[coaxrProves]]$ which computes the output coercion from a list of types and
+a list of coercions. This is elided in this presentation, as we simply identify
+axiom rules by their names $[[M]]$. See also \coderef{typecheck/TcTypeNats.lhs}{mkBinAxiom}
+and \coderef{typecheck/TcTypeNats.lhs}{mkAxiom1}.
+
 \subsection{Type constructors}
 
 Type constructors in GHC contain \emph{lots} of information. We leave most of it out
@@ -246,12 +259,6 @@ as for strictness and exportability. See the source code for further information
 
 \ottdefnlintCoreExpr{}
 
-%\arraylabel{\coderef{coreSyn/CoreLint.lhs}{checkCaseAlts}} \\
-%\multicolumn{2}{l}{[[checkCaseAlts]] \text{ checks ordering and exhaustivity constr%aints}} \\
-
-%\end{array}
-%\]
-
 \begin{itemize}
 \item Some explication of \ottdrulename{Tm\_LetRec} is helpful: The idea behind the
 second premise ($[[</ G, G'i |-ty s'i : ki // i />]]$) is that we wish
@@ -308,7 +315,8 @@ In \ottdrulename{Co\_AxiomInstCo}, the use of $[[inits]]$ creates substitutions 
 the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of 
 folding the substitution over the kinds for kind-checking.
 
-See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$.
+See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$, and
+see Section~\ref{sec:axiom_rules} for more information about $[[coaxrProves]]$.
 
 \subsection{Name consistency}
 
