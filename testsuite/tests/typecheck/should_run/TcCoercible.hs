@@ -1,4 +1,4 @@
-{-# LANGUAGE RoleAnnotations, StandaloneDeriving, FlexibleContexts, UndecidableInstances, GADTs #-}
+{-# LANGUAGE RoleAnnotations, StandaloneDeriving, FlexibleContexts, UndecidableInstances, GADTs, TypeFamilies #-}
 
 import GHC.Prim (Coercible, coerce)
 import Data.Monoid (mempty, First(First), Last())
@@ -31,6 +31,10 @@ data Oracle where Oracle :: Coercible (Fix (Either Age)) (Fix  (Either Int)) => 
 foo :: Oracle -> Either Age (Fix (Either Age)) -> Fix (Either Int)
 foo Oracle = coerce
 
+-- This ensures that Coercible looks into newtype instances (#8548)
+data family Fam k
+newtype instance Fam Int = FamInt Bool deriving Show
+
 main = do
     print (coerce $ one                       :: Age)
     print (coerce $ age                       :: Int)
@@ -57,6 +61,9 @@ main = do
 
     print (coerce $ (FixEither (Left age) :: FixEither Age) :: Either Int (FixEither Int))
     print (coerce $ (Left one :: Either Int (FixEither Age)) :: FixEither Age)
+
+    print (coerce $ True :: Fam Int)
+    print (coerce $ FamInt True :: Bool)
 
     foo `seq` return ()
 
