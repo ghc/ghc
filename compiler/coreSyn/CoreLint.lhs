@@ -550,8 +550,17 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 checkCaseAlts e ty alts = 
   do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
      ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
-     ; checkL (isJust maybe_deflt || not is_infinite_ty)
-	   (nonExhaustiveAltsMsg e) }
+
+          -- For types Int#, Word# with an infinite (well, large!) number of
+          -- possible values, there should usually be a DEFAULT case
+          -- But (see Note [Empty case alternatives] in CoreSyn) it's ok to
+          -- have *no* case alternatives.
+          -- In effect, this is a kind of partial test. I suppose it's possible
+          -- that we might *know* that 'x' was 1 or 2, in which case
+          --   case x of { 1 -> e1; 2 -> e2 }
+          -- would be fine.   
+     ; checkL (isJust maybe_deflt || not is_infinite_ty || null alts)
+              (nonExhaustiveAltsMsg e) }
   where
     (con_alts, maybe_deflt) = findDefault alts
 
