@@ -331,32 +331,21 @@ tcBracket brack ps res_ty
          tc_bracket brack ps_ref
        }
   where
-    tcUntypedBracket :: HsBracket Name -> TcM TcType
-    tcUntypedBracket (VarBr _ _) = -- Result type is Var (not Q-monadic)
-                                   tcMetaTy nameTyConName
-    tcUntypedBracket (ExpBr _)   = -- Result type is ExpQ (= Q Exp)
-                                   tcMetaTy expQTyConName
-    tcUntypedBracket (TypBr _)   = -- Result type is Type (= Q Typ)
-                                   tcMetaTy typeQTyConName
-    tcUntypedBracket (DecBrG _)  = -- Result type is Q [Dec]
-                                   tcMetaTy decsQTyConName 
-    tcUntypedBracket (PatBr _)   = -- Result type is PatQ (= Q Pat)
-                                   tcMetaTy patQTyConName
-    tcUntypedBracket (DecBrL _)  = panic "tcUntypedBracket: Unexpected DecBrL"
-    tcUntypedBracket (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
-
     tc_bracket :: HsBracket Name -> TcRef [PendingSplice] -> TcM (HsExpr TcId)
     tc_bracket brack ps_ref
       | not (isTypedBracket brack)
-      = do { mapM_ tcPendingSplice ps
+      = do { traceTc "tc_bracked untyped" (ppr brack $$ ppr ps)
+           ; mapM_ tcPendingSplice ps
            ; meta_ty <- tcUntypedBracket brack
            ; ps' <- readMutVar ps_ref
            ; co <- unifyType meta_ty res_ty
+           ; traceTc "tc_bracked done untyped" (ppr meta_ty)
            ; return (mkHsWrapCo co (HsBracketOut brack ps'))
            }
 
     tc_bracket (TExpBr expr) ps_ref
-      = do { any_ty <- newFlexiTyVarTy openTypeKind
+      = do { traceTc "tc_bracked typed" (ppr brack)
+           ; any_ty <- newFlexiTyVarTy openTypeKind
              -- NC for no context; tcBracket does that
            ; _ <- tcMonoExprNC expr any_ty
            ; meta_ty <- tcTExpTy any_ty
@@ -368,6 +357,15 @@ tcBracket brack ps res_ty
 
     tc_bracket _ _
       = panic "tc_bracket: Expected untyped splice"
+
+tcUntypedBracket :: HsBracket Name -> TcM TcType
+tcUntypedBracket (VarBr _ _) = tcMetaTy nameTyConName  -- Result type is Var (not Q-monadic)
+tcUntypedBracket (ExpBr _)   = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
+tcUntypedBracket (TypBr _)   = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
+tcUntypedBracket (DecBrG _)  = tcMetaTy decsQTyConName -- Result type is Q [Dec]
+tcUntypedBracket (PatBr _)   = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
+tcUntypedBracket (DecBrL _)  = panic "tcUntypedBracket: Unexpected DecBrL"
+tcUntypedBracket (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
 
 tcPendingSplice :: PendingSplice -> TcM ()
 tcPendingSplice (PendingRnExpSplice n expr) 
