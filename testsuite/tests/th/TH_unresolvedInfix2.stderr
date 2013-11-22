@@ -4,7 +4,7 @@ TH_unresolvedInfix2.hs:14:11:
         must have lower precedence than that of the operand,
           namely ‛:+’ [infixl 6]
         in the section: ‛:+ N :+ N’
-    In the result of the splice:
+    In the splice:
       $(let
           plus = conE ':+
           n = conE 'N

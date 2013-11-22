@@ -4,7 +4,6 @@ T5971.hs:6:7:
       Probable cause: you used a unique Template Haskell name (NameU), 
       perhaps via newName, but did not bind it
       If that's it, then -ddump-splices might be useful
-    In the result of the splice:
-      $(newName "x" >>= varE)
+    In the splice: $(newName "x" >>= varE)
     To see what the splice expanded to, use -ddump-splices
     In the expression: $(newName "x" >>= varE)
