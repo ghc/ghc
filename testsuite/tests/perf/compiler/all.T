@@ -187,15 +187,16 @@ test('T3064',
           [(wordsize(32), 111189536, 10),
          # expected value: 56380288 (x86/Linux) (28/6/2011)
          #                111189536 (x86/Windows) (30/10/12)
-           (wordsize(64), 290165632, 5)]),
+           (wordsize(64), 308300448, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
             # (amd64/Linux) (11/09/2013): 290165632, increase from AMP warnings
+            # (amd64/Linux) (22/11/2013): 308300448, GND via Coercible and counters for constraints solving
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 12000480, 20)]),
+           (wordsize(64), 16266992, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -204,6 +205,7 @@ test('T3064',
             # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
             # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
             #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
+            # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
        only_ways(['normal'])
       ],
      compile,
@@ -329,13 +331,15 @@ test('T5837',
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 40000000, 10),
           # sample from x86/Linux
-           (wordsize(64), 90587232, 10)])
+           (wordsize(64), 86795752, 10)])
               # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
              # 2013-09-18 90587232 amd64/Linux
+	     # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
+	     #                                  for constraints solving
       ],
-      compile_fail,['-fcontext-stack=50'])
+      compile_fail,['-ftype-function-depth=50'])
 
 test('T6048',
      [ only_ways(['optasm']),

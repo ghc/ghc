@@ -1,7 +1,7 @@
 
 T5837.hs:8:6:
-    Context reduction stack overflow; size = 51
-    Use -fcontext-stack=N to increase stack size to N
+    Type function application stack overflow; size = 51
+    Use -ftype-function-depth=N to increase stack size to N
       (TF
          (TF
             (TF
