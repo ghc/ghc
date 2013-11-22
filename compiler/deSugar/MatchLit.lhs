@@ -157,27 +157,46 @@ warnAboutOverflowedLiterals :: DynFlags -> HsOverLit Id -> DsM ()
 warnAboutOverflowedLiterals dflags lit
  | wopt Opt_WarnOverflowedLiterals dflags
  , Just (i, tc) <- getIntegralLit lit
- , let check :: forall a. (Bounded a, Integral a) => a -> DsM ()
-       check _proxy
-         = when (i < toInteger (minBound :: a) ||
-                 i > toInteger (maxBound :: a)) $
-           warnDs (ptext (sLit "Literal") <+> integer i <+>
-                   ptext (sLit "of type") <+> ppr tc <+>
-                   ptext (sLit "overflows"))
-  = if      tc == intTyConName    then check (undefined :: Int)
-    else if tc == int8TyConName   then check (undefined :: Int8)
-    else if tc == int16TyConName  then check (undefined :: Int16)
-    else if tc == int32TyConName  then check (undefined :: Int32)
-    else if tc == int64TyConName  then check (undefined :: Int64)
-    else if tc == wordTyConName   then check (undefined :: Word)
-    else if tc == word8TyConName  then check (undefined :: Word8)
-    else if tc == word16TyConName then check (undefined :: Word16)
-    else if tc == word32TyConName then check (undefined :: Word32)
-    else if tc == word64TyConName then check (undefined :: Word64)
+  = if      tc == intTyConName    then check i tc (undefined :: Int)
+    else if tc == int8TyConName   then check i tc (undefined :: Int8)
+    else if tc == int16TyConName  then check i tc (undefined :: Int16)
+    else if tc == int32TyConName  then check i tc (undefined :: Int32)
+    else if tc == int64TyConName  then check i tc (undefined :: Int64)
+    else if tc == wordTyConName   then check i tc (undefined :: Word)
+    else if tc == word8TyConName  then check i tc (undefined :: Word8)
+    else if tc == word16TyConName then check i tc (undefined :: Word16)
+    else if tc == word32TyConName then check i tc (undefined :: Word32)
+    else if tc == word64TyConName then check i tc (undefined :: Word64)
     else return ()
 
   | otherwise = return ()
+  where
+    check :: forall a. (Bounded a, Integral a) => Integer -> Name -> a -> DsM ()
+    check i tc _proxy
+      = when (i < minB || i > maxB) $ do
+        warnDs (vcat [ ptext (sLit "Literal") <+> integer i
+                       <+> ptext (sLit "is out of the") <+> ppr tc <+> ptext (sLit "range")
+                       <+> integer minB <> ptext (sLit "..") <> integer maxB
+                     , sug ])
+      where
+        minB = toInteger (minBound :: a)
+        maxB = toInteger (maxBound :: a)
+        sug | minB == -i   -- Note [Suggest NegativeLiterals]
+            , i > 0
+            , not (xopt Opt_NegativeLiterals dflags)
+            = ptext (sLit "If you are trying to write a large negative literal, use NegativeLiterals")
+            | otherwise = empty
 \end{code}
+
+Note [Suggest NegativeLiterals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If you write
+  x :: Int8
+  x = -128
+it'll parse as (negate 128), and overflow.  In this case, suggest NegativeLiterals.
+We get an erroneous suggestion for
+  x = 128
+but perhaps that does not matter too much.
 
 \begin{code}
 warnAboutEmptyEnumerations :: DynFlags -> LHsExpr Id -> Maybe (LHsExpr Id) -> LHsExpr Id -> DsM ()
