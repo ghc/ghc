@@ -26,6 +26,7 @@ import Name
 import RdrName ( GlobalRdrEnv, lookupGRE_Name, mkRdrQual, is_as,
                  is_decl, Provenance(Imported), gre_prov )
 import FunDeps
+import FamInstEnv ( FamInstEnvs, instNewTyConTF_maybe )
 
 import TcEvidence
 import Outputable
@@ -1845,8 +1846,9 @@ matchClassInst _ clas [ _k, ty1, ty2 ] loc
   | clas == coercibleClass =  do
       traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2 <+> text "at depth" <+> ppr (ctLocDepth loc)
       rdr_env <- getGlobalRdrEnvTcS
+      famenv <- getFamInstEnvs
       safeMode <- safeLanguageOn `fmap` getDynFlags
-      ev <- getCoercibleInst safeMode rdr_env loc ty1 ty2
+      ev <- getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
       traceTcS "matchClassInst returned" $ ppr ev
       return ev
 
@@ -1932,8 +1934,8 @@ matchClassInst inerts clas tys loc
 
 -- See Note [Coercible Instances]
 -- Changes to this logic should likely be reflected in coercible_msg in TcErrors.
-getCoercibleInst :: Bool -> GlobalRdrEnv -> CtLoc -> TcType -> TcType -> TcS LookupInstResult
-getCoercibleInst safeMode rdr_env loc ty1 ty2
+getCoercibleInst :: Bool -> FamInstEnvs -> GlobalRdrEnv -> CtLoc -> TcType -> TcType -> TcS LookupInstResult
+getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
   | ty1 `tcEqType` ty2
   = do return $ GenInst []
               $ EvCoercible (EvCoercibleRefl ty1)
@@ -1957,21 +1959,17 @@ getCoercibleInst safeMode rdr_env loc ty1 ty2
               $ EvCoercible (EvCoercibleTyCon tc1 (map snd arg_evs))
 
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
-    Just (_, _, _) <- unwrapNewTyCon_maybe tc,
-    newTyConEtadArity tc <= length tyArgs,
+    Just (concTy, _) <- instNewTyConTF_maybe famenv tc tyArgs,
     dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
   = do markDataConsAsUsed rdr_env tc
-       let concTy = newTyConInstRhs tc tyArgs
        ct_ev <- requestCoercible loc concTy ty2
        return $ GenInst (freshGoals [ct_ev])
               $ EvCoercible (EvCoercibleNewType CLeft tc tyArgs (getEvTerm ct_ev))
 
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
-    Just (_, _, _) <- unwrapNewTyCon_maybe tc,
-    newTyConEtadArity tc <= length tyArgs,
+    Just (concTy, _) <- instNewTyConTF_maybe famenv tc tyArgs,
     dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
   = do markDataConsAsUsed rdr_env tc
-       let concTy = newTyConInstRhs tc tyArgs
        ct_ev <- requestCoercible loc ty1 concTy
        return $ GenInst (freshGoals [ct_ev])
               $ EvCoercible (EvCoercibleNewType CRight tc tyArgs (getEvTerm ct_ev))

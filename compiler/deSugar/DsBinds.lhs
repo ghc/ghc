@@ -44,7 +44,7 @@ import Unique( Unique )
 import Digraph
 
 
-import TyCon      ( isTupleTyCon, tyConDataCons_maybe, unwrapNewTyCon_maybe )
+import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
 import TcEvidence
 import TcType
 import Type
@@ -53,6 +53,7 @@ import TysWiredIn ( eqBoxDataCon, coercibleTyCon, coercibleDataCon, tupleCon )
 import Id
 import Class
 import DataCon	( dataConWorkId )
+import FamInstEnv ( instNewTyConTF_maybe )
 import Name
 import MkId	( seqId )
 import Var
@@ -797,12 +798,11 @@ dsEvTerm (EvCoercible (EvCoercibleTyCon tyCon evs)) = do
 
 dsEvTerm (EvCoercible (EvCoercibleNewType lor tyCon tys v)) = do
   ntEv <- dsEvTerm v
+  famenv <- dsGetFamInstEnvs
+  let Just (_, ntCo) = instNewTyConTF_maybe famenv tyCon tys
   wrapInEqRCase ntEv $ \co -> do
-          return $ mkCoercible $
-                connect lor co $
-                mkUnbranchedAxInstCo Representational coAxiom tys
-  where Just (_, _, coAxiom) = unwrapNewTyCon_maybe tyCon
-        connect CLeft co2 co1 = mkTransCo co1 co2
+          return $ mkCoercible $ connect lor co ntCo
+  where connect CLeft co2 co1 = mkTransCo co1 co2
         connect CRight co2 co1 = mkTransCo co2 (mkSymCo co1)
 
 wrapInEqRCase :: CoreExpr -> (Coercion -> DsM CoreExpr) -> DsM CoreExpr

@@ -28,7 +28,7 @@ module FamInstEnv (
         isDominatedBy,
 
         -- Normalisation
-        chooseBranch, topNormaliseType, topNormaliseType_maybe,
+        instNewTyConTF_maybe, chooseBranch, topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
 
         -- Flattening
@@ -855,6 +855,29 @@ findBranch [] _ _ = Nothing
 %************************************************************************
 
 \begin{code}
+-- | Unwrap a newtype of a newtype intances. This is analogous to
+--   Coercion.instNewTyCon_maybe; differences are:
+--     * it also lookups up newtypes families, and
+--     * it does not require the newtype to be saturated.
+--       (a requirement using it for Coercible)
+instNewTyConTF_maybe :: FamInstEnvs -> TyCon -> [Type] -> Maybe (Type, Coercion)
+instNewTyConTF_maybe env tc tys = result
+  where
+  (co1, tc2, tys2)
+    | Just (co, rhs1) <- reduceTyFamApp_maybe env Representational tc tys
+    , Just (tc2, tys2) <- splitTyConApp_maybe rhs1
+    = (co, tc2, tys2)
+    | otherwise
+    = (mkReflCo Representational (mkTyConApp tc tys), tc, tys)
+
+  result
+     | Just (_, _, co_tc) <- unwrapNewTyCon_maybe tc2 -- Check for newtype
+     , newTyConEtadArity tc2 <= length tys2           -- Check for enough arguments
+     = Just (newTyConInstRhs tc2 tys2
+            , co1 `mkTransCo` mkUnbranchedAxInstCo Representational co_tc tys2)
+     | otherwise
+     = Nothing
+
 topNormaliseType :: FamInstEnvs -> Type -> Type
 topNormaliseType env ty = case topNormaliseType_maybe env ty of
                             Just (_co, ty') -> ty'
