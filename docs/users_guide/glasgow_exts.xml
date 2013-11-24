@@ -6387,9 +6387,10 @@ class (F a ~ b) => C a b where
 			type <literal>(Show a, Ord a)</literal> is of kind <literal>Constraint</literal>.
 		</listitem>
 		<listitem>
-			Anything whose form is not yet know, but the user has declared to have kind <literal>Constraint</literal>.
-			So for example <literal>type Foo (f :: * -> Constraint) = forall b. f b => b -> b</literal> is allowed, as
-			well as examples involving type families:
+			Anything whose form is not yet know, but the user has declared to have kind <literal>Constraint</literal>
+			(for which they need to import it from <literal>GHC.Exts</literal>).  So for example
+			<literal>type Foo (f :: * -> Constraint) = forall b. f b => b -> b</literal> is allowed, as well as
+			examples involving type families:
 <programlisting>
 type family Typ a b :: Constraint
 type instance Typ Int  b = Show b
