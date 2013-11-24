@@ -303,6 +303,41 @@ popCountDefault = go 0
    go c w = go (c+1) (w .&. (w - 1)) -- clear the least significant
 {-# INLINABLE popCountDefault #-}
 
+
+-- Interpret 'Bool' as 1-bit bit-field; /Since: 4.7.0.0/
+instance Bits Bool where
+    (.&.) = (&&)
+
+    (.|.) = (||)
+
+    xor = (/=)
+
+    complement = not
+
+    shift x 0 = x
+    shift _ _ = False
+
+    rotate x _ = x
+
+    bit 0 = True
+    bit _ = False
+
+    testBit x 0 = x
+    testBit _ _ = False
+
+    bitSizeMaybe _ = Just 1
+
+    bitSize _ = 1
+
+    isSigned _ = False
+
+    popCount False = 0
+    popCount True  = 1
+
+instance FiniteBits Bool where
+    finiteBitSize _ = 1
+
+
 instance Bits Int where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
