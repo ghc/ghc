@@ -694,6 +694,10 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   dflags = hsc_dflags hsc_env
 
   go :: Int -> Type -> Type -> HValue -> TcM Term
+   -- I belive that my_ty should not have any enclosing
+   -- foralls, nor any free RuntimeUnk skolems;
+   -- that is partly what the quantifyType stuff achieved
+   --
    -- [SPJ May 11] I don't understand the difference between my_ty and old_ty
 
   go max_depth _ _ _ | seq max_depth False = undefined
@@ -935,30 +939,22 @@ improveRTTIType _ base_ty new_ty
   = U.tcUnifyTys (const U.BindMe) [base_ty] [new_ty]
 
 getDataConArgTys :: DataCon -> Type -> TR [Type]
--- Given the result type ty of a constructor application (D a b c :: ty) 
+-- Given the result type ty of a constructor application (D a b c :: ty)
 -- return the types of the arguments.  This is RTTI-land, so 'ty' might
 -- not be fully known.  Moreover, the arg types might involve existentials;
 -- if so, make up fresh RTTI type variables for them
+--
+-- I believe that con_app_ty should not have any enclosing foralls
 getDataConArgTys dc con_app_ty
-  = do { (_, ex_tys, ex_subst) <- instTyVars ex_tvs
-       ; let UnaryRep rep_con_app_ty = repType con_app_ty
-       ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty))
-       ; ty_args <- case tcSplitTyConApp_maybe rep_con_app_ty of
-                       Just (tc, ty_args) | dataConTyCon dc == tc
-		       	   -> ASSERT( univ_tvs `equalLength` ty_args) 
-                              return ty_args
- 		       _   -> do { (_, ty_args, univ_subst) <- instTyVars univ_tvs
-		       	         ; let res_ty = substTy ex_subst (substTy univ_subst (dataConOrigResTy dc))
-                                   -- See Note [Constructor arg types]
-                                 ; addConstraint rep_con_app_ty res_ty
-                                 ; return ty_args }
-		-- It is necessary to check dataConTyCon dc == tc
-      		-- because it may be the case that tc is a recursive
-      		-- newtype and tcSplitTyConApp has not removed it. In
-      		-- that case, we happily give up and don't match
-       ; let subst = zipTopTvSubst (univ_tvs ++ ex_tvs) (ty_args ++ ex_tys)
-       ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr ty_args $$ ppr subst))
-       ; return (substTys subst (dataConRepArgTys dc)) }
+  = do { let UnaryRep rep_con_app_ty = repType con_app_ty
+       ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty 
+                   $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
+       ; (_, _, subst) <- instTyVars (univ_tvs ++ ex_tvs)
+       ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
+              -- See Note [Constructor arg types]
+       ; let con_arg_tys = substTys subst (dataConRepArgTys dc)
+       ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
+       ; return con_arg_tys }
   where
     univ_tvs = dataConUnivTyVars dc
     ex_tvs   = dataConExTyVars dc
@@ -967,17 +963,19 @@ getDataConArgTys dc con_app_ty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a GADT (cf Trac #7386)
    data family D a b
-   data instance D [a] b where
-     MkT :: b -> D [a] (Maybe b)
+   data instance D [a] a where
+     MkT :: a -> D [a] (Maybe a)
+     ...
 
 In getDataConArgTys
 * con_app_ty is the known type (from outside) of the constructor application, 
-  say D [Int] Bool
+  say D [Int] Int
 
 * The data constructor MkT has a (representation) dataConTyCon = DList,
   say where
-    data DList a b where
-      MkT :: b -> DList a (Maybe b)
+    data DList a where
+      MkT :: a -> DList a (Maybe a)
+      ...
 
 So the dataConTyCon of the data constructor, DList, differs from 
 the "outside" type, D. So we can't straightforwardly decompose the
@@ -1252,11 +1250,21 @@ tyConPhantomTyVars tc
   = tyConTyVars tc \\ dc_vars
 tyConPhantomTyVars _ = []
 
-type QuantifiedType = ([TyVar], Type)   -- Make the free type variables explicit
+type QuantifiedType = ([TyVar], Type)
+   -- Make the free type variables explicit
+   -- The returned Type should have no top-level foralls (I believe)
 
 quantifyType :: Type -> QuantifiedType
--- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
-quantifyType ty = (varSetElems (tyVarsOfType ty), ty)
+-- Generalize the type: find all free and forall'd tyvars
+-- and return them, together with the type inside, which
+-- should not be a forall type.
+--
+-- Thus (quantifyType (forall a. a->[b]))
+-- returns ([a,b], a -> [b])
+
+quantifyType ty = (varSetElems (tyVarsOfType rho), rho)
+  where
+    (_tvs, rho) = tcSplitForAllTys ty
 
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = condM >>= \c -> unless c acc
