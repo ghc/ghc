@@ -1919,6 +1919,7 @@ genInst standalone_deriv oflag comauxs
                  , ds_name = name, ds_cls = clas, ds_loc = loc })
   | is_newtype
   = do { inst_spec <- mkInstance oflag theta spec
+       ; traceTc "genInst/is_newtype" (vcat [ppr loc, ppr clas, ppr tvs, ppr tys, ppr rhs_ty])
        ; return ( InstInfo
                     { iSpec   = inst_spec
                     , iBinds  = InstBindings
