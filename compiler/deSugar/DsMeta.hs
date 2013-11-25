@@ -67,7 +67,7 @@ import Control.Monad
 import Data.List
 
 -----------------------------------------------------------------------------
-dsBracket :: HsBracket Name -> [PendingSplice] -> DsM CoreExpr
+dsBracket :: HsBracket Name -> [PendingTcSplice] -> DsM CoreExpr
 -- Returns a CoreExpr of type TH.ExpQ
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
@@ -75,7 +75,7 @@ dsBracket :: HsBracket Name -> [PendingSplice] -> DsM CoreExpr
 dsBracket brack splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
-    new_bit = mkNameEnv [(n, Splice (unLoc e)) | PendingTcSplice n e <- splices]
+    new_bit = mkNameEnv [(n, Splice (unLoc e)) | (n, e) <- splices]
 
     do_brack (VarBr _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr e)   = do { MkC e1  <- repLE e     ; return e1 }
@@ -835,7 +835,7 @@ repTy (HsKindSig t k)       = do
                                 t1 <- repLTy t
                                 k1 <- repLKind k
                                 repTSig t1 k1
-repTy (HsSpliceTy splice _ _) = repSplice splice
+repTy (HsSpliceTy splice _)     = repSplice splice
 repTy (HsExplicitListTy _ tys)  = do
                                     tys1 <- repLTys tys
                                     repTPromotedList tys1
@@ -903,7 +903,7 @@ repRole (L _ Nothing)                 = rep2 inferRName []
 repSplice :: HsSplice Name -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsSplice _ n _)
+repSplice (HsSplice n _)
  = do { mb_val <- dsLookupMetaEnv n
        ; case mb_val of
            Just (Splice e) -> do { e' <- dsExpr e
@@ -1026,13 +1026,13 @@ repE (ArithSeq _ _ aseq) =
                              ds3 <- repLE e3
                              repFromThenTo ds1 ds2 ds3
 
-repE (HsSpliceE splice)  = repSplice splice
-repE e@(PArrSeq {})      = notHandled "Parallel arrays" (ppr e)
-repE e@(HsCoreAnn {})    = notHandled "Core annotations" (ppr e)
-repE e@(HsSCC {})        = notHandled "Cost centres" (ppr e)
-repE e@(HsTickPragma {}) = notHandled "Tick Pragma" (ppr e)
-repE e@(HsBracketOut {}) = notHandled "TH brackets" (ppr e)
-repE e                   = notHandled "Expression form" (ppr e)
+repE (HsSpliceE _ splice)  = repSplice splice
+repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
+repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
+repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
+repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
+repE e@(HsTcBracketOut {}) = notHandled "TH brackets" (ppr e)
+repE e                     = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt,

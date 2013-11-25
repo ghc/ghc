@@ -24,7 +24,7 @@ import HsSyn
 import TcRnMonad
 import Module           ( getModule )
 import RnEnv
-import RnSplice
+import RnSplice         ( rnBracket, rnSpliceExpr, checkThLocalName )
 import RnTypes
 import RnPat
 import DynFlags
@@ -174,7 +174,7 @@ rnExpr (NegApp e _)
 -- (not with an rnExpr crash) in a stage-1 compiler.
 rnExpr e@(HsBracket br_body) = rnBracket e br_body
 
-rnExpr (HsSpliceE splice) = rnSpliceExpr splice
+rnExpr (HsSpliceE is_typed splice) = rnSpliceExpr is_typed splice
 
 
 rnExpr (HsQuasiQuoteE qq)

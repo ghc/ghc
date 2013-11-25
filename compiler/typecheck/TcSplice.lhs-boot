@@ -2,7 +2,7 @@
 module TcSplice where
 import HsSyn    ( HsSplice, HsBracket, HsQuasiQuote,
                   HsExpr, LHsType, LHsExpr, LPat, LHsDecl )
-import HsExpr   ( PendingSplice )
+import HsExpr   ( PendingRnSplice )
 import Id       ( Id )
 import Name     ( Name )
 import RdrName  ( RdrName )
@@ -14,16 +14,19 @@ import Annotations ( Annotation, CoreAnnTarget )
 import qualified Language.Haskell.TH as TH
 #endif
 
-tcSpliceExpr :: HsSplice Name
+tcSpliceExpr :: Bool -> HsSplice Name
              -> TcRhoType
              -> TcM (HsExpr TcId)
 
 tcSpliceDecls :: HsSplice Name -> TcM [LHsDecl RdrName]
 
-tcBracket :: HsBracket Name 
-          -> [PendingSplice]
-          -> TcRhoType
-          -> TcM (HsExpr TcId)
+tcUntypedBracket :: HsBracket Name
+                 -> [PendingRnSplice]
+                 -> TcRhoType
+                 -> TcM (HsExpr TcId)
+tcTypedBracket :: HsBracket Name
+               -> TcRhoType
+               -> TcM (HsExpr TcId)
 
 tcTopSpliceExpr :: Bool -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 

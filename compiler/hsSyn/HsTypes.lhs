@@ -38,11 +38,10 @@ module HsTypes (
         pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context,
     ) where
 
-import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
+import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
 
 import HsLit
 
-import NameSet( FreeVars )
 import Name( Name )
 import RdrName( RdrName )
 import DataCon( HsBang(..) )
@@ -230,7 +229,6 @@ data HsType name
   | HsQuasiQuoteTy      (HsQuasiQuote name)
 
   | HsSpliceTy          (HsSplice name) 
-                        FreeVars        -- Variables free in the splice (filled in by renamer)
                         PostTcKind
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
@@ -634,7 +632,7 @@ ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcol
 ppr_mono_ty _    (HsListTy ty)       = brackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec pREC_FUN (ppr n <+> dcolon <+> ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
+ppr_mono_ty _    (HsSpliceTy s _)    = pprUntypedSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)

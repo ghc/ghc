@@ -1,7 +1,8 @@
 \begin{code}
 module RnSplice (
-        rnSplice, rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
-        rnBracket, checkTH,
+        rnTopSpliceDecls,
+        rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
+        rnBracket,
         checkThLocalName
   ) where
 
@@ -15,13 +16,13 @@ import TcRnMonad
 #ifdef GHCI
 import Control.Monad    ( unless, when )
 import DynFlags
-import DsMeta           ( expQTyConName, patQTyConName, typeQTyConName )
+import DsMeta           ( decsQTyConName, expQTyConName, patQTyConName, typeQTyConName )
 import LoadIface        ( loadInterfaceForName )
 import Module
 import RnEnv
-import RnPat
+import RnPat            ( rnPat )
 import RnSource         ( rnSrcDecls, findSplice )
-import RnTypes
+import RnTypes          ( rnLHsType )
 import SrcLoc
 import TcEnv            ( checkWellStaged, tcMetaTy )
 import Outputable
@@ -30,7 +31,7 @@ import FastString
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
-import {-# SOURCE #-} TcSplice ( runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
+import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 #endif
 \end{code}
 
@@ -39,14 +40,14 @@ import {-# SOURCE #-} TcSplice ( runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e _ = failTH e "Template Haskell bracket"
 
-rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
-rnSplice e = failTH e "Template Haskell splice"
+rnTopSpliceDecls :: HsSplice RdrName -> RnM ([LHsDecl RdrName], FreeVars)
+rnTopSpliceDecls e = failTH e "Template Haskell top splice"
 
 rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
 rnSpliceType e _ = failTH e "Template Haskell type splice"
 
-rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
-rnSpliceExpr e = failTH e "Template Haskell splice"
+rnSpliceExpr :: Bool -> HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
+rnSpliceExpr _ e = failTH e "Template Haskell splice"
 
 rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
 rnSplicePat e = failTH e "Template Haskell pattern splice"
@@ -82,120 +83,71 @@ thereby get some bogus unused-import warnings, but we won't crash the
 type checker.  Not very satisfactory really.
 
 \begin{code}
+rnSpliceGen :: Bool                                     -- Typed splice?
+            -> (HsSplice Name -> RnM (a, FreeVars))     -- Outside brackets, run splice
+            -> (HsSplice Name -> (PendingRnSplice, a))  -- Inside brackets, make it pending
+            -> HsSplice RdrName
+            -> RnM (a, FreeVars)
+rnSpliceGen is_typed_splice run_splice pend_splice splice@(HsSplice _ expr)
+  = addErrCtxt (spliceCtxt (HsSpliceE is_typed_splice splice)) $
+    setSrcSpan (getLoc expr) $ do
+    { stage <- getStage
+    ; case stage of
+        Brack pop_stage RnPendingTyped
+          -> do { checkTc is_typed_splice illegalUntypedSplice
+                ; (splice', fvs) <- setStage pop_stage $
+                                    rnSplice splice
+                ; let (_pending_splice, result) = pend_splice splice'
+                ; return (result, fvs) }
+
+        Brack pop_stage (RnPendingUntyped ps_var)
+          -> do { checkTc (not is_typed_splice) illegalTypedSplice
+                ; (splice', fvs) <- setStage pop_stage $
+                                    rnSplice splice
+                ; let (pending_splice, result) = pend_splice splice'
+                ; ps <- readMutVar ps_var
+                ; writeMutVar ps_var (pending_splice : ps)
+                ; return (result, fvs) }
+
+        _ ->  do { (splice', fvs1) <- setStage (Splice is_typed_splice) $
+                                      rnSplice splice
+
+                 ; (result, fvs2) <- run_splice splice'
+                 ; return (result, fvs1 `plusFV` fvs2) } }
+
+---------------------
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
 -- Not exported...used for all
-rnSplice (HsSplice isTyped n expr)
+rnSplice (HsSplice n expr)
   = do  { checkTH expr "Template Haskell splice"
         ; loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L loc n)
         ; (expr', fvs) <- rnLExpr expr
+        ; return (HsSplice n' expr', fvs) }
 
-        ; if isTyped
-          then do
-            { -- Ugh!  See Note [Splices] above
+
+---------------------
+rnSpliceExpr :: Bool -> HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
+rnSpliceExpr is_typed splice
+  = rnSpliceGen is_typed run_expr_splice pend_expr_splice splice
+  where
+    pend_expr_splice :: HsSplice Name -> (PendingRnSplice, HsExpr Name)
+    pend_expr_splice rn_splice
+        = (PendingRnExpSplice rn_splice, HsSpliceE is_typed rn_splice)
+
+    run_expr_splice :: HsSplice Name -> RnM (HsExpr Name, FreeVars)
+    run_expr_splice rn_splice@(HsSplice _ expr)
+      | is_typed   -- Run it later, in the type checker
+      = do {  -- Ugh!  See Note [Splices] above
               lcl_rdr <- getLocalRdrEnv
-            ; gbl_rdr <- getGlobalRdrEnv
-            ; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr,
-                                                        isLocalGRE gre]
-                  lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
+           ; gbl_rdr <- getGlobalRdrEnv
+           ; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr
+                                                     , isLocalGRE gre]
+                 lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
-            ; return (HsSplice isTyped n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names)
-            }
-          else return (HsSplice isTyped n' expr', fvs)
-        }
-\end{code}
+           ; return (HsSpliceE is_typed rn_splice, lcl_names `plusFV` gbl_names) }
 
-\begin{code}
-rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
-rnSpliceType splice@(HsSplice isTypedSplice _ expr) k
-  = setSrcSpan (getLoc expr) $ do
-    { stage <- getStage
-    ; case stage of
-        { Brack isTypedBrack pop_stage ps_var _ ->
-            do { when (isTypedBrack && not isTypedSplice) $
-                     failWithTc illegalUntypedSplice
-               ; when (not isTypedBrack && isTypedSplice) $
-                     failWithTc illegalTypedSplice
-
-                 -- ToDo: deal with fvs
-               ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
-                                                           rnSplice splice
-
-               ; ps <- readMutVar ps_var
-               ; writeMutVar ps_var (PendingRnTypeSplice name expr' : ps)
-
-               ; return (HsSpliceTy splice' fvs k, fvs)
-               }
-        ; _ ->
-            do { -- ToDo: deal with fvs
-                 (splice', fvs) <- addErrCtxt (spliceResultDoc expr) $
-                                   setStage (Splice isTypedSplice) $
-                                   rnSplice splice
-               ; maybeExpandTopSplice splice' fvs
-               }
-        }
-    }
-  where
-    maybeExpandTopSplice :: HsSplice Name -> FreeVars -> RnM (HsType Name, FreeVars)
-    maybeExpandTopSplice splice@(HsSplice True _ _) fvs
-      = return (HsSpliceTy splice fvs k, fvs)
-
-    maybeExpandTopSplice (HsSplice False _ expr) _
-      = do { -- The splice must have type TypeQ
-           ; meta_exp_ty <- tcMetaTy typeQTyConName
-
-             -- Typecheck the expression
-           ; zonked_q_expr <- tcTopSpliceExpr False $
-                              tcMonoExpr expr meta_exp_ty
-
-             -- Run the expression
-           ; hs_ty2 <- runMetaT zonked_q_expr
-           ; showSplice "type" expr (ppr hs_ty2)
-
-           ; (hs_ty3, fvs) <- addErrCtxt (spliceResultDoc expr) $
-                              do { let doc = SpliceTypeCtx hs_ty2
-                                 ; checkNoErrs $ rnLHsType doc hs_ty2
-                                   -- checkNoErrs: see Note [Renamer errors]
-                                 }
-           ; return (unLoc hs_ty3, fvs)
-           }
-\end{code}
-
-\begin{code}
-rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
-rnSpliceExpr splice@(HsSplice isTypedSplice _ expr)
-  = addErrCtxt (exprCtxt (HsSpliceE splice)) $
-    setSrcSpan (getLoc expr) $ do
-    { stage <- getStage
-    ; case stage of
-        { Brack isTypedBrack pop_stage ps_var _ ->
-            do { when (isTypedBrack && not isTypedSplice) $
-                     failWithTc illegalUntypedSplice
-               ; when (not isTypedBrack && isTypedSplice) $
-                     failWithTc illegalTypedSplice
-
-               ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
-                                                           rnSplice splice
-
-               ; ps <- readMutVar ps_var
-               ; writeMutVar ps_var (PendingRnExpSplice name expr' : ps)
-
-               ; return (HsSpliceE splice', fvs)
-               }
-        ; _ ->
-            do { (splice', fvs) <- addErrCtxt (spliceResultDoc expr) $
-                                   setStage (Splice isTypedSplice) $
-                                   rnSplice splice
-               ; maybeExpandTopSplice splice' fvs
-               }
-        }
-    }
-  where
-    maybeExpandTopSplice :: HsSplice Name -> FreeVars -> RnM (HsExpr Name, FreeVars)
-    maybeExpandTopSplice splice@(HsSplice True _ _) fvs
-      = return (HsSpliceE splice, fvs)
-
-    maybeExpandTopSplice (HsSplice False _ expr) _
+      | otherwise  -- Run it here
       = do { -- The splice must have type ExpQ
            ; meta_exp_ty <- tcMetaTy expQTyConName
 
@@ -207,85 +159,86 @@ rnSpliceExpr splice@(HsSplice isTypedSplice _ expr)
            ; expr2 <- runMetaE zonked_q_expr
            ; showSplice "expression" expr (ppr expr2)
 
-           ; (lexpr3, fvs) <- addErrCtxt (spliceResultDoc expr) $
-                              checkNoErrs $
+           ; (lexpr3, fvs) <- checkNoErrs $
                               rnLExpr expr2
-           ; return (unLoc lexpr3, fvs)
-           }
-\end{code}
+           ; return (unLoc lexpr3, fvs)  }
 
-\begin{code}
+----------------------
+rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
+rnSpliceType splice k
+  = rnSpliceGen False run_type_splice pend_type_splice splice
+  where
+    pend_type_splice rn_splice
+       = (PendingRnTypeSplice rn_splice, HsSpliceTy rn_splice k)
+
+    run_type_splice (HsSplice _ expr)
+       = do { meta_exp_ty <- tcMetaTy typeQTyConName
+
+              -- Typecheck the expression
+            ; zonked_q_expr <- tcTopSpliceExpr False $
+                               tcMonoExpr expr meta_exp_ty
+
+              -- Run the expression
+            ; hs_ty2 <- runMetaT zonked_q_expr
+            ; showSplice "type" expr (ppr hs_ty2)
+
+            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
+                                  ; checkNoErrs $ rnLHsType doc hs_ty2
+                                    -- checkNoErrs: see Note [Renamer errors]
+                                  }
+            ; return (unLoc hs_ty3, fvs) }
+
+----------------------
 rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
-rnSplicePat (HsSplice True _ _)
-  = panic "rnSplicePat: encountered typed pattern splice"
+rnSplicePat splice
+  = rnSpliceGen False run_pat_splice pend_pat_splice splice
+  where
+    pend_pat_splice rn_splice
+      = (PendingRnPatSplice rn_splice, SplicePat rn_splice)
 
-rnSplicePat splice@(HsSplice False _ expr)
-  = addErrCtxt (exprCtxt (HsSpliceE splice)) $
-    setSrcSpan (getLoc expr) $ do
-    { stage <- getStage
-     ; case stage of
-         { Brack isTypedBrack pop_stage ps_var _ ->
-             do { checkTc (not isTypedBrack) illegalUntypedSplice
+    run_pat_splice (HsSplice _ expr)
+      = do { meta_exp_ty <- tcMetaTy patQTyConName
 
-                ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
-                                                            rnSplice splice
+             -- Typecheck the expression
+           ; zonked_q_expr <- tcTopSpliceExpr False $
+                              tcMonoExpr expr meta_exp_ty
 
-                ; ps <- readMutVar ps_var
-                ; writeMutVar ps_var (PendingRnPatSplice name expr' : ps)
+             -- Run the expression
+           ; pat <- runMetaP zonked_q_expr
+           ; showSplice "pattern" expr (ppr pat)
 
-                ; return (SplicePat splice', fvs)
-                }
-         ; _ -> 
-             do { (HsSplice _ _ expr', fvs) <- addErrCtxt (spliceResultDoc expr) $
-                                               setStage (Splice False) $
-                                               rnSplice splice
+           ; (pat', fvs) <- checkNoErrs $
+                            rnPat ThPatSplice pat $ \pat' -> return (pat', emptyFVs)
 
-                  -- The splice must have type Pat
-                ; meta_exp_ty <- tcMetaTy patQTyConName
+           ; return (unLoc pat', fvs) }
 
-                  -- Typecheck the expression
-                ; zonked_q_expr <- tcTopSpliceExpr False $
-                                   tcMonoExpr expr' meta_exp_ty
+----------------------
+rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
+rnSpliceDecl (SpliceDecl (L loc splice) flg)
+  = rnSpliceGen False run_decl_splice pend_decl_splice splice
+  where
+    pend_decl_splice rn_splice
+       = (PendingRnDeclSplice rn_splice, SpliceDecl(L loc rn_splice) flg)
 
-                  -- Run the expression
-                ; pat <- runMetaP zonked_q_expr
-                ; showSplice "pattern" expr' (ppr pat)
-
-                ; (pat', _) <- addErrCtxt (spliceResultDoc expr) $
-                               checkNoErrs $
-                               rnPat ThPatSplice pat $ \pat' -> return (pat', emptyFVs)
-
-                ; return (unLoc pat', fvs)
-                }
-         }
-     }
+    run_decl_splice rn_splice = pprPanic "rnSpliceDecl" (ppr rn_splice)
 \end{code}
 
 \begin{code}
-rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
-rnSpliceDecl (SpliceDecl (L _ (HsSplice True _ _)) _)
-  = panic "rnSpliceDecls: encountered typed declaration splice"
+rnTopSpliceDecls :: HsSplice RdrName -> RnM ([LHsDecl RdrName], FreeVars)
+-- Declaration splice at the very top level of the module
+rnTopSpliceDecls (HsSplice _ expr)
+   = do  { (expr', fvs) <- setStage (Splice False) $
+                           rnLExpr expr
 
-rnSpliceDecl (SpliceDecl (L loc splice@(HsSplice False _ expr)) flg)
-  = addErrCtxt (exprCtxt (HsSpliceE splice)) $
-    setSrcSpan (getLoc expr) $ do
-    { stage <- getStage
-     ; case stage of
-         { Brack isTypedBrack pop_stage ps_var _ ->
-             do { checkTc (not isTypedBrack) illegalUntypedSplice
+         ; list_q <- tcMetaTy decsQTyConName     -- Q [Dec]
+         ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr' list_q)
 
-                ; (splice'@(HsSplice _ name expr'), fvs) <- setStage pop_stage $
-                                                            rnSplice splice
+                -- Run the expression
+         ; decls <- runMetaD zonked_q_expr
+         ; showSplice "declarations" expr'
+                 (ppr (getLoc expr) $$ (vcat (map ppr decls)))
 
-                ; ps <- readMutVar ps_var
-                ; writeMutVar ps_var (PendingRnDeclSplice name expr' : ps)
-
-                ; return (SpliceDecl (L loc splice') flg, fvs)
-                }
-         ; _ -> 
-           pprPanic "rnSpliceDecls: should not have been called on top-level splice" (ppr expr)
-         }
-     }
+         ; return (decls,fvs) }
 \end{code}
 
 %************************************************************************
@@ -317,16 +270,16 @@ rnBracket e br_body
          -- Brackets are desugared to code that mentions the TH package
        ; recordThUse
 
-       ; pending_splices <- newMutVar []
-       ; let brack_stage = Brack (isTypedBracket br_body)
-                                 cur_stage pending_splices
-                                 (error "rnBracket: don't neet lie")
+       ; case isTypedBracket br_body of
+            True  -> do { (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $
+                                            rn_bracket cur_stage br_body
+                        ; return (HsBracket body', fvs_e) }
 
-       ; (body', fvs_e) <- setStage brack_stage $
-                           rn_bracket cur_stage br_body
-       ; pendings <- readMutVar pending_splices
-
-       ; return (HsRnBracketOut body' pendings, fvs_e)
+            False -> do { ps_var <- newMutVar []
+                        ; (body', fvs_e) <- setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
+                                            rn_bracket cur_stage br_body
+                        ; pendings <- readMutVar ps_var
+                        ; return (HsRnBracketOut body' pendings, fvs_e) }
        }
 
 rn_bracket :: ThStage -> HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
@@ -405,9 +358,8 @@ rn_bracket _ (TExpBr e) = do { (e', fvs) <- rnLExpr e
 \end{code}
 
 \begin{code}
-exprCtxt :: HsExpr RdrName -> SDoc
-exprCtxt expr
-  = hang (ptext (sLit "In the expression:")) 2 (ppr expr)
+spliceCtxt :: HsExpr RdrName -> SDoc
+spliceCtxt expr= hang (ptext (sLit "In the splice:")) 2 (ppr expr)
 
 showSplice :: String -> LHsExpr Name -> SDoc -> TcM ()
 -- Note that 'before' is *renamed* but not *typechecked*
@@ -447,11 +399,11 @@ quotationCtxtDoc br_body
   = hang (ptext (sLit "In the Template Haskell quotation"))
          2 (ppr br_body)
 
-spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
-spliceResultDoc expr
-  = vcat [ hang (ptext (sLit "In the splice:"))
-              2 (char '$' <> pprParendExpr expr)
-        , ptext (sLit "To see what the splice expanded to, use -ddump-splices") ]
+-- spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
+-- spliceResultDoc expr
+--  = vcat [ hang (ptext (sLit "In the splice:"))
+--              2 (char '$' <> pprParendExpr expr)
+--        , ptext (sLit "To see what the splice expanded to, use -ddump-splices") ]
 #endif
 \end{code}
 
@@ -483,10 +435,7 @@ checkCrossStageLifting :: TopLevelFlag -> Name -> ThStage -> TcM ()
 -- Examples   \x -> [| x |]
 --            [| map |]
 
-checkCrossStageLifting _ _ Comp      = return ()
-checkCrossStageLifting _ _ (Splice _) = return ()
-
-checkCrossStageLifting top_lvl name (Brack _ _ ps_var _)
+checkCrossStageLifting top_lvl name (Brack _ (RnPendingUntyped ps_var))
   | isTopLevel top_lvl
         -- Top-level identifiers in this module,
         -- (which have External Names)
@@ -511,8 +460,9 @@ checkCrossStageLifting top_lvl name (Brack _ _ ps_var _)
     do  { traceRn (text "checkCrossStageLifting" <+> ppr name)
         ; -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; writeMutVar ps_var (PendingRnCrossStageSplice name : ps)
-        }
+        ; writeMutVar ps_var (PendingRnCrossStageSplice name : ps) }
+
+checkCrossStageLifting _ _ _ = return ()
 #endif /* GHCI */
 \end{code}
 

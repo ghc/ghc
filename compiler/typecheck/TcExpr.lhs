@@ -1,4 +1,4 @@
-%
+c%
 % (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
@@ -12,7 +12,7 @@ module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcBracket )
+import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 #ifdef GHCI
 import DsMeta( liftStringName, liftName )
 #endif
@@ -797,13 +797,9 @@ tcExpr (PArrSeq _ _) _
 %************************************************************************
 
 \begin{code}
-        -- Rename excludes these cases otherwise
-tcExpr (HsSpliceE splice)        res_ty = tcSpliceExpr splice res_ty
-tcExpr (HsRnBracketOut brack ps) res_ty = tcBracket brack ps res_ty
-tcExpr e@(HsBracketOut _ _) _ =
-    pprPanic "Should never see HsBracketOut in type checker" (ppr e)
-tcExpr e@(HsQuasiQuoteE _) _ =
-    pprPanic "Should never see HsQuasiQuoteE in type checker" (ppr e)
+tcExpr (HsSpliceE is_ty splice)  res_ty = tcSpliceExpr is_ty splice res_ty
+tcExpr (HsBracket brack)         res_ty = tcTypedBracket   brack res_ty
+tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
 \end{code}
 
 
@@ -816,6 +812,7 @@ tcExpr e@(HsQuasiQuoteE _) _ =
 \begin{code}
 tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
+  -- Also HsTcBracketOut, HsQuasiQuoteE
 \end{code}
 
 
@@ -1290,10 +1287,7 @@ checkCrossStageLifting :: Id -> ThStage -> TcM ()
 --            [| map |]
 -- There is no error-checking to do, because the renamer did that
 
-checkCrossStageLifting _ Comp      = return ()
-checkCrossStageLifting _ (Splice _) = return ()
-
-checkCrossStageLifting id (Brack _ _ ps_var lie_var)
+checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [| h x |]
         -- We must behave as if the reference to x was
@@ -1316,16 +1310,18 @@ checkCrossStageLifting id (Brack _ _ ps_var lie_var)
                                      -- See Note [Lifting strings]
                         ; return (HsVar sid) }
                   else
-                     setConstraintVar lie_var   $ do
+                     setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
                      newMethodFromName (OccurrenceOf (idName id))
                                        DsMeta.liftName id_ty
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; writeMutVar ps_var (PendingTcSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id)) : ps)
+        ; writeMutVar ps_var ((idName id, nlHsApp (noLoc lift) (nlHsVar id)) : ps)
 
         ; return () }
+
+checkCrossStageLifting _ _ = return ()
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id

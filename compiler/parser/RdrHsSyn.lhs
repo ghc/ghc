@@ -1,4 +1,4 @@
-%
+o%
 % (c) The University of Glasgow, 1996-2003
 
 Functions over HsSyn specialised to RdrName.
@@ -235,11 +235,13 @@ mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- but if she wrote, say,
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
-mkSpliceDecl (L _ (HsQuasiQuoteE qq))   = QuasiQuoteD qq
-mkSpliceDecl (L loc (HsSpliceE splice)) = SpliceD (SpliceDecl (L loc splice) Explicit)
-mkSpliceDecl other_expr                 = SpliceD (SpliceDecl (L (getLoc other_expr) splice) Implicit)
+mkSpliceDecl lexpr@(L loc expr)
+  | HsQuasiQuoteE qq <- expr          = QuasiQuoteD qq
+  | HsSpliceE is_typed splice <- expr = ASSERT( not is_typed )
+                                        SpliceD (SpliceDecl (L loc splice) Explicit)
+  | otherwise                         = SpliceD (SpliceDecl (L loc splice) Implicit)
   where
-    HsSpliceE splice = mkHsSpliceE other_expr
+    splice = mkHsSplice lexpr
 
 mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
 mkTyLit l =
@@ -675,11 +677,12 @@ checkAPat msg loc e0 = do
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    RecordCon c _ (HsRecFields fs dd)
-                      -> do fs <- mapM (checkPatField msg) fs
-                            return (ConPatIn c (RecCon (HsRecFields fs dd)))
-   HsSpliceE s        -> return (SplicePat s)
-   HsQuasiQuoteE q    -> return (QuasiQuotePat q)
-   _                  -> patFail msg loc e0
+                        -> do fs <- mapM (checkPatField msg) fs
+                              return (ConPatIn c (RecCon (HsRecFields fs dd)))
+   HsSpliceE is_typed s | not is_typed 
+                        -> return (SplicePat s)
+   HsQuasiQuoteE q      -> return (QuasiQuotePat q)
+   _                    -> patFail msg loc e0
 
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer

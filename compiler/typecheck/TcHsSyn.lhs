@@ -556,31 +556,15 @@ zonkExpr env (HsApp e1 e2)
 zonkExpr _ e@(HsRnBracketOut _ _)
   = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
 
-zonkExpr env (HsBracketOut body bs)
+zonkExpr env (HsTcBracketOut body bs)
   = do bs' <- mapM zonk_b bs
-       return (HsBracketOut body bs')
+       return (HsTcBracketOut body bs')
   where
-    zonk_b (PendingRnExpSplice _ e)
-      = pprPanic "zonkExpr: PendingRnExpSplice" (ppr e)
+    zonk_b (n, e) = do e' <- zonkLExpr env e
+                       return (n, e')
 
-    zonk_b (PendingRnPatSplice _ e)
-      = pprPanic "zonkExpr: PendingRnPatSplice" (ppr e)
-
-    zonk_b (PendingRnCrossStageSplice n)
-      = pprPanic "zonkExpr: PendingRnCrossStageSplice" (ppr n)
-
-    zonk_b (PendingRnTypeSplice _ e)
-      = pprPanic "zonkExpr: PendingRnTypeSplice" (ppr e)
-
-    zonk_b (PendingRnDeclSplice _ e)
-      = pprPanic "zonkExpr: PendingRnDeclSplice" (ppr e)
-
-    zonk_b (PendingTcSplice n e)
-      = do e' <- zonkLExpr env e
-           return (PendingTcSplice n e')
-
-zonkExpr _ (HsSpliceE s) = WARN( True, ppr s ) -- Should not happen
-                           return (HsSpliceE s)
+zonkExpr _ (HsSpliceE t s) = WARN( True, ppr s ) -- Should not happen
+                             return (HsSpliceE t s)
 
 zonkExpr env (OpApp e1 op fixity e2)
   = do new_e1 <- zonkLExpr env e1

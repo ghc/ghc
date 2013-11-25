@@ -33,7 +33,6 @@ instance Data i => Data (HsCmd i)
 instance (Data i, Data body) => Data (MatchGroup i body)
 instance (Data i, Data body) => Data (GRHSs i body)
 
-instance OutputableBndr id => Outputable (HsSplice id)
 instance OutputableBndr id => Outputable (HsExpr id)
 instance OutputableBndr id => Outputable (HsCmd id)
 
@@ -46,8 +45,8 @@ pprLExpr :: (OutputableBndr i) =>
 pprExpr :: (OutputableBndr i) => 
         HsExpr i -> SDoc
 
-pprSplice :: (OutputableBndr i) => 
-        HsSplice i -> SDoc
+pprUntypedSplice :: (OutputableBndr i) => 
+                    HsSplice i -> SDoc
 
 pprPatBind :: (OutputableBndr bndr, OutputableBndr id, Outputable body)
            => LPat bndr -> GRHSs id body -> SDoc

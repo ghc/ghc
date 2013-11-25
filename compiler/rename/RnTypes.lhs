@@ -249,7 +249,7 @@ rnHsTyKi isType doc (HsEqTy ty1 ty2)
        ; (ty2', fvs2) <- rnLHsType doc ty2
        ; return (HsEqTy ty1' ty2', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi isType _ (HsSpliceTy sp _ k)
+rnHsTyKi isType _ (HsSpliceTy sp k)
   = ASSERT( isType )
     rnSpliceType sp k
 

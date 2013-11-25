@@ -7,10 +7,7 @@ import RdrName
 import Name
 import NameSet
 
-rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
-
-rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
-rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
-rnSplicePat  :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
+rnSpliceType :: HsSplice RdrName   -> PostTcKind -> RnM (HsType Name, FreeVars)
+rnSplicePat  :: HsSplice RdrName   -> RnM (Pat Name, FreeVars)
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
 \end{code}

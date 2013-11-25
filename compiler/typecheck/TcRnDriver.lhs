@@ -22,8 +22,8 @@ module TcRnDriver (
     ) where
 
 #ifdef GHCI
-import {-# SOURCE #-} TcSplice ( tcSpliceDecls, runQuasi )
-import RnSplice ( rnSplice )
+import {-# SOURCE #-} TcSplice ( runQuasi )
+import RnSplice ( rnTopSpliceDecls )
 #endif
 
 import DynFlags
@@ -546,12 +546,7 @@ tc_rn_src_decls boot_details ds
             -- If there's a splice, we must carry on
           ; Just (SpliceDecl (L _ splice) _, rest_ds) ->
             do { -- Rename the splice expression, and get its supporting decls
-                 (rn_splice, splice_fvs) <- checkNoErrs (rnSplice splice)
-                 -- checkNoErrs: don't typecheck if renaming failed
-               ; rnDump (ppr rn_splice)
-
-                 -- Execute the splice
-               ; spliced_decls <- tcSpliceDecls rn_splice
+                 (spliced_decls, splice_fvs) <- checkNoErrs (rnTopSpliceDecls splice)
 
                  -- Glue them on the front of the remaining decls and loop
                ; setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $

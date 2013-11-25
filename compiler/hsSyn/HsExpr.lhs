@@ -246,20 +246,20 @@ data HsExpr id
 
   | HsBracket    (HsBracket id)
 
-    -- See Note [Pending Renamer Splices]
-  | HsRnBracketOut (HsBracket Name)     -- Output of the renamer is
-                                        -- the *original*
-                   [PendingSplice]      -- renamed expression, plus
-                                        -- _renamed_ splices to be
-                                        -- type checked
+    -- See Note [Pending Splices]
+  | HsRnBracketOut
+      (HsBracket Name)     -- Output of the renamer is the *original* renamed
+                           -- expression, plus
+      [PendingRnSplice]    -- _renamed_ splices to be type checked
 
-  | HsBracketOut (HsBracket Name)       -- Output of the type checker is
-                                        -- the *original*
-                 [PendingSplice]        -- renamed expression, plus
-                                        -- _typechecked_ splices to be
-                                        -- pasted back in by the desugarer
+  | HsTcBracketOut
+      (HsBracket Name)     -- Output of the type checker is the *original*
+                           -- renamed expression, plus
+      [PendingTcSplice]    -- _typechecked_ splices to be
+                           -- pasted back in by the desugarer
 
-  | HsSpliceE (HsSplice id)
+  | HsSpliceE    Bool                   -- True <=> typed splice
+                 (HsSplice id)          -- False <=> untyped
 
   | HsQuasiQuoteE (HsQuasiQuote id)
         -- See Note [Quasi-quote overview] in TcSplice
@@ -346,14 +346,15 @@ tupArgPresent (Present {}) = True
 tupArgPresent (Missing {}) = False
 
 -- See Note [Pending Splices]
-data PendingSplice
-  = PendingRnExpSplice Name (LHsExpr Name)
-  | PendingRnPatSplice Name (LHsExpr Name)
-  | PendingRnTypeSplice Name (LHsExpr Name)
-  | PendingRnDeclSplice Name (LHsExpr Name)
+data PendingRnSplice
+  = PendingRnExpSplice        (HsSplice Name)
+  | PendingRnPatSplice        (HsSplice Name)
+  | PendingRnTypeSplice       (HsSplice Name)
+  | PendingRnDeclSplice       (HsSplice Name)
   | PendingRnCrossStageSplice Name
-  | PendingTcSplice Name (LHsExpr Id)
   deriving (Data, Typeable)
+
+type PendingTcSplice = (Name, LHsExpr Id)
 \end{code}
 
 Note [Pending Splices]
@@ -598,12 +599,12 @@ ppr_expr (HsSCC lbl expr)
 ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
 ppr_expr (HsType id)      = ppr id
 
-ppr_expr (HsSpliceE s)        = pprSplice s
-ppr_expr (HsBracket b)        = pprHsBracket b
+ppr_expr (HsSpliceE t s)       = pprSplice t s
+ppr_expr (HsBracket b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut e []) = ppr e
 ppr_expr (HsRnBracketOut e ps) = ppr e $$ ptext (sLit "pending(rn)") <+> ppr ps
-ppr_expr (HsBracketOut e [])   = ppr e
-ppr_expr (HsBracketOut e ps)   = ppr e $$ ptext (sLit "pending(tc)") <+> ppr ps
+ppr_expr (HsTcBracketOut e []) = ppr e
+ppr_expr (HsTcBracketOut e ps) = ppr e $$ ptext (sLit "pending(tc)") <+> ppr ps
 ppr_expr (HsQuasiQuoteE qq)    = ppr qq
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
@@ -687,7 +688,7 @@ hsExprNeedsParens (ExplicitPArr {})   = False
 hsExprNeedsParens (HsPar {})          = False
 hsExprNeedsParens (HsBracket {})      = False
 hsExprNeedsParens (HsRnBracketOut {}) = False
-hsExprNeedsParens (HsBracketOut _ []) = False
+hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
 hsExprNeedsParens _ = True
@@ -1371,17 +1372,19 @@ pprQuals quals = interpp'SP quals
 
 \begin{code}
 data HsSplice id  = HsSplice            --  $z  or $(f 4)
-                        Bool            -- True if typed, False if untyped
                         id              -- The id is just a unique name to
                         (LHsExpr id)    -- identify this splice point
   deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsSplice id) where
-  ppr = pprSplice
+  ppr (HsSplice n e) = angleBrackets (ppr n <> comma <+> ppr e)
 
-pprSplice :: OutputableBndr id => HsSplice id -> SDoc
-pprSplice (HsSplice isTyped n e)
-    = (if isTyped then ptext (sLit "$$") else char '$')
+pprUntypedSplice :: OutputableBndr id => HsSplice id -> SDoc
+pprUntypedSplice = pprSplice False
+
+pprSplice :: OutputableBndr id => Bool -> HsSplice id -> SDoc
+pprSplice is_typed (HsSplice n e)
+    = (if is_typed then ptext (sLit "$$") else char '$')
       <> ifPprDebug (brackets (ppr n)) <> eDoc
     where
           -- We use pprLExpr to match pprParendExpr:
@@ -1428,13 +1431,12 @@ thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>
 thTyBrackets :: SDoc -> SDoc
 thTyBrackets pp_body = ptext (sLit "[||") <+> pp_body <+> ptext (sLit "||]")
 
-instance Outputable PendingSplice where
-  ppr (PendingRnExpSplice name expr)   = ppr (name, expr)
-  ppr (PendingRnPatSplice name expr)   = ppr (name, expr)
-  ppr (PendingRnTypeSplice name expr)  = ppr (name, expr)
-  ppr (PendingRnDeclSplice name expr)  = ppr (name, expr)
+instance Outputable PendingRnSplice where
+  ppr (PendingRnExpSplice s)   = ppr s
+  ppr (PendingRnPatSplice s)   = ppr s
+  ppr (PendingRnTypeSplice s)  = ppr s
+  ppr (PendingRnDeclSplice s)  = ppr s
   ppr (PendingRnCrossStageSplice name) = ppr name
-  ppr (PendingTcSplice name expr)      = ppr (name, expr)
 \end{code}
 
 %************************************************************************

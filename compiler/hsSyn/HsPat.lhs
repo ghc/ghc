@@ -23,7 +23,7 @@ module HsPat (
         pprParendLPat
     ) where
 
-import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr)
+import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprUntypedSplice)
 
 -- friends:
 import HsBinds
@@ -271,7 +271,7 @@ pprPat (LitPat s)           = ppr s
 pprPat (NPat l Nothing  _)  = ppr l
 pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)  = hcat [ppr n, char '+', ppr k]
-pprPat (SplicePat splice)   = ppr splice
+pprPat (SplicePat splice)   = pprUntypedSplice splice
 pprPat (QuasiQuotePat qq)   = ppr qq
 pprPat (CoPat co pat _)     = pprHsWrapper (ppr pat) co
 pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty

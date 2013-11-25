@@ -559,11 +559,11 @@ Here is where we desugar the Template Haskell brackets and escapes
 
 dsExpr (HsRnBracketOut _ _) = panic "dsExpr HsRnBracketOut"
 #ifdef GHCI
-dsExpr (HsBracketOut x ps) = dsBracket x ps
+dsExpr (HsTcBracketOut x ps) = dsBracket x ps
 #else
-dsExpr (HsBracketOut _ _) = panic "dsExpr HsBracketOut"
+dsExpr (HsTcBracketOut _ _) = panic "dsExpr HsBracketOut"
 #endif
-dsExpr (HsSpliceE s)       = pprPanic "dsExpr:splice" (ppr s)
+dsExpr (HsSpliceE _ s)      = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
 dsExpr (HsProc pat cmd) = dsProcExpr pat cmd

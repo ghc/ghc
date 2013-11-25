@@ -571,9 +571,10 @@ addTickHsExpr (HsCoreAnn nm e) =
         liftM2 HsCoreAnn
                 (return nm)
                 (addTickLHsExpr e)
-addTickHsExpr e@(HsBracket     {}) = return e
-addTickHsExpr e@(HsBracketOut  {}) = return e
-addTickHsExpr e@(HsSpliceE  {}) = return e
+addTickHsExpr e@(HsBracket     {})   = return e
+addTickHsExpr e@(HsTcBracketOut  {}) = return e
+addTickHsExpr e@(HsRnBracketOut  {}) = return e
+addTickHsExpr e@(HsSpliceE  {})      = return e
 addTickHsExpr (HsProc pat cmdtop) =
         liftM2 HsProc
                 (addTickLPat pat)

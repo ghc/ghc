@@ -35,7 +35,7 @@ module TcRnTypes(
         pprTcTyThingCategory, pprPECategory,
 
         -- Template Haskell
-        ThStage(..), topStage, topAnnStage, topSpliceStage,
+        ThStage(..), PendingStuff(..), topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
 
         -- Arrows
@@ -536,10 +536,18 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
                 -- Binding level = 1
 
   | Brack                       -- Inside brackets
-      Bool                      --   True if inside a typed bracket, False otherwise
-      ThStage                   --   Binding level = level(stage) + 1
-      (TcRef [PendingSplice])   --   Accumulate pending splices here
-      (TcRef WantedConstraints) --     and type constraints here
+      ThStage                   --   Enclosing stage
+      PendingStuff
+
+data PendingStuff
+  = RnPendingUntyped              -- Renaming the inside of an *untyped* bracket
+      (TcRef [PendingRnSplice])   -- Pending splices in here
+
+  | RnPendingTyped                -- Renaming the inside of a *typed* bracket
+
+  | TcPending                     -- Typechecking the iniside of a typed bracket
+      (TcRef [PendingTcSplice])   --   Accumulate pending splices here
+      (TcRef WantedConstraints)   --     and type constraints here
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
@@ -547,9 +555,9 @@ topAnnStage    = Splice False
 topSpliceStage = Splice False
 
 instance Outputable ThStage where
-   ppr (Splice _)      = text "Splice"
-   ppr Comp            = text "Comp"
-   ppr (Brack _ s _ _) = text "Brack" <> parens (ppr s)
+   ppr (Splice _)  = text "Splice"
+   ppr Comp        = text "Comp"
+   ppr (Brack s _) = text "Brack" <> parens (ppr s)
 
 type ThLevel = Int
     -- NB: see Note [Template Haskell levels] in TcSplice
@@ -563,9 +571,9 @@ impLevel = 0    -- Imported things; they can be used inside a top level splice
 outerLevel = 1  -- Things defined outside brackets
 
 thLevel :: ThStage -> ThLevel
-thLevel (Splice _)      = 0
-thLevel Comp            = 1
-thLevel (Brack _ s _ _) = thLevel s + 1
+thLevel (Splice _)  = 0
+thLevel Comp        = 1
+thLevel (Brack s _) = thLevel s + 1
 
 ---------------------------
 -- Arrow-notation context
