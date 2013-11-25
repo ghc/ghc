@@ -276,7 +276,7 @@ renameType t = case t of
   HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsQuasiQuoteTy a        -> HsQuasiQuoteTy <$> renameHsQuasiQuote a
-  HsSpliceTy _ _ _        -> error "renameType: HsSpliceTy"
+  HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
 
 renameHsQuasiQuote :: HsQuasiQuote Name -> RnM (HsQuasiQuote DocName)
 renameHsQuasiQuote (HsQuasiQuote a b c) = HsQuasiQuote <$> rename a <*> pure b <*> pure c
