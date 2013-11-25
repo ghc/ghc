@@ -1,1 +1,1 @@
-u = (_t1::forall s a. ST s (forall s'. ST s' a))
+u = (_t1::ST s (forall s'. ST s' a))
