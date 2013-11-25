@@ -37,7 +37,7 @@ T7360.fun4 = T7360.fun1 T7360.Foo1
 T7360.fun3 :: GHC.Types.Int
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType tm,
+ Str=DmdType tm(t),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 20}]
@@ -46,7 +46,7 @@ T7360.fun3 = GHC.Types.I# 0
 T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
 [GblId,
  Arity=1,
- Str=DmdType <L,1*U>tm,
+ Str=DmdType <L,1*U>tm(,m(t)),
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

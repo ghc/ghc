@@ -98,7 +98,7 @@ Roman.foo_go [InlPrag=INLINE[0]]
      -> Data.Maybe.Maybe GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=2,
- Str=DmdType <S,1*U><S,1*U>m,
+ Str=DmdType <S,1*U><S,1*U>m(t),
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=2, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
@@ -113,7 +113,7 @@ Roman.foo_go =
 Roman.foo2 :: GHC.Types.Int
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType tm,
+ Str=DmdType tm(t),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 20}]
@@ -132,7 +132,7 @@ Roman.foo :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U>m,
+ Str=DmdType <S,1*U>m(t),
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

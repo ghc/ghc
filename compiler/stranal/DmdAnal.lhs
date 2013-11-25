@@ -123,11 +123,15 @@ dmdTransformThunkDmd e
 -- See |-* relation in the companion paper
 dmdAnalStar :: AnalEnv 
             -> Demand 	-- This one takes a *Demand*
-            -> CoreExpr -> (BothDmdArg, CoreExpr)
+            -> CoreExpr
+            -> (BothDmdArg, DmdResult, CoreExpr)
 dmdAnalStar env dmd e 
   | (cd, defer_and_use) <- toCleanDmd dmd
   , (dmd_ty, e')        <- dmdAnal env cd e
-  = (postProcessDmdTypeM defer_and_use dmd_ty, e')
+  = let dmd_ty' = postProcessDmdTypeM defer_and_use dmd_ty
+    in -- pprTrace "dmdAnalStar" (vcat [ppr e, ppr dmd, ppr defer_and_use, ppr dmd_ty, ppr dmd_ty'])
+        -- We also return the unmodified DmdResult, to store it in nested CPR information
+       (dmd_ty', getDmdResult dmd_ty,  e')
 
 -- Main Demand Analsysis machinery
 dmdAnal :: AnalEnv
@@ -141,8 +145,8 @@ dmdAnal _ _ (Lit lit)     = (litDmdType, Lit lit)
 dmdAnal _ _ (Type ty)     = (nopDmdType, Type ty)	-- Doesn't happen, in fact
 dmdAnal _ _ (Coercion co) = (nopDmdType, Coercion co)
 
-dmdAnal env dmd (Var var)
-  = (dmdTransform env var dmd, Var var)
+dmdAnal env dmd (Var var)     = dmdAnalVarApp env dmd var []
+dmdAnal env dmd (App fun arg) = dmdAnalApp    env dmd fun [arg]
 
 dmdAnal env dmd (Cast e co)
   = (dmd_ty, Cast e' co)
@@ -166,35 +170,6 @@ dmdAnal env dmd (Tick t e)
   = (dmd_ty, Tick t e')
   where
     (dmd_ty, e') = dmdAnal env dmd e
-
-dmdAnal env dmd (App fun (Type ty))
-  = (fun_ty, App fun' (Type ty))
-  where
-    (fun_ty, fun') = dmdAnal env dmd fun
-
-dmdAnal sigs dmd (App fun (Coercion co))
-  = (fun_ty, App fun' (Coercion co))
-  where
-    (fun_ty, fun') = dmdAnal sigs dmd fun
-
--- Lots of the other code is there to make this
--- beautiful, compositional, application rule :-)
-dmdAnal env dmd (App fun arg)	-- Non-type arguments
-  = let				-- [Type arg handled above]
-        call_dmd          = mkCallDmd dmd
-	(fun_ty, fun') 	  = dmdAnal env call_dmd fun
-	(arg_dmd, res_ty) = splitDmdTy fun_ty
-        (arg_ty, arg') 	  = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
-    in
---    pprTrace "dmdAnal:app" (vcat
---         [ text "dmd =" <+> ppr dmd
---         , text "expr =" <+> ppr (App fun arg)
---         , text "fun dmd_ty =" <+> ppr fun_ty
---         , text "arg dmd =" <+> ppr arg_dmd
---         , text "arg dmd_ty =" <+> ppr arg_ty
---         , text "res dmd_ty =" <+> ppr res_ty
---         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty `bothDmdType` arg_ty, App fun' arg')
 
 -- this is an anonymous lambda, since @dmdAnalRhs@ uses @collectBinders@
 dmdAnal env dmd (Lam var body)
@@ -520,6 +495,79 @@ dmdTransform env var dmd
 
   | otherwise	 		                 -- Local non-letrec-bound thing
   = unitVarDmd var (mkOnceUsedDmd dmd)
+
+----------------
+dmdAnalApp :: AnalEnv -> CleanDemand -> CoreExpr
+           -> [CoreExpr] -> (DmdType, CoreExpr)
+dmdAnalApp env dmd (App fun arg) args = dmdAnalApp env dmd fun (arg:args)
+dmdAnalApp env dmd (Var fun)     args = dmdAnalVarApp env dmd fun args
+dmdAnalApp env dmd other_fun     args = dmdAnalOtherApp env dmd other_fun args
+
+----------------
+dmdAnalOtherApp :: AnalEnv -> CleanDemand -> CoreExpr
+                -> [CoreExpr] -> (DmdType, CoreExpr)
+dmdAnalOtherApp env dmd fun args
+  = completeApp env (dmdAnal env call_dmd fun) args
+  where
+    call_dmd = mkCallDmdN (valArgCount args) dmd
+
+----------------
+completeApp :: AnalEnv
+            -> (DmdType, CoreExpr)     -- Function and its demand-type
+            -> [CoreExpr]              -- Arguments
+            -> (DmdType, CoreExpr)     -- Function applied to args
+
+completeApp _ fun_ty_fun []
+  = fun_ty_fun
+completeApp env (fun_ty, fun') (arg:args)
+  | isTypeArg arg = completeApp env (fun_ty,                      App fun' arg)  args
+  | otherwise     = completeApp env (res_ty `bothDmdType` arg_ty, App fun' arg') args
+  where
+    (arg_dmd, res_ty) = splitDmdTy fun_ty
+    (arg_ty, _, arg') = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
+
+----------------
+dmdAnalVarApp :: AnalEnv -> CleanDemand -> Id
+              -> [CoreExpr] -> (DmdType, CoreExpr)
+dmdAnalVarApp env dmd fun args
+  | Just con <- isDataConWorkId_maybe fun  -- Data constructor
+  , isVanillaDataCon con
+  , n_val_args == dataConRepArity con      -- Saturated
+  , dataConRepArity con > 0
+  , dataConRepArity con < 10
+  , let cpr_info
+          | isProductTyCon (dataConTyCon con) = cprProdRes arg_rets
+          | otherwise                         = cprSumRes (dataConTag con)
+        res_ty = foldl bothDmdType (DmdType emptyDmdEnv [] cpr_info) arg_tys
+  = -- pprTrace "dmdAnalVarApp" (vcat [ ppr con, ppr args, ppr n_val_args, ppr cxt_ds
+    --                                , ppr arg_tys, ppr cpr_info, ppr res_ty]) $
+    ( res_ty
+    , foldl App (Var fun) args')
+  where
+    n_val_args = valArgCount args
+    cxt_ds = splitProdCleanDmd  n_val_args dmd
+
+    (arg_tys, arg_rets, args') = anal_con_args cxt_ds args
+        -- The constructor itself is lazy
+        -- See Note [Data-con worker strictness] in MkId
+
+    anal_con_args :: [Demand] -> [CoreExpr] -> ([BothDmdArg], [DmdResult], [CoreExpr])
+    anal_con_args _ [] = ([],[],[])
+    anal_con_args ds (arg : args)
+      | isTypeArg arg
+      , (arg_tys, arg_rets, args') <- anal_con_args ds args
+      = (arg_tys, arg_rets, arg:args')
+    anal_con_args (d:ds) (arg : args)
+      | (arg_ty, arg_ret, arg') <- dmdAnalStar env (dmdTransformThunkDmd arg d) arg
+      , (arg_tys, arg_rets, args') <- anal_con_args ds args
+      = (arg_ty:arg_tys, arg_ret:arg_rets, arg':args')
+    anal_con_args ds args = pprPanic "anal_con_args" (ppr args $$ ppr ds)
+
+dmdAnalVarApp env dmd fun args
+  = --pprTrace "dmdAnalVarApp" (vcat [ ppr fun, ppr args
+    --                               , ppr $ completeApp env (dmdTransform env fun (mkCallDmdN n_val_args dmd), Var fun) args
+    --                               ])
+    completeApp env (dmdTransform env fun (mkCallDmdN (valArgCount args) dmd), Var fun) args
 \end{code}
 
 %************************************************************************
@@ -796,7 +844,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty one_shot id
                  Nothing  -> main_ty
                  Just unf -> main_ty `bothDmdType` unf_ty
                           where
-                             (unf_ty, _) = dmdAnalStar env dmd unf
+                             (unf_ty, _, _) = dmdAnalStar env dmd unf
 
     main_ty = addDemand dmd dmd_ty'
     (dmd_ty', dmd) = peelFV dmd_ty id

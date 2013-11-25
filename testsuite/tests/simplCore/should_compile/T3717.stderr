@@ -17,7 +17,7 @@ T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S(S),1*U(1*U)>m,
+ Str=DmdType <S(S),1*U(1*U)>m(t),
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

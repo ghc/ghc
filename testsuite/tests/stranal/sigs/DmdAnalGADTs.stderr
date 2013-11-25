@@ -2,9 +2,9 @@
 ==================== Strictness signatures ====================
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f: <S,1*U>
-DmdAnalGADTs.f': <S,1*U>m
+DmdAnalGADTs.f': <S,1*U>m(t)
 DmdAnalGADTs.g: <S,1*U>
-DmdAnalGADTs.hasCPR: tm
-DmdAnalGADTs.hasStrSig: <S,1*U(U)>m
+DmdAnalGADTs.hasCPR: tm(t)
+DmdAnalGADTs.hasStrSig: <S,1*U(U)>m()
 
 
