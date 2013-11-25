@@ -3,10 +3,6 @@
 instance C Bool where
   data D Bool = T7532.MkD
 
-
-==================== Renamer ====================
-$bang
-
 T7532.hs:1:1: Splicing declarations
     bang
   ======>

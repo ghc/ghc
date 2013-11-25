@@ -5,7 +5,7 @@ T6114.hs:6:17:
       perhaps via newName, but did not bind it
       If that's it, then -ddump-splices might be useful
     In the argument of reifyInstances: GHC.Classes.Eq x_0
-    In the expression:
+    In the splice:
       $(do { xName <- newName "x";
              instanceType <- [t| $(varT xName) |];
              _ <- reifyInstances ''Eq [instanceType];

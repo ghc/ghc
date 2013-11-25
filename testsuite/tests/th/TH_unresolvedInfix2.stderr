@@ -6,12 +6,6 @@ TH_unresolvedInfix2.hs:14:11:
         in the section: ‛:+ N :+ N’
     In the splice:
       $(let
-          plus = conE ':+
-          n = conE 'N
-        in infixE Nothing plus (Just $ uInfixE n plus n))
-    To see what the splice expanded to, use -ddump-splices
-    In the expression:
-      $(let
           plus = conE ...
           n = conE ...
         in infixE Nothing plus (Just $ uInfixE n plus n))

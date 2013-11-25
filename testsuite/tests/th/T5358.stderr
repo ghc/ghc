@@ -4,6 +4,6 @@ T5358.hs:14:15:
       runTest called error: forall t_0 . t_0 -> GHC.Types.Bool
     Code: do { VarI _ t _ _ <- reify (mkName "prop_x1");
                ($) error ((++) "runTest called error: " pprint t) }
-    In the expression:
+    In the splice:
       $(do { VarI _ t _ _ <- reify (mkName "prop_x1");
              error $ ("runTest called error: " ++ pprint t) })

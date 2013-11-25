@@ -2,6 +2,6 @@ T5508.hs:(7,9)-(9,28): Splicing expression
     do { let x = mkName "x"
              v = return (LamE [VarP x] $ VarE x);
          [| $v . id |]
-         pending(rn) [(splice, v)] }
+         pending(rn) [<splice, v>] }
   ======>
     ((\ x -> x) . id)

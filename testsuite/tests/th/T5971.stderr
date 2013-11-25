@@ -5,5 +5,3 @@ T5971.hs:6:7:
       perhaps via newName, but did not bind it
       If that's it, then -ddump-splices might be useful
     In the splice: $(newName "x" >>= varE)
-    To see what the splice expanded to, use -ddump-splices
-    In the expression: $(newName "x" >>= varE)

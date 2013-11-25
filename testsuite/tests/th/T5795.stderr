@@ -4,4 +4,3 @@ T5795.hs:9:6:
       ‛ty’ is used in a top-level splice or annotation,
       and must be imported, not defined locally
     In the splice: $ty
-    To see what the splice expanded to, use -ddump-splices

@@ -3,4 +3,4 @@ TH_runIO.hs:12:9:
     Exception when trying to run compile-time code:
       user error (hi)
     Code: runIO (fail "hi")
-    In the expression: $(runIO (fail "hi"))
+    In the splice: $(runIO (fail "hi"))
