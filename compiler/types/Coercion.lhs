@@ -38,7 +38,7 @@ module Coercion (
         splitAppCo_maybe,
         splitForAllCo_maybe,
         nthRole, tyConRolesX,
-        tvUsedAtNominalRole, nextRole,
+        nextRole,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
@@ -1102,21 +1102,6 @@ ltRole Representational Phantom = True
 ltRole Representational _       = False
 ltRole Nominal          Nominal = False
 ltRole Nominal          _       = True
-
--- Is the given tyvar used in a nominal position anywhere?
--- This is used in the GeneralizedNewtypeDeriving check.
-tvUsedAtNominalRole :: TyVar -> Type -> Bool
-tvUsedAtNominalRole tv = go Representational
-  where go r (TyVarTy tv')
-          | tv == tv' = (r == Nominal)
-          | otherwise = False
-        go r (AppTy t1 t2)      = go r t1 || go Nominal t2
-        go r (TyConApp tc args) = or $ zipWith go (tyConRolesX r tc) args
-        go r (FunTy t1 t2)      = go r t1 || go r t2
-        go r (ForAllTy qtv ty)
-          | tv == qtv  = False -- shadowed
-          | otherwise  = go r ty
-        go _ (LitTy _) = False
 
 -- if we wish to apply `co` to some other coercion, what would be its best
 -- role?

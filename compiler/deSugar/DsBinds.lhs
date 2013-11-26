@@ -844,14 +844,11 @@ ds_tc_coercion subst tc_co
     go (TcTransCo co1 co2)      = mkTransCo (go co1) (go co2)
     go (TcNthCo n co)           = mkNthCo n (go co)
     go (TcLRCo lr co)           = mkLRCo lr (go co)
-    go (TcInstCo co ty)         = mkInstCo (go co) ty
     go (TcSubCo co)             = mkSubCo (go co)
     go (TcLetCo bs co)          = ds_tc_coercion (ds_co_binds bs) co
     go (TcCastCo co1 co2)       = mkCoCast (go co1) (go co2)
     go (TcCoVarCo v)            = ds_ev_id subst v
     go (TcAxiomRuleCo co ts cs) = AxiomRuleCo co (map (Coercion.substTy subst) ts) (map go cs)
-
-
 
     ds_co_binds :: TcEvBinds -> CvSubst
     ds_co_binds (EvBinds bs)      = foldl ds_scc subst (sccEvBinds bs)

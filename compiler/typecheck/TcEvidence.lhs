@@ -21,13 +21,12 @@ module TcEvidence (
   TcCoercion(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos, 
-  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcInstCos, mkTcSubCo,
+  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo,
   mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
   isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe,
   tcCoercionRole, eqVarRole,
   coercionToTcCoercion
-
   ) where
 #include "HsVersions.h"
 
@@ -96,7 +95,6 @@ data TcCoercion
   | TcTyConAppCo Role TyCon [TcCoercion]
   | TcAppCo TcCoercion TcCoercion
   | TcForAllCo TyVar TcCoercion 
-  | TcInstCo TcCoercion TcType
   | TcCoVarCo EqVar
   | TcAxiomInstCo (CoAxiom Branched) Int [TcCoercion] -- Int specifies branch number
                                                       -- See [CoAxiom Index] in Coercion.lhs
@@ -228,10 +226,6 @@ mkTcForAllCos :: [Var] -> TcCoercion -> TcCoercion
 mkTcForAllCos tvs (TcRefl r ty) = ASSERT( all isTyVar tvs ) TcRefl r (mkForAllTys tvs ty)
 mkTcForAllCos tvs co            = ASSERT( all isTyVar tvs ) foldr TcForAllCo co tvs
 
-mkTcInstCos :: TcCoercion -> [TcType] -> TcCoercion
-mkTcInstCos (TcRefl r ty) tys = TcRefl r (applyTys ty tys)
-mkTcInstCos co tys            = foldl TcInstCo co tys
-
 mkTcCoVarCo :: EqVar -> TcCoercion
 -- ipv :: s ~ t  (the boxed equality type) or Coercible s t (the boxed representational equality type)
 mkTcCoVarCo ipv = TcCoVarCo ipv
@@ -253,7 +247,6 @@ tcCoercionKind co = go co
     go (TcTyConAppCo _ tc cos)= mkTyConApp tc <$> (sequenceA $ map go cos)
     go (TcAppCo co1 co2)      = mkAppTy <$> go co1 <*> go co2
     go (TcForAllCo tv co)     = mkForAllTy tv <$> go co
-    go (TcInstCo co ty)       = go_inst co [ty]
     go (TcCoVarCo cv)         = eqVarKind cv
     go (TcAxiomInstCo ax ind cos)
       = let branch = coAxiomNthBranch ax ind
@@ -272,10 +265,6 @@ tcCoercionKind co = go co
        case coaxrProves ax ts (map tcCoercionKind cs) of
          Just res -> res
          Nothing -> panic "tcCoercionKind: malformed TcAxiomRuleCo"
-
-    -- c.f. Coercion.coercionKind
-    go_inst (TcInstCo co ty) tys = go_inst co (ty:tys)
-    go_inst co               tys = (`applyTys` tys) <$> go co
 
 eqVarRole :: EqVar -> Role
 eqVarRole cv = getEqPredRole (varType cv)
@@ -320,7 +309,6 @@ coVarsOfTcCo tc_co
     go (TcAppCo co1 co2)         = go co1 `unionVarSet` go co2
     go (TcCastCo co1 co2)        = go co1 `unionVarSet` go co2
     go (TcForAllCo _ co)         = go co
-    go (TcInstCo co _)           = go co
     go (TcCoVarCo v)             = unitVarSet v
     go (TcAxiomInstCo _ _ cos)   = foldr (unionVarSet . go) emptyVarSet cos
     go (TcPhantomCo _ _)         = emptyVarSet
@@ -368,8 +356,6 @@ ppr_co p (TcAppCo co1 co2)       = maybeParen p TyConPrec $
 ppr_co p (TcCastCo co1 co2)      = maybeParen p FunPrec $
                                    ppr_co FunPrec co1 <+> ptext (sLit "|>") <+> ppr_co FunPrec co2
 ppr_co p co@(TcForAllCo {})      = ppr_forall_co p co
-ppr_co p (TcInstCo co ty)        = maybeParen p TyConPrec $
-                                   pprParendTcCo co <> ptext (sLit "@") <> pprType ty
                      
 ppr_co _ (TcCoVarCo cv)          = parenSymOcc (getOccName cv) (ppr cv)
 

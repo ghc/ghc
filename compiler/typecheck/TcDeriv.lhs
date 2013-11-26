@@ -1569,35 +1569,6 @@ minded way of generating the instance decl:
    instance Eq [A] => Eq A      -- Makes typechecker loop!
 But now we require a simple context, so it's ok.
 
-Note [Role checking in GND]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When checking to see if GND (GeneralizedNewtypeDeriving) is possible, we
-do *not* look at the roles of the class being derived. Instead, we look
-at the uses of the last type variable to that class in all the methods of
-the class. (Why? Keep reading.) For example:
-
-  class Foo a b where
-    meth :: a b -> b
-
-  instance Foo Maybe Int where
-    meth = fromJust
-
-  newtype Age = MkAge Int
-    deriving (Foo Maybe)
-
-According to the role rules, the `b` parameter to Foo must be at nominal
-role -- after all, `a` could be a GADT. BUT, when deriving (Foo Maybe)
-for Age, we in fact know that `a` is *not* a GADT. So, instead of looking
-holistically at the roles for the parameters of Foo, we instead perform
-the substitution on the type variables that we know (in this case,
-[a |-> Maybe]) and then check each method individually.
-
-Why check only methods, and not other things? In GND, superclass constraints
-must be satisfied by the *newtype*, not the *base type*. So, we don't coerce
-the base type's superclass dictionaries in GND, and we don't need to check
-them here. For associated types, GND is impossible anyway, so we don't need
-to look. All that is left is methods.
-
 Note [Determining whether newtype-deriving is appropriate]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we see
