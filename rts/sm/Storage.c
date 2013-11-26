@@ -1152,13 +1152,29 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
     return (ret + 1);
 }
 
+#if defined(arm_HOST_ARCH) && defined(ios_HOST_OS)
+void sys_icache_invalidate(void *start, size_t len);
+#endif
+
+/* On ARM and other platforms, we need to flush the cache after
+   writing code into memory, so the processor reliably sees it. */
 void flushExec (W_ len, AdjustorExecutable exec_addr)
 {
-  /* On ARM and other platforms, we need to flush the cache after
-     writing code into memory, so the processor reliably sees it. */
+#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+  /* x86 doesn't need to do anything, so just suppress some warnings. */
+  (void)len;
+  (void)exec_addr;
+#elif defined(arm_HOST_ARCH) && defined(ios_HOST_OS)
+  /* On iOS we need to use the special 'sys_icache_invalidate' call. */
+  sys_icache_invalidate(exec_addr, ((unsigned char*)exec_addr)+len);
+#elif defined(__GNUC__)
+  /* For all other platforms, fall back to a libgcc builtin. */
   unsigned char* begin = (unsigned char*)exec_addr;
   unsigned char* end   = begin + len;
-  __builtin___clear_cache(begin, end);
+  __clear_cache((void*)begin, (void*)end);
+#else
+#error Missing support to flush the instruction cache
+#endif
 }
 
 // freeExec gets passed the executable address, not the writable address.
