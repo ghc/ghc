@@ -33,6 +33,7 @@ module Demand (
         trimCPRInfo, returnsCPR, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig, convergeSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,
+        sigMayDiverge,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig, 
 
@@ -794,6 +795,10 @@ cprProdRes _arg_tys
   | opt_CprOff = topRes
   | otherwise  = Converges $ RetProd
 
+-- Forget that something might converge for sure
+divergeDmdResult :: DmdResult -> DmdResult
+divergeDmdResult r = r `lubDmdResult` botRes
+
 vanillaCprProdRes :: Arity -> DmdResult
 vanillaCprProdRes _arity
   | opt_CprOff = topRes
@@ -1448,6 +1453,9 @@ convergeResult :: DmdResult -> DmdResult
 convergeResult Diverges      = Converges NoCPR
 convergeResult (Dunno c)     = Converges c
 convergeResult (Converges c) = Converges c
+
+sigMayDiverge :: StrictSig -> StrictSig
+sigMayDiverge (StrictSig (DmdType env ds res)) = (StrictSig (DmdType env ds (divergeDmdResult res)))
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args

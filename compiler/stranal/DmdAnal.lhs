@@ -1056,7 +1056,10 @@ updSigEnv env sigs = env { ae_sigs = sigs }
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
 extendAnalEnv top_lvl env var sig
-  = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig }
+  = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig' }
+  where
+  sig' | isWeakLoopBreaker (idOccInfo var) = sigMayDiverge sig
+       | otherwise                         = sig
 
 extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
 extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
