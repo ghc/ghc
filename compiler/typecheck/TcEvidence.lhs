@@ -59,17 +59,17 @@ import Data.IORef( IORef )
 
 Note [TcCoercions]
 ~~~~~~~~~~~~~~~~~~
-| LCoercions are a hack used by the typechecker. Normally,
+| TcCoercions are a hack used by the typechecker. Normally,
 Coercions have free variables of type (a ~# b): we call these
 CoVars. However, the type checker passes around equality evidence
 (boxed up) at type (a ~ b).
 
-An LCoercion is simply a Coercion whose free variables have the
+An TcCoercion is simply a Coercion whose free variables have the
 boxed type (a ~ b). After we are done with typechecking the
 desugarer finds the free variables, unboxes them, and creates a
 resulting real Coercion with kosher free variables.
 
-We can use most of the Coercion "smart constructors" to build LCoercions. However,
+We can use most of the Coercion "smart constructors" to build TcCoercions. However,
 mkCoVarCo will not work! The equivalent is mkTcCoVarCo.
 
 The data type is similar to Coercion.Coercion, with the following
@@ -87,12 +87,12 @@ differences
                    These, of course, are only used in casts, so the desugarer
                    will still produce the right 'Coercion's.
 
-  * TcAxiomInstCo takes Types, not Coecions as arguments;
+  * TcAxiomInstCo takes Types, not Coercions as arguments;
     the generality is required only in the Simplifier
 
   * UnsafeCo aren't required
 
-  * Reprsentation invariants are weaker:
+  * Representation invariants are weaker:
      - we are allowed to have type synonyms in TcTyConAppCo
      - the first arg of a TcAppCo can be a TcTyConAppCo
     Reason: they'll get established when we desugar to Coercion
@@ -580,7 +580,7 @@ a coercion evidence term.  Consider for example
 If we have
     ax7 a :: F Int a ~ (a ~ Bool)
 then we do NOT generate the constraint
-    [G} (d |> ax7 a) :: a ~ Bool
+    [G] (d |> ax7 a) :: a ~ Bool
 because that does not satisfy the invariant (d is not a coercion variable).  
 Instead we make a binding
     g1 :: a~Bool = g |> ax7 a
