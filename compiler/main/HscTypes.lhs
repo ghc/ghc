@@ -1104,17 +1104,12 @@ data InteractiveContext
              -- ^ The cached 'GlobalRdrEnv', built by
              -- 'InteractiveEval.setContext' and updated regularly
              -- It contains everything in scope at the command line,
-             -- including everything in ic_tythings and ic_sys_vars
+             -- including everything in ic_tythings
 
          ic_tythings   :: [TyThing],
              -- ^ TyThings defined by the user, in reverse order of
-             -- definition.  At a breakpoint, this list includes the
-             -- local variables in scope at that point
-
-         ic_sys_vars   :: [Id],
-             -- ^ Variables defined automatically from
-             -- ic_ty_things (e.g. record field selectors).
-             -- See Notes [ic_sys_vars]
+             -- definition (ie most recent at the front)
+             -- See Note [ic_tythings]
 
          ic_instances  :: ([ClsInst], [FamInst]),
              -- ^ All instances and family instances created during
@@ -1144,24 +1139,24 @@ data InteractiveContext
     }
 
 {-
-Note [ic_sys_vars]
+Note [ic_tythings]
 ~~~~~~~~~~~~~~~~~~
-This list constains any Ids that arise from TyCons, Classes or
-instances defined interactively, but that are *not* given by
-'implicitTyThings'.  This includes record selectors, default methods,
-and dfuns.
+The ic_tythings field contains
+  * The TyThings declared by the user at the command prompt
+    (eg Ids, TyCons, Classes)
 
-We *could* get rid of this list and generate these Ids from
-ic_tythings:
+  * The user-visible Ids that arise from such things, which 
+    *don't* come from 'implicitTyThings', notably:
+       - record selectors
+       - class ops
+    The implicitTyThings are readily obtained from the TyThings
+    but record selectors etc are not
 
-   - dfuns come from Instances
-   - record selectors from TyCons
-   - default methods from Classes
+It does *not* contain
+  * DFunIds (they can be gotten from ic_instances)
+  * CoAxioms (ditto)
 
-For record selectors the TyCon gives the Name, but in order to make an
-Id we would have to construct the type ourselves.  Similarly for
-default methods.  So for now we collect the Ids after tidying (see
-hscDeclsWithLocation) and save them in ic_sys_vars.
+See also Note [Interactively-bound Ids in GHCi] in TcRnDriver
 -}
 
 -- | Constructs an empty InteractiveContext.
@@ -1173,7 +1168,6 @@ emptyInteractiveContext dflags
                          ic_imports    = [],
                          ic_rn_gbl_env = emptyGlobalRdrEnv,
                          ic_tythings   = [],
-                         ic_sys_vars   = [],
                          ic_instances  = ([],[]),
                          ic_fix_env    = emptyNameEnv,
                          -- System.IO.print by default

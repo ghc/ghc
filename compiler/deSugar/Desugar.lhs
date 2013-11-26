@@ -17,6 +17,7 @@ import MkIface
 import Id
 import Name
 import Type
+import FamInstEnv
 import InstEnv
 import Class
 import Avail
@@ -28,13 +29,12 @@ import DsExpr
 import DsBinds
 import DsForeign
 import Module
-import RdrName
 import NameSet
 import NameEnv
-import FamInstEnv       ( FamInstEnv )
 import Rules
 import BasicTypes       ( Activation(.. ) )
 import CoreMonad        ( endPass, CoreToDo(..) )
+import PrelNames        ( iNTERACTIVE )
 import FastString
 import ErrUtils
 import Outputable
@@ -218,29 +218,29 @@ and Rec the rest.
 
 
 \begin{code}
-deSugarExpr :: HscEnv
-            -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-            -> LHsExpr Id
-            -> IO (Messages, Maybe CoreExpr)
--- Prints its own errors; returns Nothing if error occurred
+deSugarExpr :: HscEnv -> LHsExpr Id -> IO (Messages, Maybe CoreExpr)
 
-deSugarExpr hsc_env this_mod rdr_env type_env fam_inst_env tc_expr
-  = do { let dflags = hsc_dflags hsc_env
+deSugarExpr hsc_env tc_expr
+  = do { let dflags       = hsc_dflags hsc_env
+             icntxt       = hsc_IC hsc_env
+             rdr_env      = ic_rn_gbl_env icntxt
+             type_env     = mkTypeEnvWithImplicits (ic_tythings icntxt)
+             fam_insts    = snd (ic_instances icntxt)
+             fam_inst_env = extendFamInstEnvList emptyFamInstEnv fam_insts
+             -- This stuff is a half baked version of TcRnDriver.setInteractiveContext
+
        ; showPass dflags "Desugar"
 
          -- Do desugaring
-       ; (msgs, mb_core_expr) <- initDs hsc_env this_mod rdr_env
+       ; (msgs, mb_core_expr) <- initDs hsc_env iNTERACTIVE rdr_env
                                         type_env fam_inst_env $
                                  dsLExpr tc_expr
 
-       ; case mb_core_expr of {
-            Nothing   -> return (msgs, Nothing) ;
-            Just expr ->
- 
-         -- Dump output
-    do { dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
+       ; case mb_core_expr of
+            Nothing   -> return ()
+            Just expr -> dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
 
-       ; return (msgs, Just expr) } } }
+       ; return (msgs, mb_core_expr) }
 \end{code}
 
 %************************************************************************
