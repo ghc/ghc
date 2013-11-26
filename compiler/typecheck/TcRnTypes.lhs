@@ -1571,9 +1571,9 @@ Note [Preventing recursive dictionaries]
 
 We have some classes where it is not very useful to build recursive
 dictionaries (Coercible, at the moment). So we need the constraint solver to
-prevent that. We conservativey ensure this property using the subgoal depth of
+prevent that. We conservatively ensure this property using the subgoal depth of
 the constraints: When solving a Coercible constraint at depth d, we do not
-consider evicence from a depth <= d as suitable.
+consider evidence from a depth <= d as suitable.
 
 Therefore we need to record the minimum depth allowed to solve a CtWanted. This
 is done in the SubGoalDepth field of CtWanted. Most code now uses mkCtWanted,
