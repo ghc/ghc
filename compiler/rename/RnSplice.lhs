@@ -294,7 +294,7 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
                  do { mb_bind_lvl <- lookupLocalOccThLvl_maybe name
                     ; case mb_bind_lvl of
                         { Nothing -> return ()      -- Can happen for data constructors,
-                                                    -- but nothign needs doing for them
+                                                    -- but nothing needs to be done for them
 
                         ; Just (top_lvl, bind_lvl)  -- See Note [Quoting names]
                              | isTopLevel top_lvl
