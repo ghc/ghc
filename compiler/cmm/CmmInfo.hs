@@ -496,16 +496,16 @@ funInfoTable dflags info_ptr
 -- Takes the info pointer of a function, returns the function's arity
 funInfoArity :: DynFlags -> CmmExpr -> CmmExpr
 funInfoArity dflags iptr
-  = cmmToWord dflags (cmmLoadIndex dflags rep fun_info offset)
+  = cmmToWord dflags (cmmLoadIndex dflags rep fun_info (offset `div` rep_bytes))
   where
    fun_info = funInfoTable dflags iptr
    rep = cmmBits (widthFromBytes rep_bytes)
 
    (rep_bytes, offset)
-    | tablesNextToCode dflags = ( pc_REP_StgFunInfoExtraFwd_arity pc
-                                , oFFSET_StgFunInfoExtraFwd_arity dflags )
-    | otherwise               = ( pc_REP_StgFunInfoExtraRev_arity pc
+    | tablesNextToCode dflags = ( pc_REP_StgFunInfoExtraRev_arity pc
                                 , oFFSET_StgFunInfoExtraRev_arity dflags )
+    | otherwise               = ( pc_REP_StgFunInfoExtraFwd_arity pc
+                                , oFFSET_StgFunInfoExtraFwd_arity dflags )
 
    pc = sPlatformConstants (settings dflags)
 

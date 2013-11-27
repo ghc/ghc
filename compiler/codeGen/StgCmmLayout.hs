@@ -191,22 +191,22 @@ slowCall fun stg_args
         let n_args = length stg_args
         if n_args > arity && optLevel dflags >= 2
            then do
+             funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun
+             fun_iptr <- (CmmReg . CmmLocal) `fmap`
+                    assignTemp (closureInfoPtr dflags (cmmUntag dflags funv))
+
              fast_code <- getCode $
                 emitCall (NativeNodeCall, NativeReturn)
-                  (entryCode dflags (closureInfoPtr dflags fun))
-                  (nonVArgs ((P,Just fun):argsreps))
+                  (entryCode dflags fun_iptr)
+                  (nonVArgs ((P,Just funv):argsreps))
 
              slow_lbl <- newLabelC
              fast_lbl <- newLabelC
              is_tagged_lbl <- newLabelC
              end_lbl <- newLabelC
 
-             funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun
-
-             let correct_arity = cmmEqWord dflags (funInfoArity dflags funv)
+             let correct_arity = cmmEqWord dflags (funInfoArity dflags fun_iptr)
                                                   (mkIntExpr dflags n_args)
-
-             pprTrace "fast call" (int n_args) $ return ()
 
              emit (mkCbranch (cmmIsTagged dflags funv) is_tagged_lbl slow_lbl
                    <*> mkLabel is_tagged_lbl
