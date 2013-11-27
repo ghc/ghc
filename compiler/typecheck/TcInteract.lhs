@@ -817,7 +817,7 @@ kickOutRewritable new_ev new_tv
 
 Note [Kicking out inert constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given a new (a -> ty) inert, wewant to kick out an existing inert
+Given a new (a -> ty) inert, we want to kick out an existing inert
 constraint if
   a) the new constraint can rewrite the inert one
   b) 'a' is free in the inert constraint (so that it *will*)
