@@ -25,8 +25,7 @@ module TcEvidence (
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcInstCos,
   mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
-  isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe,
-  liftTcCoSubstWith
+  isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe
 
   ) where
 #include "HsVersions.h"
@@ -285,24 +284,6 @@ coVarsOfTcCo tc_co
 
     get_bndrs :: Bag EvBind -> VarSet
     get_bndrs = foldrBag (\ (EvBind b _) bs -> extendVarSet bs b) emptyVarSet 
-
-liftTcCoSubstWith :: [TyVar] -> [TcCoercion] -> TcType -> TcCoercion
--- This version can ignore capture; the free varialbes of the 
--- TcCoerion are all fresh.  Result is mush simpler code
-liftTcCoSubstWith tvs cos ty
-  = ASSERT( equalLength tvs cos )
-    go ty
-  where
-    env = zipVarEnv tvs cos
-
-    go ty@(TyVarTy tv)   = case lookupVarEnv env tv of
-                             Just co -> co
-                             Nothing -> mkTcReflCo ty
-    go (AppTy t1 t2)     = mkTcAppCo (go t1) (go t2)
-    go (TyConApp tc tys) = mkTcTyConAppCo tc (map go tys)
-    go ty@(LitTy {})     = mkTcReflCo ty
-    go (ForAllTy tv ty)  = mkTcForAllCo tv (go ty)
-    go (FunTy t1 t2)     = mkTcFunCo (go t1) (go t2)
 \end{code}
 
 Pretty printing
