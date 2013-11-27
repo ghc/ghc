@@ -101,7 +101,7 @@ solveInteractGiven loc fsks givens
                                                      , ctev_loc = loc }
                           | ev_id <- givens ]
 
-    fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvCoercion (mkTcReflCo tv_ty)
+    fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvCoercion (mkTcReflCo Nominal tv_ty)
                                                    , ctev_pred = pred
                                                    , ctev_loc = loc }
                         | tv <- fsks
@@ -988,7 +988,7 @@ solveWithIdentity wd tv xi
                -- cf TcUnify.uUnboundKVar
 
        ; setWantedTyBind tv xi'
-       ; let refl_evtm = EvCoercion (mkTcReflCo xi')
+       ; let refl_evtm = EvCoercion (mkTcReflCo Nominal xi')
 
        ; when (isWanted wd) $
               setEvBind (ctev_evar wd) refl_evtm
@@ -1835,9 +1835,9 @@ matchClassInst _ clas [ ty ] _
                       $ idType meth         -- forall n. KnownNat n => SNat n
         , Just (_,_,axRep) <- unwrapNewTyCon_maybe tcRep
         -> return $
-           let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axRep  [ty]
-               co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [ty]
-           in GenInst [] $ EvCast (EvLit evLit) (mkTcTransCo co1 co2)
+           let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo Representational axRep  [ty]
+               co2 = mkTcSymCo $ mkTcUnbranchedAxInstCo Representational axDict [ty]
+           in GenInst [] $ mkEvCast (EvLit evLit) (mkTcTransCo co1 co2)
 
       _ -> panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))

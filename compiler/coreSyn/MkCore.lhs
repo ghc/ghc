@@ -25,11 +25,8 @@ module MkCore (
         -- * Floats
         FloatBind(..), wrapFloat,
 
-        -- * Constructing/deconstructing equality evidence boxes
+        -- * Constructing equality evidence boxes
         mkEqBox,
-        
-        -- * Constructing Coercible evidence
-        mkCoercible,
 
         -- * Constructing general big tuples
         -- $big_tuples
@@ -302,17 +299,17 @@ mkStringExprFS str
 
 \begin{code}
 
+-- This take a ~# b (or a ~# R b) and returns a ~ b (or Coercible a b)
 mkEqBox :: Coercion -> CoreExpr
 mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
-             Var (dataConWorkId eqBoxDataCon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
+             Var (dataConWorkId datacon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
   where Pair ty1 ty2 = coercionKind co
         k = typeKind ty1
-
-mkCoercible :: Coercion -> CoreExpr
-mkCoercible co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
-             Var (dataConWorkId coercibleDataCon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
-  where Pair ty1 ty2 = coercionKind co
-        k = typeKind ty1
+        datacon = case coercionRole co of 
+            Nominal ->          eqBoxDataCon
+            Representational -> coercibleDataCon
+            Phantom ->          pprPanic "mkEqBox does not support boxing phantom coercions"
+                                         (ppr co)
 \end{code}
 
 %************************************************************************

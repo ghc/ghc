@@ -1423,7 +1423,7 @@ newFlattenSkolem ev fam_ty
 
        ; let rhs_ty = mkTyVarTy tv
              ctev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
-                            , ctev_evtm = EvCoercion (mkTcReflCo fam_ty)
+                            , ctev_evtm = EvCoercion (mkTcReflCo Nominal fam_ty)
                             , ctev_loc =  ctev_loc ev }
        ; dflags <- getDynFlags
        ; updInertTcS $ \ is@(IS { inert_fsks = fsks }) ->
@@ -1704,6 +1704,7 @@ rewriteCtFlavor (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
 
 rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { new_evar <- newWantedEvVar loc new_pred
+       ; ASSERT ( tcCoercionRole co == Nominal ) return ()
        ; setEvBind evar (mkEvCast (getEvTerm new_evar) co)
        ; case new_evar of
             Fresh ctev -> return (Just ctev)
@@ -1722,13 +1723,13 @@ matchFam tycon args
            Nothing -> return Nothing
            Just (FamInstMatch { fim_instance = famInst
                               , fim_tys      = inst_tys })
-             -> let co = mkTcUnbranchedAxInstCo (famInstAxiom famInst) inst_tys
+             -> let co = mkTcUnbranchedAxInstCo Nominal (famInstAxiom famInst) inst_tys
                     ty = pSnd $ tcCoercionKind co
                 in return $ Just (co, ty) }
 
   | Just ax <- isClosedSynFamilyTyCon_maybe tycon
   , Just (ind, inst_tys) <- chooseBranch ax args
-  = let co = mkTcAxInstCo ax ind inst_tys
+  = let co = mkTcAxInstCo Nominal ax ind inst_tys
         ty = pSnd (tcCoercionKind co)
     in return $ Just (co, ty)
 

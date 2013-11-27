@@ -32,6 +32,7 @@ import HsSyn
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
 import TcType
+import Coercion ( Role(..) )
 import TcEvidence
 import TcRnMonad
 import Type
@@ -533,11 +534,11 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 
                         -- Tediously wrap the application in a cast
                         -- Note [Update for GADTs]
-                 wrap_co = mkTcTyConAppCo tycon
+                 wrap_co = mkTcTyConAppCo Nominal tycon
                                 [ lookup tv ty | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
                  lookup univ_tv ty = case lookupVarEnv wrap_subst univ_tv of
                                         Just co' -> co'
-                                        Nothing  -> mkTcReflCo ty
+                                        Nothing  -> mkTcReflCo Nominal ty
                  wrap_subst = mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
                                        | ((tv,_),eq_var) <- eq_spec `zip` eqs_vars ]
 
@@ -547,7 +548,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
                                          , pat_args = PrefixCon $ map nlVarPat arg_ids
                                          , pat_ty = in_ty }
            ; let wrapped_rhs | null eq_spec = rhs
-                             | otherwise    = mkLHsWrap (WpCast wrap_co) rhs
+                             | otherwise    = mkLHsWrap (mkWpCast (mkTcSubCo wrap_co)) rhs
            ; return (mkSimpleMatch [pat] wrapped_rhs) }
 
 \end{code}

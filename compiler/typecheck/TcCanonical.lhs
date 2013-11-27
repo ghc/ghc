@@ -235,7 +235,7 @@ canClassNC ev cls tys
 
 canClass ev cls tys
   = do { (xis, cos) <- flattenMany FMFullFlatten ev tys
-       ; let co = mkTcTyConAppCo (classTyCon cls) cos
+       ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
        ; mb <- rewriteCtFlavor ev xi co
        ; traceTcS "canClass" (vcat [ ppr ev <+> ppr cls <+> ppr tys
@@ -491,7 +491,7 @@ flatten f ctxt ty
        ; if eqType xi ty then return (ty,co) else return (xi,co) }
        -- Small tweak for better error messages
 
-flatten _ _ xi@(LitTy {}) = return (xi, mkTcReflCo xi)
+flatten _ _ xi@(LitTy {}) = return (xi, mkTcReflCo Nominal xi)
 
 flatten f ctxt (TyVarTy tv)
   = flattenTyVar f ctxt tv
@@ -504,14 +504,14 @@ flatten f ctxt (AppTy ty1 ty2)
 flatten f ctxt (FunTy ty1 ty2)
   = do { (xi1,co1) <- flatten f ctxt ty1
        ; (xi2,co2) <- flatten f ctxt ty2
-       ; return (mkFunTy xi1 xi2, mkTcFunCo co1 co2) }
+       ; return (mkFunTy xi1 xi2, mkTcFunCo Nominal co1 co2) }
 
 flatten f ctxt (TyConApp tc tys)
   -- For a normal type constructor or data family application, we just
   -- recursively flatten the arguments.
   | not (isSynFamilyTyCon tc)
     = do { (xis,cos) <- flattenMany f ctxt tys
-         ; return (mkTyConApp tc xis, mkTcTyConAppCo tc cos) }
+         ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
@@ -529,7 +529,7 @@ flatten f ctxt (TyConApp tc tys)
          ; (ret_co, rhs_xi) <-
              case f of
                FMSubstOnly ->
-                 return (mkTcReflCo fam_ty, fam_ty)
+                 return (mkTcReflCo Nominal fam_ty, fam_ty)
                FMFullFlatten ->
                  do { mb_ct <- lookupFlatEqn tc xi_args
                     ; case mb_ct of
@@ -561,7 +561,7 @@ flatten f ctxt (TyConApp tc tys)
                   -- Emit the flat constraints
          ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
                                             --    cf Trac #5655
-                  , mkTcAppCos (mkTcSymCo ret_co `mkTcTransCo` mkTcTyConAppCo tc cos_args) $
+                  , mkTcAppCos (mkTcSymCo ret_co `mkTcTransCo` mkTcTyConAppCo Nominal tc cos_args) $
                     cos_rest
                   )
          }
@@ -651,7 +651,7 @@ flattenFinalTyVar f ctxt tv
     do { let knd = tyVarKind tv
        ; (new_knd, _kind_co) <- flatten f ctxt knd
        ; let ty = mkTyVarTy (setVarType tv new_knd)
-       ; return (ty, mkTcReflCo ty) }
+       ; return (ty, mkTcReflCo Nominal ty) }
 \end{code}
 
 Note [Non-idempotent inert substitution]
@@ -712,7 +712,7 @@ canEqNC ev ty1 ty2
   | tcEqType ty1 ty2      -- Dealing with equality here avoids
                           -- later spurious occurs checks for a~a
   = if isWanted ev then
-      setEvBind (ctev_evar ev) (EvCoercion (mkTcReflCo ty1)) >> return Stop
+      setEvBind (ctev_evar ev) (EvCoercion (mkTcReflCo Nominal ty1)) >> return Stop
     else
       return Stop
 
@@ -781,7 +781,8 @@ canEqNC ev ty1 ty2
       = do { let xevcomp [x,y] = EvCoercion (mkTcAppCo (evTermCoercion x) (evTermCoercion y))
                  xevcomp _ = error "canEqAppTy: can't happen" -- Can't happen
                  xevdecomp x = let xco = evTermCoercion x
-                               in [EvCoercion (mkTcLRCo CLeft xco), EvCoercion (mkTcLRCo CRight xco)]
+                               in [ EvCoercion (mkTcLRCo CLeft xco)
+                                  , EvCoercion (mkTcLRCo CRight xco)]
            ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] (XEvTerm xevcomp xevdecomp)
            ; canEvVarsCreated ctevs }
 
@@ -799,7 +800,7 @@ canDecomposableTyConApp ev tc1 tys1 tc2 tys2
     -- Fail straight away for better error messages
   = canEqFailure ev (mkTyConApp tc1 tys1) (mkTyConApp tc2 tys2)
   | otherwise
-  = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo tc1 (map evTermCoercion xs))
+  = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo Nominal tc1 (map evTermCoercion xs))
              xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
              xev = XEvTerm xcomp xdecomp
        ; ctevs <- xCtFlavor ev (zipWith mkTcEqPred tys1 tys2) xev
@@ -1085,7 +1086,7 @@ canEqLeafFun ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
           -- Fancy higher-dimensional coercion between equalities!
           -- SPJ asks why?  Why not just co : F xis1 ~ F tys1?
        ; let fam_head = mkTyConApp fn xis1
-             xco = mkHdEqPred ty2 (mkTcTyConAppCo fn cos1) co2
+             xco = mkHdEqPred ty2 (mkTcTyConAppCo Nominal fn cos1) co2
              -- xco :: (F xis1 ~ xi2) ~ (F tys1 ~ ty2)
 
        ; mb <- rewriteCtFlavor ev (mkTcEqPred fam_head xi2) xco
@@ -1117,7 +1118,8 @@ canEqLeafTyVar ev tv s2              -- ev :: tv ~ s2
 
            (Just tv1, Just tv2) | tv1 == tv2
               -> do { when (isWanted ev) $
-                      setEvBind (ctev_evar ev) (mkEvCast (EvCoercion (mkTcReflCo xi1)) co)
+                      ASSERT ( tcCoercionRole co == Nominal )
+                      setEvBind (ctev_evar ev) (mkEvCast (EvCoercion (mkTcReflCo Nominal xi1)) co)
                     ; return Stop }
 
            (Just tv1, _) -> do { dflags <- getDynFlags
@@ -1188,7 +1190,7 @@ mkHdEqPred :: Type -> TcCoercion -> TcCoercion -> TcCoercion
 -- Make a higher-dimensional equality
 --    co1 :: s1~t1,  co2 :: s2~t2
 -- Then (mkHdEqPred t2 co1 co2) :: (s1~s2) ~ (t1~t2)
-mkHdEqPred t2 co1 co2 = mkTcTyConAppCo eqTyCon [mkTcReflCo (defaultKind (typeKind t2)), co1, co2]
+mkHdEqPred t2 co1 co2 = mkTcTyConAppCo Nominal eqTyCon [mkTcReflCo Nominal (defaultKind (typeKind t2)), co1, co2]
    -- Why defaultKind? Same reason as the comment on TcType/mkTcEqPred. I truly hate this (DV)
 \end{code}
 

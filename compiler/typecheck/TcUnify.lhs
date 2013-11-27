@@ -131,7 +131,7 @@ matchExpectedFunTys herald arity orig_ty
     -- then   co : ty ~ t1 -> .. -> tn -> ty_r
 
     go n_req ty
-      | n_req == 0 = return (mkTcReflCo ty, [], ty)
+      | n_req == 0 = return (mkTcReflCo Nominal ty, [], ty)
 
     go n_req ty
       | Just ty' <- tcView ty = go n_req ty'
@@ -139,7 +139,7 @@ matchExpectedFunTys herald arity orig_ty
     go n_req (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
       = do { (co, tys, ty_r) <- go (n_req-1) res_ty
-           ; return (mkTcFunCo (mkTcReflCo arg_ty) co, arg_ty:tys, ty_r) }
+           ; return (mkTcFunCo Nominal (mkTcReflCo Nominal arg_ty) co, arg_ty:tys, ty_r) }
 
     go n_req ty@(TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -222,7 +222,7 @@ matchExpectedTyConApp tc orig_ty
 
     go ty@(TyConApp tycon args) 
        | tc == tycon  -- Common case
-       = return (mkTcReflCo ty, args)
+       = return (mkTcReflCo Nominal ty, args)
 
     go (TyVarTy tv)
        | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -267,7 +267,7 @@ matchExpectedAppTy orig_ty
       | Just ty' <- tcView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = return (mkTcReflCo orig_ty, (fun_ty, arg_ty))
+      = return (mkTcReflCo Nominal orig_ty, (fun_ty, arg_ty))
 
     go (TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -604,7 +604,7 @@ uType origin orig_ty1 orig_ty2
     go (FunTy fun1 arg1) (FunTy fun2 arg2)
       = do { co_l <- uType origin fun1 fun2
            ; co_r <- uType origin arg1 arg2
-           ; return $ mkTcFunCo co_l co_r }
+           ; return $ mkTcFunCo Nominal co_l co_r }
 
         -- Always defer if a type synonym family (type function)
       	-- is involved.  (Data families behave rigidly.)
@@ -617,11 +617,11 @@ uType origin orig_ty1 orig_ty2
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, length tys1 == length tys2
       = do { cos <- zipWithM (uType origin) tys1 tys2
-           ; return $ mkTcTyConAppCo tc1 cos }
+           ; return $ mkTcTyConAppCo Nominal tc1 cos }
 
     go (LitTy m) ty@(LitTy n)
       | m == n
-      = return $ mkTcReflCo ty
+      = return $ mkTcReflCo Nominal ty
 
 	-- See Note [Care with type applications]
         -- Do not decompose FunTy against App; 
@@ -769,7 +769,7 @@ uUnfilledVar :: CtOrigin
 
 uUnfilledVar origin swapped tv1 details1 (TyVarTy tv2)
   | tv1 == tv2  -- Same type variable => no-op
-  = return (mkTcReflCo (mkTyVarTy tv1))
+  = return (mkTcReflCo Nominal (mkTyVarTy tv1))
 
   | otherwise  -- Distinct type variables
   = do  { lookup2 <- lookupTcTyVar tv2
@@ -1044,7 +1044,7 @@ lookupTcTyVar tyvar
 updateMeta :: TcTyVar -> TcRef MetaDetails -> TcType -> TcM TcCoercion
 updateMeta tv1 ref1 ty2
   = do { writeMetaTyVarRef tv1 ref1 ty2
-       ; return (mkTcReflCo ty2) }
+       ; return (mkTcReflCo Nominal ty2) }
 \end{code}
 
 Note [Unifying untouchables]

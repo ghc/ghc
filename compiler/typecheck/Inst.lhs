@@ -48,6 +48,7 @@ import InstEnv
 import FunDeps
 import TcMType
 import Type
+import Coercion ( Role(..) )
 import TcType
 import Class
 import Unify
@@ -222,7 +223,7 @@ instCallConstraints orig preds
        ; return (mkWpEvApps evs) }
   where
     go pred 
-     | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
+     | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
      = do  { co <- unifyType ty1 ty2
            ; return (EvCoercion co) }
      | otherwise

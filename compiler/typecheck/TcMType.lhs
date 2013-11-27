@@ -809,7 +809,7 @@ zonkFlats binds_var untch cts
       , not (tv `elemVarSet` tyVarsOfType ty_lhs)   -- Do not construct an infinite type
       = ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
         do { writeMetaTyVar tv ty_lhs
-           ; let evterm = EvCoercion (mkTcReflCo ty_lhs)
+           ; let evterm = EvCoercion (mkTcReflCo Nominal ty_lhs)
                  evvar  = ctev_evar (cc_ev zct)
            ; when (isWantedCt orig_ct) $         -- Can be derived (Trac #8129)
              addTcEvBind binds_var evvar evterm

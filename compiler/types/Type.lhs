@@ -56,7 +56,7 @@ module Type (
         -- Deconstructing predicate types
         PredTree(..), classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
-        getEqPredTys, getEqPredTys_maybe,
+        getEqPredTys, getEqPredTys_maybe, getEqPredRole,
 
         -- ** Common type constructors
         funTyCon,
@@ -161,7 +161,8 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
-import PrelNames ( eqTyConKey, ipClassNameKey, openTypeKindTyConKey,
+import PrelNames ( eqTyConKey, coercibleTyConKey,
+                   ipClassNameKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
 
@@ -994,15 +995,27 @@ getClassPredTys_maybe ty = case splitTyConApp_maybe ty of
 getEqPredTys :: PredType -> (Type, Type)
 getEqPredTys ty
   = case splitTyConApp_maybe ty of
-      Just (tc, (_ : ty1 : ty2 : tys)) -> ASSERT( tc `hasKey` eqTyConKey && null tys )
-                                          (ty1, ty2)
+      Just (tc, (_ : ty1 : ty2 : tys)) ->
+        ASSERT( null tys && (tc `hasKey` eqTyConKey || tc `hasKey` coercibleTyConKey) )
+        (ty1, ty2)
       _ -> pprPanic "getEqPredTys" (ppr ty)
 
-getEqPredTys_maybe :: PredType -> Maybe (Type, Type)
+getEqPredTys_maybe :: PredType -> Maybe (Role, Type, Type)
 getEqPredTys_maybe ty
   = case splitTyConApp_maybe ty of
-      Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
+      Just (tc, [_, ty1, ty2])
+        | tc `hasKey` eqTyConKey -> Just (Nominal, ty1, ty2)
+        | tc `hasKey` coercibleTyConKey -> Just (Representational, ty1, ty2)
       _ -> Nothing
+
+getEqPredRole :: PredType -> Role
+getEqPredRole ty
+  = case splitTyConApp_maybe ty of
+      Just (tc, [_, _, _])
+        | tc `hasKey` eqTyConKey -> Nominal
+        | tc `hasKey` coercibleTyConKey -> Representational
+      _ -> pprPanic "getEqPredRole" (ppr ty)
+
 \end{code}
 
 %************************************************************************

@@ -219,11 +219,11 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
   | otherwise 
   = do { bndr_id <- newNoSigLetBndr no_gen bndr_name pat_ty
        ; traceTc "tcPatBndr(no-sig)" (ppr bndr_id $$ ppr (idType bndr_id))
-       ; return (mkTcReflCo pat_ty, bndr_id) }
+       ; return (mkTcReflCo Nominal pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
   = do { bndr <- mkLocalBinder bndr_name pat_ty
-       ; return (mkTcReflCo pat_ty, bndr) }
+       ; return (mkTcReflCo Nominal pat_ty, bndr) }
 
 ------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
@@ -773,7 +773,7 @@ matchExpectedConTy data_tc pat_ty
        ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
        	     -- co1 : T (ty1,ty2) ~ pat_ty
 
-       ; let co2 = mkTcUnbranchedAxInstCo co_tc tys
+       ; let co2 = mkTcUnbranchedAxInstCo Nominal co_tc tys
        	     -- co2 : T (ty1,ty2) ~ T7 ty1 ty2
 
        ; return (mkTcSymCo co2 `mkTcTransCo` co1, tys) }

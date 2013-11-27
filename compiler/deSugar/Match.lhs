@@ -996,11 +996,11 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     eq_co :: TcCoercion -> TcCoercion -> Bool
-    -- Just some simple cases
-    eq_co (TcRefl t1)             (TcRefl t2)             = eqType t1 t2
-    eq_co (TcCoVarCo v1)          (TcCoVarCo v2)          = v1==v2
-    eq_co (TcSymCo co1)           (TcSymCo co2)           = co1 `eq_co` co2
-    eq_co (TcTyConAppCo tc1 cos1) (TcTyConAppCo tc2 cos2) = tc1==tc2 && eq_list eq_co cos1 cos2
+    -- Just some simple cases (should the r1 == r2 rather be an ASSERT?)
+    eq_co (TcRefl r1 t1)             (TcRefl r2 t2)             = r1 == r2 && eqType t1 t2
+    eq_co (TcCoVarCo v1)             (TcCoVarCo v2)             = v1==v2
+    eq_co (TcSymCo co1)              (TcSymCo co2)              = co1 `eq_co` co2
+    eq_co (TcTyConAppCo r1 tc1 cos1) (TcTyConAppCo r2 tc2 cos2) = r1 == r2 && tc1==tc2 && eq_list eq_co cos1 cos2
     eq_co _ _ = False
 
 patGroup :: DynFlags -> Pat Id -> PatGroup

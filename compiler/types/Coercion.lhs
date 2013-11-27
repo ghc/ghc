@@ -1021,7 +1021,7 @@ mkSubCo (Refl Nominal ty) = Refl Representational ty
 mkSubCo (TyConAppCo Nominal tc cos)
   = TyConAppCo Representational tc (applyRoles tc cos)
 mkSubCo (UnivCo Nominal ty1 ty2) = UnivCo Representational ty1 ty2
-mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co )
+mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
 
 

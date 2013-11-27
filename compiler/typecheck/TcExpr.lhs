@@ -201,7 +201,7 @@ tcExpr (HsIPVar x) res_ty
   -- Coerces a dictionry for `IP "x" t` into `t`.
   fromDict ipClass x ty =
     case unwrapNewTyCon_maybe (classTyCon ipClass) of
-      Just (_,_,ax) -> HsWrap $ WpCast $ mkTcUnbranchedAxInstCo ax [x,ty]
+      Just (_,_,ax) -> HsWrap $ mkWpCast $ mkTcUnbranchedAxInstCo Representational ax [x,ty]
       Nothing       -> panic "The dictionary for `IP` is not a newtype?"
 
 tcExpr (HsLam match) res_ty
@@ -334,7 +334,7 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
        ; let op' = L loc (HsWrap (mkWpTyApps [a_ty, b_ty]) (HsVar op_id))
        ; return $ mkHsWrapCo (co_res) $
-         OpApp (mkLHsWrapCo (mkTcFunCo co_a co_b) $
+         OpApp (mkLHsWrapCo (mkTcFunCo Nominal co_a co_b) $
                 mkLHsWrapCo co_arg1 arg1')
                op' fix
                (mkLHsWrapCo co_a arg2') }
@@ -720,7 +720,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
         -- Step 7: make a cast for the scrutinee, in the case that it's from a type family
         ; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon
-                       = WpCast (mkTcUnbranchedAxInstCo co_con scrut_inst_tys)
+                       = mkWpCast (mkTcUnbranchedAxInstCo Representational co_con scrut_inst_tys)
                        | otherwise
                        = idHsWrapper
         -- Phew!
@@ -1232,14 +1232,14 @@ tcTagToEnum loc fun_name arg res_ty
         -- and returns a coercion between the two
     get_rep_ty ty tc tc_args
       | not (isFamilyTyCon tc)
-      = return (mkTcReflCo ty, tc, tc_args)
+      = return (mkTcReflCo Nominal ty, tc, tc_args)
       | otherwise
       = do { mb_fam <- tcLookupFamInst tc tc_args
            ; case mb_fam of
                Nothing -> failWithTc (tagToEnumError ty doc3)
                Just (FamInstMatch { fim_instance = rep_fam
                                   , fim_tys      = rep_args })
-                   -> return ( mkTcSymCo (mkTcUnbranchedAxInstCo co_tc rep_args)
+                   -> return ( mkTcSymCo (mkTcUnbranchedAxInstCo Nominal co_tc rep_args)
                              , rep_tc, rep_args )
                  where
                    co_tc  = famInstAxiom rep_fam
