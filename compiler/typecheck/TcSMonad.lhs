@@ -1750,19 +1750,23 @@ matchFam tycon args
 -- Deferring forall equalities as implications
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-deferTcSForAllEq :: (CtLoc,EvVar)  -- Original wanted equality flavor
+deferTcSForAllEq :: Role -- Nominal or Representational
+                 -> (CtLoc,EvVar)  -- Original wanted equality flavor
                  -> ([TyVar],TcType)   -- ForAll tvs1 body1
                  -> ([TyVar],TcType)   -- ForAll tvs2 body2
                  -> TcS ()
 -- Some of this functionality is repeated from TcUnify,
 -- consider having a single place where we create fresh implications.
-deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
+deferTcSForAllEq role (loc,orig_ev) (tvs1,body1) (tvs2,body2)
  = do { (subst1, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
       ; let tys  = mkTyVarTys skol_tvs
             phi1 = Type.substTy subst1 body1
             phi2 = Type.substTy (zipTopTvSubst tvs2 tys) body2
             skol_info = UnifyForAllSkol skol_tvs phi1
-        ; mev <- newWantedEvVar loc (mkTcEqPred phi1 phi2)
+        ; mev <- newWantedEvVar loc $ case role of
+                Nominal ->          mkTcEqPred      phi1 phi2
+                Representational -> mkCoerciblePred phi1 phi2
+                Phantom ->          panic "deferTcSForAllEq Phantom"
         ; coe_inside <- case mev of
             Cached ev_tm -> return (evTermCoercion ev_tm)
             Fresh ctev   -> do { ev_binds_var <- wrapTcS $ TcM.newTcEvBinds

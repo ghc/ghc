@@ -1939,7 +1939,6 @@ getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
   | ty1 `tcEqType` ty2
   = do return $ GenInst []
               $ EvCoercion (TcRefl Representational ty1)
-
   | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
     Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
     tc1 == tc2,
