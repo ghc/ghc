@@ -48,7 +48,7 @@ module Type (
         -- Pred types
         mkFamilyTyConApp,
         isDictLikeTy,
-        mkEqPred, mkPrimEqPred, mkReprPrimEqPred,
+        mkEqPred, mkCoerciblePred, mkPrimEqPred, mkReprPrimEqPred,
         mkClassPred,
         noParenPred, isClassPred, isEqPred,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
@@ -160,7 +160,7 @@ import NameEnv
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
+import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, coercibleTyConKey,
                    ipClassNameKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey )
@@ -896,6 +896,13 @@ mkEqPred :: Type -> Type -> PredType
 mkEqPred ty1 ty2
   = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 $$ ppr k $$ ppr (typeKind ty2) )
     TyConApp eqTyCon [k, ty1, ty2]
+  where
+    k = typeKind ty1
+
+mkCoerciblePred :: Type -> Type -> PredType
+mkCoerciblePred ty1 ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 $$ ppr k $$ ppr (typeKind ty2) )
+    TyConApp coercibleTyCon [k, ty1, ty2]
   where
     k = typeKind ty1
 
