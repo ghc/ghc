@@ -122,6 +122,7 @@ import VarEnv
 import Outputable
 import Bag
 import MonadUtils
+import UniqSupply
 
 import FastString
 import Util
@@ -991,6 +992,9 @@ instance Monad TcS where
   return x  = TcS (\_ -> return x)
   fail err  = TcS (\_ -> fail err)
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
+
+instance MonadUnique TcS where
+   getUniqueSupplyM = wrapTcS getUniqueSupplyM
 
 -- Basic functionality
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

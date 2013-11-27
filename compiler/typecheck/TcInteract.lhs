@@ -18,7 +18,7 @@ import Var
 import TcType
 import PrelNames (knownNatClassName, knownSymbolClassName, ipClassNameKey )
 import TysWiredIn ( coercibleClass )
-import Id( idType )
+import Id( idType, mkSysLocalM )
 import Class
 import TyCon
 import DataCon
@@ -39,15 +39,15 @@ import TcSMonad
 import Bag
 
 import Control.Monad ( foldM )
-import Data.Maybe ( catMaybes, mapMaybe )
+import Data.Maybe ( catMaybes )
 import Data.List( partition )
 
 import VarEnv
 
-import Control.Monad( when, unless )
+import Control.Monad( when, unless, forM )
 import Pair (Pair(..))
 import Unique( hasKey )
-import FastString ( sLit )
+import FastString ( sLit, fsLit )
 import DynFlags
 import Util
 \end{code}
@@ -1938,7 +1938,7 @@ getCoercibleInst :: Bool -> FamInstEnvs -> GlobalRdrEnv -> CtLoc -> TcType -> Tc
 getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
   | ty1 `tcEqType` ty2
   = do return $ GenInst []
-              $ EvCoercible (EvCoercibleRefl ty1)
+              $ EvCoercion (TcRefl Representational ty1)
 
   | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
     Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
@@ -1948,15 +1948,33 @@ getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
   = do -- Mark all used data constructors as used
        when safeMode $ mapM_ (markDataConsAsUsed rdr_env) (tyConsOfTyCon tc1)
        -- We want evidence for all type arguments of role R
-       arg_evs <- flip mapM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
-         case r of Nominal -> return (Nothing, EvCoercibleArgN ta1 {- == ta2, due to nominalArgsAgree -})
+       arg_stuff <- forM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
+         case r of Nominal -> do
+                        return
+                          ( Nothing
+                          , Nothing
+                          , mkTcReflCo Nominal ta1 {- == ta2, due to nominalArgsAgree -}
+                          )
                    Representational -> do
                         ct_ev <- requestCoercible loc ta1 ta2
-                        return (freshGoal ct_ev, EvCoercibleArgR (getEvTerm ct_ev))
+                        local_var <- mkSysLocalM (fsLit "coev") $
+                                coercibleClass `mkClassPred` [typeKind ta1, ta1, ta2]
+                        return
+                          ( freshGoal ct_ev
+                          , Just (EvBind local_var (getEvTerm ct_ev))
+                          , mkTcCoVarCo local_var
+                          )
                    Phantom -> do
-                        return (Nothing, EvCoercibleArgP ta1 ta2)
-       return $ GenInst (mapMaybe fst arg_evs)
-              $ EvCoercible (EvCoercibleTyCon tc1 (map snd arg_evs))
+                        return
+                          ( Nothing
+                          , Nothing
+                          , TcPhantomCo ta1 ta2)
+       let (arg_new, arg_binds, arg_cos) = unzip3 arg_stuff
+       let binds = EvBinds (listToBag (catMaybes arg_binds))
+       let tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
+
+       return $ GenInst (catMaybes arg_new)
+              $ EvCoercion tcCo
 
   | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
     Just (concTy, _) <- instNewTyConTF_maybe famenv tc tyArgs,
