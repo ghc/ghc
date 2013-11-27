@@ -125,11 +125,12 @@ test('haddock.compiler',
             # 2012-08-14: 231064920 (x86/OSX)
             # 2013-02-10: 241785276 (x86/Windows)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 25990254632, 10)
+          [(wordsize(64), 28708374824, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
             # 2012-11-12: 25990254632 (amd64/Linux)
+	    # 2012-11-27: 28708374824 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 14925262356, 1)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
