@@ -5,8 +5,27 @@ def no_lint(name, opts):
 setTestOpts(no_lint)
 
 
+# Note [residency]
+#
+# Residency (peak_megabytes_allocated and max_bytes_used) is sensitive
+# to when the major GC runs, which makes it inherently inaccurate.
+# Sometime an innocuous change somewhere can shift things around such
+# that the samples occur at a different time, and the residency
+# appears to change (up or down) when the underlying profile hasn't
+# really changed.
+#
+# However, please don't just ignore changes in residency.  If you see
+# a change in one of these figures, please check whether it is real or
+# not as follows:
+#
+#  * Run the test with old and new compilers, adding +RTS -h -i0.01
+#    (you don't need to compile anything for profiling or enable profiling
+#    libraries to get a heap profile).
+#  * view the heap profiles, read off the maximum residency.  If it has
+#    really changed, then you know there's an issue.
+
 test('T1969',
-     [compiler_stats_num_field('peak_megabytes_allocated',
+     [compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
           [(wordsize(32), 14, 1),
              # 2010-05-17 14 (x86/Windows)
              #            15 (x86/OS X)
@@ -34,6 +53,7 @@ test('T1969',
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
+               # See Note [residency] to get an accurate view.
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 310633884, 1),
                                  #            215582916 (x86/Windows)
@@ -88,7 +108,7 @@ else:
 
 test('T3294',
      [
-      compiler_stats_num_field('max_bytes_used',
+      compiler_stats_num_field('max_bytes_used', # Note [residency]
           [(wordsize(32), 20712280, 1),
              #            17725476 (x86/OS X)
              #            14593500 (Windows)
@@ -124,7 +144,7 @@ test('T3294',
 test('T4801',
      [ # expect_broken(5224),
        # temporarily unbroken (#5227)
-      compiler_stats_num_field('peak_megabytes_allocated',
+      compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
           [(platform('x86_64-apple-darwin'), 58, 1),
                            # expected value: 58 (amd64/OS X)
            (wordsize(32), 30, 20),
@@ -170,7 +190,7 @@ test('T4801',
 
 test('T3064',
      [# expect_broken( 3064 ),
-      compiler_stats_num_field('peak_megabytes_allocated',
+      compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
           [(wordsize(32), 14, 1),
         # expected value: 14 (x86/Linux 28-06-2012):
            (wordsize(64), 37, 20)]),
