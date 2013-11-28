@@ -850,19 +850,15 @@ tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
 	= case [ty | (f,ty) <- field_tys, f == field_lbl] of
 
 		-- No matching field; chances are this field label comes from some
-		-- other record type (or maybe none).  As well as reporting an
-		-- error we still want to typecheck the pattern, principally to
-		-- make sure that all the variables it binds are put into the
-		-- environment, else the type checker crashes later:
+		-- other record type (or maybe none).  If this happens, just fail,
+                -- otherwise we get crashes later (Trac #8570), and similar:
 		--	f (R { foo = (a,b) }) = a+b
 		-- If foo isn't one of R's fields, we don't want to crash when
 		-- typechecking the "a+b".
-	   [] -> do { addErrTc (badFieldCon data_con field_lbl)
-		    ; bogus_ty <- newFlexiTyVarTy liftedTypeKind
-		    ; return (error "Bogus selector Id", bogus_ty) }
+	   [] -> failWith (badFieldCon data_con field_lbl)
 
 		-- The normal case, when the field comes from the right constructor
-	   (pat_ty : extras) -> 
+	   (pat_ty : extras) ->
 		ASSERT( null extras )
 		do { sel_id <- tcLookupField field_lbl
 		   ; return (sel_id, pat_ty) }
