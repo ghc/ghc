@@ -242,64 +242,74 @@ handleRunStatus :: GhcMonad m
 
 handleRunStatus step expr bindings final_ids
                breakMVar statusMVar status history
-  | RunAndLogSteps <- step
-  , Break is_exception apStack info tid <- status
-  , not is_exception
-  =  -- When tracing, if we hit a breakpoint that is not explicitly
-     -- enabled, then we just log the event in the history and continue.
-    do { hsc_env <- getSession
-       ; b <- liftIO $ isBreakEnabled hsc_env info
-       ; if b
-           then handleRunStatus RunToCompletion expr bindings final_ids
-                                breakMVar statusMVar status history
-           else
-    do  { let history' = mkHistory hsc_env apStack info `consBL` history
-                -- probably better make history strict here, otherwise
-                -- our BoundedList will be pointless.
-        ; _ <- liftIO $ evaluate history'
-        ; status <- withBreakAction True (hsc_dflags hsc_env)
-                                    breakMVar statusMVar $ do
-                    liftIO $ mask_ $ do
-                       putMVar breakMVar ()  -- awaken the stopped thread
-                       redirectInterrupts tid $
-                         takeMVar statusMVar   -- and wait for the result
-        ; handleRunStatus RunAndLogSteps expr bindings final_ids
-                          breakMVar statusMVar status history' } }
+  | RunAndLogSteps <- step = tracing
+  | otherwise              = not_tracing
+ where
+  tracing
+    | Break is_exception apStack info tid <- status
+    , not is_exception
+    = do
+       hsc_env <- getSession
+       b <- liftIO $ isBreakEnabled hsc_env info
+       if b
+         then not_tracing
+           -- This breakpoint is explicitly enabled; we want to stop
+           -- instead of just logging it.
+         else do
+           let history' = mkHistory hsc_env apStack info `consBL` history
+                 -- probably better make history strict here, otherwise
+                 -- our BoundedList will be pointless.
+           _ <- liftIO $ evaluate history'
+           status <- withBreakAction True (hsc_dflags hsc_env)
+                                     breakMVar statusMVar $ do
+                     liftIO $ mask_ $ do
+                        putMVar breakMVar ()  -- awaken the stopped thread
+                        redirectInterrupts tid $
+                          takeMVar statusMVar   -- and wait for the result
+           handleRunStatus RunAndLogSteps expr bindings final_ids
+                           breakMVar statusMVar status history'
+    | otherwise
+    = not_tracing
 
-  | Break is_exception apStack info tid <- status
-  =  -- Did we hit a breakpoint or did we complete?
-    do { hsc_env <- getSession
-       ; let mb_info | is_exception = Nothing
+  not_tracing
+    -- Hit a breakpoint
+    | Break is_exception apStack info tid <- status
+    = do
+         hsc_env <- getSession
+         let mb_info | is_exception = Nothing
                      | otherwise    = Just info
-       ; (hsc_env1, names, span) <- liftIO $ bindLocalsAtBreakpoint hsc_env apStack
-                                                               mb_info
-       ; let
-            resume = Resume { resumeStmt = expr, resumeThreadId = tid
-                            , resumeBreakMVar = breakMVar, resumeStatMVar = statusMVar
-                            , resumeBindings = bindings, resumeFinalIds = final_ids
-                            , resumeApStack = apStack, resumeBreakInfo = mb_info
-                            , resumeSpan = span, resumeHistory = toListBL history
-                            , resumeHistoryIx = 0 }
-            hsc_env2 = pushResume hsc_env1 resume
-
-        ; modifySession (\_ -> hsc_env2)
-        ; return (RunBreak tid names mb_info) }
-
-  | Complete (Left e) <- status
-  = return (RunException e)
-
-  | Complete (Right hvals) <- status
-  = do { hsc_env <- getSession
-       ; let final_ic = extendInteractiveContext (hsc_IC hsc_env)
+         (hsc_env1, names, span) <- liftIO $
+           bindLocalsAtBreakpoint hsc_env apStack mb_info
+         let
+           resume = Resume
+             { resumeStmt = expr, resumeThreadId = tid
+             , resumeBreakMVar = breakMVar, resumeStatMVar = statusMVar
+             , resumeBindings = bindings, resumeFinalIds = final_ids
+             , resumeApStack = apStack, resumeBreakInfo = mb_info
+             , resumeSpan = span, resumeHistory = toListBL history
+             , resumeHistoryIx = 0 }
+           hsc_env2 = pushResume hsc_env1 resume
+  
+         modifySession (\_ -> hsc_env2)
+         return (RunBreak tid names mb_info)
+  
+    -- Completed with an exception
+    | Complete (Left e) <- status
+    = return (RunException e)
+  
+    -- Completed successfully
+    | Complete (Right hvals) <- status
+    = do hsc_env <- getSession
+         let final_ic = extendInteractiveContext (hsc_IC hsc_env)
                                                  (map AnId final_ids)
              final_names = map getName final_ids
-       ; liftIO $ Linker.extendLinkEnv (zip final_names hvals)
-       ; hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
-       ; modifySession (\_ -> hsc_env')
-       ; return (RunOk final_names) }
-
-  | otherwise
-  = panic "handleRunStatus"  -- The above cases are in fact exhaustive
+         liftIO $ Linker.extendLinkEnv (zip final_names hvals)
+         hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
+         modifySession (\_ -> hsc_env')
+         return (RunOk final_names)
+  
+    | otherwise
+    = panic "handleRunStatus"  -- The above cases are in fact exhaustive
 
 isBreakEnabled :: HscEnv -> BreakInfo -> IO Bool
 isBreakEnabled hsc_env inf =
