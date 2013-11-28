@@ -291,6 +291,9 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
     if field in opts.compiler_stats_range_fields:
         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
+    if compiler_debugged():
+        skip(name, opts)
+
     for (b, expected, dev) in expecteds:
         if b:
             opts.compiler_stats_range_fields[field] = (expected, dev)
