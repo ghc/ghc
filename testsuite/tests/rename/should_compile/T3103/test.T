@@ -2,7 +2,7 @@
 
 test('T3103',
      [only_compiler_types(['ghc']),
-      expect_broken_for(3103, opt_ways),
+      normal,
       extra_clean(['Foreign/Ptr.hi', 'Foreign/Ptr.o',
                    'GHC/Base.hi',    'GHC/Base.o',
                    'GHC/Num.hi',     'GHC/Num.o',
