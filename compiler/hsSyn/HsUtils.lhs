@@ -416,7 +416,10 @@ toHsType ty
     to_hs_type (TyVarTy tv) = nlHsTyVar (getRdrName tv)
     to_hs_type (AppTy t1 t2) = nlHsAppTy (toHsType t1) (toHsType t2)
     to_hs_type (TyConApp tc args) = nlHsTyConApp (getRdrName tc) (map toHsType args')
-       where args' = filter (not . isKind) args
+       where 
+         args' = filterOut isKind args
+         -- Source-language types have _implicit_ kind arguments,
+         -- so we must remove them here (Trac #8563)
     to_hs_type (FunTy arg res) = ASSERT( not (isConstraintKind (typeKind arg)) )
                                  nlHsFunTy (toHsType arg) (toHsType res)
     to_hs_type t@(ForAllTy {}) = pprPanic "toHsType" (ppr t)
