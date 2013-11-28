@@ -291,6 +291,8 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
     if field in opts.compiler_stats_range_fields:
         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
+    # Compiler performance numbers change when debugging is on, making the results
+    # useless and confusing. Therefore, skip if debugging is on.
     if compiler_debugged():
         skip(name, opts)
 
