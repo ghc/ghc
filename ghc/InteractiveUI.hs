@@ -524,7 +524,8 @@ runGHCi paths maybe_exprs = do
                                    $ topHandler e
                                    -- this used to be topHandlerFastExit, see #2228
             runInputTWithPrefs defaultPrefs defaultSettings $ do
-                runCommands' hdle (return Nothing)
+                -- make `ghc -e` exit nonzero on invalid input, see Trac #7962
+                runCommands' hdle (Just $ hdle (toException $ ExitFailure 1) >> return ()) (return Nothing)
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -675,11 +676,12 @@ installInteractivePrint (Just ipFun) exprmode = do
 
 -- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands = runCommands' handler
+runCommands = runCommands' handler Nothing
 
 runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
+             -> Maybe (GHCi ()) -- ^ Source error handler
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands' eh gCmd = do
+runCommands' eh sourceErrorHandler gCmd = do
     b <- ghandle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
@@ -691,7 +693,11 @@ runCommands' eh gCmd = do
             (runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
-      Just _  -> runCommands' eh gCmd
+      Just success -> do
+        let nextCommand = runCommands' eh sourceErrorHandler gCmd
+        case sourceErrorHandler of
+          Just handler | success == False -> lift handler >> nextCommand
+          _ -> nextCommand
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code)
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
