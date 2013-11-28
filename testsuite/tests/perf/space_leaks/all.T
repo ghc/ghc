@@ -6,7 +6,7 @@ test('space_leak_001',
      #           5 (x86/Linux)
      [stats_num_field('peak_megabytes_allocated', (4, 1)),
       stats_num_field('max_bytes_used',
-          [(wordsize(64), 440000, 10),
+          [(wordsize(64), 440000, 15),
                         # 440224 (amd64/Linux)
                         # 417016 (x86/OS X)
                         # 415672 (x86/Windows)

@@ -344,10 +344,11 @@ test('T5837',
 test('T6048',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 48887164, 10),
-            # prev:       38000000 (x86/Linux)
-            # 2012-10-08: 48887164 (x86/Linux)
-           (wordsize(64), 97247032, 10)])
-             # 18/09/2012 97247032 amd64/Linux
+          [(wordsize(32),   48887164, 10),
+            # prev:         38000000 (x86/Linux)
+            # 2012-10-08:   48887164 (x86/Linux)
+           (wordsize(64),  237077056, 10)])
+             # 18/09/2012   97247032 amd64/Linux
+	     # 2013-11-26: 237077056 amd64/Linux
       ],
       compile,[''])
