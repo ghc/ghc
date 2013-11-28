@@ -176,16 +176,52 @@ directCall conv lbl arity stg_args
 slowCall :: CmmExpr -> [StgArg] -> FCode ReturnKind
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args
-  = do  { dflags <- getDynFlags
-        ; argsreps <- getArgRepsAmodes stg_args
-        ; let (rts_fun, arity) = slowCallPattern (map fst argsreps)
-        ; r <- direct_call "slow_call" NativeNodeCall
+  = do  dflags <- getDynFlags
+        argsreps <- getArgRepsAmodes stg_args
+        let (rts_fun, arity) = slowCallPattern (map fst argsreps)
+
+        (r, slow_code) <- getCodeR $ do
+           r <- direct_call "slow_call" NativeNodeCall
                  (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
-        ; emitComment $ mkFastString ("slow_call for " ++
+           emitComment $ mkFastString ("slow_call for " ++
                                       showSDoc dflags (ppr fun) ++
                                       " with pat " ++ unpackFS rts_fun)
-        ; return r
-        }
+           return r
+
+        let n_args = length stg_args
+        if n_args > arity && optLevel dflags >= 2
+           then do
+             fast_code <- getCode $
+                emitCall (NativeNodeCall, NativeReturn)
+                  (entryCode dflags (closureInfoPtr dflags fun))
+                  (nonVArgs ((P,Just fun):argsreps))
+
+             slow_lbl <- newLabelC
+             fast_lbl <- newLabelC
+             is_tagged_lbl <- newLabelC
+             end_lbl <- newLabelC
+
+             funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun
+
+             let correct_arity = cmmEqWord dflags (funInfoArity dflags funv)
+                                                  (mkIntExpr dflags n_args)
+
+             pprTrace "fast call" (int n_args) $ return ()
+
+             emit (mkCbranch (cmmIsTagged dflags funv) is_tagged_lbl slow_lbl
+                   <*> mkLabel is_tagged_lbl
+                   <*> mkCbranch correct_arity fast_lbl slow_lbl
+                   <*> mkLabel fast_lbl
+                   <*> fast_code
+                   <*> mkBranch end_lbl
+                   <*> mkLabel slow_lbl
+                   <*> slow_code
+                   <*> mkLabel end_lbl)
+             return r
+
+           else do
+             emit slow_code
+             return r
 
 
 --------------
