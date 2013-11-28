@@ -188,12 +188,22 @@ slowCall fun stg_args
                                       " with pat " ++ unpackFS rts_fun)
            return r
 
+        -- Note [avoid intermediate PAPs]
         let n_args = length stg_args
         if n_args > arity && optLevel dflags >= 2
            then do
              funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun
              fun_iptr <- (CmmReg . CmmLocal) `fmap`
                     assignTemp (closureInfoPtr dflags (cmmUntag dflags funv))
+
+             -- ToDo: we could do slightly better here by reusing the
+             -- continuation from the slow call, which we have in r.
+             -- Also we'd like to push the continuation on the stack
+             -- before the branch, so that we only get one copy of the
+             -- code that saves all the live variables across the
+             -- call, but that might need some improvements to the
+             -- special case in the stack layout code to handle this
+             -- (see Note [diamond proc point]).
 
              fast_code <- getCode $
                 emitCall (NativeNodeCall, NativeReturn)
@@ -222,6 +232,32 @@ slowCall fun stg_args
            else do
              emit slow_code
              return r
+
+
+-- Note [avoid intermediate PAPs]
+--
+-- A slow call which needs multiple generic apply patterns will be
+-- almost guaranteed to create one or more intermediate PAPs when
+-- applied to a function that takes the correct number of arguments.
+-- We try to avoid this situation by generating code to test whether
+-- we are calling a function with the correct number of arguments
+-- first, i.e.:
+--
+--   if (TAG(f) != 0} {  // f is not a thunk
+--      if (f->info.arity == n) {
+--         ... make a fast call to f ...
+--      }
+--   }
+--   ... otherwise make the slow call ...
+--
+-- We *only* do this when the call requires multiple generic apply
+-- functions, which requires pushing extra stack frames and probably
+-- results in intermediate PAPs.  (I say probably, because it might be
+-- that we're over-applying a function, but that seems even less
+-- likely).
+--
+-- This very rarely applies, but if it does happen in an inner loop it
+-- can have a severe impact on performance (#6084).
 
 
 --------------
