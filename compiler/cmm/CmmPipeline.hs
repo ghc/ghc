@@ -79,11 +79,14 @@ cpsTop hsc_env proc =
        let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
        proc_points <-
           if splitting_proc_points
-             then {-# SCC "minimalProcPointSet" #-} runUniqSM $
+             then do
+               pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                   minimalProcPointSet (targetPlatform dflags) call_pps g
+               dumpIfSet_dyn dflags Opt_D_dump_cmm "Proc points"
+                     (ppr l $$ ppr pp $$ ppr g)
+               return pp
              else
-                  return call_pps
-       dumpIfSet_dyn dflags Opt_D_dump_cmm "Proc points" (ppr l $$ ppr proc_points $$ ppr g)
+               return call_pps
 
        let noncall_pps = proc_points `setDifference` call_pps
        when (not (setNull noncall_pps) && dopt Opt_D_dump_cmm dflags) $
