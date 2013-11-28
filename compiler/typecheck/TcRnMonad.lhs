@@ -1314,7 +1314,8 @@ forkM_maybe doc thing_inside
  --     does not get updated atomically (e.g. in newUnique and newUniqueSupply).
  = do { child_us <- newUniqueSupply
       ; child_env_us <- newMutVar child_us
-      ; unsafeInterleaveM $ updEnv (\env -> env { env_us = child_env_us }) $
+        -- see Note [Masking exceptions in forkM_maybe]
+      ; unsafeInterleaveM $ uninterruptibleMaskM_ $ updEnv (\env -> env { env_us = child_env_us }) $
         do { traceIf (text "Starting fork {" <+> doc)
            ; mb_res <- tryM $
                        updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $
@@ -1345,3 +1346,19 @@ forkM doc thing_inside
                                    -- pprPanic "forkM" doc
                         Just r  -> r) }
 \end{code}
+
+Note [Masking exceptions in forkM_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When using GHC-as-API it must be possible to interrupt snippets of code
+executed using runStmt (#1381). Since commit 02c4ab04 this is almost possible
+by throwing an asynchronous interrupt to the GHC thread. However, there is a
+subtle problem: runStmt first typechecks the code before running it, and the
+exception might interrupt the type checker rather than the code. Moreover, the
+typechecker might be inside an unsafeInterleaveIO (through forkM_maybe), and
+more importantly might be inside an exception handler inside that
+unsafeInterleaveIO. If that is the case, the exception handler will rethrow the
+asynchronous exception as a synchronous exception, and the exception will end
+up as the value of the unsafeInterleaveIO thunk (see #8006 for a detailed
+discussion).  We don't currently know a general solution to this problem, but
+we can use uninterruptibleMask_ to avoid the situation. 

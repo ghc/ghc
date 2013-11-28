@@ -22,7 +22,7 @@ module IOEnv (
         -- Getting at the environment
         getEnv, setEnv, updEnv,
 
-        runIOEnv, unsafeInterleaveM,
+        runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
 
         -- I/O operations
@@ -149,6 +149,8 @@ tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a
 unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 
+uninterruptibleMaskM_ :: IOEnv env a -> IOEnv env a
+uninterruptibleMaskM_ (IOEnv m) = IOEnv (\ env -> uninterruptibleMask_ (m env))
 
 ----------------------------------------------------------------------
 -- Alternative/MonadPlus
