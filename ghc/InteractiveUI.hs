@@ -694,10 +694,8 @@ runCommands' eh sourceErrorHandler gCmd = do
     case b of
       Nothing -> return ()
       Just success -> do
-        let nextCommand = runCommands' eh sourceErrorHandler gCmd
-        case sourceErrorHandler of
-          Just handler | success == False -> lift handler >> nextCommand
-          _ -> nextCommand
+        when (not success) $ maybe (return ()) lift sourceErrorHandler
+        runCommands' eh sourceErrorHandler gCmd
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code)
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
