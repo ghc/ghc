@@ -582,7 +582,7 @@ data EvTerm
   | EvCoercion TcCoercion        -- (Boxed) coercion bindings
                                  -- See Note [Coercion evidence terms]
 
-  | EvCast EvTerm TcCoercion     -- d |> co, the coerction being at role nominal
+  | EvCast EvTerm TcCoercion     -- d |> co, the coerction being at role representational
 
   | EvDFunApp DFunId             -- Dictionary instance application
        [Type] [EvTerm]
@@ -709,7 +709,7 @@ The story for kind `Symbol` is analogous:
 \begin{code}
 mkEvCast :: EvTerm -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | ASSERT2 (tcCoercionRole lco == Nominal, (vcat [ptext (sLit "Coercion of wrong role passed to mkEvCast:"), ppr ev, ppr lco]))
+  | ASSERT2 (tcCoercionRole lco == Representational, (vcat [ptext (sLit "Coercion of wrong role passed to mkEvCast:"), ppr ev, ppr lco]))
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 

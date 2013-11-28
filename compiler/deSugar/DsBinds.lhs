@@ -740,7 +740,7 @@ dsEvTerm (EvId v) = return (Var v)
 
 dsEvTerm (EvCast tm co) 
   = do { tm' <- dsEvTerm tm
-       ; dsTcCoercion co $ (mkCast tm' . mkSubCo) }
+       ; dsTcCoercion co $ mkCast tm' }
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 

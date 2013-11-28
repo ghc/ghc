@@ -1133,7 +1133,7 @@ canEqLeafTyVar ev tv s2              -- ev :: tv ~ s2
            (Just tv1, Just tv2) | tv1 == tv2
               -> do { when (isWanted ev) $
                       ASSERT ( tcCoercionRole co == Nominal )
-                      setEvBind (ctev_evar ev) (mkEvCast (EvCoercion (mkTcReflCo Nominal xi1)) co)
+                      setEvBind (ctev_evar ev) (mkEvCast (EvCoercion (mkTcReflCo Nominal xi1)) (mkTcSubCo co))
                     ; return Stop }
 
            (Just tv1, _) -> do { dflags <- getDynFlags

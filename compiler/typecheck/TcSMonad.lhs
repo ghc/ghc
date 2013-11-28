@@ -1704,12 +1704,12 @@ rewriteCtFlavor (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
   = do { new_ev <- newGivenEvVar loc new_pred new_tm  -- See Note [Bind new Givens immediately]
        ; return (Just new_ev) }
   where
-    new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCast optimises ReflCo
+    new_tm = mkEvCast old_tm (mkTcSubCo (mkTcSymCo co))  -- mkEvCast optimises ReflCo
 
 rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { new_evar <- newWantedEvVar loc new_pred
-       ; ASSERT ( tcCoercionRole co == Nominal ) return ()
-       ; setEvBind evar (mkEvCast (getEvTerm new_evar) co)
+       ; MASSERT ( tcCoercionRole co == Nominal )
+       ; setEvBind evar (mkEvCast (getEvTerm new_evar) (mkTcSubCo co))
        ; case new_evar of
             Fresh ctev -> return (Just ctev)
             _          -> return Nothing }
