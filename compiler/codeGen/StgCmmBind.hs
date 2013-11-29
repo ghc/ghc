@@ -31,7 +31,6 @@ import StgCmmForeign    (emitPrimCall)
 import MkGraph
 import CoreSyn          ( AltCon(..) )
 import SMRep
-import BlockId
 import Cmm
 import CmmInfo
 import CmmUtils
@@ -481,8 +480,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 -- Emit new label that might potentially be a header
                 -- of a self-recursive tail call. See Note
                 -- [Self-recursive tail calls] in StgCmmExpr
-                ; u <- newUnique
-                ; let loop_header_id = mkBlockId u
+                ; loop_header_id <- newLabelC
                 ; emitLabel loop_header_id
                 -- Extend reader monad with information that
                 -- self-recursive tail calls can be optimized into local
@@ -495,7 +493,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                   tickyEnterFun cl_info
                 ; enterCostCentreFun cc
                     (CmmMachOp (mo_wordSub dflags)
-                         [ CmmReg nodeReg
+                         [ CmmReg (CmmLocal node) -- not nodeReg, see #8275
                          , mkIntExpr dflags (funTag dflags cl_info) ])
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*

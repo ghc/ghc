@@ -2957,6 +2957,7 @@ optLevelFlags
     , ([0,1,2], Opt_LlvmTBAA)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CmmElimCommonBlocks)
+    , ([1,2],   Opt_Loopification)
 
     , ([0,1,2],     Opt_DmdTxDictSel)
 
