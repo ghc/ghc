@@ -149,7 +149,7 @@ mkTcTyConAppCo role tc cos -- No need to expand type synonyms
 -- mkSubCo will do some normalisation. We do not do it for TcCoercions, but
 -- defer that to desugaring; just to reduce the code duplication a little bit
 mkTcSubCo :: TcCoercion -> TcCoercion
-mkTcSubCo co = ASSERT2 ( tcCoercionRole co == Nominal, ppr co)
+mkTcSubCo co = ASSERT2( tcCoercionRole co == Nominal, ppr co)
                TcSubCo co
 
 maybeTcSubCo2_maybe :: Role   -- desired role
@@ -171,7 +171,7 @@ maybeTcSubCo2 r1 r2 co
 
 mkTcAxInstCo :: Role -> CoAxiom br -> Int -> [TcType] -> TcCoercion
 mkTcAxInstCo role ax index tys
-  | ASSERT2 ( not (role == Nominal && ax_role == Representational) , ppr (ax, tys) )
+  | ASSERT2( not (role == Nominal && ax_role == Representational) , ppr (ax, tys) )
     arity == n_tys = maybeTcSubCo2 role ax_role $ TcAxiomInstCo ax_br index rtys
   | otherwise      = ASSERT( arity < n_tys )
                      maybeTcSubCo2 role ax_role $ 
@@ -486,7 +486,7 @@ c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
 mkWpCast :: TcCoercion -> HsWrapper
-mkWpCast co = ASSERT2 (tcCoercionRole co == Representational, ppr co)
+mkWpCast co = ASSERT2(tcCoercionRole co == Representational, ppr co)
               WpCast co
 
 mkWpTyApps :: [Type] -> HsWrapper
@@ -709,7 +709,7 @@ The story for kind `Symbol` is analogous:
 \begin{code}
 mkEvCast :: EvTerm -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | ASSERT2 (tcCoercionRole lco == Representational, (vcat [ptext (sLit "Coercion of wrong role passed to mkEvCast:"), ppr ev, ppr lco]))
+  | ASSERT2(tcCoercionRole lco == Representational, (vcat [ptext (sLit "Coercion of wrong role passed to mkEvCast:"), ppr ev, ppr lco]))
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 

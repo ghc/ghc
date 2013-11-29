@@ -705,7 +705,7 @@ dsHsWrapper (WpTyApp ty)      e = return $ App e (Type ty)
 dsHsWrapper (WpLet ev_binds)  e = do bs <- dsTcEvBinds ev_binds
                                      return (mkCoreLets bs e)
 dsHsWrapper (WpCompose c1 c2) e = dsHsWrapper c1 =<< dsHsWrapper c2 e
-dsHsWrapper (WpCast co)       e = ASSERT (tcCoercionRole co == Representational)
+dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
                                   dsTcCoercion co (mkCast e)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e 
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e 

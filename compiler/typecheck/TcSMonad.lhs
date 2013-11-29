@@ -1708,7 +1708,7 @@ rewriteCtFlavor (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
 
 rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { new_evar <- newWantedEvVar loc new_pred
-       ; MASSERT ( tcCoercionRole co == Nominal )
+       ; MASSERT( tcCoercionRole co == Nominal )
        ; setEvBind evar (mkEvCast (getEvTerm new_evar) (mkTcSubCo co))
        ; case new_evar of
             Fresh ctev -> return (Just ctev)

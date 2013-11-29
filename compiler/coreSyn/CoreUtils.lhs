@@ -190,8 +190,8 @@ applyTypeToArgs e op_ty args
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
 mkCast :: CoreExpr -> Coercion -> CoreExpr
-mkCast e co | ASSERT2 ( coercionRole co == Representational
-                      , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast") <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
+mkCast e co | ASSERT2( coercionRole co == Representational
+                     , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast") <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
               isReflCo co = e
 
 mkCast (Coercion e_co) co 
