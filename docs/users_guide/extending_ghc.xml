@@ -245,7 +245,7 @@ pass = do dflags &lt;- getDynFlags
 
 <programlisting>
 {-# LANGUAGE DeriveDataTypeable #-}
-module SayAnnNames.Plugin (plugin, SomeAnn) where
+module SayAnnNames.Plugin (plugin, SomeAnn(..)) where
 import GhcPlugins
 import Control.Monad (unless)
 import Data.Data
