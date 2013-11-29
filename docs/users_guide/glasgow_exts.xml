@@ -2260,8 +2260,7 @@ The following syntax is stolen:
 
       <varlistentry>
 	<term>
-	  <literal>?<replaceable>varid</replaceable></literal>,
-	  <literal>%<replaceable>varid</replaceable></literal>
+	  <literal>?<replaceable>varid</replaceable></literal>
           <indexterm><primary>implicit parameters</primary></indexterm>
 	</term>
 	<listitem><para>
@@ -2275,6 +2274,8 @@ The following syntax is stolen:
 	  <literal>[e|</literal>, <literal>[p|</literal>,
 	  <literal>[d|</literal>, <literal>[t|</literal>,
 	  <literal>$(</literal>,
+	  <literal>[||</literal>,
+	  <literal>[e||</literal>,
 	  <literal>$<replaceable>varid</replaceable></literal>
           <indexterm><primary>Template Haskell</primary></indexterm>
 	</term>
@@ -2285,7 +2286,7 @@ The following syntax is stolen:
 
       <varlistentry>
 	<term>
-	  <literal>[:<replaceable>varid</replaceable>|</literal>
+	  <literal>[<replaceable>varid</replaceable>|</literal>
           <indexterm><primary>quasi-quotation</primary></indexterm>
 	</term>
 	<listitem><para>
