@@ -5,16 +5,3 @@ tcfail083.hs:8:39:
     In the pattern: State {bar = Bar {flag = f, baz = b}}
     In an equation for ‛display’:
         display (State {bar = Bar {flag = f, baz = b}}) = print (f, b)
-
-tcfail083.hs:8:53:
-    No instance for (Show t0) arising from a use of ‛print’
-    The type variable ‛t0’ is ambiguous
-    Relevant bindings include b :: t0 (bound at tcfail083.hs:8:45)
-    Note: there are several potential instances:
-      instance Show Bar -- Defined at tcfail083.hs:3:43
-      instance Show Double -- Defined in ‛GHC.Float’
-      instance Show Float -- Defined in ‛GHC.Float’
-      ...plus 25 others
-    In the expression: print (f, b)
-    In an equation for ‛display’:
-        display (State {bar = Bar {flag = f, baz = b}}) = print (f, b)
