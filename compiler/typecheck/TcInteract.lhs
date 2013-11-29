@@ -2030,9 +2030,9 @@ requestCoercible loc ty1 ty2 =
 Note [Coercible Instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 The class Coercible is special: There are no regular instances, and the user
-cannot even define them. Instead, the type checker will create instances and
-their evidence out of thin air, in getCoercibleInst. The following “instances”
-are present:
+cannot even define them (it is listed as an `abstractClass` in TcValidity).
+Instead, the type checker will create instances and their evidence out of thin
+air, in getCoercibleInst. The following “instances” are present:
 
  1. instance Coercible a a
     for any type a at any kind k.
@@ -2050,13 +2050,15 @@ are present:
 
     Furthermore in Safe Haskell code, we check that
      * the data constructors of C are in scope and
-     * the data constructors of all type constructors used in the definition of C are in scope.
+     * the data constructors of all type constructors used in the definition of
+     * C are in scope.
        This is required as otherwise the previous check can be circumvented by
        just adding a local data type around C.
 
  3. instance Coercible r b => Coercible (NT t1 t2 ...) b
     instance Coercible a r => Coercible a (NT t1 t2 ...)
-    for a newtype constructor NT where
+    for a newtype constructor NT (nor data family instance that resolves to a
+    newtype) where
      * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
      * the data constructors of NT are in scope.
 
@@ -2068,9 +2070,24 @@ are present:
       newtype NT3 a b = NT3 (b -> a)
       Coercible (NT2 Int) (NT3 Int) -- cannot be derived
 
-These three shapes of instances correspond to the three constructors of
-EvCoercible (defined in EvEvidence). They are assembled here and turned to Core
-by dsEvTerm in DsBinds.
+  4. instance (forall a. Coercible t1 t2) => Coercible (forall a. t1) (forall a. t2)
+     (which would be illegal to write like that in the source code, but we have
+     it nevertheless).
+
+The type checker generates evidence in the form of EvCoercion, but the
+TcCoercion therein has role Representational,  which are turned into Core
+coercions by dsEvTerm in DsBinds.
+
+The evidence for the first three instance is generated here by
+getCoercibleInst, the forth instance is implemented in the canonicalization
+stage using deferTcSForAllEq.
+
+When the constraint cannot be solved, it is treated as any other unsolved
+constraint, i.e. it can turn up in an inferred type signature, or reported to
+the user as a regular "Cannot derive instance ..." error. In the latter case,
+coercible_msg in TcErrors gives additional explanations of why GHC could not
+find a Coercible instance, so it duplicates some of the logic from
+getCoercibleInst (in negated form).
 
 
 Note [Instance and Given overlap]

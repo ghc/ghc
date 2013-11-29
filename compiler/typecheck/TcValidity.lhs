@@ -803,7 +803,7 @@ checkValidInstHead ctxt clas cls_args
                 text "The class is abstract, manual instances are not permitted."
 
 abstractClasses :: [ Class ]
-abstractClasses = [ coercibleClass ]
+abstractClasses = [ coercibleClass ] -- See Note [Coercible Instances]
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg

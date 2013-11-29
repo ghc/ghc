@@ -235,6 +235,7 @@ canClassNC ev cls tys
 
 -- This case implements Coercible (forall a. body) (forall b. body)
 canClass ev cls tys
+  -- See Note [Coercible instances]
   | cls == coercibleClass
   , [_k, ty1, ty2] <- tys
   , tcIsForAllTy ty1

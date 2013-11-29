@@ -2372,7 +2372,7 @@ primclass Coercible a b
 
      In SafeHaskell code, this instance is only usable if the constructors of
      every type constructor used in the definition of {\tt D} (including
-     those of {\tt D} itself) is in scope.
+     those of {\tt D} itself) are in scope.
 
      The third kind of instance exists for every {\tt newtype NT = MkNT T} and
      comes in two variants, namely
