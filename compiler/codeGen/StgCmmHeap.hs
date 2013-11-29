@@ -14,7 +14,6 @@ module StgCmmHeap (
         heapStackCheckGen,
         entryHeapCheck',
 
-        mkVirtHeapOffsets, mkVirtConstrOffsets,
         mkStaticClosureFields, mkStaticClosure,
 
         allocDynClosure, allocDynClosureCmm,
@@ -68,7 +67,7 @@ allocDynClosure
 
 allocDynClosureCmm
         :: Maybe Id -> CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
-        -> [(CmmExpr, VirtualHpOffset)]
+        -> [(CmmExpr, ByteOff)]
         -> FCode CmmExpr -- returns Hp+n
 
 -- allocDynClosure allocates the thing in the heap,
@@ -130,18 +129,18 @@ allocDynClosureCmm mb_id info_tbl lf_info use_cc _blame_cc amodes_w_offsets
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs
   = do dflags <- getDynFlags
-       hpStore base (header dflags) [0..]
+       hpStore base (header dflags) [0, wORD_SIZE dflags ..]
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs
         -- ToDof: Parallel stuff
         -- No ticky header
 
-hpStore :: CmmExpr -> [CmmExpr] -> [VirtualHpOffset] -> FCode ()
+hpStore :: CmmExpr -> [CmmExpr] -> [ByteOff] -> FCode ()
 -- Store the item (expr,off) in base[off]
 hpStore base vals offs
   = do dflags <- getDynFlags
-       let mk_store val off = mkStore (cmmOffsetW dflags base off) val
+       let mk_store val off = mkStore (cmmOffsetB dflags base off) val
        emit (catAGraphs (zipWith mk_store vals offs))
 
 

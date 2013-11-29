@@ -142,7 +142,8 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
-mkTaggedObjectLoad :: DynFlags -> LocalReg -> LocalReg -> WordOff -> DynTag -> CmmAGraph
+mkTaggedObjectLoad
+  :: DynFlags -> LocalReg -> LocalReg -> ByteOff -> DynTag -> CmmAGraph
 -- (loadTaggedObjectField reg base off tag) generates assignment
 --      reg = bitsK[ base + off - tag ]
 -- where K is fixed by 'reg'
@@ -150,7 +151,7 @@ mkTaggedObjectLoad dflags reg base offset tag
   = mkAssign (CmmLocal reg)
              (CmmLoad (cmmOffsetB dflags
                                   (CmmReg (CmmLocal base))
-                                  (wORD_SIZE dflags * offset - tag))
+                                  (offset - tag))
                       (localRegType reg))
 
 -------------------------------------------------------------------------

@@ -10,11 +10,13 @@ Storage manager representation of closures
 
 module SMRep (
         -- * Words and bytes
+        WordOff, ByteOff,
+        wordsToBytes, bytesToWordsRoundUp,
+        roundUpToWords,
+
         StgWord, fromStgWord, toStgWord,
         StgHalfWord, fromStgHalfWord, toStgHalfWord,
         hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
-        WordOff, ByteOff,
-        roundUpToWords,
 
         -- * Closure repesentation
         SMRep(..), -- CmmInfo sees the rep; no one else does
@@ -67,7 +69,15 @@ type WordOff = Int -- Word offset, or word count
 type ByteOff = Int -- Byte offset, or byte count
 
 roundUpToWords :: DynFlags -> ByteOff -> ByteOff
-roundUpToWords dflags n = (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZE dflags - 1))
+roundUpToWords dflags n =
+  (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZE dflags - 1))
+
+wordsToBytes :: DynFlags -> WordOff -> ByteOff
+wordsToBytes dflags n = wORD_SIZE dflags * n
+
+bytesToWordsRoundUp :: DynFlags -> ByteOff -> WordOff
+bytesToWordsRoundUp dflags n = (n + word_size - 1) `quot` word_size
+ where word_size = wORD_SIZE dflags
 \end{code}
 
 StgWord is a type representing an StgWord on the target platform.

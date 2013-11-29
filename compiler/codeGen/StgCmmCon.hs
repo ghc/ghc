@@ -21,6 +21,7 @@ import CoreSyn  ( AltCon(..) )
 import StgCmmMonad
 import StgCmmEnv
 import StgCmmHeap
+import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
 import StgCmmProf ( curCCS )

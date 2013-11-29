@@ -286,22 +286,23 @@ cmmOffsetLitB = cmmOffsetLit
 
 -----------------------
 -- The "W" variants take word offsets
+
 cmmOffsetExprW :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 -- The second arg is a *word* offset; need to change it to bytes
 cmmOffsetExprW dflags  e (CmmLit (CmmInt n _)) = cmmOffsetW dflags e (fromInteger n)
 cmmOffsetExprW dflags e wd_off = cmmIndexExpr dflags (wordWidth dflags) e wd_off
 
 cmmOffsetW :: DynFlags -> CmmExpr -> WordOff -> CmmExpr
-cmmOffsetW dflags e n = cmmOffsetB dflags e (wORD_SIZE dflags * n)
+cmmOffsetW dflags e n = cmmOffsetB dflags e (wordsToBytes dflags n)
 
 cmmRegOffW :: DynFlags -> CmmReg -> WordOff -> CmmExpr
-cmmRegOffW dflags reg wd_off = cmmRegOffB reg (wd_off * wORD_SIZE dflags)
+cmmRegOffW dflags reg wd_off = cmmRegOffB reg (wordsToBytes dflags wd_off)
 
 cmmOffsetLitW :: DynFlags -> CmmLit -> WordOff -> CmmLit
-cmmOffsetLitW dflags lit wd_off = cmmOffsetLitB lit (wORD_SIZE dflags * wd_off)
+cmmOffsetLitW dflags lit wd_off = cmmOffsetLitB lit (wordsToBytes dflags wd_off)
 
 cmmLabelOffW :: DynFlags -> CLabel -> WordOff -> CmmLit
-cmmLabelOffW dflags lbl wd_off = cmmLabelOffB lbl (wORD_SIZE dflags * wd_off)
+cmmLabelOffW dflags lbl wd_off = cmmLabelOffB lbl (wordsToBytes dflags wd_off)
 
 cmmLoadIndexW :: DynFlags -> CmmExpr -> Int -> CmmType -> CmmExpr
 cmmLoadIndexW dflags base off ty = CmmLoad (cmmOffsetW dflags base off) ty
