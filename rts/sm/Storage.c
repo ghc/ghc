@@ -1152,24 +1152,6 @@ calcNeeded (rtsBool force_major, memcount *blocks_needed)
          should be modified to use allocateExec instead of VirtualAlloc.
    ------------------------------------------------------------------------- */
 
-#if defined(linux_HOST_OS)
-
-// On Linux we need to use libffi for allocating executable memory,
-// because it knows how to work around the restrictions put in place
-// by SELinux.
-
-AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
-{
-    void **ret, **exec;
-    ACQUIRE_SM_LOCK;
-    ret = ffi_closure_alloc (sizeof(void *) + (size_t)bytes, (void**)&exec);
-    RELEASE_SM_LOCK;
-    if (ret == NULL) return ret;
-    *ret = ret; // save the address of the writable mapping, for freeExec().
-    *exec_ret = exec + 1;
-    return (ret + 1);
-}
-
 #if defined(arm_HOST_ARCH) && defined(ios_HOST_OS)
 void sys_icache_invalidate(void *start, size_t len);
 #endif
@@ -1193,6 +1175,24 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
 #else
 #error Missing support to flush the instruction cache
 #endif
+}
+
+#if defined(linux_HOST_OS)
+
+// On Linux we need to use libffi for allocating executable memory,
+// because it knows how to work around the restrictions put in place
+// by SELinux.
+
+AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
+{
+    void **ret, **exec;
+    ACQUIRE_SM_LOCK;
+    ret = ffi_closure_alloc (sizeof(void *) + (size_t)bytes, (void**)&exec);
+    RELEASE_SM_LOCK;
+    if (ret == NULL) return ret;
+    *ret = ret; // save the address of the writable mapping, for freeExec().
+    *exec_ret = exec + 1;
+    return (ret + 1);
 }
 
 // freeExec gets passed the executable address, not the writable address.
@@ -1239,15 +1239,6 @@ AdjustorWritable execToWritable(AdjustorExecutable exec)
     }
     RELEASE_SM_LOCK;
     return writ;
-}
-
-void flushExec (W_ len, AdjustorExecutable exec_addr)
-{
-  /* On ARM and other platforms, we need to flush the cache after
-     writing code into memory, so the processor reliably sees it. */
-  unsigned char* begin = (unsigned char*)exec_addr;
-  unsigned char* end   = begin + len;
-  __builtin___clear_cache(begin, end);
 }
 
 void freeExec(AdjustorExecutable exec)
@@ -1303,15 +1294,6 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
     return ret;
 }
 
-void flushExec (W_ len, AdjustorExecutable exec_addr)
-{
-  /* On ARM and other platforms, we need to flush the cache after
-     writing code into memory, so the processor reliably sees it. */
-  unsigned char* begin = (unsigned char*)exec_addr;
-  unsigned char* end   = begin + len;
-  __builtin___clear_cache(begin, end);
-}
-
 void freeExec (void *addr)
 {
     StgPtr p = (StgPtr)addr - 1;
@@ -1346,7 +1328,7 @@ void freeExec (void *addr)
     RELEASE_SM_LOCK
 }
 
-#endif /* mingw32_HOST_OS */
+#endif /* switch(HOST_OS) */
 
 #ifdef DEBUG
 
