@@ -2088,11 +2088,9 @@ srcParseErr
   -> Int                -- length of the previous token
   -> MsgDoc
 srcParseErr buf len
-  = hcat [ if null token
-             then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
-             else hcat [ptext (sLit "parse error on input "),
-                        char '`', text token, char '\'']
-    ]
+  = if null token
+         then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
+         else ptext (sLit "parse error on input") <+> quotes (text token)
   where token = lexemeToString (offsetBytes (-len) buf) len
 
 -- Report a parse failure, giving the span of the previous token as
