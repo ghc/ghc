@@ -1182,7 +1182,10 @@ shutdown_gc_threads (nat me USED_IF_THREADS)
 
     for (i=0; i < n_gc_threads; i++) {
         if (i == me || gc_threads[i]->idle) continue;
-        while (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) { write_barrier(); }
+        while (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) {
+            busy_wait_nop();
+            write_barrier();
+        }
     }
 #endif
 }
