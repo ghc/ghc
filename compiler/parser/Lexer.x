@@ -2058,11 +2058,11 @@ setContext :: [LayoutContext] -> P ()
 setContext ctx = P $ \s -> POk s{context=ctx} ()
 
 popContext :: P ()
-popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
+popContext = P $ \ s@(PState{ buffer = buf, dflags = flags, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
         (_:tl) -> POk s{ context = tl } ()
-        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
+        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 -- This is only used at the outer level of a module when the 'module'
@@ -2084,22 +2084,26 @@ getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
 -- Construct a parse error
 
 srcParseErr
-  :: StringBuffer       -- current buffer (placed just after the last token)
+  :: DynFlags
+  -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
   -> MsgDoc
-srcParseErr buf len
+srcParseErr dflags buf len
   = if null token
          then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
          else ptext (sLit "parse error on input") <+> quotes (text token)
+              $$ ppWhen (not th_enabled && token == "$") -- #7396
+                        (text "Perhaps you intended to use TemplateHaskell")
   where token = lexemeToString (offsetBytes (-len) buf) len
+        th_enabled = xopt Opt_TemplateHaskell dflags
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, last_len = len,
+srcParseFail = P $ \PState{ buffer = buf, dflags = flags, last_len = len,
                             last_loc = last_loc } ->
-    PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
+    PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
