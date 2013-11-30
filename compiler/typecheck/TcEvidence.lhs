@@ -292,7 +292,6 @@ tcCoercionRole = go
                                     (tc, _) = tcSplitTyConApp ty1
                                 in nthRole (go co) tc n
     go (TcLRCo _ _)           = Nominal
-    go (TcInstCo co _)        = go co
     go (TcSubCo _)            = Representational
     go (TcAxiomRuleCo c _ _)  = coaxrRole c
     go (TcCastCo c _)         = go c

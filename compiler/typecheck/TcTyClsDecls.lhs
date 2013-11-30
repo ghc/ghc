@@ -98,6 +98,16 @@ kind-checked by itself, hence getting the most general kind. We then kind check
 X, which works fine because we then know the polymorphic kind of Id, and simply
 instantiate k to *.
 
+Note [Check role annotations in a second pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Role inference potentially depends on the types of all of the datacons declared
+in a mutually recursive group. The validity of a role annotation, in turn,
+depends on the result of role inference. Because the types of datacons might
+be ill-formed (see #7175 and Note [Checking GADT return types]) we must check
+*all* the tycons in a group for validity before checking *any* of the roles.
+Thus, we take two passes over the resulting tycons, first checking for general
+validity and then checking for valid role annotations.
+
 \begin{code}
 
 tcTyAndClassDecls :: ModDetails
@@ -123,9 +133,8 @@ tcTyClGroup boot_details tyclds
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
-         names_w_poly_kinds <- checkNoErrs $ kcTyClGroup tyclds
+         names_w_poly_kinds <- kcTyClGroup tyclds
        ; traceTc "tcTyAndCl generalized kinds" (ppr names_w_poly_kinds)
-            -- the checkNoErrs is necessary to fix #7175.
 
             -- Step 2: type-check all groups together, returning
             -- the final TyCons and Classes
@@ -156,8 +165,12 @@ tcTyClGroup boot_details tyclds
            -- expects well-formed TyCons
        ; tcExtendGlobalEnv tyclss $ do
        { traceTc "Starting validity check" (ppr tyclss)
-       ; mapM_ (recoverM (return ()) . checkValidTyCl role_annots) tyclss
+       ; checkNoErrs $
+         mapM_ (recoverM (return ()) . checkValidTyCl) tyclss
            -- We recover, which allows us to report multiple validity errors
+           -- the checkNoErrs is necessary to fix #7175.
+       ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
+           -- See Note [Check role annotations in a second pass]
 
            -- Step 4: Add the implicit things;
            -- we want them in the environment because
@@ -460,7 +473,7 @@ kcTyClDecl :: TyClDecl Name -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = defn })
   | HsDataDefn { dd_cons = cons, dd_kindSig = Just _ } <- defn
-  = mapM_ (wrapLocM (kcConDecl name)) cons
+  = mapM_ (wrapLocM kcConDecl) cons
     -- hs_tvs and dd_kindSig already dealt with in getInitialKind
     -- If dd_kindSig is Just, this must be a GADT-style decl,
     --        (see invariants of DataDefn declaration)
@@ -471,7 +484,7 @@ kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = de
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
   = kcTyClTyVars name hs_tvs $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM (kcConDecl name)) cons }
+        ; mapM_ (wrapLocM kcConDecl) cons }
 
 kcTyClDecl decl@(SynDecl {}) = pprPanic "kcTyClDecl" (ppr decl)
 
@@ -496,15 +509,15 @@ kcTyClDecl (FamDecl (FamilyDecl { fdLName = L _ fam_tc_name
 kcTyClDecl (FamDecl {})    = return ()
 
 -------------------
-kcConDecl :: Name -> ConDecl Name -> TcM ()
-kcConDecl tc_name (ConDecl { con_name = name, con_qvars = ex_tvs
-                           , con_cxt = ex_ctxt, con_details = details
-                           , con_res = res })
+kcConDecl :: ConDecl Name -> TcM ()
+kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
+                   , con_cxt = ex_ctxt, con_details = details
+                   , con_res = res })
   = addErrCtxt (dataConCtxt name) $
     do { _ <- kcHsTyVarBndrs ParametricKinds ex_tvs $
               do { _ <- tcHsContext ex_ctxt
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
-                 ; _ <- tcConRes tc_name (unLoc name) res
+                 ; _ <- tcConRes res
                  ; return (panic "kcConDecl", ()) }
        ; return () }
 \end{code}
@@ -783,8 +796,7 @@ tcDataDefn rec_info tc_name tvs kind
 
        ; tycon <- fixM $ \ tycon -> do
              { let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
-             ; data_cons <- tcConDecls new_or_data tc_name tycon
-                                       (final_tvs, res_ty) cons
+             ; data_cons <- tcConDecls new_or_data tycon (final_tvs, res_ty) cons
              ; tc_rhs <-
                  if null cons && is_boot              -- In a hs-boot file, empty cons means
                  then return totallyAbstractTyConRhs  -- "don't know"; hence totally Abstract
@@ -898,13 +910,12 @@ tcTyFamInstEqn fam_tc_name kind
           -- don't print out the pats here, as they might be zonked inside the knot
        ; return (mkCoAxBranch tvs' pats' rhs_ty loc) }
 
-kcDataDefn :: Name -> HsDataDefn Name -> TcKind -> TcM ()
+kcDataDefn :: HsDataDefn Name -> TcKind -> TcM ()
 -- Used for 'data instance' only
 -- Ordinary 'data' is handled by kcTyClDec
-kcDataDefn tc_name
-           (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
+kcDataDefn (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
   = do  { _ <- tcHsContext ctxt
-        ; checkNoErrs $ mapM_ (wrapLocM (kcConDecl tc_name)) cons
+        ; checkNoErrs $ mapM_ (wrapLocM kcConDecl) cons
           -- See Note [Failing early in kcDataDefn]
         ; kcResultKind mb_kind res_k }
 
@@ -1115,20 +1126,19 @@ consUseH98Syntax _                                             = True
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: NewOrData -> Name -> TyCon -> ([TyVar], Type)
+tcConDecls :: NewOrData -> TyCon -> ([TyVar], Type)
            -> [LConDecl Name] -> TcM [DataCon]
-tcConDecls new_or_data tc_name rep_tycon (tmpl_tvs, res_tmpl) cons
-  = mapM (addLocM  $ tcConDecl new_or_data tc_name rep_tycon tmpl_tvs res_tmpl) cons
+tcConDecls new_or_data rep_tycon (tmpl_tvs, res_tmpl) cons
+  = mapM (addLocM  $ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl) cons
 
 tcConDecl :: NewOrData
-          -> Name              -- of tycon
           -> TyCon             -- Representation tycon
           -> [TyVar] -> Type   -- Return type template (with its template tyvars)
                                --    (tvs, T tys), where T is the family TyCon
           -> ConDecl Name
           -> TcM DataCon
 
-tcConDecl new_or_data tc_name rep_tycon tmpl_tvs res_tmpl        -- Data types
+tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
           (ConDecl { con_name = name
                    , con_qvars = hs_tvs, con_cxt = hs_ctxt
                    , con_details = hs_details, con_res = hs_res_ty })
@@ -1138,7 +1148,7 @@ tcConDecl new_or_data tc_name rep_tycon tmpl_tvs res_tmpl        -- Data types
            <- tcHsTyVarBndrs hs_tvs $ \ _ ->
               do { ctxt    <- tcHsContext hs_ctxt
                  ; details <- tcConArgs new_or_data hs_details
-                 ; res_ty  <- tcConRes tc_name (unLoc name) hs_res_ty
+                 ; res_ty  <- tcConRes hs_res_ty
                  ; let (is_infix, field_lbls, btys) = details
                        (arg_tys, stricts)           = unzip btys
                  ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
@@ -1195,50 +1205,35 @@ tcConArg new_or_data bty
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (arg_ty, getBangStrictness bty) }
 
-tcConRes :: Name  -- of tycon   (for checking the validity of return type)
-         -> Name  -- of datacon (for error messages only)
-         -> ResType (LHsType Name) -> TcM (ResType Type)
-tcConRes _ _ ResTyH98           = return ResTyH98
-tcConRes tc_name dc_name (ResTyGADT res_ty)
-  = do { -- See Note [Checking GADT return types]
-         case hsTyGetAppHead_maybe res_ty of
-           Just (tc_name', _)
-             | tc_name' == tc_name -> return ()
-           _                       -> addErrTc (badDataConTyCon dc_name (ppr tc_name)
-                                                                        (ppr res_ty))
-       ; res_ty' <- tcHsLiftedType res_ty
-       ; return (ResTyGADT res_ty') }
+tcConRes :: ResType (LHsType Name) -> TcM (ResType Type)
+tcConRes ResTyH98           = return ResTyH98
+tcConRes (ResTyGADT res_ty) = do { res_ty' <- tcHsLiftedType res_ty
+                                 ; return (ResTyGADT res_ty') }
 
 \end{code}
 
 Note [Checking GADT return types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There isn't really a good place to check that the return type of a GADT is
-well-formed (that is, its head is the datatype's TyCon). One might think that
-we can usefully do this in checkValidDataCon. But, the problem is that
-rejigConRes, which sorts out the proper fields for the DataCon, has to match
-the return type of the declaration with an appropriate template. If the return
-type is mal-formed, this match fails, and rejigConRes has nowhere to go.
-Before roles, rejigConRes just panicked in this scenario, because
-checkValidDataCon was always called before anyone looked at the type of the
-DataCon; laziness saved the day. However, role inference needs to look at the
-types of all the DataCons in a group. Furthermore, checkValidTyCon needs to
-make sure that the inferred roles are compatible with user-supplied role
-annotations, so checkValidTyCon must force the role inference. So, if we're
-not careful about all of this, role inference would force rejigConRes's panic,
-and nastiness would ensue.
+There is a delicacy around checking the return types of a datacon. The
+central problem is dealing with a declaration like
 
-There are two ways out of this scenario:
-  1) Make sure we call checkValidDataCon on every DataCon in a group before
-     checking role annotations. This works fine, but it requires a change in 
-     plumbing all the way up to tcTyClGroup, which is a little painful.
+  data T a where
+    MkT :: a -> Q a
 
-  2) Do the check in tcConRes. It's a little harder to do the check here,
-     because the check must be made on an HsType, instead of a Type. Why
-     can't we look at the result of tcHsLiftedType? Because eventually, we'll
-     need to look inside of a TyCon, and that's a no-no inside of the knot.
+Note that the return type of MkT is totally bogus. When creating the T
+tycon, we also need to create the MkT datacon, which must have a "rejigged"
+return type. That is, the MkT datacon's type must be transformed to have
+a uniform return type with explicit coercions for GADT-like type parameters.
+This rejigging is what rejigConRes does. The problem is, though, that checking
+that the return type is appropriate is much easier when done over *Type*,
+not *HsType*.
 
-We do #2.
+So, we want to make rejigConRes lazy and then check the validity of the return
+type in checkValidDataCon. But, if the return type is bogus, rejigConRes can't
+work -- it will have a failed pattern match. Luckily, if we run
+checkValidDataCon before ever looking at the rejigged return type
+(checkValidDataCon checks the dataConUserType, which is not rejigged!), we
+catch the error before forcing the rejigged type and panicking.
 
 \begin{code}
 
@@ -1261,7 +1256,7 @@ rejigConRes :: [TyVar] -> Type  -- Template for result type; e.g.
                  [(TyVar,Type)],        -- Equality predicates
                  Type)          -- Typechecked return type
         -- We don't check that the TyCon given in the ResTy is
-        -- the same as the parent tycon, because tcConRes has already done it
+        -- the same as the parent tycon, because checkValidDataCon will do it
 
 rejigConRes tmpl_tvs res_ty dc_tvs ResTyH98
   = (tmpl_tvs, dc_tvs, [], res_ty)
@@ -1283,7 +1278,7 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT res_ty)
   where
     Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty
                 -- This 'Just' pattern is sure to match, because if not
-                -- tcConRes will complain first.
+                -- checkValidDataCon will complain first.
                -- See Note [Checking GADT return types]
 
                 -- /Lazily/ figure out the univ_tvs etc
@@ -1350,33 +1345,17 @@ checkClassCycleErrs cls
   = unless (null cls_cycles) $ mapM_ recClsErr cls_cycles
   where cls_cycles = calcClassCycles cls
 
-checkValidTyCl :: RoleAnnots -> TyThing -> TcM ()
-checkValidTyCl role_annots thing
-  = setSrcSpan (getSrcSpan name) $
-    addErrCtxt ctxt $
+checkValidTyCl :: TyThing -> TcM ()
+checkValidTyCl thing
+  = setSrcSpan (getSrcSpan thing) $
+    addTyThingCtxt thing $
     case thing of
-      ATyCon tc -> checkValidTyCon tc role_annots
+      ATyCon tc -> checkValidTyCon tc
       AnId _    -> return ()  -- Generic default methods are checked
                               -- with their parent class
       ACoAxiom _ -> return () -- Axioms checked with their parent
                               -- closed family tycon
       _         -> pprTrace "checkValidTyCl" (ppr thing) $ return ()
-  where
-    name = getName thing
-    flav = case thing of
-             ATyCon tc
-                | isClassTyCon tc      -> ptext (sLit "class")
-                | isSynFamilyTyCon tc  -> ptext (sLit "type family")
-                | isDataFamilyTyCon tc -> ptext (sLit "data family")
-                | isSynTyCon tc        -> ptext (sLit "type")
-                | isNewTyCon tc        -> ptext (sLit "newtype")
-                | isDataTyCon tc       -> ptext (sLit "data")
-
-             _ -> pprTrace "checkValidTyCl strange" (ppr thing)
-                  empty
-
-    ctxt = hsep [ ptext (sLit "In the"), flav
-                , ptext (sLit "declaration for"), quotes (ppr name) ]
 
 -------------------------
 -- For data types declared with record syntax, we require
@@ -1393,32 +1372,26 @@ checkValidTyCl role_annots thing
 --        T2 { f1 :: c, f2 :: c, f3 ::Int } :: T
 -- Here we do not complain about f1,f2 because they are existential
 
-checkValidTyCon :: TyCon -> RoleAnnots -> TcM ()
-checkValidTyCon tc role_annots
+checkValidTyCon :: TyCon -> TcM ()
+checkValidTyCon tc
   | Just cl <- tyConClass_maybe tc
-  = do { check_roles
-       ; checkValidClass cl }
+  = checkValidClass cl
 
   | Just syn_rhs <- synTyConRhs_maybe tc
-  = do { check_no_roles
-       ; case syn_rhs of
-       { ClosedSynFamilyTyCon ax      -> checkValidClosedCoAxiom ax
-       ; AbstractClosedSynFamilyTyCon ->
-         do { hsBoot <- tcIsHsBoot
-            ; checkTc hsBoot $
-              ptext (sLit "You may omit the equations in a closed type family") $$
-              ptext (sLit "only in a .hs-boot file") }
-       ; OpenSynFamilyTyCon           -> return ()
-       ; SynonymTyCon ty              -> checkValidType syn_ctxt ty
-       ; BuiltInSynFamTyCon _         -> return () } }
+  = case syn_rhs of
+    { ClosedSynFamilyTyCon ax      -> checkValidClosedCoAxiom ax
+    ; AbstractClosedSynFamilyTyCon ->
+      do { hsBoot <- tcIsHsBoot
+         ; checkTc hsBoot $
+           ptext (sLit "You may omit the equations in a closed type family") $$
+           ptext (sLit "only in a .hs-boot file") }
+    ; OpenSynFamilyTyCon           -> return ()
+    ; SynonymTyCon ty              -> checkValidType syn_ctxt ty
+    ; BuiltInSynFamTyCon _         -> return () }
 
   | otherwise
-  = do { if isFamilyTyCon tc
-         then check_no_roles
-         else check_roles
-
-       -- Check the context on the data decl
-       ; traceTc "cvtc1" (ppr tc)
+  = do { -- Check the context on the data decl
+         traceTc "cvtc1" (ppr tc)
        ; checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)
 
        ; traceTc "cvtc2" (ppr tc)
@@ -1436,33 +1409,6 @@ checkValidTyCon tc role_annots
     syn_ctxt  = TySynCtxt name
     name      = tyConName tc
     data_cons = tyConDataCons tc
-
-     -- Role annotations are given only on *type* variables, but a tycon stores
-     -- roles for all variables. So, we drop the kind roles (which are all
-     -- Nominal, anyway).
-    tyvars                 = tyConTyVars tc
-    (kind_vars, type_vars) = span isKindVar tyvars
-    roles                  = tyConRoles tc
-    type_roles             = dropList kind_vars roles
-
-    role_annot_decl_maybe  = lookupNameEnv role_annots name
-
-    check_roles
-      = do { whenIsJust role_annot_decl_maybe $
-             \decl@(L loc (RoleAnnotDecl _ the_role_annots)) -> do
-           { _ <- zipWith3M checkRoleAnnot type_vars the_role_annots type_roles
-           ; setErrCtxt [] $
-             setSrcSpan loc $ do
-           { role_annots_ok <- xoptM Opt_RoleAnnotations
-           ; checkTc role_annots_ok $ needXRoleAnnotations tc
-           ; checkTc (type_vars `equalLength` the_role_annots)
-                     (wrongNumberOfRoles type_vars decl) }
-
-           ; lint <- goptM Opt_DoCoreLinting
-           ; when lint $ checkValidRoles tc } }
-
-    check_no_roles
-      = whenIsJust role_annot_decl_maybe $ \decl -> illegalRoleAnnotDecl decl
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)
     cmp_fld (f1,_) (f2,_) = f1 `compare` f2
@@ -1504,79 +1450,6 @@ checkValidTyCon tc role_annots
                 fty2 = dataConFieldType con2 label
     check_fields [] = panic "checkValidTyCon/check_fields []"
 
-checkRoleAnnot :: TyVar -> Located (Maybe Role) -> Role -> TcM ()
-checkRoleAnnot _  (L _ Nothing)   _  = return ()
-checkRoleAnnot tv (L _ (Just r1)) r2
-  = when (r1 /= r2) $
-    addErrTc $ badRoleAnnot (tyVarName tv) r1 r2
-
--- This is a double-check on the role inference algorithm. It is only run when
--- -dcore-lint is enabled. See Note [Role inference] in TcTyDecls
-checkValidRoles :: TyCon -> TcM ()
--- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in CoreLint
-checkValidRoles tc
-  | isAlgTyCon tc
-    -- tyConDataCons returns an empty list for data families
-  = mapM_ check_dc_roles (tyConDataCons tc)
-  | Just (SynonymTyCon rhs) <- synTyConRhs_maybe tc
-  = check_ty_roles (zipVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
-  | otherwise
-  = return ()
-  where
-    check_dc_roles datacon
-      = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
-           ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ arg_tys }
-                    -- See Note [Role-checking data constructor arguments] in TcTyDecls
-      where
-        (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig datacon
-        univ_roles = zipVarEnv univ_tvs (tyConRoles tc)
-              -- zipVarEnv uses zipEqual, but we don't want that for ex_tvs
-        ex_roles   = mkVarEnv (zip ex_tvs (repeat Nominal))
-        role_env   = univ_roles `plusVarEnv` ex_roles
-
-    check_ty_roles env role (TyVarTy tv)
-      = case lookupVarEnv env tv of
-          Just role' -> unless (role' `ltRole` role || role' == role) $
-                        report_error $ ptext (sLit "type variable") <+> quotes (ppr tv) <+>
-                                       ptext (sLit "cannot have role") <+> ppr role <+>
-                                       ptext (sLit "because it was assigned role") <+> ppr role'
-          Nothing    -> report_error $ ptext (sLit "type variable") <+> quotes (ppr tv) <+>
-                                       ptext (sLit "missing in environment")
-
-    check_ty_roles env Representational (TyConApp tc tys)
-      = let roles' = tyConRoles tc in
-        zipWithM_ (maybe_check_ty_roles env) roles' tys
-
-    check_ty_roles env Nominal (TyConApp _ tys)
-      = mapM_ (check_ty_roles env Nominal) tys
-
-    check_ty_roles _   Phantom ty@(TyConApp {})
-      = pprPanic "check_ty_roles" (ppr ty)
-
-    check_ty_roles env role (AppTy ty1 ty2)
-      =  check_ty_roles env role    ty1
-      >> check_ty_roles env Nominal ty2
-
-    check_ty_roles env role (FunTy ty1 ty2)
-      =  check_ty_roles env role ty1
-      >> check_ty_roles env role ty2
-
-    check_ty_roles env role (ForAllTy tv ty)
-      = check_ty_roles (extendVarEnv env tv Nominal) role ty
-
-    check_ty_roles _   _    (LitTy {}) = return ()
-
-    maybe_check_ty_roles env role ty
-      = when (role == Nominal || role == Representational) $
-        check_ty_roles env role ty
-
-    report_error doc
-      = addErrTc $ vcat [ptext (sLit "Internal error in role inference:"),
-                         doc,
-                         ptext (sLit "Please report this as a GHC bug: http://www.haskell.org/ghc/reportabug")]
-
 checkValidClosedCoAxiom :: CoAxiom Branched -> TcM ()
 checkValidClosedCoAxiom (CoAxiom { co_ax_branches = branches, co_ax_tc = tc })
  = tcAddClosedTypeFamilyDeclCtxt tc $
@@ -1609,6 +1482,13 @@ checkValidDataCon dflags existential_ok tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))     $
     addErrCtxt (dataConCtxt con)                $
     do  { traceTc "checkValidDataCon" (ppr con $$ ppr tc)
+        ; let tc_tvs = tyConTyVars tc
+              res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
+              actual_res_ty = dataConOrigResTy con
+        ; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
+                                res_ty_tmpl
+                                actual_res_ty))
+                  (badDataConTyCon con res_ty_tmpl actual_res_ty)
              -- IA0_TODO: we should also check that kind variables
              -- are only instantiated with kind variables
         ; checkValidMonoType (dataConOrigResTy con)
@@ -1758,6 +1638,124 @@ checkFamFlag tc_name
   where
     err_msg = hang (ptext (sLit "Illegal family declaraion for") <+> quotes (ppr tc_name))
                  2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                Checking role validity
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+checkValidRoleAnnots :: RoleAnnots -> TyThing -> TcM ()
+checkValidRoleAnnots role_annots thing
+  = case thing of
+    { ATyCon tc
+        | isSynTyCon tc    -> check_no_roles
+        | isFamilyTyCon tc -> check_no_roles
+        | isAlgTyCon tc    -> check_roles
+        where
+          name                   = tyConName tc
+
+     -- Role annotations are given only on *type* variables, but a tycon stores
+     -- roles for all variables. So, we drop the kind roles (which are all
+     -- Nominal, anyway).
+          tyvars                 = tyConTyVars tc
+          roles                  = tyConRoles tc
+          (kind_vars, type_vars) = span isKindVar tyvars
+          type_roles             = dropList kind_vars roles
+          role_annot_decl_maybe  = lookupRoleAnnots role_annots name
+
+          check_roles
+            = whenIsJust role_annot_decl_maybe $
+                \decl@(L loc (RoleAnnotDecl _ the_role_annots)) ->
+                addRoleAnnotCtxt name $
+                setSrcSpan loc $ do
+                { role_annots_ok <- xoptM Opt_RoleAnnotations
+                ; checkTc role_annots_ok $ needXRoleAnnotations tc
+                ; checkTc (type_vars `equalLength` the_role_annots)
+                          (wrongNumberOfRoles type_vars decl)
+                ; _ <- zipWith3M checkRoleAnnot type_vars the_role_annots type_roles
+                ; lint <- goptM Opt_DoCoreLinting
+                ; when lint $ checkValidRoles tc }
+
+          check_no_roles
+            = whenIsJust role_annot_decl_maybe illegalRoleAnnotDecl
+    ; _ -> return () }
+
+checkRoleAnnot :: TyVar -> Located (Maybe Role) -> Role -> TcM ()
+checkRoleAnnot _  (L _ Nothing)   _  = return ()
+checkRoleAnnot tv (L _ (Just r1)) r2
+  = when (r1 /= r2) $
+    addErrTc $ badRoleAnnot (tyVarName tv) r1 r2
+
+-- This is a double-check on the role inference algorithm. It is only run when
+-- -dcore-lint is enabled. See Note [Role inference] in TcTyDecls
+checkValidRoles :: TyCon -> TcM ()
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in CoreLint
+checkValidRoles tc
+  | isAlgTyCon tc
+    -- tyConDataCons returns an empty list for data families
+  = mapM_ check_dc_roles (tyConDataCons tc)
+  | Just (SynonymTyCon rhs) <- synTyConRhs_maybe tc
+  = check_ty_roles (zipVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
+  | otherwise
+  = return ()
+  where
+    check_dc_roles datacon
+      = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
+           ; mapM_ (check_ty_roles role_env Representational) $
+                    eqSpecPreds eq_spec ++ theta ++ arg_tys }
+                    -- See Note [Role-checking data constructor arguments] in TcTyDecls
+      where
+        (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig datacon
+        univ_roles = zipVarEnv univ_tvs (tyConRoles tc)
+              -- zipVarEnv uses zipEqual, but we don't want that for ex_tvs
+        ex_roles   = mkVarEnv (zip ex_tvs (repeat Nominal))
+        role_env   = univ_roles `plusVarEnv` ex_roles
+
+    check_ty_roles env role (TyVarTy tv)
+      = case lookupVarEnv env tv of
+          Just role' -> unless (role' `ltRole` role || role' == role) $
+                        report_error $ ptext (sLit "type variable") <+> quotes (ppr tv) <+>
+                                       ptext (sLit "cannot have role") <+> ppr role <+>
+                                       ptext (sLit "because it was assigned role") <+> ppr role'
+          Nothing    -> report_error $ ptext (sLit "type variable") <+> quotes (ppr tv) <+>
+                                       ptext (sLit "missing in environment")
+
+    check_ty_roles env Representational (TyConApp tc tys)
+      = let roles' = tyConRoles tc in
+        zipWithM_ (maybe_check_ty_roles env) roles' tys
+
+    check_ty_roles env Nominal (TyConApp _ tys)
+      = mapM_ (check_ty_roles env Nominal) tys
+
+    check_ty_roles _   Phantom ty@(TyConApp {})
+      = pprPanic "check_ty_roles" (ppr ty)
+
+    check_ty_roles env role (AppTy ty1 ty2)
+      =  check_ty_roles env role    ty1
+      >> check_ty_roles env Nominal ty2
+
+    check_ty_roles env role (FunTy ty1 ty2)
+      =  check_ty_roles env role ty1
+      >> check_ty_roles env role ty2
+
+    check_ty_roles env role (ForAllTy tv ty)
+      = check_ty_roles (extendVarEnv env tv Nominal) role ty
+
+    check_ty_roles _   _    (LitTy {}) = return ()
+
+    maybe_check_ty_roles env role ty
+      = when (role == Nominal || role == Representational) $
+        check_ty_roles env role ty
+
+    report_error doc
+      = addErrTc $ vcat [ptext (sLit "Internal error in role inference:"),
+                         doc,
+                         ptext (sLit "Please report this as a GHC bug: http://www.haskell.org/ghc/reportabug")]
+
 \end{code}
 
 %************************************************************************
@@ -2059,11 +2057,11 @@ recClsErr cycles
   = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
                  nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
 
-badDataConTyCon :: Name -> SDoc -> SDoc -> SDoc
-badDataConTyCon data_con tc_doc actual_res_ty_doc
+badDataConTyCon :: DataCon -> Type -> Type -> SDoc
+badDataConTyCon data_con res_ty_tmpl actual_res_ty
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
-                ptext (sLit "returns type") <+> quotes actual_res_ty_doc)
-       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes tc_doc)
+                ptext (sLit "returns type") <+> quotes (ppr actual_res_ty))
+       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes (ppr res_ty_tmpl))
 
 badGadtKindCon :: DataCon -> SDoc
 badGadtKindCon data_con
@@ -2163,4 +2161,30 @@ needXRoleAnnotations :: TyCon -> SDoc
 needXRoleAnnotations tc
   = ptext (sLit "Illegal role annotation for") <+> ppr tc <> char ';' $$
     ptext (sLit "did you intend to use RoleAnnotations?")
+
+addTyThingCtxt :: TyThing -> TcM a -> TcM a
+addTyThingCtxt thing
+  = addErrCtxt ctxt
+  where
+    name = getName thing
+    flav = case thing of
+             ATyCon tc
+                | isClassTyCon tc      -> ptext (sLit "class")
+                | isSynFamilyTyCon tc  -> ptext (sLit "type family")
+                | isDataFamilyTyCon tc -> ptext (sLit "data family")
+                | isSynTyCon tc        -> ptext (sLit "type")
+                | isNewTyCon tc        -> ptext (sLit "newtype")
+                | isDataTyCon tc       -> ptext (sLit "data")
+
+             _ -> pprTrace "addTyThingCtxt strange" (ppr thing)
+                  empty
+
+    ctxt = hsep [ ptext (sLit "In the"), flav
+                , ptext (sLit "declaration for"), quotes (ppr name) ]
+
+addRoleAnnotCtxt :: Name -> TcM a -> TcM a
+addRoleAnnotCtxt name
+  = addErrCtxt $
+    text "while checking a role annotation for" <+> quotes (ppr name)
+    
 \end{code}

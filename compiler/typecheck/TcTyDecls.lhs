@@ -19,7 +19,7 @@ files for imported data types.
 module TcTyDecls(
         calcRecFlags, RecTyInfo(..), 
         calcSynCycles, calcClassCycles,
-        extractRoleAnnots, emptyRoleAnnots, RoleAnnots
+        RoleAnnots, extractRoleAnnots, emptyRoleAnnots, lookupRoleAnnots
     ) where
 
 #include "HsVersions.h"
@@ -546,6 +546,9 @@ extractRoleAnnots (TyClGroup { group_roles = roles })
 
 emptyRoleAnnots :: RoleAnnots
 emptyRoleAnnots = emptyNameEnv
+
+lookupRoleAnnots :: RoleAnnots -> Name -> Maybe (LRoleAnnotDecl Name)
+lookupRoleAnnots = lookupNameEnv
 
 \end{code}
 
