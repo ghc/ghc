@@ -12,6 +12,8 @@
 module Haddock.Interface.Rename (renameInterface) where
 
 
+import Data.Traversable (traverse)
+
 import Haddock.GhcUtils
 import Haddock.Types
 
@@ -159,50 +161,7 @@ renameLDocHsSyn = return
 
 
 renameDoc :: Doc Name -> RnM (Doc DocName)
-renameDoc d = case d of
-  DocEmpty -> return DocEmpty
-  DocAppend a b -> do
-    a' <- renameDoc a
-    b' <- renameDoc b
-    return (DocAppend a' b')
-  DocString str -> return (DocString str)
-  DocParagraph doc -> do
-    doc' <- renameDoc doc
-    return (DocParagraph doc')
-  DocIdentifier x -> do
-    x' <- rename x
-    return (DocIdentifier x')
-  DocIdentifierUnchecked x -> return (DocIdentifierUnchecked x)
-  DocModule str -> return (DocModule str)
-  DocWarning doc -> do
-    doc' <- renameDoc doc
-    return (DocWarning doc')
-  DocEmphasis doc -> do
-    doc' <- renameDoc doc
-    return (DocEmphasis doc')
-  DocMonospaced doc -> do
-    doc' <- renameDoc doc
-    return (DocMonospaced doc')
-  DocUnorderedList docs -> do
-    docs' <- mapM renameDoc docs
-    return (DocUnorderedList docs')
-  DocOrderedList docs -> do
-    docs' <- mapM renameDoc docs
-    return (DocOrderedList docs')
-  DocDefList docs -> do
-    docs' <- mapM (\(a,b) -> do
-      a' <- renameDoc a
-      b' <- renameDoc b
-      return (a',b')) docs
-    return (DocDefList docs')
-  DocCodeBlock doc -> do
-    doc' <- renameDoc doc
-    return (DocCodeBlock doc')
-  DocHyperlink l -> return (DocHyperlink l)
-  DocPic str -> return (DocPic str)
-  DocAName str -> return (DocAName str)
-  DocProperty p -> return (DocProperty p)
-  DocExamples e -> return (DocExamples e)
+renameDoc = traverse rename
 
 
 renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)
@@ -215,12 +174,8 @@ renameLType = mapM renameType
 renameLKind :: LHsKind Name -> RnM (LHsKind DocName)
 renameLKind = renameLType
 
-renameMaybeLKind :: Maybe (LHsKind Name)
-                 -> RnM (Maybe (LHsKind DocName))
-renameMaybeLKind Nothing = return Nothing
-renameMaybeLKind (Just ki)
-  = do { ki' <- renameLKind ki
-       ; return (Just ki') }
+renameMaybeLKind :: Maybe (LHsKind Name) -> RnM (Maybe (LHsKind DocName))
+renameMaybeLKind = traverse renameLKind
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of

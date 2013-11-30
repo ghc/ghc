@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -20,6 +20,8 @@ module Haddock.Types (
  ) where
 
 
+import Data.Foldable
+import Data.Traversable
 import Control.Exception
 import Control.Arrow
 import Control.DeepSeq
@@ -316,7 +318,7 @@ data Doc id
   | DocAName String
   | DocProperty String
   | DocExamples [Example]
-  deriving (Functor)
+  deriving (Functor, Foldable, Traversable)
 
 
 instance Monoid (Doc id) where
