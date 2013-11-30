@@ -2274,9 +2274,11 @@ The following syntax is stolen:
 	  <literal>[e|</literal>, <literal>[p|</literal>,
 	  <literal>[d|</literal>, <literal>[t|</literal>,
 	  <literal>$(</literal>,
+	  <literal>$$(</literal>,
 	  <literal>[||</literal>,
 	  <literal>[e||</literal>,
-	  <literal>$<replaceable>varid</replaceable></literal>
+	  <literal>$<replaceable>varid</replaceable></literal>,
+	  <literal>$$<replaceable>varid</replaceable></literal>
           <indexterm><primary>Template Haskell</primary></indexterm>
 	</term>
 	<listitem><para>
