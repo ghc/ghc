@@ -6476,7 +6476,7 @@ a type variable any more!
 The <option>-XFlexibleContexts</option> flag lifts the Haskell 98 restriction
 that the type-class constraints in a type signature must have the
 form <emphasis>(class type-variable)</emphasis> or
-<emphasis>(class (type-variable type-variable ...))</emphasis>.
+<emphasis>(class (type-variable type1 type2 ... typen))</emphasis>.
 With <option>-XFlexibleContexts</option>
 these type signatures are perfectly OK
 <programlisting>
