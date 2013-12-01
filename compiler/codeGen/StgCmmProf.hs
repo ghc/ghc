@@ -328,11 +328,12 @@ ldvRecordCreate closure = do dflags <- getDynFlags
 -- The closure is not IND or IND_OLDGEN because neither is considered for LDV
 -- profiling.
 --
-ldvEnterClosure :: ClosureInfo -> FCode ()
-ldvEnterClosure closure_info = do dflags <- getDynFlags
-                                  let tag = funTag dflags closure_info
-                                  ldvEnter (cmmOffsetB dflags (CmmReg nodeReg) (-tag))
-        -- don't forget to substract node's tag
+ldvEnterClosure :: ClosureInfo -> CmmReg -> FCode ()
+ldvEnterClosure closure_info node_reg = do
+    dflags <- getDynFlags
+    let tag = funTag dflags closure_info
+    -- don't forget to substract node's tag
+    ldvEnter (cmmOffsetB dflags (CmmReg node_reg) (-tag))
 
 ldvEnter :: CmmExpr -> FCode ()
 -- Argument is a closure pointer

@@ -476,7 +476,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; dflags <- getDynFlags
                 ; let node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
-                ; when node_points (ldvEnterClosure cl_info)
+                ; when node_points (ldvEnterClosure cl_info (CmmLocal node))
                 -- Emit new label that might potentially be a header
                 -- of a self-recursive tail call. See Note
                 -- [Self-recursive tail calls] in StgCmmExpr
@@ -561,7 +561,7 @@ thunkCode cl_info fv_details _cc node arity body
   = do { dflags <- getDynFlags
        ; let node_points = nodeMustPointToIt dflags (closureLFInfo cl_info)
              node'       = if node_points then Just node else Nothing
-        ; ldvEnterClosure cl_info -- NB: Node always points when profiling
+        ; ldvEnterClosure cl_info (CmmLocal node) -- NB: Node always points when profiling
 
         -- Heap overflow check
         ; entryHeapCheck cl_info node' arity [] $ do
