@@ -73,7 +73,10 @@ module HscMain
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
 #endif
+      -- We want to make sure that we export enough to be able to redefine
+      -- hscFileFrontEnd in client code
     , hscParse', hscSimplify', hscDesugar', tcRnModule'
+    , getHscEnv
     , hscSimpleIface', hscNormalIface'
     , oneShotMsg
     , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
@@ -286,7 +289,7 @@ hscTcRnGetInfo hsc_env0 name = runInteractiveHsc hsc_env0 $ do
 
 #ifdef GHCI
 hscIsGHCiMonad :: HscEnv -> String -> IO Name
-hscIsGHCiMonad hsc_env name 
+hscIsGHCiMonad hsc_env name
   = runHsc hsc_env $ ioMsgMaybe $ isGHCiMonad hsc_env name
 
 hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
