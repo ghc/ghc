@@ -493,7 +493,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                   tickyEnterFun cl_info
                 ; enterCostCentreFun cc
                     (CmmMachOp (mo_wordSub dflags)
-                         [ CmmReg (CmmLocal node) -- not nodeReg, see #8275
+                         [ CmmReg (CmmLocal node) -- See [NodeReg clobbered with loopification]
                          , mkIntExpr dflags (funTag dflags cl_info) ])
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
@@ -503,6 +503,18 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 }}}
 
   }
+
+-- Note [NodeReg clobbered with loopification]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Previously we used to pass nodeReg (aka R1) here. With profiling, upon
+-- entering a closure, enterFunCCS was called with R1 passed to it. But since R1
+-- may get clobbered inside the body of a closure, and since a self-recursive
+-- tail call does not restore R1, a subsequent call to enterFunCCS received a
+-- possibly bogus value from R1. The solution is to not pass nodeReg (aka R1) to
+-- enterFunCCS. Instead, we pass node, the callee-saved temporary that stores
+-- the original value of R1. This way R1 may get modified but loopification will
+-- not care.
 
 -- A function closure pointer may be tagged, so we
 -- must take it into account when accessing the free variables.
@@ -780,4 +792,3 @@ closureDescription dflags mod_name name
                       else pprModule mod_name <> char '.' <> ppr name) <>
                     char '>')
    -- showSDocDump, because we want to see the unique on the Name.
-
