@@ -207,12 +207,13 @@ test('T3064',
           [(wordsize(32), 111189536, 10),
          # expected value: 56380288 (x86/Linux) (28/6/2011)
          #                111189536 (x86/Windows) (30/10/12)
-           (wordsize(64), 308300448, 5)]),
+           (wordsize(64), 329795912, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
             # (amd64/Linux) (11/09/2013): 290165632, increase from AMP warnings
             # (amd64/Linux) (22/11/2013): 308300448, GND via Coercible and counters for constraints solving
+	    # (amd64/Linux) (02/12/2013): 329795912, Coercible refactor
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
