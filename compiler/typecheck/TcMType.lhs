@@ -36,7 +36,7 @@ module TcMType (
   newEvVar, newEvVars, newEq, newDict,
   newWantedEvVar, newWantedEvVars,
   newTcEvBinds, addTcEvBind,
-  newFlatWanteds,
+  newFlatWanted, newFlatWanteds,
 
   --------------------------------
   -- Instantiation
@@ -163,17 +163,17 @@ predTypeOccName ty = case classifyPredType ty of
 *********************************************************************************
 
 \begin{code}
+newFlatWanted :: CtOrigin -> PredType -> TcM Ct
+newFlatWanted orig pty
+  = do loc <- getCtLoc orig
+       v <- newWantedEvVar pty
+       return $ mkNonCanonical $
+            CtWanted { ctev_evar = v
+                     , ctev_pred = pty
+                     , ctev_loc = loc }
+
 newFlatWanteds :: CtOrigin -> ThetaType -> TcM [Ct]
-newFlatWanteds orig theta
-  = do { loc <- getCtLoc orig
-       ; mapM (inst_to_wanted loc) theta }
-  where 
-    inst_to_wanted loc pty 
-          = do { v <- newWantedEvVar pty 
-               ; return $ mkNonCanonical $
-                 CtWanted { ctev_evar = v
-                          , ctev_pred = pty
-                          , ctev_loc = loc } }
+newFlatWanteds orig = mapM (newFlatWanted orig)
 \end{code}
 
 %************************************************************************
