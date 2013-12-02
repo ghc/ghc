@@ -271,7 +271,7 @@ cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
        ; let roles' = map (noLoc . cvtRole) roles
-       ; return $ noLoc $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
+       ; returnL $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
