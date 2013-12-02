@@ -1751,13 +1751,13 @@ matchFam tycon args
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 deferTcSForAllEq :: Role -- Nominal or Representational
-                 -> (CtLoc,EvVar)  -- Original wanted equality flavor
+                 -> CtLoc  -- Original wanted equality flavor
                  -> ([TyVar],TcType)   -- ForAll tvs1 body1
                  -> ([TyVar],TcType)   -- ForAll tvs2 body2
-                 -> TcS ()
+                 -> TcS EvTerm
 -- Some of this functionality is repeated from TcUnify,
 -- consider having a single place where we create fresh implications.
-deferTcSForAllEq role (loc,orig_ev) (tvs1,body1) (tvs2,body2)
+deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
  = do { (subst1, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
       ; let tys  = mkTyVarTys skol_tvs
             phi1 = Type.substTy subst1 body1
@@ -1790,8 +1790,7 @@ deferTcSForAllEq role (loc,orig_ev) (tvs1,body1) (tvs2,body2)
                                ; updTcSImplics (consBag imp)
                                ; return (TcLetCo ev_binds new_co) }
 
-        ; setEvBind orig_ev $
-          EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs)
+        ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs)
         }
 \end{code}
 

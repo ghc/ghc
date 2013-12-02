@@ -245,7 +245,8 @@ canClass ev cls tys
   , CtWanted { ctev_loc = loc, ctev_evar = orig_ev } <- ev
   , equalLength tvs1 tvs2
   = do { traceTcS "Creating implication for polytype coercible equality" $ ppr ev
-       ; deferTcSForAllEq Representational (loc,orig_ev) (tvs1,body1) (tvs2,body2)
+       ; ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
+       ; setEvBind orig_ev ev_term
        ; return Stop }
 
 canClass ev cls tys
@@ -766,7 +767,8 @@ canEqNC ev s1@(ForAllTy {}) s2@(ForAllTy {})
           canEqFailure ev s1 s2
         else
           do { traceTcS "Creating implication for polytype equality" $ ppr ev
-             ; deferTcSForAllEq Nominal (loc,orig_ev) (tvs1,body1) (tvs2,body2)
+             ; ev_term <- deferTcSForAllEq Nominal loc (tvs1,body1) (tvs2,body2)
+             ; setEvBind orig_ev ev_term
              ; return Stop } }
  | otherwise
  = do { traceTcS "Ommitting decomposition of given polytype equality" $
