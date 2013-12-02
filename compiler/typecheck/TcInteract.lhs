@@ -1944,6 +1944,16 @@ getCoercibleInst loc ty1 ty2 = do
     | ty1 `tcEqType` ty2
     = do return $ GenInst []
                 $ EvCoercion (TcRefl Representational ty1)
+
+    | tcIsForAllTy ty1
+    , tcIsForAllTy ty2
+    , let (tvs1,body1) = tcSplitForAllTys ty1
+          (tvs2,body2) = tcSplitForAllTys ty2
+    , equalLength tvs1 tvs2
+    = do
+       ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
+       return $ GenInst [] ev_term
+
     | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
       Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
       tc1 == tc2,

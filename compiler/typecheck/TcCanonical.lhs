@@ -19,7 +19,7 @@ import VarEnv
 import OccName( OccName )
 import Outputable
 import Control.Monad    ( when )
-import TysWiredIn ( eqTyCon, coercibleClass )
+import TysWiredIn ( eqTyCon )
 import DynFlags( DynFlags )
 import VarSet
 import TcSMonad
@@ -232,22 +232,6 @@ canClass, canClassNC
 canClassNC ev cls tys
   = canClass ev cls tys
     `andWhenContinue` emitSuperclasses
-
--- This case implements Coercible (forall a. body) (forall b. body)
-canClass ev cls tys
-  -- See Note [Coercible instances]
-  | cls == coercibleClass
-  , [_k, ty1, ty2] <- tys
-  , tcIsForAllTy ty1
-  , tcIsForAllTy ty2
-  , let (tvs1,body1) = tcSplitForAllTys ty1
-        (tvs2,body2) = tcSplitForAllTys ty2
-  , CtWanted { ctev_loc = loc, ctev_evar = orig_ev } <- ev
-  , equalLength tvs1 tvs2
-  = do { traceTcS "Creating implication for polytype coercible equality" $ ppr ev
-       ; ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
-       ; setEvBind orig_ev ev_term
-       ; return Stop }
 
 canClass ev cls tys
   = do { (xis, cos) <- flattenMany FMFullFlatten ev tys
