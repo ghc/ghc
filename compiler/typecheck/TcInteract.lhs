@@ -634,7 +634,7 @@ xi_w).
 Note [Carefully solve the right CFunEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    ---- OLD COMMENT, NOW NOT NEEDED
-   ---- becuase we now allow multiple
+   ---- because we now allow multiple
    ---- wanted FunEqs with the same head
 Consider the constraints
   c1 :: F Int ~ a      -- Arising from an application line 5
@@ -1555,7 +1555,7 @@ Note [Cached solved FunEqs]
 When trying to solve, say (FunExpensive big-type ~ ty), it's important
 to see if we have reduced (FunExpensive big-type) before, lest we
 simply repeat it.  Hence the lookup in inert_solved_funeqs.  Moreover
-we must use `canRewriteOrSame` becuase both uses might (say) be Wanteds,
+we must use `canRewriteOrSame` because both uses might (say) be Wanteds,
 and we *still* want to save the re-computation.
 
 Note [MATCHING-SYNONYMS]

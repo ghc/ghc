@@ -618,7 +618,7 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 -- The "deriv_pred" is a LHsType to take account of the fact that for
                 -- newtype deriving we allow deriving (forall a. C [a]).
 
-                -- Typeable is special, becuase Typeable :: forall k. k -> Constraint
+                -- Typeable is special, because Typeable :: forall k. k -> Constraint
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
         ; if className cls == typeableClassName

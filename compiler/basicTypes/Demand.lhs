@@ -1456,7 +1456,7 @@ Note [HyperStr and Use demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The information "HyperStr" needs to be in the strictness signature, and not in
-the demand signature, becuase we still want to know about the demand on things. Consider
+the demand signature, because we still want to know about the demand on things. Consider
 
     f (x,y) True  = error (show x)
     f (x,y) False = x+1

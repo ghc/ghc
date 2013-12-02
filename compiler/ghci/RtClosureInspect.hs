@@ -694,7 +694,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   dflags = hsc_dflags hsc_env
 
   go :: Int -> Type -> Type -> HValue -> TcM Term
-   -- I belive that my_ty should not have any enclosing
+   -- I believe that my_ty should not have any enclosing
    -- foralls, nor any free RuntimeUnk skolems;
    -- that is partly what the quantifyType stuff achieved
    --
