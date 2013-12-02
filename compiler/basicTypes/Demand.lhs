@@ -437,7 +437,7 @@ seqMaybeUsed _          = ()
 splitUseProdDmd :: Int -> UseDmd -> [MaybeUsed]
 splitUseProdDmd n Used          = replicate n useTop
 splitUseProdDmd n UHead         = replicate n Abs
-splitUseProdDmd n (UProd ds)    = ASSERT( ds `lengthIs` n ) ds
+splitUseProdDmd n (UProd ds)    = ASSERT2( ds `lengthIs` n, ppr n $$ ppr ds ) ds
 splitUseProdDmd _ d@(UCall _ _) = pprPanic "attempt to prod-split usage call demand" (ppr d)
 \end{code}
   
