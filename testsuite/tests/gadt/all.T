@@ -40,7 +40,7 @@ test('gadt23',
 test('gadt24', normal, compile, [''])
 
 test('red-black', normal, compile, [''])
-test('type-rep', when(fast(), skip), compile_and_run, [''])
+test('type-rep', [ when(fast(), skip), expect_broken_for(8569, ['hpc','optasm','threaded2','dyn','optllvm']) ] , compile_and_run, [''])
 test('equal', normal, compile, [''])
 test('nbe', normal, compile, [''])
 test('while', normal, compile_and_run, [''])
