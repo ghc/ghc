@@ -274,9 +274,9 @@ clause. The last arg is the new instance type.
 We must pass the superclasses; the newtype might be an instance
 of them in a different way than the representation type
 E.g.            newtype Foo a = Foo a deriving( Show, Num, Eq )
-Then the Show instance is not done via isomorphism; it shows
+Then the Show instance is not done via Coercible; it shows
         Foo 3 as "Foo 3"
-The Num instance is derived via isomorphism, but the Show superclass
+The Num instance is derived via Coercible, but the Show superclass
 dictionary must the Show instance for Foo, *not* the Show dictionary
 gotten from the Num dictionary. So we must build a whole new dictionary
 not just use the Num one.  The instance we want is something like:
@@ -977,7 +977,7 @@ mkPolyKindedTypeableEqn orig tvs cls tycon tc_args mtheta
                      = ptext (sLit "Derived Typeable instance must be of form")
                        <+> parens (ptext (sLit "Typeable") <+> ppr tycon)
 
-----------------------
+
 inferConstraints :: Class -> [TcType]
                  -> TyCon -> [TcType]
                  -> TcM ThetaType
@@ -1327,23 +1327,23 @@ checkFlag flag (dflags, _, _)
                  [s]   -> s
                  other -> pprPanic "checkFlag" (ppr other)
 
-std_class_via_iso :: Class -> Bool
+std_class_via_coercible :: Class -> Bool
 -- These standard classes can be derived for a newtype
--- using the isomorphism trick *even if no -XGeneralizedNewtypeDeriving
+-- using the coercible trick *even if no -XGeneralizedNewtypeDeriving
 -- because giving so gives the same results as generating the boilerplate
-std_class_via_iso clas
+std_class_via_coercible clas
   = classKey clas `elem` [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
         -- Not Read/Show because they respect the type
         -- Not Enum, because newtypes are never in Enum
 
 
-non_iso_class :: Class -> Bool
--- *Never* derive Read, Show, Typeable, Data, Generic, Generic1 by isomorphism,
+non_coercible_class :: Class -> Bool
+-- *Never* derive Read, Show, Typeable, Data, Generic, Generic1 by Coercible,
 -- even with -XGeneralizedNewtypeDeriving
--- Also, avoid Traversable, as the iso-derived instance and the "normal"-derived
+-- Also, avoid Traversable, as the Coercible-derived instance and the "normal"-derived
 -- instance behave differently if there's a non-lawful Applicative out there.
--- Besides, with roles, iso-deriving Traversable is ill-roled.
-non_iso_class cls
+-- Besides, with roles, Coercible-deriving Traversable is ill-roled.
+non_coercible_class cls
   = classKey cls `elem` ([ readClassKey, showClassKey, dataClassKey
                          , genClassKey, gen1ClassKey, typeableClassKey
                          , traversableClassKey ]
@@ -1402,7 +1402,7 @@ mkNewTypeEqn :: CtOrigin -> DynFlags -> [Var] -> Class
 mkNewTypeEqn orig dflags tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  | might_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
+  | might_derive_via_coercible && (newtype_deriving || std_class_via_coercible cls)
   = do  { traceTc "newtype deriving:" (ppr tycon <+> ppr rep_tys <+> ppr all_preds)
         ; dfun_name <- new_dfun_name cls tycon
         ; loc <- getSrcSpanM
@@ -1419,12 +1419,12 @@ mkNewTypeEqn orig dflags tvs
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
       CanDerive -> go_for_it    -- Use the standard H98 method
       DerivableClassError msg   -- Error with standard class
-        | might_derive_via_isomorphism -> bale_out (msg $$ suggest_nd)
-        | otherwise                    -> bale_out msg
+        | might_derive_via_coercible -> bale_out (msg $$ suggest_nd)
+        | otherwise                  -> bale_out msg
       NonDerivableClass         -- Must use newtype deriving
-        | newtype_deriving             -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
-        | might_derive_via_isomorphism -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
-        | otherwise                    -> bale_out non_std
+        | newtype_deriving           -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
+        | might_derive_via_coercible -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
+        | otherwise                  -> bale_out non_std
   where
         newtype_deriving = xopt Opt_GeneralizedNewtypeDeriving dflags
         go_for_it        = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
@@ -1509,8 +1509,8 @@ mkNewTypeEqn orig dflags tvs
         --  Figuring out whether we can only do this newtype-deriving thing
 
         -- See Note [Determining whether newtype-deriving is appropriate]
-        might_derive_via_isomorphism
-           =  not (non_iso_class cls)
+        might_derive_via_coercible
+           =  not (non_coercible_class cls)
            && arity_ok
            && eta_ok
            && ats_ok
