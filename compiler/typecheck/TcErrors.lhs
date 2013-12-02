@@ -1002,8 +1002,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     all_tyvars  = all isTyVarTy tys
 
     cannot_resolve_msg safe_mod rdr_env has_ambig_tvs binds_msg ambig_msg
-      = vcat [ addArising orig (no_inst_herald <+> pprParendType pred $$
-                                coercible_msg safe_mod rdr_env)
+      = vcat [ addArising orig (no_inst_msg $$ coercible_explanation safe_mod rdr_env)
              , vcat (pp_givens givens)
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
                (vcat [ ambig_msg, binds_msg, potential_msg ])
@@ -1039,9 +1038,15 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                          SigSkol (InfSigCtxt {}) _ -> Nothing
                          origin                    -> Just origin
 
-    no_inst_herald
-      | null givens && null matches = ptext (sLit "No instance for")
-      | otherwise                   = ptext (sLit "Could not deduce")
+    no_inst_msg
+      | clas == coercibleClass
+      = let (ty1, ty2) = getEqPredTys pred
+        in ptext (sLit "Could not coerce from") <+> quotes (ppr ty1) <+>
+           ptext (sLit "to") <+> quotes (ppr ty2)
+      | null givens && null matches
+      = ptext (sLit "No instance for")  <+> pprParendType pred
+      | otherwise
+      = ptext (sLit "Could not deduce") <+> pprParendType pred
 
     drv_fixes = case orig of
                    DerivOrigin -> [drv_fix]
@@ -1120,7 +1125,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     -- This function tries to reconstruct why a "Coercible ty1 ty2" constraint
     -- is left over. Therefore its logic has to stay in sync with
     -- getCoericbleInst in TcInteract. See Note [Coercible Instances]
-    coercible_msg safe_mod rdr_env
+    coercible_explanation safe_mod rdr_env
       | clas /= coercibleClass = empty
       | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
         Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
@@ -1162,7 +1167,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                         ptext $ sLit "and", quotes (ppr ty2),
                         ptext $ sLit "are different types." ]
       where
-        (clas, ~[_k, ty1,ty2]) = getClassPredTys (ctPred ct)
+        (ty1, ty2) = getEqPredTys pred
 
     dataConMissing rdr_env tc =
         all (null . lookupGRE_Name rdr_env) (map dataConName (tyConDataCons tc))
