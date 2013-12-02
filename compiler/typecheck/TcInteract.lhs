@@ -1845,10 +1845,7 @@ matchClassInst _ clas [ ty ] _
 matchClassInst _ clas [ _k, ty1, ty2 ] loc
   | clas == coercibleClass =  do
       traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2 <+> text "at depth" <+> ppr (ctLocDepth loc)
-      rdr_env <- getGlobalRdrEnvTcS
-      famenv <- getFamInstEnvs
-      safeMode <- safeLanguageOn `fmap` getDynFlags
-      ev <- getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
+      ev <- getCoercibleInst loc ty1 ty2
       traceTcS "matchClassInst returned" $ ppr ev
       return ev
 
@@ -1934,68 +1931,76 @@ matchClassInst inerts clas tys loc
 
 -- See Note [Coercible Instances]
 -- Changes to this logic should likely be reflected in coercible_msg in TcErrors.
-getCoercibleInst :: Bool -> FamInstEnvs -> GlobalRdrEnv -> CtLoc -> TcType -> TcType -> TcS LookupInstResult
-getCoercibleInst safeMode famenv rdr_env loc ty1 ty2
-  | ty1 `tcEqType` ty2
-  = do return $ GenInst []
-              $ EvCoercion (TcRefl Representational ty1)
-  | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
-    Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
-    tc1 == tc2,
-    nominalArgsAgree tc1 tyArgs1 tyArgs2,
-    not safeMode || all (dataConsInScope rdr_env) (tyConsOfTyCon tc1)
-  = do -- Mark all used data constructors as used
-       when safeMode $ mapM_ (markDataConsAsUsed rdr_env) (tyConsOfTyCon tc1)
-       -- We want evidence for all type arguments of role R
-       arg_stuff <- forM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
-         case r of Nominal -> do
-                        return
-                          ( Nothing
-                          , Nothing
-                          , mkTcReflCo Nominal ta1 {- == ta2, due to nominalArgsAgree -}
-                          )
-                   Representational -> do
-                        ct_ev <- requestCoercible loc ta1 ta2
-                        local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ta1 ta2
-                        return
-                          ( freshGoal ct_ev
-                          , Just (EvBind local_var (getEvTerm ct_ev))
-                          , mkTcCoVarCo local_var
-                          )
-                   Phantom -> do
-                        return
-                          ( Nothing
-                          , Nothing
-                          , TcPhantomCo ta1 ta2)
-       let (arg_new, arg_binds, arg_cos) = unzip3 arg_stuff
-           binds = EvBinds (listToBag (catMaybes arg_binds))
-           tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
-       return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
+getCoercibleInst :: CtLoc -> TcType -> TcType -> TcS LookupInstResult
+getCoercibleInst loc ty1 ty2 = do
+      -- Get some global stuff in scope, for nice pattern-guard based code in `go`
+      rdr_env <- getGlobalRdrEnvTcS
+      famenv <- getFamInstEnvs
+      safeMode <- safeLanguageOn `fmap` getDynFlags
+      go safeMode famenv rdr_env
+  where
+  go :: Bool -> FamInstEnvs -> GlobalRdrEnv -> TcS LookupInstResult
+  go safeMode famenv rdr_env
+    | ty1 `tcEqType` ty2
+    = do return $ GenInst []
+                $ EvCoercion (TcRefl Representational ty1)
+    | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
+      Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
+      tc1 == tc2,
+      nominalArgsAgree tc1 tyArgs1 tyArgs2,
+      not safeMode || all (dataConsInScope rdr_env) (tyConsOfTyCon tc1)
+    = do -- Mark all used data constructors as used
+         when safeMode $ mapM_ (markDataConsAsUsed rdr_env) (tyConsOfTyCon tc1)
+         -- We want evidence for all type arguments of role R
+         arg_stuff <- forM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
+           case r of Nominal -> do
+                          return
+                            ( Nothing
+                            , Nothing
+                            , mkTcReflCo Nominal ta1 {- == ta2, due to nominalArgsAgree -}
+                            )
+                     Representational -> do
+                          ct_ev <- requestCoercible loc ta1 ta2
+                          local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ta1 ta2
+                          return
+                            ( freshGoal ct_ev
+                            , Just (EvBind local_var (getEvTerm ct_ev))
+                            , mkTcCoVarCo local_var
+                            )
+                     Phantom -> do
+                          return
+                            ( Nothing
+                            , Nothing
+                            , TcPhantomCo ta1 ta2)
+         let (arg_new, arg_binds, arg_cos) = unzip3 arg_stuff
+             binds = EvBinds (listToBag (catMaybes arg_binds))
+             tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
+         return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
 
-  | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
-    Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-    dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
-  = do markDataConsAsUsed rdr_env tc
-       ct_ev <- requestCoercible loc concTy ty2
-       local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
-       let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-           tcCo = TcLetCo binds $
-                          coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
-       return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
+    | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
+      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
+      dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
+    = do markDataConsAsUsed rdr_env tc
+         ct_ev <- requestCoercible loc concTy ty2
+         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
+         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
+             tcCo = TcLetCo binds $
+                            coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
+         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
-  | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
-    Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-    dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
-  = do markDataConsAsUsed rdr_env tc
-       ct_ev <- requestCoercible loc ty1 concTy
-       local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
-       let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-           tcCo = TcLetCo binds $
-                          mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
-       return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
+    | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
+      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
+      dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
+    = do markDataConsAsUsed rdr_env tc
+         ct_ev <- requestCoercible loc ty1 concTy
+         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
+         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
+             tcCo = TcLetCo binds $
+                            mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
+         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
-  | otherwise
-  = return NoInstance
+    | otherwise
+    = return NoInstance
 
 nominalArgsAgree :: TyCon -> [Type] -> [Type] -> Bool
 nominalArgsAgree tc tys1 tys2 = all ok $ zip3 (tyConRoles tc) tys1 tys2
