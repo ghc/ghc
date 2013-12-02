@@ -86,6 +86,7 @@ import DataCon         ( splitDataProductType_maybe )
 data StrDmd
   = HyperStr             -- Hyper-strict 
                          -- Bottom of the lattice
+                         -- Note [HyperStr and Use demands]
 
   | SCall StrDmd         -- Call demand
                          -- Used only for values of function type
@@ -1450,6 +1451,19 @@ strictifyDictDmd ty dmd = case absd dmd of
              -- the superclass dicts are always a prefix
   _ -> dmd -- unused or not a dictionary
 \end{code}
+
+Note [HyperStr and Use demands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The information "HyperStr" needs to be in the strictness signature, and not in
+the demand signature, becuase we still want to know about the demand on things. Consider
+
+    f (x,y) True  = error (show x)
+    f (x,y) False = x+1
+
+The signature of f should be <S(SL),1*U(1*U(U),A)><S,1*U>m. If we were not
+distinguishing the uses on x and y in the True case, we could either not figure
+out how deeply we can unpack x, or that we do not have to pass y.
 
 
 %************************************************************************
