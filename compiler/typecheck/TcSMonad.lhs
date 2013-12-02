@@ -1651,22 +1651,21 @@ xCtFlavor (CtDerived { ctev_loc = loc }) ptys _xev
        ; return (catMaybes ders) }
 
 -----------------------------
-rewriteCtFlavor :: CtEvidence
+rewriteCtFlavor :: CtEvidence   -- old evidence
                 -> TcPredType   -- new predicate
-                -> TcCoercion   -- new ~ old
+                -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
                 -> TcS (Maybe CtEvidence)
--- Returns Just new_fl iff either (i)  'co' is reflexivity
+-- Returns Just new_ev iff either (i)  'co' is reflexivity
 --                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
--- In either case, there is nothing new to do with new_fl
+-- In either case, there is nothing new to do with new_ev
 {-
-     rewriteCtFlavor old_fl new_pred co
+     rewriteCtFlavor old_ev new_pred co
 Main purpose: create new evidence for new_pred;
               unless new_pred is cached already
-* Returns a new_fl : new_pred, with same wanted/given/derived flag as old_fl
-* If old_fl was wanted, create a binding for old_fl, in terms of new_fl
-* If old_fl was given, AND not cached, create a binding for new_fl, in terms of old_fl
-* Returns Nothing if new_fl is already cached
-
+* Returns a new_ev : new_pred, with same wanted/given/derived flag as old_ev
+* If old_ev was wanted, create a binding for old_ev, in terms of new_ev
+* If old_ev was given, AND not cached, create a binding for new_ev, in terms of old_ev
+* Returns Nothing if new_ev is already cached
 
         Old evidence    New predicate is               Return new evidence
         flavour                                        of same flavor
