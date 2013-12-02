@@ -1941,10 +1941,12 @@ getCoercibleInst loc ty1 ty2 = do
   where
   go :: Bool -> FamInstEnvs -> GlobalRdrEnv -> TcS LookupInstResult
   go safeMode famenv rdr_env
+    -- Coercible a a                             (see case 1 in [Coercible Instances])
     | ty1 `tcEqType` ty2
     = do return $ GenInst []
                 $ EvCoercion (TcRefl Representational ty1)
 
+    -- Coercible (forall a. ty) (forall a. ty')  (see case 2 in [Coercible Instances])
     | tcIsForAllTy ty1
     , tcIsForAllTy ty2
     , let (tvs1,body1) = tcSplitForAllTys ty1
@@ -1954,6 +1956,7 @@ getCoercibleInst loc ty1 ty2 = do
        ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
        return $ GenInst [] ev_term
 
+    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 3 in [Coercible Instances])
     | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
       Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
       tc1 == tc2,
@@ -1987,6 +1990,7 @@ getCoercibleInst loc ty1 ty2 = do
              tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
          return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
 
+    -- Coercible NT a                            (see case 4 in [Coercible Instances])
     | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
       Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
       dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
@@ -1998,6 +2002,7 @@ getCoercibleInst loc ty1 ty2 = do
                             coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
          return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
+    -- Coercible a NT                            (see case 4 in [Coercible Instances])
     | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
       Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
       dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
@@ -2009,6 +2014,7 @@ getCoercibleInst loc ty1 ty2 = do
                             mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
          return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
+    -- Cannot solve this one
     | otherwise
     = return NoInstance
 
@@ -2052,7 +2058,12 @@ air, in getCoercibleInst. The following “instances” are present:
  1. instance Coercible a a
     for any type a at any kind k.
 
- 2. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
+ 2. instance (forall a. Coercible t1 t2) => Coercible (forall a. t1) (forall a. t2)
+    (which would be illegal to write like that in the source code, but we have
+    it nevertheless).
+
+
+ 3. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
        Coercible (C t1_r  t2_r  ... t1_p  t2_p  ... t1_n t2_n ...)
                  (C t1_r' t2_r' ... t1_p' t2_p' ... t1_n t2_n ...)
     for a type constructor C where
@@ -2070,7 +2081,7 @@ air, in getCoercibleInst. The following “instances” are present:
        This is required as otherwise the previous check can be circumvented by
        just adding a local data type around C.
 
- 3. instance Coercible r b => Coercible (NT t1 t2 ...) b
+ 4. instance Coercible r b => Coercible (NT t1 t2 ...) b
     instance Coercible a r => Coercible a (NT t1 t2 ...)
     for a newtype constructor NT (nor data family instance that resolves to a
     newtype) where
@@ -2084,10 +2095,6 @@ air, in getCoercibleInst. The following “instances” are present:
       newtype NT2 a b = NT2 (b -> a)
       newtype NT3 a b = NT3 (b -> a)
       Coercible (NT2 Int) (NT3 Int) -- cannot be derived
-
-  4. instance (forall a. Coercible t1 t2) => Coercible (forall a. t1) (forall a. t2)
-     (which would be illegal to write like that in the source code, but we have
-     it nevertheless).
 
 The type checker generates evidence in the form of EvCoercion, but the
 TcCoercion therein has role Representational,  which are turned into Core
