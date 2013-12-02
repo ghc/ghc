@@ -1,34 +1,20 @@
 
 T7148.hs:27:40:
-    Could not deduce (GHC.Types.Coercible
-                        (SameType b b2) (SameType (Tagged a b) b2))
-      because the first type argument of ‛SameType’ has role Nominal,
-      but the arguments ‛b’ and ‛Tagged a b’ differ
-      arising from a use of ‛GHC.Prim.coerce’
-    from the context (IsoUnit b)
-      bound by the instance declaration at T7148.hs:27:40-46
-    In the expression:
-        GHC.Prim.coerce (iso1 :: SameType () b -> SameType b b) ::
-          forall (b :: *). SameType () b -> SameType (Tagged a b) b
-    In an equation for ‛iso1’:
-        iso1
-          = GHC.Prim.coerce (iso1 :: SameType () b -> SameType b b) ::
-              forall (b :: *). SameType () b -> SameType (Tagged a b) b
-    In the instance declaration for ‛IsoUnit (Tagged a b)’
-
-T7148.hs:27:40:
-    Could not deduce (GHC.Types.Coercible
-                        (SameType b2 b) (SameType b2 (Tagged a b)))
+    Could not coerce from ‛SameType b1 b’ to ‛SameType b1 (Tagged a b)’
       because the second type argument of ‛SameType’ has role Nominal,
       but the arguments ‛b’ and ‛Tagged a b’ differ
-      arising from a use of ‛GHC.Prim.coerce’
-    from the context (IsoUnit b)
-      bound by the instance declaration at T7148.hs:27:40-46
-    In the expression:
-        GHC.Prim.coerce (iso2 :: SameType b () -> SameType b b) ::
-          forall (b :: *). SameType b () -> SameType b (Tagged a b)
-    In an equation for ‛iso2’:
-        iso2
-          = GHC.Prim.coerce (iso2 :: SameType b () -> SameType b b) ::
-              forall (b :: *). SameType b () -> SameType b (Tagged a b)
-    In the instance declaration for ‛IsoUnit (Tagged a b)’
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (IsoUnit (Tagged a b))
+
+T7148.hs:27:40:
+    Could not coerce from ‛SameType b b1’ to ‛SameType (Tagged a b) b1’
+      because the first type argument of ‛SameType’ has role Nominal,
+      but the arguments ‛b’ and ‛Tagged a b’ differ
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (IsoUnit (Tagged a b))

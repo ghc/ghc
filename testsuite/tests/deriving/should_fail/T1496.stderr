@@ -1,13 +1,9 @@
 
 T1496.hs:10:32:
-    No instance for (GHC.Types.Coercible (c1 Int) (c1 Moo))
-      because ‛c1 Int’ and ‛c1 Moo’ are different types.
-      arising from a use of ‛GHC.Prim.coerce’
-    In the expression:
-        GHC.Prim.coerce (isInt :: c Int -> c Int) ::
-          forall (c :: * -> *). c Int -> c Moo
-    In an equation for ‛isInt’:
-        isInt
-          = GHC.Prim.coerce (isInt :: c Int -> c Int) ::
-              forall (c :: * -> *). c Int -> c Moo
-    In the instance declaration for ‛IsInt Moo’
+    Could not coerce from ‛c Int’ to ‛c Moo’
+      because ‛c Int’ and ‛c Moo’ are different types.
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (IsInt Moo)

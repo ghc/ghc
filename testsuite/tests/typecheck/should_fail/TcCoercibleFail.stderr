@@ -1,6 +1,6 @@
 
 TcCoercibleFail.hs:11:8:
-    No instance for (Coercible Int ())
+    Could not coerce from ‛Int’ to ‛()’
       because ‛Int’ and ‛()’ are different types.
       arising from a use of ‛coerce’
     In the expression: coerce
@@ -8,7 +8,7 @@ TcCoercibleFail.hs:11:8:
     In an equation for ‛foo1’: foo1 = coerce $ one :: ()
 
 TcCoercibleFail.hs:14:8:
-    Could not deduce (Coercible (m Int) (m Age))
+    Could not coerce from ‛m Int’ to ‛m Age’
       because ‛m Int’ and ‛m Age’ are different types.
       arising from a use of ‛coerce’
     from the context (Monad m)
@@ -19,7 +19,7 @@ TcCoercibleFail.hs:14:8:
     In an equation for ‛foo2’: foo2 = coerce $ (return one :: m Int)
 
 TcCoercibleFail.hs:16:8:
-    No instance for (Coercible (Map Int ()) (Map Age ()))
+    Could not coerce from ‛Map Int ()’ to ‛Map Age ()’
       because the first type argument of ‛Map’ has role Nominal,
       but the arguments ‛Int’ and ‛Age’ differ
       arising from a use of ‛coerce’
@@ -28,7 +28,7 @@ TcCoercibleFail.hs:16:8:
     In an equation for ‛foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
 TcCoercibleFail.hs:18:8:
-    No instance for (Coercible Int (Down Int))
+    Could not coerce from ‛Int’ to ‛Down Int’
     because the constructor of ‛Down’ is not imported
       arising from a use of ‛coerce’
     In the expression: coerce
@@ -51,7 +51,7 @@ TcCoercibleFail.hs:30:8:
         foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
 
 TcCoercibleFail.hs:31:8:
-    No instance for (Coercible (Either Int (Fix (Either Int))) ())
+    Could not coerce from ‛Either Int (Fix (Either Int))’ to ‛()’
       because ‛Either
                  Int (Fix (Either Int))’ and ‛()’ are different types.
       arising from a use of ‛coerce’

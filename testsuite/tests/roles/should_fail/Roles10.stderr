@@ -1,10 +1,9 @@
 
 Roles10.hs:16:12:
-    No instance for (GHC.Types.Coercible Bool Char)
+    Could not coerce from ‛Bool’ to ‛Char’
       because ‛Bool’ and ‛Char’ are different types.
-      arising from a use of ‛GHC.Prim.coerce’
-    In the expression:
-        GHC.Prim.coerce (meth :: Int -> F Int) :: Age -> F Age
-    In an equation for ‛meth’:
-        meth = GHC.Prim.coerce (meth :: Int -> F Int) :: Age -> F Age
-    In the instance declaration for ‛C Age’
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (C Age)
