@@ -57,6 +57,7 @@ import ListSetOps
 import Outputable
 import FastString
 import Bag
+import Pair
 
 import Control.Monad
 import Data.List
@@ -1486,8 +1487,8 @@ mkNewTypeEqn orig dflags tvs
                 -- dictionary
 
 
-    -- Next we figure out what superclass dictionaries to use
-    -- See Note [Newtype deriving superclasses] above
+        -- Next we figure out what superclass dictionaries to use
+        -- See Note [Newtype deriving superclasses] above
 
         cls_tyvars = classTyVars cls
         dfun_tvs = tyVarsOfTypes inst_tys
@@ -1496,6 +1497,15 @@ mkNewTypeEqn orig dflags tvs
         sc_theta = substTheta (zipOpenTvSubst cls_tyvars inst_tys)
                               (classSCTheta cls)
 
+
+        -- Next we collect Coercible constaints between
+        -- the Class method types, instantiated with the representation and the
+        -- newtype type; precisely the constraints required for the
+        -- calls to coercible that we are going to generate.
+        coercible_constraints =
+            map (\(Pair t1 t2) -> mkCoerciblePred t1 t2) $
+            mkCoerceClassMethEqn cls (varSetElemsKvsFirst dfun_tvs) inst_tys rep_inst_ty
+
                 -- If there are no tyvars, there's no need
                 -- to abstract over the dictionaries we need
                 -- Example:     newtype T = MkT Int deriving( C )
@@ -1503,7 +1513,7 @@ mkNewTypeEqn orig dflags tvs
                 --              instance C T
                 -- rather than
                 --              instance C Int => C T
-        all_preds = rep_pred : sc_theta         -- NB: rep_pred comes first
+        all_preds = rep_pred : coercible_constraints ++ sc_theta -- NB: rep_pred comes first
 
         -------------------------------------------------------------------
         --  Figuring out whether we can only do this newtype-deriving thing

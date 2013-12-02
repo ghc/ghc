@@ -30,6 +30,7 @@ module TcGenDeriv (
         deepSubtypesContaining, foldDataConArgs,
         gen_Foldable_binds,
         gen_Traversable_binds,
+        mkCoerceClassMethEqn,
         gen_Newtype_binds,
         genAuxBinds,
         ordOpTbl, boxConTbl
@@ -68,6 +69,7 @@ import Var
 import MonadUtils
 import Outputable
 import FastString
+import Pair
 import Bag
 import Fingerprint
 import TcEnv (InstInfo)
@@ -1907,6 +1909,31 @@ coercing from.
 See #8503 for more discussion.
 
 \begin{code}
+mkCoerceClassMethEqn :: Class   -- the class being derived
+                     -> [TyVar] -- the tvs in the instance head
+                     -> [Type]  -- instance head parameters (incl. newtype)
+                     -> Type    -- the representation type (already eta-reduced)
+                     -> [Pair Type]
+mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty
+  = map mk_tys $ classMethods cls
+  where
+    cls_tvs = classTyVars cls
+    in_scope = mkInScopeSet $ mkVarSet inst_tvs
+    lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs cls_tys)
+    rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast cls_tys rhs_ty))
+
+    mk_tys :: Id -> Pair Type
+    mk_tys id = Pair (substTy rhs_subst user_meth_ty)
+                     (substTy lhs_subst user_meth_ty)
+      where
+        (_class_tvs, _class_constraint, user_meth_ty) = tcSplitSigmaTy (varType id)
+
+    changeLast :: [a] -> a -> [a]
+    changeLast []     _  = panic "changeLast"
+    changeLast [_]    x  = [x]
+    changeLast (x:xs) x' = x : changeLast xs x'
+
+
 gen_Newtype_binds :: SrcSpan
                   -> Class   -- the class being derived
                   -> [TyVar] -- the tvs in the instance head
@@ -1914,37 +1941,26 @@ gen_Newtype_binds :: SrcSpan
                   -> Type    -- the representation type (already eta-reduced)
                   -> LHsBinds RdrName
 gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
-  = listToBag $ map (L loc . mk_bind) $ classMethods cls
+  = listToBag $ zipWith mk_bind
+        (classMethods cls)
+        (mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty)
   where
-    cls_tvs = classTyVars cls
-    in_scope = mkInScopeSet $ mkVarSet inst_tvs
-    lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs cls_tys)
-    rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast cls_tys rhs_ty))
-
     coerce_RDR = getRdrName coerceId
-    
-    mk_bind :: Id -> HsBind RdrName
-    mk_bind id
-      = mkRdrFunBind (L loc meth_RDR)
-                     [mkSimpleMatch [] rhs_expr]
+    mk_bind :: Id -> Pair Type -> LHsBind RdrName
+    mk_bind id (Pair tau_ty user_ty)
+      = L loc $ mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
       where
         meth_RDR = getRdrName id
-        (_class_tvs, _class_constraint, user_meth_ty) = tcSplitSigmaTy (varType id)
-        (_quant_tvs, _quant_constraint, tau_meth_ty)  = tcSplitSigmaTy user_meth_ty
-                       
         rhs_expr
-          = noLoc $ ExprWithTySig
-              (nlHsApp
-                (nlHsVar coerce_RDR)
-                (noLoc $ ExprWithTySig
-                  (nlHsVar meth_RDR)
-                  (toHsType $ substTy rhs_subst tau_meth_ty)))
-              (toHsType $ substTy lhs_subst user_meth_ty)
+          = ( nlHsVar coerce_RDR
+                `nlHsApp`
+              (nlHsVar meth_RDR `nlExprWithTySig` toHsType tau_ty'))
+            `nlExprWithTySig` toHsType user_ty
+        -- Open the representation type here, so that it's forall'ed type
+        -- variables refer to the ones bound in the user_ty
+        (_, _, tau_ty')  = tcSplitSigmaTy tau_ty
 
-    changeLast :: [a] -> a -> [a]
-    changeLast []     _  = panic "changeLast"
-    changeLast [_]    x  = [x]
-    changeLast (x:xs) x' = x : changeLast xs x'
+    nlExprWithTySig e s = noLoc (ExprWithTySig e s)
 \end{code}
 
 %************************************************************************
