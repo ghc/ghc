@@ -333,9 +333,12 @@ freeStorage (rtsBool free_heap)
 
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE StgWord lockCAF (StgIndStatic *caf, StgClosure *bh)
+STATIC_INLINE StgInd *
+lockCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     const StgInfoTable *orig_info;
+    Capability *cap = regTableToCapability(reg);
+    StgInd *bh;
 
     orig_info = caf->header.info;
 
@@ -345,7 +348,7 @@ STATIC_INLINE StgWord lockCAF (StgIndStatic *caf, StgClosure *bh)
     if (orig_info == &stg_IND_STATIC_info ||
         orig_info == &stg_WHITEHOLE_info) {
         // already claimed by another thread; re-enter the CAF
-        return 0;
+        return NULL;
     }
 
     cur_info = (const StgInfoTable *)
@@ -355,7 +358,7 @@ STATIC_INLINE StgWord lockCAF (StgIndStatic *caf, StgClosure *bh)
 
     if (cur_info != orig_info) {
         // already claimed by another thread; re-enter the CAF
-        return 0;
+        return NULL;
     }
 
     // successfully claimed by us; overwrite with IND_STATIC
@@ -364,17 +367,25 @@ STATIC_INLINE StgWord lockCAF (StgIndStatic *caf, StgClosure *bh)
     // For the benefit of revertCAFs(), save the original info pointer
     caf->saved_info = orig_info;
 
-    caf->indirectee = bh;
+    // Allocate the blackhole indirection closure
+    bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
+    bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
+
+    caf->indirectee = (StgClosure *)bh;
     write_barrier();
     SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
 
-    return 1;
+    return bh;
 }
 
-StgWord
-newCAF(StgRegTable *reg, StgIndStatic *caf, StgClosure *bh)
+StgInd *
+newCAF(StgRegTable *reg, StgIndStatic *caf)
 {
-    if (lockCAF(caf,bh) == 0) return 0;
+    StgInd *bh;
+
+    bh = lockCAF(reg, caf);
+    if (!bh) return NULL;
 
     if(keepCAFs)
     {
@@ -418,7 +429,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf, StgClosure *bh)
 #endif
     }
 
-    return 1;
+    return bh;
 }
 
 // External API for setting the keepCAFs flag. see #3900.
@@ -437,10 +448,13 @@ setKeepCAFs (void)
 //
 // The linker hackily arranges that references to newCaf from dynamic
 // code end up pointing to newDynCAF.
-StgWord
-newDynCAF (StgRegTable *reg STG_UNUSED, StgIndStatic *caf, StgClosure *bh)
+StgInd *
+newDynCAF (StgRegTable *reg, StgIndStatic *caf)
 {
-    if (lockCAF(caf,bh) == 0) return 0;
+    StgInd *bh;
+
+    bh = lockCAF(reg, caf);
+    if (!bh) return NULL;
 
     ACQUIRE_SM_LOCK;
 
@@ -449,7 +463,7 @@ newDynCAF (StgRegTable *reg STG_UNUSED, StgIndStatic *caf, StgClosure *bh)
 
     RELEASE_SM_LOCK;
 
-    return 1;
+    return bh;
 }
 
 /* -----------------------------------------------------------------------------

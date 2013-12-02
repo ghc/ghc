@@ -21,7 +21,7 @@ import StgCmmEnv
 import StgCmmCon
 import StgCmmHeap
 import StgCmmProf (curCCS, ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
-                   initUpdFrameProf, costCentreFrom)
+                   initUpdFrameProf)
 import StgCmmTicky
 import StgCmmLayout
 import StgCmmUtils
@@ -718,13 +718,6 @@ emitUpdateFrame dflags frame lbl updatee = do
 -- (which Hugs needs to do in order that combined mode works right.)
 --
 
--- ToDo [Feb 04]  This entire link_caf nonsense could all be moved
--- into the "newCAF" RTS procedure, which we call anyway, including
--- the allocation of the black-hole indirection closure.
--- That way, code size would fall, the CAF-handling code would
--- be closer together, and the compiler wouldn't need to know
--- about off_indirectee etc.
-
 link_caf :: LocalReg           -- pointer to the closure
          -> Bool               -- True <=> updatable, False <=> single-entry
          -> FCode CmmExpr      -- Returns amode for closure to be updated
@@ -736,40 +729,27 @@ link_caf :: LocalReg           -- pointer to the closure
 -- so that generational GC is easier.
 link_caf node _is_upd = do
   { dflags <- getDynFlags
-    -- Alloc black hole specifying CC_HDR(Node) as the cost centre
-  ; let use_cc   = costCentreFrom dflags (CmmReg nodeReg)
-        blame_cc = use_cc
-        tso      = CmmReg (CmmGlobal CurrentTSO)
-
-  ; hp_rel <- allocDynClosureCmm Nothing cafBlackHoleInfoTable mkLFBlackHole
-                                         use_cc blame_cc [(tso,fixedHdrSize dflags)]
-        -- small optimisation: we duplicate the hp_rel expression in
-        -- both the newCAF call and the value returned below.
-        -- If we instead used allocDynClosureReg which assigns it to a reg,
-        -- then the reg is live across the newCAF call and gets spilled,
-        -- which is stupid.  Really we should have an optimisation pass to
-        -- fix this, but we don't yet. --SDM
-
         -- Call the RTS function newCAF to add the CAF to the CafList
         -- so that the garbage collector can find them
         -- This must be done *before* the info table pointer is overwritten,
         -- because the old info table ptr is needed for reversion
-  ; ret <- newTemp (bWord dflags)
-  ; emitRtsCallGen [(ret,NoHint)] (mkForeignLabel (fsLit "newCAF") Nothing ForeignLabelInExternalPackage IsFunction)
+  ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
+                                    ForeignLabelInExternalPackage IsFunction
+  ; bh <- newTemp (bWord dflags)
+  ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
-        (CmmReg (CmmLocal node), AddrHint),
-        (hp_rel, AddrHint) ]
+        (CmmReg (CmmLocal node), AddrHint) ]
       False
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
   ; updfr  <- getUpdFrameOff
+  ; let target = entryCode dflags (closureInfoPtr dflags (CmmReg (CmmLocal node)))
   ; emit =<< mkCmmIfThen
-      (CmmMachOp (mo_wordEq dflags) [ CmmReg (CmmLocal ret), CmmLit (zeroCLit dflags)])
+      (cmmEqWord dflags (CmmReg (CmmLocal bh)) (zeroExpr dflags))
         -- re-enter the CAF
-       (let target = entryCode dflags (closureInfoPtr dflags (CmmReg (CmmLocal node))) in
-        mkJump dflags NativeNodeCall target [] updfr)
+       (mkJump dflags NativeNodeCall target [] updfr)
 
-  ; return hp_rel }
+  ; return (CmmReg (CmmLocal bh)) }
 
 ------------------------------------------------------------------------
 --              Profiling
