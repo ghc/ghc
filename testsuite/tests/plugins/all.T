@@ -34,7 +34,6 @@ test('plugins05',
 
 test('plugins06',
      [ extra_clean(['LinkerTicklingPlugin.hi', 'LinkerTicklingPlugin.o']),
-       unless(have_dynamic(),skip),
        only_ways([config.ghc_plugin_way]) ],
-     multimod_compile_and_run, ['plugins06', '-package ghc'])
+     multimod_compile_and_run, ['plugins06', '-package ghc ' + config.ghc_th_way_flags ])
 

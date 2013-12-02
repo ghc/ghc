@@ -185,7 +185,7 @@ test('ffishutdown', [ ignore_output, only_ways(['threaded1','threaded2']) ], com
 test('T7919', [extra_clean(['T7919A.o','T7919A.hi',
                             'T7919A.dyn_o','T7919A.dyn_hi']),
                when(fast(),skip) ],
-             compile_and_run, [''])
+             compile_and_run, [config.ghc_th_way_flags])
 
 test('T8035', normal, compile_and_run, [''])
 
