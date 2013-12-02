@@ -1,5 +1,5 @@
 
-Roles11.hs:6:1:
+Roles11.hs:5:1:
     Role mismatch on variable a:
       Annotation says representational but role nominal is required
-    In the data declaration for ‛T2’
+    while checking a role annotation for ‛T2’
