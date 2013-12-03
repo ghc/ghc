@@ -122,15 +122,6 @@ type DerivContext = Maybe ThetaType
    -- Nothing    <=> Vanilla deriving; infer the context of the instance decl
    -- Just theta <=> Standalone deriving: context supplied by programmer
 
-data PredOrigin = PredOrigin PredType CtOrigin
-type ThetaOrigin = [PredOrigin]
-
-mkPredOrigin :: CtOrigin -> PredType -> PredOrigin
-mkPredOrigin origin pred = PredOrigin pred origin
-
-mkThetaOrigin :: CtOrigin -> ThetaType -> ThetaOrigin
-mkThetaOrigin origin = map (mkPredOrigin origin)
-
 data EarlyDerivSpec = InferTheta (DerivSpec ThetaOrigin)
                     | GivenTheta (DerivSpec ThetaType)
         -- InferTheta ds => the context for the instance should be inferred
@@ -175,8 +166,6 @@ instance Outputable EarlyDerivSpec where
   ppr (InferTheta spec) = ppr spec <+> ptext (sLit "(Infer)")
   ppr (GivenTheta spec) = ppr spec <+> ptext (sLit "(Given)")
 
-instance Outputable PredOrigin where
-  ppr (PredOrigin ty _) = ppr ty -- The origin is not so interesting when debugging
 \end{code}
 
 

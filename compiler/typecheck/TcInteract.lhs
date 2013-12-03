@@ -413,8 +413,8 @@ addFunDepWork :: Ct -> Ct -> TcS ()
 addFunDepWork work_ct inert_ct
   = do { let work_loc           = ctLoc work_ct
              inert_loc          = ctLoc inert_ct
-             inert_pred_loc     = (ctPred inert_ct, pprArisingAt inert_loc)
-             work_item_pred_loc = (ctPred work_ct,  pprArisingAt work_loc)
+             inert_pred_loc     = mkPredOrigin (ctLocOrigin inert_loc) (ctPred inert_ct)
+             work_item_pred_loc = mkPredOrigin (ctLocOrigin work_loc) (ctPred work_ct)
 
        ; let fd_eqns = improveFromAnother inert_pred_loc work_item_pred_loc
        ; fd_work <- rewriteWithFunDeps fd_eqns work_loc
@@ -1374,17 +1374,17 @@ instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
          sty1 = Type.substTy subst ty1
          sty2 = Type.substTy subst ty2
 
-mkEqnMsg :: (TcPredType, SDoc)
-         -> (TcPredType, SDoc) -> TidyEnv -> TcM (TidyEnv, SDoc)
-mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
+mkEqnMsg :: PredOrigin -> PredOrigin -> TidyEnv -> TcM (TidyEnv, SDoc)
+mkEqnMsg (PredOrigin pred1 from1) (PredOrigin pred2 from2) tidy_env
   = do  { zpred1 <- zonkTcPredType pred1
         ; zpred2 <- zonkTcPredType pred2
         ; let { tpred1 = tidyType tidy_env zpred1
               ; tpred2 = tidyType tidy_env zpred2 }
         ; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
-                          nest 2 (sep [ppr tpred1 <> comma, nest 2 from1]),
-                          nest 2 (sep [ppr tpred2 <> comma, nest 2 from2])]
+                          nest 2 (sep [ppr tpred1 <> comma, nest 2 (arr <+> ppr from1)]),
+                          nest 2 (sep [ppr tpred2 <> comma, nest 2 (arr <+> ppr from2)])]
         ; return (tidy_env, msg) }
+  where arr = ptext (sLit "arising from")
 \end{code}
 
 
@@ -1456,7 +1456,6 @@ doTopReactDict inerts fl cls xis
                                           ; solve_from_instance wtvs ev_term }
                NoInstance -> try_fundeps_and_return }
    where
-     arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
      pred = mkClassPred cls xis
      loc = ctev_loc fl
@@ -1489,7 +1488,7 @@ doTopReactDict inerts fl cls xis
      -- so we make sure we get on and solve it first. See Note [Weird fundeps]
      try_fundeps_and_return
        = do { instEnvs <- getInstEnvs
-            ; let fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
+            ; let fd_eqns = improveFromInstEnv instEnvs (mkPredOrigin (ctLocOrigin loc) pred)
             ; fd_work <- rewriteWithFunDeps fd_eqns loc
             ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
             ; return NoTopInt }

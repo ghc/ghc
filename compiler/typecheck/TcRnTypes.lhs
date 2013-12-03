@@ -72,6 +72,10 @@ module TcRnTypes(
         isWanted, isGiven, isDerived,
         canRewrite, canRewriteOrSame,
 
+        PredOrigin(..), ThetaOrigin,
+        mkPredOrigin, mkThetaOrigin,
+        predOriginPred,
+
         -- Pretty printing
         pprEvVarTheta, pprWantedsWithLocs,
         pprEvVars, pprEvVarWithType,
@@ -88,7 +92,7 @@ import HsSyn
 import HscTypes
 import TcEvidence
 import Type
-import Class    ( Class )
+import Class    ( Class, FunDep, pprFunDep )
 import TyCon    ( TyCon )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import TcType
@@ -1657,6 +1661,7 @@ pprArisingAt (CtLoc { ctl_origin = o, ctl_env = lcl})
         , text "at" <+> ppr (tcl_loc lcl)]
 \end{code}
 
+
 %************************************************************************
 %*                                                                      *
                 SkolemInfo
@@ -1789,6 +1794,7 @@ data CtOrigin
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
   | FunDepOrigin
+  | FunDepInstOrigin (FunDep TyVar) ClsInst
   | HoleOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
@@ -1831,6 +1837,11 @@ pprO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, cha
 pprO (KindEqOrigin t1 t2 _) = ptext (sLit "a kind equality arising from") <+> sep [ppr t1, char '~', ppr t2]
 pprO AnnOrigin             = ptext (sLit "an annotation")
 pprO FunDepOrigin          = ptext (sLit "a functional dependency")
+pprO (FunDepInstOrigin fd ispec) = sep [ ptext (sLit "the dependency") <+>
+                                         quotes (pprFunDep fd)
+                                       , ptext (sLit "in the instance declaration") <+>
+                                         pprNameDefnLoc (getName ispec)
+                                       ]
 pprO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
 pprO (UnboundOccurrenceOf name) = hsep [ptext (sLit "an undeclared identifier"), quotes (ppr name)]
 pprO ListOrigin            = ptext (sLit "an overloaded list")
@@ -1839,3 +1850,25 @@ instance Outputable CtOrigin where
   ppr = pprO
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+                PredOrigin
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+data PredOrigin = PredOrigin PredType CtOrigin
+type ThetaOrigin = [PredOrigin]
+
+mkPredOrigin :: CtOrigin -> PredType -> PredOrigin
+mkPredOrigin origin pred = PredOrigin pred origin
+
+predOriginPred :: PredOrigin -> PredType
+predOriginPred (PredOrigin p _) = p
+
+mkThetaOrigin :: CtOrigin -> ThetaType -> ThetaOrigin
+mkThetaOrigin origin = map (mkPredOrigin origin)
+
+instance Outputable PredOrigin where
+  ppr (PredOrigin ty _) = ppr ty -- The origin is not so interesting when debugging
+\end{code}
