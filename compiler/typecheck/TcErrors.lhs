@@ -1049,8 +1049,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
       = ptext (sLit "Could not deduce") <+> pprParendType pred
 
     drv_fixes = case orig of
-                   DerivOrigin -> [drv_fix]
-                   _           -> []
+                   DerivOrigin      -> [drv_fix]
+                   DerivOriginDC {} -> [drv_fix]
+                   _                -> []
 
     drv_fix = hang (ptext (sLit "use a standalone 'deriving instance' declaration,"))
                  2 (ptext (sLit "so you can specify the instance context yourself"))

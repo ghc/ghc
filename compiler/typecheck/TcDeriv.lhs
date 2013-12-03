@@ -1049,11 +1049,13 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
   where
        -- Constraints arising from the arguments of each constructor
     con_arg_constraints cls' get_constrained_tys
-      = [ mkPredOrigin DerivOrigin (mkClassPred cls' [arg_ty])
+      = [ mkPredOrigin (DerivOriginDC data_con arg_n) (mkClassPred cls' [arg_ty])
         | data_con <- tyConDataCons rep_tc,
-          arg_ty   <- ASSERT( isVanillaDataCon data_con )
-                        get_constrained_tys $
-                        dataConInstOrigArgTys data_con all_rep_tc_args,
+          (arg_n, arg_ty) <-
+                ASSERT( isVanillaDataCon data_con )
+                zip [1..] $
+                get_constrained_tys $
+                dataConInstOrigArgTys data_con all_rep_tc_args,
           not (isUnLiftedType arg_ty) ]
                 -- No constraints for unlifted types
                 -- See Note [Deriving and unboxed types]

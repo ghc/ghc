@@ -90,7 +90,7 @@ import TcEvidence
 import Type
 import Class    ( Class )
 import TyCon    ( TyCon )
-import DataCon  ( DataCon, dataConUserType )
+import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import TcType
 import Annotations
 import InstEnv
@@ -1779,6 +1779,8 @@ data CtOrigin
 
   | ScOrigin            -- Typechecking superclasses of an instance declaration
   | DerivOrigin         -- Typechecking deriving
+  | DerivOriginDC DataCon Int
+                        -- Checking constraings arising from this data an and field index
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
@@ -1816,6 +1818,10 @@ pprO TupleOrigin           = ptext (sLit "a tuple")
 pprO NegateOrigin          = ptext (sLit "a use of syntactic negation")
 pprO ScOrigin              = ptext (sLit "the superclasses of an instance declaration")
 pprO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
+pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
+                                    ptext (sLit "field of"), quotes (ppr dc),
+                                    parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
+    where ty = dataConOrigArgTys dc !! (n-1)
 pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprO DefaultOrigin         = ptext (sLit "a 'default' declaration")
 pprO DoOrigin              = ptext (sLit "a do statement")
