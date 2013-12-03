@@ -24,7 +24,7 @@ drvfail-functor2.hs:20:14:
 
 drvfail-functor2.hs:26:14:
     No instance for (Functor NoFunctor)
-      arising from the 'deriving' clause of a data type declaration
+      arising from the first field of ‛UseNoFunctor’ (type ‛NoFunctor a’)
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself
