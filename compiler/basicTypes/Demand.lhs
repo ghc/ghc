@@ -814,6 +814,7 @@ cprSumRes tag | opt_CprOff = topRes
 cprProdRes :: [DmdResult] -> DmdResult
 cprProdRes arg_ress
   | opt_CprOff        = topRes
+  | opt_NestedCprOff  = Converges $ cutCPRResult flatCPRDepth $ RetProd arg_ress
   | otherwise         = Converges $ cutCPRResult maxCPRDepth  $ RetProd arg_ress
 
 getDmdResult :: DmdType -> DmdResult
@@ -827,6 +828,13 @@ divergeDmdResult r = r `lubDmdResult` botRes
 maxCPRDepth :: Int
 maxCPRDepth = 3
 
+-- This is the depth we use with -fnested-cpr-off, in order
+-- to get precisely the same behaviour as before introduction of nested cpr
+-- -fnested-cpr-off can eventually be removed if nested cpr is deemd to be
+-- a good thing always.
+flatCPRDepth :: Int
+flatCPRDepth = 1
+
 -- With nested CPR, DmdResult can be arbitrarily deep; consider
 -- data Rec1 = Foo Rec2 Rec2
 -- data Rec2 = Bar Rec1 Rec1
@@ -836,16 +844,17 @@ maxCPRDepth = 3
 --
 -- So we need to forget information at a certain depth. We do that at all points
 -- where we are constructing new RetProd constructors.
-cutDmdResult :: Int -> DmdResult -> DmdResult
-cutDmdResult 0 _ = topRes
-cutDmdResult _ Diverges = Diverges
-cutDmdResult n (Converges c) = Converges (cutCPRResult n c)
-cutDmdResult n (Dunno c) = Dunno (cutCPRResult n c)
-
 cutCPRResult :: Int -> CPRResult -> CPRResult
-cutCPRResult _ NoCPR = NoCPR
-cutCPRResult n (RetProd rs) = RetProd (map (cutDmdResult (n-1)) rs)
-cutCPRResult _ (RetSum tag) = RetSum tag
+cutCPRResult 0 _               = NoCPR
+cutCPRResult _ NoCPR           = NoCPR
+cutCPRResult _ (RetSum tag)    = RetSum tag
+cutCPRResult n (RetProd rs)    = RetProd (map (cutDmdResult (n-1)) rs)
+  where
+    cutDmdResult :: Int -> DmdResult -> DmdResult
+    cutDmdResult 0 _             = topRes
+    cutDmdResult _ Diverges      = Diverges
+    cutDmdResult n (Converges c) = Converges (cutCPRResult n c)
+    cutDmdResult n (Dunno c)     = Dunno     (cutCPRResult n c)
 
 vanillaCprProdRes :: Arity -> DmdResult
 vanillaCprProdRes arity = cprProdRes (replicate arity topRes)

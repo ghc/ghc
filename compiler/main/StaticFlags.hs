@@ -27,6 +27,7 @@ module StaticFlags (
         -- optimisation opts
         opt_NoStateHack,
         opt_CprOff,
+        opt_NestedCprOff,
         opt_NoOptCoercion,
 
         -- For the parser
@@ -140,7 +141,8 @@ flagsStaticNames :: [String]
 flagsStaticNames = [
     "fno-state-hack",
     "fno-opt-coercion",
-    "fcpr-off"
+    "fcpr-off",
+    "fnested-cpr-off"
     ]
 
 -- We specifically need to discard static flags for clients of the
@@ -195,9 +197,12 @@ opt_NoDebugOutput  = lookUp  (fsLit "-dno-debug-output")
 opt_NoStateHack    :: Bool
 opt_NoStateHack    = lookUp  (fsLit "-fno-state-hack")
 
--- Switch off CPR analysis in the new demand analyser
+-- Switch off CPR analysis in the demand analyser
 opt_CprOff         :: Bool
 opt_CprOff         = lookUp  (fsLit "-fcpr-off")
+
+opt_NestedCprOff   :: Bool
+opt_NestedCprOff   = lookUp  (fsLit "-fnested-cpr-off")
 
 opt_NoOptCoercion  :: Bool
 opt_NoOptCoercion  = lookUp  (fsLit "-fno-opt-coercion")
