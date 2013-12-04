@@ -776,8 +776,9 @@ seqCPRResult RetProd      = ()
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
-topRes, botRes :: DmdResult
+topRes, convRes, botRes :: DmdResult
 topRes = Dunno NoCPR
+convRes = Converges NoCPR
 botRes = Diverges
 
 cprSumRes :: ConTag -> DmdResult
@@ -1182,9 +1183,9 @@ postProcessUnsat (True,  One)  ty = deferType ty
 postProcessUnsat (False, One)  ty = ty
 
 deferType, reuseType, deferReuse :: DmdType -> DmdType
-deferType  (DmdType fv ds _)      = DmdType (deferEnv fv)      (map deferDmd ds)      topRes
+deferType  (DmdType fv ds _)      = DmdType (deferEnv fv)      (map deferDmd ds)      convRes
 reuseType  (DmdType fv ds res_ty) = DmdType (reuseEnv fv)      (map reuseDmd ds)      res_ty
-deferReuse (DmdType fv ds _)      = DmdType (deferReuseEnv fv) (map deferReuseDmd ds) topRes
+deferReuse (DmdType fv ds _)      = DmdType (deferReuseEnv fv) (map deferReuseDmd ds) convRes
 
 deferEnv, reuseEnv, deferReuseEnv :: DmdEnv -> DmdEnv
 deferEnv      fv = mapVarEnv deferDmd fv
