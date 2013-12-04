@@ -103,13 +103,12 @@ c) The application rule wouldn't be right either
    evaluation of f in a C(L) demand!
 
 \begin{code}
-dmdAnalArg :: AnalEnv 
-           -> Demand 	-- This one takes a *Demand*
-           -> CoreExpr -> (DmdType, CoreExpr)
--- Used for function arguments
-dmdAnalArg env dmd e
-  | exprIsTrivial e = dmdAnalStar env dmd e
-  | otherwise       = dmdAnalStar env (oneifyDmd dmd) e
+-- If e is complicated enough to become a thunk, its contents will be evaluated
+-- at most once, so oneify it.
+dmdTransformThunkDmd :: CoreExpr -> Demand -> Demand
+dmdTransformThunkDmd e
+  | exprIsTrivial e = id
+  | otherwise       = oneifyDmd
 
 -- Do not process absent demands
 -- Otherwise act like in a normal demand analysis
@@ -177,7 +176,7 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
         call_dmd          = mkCallDmd dmd
 	(fun_ty, fun') 	  = dmdAnal env call_dmd fun
 	(arg_dmd, res_ty) = splitDmdTy fun_ty
-        (arg_ty, arg') 	  = dmdAnalArg env arg_dmd arg
+        (arg_ty, arg') 	  = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
     in
 --    pprTrace "dmdAnal:app" (vcat
 --         [ text "dmd =" <+> ppr dmd
@@ -510,6 +509,7 @@ dmdTransform env var dmd
 
   | otherwise	 		                 -- Local non-letrec-bound thing
   = unitVarDmd var (mkOnceUsedDmd dmd)
+
 \end{code}
 
 %************************************************************************
