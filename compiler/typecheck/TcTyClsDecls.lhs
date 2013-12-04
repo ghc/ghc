@@ -1482,26 +1482,44 @@ checkValidDataCon dflags existential_ok tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))     $
     addErrCtxt (dataConCtxt con)                $
     do  { traceTc "checkValidDataCon" (ppr con $$ ppr tc)
+
+          -- Check that the return type of the data constructor
+          -- matches the type constructor; eg reject this:
+          --   data T a where { MkT :: Bogus a }
+          -- c.f. Note [Check role annotations in a second pass]
+          --  and Note [Checking GADT return types]
         ; let tc_tvs = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
-              actual_res_ty = dataConOrigResTy con
+              orig_res_ty = dataConOrigResTy con
         ; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
-                                res_ty_tmpl
-                                actual_res_ty))
-                  (badDataConTyCon con res_ty_tmpl actual_res_ty)
-             -- IA0_TODO: we should also check that kind variables
-             -- are only instantiated with kind variables
-        ; checkValidMonoType (dataConOrigResTy con)
-                -- Disallow MkT :: T (forall a. a->a)
-                -- Reason: it's really the argument of an equality constraint
+                                     res_ty_tmpl
+                                     orig_res_ty))
+                  (badDataConTyCon con res_ty_tmpl orig_res_ty)
+
+          -- Check that the result type is a *monotype*
+          --  e.g. reject this:   MkT :: T (forall a. a->a)
+          -- Reason: it's really the argument of an equality constraint
+        ; checkValidMonoType orig_res_ty
+
+          -- Check all argument types for validity
         ; checkValidType ctxt (dataConUserType con)
+
+          -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
 
+          -- Check that UNPACK pragmas and bangs work out
+          -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
+          --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
         ; mapM_ check_bang (zip3 (dataConStrictMarks con) (dataConRepBangs con) [1..])
 
+          -- Check that existentials are allowed if they are used
         ; checkTc (existential_ok || isVanillaDataCon con)
                   (badExistential con)
 
+          -- Check that we aren't doing GADT type refinement on kind variables
+          -- e.g reject    data T (a::k) where
+          --                  T1 :: T Int
+          --                  T2 :: T Maybe
         ; checkTc (not (any (isKindVar . fst) (dataConEqSpec con)))
                   (badGadtKindCon con)
 
@@ -1527,7 +1545,7 @@ checkValidDataCon dflags existential_ok tc con
                        <+> ptext (sLit "argument of") <+> quotes (ppr con))
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
--- Checks for the data constructor of a newtype
+-- Further checks for the data constructor of a newtype
 checkNewDataCon con
   = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
                 -- One argument
