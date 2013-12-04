@@ -181,12 +181,13 @@ safeExit, fastExit :: Int -> IO a
 safeExit = exitHelper useSafeExit
 fastExit = exitHelper useFastExit
 
+unreachable :: IO a
+unreachable = fail "If you can read this, shutdownHaskellAndExit did not exit."
+
 exitHelper :: CInt -> Int -> IO a
--- we have to use unsafeCoerce# to get the 'IO a' result type, since the
--- compiler doesn't let us declare that as the result type of a foreign export.
 #ifdef mingw32_HOST_OS
 exitHelper exitKind r =
-  unsafeCoerce# (shutdownHaskellAndExit (fromIntegral r) exitKind)
+  shutdownHaskellAndExit (fromIntegral r) exitKind >> unreachable
 #else
 -- On Unix we use an encoding for the ExitCode:
 --      0 -- 255  normal exit code
@@ -194,11 +195,11 @@ exitHelper exitKind r =
 -- For any invalid encoding we just use a replacement (0xff).
 exitHelper exitKind r
   | r >= 0 && r <= 255
-  = unsafeCoerce# (shutdownHaskellAndExit   (fromIntegral   r)  exitKind)
+  = shutdownHaskellAndExit   (fromIntegral   r)  exitKind >> unreachable
   | r >= -127 && r <= -1
-  = unsafeCoerce# (shutdownHaskellAndSignal (fromIntegral (-r)) exitKind)
+  = shutdownHaskellAndSignal (fromIntegral (-r)) exitKind >> unreachable
   | otherwise
-  = unsafeCoerce# (shutdownHaskellAndExit   0xff                exitKind)
+  = shutdownHaskellAndExit   0xff                exitKind >> unreachable
 
 foreign import ccall "shutdownHaskellAndSignal"
   shutdownHaskellAndSignal :: CInt -> CInt -> IO ()
