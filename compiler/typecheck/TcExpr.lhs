@@ -797,7 +797,10 @@ tcExpr (PArrSeq _ _) _
 %************************************************************************
 
 \begin{code}
-tcExpr (HsSpliceE is_ty splice)  res_ty = tcSpliceExpr is_ty splice res_ty
+tcExpr (HsSpliceE is_ty splice)  res_ty
+  = ASSERT( is_ty )   -- Untyped splices are expanced by the renamer
+   tcSpliceExpr splice res_ty
+
 tcExpr (HsBracket brack)         res_ty = tcTypedBracket   brack res_ty
 tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
 \end{code}

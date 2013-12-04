@@ -14,11 +14,9 @@ import Annotations ( Annotation, CoreAnnTarget )
 import qualified Language.Haskell.TH as TH
 #endif
 
-tcSpliceExpr :: Bool -> HsSplice Name
+tcSpliceExpr :: HsSplice Name
              -> TcRhoType
              -> TcM (HsExpr TcId)
-
-tcSpliceDecls :: HsSplice Name -> TcM [LHsDecl RdrName]
 
 tcUntypedBracket :: HsBracket Name
                  -> [PendingRnSplice]

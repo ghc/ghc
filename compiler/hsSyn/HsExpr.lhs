@@ -1382,6 +1382,9 @@ instance OutputableBndr id => Outputable (HsSplice id) where
 pprUntypedSplice :: OutputableBndr id => HsSplice id -> SDoc
 pprUntypedSplice = pprSplice False
 
+pprTypedSplice :: OutputableBndr id => HsSplice id -> SDoc
+pprTypedSplice = pprSplice True
+
 pprSplice :: OutputableBndr id => Bool -> HsSplice id -> SDoc
 pprSplice is_typed (HsSplice n e)
     = (if is_typed then ptext (sLit "$$") else char '$')
