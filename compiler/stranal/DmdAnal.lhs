@@ -32,7 +32,7 @@ import Type		( eqType )
 -- import Pair
 -- import Coercion         ( coercionKind )
 import Util
-import Maybes		( isJust, orElse )
+import Maybes		( isJust )
 import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
@@ -726,16 +726,6 @@ addLazyFVs dmd_ty lazy_fvs
 	-- which floats out of the defn for h.  Without the modifyEnv, that
 	-- L demand doesn't get both'd with the Bot coming up from the inner
 	-- call to f.  So we just get an L demand for x for g.
-
-peelFV :: DmdEnv -> Var -> DmdResult -> (DmdEnv, Demand)
-peelFV fv id res = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
-                     (fv', dmd)
-		where
-		  fv' = fv `delVarEnv` id
-		  dmd = lookupVarEnv fv id `orElse` deflt
-                  -- See note [Default demand for variables]
-	 	  deflt | isBotRes res = botDmd
-		        | otherwise    = absDmd
 \end{code}
 
 Note [Default demand for variables]
@@ -761,11 +751,11 @@ annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- The returned var is annotated with demand info
 -- according to the result demand of the provided demand type
 -- No effect on the argument demands
-annotateBndr env dmd_ty@(DmdType fv ds res) var
+annotateBndr env dmd_ty var
   | isTyVar var = (dmd_ty, var)
-  | otherwise   = (DmdType fv' ds res, set_idDemandInfo env var dmd')
+  | otherwise   = (dmd_ty', set_idDemandInfo env var dmd')
   where
-    (fv', dmd) = peelFV fv var res
+    (dmd_ty', dmd) = peelFV dmd_ty var
 
     dmd' | gopt Opt_DictsStrict (ae_dflags env)
              -- We never want to strictify a recursive let. At the moment
@@ -786,13 +776,13 @@ annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
 
 annotateLamIdBndr :: AnalEnv
                   -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
-                  -> DmdType 	-- Demand type of body
+                  -> DmdType    -- Demand type of body
                   -> Count      -- One-shot-ness of the lambda
-		  -> Id 	-- Lambda binder
-		  -> (DmdType, 	-- Demand type of lambda
-		      Id)	-- and binder annotated with demand	
+		  -> Id         -- Lambda binder
+		  -> (DmdType,  -- Demand type of lambda
+		      Id)	-- and binder annotated with demand
 
-annotateLamIdBndr env arg_of_dfun _dmd_ty@(DmdType fv ds res) one_shot id
+annotateLamIdBndr env arg_of_dfun dmd_ty one_shot id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
@@ -805,10 +795,9 @@ annotateLamIdBndr env arg_of_dfun _dmd_ty@(DmdType fv ds res) one_shot id
                  Just unf -> main_ty `bothDmdType` unf_ty
                           where
                              (unf_ty, _) = dmdAnalStar env dmd unf
-    
-    main_ty = DmdType fv' (dmd:ds) res
 
-    (fv', dmd) = peelFV fv id res
+    main_ty = addDemand dmd dmd_ty'
+    (dmd_ty', dmd) = peelFV dmd_ty id
 
     dmd' | gopt Opt_DictsStrict (ae_dflags env),
            -- see Note [do not strictify the argument dictionaries of a dfun]

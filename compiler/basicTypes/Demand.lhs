@@ -20,8 +20,10 @@ module Demand (
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdEnv, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
+        addDemand,
 
         DmdEnv, emptyDmdEnv,
+        peelFV,
 
         DmdResult, CPRResult,
         isBotRes, isTopRes, resTypeArgDmd, 
@@ -55,12 +57,13 @@ module Demand (
 import StaticFlags
 import DynFlags
 import Outputable
+import Var ( Var )
 import VarEnv
 import UniqFM
 import Util
 import BasicTypes
 import Binary
-import Maybes           ( isJust, expectJust )
+import Maybes           ( isJust, expectJust, orElse )
 
 import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
@@ -1151,6 +1154,20 @@ peelManyCalls arg_ds (CD { sd = str, ud = abs })
     go_abs []      _             = One       --          one UCall Many in the demand
     go_abs (_:as) (UCall One d') = go_abs as d'
     go_abs _      _              = Many
+
+
+peelFV :: DmdType -> Var -> (DmdType, Demand)
+peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
+                               (DmdType fv' ds res, dmd)
+  where
+  fv' = fv `delVarEnv` id
+  dmd = lookupVarEnv fv id `orElse` deflt
+  -- See note [Default demand for variables]
+  deflt | isBotRes res = botDmd
+        | otherwise    = absDmd
+
+addDemand :: Demand -> DmdType -> DmdType
+addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
 \end{code}
 
 Note [Always analyse in virgin pass]
