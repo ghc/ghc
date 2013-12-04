@@ -1560,9 +1560,9 @@ mkNewTypeEqn dflags tvs
         -- newtype type; precisely the constraints required for the
         -- calls to coercible that we are going to generate.
         coercible_constraints =
-            mkThetaOrigin DerivOrigin $
-            map (\(Pair t1 t2) -> mkCoerciblePred t1 t2) $
-            mkCoerceClassMethEqn cls (varSetElemsKvsFirst dfun_tvs) inst_tys rep_inst_ty
+            [ let (Pair t1 t2) = mkCoerceClassMethEqn cls (varSetElemsKvsFirst dfun_tvs) inst_tys rep_inst_ty meth
+              in mkPredOrigin (DerivOriginCoerce meth t1 t2) (mkCoerciblePred t1 t2)
+            | meth <- classMethods cls ]
 
                 -- If there are no tyvars, there's no need
                 -- to abstract over the dictionaries we need

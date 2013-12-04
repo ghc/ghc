@@ -1913,20 +1913,16 @@ mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head
                      -> [Type]  -- instance head parameters (incl. newtype)
                      -> Type    -- the representation type (already eta-reduced)
-                     -> [Pair Type]
-mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty
-  = map mk_tys $ classMethods cls
+                     -> Id      -- the method to look at
+                     -> Pair Type
+mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty id
+  = Pair (substTy rhs_subst user_meth_ty) (substTy lhs_subst user_meth_ty)
   where
     cls_tvs = classTyVars cls
     in_scope = mkInScopeSet $ mkVarSet inst_tvs
     lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs cls_tys)
     rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast cls_tys rhs_ty))
-
-    mk_tys :: Id -> Pair Type
-    mk_tys id = Pair (substTy rhs_subst user_meth_ty)
-                     (substTy lhs_subst user_meth_ty)
-      where
-        (_class_tvs, _class_constraint, user_meth_ty) = tcSplitSigmaTy (varType id)
+    (_class_tvs, _class_constraint, user_meth_ty) = tcSplitSigmaTy (varType id)
 
     changeLast :: [a] -> a -> [a]
     changeLast []     _  = panic "changeLast"
@@ -1943,7 +1939,7 @@ gen_Newtype_binds :: SrcSpan
 gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
   = listToBag $ zipWith mk_bind
         (classMethods cls)
-        (mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty)
+        (map (mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty) (classMethods cls))
   where
     coerce_RDR = getRdrName coerceId
     mk_bind :: Id -> Pair Type -> LHsBind RdrName

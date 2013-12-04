@@ -1780,7 +1780,10 @@ data CtOrigin
   | ScOrigin            -- Typechecking superclasses of an instance declaration
   | DerivOrigin         -- Typechecking deriving
   | DerivOriginDC DataCon Int
-                        -- Checking constraings arising from this data an and field index
+                        -- Checking constraints arising from this data con and field index
+  | DerivOriginCoerce Id Type Type
+                        -- DerivOriginCoerce id ty1 ty2: Trying to coerce class method `id` from
+                        -- `ty1` to `ty2`.
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
@@ -1822,6 +1825,10 @@ pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
                                     ptext (sLit "field of"), quotes (ppr dc),
                                     parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
     where ty = dataConOrigArgTys dc !! (n-1)
+pprO (DerivOriginCoerce meth ty1 ty2)
+                           = fsep [ ptext (sLit "the coercion"), ptext (sLit "of the method")
+                                  , quotes (ppr meth), ptext (sLit "from type"), quotes (ppr ty1)
+                                  , ptext (sLit "to type"), quotes (ppr ty2) ]
 pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprO DefaultOrigin         = ptext (sLit "a 'default' declaration")
 pprO DoOrigin              = ptext (sLit "a do statement")

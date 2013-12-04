@@ -1051,6 +1051,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     drv_fixes = case orig of
                    DerivOrigin      -> [drv_fix]
                    DerivOriginDC {} -> [drv_fix]
+                   DerivOriginCoerce {} -> [drv_fix]
                    _                -> []
 
     drv_fix = hang (ptext (sLit "use a standalone 'deriving instance' declaration,"))
