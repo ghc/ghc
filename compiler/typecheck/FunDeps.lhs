@@ -133,12 +133,10 @@ unification variables when producing the FD constraints.
 Finally, the position parameters will help us rewrite the wanted constraint ``on the spot''
 
 \begin{code}
-type Pred_Loc = (PredType, SDoc)        -- SDoc says where the Pred comes from
-
 data Equation
    = FDEqn { fd_qtvs :: [TyVar]                 -- Instantiate these type and kind vars to fresh unification vars
            , fd_eqs  :: [FDEq]                  --   and then make these equal
-           , fd_pred1, fd_pred2 :: Pred_Loc }   -- The Equation arose from
+           , fd_pred1, fd_pred2 :: PredType }   -- The Equation arose from
                                                 -- combining these two constraints
 
 data FDEq = FDEq { fd_pos      :: Int -- We use '0' for the first position
@@ -213,14 +211,14 @@ zipAndComputeFDEqs _ _ _ = []
 
 -- Improve a class constraint from another class constraint
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-improveFromAnother :: Pred_Loc -- Template item (usually given, or inert)
-                   -> Pred_Loc -- Workitem [that can be improved]
+improveFromAnother :: PredType -- Template item (usually given, or inert)
+                   -> PredType -- Workitem [that can be improved]
                    -> [Equation]
 -- Post: FDEqs always oriented from the other to the workitem
 --       Equations have empty quantified variables
-improveFromAnother pred1@(ty1, _) pred2@(ty2, _)
-  | Just (cls1, tys1) <- getClassPredTys_maybe ty1
-  , Just (cls2, tys2) <- getClassPredTys_maybe ty2
+improveFromAnother pred1 pred2
+  | Just (cls1, tys1) <- getClassPredTys_maybe pred1
+  , Just (cls2, tys2) <- getClassPredTys_maybe pred2
   , tys1 `lengthAtLeast` 2 && cls1 == cls2
   = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2 }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
@@ -243,15 +241,15 @@ pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
           nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (FDEq _ t1 t2) <- pairs])]
 
 improveFromInstEnv :: (InstEnv,InstEnv)
-                   -> Pred_Loc
+                   -> PredType
                    -> [Equation] -- Needs to be an Equation because
                                  -- of quantified variables
 -- Post: Equations oriented from the template (matching instance) to the workitem!
-improveFromInstEnv _inst_env (pred,_loc)
+improveFromInstEnv _inst_env pred
   | not (isClassPred pred)
   = panic "improveFromInstEnv: not a class predicate"
-improveFromInstEnv inst_env pred@(ty, _)
-  | Just (cls, tys) <- getClassPredTys_maybe ty
+improveFromInstEnv inst_env pred
+  | Just (cls, tys) <- getClassPredTys_maybe pred
   , tys `lengthAtLeast` 2
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
@@ -267,10 +265,7 @@ improveFromInstEnv inst_env pred@(ty, _)
     , ispec <- instances
     , (meta_tvs, eqs) <- checkClsFD fd cls_tvs ispec
                                     emptyVarSet tys trimmed_tcs -- NB: orientation
-    , let p_inst = (mkClassPred cls (is_tys ispec),
-                    sep [ ptext (sLit "arising from the dependency") <+> quotes (pprFunDep fd)
-                        , ptext (sLit "in the instance declaration")
-                          <+> pprNameDefnLoc (getName ispec)])
+    , let p_inst = mkClassPred cls (is_tys ispec)
     ]
 improveFromInstEnv _ _ = []
 

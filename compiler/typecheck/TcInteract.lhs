@@ -31,8 +31,6 @@ import FamInstEnv ( FamInstEnvs, instNewTyConTF_maybe )
 import TcEvidence
 import Outputable
 
-import TcMType ( zonkTcPredType )
-
 import TcRnTypes
 import TcErrors
 import TcSMonad
@@ -411,13 +409,8 @@ interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
 
 addFunDepWork :: Ct -> Ct -> TcS ()
 addFunDepWork work_ct inert_ct
-  = do { let work_loc           = ctLoc work_ct
-             inert_loc          = ctLoc inert_ct
-             inert_pred_loc     = (ctPred inert_ct, pprArisingAt inert_loc)
-             work_item_pred_loc = (ctPred work_ct,  pprArisingAt work_loc)
-
-       ; let fd_eqns = improveFromAnother inert_pred_loc work_item_pred_loc
-       ; fd_work <- rewriteWithFunDeps fd_eqns work_loc
+  = do {  let fd_eqns = improveFromAnother (ctPred inert_ct) (ctPred work_ct)
+       ; fd_work <- rewriteWithFunDeps fd_eqns (ctLoc work_ct)
                 -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                 -- NB: We do create FDs for given to report insoluble equations that arise
                 -- from pairs of Givens, and also because of floating when we approximate
@@ -1355,20 +1348,17 @@ rewriteWithFunDeps eqn_pred_locs loc
 
 instFunDepEqn :: CtLoc -> Equation -> TcS [Ct]
 -- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
-                         , fd_pred1 = d1, fd_pred2 = d2 })
+instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs })
   = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
        ; foldM (do_one subst) [] eqs }
   where
-    der_loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
-
     do_one subst ievs (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
        | tcEqType sty1 sty2
        = return ievs -- Return no trivial equalities
        | otherwise
-       = do { mb_eqv <- newDerived der_loc (mkTcEqPred sty1 sty2)
+       = do { mb_eqv <- newDerived loc (mkTcEqPred sty1 sty2)
             ; case mb_eqv of
-                 Just ev -> return (mkNonCanonical (ev {ctev_loc = der_loc}) : ievs)
+                 Just ev -> return (mkNonCanonical (ev {ctev_loc = loc}) : ievs)
                  Nothing -> return ievs }
                    -- We are eventually going to emit FD work back in the work list so
                    -- it is important that we only return the /freshly created/ and not
@@ -1376,18 +1366,6 @@ instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
        where
          sty1 = Type.substTy subst ty1
          sty2 = Type.substTy subst ty2
-
-mkEqnMsg :: (TcPredType, SDoc)
-         -> (TcPredType, SDoc) -> TidyEnv -> TcM (TidyEnv, SDoc)
-mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
-  = do  { zpred1 <- zonkTcPredType pred1
-        ; zpred2 <- zonkTcPredType pred2
-        ; let { tpred1 = tidyType tidy_env zpred1
-              ; tpred2 = tidyType tidy_env zpred2 }
-        ; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
-                          nest 2 (sep [ppr tpred1 <> comma, nest 2 from1]),
-                          nest 2 (sep [ppr tpred2 <> comma, nest 2 from2])]
-        ; return (tidy_env, msg) }
 \end{code}
 
 
@@ -1459,7 +1437,6 @@ doTopReactDict inerts fl cls xis
                                           ; solve_from_instance wtvs ev_term }
                NoInstance -> try_fundeps_and_return }
    where
-     arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
      pred = mkClassPred cls xis
      loc = ctev_loc fl
@@ -1492,7 +1469,7 @@ doTopReactDict inerts fl cls xis
      -- so we make sure we get on and solve it first. See Note [Weird fundeps]
      try_fundeps_and_return
        = do { instEnvs <- getInstEnvs
-            ; let fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
+            ; let fd_eqns = improveFromInstEnv instEnvs pred
             ; fd_work <- rewriteWithFunDeps fd_eqns loc
             ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
             ; return NoTopInt }
