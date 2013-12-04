@@ -268,14 +268,12 @@ freeStorage (rtsBool free_heap)
 }
 
 /* -----------------------------------------------------------------------------
-   CAF management.
+   Note [CAF management].
 
    The entry code for every CAF does the following:
-     
-      - builds a CAF_BLACKHOLE in the heap
 
-      - calls newCaf, which atomically updates the CAF with
-        IND_STATIC pointing to the CAF_BLACKHOLE
+      - calls newCaf, which builds a CAF_BLACKHOLE on the heap and atomically
+        updates the CAF with IND_STATIC pointing to the CAF_BLACKHOLE
 
       - if newCaf returns zero, it re-enters the CAF (see Note [atomic
         CAF entry])
@@ -289,13 +287,19 @@ freeStorage (rtsBool free_heap)
    frames would also need special cases for static update frames.
 
    newCaf() does the following:
-       
+
+      - atomically locks the CAF (see [atomic CAF entry])
+
+      - it builds a CAF_BLACKHOLE on the heap
+
       - it updates the CAF with an IND_STATIC pointing to the
         CAF_BLACKHOLE, atomically.
 
       - it puts the CAF on the oldest generation's mutable list.
         This is so that we treat the CAF as a root when collecting
         younger generations.
+
+      - links the CAF onto the CAF list (see below)
 
    ------------------
    Note [atomic CAF entry]

@@ -695,44 +695,17 @@ emitUpdateFrame dflags frame lbl updatee = do
 -----------------------------------------------------------------------------
 -- Entering a CAF
 --
--- When a CAF is first entered, it creates a black hole in the heap,
--- and updates itself with an indirection to this new black hole.
---
--- We update the CAF with an indirection to a newly-allocated black
--- hole in the heap.  We also set the blocking queue on the newly
--- allocated black hole to be empty.
---
--- Why do we make a black hole in the heap when we enter a CAF?
---
---     - for a  generational garbage collector, which needs a fast
---       test for whether an updatee is in an old generation or not
---
---     - for the parallel system, which can implement updates more
---       easily if the updatee is always in the heap. (allegedly).
---
--- When debugging, we maintain a separate CAF list so we can tell when
--- a CAF has been garbage collected.
-
--- newCAF must be called before the itbl ptr is overwritten, since
--- newCAF records the old itbl ptr in order to do CAF reverting
--- (which Hugs needs to do in order that combined mode works right.)
---
+-- See Note [CAF management] in rts/sm/Storage.c
 
 link_caf :: LocalReg           -- pointer to the closure
          -> Bool               -- True <=> updatable, False <=> single-entry
          -> FCode CmmExpr      -- Returns amode for closure to be updated
--- To update a CAF we must allocate a black hole, link the CAF onto the
--- CAF list, then update the CAF to point to the fresh black hole.
 -- This function returns the address of the black hole, so it can be
--- updated with the new value when available.  The reason for all of this
--- is that we only want to update dynamic heap objects, not static ones,
--- so that generational GC is easier.
+-- updated with the new value when available.
 link_caf node _is_upd = do
   { dflags <- getDynFlags
-        -- Call the RTS function newCAF to add the CAF to the CafList
-        -- so that the garbage collector can find them
-        -- This must be done *before* the info table pointer is overwritten,
-        -- because the old info table ptr is needed for reversion
+        -- Call the RTS function newCAF, returning the newly-allocated
+        -- blackhole indirection closure
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
                                     ForeignLabelInExternalPackage IsFunction
   ; bh <- newTemp (bWord dflags)
