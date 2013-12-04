@@ -728,16 +728,6 @@ addLazyFVs dmd_ty lazy_fvs
 	-- call to f.  So we just get an L demand for x for g.
 \end{code}
 
-Note [Default demand for variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If the variable is not mentioned in the environment of a demand type,
-its demand is taken to be a result demand of the type: either L or the
-bottom. Both are safe from the semantical pont of view, however, for
-the safe result we also have absent demand set to Abs, which makes it
-possible to safely ignore non-mentioned variables (their joint demand
-is <L,A>).
-
 Note [do not strictify the argument dictionaries of a dfun]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

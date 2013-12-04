@@ -18,7 +18,7 @@ module Demand (
         isTopDmd, isBotDmd, isAbsDmd, isSeqDmd, 
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
 
-        DmdType(..), dmdTypeDepth, lubDmdType, bothDmdEnv, bothDmdType,
+        DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
         addDemand,
 
@@ -63,7 +63,7 @@ import UniqFM
 import Util
 import BasicTypes
 import Binary
-import Maybes           ( isJust, expectJust, orElse )
+import Maybes           ( isJust, orElse )
 
 import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
@@ -706,11 +706,17 @@ lubCPR (RetSum t1) (RetSum t2)
   | t1 == t2                   = RetSum t1
 lubCPR RetProd     RetProd     = RetProd
 lubCPR _ _                     = NoCPR
+-- This needs to commute with defaultDmd, i.e.
+-- defaultDmd (r1 `lubCPR` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
+-- (See Note [Default demand on free variables] for why)
 
 bothCPR :: CPRResult -> CPRResult -> CPRResult
 -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
 bothCPR _ BotCPR = BotCPR   -- If either diverges, we diverge
 bothCPR r _      = r
+-- This needs to commute with defaultDmd, i.e.
+-- defaultDmd (r1 `bothCPR` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
+-- (See Note [Default demand on free variables] for why)
 
 instance Outputable DmdResult where
   ppr RetProd    = char 'm' 
@@ -898,8 +904,7 @@ in GHC itself where the tuple was DynFlags
 \begin{code}
 type Demand = JointDmd
 
-type DmdEnv = VarEnv Demand   -- If a variable v is not in the domain of the
-                              -- DmdEnv, it implicitly maps to <Lazy,Absent>
+type DmdEnv = VarEnv Demand   -- See Note [Default demand on free variables]
 
 data DmdType = DmdType 
                   DmdEnv        -- Demand on explicitly-mentioned 
@@ -945,8 +950,13 @@ Similarly with
 we get dt_scrut from the scrutinee and dt_rhs from the RHS, and then
 compute (dt_rhs `bothType` dt_scrut).
 
-We take the CPR info from FIRST argument, but combine both to get
-termination info.
+We
+ 1. combine the information on the free variables,
+ 2. take the demand on arguments from the first argument
+ 3. combine the termination results, but
+ 4. take CPR info from the first argument.
+
+3 and 4 are implementd in bothDmdResult.
 
 
 \begin{code}
@@ -958,39 +968,23 @@ instance Eq DmdType where
 
 lubDmdType :: DmdType -> DmdType -> DmdType
 lubDmdType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
-  = DmdType lub_fv2 (lub_ds ds1 ds2) (r1 `lubDmdResult` r2)
+  = DmdType lub_fv (lub_ds ds1 ds2) (r1 `lubDmdResult` r2)
   where
-    absLub  = lubDmd absDmd
-    lub_fv  = plusVarEnv_C lubDmd fv1 fv2
-    -- Consider (if x then y else []) with demand V
-    -- Then the first branch gives {y->V} and the second
-    -- *implicitly* has {y->A}.  So we must put {y->(V `lub` A)}
-    -- in the result env.
-    lub_fv1 = modifyEnv (not (isBotRes r1)) absLub fv2 fv1 lub_fv
-    lub_fv2 = modifyEnv (not (isBotRes r2)) absLub fv1 fv2 lub_fv1
-      -- lub is the identity for Bot
+    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
 
       -- Extend the shorter argument list to match the longer
     lub_ds (d1:ds1) (d2:ds2) = lubDmd d1 d2 : lub_ds ds1 ds2
     lub_ds []     []       = []
     lub_ds ds1    []       = map (`lubDmd` resTypeArgDmd r2) ds1
     lub_ds []     ds2      = map (resTypeArgDmd r1 `lubDmd`) ds2
- 
+
 bothDmdType :: DmdType -> DmdType -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (DmdType fv2 _ r2)
     -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
-    -- NB: Don't forget about r2!  It might be BotRes, which is
-    -- a bottom demand on all the in-scope variables.
-  = DmdType both_fv2 ds1 (r1 `bothDmdResult` r2)
-  where
-    both_fv  = plusVarEnv_C bothDmd fv1 fv2
-    both_fv1 = modifyEnv (isBotRes r1) (`bothDmd` botDmd) fv2 fv1 both_fv
-    both_fv2 = modifyEnv (isBotRes r2) (`bothDmd` botDmd) fv1 fv2 both_fv1
-
-bothDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
-bothDmdEnv = plusVarEnv_C bothDmd
+  = DmdType both_fv ds1 (r1 `bothDmdResult` r2)
+  where both_fv = plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
 
 instance Outputable DmdType where
   ppr (DmdType fv ds res) 
@@ -1053,20 +1047,6 @@ deferAfterIO d@(DmdType _ _ res) =
   where
   defer_res BotCPR  = NoCPR
   defer_res r       = r
-
-modifyEnv :: Bool                       -- No-op if False
-          -> (Demand -> Demand)         -- The zapper
-          -> DmdEnv -> DmdEnv           -- Env1 and Env2
-          -> DmdEnv -> DmdEnv           -- Transform this env
-        -- Zap anything in Env1 but not in Env2
-        -- Assume: dom(env) includes dom(Env1) and dom(Env2)
-modifyEnv need_to_modify zapper env1 env2 env
-  | need_to_modify = foldr zap env (varEnvKeys (env1 `minusUFM` env2))
-  | otherwise      = env
-  where
-    zap uniq env = addToUFM_Directly env uniq (zapper current_val)
-                 where
-                   current_val = expectJust "modifyEnv" (lookupUFM_Directly env uniq)
 
 strictenDmd :: JointDmd -> CleanDemand
 strictenDmd (JD {strd = s, absd = u})
@@ -1155,20 +1135,33 @@ peelManyCalls arg_ds (CD { sd = str, ud = abs })
     go_abs (_:as) (UCall One d') = go_abs as d'
     go_abs _      _              = Many
 
-
 peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
                                (DmdType fv' ds res, dmd)
   where
   fv' = fv `delVarEnv` id
-  dmd = lookupVarEnv fv id `orElse` deflt
-  -- See note [Default demand for variables]
-  deflt | isBotRes res = botDmd
-        | otherwise    = absDmd
+  -- See note [Default demand on free variables]
+  dmd  = lookupVarEnv fv id `orElse` defaultDmd res
+
+defaultDmd :: DmdResult -> Demand
+defaultDmd res | isBotRes res = botDmd
+               | otherwise    = absDmd
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
 \end{code}
+
+Note [Default demand on free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the variable is not mentioned in the environment of a demand type,
+its demand is taken to be a result demand of the type.
+    For the stricness component,
+     if the result demand is a Diverges, then we use HyperStr
+                                         else we use Lazy
+    For the usage component, we use Absent.
+So we use either absDmd or botDmd.
+
+Also note the equations for lubDmdResult (resp. bothDmdResult) noted there.
 
 Note [Always analyse in virgin pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

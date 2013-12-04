@@ -12,7 +12,7 @@ module VarEnv (
         emptyVarEnv, unitVarEnv, mkVarEnv,
         elemVarEnv, varEnvElts, varEnvKeys,
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnvList,
-        plusVarEnv, plusVarEnv_C, alterVarEnv,
+        plusVarEnv, plusVarEnv_C, plusVarEnv_CD, alterVarEnv,
         delVarEnvList, delVarEnv,
         minusVarEnv, intersectsVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
@@ -385,6 +385,7 @@ delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
 intersectsVarEnv  :: VarEnv a -> VarEnv a -> Bool
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
+plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 mapVarEnv         :: (a -> b) -> VarEnv a -> VarEnv b
 modifyVarEnv      :: (a -> a) -> VarEnv a -> Var -> VarEnv a
 varEnvElts        :: VarEnv a -> [a]
@@ -409,6 +410,7 @@ extendVarEnv_C   = addToUFM_C
 extendVarEnv_Acc = addToUFM_Acc
 extendVarEnvList = addListToUFM
 plusVarEnv_C     = plusUFM_C
+plusVarEnv_CD    = plusUFM_CD
 delVarEnvList    = delListFromUFM
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM

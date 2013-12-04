@@ -45,6 +45,7 @@ module UniqFM (
         delListFromUFM,
         plusUFM,
         plusUFM_C,
+        plusUFM_CD,
         minusUFM,
         intersectUFM,
         intersectUFM_C,
@@ -134,6 +135,16 @@ plusUFM         :: UniqFM elt -> UniqFM elt -> UniqFM elt
 plusUFM_C       :: (elt -> elt -> elt)
                 -> UniqFM elt -> UniqFM elt -> UniqFM elt
 
+-- | plusUFM_CD  f m1 d1 m2 d2
+--   merges the maps using `f` as the combinding function and d1 resp. d2 as
+--   the default value if there is no entry in m1 reps. m2. The domain is the union
+--   of the domains of m1 m2.
+--   Representative example:
+--   > plusUFM_CD f {A: 1, B: 2} 23 {B: 3, C: 4} 42
+--   >   == {A: f 1 42, B: f 2 3, C: f 23 4 }
+plusUFM_CD      :: (elt -> elt -> elt)
+                -> UniqFM elt -> elt -> UniqFM elt -> elt -> UniqFM elt
+
 minusUFM        :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 
 intersectUFM    :: UniqFM elt -> UniqFM elt -> UniqFM elt
@@ -222,7 +233,24 @@ delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
 
 -- M.union is left-biased, plusUFM should be right-biased.
 plusUFM (UFM x) (UFM y) = UFM (M.union y x)
+     -- Note (M.union y x), with arguments flipped
+     -- M.union is left-biased, plusUFM should be right-biased.
+
 plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
+
+plusUFM_CD f (UFM xm) dx (UFM ym) dy
+{-
+The following implementation should be used as soon as we can expect
+containers-0.5; presumably from GHC 7.9 on:
+    = UFM $ M.mergeWithKey
+        (\_ x y -> Just (x `f` y))
+        (M.map (\x -> x `f` dy))
+        (M.map (\y -> dx `f` y))
+        xm ym
+-}
+    = UFM $ M.intersectionWith f xm ym
+        `M.union` M.map (\x -> x  `f` dy) xm
+        `M.union` M.map (\y -> dx `f`  y) ym
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
