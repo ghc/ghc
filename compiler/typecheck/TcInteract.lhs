@@ -517,7 +517,10 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
        ; return (Just (inerts { inert_funeqs = replaceFunEqs funeqs tc args workItem }), True) }
 
   | (CFunEqCan { cc_rhs = rhs_i } : _) <- matching_inerts
-  = do { mb <- newDerived loc (mkTcEqPred rhs_i rhs)
+  = -- We have  F ty ~ r1, F ty ~ r2, but neither can rewrite the other;
+    -- for example, they might both be Derived, or both Wanted
+    -- So we generate a new derived equality r1~r2
+    do { mb <- newDerived loc (mkTcEqPred rhs_i rhs)
        ; case mb of
            Just x  -> updWorkListTcS (extendWorkListEq (mkNonCanonical x))
            Nothing -> return ()

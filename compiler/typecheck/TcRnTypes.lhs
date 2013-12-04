@@ -1057,7 +1057,7 @@ ctPred :: Ct -> PredType
 ctPred ct = ctEvPred (cc_ev ct)
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
--- See Note [Insoluble derived constraints]
+-- See Note [Dropping derived constraints]
 dropDerivedWC wc@(WC { wc_flat = flats, wc_insol = insols })
   = wc { wc_flat  = filterBag isWantedCt          flats
        , wc_insol = filterBag (not . isDerivedCt) insols  }
@@ -1065,10 +1065,14 @@ dropDerivedWC wc@(WC { wc_flat = flats, wc_insol = insols })
     -- The implications are (recursively) already filtered
 \end{code}
 
-Note [Insoluble derived constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Dropping derived constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we discard derived constraints at the end of constraint solving;
-see dropDerivedWC.  For example,
+see dropDerivedWC.  A consequence is that
+   we never report an error for a derived constraint,
+   and hence we do not need to take much care with their CtLoc
+
+For example,
 
  * If we have an unsolved (Ord a), we don't want to complain about
    an unsolved (Eq a) as well.
@@ -1080,9 +1084,10 @@ Notably, functional dependencies.  If we have
     class C a b | a -> b
 and we have
     [W] C a b, [W] C a c
-where a,b,c are all signature variables.  Then we could reasonably
-report an error unifying (b ~ c). But it's probably not worth it;
-after all, we also get an error because we can't discharge the constraint.
+where a,b,c are all signature variables.  Then we could imagine
+reporting an error unifying (b ~ c). But it's better to report that we can't
+solve (C a b) and (C a c) since those arose directly from something the
+programmer wrote.
 
 
 %************************************************************************
