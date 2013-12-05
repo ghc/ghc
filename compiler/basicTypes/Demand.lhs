@@ -897,15 +897,17 @@ isBotRes :: DmdResult -> Bool
 isBotRes Diverges = True
 isBotRes _        = False
 
-returnsCPR_maybe :: DmdResult -> Maybe ConTag
-returnsCPR_maybe (Converges c) = retCPR_maybe c
-returnsCPR_maybe (Dunno c)     = retCPR_maybe c
-returnsCPR_maybe Diverges      = Nothing
+-- If the first argument is True, we only consider surely terminating DmdResults
+returnsCPR_maybe :: Bool -> DmdResult -> Maybe (ConTag, [DmdResult])
+returnsCPR_maybe _     (Converges c) = retCPR_maybe c
+returnsCPR_maybe False (Dunno c)     = retCPR_maybe c
+returnsCPR_maybe True  (Dunno _)     = Nothing
+returnsCPR_maybe _     Diverges      = Nothing
 
-retCPR_maybe :: CPRResult -> Maybe ConTag
-retCPR_maybe (RetSum t)  = Just t
-retCPR_maybe (RetProd _) = Just fIRST_TAG
-retCPR_maybe NoCPR       = Nothing
+retCPR_maybe :: CPRResult -> Maybe (ConTag, [DmdResult])
+retCPR_maybe (RetSum t)   = Just (t, [])
+retCPR_maybe (RetProd rs) = Just (fIRST_TAG, rs)
+retCPR_maybe NoCPR        = Nothing
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
