@@ -311,3 +311,7 @@ test('T8540',
      extra_clean(['T8540a.hi', 'T8540a.o']),
      multimod_compile,
      ['T8540', '-v0 ' + config.ghc_th_way_flags])
+test('T8577',
+     extra_clean(['T8577a.hi', 'T8577a.o']),
+     multimod_compile_fail,
+     ['T8577', '-v0 ' + config.ghc_th_way_flags])

@@ -1,0 +1,7 @@
+
+T8577.hs:9:11:
+    Couldn't match type ‛Int’ with ‛Bool’
+    Expected type: Q (TExp (A Bool))
+      Actual type: Q (TExp (A Int))
+    In the expression: y
+    In the Template Haskell splice $$y
