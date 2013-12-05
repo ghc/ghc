@@ -1,2 +1,4 @@
 
-T1914A.hs:1:38: Parse error: naked expression at top level
+T1914A.hs:1:38:
+    Parse error: naked expression at top level
+    Perhaps you intended to use TemplateHaskell
