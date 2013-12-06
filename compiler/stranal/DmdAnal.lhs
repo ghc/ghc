@@ -335,7 +335,7 @@ dmdAnalAlt env dmd (con,bndrs,rhs)
 	(rhs_ty, rhs')   = dmdAnal env dmd rhs
         rhs_ty'          = addDataConPatDmds con bndrs rhs_ty
 	(alt_ty, bndrs') = annotateBndrs env rhs_ty' bndrs
-	final_alt_ty | io_hack_reqd = alt_ty `lubDmdType` topDmdType
+	final_alt_ty | io_hack_reqd = deferAfterIO alt_ty
 		     | otherwise    = alt_ty
 
 	-- There's a hack here for I/O operations.  Consider

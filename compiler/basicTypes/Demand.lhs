@@ -35,7 +35,7 @@ module Demand (
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd, 
         splitDmdTy, splitFVs,
-        deferDmd, deferType, deferAndUse, deferEnv, modifyEnv,
+        deferDmd, deferType, deferAndUse, deferAfterIO, deferEnv, modifyEnv,
 
         splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
         dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
@@ -1085,6 +1085,23 @@ useType (DmdType fv ds res_ty) = DmdType (useEnv fv) ds res_ty
 
 useEnv :: DmdEnv -> DmdEnv
 useEnv fv = mapVarEnv useDmd fv
+
+-- When e is evaluated after executing an IO action, and d is e's demand, then
+-- what of this demand should we consider, given that the IO action can cleanly
+-- exit?
+-- * We have to kill all strictness demands (i.e. lub with a lazy demand)
+-- * We can keep demand information (i.e. lub with an absent deman)
+-- * We have to kill definite divergence
+-- * We can keep CPR information.
+-- See Note [IO hack in the demand analyser]
+deferAfterIO :: DmdType -> DmdType
+deferAfterIO d@(DmdType _ _ res) =
+    case d `lubDmdType` topDmdType of
+        DmdType fv ds _ -> DmdType fv ds (defer_res res)
+  where
+  defer_res BotCPR  = NoCPR
+  defer_res r       = r
+
 
 modifyEnv :: Bool                       -- No-op if False
           -> (Demand -> Demand)         -- The zapper
