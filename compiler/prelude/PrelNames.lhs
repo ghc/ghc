@@ -1084,6 +1084,9 @@ datatypeClassName    = clsQual gHC_GENERICS (fsLit "Datatype")    datatypeClassK
 constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
 selectorClassName    = clsQual gHC_GENERICS (fsLit "Selector")    selectorClassKey
 
+genericClassNames :: [Name]
+genericClassNames = [genClassName, gen1ClassName]
+
 -- GHCi things
 ghciIoClassName, ghciStepIoMName :: Name
 ghciIoClassName = clsQual gHC_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
