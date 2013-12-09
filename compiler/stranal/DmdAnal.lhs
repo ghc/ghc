@@ -36,6 +36,8 @@ import Maybes		( isJust, orElse )
 import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
+import Name             ( getName, stableNameCmp )
+import Data.Function    ( on )
 \end{code}
 
 %************************************************************************
@@ -1107,12 +1109,13 @@ set_idStrictness env id sig
   = setIdStrictness id (zapStrictSig (ae_dflags env) sig)
 
 dumpStrSig :: CoreProgram -> SDoc
-dumpStrSig binds = vcat (concatMap goBind binds)
+dumpStrSig binds = vcat (map printId ids)
   where
-  goBind (NonRec i _) = [ goId i ]
-  goBind (Rec bs)     = map (goId . fst) bs
-  goId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
-          | otherwise       = empty
+  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
+  getIds (NonRec i _) = [ i ]
+  getIds (Rec bs)     = map fst bs
+  printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
+             | otherwise       = empty
 
 \end{code}
 
