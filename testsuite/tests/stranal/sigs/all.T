@@ -18,4 +18,5 @@ test('StrAnalExample', normal, compile, ['--make -package ghc -v0 ' + config.ghc
 
 test('T8569', expect_broken(8569), compile, ['--make -package ghc -v0 ' + config.ghc_th_way_flags])
 test('HyperStrUse', normal, compile, ['--make -package ghc -v0 ' + config.ghc_th_way_flags])
+test('T8598', expect_broken(8598), compile, ['--make -package ghc -v0 ' + config.ghc_th_way_flags])
 
