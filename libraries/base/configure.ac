@@ -16,7 +16,7 @@ AC_PROG_CC()
 
 AC_MSG_CHECKING(for WINDOWS platform)
 case $host in
-    *mingw32*|*cygwin*)
+    *mingw32*|*mingw64*|*cygwin*)
         WINDOWS=YES;;
     *)
         WINDOWS=NO;;
