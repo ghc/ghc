@@ -61,7 +61,7 @@ defaults
    can_fail         = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
-   strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity topDmd) topRes) }
+   strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topRes }
    fixity           = Nothing
    llvm_only        = False
    vector           = []
@@ -1626,7 +1626,7 @@ primop  CatchOp "catch#" GenPrimOp
 primop  RaiseOp "raise#" GenPrimOp
    a -> b
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd] botRes) }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
    out_of_line = True
 
@@ -1643,7 +1643,7 @@ primop  RaiseOp "raise#" GenPrimOp
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd, topDmd] botRes) }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] botRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1700,7 +1700,7 @@ primop	AtomicallyOp "atomically#" GenPrimOp
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [topDmd] botRes) }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
    out_of_line = True
    has_side_effects = True
 
@@ -2159,7 +2159,7 @@ section "Tag to enum stuff"
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#
    with
-   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [evalDmd] topRes) }
+   strictness  = { \ _arity -> mkClosedStrictSig [evalDmd] topRes }
 
 	-- dataToTag# must have an evaluated argument
 

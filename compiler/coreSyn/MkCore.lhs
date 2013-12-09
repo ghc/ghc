@@ -774,7 +774,7 @@ pc_bottoming_Id1 name ty
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] botRes)
+    strict_sig = mkClosedStrictSig [evalDmd] botRes
     -- These "bottom" out, no matter what their arguments
 
 pc_bottoming_Id0 :: Name -> Type -> Id
@@ -783,6 +783,6 @@ pc_bottoming_Id0 name ty
  = mkVanillaGlobalWithInfo name ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
-    strict_sig = mkStrictSig (mkTopDmdType [] botRes)
+    strict_sig = mkClosedStrictSig [] botRes
 \end{code}
 

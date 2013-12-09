@@ -19,7 +19,7 @@ module Demand (
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdEnv, bothDmdType,
-        nopDmdType, botDmdType, mkDmdType, mkTopDmdType,
+        nopDmdType, botDmdType, mkDmdType,
 
         DmdEnv, emptyDmdEnv,
 
@@ -28,7 +28,7 @@ module Demand (
         topRes, botRes, cprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig, 
         returnsCPR, returnsCPRProd, returnsCPR_maybe,
-        StrictSig(..), mkStrictSig, nopSig, botSig, cprProdSig,
+        StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,
        
         seqDemand, seqDemandList, seqDmdType, seqStrictSig, 
@@ -1049,9 +1049,6 @@ isNopDmdType _                        = False
 mkDmdType :: DmdEnv -> [Demand] -> DmdResult -> DmdType
 mkDmdType fv ds res = DmdType fv ds res
 
-mkTopDmdType :: [Demand] -> DmdResult -> DmdType
-mkTopDmdType ds res = DmdType emptyDmdEnv ds res
-
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
@@ -1235,6 +1232,9 @@ instance Outputable StrictSig where
 
 mkStrictSig :: DmdType -> StrictSig
 mkStrictSig dmd_ty = StrictSig dmd_ty
+
+mkClosedStrictSig :: [Demand] -> DmdResult -> StrictSig
+mkClosedStrictSig ds res = mkStrictSig (DmdType emptyDmdEnv ds res)
 
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)

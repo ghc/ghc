@@ -323,7 +323,7 @@ mkDictSelId dflags no_unf name clas
         -- It's worth giving one, so that absence info etc is generated
         -- even if the selector isn't inlined
 
-    strict_sig = mkStrictSig (mkTopDmdType [arg_dmd] topRes)
+    strict_sig = mkClosedStrictSig [arg_dmd] topRes
     arg_dmd | new_tycon = evalDmd
             | otherwise = mkManyUsedDmd $
                           mkProdDmd [ if the_arg_id == id then evalDmd else absDmd
@@ -393,7 +393,7 @@ mkDataConWorkId wkr_name data_con
                 `setUnfoldingInfo`   evaldUnfolding  -- Record that it's evaluated,
                                                      -- even if arity = 0
 
-    wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) (dataConCPR data_con))
+    wkr_sig = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
         --      Note [Data-con worker strictness]
         -- Notice that we do *not* say the worker is strict
         -- even if the data constructor is declared strict
@@ -497,7 +497,7 @@ mkDataConRep dflags fam_envs wrap_name data_con
                     	     -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                     	     -- so it not make sure that the CAF info is sane
 
-    	     wrap_sig = mkStrictSig (mkTopDmdType wrap_arg_dmds (dataConCPR data_con))
+    	     wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
     	     wrap_arg_dmds = map mk_dmd (dropList eq_spec wrap_bangs)
     	     mk_dmd str | isBanged str = evalDmd
     	                | otherwise    = topDmd
@@ -946,7 +946,7 @@ mkFCallId dflags uniq fcall ty
     (_, tau)        = tcSplitForAllTys ty
     (arg_tys, _)    = tcSplitFunTys tau
     arity           = length arg_tys
-    strict_sig      = mkStrictSig (mkTopDmdType (replicate arity evalDmd) topRes)
+    strict_sig      = mkClosedStrictSig (replicate arity evalDmd) topRes
 \end{code}
 
 

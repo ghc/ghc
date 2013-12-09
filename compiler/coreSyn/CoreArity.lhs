@@ -145,7 +145,7 @@ exprBotStrictness_maybe e
 	Just ar -> Just (ar, sig ar)
   where
     env    = AE { ae_bndrs = [], ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
-    sig ar = mkStrictSig (mkTopDmdType (replicate ar topDmd) botRes)
+    sig ar = mkClosedStrictSig (replicate ar topDmd) botRes
                   -- For this purpose we can be very simple
 \end{code}
 
