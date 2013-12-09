@@ -10,5 +10,5 @@ setTestOpts(only_ways(['optasm']))
 test('StrAnalExample', normal, compile, [''])
 test('T8569', expect_broken(8569), compile, [''])
 test('HyperStrUse', normal, compile, [''])
-test('T8598', expect_broken(8598), compile, [''])
+test('T8598', normal, compile, [''])
 
