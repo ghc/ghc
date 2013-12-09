@@ -1,0 +1,5 @@
+
+==================== Strictness signatures ====================
+StrAnalExample.foo: <S,1*U>
+
+

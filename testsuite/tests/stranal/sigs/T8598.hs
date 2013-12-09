@@ -1,11 +1,9 @@
-{-# OPTIONS_GHC -fplugin StrAnalAnnotation #-}
 {-# LANGUAGE  MagicHash , UnboxedTuples #-}
 
 module T8598(fun) where
 
 import GHC.Float (Double(..))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import StrAnalAnnotation (StrAnal(StrAnal))
 
 -- Float.scaleFloat for Doubles, slightly simplified
 fun :: Double -> Double
@@ -15,6 +13,5 @@ fun x | isFix           = x
             (# i, j #) -> D# (encodeDoubleInteger i j)
   where
   isFix = isDoubleFinite x == 0
-{-# ANN fun (StrAnal "<S(S),1*U(U)>m") #-}
 
 foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
