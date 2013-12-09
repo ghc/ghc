@@ -1131,7 +1131,19 @@ postProcessDmdTypeM Nothing   _  = nopDmdType
   -- Incoming demand was Absent, so just discard all usage information
   -- We only processed the thing at all to analyse the body
   -- See Note [Always analyse in virgin pass]
-postProcessDmdTypeM (Just du) ty = postProcessUnsat du ty
+postProcessDmdTypeM (Just du) (DmdType fv _ res_ty)
+    = DmdType (postProcessDmdEnv du fv) [] (postProcessDmdResult du res_ty)
+
+postProcessDmdResult :: DeferAndUse -> DmdResult -> DmdResult
+postProcessDmdResult (True,_)  r = topRes
+postProcessDmdResult (False,_) r = r
+
+postProcessDmdEnv :: DeferAndUse -> DmdEnv -> DmdEnv
+postProcessDmdEnv (True,  Many) env = deferReuseEnv env
+postProcessDmdEnv (False, Many) env = reuseEnv env
+postProcessDmdEnv (True,  One)  env = deferEnv env
+postProcessDmdEnv (False, One)  env = env
+
 
 postProcessUnsat :: DeferAndUse -> DmdType -> DmdType
 postProcessUnsat (True,  Many) ty = deferReuse ty
