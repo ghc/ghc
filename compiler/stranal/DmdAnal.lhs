@@ -35,6 +35,7 @@ import Util
 import Maybes		( isJust, orElse )
 import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
+import ErrUtils         ( dumpIfSet_dyn )
 \end{code}
 
 %************************************************************************
@@ -48,6 +49,8 @@ dmdAnalProgram :: DynFlags -> CoreProgram -> IO CoreProgram
 dmdAnalProgram dflags binds
   = do {
 	let { binds_plus_dmds = do_prog binds } ;
+        dumpIfSet_dyn dflags Opt_D_dump_strsigs "Strictness signatures" $
+            dumpStrSig binds_plus_dmds ;
 	return binds_plus_dmds
     }
   where
@@ -1100,6 +1103,15 @@ set_idDemandInfo env id dmd
 set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
   = setIdStrictness id (zapStrictSig (ae_dflags env) sig)
+
+dumpStrSig :: CoreProgram -> SDoc
+dumpStrSig binds = vcat (concatMap goBind binds)
+  where
+  goBind (NonRec i _) = [ goId i ]
+  goBind (Rec bs)     = map (goId . fst) bs
+  goId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
+          | otherwise       = empty
+
 \end{code}
 
 Note [Initial CPR for strict binders]

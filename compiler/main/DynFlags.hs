@@ -242,6 +242,7 @@ data DumpFlag
    | Opt_D_dump_prep
    | Opt_D_dump_stg
    | Opt_D_dump_stranal
+   | Opt_D_dump_strsigs
    | Opt_D_dump_tc
    | Opt_D_dump_types
    | Opt_D_dump_rules
@@ -2311,6 +2312,7 @@ dynamic_flags = [
   , Flag "ddump-prep"              (setDumpFlag Opt_D_dump_prep)
   , Flag "ddump-stg"               (setDumpFlag Opt_D_dump_stg)
   , Flag "ddump-stranal"           (setDumpFlag Opt_D_dump_stranal)
+  , Flag "ddump-strsigs"           (setDumpFlag Opt_D_dump_strsigs)
   , Flag "ddump-tc"                (setDumpFlag Opt_D_dump_tc)
   , Flag "ddump-types"             (setDumpFlag Opt_D_dump_types)
   , Flag "ddump-rules"             (setDumpFlag Opt_D_dump_rules)

@@ -2817,6 +2817,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-ddump-strsigs</option></entry>
+            <entry>Dump strictness signatures</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-ddump-tc</option></entry>
             <entry>Dump typechecker output</entry>
             <entry>dynamic</entry>
