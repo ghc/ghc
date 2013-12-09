@@ -21,6 +21,7 @@ module Demand (
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
         addDemand,
+        BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
         DmdEnv, emptyDmdEnv,
         peelFV,
@@ -709,14 +710,15 @@ We have lubs, but not glbs; but that is ok.
 -- Constructed Product Result                                             
 ------------------------------------------------------------------------
 
-data CPRResult = NoCPR                -- Top of the lattice
-               | RetProd              -- Returns a constructor from a product type
-               | RetSum ConTag        -- Returns a constructor from a sum type with this tag
+data Termination r = Diverges    -- Definitely diverges
+                   | Dunno r     -- Might diverge or converge
                deriving( Eq, Show )
 
-data DmdResult = Diverges              -- Definitely diverges
-               | Dunno CPRResult       -- Might diverge or converge, but in the latter case the
-                                       -- result shape is described by CPRResult
+type DmdResult = Termination CPRResult
+
+data CPRResult = NoCPR          -- Top of the lattice
+               | RetProd        -- Returns a constructor from a product type
+               | RetSum ConTag  -- Returns a constructor from a data type
                deriving( Eq, Show )
 
 lubCPR :: CPRResult -> CPRResult -> CPRResult
@@ -733,7 +735,7 @@ lubDmdResult (Dunno c1)     (Dunno c2)     = Dunno (c1 `lubCPR` c2)
 -- defaultDmd (r1 `lubDmdResult` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
-bothDmdResult :: DmdResult -> DmdResult -> DmdResult
+bothDmdResult :: DmdResult -> Termination () -> DmdResult
 -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
 bothDmdResult _              Diverges   = Diverges
 bothDmdResult r              _          = r
@@ -1024,13 +1026,25 @@ lubDmdType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
     lub_ds ds1    []       = map (`lubDmd` resTypeArgDmd r2) ds1
     lub_ds []     ds2      = map (resTypeArgDmd r1 `lubDmd`) ds2
 
-bothDmdType :: DmdType -> DmdType -> DmdType
-bothDmdType (DmdType fv1 ds1 r1) (DmdType fv2 _ r2)
+
+type BothDmdArg = (DmdEnv, Termination ())
+
+mkBothDmdArg :: DmdEnv -> BothDmdArg
+mkBothDmdArg env = (env, Dunno ())
+
+toBothDmdArg :: DmdType -> BothDmdArg
+toBothDmdArg (DmdType fv _ r) = (fv, go r)
+  where
+  go (Dunno {})     = Dunno ()
+  go Diverges       = Diverges
+
+bothDmdType :: DmdType -> BothDmdArg -> DmdType
+bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
     -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
-  = DmdType both_fv ds1 (r1 `bothDmdResult` r2)
-  where both_fv = plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
+  = DmdType both_fv ds1 (r1 `bothDmdResult` t2)
+  where both_fv = plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd t2)
 
 instance Outputable DmdType where
   ppr (DmdType fv ds res) 
@@ -1126,17 +1140,18 @@ toCleanDmd (JD { strd = s, absd = u })
 -- This is used in dmdAnalStar when post-processing
 -- a function's argument demand. So we only care about what
 -- does to free variables, and whether it terminates.
-postProcessDmdTypeM :: DeferAndUseM -> DmdType -> DmdType
-postProcessDmdTypeM Nothing   _  = nopDmdType
+postProcessDmdTypeM :: DeferAndUseM -> DmdType -> BothDmdArg
+postProcessDmdTypeM Nothing   _  = (emptyDmdEnv, Dunno ())
   -- Incoming demand was Absent, so just discard all usage information
   -- We only processed the thing at all to analyse the body
   -- See Note [Always analyse in virgin pass]
 postProcessDmdTypeM (Just du) (DmdType fv _ res_ty)
-    = DmdType (postProcessDmdEnv du fv) [] (postProcessDmdResult du res_ty)
+    = (postProcessDmdEnv du fv, postProcessDmdResult du res_ty)
 
-postProcessDmdResult :: DeferAndUse -> DmdResult -> DmdResult
-postProcessDmdResult (True,_)  r = topRes
-postProcessDmdResult (False,_) r = r
+postProcessDmdResult :: DeferAndUse -> DmdResult -> Termination ()
+postProcessDmdResult (True,_)  _          = Dunno ()
+postProcessDmdResult (False,_) (Dunno {}) = Dunno ()
+postProcessDmdResult (False,_) Diverges   = Diverges
 
 postProcessDmdEnv :: DeferAndUse -> DmdEnv -> DmdEnv
 postProcessDmdEnv (True,  Many) env = deferReuseEnv env
@@ -1246,9 +1261,9 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
   -- See note [Default demand on free variables]
   dmd  = lookupVarEnv fv id `orElse` defaultDmd res
 
-defaultDmd :: DmdResult -> Demand
-defaultDmd res | isBotRes res = botDmd
-               | otherwise    = absDmd
+defaultDmd :: Termination r -> Demand
+defaultDmd Diverges = botDmd
+defaultDmd _        = absDmd
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res

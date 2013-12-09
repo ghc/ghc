@@ -115,7 +115,7 @@ dmdTransformThunkDmd e
 -- See |-* relation in the companion paper
 dmdAnalStar :: AnalEnv 
             -> Demand 	-- This one takes a *Demand*
-            -> CoreExpr -> (DmdType, CoreExpr)
+            -> CoreExpr -> (BothDmdArg, CoreExpr)
 dmdAnalStar env dmd e 
   | (cd, defer_and_use) <- toCleanDmd dmd
   , (dmd_ty, e')        <- dmdAnal env cd e
@@ -255,7 +255,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
         scrut_dmd  = scrut_dmd1 `bothCleanDmd` scrut_dmd2
 
 	(scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty1 `bothDmdType` scrut_ty
+        res_ty             = alt_ty1 `bothDmdType` toBothDmdArg scrut_ty
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -271,7 +271,7 @@ dmdAnal env dmd (Case scrut case_bndr ty alts)
 	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
 	(scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
 	(alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
-        res_ty               = alt_ty `bothDmdType` scrut_ty
+        res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
@@ -509,7 +509,6 @@ dmdTransform env var dmd
 
   | otherwise	 		                 -- Local non-letrec-bound thing
   = unitVarDmd var (mkOnceUsedDmd dmd)
-
 \end{code}
 
 %************************************************************************
@@ -698,7 +697,7 @@ addVarDmd (DmdType fv ds res) var dmd
 
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
-  = dmd_ty `bothDmdType` mkDmdType lazy_fvs [] topRes
+  = dmd_ty `bothDmdType` mkBothDmdArg lazy_fvs
 	-- Using bothDmdType (rather than just both'ing the envs)
         -- is vital.  Consider
 	--	let f = \x -> (x,y)
