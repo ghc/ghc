@@ -25,7 +25,7 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV,
 
-        DmdResult(..), CPRResult(..),
+        DmdResult, CPRResult,
         isBotRes, isTopRes, resTypeArgDmd, 
         topRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig, 
@@ -768,19 +768,19 @@ topRes, botRes :: DmdResult
 topRes = Dunno NoCPR
 botRes = Diverges
 
-cprSumRes :: ConTag -> CPRResult
-cprSumRes tag | opt_CprOff = NoCPR
-              | otherwise  = RetSum tag
+cprSumRes :: ConTag -> DmdResult
+cprSumRes tag | opt_CprOff = topRes
+              | otherwise  = Dunno $ RetSum tag
 
-cprProdRes :: [DmdType] -> CPRResult
+cprProdRes :: [DmdType] -> DmdResult
 cprProdRes _arg_tys
-  | opt_CprOff = NoCPR
-  | otherwise  = RetProd
+  | opt_CprOff = topRes
+  | otherwise  = Dunno $ RetProd
 
-vanillaCprProdRes :: Arity -> CPRResult
+vanillaCprProdRes :: Arity -> DmdResult
 vanillaCprProdRes _arity
-  | opt_CprOff = NoCPR
-  | otherwise  = RetProd
+  | opt_CprOff = topRes
+  | otherwise  = Dunno $ RetProd
 
 isTopRes :: DmdResult -> Bool
 isTopRes (Dunno NoCPR) = True
