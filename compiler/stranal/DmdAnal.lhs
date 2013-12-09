@@ -124,9 +124,9 @@ dmdAnal :: AnalEnv
 -- The CleanDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
-dmdAnal _ _ (Lit lit)     = (topDmdType, Lit lit)
-dmdAnal _ _ (Type ty)     = (topDmdType, Type ty)	-- Doesn't happen, in fact
-dmdAnal _ _ (Coercion co) = (topDmdType, Coercion co)
+dmdAnal _ _ (Lit lit)     = (nopDmdType, Lit lit)
+dmdAnal _ _ (Type ty)     = (nopDmdType, Type ty)	-- Doesn't happen, in fact
+dmdAnal _ _ (Coercion co) = (nopDmdType, Coercion co)
 
 dmdAnal env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
@@ -338,6 +338,8 @@ dmdAnalAlt env dmd (con,bndrs,rhs)
 	final_alt_ty | io_hack_reqd = deferAfterIO alt_ty
 		     | otherwise    = alt_ty
 
+        -- Note [IO hack in the demand analyser]
+        --
 	-- There's a hack here for I/O operations.  Consider
 	-- 	case foo x s of { (# s, r #) -> y }
 	-- Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
@@ -1069,7 +1071,7 @@ getStrictness :: AnalEnv -> Id -> StrictSig
 getStrictness env fn
   | isGlobalId fn                        = idStrictness fn
   | Just (sig, _) <- lookupSigEnv env fn = sig
-  | otherwise                            = topSig
+  | otherwise                            = nopSig
 
 addInitialSigs :: TopLevelFlag -> AnalEnv -> [Id] -> AnalEnv
 -- See Note [Initialising strictness]

@@ -290,7 +290,7 @@ vanillaIdInfo
 	    inlinePragInfo 	= defaultInlinePragma,
 	    occInfo		= NoOccInfo,
             demandInfo	        = topDmd,
-	    strictnessInfo      = topSig
+	    strictnessInfo      = nopSig
 	   }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references

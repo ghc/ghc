@@ -1777,7 +1777,7 @@ toIfaceIdInfo id_info
     ------------  Strictness  --------------
         -- No point in explicitly exporting TopSig
     sig_info = strictnessInfo id_info
-    strict_hsinfo | not (isTopSig sig_info) = Just (HsStrictness sig_info)
+    strict_hsinfo | not (isNopSig sig_info) = Just (HsStrictness sig_info)
                   | otherwise               = Nothing
 
     ------------  Unfolding  --------------
