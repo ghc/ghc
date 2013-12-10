@@ -553,7 +553,7 @@ solveFunEq :: CtEvidence    -- From this  :: F tys ~ xi1
            -> Type
            -> TcS ()
 solveFunEq from_this xi1 solve_this xi2
-  = do { ctevs <- xCtFlavor solve_this [mkTcEqPred xi2 xi1] xev
+  = do { ctevs <- xCtFlavor solve_this xev
              -- No caching!  See Note [Cache-caused loops]
              -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
@@ -561,7 +561,7 @@ solveFunEq from_this xi1 solve_this xi2
   where
     from_this_co = evTermCoercion $ ctEvTerm from_this
 
-    xev = XEvTerm xcomp xdecomp
+    xev = XEvTerm [mkTcEqPred xi2 xi1] xcomp xdecomp
 
     -- xcomp : [(xi2 ~ xi1)] -> (F tys ~ xi2)
     xcomp [x] = EvCoercion (from_this_co `mkTcTransCo` mk_sym_co x)
@@ -694,6 +694,9 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
               -> do { untch <- getUntouchables
                     ; traceTcS "Can't solve tyvar equality"
                           (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+                                , ppWhen (isMetaTyVar tv) $
+                                  nest 4 (text "Untouchable level of" <+> ppr tv
+                                          <+> text "is" <+> ppr (metaTyVarUntouchables tv))
                                 , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
                                 , text "Untouchables =" <+> ppr untch ])
                     ; (n_kicked, inerts') <- kickOutRewritable ev tv inerts
@@ -1514,7 +1517,7 @@ doTopReactFunEq _ct fl fun_tc args xi
 
     succeed_with :: String -> TcCoercion -> TcType -> TcS TopInteractResult
     succeed_with str co rhs_ty    -- co :: fun_tc args ~ rhs_ty
-      = do { ctevs <- xCtFlavor fl [mkTcEqPred rhs_ty xi] xev
+      = do { ctevs <- xCtFlavor fl xev
            ; traceTcS ("doTopReactFunEq " ++ str) (ppr ctevs)
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $
@@ -1527,7 +1530,7 @@ doTopReactFunEq _ct fl fun_tc args xi
         xdecomp x = [EvCoercion (mkTcSymCo co `mkTcTransCo` evTermCoercion x)]
         xcomp [x] = EvCoercion (co `mkTcTransCo` evTermCoercion x)
         xcomp _   = panic "No more goals!"
-        xev = XEvTerm xcomp xdecomp
+        xev = XEvTerm [mkTcEqPred rhs_ty xi] xcomp xdecomp
 \end{code}
 
 Note [Cached solved FunEqs]

@@ -135,7 +135,7 @@ import Maybes ( orElse, catMaybes, firstJust )
 import Pair ( pSnd )
 
 import TrieMap
-import Control.Monad( ap, when, zipWithM )
+import Control.Monad( ap, when )
 import Data.IORef
 import Data.List( partition )
 
@@ -1504,12 +1504,11 @@ instFlexiTcSHelperTcS n k = wrapTcS (instFlexiTcSHelper n k)
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-data XEvTerm =
-  XEvTerm { ev_comp   :: [EvTerm] -> EvTerm
-                         -- How to compose evidence
-          , ev_decomp :: EvTerm -> [EvTerm]
-                         -- How to decompose evidence
-          }
+data XEvTerm
+  = XEvTerm { ev_preds  :: [PredType]           -- New predicate types
+            , ev_comp   :: [EvTerm] -> EvTerm   -- How to compose evidence
+            , ev_decomp :: EvTerm -> [EvTerm]   -- How to decompose evidence
+            }
 
 data MaybeNew = Fresh CtEvidence | Cached EvTerm
 
@@ -1538,11 +1537,11 @@ setEvBind the_ev tm
        ; tc_evbinds <- getTcEvBinds
        ; wrapTcS $ TcM.addTcEvBind tc_evbinds the_ev tm }
 
-newGivenEvVar :: CtLoc -> TcPredType -> EvTerm -> TcS CtEvidence
+newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
-newGivenEvVar loc pred rhs
+newGivenEvVar loc (pred, rhs)
   = do { new_ev <- wrapTcS $ TcM.newEvVar pred
        ; setEvBind new_ev rhs
        ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev, ctev_loc = loc }) }
@@ -1553,7 +1552,7 @@ newWantedEvVarNC loc pty
   = do { new_ev <- wrapTcS $ TcM.newEvVar pty
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
--- | Variant of newGivenEvVar that has a lower bound on the depth of the result
+-- | Variant of newWantedEvVar that has a lower bound on the depth of the result
 --   (see Note [Preventing recursive dictionaries])
 newWantedEvVarNonrec :: CtLoc -> TcPredType -> TcS MaybeNew
 newWantedEvVarNonrec loc pty
@@ -1629,24 +1628,59 @@ But that superclass selector can't (yet) appear in a coercion
 
 See Note [Coercion evidence terms] in TcEvidence.
 
+Note [Do not create Given kind equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not want to create a Given like
+
+     kv ~ k            -- kv is a skolem kind variable
+                       -- Reason we don't yet support non-Refl kind equalities
+
+or   t1::k1 ~ t2::k2   -- k1 and k2 are un-equal kinds
+                       -- Reason: (~) is kind-uniform at the moment, and
+                       -- k1/k2 may be distinct kind skolems
+
+This showed up in Trac #8566, where we had a data type
+   data I (u :: U *) (r :: [*]) :: * where
+        A :: I (AA t as) r                  -- Existential k
+so A has type
+   A :: forall (u:U *) (r:[*])                  Universal
+        (k:BOX) (t:k) (as:[U *]).        Existential
+        (u ~ AA * k t as) => I u r
+
+There is no direct kind equality, but in a pattern match where 'u' is
+instantiated to, say, (AA * kk t1 as1), we'd decompose to get
+   k ~ kk, t ~ t1, as ~ as1
+This is bad.  We "fix" this by simply ignoring
+  *     the Given kind equality
+  * AND the Given type equality (t:k1) ~ (t1:kk)
+
 
 \begin{code}
 xCtFlavor :: CtEvidence            -- Original flavor
-          -> [TcPredType]          -- New predicate types
           -> XEvTerm               -- Instructions about how to manipulate evidence
           -> TcS [CtEvidence]
 
-xCtFlavor (CtGiven { ctev_evtm = tm, ctev_loc = loc }) ptys xev
-  = ASSERT( equalLength ptys (ev_decomp xev tm) )
-    zipWithM (newGivenEvVar loc) ptys (ev_decomp xev tm)
-    -- See Note [Bind new Givens immediately]
+xCtFlavor (CtGiven { ctev_evtm = tm, ctev_loc = loc })
+          (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
+  = ASSERT( equalLength ptys (decomp_fn tm) )
+    mapM (newGivenEvVar loc)     -- See Note [Bind new Givens immediately]
+         (filterOut bad_given_pred (ptys `zip` decomp_fn tm))
+  where
+    -- See Note [Do not create Given kind equalities]
+    bad_given_pred (pred_ty, _)
+      | EqPred t1 t2 <- classifyPredType pred_ty
+      = isKind t1 || not (typeKind t1 `tcEqKind` typeKind t2)
+      | otherwise
+      = False
 
-xCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) ptys xev
+xCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc })
+          (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
   = do { new_evars <- mapM (newWantedEvVar loc) ptys
-       ; setEvBind evar (ev_comp xev (getEvTerms new_evars))
+       ; setEvBind evar (comp_fn (getEvTerms new_evars))
        ; return (freshGoals new_evars) }
 
-xCtFlavor (CtDerived { ctev_loc = loc }) ptys _xev
+xCtFlavor (CtDerived { ctev_loc = loc })
+          (XEvTerm { ev_preds = ptys })
   = do { ders <- mapM (newDerived loc) ptys
        ; return (catMaybes ders) }
 
@@ -1700,7 +1734,7 @@ rewriteCtFlavor old_ev new_pred co
        -- then retain the old type, so that error messages come out mentioning synonyms
 
 rewriteCtFlavor (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
-  = do { new_ev <- newGivenEvVar loc new_pred new_tm  -- See Note [Bind new Givens immediately]
+  = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
        ; return (Just new_ev) }
   where
     new_tm = mkEvCast old_tm (mkTcSubCo (mkTcSymCo co))  -- mkEvCast optimises ReflCo

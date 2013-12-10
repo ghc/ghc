@@ -208,7 +208,7 @@ canTuple ev tys
   = do { traceTcS "can_pred" (text "TuplePred!")
        ; let xcomp = EvTupleMk
              xdecomp x = zipWith (\_ i -> EvTupleSel x i) tys [0..]
-       ; ctevs <- xCtFlavor ev tys (XEvTerm xcomp xdecomp)
+       ; ctevs <- xCtFlavor ev (XEvTerm tys xcomp xdecomp)
        ; canEvVarsCreated ctevs }
 \end{code}
 
@@ -332,9 +332,10 @@ newSCWorkFromFlavored flavor cls xis
   | isGiven flavor
   = do { let sc_theta = immSuperClasses cls xis
              xev_decomp x = zipWith (\_ i -> EvSuperClass x i) sc_theta [0..]
-             xev = XEvTerm { ev_comp   = panic "Can't compose for given!"
+             xev = XEvTerm { ev_preds  =  sc_theta
+                           , ev_comp   = panic "Can't compose for given!"
                            , ev_decomp = xev_decomp }
-       ; ctevs <- xCtFlavor flavor sc_theta xev
+       ; ctevs <- xCtFlavor flavor xev
        ; emitWorkNC ctevs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
@@ -784,7 +785,7 @@ canEqNC ev ty1 ty2
                  xevdecomp x = let xco = evTermCoercion x
                                in [ EvCoercion (mkTcLRCo CLeft xco)
                                   , EvCoercion (mkTcLRCo CRight xco)]
-           ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] (XEvTerm xevcomp xevdecomp)
+           ; ctevs <- xCtFlavor ev (XEvTerm [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xevcomp xevdecomp)
            ; canEvVarsCreated ctevs }
 
       | otherwise
@@ -803,8 +804,8 @@ canDecomposableTyConApp ev tc1 tys1 tc2 tys2
   | otherwise
   = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo Nominal tc1 (map evTermCoercion xs))
              xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
-             xev = XEvTerm xcomp xdecomp
-       ; ctevs <- xCtFlavor ev (zipWith mkTcEqPred tys1 tys2) xev
+             xev = XEvTerm (zipWith mkTcEqPred tys1 tys2) xcomp xdecomp
+       ; ctevs <- xCtFlavor ev xev
        ; canEvVarsCreated ctevs }
 
 canEqFailure :: CtEvidence -> TcType -> TcType -> TcS StopOrContinue
@@ -1051,8 +1052,8 @@ canEqLeaf ev s1 s2
        ; let xcomp [x] = EvCoercion (mkTcSymCo (evTermCoercion x))
              xcomp _ = panic "canEqLeaf: can't happen"
              xdecomp x = [EvCoercion (mkTcSymCo (evTermCoercion x))]
-             xev = XEvTerm xcomp xdecomp
-       ; ctevs <- xCtFlavor ev [mkTcEqPred s2 s1] xev
+             xev = XEvTerm [mkTcEqPred s2 s1] xcomp xdecomp
+       ; ctevs <- xCtFlavor ev xev
        ; case ctevs of
            []     -> return Stop
            [ctev] -> canEqLeafOriented ctev cls2 s1
@@ -1108,7 +1109,8 @@ canEqLeafTyVar ev tv s2              -- ev :: tv ~ s2
        ; let co = mkHdEqPred s2 co1 co2
              -- co :: (xi1 ~ xi2) ~ (tv ~ s2)
 
-       ; traceTcS "canEqLeafTyVar 2" $ vcat [ppr xi1, ppr xi2]
+       ; traceTcS "canEqLeafTyVar 2" $ vcat [ ppr xi1 <+> dcolon <+> ppr (typeKind xi1)
+                                            , ppr xi2 <+> dcolon <+> ppr (typeKind xi2)]
        ; case (getTyVar_maybe xi1, getTyVar_maybe xi2) of
            (Nothing,  _) -> -- Rewriting the LHS did not yield a type variable
                             -- so go around again to canEq
@@ -1164,22 +1166,20 @@ checkKind :: CtEvidence          -- t1~t2
 -- for the type equality; and continue with the kind equality constraint.
 -- When the latter is solved, it'll kick out the irreducible equality for
 -- a second attempt at solving
--- See Note [Equalities with incompatible kinds]
 
-checkKind new_ev s1 s2
+checkKind new_ev s1 s2   -- See Note [Equalities with incompatible kinds]
   = ASSERT( isKind k1 && isKind k2 )
-    do {  -- See Note [Equalities with incompatible kinds]
-         traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
+    do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
+
+         -- Put the not-currently-soluble thing back onto the work list
        ; updWorkListTcS $ extendWorkListNonEq $
          CIrredEvCan { cc_ev = new_ev }
+
+         -- Create a derived kind-equality, and solve it
        ; mw <- newDerived kind_co_loc (mkEqPred k1 k2)
        ; case mw of
            Nothing  -> return Stop
            Just kev -> canEqNC kev k1 k2 }
-
-         -- Always create a Wanted kind equality even if
-         -- you are decomposing a given constraint.
-         -- NB: DV finds this reasonable for now. Maybe we have to revisit.
   where
     k1 = typeKind s1
     k2 = typeKind s2
