@@ -567,7 +567,7 @@ data EvTerm
   | EvCoercion TcCoercion        -- (Boxed) coercion bindings
                                  -- See Note [Coercion evidence terms]
 
-  | EvCast EvTerm TcCoercion     -- d |> co, the coerction being at role representational
+  | EvCast EvTerm TcCoercion     -- d |> co, the coercion being at role representational
 
   | EvDFunApp DFunId             -- Dictionary instance application
        [Type] [EvTerm]
