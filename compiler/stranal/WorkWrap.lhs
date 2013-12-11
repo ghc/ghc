@@ -17,6 +17,7 @@ import CoreSyn
 import CoreUnfold	( certainlyWillInline, mkInlineUnfolding, mkWwInlineRule )
 import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
+import Type             ( isVoidTy )
 import Var
 import Id
 import IdInfo
@@ -256,7 +257,7 @@ tryWW dflags is_rec fn_id rhs
 	-- Furthermore, don't even expose strictness info
   = return [ (fn_id, rhs) ]
 
-  | is_fun && (any worthSplittingArgDmd wrap_dmds || returnsCPR res_info)
+  | is_fun && (worth_splitting_args wrap_dmds rhs || returnsCPR res_info)
   = checkSize dflags new_fn_id rhs $
     splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
 
@@ -274,7 +275,13 @@ tryWW dflags is_rec fn_id rhs
     fn_dmd       = demandInfo fn_info
     inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
 
-	-- In practice it always will have a strictness 
+    worth_splitting_args [d] (Lam b _)
+      | isAbsDmd d && isVoidTy (idType b)
+      = False  -- Note [Do not split void functions]
+    worth_splitting_args wrap_dmds _
+      = any worthSplittingArgDmd wrap_dmds
+
+	-- In practice it always will have a strictness
 	-- signature, even if it's a uninformative one
     strict_sig  = strictnessInfo fn_info
     StrictSig (DmdType env wrap_dmds res_info) = strict_sig
@@ -393,6 +400,17 @@ get_one_shots _    	 = noOneShotInfo
 noOneShotInfo :: [Bool]
 noOneShotInfo = repeat False
 \end{code}
+
+Note [Do not split void functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this rather common form of binding:
+        $j = \x:Void# -> ...no use of x...
+
+Since x is not used it'll be marked as absent.  But there is no point
+in w/w-ing because we'll simply add (\y:Void#), see WwLib.mkWorerArgs.
+
+If x has a more interesting type (eg Int, or Int#), there *is* a point
+in w/w so that we don't pass the argument at all.
 
 Note [Thunk splitting]
 ~~~~~~~~~~~~~~~~~~~~~~
