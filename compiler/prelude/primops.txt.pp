@@ -1618,8 +1618,8 @@ primop  CatchOp "catch#" GenPrimOp
    with
 	-- Catch is actually strict in its first argument
 	-- but we don't want to tell the strictness
-	-- analyser about that!
-        -- might use caught action multiply
+	-- analyser about that, so that exceptions stay inside it.
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1651,6 +1651,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1658,6 +1659,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1665,6 +1667,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1684,6 +1687,7 @@ primop	AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1709,6 +1713,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1717,6 +1722,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
+   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
