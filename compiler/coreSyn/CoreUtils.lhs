@@ -778,13 +778,10 @@ exprIsCheap' good_app (Tick t e)
      -- never duplicate ticks.  If we get this wrong, then HPC's entry
      -- counts will be off (check test in libraries/hpc/tests/raytrace)
 
-exprIsCheap' good_app (Let (NonRec x _) e)
-  | isUnLiftedType (idType x) = exprIsCheap' good_app e
-  | otherwise                 = False
-        -- Strict lets always have cheap right hand sides,
-        -- and do no allocation, so just look at the body
-        -- Non-strict lets do allocation so we don't treat them as cheap
-        -- See also
+exprIsCheap' good_app (Let (NonRec _ b) e)
+  = exprIsCheap' good_app b && exprIsCheap' good_app e
+exprIsCheap' good_app (Let (Rec prs) e)
+  = all (exprIsCheap' good_app . snd) prs && exprIsCheap' good_app e
 
 exprIsCheap' good_app other_expr        -- Applications and variables
   = go other_expr []

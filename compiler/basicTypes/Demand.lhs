@@ -35,15 +35,16 @@ module Demand (
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd, 
         splitDmdTy, splitFVs,
-        deferDmd, deferType, deferAndUse, deferAfterIO, deferEnv, modifyEnv,
+        deferAfterIO,
+        postProcessDmdType, postProcessDmdTypeM,
 
         splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
         dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
         argOneShots, argsOneShots,
 
-        isSingleUsed, useType, useEnv, zapDemand, zapStrictSig,
+        isSingleUsed, useEnv, zapDemand, zapStrictSig,
 
-        worthSplittingFun, worthSplittingThunk,
+        worthSplittingArgDmd, worthSplittingThunkDmd,
 
         strictifyDictDmd
 
@@ -507,9 +508,6 @@ seqDemandList :: [JointDmd] -> ()
 seqDemandList [] = ()
 seqDemandList (d:ds) = seqDemand d `seq` seqDemandList ds
 
-deferDmd :: JointDmd -> JointDmd
-deferDmd (JD {absd = a}) = mkJointDmd Lazy a 
-
 isStrictDmd :: Demand -> Bool
 -- See Note [Strict demands]
 isStrictDmd (JD {absd = Abs})  = False
@@ -518,9 +516,6 @@ isStrictDmd _                  = True
 
 isWeakDmd :: Demand -> Bool
 isWeakDmd (JD {strd = s, absd = a}) = isLazy s && isUsedMU a
-
-useDmd :: JointDmd -> JointDmd
-useDmd (JD {strd=d, absd=a}) = mkJointDmd d (markAsUsedDmd a)
 
 cleanUseDmd_maybe :: JointDmd -> Maybe UseDmd
 cleanUseDmd_maybe (JD { absd = Use _ ud }) = Just ud
@@ -621,30 +616,6 @@ mkProdDmd dx
 mkCallDmd :: CleanDemand -> CleanDemand
 mkCallDmd (CD {sd = d, ud = u}) 
   = mkCleanDmd (mkSCall d) (mkUCall One u)
-
--- Returns result demand * strictness flag * one-shotness of the call 
-peelCallDmd :: CleanDemand 
-            -> ( CleanDemand
-               , Bool      -- True <=> had to strengthen from HeadStr
-                           --          hence defer results
-               , Count)    -- Call count
-
--- Exploiting the fact that 
--- on the strictness side      C(B) = B
--- and on the usage side       C(U) = U 
-peelCallDmd (CD {sd = s, ud = u}) 
-  = let (s', b) = peel_s s
-        (u', c) = peel_u u
-    in  (mkCleanDmd s' u', b, c)
-  where
-    peel_s (SCall s)   = (s,        False)
-    peel_s HyperStr    = (HyperStr, False)
-    peel_s _           = (HeadStr,  True)
-
-    peel_u (UCall c u) = (u,       c)
-    peel_u _           = (Used, Many)
-       -- The last case includes UHead which seems a bit wrong
-       -- because the body isn't used at all!
 
 cleanEvalDmd :: CleanDemand
 cleanEvalDmd = mkCleanDmd HeadStr Used
@@ -802,45 +773,40 @@ resTypeArgDmd _              = topDmd
 %************************************************************************
 
 \begin{code}
-worthSplittingFun :: [JointDmd] -> DmdResult -> Bool
-                -- True <=> the wrapper would not be an identity function
-worthSplittingFun ds res
-  = any worth_it ds || returnsCPR res
-        -- worthSplitting returns False for an empty list of demands,
-        -- and hence do_strict_ww is False if arity is zero and there is no CPR
+worthSplittingArgDmd :: Demand    -- Demand on a function argument
+                     -> Bool
+worthSplittingArgDmd dmd
+  = go dmd
   where
-    worth_it (JD {absd=Abs})                             = True      -- Absent arg
+    go (JD {absd=Abs}) = True      -- Absent arg
 
     -- See Note [Worker-wrapper for bottoming functions]
-    worth_it (JD {strd=Str HyperStr, absd=Use _ (UProd _)}) = True
+    go (JD {strd=Str HyperStr, absd=Use _ (UProd _)}) = True
 
-    -- See Note [Worthy functions for Worker-Wrapper split]    
-    worth_it (JD {strd=Str (SProd {})})                   = True  -- Product arg to evaluate
-    worth_it (JD {strd=Str HeadStr, absd=Use _ (UProd _)}) = True  -- Strictly used product arg
-    worth_it (JD {strd=Str HeadStr, absd=Use _ UHead})     = True 
-    worth_it _                                            = False
+    -- See Note [Worthy functions for Worker-Wrapper split]
+    go (JD {strd=Str (SProd {})})                    = True  -- Product arg to evaluate
+    go (JD {strd=Str HeadStr, absd=Use _ (UProd _)}) = True  -- Strictly used product arg
+    go (JD {strd=Str HeadStr, absd=Use _ UHead})     = True
 
-worthSplittingThunk :: JointDmd         -- Demand on the thunk
-                    -> DmdResult        -- CPR info for the thunk
-                    -> Bool
-worthSplittingThunk dmd res
-  = worth_it dmd || returnsCPR res
+    go _ = False
+
+worthSplittingThunkDmd :: Demand         -- Demand on the thunk
+                       -> Bool
+worthSplittingThunkDmd dmd
+  = go dmd
   where
         -- Split if the thing is unpacked
-    worth_it (JD {strd=Str (SProd {}), absd=Use _ a})   = some_comp_used a
-    worth_it (JD {strd=Str HeadStr, absd=Use _ UProd {}}) = True   
-        -- second component points out that at least some of     
-    worth_it _                                      = False
+    go (JD {strd=Str (SProd {}), absd=Use _ a})     = some_comp_used a
+    go (JD {strd=Str HeadStr, absd=Use _ UProd {}}) = True
+    go _                                            = False
 
     some_comp_used Used       = True
     some_comp_used (UProd _ ) = True
     some_comp_used _          = False
-
-
 \end{code}
 
 Note [Worthy functions for Worker-Wrapper split]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For non-bottoming functions a worker-wrapper transformation takes into
 account several possibilities to decide if the function is worthy for
 splitting:
@@ -867,7 +833,7 @@ usage information: if the function uses its product argument's
 components, the WW split can be beneficial. Example:
 
 g :: Bool -> (Int, Int) -> Int
-g c p = case p of (a,b) -> 
+g c p = case p of (a,b) ->
           if c then a else b
 
 The function g is strict in is argument p and lazy in its
@@ -909,7 +875,7 @@ masssive tuple which is barely used.  Example:
         f g pr = error (g pr)
 
         main = print (f fst (1, error "no"))
-          
+
 Here, f does not take 'pr' apart, and it's stupid to do so.
 Imagine that it had millions of fields. This actually happened
 in GHC itself where the tuple was DynFlags
@@ -924,7 +890,8 @@ in GHC itself where the tuple was DynFlags
 \begin{code}
 type Demand = JointDmd
 
-type DmdEnv = VarEnv Demand
+type DmdEnv = VarEnv Demand   -- If a variable v is not in the domain of the
+                              -- DmdEnv, it implicitly maps to <Lazy,Absent>
 
 data DmdType = DmdType 
                   DmdEnv        -- Demand on explicitly-mentioned 
@@ -1063,30 +1030,6 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
 splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 
-deferAndUse :: Bool    -- Lazify (defer) the type
-            -> Count   -- Many => manify the type
-            -> DmdType -> DmdType
-deferAndUse True  Many ty = deferType (useType ty)
-deferAndUse False Many ty = useType ty
-deferAndUse True  One  ty = deferType ty
-deferAndUse False One  ty = ty
-
-deferType :: DmdType -> DmdType
--- deferType ty1 ==  ty1 `lubType` DT { v -> <L,A> } [] top }
--- Ie it might be used, or not 
-deferType (DmdType fv _ _) = DmdType (deferEnv fv) [] topRes
-
-deferEnv :: DmdEnv -> DmdEnv
-deferEnv fv = mapVarEnv deferDmd fv
-
-useType :: DmdType -> DmdType
--- useType ty1 == ty1 `bothType` ty1
--- NB that bothType is assymetrical, so no-op on argument demands
-useType (DmdType fv ds res_ty) = DmdType (useEnv fv) ds res_ty
-
-useEnv :: DmdEnv -> DmdEnv
-useEnv fv = mapVarEnv useDmd fv
-
 -- When e is evaluated after executing an IO action, and d is e's demand, then
 -- what of this demand should we consider, given that the IO action can cleanly
 -- exit?
@@ -1102,7 +1045,6 @@ deferAfterIO d@(DmdType _ _ res) =
   where
   defer_res BotCPR  = NoCPR
   defer_res r       = r
-
 
 modifyEnv :: Bool                       -- No-op if False
           -> (Demand -> Demand)         -- The zapper
@@ -1126,20 +1068,84 @@ strictenDmd (JD {strd = s, absd = u})
     poke_s (Str s)   = s
     poke_u Abs       = UHead
     poke_u (Use _ u) = u
+\end{code}
 
-toCleanDmd :: (CleanDemand -> e -> (DmdType, e))
-           -> Demand
-           -> e -> (DmdType, e)
+Deferring and peeeling
+
+\begin{code}
+type DeferAndUse   -- Describes how to degrade a result type
+   =( Bool        -- Lazify (defer) the type
+    , Count)      -- Many => manify the type
+
+type DeferAndUseM = Maybe DeferAndUse
+  -- Nothing <=> absent-ify the result type; it will never be used
+
+toCleanDmd :: Demand -> (CleanDemand, DeferAndUseM)
 -- See Note [Analyzing with lazy demand and lambdas]
-toCleanDmd anal (JD { strd = s, absd = u }) e
+toCleanDmd (JD { strd = s, absd = u })
   = case (s,u) of
-      (_, Abs) -> mf (const nopDmdType) (anal (CD { sd = HeadStr, ud = Used }) e)
-                  --  See Note [Always analyse in virgin pass]
-             
-      (Str s', Use c u') -> mf (deferAndUse False c) (anal (CD { sd = s',      ud = u' }) e)
-      (Lazy,   Use c u') -> mf (deferAndUse True c)  (anal (CD { sd = HeadStr, ud = u' }) e)
+      (Str s', Use c u') -> (CD { sd = s',      ud = u' },   Just (False, c))
+      (Lazy,   Use c u') -> (CD { sd = HeadStr, ud = u' },   Just (True,  c))
+      (_,      Abs)      -> (CD { sd = HeadStr, ud = Used }, Nothing)
+
+postProcessDmdTypeM :: DeferAndUseM -> DmdType -> DmdType
+postProcessDmdTypeM Nothing   _  = nopDmdType
+  -- Incoming demand was Absent, so just discard all usage information
+  -- We only processed the thing at all to analyse the body
+  -- See Note [Always analyse in virgin pass]
+postProcessDmdTypeM (Just du) ty = postProcessDmdType du ty
+
+postProcessDmdType :: DeferAndUse -> DmdType -> DmdType
+postProcessDmdType (True,  Many) ty  = deferAndUse ty
+postProcessDmdType (False, Many) ty  = useType ty
+postProcessDmdType (True,  One)  ty = deferType ty
+postProcessDmdType (False, One)  ty = ty
+
+deferType, useType, deferAndUse :: DmdType -> DmdType
+deferType   (DmdType fv ds _)      = DmdType (deferEnv fv)    (map deferDmd ds)    topRes
+useType     (DmdType fv ds res_ty) = DmdType (useEnv fv)      (map useDmd ds)      res_ty
+deferAndUse (DmdType fv ds _)      = DmdType (deferUseEnv fv) (map deferUseDmd ds) topRes
+
+deferEnv, useEnv, deferUseEnv :: DmdEnv -> DmdEnv
+deferEnv    fv = mapVarEnv deferDmd fv
+useEnv      fv = mapVarEnv useDmd fv
+deferUseEnv fv = mapVarEnv deferUseDmd fv
+
+deferDmd, useDmd, deferUseDmd :: JointDmd -> JointDmd
+deferDmd    (JD {strd=_, absd=a}) = mkJointDmd Lazy a
+useDmd      (JD {strd=d, absd=a}) = mkJointDmd d    (markAsUsedDmd a)
+deferUseDmd (JD {strd=_, absd=a}) = mkJointDmd Lazy (markAsUsedDmd a)
+
+peelCallDmd :: CleanDemand -> (CleanDemand, DeferAndUse)
+-- Exploiting the fact that
+-- on the strictness side      C(B) = B
+-- and on the usage side       C(U) = U
+peelCallDmd (CD {sd = s, ud = u})
+  = case (s, u) of
+      (SCall s', UCall c u') -> (CD { sd = s',       ud = u' },   (False, c))
+      (SCall s', _)          -> (CD { sd = s',       ud = Used }, (False, Many))
+      (HyperStr, UCall c u') -> (CD { sd = HyperStr, ud = u' },   (False, c))
+      (HyperStr, _)          -> (CD { sd = HyperStr, ud = Used }, (False, Many))
+      (_,        UCall c u') -> (CD { sd = HeadStr,  ud = u' },   (True,  c))
+      (_,        _)          -> (CD { sd = HeadStr,  ud = Used }, (True,  Many))
+       -- The _ cases for usage includes UHead which seems a bit wrong
+       -- because the body isn't used at all!
+       -- c.f. the Abs case in toCleanDmd
+
+peelManyCalls :: [Demand] -> CleanDemand -> DeferAndUse
+peelManyCalls arg_ds (CD { sd = str, ud = abs })
+  = (go_str arg_ds str, go_abs arg_ds abs)
   where
-    mf f (a,b) = (f a, b)
+    go_str :: [Demand] -> StrDmd -> Bool     -- True <=> unsaturated, defer
+    go_str [] _              = False
+    go_str (_:_)  HyperStr   = False         -- HyperStr = Call(HyperStr)
+    go_str (_:as) (SCall d') = go_str as d'
+    go_str _      _          = True
+
+    go_abs :: [Demand] -> UseDmd -> Count    -- Many <=> unsaturated, or at least
+    go_abs []      _             = One       --          one UCall Many in the demand
+    go_abs (_:as) (UCall One d') = go_abs as d'
+    go_abs _      _              = Many
 \end{code}
 
 Note [Always analyse in virgin pass]
@@ -1284,31 +1290,13 @@ dmdTransformSig :: StrictSig -> CleanDemand -> DmdType
 -- (dmdTransformSig fun_sig dmd) considers a call to a function whose
 -- signature is fun_sig, with demand dmd.  We return the demand
 -- that the function places on its context (eg its args)
-dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) 
-                (CD { sd = str, ud = abs })
-  = dmd_ty2
-  where
-    dmd_ty1 | str_sat   = dmd_ty
-            | otherwise = deferType dmd_ty
-    dmd_ty2 | abs_sat   = dmd_ty1
-            | otherwise = useType dmd_ty1
-
-    str_sat = go_str arg_ds str
-    abs_sat = go_abs arg_ds abs
-
-    go_str [] _              = True
-    go_str (_:_)  HyperStr   = True         -- HyperStr = Call(HyperStr)
-    go_str (_:as) (SCall d') = go_str as d'
-    go_str _      _          = False
-
-    go_abs []      _             = True
-    go_abs (_:as) (UCall One d') = go_abs as d'
-    go_abs _      _              = False
-
-    -- NB: it's important to use deferType, and not just return nopDmdType
+dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) cd
+  = postProcessDmdType (peelManyCalls arg_ds cd) dmd_ty
+    -- NB: it's important to use postProcessDmdType, and not
+    -- just return nopDmdType for unsaturated calls
     -- Consider     let { f x y = p + x } in f 1
-    -- The application isn't saturated, but we must nevertheless propagate 
-    --      a lazy demand for p!  
+    -- The application isn't saturated, but we must nevertheless propagate
+    --      a lazy demand for p!
 
 dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
 -- Same as dmdTranformSig but for a data constructor (worker), 
@@ -1327,8 +1315,9 @@ dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
   where
     go_str 0 dmd        = Just (splitStrProdDmd arity dmd)
     go_str n (SCall s') = go_str (n-1) s'
+    go_str n HyperStr   = go_str (n-1) HyperStr
     go_str _ _          = Nothing
-   
+
     go_abs 0 dmd            = Just (splitUseProdDmd arity dmd)
     go_abs n (UCall One u') = go_abs (n-1) u'
     go_abs _ _              = Nothing
@@ -1339,15 +1328,15 @@ dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
 -- argument: the dictionary), we feed the demand on the result into
 -- the indicated dictionary component.
 dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
-   | (cd',defer,_) <- peelCallDmd cd
-   , not defer
+   | (cd',defer_use) <- peelCallDmd cd
    , Just jds <- splitProdDmd_maybe dict_dmd
-   = DmdType emptyDmdEnv [mkManyUsedDmd $ mkProdDmd $ map (enhance cd') jds] topRes
+   = postProcessDmdType defer_use $
+     DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] topRes
    | otherwise
    = nopDmdType              -- See Note [Demand transformer for a dictionary selector]
   where
     enhance cd old | isAbsDmd old = old
-                   | otherwise    = mkManyUsedDmd cd
+                   | otherwise    = mkOnceUsedDmd cd  -- This is the one!
 
 dmdTransformDictSelSig _ _ = panic "dmdTransformDictSelSig: no args"
 \end{code}

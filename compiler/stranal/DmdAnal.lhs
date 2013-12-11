@@ -103,10 +103,11 @@ c) The application rule wouldn't be right either
    evaluation of f in a C(L) demand!
 
 \begin{code}
-dmdAnalThunk :: AnalEnv 
-             -> Demand 	-- This one takes a *Demand*
-             -> CoreExpr -> (DmdType, CoreExpr)
-dmdAnalThunk env dmd e
+dmdAnalArg :: AnalEnv 
+           -> Demand 	-- This one takes a *Demand*
+           -> CoreExpr -> (DmdType, CoreExpr)
+-- Used for function arguments
+dmdAnalArg env dmd e
   | exprIsTrivial e = dmdAnalStar env dmd e
   | otherwise       = dmdAnalStar env (oneifyDmd dmd) e
 
@@ -116,10 +117,13 @@ dmdAnalThunk env dmd e
 dmdAnalStar :: AnalEnv 
             -> Demand 	-- This one takes a *Demand*
             -> CoreExpr -> (DmdType, CoreExpr)
-dmdAnalStar env dmd e = toCleanDmd (dmdAnal env) dmd e
+dmdAnalStar env dmd e 
+  | (cd, defer_and_use) <- toCleanDmd dmd
+  , (dmd_ty, e')        <- dmdAnal env cd e
+  = (postProcessDmdTypeM defer_and_use dmd_ty, e')
 
 -- Main Demand Analsysis machinery
-dmdAnal :: AnalEnv 
+dmdAnal :: AnalEnv
         -> CleanDemand 	       -- The main one takes a *CleanDemand*
         -> CoreExpr -> (DmdType, CoreExpr)
 
@@ -173,7 +177,7 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
         call_dmd          = mkCallDmd dmd
 	(fun_ty, fun') 	  = dmdAnal env call_dmd fun
 	(arg_dmd, res_ty) = splitDmdTy fun_ty
-        (arg_ty, arg') 	  = dmdAnalThunk env arg_dmd arg
+        (arg_ty, arg') 	  = dmdAnalArg env arg_dmd arg
     in
 --    pprTrace "dmdAnal:app" (vcat
 --         [ text "dmd =" <+> ppr dmd
@@ -188,13 +192,13 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
 -- this is an anonymous lambda, since @dmdAnalRhs@ uses @collectBinders@
 dmdAnal env dmd (Lam var body)
   | isTyVar var
-  = let    
+  = let 
 	(body_ty, body') = dmdAnal env dmd body
     in
     (body_ty, Lam var body')
 
   | otherwise
-  = let (body_dmd, defer_me, one_shot) = peelCallDmd dmd	
+  = let (body_dmd, defer_and_use@(_,one_shot)) = peelCallDmd dmd
           -- body_dmd  - a demand to analyze the body
           -- one_shot  - one-shotness of the lambda
           --             hence, cardinality of its free vars
@@ -203,7 +207,7 @@ dmdAnal env dmd (Lam var body)
 	(body_ty, body') = dmdAnal env' body_dmd body
 	(lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty one_shot var
     in
-    (deferAndUse defer_me one_shot lam_ty, Lam var' body')
+    (postProcessDmdType defer_and_use lam_ty, Lam var' body')
 
 dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   -- Only one alternative with a product constructor
@@ -494,13 +498,13 @@ dmdTransform env var dmd
 
   | isGlobalId var	                         -- Imported function
   = let res = dmdTransformSig (idStrictness var) dmd in
---    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res]) 
+--    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
 
   | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
   , let fn_ty = dmdTransformSig sig dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr dmd, ppr fn_ty]) $
-    if isTopLevel top_lvl           
+  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
+    if isTopLevel top_lvl
     then fn_ty   -- Don't record top level things
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
 
@@ -600,18 +604,17 @@ dmdAnalRhs top_lvl rec_flag env id rhs
   where
     (bndrs, body)        = collectBinders rhs
     env_body             = foldl extendSigsWithLam env bndrs
-    (body_dmd_ty, body') = dmdAnal env_body body_dmd body
-    (rhs_dmd_ty, bndrs') = annotateLamBndrs env (isDFunId id) body_dmd_ty bndrs
-    id'		         = set_idStrictness env id sig_ty
+    (DmdType body_fv _      body_res, body')  = dmdAnal env_body body_dmd body
+    (DmdType rhs_fv rhs_dmds rhs_res, bndrs') = annotateLamBndrs env (isDFunId id)
+                                                  (DmdType body_fv [] body_res) bndrs
     sig_ty               = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
+    id'		         = set_idStrictness env id sig_ty
 	-- See Note [NOINLINE and strictness]
 
     -- See Note [Product demands for function body]
     body_dmd = case deepSplitProductType_maybe (exprType body) of
                  Nothing            -> cleanEvalDmd
                  Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
-
-    DmdType rhs_fv rhs_dmds rhs_res = rhs_dmd_ty
 
     -- See Note [Lazy and unleashable free variables]
     -- See Note [Aggregated demand for cardinality]

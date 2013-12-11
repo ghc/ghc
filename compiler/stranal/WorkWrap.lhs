@@ -256,15 +256,15 @@ tryWW dflags is_rec fn_id rhs
 	-- Furthermore, don't even expose strictness info
   = return [ (fn_id, rhs) ]
 
-  | is_thunk && worthSplittingThunk fn_dmd res_info
-  	-- See Note [Thunk splitting]
-  = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
-    checkSize dflags new_fn_id rhs $ 
-    splitThunk dflags new_fn_id rhs
-
-  | is_fun && worthSplittingFun wrap_dmds res_info
+  | is_fun && (any worthSplittingArgDmd wrap_dmds || returnsCPR res_info)
   = checkSize dflags new_fn_id rhs $
     splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
+
+  | is_thunk && (worthSplittingThunkDmd fn_dmd || returnsCPR res_info)
+  	-- See Note [Thunk splitting]
+  = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
+    checkSize dflags new_fn_id rhs $
+    splitThunk dflags new_fn_id rhs
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
