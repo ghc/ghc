@@ -1195,8 +1195,11 @@ tryEtaExpandRhs env bndr rhs
   = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
 
-       ; WARN( new_arity < old_arity || new_arity < _dmd_arity,
-               (ptext (sLit "Arity decrease:") <+> (ppr bndr <+> ppr old_arity
+       ; WARN( new_arity < old_arity,
+               (ptext (sLit "Arity decrease:") <+> (ppr bndr
+                <+> ppr old_arity <+> ppr new_arity) $$ ppr new_rhs) )
+         WARN( new_arity < _dmd_arity,
+               (ptext (sLit "Arity less than dmd sig arity:") <+> (ppr bndr
                 <+> ppr new_arity <+> ppr _dmd_arity) $$ ppr new_rhs) )
                         -- Note [Arity decrease]
          return (new_arity, new_rhs) }
@@ -1211,12 +1214,22 @@ tryEtaExpandRhs env bndr rhs
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }
       | otherwise
-      = return (manifest_arity, rhs)
+      = return (exprArity rhs, rhs)   -- See Note [Return exprArity, not manifestArity]
 
     manifest_arity = manifestArity rhs
     old_arity  = idArity bndr
     _dmd_arity = length $ fst $ splitStrictSig $ idStrictness bndr
 \end{code}
+
+Note [Return exprArity, not manifestArity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f = \xy. blah
+  g = f 2
+The f will get arity 2, and we want g to get arity 1, even though
+exprEtaExpandArity (and hence findArity) may not eta-expand it.
+Hence tryEtaExpand should return (exprArity (f 2)), not its
+manifest arity (which is zero).
 
 Note [Eta-expanding at let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
