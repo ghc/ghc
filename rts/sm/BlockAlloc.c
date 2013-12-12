@@ -101,12 +101,28 @@ static void  initMBlock(void *mblock);
 
   Free is O(1).
 
-  We cannot play this coalescing trick with mblocks, because there is
+  Megablocks
+  ~~~~~~~~~~
+
+  Separately from the free list of block groups, which are smaller than
+  an mblock, we maintain a free list of mblock groups.  This is the unit
+  of memory the operating system gives us, and we may either split mblocks
+  into blocks or allocate them directly (when very large contiguous regions
+  of memory).  mblocks have a different set of invariants than blocks:
+
+  bd->start points to the start of the block IF the block is in the first mblock
+  bd->blocks and bd->link are only valid IF this block is the first block
+    of the first mblock
+  No other fields are used (in particular, free is not used, meaning that
+    space that is not used by the (single) object is wasted.
+
+  This has implications for the free list as well:
+  We cannot play the coalescing trick with mblocks, because there is
   no requirement that the bdescrs in the second and subsequent mblock
   of an mgroup are initialised (the mgroup might be filled with a
   large array, overwriting the bdescrs for example).
 
-  So there is a separate free list for megablocks, sorted in *address*
+  The separate free list for megablocks is thus sorted in *address*
   order, so that we can coalesce.  Allocation in this list is best-fit
   by traversing the whole list: we don't expect this list to be long,
   and allocation/freeing of large blocks is rare; avoiding
@@ -170,7 +186,14 @@ initGroup(bdescr *head)
   bdescr *bd;
   W_ i, n;
 
-  n = head->blocks;
+  // If this block group fits in a single megablock, initialize
+  // all of the block descriptors.  Otherwise, initialize *only*
+  // the first block descriptor, since for large allocations we don't
+  // need to give the invariant that Bdescr(p) is valid for any p in the
+  // block group. (This is because it is impossible to do, as the
+  // block descriptor table for the second mblock will get overwritten
+  // by contiguous user data.)
+  n = head->blocks > BLOCKS_PER_MBLOCK ? 1 : head->blocks;
   head->free   = head->start;
   head->link   = NULL;
   for (i=1, bd = head+1; i < n; i++, bd++) {
@@ -259,6 +282,10 @@ split_free_block (bdescr *bd, W_ n, nat ln)
     return fg;
 }
 
+/* Only initializes the start pointers on the first megablock and the
+ * blocks field of the first bdescr; callers are responsible for calling
+ * initGroup afterwards.
+ */
 static bdescr *
 alloc_mega_group (StgWord mblocks)
 {
@@ -278,7 +305,6 @@ alloc_mega_group (StgWord mblocks)
             } else {
                 free_mblock_list = bd->link;
             }
-            initGroup(bd);
             return bd;
         }
         else if (bd->blocks > n)
