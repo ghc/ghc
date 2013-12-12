@@ -75,7 +75,7 @@ test('haddock.Cabal',
             # 2012-08-14: 47461532 (x86/OSX)
             # 2013-02-10: 46563344 (x86/OSX)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 3908586784, 2)
+          [(wordsize(64), 3828567272, 2)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -83,7 +83,8 @@ test('haddock.Cabal',
             # 2013-03-28: 3517301864 (amd64/Linux) fixed #7796
             # 2013-04-26: 3658801800 (amd64/Linux) Cabal updated
             # 2013-08-26: 3808466816 (amd64/Linux) Cabal updated
-            # 2013-21-11: 3908586784 (amd64/Linux) Cabal updated
+            # 2013-11-21: 3908586784 (amd64/Linux) Cabal updated
+            # 2013-12-12: 3828567272 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 1906532680, 1)
             # 2012-10-30:                     1733638168 (x86/Windows)
             # 2013-02-10:                     1906532680 (x86/Windows)
@@ -96,13 +97,14 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 1408, 10)
+          [(wordsize(64), 1551, 10)
             # 2012-08-14: 1203 (amd64/Linux)
             # 2012-08-21: 1199 (amd64/Linux)
             # 2012-09-20: 1228 (amd64/Linux)
             # 2012-10-08: 1240 (amd64/Linux)
             # 2013-08-26: 1250 (amd64/Linux) Cabal updated
             # 2013-10-18: 1408 (amd64/Linux)
+            # 2013-12-12: 1551 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 653, 1)
             # 2012-10-30:                     606 (x86/Windows)
             # 2013-02-10:                     653 (x86/Windows)

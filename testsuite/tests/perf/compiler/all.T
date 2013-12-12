@@ -129,12 +129,14 @@ test('T3294',
            # previous:     815479800  (x86/Linux)
            # (^ increase due to new codegen, see #7198)
            # 2012-10-08:  1373514844 (x86/Linux)
-           (wordsize(64), 2901451552, 5)]),
+           (wordsize(64), 3083825616, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
             # 18/09/2012: 2717327208 (amd64/Linux)
             # 08/06/2013: 2901451552 (amd64/Linux)
+            # (^ reason unknown)
+            # 12/12/2013: 3083825616 (amd64/Linux)
             # (^ reason unknown)
       conf_3294
       ],
@@ -217,7 +219,7 @@ test('T3064',
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 16266992, 20)]),
+           (wordsize(64), 19821544, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -227,6 +229,7 @@ test('T3064',
             # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
             #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
             # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
+            # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
        only_ways(['normal'])
       ],
      compile,
@@ -262,8 +265,9 @@ test('T5631',
      [compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 392904228, 10),
         # expected value: 392904228 (x86/Linux)
-           (wordsize(64), 774595008, 5)]),
+           (wordsize(64), 735486328, 5)]),
         # expected value: 774595008 (amd64/Linux):
+        # expected value: 735486328 (amd64/Linux) 2012/12/12:
        only_ways(['normal'])
       ],
      compile,
