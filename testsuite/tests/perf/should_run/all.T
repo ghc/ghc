@@ -35,9 +35,10 @@ test('lazy-bs-alloc',
      [stats_num_field('peak_megabytes_allocated', (2, 1)),
                                  # expected value: 2 (amd64/Linux)
       stats_num_field('bytes allocated',
-          [(wordsize(64), 429744, 1),
+          [(wordsize(64), 425400, 1),
             #             489776 (amd64/Linux)
             # 2013-02-07: 429744 (amd64/Linux)
+            # 2013-12-12: 425400 (amd64/Linux)
            (wordsize(32), 417738, 1)]),
             # 2013-02-10: 421296 (x86/Windows)
             # 2013-02-10: 414180 (x86/OSX)
