@@ -219,7 +219,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 	(alt_ty, alt')	      = dmdAnalAlt env_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
-	case_bndr_sig	      = cprProdSig
+	case_bndr_sig	      = cprProdSig (dataConRepArity dc)
 		-- Inside the alternative, the case binder has the CPR property.
 		-- Meaning that a case on it will successfully cancel.
 		-- Example:
@@ -624,13 +624,9 @@ dmdAnalRhs top_lvl rec_flag env id rhs
 
     (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
 
-    rhs_res' | returnsCPR rhs_res
-             , discard_cpr_info   = topRes
-             | otherwise          = rhs_res
-
-    discard_cpr_info = nested_sum || (is_thunk && not_strict)
-    nested_sum     -- See Note [CPR for sum types ]
-        = not (isTopLevel top_lvl || returnsCPRProd rhs_res) 
+    rhs_res'  = trimCPRInfo trim_all trim_sums rhs_res
+    trim_all  = is_thunk && not_strict
+    trim_sums = not (isTopLevel top_lvl) -- See Note [CPR for sum types]
 
     -- See Note [CPR for thunks]
     is_thunk = not (exprIsHNF rhs)
@@ -1076,8 +1072,8 @@ extendSigsWithLam env id
   , isStrictDmd (idDemandInfo id) || ae_virgin env  
        -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
-  , Just {} <- deepSplitProductType_maybe $ idType id
-  = extendAnalEnv NotTopLevel env id cprProdSig 
+  , Just (dc,_,_,_) <- deepSplitProductType_maybe $ idType id
+  = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
 
   | otherwise 
   = env

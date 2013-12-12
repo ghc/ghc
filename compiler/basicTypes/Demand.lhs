@@ -25,14 +25,14 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV,
 
-        DmdResult, CPRResult,
+        DmdResult(..), CPRResult(..),
         isBotRes, isTopRes, resTypeArgDmd, 
-        topRes, botRes, cprProdRes, cprSumRes,
+        topRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig, 
-        returnsCPR, returnsCPRProd, returnsCPR_maybe,
+        trimCPRInfo, returnsCPR, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,
-       
+
         seqDemand, seqDemandList, seqDmdType, seqStrictSig, 
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd, 
@@ -682,94 +682,138 @@ splitProdDmd_maybe (JD {strd = s, absd = u})
 
 %************************************************************************
 %*                                                                      *
-\subsection{Demand results}
+                   Demand results
 %*                                                                      *
 %************************************************************************
+
+
+DmdResult:     Dunno CPRResult
+               /
+        Diverges
+
+
+CPRResult:         NoCPR
+                   /    \
+            RetProd    RetSum ConTag
+
+
+Product contructors return (Dunno (RetProd rs))
+In a fixpoint iteration, start from Diverges
+We have lubs, but not glbs; but that is ok.
+
 
 \begin{code}
 ------------------------------------------------------------------------
 -- Constructed Product Result                                             
 ------------------------------------------------------------------------
 
-data CPRResult = NoCPR              -- Top of the lattice
-               | RetProd            -- Returns a constructor from a product type
-               | RetSum ConTag      -- Returns a constructor from a sum type with this tag
-               | BotCPR             -- Returns a constructor with any tag
-                                    -- Bottom of the domain
+data CPRResult = NoCPR                -- Top of the lattice
+               | RetProd              -- Returns a constructor from a product type
+               | RetSum ConTag        -- Returns a constructor from a sum type with this tag
+               deriving( Eq, Show )
+
+data DmdResult = Diverges              -- Definitely diverges
+               | Dunno CPRResult       -- Might diverge or converge, but in the latter case the
+                                       -- result shape is described by CPRResult
                deriving( Eq, Show )
 
 lubCPR :: CPRResult -> CPRResult -> CPRResult
-lubCPR BotCPR      r           = r
-lubCPR RetProd     BotCPR      = RetProd
-lubCPR (RetSum t)  BotCPR      = RetSum t
 lubCPR (RetSum t1) (RetSum t2) 
-  | t1 == t2                   = RetSum t1
+  | t1 == t2                       = RetSum t1
 lubCPR RetProd     RetProd     = RetProd
 lubCPR _ _                     = NoCPR
+
+lubDmdResult :: DmdResult -> DmdResult -> DmdResult
+lubDmdResult Diverges       r              = r
+lubDmdResult (Dunno c1)     Diverges       = Dunno c1
+lubDmdResult (Dunno c1)     (Dunno c2)     = Dunno (c1 `lubCPR` c2)
 -- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `lubCPR` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
+-- defaultDmd (r1 `lubDmdResult` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
-bothCPR :: CPRResult -> CPRResult -> CPRResult
+bothDmdResult :: DmdResult -> DmdResult -> DmdResult
 -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
-bothCPR _ BotCPR = BotCPR   -- If either diverges, we diverge
-bothCPR r _      = r
+bothDmdResult _              Diverges   = Diverges
+bothDmdResult r              _          = r
 -- This needs to commute with defaultDmd, i.e.
--- defaultDmd (r1 `bothCPR` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
+-- defaultDmd (r1 `bothDmdResult` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 instance Outputable DmdResult where
-  ppr RetProd    = char 'm' 
-  ppr (RetSum n) = char 'm' <> int n  
-  ppr BotCPR     = char 'b'   
-  ppr NoCPR      = empty   -- Keep these distinct from Demand letters
+  ppr Diverges      = char 'b'
+  ppr (Dunno c)     = ppr c
+
+instance Outputable CPRResult where
+  ppr NoCPR        = empty
+  ppr (RetSum n)   = char 'm' <> int n
+  ppr RetProd      = char 'm'
+
+seqDmdResult :: DmdResult -> ()
+seqDmdResult Diverges = ()
+seqDmdResult (Dunno c)     = seqCPRResult c
+
+seqCPRResult :: CPRResult -> ()
+seqCPRResult NoCPR        = ()
+seqCPRResult (RetSum n)   = n `seq` ()
+seqCPRResult RetProd      = ()
+
 
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
-type DmdResult = CPRResult
-
-lubDmdResult :: DmdResult -> DmdResult -> DmdResult
-lubDmdResult = lubCPR
-
-bothDmdResult :: DmdResult -> DmdResult -> DmdResult
-bothDmdResult = bothCPR
-
-seqDmdResult :: DmdResult -> ()
-seqDmdResult r = r `seq` ()
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
 topRes, botRes :: DmdResult
-topRes = NoCPR
-botRes = BotCPR
+topRes = Dunno NoCPR
+botRes = Diverges
 
-cprSumRes :: ConTag -> DmdResult
-cprSumRes tag | opt_CprOff = topRes
+cprSumRes :: ConTag -> CPRResult
+cprSumRes tag | opt_CprOff = NoCPR
               | otherwise  = RetSum tag
-cprProdRes :: DmdResult
-cprProdRes | opt_CprOff = topRes
-           | otherwise  = RetProd
+
+cprProdRes :: [DmdType] -> CPRResult
+cprProdRes _arg_tys
+  | opt_CprOff = NoCPR
+  | otherwise  = RetProd
+
+vanillaCprProdRes :: Arity -> CPRResult
+vanillaCprProdRes _arity
+  | opt_CprOff = NoCPR
+  | otherwise  = RetProd
 
 isTopRes :: DmdResult -> Bool
-isTopRes NoCPR  = True
-isTopRes _      = False
+isTopRes (Dunno NoCPR) = True
+isTopRes _             = False
 
 isBotRes :: DmdResult -> Bool
-isBotRes BotCPR = True
-isBotRes _      = False
+isBotRes Diverges = True
+isBotRes _        = False
+
+trimCPRInfo :: Bool -> Bool -> DmdResult -> DmdResult
+trimCPRInfo trim_all trim_sums res
+  = trimR res
+  where
+    trimR (Dunno c)     = Dunno (trimC c)
+    trimR Diverges      = Diverges
+
+    trimC (RetSum n)   | trim_all || trim_sums = NoCPR
+                       | otherwise             = RetSum n
+    trimC RetProd      | trim_all  = NoCPR
+                       | otherwise = RetProd
+    trimC NoCPR = NoCPR
 
 returnsCPR :: DmdResult -> Bool
 returnsCPR dr = isJust (returnsCPR_maybe dr)
 
-returnsCPRProd :: DmdResult -> Bool
-returnsCPRProd RetProd = True
-returnsCPRProd _       = False
-
 returnsCPR_maybe :: DmdResult -> Maybe ConTag
-returnsCPR_maybe (RetSum t) = Just t
-returnsCPR_maybe (RetProd)  = Just fIRST_TAG
-returnsCPR_maybe _          = Nothing
+returnsCPR_maybe (Dunno c)     = retCPR_maybe c
+returnsCPR_maybe Diverges      = Nothing
+
+retCPR_maybe :: CPRResult -> Maybe ConTag
+retCPR_maybe (RetSum t)  = Just t
+retCPR_maybe RetProd     = Just fIRST_TAG
+retCPR_maybe NoCPR       = Nothing
 
 resTypeArgDmd :: DmdResult -> JointDmd
 -- TopRes and BotRes are polymorphic, so that
@@ -1007,8 +1051,9 @@ nopDmdType, botDmdType :: DmdType
 nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
 
-cprProdDmdType :: DmdType
-cprProdDmdType = DmdType emptyDmdEnv [] cprProdRes
+cprProdDmdType :: Arity -> DmdType
+cprProdDmdType _arity
+  = DmdType emptyDmdEnv [] (Dunno RetProd)
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1045,8 +1090,8 @@ deferAfterIO d@(DmdType _ _ res) =
     case d `lubDmdType` nopDmdType of
         DmdType fv ds _ -> DmdType fv ds (defer_res res)
   where
-  defer_res BotCPR  = NoCPR
-  defer_res r       = r
+  defer_res Diverges      = topRes
+  defer_res r             = r
 
 strictenDmd :: JointDmd -> CleanDemand
 strictenDmd (JD {strd = s, absd = u})
@@ -1275,8 +1320,8 @@ nopSig, botSig :: StrictSig
 nopSig = StrictSig nopDmdType
 botSig = StrictSig botDmdType
 
-cprProdSig :: StrictSig
-cprProdSig = StrictSig cprProdDmdType
+cprProdSig :: Arity -> StrictSig
+cprProdSig arity = StrictSig (cprProdDmdType arity)
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
@@ -1604,17 +1649,24 @@ instance Binary DmdType where
            dr <- get bh 
            return (DmdType emptyDmdEnv ds dr)
 
+instance Binary DmdResult where
+  put_ bh (Dunno c)     = do { putByte bh 0; put_ bh c }
+  put_ bh Diverges      = putByte bh 2
+
+  get bh = do { h <- getByte bh
+              ; case h of
+                  0 -> do { c <- get bh; return (Dunno c) }
+                  _ -> return Diverges }
+
 instance Binary CPRResult where
     put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
     put_ bh RetProd      = putByte bh 1
     put_ bh NoCPR        = putByte bh 2
-    put_ bh BotCPR       = putByte bh 3
 
     get  bh = do
             h <- getByte bh
             case h of 
               0 -> do { n <- get bh; return (RetSum n) }
               1 -> return RetProd
-              2 -> return NoCPR
-              _ -> return BotCPR
+              _ -> return NoCPR
 \end{code}

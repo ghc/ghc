@@ -434,8 +434,8 @@ dataConCPR con
   , isVanillaDataCon con  -- No existentials 
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
-  = if is_prod then cprProdRes 
-               else cprSumRes (dataConTag con)
+  = if is_prod then Dunno (vanillaCprProdRes (dataConRepArity con))
+               else Dunno (cprSumRes (dataConTag con))
   | otherwise
   = topRes
   where
