@@ -227,7 +227,8 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 	(alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
 	case_bndr_sig	      = cprProdSig (dataConRepArity dc)
-		-- Inside the alternative, the case binder has the CPR property.
+		-- Inside the alternative, the case binder has the CPR property, and
+                -- is known to converge.
 		-- Meaning that a case on it will successfully cancel.
 		-- Example:
 		--	f True  x = case x of y { I# x' -> if x' ==# 3 then y else I# 8 }
@@ -277,7 +278,7 @@ dmdAnal env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
 	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
 	(scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
-	(alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
+	(alt_ty, case_bndr') = annotateBndr env (lubDmdTypes alt_tys) case_bndr
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -1052,7 +1053,10 @@ updSigEnv env sigs = env { ae_sigs = sigs }
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
 extendAnalEnv top_lvl env var sig
-  = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig }
+  = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig' }
+  where
+  sig' | isWeakLoopBreaker (idOccInfo var) = sigMayDiverge sig
+       | otherwise                         = sig
 
 extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
 extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
@@ -1086,7 +1090,7 @@ extendSigsWithLam env id
        -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
+  = extendAnalEnv NotTopLevel env id (sigMayDiverge (cprProdSig (dataConRepArity dc)))
 
   | otherwise 
   = env
@@ -1131,6 +1135,9 @@ We want f to have the CPR property because x does, by the time f has been w/w'd
 Also note that we only want to do this for something that definitely
 has product type, else we may get over-optimistic CPR results
 (e.g. from \x -> x!).
+
+And finally note that the signature should obviously _not_ claim that it is
+converging (like a constructor call would).
 
 
 Note [Initialising strictness]

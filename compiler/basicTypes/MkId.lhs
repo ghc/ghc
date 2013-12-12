@@ -497,7 +497,10 @@ mkDataConRep dflags fam_envs wrap_name data_con
                     	     -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                     	     -- so it not make sure that the CAF info is sane
 
-    	     wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
+             wrap_sig_conv = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
+             wrap_sig | any isBanged (dropList eq_spec wrap_bangs) = sigMayDiverge wrap_sig_conv
+                      | otherwise                                  = wrap_sig_conv
+
     	     wrap_arg_dmds = map mk_dmd (dropList eq_spec wrap_bangs)
     	     mk_dmd str | isBanged str = evalDmd
     	                | otherwise    = topDmd

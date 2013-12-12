@@ -46,7 +46,7 @@ T7360.fun3 = GHC.Types.I# 0
 T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
 [GblId,
  Arity=1,
- Str=DmdType <L,1*U>m,
+ Str=DmdType <L,1*U>tm,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
