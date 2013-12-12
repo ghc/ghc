@@ -691,8 +691,8 @@ splitProdDmd_maybe (JD {strd = s, absd = u})
 
 
 DmdResult:     Dunno CPRResult
-               /
-        Diverges
+               /         \
+        Diverges         Converges CPRResult
 
 
 CPRResult:         NoCPR
@@ -700,7 +700,7 @@ CPRResult:         NoCPR
             RetProd    RetSum ConTag
 
 
-Product contructors return (Dunno (RetProd rs))
+Product contructors return (Converges (RetProd rs))
 In a fixpoint iteration, start from Diverges
 We have lubs, but not glbs; but that is ok.
 
@@ -711,6 +711,7 @@ We have lubs, but not glbs; but that is ok.
 ------------------------------------------------------------------------
 
 data Termination r = Diverges    -- Definitely diverges
+                   | Converges r -- Definitely converges
                    | Dunno r     -- Might diverge or converge
                deriving( Eq, Show )
 
@@ -729,7 +730,11 @@ lubCPR _ _                     = NoCPR
 
 lubDmdResult :: DmdResult -> DmdResult -> DmdResult
 lubDmdResult Diverges       r              = r
+lubDmdResult (Converges c1) Diverges       = Converges c1
+lubDmdResult (Converges c1) (Converges c2) = Converges (c1 `lubCPR` c2)
+lubDmdResult (Converges c1) (Dunno c2)     = Dunno (c1 `lubCPR` c2)
 lubDmdResult (Dunno c1)     Diverges       = Dunno c1
+lubDmdResult (Dunno c1)     (Converges c2) = Dunno (c1 `lubCPR` c2)
 lubDmdResult (Dunno c1)     (Dunno c2)     = Dunno (c1 `lubCPR` c2)
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `lubDmdResult` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
@@ -738,6 +743,7 @@ lubDmdResult (Dunno c1)     (Dunno c2)     = Dunno (c1 `lubCPR` c2)
 bothDmdResult :: DmdResult -> Termination () -> DmdResult
 -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
 bothDmdResult _              Diverges   = Diverges
+bothDmdResult (Converges c1) (Dunno {}) = Dunno c1
 bothDmdResult r              _          = r
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `bothDmdResult` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
@@ -745,6 +751,7 @@ bothDmdResult r              _          = r
 
 instance Outputable DmdResult where
   ppr Diverges      = char 'b'
+  ppr (Converges c) = char 't' <> ppr c
   ppr (Dunno c)     = ppr c
 
 instance Outputable CPRResult where
@@ -754,6 +761,7 @@ instance Outputable CPRResult where
 
 seqDmdResult :: DmdResult -> ()
 seqDmdResult Diverges = ()
+seqDmdResult (Converges c) = seqCPRResult c
 seqDmdResult (Dunno c)     = seqCPRResult c
 
 seqCPRResult :: CPRResult -> ()
@@ -774,17 +782,17 @@ botRes = Diverges
 
 cprSumRes :: ConTag -> DmdResult
 cprSumRes tag | opt_CprOff = topRes
-              | otherwise  = Dunno $ RetSum tag
+              | otherwise  = Converges $ RetSum tag
 
 cprProdRes :: [DmdType] -> DmdResult
 cprProdRes _arg_tys
   | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+  | otherwise  = Converges $ RetProd
 
 vanillaCprProdRes :: Arity -> DmdResult
 vanillaCprProdRes _arity
   | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+  | otherwise  = Converges $ RetProd
 
 isTopRes :: DmdResult -> Bool
 isTopRes (Dunno NoCPR) = True
@@ -798,6 +806,7 @@ trimCPRInfo :: Bool -> Bool -> DmdResult -> DmdResult
 trimCPRInfo trim_all trim_sums res
   = trimR res
   where
+    trimR (Converges c) = Converges (trimC c)
     trimR (Dunno c)     = Dunno (trimC c)
     trimR Diverges      = Diverges
 
@@ -811,6 +820,7 @@ returnsCPR :: DmdResult -> Bool
 returnsCPR dr = isJust (returnsCPR_maybe dr)
 
 returnsCPR_maybe :: DmdResult -> Maybe ConTag
+returnsCPR_maybe (Converges c) = retCPR_maybe c
 returnsCPR_maybe (Dunno c)     = retCPR_maybe c
 returnsCPR_maybe Diverges      = Nothing
 
@@ -1036,6 +1046,7 @@ toBothDmdArg :: DmdType -> BothDmdArg
 toBothDmdArg (DmdType fv _ r) = (fv, go r)
   where
   go (Dunno {})     = Dunno ()
+  go (Converges {}) = Converges ()
   go Diverges       = Diverges
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
@@ -1069,7 +1080,7 @@ botDmdType = DmdType emptyDmdEnv [] botRes
 
 cprProdDmdType :: Arity -> DmdType
 cprProdDmdType _arity
-  = DmdType emptyDmdEnv [] (Dunno RetProd)
+  = DmdType emptyDmdEnv [] (Converges RetProd)
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1098,7 +1109,7 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 -- exit?
 -- * We have to kill all strictness demands (i.e. lub with a lazy demand)
 -- * We can keep demand information (i.e. lub with an absent deman)
--- * We have to kill definite divergence
+-- * We have to kill definite divergence and definite convergence
 -- * We can keep CPR information.
 -- See Note [IO hack in the demand analyser]
 deferAfterIO :: DmdType -> DmdType
@@ -1107,6 +1118,7 @@ deferAfterIO d@(DmdType _ _ res) =
         DmdType fv ds _ -> DmdType fv ds (defer_res res)
   where
   defer_res Diverges      = topRes
+  defer_res (Converges r) = Dunno r
   defer_res r             = r
 
 strictenDmd :: JointDmd -> CleanDemand
@@ -1149,9 +1161,12 @@ postProcessDmdTypeM (Just du) (DmdType fv _ res_ty)
     = (postProcessDmdEnv du fv, postProcessDmdResult du res_ty)
 
 postProcessDmdResult :: DeferAndUse -> DmdResult -> Termination ()
-postProcessDmdResult (True,_)  _          = Dunno ()
-postProcessDmdResult (False,_) (Dunno {}) = Dunno ()
-postProcessDmdResult (False,_) Diverges   = Diverges
+    -- if we use it lazily, there cannot be divergence worrying us
+    -- (Otherwise we'd lose the termination information of constructors in in dmdAnalVarApp, for example)
+postProcessDmdResult (True,_)  _              = Converges ()
+postProcessDmdResult (False,_) (Dunno {})     = Dunno ()
+postProcessDmdResult (False,_) (Converges {}) = Converges ()
+postProcessDmdResult (False,_) Diverges       = Diverges
 
 postProcessDmdEnv :: DeferAndUse -> DmdEnv -> DmdEnv
 postProcessDmdEnv (True,  Many) env = deferReuseEnv env
@@ -1720,11 +1735,13 @@ instance Binary DmdType where
 
 instance Binary DmdResult where
   put_ bh (Dunno c)     = do { putByte bh 0; put_ bh c }
-  put_ bh Diverges      = putByte bh 2
+  put_ bh (Converges c) = do { putByte bh 1; put_ bh c }
+  put_ bh Diverges      = putByte bh 3
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> do { c <- get bh; return (Dunno c) }
+                  1 -> do { c <- get bh; return (Converges c) }
                   _ -> return Diverges }
 
 instance Binary CPRResult where
