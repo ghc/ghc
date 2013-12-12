@@ -25,13 +25,13 @@ Roman.foo_$s$wgo =
              sc1)
           sc1 } in
     case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=# sc 0)
-    of _ {
+    of _ [Occ=Dead] {
       GHC.Types.False ->
         case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# sc 100)
-        of _ {
+        of _ [Occ=Dead] {
           GHC.Types.False ->
             case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# sc 500)
-            of _ {
+            of _ [Occ=Dead] {
               GHC.Types.False ->
                 Roman.foo_$s$wgo (GHC.Prim.-# sc 1) (GHC.Prim.+# a a);
               GHC.Types.True -> Roman.foo_$s$wgo (GHC.Prim.-# sc 3) a
@@ -54,10 +54,10 @@ Roman.$wgo
 Roman.$wgo =
   \ (w :: Data.Maybe.Maybe GHC.Types.Int)
     (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->
-    case w1 of _ {
+    case w1 of _ [Occ=Dead] {
       Data.Maybe.Nothing -> case Roman.foo3 of wild1 { };
       Data.Maybe.Just x ->
-        case x of _ { GHC.Types.I# ipv ->
+        case x of _ [Occ=Dead] { GHC.Types.I# ipv ->
         let {
           a :: GHC.Prim.Int#
           [LclId, Str=DmdType]
@@ -68,18 +68,18 @@ Roman.$wgo =
                     (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# ipv ipv) ipv) ipv) ipv)
                  ipv)
               ipv } in
-        case w of _ {
+        case w of _ [Occ=Dead] {
           Data.Maybe.Nothing -> Roman.foo_$s$wgo 10 a;
           Data.Maybe.Just n ->
-            case n of _ { GHC.Types.I# x2 ->
+            case n of _ [Occ=Dead] { GHC.Types.I# x2 ->
             case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=# x2 0)
-            of _ {
+            of _ [Occ=Dead] {
               GHC.Types.False ->
                 case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x2 100)
-                 of _ {
+                of _ [Occ=Dead] {
                   GHC.Types.False ->
                     case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x2 500)
-                    of _ {
+                    of _ [Occ=Dead] {
                       GHC.Types.False ->
                         Roman.foo_$s$wgo (GHC.Prim.-# x2 1) (GHC.Prim.+# a a);
                       GHC.Types.True -> Roman.foo_$s$wgo (GHC.Prim.-# x2 3) a
@@ -137,12 +137,12 @@ Roman.foo :: GHC.Types.Int -> GHC.Types.Int
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
-                 case n of n1 { GHC.Types.I# _ ->
+                 case n of n1 { GHC.Types.I# _ [Occ=Dead] ->
                  Roman.foo_go (Data.Maybe.Just @ GHC.Types.Int n1) Roman.foo1
                  }}]
 Roman.foo =
   \ (n :: GHC.Types.Int) ->
-    case n of _ { GHC.Types.I# ipv ->
+    case n of _ [Occ=Dead] { GHC.Types.I# ipv ->
     case Roman.foo_$s$wgo ipv 6 of ww { __DEFAULT -> GHC.Types.I# ww }
     }
 

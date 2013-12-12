@@ -11,10 +11,14 @@ T7116.dl :: GHC.Types.Double -> GHC.Types.Double
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Double) ->
-                 case x of _ { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
+                 case x of _ [Occ=Dead] { GHC.Types.D# y ->
+                 GHC.Types.D# (GHC.Prim.+## y y)
+                 }}]
 T7116.dl =
   \ (x :: GHC.Types.Double) ->
-    case x of _ { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }
+    case x of _ [Occ=Dead] { GHC.Types.D# y ->
+    GHC.Types.D# (GHC.Prim.+## y y)
+    }
 
 T7116.dr :: GHC.Types.Double -> GHC.Types.Double
 [GblId,
@@ -25,7 +29,7 @@ T7116.dr :: GHC.Types.Double -> GHC.Types.Double
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Double) ->
-                 case x of _ { GHC.Types.D# x1 ->
+                 case x of _ [Occ=Dead] { GHC.Types.D# x1 ->
                  GHC.Types.D# (GHC.Prim.+## x1 x1)
                  }}]
 T7116.dr = T7116.dl
@@ -39,12 +43,12 @@ T7116.fl :: GHC.Types.Float -> GHC.Types.Float
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Float) ->
-                 case x of _ { GHC.Types.F# y ->
+                 case x of _ [Occ=Dead] { GHC.Types.F# y ->
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]
 T7116.fl =
   \ (x :: GHC.Types.Float) ->
-    case x of _ { GHC.Types.F# y ->
+    case x of _ [Occ=Dead] { GHC.Types.F# y ->
     GHC.Types.F# (GHC.Prim.plusFloat# y y)
     }
 
@@ -57,7 +61,7 @@ T7116.fr :: GHC.Types.Float -> GHC.Types.Float
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Float) ->
-                 case x of _ { GHC.Types.F# x1 ->
+                 case x of _ [Occ=Dead] { GHC.Types.F# x1 ->
                  GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
                  }}]
 T7116.fr = T7116.fl

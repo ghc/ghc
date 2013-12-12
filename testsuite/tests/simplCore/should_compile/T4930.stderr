@@ -18,16 +18,18 @@ T4930.foo :: GHC.Types.Int -> GHC.Types.Int
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
-                 case n of _ { GHC.Types.I# x ->
-                 case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5) of _ {
+                 case n of _ [Occ=Dead] { GHC.Types.I# x ->
+                 case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5)
+                 of _ [Occ=Dead] {
                    GHC.Types.False -> GHC.Types.I# (GHC.Prim.+# x 5);
                    GHC.Types.True -> T4930.foo1
                  }
                  }}]
 T4930.foo =
   \ (n :: GHC.Types.Int) ->
-    case n of _ { GHC.Types.I# x ->
-    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5) of _ {
+    case n of _ [Occ=Dead] { GHC.Types.I# x ->
+    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5)
+    of _ [Occ=Dead] {
       GHC.Types.False -> GHC.Types.I# (GHC.Prim.+# x 5);
       GHC.Types.True -> T4930.foo1
     }

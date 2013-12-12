@@ -11,15 +11,20 @@ T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
          Tmpl= \ (dt [Occ=Once!] :: GHC.Types.Int) ->
-                 case dt of _ { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }}]
+                 case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
+                 T7360.Foo3 dt
+                 }}]
 T7360.$WFoo3 =
   \ (dt [Occ=Once!] :: GHC.Types.Int) ->
-    case dt of _ { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }
+    case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
+    T7360.Foo3 dt
+    }
 
 T7360.fun1 [InlPrag=NOINLINE] :: T7360.Foo -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
 T7360.fun1 =
-  \ (x :: T7360.Foo) -> case x of _ { __DEFAULT -> GHC.Tuple.() }
+  \ (x :: T7360.Foo) ->
+    case x of _ [Occ=Dead] { __DEFAULT -> GHC.Tuple.() }
 
 T7360.fun4 :: ()
 [GblId,
@@ -49,7 +54,7 @@ T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
                  (T7360.fun4,
                   case x of wild {
                     [] -> T7360.fun3;
-                    : _ _ ->
+                    : _ [Occ=Dead] _ [Occ=Dead] ->
                       case GHC.List.$wlenAcc @ a wild 0 of ww { __DEFAULT ->
                       GHC.Types.I# ww
                       }

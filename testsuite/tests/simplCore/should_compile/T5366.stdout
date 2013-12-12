@@ -1,2 +1,1 @@
-                 case ds of _ { T5366.Bar dt [Occ=Once] _ -> GHC.Types.I# dt }}]
-    case ds of _ { T5366.Bar dt dt1 -> GHC.Types.I# dt }
+    case ds of _ [Occ=Dead] { T5366.Bar dt dt1 -> GHC.Types.I# dt }

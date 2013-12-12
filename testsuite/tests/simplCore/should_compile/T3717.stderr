@@ -22,12 +22,12 @@ T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int) ->
-                 case w of _ { GHC.Types.I# ww1 [Occ=Once] ->
+                 case w of _ [Occ=Dead] { GHC.Types.I# ww1 [Occ=Once] ->
                  case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
                  }}]
 T3717.foo =
   \ (w :: GHC.Types.Int) ->
-    case w of _ { GHC.Types.I# ww1 ->
+    case w of _ [Occ=Dead] { GHC.Types.I# ww1 ->
     case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
     }
 
