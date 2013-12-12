@@ -38,13 +38,13 @@ module Demand (
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd, 
         splitDmdTy, splitFVs,
         deferAfterIO,
-        postProcessDmdType, postProcessDmdTypeM,
+        postProcessUnsat, postProcessDmdTypeM,
 
         splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
         dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
         argOneShots, argsOneShots,
 
-        isSingleUsed, useEnv, zapDemand, zapStrictSig,
+        isSingleUsed, reuseEnv, zapDemand, zapStrictSig,
 
         worthSplittingArgDmd, worthSplittingThunkDmd,
 
@@ -400,23 +400,25 @@ Compare with: (C) making Used win for both, but UProd win for lub
 
 
 \begin{code}
-markAsUsedDmd :: MaybeUsed -> MaybeUsed
-markAsUsedDmd Abs         = Abs
-markAsUsedDmd (Use _ a)   = Use Many (markUsed a)
+-- If a demand is used multiple times (i.e. reused), than any use-once
+-- mentioned there, that is not protected by a UCall, can happen many times.
+markReusedDmd :: MaybeUsed -> MaybeUsed
+markReusedDmd Abs         = Abs
+markReusedDmd (Use _ a)   = Use Many (markReused a)
 
-markUsed :: UseDmd -> UseDmd
-markUsed (UCall _ u)      = UCall Many u   -- No need to recurse here
-markUsed (UProd ux)       = UProd (map markAsUsedDmd ux)
-markUsed u                = u
+markReused :: UseDmd -> UseDmd
+markReused (UCall _ u)      = UCall Many u   -- No need to recurse here
+markReused (UProd ux)       = UProd (map markReusedDmd ux)
+markReused u                = u
 
 isUsedMU :: MaybeUsed -> Bool
--- True <=> markAsUsedDmd d = d
+-- True <=> markReusedDmd d = d
 isUsedMU Abs          = True
 isUsedMU (Use One _)  = False
 isUsedMU (Use Many u) = isUsedU u
 
 isUsedU :: UseDmd -> Bool
--- True <=> markUsed d = d
+-- True <=> markReused d = d
 isUsedU Used           = True
 isUsedU UHead          = True
 isUsedU (UProd us)     = all isUsedMU us
@@ -1121,34 +1123,39 @@ toCleanDmd (JD { strd = s, absd = u })
       (Lazy,   Use c u') -> (CD { sd = HeadStr, ud = u' },   Just (True,  c))
       (_,      Abs)      -> (CD { sd = HeadStr, ud = Used }, Nothing)
 
+-- This is used in dmdAnalStar when post-processing
+-- a function's argument demand. So we only care about what
+-- does to free variables, and whether it terminates.
 postProcessDmdTypeM :: DeferAndUseM -> DmdType -> DmdType
 postProcessDmdTypeM Nothing   _  = nopDmdType
   -- Incoming demand was Absent, so just discard all usage information
   -- We only processed the thing at all to analyse the body
   -- See Note [Always analyse in virgin pass]
-postProcessDmdTypeM (Just du) ty = postProcessDmdType du ty
+postProcessDmdTypeM (Just du) ty = postProcessUnsat du ty
 
-postProcessDmdType :: DeferAndUse -> DmdType -> DmdType
-postProcessDmdType (True,  Many) ty  = deferAndUse ty
-postProcessDmdType (False, Many) ty  = useType ty
-postProcessDmdType (True,  One)  ty = deferType ty
-postProcessDmdType (False, One)  ty = ty
+postProcessUnsat :: DeferAndUse -> DmdType -> DmdType
+postProcessUnsat (True,  Many) ty = deferReuse ty
+postProcessUnsat (False, Many) ty = reuseType ty
+postProcessUnsat (True,  One)  ty = deferType ty
+postProcessUnsat (False, One)  ty = ty
 
-deferType, useType, deferAndUse :: DmdType -> DmdType
-deferType   (DmdType fv ds _)      = DmdType (deferEnv fv)    (map deferDmd ds)    topRes
-useType     (DmdType fv ds res_ty) = DmdType (useEnv fv)      (map useDmd ds)      res_ty
-deferAndUse (DmdType fv ds _)      = DmdType (deferUseEnv fv) (map deferUseDmd ds) topRes
+deferType, reuseType, deferReuse :: DmdType -> DmdType
+deferType  (DmdType fv ds _)      = DmdType (deferEnv fv)      (map deferDmd ds)      topRes
+reuseType  (DmdType fv ds res_ty) = DmdType (reuseEnv fv)      (map reuseDmd ds)      res_ty
+deferReuse (DmdType fv ds _)      = DmdType (deferReuseEnv fv) (map deferReuseDmd ds) topRes
 
-deferEnv, useEnv, deferUseEnv :: DmdEnv -> DmdEnv
-deferEnv    fv = mapVarEnv deferDmd fv
-useEnv      fv = mapVarEnv useDmd fv
-deferUseEnv fv = mapVarEnv deferUseDmd fv
+deferEnv, reuseEnv, deferReuseEnv :: DmdEnv -> DmdEnv
+deferEnv      fv = mapVarEnv deferDmd fv
+reuseEnv      fv = mapVarEnv reuseDmd fv
+deferReuseEnv fv = mapVarEnv deferReuseDmd fv
 
-deferDmd, useDmd, deferUseDmd :: JointDmd -> JointDmd
-deferDmd    (JD {strd=_, absd=a}) = mkJointDmd Lazy a
-useDmd      (JD {strd=d, absd=a}) = mkJointDmd d    (markAsUsedDmd a)
-deferUseDmd (JD {strd=_, absd=a}) = mkJointDmd Lazy (markAsUsedDmd a)
+deferDmd, reuseDmd, deferReuseDmd :: JointDmd -> JointDmd
+deferDmd      (JD {strd=_, absd=a}) = mkJointDmd Lazy a
+reuseDmd      (JD {strd=d, absd=a}) = mkJointDmd d    (markReusedDmd a)
+deferReuseDmd (JD {strd=_, absd=a}) = mkJointDmd Lazy (markReusedDmd a)
 
+-- Peels one call level from the demand, and also returns
+-- whether it was unsaturated (separately for strictness and usage)
 peelCallDmd :: CleanDemand -> (CleanDemand, DeferAndUse)
 -- Exploiting the fact that
 -- on the strictness side      C(B) = B
@@ -1352,8 +1359,8 @@ dmdTransformSig :: StrictSig -> CleanDemand -> DmdType
 -- signature is fun_sig, with demand dmd.  We return the demand
 -- that the function places on its context (eg its args)
 dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) cd
-  = postProcessDmdType (peelManyCalls arg_ds cd) dmd_ty
-    -- NB: it's important to use postProcessDmdType, and not
+  = postProcessUnsat (peelManyCalls arg_ds cd) dmd_ty
+    -- NB: it's important to use postProcessUnsat, and not
     -- just return nopDmdType for unsaturated calls
     -- Consider     let { f x y = p + x } in f 1
     -- The application isn't saturated, but we must nevertheless propagate
@@ -1391,7 +1398,7 @@ dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
 dmdTransformDictSelSig (StrictSig (DmdType _ [dict_dmd] _)) cd
    | (cd',defer_use) <- peelCallDmd cd
    , Just jds <- splitProdDmd_maybe dict_dmd
-   = postProcessDmdType defer_use $
+   = postProcessUnsat defer_use $
      DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] topRes
    | otherwise
    = nopDmdType              -- See Note [Demand transformer for a dictionary selector]

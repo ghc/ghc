@@ -206,7 +206,7 @@ dmdAnal env dmd (Lam var body)
 	(body_ty, body') = dmdAnal env' body_dmd body
 	(lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty one_shot var
     in
-    (postProcessDmdType defer_and_use lam_ty, Lam var' body')
+    (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
 dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   -- Only one alternative with a product constructor
@@ -619,7 +619,7 @@ dmdAnalRhs top_lvl rec_flag env id rhs
     -- See Note [Lazy and unleashable free variables]
     -- See Note [Aggregated demand for cardinality]
     rhs_fv1 = case rec_flag of
-                Just bs -> useEnv (delVarEnvList rhs_fv bs)
+                Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
 
     (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
