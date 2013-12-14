@@ -1172,21 +1172,60 @@ peelCallDmd (CD {sd = s, ud = u})
        -- because the body isn't used at all!
        -- c.f. the Abs case in toCleanDmd
 
-peelManyCalls :: [Demand] -> CleanDemand -> DeferAndUse
-peelManyCalls arg_ds (CD { sd = str, ud = abs })
-  = (go_str arg_ds str, go_abs arg_ds abs)
+-- Peels that multiple nestings of calls clean demand and also returns
+-- whether it was unsaturated (separately for strictness and usage
+-- see Note [Demands from unsaturated function calls]
+peelManyCalls :: Int -> CleanDemand -> DeferAndUse
+peelManyCalls n (CD { sd = str, ud = abs })
+  = (go_str n str, go_abs n abs)
   where
-    go_str :: [Demand] -> StrDmd -> Bool     -- True <=> unsaturated, defer
-    go_str [] _              = False
-    go_str (_:_)  HyperStr   = False         -- HyperStr = Call(HyperStr)
-    go_str (_:as) (SCall d') = go_str as d'
-    go_str _      _          = True
+    go_str :: Int -> StrDmd -> Bool  -- True <=> unsaturated, defer
+    go_str 0 _          = False
+    go_str _ HyperStr   = False -- == go_str (n-1) HyperStr, as HyperStr = Call(HyperStr)
+    go_str n (SCall d') = go_str (n-1) d'
+    go_str _ _          = True
 
-    go_abs :: [Demand] -> UseDmd -> Count    -- Many <=> unsaturated, or at least
-    go_abs []      _             = One       --          one UCall Many in the demand
-    go_abs (_:as) (UCall One d') = go_abs as d'
-    go_abs _      _              = Many
+    go_abs :: Int -> UseDmd -> Count -- Many <=> unsaturated, or at least
+    go_abs 0 _              = One    --          one UCall Many in the demand
+    go_abs n (UCall One d') = go_abs (n-1) d'
+    go_abs _ _              = Many
+\end{code}
 
+Note [Demands from unsaturated function calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider a demand transformer d1 -> d2 -> r for f.
+If a sufficiently detailed demand is fed into this transformer,
+e.g <C(C(S)), C1(C1(S))> arising from "f x1 x2" in a strict, use-once context,
+then d1 and d2 is precisely the demand unleashed onto x1 and x2 (similar for
+the free variable environment) and furthermore the result information r is the
+one we want to use.
+
+But the demand fed into f might be less than <C(C(S)), C1(C1(S))>. There are a few cases:
+ * Not enough demand on the strictness side:
+   - In that case, we need to zap all strictness in the demand on arguments and
+     free variables.
+   - Furthermore, we need to remove CPR information (after all, "f x1" surely
+     does not return a constructor).
+   - And finally, if r said that f would (possible or definitely) diverge when
+     called with two arguments, then "f x1" may diverge. So we use topRes here.
+     (We could return "Converges NoCPR" if f would converge for sure, but that
+     information would currently not be useful in any way.)
+ * Not enough demand from the usage side: The missing usage can be expanded
+   using UCall Many, therefore this is subsumed by the third case:
+ * At least one of the uses has a cardinality of Many.
+   - Even if f puts a One demand on any of its argument or free variables, if
+     we call f multiple times, we may evaluate this argument or free variable
+     multiple times. So forget about any occurrence of "One" in the demand.
+
+In dmdTransformSig, we call peelManyCalls to find out if we are in any of these
+cases, and then call postProcessUnsat to reduce the demand appropriately.
+
+Similarly, dmdTransformDictSelSig and dmdAnal, when analyzing a Lambda, use
+peelCallDmd, which peels only one level, but also returns the demand put on the
+body of the function.
+
+\begin{code}
 peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
                                (DmdType fv' ds res, dmd)
@@ -1359,12 +1398,8 @@ dmdTransformSig :: StrictSig -> CleanDemand -> DmdType
 -- signature is fun_sig, with demand dmd.  We return the demand
 -- that the function places on its context (eg its args)
 dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) cd
-  = postProcessUnsat (peelManyCalls arg_ds cd) dmd_ty
-    -- NB: it's important to use postProcessUnsat, and not
-    -- just return nopDmdType for unsaturated calls
-    -- Consider     let { f x y = p + x } in f 1
-    -- The application isn't saturated, but we must nevertheless propagate
-    --      a lazy demand for p!
+  = postProcessUnsat (peelManyCalls (length arg_ds) cd) dmd_ty
+    -- see Note [Demands from unsaturated function calls]
 
 dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
 -- Same as dmdTransformSig but for a data constructor (worker), 
