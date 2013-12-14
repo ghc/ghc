@@ -51,10 +51,16 @@ llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w
     hClose r
-    let fixed = (map rewriteAVX . fixTables) ss
+    let fixed = (map (rewriteSymType . rewriteAVX) . fixTables) ss
     mapM_ (writeSection w) fixed
     hClose w
     return ()
+    
+rewriteSymType :: Section -> Section
+rewriteSymType = rewriteInstructions typeFunc typeObj
+  where
+    typeFunc = B.pack "@function"
+    typeObj = B.pack "@object"
 
 -- | Splits the file contents into its sections
 readSections :: Handle -> Handle -> IO [Section]
@@ -111,6 +117,10 @@ rewriteVmovap = rewriteInstructions vmovap vmovup
     vmovap, vmovup :: B.ByteString
     vmovap = B.pack "vmovap"
     vmovup = B.pack "vmovup"
+#else /* !REWRITE_AVX */
+rewriteAVX :: Section -> Section
+rewriteAVX = id
+#endif /* !REWRITE_SSE */
 
 rewriteInstructions :: B.ByteString -> B.ByteString -> Section -> Section
 rewriteInstructions matchBS replaceBS (hdr, cts) =
@@ -122,10 +132,6 @@ rewriteInstructions matchBS replaceBS (hdr, cts) =
           (hd,tl) | B.null tl -> hd
                   | otherwise -> hd `B.append` replaceBS `B.append`
                                  loop (B.drop (B.length matchBS) tl)
-#else /* !REWRITE_AVX */
-rewriteAVX :: Section -> Section
-rewriteAVX = id
-#endif /* !REWRITE_SSE */
 
 -- | Reorder and convert sections so info tables end up next to the
 -- code. Also does stack fixups.
