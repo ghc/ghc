@@ -6,7 +6,9 @@ Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> reid <unknown>
 Alexey Rodriguez        <mrchebas@gmail.com>
 Alexey Rodriguez        <mrchebas@gmail.com>                mrchebas@gmail.com <unknown>
 Andrew Pimlott          <andrew.pimlott.ctr@metnet.navy.mil> andrew.pimlott.ctr@metnet.navy.mil <unknown>
+Andrew Tolmach          <apt@cs.pdx.edu>                    apt <unknown>
 André Santos            <alms@di.ufpe.br>                   andre <unknown>
+Andy Adams-Moran        <andy.adamsmoran@gmail.com>         moran <unknown>
 Andy Gill               <andy@galois.com>                   andy@galois.com <unknown>
 Andy Gill               <andy@galois.com>                   andy@unsafeperformio.com <unknown>
 Andy Gill               <andygill@ku.edu>                   andy <unknown>
@@ -66,11 +68,14 @@ John Dias               <dias@cs.tufts.edu>                 dias@eecs.harvard.ed
 John Dias               <dias@cs.tufts.edu>                 dias@eecs.tufts.edu <unknown>
 John McCall             <rjmccall@gmail.com>                rjmccall@gmail.com <unknown>
 Jose Pedro Magalhaes    <jpm@cs.uu.nl>                      <jpm@cs.uu.nl>
+Josef Svenningsson      <josef.svenningsson@gmail.com>      josefs <unknown>
 Jost Berthold           <berthold@mathematik.uni-marburg.de> berthold@mathematik.uni-marburg.de <unknown>
 Juan J. Quintela        <quintela@fi.udc.es>                quintela <unknown>
 Judah Jacobson          <judah.jacobson@gmail.com>          judah.jacobson@gmail.com <unknown>
 Julian Seward           <jseward@acm.org>                   sewardj <unknown>
 Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     keithw <unknown>
+Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     kw <unknown>
+Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     kw217 <unknown>
 Ken Shan                <ken@digitas.harvard.edu>           ken <unknown>
 Kevin G Donnelly        <kevind@bu.edu>                     kevind@bu.edu <unknown>
 Kevin Glynn             <glynn@info.ucl.ac.be>              kglynn <unknown>
@@ -90,6 +95,7 @@ Michael Weber           <michaelw@debian.org>               michaelw <unknown>
 Mike Thomas             <mthomas@gil.com.au>                mthomas <unknown>
 Neil Mitchell           <ndmitchell@gmail.com>              <http://www.cs.york.ac.uk/~ndm/>
 Neil Mitchell           <ndmitchell@gmail.com>              Neil Mitchell <unknown>
+Nicholas Nethercote     <njn25@cam.ac.uk>                   njn <unknown>
 Norman Ramsey           <nr@eecs.harvard.edu>               nr@eecs.harvard.edu <unknown>
 PHO                     <pho@cielonegro.org>                pho@cielonegro.org <unknown>
 Pepe Iborra             <mnislaih@gmail.com>                pepe <unknown>
@@ -100,7 +106,9 @@ Peter Wortmann          <scpmw@leeds.ac.uk>                 scpmw@leeds.ac.uk <u
 Reuben Thomas           <rrt@sc3d.org>                      rrt <unknown>
 Roman Leshchinskiy      <rl@cse.unsw.edu.au>                rl@cse.unsw.edu.au <unknown>
 Ross Paterson           <ross@soi.city.ac.uk>               ross <unknown>
+Ryan Lortie             <desrt@desrt.ca>                    desrt <unknown>
 Sam Anklesaria          <amsay@amsay.net>                   amsay@amsay.net <unknown>
+Sean Seefried           <sean.seefried@gmail.com>           sseefried <unknown>
 Shae Matijs Erisson     <shae@ScannedInAvian.com>           shae@ScannedInAvian.com <unknown>
 Sigbjorn Finne          <sof@galois.com>                    sof <unknown>
 Sigbjorn Finne          <sof@galois.com>                    sof@galois.com <unknown>
@@ -123,6 +131,7 @@ Sébastien Carlier       <sebc@posse42.net>                  sebc <unknown>
 Thorkil Naur            <naur@post11.tele.dk>               naur@post11.tele.dk <unknown>
 Tim Harris              <tharris@microsoft.com>             tharris <unknown>
 Tim Harris              <tharris@microsoft.com>             tharris@microsoft.com <unknown>
+Tobias Gedell           <d99getob@dtek.chalmers.se>         tgedell <unknown>
 Tom Schrijvers          <tom.schrijvers@cs.kuleuven.be>     tom.schrijvers@cs.kuleuven.be <unknown>
 Volker Stolz            <stolz@i2.informatik.rwth-aachen.de> stolz <unknown>
 Will Partain            <partain@dcs.gla.ac.uk>             partain <unknown>
