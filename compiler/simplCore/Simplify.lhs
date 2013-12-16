@@ -1780,7 +1780,7 @@ Consider:       test :: Integer -> IO ()
 Turns out that this compiles to:
     Print.test
       = \ eta :: Integer
-          eta1 :: State# RealWorld ->
+          eta1 :: Void# ->
           case PrelNum.< eta PrelNum.zeroInteger of wild { __DEFAULT ->
           case hPutStr stdout
                  (PrelNum.jtos eta ($w[] @ Char))
@@ -2620,8 +2620,8 @@ for several reasons
   for let-binding-purposes, we will *caseify* it (!),
   with potentially-disastrous strictness results.  So
   instead we turn it into a function: \v -> e
-  where v::State# RealWorld#.  The value passed to this function
-  is realworld#, which generates (almost) no code.
+  where v::Void#.  The value passed to this function is void,
+  which generates (almost) no code.
 
 * CPR.  We used to say "&& isUnLiftedType rhs_ty'" here, but now
   we make the join point into a function whenever used_bndrs'
