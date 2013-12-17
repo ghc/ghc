@@ -2138,7 +2138,7 @@ f "2"    = 2
         <varlistentry>
           <term>
             <option>-ffun-to-thunk</option>
-            <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+            <indexterm><primary><option>-ffun-to-thunk</option></primary></indexterm>
           </term>
           <listitem>
             <para>Worker-wrapper removes unused arguments, but usually we do
