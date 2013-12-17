@@ -60,7 +60,7 @@ process v e body
                 e' = mkLams bndrs fun_body'
                 v' = setIdType v (exprType e')
                 body' = replaceContext v v' cts body
-            in -- pprTrace "findInterestingLet" (vcat [ppr v, ppr (idArity v), pprConts cts, ppr body])
+            in -- pprTrace "findInterestingLet" (vcat [ppr v, ppr (idArity v), pprConts cts])
                (v', mkLams bndrs fun_body', body')
         _ -> (v, e, body)
 
@@ -85,7 +85,6 @@ contextOf v (Var v')
     = NeedsArgs (idArity v)
     | otherwise
     = NoUse
---contextOf v (App f (Type _)) = finish $ contextOf v f
 contextOf v (App f a) =
     case (contextOf v f, contextOf v a) of
         (NoUse, NoUse) -> NoUse
@@ -93,8 +92,8 @@ contextOf v (App f a) =
         (NoUse, Building cts) -> Building (PassTo f : cts)
         (NoUse, OneUse cts) -> OneUse cts
         (NoUse, MultiUse) -> MultiUse
-        (NeedsArgs 1, NoUse) -> Building []
-        (NeedsArgs i, NoUse) -> NeedsArgs (i-1)
+        (NeedsArgs 1, NoUse) | isValArg a -> Building []
+        (NeedsArgs i, NoUse) | isValArg a -> NeedsArgs (i-1)
         (NeedsArgs _, _) -> MultiUse
         (Building cts, NoUse) -> Building (AppTo a : cts)
         (Building _, _) -> MultiUse
