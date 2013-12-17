@@ -16,6 +16,7 @@ module Hooks ( Hooks
              , runPhaseHook
              , linkHook
              , runQuasiQuoteHook
+             , runRnSpliceHook
              , getValueSafelyHook
              ) where
 
@@ -26,6 +27,7 @@ import PipelineMonad
 import HscTypes
 import HsDecls
 import HsBinds
+import HsExpr
 import {-# SOURCE #-} DsMonad
 import OrdList
 import Id
@@ -54,7 +56,7 @@ import Data.Maybe
 
 emptyHooks :: Hooks
 emptyHooks = Hooks Nothing Nothing Nothing Nothing Nothing Nothing
-                   Nothing Nothing Nothing Nothing Nothing
+                   Nothing Nothing Nothing Nothing Nothing Nothing
 
 data Hooks = Hooks
   { dsForeignsHook         :: Maybe ([LForeignDecl Id] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
@@ -67,6 +69,7 @@ data Hooks = Hooks
   , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath))
   , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool -> HomePackageTable -> IO SuccessFlag)
   , runQuasiQuoteHook      :: Maybe (HsQuasiQuote Name -> RnM (HsQuasiQuote Name))
+  , runRnSpliceHook        :: Maybe (HsSplice Name -> RnM (HsSplice Name))
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type -> IO (Maybe HValue))
   }
 
