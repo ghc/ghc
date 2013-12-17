@@ -52,6 +52,8 @@ findInterestingLet (Let (Rec pairs) body) =
 process :: Var -> CoreExpr -> CoreExpr -> (Var, CoreExpr, CoreExpr)
 process v e body
   | idArity v <= 0 = (v, e, body)
+  -- TODO: check for non value args here. For now, ignore this let then
+  -- Possibly later: Check if all uses have the same type argument
   | otherwise
   = case contextOf v body of
         OneUse cts | not (null cts) ->

@@ -190,8 +190,6 @@ getCoreToDo dflags
     demand_analyser = (CoreDoPasses ([
                            CoreDoStrictness,
                            CoreDoWorkerWrapper,
-                           simpl_phase 0 ["post-worker-wrapper"] max_iter,
-                           CoreCommonContext,
                            simpl_phase 0 ["post-worker-wrapper"] max_iter
                            ]))
 
@@ -292,6 +290,9 @@ getCoreToDo dflags
             ]),         -- Run the simplifier after LiberateCase to vastly
                         -- reduce the possiblility of shadowing
                         -- Reason: see Note [Shadowing] in SpecConstr.lhs
+
+        CoreCommonContext,
+        simpl_phase 0 ["post-common-context"] max_iter,
 
         runWhen spec_constr CoreDoSpecConstr,
 
