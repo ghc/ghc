@@ -9220,7 +9220,9 @@ GHC ignores assertions when optimisation is turned on with the
 <literal>e</literal>.  You can also disable assertions using the
       <option>-fignore-asserts</option>
       option<indexterm><primary><option>-fignore-asserts</option></primary>
-      </indexterm>.</para>
+      </indexterm>.  The option <option>-fno-ignore-asserts</option> allows
+enabling assertions even when optimisation is turned on.
+</para>
 
 <para>
 Assertion failures can be caught, see the documentation for the
