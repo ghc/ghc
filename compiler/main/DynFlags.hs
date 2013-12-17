@@ -248,6 +248,7 @@ data DumpFlag
    | Opt_D_dump_rules
    | Opt_D_dump_cse
    | Opt_D_dump_worker_wrapper
+   | Opt_D_dump_common_context
    | Opt_D_dump_rn_trace
    | Opt_D_dump_rn_stats
    | Opt_D_dump_opt_cmm
@@ -2318,6 +2319,7 @@ dynamic_flags = [
   , Flag "ddump-rules"             (setDumpFlag Opt_D_dump_rules)
   , Flag "ddump-cse"               (setDumpFlag Opt_D_dump_cse)
   , Flag "ddump-worker-wrapper"    (setDumpFlag Opt_D_dump_worker_wrapper)
+  , Flag "ddump-common-context"    (setDumpFlag Opt_D_dump_common_context)
   , Flag "ddump-rn-trace"          (setDumpFlag Opt_D_dump_rn_trace)
   , Flag "ddump-if-trace"          (setDumpFlag Opt_D_dump_if_trace)
   , Flag "ddump-cs-trace"          (setDumpFlag Opt_D_dump_cs_trace)

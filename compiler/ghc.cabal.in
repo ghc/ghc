@@ -329,6 +329,7 @@ Library
         RnTypes
         CoreMonad
         CSE
+        CommonContext
         FloatIn
         FloatOut
         LiberateCase

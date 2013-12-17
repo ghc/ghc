@@ -13,6 +13,7 @@ import CoreSyn
 import CoreSubst
 import HscTypes
 import CSE              ( cseProgram )
+import CommonContext    ( ccProgram )
 import Rules            ( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addSpecInfo, )
 import PprCore          ( pprCoreBindings, pprCoreExpr )
@@ -189,6 +190,8 @@ getCoreToDo dflags
     demand_analyser = (CoreDoPasses ([
                            CoreDoStrictness,
                            CoreDoWorkerWrapper,
+                           simpl_phase 0 ["post-worker-wrapper"] max_iter,
+                           CoreCommonContext,
                            simpl_phase 0 ["post-worker-wrapper"] max_iter
                            ]))
 
@@ -383,6 +386,9 @@ doCorePass _      pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
 
 doCorePass _      CoreCSE                   = {-# SCC "CommonSubExpr" #-}
                                               doPass cseProgram
+
+doCorePass _      CoreCommonContext         = {-# SCC "CommonContext" #-}
+                                              doPass ccProgram
 
 doCorePass _      CoreLiberateCase          = {-# SCC "LiberateCase" #-}
                                               doPassD liberateCase
