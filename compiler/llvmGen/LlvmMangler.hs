@@ -51,16 +51,18 @@ llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w
     hClose r
-    let fixed = (map (rewriteSymType . rewriteAVX) . fixTables) ss
+    let fixed = (map rewriteAVX . fixTables) ss
     mapM_ (writeSection w) fixed
     hClose w
     return ()
     
-rewriteSymType :: Section -> Section
-rewriteSymType = rewriteInstructions typeFunc typeObj
+rewriteSymType :: B.ByteString -> B.ByteString
+rewriteSymType s =
+    foldl (\s' (typeFunc,typeObj)->replace typeFunc typeObj s') s types
   where
-    typeFunc = B.pack "@function"
-    typeObj = B.pack "@object"
+    types = [ (B.pack "@function", B.pack "@object")
+            , (B.pack "%function", B.pack "%object")
+            ]
 
 -- | Splits the file contents into its sections
 readSections :: Handle -> Handle -> IO [Section]
@@ -73,7 +75,7 @@ readSections r w = go B.empty [] []
       -- the first directive of the *next* section, therefore we take
       -- it over to that section.
       let (tys, ls') = span isType ls
-          cts = B.intercalate newLine $ reverse ls'
+          cts = rewriteSymType $ B.intercalate newLine $ reverse ls'
 
       -- Decide whether to directly output the section or append it
       -- to the list for resorting.
@@ -124,7 +126,10 @@ rewriteAVX = id
 
 rewriteInstructions :: B.ByteString -> B.ByteString -> Section -> Section
 rewriteInstructions matchBS replaceBS (hdr, cts) =
-    (hdr, loop cts)
+    (hdr, replace matchBS replaceBS cts)
+
+replace :: B.ByteString -> B.ByteString -> B.ByteString -> B.ByteString
+replace matchBS replaceBS = loop
   where
     loop :: B.ByteString -> B.ByteString
     loop cts =
