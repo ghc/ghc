@@ -305,7 +305,7 @@ howToAccessLabel _ ArchPPC_64 os _ kind _
 howToAccessLabel dflags _ os _ _ _
         -- no PIC -> the dynamic linker does everything for us;
         --           if we don't dynamically link to Haskell code,
-        --           it actually manages to do so without messing thins up.
+        --           it actually manages to do so without messing things up.
         | osElfTarget os
         , not (gopt Opt_PIC dflags) && gopt Opt_Static dflags
         = AccessDirectly
