@@ -5,4 +5,4 @@ rnfail042.hs:6:10: Illegal binding of built-in syntax: (,,,)
 
 rnfail042.hs:7:12: Illegal binding of built-in syntax: []
 
-rnfail042.hs:8:17: Illegal binding of built-in syntax: :
+rnfail042.hs:8:13: Illegal binding of built-in syntax: :
