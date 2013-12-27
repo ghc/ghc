@@ -68,7 +68,7 @@ module HsUtils(
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
 
-  hsLTyClDeclBinders, hsTyClDeclBinders, hsTyClDeclsBinders, 
+  hsLTyClDeclBinders, hsTyClDeclsBinders, 
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
   
   -- Collecting implicit binders
@@ -690,26 +690,25 @@ hsTyClDeclsBinders tycl_decls inst_decls
 
 -------------------
 hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
--- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.
+-- ^ Returns all the /binding/ names of the decl.
 -- The first one is guaranteed to be the name of the decl. For record fields
 -- mentioned in multiple constructors, the SrcLoc will be from the first
--- occurence.  We use the equality to filter out duplicate field names
-hsLTyClDeclBinders (L _ d) = hsTyClDeclBinders d
+-- occurence.  We use the equality to filter out duplicate field names.
+-- The @SrcLoc@s are the locations of the /declaration/, not just the name.
 
--------------------
-hsTyClDeclBinders :: Eq name => TyClDecl name -> [Located name]
-hsTyClDeclBinders (FamDecl { tcdFam = FamilyDecl { fdLName = name} }) = [name]
-hsTyClDeclBinders (ForeignType {tcdLName = name}) = [name]
-hsTyClDeclBinders (SynDecl     {tcdLName = name}) = [name]
-
-hsTyClDeclBinders (ClassDecl { tcdLName = cls_name, tcdSigs = sigs
-                             , tcdATs = ats })
-  = cls_name : 
-    map (fdLName . unLoc) ats ++ 
-    [n | L _ (TypeSig ns _) <- sigs, n <- ns]
-
-hsTyClDeclBinders (DataDecl { tcdLName = name, tcdDataDefn = defn }) 
-  = name : hsDataDefnBinders defn
+-- The re-mangling of the SrcLocs here are to keep good error messages while
+-- avoiding #8607.
+hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
+  = [L loc name]
+hsLTyClDeclBinders (L loc (ForeignType { tcdLName = L _ name })) = [L loc name]
+hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = [L loc name]
+hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
+                                       , tcdSigs = sigs, tcdATs = ats }))
+  = L loc cls_name :
+    [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
+    [ L mem_loc mem_name | L mem_loc (TypeSig ns _) <- sigs, L _ mem_name <- ns ]
+hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
+  = L loc name : hsDataDefnBinders defn
 
 -------------------
 hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
@@ -719,32 +718,37 @@ hsInstDeclBinders (DataFamInstD { dfid_inst = fi }) = hsDataFamInstBinders fi
 hsInstDeclBinders (TyFamInstD {}) = []
 
 -------------------
+-- the SrcLoc returned are for the whole declarations, not just the names
 hsDataFamInstBinders :: Eq name => DataFamInstDecl name -> [Located name]
 hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 
 -------------------
+-- the SrcLoc returned are for the whole declarations, not just the names
 hsDataDefnBinders :: Eq name => HsDataDefn name -> [Located name]
 hsDataDefnBinders (HsDataDefn { dd_cons = cons }) = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
 hsConDeclsBinders :: (Eq name) => [LConDecl name] -> [Located name]
-  -- See hsTyClDeclBinders for what this does
+  -- See hsLTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 hsConDeclsBinders cons
   = snd (foldl do_one ([], []) cons)
   where
-    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname, con_details = RecCon flds }))
-	= (map unLoc new_flds ++ flds_seen, lname : new_flds ++ acc)
+    do_one (flds_seen, acc) (L loc (ConDecl { con_name = L _ name
+                                            , con_details = RecCon flds }))
+	= (map unLoc new_flds ++ flds_seen, L loc name : new_flds ++ acc)
 	where
+          -- don't re-mangle the location of field names, because we don't
+          -- have a record of the full location of the field declaration anyway
 	  new_flds = filterOut (\f -> unLoc f `elem` flds_seen) 
 			       (map cd_fld_name flds)
 
-    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname }))
-	= (flds_seen, lname:acc)
+    do_one (flds_seen, acc) (L loc (ConDecl { con_name = L _ name }))
+	= (flds_seen, L loc name : acc)
 \end{code}
 
 Note [Binders in family instances]

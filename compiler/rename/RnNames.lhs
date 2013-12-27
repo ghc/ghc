@@ -500,19 +500,23 @@ getLocalNonValBinders fixity_env
         ; return (envs, new_bndrs) } }
   where
     for_hs_bndrs :: [Located RdrName]
-    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
+    for_hs_bndrs = [ L decl_loc (unLoc nm)
+                   | L decl_loc (ForeignImport nm _ _ _) <- foreign_decls]
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [n | L _ (TypeSig ns _) <- val_sigs, n <- ns]
+    hs_boot_sig_bndrs = [ L decl_loc (unLoc n)
+                        | L decl_loc (TypeSig ns _) <- val_sigs, n <- ns]
     ValBindsIn _ val_sigs = val_binds
 
+      -- the SrcSpan attached to the input should be the span of the
+      -- declaration, not just the name
     new_simple :: Located RdrName -> RnM AvailInfo
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
                             ; return (Avail nm) }
 
     new_tc tc_decl              -- NOT for type/data instances
-        = do { let bndrs = hsTyClDeclBinders (unLoc tc_decl)
+        = do { let bndrs = hsLTyClDeclBinders tc_decl
              ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
              ; return (AvailTC main_name names) }
 

@@ -134,7 +134,6 @@ newTopSrcBinder (L loc rdr_name)
         -- have an arbitrary mixture of external core definitions in a single module,
         -- (apart from module-initialisation issues, perhaps).
         ; newGlobalBinder rdr_mod rdr_occ loc }
-                --TODO, should pass the whole span
 
   | otherwise
   = do  { unless (not (isQual rdr_name))
