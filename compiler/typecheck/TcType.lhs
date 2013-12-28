@@ -1050,7 +1050,7 @@ pickyEqType ty1 ty2
 
 Note [Occurs check expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-@occurCheckExpand tv xi@ expands synonyms in xi just enough to get rid
+(occurCheckExpand tv xi) expands synonyms in xi just enough to get rid
 of occurrences of tv outside type function arguments, if that is
 possible; otherwise, it returns Nothing.
 
@@ -1070,7 +1070,7 @@ We have
   occurCheckExpand b (F (G b)) = F Char
 even though we could also expand F to get rid of b.
 
-See also Note [Type synonyms and canonicalization] in TcCanonical
+See also Note [occurCheckExpand] in TcCanonical
 
 \begin{code}
 data OccCheckResult a
