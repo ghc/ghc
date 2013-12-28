@@ -137,17 +137,17 @@ parS sss = do { sss1 <- mapM sequence sss; return (ParS sss1) }
 -- *   Range
 
 fromR :: ExpQ -> RangeQ
-fromR x = do { a <- x; return (FromR a) }  
+fromR x = do { a <- x; return (FromR a) }
 
 fromThenR :: ExpQ -> ExpQ -> RangeQ
-fromThenR x y = do { a <- x; b <- y; return (FromThenR a b) }  
+fromThenR x y = do { a <- x; b <- y; return (FromThenR a b) }
 
 fromToR :: ExpQ -> ExpQ -> RangeQ
-fromToR x y = do { a <- x; b <- y; return (FromToR a b) }  
+fromToR x y = do { a <- x; b <- y; return (FromToR a b) }
 
 fromThenToR :: ExpQ -> ExpQ -> ExpQ -> RangeQ
 fromThenToR x y z = do { a <- x; b <- y; c <- z;
-                         return (FromThenToR a b c) }  
+                         return (FromThenToR a b c) }
 -------------------------------------------------------------------------------
 -- *   Body
 
@@ -265,16 +265,16 @@ letE :: [DecQ] -> ExpQ -> ExpQ
 letE ds e = do { ds2 <- sequence ds; e2 <- e; return (LetE ds2 e2) }
 
 caseE :: ExpQ -> [MatchQ] -> ExpQ
-caseE e ms = do { e1 <- e; ms1 <- sequence ms; return (CaseE e1 ms1) } 
+caseE e ms = do { e1 <- e; ms1 <- sequence ms; return (CaseE e1 ms1) }
 
 doE :: [StmtQ] -> ExpQ
-doE ss = do { ss1 <- sequence ss; return (DoE ss1) } 
+doE ss = do { ss1 <- sequence ss; return (DoE ss1) }
 
 compE :: [StmtQ] -> ExpQ
-compE ss = do { ss1 <- sequence ss; return (CompE ss1) } 
+compE ss = do { ss1 <- sequence ss; return (CompE ss1) }
 
 arithSeqE :: RangeQ -> ExpQ
-arithSeqE r = do { r' <- r; return (ArithSeqE r') }  
+arithSeqE r = do { r' <- r; return (ArithSeqE r') }
 
 listE :: [ExpQ] -> ExpQ
 listE es = do { es1 <- sequence es; return (ListE es1) }
@@ -296,24 +296,24 @@ fieldExp s e = do { e' <- e; return (s,e') }
 
 -- ** 'arithSeqE' Shortcuts
 fromE :: ExpQ -> ExpQ
-fromE x = do { a <- x; return (ArithSeqE (FromR a)) }  
+fromE x = do { a <- x; return (ArithSeqE (FromR a)) }
 
 fromThenE :: ExpQ -> ExpQ -> ExpQ
-fromThenE x y = do { a <- x; b <- y; return (ArithSeqE (FromThenR a b)) }  
+fromThenE x y = do { a <- x; b <- y; return (ArithSeqE (FromThenR a b)) }
 
 fromToE :: ExpQ -> ExpQ -> ExpQ
-fromToE x y = do { a <- x; b <- y; return (ArithSeqE (FromToR a b)) }  
+fromToE x y = do { a <- x; b <- y; return (ArithSeqE (FromToR a b)) }
 
 fromThenToE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
 fromThenToE x y z = do { a <- x; b <- y; c <- z;
-                         return (ArithSeqE (FromThenToR a b c)) }  
+                         return (ArithSeqE (FromThenToR a b c)) }
 
 
 -------------------------------------------------------------------------------
 -- *   Dec
 
 valD :: PatQ -> BodyQ -> [DecQ] -> DecQ
-valD p b ds = 
+valD p b ds =
   do { p' <- p
      ; ds' <- sequence ds
      ; b' <- b
@@ -321,7 +321,7 @@ valD p b ds =
      }
 
 funD :: Name -> [ClauseQ] -> DecQ
-funD nm cs = 
+funD nm cs =
  do { cs1 <- sequence cs
     ; return (FunD nm cs1)
     }
@@ -345,14 +345,14 @@ newtypeD ctxt tc tvs con derivs =
 
 classD :: CxtQ -> Name -> [TyVarBndr] -> [FunDep] -> [DecQ] -> DecQ
 classD ctxt cls tvs fds decs =
-  do 
+  do
     decs1 <- sequence decs
     ctxt1 <- ctxt
     return $ ClassD ctxt1 cls tvs fds decs1
 
 instanceD :: CxtQ -> TypeQ -> [DecQ] -> DecQ
 instanceD ctxt ty decs =
-  do 
+  do
     ctxt1 <- ctxt
     decs1 <- sequence decs
     ty1   <- ty
@@ -434,8 +434,8 @@ newtypeInstD ctxt tc tys con derivs =
     return (NewtypeInstD ctxt1 tc tys1 con1 derivs)
 
 tySynInstD :: Name -> TySynEqnQ -> DecQ
-tySynInstD tc eqn = 
-  do 
+tySynInstD tc eqn =
+  do
     eqn1 <- eqn
     return (TySynInstD tc eqn1)
 
