@@ -1,14 +1,14 @@
 
 Simple14.hs:17:19:
-    Couldn't match type ‛z0’ with ‛n’
+    Couldn't match type ‛z0’ with ‛m’
       ‛z0’ is untouchable
         inside the constraints (Maybe m ~ Maybe n)
         bound by a type expected by the context:
                    Maybe m ~ Maybe n => EQ_ z0 z0
         at Simple14.hs:17:12-33
-      ‛n’ is a rigid type variable bound by
+      ‛m’ is a rigid type variable bound by
           the type signature for foo :: EQ_ (Maybe m) (Maybe n)
-          at Simple14.hs:16:17
+          at Simple14.hs:16:15
     Expected type: EQ_ z0 z0
       Actual type: EQ_ m n
     Relevant bindings include

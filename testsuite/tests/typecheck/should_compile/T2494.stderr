@@ -1,10 +1,10 @@
 
 T2494.hs:15:14:
-    Couldn't match type ‛a’ with ‛b’
-      ‛a’ is a rigid type variable bound by
-          the RULE "foo/foo" at T2494.hs:13:16
+    Couldn't match type ‛b’ with ‛a’
       ‛b’ is a rigid type variable bound by
           the RULE "foo/foo" at T2494.hs:14:16
+      ‛a’ is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:13:16
     Expected type: Maybe (m a) -> Maybe (m a)
       Actual type: Maybe (m b) -> Maybe (m b)
     Relevant bindings include
@@ -17,11 +17,11 @@ T2494.hs:15:14:
     In the second argument of ‛foo’, namely ‛(foo g x)’
 
 T2494.hs:15:30:
-    Couldn't match type ‛a’ with ‛b’
-      ‛a’ is a rigid type variable bound by
-          the RULE "foo/foo" at T2494.hs:13:16
+    Couldn't match type ‛b’ with ‛a’
       ‛b’ is a rigid type variable bound by
           the RULE "foo/foo" at T2494.hs:14:16
+      ‛a’ is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:13:16
     Expected type: Maybe (m a) -> Maybe (m a)
       Actual type: Maybe (m b) -> Maybe (m b)
     Relevant bindings include
