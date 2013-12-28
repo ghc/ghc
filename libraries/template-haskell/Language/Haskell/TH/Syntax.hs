@@ -24,7 +24,7 @@ import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad (liftM)
 import System.IO	( hPutStrLn, stderr )
-import Data.Char        ( isAlpha )
+import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Word        ( Word8 )
 
 -----------------------------------------------------
@@ -758,16 +758,32 @@ mkName str
   = split [] (reverse str)
   where
     split occ []        = Name (mkOccName occ) NameS
-    split occ ('.':rev)	| not (null occ),
-			  not (null rev), head rev /= '.'
+    split occ ('.':rev)	| not (null occ)
+			, is_rev_mod_name rev
 			= Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
 	-- The 'not (null occ)' guard ensures that
 	-- 	mkName "&." = Name "&." NameS
-	-- The 'rev' guards ensure that
+	-- The 'is_rev_mod' guards ensure that
 	--	mkName ".&" = Name ".&" NameS
+	--	mkName "^.." = Name "^.." NameS      -- Trac #8633
 	--	mkName "Data.Bits..&" = Name ".&" (NameQ "Data.Bits")
 	-- This rather bizarre case actually happened; (.&.) is in Data.Bits
     split occ (c:rev)   = split (c:occ) rev
+
+    -- Recognises a reversed module name xA.yB.C, 
+    -- with at least one component, 
+    -- and each component looks like a module name
+    --   (i.e. non-empty, starts with capital, all alpha)
+    is_rev_mod_name rev_mod_str
+      | (compt, rest) <- break (== '.') rev_mod_str
+      , not (null compt), isUpper (last compt), all is_mod_char compt
+      = case rest of
+          []             -> True
+          (_dot : rest') -> is_rev_mod_name rest'
+      | otherwise
+      = False
+
+    is_mod_char c = isAlphaNum c || c == '_' || c == '\''
 
 -- | Only used internally
 mkNameU :: String -> Uniq -> Name
