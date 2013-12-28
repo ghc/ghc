@@ -329,3 +329,4 @@ test('ContextStack1', normal, compile_fail, ['-fcontext-stack=10'])
 test('ContextStack2', normal, compile_fail, ['-ftype-function-depth=10'])
 test('T8570', extra_clean(['T85570a.o', 'T8570a.hi','T85570b.o', 'T8570b.hi']),
      multimod_compile_fail, ['T8570', '-v0'])
+test('T8603', normal, compile_fail, [''])
