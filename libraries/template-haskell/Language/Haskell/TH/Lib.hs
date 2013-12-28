@@ -196,7 +196,7 @@ clause ps r ds = do { ps' <- sequence ps;
 -- *   Exp
 
 -- | Dynamically binding a variable (unhygenic)
-dyn :: String -> Q Exp 
+dyn :: String -> ExpQ
 dyn s = return (VarE (mkName s))
 
 global :: Name -> ExpQ
