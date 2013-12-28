@@ -1235,7 +1235,7 @@ tcTagToEnum loc fun_name arg res_ty
         -- and returns a coercion between the two
     get_rep_ty ty tc tc_args
       | not (isFamilyTyCon tc)
-      = return (mkTcReflCo Nominal ty, tc, tc_args)
+      = return (mkTcNomReflCo ty, tc, tc_args)
       | otherwise
       = do { mb_fam <- tcLookupFamInst tc tc_args
            ; case mb_fam of

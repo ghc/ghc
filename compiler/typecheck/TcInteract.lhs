@@ -99,7 +99,7 @@ solveInteractGiven loc fsks givens
                                                      , ctev_loc = loc }
                           | ev_id <- givens ]
 
-    fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvCoercion (mkTcReflCo Nominal tv_ty)
+    fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvCoercion (mkTcNomReflCo tv_ty)
                                                    , ctev_pred = pred
                                                    , ctev_loc = loc }
                         | tv <- fsks
@@ -987,7 +987,7 @@ solveWithIdentity wd tv xi
                -- cf TcUnify.uUnboundKVar
 
        ; setWantedTyBind tv xi'
-       ; let refl_evtm = EvCoercion (mkTcReflCo Nominal xi')
+       ; let refl_evtm = EvCoercion (mkTcNomReflCo xi')
 
        ; when (isWanted wd) $
               setEvBind (ctev_evar wd) refl_evtm
@@ -1953,7 +1953,7 @@ getCoercibleInst loc ty1 ty2 = do
                           return
                             ( Nothing
                             , Nothing
-                            , mkTcReflCo Nominal ta1 {- == ta2, due to nominalArgsAgree -}
+                            , mkTcNomReflCo ta1 {- == ta2, due to nominalArgsAgree -}
                             )
                      Representational -> do
                           ct_ev <- requestCoercible loc ta1 ta2

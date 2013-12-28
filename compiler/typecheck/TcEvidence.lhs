@@ -19,7 +19,8 @@ module TcEvidence (
 
   -- TcCoercion
   TcCoercion(..), LeftOrRight(..), pickLR,
-  mkTcReflCo, mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
+  mkTcReflCo, mkTcNomReflCo, 
+  mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos, 
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo,
   mkTcAxiomRuleCo,
@@ -131,6 +132,9 @@ getTcCoVar_maybe _             = Nothing
 
 mkTcReflCo :: Role -> TcType -> TcCoercion
 mkTcReflCo = TcRefl
+
+mkTcNomReflCo :: TcType -> TcCoercion
+mkTcNomReflCo = TcRefl Nominal
 
 mkTcFunCo :: Role -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcFunCo role co1 co2 = mkTcTyConAppCo role funTyCon [co1, co2]
