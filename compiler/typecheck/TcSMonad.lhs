@@ -41,11 +41,14 @@ module TcSMonad (
     XEvTerm(..),
     MaybeNew (..), isFresh, freshGoal, freshGoals, getEvTerm, getEvTerms,
 
-    xCtFlavor,        -- Transform a CtEvidence during a step
-    rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
-    newWantedEvVar, newWantedEvVarNC, newWantedEvVarNonrec, instDFunConstraints,
-    newDerived,
+    xCtFlavor,          -- Transform a CtEvidence during a step
+    rewriteEvidence,    -- Specialized version of xCtFlavor for coercions
+    rewriteEqEvidence,  -- Yet more specialised, for equality coercions
+    maybeSym,
 
+    newWantedEvVar, newWantedEvVarNC, newWantedEvVarNonrec, newDerived,
+    instDFunConstraints,
+    
        -- Creation of evidence variables
     setWantedTyBind, reportUnifications,
 
@@ -129,6 +132,7 @@ import Util
 import Id
 import TcRnTypes
 
+import BasicTypes
 import Unique
 import UniqFM
 import Maybes ( orElse, catMaybes, firstJust )
@@ -1427,7 +1431,7 @@ newFlattenSkolem ev fam_ty
 
        ; let rhs_ty = mkTyVarTy tv
              ctev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
-                            , ctev_evtm = EvCoercion (mkTcReflCo Nominal fam_ty)
+                            , ctev_evtm = EvCoercion (mkTcNomReflCo fam_ty)
                             , ctev_loc =  ctev_loc ev }
        ; dflags <- getDynFlags
        ; updInertTcS $ \ is@(IS { inert_fsks = fsks }) ->
@@ -1654,6 +1658,7 @@ This is bad.  We "fix" this by simply ignoring
   *     the Given kind equality
   * AND the Given type equality (t:k1) ~ (t1:kk)
 
+But the Right Thing is to add kind equalities!
 
 \begin{code}
 xCtFlavor :: CtEvidence            -- Original flavor
@@ -1685,7 +1690,7 @@ xCtFlavor (CtDerived { ctev_loc = loc })
        ; return (catMaybes ders) }
 
 -----------------------------
-rewriteCtFlavor :: CtEvidence   -- old evidence
+rewriteEvidence :: CtEvidence   -- old evidence
                 -> TcPredType   -- new predicate
                 -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
                 -> TcS (Maybe CtEvidence)
@@ -1693,7 +1698,7 @@ rewriteCtFlavor :: CtEvidence   -- old evidence
 --                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
 -- In either case, there is nothing new to do with new_ev
 {-
-     rewriteCtFlavor old_ev new_pred co
+     rewriteEvidence old_ev new_pred co
 Main purpose: create new evidence for new_pred;
               unless new_pred is cached already
 * Returns a new_ev : new_pred, with same wanted/given/derived flag as old_ev
@@ -1712,17 +1717,17 @@ Main purpose: create new evidence for new_pred;
 -}
 
 
-rewriteCtFlavor (CtDerived { ctev_loc = loc }) new_pred _co
+rewriteEvidence (CtDerived { ctev_loc = loc }) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
-    -- rewriteCtFlavor to put the isTcReflCo test first!
+    -- rewriteEvidence to put the isTcReflCo test first!
     -- Why?  Because for *Derived* constraints, c, the coercion, which
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvTerm c), which fails for Derived constraints.
     -- (Getting this wrong caused Trac #7384.)
     newDerived loc new_pred
 
-rewriteCtFlavor old_ev new_pred co
+rewriteEvidence old_ev new_pred co
   | isTcReflCo co -- If just reflexivity then you may re-use the same variable
   = return (Just (if ctEvPred old_ev `tcEqType` new_pred
                   then old_ev
@@ -1733,19 +1738,79 @@ rewriteCtFlavor old_ev new_pred co
        -- However, if they *do* look the same, we'd prefer to stick with old_pred
        -- then retain the old type, so that error messages come out mentioning synonyms
 
-rewriteCtFlavor (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
+rewriteEvidence (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
        ; return (Just new_ev) }
   where
     new_tm = mkEvCast old_tm (mkTcSubCo (mkTcSymCo co))  -- mkEvCast optimises ReflCo
 
-rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
+rewriteEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { new_evar <- newWantedEvVar loc new_pred
        ; MASSERT( tcCoercionRole co == Nominal )
        ; setEvBind evar (mkEvCast (getEvTerm new_evar) (mkTcSubCo co))
-       ; case new_evar of
-            Fresh ctev -> return (Just ctev)
-            _          -> return Nothing }
+       ; return (freshGoal new_evar) }
+
+
+rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
+                                        --              or orhs ~ olhs (swapped)
+                  -> SwapFlag
+                  -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
+                                        -- Should be zonked, becuase we use typeKind on nlhs/nrhs
+                  -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
+                  -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
+                  -> TcS (Maybe CtEvidence)  -- Of type nlhs ~ nrhs
+-- For (rewriteEqEvidence (Given g olhs orhs) False nlhs nrhs lhs_co rhs_co)
+-- we generate
+-- If not swapped
+--      g1 : nlhs ~ nrhs = lhs_co ; g ; sym rhs_co
+-- If 'swapped'
+--      g1 : nlhs ~ nrhs = lhs_co ; Sym g ; sym rhs_co
+--
+-- For (Wanted w) we do the dual thing.
+-- New  w1 : nlhs ~ nrhs
+-- If not swapped
+--      w : olhs ~ orhs = sym lhs_co ; w1 ; rhs_co
+-- If swapped
+--      w : orhs ~ olhs = sym rhs_co ; sym w1 ; lhs_co
+--
+-- It's all a form of rewwriteEvidence, specialised for equalities
+rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
+  | CtDerived { ctev_loc = loc } <- old_ev
+  = newDerived loc (mkEqPred nlhs nrhs)
+
+  | NotSwapped <- swapped
+  , isTcReflCo lhs_co
+  , isTcReflCo rhs_co
+  , let new_pred = mkTcEqPred nlhs nrhs
+  = return (Just (if ctEvPred old_ev `tcEqType` new_pred
+                  then old_ev
+                  else old_ev { ctev_pred = new_pred }))
+
+  | CtGiven { ctev_evtm = old_tm , ctev_loc = loc } <- old_ev
+  = do { let new_tm = EvCoercion (lhs_co 
+                                  `mkTcTransCo` maybeSym swapped (evTermCoercion old_tm)
+                                  `mkTcTransCo` mkTcSymCo rhs_co)
+       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
+       ; return (Just new_ev) }
+
+  | CtWanted { ctev_evar = evar, ctev_loc = loc } <- old_ev
+  = do { new_evar <- newWantedEvVar loc new_pred
+       ; let co = maybeSym swapped $
+                  mkTcSymCo lhs_co
+                  `mkTcTransCo` evTermCoercion (getEvTerm new_evar)
+                  `mkTcTransCo` rhs_co
+       ; setEvBind evar (EvCoercion co)
+       ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
+       ; return (freshGoal new_evar) }
+
+  | otherwise
+  = panic "rewriteEvidence"
+  where
+    new_pred = mkEqPred nlhs nrhs
+
+maybeSym :: SwapFlag -> TcCoercion -> TcCoercion 
+maybeSym IsSwapped  co = mkTcSymCo co
+maybeSym NotSwapped co = co
 
 
 matchOpenFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)

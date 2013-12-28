@@ -63,7 +63,7 @@ module BasicTypes(
         EP(..),
 
         DefMethSpec(..),
-        SwapFlag(..), flipSwap, unSwap,
+        SwapFlag(..), flipSwap, unSwap, isSwapped,
 
         CompilerPhase(..), PhaseNum,
         Activation(..), isActive, isActiveIn,
@@ -207,6 +207,10 @@ instance Outputable SwapFlag where
 flipSwap :: SwapFlag -> SwapFlag
 flipSwap IsSwapped  = NotSwapped
 flipSwap NotSwapped = IsSwapped
+
+isSwapped :: SwapFlag -> Bool
+isSwapped IsSwapped  = True
+isSwapped NotSwapped = False
 
 unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
 unSwap NotSwapped f a b = f a b
