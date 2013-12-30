@@ -50,7 +50,7 @@ test('T1969',
            (wordsize(32), 6149572, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
-           (wordsize(64), 11,000,000, 20)]),
+           (wordsize(64), 11000000, 20)]),
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
