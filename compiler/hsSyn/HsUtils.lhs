@@ -694,10 +694,13 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- The first one is guaranteed to be the name of the decl. For record fields
 -- mentioned in multiple constructors, the SrcLoc will be from the first
 -- occurence.  We use the equality to filter out duplicate field names.
--- The @SrcLoc@s are the locations of the /declaration/, not just the name.
+--
+-- Each returned (Located name) is wrapped in a @SrcSpan@ of the whole
+-- /declaration/, not just the name itself (which is how it appears in
+-- the syntax tree).  This SrcSpan (for the entire declaration) is used
+-- as the SrcSpan for the Name that is finally produced, and hence for
+-- error messages.  (See Trac #8607.)
 
--- The re-mangling of the SrcLocs here are to keep good error messages while
--- avoiding #8607.
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
   = [L loc name]
 hsLTyClDeclBinders (L loc (ForeignType { tcdLName = L _ name })) = [L loc name]
