@@ -150,7 +150,7 @@ atomicWriteIORef ref a = do
   operations cannot cause type-correct code to go wrong.  In
   particular, when inspecting the value read from an 'IORef', the
   memory writes that created that value must have occurred from the
-  point of view of the current therad.
+  point of view of the current thread.
 
   'atomicModifyIORef' acts as a barrier to reordering.  Multiple
   'atomicModifyIORef' operations occur in strict program order.  An
