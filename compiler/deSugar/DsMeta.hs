@@ -763,6 +763,8 @@ repLPred :: LHsType Name -> DsM (Core TH.PredQ)
 repLPred (L _ p) = repPred p
 
 repPred :: HsType Name -> DsM (Core TH.PredQ)
+repPred (HsParTy ty) 
+  = repLPred ty
 repPred ty
   | Just (cls, tys) <- splitHsClassTy_maybe ty
   = do
