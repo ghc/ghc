@@ -316,3 +316,4 @@ test('T8577',
      multimod_compile_fail,
      ['T8577', '-v0 ' + config.ghc_th_way_flags])
 test('T8633', normal, compile_and_run, [''])
+test('T8625', normal, ghci_script, ['T8625.script'])
