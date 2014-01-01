@@ -575,7 +575,7 @@ repConstr dt cr =
         (IntRep,    IntConstr i)      -> mkIntegralConstr dt i
         (FloatRep,  FloatConstr f)    -> mkRealConstr dt f
         (CharRep,   CharConstr c)     -> mkCharConstr dt c
-        _ -> error "Data.Data.repConstr"
+        _ -> error "Data.Data.repConstr: The given ConstrRep does not fit to the given DataType."
 
 
 
@@ -613,7 +613,9 @@ mkConstr dt str fields fix =
 dataTypeConstrs :: DataType -> [Constr]
 dataTypeConstrs dt = case datarep dt of
                         (AlgRep cons) -> cons
-                        _ -> error "Data.Data.dataTypeConstrs"
+                        _ -> error $ "Data.Data.dataTypeConstrs is not supported for "
+                                    ++ dataTypeName dt ++
+                                    ", as it is not an algebraic data type."
 
 
 -- | Gets the field labels of a constructor.  The list of labels
@@ -686,21 +688,27 @@ isAlgType dt = case datarep dt of
 indexConstr :: DataType -> ConIndex -> Constr
 indexConstr dt idx = case datarep dt of
                         (AlgRep cs) -> cs !! (idx-1)
-                        _           -> error "Data.Data.indexConstr"
+                        _           -> error $ "Data.Data.indexConstr is not supported for "
+                                               ++ dataTypeName dt ++
+                                               ", as it is not an algebraic data type."
 
 
 -- | Gets the index of a constructor (algebraic datatypes only)
 constrIndex :: Constr -> ConIndex
 constrIndex con = case constrRep con of
                     (AlgConstr idx) -> idx
-                    _ -> error "Data.Data.constrIndex"
+                    _ -> error $ "Data.Data.constrIndex is not supported for "
+                                 ++ dataTypeName (constrType con) ++
+                                 ", as it is not an algebraic data type."
 
 
 -- | Gets the maximum constructor index of an algebraic datatype
 maxConstrIndex :: DataType -> ConIndex
 maxConstrIndex dt = case dataTypeRep dt of
                         AlgRep cs -> length cs
-                        _            -> error "Data.Data.maxConstrIndex"
+                        _            -> error $ "Data.Data.maxConstrIndex is not supported for "
+                                                 ++ dataTypeName dt ++
+                                                 ", as it is not an algebraic data type."
 
 
 
@@ -747,18 +755,24 @@ mkPrimCon dt str cr = Constr
 mkIntegralConstr :: (Integral a, Show a) => DataType -> a -> Constr
 mkIntegralConstr dt i = case datarep dt of
                   IntRep -> mkPrimCon dt (show i) (IntConstr (toInteger  i))
-                  _ -> error "Data.Data.mkIntegralConstr"
+                  _ -> error $ "Data.Data.mkIntegralConstr is not supported for "
+                               ++ dataTypeName dt ++
+                               ", as it is not an Integral data type."
 
 mkRealConstr :: (Real a, Show a) => DataType -> a -> Constr
 mkRealConstr dt f = case datarep dt of
                     FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
-                    _ -> error "Data.Data.mkRealConstr"
+                    _ -> error $ "Data.Data.mkRealConstr is not supported for "
+                                 ++ dataTypeName dt ++
+                                 ", as it is not an Real data type."
 
 -- | Makes a constructor for 'Char'.
 mkCharConstr :: DataType -> Char -> Constr
 mkCharConstr dt c = case datarep dt of
                    CharRep -> mkPrimCon dt (show c) (CharConstr c)
-                   _ -> error "Data.Data.mkCharConstr"
+                   _ -> error $ "Data.Data.mkCharConstr is not supported for "
+                                ++ dataTypeName dt ++
+                                ", as it is not an Char data type."
 
 
 ------------------------------------------------------------------------------
@@ -835,7 +849,9 @@ instance Data Bool where
   gunfold _ z c  = case constrIndex c of
                      1 -> z False
                      2 -> z True
-                     _ -> error "Data.Data.gunfold(Bool)"
+                     _ -> error $ "Data.Data.gunfold: Constructor "
+                                  ++ show c
+                                  ++ " is not of type Bool."
   dataTypeOf _ = boolDataType
 
 
@@ -848,7 +864,8 @@ instance Data Char where
   toConstr x = mkCharConstr charType x
   gunfold _ z c = case constrRep c of
                     (CharConstr x) -> z x
-                    _ -> error "Data.Data.gunfold(Char)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Char."
   dataTypeOf _ = charType
 
 
@@ -861,7 +878,8 @@ instance Data Float where
   toConstr = mkRealConstr floatType
   gunfold _ z c = case constrRep c of
                     (FloatConstr x) -> z (realToFrac x)
-                    _ -> error "Data.Data.gunfold(Float)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Float."
   dataTypeOf _ = floatType
 
 
@@ -874,7 +892,8 @@ instance Data Double where
   toConstr = mkRealConstr doubleType
   gunfold _ z c = case constrRep c of
                     (FloatConstr x) -> z (realToFrac x)
-                    _ -> error "Data.Data.gunfold(Double)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Double."
   dataTypeOf _ = doubleType
 
 
@@ -887,7 +906,8 @@ instance Data Int where
   toConstr x = mkIntegralConstr intType x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Int)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int."
   dataTypeOf _ = intType
 
 
@@ -900,7 +920,8 @@ instance Data Integer where
   toConstr = mkIntegralConstr integerType
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z x
-                    _ -> error "Data.Data.gunfold(Integer)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Integer."
   dataTypeOf _ = integerType
 
 
@@ -913,7 +934,8 @@ instance Data Int8 where
   toConstr x = mkIntegralConstr int8Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Int8)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int8."
   dataTypeOf _ = int8Type
 
 
@@ -926,7 +948,8 @@ instance Data Int16 where
   toConstr x = mkIntegralConstr int16Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Int16)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int16."
   dataTypeOf _ = int16Type
 
 
@@ -939,7 +962,8 @@ instance Data Int32 where
   toConstr x = mkIntegralConstr int32Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Int32)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int32."
   dataTypeOf _ = int32Type
 
 
@@ -952,7 +976,8 @@ instance Data Int64 where
   toConstr x = mkIntegralConstr int64Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Int64)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int64."
   dataTypeOf _ = int64Type
 
 
@@ -965,7 +990,8 @@ instance Data Word where
   toConstr x = mkIntegralConstr wordType x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Word)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word"
   dataTypeOf _ = wordType
 
 
@@ -978,7 +1004,8 @@ instance Data Word8 where
   toConstr x = mkIntegralConstr word8Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Word8)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word8."
   dataTypeOf _ = word8Type
 
 
@@ -991,7 +1018,8 @@ instance Data Word16 where
   toConstr x = mkIntegralConstr word16Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Word16)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word16."
   dataTypeOf _ = word16Type
 
 
@@ -1004,7 +1032,8 @@ instance Data Word32 where
   toConstr x = mkIntegralConstr word32Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Word32)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word32."
   dataTypeOf _ = word32Type
 
 
@@ -1017,7 +1046,8 @@ instance Data Word64 where
   toConstr x = mkIntegralConstr word64Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "Data.Data.gunfold(Word64)"
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word64."
   dataTypeOf _ = word64Type
 
 
