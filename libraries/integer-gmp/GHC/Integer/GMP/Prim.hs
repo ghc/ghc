@@ -10,6 +10,7 @@ module GHC.Integer.GMP.Prim (
     plusInteger#,
     minusInteger#,
     timesInteger#,
+    timesIntegerInt#,
 
     quotRemInteger#,
     quotInteger#,
@@ -96,6 +97,11 @@ foreign import prim "integer_cmm_minusIntegerzh" minusInteger#
 --
 foreign import prim "integer_cmm_timesIntegerzh" timesInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- | Optimized version of 'timesInteger#' for multiplying big-ints with small-ints
+--
+foreign import prim "integer_cmm_timesIntegerIntzh" timesIntegerInt#
+  :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #)
 
 -- | Compute div and mod simultaneously, where div rounds towards negative
 -- infinity and\ @(q,r) = divModInteger#(x,y)@ implies

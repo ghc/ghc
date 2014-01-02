@@ -38,7 +38,7 @@ import GHC.Prim (
 import GHC.Integer.GMP.Prim (
     -- GMP-related primitives
     cmpInteger#, cmpIntegerInt#,
-    plusInteger#, minusInteger#, timesInteger#,
+    plusInteger#, minusInteger#, timesInteger#, timesIntegerInt#,
     quotRemInteger#, quotInteger#, remInteger#,
     divModInteger#, divInteger#, modInteger#,
     gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
@@ -529,13 +529,16 @@ minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of
 
 {-# NOINLINE timesInteger #-}
 timesInteger :: Integer -> Integer -> Integer
-timesInteger i1@(S# i) i2@(S# j)   = if isTrue# (mulIntMayOflo# i j ==# 0#)
+timesInteger (S# i) (S# j)         = if isTrue# (mulIntMayOflo# i j ==# 0#)
                                      then S# (i *# j)
-                                     else timesInteger (toBig i1) (toBig i2)
+                                     else case int2Integer# i of
+                                          (# s, d #) -> case timesIntegerInt# s d j of
+                                                        (# s', d' #) -> smartJ# s' d'
 timesInteger (S# 0#)     _         = S# 0#
 timesInteger (S# -1#)    i2        = negateInteger i2
 timesInteger (S# 1#)     i2        = i2
-timesInteger i1@(S# _) i2@(J# _ _) = timesInteger (toBig i1) i2
+timesInteger (S# i1)    (J# s2 d2) = case timesIntegerInt# s2 d2 i1 of
+                                     (# s, d #) -> J# s d
 timesInteger i1@(J# _ _) i2@(S# _) = timesInteger i2 i1 -- swap args & retry
 timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of
                                      (# s, d #) -> J# s d

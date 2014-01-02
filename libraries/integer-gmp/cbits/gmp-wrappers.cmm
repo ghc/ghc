@@ -33,6 +33,7 @@ import "integer-gmp" __gmpz_add;
 import "integer-gmp" __gmpz_sub;
 import "integer-gmp" __gmpz_mul;
 import "integer-gmp" __gmpz_mul_2exp;
+import "integer-gmp" __gmpz_mul_si;
 import "integer-gmp" __gmpz_tstbit;
 import "integer-gmp" __gmpz_fdiv_q_2exp;
 import "integer-gmp" __gmpz_gcd;
@@ -488,6 +489,7 @@ again:                                                                  \
 GMP_TAKE2_RET1(integer_cmm_plusIntegerzh,           __gmpz_add)
 GMP_TAKE2_RET1(integer_cmm_minusIntegerzh,          __gmpz_sub)
 GMP_TAKE2_RET1(integer_cmm_timesIntegerzh,          __gmpz_mul)
+GMP_TAKE1_UL1_RET1(integer_cmm_timesIntegerIntzh,   __gmpz_mul_si)
 GMP_TAKE2_RET1(integer_cmm_gcdIntegerzh,            __gmpz_gcd)
 #define CMM_GMPZ_GCDEXT(g,s,a,b) __gmpz_gcdext(g,s,NULL,a,b)
 GMP_TAKE2_RET2(integer_cmm_gcdExtIntegerzh,         CMM_GMPZ_GCDEXT)
