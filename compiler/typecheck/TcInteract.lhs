@@ -2066,10 +2066,10 @@ air, in getCoercibleInst. The following “instances” are present:
 
  4. instance Coercible r b => Coercible (NT t1 t2 ...) b
     instance Coercible a r => Coercible a (NT t1 t2 ...)
-    for a newtype constructor NT (nor data family instance that resolves to a
+    for a newtype constructor NT (or data family instance that resolves to a
     newtype) where
      * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
-     * the data constructors of NT are in scope.
+     * the constructor of NT are in scope.
 
     Again, the newtype TyCon can appear undersaturated, but only if it has
     enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
@@ -2084,8 +2084,7 @@ TcCoercion therein has role Representational,  which are turned into Core
 coercions by dsEvTerm in DsBinds.
 
 The evidence for the first three instance is generated here by
-getCoercibleInst, the forth instance is implemented in the canonicalization
-stage using deferTcSForAllEq.
+getCoercibleInst, for the second instance deferTcSForAllEq is used.
 
 When the constraint cannot be solved, it is treated as any other unsolved
 constraint, i.e. it can turn up in an inferred type signature, or reported to
