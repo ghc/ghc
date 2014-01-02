@@ -395,7 +395,7 @@ runPp :: DynFlags -> [Option] -> IO ()
 runPp dflags args =   do
   let prog = pgm_F dflags
       opts = map Option (getOpts dflags opt_F)
-  runSomething dflags "Haskell pre-processor" prog (opts ++ args)
+  runSomething dflags "Haskell pre-processor" prog (args ++ opts)
 
 runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do
