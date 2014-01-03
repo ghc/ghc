@@ -503,10 +503,9 @@ signumInteger (Negative _) = negativeOneInteger
 signumInteger Naught       = Naught
 signumInteger (Positive _) = oneInteger
 
--- XXX This isn't a great hash function
 {-# NOINLINE hashInteger #-}
 hashInteger :: Integer -> Int#
-hashInteger (!_) = 42#
+hashInteger = integerToInt
 
 -------------------------------------------------------------------
 -- The hard work is done on positive numbers
