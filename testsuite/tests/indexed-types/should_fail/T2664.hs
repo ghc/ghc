@@ -26,6 +26,6 @@ instance (Connect a, Connect b) => Connect (a :*: b) where
         -- This version is in T2664a
         -- correct implementation:
         -- return (O $ takeMVar v, E (pchoose Left v newPChan) (pchoose Right v newPChan))
-       
+
         -- type error leads to stack overflow (even without UndecidableInstances!)
         return (O $ takeMVar v, E (pchoose Right v newPChan) (pchoose Left v newPChan))
