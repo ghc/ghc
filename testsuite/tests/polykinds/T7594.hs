@@ -23,5 +23,15 @@ q :: ColD (Show :&: Real)
 q = ColD (1.2 :: Double)
 
 bar = app print q
+-- This one works, as a result of fixing Trac #8644,
+-- because the given constraint is
+--   (Show :&: Real) a, which has no equality superclasses
+
+q2 :: ColD (c :&: Real)
+q2 = error "urk"
+
+bar2 = app print q2
+-- This one fail, because the given constraint is
+--   (c :&: Real) a, which might have equality superclasses
 
 

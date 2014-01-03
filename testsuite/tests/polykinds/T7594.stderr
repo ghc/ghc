@@ -1,15 +1,14 @@
 
-T7594.hs:25:11:
+T7594.hs:32:12:
     Couldn't match type ‛b’ with ‛IO ()’
       ‛b’ is untouchable
-        inside the constraints ((:&:) Show Real a)
-        bound by a type expected by the context:
-                   (:&:) Show Real a => a -> b
-        at T7594.hs:25:7-17
+        inside the constraints ((:&:) c0 Real a)
+        bound by a type expected by the context: (:&:) c0 Real a => a -> b
+        at T7594.hs:32:8-19
       ‛b’ is a rigid type variable bound by
-          the inferred type of bar :: b at T7594.hs:25:1
+          the inferred type of bar2 :: b at T7594.hs:32:1
     Expected type: a -> b
       Actual type: a -> IO ()
-    Relevant bindings include bar :: b (bound at T7594.hs:25:1)
+    Relevant bindings include bar2 :: b (bound at T7594.hs:32:1)
     In the first argument of ‛app’, namely ‛print’
-    In the expression: app print q
+    In the expression: app print q2
