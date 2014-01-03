@@ -114,6 +114,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    let { val_binders = collectHsValBinders new_lhs ;
          all_bndrs   = addListToNameSet tc_bndrs val_binders ;
          val_avails  = map Avail val_binders  } ;
+   traceRn (text "rnSrcDecls" <+> ppr val_avails) ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
    traceRn (ptext (sLit "Val binders") <+> (ppr val_binders)) ;
    setEnvs (tcg_env, tcl_env) $ do {

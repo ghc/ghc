@@ -411,44 +411,41 @@ extendGlobalRdrEnvRn avails new_fixities
               inBracket = isBrackStage stage
               lcl_env_TH = lcl_env { tcl_rdr = delLocalRdrEnvList (tcl_rdr lcl_env) new_occs }
 
-              rdr_env_GHCi = delListFromOccEnv rdr_env new_occs
-                     -- This seems a bit brutal.
-                     -- Mightn't we lose some qualified bindings that we want?
-                     -- e.g.   ghci> import Prelude as Q
-                     --        ghci> data Int = Mk Q.Int
-                     -- This fails because we expunge the binding for Prelude.Q
+              lcl_env2 | inBracket = lcl_env_TH
+                       | otherwise = lcl_env
 
-              (rdr_env2, lcl_env2) | inBracket = (rdr_env,      lcl_env_TH)
-                                   | isGHCi    = (rdr_env_GHCi, lcl_env)
-                                   | otherwise = (rdr_env,      lcl_env)
+              rdr_env2  = extendGlobalRdrEnv (isGHCi && not inBracket) rdr_env avails
+                 -- Shadowing only applies for GHCi decls outside brackets
+                 -- e.g. (Trac #4127a)
+                 --   ghci> runQ [d| class C a where f :: a
+                 --                  f = True
+                 --                  instance C Int where f = 2 |]
+                 --   We don't want the f=True to shadow the f class-op
 
-              rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 new_gres
               lcl_env3 = lcl_env2 { tcl_th_bndrs = extendNameEnvList th_bndrs
                                                        [ (n, (TopLevel, th_lvl))
                                                        | n <- new_names ] }
-              fix_env' = foldl extend_fix_env fix_env new_gres
-              dups = findLocalDupsRdrEnv rdr_env3 new_names
+              fix_env' = foldl extend_fix_env fix_env new_names
+              dups = findLocalDupsRdrEnv rdr_env2 new_names
 
-              gbl_env' = gbl_env { tcg_rdr_env = rdr_env3, tcg_fix_env = fix_env' }
+              gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
 
-        ; traceRn (text "extendGlobalRdrEnvRn dups" <+> (ppr dups))
+        ; traceRn (text "extendGlobalRdrEnvRn 1" <+> (ppr avails $$ (ppr dups)))
         ; mapM_ (addDupDeclErr . map gre_name) dups
 
-        ; traceRn (text "extendGlobalRdrEnvRn" <+> (ppr new_fixities $$ ppr fix_env $$ ppr fix_env'))
+        ; traceRn (text "extendGlobalRdrEnvRn 2" <+> (pprGlobalRdrEnv True rdr_env2))
         ; return (gbl_env', lcl_env3) }
   where
-    new_gres = gresFromAvails LocalDef avails
-    new_names = map gre_name new_gres
+    new_names = concatMap availNames avails
     new_occs  = map nameOccName new_names
 
     -- If there is a fixity decl for the gre, add it to the fixity env
-    extend_fix_env fix_env gre
+    extend_fix_env fix_env name
       | Just (L _ fi) <- lookupFsEnv new_fixities (occNameFS occ)
       = extendNameEnv fix_env name (FixItem occ fi)
       | otherwise
       = fix_env
       where
-        name = gre_name gre
         occ  = nameOccName name
 \end{code}
 
@@ -476,6 +473,7 @@ getLocalNonValBinders fixity_env
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
         ; tc_avails <- mapM new_tc (tyClGroupConcat tycl_decls)
+        ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
             -- Bring these things into scope first
@@ -496,6 +494,7 @@ getLocalNonValBinders fixity_env
         ; let avails    = nti_avails ++ val_avails
               new_bndrs = availsToNameSet avails `unionNameSets`
                           availsToNameSet tc_avails
+        ; traceRn (text "getLocalNonValBinders 2" <+> ppr avails)
         ; envs <- extendGlobalRdrEnvRn avails fixity_env
         ; return (envs, new_bndrs) } }
   where

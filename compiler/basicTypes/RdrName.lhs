@@ -45,10 +45,13 @@ module RdrName (
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
-        lookupGlobalRdrEnv, extendGlobalRdrEnv,
+        lookupGlobalRdrEnv, extendGlobalRdrEnv, 
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
         transformGREs, findLocalDupsRdrEnv, pickGREs,
+
+        -- * GlobalRdrElts
+        gresFromAvails, gresFromAvail,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
@@ -62,6 +65,7 @@ module RdrName (
 
 import Module
 import Name
+import Avail
 import NameSet
 import Maybes
 import SrcLoc
@@ -410,7 +414,25 @@ data GlobalRdrElt
 data Parent = NoParent | ParentIs Name
               deriving (Eq)
 
-{- Note [Parents]
+instance Outputable Parent where
+   ppr NoParent     = empty
+   ppr (ParentIs n) = ptext (sLit "parent:") <> ppr n
+
+plusParent :: Parent -> Parent -> Parent
+-- See Note [Combining parents]
+plusParent (ParentIs n) p2 = hasParent n p2
+plusParent p1 (ParentIs n) = hasParent n p1
+plusParent _ _ = NoParent
+
+hasParent :: Name -> Parent -> Parent
+#ifdef DEBUG
+hasParent n (ParentIs n')
+  | n /= n' = pprPanic "hasParent" (ppr n <+> ppr n')  -- Parents should agree
+#endif
+hasParent n _  = ParentIs n
+\end{code}
+
+Note [Parents]
 ~~~~~~~~~~~~~~~~~
   Parent           Children
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -449,25 +471,28 @@ those.  For T that will mean we have
   one GRE with Parent C
   one GRE with NoParent
 That's why plusParent picks the "best" case.
--}
-
-instance Outputable Parent where
-   ppr NoParent     = empty
-   ppr (ParentIs n) = ptext (sLit "parent:") <> ppr n
 
 
-plusParent :: Parent -> Parent -> Parent
--- See Note [Combining parents]
-plusParent (ParentIs n) p2 = hasParent n p2
-plusParent p1 (ParentIs n) = hasParent n p1
-plusParent _ _ = NoParent
+\begin{code}
+-- | make a 'GlobalRdrEnv' where all the elements point to the same
+-- Provenance (useful for "hiding" imports, or imports with
+-- no details).
+gresFromAvails :: Provenance -> [AvailInfo] -> [GlobalRdrElt]
+gresFromAvails prov avails
+  = concatMap (gresFromAvail (const prov)) avails
 
-hasParent :: Name -> Parent -> Parent
-#ifdef DEBUG
-hasParent n (ParentIs n')
-  | n /= n' = pprPanic "hasParent" (ppr n <+> ppr n')  -- Parents should agree
-#endif
-hasParent n _  = ParentIs n
+gresFromAvail :: (Name -> Provenance) -> AvailInfo -> [GlobalRdrElt]
+gresFromAvail prov_fn avail
+  = [ GRE {gre_name = n,
+           gre_par = mkParent n avail,
+           gre_prov = prov_fn n}
+    | n <- availNames avail ]
+  where
+
+mkParent :: Name -> AvailInfo -> Parent
+mkParent _ (Avail _)                 = NoParent
+mkParent n (AvailTC m _) | n == m    = NoParent
+                         | otherwise = ParentIs m
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
@@ -479,24 +504,27 @@ instance Outputable GlobalRdrElt where
   ppr gre = hang (ppr (gre_name gre) <+> ppr (gre_par gre))
                2 (pprNameProvenance gre)
 
-pprGlobalRdrEnv :: GlobalRdrEnv -> SDoc
-pprGlobalRdrEnv env
-  = vcat (map pp (occEnvElts env))
+pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
+pprGlobalRdrEnv locals_only env
+  = vcat [ ptext (sLit "GlobalRdrEnv") <+> ppWhen locals_only (ptext (sLit "(locals only)")) 
+             <+> lbrace
+         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- occEnvElts env ] 
+             <+> rbrace) ]
   where
-    pp gres = ppr (nameOccName (gre_name (head gres))) <> colon <+>
-              vcat (map ppr gres)
-\end{code}
+    remove_locals gres | locals_only = filter isLocalGRE gres
+                       | otherwise   = gres
+    pp []   = empty
+    pp gres = hang (ppr occ
+                     <+> parens (ptext (sLit "unique") <+> ppr (getUnique occ))
+                     <> colon)
+                 2 (vcat (map ppr gres))
+      where
+        occ = nameOccName (gre_name (head gres))
 
-\begin{code}
 lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
 lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
                                   Nothing   -> []
                                   Just gres -> gres
-
-extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
-extendGlobalRdrEnv env gre = extendOccEnv_Acc (:) singleton env occ gre
-  where
-    occ = nameOccName (gre_name gre)
 
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env
@@ -518,6 +546,15 @@ getGRE_NameQualifier_maybes env
   where
     qualifier_maybe LocalDef       = Nothing
     qualifier_maybe (Imported iss) = Just $ map (is_as . is_decl) iss
+
+isLocalGRE :: GlobalRdrElt -> Bool
+isLocalGRE (GRE {gre_prov = LocalDef}) = True
+isLocalGRE _                           = False
+
+unQualOK :: GlobalRdrElt -> Bool
+-- ^ Test if an unqualifed version of this thing would be in scope
+unQualOK (GRE {gre_prov = LocalDef})    = True
+unQualOK (GRE {gre_prov = Imported is}) = any unQualSpecOK is
 
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- ^ Take a list of GREs which have the right OccName
@@ -580,16 +617,11 @@ pickGREs rdr_name gres
                       = filter ((== mod) . is_as . is_decl) is
                       | otherwise
                       = []
+\end{code}
 
-isLocalGRE :: GlobalRdrElt -> Bool
-isLocalGRE (GRE {gre_prov = LocalDef}) = True
-isLocalGRE _                           = False
+Building GlobalRdrEnvs
 
-unQualOK :: GlobalRdrElt -> Bool
--- ^ Test if an unqualifed version of this thing would be in scope
-unQualOK (GRE {gre_prov = LocalDef})    = True
-unQualOK (GRE {gre_prov = Imported is}) = any unQualSpecOK is
-
+\begin{code}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
 
@@ -600,33 +632,6 @@ mkGlobalRdrEnv gres
     add gre env = extendOccEnv_Acc insertGRE singleton env
                                    (nameOccName (gre_name gre))
                                    gre
-
-findLocalDupsRdrEnv :: GlobalRdrEnv -> [Name] -> [[GlobalRdrElt]]
--- ^ For each 'OccName', see if there are multiple local definitions
--- for it; return a list of all such
--- and return a list of the duplicate bindings
-findLocalDupsRdrEnv rdr_env occs
-  = go rdr_env [] occs
-  where
-    go _       dups [] = dups
-    go rdr_env dups (name:names)
-      = case filter (pick name) gres of
-          []       -> go rdr_env  dups              names
-          [_]      -> go rdr_env  dups              names   -- The common case
-          dup_gres -> go rdr_env' (dup_gres : dups) names
-      where
-        occ      = nameOccName name
-        gres     = lookupOccEnv rdr_env occ `orElse` []
-        rdr_env' = delFromOccEnv rdr_env occ
-            -- The delFromOccEnv avoids repeating the same
-            -- complaint twice, when names itself has a duplicate
-            -- which is a common case
-
-    -- See Note [Template Haskell binders in the GlobalRdrEnv]
-    pick name (GRE { gre_name = n, gre_prov = LocalDef })
-      | isInternalName name = isInternalName n
-      | otherwise           = True
-    pick _ _ = False
 
 insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
 insertGRE new_g [] = [new_g]
@@ -654,6 +659,77 @@ transformGREs trans_gre occs rdr_env
       = case lookupOccEnv env occ of
            Just gres -> extendOccEnv env occ (map trans_gre gres)
            Nothing   -> env
+
+extendGlobalRdrEnv :: Bool -> GlobalRdrEnv -> [AvailInfo] -> GlobalRdrEnv
+-- Extend with new LocalDef GREs from the AvailInfos.
+--
+-- If do_shadowing is True, first remove name clashes between the new
+-- AvailInfos and the existing GlobalRdrEnv.
+-- This is used by the GHCi top-level
+--
+-- E.g.  Adding a LocalDef "x" when there is an existing GRE for Q.x
+--       should remove any unqualified import of Q.x,
+--       leaving only the qualified one
+--
+-- However do *not* remove name clashes between the AvailInfos themselves,
+-- so that (say)   data T = A | A
+-- will still give a duplicate-binding error.
+-- Same thing if there are multiple AvailInfos (don't remove clashes),
+-- though I'm not sure this ever happens with do_shadowing=True
+
+extendGlobalRdrEnv do_shadowing env avails
+  = foldl add_avail env1 avails
+  where
+    names = concatMap availNames avails
+    env1 | do_shadowing = foldl shadow_name env names
+         | otherwise    = env
+         -- By doing the removal first, we ensure that the new AvailInfos
+         -- don't shadow each other; that would conceal genuine errors
+         -- E.g. in GHCi   data T = A | A
+
+    add_avail env avail = foldl (add_name avail) env (availNames avail)
+
+    add_name avail env name
+       = extendOccEnv_Acc (:) singleton env occ gre
+       where
+         occ = nameOccName name
+         gre = GRE { gre_name = name
+                   , gre_par = mkParent name avail
+                   , gre_prov = LocalDef }
+
+shadow_name :: GlobalRdrEnv -> Name -> GlobalRdrEnv
+shadow_name env name
+  = alterOccEnv (fmap alter_fn) env (nameOccName name)
+  where
+    alter_fn :: [GlobalRdrElt] -> [GlobalRdrElt]
+    alter_fn gres = mapCatMaybes (shadow_with name) gres
+
+    shadow_with :: Name -> GlobalRdrElt -> Maybe GlobalRdrElt
+    shadow_with new_name old_gre@(GRE { gre_name = old_name, gre_prov = LocalDef })
+       = case (nameModule_maybe old_name, nameModule_maybe new_name) of
+           (Nothing,      _)                                 -> Nothing
+           (Just old_mod, Just new_mod) | new_mod == old_mod -> Nothing
+           (Just old_mod, _) -> Just (old_gre { gre_prov = Imported [fake_imp_spec] })
+              where
+                 fake_imp_spec = ImpSpec id_spec ImpAll  -- Urgh!
+                 old_mod_name = moduleName old_mod
+                 id_spec = ImpDeclSpec { is_mod = old_mod_name
+                                       , is_as = old_mod_name
+                                       , is_qual = True
+                                       , is_dloc = nameSrcSpan old_name }
+    shadow_with new_name old_gre@(GRE { gre_prov = Imported imp_specs })
+       | null imp_specs' = Nothing
+       | otherwise       = Just (old_gre { gre_prov = Imported imp_specs' })
+       where
+         imp_specs' = mapCatMaybes (shadow_is new_name) imp_specs
+
+    shadow_is :: Name -> ImportSpec -> Maybe ImportSpec
+    shadow_is new_name is@(ImpSpec { is_decl = id_spec })
+       | Just new_mod <- nameModule_maybe new_name
+       , is_as id_spec == moduleName new_mod
+       = Nothing   -- Shadow both qualified and unqualified
+       | otherwise -- Shadow unqualified only
+       = Just (is { is_decl = id_spec { is_qual = True } })
 \end{code}
 
 Note [Template Haskell binders in the GlobalRdrEnv]
@@ -662,6 +738,35 @@ For reasons described in Note [Top-level Names in Template Haskell decl quotes]
 in RnNames, a GRE with an Internal gre_name (i.e. one generated by a TH decl
 quote) should *shadow* a GRE with an External gre_name.  Hence some faffing
 around in pickGREs and findLocalDupsRdrEnv
+
+\begin{code}
+findLocalDupsRdrEnv :: GlobalRdrEnv -> [Name] -> [[GlobalRdrElt]]
+-- ^ For each 'OccName', see if there are multiple local definitions
+-- for it; return a list of all such
+-- and return a list of the duplicate bindings
+findLocalDupsRdrEnv rdr_env occs
+  = go rdr_env [] occs
+  where
+    go _       dups [] = dups
+    go rdr_env dups (name:names)
+      = case filter (pick name) gres of
+          []       -> go rdr_env  dups              names
+          [_]      -> go rdr_env  dups              names   -- The common case
+          dup_gres -> go rdr_env' (dup_gres : dups) names
+      where
+        occ      = nameOccName name
+        gres     = lookupOccEnv rdr_env occ `orElse` []
+        rdr_env' = delFromOccEnv rdr_env occ
+            -- The delFromOccEnv avoids repeating the same
+            -- complaint twice, when names itself has a duplicate
+            -- which is a common case
+
+    -- See Note [Template Haskell binders in the GlobalRdrEnv]
+    pick name (GRE { gre_name = n, gre_prov = LocalDef })
+      | isInternalName name = isInternalName n
+      | otherwise           = True
+    pick _ _ = False
+\end{code}
 
 %************************************************************************
 %*                                                                      *

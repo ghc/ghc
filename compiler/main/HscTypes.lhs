@@ -48,7 +48,7 @@ module HscTypes (
 
         -- * Interactive context
         InteractiveContext(..), emptyInteractiveContext,
-        icPrintUnqual, icInScopeTTs, icPlusGblRdrEnv,
+        icPrintUnqual, icInScopeTTs, icExtendGblRdrEnv,
         extendInteractiveContext, substInteractiveContext,
         setInteractivePrintName,
         InteractiveImport(..),
@@ -1197,7 +1197,7 @@ icPrintUnqual dflags InteractiveContext{ ic_rn_gbl_env = grenv } =
 extendInteractiveContext :: InteractiveContext -> [TyThing] -> InteractiveContext
 extendInteractiveContext ictxt new_tythings
   = ictxt { ic_tythings   = new_tythings ++ old_tythings
-          , ic_rn_gbl_env = new_tythings `icPlusGblRdrEnv` ic_rn_gbl_env ictxt
+          , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
           }
   where
     old_tythings = filter (not . shadowed) (ic_tythings ictxt)
@@ -1214,19 +1214,22 @@ setInteractivePrintName ic n = ic{ic_int_print = n}
 
 -- | Add TyThings to the GlobalRdrEnv, earlier ones in the list shadowing
 -- later ones, and shadowing existing entries in the GlobalRdrEnv.
-icPlusGblRdrEnv :: [TyThing] -> GlobalRdrEnv -> GlobalRdrEnv
-icPlusGblRdrEnv tythings env = extendOccEnvList env list
-  where new_gres = gresFromAvails LocalDef (map tyThingAvailInfo tythings)
-        list = [ (nameOccName (gre_name gre), [gre]) | gre <- new_gres ]
+icExtendGblRdrEnv :: GlobalRdrEnv -> [TyThing] -> GlobalRdrEnv
+icExtendGblRdrEnv env tythings
+  = foldr add env tythings  -- Foldr makes things in the front of
+                            -- the list shadow things at the back
+  where
+    add thing env = extendGlobalRdrEnv True {- Shadowing please -} env
+                                       [tyThingAvailInfo thing]
+       -- One at a time, to ensure each shadows the previous ones
 
 substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
-substInteractiveContext ictxt subst
-    | isEmptyTvSubst subst = ictxt
-
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
-    = ictxt { ic_tythings = map subst_ty tts }
-  where subst_ty (AnId id) = AnId $ id `setIdType` substTy subst (idType id)
-        subst_ty tt        = tt
+  | isEmptyTvSubst subst = ictxt
+  | otherwise            = ictxt { ic_tythings = map subst_ty tts }
+  where
+    subst_ty (AnId id) = AnId $ id `setIdType` substTy subst (idType id)
+    subst_ty tt        = tt
 
 data InteractiveImport
   = IIDecl (ImportDecl RdrName)
@@ -1241,7 +1244,6 @@ data InteractiveImport
 instance Outputable InteractiveImport where
   ppr (IIModule m) = char '*' <> ppr m
   ppr (IIDecl d)   = ppr d
-
 \end{code}
 
 %************************************************************************
