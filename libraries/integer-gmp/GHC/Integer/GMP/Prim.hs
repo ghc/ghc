@@ -8,7 +8,9 @@ module GHC.Integer.GMP.Prim (
     cmpIntegerInt#,
 
     plusInteger#,
+    plusIntegerInt#,
     minusInteger#,
+    minusIntegerInt#,
     timesInteger#,
     timesIntegerInt#,
 
@@ -88,10 +90,20 @@ foreign import prim "integer_cmm_cmpIntegerIntzh" cmpIntegerInt#
 foreign import prim "integer_cmm_plusIntegerzh" plusInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
 
+-- | Optimized version of 'plusInteger#' for summing big-ints with small-ints
+--
+foreign import prim "integer_cmm_plusIntegerIntzh" plusIntegerInt#
+  :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #)
+
 -- |
 --
 foreign import prim "integer_cmm_minusIntegerzh" minusInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- | Optimized version of 'minusInteger#' for substracting small-ints from big-ints
+--
+foreign import prim "integer_cmm_minusIntegerIntzh" minusIntegerInt#
+  :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #)
 
 -- |
 --

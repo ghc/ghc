@@ -38,7 +38,8 @@ import GHC.Prim (
 import GHC.Integer.GMP.Prim (
     -- GMP-related primitives
     cmpInteger#, cmpIntegerInt#,
-    plusInteger#, minusInteger#, timesInteger#, timesIntegerInt#,
+    plusInteger#, plusIntegerInt#, minusInteger#, minusIntegerInt#,
+    timesInteger#, timesIntegerInt#,
     quotRemInteger#, quotInteger#, remInteger#,
     divModInteger#, divInteger#, modInteger#,
     gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
@@ -505,25 +506,34 @@ signumInteger (J# s d)
 
 {-# NOINLINE plusInteger #-}
 plusInteger :: Integer -> Integer -> Integer
-plusInteger i1@(S# i) i2@(S# j)  = case addIntC# i j of
+plusInteger (S# i)      (S# j)   = case addIntC# i j of
                                    (# r, c #) ->
                                        if isTrue# (c ==# 0#)
                                        then S# r
-                                       else plusInteger (toBig i1) (toBig i2)
-plusInteger i1@(J# _ _) i2@(S# _) = plusInteger i1 (toBig i2)
-plusInteger i1@(S# _) i2@(J# _ _) = plusInteger (toBig i1) i2
+                                       else case int2Integer# i of
+                                            (# s, d #) -> case plusIntegerInt# s d j of
+                                                          (# s', d' #) -> J# s' d'
+plusInteger i1@(J# _ _) (S# 0#)   = i1
+plusInteger (J# s1 d1)  (S# j)    = case plusIntegerInt# s1 d1 j of
+                                    (# s, d #) -> smartJ# s d
+plusInteger i1@(S# _) i2@(J# _ _) = plusInteger i2 i1
 plusInteger (J# s1 d1) (J# s2 d2) = case plusInteger# s1 d1 s2 d2 of
                                     (# s, d #) -> smartJ# s d
 
 {-# NOINLINE minusInteger #-}
 minusInteger :: Integer -> Integer -> Integer
-minusInteger i1@(S# i) i2@(S# j)   = case subIntC# i j of
+minusInteger (S# i)      (S# j)    = case subIntC# i j of
                                      (# r, c #) ->
                                          if isTrue# (c ==# 0#) then S# r
-                                         else minusInteger (toBig i1)
-                                                           (toBig i2)
-minusInteger i1@(J# _ _) i2@(S# _) = minusInteger i1 (toBig i2)
-minusInteger i1@(S# _) i2@(J# _ _) = minusInteger (toBig i1) i2
+                                         else case int2Integer# i of
+                                              (# s, d #) -> case minusIntegerInt# s d j of
+                                                            (# s', d' #) -> J# s' d'
+minusInteger i1@(J# _ _) (S# 0#)   = i1
+minusInteger (J# s1 d1)  (S# j)    = case minusIntegerInt# s1 d1 j of
+                                     (# s, d #) -> smartJ# s d
+minusInteger (S# 0#)    (J# s2 d2) = J# (negateInt# s2) d2
+minusInteger (S# i)     (J# s2 d2) = case plusIntegerInt# (negateInt# s2) d2 i of
+                                     (# s, d #) -> smartJ# s d
 minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of
                                      (# s, d #) -> smartJ# s d
 

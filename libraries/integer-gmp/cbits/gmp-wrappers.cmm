@@ -30,7 +30,9 @@
 
 import "integer-gmp" __gmpz_init;
 import "integer-gmp" __gmpz_add;
+import "integer-gmp" __gmpz_add_ui;
 import "integer-gmp" __gmpz_sub;
+import "integer-gmp" __gmpz_sub_ui;
 import "integer-gmp" __gmpz_mul;
 import "integer-gmp" __gmpz_mul_2exp;
 import "integer-gmp" __gmpz_mul_si;
@@ -646,3 +648,35 @@ integer_cmm_decodeDoublezh (D_ arg)
     /* returns: (Int# (expn), Int#, ByteArray#) */
     return (W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
 }
+
+/* :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #) */
+#define GMPX_TAKE1_UL1_RET1(name,pos_arg_fun,neg_arg_fun)               \
+name(W_ ws1, P_ d1, W_ wl)                                              \
+{                                                                       \
+  W_ mp_tmp;                                                            \
+  W_ mp_result;                                                         \
+                                                                        \
+again:                                                                  \
+  STK_CHK_GEN_N (2 * SIZEOF_MP_INT);                                    \
+  MAYBE_GC(again);                                                      \
+                                                                        \
+  mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                                  \
+  mp_result  = Sp - 2 * SIZEOF_MP_INT;                                  \
+                                                                        \
+  MP_INT_SET_FROM_BA(mp_tmp,ws1,d1);                                    \
+                                                                        \
+  ccall __gmpz_init(mp_result "ptr");                                   \
+                                                                        \
+  if(%lt(wl,0)) {                                                       \
+      ccall neg_arg_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(-wl)); \
+      return(MP_INT_AS_PAIR(mp_result));                                \
+  }                                                                     \
+                                                                        \
+  ccall pos_arg_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(wl));      \
+  return(MP_INT_AS_PAIR(mp_result));                                    \
+}
+
+/* NB: We need both primitives as we can't express 'minusIntegerInt#'
+   in terms of 'plusIntegerInt#' for @minBound :: Int@ */
+GMPX_TAKE1_UL1_RET1(integer_cmm_plusIntegerIntzh,__gmpz_add_ui,__gmpz_sub_ui)
+GMPX_TAKE1_UL1_RET1(integer_cmm_minusIntegerIntzh,__gmpz_sub_ui,__gmpz_add_ui)
