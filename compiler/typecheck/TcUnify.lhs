@@ -440,17 +440,15 @@ newImplication :: SkolemInfo -> [TcTyVar]
 newImplication skol_info skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { let no_equalities = not (hasEqualities given)
-       ; ((result, untch), wanted) <- captureConstraints  $ 
+    do { ((result, untch), wanted) <- captureConstraints  $ 
                                       captureUntouchables $
                                       thing_inside
 
-       ; if isEmptyWC wanted && no_equalities
-       	    -- Optimisation : if there are no wanteds, and the givens
-       	    -- are sufficiently simple, don't generate an implication
-       	    -- at all.  Reason for the hasEqualities test:
-	    -- we don't want to lose the "inaccessible alternative"
-	    -- error check
+       ; if isEmptyWC wanted && null given
+       	    -- Optimisation : if there are no wanteds, and no givens
+       	    -- don't generate an implication at all.
+            -- Reason for the (null given): we don't want to lose 
+            -- the "inaccessible alternative" error check
          then 
             return (emptyTcEvBinds, result)
          else do
@@ -459,6 +457,7 @@ newImplication skol_info skol_tvs given thing_inside
        ; emitImplication $ Implic { ic_untch = untch
              		     	  , ic_skols = skol_tvs
                                   , ic_fsks  = []
+                                  , ic_no_eqs = False
                              	  , ic_given = given
                                   , ic_wanted = wanted
                                   , ic_insol  = insolubleWC wanted

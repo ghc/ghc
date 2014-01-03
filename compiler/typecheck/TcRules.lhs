@@ -176,6 +176,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
        ; emitImplication $ Implic { ic_untch  = noUntouchables
                                   , ic_skols  = qtkvs
                                   , ic_fsks   = []
+                                  , ic_no_eqs = False
                                   , ic_given  = lhs_evs
                                   , ic_wanted = rhs_wanted
                                   , ic_insol  = insolubleWC rhs_wanted
@@ -190,6 +191,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
        ; emitImplication $ Implic { ic_untch  = noUntouchables
                                   , ic_skols  = qtkvs
                                   , ic_fsks   = []
+                                  , ic_no_eqs = False
                                   , ic_given  = lhs_evs
                                   , ic_wanted = other_lhs_wanted
                                   , ic_insol  = insolubleWC other_lhs_wanted

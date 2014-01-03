@@ -25,8 +25,6 @@ module Inst (
        tcSyntaxName,
 
        -- Simple functions over evidence variables
-       hasEqualities, 
-       
        tyVarsOfWC, tyVarsOfBag, 
        tyVarsOfCt, tyVarsOfCts, 
 
@@ -50,7 +48,6 @@ import TcMType
 import Type
 import Coercion ( Role(..) )
 import TcType
-import Class
 import Unify
 import HscTypes
 import Id
@@ -515,22 +512,6 @@ addClsInstsErr herald ispecs
 %************************************************************************
 
 \begin{code}
-hasEqualities :: [EvVar] -> Bool
--- Has a bunch of canonical constraints (all givens) got any equalities in it?
-hasEqualities givens = any (has_eq . evVarPred) givens
-  where
-    has_eq = has_eq' . classifyPredType
-    
-    -- See Note [Float Equalities out of Implications] in TcSimplify
-    has_eq' (EqPred {})          = True
-    has_eq' (ClassPred cls _tys) = any has_eq (classSCTheta cls)
-    has_eq' (TuplePred ts)       = any has_eq ts
-    has_eq' (IrredPred _)        = True -- Might have equalities in it after reduction?
-       -- This is conservative.  e.g. if there's a constraint function FC with
-       --    type instance FC Int = Show
-       -- then we won't float from inside a given constraint (FC Int a), even though
-       -- it's really the innocuous (Show a).  Too bad!  Add a type signature
-
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet
 -- NB: the 
