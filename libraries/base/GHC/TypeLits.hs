@@ -26,6 +26,8 @@ module GHC.TypeLits
   , KnownSymbol, symbolVal
   , SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
+  , sameNat, sameSymbol
+
 
     -- * Functions on type nats
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
@@ -40,7 +42,8 @@ import GHC.Read(Read(..))
 import GHC.Prim(magicDict)
 import Data.Maybe(Maybe(..))
 import Data.Proxy(Proxy(..))
-import Data.Type.Equality(type (==))
+import Data.Type.Equality(type (==), TestEquality(..), (:~:)(Refl))
+import Unsafe.Coerce(unsafeCoerce)
 
 -- | (Kind) This is the kind of type-level natural numbers.
 data Nat
@@ -167,6 +170,23 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 type family (m :: Nat) - (n :: Nat) :: Nat
 
 
+--------------------------------------------------------------------------------
+
+-- | We either get evidence that this function was instantiated with the
+-- same type-level numbers, or 'Nothing'.
+sameNat :: (KnownNat a, KnownNat b) =>
+           Proxy a -> Proxy b -> Maybe (a :~: b)
+sameNat x y
+  | natVal x == natVal y = Just (unsafeCoerce Refl)
+  | otherwise            = Nothing
+
+-- | We either get evidence that this function was instantiated with the
+-- same type-level symbols, or 'Nothing'.
+sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
+              Proxy a -> Proxy b -> Maybe (a :~: b)
+sameSymbol x y
+  | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
+  | otherwise                   = Nothing
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
@@ -186,4 +206,5 @@ withSNat f x y = magicDict (WrapN f) x y
 withSSymbol :: (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
 withSSymbol f x y = magicDict (WrapS f) x y
+
 
