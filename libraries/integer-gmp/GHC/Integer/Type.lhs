@@ -28,7 +28,7 @@ import GHC.Prim (
     -- Conversions between those types
     int2Word#, int2Double#, int2Float#, word2Int#,
     -- Operations on Int# that we use for operations on S#
-    quotInt#, remInt#, negateInt#,
+    quotInt#, remInt#, quotRemInt#, negateInt#,
     (*#), (-#),
     (==#), (/=#), (<=#), (>=#), (<#), (>#),
     mulIntMayOflo#, addIntC#, subIntC#,
@@ -216,14 +216,8 @@ Just using smartJ# in this way has good results:
 {-# NOINLINE quotRemInteger #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 quotRemInteger a@(S# INT_MINBOUND) b = quotRemInteger (toBig a) b
-quotRemInteger (S# i) (S# j) = (# S# q, S# r #)
-    where
-      -- NB. don't inline these.  (# S# (i `quotInt#` j), ... #) means
-      -- (# let q = i `quotInt#` j in S# q, ... #) which builds a
-      -- useless thunk.  Placing the bindings here means they'll be
-      -- evaluated strictly.
-      !q = i `quotInt#` j
-      !r = i `remInt#`  j
+quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
+                                   (# q, r #) -> (# S# q, S# r #)
 quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
@@ -238,7 +232,10 @@ divModInteger :: Integer -> Integer -> (# Integer, Integer #)
 divModInteger a@(S# INT_MINBOUND) b = divModInteger (toBig a) b
 divModInteger (S# i) (S# j) = (# S# d, S# m #)
     where
-      -- NB. don't inline these.  See quotRemInteger above.
+      -- NB. don't inline these.  (# S# (i `quotInt#` j), ... #) means
+      -- (# let q = i `quotInt#` j in S# q, ... #) which builds a
+      -- useless thunk.  Placing the bindings here means they'll be
+      -- evaluated strictly.
       !d = i `divInt#` j
       !m = i `modInt#` j
 
