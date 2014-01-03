@@ -726,8 +726,7 @@ runOneCommand eh gCmd = do
       st <- lift getGHCiState
       let p = prompt st
       lift $ setGHCiState st{ prompt = prompt2 st }
-      mb_cmd <- collectCommand q ""
-      lift $ getGHCiState >>= \st' -> setGHCiState st'{ prompt = p }
+      mb_cmd <- collectCommand q "" `GHC.gfinally` lift (getGHCiState >>= \st' -> setGHCiState st' { prompt = p })
       return mb_cmd
     -- we can't use removeSpaces for the sublines here, so
     -- multiline commands are somewhat more brittle against
