@@ -152,21 +152,52 @@ toBig i@(J# _ _) = i
 
 -- | Demote 'J#' to 'S#' if possible. See also 'smartJ#'.
 toSmall :: Integer -> Integer
-toSmall i@(S# _)  = i
-toSmall (J# 0# _) = S# 0#
-toSmall (J# 1# mb#)  | isTrue# (v ># 0#) = S# v
-    where
-      v = indexIntArray# mb# 0#
-toSmall (J# -1# mb#) | isTrue# (v <# 0#) = S# v
-    where
-      v = negateInt# (indexIntArray# mb# 0#)
-toSmall i         = i
+toSmall i@(S# _)    = i
+toSmall (J# s# mb#) = smartJ# s# mb#
+
 
 -- | Smart 'J#' constructor which tries to construct 'S#' if possible
 smartJ# :: Int# -> ByteArray# -> Integer
-smartJ# s# mb# = toSmall (J# s# mb#)
+smartJ# 0# _ = S# 0#
+smartJ# 1# mb#  | isTrue# (v ># 0#) = S# v
+    where
+      v = indexIntArray# mb# 0#
+smartJ# (-1#) mb# | isTrue# (v <# 0#) = S# v
+    where
+      v = negateInt# (indexIntArray# mb# 0#)
+smartJ# s# mb# = J# s# mb#
 \end{code}
 
+Note [Use S# if possible]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+It's a big win to use S#, rather than J#, whenever possible.  Not only
+does it take less space, but (probably more important) subsequent
+operations are more efficient. See Trac #8638.
+
+'smartJ#' is the smart constructor for J# that performs the necessary
+tests.  When returning a nested result, we always use smartJ# strictly,
+thus
+       let !r = smartJ# a b in (# r, somthing_else #)
+to avoid creating a thunk that is subsequently evaluated to a J#.
+smartJ# itself does a pretty small amount of work, so it's not worth
+thunking it.
+
+We call 'smartJ#' in places like quotRemInteger where a big input
+might produce a small output.
+
+Just using smartJ# in this way has good results:
+
+        Program           Size    Allocs   Runtime   Elapsed  TotalMem
+--------------------------------------------------------------------------------
+         gamteb          +0.1%    -19.0%      0.03      0.03     +0.0%
+          kahan          +0.2%     -1.2%      0.17      0.17     +0.0%
+         mandel          +0.1%     -7.7%      0.05      0.05     +0.0%
+          power          +0.1%    -40.8%    -32.5%    -32.5%     +0.0%
+         symalg          +0.2%     -0.5%      0.01      0.01     +0.0%
+--------------------------------------------------------------------------------
+            Min          +0.0%    -40.8%    -32.5%    -32.5%     -5.1%
+            Max          +0.2%     +0.1%     +2.0%     +2.0%     +0.0%
+ Geometric Mean          +0.1%     -1.0%     -2.5%     -2.5%     -0.1%
 
 %*********************************************************
 %*                                                      *
@@ -200,6 +231,7 @@ quotRemInteger (J# s1 d1) (J# s2 d2)
           (# s3, d3, s4, d4 #) -> let !q = smartJ# s3 d3
                                       !r = smartJ# s4 d4
                                   in (# q, r #)
+                           -- See Note [Use S# if possible]
 
 {-# NOINLINE divModInteger #-}
 divModInteger :: Integer -> Integer -> (# Integer, Integer #)
