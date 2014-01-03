@@ -10,7 +10,8 @@ Loading interface files
 module LoadIface (
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces, 
-        loadSrcInterface, loadInterfaceForName, loadInterfaceForModule,
+        loadSrcInterface, loadSrcInterface_maybe, 
+        loadInterfaceForName, loadInterfaceForModule,
 
         -- IfM functions
         loadInterface, loadWiredInHomeIface, 
@@ -84,23 +85,30 @@ loadSrcInterface :: SDoc
                  -> Maybe FastString    -- "package", if any
                  -> RnM ModIface
 
-loadSrcInterface doc mod want_boot maybe_pkg  = do
+loadSrcInterface doc mod want_boot maybe_pkg
+  = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
+       ; case res of
+           Failed err      -> failWithTc err
+           Succeeded iface -> return iface }
+
+-- | Like loadSrcInterface, but returns a MaybeErr
+loadSrcInterface_maybe :: SDoc
+                       -> ModuleName
+                       -> IsBootInterface     -- {-# SOURCE #-} ?
+                       -> Maybe FastString    -- "package", if any
+                       -> RnM (MaybeErr MsgDoc ModIface)
+
+loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
   -- calling the Finder, which as a side effect will search the filesystem
   -- and create a ModLocation.  If successful, loadIface will read the
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
-  hsc_env <- getTopEnv
-  res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
-  case res of
-    Found _ mod -> do
-      mb_iface <- initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
-      case mb_iface of
-        Failed err      -> failWithTc err
-        Succeeded iface -> return iface
-    err ->
-        let dflags = hsc_dflags hsc_env in
-        failWithTc (cannotFindInterface dflags mod err)
+  = do { hsc_env <- getTopEnv
+       ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
+       ; case res of
+           Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
+           err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
 
 -- | Load interface for a module.
 loadModuleInterface :: SDoc -> Module -> TcM ModIface
