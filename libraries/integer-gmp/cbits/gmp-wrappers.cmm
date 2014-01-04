@@ -69,6 +69,17 @@ import "integer-gmp" integer_cbits_decodeDouble;
    the case for all the platforms that GHC supports, currently.
    -------------------------------------------------------------------------- */
 
+/* set mpz_t from Int#/ByteArray# */
+#define MP_INT_SET_FROM_BA(mp_ptr,i,ba)                  \
+  MP_INT__mp_alloc(mp_ptr) = W_TO_INT(BYTE_ARR_WDS(ba)); \
+  MP_INT__mp_size(mp_ptr)  = W_TO_INT(i);                \
+  MP_INT__mp_d(mp_ptr)     = BYTE_ARR_CTS(ba)
+
+/* convert mpz_t to Int#/ByteArray# return pair */
+#define MP_INT_AS_PAIR(mp_ptr) \
+  TO_W_(MP_INT__mp_size(mp_ptr)),(MP_INT__mp_d(mp_ptr)-SIZEOF_StgArrWords)
+
+
 /* :: ByteArray# -> Word# -> Word# -> Int# -> (# Int#, ByteArray# #) */
 integer_cmm_importIntegerFromByteArrayzh (P_ ba, W_ of, W_ sz, W_ e)
 {
@@ -86,8 +97,7 @@ again:
   ccall __gmpz_init(mp_result "ptr");
   ccall __gmpz_import(mp_result "ptr", sz, W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, src_ptr "ptr");
 
-  return(TO_W_(MP_INT__mp_size(mp_result)),
-         MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);
+  return(MP_INT_AS_PAIR(mp_result));
 }
 
 /* :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Int#, ByteArray# #) */
@@ -104,12 +114,11 @@ again:
   ccall __gmpz_init(mp_result "ptr");
   ccall __gmpz_import(mp_result "ptr", sz, W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, src_ptr "ptr");
 
-  return(TO_W_(MP_INT__mp_size(mp_result)),
-         MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);
+  return(MP_INT_AS_PAIR(mp_result));
 }
 
 /* :: Int# -> ByteArray# -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #) */
-integer_cmm_exportIntegerToMutableByteArrayzh (W_ s1, P_ d1, P_ mba, W_ of, W_ e)
+integer_cmm_exportIntegerToMutableByteArrayzh (W_ ws1, P_ d1, P_ mba, W_ of, W_ e)
 {
   W_ dst_ptr;
   W_ mp_tmp;
@@ -120,9 +129,7 @@ again:
   MAYBE_GC(again);
 
   mp_tmp = Sp - SIZEOF_MP_INT;
-  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));
-  MP_INT__mp_size(mp_tmp)  = (s1);
-  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);
+  MP_INT_SET_FROM_BA(mp_tmp, ws1, d1);
 
   cnt_result = Sp - (SIZEOF_MP_INT + SIZEOF_W);
   W_[cnt_result] = 0;
@@ -135,7 +142,7 @@ again:
 }
 
 /* :: Int# -> ByteArray# -> Addr# -> Int# -> State# s -> (# State# s, Word# #) */
-integer_cmm_exportIntegerToAddrzh (W_ s1, P_ d1, W_ dst_ptr, W_ e)
+integer_cmm_exportIntegerToAddrzh (W_ ws1, P_ d1, W_ dst_ptr, W_ e)
 {
   W_ mp_tmp;
   W_ cnt_result;
@@ -145,9 +152,7 @@ again:
   MAYBE_GC(again);
 
   mp_tmp = Sp - SIZEOF_MP_INT;
-  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));
-  MP_INT__mp_size(mp_tmp)  = (s1);
-  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);
+  MP_INT_SET_FROM_BA(mp_tmp, ws1, d1);
 
   cnt_result = Sp - (SIZEOF_MP_INT + SIZEOF_W);
   W_[cnt_result] = 0;
@@ -313,7 +318,6 @@ integer_cmm_word64ToIntegerzh (L_ val)
 #define GMP_TAKE2_RET1(name,mp_fun)                             \
 name (W_ ws1, P_ d1, W_ ws2, P_ d2)                             \
 {                                                               \
-  CInt s1, s2;                                                  \
   W_ mp_tmp1;                                                   \
   W_ mp_tmp2;                                                   \
   W_ mp_result1;                                                \
@@ -322,32 +326,24 @@ again:                                                          \
   STK_CHK_GEN_N (3 * SIZEOF_MP_INT);                            \
   MAYBE_GC(again);                                              \
                                                                 \
-  s1 = W_TO_INT(ws1);                                           \
-  s2 = W_TO_INT(ws2);                                           \
-                                                                \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
   mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                          \
   mp_result1 = Sp - 3 * SIZEOF_MP_INT;                          \
-  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(BYTE_ARR_WDS(d1));       \
-  MP_INT__mp_size(mp_tmp1)  = (s1);                             \
-  MP_INT__mp_d(mp_tmp1)     = BYTE_ARR_CTS(d1);                 \
-  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(BYTE_ARR_WDS(d2));       \
-  MP_INT__mp_size(mp_tmp2)  = (s2);                             \
-  MP_INT__mp_d(mp_tmp2)     = BYTE_ARR_CTS(d2);                 \
+                                                                \
+  MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                           \
+  MP_INT_SET_FROM_BA(mp_tmp2,ws2,d2);                           \
                                                                 \
   ccall __gmpz_init(mp_result1 "ptr");                          \
                                                                 \
   /* Perform the operation */                                   \
   ccall mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr"); \
                                                                 \
-  return (TO_W_(MP_INT__mp_size(mp_result1)),                   \
-         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);        \
+  return (MP_INT_AS_PAIR(mp_result1));                          \
 }
 
 #define GMP_TAKE3_RET1(name,mp_fun)                             \
 name (W_ ws1, P_ d1, W_ ws2, P_ d2, W_ ws3, P_ d3)              \
 {                                                               \
-  CInt s1, s2, s3;                                              \
   W_ mp_tmp1;                                                   \
   W_ mp_tmp2;                                                   \
   W_ mp_tmp3;                                                   \
@@ -357,23 +353,14 @@ again:                                                          \
   STK_CHK_GEN_N (4 * SIZEOF_MP_INT);                            \
   MAYBE_GC(again);                                              \
                                                                 \
-  s1 = W_TO_INT(ws1);                                           \
-  s2 = W_TO_INT(ws2);                                           \
-  s3 = W_TO_INT(ws3);                                           \
-                                                                \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
   mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                          \
   mp_tmp3    = Sp - 3 * SIZEOF_MP_INT;                          \
   mp_result1 = Sp - 4 * SIZEOF_MP_INT;                          \
-  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(BYTE_ARR_WDS(d1));       \
-  MP_INT__mp_size(mp_tmp1)  = (s1);                             \
-  MP_INT__mp_d(mp_tmp1)     = BYTE_ARR_CTS(d1);                 \
-  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(BYTE_ARR_WDS(d2));       \
-  MP_INT__mp_size(mp_tmp2)  = (s2);                             \
-  MP_INT__mp_d(mp_tmp2)     = BYTE_ARR_CTS(d2);                 \
-  MP_INT__mp_alloc(mp_tmp3) = W_TO_INT(BYTE_ARR_WDS(d3));       \
-  MP_INT__mp_size(mp_tmp3)  = (s3);                             \
-  MP_INT__mp_d(mp_tmp3)     = BYTE_ARR_CTS(d3);                 \
+                                                                \
+  MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                           \
+  MP_INT_SET_FROM_BA(mp_tmp2,ws2,d2);                           \
+  MP_INT_SET_FROM_BA(mp_tmp3,ws3,d3);                           \
                                                                 \
   ccall __gmpz_init(mp_result1 "ptr");                          \
                                                                 \
@@ -381,15 +368,12 @@ again:                                                          \
   ccall mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr",  \
                mp_tmp3  "ptr");                                 \
                                                                 \
-  return (TO_W_(MP_INT__mp_size(mp_result1)),                   \
-         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);        \
+  return (MP_INT_AS_PAIR(mp_result1));                          \
 }
 
 #define GMP_TAKE1_UL1_RET1(name,mp_fun)                         \
 name (W_ ws1, P_ d1, W_ wul)                                    \
 {                                                               \
-  CInt s1;                                                      \
-  CLong ul;                                                     \
   W_ mp_tmp;                                                    \
   W_ mp_result;                                                 \
                                                                 \
@@ -398,44 +382,34 @@ again:                                                          \
   STK_CHK_GEN_N (2 * SIZEOF_MP_INT);                            \
   MAYBE_GC(again);                                              \
                                                                 \
-  s1 = W_TO_INT(ws1);                                           \
-  ul = W_TO_LONG(wul);                                          \
-                                                                \
   mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                          \
   mp_result  = Sp - 2 * SIZEOF_MP_INT;                          \
-  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));        \
-  MP_INT__mp_size(mp_tmp)  = (s1);                              \
-  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                  \
+                                                                \
+  MP_INT_SET_FROM_BA(mp_tmp,ws1,d1);                            \
                                                                 \
   ccall __gmpz_init(mp_result "ptr");                           \
                                                                 \
   /* Perform the operation */                                   \
-  ccall mp_fun(mp_result "ptr",mp_tmp "ptr", ul);               \
+  ccall mp_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(wul));  \
                                                                 \
-  return(TO_W_(MP_INT__mp_size(mp_result)),                     \
-         MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);         \
+  return (MP_INT_AS_PAIR(mp_result));                           \
 }
 
 #define GMP_TAKE1_I1_RETI1(name,mp_fun)                         \
 name (W_ ws1, P_ d1, W_ wi)                                     \
 {                                                               \
-  CInt s1, res, i;                                              \
+  CInt res;                                                     \
   W_ mp_tmp;                                                    \
                                                                 \
 again:                                                          \
   STK_CHK_GEN_N (SIZEOF_MP_INT);                                \
   MAYBE_GC(again);                                              \
                                                                 \
-  s1 = W_TO_INT(ws1);                                           \
-  i  = W_TO_INT(wi);                                            \
-                                                                \
   mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                          \
-  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));        \
-  MP_INT__mp_size(mp_tmp)  = (s1);                              \
-  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                  \
+  MP_INT_SET_FROM_BA(mp_tmp,ws1,d1);                            \
                                                                 \
   /* Perform the operation */                                   \
-  (res) = ccall mp_fun(mp_tmp "ptr", i);                        \
+  (res) = ccall mp_fun(mp_tmp "ptr", W_TO_INT(wi));             \
                                                                 \
   return (TO_W_(res));                                          \
 }
@@ -443,24 +417,18 @@ again:                                                          \
 #define GMP_TAKE1_UL1_RETI1(name,mp_fun)                        \
 name (W_ ws1, P_ d1, W_ wul)                                    \
 {                                                               \
-  CInt s1, res;                                                 \
-  CLong ul;                                                     \
+  CInt res;                                                     \
   W_ mp_tmp;                                                    \
                                                                 \
 again:                                                          \
   STK_CHK_GEN_N (SIZEOF_MP_INT);                                \
   MAYBE_GC(again);                                              \
                                                                 \
-  s1 = W_TO_INT(ws1);                                           \
-  ul = W_TO_LONG(wul);                                          \
-                                                                \
   mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                          \
-  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));        \
-  MP_INT__mp_size(mp_tmp)  = (s1);                              \
-  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                  \
+  MP_INT_SET_FROM_BA(mp_tmp,ws1,d1);                            \
                                                                 \
   /* Perform the operation */                                   \
-  (res) = ccall mp_fun(mp_tmp "ptr", ul);                       \
+  (res) = ccall mp_fun(mp_tmp "ptr", W_TO_LONG(wul));           \
                                                                 \
   return (TO_W_(res));                                          \
 }
@@ -468,7 +436,6 @@ again:                                                          \
 #define GMP_TAKE1_RET1(name,mp_fun)                             \
 name (W_ ws1, P_ d1)                                            \
 {                                                               \
-  CInt s1;                                                      \
   W_ mp_tmp1;                                                   \
   W_ mp_result1;                                                \
                                                                 \
@@ -476,27 +443,22 @@ again:                                                          \
   STK_CHK_GEN_N (2 * SIZEOF_MP_INT);                            \
   MAYBE_GC(again);                                              \
                                                                 \
-  s1 = W_TO_INT(ws1);                                           \
-                                                                \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
   mp_result1 = Sp - 2 * SIZEOF_MP_INT;                          \
-  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(BYTE_ARR_WDS(d1));   \
-  MP_INT__mp_size(mp_tmp1)      = (s1);                         \
-  MP_INT__mp_d(mp_tmp1)         = BYTE_ARR_CTS(d1);             \
+                                                                \
+  MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                           \
                                                                 \
   ccall __gmpz_init(mp_result1 "ptr");                          \
                                                                 \
   /* Perform the operation */                                   \
   ccall mp_fun(mp_result1 "ptr",mp_tmp1 "ptr");                 \
                                                                 \
-  return(TO_W_(MP_INT__mp_size(mp_result1)),                    \
-         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);        \
+  return(MP_INT_AS_PAIR(mp_result1));                           \
 }
 
 #define GMP_TAKE2_RET2(name,mp_fun)                                     \
 name (W_ ws1, P_ d1, W_ ws2, P_ d2)                                     \
 {                                                                       \
-  CInt s1, s2;                                                          \
   W_ mp_tmp1;                                                           \
   W_ mp_tmp2;                                                           \
   W_ mp_result1;                                                        \
@@ -506,19 +468,13 @@ again:                                                                  \
   STK_CHK_GEN_N (4 * SIZEOF_MP_INT);                                    \
   MAYBE_GC(again);                                                      \
                                                                         \
-  s1 = W_TO_INT(ws1);                                                   \
-  s2 = W_TO_INT(ws2);                                                   \
-                                                                        \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
   mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                  \
   mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                  \
   mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                  \
-  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(BYTE_ARR_WDS(d1));           \
-  MP_INT__mp_size(mp_tmp1)      = (s1);                                 \
-  MP_INT__mp_d(mp_tmp1)         = BYTE_ARR_CTS(d1);                     \
-  MP_INT__mp_alloc(mp_tmp2)     = W_TO_INT(BYTE_ARR_WDS(d2));           \
-  MP_INT__mp_size(mp_tmp2)      = (s2);                                 \
-  MP_INT__mp_d(mp_tmp2)         = BYTE_ARR_CTS(d2);                     \
+                                                                        \
+  MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                                   \
+  MP_INT_SET_FROM_BA(mp_tmp2,ws2,d2);                                   \
                                                                         \
   ccall __gmpz_init(mp_result1 "ptr");                                  \
   ccall __gmpz_init(mp_result2 "ptr");                                  \
@@ -526,10 +482,7 @@ again:                                                                  \
   /* Perform the operation */                                           \
   ccall mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr"); \
                                                                         \
-  return (TO_W_(MP_INT__mp_size(mp_result1)),                           \
-           MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords,               \
-           TO_W_(MP_INT__mp_size(mp_result2)),                          \
-           MP_INT__mp_d(mp_result2) - SIZEOF_StgArrWords);              \
+  return (MP_INT_AS_PAIR(mp_result1),MP_INT_AS_PAIR(mp_result2));       \
 }
 
 GMP_TAKE2_RET1(integer_cmm_plusIntegerzh,           __gmpz_add)
