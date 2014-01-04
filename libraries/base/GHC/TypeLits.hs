@@ -42,7 +42,7 @@ import GHC.Read(Read(..))
 import GHC.Prim(magicDict)
 import Data.Maybe(Maybe(..))
 import Data.Proxy(Proxy(..))
-import Data.Type.Equality(type (==), TestEquality(..), (:~:)(Refl))
+import Data.Type.Equality(type (==), (:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
 -- | (Kind) This is the kind of type-level natural numbers.
@@ -174,6 +174,7 @@ type family (m :: Nat) - (n :: Nat) :: Nat
 
 -- | We either get evidence that this function was instantiated with the
 -- same type-level numbers, or 'Nothing'.
+-- /Since: 4.7.0.0/
 sameNat :: (KnownNat a, KnownNat b) =>
            Proxy a -> Proxy b -> Maybe (a :~: b)
 sameNat x y
@@ -182,6 +183,7 @@ sameNat x y
 
 -- | We either get evidence that this function was instantiated with the
 -- same type-level symbols, or 'Nothing'.
+-- /Since: 4.7.0.0/
 sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
               Proxy a -> Proxy b -> Maybe (a :~: b)
 sameSymbol x y
