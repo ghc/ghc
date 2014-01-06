@@ -195,8 +195,9 @@ test('T5237',
      [stats_num_field('bytes allocated',
                         [(wordsize(32), 78328, 5),
                       # expected value: 78328 (i386/Linux)
-                         (wordsize(64), 110888, 5)]),
+                         (wordsize(64), 104176, 5)]),
                       # expected value: 110888 (amd64/Linux)
+                      # expected value: 104176 (amd64/Linux)
      only_ways(['normal'])
      ],
     compile_and_run,
