@@ -1347,7 +1347,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
                 ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
                   simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
-          | isStrictId bndr ->           -- Includes coercions
+          | isStrictId bndr || isConvId bndr ->  -- Includes coercions
             do  { simplExprF (rhs_se `setFloats` env) rhs
                              (StrictBind bndr bndrs body env cont) }
 

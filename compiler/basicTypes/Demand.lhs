@@ -27,9 +27,9 @@ module Demand (
         peelFV,
 
         DmdResult, CPRResult,
-        isBotRes, isTopRes, resTypeArgDmd,
+        isBotRes, isTopRes, resTypeArgDmd, 
         topRes, convRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
-        appIsBottom, isBottomingSig, isConvSig, pprIfaceStrictSig,
+        appIsBottom, isBottomingSig, isConvSig, pprIfaceStrictSig, 
         trimCPRInfo, returnsCPR, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig, convergeSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,
@@ -812,6 +812,10 @@ isBotRes :: DmdResult -> Bool
 isBotRes Diverges = True
 isBotRes _        = False
 
+isConvRes :: DmdResult -> Bool
+isConvRes (Converges {}) = True
+isConvRes _              = False
+
 trimCPRInfo :: Bool -> Bool -> DmdResult -> DmdResult
 trimCPRInfo trim_all trim_sums res
   = trimR res
@@ -1438,6 +1442,9 @@ isNopSig (StrictSig ty) = isNopDmdType ty
 
 isBottomingSig :: StrictSig -> Bool
 isBottomingSig (StrictSig (DmdType _ _ res)) = isBotRes res
+
+isConvSig :: StrictSig -> Bool
+isConvSig (StrictSig (DmdType _ _ res)) = isConvRes res
 
 nopSig, botSig :: StrictSig
 nopSig = StrictSig nopDmdType

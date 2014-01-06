@@ -47,7 +47,7 @@ module Id (
 
         -- ** Predicates on Ids
         isImplicitId, isDeadBinder, 
-        isStrictId,
+        isStrictId, isConvId,
         isExportedId, isLocalId, isGlobalId,
         isRecordSelector, isNaughtyRecordSelector,
         isClassOpId_maybe, isDFunId,
@@ -494,6 +494,11 @@ isStrictId id
            (isStrictType (idType id)) ||
            -- Take the best of both strictnesses - old and new               
            (isStrictDmd (idDemandInfo id))
+
+isConvId :: Id -> Bool
+isConvId id
+  = ASSERT2( isId id, text "isConvId: not an id: " <+> ppr id )
+           (isConvSig (idStrictness id))
 
         ---------------------------------
         -- UNFOLDING
