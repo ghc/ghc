@@ -105,7 +105,7 @@ endif
 #
 # See #5987
 ifeq "$(TargetOS_CPP)" "mingw32"
-GhcStage2HcOpts += -funfolding-creation-threshold=300
+GhcStage2HcOpts += -funfolding-creation-threshold=100
 endif
 
 # Some platforms don't support shared libraries
