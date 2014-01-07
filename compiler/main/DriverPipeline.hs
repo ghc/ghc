@@ -2086,7 +2086,9 @@ doCpp dflags raw input_fn output_fn = do
 getBackendDefs :: DynFlags -> IO [String]
 getBackendDefs dflags | hscTarget dflags == HscLlvm = do
     llvmVer <- figureLlvmVersion dflags
-    return [ "-D__GLASGOW_HASKELL_LLVM__="++show llvmVer ]
+    return $ case llvmVer of
+               Just n -> [ "-D__GLASGOW_HASKELL_LLVM__="++show n ]
+               _      -> []
 
 getBackendDefs _ =
     return []
