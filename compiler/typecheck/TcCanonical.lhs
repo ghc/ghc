@@ -208,7 +208,7 @@ canTuple ev tys
   = do { traceTcS "can_pred" (text "TuplePred!")
        ; let xcomp = EvTupleMk
              xdecomp x = zipWith (\_ i -> EvTupleSel x i) tys [0..]
-       ; ctevs <- xCtFlavor ev (XEvTerm tys xcomp xdecomp)
+       ; ctevs <- xCtEvidence ev (XEvTerm tys xcomp xdecomp)
        ; canEvVarsCreated ctevs }
 \end{code}
 
@@ -335,7 +335,7 @@ newSCWorkFromFlavored flavor cls xis
              xev = XEvTerm { ev_preds  =  sc_theta
                            , ev_comp   = panic "Can't compose for given!"
                            , ev_decomp = xev_decomp }
-       ; ctevs <- xCtFlavor flavor xev
+       ; ctevs <- xCtEvidence flavor xev
        ; emitWorkNC ctevs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
@@ -875,7 +875,7 @@ can_eq_flat_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
                  xevdecomp x = let xco = evTermCoercion x
                                in [ EvCoercion (mkTcLRCo CLeft xco)
                                   , EvCoercion (mkTcLRCo CRight xco)]
-           ; ctevs <- xCtFlavor ev (XEvTerm [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xevcomp xevdecomp)
+           ; ctevs <- xCtEvidence ev (XEvTerm [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xevcomp xevdecomp)
            ; canEvVarsCreated ctevs }
 
 
@@ -899,7 +899,7 @@ canDecomposableTyConAppOK ev tc1 tys1 tys2
   = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo Nominal tc1 (map evTermCoercion xs))
              xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
              xev = XEvTerm (zipWith mkTcEqPred tys1 tys2) xcomp xdecomp
-       ; ctevs <- xCtFlavor ev xev
+       ; ctevs <- xCtEvidence ev xev
        ; canEvVarsCreated ctevs }
 
 canEqFailure :: CtEvidence -> TcType -> TcType -> TcS StopOrContinue

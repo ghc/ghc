@@ -1041,15 +1041,15 @@ Consequence: classes with functional dependencies don't matter (since there is
 no evidence for a fundep equality), but equality superclasses do matter (since
 they carry evidence).
 
-Note [Canonicalise givens before float decison]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [When does an implication have given equalities?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider an implication
    beta => alpha ~ Int
 where beta is a unification variable that has already been unified
-to () in an outer scope.  Then we can float the (alpah ~ Int) out
+to () in an outer scope.  Then we can float the (alpha ~ Int) out
 just fine. So when deciding whether the givens contain an equality,
 we should canonicalise first, rather than just looking at the original
-givens.
+givens (Trac #8644).
 
 This is the entire reason for the inert_no_eqs field in InertCans.
 We initialise it to False before processing the Givens of an implication;
@@ -1059,9 +1059,33 @@ However, when flattening givens, we generate given equalities like
   <F [a]> : F [a] ~ f,
 with Refl evidence, and we *don't* want those to count as an equality
 in the givens!  After all, the entire flattening business is just an
-internal matter.  So we set the flag to False when adding an equality
-whose evidence has a locally-bound evidence variable; anything with
-constants (axioms, Refl) is fine.  See isLocalGiven in TcSMonad.
+internal matter, and the evidence does not mention any of the 'givens'
+of this implication.
+
+So we set the flag to False when adding an equality
+(TcSMonad.addInertCan) whose evidence whose CtOrigin is
+FlatSkolOrigin; see TcSMonad.isFlatSkolEv.  Note that we may transform
+the original flat-skol equality before adding it to the inerts, so
+it's important that the transformation preserves origin (which
+xCtEvidence and rewriteEvidence both do).  Example
+     instance F [a] = Maybe a
+     implication: C (F [a]) => blah
+  We flatten (C (F [a])) to C fsk, with <F [a]> : F [a] ~ fsk
+  Then we reduce the F [a] LHS, giving
+       g22 = ax7 ; <F [a]>
+       g22 : Maybe a ~ fsk
+  And before adding g22 we'll re-orient it to an ordinary tyvar
+  equality.  None of this should count as "adding a given equality".
+  This really happens (Trac #8651).
+
+An alternative we considered was to
+  * Accumulate the new inert equalities (in TcSMonad.addInertCan)
+  * In solveInteractGiven, check whether the evidence for the new
+    equalities mentions any of the ic_givens of this implication.
+This seems like the Right Thing, but it's more code, and more work
+at runtime, so we are using the FlatSkolOrigin idea intead. It's less
+obvious that it works, but I htink it does, and it's simple and efficient.
+
 
 Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

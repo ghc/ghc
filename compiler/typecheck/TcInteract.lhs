@@ -555,7 +555,7 @@ solveFunEq :: CtEvidence    -- From this  :: F tys ~ xi1
            -> Type
            -> TcS ()
 solveFunEq from_this xi1 solve_this xi2
-  = do { ctevs <- xCtFlavor solve_this xev
+  = do { ctevs <- xCtEvidence solve_this xev
              -- No caching!  See Note [Cache-caused loops]
              -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
@@ -578,7 +578,7 @@ solveFunEq from_this xi1 solve_this xi2
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very dangerous to cache a rewritten wanted family equation as 'solved' in our
-solved cache (which is the default behaviour or xCtFlavor), because the interaction
+solved cache (which is the default behaviour or xCtEvidence), because the interaction
 may not be contributing towards a solution. Here is an example:
 
 Initial inert set:
@@ -1520,7 +1520,7 @@ doTopReactFunEq _ct fl fun_tc args xi
 
     succeed_with :: String -> TcCoercion -> TcType -> TcS TopInteractResult
     succeed_with str co rhs_ty    -- co :: fun_tc args ~ rhs_ty
-      = do { ctevs <- xCtFlavor fl xev
+      = do { ctevs <- xCtEvidence fl xev
            ; traceTcS ("doTopReactFunEq " ++ str) (ppr ctevs)
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $

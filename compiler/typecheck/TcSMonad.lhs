@@ -41,8 +41,8 @@ module TcSMonad (
     XEvTerm(..),
     MaybeNew (..), isFresh, freshGoal, freshGoals, getEvTerm, getEvTerms,
 
-    xCtFlavor,          -- Transform a CtEvidence during a step
-    rewriteEvidence,    -- Specialized version of xCtFlavor for coercions
+    xCtEvidence,        -- Transform a CtEvidence during a step
+    rewriteEvidence,    -- Specialized version of xCtEvidence for coercions
     rewriteEqEvidence,  -- Yet more specialised, for equality coercions
     maybeSym,
 
@@ -120,7 +120,6 @@ import Name
 import RdrName (RdrName, GlobalRdrEnv)
 import RnEnv (addUsedRdrNames)
 import Var
-import VarSet
 import VarEnv
 import Outputable
 import Bag
@@ -144,6 +143,7 @@ import Data.IORef
 import Data.List( partition )
 
 #ifdef DEBUG
+import VarSet
 import Digraph
 #endif
 \end{code}
@@ -424,7 +424,7 @@ data InertCans
               -- Set to False when adding a new equality
               -- (eq/funeq) or potential equality (irred)
               -- whose evidence is not a constant
-              -- See Note [Canonicalise givens before float decison]
+              -- See Note [When does an implication have given equalities?]
               -- in TcSimplify
        }
 
@@ -512,15 +512,15 @@ emptyInert
 ---------------
 addInertCan :: InertCans -> Ct -> InertCans
 -- Precondition: item /is/ canonical
-addInertCan ics item@(CTyEqCan {})
+addInertCan ics item@(CTyEqCan { cc_ev = ev })
   = ics { inert_eqs = extendVarEnv_C (\eqs _ -> item : eqs)
                               (inert_eqs ics)
                               (cc_tyvar item) [item]
-        , inert_no_eqs = False }
+        , inert_no_eqs = isFlatSkolEv ev && inert_no_eqs ics }
 
 addInertCan ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys, cc_ev = ev })
   = ics { inert_funeqs = addFunEq (inert_funeqs ics) tc tys item
-        , inert_no_eqs = not (isLocalGiven ev) && inert_no_eqs ics }
+        , inert_no_eqs = isFlatSkolEv ev && inert_no_eqs ics }
 
 addInertCan ics item@(CIrredEvCan {})
   = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item
@@ -539,12 +539,13 @@ addInertCan _ item
     ppr item   -- Can't be CNonCanonical, CHoleCan,
                -- because they only land in inert_insols
 
-isLocalGiven :: CtEvidence -> Bool
--- True if (a) it's a Given and (b) it mentions a locally-bound evidence variable
--- Thus it is false of flatten-skol equalities, which are Refls
--- See Note Note [Canonicalise givens before float decison]
-isLocalGiven (CtGiven { ctev_evtm = tm }) = not (isEmptyVarSet (evVarsOfTerm tm))
-isLocalGiven _                            = False
+isFlatSkolEv :: CtEvidence -> Bool
+-- True if (a) it's a Given and (b) it is evidence for
+-- (or derived from) a flatten-skolem equality.
+-- See Note [When does an implication have given equalities?] in TcSimplify
+isFlatSkolEv ev = case ctLocOrigin (ctev_loc ev) of
+                    FlatSkolOrigin -> True
+                    _              -> False
 
 --------------
 insertInertItemTcS :: Ct -> TcS ()
@@ -1443,7 +1444,7 @@ newFlattenSkolem ev fam_ty
        ; let rhs_ty = mkTyVarTy tv
              ctev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
                             , ctev_evtm = EvCoercion (mkTcNomReflCo fam_ty)
-                            , ctev_loc =  ctev_loc ev }
+                            , ctev_loc =  (ctev_loc ev) { ctl_origin = FlatSkolOrigin } }
        ; return (ctev, rhs_ty) }
 
   | otherwise  -- Wanted or Derived: make new unification variable
@@ -1618,8 +1619,8 @@ Note: The [CtEvidence] returned is a subset of the subgoal-preds passed in
 
 Example
     ev : Tree a b ~ Tree c d
-    xCtFlavor ev [a~c, b~d] (XEvTerm { ev_comp = \[c1 c2]. <Tree> c1 c2
-                                     , ev_decomp = \c. [nth 1 c, nth 2 c] })
+    xCtEvidence ev [a~c, b~d] (XEvTerm { ev_comp = \[c1 c2]. <Tree> c1 c2
+                                       , ev_decomp = \c. [nth 1 c, nth 2 c] })
               (\fresh-goals.  stuff)
 
 Note [Bind new Givens immediately]
@@ -1664,12 +1665,12 @@ This is bad.  We "fix" this by simply ignoring
 But the Right Thing is to add kind equalities!
 
 \begin{code}
-xCtFlavor :: CtEvidence            -- Original flavor
-          -> XEvTerm               -- Instructions about how to manipulate evidence
-          -> TcS [CtEvidence]
+xCtEvidence :: CtEvidence            -- Original flavor
+            -> XEvTerm               -- Instructions about how to manipulate evidence
+            -> TcS [CtEvidence]
 
-xCtFlavor (CtGiven { ctev_evtm = tm, ctev_loc = loc })
-          (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
+xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
   = ASSERT( equalLength ptys (decomp_fn tm) )
     mapM (newGivenEvVar loc)     -- See Note [Bind new Givens immediately]
          (filterOut bad_given_pred (ptys `zip` decomp_fn tm))
@@ -1681,14 +1682,14 @@ xCtFlavor (CtGiven { ctev_evtm = tm, ctev_loc = loc })
       | otherwise
       = False
 
-xCtFlavor (CtWanted { ctev_evar = evar, ctev_loc = loc })
-          (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
+xCtEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
   = do { new_evars <- mapM (newWantedEvVar loc) ptys
        ; setEvBind evar (comp_fn (getEvTerms new_evars))
        ; return (freshGoals new_evars) }
 
-xCtFlavor (CtDerived { ctev_loc = loc })
-          (XEvTerm { ev_preds = ptys })
+xCtEvidence (CtDerived { ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys })
   = do { ders <- mapM (newDerived loc) ptys
        ; return (catMaybes ders) }
 
