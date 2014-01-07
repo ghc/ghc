@@ -119,14 +119,14 @@ rewriteVmovap = rewriteInstructions vmovap vmovup
     vmovap, vmovup :: B.ByteString
     vmovap = B.pack "vmovap"
     vmovup = B.pack "vmovup"
-#else /* !REWRITE_AVX */
-rewriteAVX :: Section -> Section
-rewriteAVX = id
-#endif /* !REWRITE_SSE */
 
 rewriteInstructions :: B.ByteString -> B.ByteString -> Section -> Section
 rewriteInstructions matchBS replaceBS (hdr, cts) =
     (hdr, replace matchBS replaceBS cts)
+#else /* !REWRITE_AVX */
+rewriteAVX :: Section -> Section
+rewriteAVX = id
+#endif /* !REWRITE_SSE */
 
 replace :: B.ByteString -> B.ByteString -> B.ByteString -> B.ByteString
 replace matchBS replaceBS = loop
