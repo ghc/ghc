@@ -55,7 +55,7 @@ llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     mapM_ (writeSection w) fixed
     hClose w
     return ()
-    
+
 rewriteSymType :: B.ByteString -> B.ByteString
 rewriteSymType s =
     foldl (\s' (typeFunc,typeObj)->replace typeFunc typeObj s') s types
@@ -86,7 +86,7 @@ readSections r w = go B.empty [] []
                 writeSection w (hdr, cts) >> return ss
 
       case e_l of
-        Right l | l == syntaxUnified 
+        Right l | l == syntaxUnified
                   -> finishSection >>= \ss' -> writeSection w (l, B.empty)
                                    >> go B.empty ss' tys
                 | any (`B.isPrefixOf` l) [secStmt, textStmt, dataStmt]
@@ -167,4 +167,3 @@ readInt :: B.ByteString -> Int
 readInt str | B.all isDigit str = (read . B.unpack) str
             | otherwise = error $ "LLvmMangler Cannot read " ++ show str
                                 ++ " as it's not an Int"
-
