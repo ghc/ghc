@@ -502,7 +502,7 @@ pprModulePrefix sty mod name = sdocWithDynFlags $ \dflags ->
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
       NameNotInScope2  -> ppr (modulePackageId mod) <> colon     -- Module not in
-                          <> ppr (moduleName mod) <> dot         -- scope eithber
+                          <> ppr (moduleName mod) <> dot         -- scope either
       _otherwise       -> empty
 
 ppr_underscore_unique :: Unique -> SDoc
