@@ -118,7 +118,7 @@ rewriteInstructions matchBS replaceBS (hdr, cts) =
   where
     loop :: B.ByteString -> B.ByteString
     loop cts =
-        case B.breakSubstring cts matchBS of
+        case B.breakSubstring matchBS cts of
           (hd,tl) | B.null tl -> hd
                   | otherwise -> hd `B.append` replaceBS `B.append`
                                  loop (B.drop (B.length matchBS) tl)
