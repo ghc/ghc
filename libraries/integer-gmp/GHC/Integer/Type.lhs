@@ -147,6 +147,10 @@ integerToInt :: Integer -> Int#
 integerToInt (S# i)   = i
 integerToInt (J# s d) = integer2Int# s d
 
+-- This manually floated out constant is needed as GHC doesn't do it on its own
+minIntAsBig :: Integer
+minIntAsBig = case int2Integer# INT_MINBOUND of { (# s, d #) -> J# s d }
+
 -- | Promote 'S#' to 'J#'
 toBig :: Integer -> Integer
 toBig (S# i)     = case int2Integer# i of { (# s, d #) -> J# s d }
@@ -217,7 +221,7 @@ Just using smartJ# in this way has good results:
 
 {-# NOINLINE quotRemInteger #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
-quotRemInteger a@(S# INT_MINBOUND) b = quotRemInteger (toBig a) b
+quotRemInteger (S# INT_MINBOUND) b = quotRemInteger minIntAsBig b
 quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
                                    (# q, r #) -> (# S# q, S# r #)
 quotRemInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
@@ -240,7 +244,7 @@ quotRemInteger (J# s1 d1) (J# s2 d2)
 
 {-# NOINLINE divModInteger #-}
 divModInteger :: Integer -> Integer -> (# Integer, Integer #)
-divModInteger a@(S# INT_MINBOUND) b = divModInteger (toBig a) b
+divModInteger (S# INT_MINBOUND) b = divModInteger minIntAsBig b
 divModInteger (S# i) (S# j) = (# S# d, S# m #)
     where
       -- NB. don't inline these.  (# S# (i `quotInt#` j), ... #) means
@@ -260,7 +264,7 @@ divModInteger (J# s1 d1) (J# s2 d2)
 
 {-# NOINLINE remInteger #-}
 remInteger :: Integer -> Integer -> Integer
-remInteger a@(S# INT_MINBOUND) b = remInteger (toBig a) b
+remInteger (S# INT_MINBOUND) b = remInteger minIntAsBig b
 remInteger (S# a) (S# b) = S# (remInt# a b)
 {- Special case doesn't work, because a 1-element J# has the range
    -(2^32-1) -- 2^32-1, whereas S# has the range -2^31 -- (2^31-1)
@@ -281,7 +285,7 @@ remInteger (J# sa a) (J# sb b)
 
 {-# NOINLINE quotInteger #-}
 quotInteger :: Integer -> Integer -> Integer
-quotInteger a@(S# INT_MINBOUND) b = quotInteger (toBig a) b
+quotInteger (S# INT_MINBOUND) b = quotInteger minIntAsBig b
 quotInteger (S# a) (S# b) = S# (quotInt# a b)
 {- Special case disabled, see remInteger above
 quotInteger (S# a) (J# sb b)
@@ -301,7 +305,7 @@ quotInteger (J# sa a) (J# sb b)
 
 {-# NOINLINE modInteger #-}
 modInteger :: Integer -> Integer -> Integer
-modInteger a@(S# INT_MINBOUND) b = modInteger (toBig a) b
+modInteger (S# INT_MINBOUND) b = modInteger minIntAsBig b
 modInteger (S# a) (S# b) = S# (modInt# a b)
 modInteger ia@(S# _) ib@(J# _ _) = modInteger (toBig ia) ib
 modInteger (J# sa a) (S# b)
@@ -313,7 +317,7 @@ modInteger (J# sa a) (J# sb b)
 
 {-# NOINLINE divInteger #-}
 divInteger :: Integer -> Integer -> Integer
-divInteger a@(S# INT_MINBOUND) b = divInteger (toBig a) b
+divInteger (S# INT_MINBOUND) b = divInteger minIntAsBig b
 divInteger (S# a) (S# b) = S# (divInt# a b)
 divInteger ia@(S# _) ib@(J# _ _) = divInteger (toBig ia) ib
 divInteger (J# sa a) (S# b)
@@ -330,8 +334,8 @@ divInteger (J# sa a) (J# sb b)
 {-# NOINLINE gcdInteger #-}
 gcdInteger :: Integer -> Integer -> Integer
 -- SUP: Do we really need the first two cases?
-gcdInteger a@(S# INT_MINBOUND) b = gcdInteger (toBig a) b
-gcdInteger a b@(S# INT_MINBOUND) = gcdInteger a (toBig b)
+gcdInteger (S# INT_MINBOUND) b = gcdInteger minIntAsBig b
+gcdInteger a (S# INT_MINBOUND) = gcdInteger a minIntAsBig
 gcdInteger (S# a) (S# b) = S# (gcdInt a b)
 gcdInteger ia@(S# a)  ib@(J# sb b)
  =      if isTrue# (a  ==# 0#) then absInteger ib
@@ -377,7 +381,7 @@ absInt :: Int# -> Int#
 absInt x = if isTrue# (x <# 0#) then negateInt# x else x
 
 divExact :: Integer -> Integer -> Integer
-divExact a@(S# INT_MINBOUND) b = divExact (toBig a) b
+divExact (S# INT_MINBOUND) b = divExact minIntAsBig b
 divExact (S# a) (S# b) = S# (quotInt# a b)
 divExact (S# a) (J# sb b)
   = S# (quotInt# a (integer2Int# sb b))
