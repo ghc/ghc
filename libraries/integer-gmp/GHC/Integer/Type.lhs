@@ -40,7 +40,8 @@ import GHC.Integer.GMP.Prim (
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, plusIntegerInt#, minusInteger#, minusIntegerInt#,
     timesInteger#, timesIntegerInt#,
-    quotRemInteger#, quotInteger#, remInteger#,
+    quotRemInteger#, quotRemIntegerWord#,
+    quotInteger#, quotIntegerWord#, remInteger#, remIntegerWord#,
     divModInteger#, divInteger#, modInteger#,
     gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
     decodeDouble#,
@@ -219,7 +220,16 @@ quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 quotRemInteger a@(S# INT_MINBOUND) b = quotRemInteger (toBig a) b
 quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
                                    (# q, r #) -> (# S# q, S# r #)
-quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
+quotRemInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
+  = case quotRemIntegerWord# s1 d1 (int2Word# (negateInt# b)) of
+          (# s3, d3, s4, d4 #) -> let !q = smartJ# (negateInt# s3) d3
+                                      !r = smartJ# s4 d4
+                                  in (# q, r #)
+quotRemInteger (J# s1 d1) (S# b)
+  = case quotRemIntegerWord# s1 d1 (int2Word# b) of
+          (# s3, d3, s4, d4 #) -> let !q = smartJ# s3 d3
+                                      !r = smartJ# s4 d4
+                                  in (# q, r #)
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
   = case (quotRemInteger# s1 d1 s2 d2) of
@@ -262,9 +272,10 @@ remInteger ia@(S# a) (J# sb b)
 -}
 remInteger ia@(S# _) ib@(J# _ _) = remInteger (toBig ia) ib
 remInteger (J# sa a) (S# b)
-  = case int2Integer# b of { (# sb, b' #) ->
-    case remInteger# sa a sb b' of { (# sr, r #) ->
-    S# (integer2Int# sr r) }}
+  = case remIntegerWord# sa a w of
+          (# sr, r #) -> smartJ# sr r
+  where
+    w = int2Word# (if isTrue# (b <# 0#) then negateInt# b else b)
 remInteger (J# sa a) (J# sb b)
   = case remInteger# sa a sb b of (# sr, r #) -> smartJ# sr r
 
@@ -279,9 +290,12 @@ quotInteger (S# a) (J# sb b)
   | otherwise  = S# 0
 -}
 quotInteger ia@(S# _) ib@(J# _ _) = quotInteger (toBig ia) ib
+quotInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
+  = case quotIntegerWord# sa a (int2Word# (negateInt# b)) of
+          (# sq, q #) -> smartJ# (negateInt# sq) q
 quotInteger (J# sa a) (S# b)
-  = case int2Integer# b of { (# sb, b' #) ->
-    case quotInteger# sa a sb b' of (# sq, q #) -> smartJ# sq q }
+  = case quotIntegerWord# sa a (int2Word# b) of
+          (# sq, q #) -> smartJ# sq q
 quotInteger (J# sa a) (J# sb b)
   = case quotInteger# sa a sb b of (# sg, g #) -> smartJ# sg g
 

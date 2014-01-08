@@ -15,8 +15,12 @@ module GHC.Integer.GMP.Prim (
     timesIntegerInt#,
 
     quotRemInteger#,
+    quotRemIntegerWord#,
     quotInteger#,
+    quotIntegerWord#,
     remInteger#,
+    remIntegerWord#,
+
     divModInteger#,
     divInteger#,
     modInteger#,
@@ -122,15 +126,28 @@ foreign import prim "integer_cmm_timesIntegerIntzh" timesIntegerInt#
 foreign import prim "integer_cmm_quotRemIntegerzh" quotRemInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
 
+-- | Variant of 'quotRemInteger#'
+--
+foreign import prim "integer_cmm_quotRemIntegerWordzh" quotRemIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> (# Int#, ByteArray#, Int#, ByteArray# #)
+
 -- | Rounds towards zero.
 --
 foreign import prim "integer_cmm_quotIntegerzh" quotInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
 
+-- | Rounds towards zero.
+foreign import prim "integer_cmm_quotIntegerWordzh" quotIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> (# Int#, ByteArray# #)
+
 -- | Satisfies \texttt{plusInteger\# (timesInteger\# (quotInteger\# x y) y) (remInteger\# x y) == x}.
 --
 foreign import prim "integer_cmm_remIntegerzh" remInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- | Variant of 'remInteger#'
+foreign import prim "integer_cmm_remIntegerWordzh" remIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> (# Int#, ByteArray# #)
 
 -- | Compute div and mod simultaneously, where div rounds towards negative infinity
 -- and\texttt{(q,r) = divModInteger\#(x,y)} implies \texttt{plusInteger\# (timesInteger\# q y) r = x}.

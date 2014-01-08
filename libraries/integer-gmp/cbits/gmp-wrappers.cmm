@@ -43,10 +43,13 @@ import "integer-gmp" __gmpz_gcdext;
 import "integer-gmp" __gmpn_gcd_1;
 import "integer-gmp" __gmpn_cmp;
 import "integer-gmp" __gmpz_tdiv_q;
+import "integer-gmp" __gmpz_tdiv_q_ui;
 import "integer-gmp" __gmpz_tdiv_r;
+import "integer-gmp" __gmpz_tdiv_r_ui;
 import "integer-gmp" __gmpz_fdiv_q;
 import "integer-gmp" __gmpz_fdiv_r;
 import "integer-gmp" __gmpz_tdiv_qr;
+import "integer-gmp" __gmpz_tdiv_qr_ui;
 import "integer-gmp" __gmpz_fdiv_qr;
 import "integer-gmp" __gmpz_divexact;
 import "integer-gmp" __gmpz_and;
@@ -488,6 +491,33 @@ again:                                                                  \
   return (MP_INT_AS_PAIR(mp_result1),MP_INT_AS_PAIR(mp_result2));       \
 }
 
+#define GMP_TAKE1_UL1_RET2(name,mp_fun)                                 \
+name (W_ ws1, P_ d1, W_ wul2, P_ d2)                                    \
+{                                                                       \
+  W_ mp_tmp1;                                                           \
+  W_ mp_result1;                                                        \
+  W_ mp_result2;                                                        \
+                                                                        \
+again:                                                                  \
+  STK_CHK_GEN_N (3 * SIZEOF_MP_INT);                                    \
+  MAYBE_GC(again);                                                      \
+                                                                        \
+  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
+  mp_result1 = Sp - 2 * SIZEOF_MP_INT;                                  \
+  mp_result2 = Sp - 3 * SIZEOF_MP_INT;                                  \
+                                                                        \
+  MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                                   \
+                                                                        \
+  ccall __gmpz_init(mp_result1 "ptr");                                  \
+  ccall __gmpz_init(mp_result2 "ptr");                                  \
+                                                                        \
+  /* Perform the operation */                                           \
+  ccall mp_fun(mp_result1 "ptr", mp_result2 "ptr",                      \
+               mp_tmp1 "ptr", W_TO_LONG(wul2));                         \
+                                                                        \
+  return (MP_INT_AS_PAIR(mp_result1),MP_INT_AS_PAIR(mp_result2));       \
+}
+
 GMP_TAKE2_RET1(integer_cmm_plusIntegerzh,           __gmpz_add)
 GMP_TAKE2_RET1(integer_cmm_minusIntegerzh,          __gmpz_sub)
 GMP_TAKE2_RET1(integer_cmm_timesIntegerzh,          __gmpz_mul)
@@ -496,7 +526,9 @@ GMP_TAKE2_RET1(integer_cmm_gcdIntegerzh,            __gmpz_gcd)
 #define CMM_GMPZ_GCDEXT(g,s,a,b) __gmpz_gcdext(g,s,NULL,a,b)
 GMP_TAKE2_RET2(integer_cmm_gcdExtIntegerzh,         CMM_GMPZ_GCDEXT)
 GMP_TAKE2_RET1(integer_cmm_quotIntegerzh,           __gmpz_tdiv_q)
+GMP_TAKE1_UL1_RET1(integer_cmm_quotIntegerWordzh,   __gmpz_tdiv_q_ui)
 GMP_TAKE2_RET1(integer_cmm_remIntegerzh,            __gmpz_tdiv_r)
+GMP_TAKE1_UL1_RET1(integer_cmm_remIntegerWordzh,    __gmpz_tdiv_r_ui)
 GMP_TAKE2_RET1(integer_cmm_divIntegerzh,            __gmpz_fdiv_q)
 GMP_TAKE2_RET1(integer_cmm_modIntegerzh,            __gmpz_fdiv_r)
 GMP_TAKE2_RET1(integer_cmm_divExactIntegerzh,       __gmpz_divexact)
@@ -509,6 +541,7 @@ GMP_TAKE1_UL1_RET1(integer_cmm_fdivQ2ExpIntegerzh,  __gmpz_fdiv_q_2exp)
 GMP_TAKE1_RET1(integer_cmm_complementIntegerzh,     __gmpz_com)
 
 GMP_TAKE2_RET2(integer_cmm_quotRemIntegerzh,        __gmpz_tdiv_qr)
+GMP_TAKE1_UL1_RET2(integer_cmm_quotRemIntegerWordzh,__gmpz_tdiv_qr_ui)
 GMP_TAKE2_RET2(integer_cmm_divModIntegerzh,         __gmpz_fdiv_qr)
 
 GMP_TAKE3_RET1(integer_cmm_powModIntegerzh,         __gmpz_powm)
