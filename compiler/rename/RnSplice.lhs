@@ -137,7 +137,7 @@ rnSpliceExpr is_typed splice
         = (PendingRnExpSplice rn_splice, HsSpliceE is_typed rn_splice)
 
     run_expr_splice :: HsSplice Name -> RnM (HsExpr Name, FreeVars)
-    run_expr_splice rn_splice
+    run_expr_splice rn_splice@(HsSplice _ expr')
       | is_typed   -- Run it later, in the type checker
       = do {  -- Ugh!  See Note [Splices] above
               lcl_rdr <- getLocalRdrEnv
@@ -149,7 +149,7 @@ rnSpliceExpr is_typed splice
            ; return (HsSpliceE is_typed rn_splice, lcl_names `plusFV` gbl_names) }
 
       | otherwise  -- Run it here
-      = do { HsSplice _ expr <- getHooked runRnSpliceHook return >>= ($ rn_splice)
+      = do { expr <- getHooked runRnSpliceHook return >>= ($ expr')
       
              -- The splice must have type ExpQ
            ; meta_exp_ty <- tcMetaTy expQTyConName
@@ -174,8 +174,8 @@ rnSpliceType splice k
     pend_type_splice rn_splice
        = (PendingRnTypeSplice rn_splice, HsSpliceTy rn_splice k)
 
-    run_type_splice rn_splice 
-       = do { HsSplice _ expr <- getHooked runRnSpliceHook return >>= ($ rn_splice)
+    run_type_splice (HsSplice _ expr') 
+       = do { expr <- getHooked runRnSpliceHook return >>= ($ expr')
               
             ; meta_exp_ty <- tcMetaTy typeQTyConName
 
@@ -195,15 +195,16 @@ rnSpliceType splice k
 
 ----------------------
 rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
--- TODO: Run runHsSpliceHook (see runSpliceExpr)
 rnSplicePat splice
   = rnSpliceGen False run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice rn_splice
       = (PendingRnPatSplice rn_splice, SplicePat rn_splice)
 
-    run_pat_splice (HsSplice _ expr)
-      = do { meta_exp_ty <- tcMetaTy patQTyConName
+    run_pat_splice (HsSplice _ expr')
+      = do { expr <- getHooked runRnSpliceHook return >>= ($ expr')
+      
+           ; meta_exp_ty <- tcMetaTy patQTyConName
 
              -- Typecheck the expression
            ; zonked_q_expr <- tcTopSpliceExpr False $
@@ -232,10 +233,11 @@ rnSpliceDecl (SpliceDecl (L loc splice) flg)
 \begin{code}
 rnTopSpliceDecls :: HsSplice RdrName -> RnM ([LHsDecl RdrName], FreeVars)
 -- Declaration splice at the very top level of the module
--- TODO: Run runHsSpliceHook (see runSpliceExpr)
-rnTopSpliceDecls (HsSplice _ expr)
-   = do  { (expr', fvs) <- setStage (Splice False) $
-                           rnLExpr expr
+rnTopSpliceDecls (HsSplice _ expr'')
+   = do  { (expr, fvs) <- setStage (Splice False) $
+                           rnLExpr expr''
+
+         ; expr' <- getHooked runRnSpliceHook return >>= ($ expr)
 
          ; list_q <- tcMetaTy decsQTyConName     -- Q [Dec]
          ; zonked_q_expr <- tcTopSpliceExpr False (tcMonoExpr expr' list_q)
