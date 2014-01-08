@@ -37,6 +37,7 @@ import GHC.Prim (
 
 import GHC.Integer.GMP.Prim (
     -- GMP-related primitives
+    MPZ#,
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, plusIntegerInt#, minusInteger#, minusIntegerInt#,
     timesInteger#, timesIntegerInt#,
@@ -172,6 +173,37 @@ smartJ# (-1#) mb# | isTrue# (v <# 0#) = S# v
     where
       v = negateInt# (indexIntArray# mb# 0#)
 smartJ# s# mb# = J# s# mb#
+
+-- |Construct 'Integer' out of a 'MPZ#' as returned by GMP wrapper primops
+--
+-- IMPORTANT: The 'ByteArray#' element MUST NOT be accessed unless the
+-- size-element indicates more than one limb!
+--
+-- See notes at definition site of 'MPZ#' in "GHC.Integer.GMP.Prim"
+-- for more details.
+mpzToInteger :: MPZ# -> Integer
+mpzToInteger (# 0#, _, _ #) = S# 0#
+mpzToInteger (# 1#, _, w# #) | isTrue# (v# >=# 0#) = S# v#
+                             | True = case word2Integer# w# of (# _, d #) -> J# 1# d
+    where
+      v# = word2Int# w#
+mpzToInteger (# -1#, _, w# #) | isTrue# (v# <=# 0#) = S# v#
+                              | True = case word2Integer# w# of (# _, d #) -> J# -1# d
+    where
+      v# = negateInt# (word2Int# w#)
+mpzToInteger (# s#, mb#, _ #) = J# s# mb#
+
+-- | Variant of 'mpzToInteger' for pairs of 'Integer's
+mpzToInteger2 :: (# MPZ#, MPZ# #) -> (# Integer, Integer #)
+mpzToInteger2 (# mpz1, mpz2 #) = (# i1, i2 #)
+    where
+      !i1 = mpzToInteger mpz1 -- This use of `!` avoids creating thunks,
+      !i2 = mpzToInteger mpz2 -- see also Note [Use S# if possible].
+
+-- |Negate MPZ#
+mpzNeg :: MPZ# -> MPZ#
+mpzNeg (# s#, mb#, w# #) = (# negateInt# s#, mb#, w# #)
+
 \end{code}
 
 Note [Use S# if possible]
@@ -221,26 +253,19 @@ Just using smartJ# in this way has good results:
 
 {-# NOINLINE quotRemInteger #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
-quotRemInteger a@(S# INT_MINBOUND) b = quotRemInteger (toBig a) b
+quotRemInteger (S# INT_MINBOUND) b = quotRemInteger minIntAsBig b
 quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
                                    (# q, r #) -> (# S# q, S# r #)
 quotRemInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
   = case quotRemIntegerWord# s1 d1 (int2Word# (negateInt# b)) of
-          (# s3, d3, s4, d4 #) -> let !q = smartJ# (negateInt# s3) d3
-                                      !r = smartJ# s4 d4
-                                  in (# q, r #)
+          (# q, r #) -> let !q' = mpzToInteger(mpzNeg q)
+                            !r' = mpzToInteger(mpzNeg r)
+                        in (# q', r' #)
 quotRemInteger (J# s1 d1) (S# b)
-  = case quotRemIntegerWord# s1 d1 (int2Word# b) of
-          (# s3, d3, s4, d4 #) -> let !q = smartJ# s3 d3
-                                      !r = smartJ# s4 d4
-                                  in (# q, r #)
+  = mpzToInteger2(quotRemIntegerWord# s1 d1 (int2Word# b))
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
-  = case (quotRemInteger# s1 d1 s2 d2) of
-          (# s3, d3, s4, d4 #) -> let !q = smartJ# s3 d3
-                                      !r = smartJ# s4 d4
-                                  in (# q, r #)
-                           -- See Note [Use S# if possible]
+  = mpzToInteger2(quotRemInteger# s1 d1 s2 d2) -- See Note [Use S# if possible]
 
 {-# NOINLINE divModInteger #-}
 divModInteger :: Integer -> Integer -> (# Integer, Integer #)
@@ -256,11 +281,7 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
 
 divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
-divModInteger (J# s1 d1) (J# s2 d2)
-  = case (divModInteger# s1 d1 s2 d2) of
-          (# s3, d3, s4, d4 #) -> let !q = smartJ# s3 d3
-                                      !r = smartJ# s4 d4
-                                  in (# q, r #)
+divModInteger (J# s1 d1) (J# s2 d2) = mpzToInteger2 (divModInteger# s1 d1 s2 d2)
 
 {-# NOINLINE remInteger #-}
 remInteger :: Integer -> Integer -> Integer
@@ -276,12 +297,11 @@ remInteger ia@(S# a) (J# sb b)
 -}
 remInteger ia@(S# _) ib@(J# _ _) = remInteger (toBig ia) ib
 remInteger (J# sa a) (S# b)
-  = case remIntegerWord# sa a w of
-          (# sr, r #) -> smartJ# sr r
+  = mpzToInteger (remIntegerWord# sa a w)
   where
     w = int2Word# (if isTrue# (b <# 0#) then negateInt# b else b)
 remInteger (J# sa a) (J# sb b)
-  = case remInteger# sa a sb b of (# sr, r #) -> smartJ# sr r
+  = mpzToInteger (remInteger# sa a sb b)
 
 {-# NOINLINE quotInteger #-}
 quotInteger :: Integer -> Integer -> Integer
@@ -295,13 +315,11 @@ quotInteger (S# a) (J# sb b)
 -}
 quotInteger ia@(S# _) ib@(J# _ _) = quotInteger (toBig ia) ib
 quotInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
-  = case quotIntegerWord# sa a (int2Word# (negateInt# b)) of
-          (# sq, q #) -> smartJ# (negateInt# sq) q
+  = mpzToInteger (mpzNeg (quotIntegerWord# sa a (int2Word# (negateInt# b))))
 quotInteger (J# sa a) (S# b)
-  = case quotIntegerWord# sa a (int2Word# b) of
-          (# sq, q #) -> smartJ# sq q
+  = mpzToInteger (quotIntegerWord# sa a (int2Word# b))
 quotInteger (J# sa a) (J# sb b)
-  = case quotInteger# sa a sb b of (# sg, g #) -> smartJ# sg g
+  = mpzToInteger (quotInteger# sa a sb b)
 
 {-# NOINLINE modInteger #-}
 modInteger :: Integer -> Integer -> Integer
@@ -310,10 +328,9 @@ modInteger (S# a) (S# b) = S# (modInt# a b)
 modInteger ia@(S# _) ib@(J# _ _) = modInteger (toBig ia) ib
 modInteger (J# sa a) (S# b)
   = case int2Integer# b of { (# sb, b' #) ->
-    case modInteger# sa a sb b' of { (# sr, r #) ->
-    S# (integer2Int# sr r) }}
+    mpzToInteger (modInteger# sa a sb b') }
 modInteger (J# sa a) (J# sb b)
-  = case modInteger# sa a sb b of (# sr, r #) -> smartJ# sr r
+  = mpzToInteger (modInteger# sa a sb b)
 
 {-# NOINLINE divInteger #-}
 divInteger :: Integer -> Integer -> Integer
@@ -321,10 +338,9 @@ divInteger (S# INT_MINBOUND) b = divInteger minIntAsBig b
 divInteger (S# a) (S# b) = S# (divInt# a b)
 divInteger ia@(S# _) ib@(J# _ _) = divInteger (toBig ia) ib
 divInteger (J# sa a) (S# b)
-  = case int2Integer# b of { (# sb, b' #) ->
-    case divInteger# sa a sb b' of (# sq, q #) -> smartJ# sq q }
+  = case int2Integer# b of { (# sb, b' #) -> mpzToInteger (divInteger# sa a sb b') }
 divInteger (J# sa a) (J# sb b)
-  = case divInteger# sa a sb b of (# sg, g #) -> smartJ# sg g
+  = mpzToInteger (divInteger# sa a sb b)
 \end{code}
 
 
@@ -344,8 +360,7 @@ gcdInteger ia@(S# a)  ib@(J# sb b)
        where !absA  = if isTrue# (a  <# 0#) then negateInt# a  else a
              !absSb = if isTrue# (sb <# 0#) then negateInt# sb else sb
 gcdInteger ia@(J# _ _) ib@(S# _) = gcdInteger ib ia
-gcdInteger (J# sa a) (J# sb b)
-  = case gcdInteger# sa a sb b of (# sg, g #) -> smartJ# sg g
+gcdInteger (J# sa a) (J# sb b)   = mpzToInteger (gcdInteger# sa a sb b)
 
 -- | Extended euclidean algorithm.
 --
@@ -356,11 +371,7 @@ gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
 gcdExtInteger a@(S# _)   b@(S# _) = gcdExtInteger (toBig a) (toBig b)
 gcdExtInteger a@(S# _) b@(J# _ _) = gcdExtInteger (toBig a) b
 gcdExtInteger a@(J# _ _) b@(S# _) = gcdExtInteger a (toBig b)
-gcdExtInteger (J# sa a) (J# sb b)
-  = case gcdExtInteger# sa a sb b of
-      (# sg, g, ss, s #) -> let !g' = smartJ# sg g
-                                !s' = smartJ# ss s
-                            in (# g', s' #)
+gcdExtInteger (J# sa a) (J# sb b) = mpzToInteger2 (gcdExtInteger# sa a sb b)
 
 -- | Compute least common multiple.
 {-# NOINLINE lcmInteger #-}
@@ -387,10 +398,8 @@ divExact (S# a) (J# sb b)
   = S# (quotInt# a (integer2Int# sb b))
 divExact (J# sa a) (S# b)
   = case int2Integer# b of
-    (# sb, b' #) -> case divExactInteger# sa a sb b' of
-                    (# sd, d #) -> smartJ# sd d
-divExact (J# sa a) (J# sb b)
-  = case divExactInteger# sa a sb b of (# sd, d #) -> smartJ# sd d
+    (# sb, b' #) -> mpzToInteger (divExactInteger# sa a sb b')
+divExact (J# sa a) (J# sb b) = mpzToInteger (divExactInteger# sa a sb b)
 \end{code}
 
 
@@ -529,14 +538,11 @@ plusInteger (S# i)      (S# j)   = case addIntC# i j of
                                        if isTrue# (c ==# 0#)
                                        then S# r
                                        else case int2Integer# i of
-                                            (# s, d #) -> case plusIntegerInt# s d j of
-                                                          (# s', d' #) -> J# s' d'
+                                            (# s, d #) -> mpzToInteger (plusIntegerInt# s d j)
 plusInteger i1@(J# _ _) (S# 0#)   = i1
-plusInteger (J# s1 d1)  (S# j)    = case plusIntegerInt# s1 d1 j of
-                                    (# s, d #) -> smartJ# s d
+plusInteger (J# s1 d1)  (S# j)    = mpzToInteger (plusIntegerInt# s1 d1 j)
 plusInteger i1@(S# _) i2@(J# _ _) = plusInteger i2 i1
-plusInteger (J# s1 d1) (J# s2 d2) = case plusInteger# s1 d1 s2 d2 of
-                                    (# s, d #) -> smartJ# s d
+plusInteger (J# s1 d1) (J# s2 d2) = mpzToInteger (plusInteger# s1 d1 s2 d2)
 
 {-# NOINLINE minusInteger #-}
 minusInteger :: Integer -> Integer -> Integer
@@ -544,32 +550,25 @@ minusInteger (S# i)      (S# j)    = case subIntC# i j of
                                      (# r, c #) ->
                                          if isTrue# (c ==# 0#) then S# r
                                          else case int2Integer# i of
-                                              (# s, d #) -> case minusIntegerInt# s d j of
-                                                            (# s', d' #) -> J# s' d'
+                                              (# s, d #) -> mpzToInteger (minusIntegerInt# s d j)
 minusInteger i1@(J# _ _) (S# 0#)   = i1
-minusInteger (J# s1 d1)  (S# j)    = case minusIntegerInt# s1 d1 j of
-                                     (# s, d #) -> smartJ# s d
+minusInteger (J# s1 d1)  (S# j)    = mpzToInteger (minusIntegerInt# s1 d1 j)
 minusInteger (S# 0#)    (J# s2 d2) = J# (negateInt# s2) d2
-minusInteger (S# i)     (J# s2 d2) = case plusIntegerInt# (negateInt# s2) d2 i of
-                                     (# s, d #) -> smartJ# s d
-minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of
-                                     (# s, d #) -> smartJ# s d
+minusInteger (S# i)     (J# s2 d2) = mpzToInteger (plusIntegerInt# (negateInt# s2) d2 i)
+minusInteger (J# s1 d1) (J# s2 d2) = mpzToInteger (minusInteger# s1 d1 s2 d2)
 
 {-# NOINLINE timesInteger #-}
 timesInteger :: Integer -> Integer -> Integer
 timesInteger (S# i) (S# j)         = if isTrue# (mulIntMayOflo# i j ==# 0#)
                                      then S# (i *# j)
                                      else case int2Integer# i of
-                                          (# s, d #) -> case timesIntegerInt# s d j of
-                                                        (# s', d' #) -> smartJ# s' d'
+                                          (# s, d #) -> mpzToInteger (timesIntegerInt# s d j)
 timesInteger (S# 0#)     _         = S# 0#
 timesInteger (S# -1#)    i2        = negateInteger i2
 timesInteger (S# 1#)     i2        = i2
-timesInteger (S# i1)    (J# s2 d2) = case timesIntegerInt# s2 d2 i1 of
-                                     (# s, d #) -> J# s d
+timesInteger (S# i1)    (J# s2 d2) = mpzToInteger (timesIntegerInt# s2 d2 i1)
 timesInteger i1@(J# _ _) i2@(S# _) = timesInteger i2 i1 -- swap args & retry
-timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of
-                                     (# s, d #) -> J# s d
+timesInteger (J# s1 d1) (J# s2 d2) = mpzToInteger (timesInteger# s1 d1 s2 d2)
 
 {-# NOINLINE negateInteger #-}
 negateInteger :: Integer -> Integer
@@ -599,8 +598,8 @@ encodeDoubleInteger (J# s# d#) e = encodeDouble# s# d# e
 {-# NOINLINE decodeDoubleInteger #-}
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 decodeDoubleInteger d = case decodeDouble# d of
-                        (# exp#, s#, d# #) -> let !s = smartJ# s# d#
-                                              in (# s, exp# #)
+                        (# exp#, man# #) -> let !man = mpzToInteger man#
+                                            in (# man, exp# #)
 
 -- previous code: doubleFromInteger n = fromInteger n = encodeFloat n 0
 -- doesn't work too well, because encodeFloat is defined in
@@ -646,8 +645,7 @@ andInteger :: Integer -> Integer -> Integer
 x@(S# _)   `andInteger` y@(J# _ _)   = toBig x `andInteger` y
 x@(J# _ _) `andInteger` y@(S# _)     = x `andInteger` toBig y
 (J# s1 d1) `andInteger`   (J# s2 d2) =
-     case andInteger# s1 d1 s2 d2 of
-       (# s, d #) -> smartJ# s d
+     mpzToInteger (andInteger# s1 d1 s2 d2)
 
 {-# NOINLINE orInteger #-}
 orInteger :: Integer -> Integer -> Integer
@@ -655,8 +653,7 @@ orInteger :: Integer -> Integer -> Integer
 x@(S# _)   `orInteger` y@(J# _ _)   = toBig x `orInteger` y
 x@(J# _ _) `orInteger` y@(S# _)     = x `orInteger` toBig y
 (J# s1 d1) `orInteger`   (J# s2 d2) =
-     case orInteger# s1 d1 s2 d2 of
-       (# s, d #) -> J# s d
+     mpzToInteger (orInteger# s1 d1 s2 d2)
 
 {-# NOINLINE xorInteger #-}
 xorInteger :: Integer -> Integer -> Integer
@@ -664,27 +661,24 @@ xorInteger :: Integer -> Integer -> Integer
 x@(S# _)   `xorInteger` y@(J# _ _)   = toBig x `xorInteger` y
 x@(J# _ _) `xorInteger` y@(S# _)     = x `xorInteger` toBig y
 (J# s1 d1) `xorInteger`   (J# s2 d2) =
-     case xorInteger# s1 d1 s2 d2 of
-       (# s, d #) -> smartJ# s d
+     mpzToInteger (xorInteger# s1 d1 s2 d2)
 
 {-# NOINLINE complementInteger #-}
 complementInteger :: Integer -> Integer
 complementInteger (S# x)
     = S# (word2Int# (int2Word# x `xor#` int2Word# (0# -# 1#)))
 complementInteger (J# s d)
-    = case complementInteger# s d of (# s', d' #) -> smartJ# s' d'
+    = mpzToInteger (complementInteger# s d)
 
 {-# NOINLINE shiftLInteger #-}
 shiftLInteger :: Integer -> Int# -> Integer
 shiftLInteger j@(S# _) i = shiftLInteger (toBig j) i
-shiftLInteger (J# s d) i = case mul2ExpInteger# s d i of
-                           (# s', d' #) -> J# s' d'
+shiftLInteger (J# s d) i = mpzToInteger (mul2ExpInteger# s d i)
 
 {-# NOINLINE shiftRInteger #-}
 shiftRInteger :: Integer -> Int# -> Integer
 shiftRInteger j@(S# _) i = shiftRInteger (toBig j) i
-shiftRInteger (J# s d) i = case fdivQ2ExpInteger# s d i of
-                           (# s', d' #) -> smartJ# s' d'
+shiftRInteger (J# s d) i = mpzToInteger (fdivQ2ExpInteger# s d i)
 
 {-# NOINLINE testBitInteger #-}
 testBitInteger :: Integer -> Int# -> Bool
@@ -695,8 +689,7 @@ testBitInteger (J# s d) i = isTrue# (testBitInteger# s d i /=# 0#)
 {-# NOINLINE powInteger #-}
 powInteger :: Integer -> Word# -> Integer
 powInteger j@(S# _) e = powInteger (toBig j) e
-powInteger (J# s d) e = case powInteger# s d e of
-                            (# s', d' #) -> smartJ# s' d'
+powInteger (J# s d) e = mpzToInteger (powInteger# s d e)
 
 -- | \"@'powModInteger' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
@@ -709,8 +702,7 @@ powInteger (J# s d) e = case powInteger# s d e of
 {-# NOINLINE powModInteger #-}
 powModInteger :: Integer -> Integer -> Integer -> Integer
 powModInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
-    case powModInteger# s1 d1 s2 d2 s3 d3 of
-        (# s', d' #) -> smartJ# s' d'
+    mpzToInteger (powModInteger# s1 d1 s2 d2 s3 d3)
 powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
 
 -- | \"@'powModSecInteger' /b/ /e/ /m/@\" computes base @/b/@ raised to
@@ -724,8 +716,7 @@ powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
 {-# NOINLINE powModSecInteger #-}
 powModSecInteger :: Integer -> Integer -> Integer -> Integer
 powModSecInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
-    case powModSecInteger# s1 d1 s2 d2 s3 d3 of
-        (# s', d' #) -> J# s' d'
+    mpzToInteger (powModSecInteger# s1 d1 s2 d2 s3 d3)
 powModSecInteger b e m = powModSecInteger (toBig b) (toBig e) (toBig m)
 
 -- | \"@'recipModInteger' /x/ /m/@\" computes the inverse of @/x/@ modulo @/m/@. If
@@ -740,8 +731,7 @@ recipModInteger :: Integer -> Integer -> Integer
 recipModInteger j@(S# _) m@(S# _)   = recipModInteger (toBig j) (toBig m)
 recipModInteger j@(S# _) m@(J# _ _) = recipModInteger (toBig j) m
 recipModInteger j@(J# _ _) m@(S# _) = recipModInteger j (toBig m)
-recipModInteger (J# s d) (J# ms md) = case recipModInteger# s d ms md of
-                           (# s', d' #) -> smartJ# s' d'
+recipModInteger (J# s d) (J# ms md) = mpzToInteger (recipModInteger# s d ms md)
 
 -- | Probalistic Miller-Rabin primality test.
 --
@@ -771,7 +761,7 @@ testPrimeInteger (J# s d) reps = testPrimeInteger# s d reps
 {-# NOINLINE nextPrimeInteger #-}
 nextPrimeInteger :: Integer -> Integer
 nextPrimeInteger j@(S# _) = nextPrimeInteger (toBig j)
-nextPrimeInteger (J# s d) = case nextPrimeInteger# s d of (# s', d' #) -> smartJ# s' d'
+nextPrimeInteger (J# s d) = mpzToInteger (nextPrimeInteger# s d)
 
 -- | Compute number of digits (without sign) in given @/base/@.
 --
@@ -861,7 +851,7 @@ exportIntegerToAddr j@(S# _) addr o e = exportIntegerToAddr (toBig j) addr o e -
 -- * returns a new 'Integer'
 {-# NOINLINE importIntegerFromByteArray #-}
 importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
-importIntegerFromByteArray ba o l e = case importIntegerFromByteArray# ba o l e of (# s', d' #) -> smartJ# s' d'
+importIntegerFromByteArray ba o l e = mpzToInteger (importIntegerFromByteArray# ba o l e)
 
 -- | Read 'Integer' (without sign) from memory location at @/addr/@ in
 -- base-256 representation.
@@ -874,7 +864,7 @@ importIntegerFromByteArray ba o l e = case importIntegerFromByteArray# ba o l e 
 {-# NOINLINE importIntegerFromAddr #-}
 importIntegerFromAddr :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Integer #)
 importIntegerFromAddr addr l e st = case importIntegerFromAddr# addr l e st of
-                                      (# st', s', d' #) -> let !j = smartJ# s' d' in (# st', j #)
+                                      (# st', mpz #) -> let !j = mpzToInteger mpz in (# st', j #)
 
 \end{code}
 

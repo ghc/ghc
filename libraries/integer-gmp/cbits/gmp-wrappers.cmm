@@ -28,7 +28,6 @@
 #include "Cmm.h"
 #include "GmpDerivedConstants.h"
 
-import "integer-gmp" __gmpz_init;
 import "integer-gmp" __gmpz_add;
 import "integer-gmp" __gmpz_add_ui;
 import "integer-gmp" __gmpz_sub;
@@ -68,12 +67,23 @@ import "integer-gmp" __gmpz_export;
 
 import "integer-gmp" integer_cbits_decodeDouble;
 
+import "integer-gmp" stg_INTLIKE_closure;
+
 /* -----------------------------------------------------------------------------
    Arbitrary-precision Integer operations.
 
    There are some assumptions in this code that mp_limb_t == W_.  This is
    the case for all the platforms that GHC supports, currently.
    -------------------------------------------------------------------------- */
+
+/* This is used when a dummy pointer is needed for a ByteArray# return value
+
+   Ideally this would be a statically allocated 'ByteArray#'
+   containing SIZEOF_W 0-bytes. However, since in those cases when a
+   dummy value is needed, the 'ByteArray#' is not supposed to be
+   accessed anyway, this is should be a tolerable hack.
+ */
+#define DUMMY_BYTE_ARR (stg_INTLIKE_closure+1)
 
 /* set mpz_t from Int#/ByteArray# */
 #define MP_INT_SET_FROM_BA(mp_ptr,i,ba)                  \
@@ -85,42 +95,103 @@ import "integer-gmp" integer_cbits_decodeDouble;
 #define MP_INT_AS_PAIR(mp_ptr) \
   TO_W_(MP_INT__mp_size(mp_ptr)),(MP_INT__mp_d(mp_ptr)-SIZEOF_StgArrWords)
 
+#define MP_INT_TO_BA(mp_ptr) \
+  (MP_INT__mp_d(mp_ptr)-SIZEOF_StgArrWords)
 
-/* :: ByteArray# -> Word# -> Word# -> Int# -> (# Int#, ByteArray# #) */
+/* Size of mpz_t with single limb */
+#define SIZEOF_MP_INT_1LIMB (SIZEOF_MP_INT+WDS(1))
+
+/* Initialize 0-valued single-limb mpz_t at mp_ptr */
+#define MP_INT_1LIMB_INIT0(mp_ptr)                       \
+  MP_INT__mp_alloc(mp_ptr) = W_TO_INT(1);                \
+  MP_INT__mp_size(mp_ptr)  = W_TO_INT(0);                \
+  MP_INT__mp_d(mp_ptr)     = (mp_ptr+SIZEOF_MP_INT)
+
+
+/* return mpz_t as (# s::Int#, d::ByteArray#, l1::Word# #) tuple
+ *
+ * semantics:
+ *
+ *  (#  0, _, 0 #) -> value = 0
+ *  (#  1, _, w #) -> value =  w
+ *  (# -1, _, w #) -> value = -w
+ *  (#  s, d, 0 #) -> value =  J# s d
+ *
+ */
+#define MP_INT_1LIMB_RETURN(mp_ptr)                    \
+  CInt __mp_s;                                         \
+  __mp_s = MP_INT__mp_size(mp_ptr);                    \
+                                                       \
+  if (__mp_s == W_TO_INT(0))                           \
+  {                                                    \
+    return (0,DUMMY_BYTE_ARR,0);                       \
+  }                                                    \
+                                                       \
+  if (__mp_s == W_TO_INT(-1) || __mp_s == W_TO_INT(1)) \
+  {                                                    \
+    return (TO_W_(__mp_s),DUMMY_BYTE_ARR,W_[MP_INT__mp_d(mp_ptr)]); \
+  }                                                    \
+                                                       \
+  return (TO_W_(__mp_s),MP_INT_TO_BA(mp_ptr),0)
+
+/* Helper macro used by MP_INT_1LIMB_RETURN2 */
+#define MP_INT_1LIMB_AS_TUP3(s,d,w,mp_ptr) \
+  CInt s; P_ d; W_ w;                            \
+  s = MP_INT__mp_size(mp_ptr);                   \
+                                                 \
+  if (s == W_TO_INT(0))                          \
+  {                                              \
+    d = DUMMY_BYTE_ARR; w = 0;                            \
+  } else {                                       \
+    if (s == W_TO_INT(-1) || s == W_TO_INT(1))   \
+    {                                            \
+      d = DUMMY_BYTE_ARR; w = W_[MP_INT__mp_d(mp_ptr)];   \
+    } else {                                     \
+      d = MP_INT_TO_BA(mp_ptr); w = 0;           \
+    }                                            \
+  }
+
+#define MP_INT_1LIMB_RETURN2(mp_ptr1,mp_ptr2)         \
+  MP_INT_1LIMB_AS_TUP3(__r1s,__r1d,__r1w,mp_ptr1);    \
+  MP_INT_1LIMB_AS_TUP3(__r2s,__r2d,__r2w,mp_ptr2);    \
+  return (TO_W_(__r1s),__r1d,__r1w, TO_W_(__r2s),__r2d,__r2w)
+
+/* :: ByteArray# -> Word# -> Word# -> Int# -> (# Int#, ByteArray#, Word# #) */
 integer_cmm_importIntegerFromByteArrayzh (P_ ba, W_ of, W_ sz, W_ e)
 {
   W_ src_ptr;
   W_ mp_result;
 
 again:
-  STK_CHK_GEN_N (SIZEOF_MP_INT);
+  STK_CHK_GEN_N (SIZEOF_MP_INT_1LIMB);
   MAYBE_GC(again);
 
-  mp_result = Sp - SIZEOF_MP_INT;
+  mp_result = Sp - SIZEOF_MP_INT_1LIMB;
+  MP_INT_1LIMB_INIT0(mp_result);
 
   src_ptr = BYTE_ARR_CTS(ba) + of;
 
-  ccall __gmpz_init(mp_result "ptr");
   ccall __gmpz_import(mp_result "ptr", sz, W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, src_ptr "ptr");
 
-  return(MP_INT_AS_PAIR(mp_result));
+  MP_INT_1LIMB_RETURN(mp_result);
 }
 
-/* :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Int#, ByteArray# #) */
+/* :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Int#, ByteArray#, Word# #) */
 integer_cmm_importIntegerFromAddrzh (W_ src_ptr, W_ sz, W_ e)
 {
   W_ mp_result;
 
 again:
-  STK_CHK_GEN_N (SIZEOF_MP_INT);
+  STK_CHK_GEN_N (SIZEOF_MP_INT_1LIMB);
   MAYBE_GC(again);
 
-  mp_result = Sp - SIZEOF_MP_INT;
+  mp_result = Sp - SIZEOF_MP_INT_1LIMB;
 
-  ccall __gmpz_init(mp_result "ptr");
+  MP_INT_1LIMB_INIT0(mp_result);
+
   ccall __gmpz_import(mp_result "ptr", sz, W_TO_INT(e), W_TO_INT(1), W_TO_INT(0), 0, src_ptr "ptr");
 
-  return(MP_INT_AS_PAIR(mp_result));
+  MP_INT_1LIMB_RETURN(mp_result);
 }
 
 /* :: Int# -> ByteArray# -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #) */
@@ -329,22 +400,22 @@ name (W_ ws1, P_ d1, W_ ws2, P_ d2)                             \
   W_ mp_result1;                                                \
                                                                 \
 again:                                                          \
-  STK_CHK_GEN_N (3 * SIZEOF_MP_INT);                            \
+  STK_CHK_GEN_N (2*SIZEOF_MP_INT + SIZEOF_MP_INT_1LIMB);        \
   MAYBE_GC(again);                                              \
                                                                 \
-  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
-  mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                          \
-  mp_result1 = Sp - 3 * SIZEOF_MP_INT;                          \
+  mp_tmp1    = Sp - 1*SIZEOF_MP_INT;                            \
+  mp_tmp2    = Sp - 2*SIZEOF_MP_INT;                            \
+  mp_result1 = Sp - 2*SIZEOF_MP_INT - SIZEOF_MP_INT_1LIMB;      \
                                                                 \
   MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                           \
   MP_INT_SET_FROM_BA(mp_tmp2,ws2,d2);                           \
                                                                 \
-  ccall __gmpz_init(mp_result1 "ptr");                          \
+  MP_INT_1LIMB_INIT0(mp_result1);                               \
                                                                 \
   /* Perform the operation */                                   \
   ccall mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr"); \
                                                                 \
-  return (MP_INT_AS_PAIR(mp_result1));                          \
+  MP_INT_1LIMB_RETURN(mp_result1);                              \
 }
 
 #define GMP_TAKE3_RET1(name,mp_fun)                             \
@@ -356,25 +427,25 @@ name (W_ ws1, P_ d1, W_ ws2, P_ d2, W_ ws3, P_ d3)              \
   W_ mp_result1;                                                \
                                                                 \
 again:                                                          \
-  STK_CHK_GEN_N (4 * SIZEOF_MP_INT);                            \
+  STK_CHK_GEN_N (3*SIZEOF_MP_INT + SIZEOF_MP_INT_1LIMB);        \
   MAYBE_GC(again);                                              \
                                                                 \
-  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
-  mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                          \
-  mp_tmp3    = Sp - 3 * SIZEOF_MP_INT;                          \
-  mp_result1 = Sp - 4 * SIZEOF_MP_INT;                          \
+  mp_tmp1    = Sp - 1*SIZEOF_MP_INT;                            \
+  mp_tmp2    = Sp - 2*SIZEOF_MP_INT;                            \
+  mp_tmp3    = Sp - 3*SIZEOF_MP_INT;                            \
+  mp_result1 = Sp - 3*SIZEOF_MP_INT - SIZEOF_MP_INT_1LIMB;      \
                                                                 \
   MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                           \
   MP_INT_SET_FROM_BA(mp_tmp2,ws2,d2);                           \
   MP_INT_SET_FROM_BA(mp_tmp3,ws3,d3);                           \
                                                                 \
-  ccall __gmpz_init(mp_result1 "ptr");                          \
+  MP_INT_1LIMB_INIT0(mp_result1);                               \
                                                                 \
   /* Perform the operation */                                   \
-  ccall mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr",  \
-               mp_tmp3  "ptr");                                 \
+  ccall mp_fun(mp_result1 "ptr",                                \
+               mp_tmp1 "ptr", mp_tmp2 "ptr", mp_tmp3 "ptr");    \
                                                                 \
-  return (MP_INT_AS_PAIR(mp_result1));                          \
+  MP_INT_1LIMB_RETURN(mp_result1);                              \
 }
 
 #define GMP_TAKE1_UL1_RET1(name,mp_fun)                         \
@@ -385,20 +456,20 @@ name (W_ ws1, P_ d1, W_ wul)                                    \
                                                                 \
   /* call doYouWantToGC() */                                    \
 again:                                                          \
-  STK_CHK_GEN_N (2 * SIZEOF_MP_INT);                            \
+  STK_CHK_GEN_N (SIZEOF_MP_INT + SIZEOF_MP_INT_1LIMB);          \
   MAYBE_GC(again);                                              \
                                                                 \
-  mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                          \
-  mp_result  = Sp - 2 * SIZEOF_MP_INT;                          \
+  mp_tmp     = Sp - SIZEOF_MP_INT;                              \
+  mp_result  = Sp - SIZEOF_MP_INT - SIZEOF_MP_INT_1LIMB;        \
                                                                 \
   MP_INT_SET_FROM_BA(mp_tmp,ws1,d1);                            \
                                                                 \
-  ccall __gmpz_init(mp_result "ptr");                           \
+  MP_INT_1LIMB_INIT0(mp_result);                                \
                                                                 \
   /* Perform the operation */                                   \
   ccall mp_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(wul));  \
                                                                 \
-  return (MP_INT_AS_PAIR(mp_result));                           \
+  MP_INT_1LIMB_RETURN(mp_result);                               \
 }
 
 #define GMP_TAKE1_I1_RETI1(name,mp_fun)                         \
@@ -446,20 +517,20 @@ name (W_ ws1, P_ d1)                                            \
   W_ mp_result1;                                                \
                                                                 \
 again:                                                          \
-  STK_CHK_GEN_N (2 * SIZEOF_MP_INT);                            \
+  STK_CHK_GEN_N (SIZEOF_MP_INT + SIZEOF_MP_INT_1LIMB);          \
   MAYBE_GC(again);                                              \
                                                                 \
-  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                          \
-  mp_result1 = Sp - 2 * SIZEOF_MP_INT;                          \
+  mp_tmp1    = Sp - SIZEOF_MP_INT;                              \
+  mp_result1 = Sp - SIZEOF_MP_INT - SIZEOF_MP_INT_1LIMB;        \
                                                                 \
   MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                           \
                                                                 \
-  ccall __gmpz_init(mp_result1 "ptr");                          \
+  MP_INT_1LIMB_INIT0(mp_result1);                               \
                                                                 \
   /* Perform the operation */                                   \
   ccall mp_fun(mp_result1 "ptr",mp_tmp1 "ptr");                 \
                                                                 \
-  return(MP_INT_AS_PAIR(mp_result1));                           \
+  MP_INT_1LIMB_RETURN(mp_result1);                              \
 }
 
 #define GMP_TAKE2_RET2(name,mp_fun)                                     \
@@ -471,24 +542,25 @@ name (W_ ws1, P_ d1, W_ ws2, P_ d2)                                     \
   W_ mp_result2;                                                        \
                                                                         \
 again:                                                                  \
-  STK_CHK_GEN_N (4 * SIZEOF_MP_INT);                                    \
+  STK_CHK_GEN_N (2*SIZEOF_MP_INT + 2*SIZEOF_MP_INT_1LIMB);              \
   MAYBE_GC(again);                                                      \
                                                                         \
-  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
-  mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                  \
-  mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                  \
-  mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                  \
+  mp_tmp1    = Sp - 1*SIZEOF_MP_INT;                                    \
+  mp_tmp2    = Sp - 2*SIZEOF_MP_INT;                                    \
+  mp_result1 = Sp - 2*SIZEOF_MP_INT - 1*SIZEOF_MP_INT_1LIMB;            \
+  mp_result2 = Sp - 2*SIZEOF_MP_INT - 2*SIZEOF_MP_INT_1LIMB;            \
                                                                         \
   MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                                   \
   MP_INT_SET_FROM_BA(mp_tmp2,ws2,d2);                                   \
                                                                         \
-  ccall __gmpz_init(mp_result1 "ptr");                                  \
-  ccall __gmpz_init(mp_result2 "ptr");                                  \
+  MP_INT_1LIMB_INIT0(mp_result1);                                       \
+  MP_INT_1LIMB_INIT0(mp_result2);                                       \
                                                                         \
   /* Perform the operation */                                           \
-  ccall mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr"); \
+  ccall mp_fun(mp_result1 "ptr", mp_result2 "ptr",                      \
+               mp_tmp1 "ptr", mp_tmp2 "ptr");                           \
                                                                         \
-  return (MP_INT_AS_PAIR(mp_result1),MP_INT_AS_PAIR(mp_result2));       \
+  MP_INT_1LIMB_RETURN2(mp_result1, mp_result2);                         \
 }
 
 #define GMP_TAKE1_UL1_RET2(name,mp_fun)                                 \
@@ -499,23 +571,23 @@ name (W_ ws1, P_ d1, W_ wul2)                                           \
   W_ mp_result2;                                                        \
                                                                         \
 again:                                                                  \
-  STK_CHK_GEN_N (3 * SIZEOF_MP_INT);                                    \
+  STK_CHK_GEN_N (SIZEOF_MP_INT + 2*SIZEOF_MP_INT_1LIMB);                \
   MAYBE_GC(again);                                                      \
                                                                         \
-  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
-  mp_result1 = Sp - 2 * SIZEOF_MP_INT;                                  \
-  mp_result2 = Sp - 3 * SIZEOF_MP_INT;                                  \
+  mp_tmp1    = Sp - SIZEOF_MP_INT;                                      \
+  mp_result1 = Sp - SIZEOF_MP_INT - 1*SIZEOF_MP_INT_1LIMB;              \
+  mp_result2 = Sp - SIZEOF_MP_INT - 2*SIZEOF_MP_INT_1LIMB;              \
                                                                         \
   MP_INT_SET_FROM_BA(mp_tmp1,ws1,d1);                                   \
                                                                         \
-  ccall __gmpz_init(mp_result1 "ptr");                                  \
-  ccall __gmpz_init(mp_result2 "ptr");                                  \
+  MP_INT_1LIMB_INIT0(mp_result1);                                       \
+  MP_INT_1LIMB_INIT0(mp_result2);                                       \
                                                                         \
   /* Perform the operation */                                           \
   ccall mp_fun(mp_result1 "ptr", mp_result2 "ptr",                      \
                mp_tmp1 "ptr", W_TO_LONG(wul2));                         \
                                                                         \
-  return (MP_INT_AS_PAIR(mp_result1),MP_INT_AS_PAIR(mp_result2));       \
+  MP_INT_1LIMB_RETURN2(mp_result1, mp_result2);                         \
 }
 
 GMP_TAKE2_RET1(integer_cmm_plusIntegerzh,           __gmpz_add)
@@ -657,16 +729,17 @@ integer_cmm_cmpIntegerzh (W_ usize, P_ d1, W_ vsize, P_ d2)
 
 integer_cmm_decodeDoublezh (D_ arg)
 {
-    D_ arg;
-    W_ p;
     W_ mp_tmp1;
     W_ mp_tmp_w;
 
-    STK_CHK_GEN_N (2 * SIZEOF_MP_INT);
+#if SIZEOF_DOUBLE != SIZEOF_W
+    W_ p;
+
+    STK_CHK_GEN_N (SIZEOF_MP_INT + SIZEOF_W);
     ALLOC_PRIM (ARR_SIZE);
 
-    mp_tmp1  = Sp - 1 * SIZEOF_MP_INT;
-    mp_tmp_w = Sp - 2 * SIZEOF_MP_INT;
+    mp_tmp1  = Sp - SIZEOF_MP_INT;
+    mp_tmp_w = Sp - SIZEOF_MP_INT - SIZEOF_W;
 
     /* Be prepared to tell Lennart-coded integer_cbits_decodeDouble
        where mantissa.d can be put (it does not care about the rest) */
@@ -675,14 +748,29 @@ integer_cmm_decodeDoublezh (D_ arg)
     StgArrWords_bytes(p) = DOUBLE_MANTISSA_SIZE;
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
 
-    /* Perform the operation */
-    ccall integer_cbits_decodeDouble(mp_tmp1 "ptr", mp_tmp_w "ptr",arg);
+#else
+    /* When SIZEOF_DOUBLE == SIZEOF_W == 8, the result will fit into a
+       single 8-byte limb, and so we avoid allocating on the Heap and
+       use only the Stack instead */
 
-    /* returns: (Int# (expn), Int#, ByteArray#) */
-    return (W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
+    STK_CHK_GEN_N (SIZEOF_MP_INT_1LIMB + SIZEOF_W);
+
+    mp_tmp1  = Sp - SIZEOF_MP_INT_1LIMB;
+    mp_tmp_w = Sp - SIZEOF_MP_INT_1LIMB - SIZEOF_W;
+
+    MP_INT_1LIMB_INIT0(mp_tmp1);
+#endif
+
+    /* Perform the operation */
+    ccall integer_cbits_decodeDouble(mp_tmp1 "ptr", mp_tmp_w "ptr", arg);
+
+    /* returns: (Int# (expn), MPZ#) */
+    MP_INT_1LIMB_AS_TUP3(r1s, r1d, r1w, mp_tmp1);
+
+    return (W_[mp_tmp_w], TO_W_(r1s), r1d, r1w);
 }
 
-/* :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #) */
+/* :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray#, Word# #) */
 #define GMPX_TAKE1_UL1_RET1(name,pos_arg_fun,neg_arg_fun)               \
 name(W_ ws1, P_ d1, W_ wl)                                              \
 {                                                                       \
@@ -690,23 +778,23 @@ name(W_ ws1, P_ d1, W_ wl)                                              \
   W_ mp_result;                                                         \
                                                                         \
 again:                                                                  \
-  STK_CHK_GEN_N (2 * SIZEOF_MP_INT);                                    \
+  STK_CHK_GEN_N (SIZEOF_MP_INT + SIZEOF_MP_INT_1LIMB);                  \
   MAYBE_GC(again);                                                      \
                                                                         \
-  mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                                  \
-  mp_result  = Sp - 2 * SIZEOF_MP_INT;                                  \
+  mp_tmp     = Sp - SIZEOF_MP_INT;                                      \
+  mp_result  = Sp - SIZEOF_MP_INT - SIZEOF_MP_INT_1LIMB;                \
                                                                         \
   MP_INT_SET_FROM_BA(mp_tmp,ws1,d1);                                    \
                                                                         \
-  ccall __gmpz_init(mp_result "ptr");                                   \
+  MP_INT_1LIMB_INIT0(mp_result);                                        \
                                                                         \
   if(%lt(wl,0)) {                                                       \
       ccall neg_arg_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(-wl)); \
-      return(MP_INT_AS_PAIR(mp_result));                                \
+  } else {                                                              \
+      ccall pos_arg_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(wl));  \
   }                                                                     \
                                                                         \
-  ccall pos_arg_fun(mp_result "ptr", mp_tmp "ptr", W_TO_LONG(wl));      \
-  return(MP_INT_AS_PAIR(mp_result));                                    \
+  MP_INT_1LIMB_RETURN(mp_result);                                       \
 }
 
 /* NB: We need both primitives as we can't express 'minusIntegerInt#'
