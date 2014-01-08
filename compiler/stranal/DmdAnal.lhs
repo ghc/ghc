@@ -191,6 +191,44 @@ dmdAnal env dmd (Lam var body)
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
+dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, bndrs, _)])
+  -- Only one alternative with a product constructor, and a complex scrutinee
+  | let tycon = dataConTyCon dc
+  , isProductTyCon tycon
+  -- If the scrutinee is not trivial, we are not going to get much from
+  -- passing the body demand to it. OTOH, we might be getting some nested CPR
+  -- information from the scrutinee that we can feed into the bound variables.
+  , not (exprIsTrivial scrut)
+  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
+  = let
+        scrut_dmd = mkProdDmd (replicate (dataConRepArity dc) topDmd)
+	(scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
+
+        scrut_ret  = getDmdResult scrut_ty
+        comp_rets  = take (dataConRepArity dc) $ splitNestedRes scrut_ret -- infinite list!
+
+        -- Build a surely converging, CPR carrying signature for the builder,
+        -- and for the components use what we get from the scrunitee
+        case_bndr_sig = mkClosedStrictSig [] (cprProdRes comp_rets)
+
+        env_w_tc              = env { ae_rec_tc = rec_tc' }
+	env_alt	              = extendAnalEnvs NotTopLevel env_w_tc $
+            (case_bndr, case_bndr_sig) :
+            zipWithEqual "dmdAnal:CaseComplex"
+               (\b ty -> (b, mkClosedStrictSig [] ty)) bndrs  comp_rets
+
+	(alt_ty, alt')	      = dmdAnalAlt env_alt dmd alt
+	(alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
+        res_ty                = alt_ty1 `bothDmdType` toBothDmdArg scrut_ty
+    in
+    -- pprTrace "dmdAnal:CaseComplex" (vcat [ text "scrut" <+> ppr scrut
+    --                                , text "dmd" <+> ppr dmd
+    --                                , text "scrut_dmd" <+> ppr scrut_dmd
+    --                                , text "scrut_ty" <+> ppr scrut_ty
+    --                                , text "alt_ty" <+> ppr alt_ty1
+    --                                , text "res_ty" <+> ppr res_ty ]) $
+    (res_ty, Case scrut' case_bndr' ty [alt'])
+
 dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
@@ -1116,6 +1154,9 @@ sigEnv = ae_sigs
 
 updSigEnv :: AnalEnv -> SigEnv -> AnalEnv
 updSigEnv env sigs = env { ae_sigs = sigs }
+
+extendAnalEnvs :: TopLevelFlag -> AnalEnv -> [(Id, StrictSig)] -> AnalEnv
+extendAnalEnvs top_lvl = foldl' (\e (i,s) -> extendAnalEnv top_lvl e i s)
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
 extendAnalEnv top_lvl env var sig

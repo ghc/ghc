@@ -27,8 +27,9 @@ module Demand (
         peelFV,
 
         DmdResult, CPRResult,
-        isBotRes, isTopRes, getDmdResult,
+        isBotRes, isTopRes, getDmdResult, resTypeArgDmd,
         topRes, convRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
+        splitNestedRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         returnsCPR_maybe,
         forgetCPR, forgetSumCPR,
@@ -702,6 +703,7 @@ splitProdDmd_maybe (JD {strd = s, absd = u})
       (Str s,          Use _ (UProd ux)) -> Just (mkJointDmds (splitStrProdDmd (length ux) s) ux)
       (Lazy,           Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy)    ux)
       _                                  -> Nothing
+
 \end{code}
 
 %************************************************************************
@@ -874,9 +876,18 @@ forgetSumCPR_help (RetProd ds) = RetProd (map forgetSumCPR ds)
 forgetSumCPR_help (RetSum _)   = NoCPR
 forgetSumCPR_help NoCPR        = NoCPR
 
-
 vanillaCprProdRes :: Arity -> DmdResult
 vanillaCprProdRes arity = cprProdRes (replicate arity topRes)
+
+splitNestedRes :: DmdResult -> [DmdResult]
+splitNestedRes Diverges      = repeat topRes
+splitNestedRes (Dunno c)     = splitNestedCPR c
+splitNestedRes (Converges c) = splitNestedCPR c
+
+splitNestedCPR :: CPRResult -> [DmdResult]
+splitNestedCPR NoCPR        = repeat topRes
+splitNestedCPR (RetSum _)   = repeat topRes
+splitNestedCPR (RetProd cs) = cs
 
 isTopRes :: DmdResult -> Bool
 isTopRes (Dunno NoCPR) = True
