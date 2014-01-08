@@ -31,6 +31,8 @@ test('T3437', extra_run_opts('+RTS -M10m'), compile_and_run, [''])
 
 test('SeqRule', only_ways(['optasm']), compile_and_run, [''])
 
+test('runST', normal, compile_and_run, [''])
+
 test('T3403', normal, compile_and_run, ['-package containers'])
 test('T3591', normal, compile_and_run, [''])
 test('T4814', normal, compile_and_run, [''])
