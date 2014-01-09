@@ -153,7 +153,7 @@ cvtDec (TH.ValD pat body ds)
         ; returnJustL $ Hs.ValD $
           PatBind { pat_lhs = pat', pat_rhs = GRHSs body' ds'
                   , pat_rhs_ty = placeHolderType, bind_fvs = placeHolderNames
-                  , pat_ticks = (Nothing,[]) } }
+                  , pat_ticks = ([],[]) } }
 
 cvtDec (TH.FunD nm cls)
   | null cls

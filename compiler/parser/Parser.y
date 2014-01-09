@@ -1768,7 +1768,7 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
                                             PatBind pat (snd $ unLoc $3)
                                                     placeHolderType
                                                     placeHolderNames
-                                                    (Nothing,[]) } }
+                                                    ([],[]) } }
                                 -- Turn it all into an expression so that
                                 -- checkPattern can check that bangs are enabled
 

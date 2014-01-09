@@ -103,16 +103,9 @@ deSugar hsc_env
         ; let export_set = availsToNameSet exports
               target     = hscTarget dflags
               hpcInfo    = emptyHpcInfo other_hpc_info
-              want_ticks = gopt Opt_Hpc dflags
-                        || gopt Opt_Debug dflags
-                        || target == HscInterpreted
-                        || (gopt Opt_SccProfilingOn dflags
-                            && case profAuto dflags of
-                                 NoProfAuto -> False
-                                 _          -> True)
 
         ; (binds_cvr, ds_hpc_info, modBreaks)
-                         <- if want_ticks && not (isHsBootOrSig hsc_src)
+                         <- if not (isHsBootOrSig hsc_src)
                               then addTicksToBinds dflags mod mod_loc export_set
                                           (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, emptyModBreaks)

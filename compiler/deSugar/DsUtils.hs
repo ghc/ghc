@@ -599,7 +599,7 @@ cases like
      (p,q) = e
 -}
 
-mkSelectorBinds :: [Maybe (Tickish Id)]  -- ticks to add, possibly
+mkSelectorBinds :: [[Tickish Id]] -- ticks to add, possibly
                 -> LPat Id      -- The pattern
                 -> CoreExpr     -- Expression to which the pattern is bound
                 -> DsM [(Id,CoreExpr)]
@@ -650,7 +650,7 @@ mkSelectorBinds ticks pat val_expr
        ; return ( (tuple_var, tuple_expr) : zipWith mk_tup_bind ticks' binders ) }
   where
     binders       = collectPatBinders pat
-    ticks'        = ticks ++ repeat Nothing
+    ticks'        = ticks ++ repeat []
 
     local_binders = map localiseId binders      -- See Note [Localise pattern binders]
     local_tuple   = mkBigCoreVarTup binders
@@ -807,9 +807,8 @@ CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see Trac #3403.
 -}
 
-mkOptTickBox :: Maybe (Tickish Id) -> CoreExpr -> CoreExpr
-mkOptTickBox Nothing e        = e
-mkOptTickBox (Just tickish) e = Tick tickish e
+mkOptTickBox :: [Tickish Id] -> CoreExpr -> CoreExpr
+mkOptTickBox = flip (foldr Tick)
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do

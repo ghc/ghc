@@ -26,7 +26,7 @@ import Data.List
 import FastString
 import HscTypes
 import TyCon
-import Unique
+import UniqSupply
 import BasicTypes
 import MonadUtils
 import Maybes
@@ -63,21 +63,19 @@ addTicksToBinds
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
-addTicksToBinds dflags mod mod_loc exports tyCons binds =
-
- case ml_hs_file mod_loc of
-   Nothing        -> return (binds, emptyHpcInfo False, emptyModBreaks)
-   Just orig_file -> do
+addTicksToBinds dflags mod mod_loc exports tyCons binds
+  | let passes = coveragePasses dflags, not (null passes),
+    Just orig_file <- ml_hs_file mod_loc = do
 
      if "boot" `isSuffixOf` orig_file
          then return (binds, emptyHpcInfo False, emptyModBreaks)
          else do
 
+     us <- mkSplitUniqSupply 'C' -- for cost centres
      let  orig_file2 = guessSourceFile binds orig_file
 
-          (binds1,_,st)
-                 = unTM (addTickLHsBinds binds)
-                   (TTE
+          tickPass tickish (binds,st) =
+            let env = TTE
                       { fileName     = mkFastString orig_file2
                       , declPath     = []
                       , tte_dflags   = dflags
@@ -87,33 +85,34 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                       , blackList    = Map.fromList
                                           [ (getSrcSpan (tyConName tyCon),())
                                           | tyCon <- tyCons ]
-                      , density      = mkDensity dflags
+                      , density      = mkDensity tickish dflags
                       , this_mod     = mod
-                      , tickishType  = case hscTarget dflags of
-                          HscInterpreted            -> Breakpoints
-                          _ | gopt Opt_Hpc dflags   -> HpcTicks
-                            | gopt Opt_SccProfilingOn dflags
-                                                    -> ProfNotes
-                            | gopt Opt_Debug dflags -> SourceNotes
-                            | otherwise             -> error "addTicksToBinds: No way to annotate!"
-                       })
-                   (TT
-                      { tickBoxCount = 0
-                      , mixEntries   = []
-                      })
+                      , tickishType  = tickish
+                      }
+                (binds',_,st') = unTM (addTickLHsBinds binds) env st
+            in (binds', st')
 
-     let entries = reverse $ mixEntries st
+          initState = TT { tickBoxCount = 0
+                         , mixEntries   = []
+                         , breakCount   = 0
+                         , breaks       = []
+                         , uniqSupply   = us
+                         }
 
-     let count = tickBoxCount st
-     hashNo <- writeMixEntries dflags mod count entries orig_file2
-     modBreaks <- mkModBreaks dflags count entries
+          (binds1,st) = foldr tickPass (binds, initState) passes
+
+     let tickCount = tickBoxCount st
+     hashNo <- writeMixEntries dflags mod tickCount (reverse $ mixEntries st)
+                               orig_file2
+     modBreaks <- mkModBreaks dflags (breakCount st) (reverse $ breaks st)
 
      when (dopt Opt_D_dump_ticked dflags) $
          log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
              (pprLHsBinds binds1)
 
-     return (binds1, HpcInfo count hashNo, modBreaks)
+     return (binds1, HpcInfo tickCount hashNo, modBreaks)
 
+  | otherwise = return (binds, emptyHpcInfo False, emptyModBreaks)
 
 guessSourceFile :: LHsBinds Id -> FilePath -> FilePath
 guessSourceFile binds orig_file =
@@ -183,21 +182,18 @@ data TickDensity
   | TickCallSites         -- for stack tracing
   deriving Eq
 
-mkDensity :: DynFlags -> TickDensity
-mkDensity dflags
-  | gopt Opt_Hpc dflags
-    || gopt Opt_Debug dflags             = TickForCoverage
-  | HscInterpreted  <- hscTarget dflags  = TickForBreakPoints
-  | ProfAutoAll     <- profAuto dflags   = TickAllFunctions
-  | ProfAutoTop     <- profAuto dflags   = TickTopFunctions
-  | ProfAutoExports <- profAuto dflags   = TickExportedFunctions
-  | ProfAutoCalls   <- profAuto dflags   = TickCallSites
-  | otherwise                            = panic "density"
-  -- ToDo: -fhpc is taking priority over -fprof-auto here.  It seems
-  -- that coverage works perfectly well with profiling, but you don't
-  -- get any auto-generated SCCs.  It would make perfect sense to
-  -- allow both of them, and indeed to combine some of the other flags
-  -- (-fprof-auto-calls -fprof-auto-top, for example)
+mkDensity :: TickishType -> DynFlags -> TickDensity
+mkDensity tickish dflags = case tickish of
+  HpcTicks             -> TickForCoverage
+  SourceNotes          -> TickForCoverage
+  Breakpoints          -> TickForBreakPoints
+  ProfNotes ->
+    case profAuto dflags of
+      ProfAutoAll      -> TickAllFunctions
+      ProfAutoTop      -> TickTopFunctions
+      ProfAutoExports  -> TickExportedFunctions
+      ProfAutoCalls    -> TickCallSites
+      _other           -> panic "mkDensity"
 
 -- | Decide whether to add a tick to a binding or not.
 shouldTickBind  :: TickDensity
@@ -261,8 +257,6 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
 
 
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
-  env <- getEnv
-  let dflags = tte_dflags env
   let name = getOccString id
   decl_path <- getPathEntry
   density <- getDensity
@@ -272,7 +266,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
                  || id `elemVarSet` inline_ids
 
   -- See Note [inline sccs]
-  if inline && gopt Opt_SccProfilingOn dflags then return (L pos funBind) else do
+  tickish <- tickishType `liftM` getEnv
+  if inline && tickish == ProfNotes then return (L pos funBind) else do
 
   (fvs, mg@(MG { mg_alts = matches' })) <-
         getFreeVars $
@@ -296,8 +291,9 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
              else
                 return Nothing
 
+  let mbCons = maybe Prelude.id (:)
   return $ L pos $ funBind { fun_matches = mg { mg_alts = matches' }
-                           , fun_tick = tick }
+                           , fun_tick = tick `mbCons` fun_tick funBind }
 
    where
    -- a binding is a simple pattern binding if it is a funbind with zero patterns
@@ -308,23 +304,25 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs, pat_rhs = rhs }))) = do
   let name = "(...)"
   (fvs, rhs') <- getFreeVars $ addPathEntry name $ addTickGRHSs False False rhs
+  let pat' = pat { pat_rhs = rhs'}
 
+  -- Should create ticks here?
   density <- getDensity
   decl_path <- getPathEntry
   let top_lev = null decl_path
-  let add_ticks = shouldTickPatBind density top_lev
+  if not (shouldTickPatBind density top_lev) then return (L pos pat') else do
 
-  tickish <- if add_ticks
-                then bindTick density name pos fvs
-                else return Nothing
+    -- Allocate the ticks
+    rhs_tick <- bindTick density name pos fvs
+    let patvars = map getOccString (collectPatBinders lhs)
+    patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
 
-  let patvars = map getOccString (collectPatBinders lhs)
-  patvar_ticks <- if add_ticks
-                     then mapM (\v -> bindTick density v pos fvs) patvars
-                     else return []
-
-  return $ L pos $ pat { pat_rhs = rhs',
-                         pat_ticks = (tickish, patvar_ticks)}
+    -- Add to pattern
+    let mbCons = maybe id (:)
+        rhs_ticks = rhs_tick `mbCons` fst (pat_ticks pat')
+        patvar_tickss = zipWith mbCons patvar_ticks
+                        (snd (pat_ticks pat') ++ repeat [])
+    return $ L pos $ pat' { pat_ticks = (rhs_ticks, patvar_tickss) }
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
@@ -562,6 +560,13 @@ addTickHsExpr (ArithSeq  ty wit arith_seq) =
              where addTickWit Nothing = return Nothing
                    addTickWit (Just fl) = do fl' <- addTickHsExpr fl
                                              return (Just fl')
+
+-- We might encounter existing ticks (multiple Coverage passes)
+addTickHsExpr (HsTick t e) =
+        liftM (HsTick t) (addTickLHsExprNever e)
+addTickHsExpr (HsBinTick t0 t1 e) =
+        liftM (HsBinTick t0 t1) (addTickLHsExprNever e)
+
 addTickHsExpr (HsTickPragma _ (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) False False pos $
                 addTickHsExpr e0
@@ -925,6 +930,9 @@ liftL f (L loc a) = do
 
 data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry_]
+                         , breakCount  :: Int
+                         , breaks      :: [MixEntry_]
+                         , uniqSupply  :: UniqSupply
                          }
 
 data TickTransEnv = TTE { fileName     :: FastString
@@ -942,7 +950,17 @@ data TickTransEnv = TTE { fileName     :: FastString
 --      deriving Show
 
 data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
+                 deriving (Eq)
 
+coveragePasses :: DynFlags -> [TickishType]
+coveragePasses dflags =
+    ifa (hscTarget dflags == HscInterpreted) Breakpoints $
+    ifa (gopt Opt_Hpc dflags)                HpcTicks $
+    ifa (gopt Opt_SccProfilingOn dflags &&
+         profAuto dflags /= NoProfAuto)      ProfNotes $
+    ifa (gopt Opt_Debug dflags)              SourceNotes []
+  where ifa f x xs | f         = x:xs
+                   | otherwise = xs
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to
@@ -987,11 +1005,19 @@ instance Monad TM where
                                        (r2,fv2,st2) ->
                                           (r2, fv1 `plusOccEnv` fv2, st2)
 
--- getState :: TM TickTransState
--- getState = TM $ \ env st -> (st, noFVs, st)
+instance HasDynFlags TM where
+  getDynFlags = TM $ \ env st -> (tte_dflags env, noFVs, st)
 
--- setState :: (TickTransState -> TickTransState) -> TM ()
--- setState f = TM $ \ env st -> ((), noFVs, f st)
+instance MonadUnique TM where
+  getUniqueSupplyM = TM $ \_ st -> (uniqSupply st, noFVs, st)
+  getUniqueM = TM $ \_ st -> let (u, us') = takeUniqFromSupply (uniqSupply st)
+                             in (u, noFVs, st { uniqSupply = us' })
+
+getState :: TM TickTransState
+getState = TM $ \ _ st -> (st, noFVs, st)
+
+setState :: (TickTransState -> TickTransState) -> TM ()
+setState f = TM $ \ _ st -> ((), noFVs, f st)
 
 getEnv :: TM TickTransEnv
 getEnv = TM $ \ env st -> (env, noFVs, st)
@@ -1089,40 +1115,45 @@ allocATickBox boxLabel countEntries topOnly  pos fvs =
 
 mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [String]
           -> TM (Tickish Id)
-mkTickish boxLabel countEntries topOnly pos fvs decl_path =
-  TM $ \ env st ->
-    let c = tickBoxCount st
-        ids = filter (not . isUnLiftedType . idType) $ occEnvElts fvs
-            -- unlifted types cause two problems here:
-            --   * we can't bind them  at the GHCi prompt
-            --     (bindLocalsAtBreakpoint already fliters them out),
-            --   * the simplifier might try to substitute a literal for
-            --     the Id, and we can't handle that.
+mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
-        mes = mixEntries st
-        me = (pos, decl_path, map (nameOccName.idName) ids, boxLabel)
+  let ids = filter (not . isUnLiftedType . idType) $ occEnvElts fvs
+          -- unlifted types cause two problems here:
+          --   * we can't bind them  at the GHCi prompt
+          --     (bindLocalsAtBreakpoint already fliters them out),
+          --   * the simplifier might try to substitute a literal for
+          --     the Id, and we can't handle that.
 
-        cc_name | topOnly   = head decl_path
-                | otherwise = concat (intersperse "." decl_path)
+      me = (pos, decl_path, map (nameOccName.idName) ids, boxLabel)
 
-        cc = mkUserCC (mkFastString cc_name) (this_mod env) pos (mkCostCentreUnique c)
+      cc_name | topOnly   = head decl_path
+              | otherwise = concat (intersperse "." decl_path)
 
-        dflags = tte_dflags env
+  dflags <- getDynFlags
+  env <- getEnv
+  case tickishType env of
+    HpcTicks -> do
+      c <- liftM tickBoxCount getState
+      setState $ \st -> st { tickBoxCount = c + 1
+                           , mixEntries = me : mixEntries st }
+      return $ HpcTick (this_mod env) c
 
-        count = countEntries && gopt Opt_ProfCountEntries dflags
+    ProfNotes -> do
+      ccUnique <- getUniqueM
+      let cc = mkUserCC (mkFastString cc_name) (this_mod env) pos ccUnique
+          count = countEntries && gopt Opt_ProfCountEntries dflags
+      return $ ProfNote cc count True{-scopes-}
 
-        tickish = case tickishType env of
-          HpcTicks    -> HpcTick (this_mod env) c
-          ProfNotes   -> ProfNote cc count True{-scopes-}
-          Breakpoints -> Breakpoint c ids
-          SourceNotes | RealSrcSpan pos' <- pos
-                      -> SourceNote pos' cc_name
-          _otherwise  -> panic "mkTickish: bad source span!"
-    in
-    ( tickish
-    , fvs
-    , st {tickBoxCount=c+1,mixEntries=me:mes}
-    )
+    Breakpoints -> do
+      c <- liftM breakCount getState
+      setState $ \st -> st { breakCount = c + 1
+                           , breaks = me:breaks st }
+      return $ Breakpoint c ids
+
+    SourceNotes | RealSrcSpan pos' <- pos ->
+      return $ SourceNote pos' cc_name
+
+    _otherwise -> panic "mkTickish: bad source span!"
 
 
 allocBinTickBox :: (Bool -> BoxLabel) -> SrcSpan -> TM (HsExpr Id)

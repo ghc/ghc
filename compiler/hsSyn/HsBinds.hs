@@ -154,7 +154,7 @@ data HsBindLR idL idR
                                 -- See Note [Bind free vars]
 
 
-        fun_tick :: Maybe (Tickish Id)  -- ^ Tick to put on the rhs, if any
+        fun_tick :: [Tickish Id]  -- ^ Ticks to put on the rhs, if any
     }
 
   -- | The pattern is never a simple variable;
@@ -168,8 +168,8 @@ data HsBindLR idL idR
         pat_rhs    :: GRHSs idR (LHsExpr idR),
         pat_rhs_ty :: PostTc idR Type,      -- ^ Type of the GRHSs
         bind_fvs   :: PostRn idL NameSet, -- ^ See Note [Bind free vars]
-        pat_ticks  :: (Maybe (Tickish Id), [Maybe (Tickish Id)])
-               -- ^ Tick to put on the rhs, if any, and ticks to put on
+        pat_ticks  :: ([Tickish Id], [[Tickish Id]])
+               -- ^ Ticks to put on the rhs, if any, and ticks to put on
                -- the bound variables.
     }
 
@@ -465,10 +465,9 @@ ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
 ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
                         fun_co_fn = wrap,
                         fun_matches = matches,
-                        fun_tick = tick })
-  = pprTicks empty (case tick of
-                        Nothing -> empty
-                        Just t  -> text "-- tick id = " <> ppr t)
+                        fun_tick = ticks })
+  = pprTicks empty (if null ticks then empty
+                    else text "-- ticks = " <> ppr ticks)
     $$  ifPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind (unLoc fun) inf matches
     $$  ifPprDebug (ppr wrap)

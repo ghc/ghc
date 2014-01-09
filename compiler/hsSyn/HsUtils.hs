@@ -525,7 +525,7 @@ mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
                           , fun_matches = mkMatchGroup Generated ms
                           , fun_co_fn = idHsWrapper
                           , bind_fvs = placeHolderNames
-                          , fun_tick = Nothing }
+                          , fun_tick = [] }
 
 mkTopFunBind :: Origin -> Located Name -> [LMatch Name (LHsExpr Name)]
              -> HsBind Name
@@ -535,7 +535,7 @@ mkTopFunBind origin fn ms = FunBind { fun_id = fn, fun_infix = False
                                     , fun_co_fn = idHsWrapper
                                     , bind_fvs = emptyNameSet -- NB: closed
                                                               --     binding
-                                    , fun_tick = Nothing }
+                                    , fun_tick = [] }
 
 mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
 mkHsVarBind loc var rhs = mk_easy_FunBind loc var [] rhs

@@ -1146,9 +1146,10 @@ tcMonoBinds is_rec sig_fn no_gen
                                  -- type of the thing whose rhs we are type checking
                                tcMatchesFun name inf matches rhs_ty
 
-        ; return (unitBag $ L b_loc (FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,
-                                               fun_matches = matches', bind_fvs = fvs,
-                                               fun_co_fn = co_fn, fun_tick = Nothing }),
+        ; return (unitBag $ L b_loc $
+                     FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,
+                               fun_matches = matches', bind_fvs = fvs,
+                               fun_co_fn = co_fn, fun_tick = [] },
                   [(name, Nothing, mono_id)]) }
 
 tcMonoBinds _ sig_fn no_gen binds
@@ -1244,7 +1245,7 @@ tcRhs (TcFunBind (_, mb_sig, mono_id) loc inf matches)
                           , fun_matches = matches'
                           , fun_co_fn = co_fn
                           , bind_fvs = placeHolderNamesTc
-                          , fun_tick = Nothing }) }
+                          , fun_tick = [] }) }
     where
       tvsAndNwcs = maybe [] (\sig -> [(n, tv) | (Just n, tv) <- sig_tvs sig]
                                      ++ sig_nwcs sig) mb_sig
@@ -1257,7 +1258,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
                     tcGRHSsPat grhss pat_ty
         ; return (PatBind { pat_lhs = pat', pat_rhs = grhss', pat_rhs_ty = pat_ty
                           , bind_fvs = placeHolderNamesTc
-                          , pat_ticks = (Nothing,[]) }) }
+                          , pat_ticks = ([],[]) }) }
 
 
 ---------------------
