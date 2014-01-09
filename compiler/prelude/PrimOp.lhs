@@ -516,8 +516,10 @@ primOpOcc op = case primOpInfo op of
 
 primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, StrictSig)
 primOpSig op
-  = (tyvars, arg_tys, res_ty, arity, primOpStrictness op arity)
+  = (tyvars, arg_tys, res_ty, arity, strict_sig)
   where
+    strict_sig | primOpOkForSpeculation op = convergeSig $ primOpStrictness op arity
+               | otherwise                 =               primOpStrictness op arity
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
       = case (primOpInfo op) of

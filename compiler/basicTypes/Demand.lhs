@@ -11,15 +11,15 @@ module Demand (
         countOnce, countMany,   -- cardinality
 
         Demand, CleanDemand, 
-        mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
+        mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd, strictifyDmd,
         getUsage, toCleanDmd, 
         absDmd, topDmd, botDmd, seqDmd,
         lubDmd, bothDmd, apply1Dmd, apply2Dmd, 
         isTopDmd, isBotDmd, isAbsDmd, isSeqDmd, 
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
 
-        DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
-        nopDmdType, botDmdType, mkDmdType,
+        DmdType(..), dmdTypeDepth, lubDmdType, lubDmdTypes, bothDmdType,
+        nopDmdType, litDmdType, botDmdType, mkDmdType,
         addDemand,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
@@ -27,18 +27,18 @@ module Demand (
         peelFV,
 
         DmdResult, CPRResult,
-        isBotRes, isTopRes, resTypeArgDmd, 
-        topRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
-        appIsBottom, isBottomingSig, pprIfaceStrictSig, 
+        isBotRes, isTopRes, resTypeArgDmd,
+        topRes, convRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
+        appIsBottom, isBottomingSig, isConvSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR, returnsCPR_maybe,
-        StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
+        StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig, convergeSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig, 
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd, 
         splitDmdTy, splitFVs,
-        deferAfterIO,
+        deferAfterIO, deferDmd,
         postProcessUnsat, postProcessDmdTypeM,
 
         splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
@@ -64,7 +64,7 @@ import UniqFM
 import Util
 import BasicTypes
 import Binary
-import Maybes           ( isJust, orElse )
+import Maybes           ( isJust, orElse, fromMaybe )
 
 import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
@@ -184,6 +184,10 @@ bothStr (SProd s1) (SProd s2)
     | length s1 == length s2   = mkSProd (zipWith bothMaybeStr s1 s2)
     | otherwise                = HyperStr  -- Weird
 bothStr (SProd _) (SCall _)    = HyperStr
+
+strictifyDmd :: Demand -> Demand
+strictifyDmd (JD Lazy u) = (JD (Str HeadStr) u)
+strictifyDmd (JD s u) = (JD s u)
 
 -- utility functions to deal with memory leaks
 seqStrDmd :: StrDmd -> ()
@@ -730,7 +734,7 @@ lubCPR _ _                     = NoCPR
 
 lubDmdResult :: DmdResult -> DmdResult -> DmdResult
 lubDmdResult Diverges       r              = r
-lubDmdResult (Converges c1) Diverges       = Converges c1
+lubDmdResult (Converges c1) Diverges       = Dunno c1
 lubDmdResult (Converges c1) (Converges c2) = Converges (c1 `lubCPR` c2)
 lubDmdResult (Converges c1) (Dunno c2)     = Dunno (c1 `lubCPR` c2)
 lubDmdResult (Dunno c1)     Diverges       = Dunno c1
@@ -1025,17 +1029,41 @@ instance Eq DmdType where
        (DmdType fv2 ds2 res2) =  ufmToList fv1 == ufmToList fv2
                               && ds1 == ds2 && res1 == res2
 
+lubDmdTypes :: [DmdType] -> DmdType
+lubDmdTypes [] = botDmdType
+lubDmdTypes tys = foldr1 lubDmdType tys
+
 lubDmdType :: DmdType -> DmdType -> DmdType
 lubDmdType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
-  = DmdType lub_fv (lub_ds ds1 ds2) (r1 `lubDmdResult` r2)
+  = DmdType lub_fv (lub_ds ds1 ds2) r'
   where
     lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
+
+    r' | strictness_differs = (r1 `lubDmdResult` r2 `lubDmdResult` Diverges)
+       | otherwise          = (r1 `lubDmdResult` r2)
+
+    strictness_differs
+        = length ds1 /= length ds2  --  not sure, but this is the safe choice
+        || or (zipWith go ds1 ds2)
+        || foldVarEnv2_D (\d1 d2 -> (go d1 d2 ||)) False fv1 (defaultDmd r1) fv2 (defaultDmd r2)
+    go d1 d2 = isStrictDmd d1 /= isStrictDmd d2
 
       -- Extend the shorter argument list to match the longer
     lub_ds (d1:ds1) (d2:ds2) = lubDmd d1 d2 : lub_ds ds1 ds2
     lub_ds []     []       = []
     lub_ds ds1    []       = map (`lubDmd` resTypeArgDmd r2) ds1
     lub_ds []     ds2      = map (resTypeArgDmd r1 `lubDmd`) ds2
+
+foldVarEnv2_D  :: (a -> b -> c -> c) -> c ->
+                  VarEnv a -> a ->
+                  VarEnv b -> b ->
+                  c
+foldVarEnv2_D f x e1 d1 e2 d2 =
+    foldr (\k -> f (l1 k) (l2 k)) x $
+        varEnvKeys e1 ++ varEnvKeys (e2 `minusVarEnv` e1)
+  where l1 k = fromMaybe d1 (lookupVarEnv_Directly e1 k)
+        l2 k = fromMaybe d2 (lookupVarEnv_Directly e2 k)
+
 
 
 type BothDmdArg = (DmdEnv, Termination ())
@@ -1075,13 +1103,14 @@ emptyDmdEnv = emptyVarEnv
 -- (lazy, absent, no CPR information, no termination information).
 -- Note that it is ''not'' the top of the lattice (which would be "may use everything"),
 -- so it is (no longer) called topDmd
-nopDmdType, botDmdType :: DmdType
+nopDmdType, litDmdType, botDmdType :: DmdType
 nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
+litDmdType = DmdType emptyDmdEnv [] convRes
 
 cprProdDmdType :: Arity -> DmdType
 cprProdDmdType _arity
-  = DmdType emptyDmdEnv [] (Converges RetProd)
+  = DmdType emptyDmdEnv [] topRes
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1411,6 +1440,14 @@ botSig = StrictSig botDmdType
 
 cprProdSig :: Arity -> StrictSig
 cprProdSig arity = StrictSig (cprProdDmdType arity)
+
+convergeSig :: StrictSig -> StrictSig
+convergeSig (StrictSig (DmdType fv args r)) = StrictSig (DmdType fv args (convergeResult r))
+
+convergeResult :: DmdResult -> DmdResult
+convergeResult Diverges      = Converges NoCPR
+convergeResult (Dunno c)     = Converges c
+convergeResult (Converges c) = Converges c
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args

@@ -28,7 +28,7 @@ import Id
 import CoreUtils	( exprIsHNF, exprType, exprIsTrivial )
 -- import PprCore	
 import TyCon
-import Type		( eqType )
+import Type		( eqType, isUnLiftedType )
 -- import Pair
 -- import Coercion         ( coercionKind )
 import Util
@@ -129,7 +129,7 @@ dmdAnal :: AnalEnv
 -- The CleanDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
-dmdAnal _ _ (Lit lit)     = (nopDmdType, Lit lit)
+dmdAnal _ _ (Lit lit)     = (litDmdType, Lit lit)
 dmdAnal _ _ (Type ty)     = (nopDmdType, Type ty)	-- Doesn't happen, in fact
 dmdAnal _ _ (Coercion co) = (nopDmdType, Coercion co)
 
@@ -176,7 +176,10 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
         call_dmd          = mkCallDmd dmd
 	(fun_ty, fun') 	  = dmdAnal env call_dmd fun
 	(arg_dmd, res_ty) = splitDmdTy fun_ty
-        (arg_ty, arg') 	  = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
+        -- Make sure that calling something unlifted is always strict
+        arg_dmd'          | isUnLiftedType (exprType arg) = strictifyDmd arg_dmd
+                          | otherwise                     = arg_dmd
+        (arg_ty, arg') 	  = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd') arg
     in
 --    pprTrace "dmdAnal:app" (vcat
 --         [ text "dmd =" <+> ppr dmd
@@ -219,7 +222,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 	(alt_ty, alt')	      = dmdAnalAlt env_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
-	case_bndr_sig	      = cprProdSig (dataConRepArity dc)
+	case_bndr_sig	      = convergeSig (cprProdSig (dataConRepArity dc))
 		-- Inside the alternative, the case binder has the CPR property.
 		-- Meaning that a case on it will successfully cancel.
 		-- Example:
@@ -268,9 +271,11 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 
 dmdAnal env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
+	case_bndr_sig	     = convergeSig nopSig
+	env_alt	             = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
+	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env_alt dmd) alts
 	(scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
-	(alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
+	(alt_ty, case_bndr') = annotateBndr env (lubDmdTypes alt_tys) case_bndr
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -688,12 +693,25 @@ a product type.
 
 \begin{code}
 unitVarDmd :: Var -> Demand -> DmdType
-unitVarDmd var dmd 
-  = DmdType (unitVarEnv var dmd) [] topRes
+unitVarDmd var dmd
+  = -- pprTrace "unitVarDmd" (vcat [ppr var, ppr dmd, ppr res]) $
+    DmdType (unitVarEnv var dmd') [] res
+  where
+    -- If this is a strict demand, then we know that entering the variable
+    -- will terminate
+    res | isStrictDmd dmd || isUnLiftedType (idType var) = convRes
+        | otherwise                                      = topRes
+    -- Never record a strict demand on a unlifted type
+    dmd' | isUnLiftedType (idType var) = deferDmd dmd
+         | otherwise                   = dmd
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
-  = DmdType (extendVarEnv_C bothDmd fv var dmd) ds res
+  = DmdType (extendVarEnv_C bothDmd fv var dmd') ds res
+    -- Never record a strict demand on a unlifted type
+  where
+    dmd' | isUnLiftedType (idType var) = deferDmd dmd
+         | otherwise                   = dmd
 
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
@@ -1072,7 +1090,7 @@ extendSigsWithLam env id
        -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe $ idType id
-  = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
+  = extendAnalEnv NotTopLevel env id (convergeSig (cprProdSig (dataConRepArity dc)))
 
   | otherwise 
   = env
