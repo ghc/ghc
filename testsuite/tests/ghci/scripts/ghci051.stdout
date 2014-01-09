@@ -1,11 +1,9 @@
 data T = C | D 	-- Defined at <interactive>:9:1
-type T' = main::Interactive.T 	-- Defined at <interactive>:4:1
-data main::Interactive.T = A | ...
-  	-- Defined at <interactive>:3:10
-data main::Interactive.T = B | ...
-  	-- Defined at <interactive>:6:12
+type T' = Ghci1.T 	-- Defined at <interactive>:4:1
+data Ghci1.T = A | ... 	-- Defined at <interactive>:3:10
+data Ghci4.T = B | ... 	-- Defined at <interactive>:6:12
 data T = C | ... 	-- Defined at <interactive>:9:14
 data T = ... | D 	-- Defined at <interactive>:9:18
 b :: T' 	-- Defined at <interactive>:5:5
-c :: main::Interactive.T 	-- Defined at <interactive>:8:5
+c :: Ghci4.T 	-- Defined at <interactive>:8:5
 d :: T 	-- Defined at <interactive>:10:5

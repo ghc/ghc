@@ -1,2 +1,1 @@
-data main::Interactive.T = A | ...
-  	-- Defined at <interactive>:3:10
+data Ghci1.T = A | ... 	-- Defined at <interactive>:3:10
