@@ -34,7 +34,6 @@ import NameEnv
 import Rules
 import BasicTypes       ( Activation(.. ) )
 import CoreMonad        ( endPass, CoreToDo(..) )
-import PrelNames        ( iNTERACTIVE )
 import FastString
 import ErrUtils
 import Outputable
@@ -232,7 +231,7 @@ deSugarExpr hsc_env tc_expr
        ; showPass dflags "Desugar"
 
          -- Do desugaring
-       ; (msgs, mb_core_expr) <- initDs hsc_env iNTERACTIVE rdr_env
+       ; (msgs, mb_core_expr) <- initDs hsc_env (icInteractiveModule icntxt) rdr_env
                                         type_env fam_inst_env $
                                  dsLExpr tc_expr
 

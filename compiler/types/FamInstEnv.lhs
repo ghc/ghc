@@ -47,6 +47,7 @@ import Coercion
 import CoAxiom
 import VarSet
 import VarEnv
+import Module( isInteractiveModule )
 import Name
 import UniqFM
 import Outputable
@@ -353,6 +354,7 @@ extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm})
     add (FamIE items) _ = FamIE (ins_item:items)
 
 deleteFromFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
+-- Used only for overriding in GHCi
 deleteFromFamInstEnv inst_env fam_inst@(FamInst {fi_fam = fam_nm})
  = adjustUFM adjust inst_env fam_nm
  where
@@ -361,13 +363,14 @@ deleteFromFamInstEnv inst_env fam_inst@(FamInst {fi_fam = fam_nm})
      = FamIE (filterOut (identicalFamInst fam_inst) items)
 
 identicalFamInst :: FamInst -> FamInst -> Bool
--- Same LHS, *and* the instance is defined in the same module
+-- Same LHS, *and* both instances are on the interactive command line
 -- Used for overriding in GHCi
 identicalFamInst (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
-  =  nameModule (coAxiomName ax1) == nameModule (coAxiomName ax2)
-     && coAxiomTyCon ax1 == coAxiomTyCon ax2
-     && brListLength brs1 == brListLength brs2
-     && and (brListZipWith identical_ax_branch brs1 brs2)
+  =  isInteractiveModule (nameModule (coAxiomName ax1))
+  && isInteractiveModule (nameModule (coAxiomName ax2))
+  && coAxiomTyCon ax1 == coAxiomTyCon ax2
+  && brListLength brs1 == brListLength brs2
+  && and (brListZipWith identical_ax_branch brs1 brs2)
   where brs1 = coAxiomBranches ax1
         brs2 = coAxiomBranches ax2
         identical_ax_branch br1 br2

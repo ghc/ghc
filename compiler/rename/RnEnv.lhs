@@ -64,7 +64,7 @@ import DataCon          ( dataConFieldLabels, dataConTyCon )
 import TyCon            ( isTupleTyCon, tyConArity )
 import PrelNames        ( mkUnboundName, isUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils         ( MsgDoc )
-import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence )
+import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence, defaultFixity )
 import SrcLoc
 import Outputable
 import Util
@@ -1136,17 +1136,18 @@ lookupFixityRn name
     -- where 'foo' is not in scope, should not give an error (Trac #7937)
 
   | otherwise
-  = do { this_mod <- getModule
-       ; if nameIsLocalOrFrom this_mod name
-         then lookup_local
-         else lookup_imported }
-  where
-    lookup_local   -- It's defined in this module
-      = do { local_fix_env <- getFixityEnv
-           ; traceRn (text "lookupFixityRn: looking up name in local environment:" <+>
-                     vcat [ppr name, ppr local_fix_env])
-           ; return (lookupFixity local_fix_env name) }
+  = do { local_fix_env <- getFixityEnv
+       ; case lookupNameEnv local_fix_env name of {
+           Just (FixItem _ fix) -> return fix ;
+           Nothing ->
 
+    do { this_mod <- getModule
+       ; if nameIsLocalOrFrom this_mod name || isInteractiveModule (nameModule name)
+               -- Interactive modules are all in the fixity env,
+               -- and don't have entries in the HPT
+         then return defaultFixity
+         else lookup_imported } } }
+  where
     lookup_imported
       -- For imported names, we have to get their fixities by doing a
       -- loadInterfaceForName, and consulting the Ifaces that comes back

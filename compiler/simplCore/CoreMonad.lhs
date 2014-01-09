@@ -257,7 +257,7 @@ lintInteractiveExpr what hsc_env expr
 interactiveInScope :: HscEnv -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
 -- clauses, that mention variables bound in the interactive context.
--- These are Local things (see Note [Interactively-bound Ids in GHCi] in TcRnDriver).
+-- These are Local things (see Note [Interactively-bound Ids in GHCi] in HscTypes).
 -- So we have to tell Lint about them, lest it reports them as out of scope.
 -- 
 -- We do this by find local-named things that may appear free in interactive

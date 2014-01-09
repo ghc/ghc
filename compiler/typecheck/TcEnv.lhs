@@ -116,27 +116,24 @@ tcLookupGlobal :: Name -> TcM TyThing
 tcLookupGlobal name
   = do  {    -- Try local envt
           env <- getGblEnv
-        ; case lookupNameEnv (tcg_type_env env) name of { 
+        ; case lookupNameEnv (tcg_type_env env) name of {
                 Just thing -> return thing ;
                 Nothing    ->
-         
-                -- Should it have been in the local envt?
-          case nameModule_maybe name of {
-                Nothing -> notFound name ; -- Internal names can happen in GHCi
 
-                Just mod | mod == tcg_mod env   -- Names from this module 
-                         -> notFound name       -- should be in tcg_type_env
-                         | otherwise -> do
+                -- Should it have been in the local envt?
+          if nameIsLocalOrFrom (tcg_mod env) name
+          then notFound name  -- Internal names can happen in GHCi
+          else
 
            -- Try home package table and external package table
-        { mb_thing <- tcLookupImported_maybe name
+    do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return thing
             Failed msg      -> failWithTc msg
-        }}}}
+        }}}
 
 tcLookupField :: Name -> TcM Id         -- Returns the selector Id
-tcLookupField name 
+tcLookupField name
   = tcLookupId name     -- Note [Record field lookup]
 
 {- Note [Record field lookup]

@@ -199,17 +199,21 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         return (msgs, final_res)
     }
 
-initTcPrintErrors       -- Used from the interactive loop only
-       :: HscEnv
-       -> Module
-       -> TcM r
-       -> IO (Messages, Maybe r)
 
-initTcPrintErrors env mod todo = initTc env HsSrcFile False mod todo
+initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
+-- Initialise the type checker monad for use in GHCi
+initTcInteractive hsc_env thing_inside
+  = initTc hsc_env HsSrcFile False
+           (icInteractiveModule (hsc_IC hsc_env))
+           thing_inside
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
-initTcForLookup hsc_env tcm
-    = do (msgs, m) <- initTc hsc_env HsSrcFile False iNTERACTIVE tcm
+-- The thing_inside is just going to look up something
+-- in the environment, so we don't need much setup
+initTcForLookup hsc_env thing_inside
+    = do (msgs, m) <- initTc hsc_env HsSrcFile False
+                             (icInteractiveModule (hsc_IC hsc_env))  -- Irrelevant really
+                             thing_inside
          case m of
              Nothing -> throwIO $ mkSrcErr $ snd msgs
              Just x -> return x
@@ -518,7 +522,8 @@ setModule :: Module -> TcRn a -> TcRn a
 setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
 
 getIsGHCi :: TcRn Bool
-getIsGHCi = do { mod <- getModule; return (mod == iNTERACTIVE) }
+getIsGHCi = do { mod <- getModule
+               ; return (isInteractiveModule mod) }
 
 getGHCiMonad :: TcRn Name
 getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }

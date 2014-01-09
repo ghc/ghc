@@ -432,12 +432,9 @@ mAIN, rOOT_MAIN :: Module
 mAIN            = mkMainModule_ mAIN_NAME
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
-        -- The ':xxx' makes a module name that the user can never
-        -- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
-        -- module name still starts with a capital letter, which keeps
-        -- the z-encoded version consistent.
-iNTERACTIVE :: Module
-iNTERACTIVE    = mkMainModule (fsLit ":Interactive")
+mkInteractiveModule :: Int -> Module
+-- (mkInteractiveMoudule 9) makes module 'interactive:M9'
+mkInteractiveModule n = mkModule interactivePackageId (mkModuleName ("Ghci" ++ show n))
 
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")

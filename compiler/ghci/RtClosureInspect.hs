@@ -569,7 +569,11 @@ runTR hsc_env thing = do
     Just x  -> return x
 
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
-runTR_maybe hsc_env = fmap snd . initTc hsc_env HsSrcFile False  iNTERACTIVE
+runTR_maybe hsc_env thing_inside
+  = do { (_errs, res) <- initTc hsc_env HsSrcFile False 
+                                (icInteractiveModule (hsc_IC hsc_env))
+                                thing_inside
+       ; return res }
 
 traceTR :: SDoc -> TR ()
 traceTR = liftTcM . traceOptTcRn Opt_D_dump_rtti

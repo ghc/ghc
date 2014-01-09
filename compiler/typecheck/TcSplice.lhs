@@ -1110,15 +1110,18 @@ tcLookupTh name
   = do  { (gbl_env, lcl_env) <- getEnvs
         ; case lookupNameEnv (tcl_env lcl_env) name of {
                 Just thing -> return thing;
-                Nothing    -> do
-        { if nameIsLocalOrFrom (tcg_mod gbl_env) name
-          then  -- It's defined in this module
-              case lookupNameEnv (tcg_type_env gbl_env) name of
-                Just thing -> return (AGlobal thing)
-                Nothing    -> failWithTc (notInEnv name)
+                Nothing    ->
 
-          else do               -- It's imported
-        { mb_thing <- tcLookupImported_maybe name
+          case lookupNameEnv (tcg_type_env gbl_env) name of {
+                Just thing -> return (AGlobal thing);
+                Nothing    ->
+
+          if nameIsLocalOrFrom (tcg_mod gbl_env) name
+          then  -- It's defined in this module
+                failWithTc (notInEnv name)
+
+          else
+     do { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return (AGlobal thing)
             Failed msg      -> failWithTc msg

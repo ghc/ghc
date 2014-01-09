@@ -216,6 +216,7 @@ data TcGblEnv
 
         tcg_fix_env   :: FixityEnv,     -- ^ Just for things in this module
         tcg_field_env :: RecFieldEnv,   -- ^ Just for things in this module
+                                        -- See Note [The interactive package] in HscTypes
 
         tcg_type_env :: TypeEnv,
           -- ^ Global type env for the module we are compiling now.  All
@@ -224,6 +225,9 @@ data TcGblEnv
           --
           -- (Ids defined in this module start in the local envt, though they
           --  move to the global envt during zonking)
+          --
+          -- NB: for what "things in this module" means, see
+          -- Note [The interactive package] in HscTypes
 
         tcg_type_env_var :: TcRef TypeEnv,
                 -- Used only to initialise the interface-file

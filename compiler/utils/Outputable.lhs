@@ -53,7 +53,9 @@ module Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, neverQualify,
+        PprStyle, CodeStyle(..), PrintUnqualified,
+        alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
+        neverQualify, neverQualifyNames, neverQualifyModules,
         QualifyName(..),
         sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
@@ -75,7 +77,7 @@ import {-# SOURCE #-}   DynFlags( DynFlags,
                                   useUnicodeQuotes,
                                   unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
-import {-# SOURCE #-}   Name( Name, nameModule )
+import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
 import FastString
@@ -145,13 +147,20 @@ data Depth = AllTheWay
 -- purpose of the pair of functions that gets passed around
 -- when rendering 'SDoc'.
 
+type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
+
 -- | given an /original/ name, this function tells you which module
 -- name it should be qualified with when printing for the user, if
 -- any.  For example, given @Control.Exception.catch@, which is in scope
 -- as @Exception.catch@, this fuction will return @Just "Exception"@.
 -- Note that the return value is a ModuleName, not a Module, because
 -- in source code, names are qualified by ModuleNames.
-type QueryQualifyName = Name -> QualifyName
+type QueryQualifyName = Module -> OccName -> QualifyName
+
+-- | For a given module, we need to know whether to print it with
+-- a package name to disambiguate it.
+type QueryQualifyModule = Module -> Bool
+
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName                        -- given P:M.T
@@ -164,18 +173,11 @@ data QualifyName                        -- given P:M.T
                 -- it is not in scope at all, and M.T is already bound in the
                 -- current scope, so we must refer to it as "P:M.T"
 
-
--- | For a given module, we need to know whether to print it with
--- a package name to disambiguate it.
-type QueryQualifyModule = Module -> Bool
-
-type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
-
 alwaysQualifyNames :: QueryQualifyName
-alwaysQualifyNames n = NameQual (moduleName (nameModule n))
+alwaysQualifyNames m _ = NameQual (moduleName m)
 
 neverQualifyNames :: QueryQualifyName
-neverQualifyNames _ = NameUnqual
+neverQualifyNames _ _ = NameUnqual
 
 alwaysQualifyModules :: QueryQualifyModule
 alwaysQualifyModules _ = True
@@ -296,8 +298,8 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _)  n = qual_name n
-qualName _other                     n = NameQual (moduleName (nameModule n))
+qualName (PprUser (qual_name,_) _)  mod occ = qual_name mod occ
+qualName _other                     mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser (_,qual_mod) _)  m = qual_mod m

@@ -347,7 +347,7 @@ created by its bindings.
 
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also: Note [Interactively-bound Ids in GHCi] in TcRnDriver
+See also: Note [Interactively-bound Ids in GHCi] in HscTypes
 
 Consider a Template Haskell declaration quotation like this:
       module M where

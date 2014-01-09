@@ -5,10 +5,10 @@ module DynamicLoading (
         forceLoadModuleInterfaces,
         forceLoadNameModuleInterface,
         forceLoadTyCon,
-        
+
         -- * Finding names
         lookupRdrNameInModuleForPlugins,
-        
+
         -- * Loading values
         getValueSafely,
         getHValueSafely,
@@ -20,18 +20,16 @@ module DynamicLoading (
 import Linker           ( linkModule, getHValue )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findImportedModule, cannotFindModule )
-import DriverPhases     ( HscSource(HsSrcFile) )
-import TcRnMonad        ( initTc, initIfaceTcRn )
+import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName, gre_name )
 import RnNames          ( gresFromAvails )
-import PrelNames        ( iNTERACTIVE )
 import DynFlags
 
-import HscTypes         ( HscEnv(..), FindResult(..), ModIface(..), lookupTypeHscEnv )
+import HscTypes
 import BasicTypes       ( HValue )
-import TypeRep          ( TyThing(..), pprTyThingCategory )
+import TypeRep          ( pprTyThingCategory )
 import Type             ( Type, eqType )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
@@ -52,7 +50,10 @@ import GHC.Exts          ( unsafeCoerce# )
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
 forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
 forceLoadModuleInterfaces hsc_env doc modules
-    = (initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ mapM_ (loadPluginInterface doc) modules) >> return ()
+    = (initTcInteractive hsc_env $
+       initIfaceTcRn $
+       mapM_ (loadPluginInterface doc) modules) 
+      >> return ()
 
 -- | Force the interface for the module containing the name to be loaded. The 'SDoc' parameter is used
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
@@ -151,7 +152,9 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
-            (_, mb_iface) <- initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ loadPluginInterface (ptext (sLit "contains a name used in an invocation of lookupRdrNameInModule")) mod
+            (_, mb_iface) <- initTcInteractive hsc_env $
+                             initIfaceTcRn $
+                             loadPluginInterface doc mod
             case mb_iface of
                 Just iface -> do
                     -- Try and find the required name in the exports
@@ -166,8 +169,9 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
 
                 Nothing -> throwCmdLineErrorS dflags $ hsep [ptext (sLit "Could not determine the exports of the module"), ppr mod_name]
         err -> throwCmdLineErrorS dflags $ cannotFindModule dflags mod_name err
-  where dflags = hsc_dflags hsc_env
-
+  where
+    dflags = hsc_dflags hsc_env
+    doc = ptext (sLit "contains a name used in an invocation of lookupRdrNameInModule")
 
 wrongTyThingError :: Name -> TyThing -> SDoc
 wrongTyThingError name got_thing = hsep [ptext (sLit "The name"), ppr name, ptext (sLit "is not that of a value but rather a"), pprTyThingCategory got_thing]

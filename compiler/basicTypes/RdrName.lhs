@@ -265,9 +265,7 @@ instance Outputable RdrName where
     ppr (Exact name)   = ppr name
     ppr (Unqual occ)   = ppr occ
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
-    ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod name <> ppr occ)
-       where name = mkExternalName (mkUniqueGrimily 0) mod occ noSrcSpan
-         -- Note [Outputable Orig RdrName] in HscTypes
+    ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod occ <> ppr occ)
 
 instance OutputableBndr RdrName where
     pprBndr _ n

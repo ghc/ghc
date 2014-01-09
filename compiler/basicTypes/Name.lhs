@@ -442,17 +442,17 @@ instance OutputableBndr Name where
 
 
 pprName :: Name -> SDoc
-pprName n@(Name {n_sort = sort, n_uniq = u, n_occ = occ})
+pprName (Name {n_sort = sort, n_uniq = u, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      WiredIn mod _ builtin   -> pprExternal sty uniq mod occ n True  builtin
-      External mod            -> pprExternal sty uniq mod occ n False UserSyntax
+      WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
+      External mod            -> pprExternal sty uniq mod occ False UserSyntax
       System                  -> pprSystem sty uniq occ
       Internal                -> pprInternal sty uniq occ
   where uniq = mkUniqueGrimily (iBox u)
 
-pprExternal :: PprStyle -> Unique -> Module -> OccName -> Name -> Bool -> BuiltInSyntax -> SDoc
-pprExternal sty uniq mod occ name is_wired is_builtin
+pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
+pprExternal sty uniq mod occ is_wired is_builtin
   | codeStyle sty = ppr mod <> char '_' <> ppr_z_occ_name occ
         -- In code style, always qualify
         -- ToDo: maybe we could print all wired-in things unqualified
@@ -462,7 +462,7 @@ pprExternal sty uniq mod occ name is_wired is_builtin
                                       pprNameSpaceBrief (occNameSpace occ),
                                       pprUnique uniq])
   | BuiltInSyntax <- is_builtin = ppr_occ_name occ  -- Never qualify builtin syntax
-  | otherwise                   = pprModulePrefix sty mod name <> ppr_occ_name occ
+  | otherwise                   = pprModulePrefix sty mod occ <> ppr_occ_name occ
   where
     pp_mod = sdocWithDynFlags $ \dflags ->
              if gopt Opt_SuppressModulePrefixes dflags
@@ -491,14 +491,14 @@ pprSystem sty uniq occ
                                 -- so print the unique
 
 
-pprModulePrefix :: PprStyle -> Module -> Name -> SDoc
+pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
 -- See Note [Printing original names] in HscTypes
-pprModulePrefix sty mod name = sdocWithDynFlags $ \dflags ->
+pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
   if gopt Opt_SuppressModulePrefixes dflags
   then empty
   else
-    case qualName sty name of              -- See Outputable.QualifyName:
+    case qualName sty mod occ of              -- See Outputable.QualifyName:
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
       NameNotInScope2  -> ppr (modulePackageId mod) <> colon     -- Module not in

@@ -52,7 +52,6 @@ import FastString
 import Config
 import Platform
 import SysTools
-import PrelNames
 
 -- Standard libraries
 import Control.Monad
@@ -525,27 +524,26 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
-        -- (omitting iINTERACTIVE, which is already linked)
-        (mods_s, pkgs_s) <- follow_deps (filter ((/=) iNTERACTIVE) mods)
+        -- (omitting modules from the interactive package, which is already linked)
+      ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
                                         emptyUniqSet emptyUniqSet;
 
-        let {
+      ; let {
         -- 2.  Exclude ones already linked
         --      Main reason: avoid findModule calls in get_linkable
             mods_needed = mods_s `minusList` linked_mods     ;
             pkgs_needed = pkgs_s `minusList` pkgs_loaded pls ;
 
             linked_mods = map (moduleName.linkableModule)
-                                (objs_loaded pls ++ bcos_loaded pls)
-        } ;
+                                (objs_loaded pls ++ bcos_loaded pls)  }
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-        let { osuf = objectSuf dflags } ;
-        lnks_needed <- mapM (get_linkable osuf) mods_needed ;
+      ; let { osuf = objectSuf dflags }
+      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
 
-        return (lnks_needed, pkgs_needed) }
+      ; return (lnks_needed, pkgs_needed) } 
   where
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
