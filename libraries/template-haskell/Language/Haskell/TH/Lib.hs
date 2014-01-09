@@ -200,6 +200,8 @@ dyn :: String -> ExpQ
 dyn s = return (VarE (mkName s))
 
 global :: Name -> ExpQ
+{-# DEPRECATED global "Use varE instead" #-}
+-- Trac #8656; I have no idea why this function is duplicated
 global s = return (VarE s)
 
 varE :: Name -> ExpQ
