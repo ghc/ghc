@@ -672,14 +672,43 @@ Prelude>
       <title>What's really in scope at the prompt?</title>
 
       <para>When you type an expression at the prompt, what
-      identifiers and types are in scope?  GHCi provides a flexible
+      identifiers and types are in scope?  
+      GHCi provides a flexible
       way to control exactly how the context for an expression is
-      constructed.  Let's start with the simple cases; when you start
-      GHCi the prompt looks like this:</para>
+      constructed:
+  <itemizedlist>
+  <listitem><para>
+        The <literal>:load</literal>, <literal>:add</literal>, 
+        and <literal>:reload</literal> commands (<xref linkend="ghci-load-scope"/>).
+   </para></listitem>
+  <listitem><para>
+        The <literal>import</literal> declaration (<xref linkend="ghci-import-decl"/>).
+   </para></listitem>
+  <listitem><para>
+        The <literal>:module</literal> command (<xref linkend="ghci-module-cmd"/>).
+   </para></listitem>
+  </itemizedlist>
+      </para>
+      <para>The command <literal>:show imports</literal> will show a summary of which modules
+        contribute to the top-level scope.</para>
+      <para>
+        Hint: GHCi will tab-complete names that are in scope; for
+        example, if you run GHCi and type <literal>J&lt;tab&gt;</literal>
+        then GHCi will expand it to &ldquo;<literal>Just </literal>&rdquo;.
+      </para>
+
+   <sect3 id="ghci-load-scope">
+   <title>The effect of <literal>:load</literal> on what is in scope</title>
+      <para>
+      The <literal>:load</literal>, <literal>:add</literal>, and <literal>:reload</literal> 
+       commands (<xref linkend="loading-source-files"/> 
+      and <xref linkend="ghci-compiled"/>) affect the top-level scope.
+      Let's start with the simple cases; when you start
+      GHCi the prompt looks like this:
 
 <screen>Prelude></screen>
 
-      <para>Which indicates that everything from the module
+      which indicates that everything from the module
       <literal>Prelude</literal> is currently in scope; the visible
       identifiers are exactly those that would be visible in a Haskell
       source file with no <literal>import</literal>
@@ -701,7 +730,7 @@ Compiling Main             ( Main.hs, interpreted )
       prompt (probably including <literal>Prelude</literal>, as long
       as <literal>Main</literal> doesn't explicitly hide it).</para>
 
-      <para>The syntax
+      <para>The syntax in the prompt
       <literal>*<replaceable>module</replaceable></literal> indicates
       that it is the full top-level scope of
       <replaceable>module</replaceable> that is contributing to the
@@ -709,18 +738,50 @@ Compiling Main             ( Main.hs, interpreted )
       <literal>*</literal>, just the exports of the module are
       visible.</para>
 
-      <para>We're not limited to a single module: GHCi can combine
-      scopes from multiple modules, in any mixture of
-      <literal>*</literal> and non-<literal>*</literal> forms.  GHCi
-      combines the scopes from all of these modules to form the scope
-      that is in effect at the prompt.</para>
-
       <para>NOTE: for technical reasons, GHCi can only support the
       <literal>*</literal>-form for modules that are interpreted.
       Compiled modules and package modules can only contribute their
       exports to the current scope.  To ensure that GHCi loads the
       interpreted version of a module, add the <literal>*</literal>
       when loading the module, e.g. <literal>:load *M</literal>.</para>
+
+      <para>In general, after a <literal>:load</literal> command, an automatic
+      import is added to the scope for the most recently loaded
+      "target" module, in a <literal>*</literal>-form if possible.
+      For example, if you say <literal>:load foo.hs bar.hs</literal>
+      and <filename>bar.hs</filename> contains module
+      <literal>Bar</literal>, then the scope will be set to
+      <literal>*Bar</literal> if <literal>Bar</literal> is
+      interpreted, or if <literal>Bar</literal> is compiled it will be
+      set to <literal>Prelude Bar</literal> (GHCi automatically adds
+      <literal>Prelude</literal> if it isn't present and there aren't
+      any <literal>*</literal>-form modules).  These
+      automatically-added imports can be seen with
+      <literal>:show imports</literal>:
+
+<screen>
+Prelude> :load hello.hs
+[1 of 1] Compiling Main             ( hello.hs, interpreted )
+Ok, modules loaded: Main.
+*Main> :show imports
+:module +*Main -- added automatically
+*Main>
+</screen>
+
+      and the automatically-added import is replaced the next time you
+      use <literal>:load</literal>, <literal>:add</literal>, or
+      <literal>:reload</literal>.  It can also be removed by
+      <literal>:module</literal> as with normal imports.</para>
+   </sect3>
+
+      <sect3 id="ghci-import-decl">
+      <title>Controlling what is in scope with <literal>import</literal></title>
+
+      <para>We are not limited to a single module: GHCi can combine
+      scopes from multiple modules, in any mixture of
+      <literal>*</literal> and non-<literal>*</literal> forms.  GHCi
+      combines the scopes from all of these modules to form the scope
+      that is in effect at the prompt.</para>
 
       <para>To add modules to the scope, use ordinary Haskell
       <literal>import</literal> syntax:</para>
@@ -754,8 +815,35 @@ Prelude System.IO Map>
       <literal>Prelude</literal> import, just like in a Haskell
       module.</para>
 
+      <para>With multiple modules in scope, especially multiple
+      <literal>*</literal>-form modules, it is likely that name
+      clashes will occur.  Haskell specifies that name clashes are
+      only reported when an ambiguous identifier is used, and GHCi
+      behaves in the same way for expressions typed at the
+      prompt.</para>
+
+      </sect3>
+
+      <sect3 id="ghci-module-cmd">
+      <title>Controlling what is in scope with the <literal>:module</literal> command</title>
+
       <para>Another way to manipulate the scope is to use the
-      <literal>:module</literal> command, which provides a way to do
+      <literal>:module</literal> command, whose syntax is this: 
+
+<screen>
+:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable>
+</screen>
+
+      Using the <literal>+</literal> form of the
+      <literal>module</literal> commands adds modules to the current
+      scope, and <literal>-</literal> removes them.  Without either
+      <literal>+</literal> or <literal>-</literal>, the current scope
+      is replaced by the set of modules specified.  Note that if you
+      use this form and leave out <literal>Prelude</literal>, an
+      implicit <literal>Prelude</literal> import will be added
+      automatically.</para>
+
+      <para>The <literal>:module</literal> command provides a way to do
       two things that cannot be done with ordinary
       <literal>import</literal> declarations:
       <itemizedlist>
@@ -773,70 +861,27 @@ Prelude System.IO Map>
           the scope.</para>
         </listitem>
       </itemizedlist>
-      The full syntax of the <literal>:module</literal> command
-      is:</para>
-
-<screen>
-:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable>
-</screen>
-
-      <para>Using the <literal>+</literal> form of the
-      <literal>module</literal> commands adds modules to the current
-      scope, and <literal>-</literal> removes them.  Without either
-      <literal>+</literal> or <literal>-</literal>, the current scope
-      is replaced by the set of modules specified.  Note that if you
-      use this form and leave out <literal>Prelude</literal>, an
-      implicit <literal>Prelude</literal> import will be added
-      automatically.</para>
-
-      <para>After a <literal>:load</literal> command, an automatic
-      import is added to the scope for the most recently loaded
-      "target" module, in a <literal>*</literal>-form if possible.
-      For example, if you say <literal>:load foo.hs bar.hs</literal>
-      and <filename>bar.hs</filename> contains module
-      <literal>Bar</literal>, then the scope will be set to
-      <literal>*Bar</literal> if <literal>Bar</literal> is
-      interpreted, or if <literal>Bar</literal> is compiled it will be
-      set to <literal>Prelude Bar</literal> (GHCi automatically adds
-      <literal>Prelude</literal> if it isn't present and there aren't
-      any <literal>*</literal>-form modules).  These
-      automatically-added imports can be seen with
-      <literal>:show imports</literal>:
-
-<screen>
-Prelude> :load hello.hs
-[1 of 1] Compiling Main             ( hello.hs, interpreted )
-Ok, modules loaded: Main.
-*Main> :show imports
-:module +*Main -- added automatically
-*Main>
-</screen>
-
-      and the automatically-added import is replaced the next time you
-      use <literal>:load</literal>, <literal>:add</literal>, or
-      <literal>:reload</literal>.  It can also be removed by
-      <literal>:module</literal> as with normal imports.</para>
-
-      <para>With multiple modules in scope, especially multiple
-      <literal>*</literal>-form modules, it is likely that name
-      clashes will occur.  Haskell specifies that name clashes are
-      only reported when an ambiguous identifier is used, and GHCi
-      behaves in the same way for expressions typed at the
-      prompt.</para>
-
-      <para>
-        Hint: GHCi will tab-complete names that are in scope; for
-        example, if you run GHCi and type <literal>J&lt;tab&gt;</literal>
-        then GHCi will expand it to &ldquo;<literal>Just </literal>&rdquo;.
       </para>
+      </sect3>
+
+      <sect3 id="ghci-import-qualified">
+        <title>Qualified names</title>
+
+        <para>To make life slightly easier, the GHCi prompt also
+        behaves as if there is an implicit <literal>import
+        qualified</literal> declaration for every module in every
+        package, and every module currently loaded into GHCi.  This
+          behaviour can be disabled with the flag <option>-fno-implicit-import-qualified</option><indexterm><primary><option>-fno-implicit-import-qualified</option></primary></indexterm>.</para>
+      </sect3>
 
       <sect3>
         <title><literal>:module</literal> and
         <literal>:load</literal></title>
 
-        <para>It might seem that <literal>:module</literal> and
-        <literal>:load</literal> do similar things: you can use both
-        to bring a module into scope.  However, there is a clear
+        <para>It might seem that <literal>:module</literal>/<literal>import</literal> and
+        <literal>:load</literal>/<literal>:add</literal>/<literal>:reload</literal> 
+        do similar things: you can use both
+        to bring a module into scope.  However, there is a very important
         difference.  GHCi is concerned with two sets of modules:</para>
 
         <itemizedlist>
@@ -851,31 +896,27 @@ Ok, modules loaded: Main.
           <listitem>
             <para>The set of modules that are currently <emphasis>in
             scope</emphasis> at the prompt.  This set is modified by
-            <literal>import</literal>, <literal>:module</literal>, and
+            <literal>import</literal> and <literal>:module</literal>, and
             it is also modified automatically after
             <literal>:load</literal>, <literal>:add</literal>, and
-            <literal>:reload</literal>, as described above.</para>
+            <literal>:reload</literal>, as described above.
+            The set of modules in scope can be shown with
+            <literal>:show imports</literal>.</para>
           </listitem>
         </itemizedlist>
 
-        <para>You cannot add a module to the scope if it is not
-          loaded.  This is why trying to
-          use <literal>:module</literal> to load a new module results
+        <para>You can add a module to the scope (via <literal>:module</literal> 
+           or <literal>import</literal>)
+          only if either (a) it is loaded, or
+          (b) it is a module from a package that GHCi knows about.
+          Using <literal>:module</literal> or <literal>import</literal>
+          to try bring into scope a non-loaded module may result
           in the message &ldquo;<literal>module M is not
             loaded</literal>&rdquo;.</para>
       </sect3>
 
-      <sect3 id="ghci-import-qualified">
-        <title>Qualified names</title>
-
-        <para>To make life slightly easier, the GHCi prompt also
-        behaves as if there is an implicit <literal>import
-        qualified</literal> declaration for every module in every
-        package, and every module currently loaded into GHCi.  This
-          behaviour can be disabled with the flag <option>-fno-implicit-import-qualified</option><indexterm><primary><option>-fno-implicit-import-qualified</option></primary></indexterm>.</para>
-      </sect3>
-
-      <sect3>
+    </sect2>
+      <sect2>
         <title>The <literal>:main</literal> and <literal>:run</literal> commands</title>
 
         <para>
@@ -931,8 +972,6 @@ Prelude> :run bar ["foo", "bar baz"]
 bar
 ["foo","bar baz"]
 </screen>
-
-      </sect3>
     </sect2>
 
 
