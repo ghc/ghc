@@ -849,7 +849,7 @@ kindErrorMsg ty1 ty2
 --------------------
 misMatchMsg :: Maybe SwapFlag -> TcType -> TcType -> SDoc	   -- Types are already tidy
 -- If oriented then ty1 is actual, ty2 is expected
-misMatchMsg oriented ty1 ty2  
+misMatchMsg oriented ty1 ty2
   | Just IsSwapped <- oriented
   = misMatchMsg (Just NotSwapped) ty2 ty1
   | Just NotSwapped <- oriented
@@ -858,8 +858,9 @@ misMatchMsg oriented ty1 ty2
         , sameOccExtra ty2 ty1 ]
   | otherwise
   = sep [ ptext (sLit "Couldn't match") <+> what <+> quotes (ppr ty1)
-        , nest 14 $ ptext (sLit "with") <+> quotes (ppr ty2) ]
-  where 
+        , nest 14 $ ptext (sLit "with") <+> quotes (ppr ty2)
+        , sameOccExtra ty1 ty2 ]
+  where
     what | isKind ty1 = ptext (sLit "kind")
          | otherwise  = ptext (sLit "type")
 
@@ -876,6 +877,7 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act, uo_expected = exp }
 mkExpectedActualMsg _ _ _ = panic "mkExprectedAcutalMsg"
 
 sameOccExtra :: TcType -> TcType -> SDoc
+-- See Note [Disambiguating (X ~ X) errors]
 sameOccExtra ty1 ty2
   | Just (tc1, _) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, _) <- tcSplitTyConApp_maybe ty2
@@ -890,6 +892,10 @@ sameOccExtra ty1 ty2
   = empty
   where
     ppr_from same_pkg nm
+      | isGoodSrcSpan loc
+      = hang (quotes (ppr nm) <+> ptext (sLit "is defined at"))
+           2 (ppr loc)
+      | otherwise  -- Imported things have an UnhelpfulSrcSpan
       = hang (quotes (ppr nm))
            2 (sep [ ptext (sLit "is defined in") <+> quotes (ppr (moduleName mod))
                   , ppUnless (same_pkg || pkg == mainPackageId) $
@@ -897,7 +903,12 @@ sameOccExtra ty1 ty2
        where
          pkg = modulePackageId mod
          mod = nameModule nm
+         loc = nameSrcSpan nm
 \end{code}
+
+Note [Disambiguating (X ~ X) errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Trac #8278
 
 Note [Reporting occurs-check errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
