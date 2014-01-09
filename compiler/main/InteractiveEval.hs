@@ -800,9 +800,13 @@ fromListBL bound l = BL (length l) bound l []
 -- -----------------------------------------------------------------------------
 -- | Set the interactive evaluation context.
 --
--- Setting the context doesn't throw away any bindings; the bindings
--- we've built up in the InteractiveContext simply move to the new
--- module.  They always shadow anything in scope in the current context.
+-- (setContext imports) sets the ic_imports field (which in turn
+-- determines what is in scope at the prompt) to 'imports', and
+-- constucts the ic_rn_glb_env environment to reflect it.
+--
+-- We retain in scope all the things defined at the prompt, and kept
+-- in ic_tythings.  (Indeed, they shadow stuff from ic_imports.)
+
 setContext :: GhcMonad m => [InteractiveImport] -> m ()
 setContext imports
   = do { hsc_env <- getSession
@@ -830,7 +834,7 @@ findGlobalRdrEnv hsc_env imports
                     -- This call also loads any orphan modules
        ; return $ case partitionEithers (map mkEnv imods) of
            ([], imods_env) -> Right (foldr plusGlobalRdrEnv idecls_env imods_env)
-           (err : _, _)       -> Left err }
+           (err : _, _)    -> Left err }
   where
     idecls :: [LImportDecl RdrName]
     idecls = [noLoc d | IIDecl d <- imports]
