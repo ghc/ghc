@@ -2228,6 +2228,18 @@ section "Etc"
 	{Miscellaneous built-ins}
 ------------------------------------------------------------------------
 
+primtype Proxy# a
+   { The type constructor {\tt Proxy#} is used to bear witness to some
+   type variable. It's used when you want to pass around proxy values
+   for doing things like modelling type applications. A {\tt Proxy#}
+   is not only unboxed, it also has a polymorphic kind, and has no
+   runtime representation, being totally free. }
+
+pseudoop "proxy#"
+   Proxy# a
+   { Witness for an unboxed {\tt Proxy#} value, which has no runtime
+   representation. }
+
 pseudoop   "seq"
    a -> b -> b
    { Evaluates its first argument to head normal form, and then returns its second
