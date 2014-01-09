@@ -27,7 +27,9 @@ import Var
 import Class
 import TyCon
 import CoAxiom
+import ConLike
 import DataCon
+import PatSyn
 import BasicTypes ( TupleSort(..) )
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
@@ -85,8 +87,16 @@ tyThingToLHsDecl t = noLoc $ case t of
   ACoAxiom ax -> synifyAxiom ax
 
   -- a data-constructor alone just gets rendered as a function:
-  ADataCon dc -> SigD (TypeSig [synifyName dc]
+  AConLike (RealDataCon dc) -> SigD (TypeSig [synifyName dc]
     (synifyType ImplicitizeForAll (dataConUserType dc)))
+
+  AConLike (PatSynCon ps) ->
+      let (_, _, (req_theta, prov_theta)) = patSynSig ps
+      in SigD $ PatSynSig (synifyName ps)
+                          (fmap (synifyType WithinType) (patSynTyDetails ps))
+                          (synifyType WithinType (patSynType ps))
+                          (synifyCtx req_theta)
+                          (synifyCtx prov_theta)
 
 synifyAxBranch :: TyCon -> CoAxBranch -> TyFamInstEqn Name
 synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })

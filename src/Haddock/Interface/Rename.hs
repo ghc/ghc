@@ -398,6 +398,15 @@ renameSig sig = case sig of
     lnames' <- mapM renameL lnames
     ltype' <- renameLType ltype
     return (TypeSig lnames' ltype')
+  PatSynSig lname args ltype lreq lprov -> do
+    lname' <- renameL lname
+    args' <- case args of
+        PrefixPatSyn largs -> PrefixPatSyn <$> mapM renameLType largs
+        InfixPatSyn lleft lright -> InfixPatSyn <$> renameLType lleft <*> renameLType lright
+    ltype' <- renameLType ltype
+    lreq' <- renameLContext lreq
+    lprov' <- renameLContext lprov
+    return $ PatSynSig lname' args' ltype' lreq' lprov'
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
 

@@ -76,6 +76,9 @@ isNameSym = isSymOcc . nameOccName
 isVarSym :: OccName -> Bool
 isVarSym = isLexVarSym . occNameFS
 
+isConSym :: OccName -> Bool
+isConSym = isLexConSym . occNameFS
+
 
 getMainDeclBinder :: HsDecl name -> [name]
 getMainDeclBinder (TyClD d) = [tcdName d]
@@ -115,6 +118,7 @@ sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [name]
 sigNameNoLoc (TypeSig   ns _)         = map unLoc ns
+sigNameNoLoc (PatSynSig n _ _ _ _)    = [unLoc n]
 sigNameNoLoc (SpecSig   n _ _)        = [unLoc n]
 sigNameNoLoc (InlineSig n _)          = [unLoc n]
 sigNameNoLoc (FixSig (FixitySig n _)) = [unLoc n]

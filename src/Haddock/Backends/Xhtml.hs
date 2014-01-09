@@ -598,7 +598,7 @@ ppNameMini :: Module -> OccName -> Html
 ppNameMini mdl nm =
     anchor ! [ href (moduleNameUrl mdl nm)
              , target mainFrameName ]
-      << ppBinder' nm
+      << ppBinder' False nm
 
 
 ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html

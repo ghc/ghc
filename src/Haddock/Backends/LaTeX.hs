@@ -249,6 +249,7 @@ declNames :: LHsDecl DocName -> [DocName]
 declNames (L _ decl) = case decl of
   TyClD d  -> [tcdName d]
   SigD (TypeSig lnames _) -> map unLoc lnames
+  SigD (PatSynSig lname _ _ _ _) -> [unLoc lname]
   ForD (ForeignImport (L _ n) _ _ _) -> [n]
   ForD (ForeignExport (L _ n) _ _ _) -> [n]
   _ -> error "declaration not supported by declNames"
@@ -291,6 +292,8 @@ ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs = case decl of
 -- Family instances happen via FamInst now
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc doc subdocs d unicode
   SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (doc, fnArgsDoc) (map unLoc lnames) t unicode
+  SigD (PatSynSig lname args ty prov req) ->
+      ppLPatSig loc (doc, fnArgsDoc) lname args ty prov req unicode
   ForD d                         -> ppFor loc (doc, fnArgsDoc) d unicode
   InstD _                        -> empty
   _                              -> error "declaration not supported by ppDecl"
@@ -345,6 +348,33 @@ ppFunSig loc doc docnames typ unicode =
  where
    names = map getName docnames
 
+ppLPatSig :: SrcSpan -> DocForDecl DocName -> Located DocName
+          -> HsPatSynDetails (LHsType DocName) -> LHsType DocName
+          -> LHsContext DocName -> LHsContext DocName
+          -> Bool -> LaTeX
+ppLPatSig loc doc docname args typ prov req unicode =
+    ppPatSig loc doc (unLoc docname) (fmap unLoc args) (unLoc typ) (unLoc prov) (unLoc req) unicode
+
+ppPatSig :: SrcSpan -> DocForDecl DocName -> DocName
+          -> HsPatSynDetails (HsType DocName) -> HsType DocName
+          -> HsContext DocName -> HsContext DocName
+          -> Bool -> LaTeX
+ppPatSig _loc (doc, _argDocs) docname args typ prov req unicode = declWithDoc pref1 (documentationToLaTeX doc)
+  where
+    pref1 = hsep [ keyword "pattern"
+                 , pp_ctx prov
+                 , pp_head
+                 , dcolon unicode
+                 , pp_ctx req
+                 , ppType unicode typ
+                 ]
+
+    pp_head = case args of
+        PrefixPatSyn typs -> hsep $ ppDocBinder docname : map pp_type typs
+        InfixPatSyn left right -> hsep [pp_type left, ppDocBinderInfix docname, pp_type right]
+
+    pp_type = ppParendType unicode
+    pp_ctx ctx = ppContext ctx unicode
 
 ppTypeOrFunSig :: SrcSpan -> [DocName] -> HsType DocName
                -> DocForDecl DocName -> (LaTeX, LaTeX, LaTeX)
@@ -914,9 +944,16 @@ ppr_fun_ty ctxt_prec ty1 ty2 unicode
 
 ppBinder :: OccName -> LaTeX
 ppBinder n
-  | isVarSym n = parens $ ppOccName n
-  | otherwise  = ppOccName n
+  | isInfixName n = parens $ ppOccName n
+  | otherwise     = ppOccName n
 
+ppBinderInfix :: OccName -> LaTeX
+ppBinderInfix n
+  | isInfixName n = ppOccName n
+  | otherwise     = quotes $ ppOccName n
+
+isInfixName :: OccName -> Bool
+isInfixName n = isVarSym n || isConSym n
 
 ppSymName :: Name -> LaTeX
 ppSymName name
@@ -952,6 +989,9 @@ ppLDocName (L _ d) = ppDocName d
 
 ppDocBinder :: DocName -> LaTeX
 ppDocBinder = ppBinder . nameOccName . getName
+
+ppDocBinderInfix :: DocName -> LaTeX
+ppDocBinderInfix = ppBinderInfix . nameOccName . getName
 
 
 ppName :: Name -> LaTeX

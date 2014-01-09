@@ -31,6 +31,7 @@ import Data.Ord
 import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
+import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
 import qualified Packages
@@ -327,6 +328,9 @@ typeDocs d =
   let docs = go 0 in
   case d of
     SigD (TypeSig _ ty) -> docs (unLoc ty)
+    SigD (PatSynSig _ arg_tys ty req prov) ->
+        let allTys = ty : concat [ F.toList arg_tys, unLoc req, unLoc prov ]
+        in F.foldMap (docs . unLoc) allTys
     ForD (ForeignImport _ ty _ _) -> docs (unLoc ty)
     TyClD (SynDecl { tcdRhs = ty }) -> docs (unLoc ty)
     _ -> M.empty
@@ -345,7 +349,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs DocD class_
-    defs  = mkDecls (bagToList . tcdMeths) ValD class_
+    defs  = mkDecls (map snd . bagToList . tcdMeths) ValD class_
     sigs  = mkDecls tcdSigs SigD class_
     ats   = mkDecls tcdATs (TyClD . FamDecl) class_
 
@@ -360,13 +364,13 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 ungroup :: HsGroup Name -> [LHsDecl Name]
 ungroup group_ =
   mkDecls (tyClGroupConcat . hs_tyclds) TyClD  group_ ++
-  mkDecls hs_derivds             DerivD group_ ++
-  mkDecls hs_defds               DefD   group_ ++
-  mkDecls hs_fords               ForD   group_ ++
-  mkDecls hs_docs                DocD   group_ ++
-  mkDecls hs_instds              InstD  group_ ++
-  mkDecls (typesigs . hs_valds)  SigD   group_ ++
-  mkDecls (valbinds . hs_valds)  ValD   group_
+  mkDecls hs_derivds                       DerivD group_ ++
+  mkDecls hs_defds                         DefD   group_ ++
+  mkDecls hs_fords                         ForD   group_ ++
+  mkDecls hs_docs                          DocD   group_ ++
+  mkDecls hs_instds                        InstD  group_ ++
+  mkDecls (typesigs . hs_valds)            SigD   group_ ++
+  mkDecls (map snd . valbinds . hs_valds)  ValD   group_
   where
     typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
     typesigs _ = error "expected ValBindsOut"
@@ -718,8 +722,8 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap) decls =
     expandSig = foldr f []
       where
         f :: LHsDecl name -> [LHsDecl name] -> [LHsDecl name]
-        f (L l (SigD (TypeSig    names t))) xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t)) : acc) xs names
-        f (L l (SigD (GenericSig names t))) xs = foldr (\n acc -> L l (SigD (GenericSig [n] t)) : acc) xs names
+        f (L l (SigD (TypeSig    names t)))          xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t))          : acc) xs names
+        f (L l (SigD (GenericSig names t)))          xs = foldr (\n acc -> L l (SigD (GenericSig [n] t))          : acc) xs names
         f x xs = x : xs
 
     mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))

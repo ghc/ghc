@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Names (
   ppName, ppDocName, ppLDocName, ppRdrName, ppUncheckedLink,
-  ppBinder, ppBinder',
+  ppBinder, ppBinderInfix, ppBinder',
   ppModule, ppModuleRef,
   ppIPName,
   linkId
@@ -105,16 +105,23 @@ ppName name = toHtml (getOccString name)
 ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' n
+ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' False n
 ppBinder False n = namedAnchor (nameAnchorId n) ! [theclass "def"]
-                        << ppBinder' n
+                        << ppBinder' False n
 
+ppBinderInfix :: Bool -> OccName -> Html
+ppBinderInfix True n = linkedAnchor (nameAnchorId n) << ppBinder' True n
+ppBinderInfix False n = namedAnchor (nameAnchorId n) ! [theclass "def"]
+                             << ppBinder' True n
 
-ppBinder' :: OccName -> Html
-ppBinder' n
-  | isVarSym n = parens $ ppOccName n
-  | otherwise  = ppOccName n
-
+ppBinder' :: Bool -> OccName -> Html
+-- The Bool indicates if it is to be rendered in infix notation
+ppBinder' is_infix n = wrap $ ppOccName n
+  where
+    wrap | is_infix && not is_sym = quote
+         | not is_infix && is_sym = parens
+         | otherwise = id
+    is_sym = isVarSym n || isConSym n
 
 linkId :: Module -> Maybe Name -> Html -> Html
 linkId mdl mbName = linkIdOcc mdl (fmap nameOccName mbName)
