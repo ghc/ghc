@@ -42,8 +42,7 @@ module Outputable (
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
-        showPpr,
-        showSDocUnqual,
+        showSDocUnqual, showPpr,
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
@@ -366,44 +365,47 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags d =
-  Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext dflags defaultUserStyle))
+showSDoc dflags sdoc = renderWithStyle dflags sdoc defaultUserStyle
 
 renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
-renderWithStyle dflags sdoc sty =
-  Pretty.render (runSDoc sdoc (initSDocContext dflags sty))
+renderWithStyle dflags sdoc sty
+  = Pretty.showDoc PageMode (pprCols dflags) $
+    runSDoc sdoc (initSDocContext dflags sty)
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: DynFlags -> SDoc -> String
 showSDocOneLine dflags d
- = Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext dflags defaultUserStyle))
+ = Pretty.showDoc OneLineMode (pprCols dflags) $
+   runSDoc d (initSDocContext dflags defaultUserStyle)
 
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
 showSDocForUser dflags unqual doc
- = show (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
+ = renderWithStyle dflags doc (mkUserStyle unqual AllTheWay)
 
 showSDocUnqual :: DynFlags -> SDoc -> String
--- Only used in the gruesome isOperator
-showSDocUnqual dflags d
- = show (runSDoc d (initSDocContext dflags (mkUserStyle neverQualify AllTheWay)))
+-- Only used by Haddock
+showSDocUnqual dflags doc
+ = renderWithStyle dflags doc (mkUserStyle neverQualify AllTheWay)
 
 showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d
- = Pretty.showDocWith PageMode (runSDoc d (initSDocContext dflags defaultDumpStyle))
+showSDocDump dflags d = renderWithStyle dflags d defaultDumpStyle
+
+showSDocDebug :: DynFlags -> SDoc -> String
+showSDocDebug dflags d = renderWithStyle dflags d PprDebug
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
- = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext dflags PprDump))
-
-showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = show (runSDoc d (initSDocContext dflags PprDebug))
+ = Pretty.showDoc OneLineMode irrelevantNCols $
+   runSDoc d (initSDocContext dflags PprDump)
 
 showPpr :: Outputable a => DynFlags -> a -> String
-showPpr dflags = showSDoc dflags . ppr
+showPpr dflags thing = showSDoc dflags (ppr thing)
+
+irrelevantNCols :: Int
+-- Used for OneLineMode and LeftMode when number of cols isn't used
+irrelevantNCols = 1
 \end{code}
 
 \begin{code}

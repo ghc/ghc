@@ -1480,16 +1480,13 @@ defaultLogAction dflags severity srcSpan style msg
           putStrSDoc = defaultLogActionHPutStrDoc dflags stdout
 
 defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
-defaultLogActionHPrintDoc dflags h d sty
-    = do let doc = runSDoc d (initSDocContext dflags sty)
-         Pretty.printDoc Pretty.PageMode (pprCols dflags) h doc
-         hFlush h
+defaultLogActionHPrintDoc = defaultLogActionHPutStrDoc
 
 defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
 defaultLogActionHPutStrDoc dflags h d sty
-    = do let doc = runSDoc d (initSDocContext dflags sty)
-         hPutStr h (Pretty.render doc)
-         hFlush h
+    = Pretty.printDoc Pretty.PageMode (pprCols dflags) h doc
+    where
+      doc = runSDoc d (initSDocContext dflags sty)
 
 newtype FlushOut = FlushOut (IO ())
 

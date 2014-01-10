@@ -173,8 +173,7 @@ module Pretty (
 
         hang, punctuate,
 
---      renderStyle,            -- Haskell 1.3 only
-        render, fullRender, printDoc, showDocWith,
+        fullRender, printDoc, showDoc,
         bufLeftRender -- performance hack
   ) where
 
@@ -270,9 +269,8 @@ Displaying @Doc@ values.
 
 \begin{code}
 instance Show Doc where
-  showsPrec _ doc cont = showDoc doc cont
+  showsPrec _ doc cont = showDocPlus PageMode 100 doc cont
 
-render     :: Doc -> String             -- Uses default style
 fullRender :: Mode
            -> Int                       -- Line length
            -> Float                     -- Ribbons per line
@@ -281,21 +279,10 @@ fullRender :: Mode
            -> Doc
            -> a                         -- Result
 
-{-      When we start using 1.3
-renderStyle  :: Style -> Doc -> String
-data Style = Style { lineLength     :: Int,     -- In chars
-                     ribbonsPerLine :: Float,   -- Ratio of ribbon length to line length
-                     mode :: Mode
-             }
-style :: Style          -- The default style
-style = Style { lineLength = 100, ribbonsPerLine = 2.5, mode = PageMode }
--}
-
 data Mode = PageMode            -- Normal
           | ZigZagMode          -- With zig-zag cuts
           | LeftMode            -- No indentation, infinitely long lines
           | OneLineMode         -- All on one line
-
 \end{code}
 
 
@@ -890,21 +877,11 @@ oneLiner _                   = panic "oneLiner: Unhandled case"
 
 
 \begin{code}
-{-
-renderStyle Style{mode, lineLength, ribbonsPerLine} doc
-  = fullRender mode lineLength ribbonsPerLine doc ""
--}
+showDocPlus :: Mode -> Int -> Doc -> String -> String
+showDocPlus mode cols doc rest = fullRender mode cols 1.5 string_txt rest doc
 
-render doc       = showDocWith PageMode doc
-
-showDoc :: Doc -> String -> String
-showDoc doc rest = showDocWithAppend PageMode doc rest
-
-showDocWithAppend :: Mode -> Doc -> String -> String
-showDocWithAppend mode doc rest = fullRender mode 100 1.5 string_txt rest doc
-
-showDocWith :: Mode -> Doc -> String
-showDocWith mode doc = showDocWithAppend mode doc ""
+showDoc :: Mode -> Int -> Doc -> String
+showDoc mode cols doc = showDocPlus mode cols doc ""
 
 string_txt :: TextDetails -> String -> String
 string_txt (Chr c)   s  = c:s
