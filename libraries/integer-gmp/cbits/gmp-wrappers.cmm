@@ -492,7 +492,7 @@ again:                                                                  \
 }
 
 #define GMP_TAKE1_UL1_RET2(name,mp_fun)                                 \
-name (W_ ws1, P_ d1, W_ wul2, P_ d2)                                    \
+name (W_ ws1, P_ d1, W_ wul2)                                           \
 {                                                                       \
   W_ mp_tmp1;                                                           \
   W_ mp_result1;                                                        \
