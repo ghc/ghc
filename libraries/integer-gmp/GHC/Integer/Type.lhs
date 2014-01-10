@@ -221,9 +221,10 @@ Just using smartJ# in this way has good results:
 
 {-# NOINLINE quotRemInteger #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
-quotRemInteger (S# INT_MINBOUND) b = quotRemInteger minIntAsBig b
+quotRemInteger a@(S# INT_MINBOUND) b = quotRemInteger (toBig a) b
 quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
                                    (# q, r #) -> (# S# q, S# r #)
+#if SIZEOF_HSWORD == 8
 quotRemInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
   = case quotRemIntegerWord# s1 d1 (int2Word# (negateInt# b)) of
           (# s3, d3, s4, d4 #) -> let !q = smartJ# (negateInt# s3) d3
@@ -234,6 +235,10 @@ quotRemInteger (J# s1 d1) (S# b)
           (# s3, d3, s4, d4 #) -> let !q = smartJ# s3 d3
                                       !r = smartJ# s4 d4
                                   in (# q, r #)
+#else
+-- temporary workaround on 32bit due to #8661
+quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
+#endif
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
   = case (quotRemInteger# s1 d1 s2 d2) of
