@@ -802,7 +802,7 @@ fromListBL bound l = BL (length l) bound l []
 --
 -- (setContext imports) sets the ic_imports field (which in turn
 -- determines what is in scope at the prompt) to 'imports', and
--- constucts the ic_rn_glb_env environment to reflect it.
+-- constructs the ic_rn_glb_env environment to reflect it.
 --
 -- We retain in scope all the things defined at the prompt, and kept
 -- in ic_tythings.  (Indeed, they shadow stuff from ic_imports.)
