@@ -276,7 +276,9 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 
 dmdAnal env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
+	case_bndr_sig	     = convergeSig nopSig
+	env_alt	             = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
+	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env_alt dmd) alts
 	(scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
 	(alt_ty, case_bndr') = annotateBndr env (lubDmdTypes alt_tys) case_bndr
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
