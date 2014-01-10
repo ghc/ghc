@@ -16,7 +16,7 @@ Roman.foo_$s$wgo =
   \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
     let {
       a :: GHC.Prim.Int#
-      [LclId, Str=DmdType]
+      [LclId, Str=DmdType t]
       a =
         GHC.Prim.+#
           (GHC.Prim.+#
@@ -60,7 +60,7 @@ Roman.$wgo =
         case x of _ [Occ=Dead] { GHC.Types.I# ipv ->
         let {
           a :: GHC.Prim.Int#
-          [LclId, Str=DmdType]
+          [LclId, Str=DmdType t]
           a =
             GHC.Prim.+#
               (GHC.Prim.+#

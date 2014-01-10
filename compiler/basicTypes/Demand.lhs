@@ -28,8 +28,8 @@ module Demand (
 
         DmdResult, CPRResult,
         isBotRes, isTopRes,
-        topRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
-        appIsBottom, isBottomingSig, pprIfaceStrictSig, 
+        topRes, convRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
+        appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig, convergeSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,

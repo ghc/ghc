@@ -700,8 +700,13 @@ a product type.
 
 \begin{code}
 unitVarDmd :: Var -> Demand -> DmdType
-unitVarDmd var dmd 
-  = DmdType (unitVarEnv var dmd) [] topRes
+unitVarDmd var dmd
+  = -- pprTrace "unitVarDmd" (vcat [ppr var, ppr dmd, ppr res]) $
+    DmdType (unitVarEnv var dmd) [] res
+  where
+    -- Variables of unlifted types are, well, unlifted
+    res | isUnLiftedType (idType var) = convRes
+        | otherwise                   = topRes
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
@@ -1059,6 +1064,7 @@ extendAnalEnv top_lvl env var sig
   = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig' }
   where
   sig' | isWeakLoopBreaker (idOccInfo var) = sigMayDiverge sig
+       | isUnLiftedType (idType var)       = convergeSig sig
        | otherwise                         = sig
 
 extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
