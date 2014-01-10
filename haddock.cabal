@@ -105,6 +105,7 @@ executable haddock
       Haddock.Interface.LexParseRn
       Haddock.Interface.ParseModuleHeader
       Haddock.Parser
+      Haddock.Parser.Util
       Haddock.Utf8
       Haddock.Utils
       Haddock.Backends.Xhtml
@@ -176,6 +177,7 @@ library
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
     Haddock.Parser
+    Haddock.Parser.Util
     Haddock.Utf8
     Haddock.Utils
     Haddock.Backends.Xhtml

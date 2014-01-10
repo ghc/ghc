@@ -110,6 +110,7 @@ rename dflags gre = rn
 
       DocWarning doc -> DocWarning (rn doc)
       DocEmphasis doc -> DocEmphasis (rn doc)
+      DocBold doc -> DocBold (rn doc)
       DocMonospaced doc -> DocMonospaced (rn doc)
       DocUnorderedList docs -> DocUnorderedList (map rn docs)
       DocOrderedList docs -> DocOrderedList (map rn docs)

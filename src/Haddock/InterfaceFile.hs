@@ -498,6 +498,9 @@ instance (Binary id) => Binary (Doc id) where
     put_ bh (DocProperty x) = do
             putByte bh 18
             put_ bh x
+    put_ bh (DocBold x) = do
+            putByte bh 19
+            put_ bh x
     get bh = do
             h <- getByte bh
             case h of
@@ -558,6 +561,9 @@ instance (Binary id) => Binary (Doc id) where
               18 -> do
                     x <- get bh
                     return (DocProperty x)
+              19 -> do
+                    x <- get bh
+                    return (DocBold x)
               _ -> fail "invalid binary data found"
 
 

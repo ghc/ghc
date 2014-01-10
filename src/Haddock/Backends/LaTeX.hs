@@ -1003,6 +1003,7 @@ parLatexMarkup ppId = Markup {
   markupModule               = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
   markupWarning              = \p v -> emph (p v),
   markupEmphasis             = \p v -> emph (p v),
+  markupBold                 = \p v -> bold (p v),
   markupMonospaced           = \p _ -> tt (p Mono),
   markupUnorderedList        = \p v -> itemizedList (map ($v) p) $$ text "",
   markupPic                  = \p _ -> markupPic p,
@@ -1114,6 +1115,8 @@ decltt ltx = text "\\haddockdecltt" <> braces ltx
 emph :: LaTeX -> LaTeX
 emph ltx = text "\\emph" <> braces ltx
 
+bold :: LaTeX -> LaTeX
+bold ltx = text "\\textbf" <> braces ltx
 
 verb :: LaTeX -> LaTeX
 verb doc = text "{\\haddockverb\\begin{verbatim}" $$ doc <> text "\\end{verbatim}}"

@@ -30,6 +30,7 @@ import           RdrName
 import           SrcLoc (mkRealSrcLoc, unLoc)
 import           StringBuffer (stringToStringBuffer)
 import           Haddock.Utf8
+import           Haddock.Parser.Util
 
 {-# DEPRECATED parseParasMaybe "use `parseParas` instead" #-}
 parseParasMaybe :: DynFlags -> String -> Maybe (Doc RdrName)
@@ -63,7 +64,7 @@ parseStringBS d = parse p
   where
     p :: Parser (Doc RdrName)
     p = mconcat <$> many (monospace d <|> anchor <|> identifier d
-                          <|> moduleName <|> picture <|> hyperlink <|> autoUrl
+                          <|> moduleName <|> picture <|> hyperlink <|> autoUrl <|> bold d
                           <|> emphasis d <|> encodedChar <|> string' <|> skipSpecialChar)
 
 -- | Parses and processes
@@ -79,7 +80,7 @@ encodedChar = "&#" *> c <* ";"
     hex = ("x" <|> "X") *> hexadecimal
 
 specialChar :: [Char]
-specialChar = "/<@\"&'`"
+specialChar = "_/<@\"&'`"
 
 -- | Plain, regular parser for text. Called as one of the last parsers
 -- to ensure that we have already given a chance to more meaningful parsers
@@ -104,6 +105,16 @@ skipSpecialChar = DocString . return <$> satisfy (`elem` specialChar)
 emphasis :: DynFlags -> Parser (Doc RdrName)
 emphasis d = DocEmphasis . parseStringBS d <$>
   mfilter ('\n' `BS.notElem`) ("/" *> takeWhile1_ (/= '/') <* "/")
+
+-- | Bold parser.
+--
+-- >>> parseOnly bold "__Hello world__"
+-- Right (DocBold (DocString "Hello world"))
+bold :: DynFlags -> Parser (Doc RdrName)
+bold d = DocBold . parseStringBS d <$> disallowNewline ("__" *> takeUntil "__")
+
+disallowNewline :: Parser BS.ByteString -> Parser BS.ByteString
+disallowNewline = mfilter ('\n' `BS.notElem`)
 
 -- | Like `takeWhile`, but unconditionally take escaped characters.
 takeWhile_ :: (Char -> Bool) -> Parser BS.ByteString

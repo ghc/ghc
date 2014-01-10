@@ -11,7 +11,7 @@
 -- Write out Hoogle compatible documentation
 -- http://www.haskell.org/hoogle/
 -----------------------------------------------------------------------------
-module Haddock.Backends.Hoogle ( 
+module Haddock.Backends.Hoogle (
     ppHoogle
   ) where
 
@@ -160,7 +160,7 @@ ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
     = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=Nothing }} :
       concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
     where
-        
+
         -- GHC gives out "data Bar =", we want to delete the equals
         -- also writes data : a b, when we want data (:) a b
         showData d = unwords $ map f $ if last xs == "=" then init xs else xs
@@ -194,7 +194,7 @@ ppCtor dflags dat subdocs con = lookupCon dflags subdocs (con_name con)
         name = out dflags $ unL $ con_name con
 
         resType = case con_res con of
-            ResTyH98 -> apps $ map (reL . HsTyVar) $ 
+            ResTyH98 -> apps $ map (reL . HsTyVar) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvBndrs $ tyClDeclTyVars dat]
             ResTyGADT x -> x
 
@@ -247,6 +247,7 @@ markupTag dflags = Markup {
   markupModule               = box (TagInline "a") . str,
   markupWarning              = box (TagInline "i"),
   markupEmphasis             = box (TagInline "i"),
+  markupBold                 = box (TagInline "b"),
   markupMonospaced           = box (TagInline "tt"),
   markupPic                  = const $ str " ",
   markupUnorderedList        = box (TagL 'u'),

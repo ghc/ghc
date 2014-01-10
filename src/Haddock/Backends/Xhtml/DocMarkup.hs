@@ -43,6 +43,7 @@ parHtmlMarkup qual ppId = Markup {
                                      in ppModuleRef (mkModuleName mdl) ref,
   markupWarning              = thediv ! [theclass "warning"],
   markupEmphasis             = emphasize,
+  markupBold                 = strong,
   markupMonospaced           = thecode,
   markupUnorderedList        = unordList,
   markupOrderedList          = ordList,

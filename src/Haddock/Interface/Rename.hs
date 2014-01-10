@@ -443,7 +443,7 @@ renameTyFamInstEqn :: TyFamInstEqn Name -> RnM (TyFamInstEqn DocName)
 renameTyFamInstEqn (TyFamInstEqn { tfie_tycon = tc, tfie_pats = pats_w_bndrs, tfie_rhs = rhs })
   = do { tc' <- renameL tc
        ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
-       ; rhs' <- renameLType rhs 
+       ; rhs' <- renameLType rhs
        ; return (TyFamInstEqn { tfie_tycon = tc', tfie_pats = pats_w_bndrs { hswb_cts = pats' }
                               , tfie_rhs = rhs' }) }
 
@@ -451,7 +451,7 @@ renameDataFamInstD :: DataFamInstDecl Name -> RnM (DataFamInstDecl DocName)
 renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats_w_bndrs, dfid_defn = defn })
   = do { tc' <- renameL tc
        ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
-       ; defn' <- renameDataDefn defn 
+       ; defn' <- renameDataDefn defn
        ; return (DataFamInstDecl { dfid_tycon = tc', dfid_pats = pats_w_bndrs { hswb_cts = pats' }
                                  , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
 

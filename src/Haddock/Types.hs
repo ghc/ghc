@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, GADTs #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -299,6 +299,7 @@ data Doc id
   | DocWarning (Doc id)
   | DocEmphasis (Doc id)
   | DocMonospaced (Doc id)
+  | DocBold (Doc id)
   | DocUnorderedList [Doc id]
   | DocOrderedList [Doc id]
   | DocDefList [(Doc id, Doc id)]
@@ -321,6 +322,7 @@ instance NFData a => NFData (Doc a) where
     DocModule a               -> a `deepseq` ()
     DocWarning a              -> a `deepseq` ()
     DocEmphasis a             -> a `deepseq` ()
+    DocBold a                 -> a `deepseq` ()
     DocMonospaced a           -> a `deepseq` ()
     DocUnorderedList a        -> a `deepseq` ()
     DocOrderedList a          -> a `deepseq` ()
@@ -382,6 +384,7 @@ data DocMarkup id a = Markup
   , markupModule               :: String -> a
   , markupWarning              :: a -> a
   , markupEmphasis             :: a -> a
+  , markupBold                 :: a -> a
   , markupMonospaced           :: a -> a
   , markupUnorderedList        :: [a] -> a
   , markupOrderedList          :: [a] -> a

@@ -174,7 +174,53 @@ spec = before initStaticOpts $ do
         "/foo\\/bar/" `shouldParseTo` DocEmphasis "foo/bar"
 
       it "recognizes other markup constructs within emphasised text" $ do
-        "/foo @bar@ baz/" `shouldParseTo` DocEmphasis ("foo " <> DocMonospaced "bar" <> " baz")
+        "/foo @bar@ baz/" `shouldParseTo`
+          DocEmphasis ("foo " <> DocMonospaced "bar" <> " baz")
+
+      it "allows other markup inside of emphasis" $ do
+        "/__inner bold__/" `shouldParseTo` DocEmphasis (DocBold "inner bold")
+
+      it "doesn't mangle inner markup unicode" $ do
+        "/__灼眼のシャナ &#65;__/" `shouldParseTo` DocEmphasis (DocBold "灼眼のシャナ A")
+
+      it "properly converts HTML escape sequences" $ do
+        "/&#65;&#65;&#65;&#65;/" `shouldParseTo` DocEmphasis "AAAA"
+
+      it "allows to escape the emphasis delimiter inside of emphasis" $ do
+        "/empha\\/sis/" `shouldParseTo` DocEmphasis "empha/sis"
+
+    context "when parsing bold strings" $ do
+      it "allows for a bold string on its own" $ do
+        "__bold string__" `shouldParseTo`
+          DocBold "bold string"
+
+      it "bolds inline correctly" $ do
+        "hello __everyone__ there" `shouldParseTo`
+          "hello "
+           <> DocBold "everyone" <> " there"
+
+      it "bolds unicode" $ do
+        "__灼眼のシャナ__" `shouldParseTo`
+          DocBold "灼眼のシャナ"
+
+      it "does not do __multi-line\\n bold__" $ do
+        " __multi-line\n bold__" `shouldParseTo` "__multi-line\n bold__"
+
+      it "allows other markup inside of bold" $ do
+        "__/inner emphasis/__" `shouldParseTo`
+          (DocBold $ DocEmphasis "inner emphasis")
+
+      it "doesn't mangle inner markup unicode" $ do
+        "__/灼眼のシャナ &#65;/__" `shouldParseTo`
+          (DocBold $ DocEmphasis "灼眼のシャナ A")
+
+      it "properly converts HTML escape sequences" $ do
+        "__&#65;&#65;&#65;&#65;__" `shouldParseTo`
+          DocBold "AAAA"
+
+      it "allows to escape the bold delimiter inside of bold" $ do
+        "__bo\\__ld__" `shouldParseTo`
+          DocBold "bo__ld"
 
     context "when parsing monospaced text" $ do
       it "parses simple monospaced text" $ do

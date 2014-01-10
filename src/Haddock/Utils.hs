@@ -36,7 +36,7 @@ module Haddock.Utils (
   -- * HTML cross reference mapping
   html_xrefs_ref, html_xrefs_ref',
 
-  -- * Doc markup 
+  -- * Doc markup
   markup,
   idMarkup,
 
@@ -126,7 +126,7 @@ toInstalledDescription = hmi_description . instInfo
 
 restrictTo :: [Name] -> LHsDecl Name -> LHsDecl Name
 restrictTo names (L loc decl) = L loc $ case decl of
-  TyClD d | isDataDecl d  -> 
+  TyClD d | isDataDecl d  ->
     TyClD (d { tcdDataDefn = restrictDataDefn names (tcdDataDefn d) })
   TyClD d | isClassDecl d ->
     TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
@@ -239,7 +239,7 @@ subIndexHtmlFile ls = "doc-index-" ++ b ++ ".html"
 -- isn't clear if such fragment identifiers should, or should not be unescaped
 -- before being matched with IDs in the target document.
 -------------------------------------------------------------------------------
- 
+
 
 moduleUrl :: Module -> String
 moduleUrl = moduleHtmlFile
@@ -285,7 +285,7 @@ framesFile = "frames.html"
 
 
 -------------------------------------------------------------------------------
--- * Misc. 
+-- * Misc.
 -------------------------------------------------------------------------------
 
 
@@ -422,6 +422,7 @@ markup m (DocIdentifierUnchecked x)  = markupIdentifierUnchecked m x
 markup m (DocModule mod0)            = markupModule m mod0
 markup m (DocWarning d)              = markupWarning m (markup m d)
 markup m (DocEmphasis d)             = markupEmphasis m (markup m d)
+markup m (DocBold d)                 = markupBold m (markup m d)
 markup m (DocMonospaced d)           = markupMonospaced m (markup m d)
 markup m (DocUnorderedList ds)       = markupUnorderedList m (map (markup m) ds)
 markup m (DocOrderedList ds)         = markupOrderedList m (map (markup m) ds)
@@ -450,6 +451,7 @@ idMarkup = Markup {
   markupModule               = DocModule,
   markupWarning              = DocWarning,
   markupEmphasis             = DocEmphasis,
+  markupBold                 = DocBold,
   markupMonospaced           = DocMonospaced,
   markupUnorderedList        = DocUnorderedList,
   markupOrderedList          = DocOrderedList,
@@ -474,4 +476,3 @@ foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int ==
 getProcessID :: IO Int
 getProcessID = fmap fromIntegral System.Posix.Internals.c_getpid
 #endif
-
