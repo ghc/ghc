@@ -27,7 +27,7 @@ module Demand (
         peelFV,
 
         DmdResult, CPRResult,
-        isBotRes, isTopRes, resTypeArgDmd, 
+        isBotRes, isTopRes,
         topRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig, 
         trimCPRInfo, returnsCPR, returnsCPR_maybe,
@@ -819,14 +819,32 @@ retCPR_maybe (RetSum t)  = Just t
 retCPR_maybe RetProd     = Just fIRST_TAG
 retCPR_maybe NoCPR       = Nothing
 
+-- See Notes [Default demand on free variales]
+-- and [defaultDmd vs. resTypeArgDmd]
+defaultDmd :: Termination r -> JointDmd
+defaultDmd Diverges = botDmd
+defaultDmd _        = absDmd
+
 resTypeArgDmd :: DmdResult -> JointDmd
 -- TopRes and BotRes are polymorphic, so that
 --      BotRes === Bot -> BotRes === ...
 --      TopRes === Top -> TopRes === ...
 -- This function makes that concrete
+-- Also see Note [defaultDmd vs. resTypeArgDmd]
 resTypeArgDmd r | isBotRes r = botDmd
 resTypeArgDmd _              = topDmd
 \end{code}
+
+Note [defaultDmd and resTypeArgDmd]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These functions are similar: They express the demand on something not
+explictitly mentioned in the environment resp. the argument list. Yet they are
+different:
+ * Variables not mentioned in the free variables environment are definitely
+   unused, so we can use absDmd there.
+ * Further arguments *can* be used, of course. Hence topDmd is used.
+
 
 %************************************************************************
 %*                                                                      *
@@ -1020,12 +1038,11 @@ lubDmdType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
   where
     lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
 
-      -- Extend the shorter argument list to match the longer
-    lub_ds (d1:ds1) (d2:ds2) = lubDmd d1 d2 : lub_ds ds1 ds2
-    lub_ds []     []       = []
-    lub_ds ds1    []       = map (`lubDmd` resTypeArgDmd r2) ds1
-    lub_ds []     ds2      = map (resTypeArgDmd r1 `lubDmd`) ds2
-
+    -- Extend the shorter argument list to match the longer, using resTypeArgDmd
+    lub_ds (d1:ds1) (d2:ds2) = lubDmd d1 d2                   : lub_ds ds1 ds2
+    lub_ds (d1:ds1) []       = (d1 `lubDmd` resTypeArgDmd r2) : lub_ds ds1 []
+    lub_ds []       (d2:ds2) = (resTypeArgDmd r1 `lubDmd` d2) : lub_ds [] ds2
+    lub_ds []       []       = []
 
 type BothDmdArg = (DmdEnv, Termination ())
 
@@ -1260,10 +1277,6 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
   fv' = fv `delVarEnv` id
   -- See note [Default demand on free variables]
   dmd  = lookupVarEnv fv id `orElse` defaultDmd res
-
-defaultDmd :: Termination r -> Demand
-defaultDmd Diverges = botDmd
-defaultDmd _        = absDmd
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
