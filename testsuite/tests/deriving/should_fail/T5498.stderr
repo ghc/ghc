@@ -1,1 +1,11 @@
- 
+
+T5498.hs:30:39:
+    Could not coerce from ‛c a’ to ‛c (Down a)’
+      because ‛c a’ and ‛c (Down a)’ are different types.
+      arising from the coercion of the method ‛intIso’ from type
+                   ‛forall (c :: * -> *). c a -> c Int’ to type
+                   ‛forall (c :: * -> *). c (Down a) -> c Int’
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (IntIso (Down a))
