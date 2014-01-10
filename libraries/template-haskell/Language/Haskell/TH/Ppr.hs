@@ -50,21 +50,21 @@ instance Ppr Info where
     ppr (TyConI d)     = ppr d
     ppr (ClassI d is)  = ppr d $$ vcat (map ppr is)
     ppr (FamilyI d is) = ppr d $$ vcat (map ppr is)
-    ppr (PrimTyConI name arity is_unlifted) 
+    ppr (PrimTyConI name arity is_unlifted)
       = text "Primitive"
 	<+> (if is_unlifted then text "unlifted" else empty)
 	<+> text "type constructor" <+> quotes (ppr name)
 	<+> parens (text "arity" <+> int arity)
-    ppr (ClassOpI v ty cls fix) 
+    ppr (ClassOpI v ty cls fix)
       = text "Class op from" <+> ppr cls <> colon <+>
         vcat [ppr_sig v ty, pprFixity v fix]
-    ppr (DataConI v ty tc fix) 
+    ppr (DataConI v ty tc fix)
       = text "Constructor from" <+> ppr tc <> colon <+>
         vcat [ppr_sig v ty, pprFixity v fix]
     ppr (TyVarI v ty)
       = text "Type variable" <+> ppr v <+> equals <+> ppr ty
-    ppr (VarI v ty mb_d fix) 
-      = vcat [ppr_sig v ty, pprFixity v fix, 
+    ppr (VarI v ty mb_d fix)
+      = vcat [ppr_sig v ty, pprFixity v fix,
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
 
 ppr_sig :: Name -> Type -> Doc
@@ -95,9 +95,9 @@ pprPrefixOcc n = parensIf (isSymOcc n) (ppr n)
 
 isSymOcc :: Name -> Bool
 isSymOcc n
-  = case nameBase n of 
+  = case nameBase n of
       []    -> True  -- Empty name; weird
-      (c:_) -> isSymbolASCII c || (ord c > 0x7f && isSymbol c) 
+      (c:_) -> isSymbolASCII c || (ord c > 0x7f && isSymbol c)
                    -- c.f. OccName.startsVarSym in GHC itself
 
 isSymbolASCII :: Char -> Bool
@@ -158,7 +158,7 @@ pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
     pprStms []  = empty
     pprStms [s] = ppr s
     pprStms ss  = braces $ sep $ punctuate semi $ map ppr ss
-    
+
 pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
 pprExp _ (CompE ss) = text "[" <> ppr s
@@ -197,7 +197,7 @@ instance Ppr Match where
 pprGuarded :: Doc -> (Guard, Exp) -> Doc
 pprGuarded eqDoc (guard, expr) = case guard of
   NormalG guardExpr -> char '|' <+> ppr guardExpr <+> eqDoc <+> ppr expr
-  PatG    stmts     -> char '|' <+> vcat (punctuate comma $ map ppr stmts) $$ 
+  PatG    stmts     -> char '|' <+> vcat (punctuate comma $ map ppr stmts) $$
                          nest nestDepth (eqDoc <+> ppr expr)
 
 ------------------------------
@@ -222,14 +222,14 @@ pprLit _ (CharL c)       = text (show c)
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $
-                           integer (numerator rat) <+> char '/' 
+                           integer (numerator rat) <+> char '/'
                               <+> integer (denominator rat)
 
 bytesToString :: [Word8] -> String
 bytesToString = map (chr . fromIntegral)
 
 pprString :: String -> Doc
--- Print newlines as newlines with Haskell string escape notation, 
+-- Print newlines as newlines with Haskell string escape notation,
 -- not as '\n'.  For other non-printables use regular escape notation.
 pprString s = vcat (map text (showMultiLineString s))
 
@@ -271,18 +271,18 @@ instance Ppr Dec where
     ppr = ppr_dec True
 
 ppr_dec :: Bool     -- declaration on the toplevel?
-        -> Dec 
+        -> Dec
         -> Doc
 ppr_dec _ (FunD f cs)   = vcat $ map (\c -> pprPrefixOcc f <+> ppr c) cs
 ppr_dec _ (ValD p r ds) = ppr p <+> pprBody True r
                           $$ where_clause ds
-ppr_dec _ (TySynD t xs rhs) 
+ppr_dec _ (TySynD t xs rhs)
   = ppr_tySyn empty t (hsep (map ppr xs)) rhs
-ppr_dec _ (DataD ctxt t xs cs decs) 
+ppr_dec _ (DataD ctxt t xs cs decs)
   = ppr_data empty ctxt t (hsep (map ppr xs)) cs decs
 ppr_dec _ (NewtypeD ctxt t xs c decs)
   = ppr_newtype empty ctxt t (sep (map ppr xs)) c decs
-ppr_dec _  (ClassD ctxt c xs fds ds) 
+ppr_dec _  (ClassD ctxt c xs fds ds)
   = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
 ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
@@ -291,7 +291,7 @@ ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> text "::" <+> ppr t
 ppr_dec _ (ForeignD f)  = ppr f
 ppr_dec _ (InfixD fx n) = pprFixity n fx
 ppr_dec _ (PragmaD p)   = ppr p
-ppr_dec isTop (FamilyD flav tc tvs k) 
+ppr_dec isTop (FamilyD flav tc tvs k)
   = ppr flav <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
   where
     maybeFamily | isTop     = text "family"
@@ -299,12 +299,12 @@ ppr_dec isTop (FamilyD flav tc tvs k)
 
     maybeKind | (Just k') <- k = text "::" <+> ppr k'
               | otherwise      = empty
-ppr_dec isTop (DataInstD ctxt tc tys cs decs) 
+ppr_dec isTop (DataInstD ctxt tc tys cs decs)
   = ppr_data maybeInst ctxt tc (sep (map pprParendType tys)) cs decs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec isTop (NewtypeInstD ctxt tc tys c decs) 
+ppr_dec isTop (NewtypeInstD ctxt tc tys c decs)
   = ppr_newtype maybeInst ctxt tc (sep (map pprParendType tys)) c decs
   where
     maybeInst | isTop     = text "instance"
@@ -338,7 +338,7 @@ ppr_data maybeInst ctxt t argsDoc cs decs
            else nest nestDepth
               $ text "deriving"
                 <+> parens (hsep $ punctuate comma $ map ppr decs)]
-  where 
+  where
     pref :: [Doc] -> [Doc]
     pref []     = []      -- No constructors; can't happen in H98
     pref (d:ds) = (char '=' <+> d):map (char '|' <+>) ds
@@ -496,6 +496,8 @@ instance Ppr Type where
 
 pprTyApp :: (Type, [Type]) -> Doc
 pprTyApp (ArrowT, [arg1,arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
+pprTyApp (EqualityT, [arg1, arg2]) =
+    sep [pprFunArgType arg1 <+> text "~", ppr arg2]
 pprTyApp (ListT, [arg]) = brackets (ppr arg)
 pprTyApp (TupleT n, args)
  | length args == n = parens (sep (punctuate comma (map ppr args)))
@@ -540,11 +542,6 @@ pprCxt [t] = ppr t <+> text "=>"
 pprCxt ts = parens (sep $ punctuate comma $ map ppr ts) <+> text "=>"
 
 ------------------------------
-instance Ppr Pred where
-  ppr (ClassP cla tys) = ppr cla <+> sep (map pprParendType tys)
-  ppr (EqualP ty1 ty2) = pprFunArgType ty1 <+> char '~' <+> pprFunArgType ty2
-
-------------------------------
 instance Ppr Range where
     ppr = brackets . pprRange
         where pprRange :: Range -> Doc
@@ -569,4 +566,3 @@ hashParens d = text "(# " <> d <> text " #)"
 
 quoteParens :: Doc -> Doc
 quoteParens d = text "'(" <> d <> text ")"
-

@@ -58,7 +58,7 @@ module Language.Haskell.TH(
     -- quotations (@[| |]@) and splices (@$( ... )@)
 
     -- ** Declarations
-	Dec(..), Con(..), Clause(..), 
+	Dec(..), Con(..), Clause(..),
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
 	FunDep(..), FamFlavour(..), TySynEqn(..),
@@ -68,7 +68,7 @@ module Language.Haskell.TH(
     -- ** Patterns
         Pat(..), FieldExp, FieldPat,
     -- ** Types
-        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred(..), Syntax.Role(..),
+        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
 
     -- * Library functions
     -- ** Abbreviations
@@ -105,14 +105,14 @@ module Language.Haskell.TH(
     bindS, letS, noBindS, parS,
 
     -- *** Types
-	forallT, varT, conT, appT, arrowT, listT, tupleT, sigT, litT,
+	forallT, varT, conT, appT, arrowT, equalityT, listT, tupleT, sigT, litT,
     promotedT, promotedTupleT, promotedNilT, promotedConsT,
     -- **** Type literals
     numTyLit, strTyLit,
     -- **** Strictness
 	isStrict, notStrict, strictType, varStrictType,
     -- **** Class Contexts
-    cxt, classP, equalP, normalC, recC, infixC, forallC,
+    cxt, normalC, recC, infixC, forallC,
 
     -- *** Kinds
   varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,
@@ -146,4 +146,3 @@ module Language.Haskell.TH(
 import Language.Haskell.TH.Syntax as Syntax
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Ppr
-

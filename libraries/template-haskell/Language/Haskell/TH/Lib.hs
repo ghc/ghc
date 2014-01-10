@@ -466,19 +466,6 @@ tySynEqn lhs rhs =
 cxt :: [PredQ] -> CxtQ
 cxt = sequence
 
-classP :: Name -> [TypeQ] -> PredQ
-classP cla tys
-  = do
-      tys1 <- sequence tys
-      return (ClassP cla tys1)
-
-equalP :: TypeQ -> TypeQ -> PredQ
-equalP tleft tright
-  = do
-      tleft1  <- tleft
-      tright1 <- tright
-      return (EqualP tleft1 tright1)
-
 normalC :: Name -> [StrictTypeQ] -> ConQ
 normalC con strtys = liftM (NormalC con) $ sequence strtys
 
@@ -535,6 +522,14 @@ sigT t k
   = do
       t' <- t
       return $ SigT t' k
+
+equalityT :: TypeQ -> TypeQ -> TypeQ
+equalityT tleft tright
+  = do
+      tleft1  <- tleft
+      tright1 <- tright
+      let typ = AppT (AppT EqualityT tleft1) tright1
+      return typ
 
 promotedT :: Name -> TypeQ
 promotedT = return . PromotedT

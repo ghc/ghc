@@ -770,8 +770,8 @@ mkName str
 	-- This rather bizarre case actually happened; (.&.) is in Data.Bits
     split occ (c:rev)   = split (c:occ) rev
 
-    -- Recognises a reversed module name xA.yB.C, 
-    -- with at least one component, 
+    -- Recognises a reversed module name xA.yB.C,
+    -- with at least one component,
     -- and each component looks like a module name
     --   (i.e. non-empty, starts with capital, all alpha)
     is_rev_mod_name rev_mod_str
@@ -1346,9 +1346,7 @@ data AnnTarget = ModuleAnnotation
 
 type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 
-data Pred = ClassP Name [Type]    -- ^ @Eq (Int, a)@
-          | EqualP Type Type      -- ^ @F a ~ Bool@
-          deriving( Show, Eq, Data, Typeable )
+type Pred = Type
 
 data Strict = IsStrict | NotStrict | Unpacked
          deriving( Show, Eq, Data, Typeable )
@@ -1373,6 +1371,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | TupleT Int                    -- ^ @(,), (,,), etc.@
           | UnboxedTupleT Int             -- ^ @(#,#), (#,,#), etc.@
           | ArrowT                        -- ^ @->@
+          | EqualityT                     -- ^ @~@
           | ListT                         -- ^ @[]@
           | PromotedTupleT Int            -- ^ @'(), '(,), '(,,), etc.@
           | PromotedNilT                  -- ^ @'[]@
@@ -1453,4 +1452,3 @@ cmpEq _  = False
 thenCmp :: Ordering -> Ordering -> Ordering
 thenCmp EQ o2 = o2
 thenCmp o1 _  = o1
-
