@@ -113,7 +113,7 @@ Roman.foo_go =
 Roman.foo2 :: GHC.Types.Int
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m,
+ Str=DmdType tm,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 20}]

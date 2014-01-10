@@ -136,7 +136,7 @@ dmdAnal :: AnalEnv
 -- The CleanDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
-dmdAnal _ _ (Lit lit)     = (nopDmdType, Lit lit)
+dmdAnal _ _ (Lit lit)     = (litDmdType, Lit lit)
 dmdAnal _ _ (Type ty)     = (nopDmdType, Type ty)	-- Doesn't happen, in fact
 dmdAnal _ _ (Coercion co) = (nopDmdType, Coercion co)
 
