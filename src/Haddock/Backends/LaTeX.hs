@@ -128,7 +128,7 @@ ppLaTeXTop doctitle packageStr odir prologue maybe_style ifaces = do
 
       filename = odir </> (fromMaybe "haddock" packageStr <.> "tex")
 
-  writeFile filename (render tex)
+  writeFile filename (show tex)
 
 
 ppLaTeXModule :: String -> FilePath -> Interface -> IO ()
@@ -401,7 +401,7 @@ declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
 declWithDoc decl doc =
    text "\\begin{haddockdesc}" $$
    text "\\item[\\begin{tabular}{@{}l}" $$
-   text (latexMonoFilter (render decl)) $$
+   text (latexMonoFilter (show decl)) $$
    text "\\end{tabular}]" <>
        (if isNothing doc then empty else text "\\haddockbegindoc") $$
    maybe empty id doc $$
@@ -416,7 +416,7 @@ multiDecl decls =
    text "\\begin{haddockdesc}" $$
    vcat [
       text "\\item[" $$
-      text (latexMonoFilter (render decl)) $$
+      text (latexMonoFilter (show decl)) $$
       text "]"
       | decl <- decls ] $$
    text "\\end{haddockdesc}"
