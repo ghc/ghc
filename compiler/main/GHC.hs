@@ -444,16 +444,17 @@ runGhcT mb_top_dir ghct = do
 -- <http://hackage.haskell.org/cgi-bin/hackage-scripts/package/ghc-paths>.
 
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
-initGhcMonad mb_top_dir = do
-  -- catch ^C
-  liftIO $ installSignalHandlers
-
-  liftIO $ initStaticOpts
-
-  mySettings <- liftIO $ initSysTools mb_top_dir
-  dflags <- liftIO $ initDynFlags (defaultDynFlags mySettings)
-  env <- liftIO $ newHscEnv dflags
-  setSession env
+initGhcMonad mb_top_dir
+  = do { env <- liftIO $
+                do { installSignalHandlers  -- catch ^C
+                   ; initStaticOpts
+                   ; mySettings <- initSysTools mb_top_dir
+                   ; dflags <- initDynFlags (defaultDynFlags mySettings)
+                   ; setUnsafeGlobalDynFlags dflags
+                      -- c.f. DynFlags.parseDynamicFlagsFull, which
+                      -- creates DynFlags and sets the UnsafeGlobalDynFlags
+                   ; newHscEnv dflags }
+       ; setSession env }
 
 
 -- %************************************************************************
