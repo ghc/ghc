@@ -6069,6 +6069,35 @@ type family SafeHead where   -- SafeHead :: [k] -> Maybe k
 </para>
 
 </sect2>
+
+<sect2><title>Kind inference in class instance declarations</title>
+
+<para>Consider the following example of a poly-kinded class and an instance for it:</para>
+
+<programlisting>
+class C a where
+  type F a
+
+instance C b where
+  type F b = b -> b
+</programlisting>
+
+<para>In the class declaration, nothing constrains the kind of the type
+<literal>a</literal>, so it becomes a poly-kinded type variable <literal>(a :: k)</literal>.
+Yet, in the instance declaration, the right-hand side of the associated type instance
+<literal>b -> b</literal> says that <literal>b</literal> must be of kind <literal>*</literal>. GHC could theoretically propagate this information back into the instance head, and
+make that instance declaration apply only to type of kind <literal>*</literal>, as opposed
+to types of any kind. <emphasis>However, GHC does not do this.</emphasis></para>
+
+<para>In short: GHC does <emphasis>not</emphasis> propagate kind information from
+the members of a class instance declaration into the instance declaration head.</para>
+
+<para>This lack of kind inference is simply an engineering problem within GHC, but
+getting it to work would make a substantial change to the inference infrastructure,
+and it's not clear the payoff is worth it. If you want to restrict <literal>b</literal>'s
+kind in the instance above, just use a kind signature in the instance head.</para>
+
+</sect2>
 </sect1>
 
 <sect1 id="promotion">
