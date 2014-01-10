@@ -200,7 +200,7 @@ These conditions apply regardless of the activation of the RULE (eg it might be
 inactive in this phase but become active later).  Once a Rec is broken up
 it can never be put back together, so we must be conservative.
 
-The principle is that, regardless of rule firings, every variale is
+The principle is that, regardless of rule firings, every variable is
 always in scope.
 
   * Note [Rules are extra RHSs]

@@ -819,7 +819,7 @@ retCPR_maybe (RetSum t)  = Just t
 retCPR_maybe RetProd     = Just fIRST_TAG
 retCPR_maybe NoCPR       = Nothing
 
--- See Notes [Default demand on free variales]
+-- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
 defaultDmd :: Termination r -> JointDmd
 defaultDmd Diverges = botDmd
@@ -839,7 +839,7 @@ Note [defaultDmd and resTypeArgDmd]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 These functions are similar: They express the demand on something not
-explictitly mentioned in the environment resp. the argument list. Yet they are
+explicitly mentioned in the environment resp. the argument list. Yet they are
 different:
  * Variables not mentioned in the free variables environment are definitely
    unused, so we can use absDmd there.
