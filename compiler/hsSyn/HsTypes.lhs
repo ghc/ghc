@@ -407,9 +407,9 @@ plus :: HsExplicitFlag -> HsExplicitFlag -> HsExplicitFlag
 Implicit `plus` Implicit = Implicit
 _        `plus` _        = Explicit
 
-hsExplicitTvs :: LHsType name -> [name]
+hsExplicitTvs :: LHsType Name -> [Name]
 -- The explicitly-given forall'd type variables of a HsType
-hsExplicitTvs (L _ (HsForAllTy Explicit tvs _ _)) = hsLTyVarNames tvs
+hsExplicitTvs (L _ (HsForAllTy Explicit tvs _ _)) = hsLKiTyVarNames tvs
 hsExplicitTvs _                                   = []
 
 ---------------------
