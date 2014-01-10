@@ -5679,6 +5679,23 @@ instance C [c] d where
         type safety.
       </para>
     </sect3>
+
+    <sect3><title>Instance contexts and associated type and data instances</title>
+    <para>Associated type and data instance declarations do not inherit any
+          context specified on the enclosing instance. For type instance declarations,
+	  it is unclear what the context would mean. For data instance declarations,
+	  it is unlikely a user would want the context repeated for every data constructor.
+	  The only place where the context might likely be useful is in a
+	  <literal>deriving</literal> clause of an associated data instance. However,
+	  even here, the role of the outer instance context is murky. So, for
+	  clarity, we just stick to the rule above: the enclosing instance context
+	  is ignored. If you need to use
+	  a non-trivial context on a derived instance,
+	  use a <link linkend="stand-alone-deriving">standalone
+	  deriving</link> clause (at the top level).
+    </para>
+    </sect3>
+
   </sect2>
 
   <sect2 id="data-family-import-export">
@@ -6087,7 +6104,7 @@ instance C b where
 Yet, in the instance declaration, the right-hand side of the associated type instance
 <literal>b -> b</literal> says that <literal>b</literal> must be of kind <literal>*</literal>. GHC could theoretically propagate this information back into the instance head, and
 make that instance declaration apply only to type of kind <literal>*</literal>, as opposed
-to types of any kind. <emphasis>However, GHC does not do this.</emphasis></para>
+to types of any kind. However, GHC does <emphasis>not</emphasis> do this.</para>
 
 <para>In short: GHC does <emphasis>not</emphasis> propagate kind information from
 the members of a class instance declaration into the instance declaration head.</para>
