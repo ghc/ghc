@@ -40,7 +40,10 @@ import GHC.Integer.GMP.Prim (
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, plusIntegerInt#, minusInteger#, minusIntegerInt#,
     timesInteger#, timesIntegerInt#,
-    quotRemInteger#, quotRemIntegerWord#,
+    quotRemInteger#,
+#if SIZEOF_HSWORD == 8
+    quotRemIntegerWord#,
+#endif
     quotInteger#, quotIntegerWord#, remInteger#, remIntegerWord#,
     divModInteger#, divInteger#, modInteger#,
     gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
