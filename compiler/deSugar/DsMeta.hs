@@ -277,7 +277,7 @@ repFamilyDecl (L loc (FamilyDecl { fdInfo    = info,
                                    fdKindSig = opt_kind }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
-           case (opt_kind, info) of 
+           case (opt_kind, info) of
                   (Nothing, ClosedTypeFamily eqns) ->
                     do { eqns1 <- mapM repTyFamEqn eqns
                        ; eqns2 <- coreList tySynEqnQTyConName eqns1
@@ -286,13 +286,13 @@ repFamilyDecl (L loc (FamilyDecl { fdInfo    = info,
                     do { eqns1 <- mapM repTyFamEqn eqns
                        ; eqns2 <- coreList tySynEqnQTyConName eqns1
                        ; ki1 <- repLKind ki
-                       ; repClosedFamilyKind tc1 bndrs ki1 eqns2 }              
+                       ; repClosedFamilyKind tc1 bndrs ki1 eqns2 }
                   (Nothing, _) ->
                     do { info' <- repFamilyInfo info
                        ; repFamilyNoKind info' tc1 bndrs }
                   (Just ki, _) ->
                     do { info' <- repFamilyInfo info
-                       ; ki1 <- repLKind ki 
+                       ; ki1 <- repLKind ki
                        ; repFamilyKind info' tc1 bndrs ki1 }
        ; return (loc, dec)
        }
@@ -389,7 +389,7 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
 repTyFamInstD :: TyFamInstDecl Name -> DsM (Core TH.DecQ)
 repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
   = do { let tc_name = tyFamInstDeclLName decl
-       ; tc <- lookupLOcc tc_name               -- See note [Binders and occurrences]  
+       ; tc <- lookupLOcc tc_name               -- See note [Binders and occurrences]
        ; eqn1 <- repTyFamEqn eqn
        ; repTySynInst tc eqn1 }
 
@@ -763,19 +763,27 @@ repLPred :: LHsType Name -> DsM (Core TH.PredQ)
 repLPred (L _ p) = repPred p
 
 repPred :: HsType Name -> DsM (Core TH.PredQ)
-repPred (HsParTy ty) 
+repPred (HsParTy ty)
   = repLPred ty
 repPred ty
   | Just (cls, tys) <- splitHsClassTy_maybe ty
   = do
       cls1 <- lookupOcc cls
-      tys1 <- repList typeQTyConName repLTy tys
-      repClassP cls1 tys1
+      tyco <- repNamedTyCon cls1
+      tys' <- mapM repLTy tys
+      repTapps tyco tys'
 repPred (HsEqTy tyleft tyright)
   = do
       tyleft1  <- repLTy tyleft
       tyright1 <- repLTy tyright
-      repEqualP tyleft1 tyright1
+      repTequality tyleft1 tyright1
+repPred (HsTupleTy _ lps)
+  = do
+      tupTy <- repTupleTyCon size
+      foldM go tupTy lps
+  where
+    size = length lps
+    go ty' lp = repTapp ty' =<< repLPred lp
 repPred ty
   = notHandled "Exotic predicate type" (ppr ty)
 
@@ -1772,12 +1780,6 @@ repProto (MkC s) (MkC ty) = rep2 sigDName [s, ty]
 repCtxt :: Core [TH.PredQ] -> DsM (Core TH.CxtQ)
 repCtxt (MkC tys) = rep2 cxtName [tys]
 
-repClassP :: Core TH.Name -> Core [TH.TypeQ] -> DsM (Core TH.PredQ)
-repClassP (MkC cla) (MkC tys) = rep2 classPName [cla, tys]
-
-repEqualP :: Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.PredQ)
-repEqualP (MkC ty1) (MkC ty2) = rep2 equalPName [ty1, ty2]
-
 repConstr :: Core TH.Name -> HsConDeclDetails Name
           -> DsM (Core TH.ConQ)
 repConstr con (PrefixCon ps)
@@ -1815,6 +1817,9 @@ repTapps f (t:ts) = do { f1 <- repTapp f t; repTapps f1 ts }
 
 repTSig :: Core TH.TypeQ -> Core TH.Kind -> DsM (Core TH.TypeQ)
 repTSig (MkC ty) (MkC ki) = rep2 sigTName [ty, ki]
+
+repTequality :: Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.TypeQ)
+repTequality (MkC t1) (MkC t2) = rep2 equalityTName [t1, t2]
 
 repTPromotedList :: [Core TH.TypeQ] -> DsM (Core TH.TypeQ)
 repTPromotedList []     = repPromotedNilTyCon
@@ -2069,8 +2074,6 @@ templateHaskellNames = [
     roleAnnotDName,
     -- Cxt
     cxtName,
-    -- Pred
-    classPName, equalPName,
     -- Strict
     isStrictName, notStrictName, unpackedName,
     -- Con
@@ -2080,7 +2083,7 @@ templateHaskellNames = [
     -- VarStrictType
     varStrictTypeName,
     -- Type
-    forallTName, varTName, conTName, appTName,
+    forallTName, varTName, conTName, appTName, equalityTName,
     tupleTName, unboxedTupleTName, arrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     -- TyLit
@@ -2323,11 +2326,6 @@ roleAnnotDName    = libFun (fsLit "roleAnnotD")    roleAnnotDIdKey
 cxtName :: Name
 cxtName = libFun (fsLit "cxt") cxtIdKey
 
--- data Pred = ...
-classPName, equalPName :: Name
-classPName = libFun (fsLit "classP") classPIdKey
-equalPName = libFun (fsLit "equalP") equalPIdKey
-
 -- data Strict = ...
 isStrictName, notStrictName, unpackedName :: Name
 isStrictName      = libFun  (fsLit "isStrict")      isStrictKey
@@ -2351,7 +2349,7 @@ varStrictTypeName = libFun  (fsLit "varStrictType") varStrictTKey
 
 -- data Type = ...
 forallTName, varTName, conTName, tupleTName, unboxedTupleTName, arrowTName,
-    listTName, appTName, sigTName, litTName,
+    listTName, appTName, sigTName, equalityTName, litTName,
     promotedTName, promotedTupleTName,
     promotedNilTName, promotedConsTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
@@ -2363,6 +2361,7 @@ arrowTName          = libFun (fsLit "arrowT")         arrowTIdKey
 listTName           = libFun (fsLit "listT")          listTIdKey
 appTName            = libFun (fsLit "appT")           appTIdKey
 sigTName            = libFun (fsLit "sigT")           sigTIdKey
+equalityTName       = libFun (fsLit "equalityT")      equalityTIdKey
 litTName            = libFun (fsLit "litT")           litTIdKey
 promotedTName       = libFun (fsLit "promotedT")      promotedTIdKey
 promotedTupleTName  = libFun (fsLit "promotedTupleT") promotedTupleTIdKey
@@ -2681,11 +2680,6 @@ roleAnnotDIdKey              = mkPreludeMiscIdUnique 352
 cxtIdKey :: Unique
 cxtIdKey            = mkPreludeMiscIdUnique 360
 
--- data Pred = ...
-classPIdKey, equalPIdKey :: Unique
-classPIdKey         = mkPreludeMiscIdUnique 361
-equalPIdKey         = mkPreludeMiscIdUnique 362
-
 -- data Strict = ...
 isStrictKey, notStrictKey, unpackedKey :: Unique
 isStrictKey         = mkPreludeMiscIdUnique 363
@@ -2709,7 +2703,7 @@ varStrictTKey     = mkPreludeMiscIdUnique 375
 
 -- data Type = ...
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,
-    listTIdKey, appTIdKey, sigTIdKey, litTIdKey,
+    listTIdKey, appTIdKey, sigTIdKey, equalityTIdKey, litTIdKey,
     promotedTIdKey, promotedTupleTIdKey,
     promotedNilTIdKey, promotedConsTIdKey :: Unique
 forallTIdKey        = mkPreludeMiscIdUnique 380
@@ -2721,6 +2715,7 @@ arrowTIdKey         = mkPreludeMiscIdUnique 385
 listTIdKey          = mkPreludeMiscIdUnique 386
 appTIdKey           = mkPreludeMiscIdUnique 387
 sigTIdKey           = mkPreludeMiscIdUnique 388
+equalityTIdKey      = mkPreludeMiscIdUnique 362
 litTIdKey           = mkPreludeMiscIdUnique 389
 promotedTIdKey      = mkPreludeMiscIdUnique 390
 promotedTupleTIdKey = mkPreludeMiscIdUnique 391

@@ -22,6 +22,7 @@ import SrcLoc
 import Type
 import qualified Coercion ( Role(..) )
 import TysWiredIn
+import TysPrim (eqPrimTyCon)
 import BasicTypes as Hs
 import ForeignCall
 import Unique
@@ -894,16 +895,7 @@ cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
 
 cvtPred :: TH.Pred -> CvtM (LHsType RdrName)
-cvtPred (TH.ClassP cla tys)
-  = do { cla' <- if isVarName cla then tName cla else tconName cla
-       ; tys' <- mapM cvtType tys
-       ; mk_apps (HsTyVar cla') tys'
-       }
-cvtPred (TH.EqualP ty1 ty2)
-  = do { ty1' <- cvtType ty1
-       ; ty2' <- cvtType ty2
-       ; returnL $ HsEqTy ty1' ty2'
-       }
+cvtPred = cvtType
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
 cvtType = cvtTypeKind "type"
@@ -982,6 +974,10 @@ cvtTypeKind ty_str ty
 
            ConstraintT
              -> returnL (HsTyVar (getRdrName constraintKindTyCon))
+
+           EqualityT
+             | [x',y'] <- tys' -> returnL (HsEqTy x' y')
+             | otherwise       -> mk_apps (HsTyVar (getRdrName eqPrimTyCon)) tys'
 
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }

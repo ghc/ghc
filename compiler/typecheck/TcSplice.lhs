@@ -343,7 +343,7 @@ tcTypedBracket brack@(TExpBr expr) res_ty
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
        ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
-                                tcInferRhoNC expr 
+                                tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
 
        ; meta_ty <- tcTExpTy expr_ty
@@ -1016,7 +1016,7 @@ reifyInstances th_nm th_tys
                      ; let matches = lookupFamInstEnv inst_envs tc tys
                      ; traceTc "reifyInstances2" (ppr matches)
                      ; mapM (reifyFamilyInstance . fim_instance) matches }
-            _  -> bale_out (hang (ptext (sLit "reifyInstances:") <+> quotes (ppr ty)) 
+            _  -> bale_out (hang (ptext (sLit "reifyInstances:") <+> quotes (ppr ty))
                                2 (ptext (sLit "is not a class constraint or type family application"))) }
   where
     doc = ClassInstanceCtx
@@ -1309,7 +1309,7 @@ reifyClassInstance i
 
 ------------------------------
 reifyFamilyInstance :: FamInst -> TcM TH.Dec
-reifyFamilyInstance (FamInst { fi_flavor = flavor 
+reifyFamilyInstance (FamInst { fi_flavor = flavor
                              , fi_fam = fam
                              , fi_tys = lhs
                              , fi_rhs = rhs })
@@ -1399,7 +1399,7 @@ reifyFamFlavour tc
   | Just ax <- isClosedSynFamilyTyCon_maybe tc
   = do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
        ; return $ Right eqns }
-                   
+
   | otherwise
   = panic "TcSplice.reifyFamFlavour: not a type family"
 
@@ -1443,14 +1443,35 @@ reifyPred ty
   | isIPPred ty = noTH (sLit "implicit parameters") (ppr ty)
   | otherwise
    = case classifyPredType ty of
-  ClassPred cls tys -> do { tys' <- reifyTypes tys 
-                          ; return $ TH.ClassP (reifyName cls) tys' }
+  ClassPred cls tys -> do { tys' <- reifyTypes tys
+                          ; let { name = reifyName cls
+                                ; typ  = foldl TH.AppT (TH.ConT name) tys'
+                                }
+                          ; return typ
+                          }
   EqPred ty1 ty2    -> do { ty1' <- reifyType ty1
                           ; ty2' <- reifyType ty2
-                          ; return $ TH.EqualP ty1' ty2'
+                          ; return $ TH.AppT (TH.AppT TH.EqualityT ty1') ty2'
                           }
-  TuplePred _ -> noTH (sLit "tuple predicates") (ppr ty)
-  IrredPred _ -> noTH (sLit "irreducible predicates") (ppr ty)
+  TuplePred xs      -> do { xs' <- reifyTypes xs
+                          ; let { size = length xs'
+                                ; typ  = foldl TH.AppT (TH.TupleT size) xs'
+                                }
+                          ; return typ }
+  IrredPred _
+      | Just (ty1, ty2) <- splitAppTy_maybe ty
+        -> do { ty1' <- reifyType ty1
+              ; ty2' <- reifyType ty2
+              ; return $ TH.AppT ty1' ty2'
+              }
+      | Just (tyCon, tys) <- splitTyConApp_maybe ty
+        -> do { tys' <- reifyTypes tys
+              ; let { name = reifyName (tyConName tyCon)
+                    ; typ  = foldl TH.AppT (TH.ConT name) tys'
+                    }
+              ; return typ
+              }
+      | otherwise -> noTH (sLit "unsupported irreducible predicates") (ppr ty)
 
 
 ------------------------------
