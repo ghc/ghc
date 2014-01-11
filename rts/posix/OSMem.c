@@ -289,7 +289,7 @@ StgWord64 getPhysicalMemorySize (void)
         long ret = sysconf(_SC_PHYS_PAGES);
         if (ret == -1) {
 #if defined(DEBUG)
-            errorBelch("warning: getPhysicsMemorySize: cannot get physical memory size");
+            errorBelch("warning: getPhysicalMemorySize: cannot get physical memory size");
 #endif
             return 0;
         }
