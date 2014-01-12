@@ -137,8 +137,16 @@ compileOne' m_tc_result mHscMessage
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
+       mod_graph   = hsc_mod_graph hsc_env0
+       needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
 
-   debugTraceMsg dflags0 2 (text "compile: input file" <+> text input_fnpp)
+   -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
+   -- the linker can correctly load the object files.
+   let dflags1 = if needsTH
+                  then gopt_set dflags0 Opt_BuildDynamicToo
+                  else dflags0
+
+   debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
    let basename = dropExtension input_fn
 
@@ -146,8 +154,8 @@ compileOne' m_tc_result mHscMessage
   -- This is needed when we try to compile the .hc file later, if it
   -- imports a _stub.h file that we created here.
    let current_dir = takeDirectory basename
-       old_paths   = includePaths dflags0
-       dflags      = dflags0 { includePaths = current_dir : old_paths }
+       old_paths   = includePaths dflags1
+       dflags      = dflags1 { includePaths = current_dir : old_paths }
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
 
    -- Figure out what lang we're generating
@@ -468,7 +476,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         throwGhcExceptionIO (CmdLineError ("does not exist: " ++ src))
 
    let
-        dflags = hsc_dflags hsc_env
+        dflags    = hsc_dflags hsc_env
         split     = gopt Opt_SplitObjs dflags
         mb_o_file = outputFile dflags
         ghc_link  = ghcLink dflags      -- Set by -c or -no-link
