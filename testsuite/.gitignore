@@ -38,6 +38,12 @@ Thumbs.db
 tests/**/*.ps
 *.stats
 
+*.dyn_o
+*.dyn_hi
+*.dyn_hi-boot
+*o
+*.hi
+
 *bindisttest_install___dir_bin_ghc.mk
 
 # -----------------------------------------------------------------------------
