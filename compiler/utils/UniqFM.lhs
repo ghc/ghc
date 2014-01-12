@@ -135,13 +135,17 @@ plusUFM         :: UniqFM elt -> UniqFM elt -> UniqFM elt
 plusUFM_C       :: (elt -> elt -> elt)
                 -> UniqFM elt -> UniqFM elt -> UniqFM elt
 
--- | plusUFM_CD  f m1 d1 m2 d2
---   merges the maps using `f` as the combinding function and d1 resp. d2 as
---   the default value if there is no entry in m1 reps. m2. The domain is the union
---   of the domains of m1 m2.
---   Representative example:
---   > plusUFM_CD f {A: 1, B: 2} 23 {B: 3, C: 4} 42
---   >   == {A: f 1 42, B: f 2 3, C: f 23 4 }
+-- | `plusUFM_CD f m1 d1 m2 d2` merges the maps using `f` as the
+-- combinding function and `d1` resp. `d2` as the default value if
+-- there is no entry in `m1` reps. `m2`. The domain is the union of
+-- the domains of `m1` and `m2`.
+--
+-- Representative example:
+--
+-- @
+-- plusUFM_CD f {A: 1, B: 2} 23 {B: 3, C: 4} 42
+--    == {A: f 1 42, B: f 2 3, C: f 23 4 }
+-- @
 plusUFM_CD      :: (elt -> elt -> elt)
                 -> UniqFM elt -> elt -> UniqFM elt -> elt -> UniqFM elt
 

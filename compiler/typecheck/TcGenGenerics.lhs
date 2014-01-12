@@ -528,11 +528,11 @@ data ArgTyAlg a = ArgTyAlg
 -- > arg t = case t of
 -- >   _ | isTyVar t         -> if (t == argVar) then Par1 else Par0 t
 -- >   App f [t'] |
---       representable1 f &&
---       t' == argVar        -> Rec1 f
+-- >     representable1 f &&
+-- >     t' == argVar        -> Rec1 f
 -- >   App f [t'] |
---       representable1 f &&
---       t' has tyvars       -> f :.: (arg t')
+-- >     representable1 f &&
+-- >     t' has tyvars       -> f :.: (arg t')
 -- >   _                     -> Rec0 t
 --
 -- where @argVar@ is the last type variable in the data type declaration we are

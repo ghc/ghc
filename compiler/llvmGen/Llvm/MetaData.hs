@@ -1,5 +1,9 @@
---------------------------------------------------------------------------------
--- | The LLVM Metadata System.
+module Llvm.MetaData where
+
+import Llvm.Types
+import Outputable
+
+-- The LLVM Metadata System.
 --
 -- The LLVM metadata feature is poorly documented but roughly follows the
 -- following design:
@@ -50,11 +54,6 @@
 --   For example:
 --     !llvm.module.linkage = !{ !0, !1 }
 --
-module Llvm.MetaData where
-
-import Llvm.Types
-
-import Outputable
 
 -- | LLVM metadata expressions
 data MetaExpr = MetaStr LMString

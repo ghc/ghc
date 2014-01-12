@@ -1160,11 +1160,12 @@ mkCoCast c g
 %************************************************************************
 
 \begin{code}
-instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, Coercion)
--- ^ If @co :: T ts ~ rep_ty@ then:
+-- | If @co :: T ts ~ rep_ty@ then:
 --
 -- > instNewTyCon_maybe T ts = Just (rep_ty, co)
+--
 -- Checks for a newtype, and for being saturated
+instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, Coercion)
 instNewTyCon_maybe tc tys
   | Just (tvs, ty, co_tc) <- unwrapNewTyCon_maybe tc  -- Check for newtype
   , tys `lengthIs` tyConArity tc                      -- Check saturated
