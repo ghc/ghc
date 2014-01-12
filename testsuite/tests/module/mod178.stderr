@@ -1,0 +1,5 @@
+
+Mod178_2.hs:1:1:
+    File name does not match module name:
+    Saw: ‛Main’
+    Expected: ‛Mod178_2’

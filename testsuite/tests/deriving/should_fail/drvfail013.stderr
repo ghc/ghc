@@ -1,0 +1,16 @@
+
+drvfail013.hs:4:70:
+    No instance for (Eq (m (Maybe a)))
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Eq (MaybeT m a))
+
+drvfail013.hs:6:70:
+    No instance for (Eq (m (Maybe a)))
+      arising from the first field of ‛MaybeT'’ (type ‛m (Maybe a)’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Eq (MaybeT' m a))

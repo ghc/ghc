@@ -1,0 +1,4 @@
+
+readFail016.hs:7:1:
+    Precedence parsing error
+        cannot mix ‛|-’ [infix 6] and ‛:’ [infixr 5] in the same infix expression

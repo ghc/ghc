@@ -1,0 +1,2 @@
+($!) :: (a -> b) -> a -> b 	-- Defined in ‛Prelude’
+infixr 0 $!

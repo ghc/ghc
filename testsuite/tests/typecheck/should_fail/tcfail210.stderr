@@ -1,0 +1,3 @@
+
+tcfail210.hs:4:31:
+    Not in scope: type constructor or class ‛Constraint’

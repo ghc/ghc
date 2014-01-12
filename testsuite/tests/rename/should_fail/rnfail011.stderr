@@ -1,0 +1,5 @@
+
+rnfail011.hs:6:1:
+    Multiple declarations of ‛A’
+    Declared at: rnfail011.hs:2:1
+                 rnfail011.hs:6:1

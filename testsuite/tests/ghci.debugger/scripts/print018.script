@@ -1,0 +1,15 @@
+-- Test type reconstruction of Constants
+-- Found by Bernie Pope
+
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
+:l ../Test
+
+:break poly
+poly Unary
+:step
+:p x
+:t x
+seq x ()
+:p x
+:t x
+x

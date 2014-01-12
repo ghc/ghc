@@ -1,0 +1,4 @@
+
+overloadedlistsfail06.hs:3:3: Not in scope: ‛toList’
+
+overloadedlistsfail06.hs:3:8: Not in scope: ‛fromListN’

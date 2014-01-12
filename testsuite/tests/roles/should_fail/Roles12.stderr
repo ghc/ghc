@@ -1,0 +1,7 @@
+
+Roles12.hs:5:1:
+    Type constructor ‛T’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type role T phantom
+                 data T a
+    Boot file:   data T a

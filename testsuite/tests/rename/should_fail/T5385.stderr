@@ -1,0 +1,8 @@
+
+T5385.hs:3:16:
+    In module ‛T5385a’:
+      ‛(:::)’ is a data constructor of ‛T’
+    To import it use
+      ‛import’ T5385a( T( (:::) ) )
+    or
+      ‛import’ T5385a( T(..) )

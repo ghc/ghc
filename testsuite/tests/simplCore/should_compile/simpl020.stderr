@@ -1,0 +1,5 @@
+
+Simpl020_A.hs:25:10: Warning:
+    No explicit implementation for
+      ‛toGUIObject’ and ‛cset’
+    In the instance declaration for ‛GUIObject ()’

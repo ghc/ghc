@@ -1,0 +1,8 @@
+
+T6082-RULE.hs:5:11: Warning:
+    Rule "foo1" may never fire because ‛foo1’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma on ‛foo1’
+
+T6082-RULE.hs:10:11: Warning:
+    Rule "foo2" may never fire because ‛foo2’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma on ‛foo2’

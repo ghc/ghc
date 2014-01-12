@@ -1,0 +1,6 @@
+
+T7019a.hs:11:1:
+    Malformed predicate ‛forall b. Context (Associated a b)’
+    In the context: (forall b. Context (Associated a b))
+    While checking the super-classes of class ‛Class’
+    In the class declaration for ‛Class’

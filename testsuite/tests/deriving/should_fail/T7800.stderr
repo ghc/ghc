@@ -1,0 +1,6 @@
+[1 of 2] Compiling T7800a           ( T7800a.hs, T7800a.o )
+[2 of 2] Compiling T7800            ( T7800.hs, T7800.o )
+
+T7800.hs:7:1:
+    To make a Typeable instance of poly-kinded ‛A’, use XPolyKinds
+    In the stand-alone deriving instance for ‛Typeable A’

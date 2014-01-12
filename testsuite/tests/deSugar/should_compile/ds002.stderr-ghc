@@ -1,0 +1,10 @@
+
+ds002.hs:7:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛f’:
+        f y = ...
+        f z = ...
+
+ds002.hs:11:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛g’: g x y z = ...

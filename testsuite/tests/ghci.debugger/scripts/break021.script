@@ -1,0 +1,23 @@
+:l break020.hs
+:set stop :list
+:step main
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule
+:stepmodule

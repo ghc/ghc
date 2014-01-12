@@ -1,0 +1,5 @@
+ERROR "tcfail002.hs":4 - Type error in function binding
+*** Term           : c
+*** Type           : a -> a
+*** Does not match : [a] -> a
+*** Because        : unification would give infinite type

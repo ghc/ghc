@@ -1,0 +1,6 @@
+
+tcfail079.hs:9:27:
+    Expecting a lifted type, but ‛Int#’ is unlifted
+    In the type ‛Int#’
+    In the definition of data constructor ‛Unboxed’
+    In the newtype declaration for ‛Unboxed’

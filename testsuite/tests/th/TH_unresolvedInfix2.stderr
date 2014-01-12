@@ -1,0 +1,11 @@
+
+TH_unresolvedInfix2.hs:14:11:
+    The operator ‛:+’ [infixl 6] of a section
+        must have lower precedence than that of the operand,
+          namely ‛:+’ [infixl 6]
+        in the section: ‛:+ N :+ N’
+    In the splice:
+      $(let
+          plus = conE ...
+          n = conE ...
+        in infixE Nothing plus (Just $ uInfixE n plus n))

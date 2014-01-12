@@ -1,0 +1,15 @@
+
+deriving-1935.hs:15:11: Warning:
+    No explicit implementation for
+      either ‛==’ or ‛/=’
+    In the instance declaration for ‛Eq (T a)’
+
+deriving-1935.hs:18:11: Warning:
+    No explicit implementation for
+      either ‛==’ or ‛/=’
+    In the instance declaration for ‛Eq (S a)’
+
+deriving-1935.hs:19:11: Warning:
+    No explicit implementation for
+      either ‛compare’ or ‛<=’
+    In the instance declaration for ‛Ord (S a)’

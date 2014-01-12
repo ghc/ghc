@@ -1,0 +1,12 @@
+
+Church2.hs:27:14:
+    Couldn't match expected type `CNat'
+	   against inferred type `(a -> a) -> a -> a'
+    In the first argument of `n', namely `(mul m)'
+    In the expression: n (mul m) n1
+    In the definition of `exp2': exp2 m n = n (mul m) n1
+
+*** This error message is not helpful,
+*** and the test should fail, not pass
+*** These comments are here to make sure the output
+*** doesn't match!

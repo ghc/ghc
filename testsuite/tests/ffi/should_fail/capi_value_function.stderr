@@ -1,0 +1,6 @@
+
+capi_value_function.hs:8:1:
+    `value' imports cannot have function types
+    When checking declaration:
+      foreign import capi safe "static math.h value sqrt" f
+        :: CInt -> CInt

@@ -1,0 +1,4 @@
+undefined :: AND HTrue HTrue :: HTrue
+undefined :: AND (OR HFalse HTrue) (OR HTrue HFalse) :: HTrue
+t :: HTrue
+t :: HFalse

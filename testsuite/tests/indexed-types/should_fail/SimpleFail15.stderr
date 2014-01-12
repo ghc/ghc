@@ -1,0 +1,6 @@
+
+SimpleFail15.hs:5:8:
+    Illegal polymorphic or qualified type: a ~ b => t
+    Perhaps you intended to use RankNTypes or Rank2Types
+    In the type signature for ‛foo’:
+      foo :: (a, b) -> (a ~ b => t) -> (a, b)

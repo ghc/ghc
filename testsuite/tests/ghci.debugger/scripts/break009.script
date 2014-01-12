@@ -1,0 +1,7 @@
+:l ../Test6.hs
+:b 5
+main
+-- stopped now
+:l ../Test6.hs
+main
+-- should not break

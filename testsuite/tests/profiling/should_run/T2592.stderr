@@ -1,0 +1,3 @@
+T2592: Heap exhausted;
+Current maximum heap size is 1048576 bytes (1 MB);
+use `+RTS -M<size>' to increase it.

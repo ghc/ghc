@@ -1,0 +1,8 @@
+
+drvfail003.hs:16:56:
+    No instance for (Show (v (v a)))
+      arising from the first field of ‛End’ (type ‛v (v a)’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Show (Square_ v w a))

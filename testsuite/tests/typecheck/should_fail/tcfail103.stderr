@@ -1,0 +1,15 @@
+
+tcfail103.hs:15:23:
+    Couldn't match type ‛t’ with ‛s’
+      ‛t’ is a rigid type variable bound by
+          the type signature for f :: ST t Int at tcfail103.hs:10:5
+      ‛s’ is a rigid type variable bound by
+          the type signature for g :: ST s Int at tcfail103.hs:13:14
+    Expected type: STRef s Int
+      Actual type: STRef t Int
+    Relevant bindings include
+      g :: ST s Int (bound at tcfail103.hs:15:9)
+      v :: STRef t Int (bound at tcfail103.hs:12:5)
+      f :: ST t Int (bound at tcfail103.hs:11:1)
+    In the first argument of ‛readSTRef’, namely ‛v’
+    In the expression: readSTRef v

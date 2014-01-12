@@ -1,0 +1,13 @@
+:list
+-- should fail, nothing to list
+:list Data.List 20
+-- can't list a compiled module
+:list Data.List.map
+-- can't list a compiled module
+:l ../Test3.hs
+:list mymap
+:list main
+:list 4
+-- wrong syntax:
+:list a b c
+:list 10 20

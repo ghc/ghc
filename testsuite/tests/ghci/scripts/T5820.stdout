@@ -1,0 +1,4 @@
+data Foo = Foo 	-- Defined at T5820.hs:2:1
+instance Eq Foo -- Defined at T5820.hs:3:10
+data Foo = Foo 	-- Defined at T5820.hs:2:1
+instance Eq Foo -- Defined at T5820.hs:3:10

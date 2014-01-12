@@ -1,0 +1,8 @@
+
+tcfail047.hs:6:10:
+    Illegal instance declaration for ‛A (a, (b, c))’
+      (All instance types must be of the form (T a1 ... an)
+       where a1 ... an are *distinct type variables*,
+       and each type variable appears at most once in the instance head.
+       Use FlexibleInstances if you want to disable this.)
+    In the instance declaration for ‛A (a, (b, c))’

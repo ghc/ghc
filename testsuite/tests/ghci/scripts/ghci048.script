@@ -1,0 +1,5 @@
+--Testing proper error message for multiple declarations (a previous bug)
+data Foo = A | B
+data Foo = A | A
+data Foo = A | B
+data Foo = A | A

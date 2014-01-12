@@ -1,0 +1,5 @@
+
+Overlap5.hs:8:3:
+    Mismatched type names in closed type family declaration.
+    First name was F; this one is G
+    In the family declaration for ‛F’

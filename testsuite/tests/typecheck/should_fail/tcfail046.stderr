@@ -1,0 +1,16 @@
+
+tcfail046.hs:10:50:
+    No instance for (Eq (Process a))
+      arising from the first field of ‛Do’ (type ‛Process a’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Eq (Continuation a))
+
+tcfail046.hs:22:25:
+    No instance for (Eq (Process a))
+      arising from the first field of ‛Create’ (type ‛Process a’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Eq (Message a))

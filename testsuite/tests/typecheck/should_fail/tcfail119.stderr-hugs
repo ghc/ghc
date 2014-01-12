@@ -1,0 +1,4 @@
+ERROR "tcfail119.hs":11 - Type error in default member binding
+*** Term           : "Foo"
+*** Type           : String
+*** Does not match : Bool

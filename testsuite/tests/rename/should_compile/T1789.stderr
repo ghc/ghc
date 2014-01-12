@@ -1,0 +1,12 @@
+
+T1789.hs:6:1: Warning:
+    The module ‛Prelude’ does not have an explicit import list
+
+T1789.hs:7:1: Warning:
+    The module ‛Data.Map’ does not have an explicit import list
+
+T1789.hs:9:1: Warning:
+    The import item ‛Maybe(..)’ does not have an explicit import list
+
+T1789.hs:10:1: Warning:
+    The module ‛Data.Maybe’ does not have an explicit import list

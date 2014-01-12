@@ -1,0 +1,16 @@
+
+readFail003.hs:4:27:
+    Occurs check: cannot construct the infinite type:
+      t ~ (t, [a], [a1])
+    Relevant bindings include
+      a :: t (bound at readFail003.hs:4:3)
+      b :: [a] (bound at readFail003.hs:4:5)
+      c :: [a1] (bound at readFail003.hs:4:7)
+    In the expression: a
+    In a pattern binding:
+      ~(a, b, c)
+        | nullity b = a
+        | nullity c = a
+        | otherwise = a
+        where
+            nullity = null

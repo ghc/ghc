@@ -1,0 +1,4 @@
+
+drvfail016.hs-boot:7:14:
+    Deriving not permitted in hs-boot file
+      Use an instance declaration instead

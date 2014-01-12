@@ -1,0 +1,10 @@
+t = O (_t1::a)
+()
+t = O ((_t2::a1) : (_t3::[a1]))
+()
+t = O ((_t4::a2) : (_t5::a2) : (_t6::[a2]))
+()
+t = O ((_t7::Maybe [Integer]) : Just [2,2] :
+       (_t8::[Maybe [Integer]]))
+()
+t = O (Just [1,1] : Just [2,2] : (_t9::[Maybe [Integer]]))

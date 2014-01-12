@@ -1,0 +1,15 @@
+-- Simple Recovery of types - opaque types
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
+:l ../Test
+let t = O (map Just [[1,1],[2,2]])
+:p t
+-- should have bound _t1 now
+:show bindings
+seq _t1 ()
+:p t
+:show bindings
+seq _t2 ()
+:p t
+seq _t4 ()
+:p t
+

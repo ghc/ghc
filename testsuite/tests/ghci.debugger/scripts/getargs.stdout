@@ -1,0 +1,3 @@
+Stopped at ..\getargs.hs:3:8-24
+_result :: IO () = _
+["42"]

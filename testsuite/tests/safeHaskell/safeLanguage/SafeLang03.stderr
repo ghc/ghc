@@ -1,0 +1,4 @@
+
+SafeLang03.hs:7:11: Warning:
+    Rule "f" ignored
+    User defined rules are disabled under Safe Haskell

@@ -1,0 +1,7 @@
+
+tcfail184.hs:8:19:
+    Illegal polymorphic or qualified type:
+      forall a. Ord a => [a] -> [a]
+    Perhaps you intended to use RankNTypes or Rank2Types
+    In the definition of data constructor ‛MkSwizzle’
+    In the newtype declaration for ‛Swizzle’

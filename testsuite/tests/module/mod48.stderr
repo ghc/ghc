@@ -1,0 +1,4 @@
+
+mod48.hs:5:3:
+    Pattern bindings (except simple variables) not allowed in instance declarations
+	(x, y) = error "foo"

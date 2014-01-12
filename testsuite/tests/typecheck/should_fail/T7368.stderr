@@ -1,0 +1,9 @@
+
+T7368.hs:3:10:
+    Kind incompatibility when matching types:
+      c0 :: (* -> *) -> *
+      (->) a0 :: * -> *
+    Expected type: a0 -> b0
+      Actual type: c0 Maybe
+    In the first argument of ‛b’, namely ‛(l Nothing)’
+    In the expression: b (l Nothing)

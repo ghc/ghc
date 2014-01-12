@@ -1,0 +1,28 @@
+
+T2239.hs:47:13:
+    Couldn't match type ‛b -> b’
+                  with ‛forall b1. MyEq b1 Bool => b1 -> b1’
+    Expected type: (forall b1. MyEq b1 Bool => b1 -> b1) -> b -> b
+      Actual type: (b -> b) -> b -> b
+    In the expression:
+        id ::
+          (forall b. MyEq b Bool => b -> b)
+          -> (forall b. MyEq b Bool => b -> b)
+    In an equation for ‛complexFD’:
+        complexFD
+          = id ::
+              (forall b. MyEq b Bool => b -> b)
+              -> (forall b. MyEq b Bool => b -> b)
+
+T2239.hs:50:13:
+    Couldn't match type ‛Bool -> Bool’
+                  with ‛forall b1. b1 ~ Bool => b1 -> b1’
+    Expected type: (forall b1. b1 ~ Bool => b1 -> b1) -> b -> b
+      Actual type: (b -> b) -> b -> b
+    In the expression:
+        id ::
+          (forall b. b ~ Bool => b -> b) -> (forall b. b ~ Bool => b -> b)
+    In an equation for ‛complexTF’:
+        complexTF
+          = id ::
+              (forall b. b ~ Bool => b -> b) -> (forall b. b ~ Bool => b -> b)

@@ -1,0 +1,4 @@
+ERROR "tcfail069.hs":20 - Type error in case pattern
+*** Term           : []
+*** Type           : [a]
+*** Does not match : ([Int],[Int])

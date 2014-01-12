@@ -1,0 +1,20 @@
+
+T3540.hs:4:12:
+    Expected a type, but ‛a ~ Int’ has kind ‛Constraint’
+    In the type signature for ‛thing’: thing :: a ~ Int
+
+T3540.hs:7:20:
+    Expected a type, but ‛a ~ Int’ has kind ‛Constraint’
+    In the type signature for ‛thing1’: thing1 :: Int -> (a ~ Int)
+
+T3540.hs:10:13:
+    Expected a type, but ‛a ~ Int’ has kind ‛Constraint’
+    In the type signature for ‛thing2’: thing2 :: (a ~ Int) -> Int
+
+T3540.hs:13:12:
+    Expected a type, but ‛?dude :: Int’ has kind ‛Constraint’
+    In the type signature for ‛thing3’: thing3 :: (?dude :: Int) -> Int
+
+T3540.hs:16:11:
+    Expected a type, but ‛Eq a’ has kind ‛Constraint’
+    In the type signature for ‛thing4’: thing4 :: (Eq a) -> Int

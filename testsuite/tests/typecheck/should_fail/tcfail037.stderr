@@ -1,0 +1,8 @@
+
+tcfail037.hs:7:11:
+    Ambiguous occurrence ‛+’
+    It could refer to either ‛ShouldFail.+’,
+                             defined at tcfail037.hs:10:5
+                          or ‛Prelude.+’,
+                             imported from ‛Prelude’ at tcfail037.hs:3:8-17
+                             (and originally defined in ‛GHC.Num’)

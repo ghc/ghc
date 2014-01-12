@@ -1,0 +1,26 @@
+
+readFail043.hs:10:9:
+    Unexpected transform statement in a list comprehension
+    Use TransformListComp
+
+readFail043.hs:10:20: Not in scope: ‛by’
+
+readFail043.hs:10:23: Not in scope: ‛x’
+
+readFail043.hs:10:25: Not in scope: ‛using’
+
+readFail043.hs:11:9:
+    Unexpected transform statement in a list comprehension
+    Use TransformListComp
+
+readFail043.hs:11:20: Not in scope: ‛by’
+
+readFail043.hs:11:23: Not in scope: ‛x’
+
+readFail043.hs:11:25: Not in scope: ‛using’
+
+readFail043.hs:12:9:
+    Unexpected transform statement in a list comprehension
+    Use TransformListComp
+
+readFail043.hs:12:20: Not in scope: ‛using’

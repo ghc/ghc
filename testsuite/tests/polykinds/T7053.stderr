@@ -1,0 +1,8 @@
+
+T7053.hs:6:52:
+    Kind occurs check
+    The first argument of ‛a’ should have kind ‛k0’,
+      but ‛b’ has kind ‛k0 -> k1’
+    In the type ‛TypeRep (a b)’
+    In the definition of data constructor ‛TyApp’
+    In the data declaration for ‛TypeRep’

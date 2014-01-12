@@ -1,0 +1,20 @@
+Name:           simple-plugin
+Version:        0.1
+Synopsis:       A demonstration of the GHC plugin system.
+Cabal-Version:  >= 1.2
+Build-Type:	Simple
+License:        BSD3
+License-File:   LICENSE
+Author:         Max Bolingbroke
+Homepage:       http://blog.omega-prime.co.uk
+
+Library
+    Extensions:     CPP
+    Build-Depends:
+        base,
+        template-haskell,
+        ghc >= 6.11
+    Exposed-Modules:
+        Simple.Plugin
+        Simple.BadlyTypedPlugin
+        Simple.DataStructures

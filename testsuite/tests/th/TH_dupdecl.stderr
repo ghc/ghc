@@ -1,0 +1,5 @@
+
+TH_dupdecl.hs:10:4:
+    Multiple declarations of ‛x’
+    Declared at: TH_dupdecl.hs:8:4
+                 TH_dupdecl.hs:10:4

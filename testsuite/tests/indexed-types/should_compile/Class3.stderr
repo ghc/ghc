@@ -1,0 +1,5 @@
+
+Class3.hs:7:10: Warning:
+    No explicit implementation for
+      ‛foo’
+    In the instance declaration for ‛C ()’

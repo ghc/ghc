@@ -1,0 +1,5 @@
+inside b: a_0
+inside d: GHC.Types.Bool
+type of c: GHC.Types.Bool
+inside f: GHC.Types.Bool
+type of e: GHC.Types.Bool

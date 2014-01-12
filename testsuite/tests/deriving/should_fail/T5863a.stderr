@@ -1,0 +1,10 @@
+
+T5863a.hs:9:31:
+    Cannot eta-reduce to an instance of form
+      instance (...) => Typeable T
+    In the data instance declaration for ‛T’
+
+T5863a.hs:12:32:
+    Cannot eta-reduce to an instance of form
+      instance (...) => Typeable T
+    In the data instance declaration for ‛T’

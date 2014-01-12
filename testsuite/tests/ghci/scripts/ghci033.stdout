@@ -1,0 +1,2 @@
+data Foo = Foo1 Int | Int `InfixCon` Bool
+  	-- Defined at ghci033.hs:4:1

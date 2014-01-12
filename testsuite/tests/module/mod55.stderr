@@ -1,0 +1,6 @@
+
+mod55.hs:3:26:
+    Can't make a derived instance of ‛Enum T’:
+      ‛T’ must be an enumeration type
+      (an enumeration consists of one or more nullary, non-GADT constructors)
+    In the data declaration for ‛T’

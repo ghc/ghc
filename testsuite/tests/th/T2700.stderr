@@ -1,0 +1,1 @@
+foo :: (GHC.Types.Int -> GHC.Types.Bool) -> GHC.Types.Bool

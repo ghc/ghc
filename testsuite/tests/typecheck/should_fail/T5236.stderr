@@ -1,0 +1,5 @@
+
+T5236.hs:17:5:
+    No instance for (Id A B) arising from a use of ‛loop’
+    In the expression: loop
+    In an equation for ‛f’: f = loop

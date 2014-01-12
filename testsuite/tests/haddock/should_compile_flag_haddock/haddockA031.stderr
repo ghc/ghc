@@ -1,0 +1,9 @@
+
+==================== Parser ====================
+module ShouldCompile where
+data A
+    = A |
+      <document comment> forall a. B a a |
+      <document comment> forall a. Num a => C a
+
+

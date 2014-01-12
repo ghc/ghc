@@ -1,0 +1,1 @@
+ERROR "tcfail084.hs":10 - Constructor "F" does not have selected fields in F {y = 2}

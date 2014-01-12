@@ -1,0 +1,4 @@
+
+Overlap7.hs:8:1:
+    Illegal instance for closed family ‛F’
+    In the type instance declaration for ‛F’

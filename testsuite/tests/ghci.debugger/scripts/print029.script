@@ -1,0 +1,10 @@
+:l print029.hs
+let a = MkT2 [Just (1::Int)]
+a
+:break f
+f a
+:step
+-- Unsound! A false type is assigned to x
+-- reconstructType decides to stop too soon because 
+-- its BFS has recovered a monomorphic type
+:p x

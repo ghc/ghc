@@ -1,0 +1,10 @@
+
+==================== Parser ====================
+module ShouldCompile where
+data R a
+    = R {field1 :: a,
+	 field2 :: a <document comment>,
+	 field3 :: a <document comment>,
+	 field4 :: a <document comment>}
+
+

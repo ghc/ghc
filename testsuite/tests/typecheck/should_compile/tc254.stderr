@@ -1,0 +1,4 @@
+
+tc254.hs:8:1: Warning:
+    No explicit associated type or default declaration for ‛Typ’
+    In the instance declaration for ‛Cls Int’

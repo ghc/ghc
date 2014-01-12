@@ -1,0 +1,9 @@
+
+tcfail167.hs:14:14:
+    Couldn't match type ‛Char’ with ‛Float’
+    Inaccessible code in
+      a pattern with constructor
+        C2 :: T Float,
+      in an equation for ‛inaccessible’
+    In the pattern: C2
+    In an equation for ‛inaccessible’: inaccessible C2 = ' '

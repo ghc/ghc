@@ -1,0 +1,34 @@
+
+DoParamM.hs:146:25:
+    Couldn't match expected type `Int' with actual type `Char'
+    In the second argument of `(==)', namely v'
+    In the first argument of `return', namely `(v == v')'
+    In a stmt of a 'do' block: return (v == v')
+
+DoParamM.hs:286:28:
+    Couldn't match type `Unlocked' with `Locked'
+    Expected type: LIO Locked Locked ()
+      Actual type: LIO Unlocked Locked ()
+    In a stmt of a 'do' block: tlock2_do
+    In the expression:
+      do { tlock2_do;
+           tlock2_do }
+    In an equation for `tlock4_do':
+        tlock4_do
+          = do { tlock2_do;
+                 tlock2_do }
+
+DoParamM.hs:302:37:
+    Couldn't match type `Locked' with `Unlocked'
+    Expected type: LIO Unlocked Unlocked ()
+      Actual type: LIO Locked Unlocked ()
+    In a stmt of a 'do' block: unlock
+    In the expression:
+      do { tlock2_do;
+           unlock;
+           unlock }
+    In an equation for `tlock4'_do':
+        tlock4'_do
+          = do { tlock2_do;
+                 unlock;
+                 unlock }

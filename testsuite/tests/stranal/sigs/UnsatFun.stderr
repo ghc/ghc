@@ -1,0 +1,9 @@
+
+==================== Strictness signatures ====================
+UnsatFun.f: <B,1*U(U)><B,A>b
+UnsatFun.g: <B,1*U(U)>b
+UnsatFun.g2: <L,1*U(U)>
+UnsatFun.h: <C(S),1*C1(U(U))>
+UnsatFun.h2: <S,1*U><L,1*C1(U(U))>
+
+

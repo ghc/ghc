@@ -1,0 +1,5 @@
+Int :: *
+Maybe :: * -> *
+F [[[Int]]] :: *
+F [[[Int]]] :: *
+= [[Int]] -> [Int] -> Int -> Bool

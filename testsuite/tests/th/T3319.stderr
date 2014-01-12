@@ -1,0 +1,8 @@
+T3319.hs:1:1: Splicing declarations
+    return
+      [ForeignD
+         (ImportF
+            CCall Unsafe "&" (mkName "foo") (AppT (ConT ''Ptr) (ConT ''())))]
+  ======>
+    T3319.hs:8:3-93
+    foreign import ccall unsafe "static &foo" foo :: Ptr GHC.Tuple.()

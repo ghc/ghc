@@ -1,0 +1,82 @@
+
+tc211.hs:15:22:
+    Couldn't match type ‛forall a6. a6 -> a6’ with ‛a -> a’
+    Expected type: [a -> a]
+      Actual type: [forall a. a -> a]
+    In the first argument of ‛head’, namely ‛foo’
+    In the first argument of ‛(:) ::
+                                (forall a. a -> a)
+                                -> [forall a. a -> a] -> [forall a. a -> a]’, namely
+      ‛(head foo)’
+
+tc211.hs:48:19:
+    Could not deduce (Num a2) arising from the literal ‛3’
+    from the context (Num a)
+      bound by the inferred type of
+               h1 :: Num a => (forall a1. a1 -> a1) -> a
+      at tc211.hs:(47,1)-(49,9)
+    The type variable ‛a2’ is ambiguous
+    Relevant bindings include
+      y :: Pair a2 (Pair a3 b1) (bound at tc211.hs:48:10)
+    Note: there are several potential instances:
+      instance Num Double -- Defined in ‛GHC.Float’
+      instance Num Float -- Defined in ‛GHC.Float’
+      instance Integral a => Num (GHC.Real.Ratio a)
+        -- Defined in ‛GHC.Real’
+      ...plus three others
+    In the first argument of ‛g’, namely ‛3’
+    In the first argument of ‛P’, namely ‛(g 3)’
+    In the expression: P (g 3) (g (P 3 4))
+
+tc211.hs:48:28:
+    Could not deduce (Num a3) arising from the literal ‛3’
+    from the context (Num a)
+      bound by the inferred type of
+               h1 :: Num a => (forall a1. a1 -> a1) -> a
+      at tc211.hs:(47,1)-(49,9)
+    The type variable ‛a3’ is ambiguous
+    Relevant bindings include
+      y :: Pair a2 (Pair a3 b1) (bound at tc211.hs:48:10)
+    Note: there are several potential instances:
+      instance Num Double -- Defined in ‛GHC.Float’
+      instance Num Float -- Defined in ‛GHC.Float’
+      instance Integral a => Num (GHC.Real.Ratio a)
+        -- Defined in ‛GHC.Real’
+      ...plus three others
+    In the first argument of ‛P’, namely ‛3’
+    In the first argument of ‛g’, namely ‛(P 3 4)’
+    In the second argument of ‛P’, namely ‛(g (P 3 4))’
+
+tc211.hs:48:30:
+    Could not deduce (Num b1) arising from the literal ‛4’
+    from the context (Num a)
+      bound by the inferred type of
+               h1 :: Num a => (forall a1. a1 -> a1) -> a
+      at tc211.hs:(47,1)-(49,9)
+    The type variable ‛b1’ is ambiguous
+    Relevant bindings include
+      y :: Pair a2 (Pair a3 b1) (bound at tc211.hs:48:10)
+    Note: there are several potential instances:
+      instance Num Double -- Defined in ‛GHC.Float’
+      instance Num Float -- Defined in ‛GHC.Float’
+      instance Integral a => Num (GHC.Real.Ratio a)
+        -- Defined in ‛GHC.Real’
+      ...plus three others
+    In the second argument of ‛P’, namely ‛4’
+    In the first argument of ‛g’, namely ‛(P 3 4)’
+    In the second argument of ‛P’, namely ‛(g (P 3 4))’
+
+tc211.hs:70:9:
+    Couldn't match type ‛forall a7. a7 -> a7’ with ‛a6 -> a6’
+    Expected type: List (forall a. a -> a)
+                   -> (forall a. a -> a) -> a6 -> a6
+      Actual type: List (forall a. a -> a)
+                   -> (forall a. a -> a) -> forall a. a -> a
+    In the expression:
+        foo2 ::
+          List (forall a. a -> a) -> (forall a. a -> a) -> (forall a. a -> a)
+    In the expression:
+      (foo2 ::
+         List (forall a. a -> a)
+         -> (forall a. a -> a) -> (forall a. a -> a))
+        xs1 (\ x -> x)

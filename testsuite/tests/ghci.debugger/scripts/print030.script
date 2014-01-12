@@ -1,0 +1,10 @@
+:l print029.hs
+let a = MkT2 (map Just [(1::Int)])
+:break f
+seq a ()
+f a
+:step
+-- Unsound! A false type is assigned to x
+-- reconstructType is forced to stop too soon
+-- because the elements of the list in x are not evaluated yet
+:q

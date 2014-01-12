@@ -1,0 +1,5 @@
+
+rnfail015.hs:14:9:
+    Multiple declarations of ‛TokLiteral’
+    Declared at: rnfail015.hs:8:9
+                 rnfail015.hs:14:9

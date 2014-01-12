@@ -1,0 +1,6 @@
+
+mod62.hs:3:9: Qualified name in binding position: M.y
+
+mod62.hs:3:22:
+    Not in scope: ‛M.y’
+    Perhaps you meant ‛M.x’ (line 3)

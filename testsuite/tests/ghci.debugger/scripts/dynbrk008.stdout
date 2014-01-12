@@ -1,0 +1,15 @@
+Stopped at dynbrk008.hs:2:1-41
+_result :: [Int] = _
+Stopped at dynbrk008.hs:2:7-41
+_result :: [Int] = _
+i :: Int = 42
+Stopped at dynbrk008.hs:2:18-20
+_result :: [Int] = _
+i :: Int = 42
+Stopped at dynbrk008.hs:2:28-30
+_result :: [Int] = _
+j :: Int = 42
+Stopped at dynbrk008.hs:2:38-40
+_result :: [Int] = _
+h :: Int = 42
+[42]

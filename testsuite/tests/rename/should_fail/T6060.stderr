@@ -1,0 +1,4 @@
+
+T6060.hs:5:10:
+    The last statement in a 'do' block must be an expression
+      let bad = [True | x <- [] |  y <- []]

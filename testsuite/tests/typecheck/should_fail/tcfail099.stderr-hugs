@@ -1,0 +1,4 @@
+ERROR "tcfail099.hs":9 - Existentially quantified variable in inferred type
+*** Variable     : _6
+*** From pattern : C f
+*** Result type  : DS -> _6 -> Int

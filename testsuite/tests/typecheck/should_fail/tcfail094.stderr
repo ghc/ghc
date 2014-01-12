@@ -1,0 +1,3 @@
+
+tcfail094.hs:7:14:
+    Illegal literal in type (use DataKinds to enable): 1

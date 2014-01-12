@@ -1,0 +1,11 @@
+Stopped at break013.hs:(1,1)-(4,18)
+_result :: (Bool, Bool, ()) = _
+Stopped at break013.hs:1:7-13
+_result :: (Bool, Bool, ()) = _
+a :: Bool = _
+b :: Bool = _
+c :: () = _
+c :: () = _
+b :: Bool = _
+a :: Bool = _
+_result :: (Bool, Bool, ()) = _

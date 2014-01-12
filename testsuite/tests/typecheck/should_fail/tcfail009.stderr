@@ -1,0 +1,6 @@
+
+tcfail009.hs:3:17:
+    Couldn't match expected type ‛Int’ with actual type ‛Integer’
+    In the expression: (2 :: Integer)
+    In the expression: [(1 :: Int) .. (2 :: Integer)]
+    In an equation for ‛p’: p = [(1 :: Int) .. (2 :: Integer)]

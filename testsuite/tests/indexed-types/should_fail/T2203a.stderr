@@ -1,0 +1,5 @@
+
+T2203a.hs:13:19:
+    Illegal type synonym family application in instance:
+      Either a (TheFoo a)
+    In the instance declaration for ‛Bar (Either a (TheFoo a))’

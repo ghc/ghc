@@ -1,0 +1,5 @@
+
+T6161.hs:29:12:
+    No instance for (Super (Fam Float)) arising from a use of ‛testDup’
+    In the expression: testDup (FamFloat 3.0)
+    In an equation for ‛testProg’: testProg = testDup (FamFloat 3.0)

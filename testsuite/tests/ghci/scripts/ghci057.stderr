@@ -1,0 +1,19 @@
+
+<interactive>:5:1:
+    Illegal generalised algebraic data declaration for ‛T’
+      (Use GADTs to allow GADTs)
+    In the data declaration for ‛T’
+
+ghci057.hs:3:3:
+    Data constructor ‛C’ has existential type variables, a context, or a specialised result type
+      C :: T Int
+      (Use ExistentialQuantification or GADTs to allow this)
+    In the definition of data constructor ‛C’
+    In the data declaration for ‛T’
+
+ghci057.hs:3:3:
+    Data constructor ‛C’ has existential type variables, a context, or a specialised result type
+      C :: T Int
+      (Use ExistentialQuantification or GADTs to allow this)
+    In the definition of data constructor ‛C’
+    In the data declaration for ‛T’

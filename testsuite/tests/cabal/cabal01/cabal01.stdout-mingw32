@@ -1,0 +1,12 @@
+install1:
+bin
+test-1.0
+install2:
+bin
+test-1.0
+dist:
+build
+package.conf.inplace
+setup-config
+src
+test-1.0.tar.gz

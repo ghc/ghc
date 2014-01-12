@@ -1,0 +1,5 @@
+
+SCLoop.hs:22:7:
+    No instance for (SC ()) arising from a use of ‛op’
+    In the expression: op () ([Just True])
+    In an equation for ‛foo’: foo = op () ([Just True])

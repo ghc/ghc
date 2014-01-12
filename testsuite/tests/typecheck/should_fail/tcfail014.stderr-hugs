@@ -1,0 +1,6 @@
+ERROR "tcfail014.hs":5 - Type error in application
+*** Expression     : z z
+*** Term           : z
+*** Type           : a -> b
+*** Does not match : a
+*** Because        : unification would give infinite type

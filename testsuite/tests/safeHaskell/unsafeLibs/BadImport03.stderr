@@ -1,0 +1,5 @@
+[1 of 2] Compiling BadImport03_A    ( BadImport03_A.hs, BadImport03_A.o )
+[2 of 2] Compiling Main             ( BadImport03.hs, BadImport03.o )
+
+BadImport03.hs:16:10:
+    Can't create hand written instances of Typeable in Safe Haskell! Can only derive them

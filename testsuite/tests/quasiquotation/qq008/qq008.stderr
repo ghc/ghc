@@ -1,0 +1,4 @@
+
+Test.hs:9:19:
+    Warning: Deprecated syntax:
+               quasiquotes no longer need a dollar sign: $pq

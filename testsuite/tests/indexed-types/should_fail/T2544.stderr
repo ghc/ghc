@@ -1,0 +1,26 @@
+
+T2544.hs:15:18:
+    Could not deduce (IxMap i0 ~ IxMap l)
+    from the context (Ix l, Ix r)
+      bound by the instance declaration at T2544.hs:13:10-37
+    NB: ‛IxMap’ is a type function, and may not be injective
+    The type variable ‛i0’ is ambiguous
+    Expected type: IxMap l [Int]
+      Actual type: IxMap i0 [Int]
+    Relevant bindings include
+      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:15:4)
+    In the first argument of ‛BiApp’, namely ‛empty’
+    In the expression: BiApp empty empty
+
+T2544.hs:15:24:
+    Could not deduce (IxMap i1 ~ IxMap r)
+    from the context (Ix l, Ix r)
+      bound by the instance declaration at T2544.hs:13:10-37
+    NB: ‛IxMap’ is a type function, and may not be injective
+    The type variable ‛i1’ is ambiguous
+    Expected type: IxMap r [Int]
+      Actual type: IxMap i1 [Int]
+    Relevant bindings include
+      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:15:4)
+    In the second argument of ‛BiApp’, namely ‛empty’
+    In the expression: BiApp empty empty

@@ -1,0 +1,4 @@
+
+T2157.hs:7:15:
+    Type synonym ‛S’ should have 2 arguments, but has been given 1
+    In the type instance declaration for ‛F’

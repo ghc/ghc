@@ -1,0 +1,8 @@
+
+:set -XUnboxedTuples
+
+:i (   )
+:i (#   #)
+:i (  ,  )
+:i (#  ,  #)
+

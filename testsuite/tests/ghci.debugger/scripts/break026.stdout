@@ -1,0 +1,58 @@
+Stopped at break026.hs:(5,1)-(7,35)
+_result :: t = _
+Stopped at break026.hs:5:16-22
+_result :: Integer = _
+c :: Integer = 0
+go :: Integer -> [t1] -> Integer = _
+xs :: [t1] = _
+Stopped at break026.hs:(6,9)-(7,35)
+_result :: t = _
+f :: t -> t1 -> t = _
+Stopped at break026.hs:7:23-35
+_result :: Integer = _
+c :: Integer = 0
+f :: Integer -> Integer -> Integer = _
+x :: Integer = 1
+xs :: [Integer] = _
+Stopped at break026.hs:(6,9)-(7,35)
+_result :: t = _
+f :: t -> t1 -> t = _
+Stopped at break026.hs:7:23-35
+_result :: t = _
+c :: t = _
+f :: t -> Integer -> t = _
+x :: Integer = 2
+xs :: [Integer] = _
+c = 1
+Stopped at break026.hs:(5,1)-(7,35)
+_result :: t = _
+Stopped at break026.hs:5:16-22
+_result :: Integer = _
+c :: Integer = 0
+go :: Integer -> [t1] -> Integer = _
+xs :: [t1] = _
+Stopped at break026.hs:(6,9)-(7,35)
+_result :: t = _
+f :: t -> t1 -> t = _
+Stopped at break026.hs:7:23-35
+_result :: Integer = _
+c :: Integer = 0
+f :: Integer -> Integer -> Integer = _
+x :: Integer = 1
+xs :: [Integer] = _
+Stopped at break026.hs:(6,9)-(7,35)
+_result :: t = _
+f :: t -> t1 -> t = _
+Stopped at break026.hs:7:23-35
+_result :: t = _
+c :: t = _
+f :: t -> Integer -> t = _
+x :: Integer = 2
+xs :: [Integer] = _
+Stopped at break026.hs:7:27-31
+_result :: Integer = _
+c :: Integer = 0
+f :: Integer -> Integer -> Integer = _
+x :: Integer = 1
+()
+1

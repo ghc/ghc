@@ -1,0 +1,10 @@
+
+T2111.hs:6:23:
+    The arrow command
+      undefined -< x
+    was found where an expression was expected
+    In a stmt of a 'do' expression: x <- undefined -< x
+    In a stmt of a 'do' expression: rec {x <- undefined -< x}
+    In the expression:
+      do { rec {x <- undefined -< x};
+           undefined -< x }

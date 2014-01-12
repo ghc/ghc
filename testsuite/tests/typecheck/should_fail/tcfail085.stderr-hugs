@@ -1,0 +1,3 @@
+ERROR "tcfail085.hs":9 - Construction does not define strict field
+Expression : F {x = 2}
+Field      : y

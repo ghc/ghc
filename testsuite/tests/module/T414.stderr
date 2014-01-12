@@ -1,0 +1,2 @@
+
+T414.hs:1:1: The IO action ‛main’ is not exported by module ‛Main’

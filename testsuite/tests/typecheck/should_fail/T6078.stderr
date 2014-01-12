@@ -1,0 +1,11 @@
+
+T6078.hs:8:10:
+    You can't mix polymorphic and unlifted bindings
+      ip1p@(Ptr ip1) = Ptr ip0 `plusPtr` len
+      Probable fix: use a bang pattern
+    In the expression:
+      let ip1p@(Ptr ip1) = Ptr ip0 `plusPtr` len in ip1p
+    In the expression:
+      \ fpbuf ip0 ipe s0 -> let ip1p@(Ptr ip1) = ... in ip1p
+    In an equation for ‛byteStringSlice’:
+        byteStringSlice len = \ fpbuf ip0 ipe s0 -> let ... in ip1p

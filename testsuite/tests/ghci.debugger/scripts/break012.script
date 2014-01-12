@@ -1,0 +1,9 @@
+-- Test polymorphic types in a breakpoint
+:l break012
+:st g 5 `seq` ()
+:st
+:t a 
+:t b 
+:t c 
+:t d
+:p a b c d

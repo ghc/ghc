@@ -1,0 +1,5 @@
+
+annfail05.hs:11:1:
+    No instance for (Data.Data.Data NoInstances)
+      arising from an annotation
+    In the annotation: {-# ANN f NoInstances #-}

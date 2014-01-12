@@ -1,0 +1,5 @@
+ERROR "tcfail016.hs":9 - Type error in application
+*** Expression     : g e2
+*** Term           : e2
+*** Type           : (b,Expr b)
+*** Does not match : Expr a

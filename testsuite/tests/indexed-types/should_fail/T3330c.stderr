@@ -1,0 +1,24 @@
+
+T3330c.hs:23:43:
+    Could not deduce (f1 ~ f1 x)
+    from the context (f ~ (f1 :+: g))
+      bound by a pattern with constructor
+                 RSum :: forall (f :: * -> *) (g :: * -> *).
+                         R f -> R g -> R (f :+: g),
+               in an equation for ‛plug'’
+      at T3330c.hs:23:8-17
+      ‛f1’ is a rigid type variable bound by
+           a pattern with constructor
+             RSum :: forall (f :: * -> *) (g :: * -> *).
+                     R f -> R g -> R (f :+: g),
+           in an equation for ‛plug'’
+           at T3330c.hs:23:8
+    Expected type: Der ((->) x) (f1 x)
+      Actual type: R f1
+    Relevant bindings include
+      x :: x (bound at T3330c.hs:23:29)
+      df :: f1 x (bound at T3330c.hs:23:25)
+      rf :: R f1 (bound at T3330c.hs:23:13)
+      plug' :: R f -> Der f x -> x -> f x (bound at T3330c.hs:23:1)
+    In the first argument of ‛plug’, namely ‛rf’
+    In the first argument of ‛Inl’, namely ‛(plug rf df x)’

@@ -1,0 +1,49 @@
+pdb.safePkg01/local.db:
+    safePkg01-1.0
+
+trusted: False
+
+M_SafePkg
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe
+require own pkg trusted: False
+
+M_SafePkg2
+package dependencies: base ghc-prim integer-gmp
+trusted: trustworthy
+require own pkg trusted: False
+
+M_SafePkg3
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe
+require own pkg trusted: True
+
+M_SafePkg4
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe
+require own pkg trusted: True
+
+M_SafePkg5
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe-inferred
+require own pkg trusted: True
+
+M_SafePkg6
+package dependencies: array-0.4.0.1 base* bytestring-0.10.1.0*
+trusted: trustworthy
+require own pkg trusted: False
+
+M_SafePkg7
+package dependencies: array-0.4.0.1 base* bytestring-0.10.1.0*
+trusted: safe
+require own pkg trusted: False
+
+M_SafePkg8
+package dependencies: array-0.4.0.1 base bytestring-0.10.1.0*
+trusted: trustworthy
+require own pkg trusted: False
+
+Testing setting trust
+trusted: True
+trusted: False
+trusted: False

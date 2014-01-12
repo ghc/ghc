@@ -1,0 +1,5 @@
+
+T2597b.hs:8:8:
+    Empty stmt list in do-block
+    When splicing a TH expression: do
+    In the splice: $mkBug2

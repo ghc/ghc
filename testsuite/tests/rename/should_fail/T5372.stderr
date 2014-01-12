@@ -1,0 +1,6 @@
+
+T5372.hs:4:11:
+    Not in scope: data constructor ‛MkS’
+    Perhaps you meant ‛T5372a.MkS’ (imported from T5372a)
+
+T5372.hs:4:17: ‛x’ is not a (visible) constructor field name

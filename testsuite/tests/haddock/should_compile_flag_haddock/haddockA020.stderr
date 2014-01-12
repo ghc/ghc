@@ -1,0 +1,8 @@
+
+==================== Parser ====================
+module A (
+	<document comment>, <document comment>, x, <IEGroup: 2>, <document comment>
+    ) where
+x = True
+
+

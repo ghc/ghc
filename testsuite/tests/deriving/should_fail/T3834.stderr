@@ -1,0 +1,6 @@
+
+T3834.hs:8:1:
+    Can't make a derived instance of ‛C T’:
+      ‛C’ is not a derivable class
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+    In the stand-alone deriving instance for ‛C T’

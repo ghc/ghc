@@ -1,0 +1,5 @@
+
+T2846b.hs:5:5:
+    No instance for (Show (Num a0 => a0)) arising from a use of ‛show’
+    In the expression: show ([1, 2, 3] :: [Num a => a])
+    In an equation for ‛f’: f = show ([1, 2, 3] :: [Num a => a])

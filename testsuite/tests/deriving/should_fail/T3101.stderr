@@ -1,0 +1,6 @@
+
+T3101.hs:9:12:
+    Can't make a derived instance of ‛Show Boom’:
+      Constructor ‛Boom’ must have a Haskell-98 type
+      Possible fix: use a standalone deriving declaration instead
+    In the data declaration for ‛Boom’

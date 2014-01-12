@@ -1,0 +1,14 @@
+-- Test -fwarn-type-errors
+-- This test shows how each error is printed at runtime
+:l ../../typecheck/should_run/Defer01
+t5624
+print a
+print (b B)
+print (c (C2 True))
+print (d ())
+print f
+print (h ())
+print (i ())
+print j
+print (k 2)
+l

@@ -1,0 +1,8 @@
+
+tcfail159.hs:9:11:
+    Kind incompatibility when matching types:
+      t0 :: *
+      (# Int, Int #) :: #
+    In the pattern: ~(# p, q #)
+    In a case alternative: ~(# p, q #) -> p
+    In the expression: case h x of { ~(# p, q #) -> p }

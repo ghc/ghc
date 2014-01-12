@@ -1,0 +1,24 @@
+
+ClosedFam3.hs-boot:5:1:
+    Type constructor ‛Foo’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type family Foo a :: * where
+                     Foo Int = Bool
+                     Foo Double = Char
+    Boot file:   type family Foo a :: * where Foo Int = Bool
+
+ClosedFam3.hs-boot:8:1:
+    Type constructor ‛Bar’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type family Bar a :: * where
+                     Bar Int = Bool
+                     Bar Double = Double
+    Boot file:   type family Bar a :: * where
+                     Bar Int = Bool
+                     Bar Double = Char
+
+ClosedFam3.hs-boot:12:1:
+    Type constructor ‛Baz’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type family Baz a :: * where Baz Int = Bool
+    Boot file:   type family Baz (a :: k) :: * where Baz Int = Bool

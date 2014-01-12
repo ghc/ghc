@@ -1,0 +1,6 @@
+
+T7895.hs:10:6: Warning:
+    Literal 300 is out of the Word8 range 0..255
+
+T7895.hs:13:6: Warning:
+    Literal -129 is out of the Int8 range -128..127

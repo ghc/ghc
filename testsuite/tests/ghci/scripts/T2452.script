@@ -1,0 +1,2 @@
+:set -fno-implicit-import-qualified
+:t System.IO.hPutStrLn

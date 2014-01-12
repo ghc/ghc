@@ -1,0 +1,5 @@
+
+T5657.hs:3:8: Not in scope: ‛LT..’
+
+T5657.hs:3:8:
+    A section must be enclosed in parentheses thus: (LT.. GT)

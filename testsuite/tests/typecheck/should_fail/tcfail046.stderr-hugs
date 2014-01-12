@@ -1,0 +1,1 @@
+ERROR "tcfail046.hs":9 - An instance of Eq (Process a) is required to derive Eq (Continuation a)

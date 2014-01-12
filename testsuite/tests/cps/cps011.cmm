@@ -1,0 +1,7 @@
+// Yet another basic function
+
+foo7 {
+  bits32 x;
+  (x) = foreign "C--" get_time() "safe";
+  return (x);
+}

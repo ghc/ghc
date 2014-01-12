@@ -1,0 +1,23 @@
+	Wed Nov  9 09:45 2011 Time and Allocation Profiling Report  (Final)
+
+	   T5559 +RTS -p -RTS
+
+	total time  =        0.08 secs   (4 ticks @ 20 ms)
+	total alloc =  52,274,888 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE  %time %alloc
+
+føb         Main    100.0   99.9
+
+
+                                                      individual     inherited
+COST CENTRE MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN        MAIN                    100           0    0.0    0.0   100.0  100.0
+ CAF        GHC.IO.Handle.FD        126           0    0.0    0.1     0.0    0.1
+ CAF        GHC.IO.Encoding.Iconv   118           0    0.0    0.0     0.0    0.0
+ CAF        GHC.IO.Encoding         116           0    0.0    0.0     0.0    0.0
+ CAF        GHC.Conc.Signal         108           0    0.0    0.0     0.0    0.0
+ CAF        Main                    106           0    0.0    0.0   100.0   99.9
+  main      Main                    200           1    0.0    0.0   100.0   99.9
+   føb      Main                    201      392835  100.0   99.9   100.0   99.9

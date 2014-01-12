@@ -1,0 +1,5 @@
+
+GenCannotDoRep1_0.hs:9:49:
+    Can't make a derived instance of ‛Generic1 Dynamic’:
+      Dynamic must be a vanilla data constructor
+    In the data declaration for ‛Dynamic’

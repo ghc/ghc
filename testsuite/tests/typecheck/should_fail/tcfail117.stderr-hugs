@@ -1,0 +1,1 @@
+ERROR "tcfail117.hs":5 - Can only derive instances of Enum for enumeration types

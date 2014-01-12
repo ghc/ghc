@@ -1,0 +1,4 @@
+ERROR "tcfail065.hs":29 - Inferred type is not general enough
+*** Expression    : setX
+*** Expected type : HasX (X a) => b -> X a -> X a
+*** Inferred type : HasX (X a) => a -> X a -> X a

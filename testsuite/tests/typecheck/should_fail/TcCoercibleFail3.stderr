@@ -1,0 +1,7 @@
+
+TcCoercibleFail3.hs:12:7:
+    Could not coerce from ‛NT1’ to ‛NT2’
+      because ‛NT1’ and ‛NT2’ are different types.
+      arising from a use of ‛coerce’
+    In the expression: coerce
+    In an equation for ‛foo’: foo = coerce

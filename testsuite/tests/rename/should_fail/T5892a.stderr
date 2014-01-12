@@ -1,0 +1,10 @@
+
+T5892a.hs:12:8: Warning:
+    Fields of ‛Version’ not initialised: Data.Version.versionTags
+    In the expression: Version {..}
+    In the expression: let versionBranch = [] in Version {..}
+    In an equation for ‛foo’:
+        foo (Version {..}) = let versionBranch = ... in Version {..}
+
+<no location info>: 
+Failing due to -Werror.

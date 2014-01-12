@@ -1,0 +1,18 @@
+// Test foreign calls
+
+// This test won't work until the parser is changes.
+// Currently the parser calls emitForeignCall', even
+// for safe foreign calls and that function
+// creates only unsafe foreign calls.
+// This will have to be changed to 
+//   code (stmtC (CmmCall (CmmForeignCall expr convention) results args safety))
+// so the CPS can get a hold of it.
+
+foo() {
+  bits32 x, y, z;
+  x = x;
+  (x) = foreign "C" bar() "safe";
+  y = y;
+  (y) = foreign "C" baz() "safe";
+  return (z);
+}

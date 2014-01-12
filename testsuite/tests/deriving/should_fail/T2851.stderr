@@ -1,0 +1,8 @@
+
+T2851.hs:9:15:
+    No instance for (Show (F a))
+      arising from the first field of ‛D’ (type ‛F a’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Show (D a))

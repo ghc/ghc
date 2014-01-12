@@ -1,0 +1,12 @@
+
+tcfail082.hs:2:1:
+    Failed to load interface for ‛Data82’
+    Use -v to see a list of the files searched for.
+
+tcfail082.hs:3:1:
+    Failed to load interface for ‛Inst82_1’
+    Use -v to see a list of the files searched for.
+
+tcfail082.hs:4:1:
+    Failed to load interface for ‛Inst82_2’
+    Use -v to see a list of the files searched for.

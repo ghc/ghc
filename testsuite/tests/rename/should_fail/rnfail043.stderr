@@ -1,0 +1,5 @@
+
+rnfail043.hs:10:1:
+    Multiple declarations of ‛f’
+    Declared at: rnfail043.hs:6:1
+                 rnfail043.hs:10:1

@@ -1,0 +1,34 @@
+
+T2494.hs:15:14:
+    Couldn't match type ‛b’ with ‛a’
+      ‛b’ is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:14:16
+      ‛a’ is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:13:16
+    Expected type: Maybe (m a) -> Maybe (m a)
+      Actual type: Maybe (m b) -> Maybe (m b)
+    Relevant bindings include
+      f :: forall (m :: * -> *). Monad m => Maybe (m a) -> Maybe (m a)
+        (bound at T2494.hs:13:11)
+      g :: forall (m :: * -> *). Monad m => Maybe (m b) -> Maybe (m b)
+        (bound at T2494.hs:14:11)
+      x :: Maybe a (bound at T2494.hs:14:65)
+    In the first argument of ‛foo’, namely ‛g’
+    In the second argument of ‛foo’, namely ‛(foo g x)’
+
+T2494.hs:15:30:
+    Couldn't match type ‛b’ with ‛a’
+      ‛b’ is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:14:16
+      ‛a’ is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:13:16
+    Expected type: Maybe (m a) -> Maybe (m a)
+      Actual type: Maybe (m b) -> Maybe (m b)
+    Relevant bindings include
+      f :: forall (m :: * -> *). Monad m => Maybe (m a) -> Maybe (m a)
+        (bound at T2494.hs:13:11)
+      g :: forall (m :: * -> *). Monad m => Maybe (m b) -> Maybe (m b)
+        (bound at T2494.hs:14:11)
+      x :: Maybe a (bound at T2494.hs:14:65)
+    In the second argument of ‛(.)’, namely ‛g’
+    In the first argument of ‛foo’, namely ‛(f . g)’

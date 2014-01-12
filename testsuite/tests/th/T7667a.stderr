@@ -1,0 +1,5 @@
+
+T7667a.hs:8:12:
+    Illegal variable name: ‛False’
+    When splicing a TH expression: False
+    In the splice: $(return $ VarE (mkName "False"))

@@ -1,0 +1,8 @@
+
+tcfail007.hs:3:15:
+    No instance for (Num Bool) arising from a use of ‛+’
+    In the expression: x + 1
+    In an equation for ‛n’:
+        n x
+          | True = x + 1
+          | False = True

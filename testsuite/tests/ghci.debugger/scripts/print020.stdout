@@ -1,0 +1,14 @@
+Breakpoint 0 activated at ../HappyTest.hs:(226,1)-(237,35)
+Stopped at ../HappyTest.hs:(226,1)-(237,35)
+_result :: [Token] = _
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+*** Ignoring breakpoint
+_result = [TokenInt 1,TokenPlus,TokenInt 2,TokenPlus,TokenInt 3]

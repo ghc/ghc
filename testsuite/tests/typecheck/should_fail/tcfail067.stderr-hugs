@@ -1,0 +1,5 @@
+ERROR "tcfail067.hs":12 - Cannot justify constraints in explicitly typed binding
+*** Expression    : subRangeValue
+*** Type          : SubRange a -> a
+*** Given context : ()
+*** Constraints   : Ord a

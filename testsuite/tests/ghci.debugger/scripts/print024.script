@@ -1,0 +1,10 @@
+-- stg_ap_rep exception after using :print with newtypes
+
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
+:l ../Test
+
+let a = MkT (1 :: Integer)
+seq a ()
+:p a
+a
+-- Bang! "internal error: stg_ap_p_ret", triggered by the evaluation of a 

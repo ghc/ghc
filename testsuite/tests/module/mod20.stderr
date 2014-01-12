@@ -1,0 +1,5 @@
+
+mod20.hs:3:18:
+    Multiple declarations of ‛m’
+    Declared at: mod20.hs:2:18
+                 mod20.hs:3:18

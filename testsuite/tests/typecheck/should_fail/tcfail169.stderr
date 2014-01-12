@@ -1,0 +1,8 @@
+
+tcfail169.hs:7:51:
+    No instance for (Show (Succ a))
+      arising from the second field of ‛Cons’ (type ‛Seq (Succ a)’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Show (Seq a))

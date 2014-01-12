@@ -1,0 +1,5 @@
+These tests are hard to test automatically, but
+they are intended to let you eyeball the results.
+
+Often they are referred to from comments in the
+source code.

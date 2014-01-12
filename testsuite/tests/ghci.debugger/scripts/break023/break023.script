@@ -1,0 +1,18 @@
+
+-- We have this structure of modules:
+
+-- A (imports B.boot)
+-- B (imports A)
+-- B.boot (imports A)
+-- C (imports A and B)
+
+-- And we load C, to debug some function called b in B. 
+-- But first we touch A, and reload. B.boot will be reloaded, but not B,  which will end up with an empty modbreaks. We can no longer set a breakpoint in B.b
+-- The effect we want is B.boot being reloaded while B is not.
+
+:! cp A1.hs A.hs
+:l C
+:break b  -- it works ok at this point
+:! touch A.hs
+:r
+:break b  -- it does not work anymore

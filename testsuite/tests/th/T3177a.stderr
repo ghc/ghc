@@ -1,0 +1,8 @@
+
+T3177a.hs:8:6:
+    ‛Int’ is applied to too many type arguments
+    In the type signature for ‛f’: f :: Int Int
+
+T3177a.hs:11:6:
+    ‛Int’ is applied to too many type arguments
+    In the type signature for ‛g’: g :: Int Int

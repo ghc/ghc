@@ -1,0 +1,4 @@
+
+ImpSafe01.hs:9:1:
+    Data.Word: Can't be safely imported!
+    The package (base) the module resides in isn't trusted.

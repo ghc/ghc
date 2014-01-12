@@ -1,0 +1,5 @@
+
+tcfail199.hs:5:1:
+    Couldn't match expected type ‛IO t0’ with actual type ‛[Char]’
+    In the expression: main
+    When checking the type of the IO action ‛main’

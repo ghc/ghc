@@ -1,0 +1,4 @@
+
+T8132.hs:1:1:
+    Typeable instances can only be derived; replace the following instance:
+      instance Typeable K -- Defined at T8132.hs:6:10

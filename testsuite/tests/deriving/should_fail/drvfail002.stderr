@@ -1,0 +1,8 @@
+
+drvfail002.hs:19:23:
+    No instance for (X T c)
+      arising from the first field of ‛S’ (type ‛T’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Show S)

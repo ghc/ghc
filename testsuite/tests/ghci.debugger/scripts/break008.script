@@ -1,0 +1,5 @@
+:l ../Test3
+:b 1
+mymap id []
+-- second load, should discard the breakpoints without blowing up
+:l ../Test3.hs

@@ -1,0 +1,6 @@
+
+T6022.hs:3:9:
+    No instance for (Eq ([a] -> a)) arising from a use of `=='
+    Possible fix: add an instance declaration for (Eq ([a] -> a))
+    In the expression: x == head
+    In an equation for `f': f x = x == head

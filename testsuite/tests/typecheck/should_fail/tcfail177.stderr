@@ -1,0 +1,170 @@
+
+tcfail177.hs:10:12:
+    Couldn't match expected type ‛Bool’ with actual type ‛Int’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+    In an equation for ‛allTests’:
+        allTests = foo [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", ....]
+
+tcfail177.hs:20:13:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:20:20:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:20:27:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:21:13:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:21:20:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:21:27:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:22:13:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:22:20:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:22:27:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:23:13:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:23:20:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:23:27:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:24:13:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:24:20:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:24:27:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:25:13:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:25:20:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+
+tcfail177.hs:25:27:
+    Couldn't match expected type ‛Bool’ with actual type ‛[Char]’
+    In the expression: "Two"
+    In the first argument of ‛foo’, namely
+      ‛[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]’
+    In the expression:
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]

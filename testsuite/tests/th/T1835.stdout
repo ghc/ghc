@@ -1,0 +1,14 @@
+class GHC.Classes.Eq a_0 => Main.MyClass a_0
+instance Main.MyClass Main.Foo
+instance Main.MyClass Main.Baz
+instance GHC.Classes.Eq a_1 => Main.MyClass (Main.Quux a_1)
+instance GHC.Classes.Ord a_2 => Main.MyClass (Main.Quux2 a_2)
+True
+True
+True
+True
+True
+True
+True
+True
+False

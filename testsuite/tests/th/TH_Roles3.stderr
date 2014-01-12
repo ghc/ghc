@@ -1,0 +1,2 @@
+data Foo_0 a_1 (b_2 :: k_3) c_4 (d_5 :: k_3)
+type role Foo_0 _ _ representational nominal

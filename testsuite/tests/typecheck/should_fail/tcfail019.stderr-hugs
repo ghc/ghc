@@ -1,0 +1,4 @@
+ERROR "tcfail019.hs":18 - Cannot build superclass instance
+*** Instance            : D [a]
+*** Context supplied    : ()
+*** Required superclass : B [a]

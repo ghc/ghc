@@ -1,0 +1,11 @@
+
+T7148a.hs:19:50:
+    Could not coerce from ‛Result a b’ to ‛b’
+      because ‛Result a b’ and ‛b’ are different types.
+      arising from the coercion of the method ‛coerce’ from type
+                   ‛forall b. Proxy b -> a -> Result a b’ to type
+                   ‛forall b. Proxy b -> IS_NO_LONGER a -> Result (IS_NO_LONGER a) b’
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Convert (IS_NO_LONGER a))

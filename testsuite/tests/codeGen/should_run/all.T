@@ -1,0 +1,118 @@
+# Test +RTS -G1 here (it isn't tested anywhere else)
+setTestOpts(extra_ways(['g1']))
+
+test('cgrun001', normal, compile_and_run, [''])
+test('cgrun002', normal, compile_and_run, [''])
+test('cgrun003', normal, compile_and_run, [''])
+test('cgrun004', normal, compile_and_run, [''])
+test('cgrun005', normal, compile_and_run, [''])
+test('cgrun006', normal, compile_and_run, [''])
+test('cgrun007', normal, compile_and_run, [''])
+test('cgrun008', normal, compile_and_run, [''])
+test('cgrun009', normal, compile_and_run, [''])
+test('cgrun010', normal, compile_and_run, [''])
+test('cgrun011', normal, compile_and_run, [''])
+test('cgrun012', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun013', normal, compile_and_run, [''])
+test('cgrun014', normal, compile_and_run, [''])
+test('cgrun015', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun016', exit_code(1), compile_and_run, [''])
+test('cgrun017', normal, compile_and_run, [''])
+test('cgrun018', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun019', normal, compile_and_run, [''])
+test('cgrun020', normal, compile_and_run, [''])
+test('cgrun021', normal, compile_and_run, [''])
+test('cgrun022', normal, compile_and_run, [''])
+test('cgrun024', normal, compile_and_run, [''])
+test('cgrun025',
+     [reqlib('regex-compat'), extra_run_opts('cg025.hs'), exit_code(1)],
+     compile_and_run, ['-package regex-compat'])
+test('cgrun026', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun027', normal, compile_and_run, [''])
+test('cgrun028', normal, compile_and_run, [''])
+test('cgrun031', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun032', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun033', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cgrun034', normal, compile_and_run, [''])
+test('cgrun035', normal, compile_and_run, [''])
+test('cgrun036', normal, compile_and_run, [''])
+test('cgrun037', normal, compile_and_run, [''])
+test('cgrun038', normal, compile_and_run, [''])
+test('cgrun039', normal, compile_and_run, [''])
+test('cgrun040', normal, compile_and_run, [''])
+test('cgrun043', normal, compile_and_run, [''])
+test('cgrun044', normal, compile_and_run, [''])
+test('cgrun045', exit_code(1), compile_and_run, [''])
+test('cgrun046', normal, compile_and_run, [''])
+test('cgrun047', normal, compile_and_run, [''])
+test('cgrun048', normal, compile_and_run, [''])
+test('cgrun049', normal, compile_and_run, ['-funbox-strict-fields'])
+test('cgrun050', normal, compile_and_run, [''])
+# Doesn't work with External Core due to datatype declaration with no constructors
+test('cgrun051', [expect_fail_for(['extcore','optextcore']), exit_code(1)],
+     compile_and_run, [''])
+test('cgrun052', only_ways(['optasm']), compile_and_run, ['-funbox-strict-fields'])
+test('cgrun053', normal, compile_and_run, [''])
+test('cgrun054', normal, compile_and_run, [''])
+test('cgrun055', normal, compile_and_run, [''])
+test('cgrun056', normal, compile_and_run, [''])
+test('cgrun057', [ only_ways(prof_ways),
+                   extra_run_opts('+RTS -xc') ], compile_and_run, [''])
+test('cgrun058', normal, compile_and_run, [''])
+test('cgrun059', exit_code(1), compile_and_run, [''])
+test('cgrun060',
+     extra_run_opts('+RTS -K64k -RTS'),
+     compile_and_run, [''])
+test('cgrun061', normal, compile_and_run, [''])
+test('cgrun062', normal, compile_and_run, [''])
+test('cgrun063', normal, compile_and_run, [''])
+test('cgrun064', normal, compile_and_run, [''])
+test('cgrun065', normal, compile_and_run, [''])
+test('cgrun066', normal, compile_and_run, [''])
+test('cgrun067', extra_clean(['Cgrun067A.hi', 'Cgrun067A.o']),
+     compile_and_run, [''])
+test('cgrun068', reqlib('random'), compile_and_run, [''])
+test('cgrun069', omit_ways(['ghci']), multi_compile_and_run,
+                 ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
+test('cgrun070', normal, compile_and_run, [''])
+test('cgrun071', when(opsys('darwin'), expect_broken(7684)), compile_and_run, [''])
+test('cgrun072', normal, compile_and_run, [''])
+
+test('T1852', normal, compile_and_run, [''])
+test('T1861', extra_run_opts('0'), compile_and_run, [''])
+test('T2080', normal, compile_and_run, [''])
+test('T2838', normal, compile_and_run, [''])
+test('T3207', normal, compile_and_run, [''])
+test('T3561', normal, compile_and_run, [''])
+test('T3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
+test('T4441', normal, compile_and_run, [''])
+test('T5149', omit_ways(['ghci']), multi_compile_and_run,
+                 ['T5149', [('T5149_cmm.cmm', '')], ''])
+test('T5129', normal, compile_and_run, [''])
+test('T5626', exit_code(1), compile_and_run, [''])
+test('T5747', when(arch('i386'), extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
+test('T5785', normal, compile_and_run, [''])
+test('setByteArray', normal, compile_and_run, [''])
+
+test('T6146', normal, compile_and_run, [''])
+test('T5900', normal, compile_and_run, [''])
+test('T7163', normal, compile_and_run, [''])
+
+# T7319 now gives the same results in every 'way', so treat it as normal
+test('T7319', exit_code(1), compile_and_run, [''])
+
+# Gives different results when optimised, so restrict to just one way
+#test('T7319', [ extra_ways(['prof']), only_ways(['prof']), exit_code(1),
+#                req_profiling,
+#                extra_hc_opts('-fprof-auto'),
+#                extra_run_opts('+RTS -xc') ], compile_and_run, [''])
+
+test('Word2Float32', unless(wordsize(32), skip), compile_and_run, [''])
+test('Word2Float64', unless(wordsize(64), skip), compile_and_run, [''])
+
+test('T7361', normal, compile_and_run, [''])
+test('T7600', normal, compile_and_run, [''])
+test('T8103', only_ways(['normal']), compile_and_run, [''])
+test('T7953', reqlib('random'), compile_and_run, [''])
+test('T8256',normal, compile_and_run, [''])
+test('T6084',normal, compile_and_run, ['-O2'])

@@ -1,0 +1,42 @@
+Stopped at break020.hs:(9,8)-(15,11)
+_result :: IO () = _
+8  
+        vv
+9  main = do
+10    line1 0
+11    line2 0
+12    in_another_decl 0
+13    in_another_module 0
+14    line2 1
+15    return ()
+               ^^
+Stopped at break020.hs:10:3-9
+_result :: IO () = _
+9  main = do
+10    line1 0
+      ^^^^^^^
+11    line2 0
+Stopped at break020.hs:11:3-9
+_result :: IO () = _
+10    line1 0
+11    line2 0
+      ^^^^^^^
+12    in_another_decl 0
+Stopped at break020.hs:12:3-19
+_result :: IO () = _
+11    line2 0
+12    in_another_decl 0
+      ^^^^^^^^^^^^^^^^^
+13    in_another_module 0
+Stopped at break020.hs:13:3-21
+_result :: IO () = _
+12    in_another_decl 0
+13    in_another_module 0
+      ^^^^^^^^^^^^^^^^^^^
+14    line2 1
+Stopped at break020.hs:14:3-9
+_result :: IO () = _
+13    in_another_module 0
+14    line2 1
+      ^^^^^^^
+15    return ()

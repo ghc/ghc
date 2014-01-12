@@ -1,0 +1,7 @@
+
+tcfail108.hs:7:10:
+    Non type-variable argument in the constraint: Eq (f (Rec f))
+    (Use FlexibleContexts to permit this)
+    In the context: (Eq (f (Rec f)))
+    While checking an instance declaration
+    In the instance declaration for ‛Eq (Rec f)’

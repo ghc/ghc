@@ -1,0 +1,8 @@
+
+Overlap10.hs:10:7:
+    Couldn't match expected type ‛F a Bool’ with actual type ‛Bool’
+    Relevant bindings include
+      x :: a (bound at Overlap10.hs:10:3)
+      g :: a -> F a Bool (bound at Overlap10.hs:10:1)
+    In the expression: False
+    In an equation for ‛g’: g x = False

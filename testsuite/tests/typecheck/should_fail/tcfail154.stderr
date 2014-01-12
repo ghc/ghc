@@ -1,0 +1,6 @@
+
+tcfail154.hs:12:10:
+    Variable ‛a’ occurs more often than in the instance head
+      in the constraint: C a a
+    (Use UndecidableInstances to permit this)
+    In the instance declaration for ‛Eq (T a)’

@@ -1,0 +1,1 @@
+ERROR "read008.hs":5 - Illegal strictness annotation for newtype constructor

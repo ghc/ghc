@@ -1,0 +1,6 @@
+fromList "abc"
+l = Data.Sequence.Seq (Data.Sequence.Deep
+                         3 (Data.Sequence.One (Data.Sequence.Elem 'a')) Data.Sequence.Empty
+                         (Data.Sequence.Two
+                            (Data.Sequence.Elem 'b') (Data.Sequence.Elem 'c')))
+l = fromList "abc"

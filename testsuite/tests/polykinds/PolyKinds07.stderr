@@ -1,0 +1,7 @@
+
+PolyKinds07.hs:10:11:
+    Data constructor ‛A1’ cannot be used here
+      (it is defined and used in the same recursive group)
+    In the type ‛B A1’
+    In the definition of data constructor ‛B1’
+    In the data declaration for ‛B’

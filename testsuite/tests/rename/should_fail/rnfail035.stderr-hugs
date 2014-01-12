@@ -1,0 +1,1 @@
+ERROR "rnfail035.hs" - Illegal export of a lone data constructor "C"

@@ -1,0 +1,6 @@
+[1 of 2] Compiling UnsafeInfered10_A ( UnsafeInfered10_A.hs, UnsafeInfered10_A.o )
+[2 of 2] Compiling UnsafeInfered10  ( UnsafeInfered10.hs, UnsafeInfered10.o )
+
+UnsafeInfered10.hs:5:1:
+    UnsafeInfered10_A: Can't be safely imported!
+    The module itself isn't safe.

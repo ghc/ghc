@@ -1,0 +1,6 @@
+
+SimpleFail14.hs:5:15:
+    Expected a type, but ‛a ~ a’ has kind ‛Constraint’
+    In the type ‛a ~ a’
+    In the definition of data constructor ‛T’
+    In the data declaration for ‛T’

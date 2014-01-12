@@ -1,0 +1,3 @@
+
+mod14.hs:2:10: Warning:
+    ‛m2’ is exported by ‛C(m1, m2, m2, m3)’ and ‛C(m1, m2, m2, m3)’

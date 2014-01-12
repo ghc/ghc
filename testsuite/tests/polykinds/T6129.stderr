@@ -1,0 +1,7 @@
+
+T6129.hs:12:11:
+    Data constructor ‛DInt’ cannot be used here
+      (it comes from a data family instance)
+    In the type ‛X DInt’
+    In the definition of data constructor ‛X1’
+    In the data declaration for ‛X’

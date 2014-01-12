@@ -1,0 +1,90 @@
+:unset +s
+:unset +t
+-- A small multi-module program, with 4 modules, A, B, C, D.  B & C
+-- depend on D, and A depends on B & C.
+-- 
+-- This test will try various combinations of compiled and interpreted
+-- versions of each module, and make sure each combination behaves
+-- sensibly.
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
+-- clean up
+:shell rm -f *.o *.hi
+:shell cp D1.hs D.hs
+
+putStrLn "Run 1"
+:load A
+:type a
+a 42
+
+putStrLn "Run 2"
+-- sigh; sleep 1, because the filesystem only stores times in seconds
+:shell sleep 1; cp D2.hs D.hs
+:reload
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 3"
+-- compile D, check that :reload doesn't pick it up
+:shell "$HC" $HC_OPTS $ghciWayFlags -c D.hs
+:reload
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 4"
+-- pick up the compiled D now, with :load
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 5"
+-- D,C compiled
+:shell "$HC" $HC_OPTS $ghciWayFlags -c C.hs
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 6"
+-- D,C,B compiled
+:shell "$HC" $HC_OPTS $ghciWayFlags -c B.hs
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 7"
+-- D,C,B,A compiled
+:shell "$HC" $HC_OPTS $ghciWayFlags -c A.hs
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 8"
+-- D,C,A compiled  (better not use A.o)
+:shell rm B.o
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 9"
+-- D,A compiled  (better not use A.o)
+:shell rm C.o
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 10"
+-- A compiled  (better not use A.o)
+:shell rm D.o
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42
+
+putStrLn "Run 11"
+-- A,B,C compiled (better not use A.o, B.o, C.o)
+:shell "$HC" $HC_OPTS $ghciWayFlags --make -v0 A
+:shell rm D.o
+:load A
+:type (A.a,B.b,C.c,D.d)
+a 42

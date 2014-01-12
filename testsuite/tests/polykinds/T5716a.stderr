@@ -1,0 +1,7 @@
+
+T5716a.hs:10:27:
+    Data constructor ‛Bar’ cannot be used here
+      (it comes from a data family instance)
+    In the type ‛Bar a’
+    In the definition of data constructor ‛Bar’
+    In the data instance declaration for ‛DF’

@@ -1,0 +1,6 @@
+
+tcfail086.hs:6:38:
+    Can't make a derived instance of ‛Eq Ex’:
+      Constructor ‛Ex’ must have a Haskell-98 type
+      Possible fix: use a standalone deriving declaration instead
+    In the data declaration for ‛Ex’

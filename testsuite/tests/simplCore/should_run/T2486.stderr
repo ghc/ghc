@@ -1,0 +1,24 @@
+
+==================== Tidy Core rules ====================
+"SPEC Main.fib [GHC.Types.Double]" [ALWAYS]
+    forall ($dNum :: GHC.Num.Num GHC.Types.Double)
+           ($dOrd :: GHC.Classes.Ord GHC.Types.Double).
+      Main.fib @ GHC.Types.Double $dNum $dOrd
+      = Main.fib_$sfib1
+"SPEC Main.fib [GHC.Types.Int]" [ALWAYS]
+    forall ($dNum :: GHC.Num.Num GHC.Types.Int)
+           ($dOrd :: GHC.Classes.Ord GHC.Types.Int).
+      Main.fib @ GHC.Types.Int $dNum $dOrd
+      = Main.fib_$sfib
+"SPEC Main.tak [GHC.Types.Double]" [ALWAYS]
+    forall ($dNum :: GHC.Num.Num GHC.Types.Double)
+           ($dOrd :: GHC.Classes.Ord GHC.Types.Double).
+      Main.tak @ GHC.Types.Double $dNum $dOrd
+      = Main.tak_$stak1
+"SPEC Main.tak [GHC.Types.Int]" [ALWAYS]
+    forall ($dNum :: GHC.Num.Num GHC.Types.Int)
+           ($dOrd :: GHC.Classes.Ord GHC.Types.Int).
+      Main.tak @ GHC.Types.Int $dNum $dOrd
+      = Main.tak_$stak
+
+

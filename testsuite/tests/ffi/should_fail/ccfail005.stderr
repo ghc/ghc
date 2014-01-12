@@ -1,0 +1,10 @@
+
+ccfail005.hs:14:1:
+    Unacceptable argument type in foreign declaration: D
+    When checking declaration:
+      foreign import ccall safe "static f1" f1 :: F Bool
+
+ccfail005.hs:15:1:
+    Unacceptable result type in foreign declaration: IO D
+    When checking declaration:
+      foreign import ccall safe "static f2" f2 :: F Char

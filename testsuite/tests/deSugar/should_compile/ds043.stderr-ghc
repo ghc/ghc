@@ -1,0 +1,4 @@
+
+ds043.hs:8:2:
+    Warning: Pattern match(es) are overlapped
+	     In a case alternative: B {e = True, f = False} -> ...

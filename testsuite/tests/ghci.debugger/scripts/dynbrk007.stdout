@@ -1,0 +1,11 @@
+Stopped at dynbrk007.hs:(2,5)-(6,11)
+_result :: Maybe Int = _
+Stopped at dynbrk007.hs:3:9-16
+_result :: Maybe Int = _
+Stopped at dynbrk007.hs:4:9-16
+_result :: Maybe Integer = _
+Stopped at dynbrk007.hs:5:9-16
+_result :: Maybe Integer = _
+Stopped at dynbrk007.hs:6:4-11
+_result :: Maybe Int = _
+i :: Int = 1

@@ -1,0 +1,10 @@
+:l print031.hs
+let a = MkT2 [Just (Phantom 1)]
+:break f
+a
+f a
+:step
+-- ghc crashes now when the type for x is recovered 
+-- and unifyRTTI fails to compute a substitution
+:p x  
+:q

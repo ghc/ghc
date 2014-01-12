@@ -1,0 +1,3 @@
+
+T3696.hs:9:1:
+    Warning: Top-level binding with no type signature: def :: Int

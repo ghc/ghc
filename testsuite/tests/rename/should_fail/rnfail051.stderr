@@ -1,0 +1,3 @@
+
+rnfail051.hs:7:17:
+    Pattern syntax in expression context: _ -> putStrLn "_"

@@ -1,0 +1,9 @@
+
+T5246.hs:11:10:
+    Could not deduce (?x::Int) arising from a use of ‛foo’
+    from the context (?x::[Char])
+      bound by the implicit-parameter bindings for ?x
+      at T5246.hs:(10,7)-(11,12)
+    In the expression: foo
+    In the expression: let ?x = "hello" in foo
+    In an equation for ‛bar’: bar = let ?x = "hello" in foo

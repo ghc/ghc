@@ -1,0 +1,8 @@
+
+drvfail004.hs:8:12:
+    No instance for (Eq (Foo a b))
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Ord (Foo a b))

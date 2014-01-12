@@ -1,0 +1,10 @@
+
+tcfail175.hs:11:1:
+    Couldn't match expected type ‛String -> String -> String’
+                with actual type ‛a’
+      ‛a’ is a rigid type variable bound by
+          the type signature for evalRHS :: Int -> a at tcfail175.hs:10:12
+    Relevant bindings include
+      evalRHS :: Int -> a (bound at tcfail175.hs:11:1)
+    The equation(s) for ‛evalRHS’ have three arguments,
+    but its type ‛Int -> a’ has only one

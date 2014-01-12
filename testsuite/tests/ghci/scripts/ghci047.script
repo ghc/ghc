@@ -1,0 +1,40 @@
+--Testing GADTs, type families as well as a ton of crazy type stuff
+:set -XGADTs
+:set -XTypeFamilies
+:set -XOverlappingInstances
+:set -XFunctionalDependencies
+:set -XFlexibleContexts
+:set -XFlexibleInstances
+:set -XUndecidableInstances
+data A
+data B
+data C
+:{
+data ABorC t where
+  Foo :: Int -> ABorC A
+  Bar :: Bool -> ABorC A
+  Baz :: Char -> ABorC B
+  Quz :: ABorC B
+  Yud :: String -> ABorC C
+  Myp :: Double -> ABorC C
+:}
+data HTrue
+data HFalse
+
+class TypeEq x y b | x y -> b
+instance (HTrue ~ b)  => TypeEq x x b
+instance (HFalse ~ b) => TypeEq x y b
+
+type family Or a b
+type instance Or HTrue  HTrue  = HTrue
+type instance Or HTrue  HFalse = HTrue
+type instance Or HFalse HTrue  = HTrue
+type instance Or HFalse HFalse = HFalse
+
+let f :: (Or a c ~ HTrue, TypeEq t A a, TypeEq t C c) => ABorC t -> Int ;    f x = 1
+f $ Foo 1
+f $ Bar True
+f $ Baz 'a'
+f $ Quz
+f $ Yud "a"
+f $ Myp 4.3

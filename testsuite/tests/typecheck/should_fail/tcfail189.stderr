@@ -1,0 +1,8 @@
+
+tcfail189.hs:10:31:
+    Couldn't match type ‛[a0]’ with ‛a -> a1’
+    Expected type: (a -> a1) -> [a] -> [[a]]
+      Actual type: [a0] -> [a0]
+    Possible cause: ‛take’ is applied to too many arguments
+    In the expression: take 2
+    In a stmt of a list comprehension: then group by x using take 2

@@ -1,0 +1,3 @@
+
+WarnMinimalFail3.hs:12:15:
+    ‛parent’ is not a (visible) method of class ‛Child’

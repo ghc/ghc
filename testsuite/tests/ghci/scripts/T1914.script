@@ -1,0 +1,16 @@
+:set -v1
+System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; }"
+System.IO.writeFile "T1914B.hs" "module T1914B where { type T = Int; }"
+-- hack: avoid the need for sleep by using specific timestamps:
+:! touch -t 01010000 T1914A.hs
+:! touch -t 01010000 T1914B.hs
+:load T1914A
+System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; oops }"
+:! touch -t 01010001 T1914A.hs
+:reload
+-- T1914B should still be loaded
+:module *T1914B
+System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; }"
+:! touch -t 01010002 T1914A.hs
+:reload
+-- should not have to reload T1914B

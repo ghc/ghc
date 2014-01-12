@@ -1,0 +1,22 @@
+
+:set -fprint-explicit-foralls
+
+:l ../QSort
+
+:delete 1        
+-- Illegal: empty breakpoint list
+
+:break NonModule 1
+-- Illegal: I don't know this module
+
+:break QSort 1 1    
+-- Error: No breakpoint here
+
+:show breaks             
+-- Show an empty list
+
+qsort [8, 4, 42, 16, 15, 23]  
+-- Should run normally
+
+-- Testing that ghci commands work normally
+:i map                    

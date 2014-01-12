@@ -1,0 +1,6 @@
+
+==================== Parser ====================
+module ShouldCompile where
+data A = <document comment> A | B | C | D
+
+

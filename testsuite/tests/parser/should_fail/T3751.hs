@@ -1,0 +1,3 @@
+module ShouldFail where
+
+x = "\§"

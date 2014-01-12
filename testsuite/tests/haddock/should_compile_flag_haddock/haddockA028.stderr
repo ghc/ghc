@@ -1,0 +1,9 @@
+
+==================== Parser ====================
+module ShouldCompile where
+data (<-->) a b = Mk a b
+test ::
+  [a] <document comment> -> (a <--> (b -> [a])) <document comment>
+test xs ys = xs
+
+

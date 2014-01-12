@@ -1,0 +1,3 @@
+ERROR "tcfail003.hs":3 - Unresolved top-level overloading
+*** Binding             : d
+*** Outstanding context : Num Char

@@ -1,0 +1,2 @@
+ERROR "mod146.hs" - Conflicting exports of entity "m1"
+*** Could refer to Mod146.m1 or Mod145_A.m1

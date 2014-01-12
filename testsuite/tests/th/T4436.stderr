@@ -1,0 +1,11 @@
+T4436.hs:5:7-56: Splicing expression
+    return
+      (LitE
+         (StringL
+            "hello\n\
+            \goodbye\n\
+            \and then"))
+  ======>
+    "hello\n\
+    \goodbye\n\
+    \and then"

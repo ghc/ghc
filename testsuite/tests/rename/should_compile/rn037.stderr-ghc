@@ -1,0 +1,5 @@
+
+rn037.hs:3:1: Warning:
+    The import of ‛Data.List’ is redundant
+      except perhaps to import instances from ‛Data.List’
+    To import instances alone, use: import Data.List()

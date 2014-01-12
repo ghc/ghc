@@ -1,0 +1,8 @@
+// Reduced cps012.cmm to the key part that makes it crash
+// in RegisterAlloc.joinToTargets
+
+stg_ap_0_fast {
+    bits32 y, x;
+    c7: y = bits32[x];
+        goto c7;
+}

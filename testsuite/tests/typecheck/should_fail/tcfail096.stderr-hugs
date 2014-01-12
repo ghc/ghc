@@ -1,0 +1,5 @@
+ERROR "tcfail096.hs":24 - Instances are not consistent with dependencies
+*** This instance    : Foo ((a,b) -> c) (d a,d b) (d c)
+*** Conflicts with   : Foo (a -> b) (c a) (c b)
+*** For class        : Foo a b c
+*** Under dependency : a b -> c

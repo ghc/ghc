@@ -1,0 +1,6 @@
+
+rnfail041.hs:4:1:
+    The type signature for ‛h’ lacks an accompanying binding
+
+rnfail041.hs:5:1:
+    The type signature for ‛j’ lacks an accompanying binding

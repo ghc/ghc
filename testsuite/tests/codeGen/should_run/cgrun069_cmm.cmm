@@ -1,0 +1,214 @@
+#include "Cmm.h"
+
+// Test that the Memcpy, Memmove, Memset GHC intrinsic functions
+// are working correctly.
+
+section "rodata" { memsetErr : bits8[] "Memset Error - align: %d size: %d\n"; }
+section "rodata" { memcpyErr : bits8[] "Memcpy Error - align: %d size: %d\n"; }
+// You have to call printf with the same number of args for every call.
+// This is as the LLVM backend doesn't support vararg functions.
+section "rodata" { memmoveErr : bits8[] "Memmove Error Occured\n"; }
+
+memintrinTest (W_ dummy)
+{
+	W_ size, src, dst, off, alignV, set;
+	bits8 set8;
+
+   // Need two versions as memset takes a word for historical reasons
+	// but really its a bits8. We check that setting has ben done correctly
+	// at the bits8 level, so need bits8 version for checking.
+	set = 4;
+	set8 = 4::bits8;
+
+	size = 1024;
+	alignV = 4;
+
+	("ptr" src) = foreign "C" malloc(size);
+	("ptr" dst) = foreign "C" malloc(size);
+
+   // Test memset
+        prim %memset(src, set, size, alignV);
+
+   // Check memset worked
+	off = 0;
+while1:
+		if (off == size) {
+			goto while1_end;
+		}
+
+		if (bits8[src + off] != set8) {
+			// call with two dummy args for LLVM's benefit.
+			// they'll be ignored by printf
+                        foreign "C" printf(memsetErr "ptr", 0, 0);
+			goto while1_end;
+		}
+
+		off = off + 1;
+		goto while1;
+
+while1_end:
+
+   // Test memcpy
+        prim %memcpy(dst, src, size, alignV);
+
+   // Check memcpy worked
+	off = 0;
+while2:
+		if (off == size) {
+			goto while2_end;
+		}
+
+		if (bits8[dst + off] != set8) {
+                        foreign "C" printf(memcpyErr, 0, 0);
+			goto while2_end;
+		}
+
+		off = off + 1;
+		goto while2;
+
+while2_end:
+
+   // Test memove
+	set = 8;
+	set8 = 8::bits8;
+	size = 100;
+	W_ src2;
+	src2 = src + 50;
+
+        prim %memset(src, set, size, alignV);
+        prim %memmove(src2, src, size, alignV);
+
+   // Check memmove worked
+	off = 0;
+while3:
+ 		if (off == size) {
+ 			goto while3_end;
+ 		}
+
+ 		if (bits8[src2 + off] != set8) {
+                        foreign "C" printf(memmoveErr "ptr", 0, 0);
+ 			goto while3_end;
+ 		}
+
+ 		off = off + 1;
+ 		goto while3;
+
+while3_end:
+
+	foreign "C" free(src);
+	foreign "C" free(dst);
+
+        return (0);
+}
+
+// ---------------------------------------------------------------------
+// Tests for unrolling
+
+// We generate code for each configuration of alignment and size rather
+// than looping over the possible alignments/sizes as the alignment and
+// size needs to be statically known for unrolling to happen.
+
+// Below we need both 'set' and 'set8' as memset takes a word for
+// historical reasons but really its a bits8. We check that setting
+// has ben done correctly at the bits8 level, so need bits8 version
+// for checking.
+#define TEST_MEMSET(ALIGN,SIZE)                                        \
+    W_ size, src, dst, off, alignV, set;                               \
+    bits8 set8;                                                        \
+    set = 4;                                                           \
+    set8 = 4::bits8;                                                   \
+    size = SIZE;                                                       \
+    alignV = ALIGN;                                                    \
+    ("ptr" src) = foreign "C" malloc(size);                            \
+    ("ptr" dst) = foreign "C" malloc(size);                            \
+    prim %memset(src, set, size, alignV);                              \
+    off = 0;                                                           \
+loop:                                                                  \
+    if (off == size) {                                                 \
+        goto loop_end;                                                 \
+    }                                                                  \
+    if (bits8[src + off] != set8) {                                    \
+        foreign "C" printf(memsetErr "ptr", ALIGN, SIZE);              \
+        goto loop_end;                                                 \
+    }                                                                  \
+    off = off + 1;                                                     \
+    goto loop;                                                         \
+loop_end:                                                              \
+    foreign "C" free(src);                                             \
+    foreign "C" free(dst);                                             \
+    return (0);
+
+// This is not exactly beutiful but we need the separate functions to
+// avoid collisions between labels.
+//
+// The specific tests are selected with knowledge of the implementation
+// in mind in order to try to cover all branches and interesting corner
+// cases.
+
+testMemset8_0   (W_ dummy) { TEST_MEMSET(8,0); }
+testMemset8_8   (W_ dummy) { TEST_MEMSET(8,8); }
+testMemset8_9   (W_ dummy) { TEST_MEMSET(8,9); }
+testMemset8_10  (W_ dummy) { TEST_MEMSET(8,10); }
+testMemset8_11  (W_ dummy) { TEST_MEMSET(8,11); }
+testMemset8_12  (W_ dummy) { TEST_MEMSET(8,12); }
+testMemset8_13  (W_ dummy) { TEST_MEMSET(8,13); }
+testMemset8_14  (W_ dummy) { TEST_MEMSET(8,14); }
+testMemset8_15  (W_ dummy) { TEST_MEMSET(8,15); }
+testMemset8_16  (W_ dummy) { TEST_MEMSET(8,16); }
+
+testMemset4_0  (W_ dummy) { TEST_MEMSET(4,0); }
+testMemset4_4  (W_ dummy) { TEST_MEMSET(4,4); }
+testMemset4_5  (W_ dummy) { TEST_MEMSET(4,5); }
+testMemset4_6  (W_ dummy) { TEST_MEMSET(4,6); }
+testMemset4_7  (W_ dummy) { TEST_MEMSET(4,7); }
+testMemset4_8  (W_ dummy) { TEST_MEMSET(4,8); }
+
+#define TEST_MEMCPY(ALIGN,SIZE)                                        \
+    W_ size, src, dst, off, alignV;                                    \
+    size = SIZE;                                                       \
+    alignV = ALIGN;                                                    \
+    ("ptr" src) = foreign "C" malloc(size);                            \
+    ("ptr" dst) = foreign "C" malloc(size);                            \
+    off = 0;                                                           \
+init:                                                                  \
+    if (off == size) {                                                 \
+        goto init_end;                                                 \
+    }                                                                  \
+    bits8[src + off] = 0xaa;                                           \
+    off = off + 1;                                                     \
+    goto init;                                                         \
+init_end:                                                              \
+    prim %memcpy(dst, src, size, alignV);                              \
+    off = 0;                                                           \
+loop:                                                                  \
+    if (off == size) {                                                 \
+        goto loop_end;                                                 \
+    }                                                                  \
+    if (bits8[dst + off] != bits8[src + off]) {                        \
+        foreign "C" printf(memcpyErr "ptr", ALIGN, SIZE);              \
+        goto loop_end;                                                 \
+    }                                                                  \
+    off = off + 1;                                                     \
+    goto loop;                                                         \
+loop_end:                                                              \
+   foreign "C" free(src);                                              \
+   foreign "C" free(dst);                                              \
+   return (0);
+
+testMemcpy8_0   (W_ dummy) { TEST_MEMCPY(8,0); }
+testMemcpy8_8   (W_ dummy) { TEST_MEMCPY(8,8); }
+testMemcpy8_9   (W_ dummy) { TEST_MEMCPY(8,9); }
+testMemcpy8_10  (W_ dummy) { TEST_MEMCPY(8,10); }
+testMemcpy8_11  (W_ dummy) { TEST_MEMCPY(8,11); }
+testMemcpy8_12  (W_ dummy) { TEST_MEMCPY(8,12); }
+testMemcpy8_13  (W_ dummy) { TEST_MEMCPY(8,13); }
+testMemcpy8_14  (W_ dummy) { TEST_MEMCPY(8,14); }
+testMemcpy8_15  (W_ dummy) { TEST_MEMCPY(8,15); }
+testMemcpy8_16  (W_ dummy) { TEST_MEMCPY(8,16); }
+
+testMemcpy4_0  (W_ dummy) { TEST_MEMCPY(4,0); }
+testMemcpy4_4  (W_ dummy) { TEST_MEMCPY(4,4); }
+testMemcpy4_5  (W_ dummy) { TEST_MEMCPY(4,5); }
+testMemcpy4_6  (W_ dummy) { TEST_MEMCPY(4,6); }
+testMemcpy4_7  (W_ dummy) { TEST_MEMCPY(4,7); }
+testMemcpy4_8  (W_ dummy) { TEST_MEMCPY(4,8); }

@@ -1,0 +1,7 @@
+
+T8101.hs:7:9: Warning:
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            B
+            C

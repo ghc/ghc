@@ -1,0 +1,14 @@
+
+T4846.hs:29:1:
+    Could not coerce from ‛Expr Bool’ to ‛Expr BOOL’
+      because the first type argument of ‛Expr’ has role Nominal,
+      but the arguments ‛Bool’ and ‛BOOL’ differ
+      arising from a use of ‛GHC.Prim.coerce’
+    In the expression:
+        GHC.Prim.coerce (mkExpr :: Expr Bool) :: Expr BOOL
+    In an equation for ‛mkExpr’:
+        mkExpr = GHC.Prim.coerce (mkExpr :: Expr Bool) :: Expr BOOL
+    When typechecking the code for  ‛mkExpr’
+      in a standalone derived instance for ‛B BOOL’:
+      To see the code I am typechecking, use -ddump-deriv
+    In the instance declaration for ‛B BOOL’

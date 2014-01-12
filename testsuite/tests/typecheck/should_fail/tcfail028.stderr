@@ -1,0 +1,7 @@
+
+tcfail028.hs:4:17:
+    Expecting one more argument to ‛A a’
+    Expected a type, but ‛A a’ has kind ‛k0 -> *’
+    In the type ‛A a’
+    In the definition of data constructor ‛B’
+    In the data declaration for ‛A’

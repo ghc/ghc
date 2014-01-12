@@ -1,0 +1,6 @@
+
+ds003.hs:5:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛f’:
+        f (x : x1 : x2 : x3) ~(y, ys) z = ...
+        f x y True = ...

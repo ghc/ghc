@@ -1,0 +1,7 @@
+[1 of 2] Compiling T1914B           ( T1914B.hs, interpreted )
+[2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
+Ok, modules loaded: T1914A, T1914B.
+[2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
+Failed, modules loaded: T1914B.
+[2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
+Ok, modules loaded: T1914A, T1914B.

@@ -1,0 +1,6 @@
+Breakpoint 0 activated at ../Test3.hs:2:18-31
+Stopped at ../Test3.hs:2:18-31
+_result :: [t1] = _
+f :: t -> t1 = _
+x :: t = _
+xs :: [t] = [_]

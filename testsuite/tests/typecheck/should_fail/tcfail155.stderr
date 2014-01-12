@@ -1,0 +1,6 @@
+
+tcfail155.hs:8:6:
+    Data constructor ‛P’ returns type ‛L2’
+      instead of an instance of its parent type ‛T a’
+    In the definition of data constructor ‛P’
+    In the data declaration for ‛T’

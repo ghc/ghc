@@ -1,0 +1,5 @@
+
+T4875.hs:27:24:
+    ‛r’ is applied to too many type arguments
+    In the type ‛r c -> [c]’
+    In the class declaration for ‛Morphic’

@@ -1,0 +1,7 @@
+
+tcfail136.hs:9:35:
+    Expecting one more argument to ‛SymDict’
+    Expected a type, but ‛SymDict’ has kind ‛* -> *’
+    In the type ‛SymDict’
+    In the definition of data constructor ‛SymTable’
+    In the data declaration for ‛SymTable’

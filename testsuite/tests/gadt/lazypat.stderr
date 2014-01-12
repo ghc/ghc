@@ -1,0 +1,7 @@
+
+lazypat.hs:7:5:
+    An existential or GADT data constructor cannot be used
+      inside a lazy (~) pattern
+    In the pattern: T x f
+    In the pattern: ~(T x f)
+    In an equation for ‛f’: f ~(T x f) = f x

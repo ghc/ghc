@@ -1,0 +1,2 @@
+
+rnfail031.hs:2:21: Not in scope: ‛Data.List.map’

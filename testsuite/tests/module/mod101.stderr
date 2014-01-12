@@ -1,0 +1,4 @@
+
+mod101.hs:8:5:
+    Not in scope: data constructor ‛ConB’
+    Perhaps you meant ‛ConA’ (imported from Mod101_AuxB)

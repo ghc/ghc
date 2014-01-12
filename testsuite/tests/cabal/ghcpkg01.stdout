@@ -1,0 +1,223 @@
+local01.package.conf:
+    (no packages)
+Reading package info from "test.pkg" ... done.
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: stable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+synopsis:
+description: A Test Package
+category: none
+author: simonmar@microsoft.com
+exposed: True
+exposed-modules: A
+hidden-modules: B C.D
+trusted: False
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries: testpkg-1.2.3.4
+extra-libraries:
+extra-ghci-libraries:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
+includes:
+depends:
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces:
+haddock-html:
+pkgroot: 
+
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: stable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+synopsis:
+description: A Test Package
+category: none
+author: simonmar@microsoft.com
+exposed: True
+exposed-modules: A
+hidden-modules: B C.D
+trusted: False
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries: testpkg-1.2.3.4
+extra-libraries:
+extra-ghci-libraries:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
+includes:
+depends:
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces:
+haddock-html:
+pkgroot: 
+
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+Reading package info from "test2.pkg" ... done.
+local01.package.conf:
+    testpkg-1.2.3.4
+    (testpkg-2.0)
+
+name: testpkg
+version: 2.0
+id: testpkg-2.0-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: unstable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+synopsis:
+description: A Test Package (new version)
+category: none
+author: simonmar@microsoft.com
+exposed: False
+exposed-modules: A
+hidden-modules: B C.D C.E
+trusted: False
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries: testpkg-2.0
+extra-libraries:
+extra-ghci-libraries:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
+includes:
+depends:
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces:
+haddock-html:
+pkgroot: 
+
+name: testpkg
+version: 2.0
+id: testpkg-2.0-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: unstable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+synopsis:
+description: A Test Package (new version)
+category: none
+author: simonmar@microsoft.com
+exposed: False
+exposed-modules: A
+hidden-modules: B C.D C.E
+trusted: False
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries: testpkg-2.0
+extra-libraries:
+extra-ghci-libraries:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
+includes:
+depends:
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces:
+haddock-html:
+pkgroot: 
+---
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: stable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+synopsis:
+description: A Test Package
+category: none
+author: simonmar@microsoft.com
+exposed: True
+exposed-modules: A
+hidden-modules: B C.D
+trusted: False
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries: testpkg-1.2.3.4
+extra-libraries:
+extra-ghci-libraries:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
+includes:
+depends:
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces:
+haddock-html:
+pkgroot: 
+
+version: 2.0
+version: 1.2.3.4
+exposed: False
+exposed: True
+exposed: False
+exposed: False
+Reading package info from "test3.pkg" ... done.
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: stable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+synopsis:
+description: A Test Package
+category: none
+author: simonmar@microsoft.com
+exposed: False
+exposed-modules: A
+hidden-modules: B C.D
+trusted: False
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries: testpkg-1.2.3.4
+extra-libraries:
+extra-ghci-libraries:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
+includes:
+depends:
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces:
+haddock-html:
+pkgroot: 
+
+local01.package.conf:
+    (no packages)
+Reading package info from "test3.pkg" ... done.

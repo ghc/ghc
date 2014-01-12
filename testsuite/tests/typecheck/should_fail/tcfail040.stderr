@@ -1,0 +1,9 @@
+
+tcfail040.hs:19:5:
+    No instance for (ORD a0) arising from a use of ‛<<’
+    The type variable ‛a0’ is ambiguous
+    Note: there is a potential instance available:
+      instance ORD (a -> b) -- Defined at tcfail040.hs:17:10
+    In the first argument of ‛(===)’, namely ‛(<<)’
+    In the expression: (<<) === (<<)
+    In an equation for ‛f’: f = (<<) === (<<)

@@ -1,0 +1,36 @@
+~~~~~~~~~~ Testing :set
+options currently set: none.
+base language is: Haskell2010
+with the following modifiers:
+  -XNoDatatypeContexts
+  -XNondecreasingIndentation
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fforce-recomp
+  -fimplicit-import-qualified
+warning settings:
+~~~~~~~~~~ Testing :set -a
+options currently set: none.
+base language is: Haskell2010
+all active language options:
+GHCi-specific dynamic flag settings:
+  -fno-print-explicit-foralls
+other dynamic, non-language, flag settings:
+warning settings:
+  -fno-warn-implicit-prelude
+~~~~~~~~~~ Testing :show languages
+base language is: Haskell2010
+with the following modifiers:
+  -XNoDatatypeContexts
+  -XNondecreasingIndentation
+~~~~~~~~~~ Testing :show languages, with -XMagicHash
+base language is: Haskell2010
+with the following modifiers:
+  -XMagicHash
+  -XNoDatatypeContexts
+  -XNondecreasingIndentation
+~~~~~~~~~~ Testing :show packages
+active package flags: none
+~~~~~~~~~~ Testing :show packages, including the ghc package
+active package flags:
+  -package ghc

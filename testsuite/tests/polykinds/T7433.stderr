@@ -1,0 +1,6 @@
+
+T7433.hs:2:10:
+    Data constructor ‛Z’ cannot be used here
+      (Perhaps you intended to use DataKinds)
+    In the type ‛Z’
+    In the type declaration for ‛T’

@@ -1,0 +1,11 @@
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
+:l ../Test
+let a = O (id 'a')
+let b = O (id "abc")
+:p a
+:p b
+seq _t1 ()
+:p _t1
+:show bindings
+_t2
+-- bogus!! _t2 has been resolved to type Char

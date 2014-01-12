@@ -1,0 +1,3 @@
+    {- Arity: 1, HasNoCafRefs, Strictness: <S,1*U()>m,
+       Unfolding: InlineRule (0, True, True)
+                  Eta.bof `cast` (Sym (Eta.NTCo:Foo[0]) ->_R <Eta.T>_R) -}

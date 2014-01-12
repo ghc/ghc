@@ -1,0 +1,3 @@
+
+T4355.hs:1:172:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.

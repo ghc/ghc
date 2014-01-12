@@ -1,0 +1,28 @@
+
+T8142.hs:6:18:
+    Couldn't match type ‛Nu ((,) t0)’ with ‛Nu ((,) t)’
+    NB: ‛Nu’ is a type function, and may not be injective
+    The type variable ‛t0’ is ambiguous
+    Expected type: Nu ((,) t) -> Nu f
+      Actual type: Nu ((,) t0) -> Nu f0
+    When checking that ‛h’
+      has the inferred type ‛forall t (f :: * -> *). Nu ((,) t) -> Nu f’
+    Probable cause: the inferred type is ambiguous
+    In an equation for ‛tracer’:
+        tracer
+          = h
+          where
+              h = (\ (_, b) -> ((outI . fmap h) b)) . out
+
+T8142.hs:6:57:
+    Could not deduce (Nu ((,) t) ~ f1 (Nu ((,) t)))
+    from the context (Functor f, Coinductive f)
+      bound by the type signature for
+                 tracer :: (Functor f, Coinductive f) => (c -> f c) -> c -> f c
+      at T8142.hs:5:11-64
+    Expected type: Nu ((,) t) -> (t, f1 (Nu ((,) t)))
+      Actual type: Nu ((,) t) -> (t, Nu ((,) t))
+    Relevant bindings include
+      h :: Nu ((,) t) -> Nu f1 (bound at T8142.hs:6:18)
+    In the second argument of ‛(.)’, namely ‛out’
+    In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out

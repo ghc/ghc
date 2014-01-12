@@ -1,0 +1,9 @@
+Stopped at ../QSort.hs:(4,1)-(6,55)
+_result :: [t] = _
+Stopped at ../QSort.hs:5:16-51
+_result :: [Integer] = _
+a :: Integer = 1
+left :: [Integer] = _
+right :: [Integer] = _
+()
+left = []

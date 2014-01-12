@@ -1,0 +1,9 @@
+
+T2806.hs:12:11:
+    Pattern bindings containing unlifted types should use an outermost bang pattern:
+      (I# _x) = 4
+    In an equation for ‛foo’:
+        foo
+          = 3
+          where
+              (I# _x) = 4

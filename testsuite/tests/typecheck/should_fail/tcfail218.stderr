@@ -1,0 +1,11 @@
+
+tcfail218.hs:10:5:
+    Overlapping instances for C [a] b arising from a use of ‛foo’
+    Matching instances:
+      instance [incoherent] C [a] b -- Defined at tcfail218.hs:5:10
+      instance C [Int] b -- Defined at Tcfail218_Help.hs:7:10
+    (The choice depends on the instantiation of ‛a, b’
+     To pick the first instance above, use IncoherentInstances
+     when compiling the other instance declarations)
+    In the expression: foo
+    In an equation for ‛x’: x = foo

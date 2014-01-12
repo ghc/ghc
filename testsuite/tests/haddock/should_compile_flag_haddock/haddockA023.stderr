@@ -1,0 +1,10 @@
+
+==================== Parser ====================
+module ShouldCompile where
+test ::
+  Eq a =>
+  [a] <document comment>
+  -> [a] <document comment> -> [a] <document comment>
+test xs ys = xs
+
+

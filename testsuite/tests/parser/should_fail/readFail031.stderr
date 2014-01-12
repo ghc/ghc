@@ -1,0 +1,4 @@
+
+readFail031.hs:4:3:
+    Invalid type signature: (:+) :: o -> o -> o
+    Should be of form <variable> :: <type>

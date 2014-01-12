@@ -1,0 +1,18 @@
+
+ds020.hs:8:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛a’: a ~(~[], ~[], ~[]) = ...
+
+ds020.hs:11:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛b’: b ~(~x : ~xs : ~ys) = ...
+
+ds020.hs:16:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛d’:
+        d ~(n+43) = ...
+        d ~(n+999) = ...
+
+ds020.hs:22:1: Warning:
+    Pattern match(es) are overlapped
+    In an equation for ‛f’: f x@(~[]) = ...

@@ -1,0 +1,11 @@
+
+tcfail142.hs:18:8:
+    Could not deduce (Bar a0 r)
+      arising from the ambiguity check for ‛bar’
+    from the context (Bar a r)
+      bound by the type signature for bar :: Bar a r => r -> ()
+      at tcfail142.hs:18:8-25
+    The type variable ‛a0’ is ambiguous
+    In the ambiguity check for: forall r a. Bar a r => r -> ()
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‛bar’: bar :: Bar a r => r -> ()

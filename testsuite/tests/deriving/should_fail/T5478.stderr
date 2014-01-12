@@ -1,0 +1,5 @@
+
+T5478.hs:6:38:
+    Can't make a derived instance of ‛Show Foo’:
+      Don't know how to derive ‛Show’ for type ‛ByteArray#’
+    In the data declaration for ‛Foo’

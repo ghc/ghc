@@ -1,0 +1,27 @@
+***Arity is changed as occur many times: F10.f10f{v r155} 2 1
+
+==================== IdInfo ====================
+lit_s1Ll :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lit_s1Lj :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lit_s1Lh :: GHC.Num.Integer :: [*
+				Str: DmdType]
+F10.f10g :: GHC.Num.Integer -> GHC.Num.Integer -> GHC.Num.Integer :: [Arity 2
+								      *
+								      Str: DmdType SS]
+F10.f10f :: forall a_a1fu.
+	    (GHC.Num.Integer -> GHC.Num.Integer -> a_a1fu)
+	    -> (a_a1fu, GHC.Num.Integer -> a_a1fu) :: [Arity 1
+						       1 -> *
+						       Str: DmdType Lm]
+F10.f10h :: (GHC.Num.Integer, GHC.Num.Integer -> GHC.Num.Integer) :: [*
+								      Str: DmdType]
+F10.f10x1 :: GHC.Num.Integer :: [*
+				 Str: DmdType]
+F10.f10x2 :: GHC.Num.Integer -> GHC.Num.Integer :: [*
+						    Str: DmdType]
+F10.f10 :: GHC.Num.Integer :: [*
+			       Str: DmdType]
+
+

@@ -1,0 +1,5 @@
+
+T1074.hs:5:1: Warning:
+    The qualified import of `Control.Monad.Reader' is redundant
+      except perhaps to import instances from `Control.Monad.Reader'
+    To import instances alone, use: import Control.Monad.Reader()

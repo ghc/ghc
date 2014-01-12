@@ -1,0 +1,2 @@
+
+tcfail077.hs:8:3: ‛op2’ is not a (visible) method of class ‛Foo’

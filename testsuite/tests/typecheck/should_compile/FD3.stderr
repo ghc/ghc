@@ -1,0 +1,5 @@
+
+FD3.hs:15:15:
+    No instance for (MkA (String, a) a) arising from a use of ‛mkA’
+    In the expression: mkA a
+    In an equation for ‛translate’: translate a = mkA a

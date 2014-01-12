@@ -1,0 +1,28 @@
+Left user error (error)
+Stopped at <exception thrown>
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
+                                (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)
+_exception = SomeException (GHC.Exception.D:Exception _
+                                                      (GHC.Show.D:Show _ _ _) _ _)
+                           (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError []
+                                                     ['e','r','r','o','r'] Nothing Nothing)
+*** Exception: user error (error)
+Stopped at <exception thrown>
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
+                                (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)
+_exception = SomeException (GHC.Exception.D:Exception _
+                                                      (GHC.Show.D:Show _ _ _) _ _)
+                           (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError []
+                                                     ['e','r','r','o','r'] Nothing Nothing)
+*** Exception: user error (error)
+Stopped at <exception thrown>
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
+                                (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)
+_exception = SomeException (GHC.Exception.D:Exception _
+                                                      (GHC.Show.D:Show _ _ _) _ _)
+                           (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError []
+                                                     ['e','r','r','o','r'] Nothing Nothing)
+Left user error (error)

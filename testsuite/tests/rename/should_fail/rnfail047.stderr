@@ -1,0 +1,3 @@
+
+RnFail047_A.hs-boot:5:1:
+    RnFail047_A.y is exported by the hs-boot file, but not exported by the module

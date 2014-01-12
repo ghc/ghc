@@ -1,0 +1,6 @@
+
+annfail03.hs:17:11:
+    GHC stage restriction:
+      ‛InModule’ is used in a top-level splice or annotation,
+      and must be imported, not defined locally
+    In the annotation: {-# ANN f InModule #-}

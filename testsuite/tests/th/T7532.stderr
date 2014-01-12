@@ -1,0 +1,16 @@
+
+==================== Renamer ====================
+instance C Bool where
+  data D Bool = T7532.MkD
+
+T7532.hs:1:1: Splicing declarations
+    bang
+  ======>
+    T7532.hs:11:3-6
+    instance C Int where
+      data D Int = T
+
+==================== Renamer ====================
+instance C Int where
+  data D Int = T7532.T
+

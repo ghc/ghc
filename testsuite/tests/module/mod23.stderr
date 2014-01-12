@@ -1,0 +1,5 @@
+
+mod23.hs:3:8:
+    Conflicting definitions for ‛a’
+    Bound at: mod23.hs:3:8
+              mod23.hs:3:10

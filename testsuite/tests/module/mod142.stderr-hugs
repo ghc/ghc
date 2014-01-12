@@ -1,0 +1,2 @@
+ERROR "mod142.hs" - Conflicting exports of entity "x"
+*** Could refer to M.x or Mod142_A.x

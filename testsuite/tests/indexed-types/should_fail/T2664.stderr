@@ -1,0 +1,23 @@
+
+T2664.hs:31:52:
+    Could not deduce (b ~ a)
+    from the context (Connect a, Connect b)
+      bound by the instance declaration at T2664.hs:22:10-52
+    or from ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
+      bound by the type signature for
+                 newPChan :: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b)) =>
+                             IO (PChan (a :*: b), PChan c)
+      at T2664.hs:23:5-12
+      ‛b’ is a rigid type variable bound by
+          the instance declaration at T2664.hs:22:10
+      ‛a’ is a rigid type variable bound by
+          the instance declaration at T2664.hs:22:10
+    Expected type: Dual (Dual a)
+      Actual type: b
+    Relevant bindings include
+      v :: MVar (Either (PChan a) (PChan b)) (bound at T2664.hs:24:9)
+      newPChan :: IO (PChan (a :*: b), PChan c) (bound at T2664.hs:23:5)
+    In the third argument of ‛pchoose’, namely ‛newPChan’
+    In the first argument of ‛E’, namely ‛(pchoose Right v newPChan)’
+    In the expression:
+      E (pchoose Right v newPChan) (pchoose Left v newPChan)

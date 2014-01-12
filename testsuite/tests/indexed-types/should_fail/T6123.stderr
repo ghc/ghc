@@ -1,0 +1,7 @@
+
+T6123.hs:10:14:
+    Occurs check: cannot construct the infinite type: a0 ~ Id a0
+    The type variable ‛a0’ is ambiguous
+    Relevant bindings include cundefined :: a0 (bound at T6123.hs:10:1)
+    In the expression: cid undefined
+    In an equation for ‛cundefined’: cundefined = cid undefined

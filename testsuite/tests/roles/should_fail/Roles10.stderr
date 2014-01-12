@@ -1,0 +1,10 @@
+
+Roles10.hs:16:12:
+    Could not coerce from ‛Bool’ to ‛Char’
+      because ‛Bool’ and ‛Char’ are different types.
+      arising from the coercion of the method ‛meth’ from type
+                   ‛Int -> F Int’ to type ‛Age -> F Age’
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (C Age)

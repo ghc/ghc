@@ -1,0 +1,5 @@
+
+rnfail013.hs:7:11:
+    Multiple declarations of ‛MkT’
+    Declared at: rnfail013.hs:5:11
+                 rnfail013.hs:7:11

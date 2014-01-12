@@ -1,0 +1,4 @@
+ERROR "tcfail106.hs":11 - Cannot build superclass instance
+*** Instance            : C Int
+*** Context supplied    : ()
+*** Required superclass : S Int

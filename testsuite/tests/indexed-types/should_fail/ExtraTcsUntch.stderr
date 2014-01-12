@@ -1,0 +1,10 @@
+
+ExtraTcsUntch.hs:24:53:
+    Could not deduce (C [t] [a]) arising from a use of ‛op’
+    from the context (F Int ~ [[t]])
+      bound by the inferred type of
+               f :: F Int ~ [[t]] => [t] -> ((), ((), ()))
+      at ExtraTcsUntch.hs:(21,1)-(25,29)
+    In the expression: op x [y]
+    In the expression: (h [[undefined]], op x [y])
+    In a case alternative: TEx y -> (h [[undefined]], op x [y])

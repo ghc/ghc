@@ -1,0 +1,12 @@
+-- Test bad options
+
+:unset +s
+:set -XSafe
+
+-- we actually allow this for now but may want to revist this decision
+-- (as in, given we are in -XSafe, we may not want to allow package trust
+-- flags to be changed...)
+:set -trust base
+:set -distrust base
+:set -distrust-all-packages
+

@@ -1,0 +1,5 @@
+
+tc116.hs:12:10: Warning:
+    No explicit implementation for
+      ‛foo’
+    In the instance declaration for ‛Foo [m a] (m a)’

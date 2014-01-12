@@ -1,0 +1,5 @@
+-- Resolving an impredicative type
+:set -XImpredicativeTypes -fno-warn-deprecated-flags
+:m + Control.Monad.ST
+let u = undefined :: ST s (forall s'. ST s' a)
+:p u

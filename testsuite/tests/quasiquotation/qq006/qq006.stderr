@@ -1,0 +1,4 @@
+
+Main.hs:8:20:
+    Conflicting definitions for `x'
+    In a case alternative

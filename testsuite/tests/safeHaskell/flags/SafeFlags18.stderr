@@ -1,0 +1,6 @@
+
+SafeFlags18.hs:1:16:
+    Warning: -fpackage-trust ignored; must be specified with a Safe Haskell flag
+
+<no location info>: 
+Failing due to -Werror.

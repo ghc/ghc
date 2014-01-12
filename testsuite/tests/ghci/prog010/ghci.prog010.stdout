@@ -1,0 +1,9 @@
+f :: t -> [t]
+g :: a -> Maybe a
+f :: t -> [t]
+module 'A' is not interpreted; try ':add *A' first
+f :: t -> [t]
+g :: a -> Maybe a
+module 'A' is not interpreted; try ':add *A' first
+f :: t -> [t]
+g :: a -> Maybe a

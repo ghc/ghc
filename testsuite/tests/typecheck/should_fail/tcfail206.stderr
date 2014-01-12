@@ -1,0 +1,50 @@
+
+tcfail206.hs:5:5:
+    Couldn't match type ‛Bool’ with ‛Int’
+    Expected type: Bool -> (Int, Bool)
+      Actual type: Bool -> (Bool, Bool)
+    In the expression: (, True)
+    In an equation for ‛a’: a = (, True)
+
+tcfail206.hs:8:5:
+    Couldn't match type ‛(t0, Int)’ with ‛Bool -> (Int, Bool)’
+    Expected type: Int -> Bool -> (Int, Bool)
+      Actual type: Int -> (t0, Int)
+    In the expression: (1,)
+    In an equation for ‛b’: b = (1,)
+
+tcfail206.hs:11:5:
+    Couldn't match type ‛a’ with ‛Bool’
+      ‛a’ is a rigid type variable bound by
+          the type signature for c :: a -> (a, Bool) at tcfail206.hs:10:6
+    Expected type: a -> (a, Bool)
+      Actual type: a -> (a, a)
+    Relevant bindings include
+      c :: a -> (a, Bool) (bound at tcfail206.hs:11:1)
+    In the expression: (True || False,)
+    In an equation for ‛c’: c = (True || False,)
+
+tcfail206.hs:14:5:
+    Couldn't match type ‛Bool’ with ‛Int’
+    Expected type: Bool -> (# Int, Bool #)
+      Actual type: Bool -> (# Bool, Bool #)
+    In the expression: (# , True #)
+    In an equation for ‛d’: d = (# , True #)
+
+tcfail206.hs:17:5:
+    Couldn't match type ‛(# a0, Int #)’ with ‛Bool -> (# Int, Bool #)’
+    Expected type: Int -> Bool -> (# Int, Bool #)
+      Actual type: Int -> (# a0, Int #)
+    In the expression: (# 1, #)
+    In an equation for ‛e’: e = (# 1, #)
+
+tcfail206.hs:20:5:
+    Couldn't match type ‛a’ with ‛Bool’
+      ‛a’ is a rigid type variable bound by
+          the type signature for f :: a -> (# a, Bool #) at tcfail206.hs:19:6
+    Expected type: a -> (# a, Bool #)
+      Actual type: a -> (# a, a #)
+    Relevant bindings include
+      f :: a -> (# a, Bool #) (bound at tcfail206.hs:20:1)
+    In the expression: (# True || False, #)
+    In an equation for ‛f’: f = (# True || False, #)

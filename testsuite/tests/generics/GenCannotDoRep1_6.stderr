@@ -1,0 +1,6 @@
+
+GenCannotDoRep1_6.hs:9:43:
+    Can't make a derived instance of ‛Generic1 T’:
+      Constructor ‛T’ applies a type to an argument involving the last parameter
+                      but the applied type is not of kind * -> *
+    In the data declaration for ‛T’

@@ -1,0 +1,3 @@
+
+T4398.hs:5:11: Warning:
+    Forall'd constraint ‛Ord a’ is not bound in RULE lhs f @ a x y

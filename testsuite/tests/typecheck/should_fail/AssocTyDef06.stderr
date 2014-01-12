@@ -1,0 +1,5 @@
+
+AssocTyDef06.hs:6:10:
+    Number of parameters must match family declaration; expected no more than 1
+    In the type instance declaration for ‛Typ’
+    In the class declaration for ‛Cls’

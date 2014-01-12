@@ -1,0 +1,5 @@
+
+TcNoNullaryTC.hs:3:1:
+    No parameters for class ‛A’
+    (Use NullaryTypeClasses to allow no-parameter classes)
+    In the class declaration for ‛A’

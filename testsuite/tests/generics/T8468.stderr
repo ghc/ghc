@@ -1,0 +1,5 @@
+
+T8468.hs:6:42:
+    Can't make a derived instance of ‛Generic1 Array’:
+      Array must not have unlifted or polymorphic arguments
+    In the data declaration for ‛Array’

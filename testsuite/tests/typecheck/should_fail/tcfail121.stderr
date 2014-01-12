@@ -1,0 +1,12 @@
+
+tcfail121.hs:13:9:
+    Overlapping instances for Foo [a] arising from a use of ‛op’
+    Matching instances:
+      instance [overlap ok] Foo a => Foo [a]
+        -- Defined at tcfail121.hs:9:10
+      instance [overlap ok] Foo [Int] -- Defined at tcfail121.hs:10:10
+    (The choice depends on the instantiation of ‛a’
+     To pick the first instance above, use IncoherentInstances
+     when compiling the other instance declarations)
+    In the expression: op x
+    In an equation for ‛foo’: foo x = op x

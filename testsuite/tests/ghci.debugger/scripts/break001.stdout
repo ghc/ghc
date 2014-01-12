@@ -1,0 +1,19 @@
+Breakpoint 0 activated at ../Test2.hs:3:1-9
+Breakpoint 1 activated at ../Test2.hs:5:1-7
+Stopped at ../Test2.hs:3:1-9
+_result :: t = _
+Stopped at ../Test2.hs:3:7-9
+_result :: Integer = _
+x :: Integer = 1
+Stopped at ../Test2.hs:5:1-7
+_result :: t = _
+Stopped at ../Test2.hs:5:7
+_result :: Integer = _
+y :: Integer = 1
+y :: Integer = 1
+_result :: Integer = _
+1
+y = 1
+()
+y = 1
+1

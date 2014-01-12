@@ -1,0 +1,226 @@
+import os
+import re
+
+# Testsuite configuration setup for GHC
+#
+# This file is Python source
+#
+config.compiler_type         = 'ghc'
+config.compiler              = 'ghc'
+config.compiler_always_flags = ghc_compiler_always_flags.split()
+
+config.hp2ps                 = 'hp2ps'
+config.hpc                   = 'hpc'
+config.gs                    = 'gs'
+config.confdir               = '.'
+
+# By default, we test the 'normal', 'opt' and 'hpc' ways.
+# 'optasm' is added by mk/test.mk if the compiler has a native code gen,
+# 'prof'   is added by mk/test.mk if the profiling way is enabled.
+config.compile_ways       = ['normal', 'hpc']
+config.run_ways           = ['normal', 'hpc']
+
+# ways that are not enabled by default, but can always be invoked explicitly
+config.other_ways         = ['extcore','optextcore',
+                             'prof',
+                             'prof_hc_hb','prof_hb',
+                             'prof_hd','prof_hy','prof_hr',
+                             'threaded1_ls', 'threaded2_hT',
+                             'llvm', 'debugllvm',
+                             'profllvm', 'profoptllvm', 'profthreadedllvm',
+                             'threaded1llvm', 'threaded2llvm',
+                             'dynllvm']
+
+if (ghc_with_native_codegen == 1):
+    config.compile_ways.append('optasm')
+    config.run_ways.append('optasm')
+
+config.compiler_debugged = ghc_debugged
+
+if (ghc_with_vanilla == 1):
+    config.have_vanilla = True
+
+if (ghc_with_dynamic == 1):
+    config.have_dynamic = True
+
+if (ghc_with_profiling == 1):
+    config.have_profiling = True
+    config.compile_ways.append('profasm')
+    config.run_ways.append('profasm')
+
+if (ghc_with_interpreter == 1):
+    config.have_interp = True
+    config.run_ways.append('ghci')
+
+config.unregisterised = (ghc_unregisterised == 1)
+
+if (ghc_with_threaded_rts == 1):
+    config.run_ways.append('threaded1')
+    if (ghc_with_smp == 1):
+        config.have_smp = True
+        config.run_ways.append('threaded2')
+
+if (ghc_with_dynamic_rts == 1):
+    config.have_shared_libs = True
+
+config.ghc_dynamic_by_default = ghc_dynamic_by_default
+if ghc_dynamic_by_default and ghc_with_vanilla == 1:
+    config.run_ways.append('static')
+else:
+    if (ghc_with_dynamic_rts == 1):
+        config.run_ways.append('dyn')
+
+config.ghc_dynamic = ghc_dynamic
+
+if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
+    config.run_ways.append('profthreaded')
+
+if (ghc_with_llvm == 1):
+    config.compile_ways.append('optllvm')
+    config.run_ways.append('optllvm')
+
+config.in_tree_compiler = in_tree_compiler
+config.clean_only       = clean_only
+
+config.way_flags = lambda name : {
+    'normal'       : [],
+    'g1'           : [],
+    'optasm'       : ['-O', '-fasm'],
+    'llvm'         : ['-fllvm'],
+    'optllvm'      : ['-O', '-fllvm'],
+    'debugllvm'    : ['-fllvm', '-keep-llvm-files'],
+    'prof'         : ['-prof', '-static', '-auto-all', '-fasm'],
+    'profasm'      : ['-O', '-prof', '-static', '-auto-all'],
+    'profthreaded' : ['-O', '-prof', '-static', '-auto-all', '-threaded'],
+    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
+    'extcore'      : ['-fext-core'],
+    'optextcore'   : ['-O', '-fext-core'],
+    'threaded1'    : ['-threaded', '-debug'],
+    'threaded1_ls' : ['-threaded', '-debug'],
+    'threaded2'    : ['-O', '-threaded', '-eventlog'],
+    'threaded2_hT' : ['-O', '-threaded'],
+    'hpc'          : ['-O', '-fhpc', '-hpcdir', '.hpc.' + name ],
+    'prof_hc_hb'   : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hb'      : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hd'      : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hy'      : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hr'      : ['-O', '-prof', '-static', '-auto-all'],
+    'dyn'          : ['-O', '-dynamic'],
+    'static'       : ['-O', '-static'],
+    # llvm variants...
+    'profllvm'         : ['-prof', '-static', '-auto-all', '-fllvm'],
+    'profoptllvm'      : ['-O', '-prof', '-static', '-auto-all', '-fllvm'],
+    'profthreadedllvm' : ['-O', '-prof', '-static', '-auto-all', '-threaded', '-fllvm'],
+    'threaded1llvm'    : ['-threaded', '-debug', '-fllvm'],
+    'threaded2llvm'    : ['-O', '-threaded', '-eventlog', '-fllvm'],
+    'dynllvm'          : ['-O', '-dynamic', '-fllvm']
+   }
+
+config.way_rts_flags = { 
+    'normal'       : [],
+    'g1'           : ['-G1'],
+    'optasm'       : [],
+    'llvm'         : [],
+    'optllvm'      : [],
+    'debugllvm'    : [],
+    'prof'         : ['-p'],
+    'profasm'      : ['-hc', '-p'], # test heap profiling too
+    'profthreaded' : ['-p'],
+    'ghci'         : [],
+    'extcore'      : [],
+    'optextcore'   : [],
+    'threaded1'    : [],
+    'threaded1_ls' : ['-ls'],
+    'threaded2'    : ['-N2 -ls'],
+    'threaded2_hT' : ['-N2', '-hT'],
+    'hpc'          : [],
+    'prof_hc_hb'   : ['-hc -hbvoid'],
+    'prof_hb'      : ['-hb'],
+    'prof_hd'      : ['-hd'],
+    'prof_hy'      : ['-hy'],
+    'prof_hr'      : ['-hr'],
+    'dyn'          : [],
+    'static'       : [],
+    # llvm variants...
+    'profllvm'         : ['-p'],
+    'profoptllvm'      : ['-hc', '-p'],
+    'profthreadedllvm' : ['-p'],
+    'threaded1llvm'    : [],
+    'threaded2llvm'    : ['-N2 -ls'],
+    'dynllvm'          : []
+   }
+
+# Useful classes of ways that can be used with only_ways() and
+# expect_broken_for().
+
+prof_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-prof' in x[1], \
+                        config.way_flags('dummy_name').items()))
+
+threaded_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-threaded' in x[1] or 'ghci' == x[0], \
+                        config.way_flags('dummy_name').items()))
+
+opt_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-O' in x[1], \
+                        config.way_flags('dummy_name').items()))
+
+def get_compiler_info():
+# This should really not go through the shell
+    h = os.popen('"' + config.compiler + '" --info', 'r')
+    s = h.read()
+    s = re.sub('[\r\n]', '', s)
+    h.close()
+    compilerInfoDict = dict(eval(s))
+    h = os.popen('"' + config.compiler + '" +RTS --info', 'r')
+    s = h.read()
+    s = re.sub('[\r\n]', '', s)
+    h.close()
+    rtsInfoDict = dict(eval(s))
+
+    # We use a '/'-separated path for libdir, even on Windows
+    config.libdir = re.sub('\\\\','/',compilerInfoDict['LibDir'])
+
+    v = compilerInfoDict["Project version"].split('-')
+    config.compiler_version = v[0]
+    config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
+    config.compiler_tags = v[1:]
+
+    # -fno-ghci-history was added in 7.3
+    if version_ge(config.compiler_version, '7.3'):
+       config.compiler_always_flags = \
+          config.compiler_always_flags + ['-fno-ghci-history']
+
+    if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
+        config.compiler_profiled = True
+        config.run_ways = filter(lambda x: x != 'ghci', config.run_ways)
+    else:
+        config.compiler_profiled = False
+
+    try:
+        config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
+    except:
+        config.package_conf_cache_file = ''
+
+    try:
+        if compilerInfoDict["GHC Dynamic"] == "YES":
+            ghcDynamic = True
+        elif compilerInfoDict["GHC Dynamic"] == "NO":
+            ghcDynamic = False
+        else:
+            raise 'Bad value for "GHC Dynamic"'
+    except KeyError:
+        # GHC < 7.7 doesn't have a "GHC Dynamic" field
+        ghcDynamic = False
+
+    if ghcDynamic:
+        config.ghc_th_way_flags = "-dynamic"
+        config.ghci_way_flags   = "-dynamic"
+        config.ghc_th_way       = "dyn"
+        config.ghc_plugin_way   = "dyn"
+    else:
+        config.ghc_th_way_flags = "-static"
+        config.ghci_way_flags   = "-static"
+        config.ghc_th_way       = "normal"
+        config.ghc_plugin_way   = "normal"
+

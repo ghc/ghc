@@ -1,0 +1,7 @@
+[1 of 3] Compiling UnsafeInfered09_B ( UnsafeInfered09_B.hs, UnsafeInfered09_B.o )
+[2 of 3] Compiling UnsafeInfered09_A ( UnsafeInfered09_A.hs, UnsafeInfered09_A.o )
+[3 of 3] Compiling UnsafeInfered09  ( UnsafeInfered09.hs, UnsafeInfered09.o )
+
+UnsafeInfered09.hs:4:1:
+    UnsafeInfered09_A: Can't be safely imported!
+    The module itself isn't safe.

@@ -1,0 +1,3 @@
+
+TH_PromotedList.hs:11:3: Warning:
+    (':) GHC.Types.Int ((':) GHC.Types.Bool '[])

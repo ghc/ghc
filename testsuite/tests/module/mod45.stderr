@@ -1,0 +1,6 @@
+
+mod45.hs:5:11:
+    Illegal type signature in instance declaration:
+      (==) :: T -> T -> Bool
+    (Use InstanceSigs to allow this)
+    In the instance declaration for ‛Eq T’

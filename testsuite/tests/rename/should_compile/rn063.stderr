@@ -1,0 +1,4 @@
+
+rn063.hs:10:9: Warning: Defined but not used: ‛x’
+
+rn063.hs:13:9: Warning: Defined but not used: ‛y’

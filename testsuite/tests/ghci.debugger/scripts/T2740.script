@@ -1,0 +1,8 @@
+:seti -XMonomorphismRestriction
+:l T2740.hs
+:step f 1 2 3
+:step
+:print x
+:print y
+:force x
+:force y

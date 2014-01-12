@@ -1,0 +1,8 @@
+-- 
+
+let li = map Just (1 : undefined)
+:p li
+head li
+:p li
+:force li
+:p li

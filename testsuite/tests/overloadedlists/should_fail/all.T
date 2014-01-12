@@ -1,0 +1,6 @@
+test('overloadedlistsfail01', normal, compile_fail, [''])
+test('overloadedlistsfail02', normal, compile_fail, [''])
+test('overloadedlistsfail03', normal, compile_fail, [''])
+test('overloadedlistsfail04', normal, compile_fail, [''])
+test('overloadedlistsfail05', normal, compile_fail, [''])
+test('overloadedlistsfail06', normal, compile_fail, [''])

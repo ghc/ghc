@@ -1,0 +1,8 @@
+
+drvfail007.hs:4:38:
+    No instance for (Eq (Int -> Int))
+      arising from the first field of ‛Foo’ (type ‛Int -> Int’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Eq Foo)

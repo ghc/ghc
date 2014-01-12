@@ -1,0 +1,5 @@
+
+drvfail-functor1.hs:6:14:
+    Can't make a derived instance of ‛Functor List’:
+      You need DeriveFunctor to derive an instance for this class
+    In the data declaration for ‛List’

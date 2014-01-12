@@ -1,0 +1,111 @@
+-- test :browse! functionality
+:browse! *T
+-- defined locally
+T.length :: T.Integer
+class N a
+class S a
+class C a b where
+  c1 :: N b => a -> b
+  c2 :: (N b, S b) => a -> b
+  c3 :: a1 -> b
+  c4 :: a1 -> b
+c1 :: (C a b, N b) => a -> b
+c2 :: (C a b, N b, S b) => a -> b
+c3 :: C a b => forall a1. a1 -> b
+c4 :: C a b => forall a1. a1 -> b
+-- imported via Control.Monad
+class Monad m => MonadPlus m where
+  mzero :: m a
+  mplus :: m a -> m a -> m a
+mplus :: MonadPlus m => forall a. m a -> m a -> m a
+mzero :: MonadPlus m => forall a. m a
+-- imported via Control.Monad, Prelude
+(>>) :: Monad m => forall a b. m a -> m b -> m b
+(>>=) :: Monad m => forall a b. m a -> (a -> m b) -> m b
+fail :: Monad m => forall a. GHC.Base.String -> m a
+return :: Monad m => forall a. a -> m a
+-- imported via Control.Monad, Prelude, T
+class Monad m where
+  (>>=) :: m a -> (a -> m b) -> m b
+  (>>) :: m a -> m b -> m b
+  return :: a -> m a
+  fail :: GHC.Base.String -> m a
+-- imported via Data.Maybe
+catMaybes :: [Maybe a] -> [a]
+fromJust :: Maybe a -> a
+fromMaybe :: a -> Maybe a -> a
+isJust :: Maybe a -> GHC.Bool.Bool
+isNothing :: Maybe a -> GHC.Bool.Bool
+listToMaybe :: [a] -> Maybe a
+mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybeToList :: Maybe a -> [a]
+-- imported via Data.Maybe, Prelude
+Just :: a -> Maybe a
+data Maybe a = Nothing | Just a
+Nothing :: Maybe a
+-- imported via Prelude
+(+) :: GHC.Num.Num a => a -> a -> a
+(=<<) :: Monad m => (a -> m b) -> m a -> m b
+class Eq a where
+  (GHC.Classes.==) :: a -> a -> GHC.Bool.Bool
+  (GHC.Classes./=) :: a -> a -> GHC.Bool.Bool
+-- imported via Prelude, T
+Prelude.length :: [a] -> GHC.Types.Int
+-- imported via T
+data T.Integer
+  = integer-gmp:GHC.Integer.Type.S# GHC.Prim.Int#
+  | integer-gmp:GHC.Integer.Type.J# GHC.Prim.Int# GHC.Prim.ByteArray#
+T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
+:browse! T
+-- defined locally
+T.length :: T.Integer
+class N a
+class S a
+class C a b where
+  c1 :: N b => a -> b
+  c2 :: (N b, S b) => a -> b
+  c3 :: a1 -> b
+  c4 :: a1 -> b
+c1 :: (C a b, N b) => a -> b
+c2 :: (C a b, N b, S b) => a -> b
+c3 :: C a b => forall a1. a1 -> b
+c4 :: C a b => forall a1. a1 -> b
+:browse! T -- with -fprint-explicit-foralls
+-- defined locally
+T.length :: T.Integer
+class N a
+class S a
+class C a b where
+  c1 :: N b => a -> b
+  c2 :: (N b, S b) => a -> b
+  c3 :: forall a1. a1 -> b
+  c4 :: forall a1. a1 -> b
+c1 :: forall a b. (C a b, N b) => a -> b
+c2 :: forall a b. (C a b, N b, S b) => a -> b
+c3 :: forall a b. C a b => forall a1. a1 -> b
+c4 :: forall a b. C a b => forall a1. a1 -> b
+-- test :browse! <target> relative to different contexts
+:browse! C -- from *C>
+-- defined locally
+g :: forall a. Num a => a -> a
+h :: forall a. Integral a => a -> a
+-- imported via D
+f :: forall a. Num a => a -> a
+:browse! C -- from *B>, after :add B
+-- imported via C
+g :: forall a. Num a => a -> a
+h :: forall a. Integral a => a -> a
+f :: forall a. Num a => a -> a
+:browse! C -- from *C>, after :m *C
+-- defined locally
+g :: forall a. Num a => a -> a
+h :: forall a. Integral a => a -> a
+-- imported via D
+f :: forall a. Num a => a -> a
+:browse! C -- from *D>, after :m *D
+-- not currently imported
+C.g :: forall a. Num a => a -> a
+C.h :: forall a. Integral a => a -> a
+-- defined locally
+f :: forall a. Num a => a -> a

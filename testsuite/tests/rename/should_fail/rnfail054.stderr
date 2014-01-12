@@ -1,0 +1,5 @@
+
+rnfail054.hs:6:13:
+    ‛foo’ is not a record selector
+    In the expression: x {foo = 1}
+    In an equation for ‛foo’: foo x = x {foo = 1}

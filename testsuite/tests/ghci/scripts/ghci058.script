@@ -1,0 +1,17 @@
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
+:set prompt ""
+:set -v1
+
+:shell echo "module Ghci058 where c = 'a'" > Ghci058.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c Ghci058.hs
+:l Ghci058
+c
+
+:shell echo "module Ghci058 where c = 'b'" > Ghci058.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c Ghci058.hs
+:l Ghci058
+c
+

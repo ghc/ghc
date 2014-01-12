@@ -1,0 +1,41 @@
+:unset +s
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
+-- first, tidy up:
+:shell rm -f *.hi *.o *~
+:shell cp C1.hs C.hs
+:shell cp D1.hs D.hs
+
+-- load the program (all interpreted)
+:load A.hs
+
+-- reloading should do nothing
+:reload
+
+-- make sure `main' works
+main
+
+-- touch a module + recompile
+:shell sleep 1
+:shell touch C.hs
+:reload
+
+-- make sure `main' still works
+main
+
+-- compile D & reload
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
+:reload
+main
+
+-- change D, recompile & reload
+:shell cp D2.hs D.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c D.hs
+:reload
+:load A.hs
+
+-- make sure we're picking up the new D, via B
+:module B
+g 42

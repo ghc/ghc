@@ -1,0 +1,2 @@
+ERROR "tcfail037.hs":7 - Ambiguous variable occurrence "+"
+*** Could refer to: ShouldFail.+ Hugs.Prelude.+ 

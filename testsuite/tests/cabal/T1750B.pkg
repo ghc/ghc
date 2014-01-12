@@ -1,0 +1,4 @@
+name: T1750B
+version: 1
+id: T1750B-1-XXX
+depends: T1750A-1-XXX

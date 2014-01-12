@@ -1,0 +1,10 @@
+
+tcfail038.hs:7:11:
+    Conflicting definitions for ‛==’
+    Bound at: tcfail038.hs:7:11-12
+              tcfail038.hs:9:11-12
+
+tcfail038.hs:8:11:
+    Conflicting definitions for ‛/=’
+    Bound at: tcfail038.hs:8:11-12
+              tcfail038.hs:10:11-12

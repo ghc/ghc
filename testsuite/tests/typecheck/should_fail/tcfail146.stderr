@@ -1,0 +1,6 @@
+
+tcfail146.hs:7:22:
+    Expected a type, but ‛SClass a’ has kind ‛Constraint’
+    In the type ‛SClass a’
+    In the definition of data constructor ‛SCon’
+    In the data declaration for ‛SData’

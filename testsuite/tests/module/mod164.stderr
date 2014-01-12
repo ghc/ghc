@@ -1,0 +1,9 @@
+
+mod164.hs:9:5:
+    Ambiguous occurrence ‛D1’
+    It could refer to either ‛Mod164_A.D1’,
+                             imported from ‛Mod164_A’ at mod164.hs:4:1-15
+                             (and originally defined at Mod164_A.hs:3:10-11)
+                          or ‛Mod164_B.D1’,
+                             imported from ‛Mod164_B’ at mod164.hs:5:1-15
+                             (and originally defined at Mod164_B.hs:3:10-11)

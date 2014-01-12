@@ -1,0 +1,46 @@
+
+tc141.hs:11:12:
+    You cannot bind scoped type variable ‛a’
+      in a pattern binding signature
+    In the pattern: p :: a
+    In the pattern: (p :: a, q :: a)
+    In a pattern binding: (p :: a, q :: a) = x
+
+tc141.hs:11:31:
+    Couldn't match expected type ‛a1’ with actual type ‛a’
+      because type variable ‛a1’ would escape its scope
+    This (rigid, skolem) type variable is bound by
+      an expression type signature: a1
+      at tc141.hs:11:31-34
+    Relevant bindings include
+      p :: a (bound at tc141.hs:11:12)
+      q :: a (bound at tc141.hs:11:17)
+      x :: (a, a) (bound at tc141.hs:11:3)
+      f :: (a, a) -> (t, a) (bound at tc141.hs:11:1)
+    In the expression: q :: a
+    In the expression: (q :: a, p)
+
+tc141.hs:13:13:
+    You cannot bind scoped type variable ‛a’
+      in a pattern binding signature
+    In the pattern: y :: a
+    In a pattern binding: y :: a = a
+    In the expression:
+      let y :: a = a in
+      let
+        v :: a
+        v = b
+      in v
+
+tc141.hs:15:18:
+    Couldn't match expected type ‛a2’ with actual type ‛t’
+      because type variable ‛a2’ would escape its scope
+    This (rigid, skolem) type variable is bound by
+      the type signature for v :: a2
+      at tc141.hs:14:19
+    Relevant bindings include
+      v :: a2 (bound at tc141.hs:15:14)
+      b :: t (bound at tc141.hs:13:5)
+      g :: a -> t -> a1 (bound at tc141.hs:13:1)
+    In the expression: b
+    In an equation for ‛v’: v = b

@@ -1,0 +1,4 @@
+type T a b = a -> b
+:k T
+:k T Int
+:k T Int Bool
