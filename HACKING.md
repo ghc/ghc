@@ -32,7 +32,7 @@ Next, clone the repository and all the associated libraries:
 ```
 $ git clone http://git.haskell.org/ghc.git
 $ cd ghc
-$ ./sync-all --testsuite get
+$ ./sync-all get
 ```
 
 First copy `mk/build.mk.sample` to `mk/build.mk` and ensure it has

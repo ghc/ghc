@@ -89,8 +89,7 @@ check_packages () {
 
 if ! [ -d testsuite ]
 then
-    echo 'You need the testsuite to validate' >&2
-    echo 'Run "./sync-all --testsuite get" to get it' >&2
+    echo 'Could not find the testsuite for validation' >&2
     exit 1
 fi
 

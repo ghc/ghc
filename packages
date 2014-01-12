@@ -17,7 +17,7 @@
 #    - Haddock and hsc2hs are applications, built on top of GHC,
 #        and in turn needed to bootstrap GHC
 #    - ghc-tarballs is need to build GHC
-#    - nofib and testsuite are optional helpers
+#    - nofib is an optional helpers
 #
 # The format of the lines in this file is:
 #   localpath  tag  remotepath  upstreamurl
@@ -31,8 +31,8 @@
 #   * The 'tag' determines when "sync-all get" will get the
 #     repo. If the tag is "-" then it will always get it, but if there
 #     is a tag then a corresponding flag must be given to "sync-all", e.g.
-#     if you want to get the packages with an "extralibs" or "testsuite"
-#     tag then you need to use "sync-all --extra --testsuite get".
+#     if you want to get the packages with an "extralibs"
+#     tag then you need to use "sync-all --extra get".
 #     Support for new tags must be manually added to the "sync-all" script.
 #
 #     'tag' is also used to determine which packages the build system
@@ -76,7 +76,6 @@ libraries/transformers       -           -                               http://
 libraries/unix               -           packages/unix.git               -
 libraries/Win32              -           -                               https://github.com/haskell/win32.git
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
-testsuite                    testsuite   testsuite.git                   -
 nofib                        nofib       nofib.git                       -
 libraries/parallel           extra       packages/parallel.git           -
 libraries/stm                extra       packages/stm.git                -
