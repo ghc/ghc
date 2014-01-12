@@ -185,7 +185,7 @@ Axiom rules, produced by the type-nats solver:
 
 \gram{\ottmu}
 
-\label{sec:axiom_rule}
+\label{sec:axiom_rules}
 An axiom rule $[[mu]] = [[M(I, role_list, R')]]$ is an axiom name $[[M]]$, with a
 type arity $[[I]]$, a list of roles $[[role_list]]$ for its coercion parameters,
 and an output role $[[R']]$. The definition within GHC also includes a field named
