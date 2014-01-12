@@ -63,9 +63,7 @@ tests/**/*.ps
 /tests/safeHaskell/check/pkg01/local.db/
 /tests/safeHaskell/check/pkg01/setup
 mk/ghc-config
-mk/ghcconfig_home_davidt_Ghc_head_inplace_bin_ghc-stage2.mk
-mk/ghcconfig_home_davidt_Projects_Ghc_head_inplace_bin_ghc-stage1.mk
-mk/ghcconfig_home_davidt_Projects_Ghc_head_inplace_bin_ghc-stage2.mk
+mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
 tests/annotations/should_run/Config.hs
 tests/annotations/should_run/annrun01
 tests/array/should_run/arr001
@@ -501,6 +499,15 @@ tests/driver/dynamicToo/C002.dyn_hi
 tests/driver/dynamicToo/C002.dyn_o
 tests/driver/dynamicToo/d001
 tests/driver/dynamicToo/s001
+tests/driver/dynamicToo/dynamicToo004/Setup
+tests/driver/dynamicToo/dynamicToo004/local.package.conf/
+tests/driver/dynamicToo/dynamicToo004/pkg1/dist/
+tests/driver/dynamicToo/dynamicToo004/pkg1dyn/dist/
+tests/driver/dynamicToo/dynamicToo004/pkg2/dist/
+tests/driver/dynamicToo/dynamicToo004/progstatic
+tests/indexed-types/should_fail/T8129.trace
+tests/rts/T5435*_o
+tests/rts/T5435*.so
 tests/driver/dynamic_flags_001/C
 tests/driver/hello062a
 tests/driver/hello062b
