@@ -43,8 +43,13 @@ tests/**/*.ps
 *.dyn_hi-boot
 *o
 *.hi
+*.dll
 
 *bindisttest_install___dir_bin_ghc.mk
+*bindisttest_install___dir_bin_ghc.exe.mk
+mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
+mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
+*.imports
 
 # -----------------------------------------------------------------------------
 # specific generated files
@@ -69,7 +74,6 @@ tests/**/*.ps
 /tests/safeHaskell/check/pkg01/local.db/
 /tests/safeHaskell/check/pkg01/setup
 mk/ghc-config
-mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
 tests/annotations/should_run/Config.hs
 tests/annotations/should_run/annrun01
 tests/array/should_run/arr001
