@@ -1,10 +1,10 @@
 :set -fforce-recomp
 :set -v1
 
-:! echo 'a = True' > A.inc
+:! echo a = True > A.inc
 :load A
 a
 
-:! echo 'a = False' > A.inc
+:! echo a = False > A.inc
 :reload
 a
