@@ -15,9 +15,10 @@ test('T3586',
 
 test('T4830',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 99264, 1),
+          [(wordsize(64), 98248, 1),
            #             127000 (amd64/Linux)
            # 2013-02-07:  99264 (amd64/Linux)
+           # 2014-01-13:  98248 (amd64/Linux) due to #8647
            (wordsize(32), 70646, 2)]),
            # 2013-02-10:  69744 (x86/Windows)
            # 2013-02-10:  71548 (x86/OSX)
