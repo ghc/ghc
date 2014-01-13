@@ -203,7 +203,7 @@ moduleInfo iface =
       entries :: [HtmlTable]
       entries = mapMaybe doOneEntry [
           ("Copyright",hmi_copyright),
-          ("License",hmi_copyright),
+          ("License",hmi_license),
           ("Maintainer",hmi_maintainer),
           ("Stability",hmi_stability),
           ("Portability",hmi_portability),

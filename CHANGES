@@ -25,6 +25,8 @@ Changes in version 2.14.0
  * {-# OPTIONS_HADDOCK show-extensions #-} pragma will show the GHC extensions
    enabled in the module.
 
+ * Properly render License field (#271)
+
 Changes in version 2.13.2
 
  * Handle HsExplicitListTy in renamer (#213)
