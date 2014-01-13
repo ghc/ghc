@@ -58,6 +58,7 @@ import SrcLoc
 import Bag
 import FastString
 import Hooks
+import BasicTypes (Origin(..))
 
 import Control.Monad
 \end{code}
@@ -350,7 +351,7 @@ tcForeignExports' decls
   where
    combine (binds, fs, gres1) (L loc fe) = do
        (b, f, gres2) <- setSrcSpan loc (tcFExport fe)
-       return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
+       return ((FromSource, b) `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
 
 tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id, Bag GlobalRdrElt)
 tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)

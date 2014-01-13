@@ -29,7 +29,7 @@ module DsMonad (
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
         -- Warnings
-        DsWarning, warnDs, failWithDs,
+        DsWarning, warnDs, failWithDs, discardWarningsDs,
 
         -- Data types
         DsMatchContext(..),
@@ -494,4 +494,20 @@ dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (ds_meta env
 dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
 dsExtendMetaEnv menv thing_inside
   = updLclEnv (\env -> env { ds_meta = ds_meta env `plusNameEnv` menv }) thing_inside
+\end{code}
+
+\begin{code}
+discardWarningsDs :: DsM a -> DsM a
+-- Ignore warnings inside the thing inside;
+-- used to ignore inaccessable cases etc. inside generated code
+discardWarningsDs thing_inside
+  = do  { env <- getGblEnv
+        ; old_msgs <- readTcRef (ds_msgs env)
+
+        ; result <- thing_inside
+
+        -- Revert messages to old_msgs
+        ; writeTcRef (ds_msgs env) old_msgs
+
+        ; return result }
 \end{code}

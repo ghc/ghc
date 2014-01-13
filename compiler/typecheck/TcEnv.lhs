@@ -17,6 +17,7 @@ module TcEnv(
         tcExtendGlobalValEnv,
         tcLookupLocatedGlobal, tcLookupGlobal, 
         tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
+        tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
         
@@ -70,6 +71,7 @@ import VarSet
 import RdrName
 import InstEnv
 import DataCon
+import ConLike
 import TyCon
 import CoAxiom
 import TypeRep
@@ -152,8 +154,15 @@ tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon name = do
     thing <- tcLookupGlobal name
     case thing of
-        ADataCon con -> return con
-        _            -> wrongThingErr "data constructor" (AGlobal thing) name
+        AConLike (RealDataCon con) -> return con
+        _                          -> wrongThingErr "data constructor" (AGlobal thing) name
+
+tcLookupConLike :: Name -> TcM ConLike
+tcLookupConLike name = do
+    thing <- tcLookupGlobal name
+    case thing of
+        AConLike cl -> return cl
+        _           -> wrongThingErr "constructor-like thing" (AGlobal thing) name
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name = do
@@ -249,7 +258,8 @@ tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
   -- module being compiled, extend the global environment
 tcExtendGlobalEnv things thing_inside
   = do { env <- getGblEnv
-       ; let env' = env { tcg_tcs = [tc | ATyCon tc <- things] ++ tcg_tcs env }
+       ; let env' = env { tcg_tcs = [tc | ATyCon tc <- things] ++ tcg_tcs env,
+                          tcg_patsyns = [ps | AConLike (PatSynCon ps) <- things] ++ tcg_patsyns env }
        ; setGblEnv env' $
             tcExtendGlobalEnvImplicit things thing_inside
        }

@@ -73,7 +73,9 @@ import Class
 import Kind
 import TyCon
 import CoAxiom
+import ConLike
 import DataCon
+import PatSyn
 import Type
 import TcType
 import InstEnv
@@ -1458,8 +1460,9 @@ tyThingToIfaceDecl :: TyThing -> IfaceDecl
 tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
 tyThingToIfaceDecl (ATyCon tycon) = tyConToIfaceDecl emptyTidyEnv tycon
 tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl (ADataCon dc)  = pprPanic "toIfaceDecl" (ppr dc)
-                                    -- Should be trimmed out earlier
+tyThingToIfaceDecl (AConLike cl)  = case cl of
+    RealDataCon dc -> pprPanic "toIfaceDecl" (ppr dc) -- Should be trimmed out earlier
+    PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
 idToIfaceDecl :: Id -> IfaceDecl
@@ -1472,6 +1475,29 @@ idToIfaceDecl id
               ifType      = toIfaceType (idType id),
               ifIdDetails = toIfaceIdDetails (idDetails id),
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
+
+--------------------------
+patSynToIfaceDecl :: PatSyn -> IfaceDecl
+patSynToIfaceDecl ps
+  = IfacePatSyn { ifName          = getOccName . getName $ ps
+                , ifPatHasWrapper = isJust $ patSynWrapper ps
+                , ifPatIsInfix    = patSynIsInfix ps
+                , ifPatUnivTvs    = toIfaceTvBndrs univ_tvs'
+                , ifPatExTvs      = toIfaceTvBndrs ex_tvs'
+                , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
+                , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
+                , ifPatArgs       = map toIfaceArg args
+                , ifPatTy         = tidyToIfaceType env2 rhs_ty
+                }
+  where
+    toIfaceArg var = (occNameFS (getOccName var),
+                      tidyToIfaceType env2 (varType var))
+
+    (univ_tvs, ex_tvs, (prov_theta, req_theta)) = patSynSig ps
+    args = patSynArgs ps
+    rhs_ty = patSynType ps
+    (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
+    (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
 
 
 --------------------------

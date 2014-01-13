@@ -35,6 +35,7 @@ import BasicTypes
 import PprCore          ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
+import ConLike
 import DataCon
 import TyCon
 import Outputable
@@ -97,14 +98,15 @@ data Pat id
                 (HsConPatDetails id)
 
   | ConPatOut {
-        pat_con   :: Located DataCon,
+        pat_con   :: Located ConLike,
         pat_tvs   :: [TyVar],           -- Existentially bound type variables (tyvars only)
         pat_dicts :: [EvVar],           -- Ditto *coercion variables* and *dictionaries*
                                         -- One reason for putting coercion variable here, I think,
                                         --      is to ensure their kinds are zonked
         pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
         pat_args  :: HsConPatDetails id,
-        pat_ty    :: Type               -- The type of the pattern
+        pat_ty    :: Type,              -- The type of the pattern
+        pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
     }
 
         ------------ View patterns ---------------
@@ -262,9 +264,10 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
   = getPprStyle $ \ sty ->      -- Tiresome; in TcBinds.tcRhs we print out a
     if debugStyle sty then      -- typechecked Pat in an error message,
                                 -- and we want to make sure it prints nicely
-        ppr con <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                               , ppr binds])
-                <+> pprConArgs details
+        ppr con
+          <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+                         , ppr binds])
+          <+> pprConArgs details
     else pprUserCon (unLoc con) details
 
 pprPat (LitPat s)           = ppr s
@@ -313,9 +316,9 @@ instance (OutputableBndr id, Outputable arg)
 mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats ty
-  = noLoc $ ConPatOut { pat_con = noLoc dc, pat_tvs = [], pat_dicts = [],
+  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc), pat_tvs = [], pat_dicts = [],
                         pat_binds = emptyTcEvBinds, pat_args = PrefixCon pats,
-                        pat_ty = ty }
+                        pat_ty = ty, pat_wrap = idHsWrapper }
 
 mkNilPat :: Type -> OutPat id
 mkNilPat ty = mkPrefixConPat nilDataCon [] ty
@@ -413,11 +416,13 @@ isIrrefutableHsPat pat
     go1 (PArrPat {})        = False     -- ?
 
     go1 (ConPatIn {})       = False     -- Conservative
-    go1 (ConPatOut{ pat_con = L _ con, pat_args = details })
+    go1 (ConPatOut{ pat_con = L _ (RealDataCon con), pat_args = details })
         =  isJust (tyConSingleDataCon_maybe (dataConTyCon con))
            -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
            -- the latter is false of existentials. See Trac #4439
         && all go (hsConPatArgs details)
+    go1 (ConPatOut{ pat_con = L _ (PatSynCon _pat) })
+        = False -- Conservative
 
     go1 (LitPat {})    = False
     go1 (NPat {})      = False
@@ -457,4 +462,3 @@ conPatNeedsParens (PrefixCon args) = not (null args)
 conPatNeedsParens (InfixCon {})    = True
 conPatNeedsParens (RecCon {})      = True
 \end{code}
-

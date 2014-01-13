@@ -43,6 +43,7 @@ import IdInfo
 import Class
 import TyCon
 import CoAxiom
+import ConLike
 import DataCon
 import PrelNames
 import TysWiredIn
@@ -581,6 +582,32 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                              , co_ax_branches = toBranchList tc_branches
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
+
+tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
+                              , ifPatHasWrapper = has_wrapper
+                              , ifPatIsInfix = is_infix
+                              , ifPatUnivTvs = univ_tvs
+                              , ifPatExTvs = ex_tvs
+                              , ifPatProvCtxt = prov_ctxt
+                              , ifPatReqCtxt = req_ctxt
+                              , ifPatArgs = args
+                              , ifPatTy = pat_ty })
+  = do { name <- lookupIfaceTop occ_name
+       ; traceIf (ptext (sLit "tc_iface_decl") <+> ppr name)
+       ; bindIfaceTyVars univ_tvs $ \univ_tvs -> do
+       { bindIfaceTyVars ex_tvs $ \ex_tvs -> do
+       { bindIfaceIdVars args $ \args -> do
+       { ~(prov_theta, req_theta, pat_ty) <- forkM (mk_doc name) $
+             do { prov_theta <- tcIfaceCtxt prov_ctxt
+                ; req_theta  <- tcIfaceCtxt req_ctxt
+                ; pat_ty     <- tcIfaceType pat_ty
+                ; return (prov_theta, req_theta, pat_ty) }
+       ; bindIfaceTyVar (fsLit "r", toIfaceKind liftedTypeKind) $ \tv -> do
+       { patsyn <- buildPatSyn name is_infix has_wrapper args univ_tvs ex_tvs prov_theta req_theta pat_ty tv
+       ; return (AConLike (PatSynCon patsyn)) }}}}}
+  where
+     mk_doc n = ptext (sLit "Pattern synonym") <+> ppr n
+
 
 tc_ax_branches :: TyCon -> [IfaceAxBranch] -> IfL [CoAxBranch]
 tc_ax_branches tc if_branches = foldlM (tc_ax_branch (tyConKind tc)) [] if_branches
@@ -1435,8 +1462,8 @@ tcIfaceTyCon (IfaceTc name)
   = do { thing <- tcIfaceGlobal name
        ; case thing of    -- A "type constructor" can be a promoted data constructor
                           --           c.f. Trac #5881
-           ATyCon   tc -> return tc
-           ADataCon dc -> return (promoteDataCon dc)
+           ATyCon   tc               -> return tc
+           AConLike (RealDataCon dc) -> return (promoteDataCon dc)
            _ -> pprPanic "tcIfaceTyCon" (ppr name $$ ppr thing) }
 
 tcIfaceKindCon :: IfaceTyCon -> IfL TyCon
@@ -1459,7 +1486,7 @@ tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
                          ; case thing of
-                                ADataCon dc -> return dc
+                                AConLike (RealDataCon dc) -> return dc
                                 _       -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
 
 tcIfaceExtId :: Name -> IfL Id
@@ -1521,6 +1548,20 @@ bindIfaceTyVars bndrs thing_inside
   where
     (occs,kinds) = unzip bndrs
 
+bindIfaceIdVar :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
+bindIfaceIdVar (occ, ty) thing_inside
+  = do  { name <- newIfaceName (mkVarOccFS occ)
+        ; ty' <- tcIfaceType ty
+        ; let id = mkLocalId name ty'
+        ; extendIfaceIdEnv [id] (thing_inside id) }
+
+bindIfaceIdVars :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a
+bindIfaceIdVars []     thing_inside = thing_inside []
+bindIfaceIdVars (v:vs) thing_inside
+  = bindIfaceIdVar v     $ \ v' ->
+    bindIfaceIdVars vs   $ \ vs' ->
+    thing_inside (v':vs')
+
 isSuperIfaceKind :: IfaceKind -> Bool
 isSuperIfaceKind (IfaceTyConApp (IfaceTc n) []) = n == superKindTyConName
 isSuperIfaceKind _ = False
@@ -1547,4 +1588,3 @@ bindIfaceTyVars_AT (b@(tv_occ,_) : bs) thing_inside
          bindIfaceTyVars_AT bs $ \bs' ->
          thing_inside (b':bs') }
 \end{code}
-

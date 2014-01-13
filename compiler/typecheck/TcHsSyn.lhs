@@ -53,6 +53,7 @@ import Bag
 import FastString
 import Outputable
 import Util
+import Data.Traversable ( traverse )
 \end{code}
 
 %************************************************************************
@@ -291,7 +292,7 @@ zonkTopDecls :: Bag EvBind
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
              -> TcM ([Id],
                      Bag EvBind,
-                     Bag (LHsBind  Id),
+                     LHsBinds Id,
                      [LForeignDecl Id],
                      [LTcSpecPrag],
                      [LRuleDecl    Id],
@@ -402,7 +403,12 @@ warnMissingSig msg id
 
 ---------------------------------------------
 zonkMonoBinds :: ZonkEnv -> SigWarn -> LHsBinds TcId -> TcM (LHsBinds Id)
-zonkMonoBinds env sig_warn binds = mapBagM (wrapLocM (zonk_bind env sig_warn)) binds
+zonkMonoBinds env sig_warn binds = mapBagM (zonk_lbind env sig_warn) binds
+
+zonk_lbind :: ZonkEnv -> SigWarn -> (Origin, LHsBind TcId) -> TcM (Origin, LHsBind Id)
+zonk_lbind env sig_warn (origin, lbind)
+  = do  { lbind' <- wrapLocM (zonk_bind env sig_warn) lbind
+        ; return (origin, lbind') }
 
 zonk_bind :: ZonkEnv -> SigWarn -> HsBind TcId -> TcM (HsBind Id)
 zonk_bind env sig_warn bind@(PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty})
@@ -453,6 +459,28 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
              return (ABE{ abe_wrap = new_wrap, abe_poly = new_poly_id
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
+
+zonk_bind env _sig_warn bind@(PatSynBind { patsyn_id = L loc id
+                                         , patsyn_args = details
+                                         , patsyn_def = lpat
+                                         , patsyn_dir = dir })
+  = do { id' <- zonkIdBndr env id
+       ; details' <- zonkPatSynDetails env details
+       ;(env1, lpat') <- zonkPat env lpat
+       ; (_env2, dir') <- zonkPatSynDir env1 dir
+       ; return (bind { patsyn_id = L loc id'
+                      , patsyn_args = details'
+                      , patsyn_def = lpat'
+                      , patsyn_dir = dir' }) }
+
+zonkPatSynDetails :: ZonkEnv
+                  -> HsPatSynDetails (Located TcId)
+                  -> TcM (HsPatSynDetails (Located Id))
+zonkPatSynDetails env = traverse (wrapLocM $ zonkIdBndr env)
+
+zonkPatSynDir :: ZonkEnv -> HsPatSynDir TcId -> TcM (ZonkEnv, HsPatSynDir Id)
+zonkPatSynDir env Unidirectional = return (env, Unidirectional)
+zonkPatSynDir env ImplicitBidirectional = return (env, ImplicitBidirectional)
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod
@@ -1006,7 +1034,7 @@ zonk_pat env (TuplePat pats boxed ty)
 
 zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
                           , pat_dicts = evs, pat_binds = binds
-                          , pat_args = args })
+                          , pat_args = args, pat_wrap = wrapper })
   = ASSERT( all isImmutableTyVar tyvars )
     do  { new_ty <- zonkTcTypeToType env ty
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
@@ -1015,12 +1043,14 @@ zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
           -- cf typecheck/should_compile/tc221.hs
         ; (env1, new_evs) <- zonkEvBndrsX env0 evs
         ; (env2, new_binds) <- zonkTcEvBinds env1 binds
-        ; (env', new_args) <- zonkConStuff env2 args
+        ; (env3, new_wrapper) <- zonkCoFn env2 wrapper
+        ; (env', new_args) <- zonkConStuff env3 args
         ; return (env', p { pat_ty = new_ty,
                             pat_tvs = new_tyvars,
                             pat_dicts = new_evs,
                             pat_binds = new_binds,
-                            pat_args = new_args }) }
+                            pat_args = new_args,
+                            pat_wrap = new_wrapper}) }
 
 zonk_pat env (LitPat lit) = return (env, LitPat lit)
 

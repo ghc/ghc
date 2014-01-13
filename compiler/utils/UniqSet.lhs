@@ -75,6 +75,7 @@ isEmptyUniqSet :: UniqSet a -> Bool
 lookupUniqSet :: Uniquable a => UniqSet a -> a -> Maybe a
 uniqSetToList :: UniqSet a -> [a]
 \end{code}
+
 %************************************************************************
 %*                                                                      *
 \subsection{Implementation using ``UniqFM''}

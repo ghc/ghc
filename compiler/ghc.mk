@@ -479,6 +479,7 @@ compiler_stage2_dll0_MODULES = \
 	CmmType \
 	CmmUtils \
 	CoAxiom \
+	ConLike \
 	CodeGen.Platform \
 	CodeGen.Platform.ARM \
 	CodeGen.Platform.NoRegs \
@@ -563,6 +564,7 @@ compiler_stage2_dll0_MODULES = \
 	Packages \
 	Pair \
 	Panic \
+	PatSyn \
 	PipelineMonad \
 	Platform \
 	PlatformConstants \

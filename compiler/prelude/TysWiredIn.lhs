@@ -87,6 +87,7 @@ import Constants        ( mAX_TUPLE_SIZE )
 import Module           ( Module )
 import Type             ( mkTyConApp )
 import DataCon
+import ConLike
 import Var
 import TyCon
 import Class            ( Class, mkClass )
@@ -170,7 +171,7 @@ mkWiredInTyConName built_in modu fs unique tycon
 mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name
 mkWiredInDataConName built_in modu fs unique datacon
   = mkWiredInName modu (mkDataOccFS fs) unique
-                  (ADataCon datacon)    -- Relevant DataCon
+                  (AConLike (RealDataCon datacon))    -- Relevant DataCon
                   built_in
 
 eqTyConName, eqBoxDataConName :: Name
@@ -400,7 +401,7 @@ mk_tuple sort arity = (tycon, tuple_con)
         tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
         tyvar_tys = mkTyVarTys tyvars
         dc_name   = mkWiredInName modu (mkTupleOcc dataName sort arity) dc_uniq
-                                  (ADataCon tuple_con) BuiltInSyntax
+                                  (AConLike (RealDataCon tuple_con)) BuiltInSyntax
         tc_uniq   = mkTupleTyConUnique   sort arity
         dc_uniq   = mkTupleDataConUnique sort arity
 
@@ -813,7 +814,7 @@ mkPArrFakeCon arity  = data_con
         tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
         name      = mkWiredInName gHC_PARR' (mkDataOccFS nameStr) unique
-                                  (ADataCon data_con) UserSyntax
+                                  (AConLike (RealDataCon data_con)) UserSyntax
         unique      = mkPArrDataConUnique arity
 
 -- | Checks whether a data constructor is a fake constructor for parallel arrays

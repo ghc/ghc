@@ -33,7 +33,8 @@ module TcGenDeriv (
         mkCoerceClassMethEqn,
         gen_Newtype_binds,
         genAuxBinds,
-        ordOpTbl, boxConTbl
+        ordOpTbl, boxConTbl,
+        mkRdrFunBind
     ) where
 
 #include "HsVersions.h"
@@ -96,7 +97,7 @@ data DerivStuff     -- Please add this auxiliary stuff
   | DerivFamInst (FamInst)             -- New type family instances
 
   -- New top-level auxiliary bindings
-  | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
+  | DerivHsBind ((Origin, LHsBind RdrName), LSig RdrName) -- Also used for SYB
   | DerivInst (InstInfo RdrName)                -- New, auxiliary instances
 \end{code}
 
@@ -359,7 +360,7 @@ gen_Ord_binds loc tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon tycon_data_cons
 
 
-    mkOrdOp :: OrdOp -> LHsBind RdrName
+    mkOrdOp :: OrdOp -> (Origin, LHsBind RdrName)
     -- Returns a binding   op a b = ... compares a and b according to op ....
     mkOrdOp op = mk_easy_FunBind loc (ordMethRdr op) [a_Pat, b_Pat] (mkOrdOpRhs op)
 
@@ -1351,7 +1352,7 @@ gen_Data_binds dflags loc tycon
     n_cons     = length data_cons
     one_constr = n_cons == 1
 
-    genDataTyCon :: (LHsBind RdrName, LSig RdrName)
+    genDataTyCon :: ((Origin, LHsBind RdrName), LSig RdrName)
     genDataTyCon        --  $dT
       = (mkHsVarBind loc rdr_name rhs,
          L loc (TypeSig [L loc rdr_name] sig_ty))
@@ -1363,7 +1364,7 @@ gen_Data_binds dflags loc tycon
               `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr tycon)))
               `nlHsApp` nlList constrs
 
-    genDataDataCon :: DataCon -> (LHsBind RdrName, LSig RdrName)
+    genDataDataCon :: DataCon -> ((Origin, LHsBind RdrName), LSig RdrName)
     genDataDataCon dc       --  $cT1 etc
       = (mkHsVarBind loc rdr_name rhs,
          L loc (TypeSig [L loc rdr_name] sig_ty))
@@ -1602,7 +1603,7 @@ gen_Functor_binds loc tycon
   = (unitBag fmap_bind, emptyBag)
   where
     data_cons = tyConDataCons tycon
-    fmap_bind = L loc $ mkRdrFunBind (L loc fmap_RDR) eqns
+    fmap_bind = mkRdrFunBind (L loc fmap_RDR) eqns
 
     fmap_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
@@ -1791,13 +1792,13 @@ gen_Foldable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    foldr_bind = L loc $ mkRdrFunBind (L loc foldable_foldr_RDR) eqns
+    foldr_bind = mkRdrFunBind (L loc foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
     foldr_eqn con = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldr con
 
-    foldMap_bind = L loc $ mkRdrFunBind (L loc foldMap_RDR) (map foldMap_eqn data_cons)
+    foldMap_bind = mkRdrFunBind (L loc foldMap_RDR) (map foldMap_eqn data_cons)
     foldMap_eqn con = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldMap con
@@ -1866,7 +1867,7 @@ gen_Traversable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    traverse_bind = L loc $ mkRdrFunBind (L loc traverse_RDR) eqns
+    traverse_bind = mkRdrFunBind (L loc traverse_RDR) eqns
     eqns = map traverse_eqn data_cons
     traverse_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
@@ -1942,9 +1943,9 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
         (map (mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty) (classMethods cls))
   where
     coerce_RDR = getRdrName coerceId
-    mk_bind :: Id -> Pair Type -> LHsBind RdrName
+    mk_bind :: Id -> Pair Type -> (Origin, LHsBind RdrName)
     mk_bind id (Pair tau_ty user_ty)
-      = L loc $ mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
+      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
       where
         meth_RDR = getRdrName id
         rhs_expr
@@ -1977,7 +1978,7 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 
 \begin{code}
-genAuxBindSpec :: SrcSpan -> AuxBindSpec -> (LHsBind RdrName, LSig RdrName)
+genAuxBindSpec :: SrcSpan -> AuxBindSpec -> ((Origin, LHsBind RdrName), LSig RdrName)
 genAuxBindSpec loc (DerivCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns,
      L loc (TypeSig [L loc rdr_name] (L loc sig_ty)))
@@ -2023,7 +2024,7 @@ genAuxBindSpec loc (DerivMaxTag tycon)
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
 type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
-                              ( Bag (LHsBind RdrName, LSig RdrName)
+                              ( Bag ((Origin, LHsBind RdrName), LSig RdrName)
                                 -- Extra bindings (used by Generic only)
                               , Bag TyCon   -- Extra top-level datatypes
                               , Bag (FamInst)           -- Extra family instances
@@ -2078,22 +2079,23 @@ mkParentType tc
 \begin{code}
 mk_FunBind :: SrcSpan -> RdrName
            -> [([LPat RdrName], LHsExpr RdrName)]
-           -> LHsBind RdrName
+           -> (Origin, LHsBind RdrName)
 mk_FunBind loc fun pats_and_exprs
-  = L loc $ mkRdrFunBind (L loc fun) matches
+  = mkRdrFunBind (L loc fun) matches
   where
     matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
 
-mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> HsBind RdrName
-mkRdrFunBind fun@(L _ fun_rdr) matches
- | null matches = mkFunBind fun [mkMatch [] (error_Expr str) emptyLocalBinds]
-        -- Catch-all eqn looks like
-        --     fmap = error "Void fmap"
-        -- It's needed if there no data cons at all,
-        -- which can happen with -XEmptyDataDecls
-        -- See Trac #4302
- | otherwise    = mkFunBind fun matches
+mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> (Origin, LHsBind RdrName)
+mkRdrFunBind fun@(L loc fun_rdr) matches = (Generated, L loc (mkFunBind fun matches'))
  where
+   -- Catch-all eqn looks like
+   --     fmap = error "Void fmap"
+   -- It's needed if there no data cons at all,
+   -- which can happen with -XEmptyDataDecls
+   -- See Trac #4302
+   matches' = if null matches
+              then [mkMatch [] (error_Expr str) emptyLocalBinds]
+              else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 \end{code}
 

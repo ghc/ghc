@@ -35,8 +35,9 @@ import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 import HsSyn
 import TcRnMonad
 import TcEvidence     ( emptyTcEvBinds )
-import RnTypes        ( bindSigTyVarsFV, rnHsSigType, rnLHsType, checkPrecMatch )
+import RnTypes        ( bindSigTyVarsFV, rnHsSigType, rnLHsType, checkPrecMatch, rnContext )
 import RnPat
+import RnNames
 import RnEnv
 import DynFlags
 import Module
@@ -46,7 +47,7 @@ import NameSet
 import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), Origin )
 import Digraph		( SCC(..) )
 import Bag
 import Outputable
@@ -274,7 +275,7 @@ rnValBindsLHS :: NameMaker
               -> HsValBinds RdrName
               -> RnM (HsValBindsLR Name RdrName)
 rnValBindsLHS topP (ValBindsIn mbinds sigs)
-  = do { mbinds' <- mapBagM (rnBindLHS topP doc) mbinds
+  = do { mbinds' <- mapBagM (wrapOriginLocM (rnBindLHS topP doc)) mbinds
        ; return $ ValBindsIn mbinds' sigs }
   where
     bndrs = collectHsBindsBinders mbinds
@@ -292,7 +293,7 @@ rnValBindsRHS :: HsSigCtxt
 
 rnValBindsRHS ctxt (ValBindsIn mbinds sigs)
   = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
-       ; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs')) mbinds
+       ; binds_w_dus <- mapBagM (rnLBind (mkSigTvFn sigs')) mbinds
        ; case depAnalBinds binds_w_dus of
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
               where
@@ -413,39 +414,50 @@ dupFixityDecl loc rdr_name
 
 rnBindLHS :: NameMaker
           -> SDoc 
-          -> LHsBind RdrName
+          -> HsBind RdrName
           -- returns the renamed left-hand side,
           -- and the FreeVars *of the LHS*
           -- (i.e., any free variables of the pattern)
-          -> RnM (LHsBindLR Name RdrName)
+          -> RnM (HsBindLR Name RdrName)
 
-rnBindLHS name_maker _ (L loc bind@(PatBind { pat_lhs = pat }))
-  = setSrcSpan loc $ do
+rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
+  = do
       -- we don't actually use the FV processing of rnPatsAndThen here
       (pat',pat'_fvs) <- rnBindPat name_maker pat
-      return (L loc (bind { pat_lhs = pat', bind_fvs = pat'_fvs }))
+      return (bind { pat_lhs = pat', bind_fvs = pat'_fvs })
                 -- We temporarily store the pat's FVs in bind_fvs;
                 -- gets updated to the FVs of the whole bind
                 -- when doing the RHS below
-                            
-rnBindLHS name_maker _ (L loc bind@(FunBind { fun_id = name@(L nameLoc _) }))
-  = setSrcSpan loc $ 
-    do { newname <- applyNameMaker name_maker name
-       ; return (L loc (bind { fun_id = L nameLoc newname })) } 
 
-rnBindLHS _ _ b = pprPanic "rnBindLHS" (ppr b)
+rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
+  = do { newname <- applyNameMaker name_maker name
+       ; return (bind { fun_id = L nameLoc newname }) } 
+
+rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
+  = do { addLocM checkConName rdrname
+       ; name <- applyNameMaker name_maker rdrname
+       ; return (bind{ patsyn_id = L nameLoc name }) }
+
+rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
+
+rnLBind :: (Name -> [Name])		-- Signature tyvar function
+        -> (Origin, LHsBindLR Name RdrName)
+        -> RnM ((Origin, LHsBind Name), [Name], Uses)
+rnLBind sig_fn (origin, (L loc bind))
+  = setSrcSpan loc $
+    do { (bind', bndrs, dus) <- rnBind sig_fn bind
+       ; return ((origin, L loc bind'), bndrs, dus) }
 
 -- assumes the left-hands-side vars are in scope
 rnBind :: (Name -> [Name])		-- Signature tyvar function
-       -> LHsBindLR Name RdrName
-       -> RnM (LHsBind Name, [Name], Uses)
-rnBind _ (L loc bind@(PatBind { pat_lhs = pat
-                              , pat_rhs = grhss 
-                                      -- pat fvs were stored in bind_fvs
-                                      -- after processing the LHS
-                              , bind_fvs = pat_fvs }))
-  = setSrcSpan loc $ 
-    do	{ mod <- getModule
+       -> HsBindLR Name RdrName
+       -> RnM (HsBind Name, [Name], Uses)
+rnBind _ bind@(PatBind { pat_lhs = pat
+                       , pat_rhs = grhss 
+                                   -- pat fvs were stored in bind_fvs
+                                   -- after processing the LHS
+                       , bind_fvs = pat_fvs })
+  = do	{ mod <- getModule
         ; (grhss', rhs_fvs) <- rnGRHSs PatBindRhs rnLExpr grhss
 
 		-- No scoped type variables for pattern bindings
@@ -470,14 +482,13 @@ rnBind _ (L loc bind@(PatBind { pat_lhs = pat
           addWarn $ unusedPatBindWarn bind'
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
-          return (L loc bind', bndrs, all_fvs) }
+          return (bind', bndrs, all_fvs) }
 
-rnBind sig_fn (L loc bind@(FunBind { fun_id = name 
-                            	   , fun_infix = is_infix 
-                            	   , fun_matches = matches })) 
+rnBind sig_fn bind@(FunBind { fun_id = name 
+                            , fun_infix = is_infix 
+                            , fun_matches = matches }) 
        -- invariant: no free vars here when it's a FunBind
-  = setSrcSpan loc $
-    do	{ let plain_name = unLoc name
+  = do	{ let plain_name = unLoc name
 
 	; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 				-- bindSigTyVars tests for Opt_ScopedTyVars
@@ -491,10 +502,61 @@ rnBind sig_fn (L loc bind@(FunBind { fun_id = name
 		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
-          return (L loc (bind { fun_matches = matches'
-			      , bind_fvs   = fvs' }), 
+          return (bind { fun_matches = matches'
+	               , bind_fvs   = fvs' },
 		  [plain_name], rhs_fvs)
       }
+
+rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
+                                , patsyn_args = details
+                                , patsyn_def = pat
+                                , patsyn_dir = dir })
+       -- invariant: no free vars here when it's a FunBind
+  = do	{ pattern_synonym_ok <- xoptM Opt_PatternSynonyms
+        ; unless pattern_synonym_ok (addErr patternSynonymErr)
+
+        ; ((pat', details'), fvs) <- rnPat PatSyn pat $ \pat' -> do
+         -- We check the 'RdrName's instead of the 'Name's
+         -- so that the binding locations are reported
+         -- from the left-hand side
+        { (details', fvs) <- case details of
+               PrefixPatSyn vars ->
+                   do { checkDupRdrNames vars
+                      ; names <- mapM lookupVar vars
+                      ; return (PrefixPatSyn names, mkFVs (map unLoc names)) }
+               InfixPatSyn var1 var2 ->
+                   do { checkDupRdrNames [var1, var2]
+                      ; name1 <- lookupVar var1
+                      ; name2 <- lookupVar var2
+                      -- ; checkPrecMatch -- TODO
+                      ; return (InfixPatSyn name1 name2, mkFVs (map unLoc [name1, name2])) }
+        ; return ((pat', details'), fvs) }
+        ; dir' <- case dir of
+            Unidirectional -> return Unidirectional
+            ImplicitBidirectional -> return ImplicitBidirectional
+
+        ; mod <- getModule
+        ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
+	        -- Keep locally-defined Names
+		-- As well as dependency analysis, we need these for the
+		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+
+        ; let bind' = bind{ patsyn_args = details'
+                          , patsyn_def = pat'
+                          , patsyn_dir = dir'
+                          , bind_fvs = fvs' }
+
+        ; fvs' `seq` -- See Note [Free-variable space leak]
+          return (bind', [name], fvs)
+      }
+  where
+    lookupVar = wrapLocM lookupOccRn
+
+    patternSynonymErr :: SDoc
+    patternSynonymErr
+      = hang (ptext (sLit "Illegal pattern synonym declaration"))
+           2 (ptext (sLit "Use -XPatternSynonyms to enable this extension"))
+
 
 rnBind _ b = pprPanic "rnBind" (ppr b)
 
@@ -512,7 +574,7 @@ trac ticket #1136.
 -}
 
 ---------------------
-depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
+depAnalBinds :: Bag ((Origin, LHsBind Name), [Name], Uses)
 	     -> ([(RecFlag, LHsBinds Name)], DefUses)
 -- Dependency analysis; this is important so that 
 -- unused-binding reporting is accurate
@@ -597,9 +659,10 @@ rnMethodBinds cls sig_fn binds
        ; foldlM do_one (emptyBag, emptyFVs) (bagToList binds) }
   where 
     meth_names  = collectMethodBinders binds
-    do_one (binds,fvs) bind 
+    do_one (binds,fvs) (origin,bind)
        = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn bind
-	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
+            ; let bind'' = mapBag (\bind -> (origin,bind)) bind'
+	    ; return (binds `unionBags` bind'', fvs_bind `plusFV` fvs) }
 
 rnMethodBind :: Name
 	      -> (Name -> [Name])
@@ -720,6 +783,24 @@ renameSig ctxt sig@(MinimalSig bf)
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
        return (MinimalSig new_bf, emptyFVs)
 
+renameSig ctxt sig@(PatSynSig v args ty prov req)
+  = do	v' <- lookupSigOccRn ctxt sig v
+        let doc = quotes (ppr v)
+            rn_type = rnHsSigType doc
+        (ty', fvs1) <- rn_type ty
+        (args', fvs2) <- case args of
+            PrefixPatSyn tys ->
+                do (tys, fvs) <- unzip <$> mapM rn_type tys
+                   return (PrefixPatSyn tys, plusFVs fvs)
+            InfixPatSyn left right ->
+                do (left', fvs1) <- rn_type left
+                   (right', fvs2) <- rn_type right
+                   return (InfixPatSyn left' right', fvs1 `plusFV` fvs2)
+        (prov', fvs3) <- rnContext (TypeSigCtx doc) prov
+        (req', fvs4) <- rnContext (TypeSigCtx doc) req
+        let fvs = plusFVs [fvs1, fvs2, fvs3, fvs4]
+        return (PatSynSig v' args' ty' prov' req', fvs)
+
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
@@ -730,6 +811,9 @@ okHsSig ctxt (L _ sig)
      (GenericSig {}, _)              -> False
 
      (TypeSig {}, _)              -> True
+
+     (PatSynSig {}, TopSigCtxt{}) -> True
+     (PatSynSig {}, _)            -> False
 
      (FixSig {}, InstDeclCtxt {}) -> False
      (FixSig {}, _)               -> True

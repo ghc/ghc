@@ -35,6 +35,10 @@ import BooleanFormula (BooleanFormula)
 import Data.Data hiding ( Fixity )
 import Data.List
 import Data.Ord
+import Data.Foldable ( Foldable(..) )
+import Data.Traversable ( Traversable(..) )
+import Data.Monoid ( mappend )
+import Control.Applicative ( (<$>), (<*>) )
 \end{code}
 
 %************************************************************************
@@ -85,7 +89,7 @@ type LHsBind  id = LHsBindLR  id id
 type LHsBinds id = LHsBindsLR id id
 type HsBind   id = HsBindLR   id id
 
-type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
+type LHsBindsLR idL idR = Bag (Origin, LHsBindLR idL idR)
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
 data HsBindLR idL idR
@@ -160,6 +164,14 @@ data HsBindLR idL idR
 
         abs_ev_binds :: TcEvBinds,     -- ^ Evidence bindings
         abs_binds    :: LHsBinds idL   -- ^ Typechecked user bindings
+    }
+
+  | PatSynBind {
+        patsyn_id   :: Located idL,                   -- ^ Name of the pattern synonym
+        bind_fvs    :: NameSet,                       -- ^ See Note [Bind free vars]
+        patsyn_args :: HsPatSynDetails (Located idR), -- ^ Formal parameter names
+        patsyn_def  :: LPat idR,                      -- ^ Right-hand side
+        patsyn_dir  :: HsPatSynDir idR                -- ^ Directionality
     }
 
   deriving (Data, Typeable)
@@ -310,7 +322,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR id
 pprLHsBinds :: (OutputableBndr idL, OutputableBndr idR) => LHsBindsLR idL idR -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
-  | otherwise = pprDeclList (map ppr (bagToList binds))
+  | otherwise = pprDeclList (map (ppr . snd) (bagToList binds))
 
 pprLHsBindsForUser :: (OutputableBndr idL, OutputableBndr idR, OutputableBndr id2)
                    => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
@@ -326,7 +338,7 @@ pprLHsBindsForUser binds sigs
 
     decls :: [(SrcSpan, SDoc)]
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
-            [(loc, ppr bind) | L loc bind <- bagToList binds]
+            [(loc, ppr bind) | (_, L loc bind) <- bagToList binds]
 
     sort_by_loc decls = sortBy (comparing fst) decls
 
@@ -425,6 +437,19 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
     $$  ifPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind (unLoc fun) inf matches
     $$  ifPprDebug (ppr wrap)
+ppr_monobind (PatSynBind{ patsyn_id = L _ psyn, patsyn_args = details,
+                          patsyn_def = pat, patsyn_dir = dir })
+  = ppr_lhs <+> ppr_rhs
+      where
+        ppr_lhs = ptext (sLit "pattern") <+> ppr_details details
+        ppr_simple syntax = syntax <+> ppr pat
+
+        ppr_details (InfixPatSyn v1 v2) = hsep [ppr v1, pprInfixOcc psyn, ppr v2]
+        ppr_details (PrefixPatSyn vs)   = hsep (pprPrefixOcc psyn : map ppr vs)
+
+        ppr_rhs = case dir of
+            Unidirectional         -> ppr_simple (ptext (sLit "<-"))
+            ImplicitBidirectional  -> ppr_simple equals
 
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
@@ -516,6 +541,14 @@ data Sig name
   =   -- | An ordinary type signature
       -- @f :: Num a => a -> a@
     TypeSig [Located name] (LHsType name)
+
+      -- | A pattern synonym type signature
+      -- @pattern (Eq b) => P a b :: (Num a) => T a
+  | PatSynSig (Located name)
+              (HsPatSynDetails (LHsType name))
+              (LHsType name)    -- Type
+              (LHsContext name) -- Provided context
+              (LHsContext name) -- Required contex
 
         -- | A type signature for a default method inside a class
         --
@@ -644,6 +677,7 @@ isMinimalLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
+hsSigDoc (PatSynSig {})         = ptext (sLit "pattern synonym signature")
 hsSigDoc (GenericSig {})        = ptext (sLit "default type signature")
 hsSigDoc (IdSig {})             = ptext (sLit "id signature")
 hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
@@ -670,6 +704,34 @@ ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec (unLoc var) (ppr ty) i
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 ppr_sig (MinimalSig bf)           = pragBrackets (pprMinimalSig bf)
+ppr_sig (PatSynSig name arg_tys ty prov req)
+  = pprPatSynSig (unLoc name) False args (ppr ty) (pprCtx prov) (pprCtx req)
+  where
+    args = fmap ppr arg_tys
+
+    pprCtx lctx = case unLoc lctx of
+        [] -> Nothing
+        ctx -> Just (pprHsContextNoArrow ctx)
+
+pprPatSynSig :: (OutputableBndr a)
+             => a -> Bool -> HsPatSynDetails SDoc -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc
+pprPatSynSig ident is_bidir args rhs_ty prov_theta req_theta
+  = sep [ ptext (sLit "pattern")
+        , thetaOpt prov_theta, name_and_args
+        , colon
+        , thetaOpt req_theta, rhs_ty
+        ]
+  where
+    name_and_args = case args of
+        PrefixPatSyn arg_tys ->
+            pprPrefixOcc ident <+> sep arg_tys
+        InfixPatSyn left_ty right_ty ->
+            left_ty <+> pprInfixOcc ident <+> right_ty
+
+    -- TODO: support explicit foralls
+    thetaOpt = maybe empty (<+> darrow)
+
+    colon = if is_bidir then dcolon else dcolon -- TODO
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, pprInfixOcc (unLoc name)]
@@ -697,4 +759,36 @@ instance Outputable TcSpecPrag where
 
 pprMinimalSig :: OutputableBndr name => BooleanFormula (Located name) -> SDoc
 pprMinimalSig bf = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection[PatSynBind]{A pattern synonym definition}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+data HsPatSynDetails a
+  = InfixPatSyn a a
+  | PrefixPatSyn [a]
+  deriving (Data, Typeable)
+
+instance Functor HsPatSynDetails where
+    fmap f (InfixPatSyn left right) = InfixPatSyn (f left) (f right)
+    fmap f (PrefixPatSyn args) = PrefixPatSyn (fmap f args)
+
+instance Foldable HsPatSynDetails where
+    foldMap f (InfixPatSyn left right) = f left `mappend` f right
+    foldMap f (PrefixPatSyn args) = foldMap f args
+
+instance Traversable HsPatSynDetails where
+    traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right
+    traverse f (PrefixPatSyn args) = PrefixPatSyn <$> traverse f args
+
+data HsPatSynDirLR idL idR
+  = Unidirectional
+  | ImplicitBidirectional
+  deriving (Data, Typeable)
+
+type HsPatSynDir id = HsPatSynDirLR id id
 \end{code}

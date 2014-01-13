@@ -73,6 +73,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 import Data.Typeable
 import Data.Data
+import Data.Monoid
 \end{code}
 
 %************************************************************************
@@ -181,6 +182,18 @@ keysUFM         :: UniqFM elt -> [Unique]       -- Get the keys
 eltsUFM         :: UniqFM elt -> [elt]
 ufmToList       :: UniqFM elt -> [(Unique, elt)]
 
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Monoid interface}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+instance Monoid (UniqFM a) where
+    mempty = emptyUFM
+    mappend = plusUFM
 \end{code}
 
 %************************************************************************

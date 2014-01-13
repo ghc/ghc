@@ -27,7 +27,9 @@ import DsBinds
 import DsGRHSs
 import DsUtils
 import Id
+import ConLike
 import DataCon
+import PatSyn
 import MatchCon
 import MatchLit
 import Type
@@ -91,6 +93,7 @@ matchCheck_really dflags ctx@(DsMatchContext hs_ctx _) vars ty qs
     incomplete_flag RecUpd        = wopt Opt_WarnIncompletePatternsRecUpd dflags
 
     incomplete_flag ThPatSplice   = False
+    incomplete_flag PatSyn        = False
     incomplete_flag ThPatQuote    = False
     incomplete_flag (StmtCtxt {}) = False  -- Don't warn about incomplete patterns
                                            -- in list comprehensions, pattern guards
@@ -314,6 +317,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
     match_group eqns@((group,_) : _)
         = case group of
             PgCon _    -> matchConFamily  vars ty (subGroup [(c,e) | (PgCon c, e) <- eqns])
+            PgSyn _    -> matchPatSyn     vars ty (dropGroup eqns)
             PgLit _    -> matchLiterals   vars ty (subGroup [(l,e) | (PgLit l, e) <- eqns])
             PgAny      -> matchVariables  vars ty (dropGroup eqns)
             PgN _      -> matchNPats      vars ty (dropGroup eqns)
@@ -831,6 +835,7 @@ data PatGroup
   = PgAny               -- Immediate match: variables, wildcards,
                         --                  lazy patterns
   | PgCon DataCon       -- Constructor patterns (incl list, tuple)
+  | PgSyn PatSyn
   | PgLit Literal       -- Literal patterns
   | PgN   Literal       -- Overloaded literals
   | PgNpK Literal       -- n+k patterns
@@ -886,6 +891,7 @@ sameGroup :: PatGroup -> PatGroup -> Bool
 sameGroup PgAny      PgAny      = True
 sameGroup PgBang     PgBang     = True
 sameGroup (PgCon _)  (PgCon _)  = True          -- One case expression
+sameGroup (PgSyn p1) (PgSyn p2) = p1==p2
 sameGroup (PgLit _)  (PgLit _)  = True          -- One case expression
 sameGroup (PgN l1)   (PgN l2)   = l1==l2        -- Order is significant
 sameGroup (PgNpK l1) (PgNpK l2) = l1==l2        -- See Note [Grouping overloaded literal patterns]
@@ -1004,16 +1010,18 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_co _ _ = False
 
 patGroup :: DynFlags -> Pat Id -> PatGroup
-patGroup _      (WildPat {})                 = PgAny
-patGroup _      (BangPat {})                 = PgBang
-patGroup _      (ConPatOut { pat_con = dc }) = PgCon (unLoc dc)
-patGroup dflags (LitPat lit)                 = PgLit (hsLitKey dflags lit)
-patGroup _      (NPat olit mb_neg _)         = PgN   (hsOverLitKey olit (isJust mb_neg))
-patGroup _      (NPlusKPat _ olit _ _)       = PgNpK (hsOverLitKey olit False)
-patGroup _      (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
-patGroup _      (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
-patGroup _      (ListPat _ _ (Just _))       = PgOverloadedList
-patGroup _      pat = pprPanic "patGroup" (ppr pat)
+patGroup _      (WildPat {})                  = PgAny
+patGroup _      (BangPat {})                  = PgBang
+patGroup _      (ConPatOut { pat_con = con }) = case unLoc con of
+    RealDataCon dcon -> PgCon dcon
+    PatSynCon psyn -> PgSyn psyn
+patGroup dflags (LitPat lit)                  = PgLit (hsLitKey dflags lit)
+patGroup _      (NPat olit mb_neg _)          = PgN   (hsOverLitKey olit (isJust mb_neg))
+patGroup _      (NPlusKPat _ olit _ _)        = PgNpK (hsOverLitKey olit False)
+patGroup _      (CoPat _ p _)                 = PgCo  (hsPatType p) -- Type of innelexp pattern
+patGroup _      (ViewPat expr p _)            = PgView expr (hsPatType (unLoc p))
+patGroup _      (ListPat _ _ (Just _))        = PgOverloadedList
+patGroup _      pat                           = pprPanic "patGroup" (ppr pat)
 \end{code}
 
 Note [Grouping overloaded literal patterns]

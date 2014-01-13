@@ -21,6 +21,7 @@ import FamInstEnv
 import InstEnv
 import Class
 import Avail
+import PatSyn
 import CoreSyn
 import CoreSubst
 import PprCore
@@ -45,6 +46,8 @@ import OrdList
 import Data.List
 import Data.IORef
 import Control.Monad( when )
+import Data.Maybe ( mapMaybe )
+import UniqFM
 \end{code}
 
 %************************************************************************
@@ -80,6 +83,7 @@ deSugar hsc_env
                             tcg_fords        = fords,
                             tcg_rules        = rules,
                             tcg_vects        = vects,
+                            tcg_patsyns      = patsyns,
                             tcg_tcs          = tcs,
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
@@ -115,21 +119,27 @@ deSugar hsc_env
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
+                          ; let patsyn_defs = [(patSynId ps, ps) | ps <- patsyns]
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
                                    , spec_rules ++ ds_rules, ds_vects
-                                   , ds_fords `appendStubC` hpc_init ) }
+                                   , ds_fords `appendStubC` hpc_init
+                                   , patsyn_defs) }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
-           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords) ->
+           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords, patsyn_defs) -> do
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
         ; let (rules_for_locals, rules_for_imps)
                    = partition isLocalRule all_rules
+              final_patsyns = addExportFlagsAndRules target export_set keep_alive [] patsyn_defs
+              exp_patsyn_wrappers = mapMaybe (patSynWrapper . snd) final_patsyns
+              exp_patsyn_matchers = map (patSynMatcher . snd) final_patsyns
+              keep_alive' = addListToUFM keep_alive (map (\x -> (x, getName x)) (exp_patsyn_wrappers ++ exp_patsyn_matchers))
               final_prs = addExportFlagsAndRules target
-                              export_set keep_alive rules_for_locals (fromOL all_prs)
+                              export_set keep_alive' rules_for_locals (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -173,6 +183,7 @@ deSugar hsc_env
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
+                mg_patsyns      = map snd . filter (isExportedId . fst) $ final_patsyns,
                 mg_rules        = ds_rules_for_imps,
                 mg_binds        = ds_binds,
                 mg_foreign      = ds_fords,

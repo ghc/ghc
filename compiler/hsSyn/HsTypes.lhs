@@ -35,7 +35,7 @@ module HsTypes (
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
 
         -- Printing
-        pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context,
+        pprParendHsType, pprHsForAll, pprHsContext, pprHsContextNoArrow, ppr_hs_context,
     ) where
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
@@ -553,9 +553,13 @@ pprHsForAll exp qtvs cxt
     forall_part = ptext (sLit "forall") <+> ppr qtvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
-pprHsContext []         = empty
-pprHsContext [L _ pred] = ppr pred <+> darrow
-pprHsContext cxt        = ppr_hs_context cxt <+> darrow
+pprHsContext []  = empty
+pprHsContext cxt = pprHsContextNoArrow cxt <+> darrow
+
+pprHsContextNoArrow :: (OutputableBndr name) => HsContext name -> SDoc
+pprHsContextNoArrow []         = empty
+pprHsContextNoArrow [L _ pred] = ppr pred
+pprHsContextNoArrow cxt        = ppr_hs_context cxt
 
 ppr_hs_context :: (OutputableBndr name) => HsContext name -> SDoc
 ppr_hs_context []  = empty

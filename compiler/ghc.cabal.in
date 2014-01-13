@@ -130,7 +130,9 @@ Library
     Exposed-Modules:
         Avail
         BasicTypes
+        ConLike
         DataCon
+        PatSyn
         Demand
         Exception
         GhcMonad
@@ -372,6 +374,7 @@ Library
         TcValidity
         TcMatches
         TcPat
+        TcPatSyn
         TcRnDriver
         TcRnMonad
         TcRnTypes

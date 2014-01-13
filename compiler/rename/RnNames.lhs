@@ -9,6 +9,7 @@ module RnNames (
         rnExports, extendGlobalRdrEnvRn,
         gresFromAvails,
         reportUnusedNames,
+        checkConName
     ) where
 
 #include "HsVersions.h"
@@ -1689,4 +1690,21 @@ moduleWarn mod (DeprecatedTxt txt)
 packageImportErr :: SDoc
 packageImportErr
   = ptext (sLit "Package-qualified imports are not enabled; use PackageImports")
+
+-- This data decl will parse OK
+--      data T = a Int
+-- treating "a" as the constructor.
+-- It is really hard to make the parser spot this malformation.
+-- So the renamer has to check that the constructor is legal
+--
+-- We can get an operator as the constructor, even in the prefix form:
+--      data T = :% Int Int
+-- from interface files, which always print in prefix form
+
+checkConName :: RdrName -> TcRn ()
+checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
+
+badDataCon :: RdrName -> SDoc
+badDataCon name
+   = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
 \end{code}

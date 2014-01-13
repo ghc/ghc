@@ -64,7 +64,7 @@ import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
 import OccName          ( tcClsName, isVarNameSpace )
 import Name             ( Name )
 import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
-                          InlinePragma(..), InlineSpec(..) )
+                          InlinePragma(..), InlineSpec(..), Origin(..) )
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import TysWiredIn       ( unitTyCon, unitDataCon )
@@ -75,7 +75,7 @@ import PrelNames        ( forall_tv_RDR )
 import DynFlags
 import SrcLoc
 import OrdList          ( OrdList, fromOL )
-import Bag              ( Bag, emptyBag, consBag )
+import Bag              ( emptyBag, consBag )
 import Outputable
 import FastString
 import Maybes
@@ -305,7 +305,7 @@ cvBindGroup binding
             ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (Bag ( LHsBind RdrName), [LSig RdrName], [LFamilyDecl RdrName]
+  -> (LHsBinds RdrName, [LSig RdrName], [LFamilyDecl RdrName]
           , [LTyFamInstDecl RdrName], [LDataFamInstDecl RdrName], [LDocDecl])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
@@ -315,7 +315,7 @@ cvBindsAndSigs  fb = go (fromOL fb)
     go []                  = (emptyBag, [], [], [], [], [])
     go (L l (SigD s) : ds) = (bs, L l s : ss, ts, tfis, dfis, docs)
                            where (bs, ss, ts, tfis, dfis, docs) = go ds
-    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, tfis, dfis, docs)
+    go (L l (ValD b) : ds) = ((FromSource, b') `consBag` bs, ss, ts, tfis, dfis, docs)
                            where (b', ds')    = getMonoBind (L l b) ds
                                  (bs, ss, ts, tfis, dfis, docs) = go ds'
     go (L l (TyClD (FamDecl t)) : ds) = (bs, ss, L l t : ts, tfis, dfis, docs)

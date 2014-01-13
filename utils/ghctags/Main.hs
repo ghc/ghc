@@ -257,7 +257,7 @@ boundValues mod group =
   let vals = case hs_valds group of
                ValBindsOut nest _sigs ->
                    [ x | (_rec, binds) <- nest
-                       , bind <- bagToList binds
+                       , (_, bind) <- bagToList binds
                        , x <- boundThings mod bind ]
                _other -> error "boundValues"
       tys = [ n | ns <- map hsLTyClDeclBinders (tyClGroupConcat (hs_tyclds group))
@@ -284,6 +284,7 @@ boundThings modname lbinding =
     PatBind { pat_lhs = lhs } -> patThings lhs []
     VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
     AbsBinds { } -> [] -- nothing interesting in a type abstraction
+    PatSynBind { patsyn_id = id } -> [thing id]
   where thing = foundOfLName modname
         patThings lpat tl =
           let loc = startOfLocated lpat
@@ -299,7 +300,7 @@ boundThings modname lbinding =
                TuplePat ps _ _ -> foldr patThings tl ps
                PArrPat ps _ -> foldr patThings tl ps
                ConPatIn _ conargs -> conArgs conargs tl
-               ConPatOut _ _ _ _ conargs _ -> conArgs conargs tl
+               ConPatOut{ pat_args = conargs } -> conArgs conargs tl
                LitPat _ -> tl
                NPat _ _ _ -> tl -- form of literal pattern?
                NPlusKPat id _ _ _ -> thing id : tl

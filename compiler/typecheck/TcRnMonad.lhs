@@ -49,7 +49,7 @@ import FastString
 import Panic
 import Util
 import Annotations
-import BasicTypes( TopLevelFlag )
+import BasicTypes( TopLevelFlag, Origin )
 
 import Control.Exception
 import Data.IORef
@@ -150,6 +150,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_rules          = [],
                 tcg_fords          = [],
                 tcg_vects          = [],
+                tcg_patsyns        = [],
                 tcg_dfun_n         = dfun_n_var,
                 tcg_keep           = keep_var,
                 tcg_doc_hdr        = Nothing,
@@ -586,6 +587,11 @@ addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do b <- fn a; return (L loc b)
+
+wrapOriginLocM :: (a -> TcM r) -> (Origin, Located a) -> TcM (Origin, Located r)
+wrapOriginLocM fn (origin, lbind)
+  = do  { lbind' <- wrapLocM fn lbind
+        ; return (origin, lbind') }
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =

@@ -27,17 +27,17 @@ main = do
                         l <- loadModule d
                         let ts=typecheckedSource l
 --                        liftIO (putStr (showSDocDebug (ppr ts)))
-                        let fs=filterBag getDataCon ts
+                        let fs=filterBag (isDataCon . snd) ts
                         return $ not $ isEmptyBag fs
         removeFile "Test.hs"
         print ok
     where 
-      getDataCon (L _ (AbsBinds { abs_binds = bs }))
-        = not (isEmptyBag (filterBag getDataCon bs))
-      getDataCon (L l (f@FunBind {}))
+      isDataCon (L _ (AbsBinds { abs_binds = bs }))
+        = not (isEmptyBag (filterBag (isDataCon . snd) bs))
+      isDataCon (L l (f@FunBind {}))
         | (MG (m:_) _ _) <- fun_matches f,
           (L _ (c@ConPatOut{}):_)<-hsLMatchPats m,
           (L l _)<-pat_con c
         = isGoodSrcSpan l       -- Check that the source location is a good one
-      getDataCon _ 
+      isDataCon _
         = False

@@ -35,6 +35,7 @@ module BasicTypes(
         compareFixity,
 
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
+        Origin(..), isGenerated,
 
         RuleName,
 
@@ -415,6 +416,25 @@ boolToRecFlag False = NonRecursive
 instance Outputable RecFlag where
   ppr Recursive    = ptext (sLit "Recursive")
   ppr NonRecursive = ptext (sLit "NonRecursive")
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                Code origin
+%*                                                                      *
+%************************************************************************
+\begin{code}
+data Origin = FromSource
+            | Generated
+            deriving( Eq, Data, Typeable )
+
+isGenerated :: Origin -> Bool
+isGenerated Generated = True
+isGenerated FromSource = False
+
+instance Outputable Origin where
+  ppr FromSource  = ptext (sLit "FromSource")
+  ppr Generated   = ptext (sLit "Generated")
 \end{code}
 
 %************************************************************************

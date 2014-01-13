@@ -433,9 +433,9 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 -- Bindings for the Generic instance
 mkBindsRep :: GenericKind -> TyCon -> LHsBinds RdrName
 mkBindsRep gk tycon = 
-    unitBag (L loc (mkFunBind (L loc from01_RDR) from_matches))
+    unitBag (mkRdrFunBind (L loc from01_RDR) from_matches)
   `unionBags`
-    unitBag (L loc (mkFunBind (L loc to01_RDR) to_matches))
+    unitBag (mkRdrFunBind (L loc to01_RDR) to_matches)
       where
         from_matches  = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
@@ -677,7 +677,7 @@ mkBindsMetaD :: FixityEnv -> TyCon
 mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
       where
         mkBag l = foldr1 unionBags 
-                    [ unitBag (L loc (mkFunBind (L loc name) matches)) 
+                    [ unitBag (mkRdrFunBind (L loc name) matches)
                         | (name, matches) <- l ]
         dtBinds       = mkBag ( [ (datatypeName_RDR, dtName_matches)
                                 , (moduleName_RDR, moduleName_matches)]

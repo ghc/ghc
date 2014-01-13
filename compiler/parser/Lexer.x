@@ -59,7 +59,9 @@ module Lexer (
    typeLiteralsEnabled,
    explicitForallEnabled,
    inRulePrag,
-   explicitNamespacesEnabled, sccProfilingOn, hpcEnabled,
+   explicitNamespacesEnabled,
+   patternSynonymsEnabled,
+   sccProfilingOn, hpcEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -489,6 +491,7 @@ data Token
   | ITgroup
   | ITby
   | ITusing
+  | ITpattern
 
   -- Pragmas
   | ITinline_prag InlineSpec RuleMatchInfo
@@ -667,6 +670,7 @@ reservedWordsFM = listToUFM $
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
          ( "role",           ITrole,          0 ),
+         ( "pattern",        ITpattern,       bit patternSynonymsBit),
          ( "group",          ITgroup,         bit transformComprehensionsBit),
          ( "by",             ITby,            bit transformComprehensionsBit),
          ( "using",          ITusing,         bit transformComprehensionsBit),
@@ -1872,7 +1876,8 @@ explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
 bangPatBit :: Int
 bangPatBit = 8  -- Tells the parser to understand bang-patterns
                 -- (doesn't affect the lexer)
--- Bit #9 is available!
+patternSynonymsBit :: Int
+patternSynonymsBit = 9 -- pattern synonyms
 haddockBit :: Int
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit :: Int
@@ -1917,7 +1922,6 @@ lambdaCaseBit :: Int
 lambdaCaseBit = 30
 negativeLiteralsBit :: Int
 negativeLiteralsBit = 31
--- need another bit? See bit 9 above.
 
 
 always :: Int -> Bool
@@ -1973,6 +1977,8 @@ lambdaCaseEnabled :: Int -> Bool
 lambdaCaseEnabled flags = testBit flags lambdaCaseBit
 negativeLiteralsEnabled :: Int -> Bool
 negativeLiteralsEnabled flags = testBit flags negativeLiteralsBit
+patternSynonymsEnabled :: Int -> Bool
+patternSynonymsEnabled flags = testBit flags patternSynonymsBit
 
 -- PState for parsing options pragmas
 --
@@ -2036,6 +2042,7 @@ mkPState flags buf loc =
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
                .|. negativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
+               .|. patternSynonymsBit          `setBitIf` xopt Opt_PatternSynonyms          flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

@@ -70,8 +70,10 @@ module HscTypes (
 
         TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
         typeEnvFromEntities, mkTypeEnvWithImplicits,
-        extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
-        typeEnvElts, typeEnvTyCons, typeEnvIds,
+        extendTypeEnv, extendTypeEnvList,
+        extendTypeEnvWithIds, extendTypeEnvWithPatSyns,
+        lookupTypeEnv,
+        typeEnvElts, typeEnvTyCons, typeEnvIds, typeEnvPatSyns,
         typeEnvDataCons, typeEnvCoAxioms, typeEnvClasses,
 
         -- * MonadThings
@@ -143,7 +145,9 @@ import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import Class
 import TyCon
 import CoAxiom
+import ConLike
 import DataCon
+import PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import Packages hiding  ( Version(..) )
 import DynFlags
@@ -996,6 +1000,7 @@ data ModGuts
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module
+        mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
@@ -1496,8 +1501,15 @@ implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []
 implicitTyThings (ACoAxiom _cc) = []
 implicitTyThings (ATyCon tc)    = implicitTyConThings tc
-implicitTyThings (ADataCon dc)  = map AnId (dataConImplicitIds dc)
-    -- For data cons add the worker and (possibly) wrapper
+implicitTyThings (AConLike cl)  = case cl of
+    RealDataCon dc ->
+        -- For data cons add the worker and (possibly) wrapper
+        map AnId (dataConImplicitIds dc)
+    PatSynCon ps ->
+        -- For bidirectional pattern synonyms, add the wrapper
+        case patSynWrapper ps of
+            Nothing -> []
+            Just id -> [AnId id]
 
 implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl
@@ -1520,7 +1532,7 @@ implicitTyConThings tc
 
       -- for each data constructor in order,
       --   the contructor, worker, and (possibly) wrapper
-    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
+    concatMap (extras_plus . AConLike . RealDataCon) (tyConDataCons tc)
       -- NB. record selectors are *not* implicit, they have fully-fledged
       -- bindings that pass through the compilation pipeline as normal.
   where
@@ -1545,7 +1557,9 @@ implicitCoTyCon tc
 -- of some other declaration, or it is generated implicitly by some
 -- other declaration.
 isImplicitTyThing :: TyThing -> Bool
-isImplicitTyThing (ADataCon {}) = True
+isImplicitTyThing (AConLike cl) = case cl of
+    RealDataCon{}  -> True
+    PatSynCon ps   -> isImplicitId (patSynId ps)
 isImplicitTyThing (AnId id)     = isImplicitId id
 isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
 isImplicitTyThing (ACoAxiom ax) = isImplicitCoAxiom ax
@@ -1557,7 +1571,9 @@ isImplicitTyThing (ACoAxiom ax) = isImplicitCoAxiom ax
 -- but the tycon could be the associated type of a class, so it in turn
 -- might have a parent.
 tyThingParent_maybe :: TyThing -> Maybe TyThing
-tyThingParent_maybe (ADataCon dc) = Just (ATyCon (dataConTyCon dc))
+tyThingParent_maybe (AConLike cl) = case cl of
+    RealDataCon dc  -> Just (ATyCon (dataConTyCon dc))
+    PatSynCon{}     -> Nothing
 tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
                                       Just cls -> Just (ATyCon (classTyCon cls))
                                       Nothing  -> Nothing
@@ -1572,7 +1588,9 @@ tyThingsTyVars tts =
     unionVarSets $ map ttToVarSet tts
     where
         ttToVarSet (AnId id)     = tyVarsOfType $ idType id
-        ttToVarSet (ADataCon dc) = tyVarsOfType $ dataConRepType dc
+        ttToVarSet (AConLike cl) = case cl of
+            RealDataCon dc  -> tyVarsOfType $ dataConRepType dc
+            PatSynCon{}     -> emptyVarSet
         ttToVarSet (ATyCon tc)
           = case tyConClass_maybe tc of
               Just cls -> (mkVarSet . fst . classTvsFds) cls
@@ -1611,6 +1629,7 @@ typeEnvElts     :: TypeEnv -> [TyThing]
 typeEnvTyCons   :: TypeEnv -> [TyCon]
 typeEnvCoAxioms :: TypeEnv -> [CoAxiom Branched]
 typeEnvIds      :: TypeEnv -> [Id]
+typeEnvPatSyns  :: TypeEnv -> [PatSyn]
 typeEnvDataCons :: TypeEnv -> [DataCon]
 typeEnvClasses  :: TypeEnv -> [Class]
 lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
@@ -1620,7 +1639,8 @@ typeEnvElts     env = nameEnvElts env
 typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env]
 typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env]
 typeEnvIds      env = [id | AnId id     <- typeEnvElts env]
-typeEnvDataCons env = [dc | ADataCon dc <- typeEnvElts env]
+typeEnvPatSyns  env = [ps | AConLike (PatSynCon ps) <- typeEnvElts env]
+typeEnvDataCons env = [dc | AConLike (RealDataCon dc) <- typeEnvElts env]
 typeEnvClasses  env = [cl | tc <- typeEnvTyCons env,
                             Just cl <- [tyConClass_maybe tc]]
 
@@ -1655,6 +1675,16 @@ extendTypeEnvList env things = foldl extendTypeEnv env things
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids
   = extendNameEnvList env [(getName id, AnId id) | id <- ids]
+
+extendTypeEnvWithPatSyns :: TypeEnv -> [PatSyn] -> TypeEnv
+extendTypeEnvWithPatSyns env patsyns
+  = extendNameEnvList env $ concatMap pat_syn_things patsyns
+  where
+    pat_syn_things :: PatSyn -> [(Name, TyThing)]
+    pat_syn_things ps = (getName ps, AConLike (PatSynCon ps)):
+                        case patSynWrapper ps of
+                            Just wrap_id -> [(getName wrap_id, AnId wrap_id)]
+                            Nothing -> []
 
 \end{code}
 
@@ -1704,14 +1734,14 @@ tyThingCoAxiom other         = pprPanic "tyThingCoAxiom" (pprTyThing other)
 
 -- | Get the 'DataCon' from a 'TyThing' if it is a data constructor thing. Panics otherwise
 tyThingDataCon :: TyThing -> DataCon
-tyThingDataCon (ADataCon dc) = dc
-tyThingDataCon other         = pprPanic "tyThingDataCon" (pprTyThing other)
+tyThingDataCon (AConLike (RealDataCon dc)) = dc
+tyThingDataCon other                       = pprPanic "tyThingDataCon" (pprTyThing other)
 
 -- | Get the 'Id' from a 'TyThing' if it is a id *or* data constructor thing. Panics otherwise
 tyThingId :: TyThing -> Id
-tyThingId (AnId id)     = id
-tyThingId (ADataCon dc) = dataConWrapId dc
-tyThingId other         = pprPanic "tyThingId" (pprTyThing other)
+tyThingId (AnId id)                   = id
+tyThingId (AConLike (RealDataCon dc)) = dataConWrapId dc
+tyThingId other                       = pprPanic "tyThingId" (pprTyThing other)
 \end{code}
 
 %************************************************************************

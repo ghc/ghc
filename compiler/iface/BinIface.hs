@@ -20,6 +20,7 @@ module BinIface (
 
 import TcRnMonad
 import TyCon
+import ConLike
 import DataCon    (dataConName, dataConWorkId, dataConTyCon)
 import PrelInfo   (wiredInThings, basicKnownKeyNames)
 import Id         (idName, isDataConWorkId_maybe)
@@ -318,7 +319,7 @@ putName _dict BinSymbolTable{
   = case wiredInNameTyThing_maybe name of
      Just (ATyCon tc)
        | isTupleTyCon tc             -> putTupleName_ bh tc 0
-     Just (ADataCon dc)
+     Just (AConLike (RealDataCon dc))
        | let tc = dataConTyCon dc, isTupleTyCon tc -> putTupleName_ bh tc 1
      Just (AnId x)
        | Just dc <- isDataConWorkId_maybe x, let tc = dataConTyCon dc, isTupleTyCon tc -> putTupleName_ bh tc 2

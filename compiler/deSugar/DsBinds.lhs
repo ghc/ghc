@@ -95,9 +95,13 @@ ds_lhs_binds :: LHsBinds Id -> DsM (OrdList (Id,CoreExpr))
 ds_lhs_binds binds = do { ds_bs <- mapBagM dsLHsBind binds
                         ; return (foldBag appOL id nilOL ds_bs) }
 
-dsLHsBind :: LHsBind Id -> DsM (OrdList (Id,CoreExpr))
-dsLHsBind (L loc bind)
-  = putSrcSpanDs loc $ dsHsBind bind
+dsLHsBind :: (Origin, LHsBind Id) -> DsM (OrdList (Id,CoreExpr))
+dsLHsBind (origin, L loc bind)
+  = handleWarnings $ putSrcSpanDs loc $ dsHsBind bind
+  where
+    handleWarnings = if isGenerated origin
+                     then discardWarningsDs
+                     else id
 
 dsHsBind :: HsBind Id -> DsM (OrdList (Id,CoreExpr))
 
@@ -210,6 +214,8 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 
     add_inline :: Id -> Id    -- tran
     add_inline lcl_id = lookupVarEnv inline_env lcl_id `orElse` lcl_id
+
+dsHsBind (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
 ------------------------
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)

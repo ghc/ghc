@@ -298,7 +298,9 @@ cvt_ci_decs doc decs
         ; let (binds', prob_fams')   = partitionWith is_bind prob_binds'
         ; let (fams', bads)          = partitionWith is_fam_decl prob_fams'
         ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-        ; return (listToBag binds', sigs', fams', ats', adts') }
+          --We use FromSource as the origin of the bind
+          -- because the TH declaration is user-written
+        ; return (listToBag (map (\bind -> (FromSource, bind)) binds'), sigs', fams', ats', adts') }
 
 ----------------
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
@@ -533,7 +535,9 @@ cvtLocalDecs doc ds
        ; let (binds, prob_sigs) = partitionWith is_bind ds'
        ; let (sigs, bads) = partitionWith is_sig prob_sigs
        ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-       ; return (HsValBinds (ValBindsIn (listToBag binds) sigs)) }
+       ; return (HsValBinds (ValBindsIn (toBindBag binds) sigs)) }
+  where
+    toBindBag = listToBag . map (\bind -> (FromSource, bind))
 
 cvtClause :: TH.Clause -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
 cvtClause (Clause ps body wheres)

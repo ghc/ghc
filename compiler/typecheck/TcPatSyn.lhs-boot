@@ -1,0 +1,16 @@
+\begin{code}
+module TcPatSyn where
+
+import Name      ( Name )
+import Id        ( Id )
+import HsSyn     ( LPat, HsPatSynDetails, HsPatSynDir, LHsBinds )
+import TcRnTypes ( TcM )
+import SrcLoc    ( Located )
+import PatSyn    ( PatSyn )
+
+tcPatSynDecl :: Located Name
+             -> HsPatSynDetails (Located Name)
+             -> LPat Name
+             -> HsPatSynDir Name
+             -> TcM (PatSyn, LHsBinds Id)
+\end{code}

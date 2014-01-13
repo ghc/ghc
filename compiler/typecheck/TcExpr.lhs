@@ -35,7 +35,9 @@ import TcMType
 import TcType
 import DsMonad hiding (Splice)
 import Id
+import ConLike
 import DataCon
+import PatSyn
 import RdrName
 import Name
 import TyCon
@@ -1074,11 +1076,17 @@ tcInferIdWithOrig orig id_name
                         -- nor does it need the 'lifting' treatment
                         -- hence no checkTh stuff here
 
-                 AGlobal (ADataCon con) -> return (dataConWrapId con)
+                 AGlobal (AConLike cl) -> case cl of
+                     RealDataCon con -> return (dataConWrapId con)
+                     PatSynCon ps -> case patSynWrapper ps of
+                         Nothing -> failWithTc (bad_patsyn ps)
+                         Just id -> return id
 
                  other -> failWithTc (bad_lookup other) }
 
     bad_lookup thing = ppr thing <+> ptext (sLit "used where a value identifer was expected")
+
+    bad_patsyn name = ppr name <+>  ptext (sLit "used in an expression, but it's a non-bidirectional pattern synonym")
 
     check_naughty id
       | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel id)
@@ -1399,7 +1407,7 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
                 --          (so the desugarer knows the type of local binder to make)
            ; return (Just (fld { hsRecFieldId = L loc field_id, hsRecFieldArg = rhs' })) }
       | otherwise
-      = do { addErrTc (badFieldCon data_con field_lbl)
+      = do { addErrTc (badFieldCon (RealDataCon data_con) field_lbl)
            ; return Nothing }
 
 checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()

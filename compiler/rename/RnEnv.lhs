@@ -60,6 +60,7 @@ import NameEnv
 import Avail
 import Module
 import UniqFM
+import ConLike
 import DataCon          ( dataConFieldLabels, dataConTyCon )
 import TyCon            ( isTupleTyCon, tyConArity )
 import PrelNames        ( mkUnboundName, isUnboundName, rOOT_MAIN, forall_tv_RDR )
@@ -233,9 +234,9 @@ lookupExactOcc :: Name -> RnM Name
 lookupExactOcc name
   | Just thing <- wiredInNameTyThing_maybe name
   , Just tycon <- case thing of
-                    ATyCon tc   -> Just tc
-                    ADataCon dc -> Just (dataConTyCon dc)
-                    _           -> Nothing
+                    ATyCon tc                 -> Just tc
+                    AConLike (RealDataCon dc) -> Just (dataConTyCon dc)
+                    _                         -> Nothing
   , isTupleTyCon tycon
   = do { checkTupSize (tyConArity tycon)
        ; return name }

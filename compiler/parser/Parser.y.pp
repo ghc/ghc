@@ -249,6 +249,7 @@ incorrect.
  'group'    { L _ ITgroup }     -- for list transform extension
  'by'       { L _ ITby }        -- for list transform extension
  'using'    { L _ ITusing }     -- for list transform extension
+ 'pattern'      { L _ ITpattern } -- for pattern synonyms
 
  '{-# INLINE'             { L _ (ITinline_prag _ _) }
  '{-# SPECIALISE'         { L _ ITspec_prag }
@@ -478,6 +479,7 @@ export  :: { OrdList (LIE RdrName) }
         : qcname_ext export_subspec     { unitOL (LL (mkModuleImpExp (unLoc $1)
                                                                      (unLoc $2))) }
         |  'module' modid               { unitOL (LL (IEModuleContents (unLoc $2))) }
+        |  'pattern' qcon               { unitOL (LL (IEVar (unLoc $2))) }
 
 export_subspec :: { Located ImpExpSubSpec }
         : {- empty -}                   { L0 ImpExpAbs }
@@ -803,6 +805,21 @@ roles : role             { LL [$1] }
 role :: { Located (Maybe FastString) }
 role : VARID             { L1 $ Just $ getVARID $1 }
      | '_'               { L1 Nothing }
+
+-- Pattern synonyms
+
+-- Glasgow extension: pattern synonyms
+pattern_synonym_decl :: { LHsDecl RdrName }
+        : 'pattern' con vars0 patsyn_token pat { LL . ValD $ mkPatSynBind $2 (PrefixPatSyn $3) $5 $4 }
+        | 'pattern' varid conop varid patsyn_token pat { LL . ValD $ mkPatSynBind $3 (InfixPatSyn $2 $4) $6 $5 }
+
+vars0 :: { [Located RdrName] }
+        : {- empty -}                 { [] }
+        | varid vars0                 { $1 : $2 }
+
+patsyn_token :: { HsPatSynDir RdrName }
+        : '<-' { Unidirectional }
+        | '='  { ImplicitBidirectional }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -1376,6 +1393,7 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
         | infixexp opt_sig rhs  {% do { r <- checkValDef empty $1 $2 $3;
                                         let { l = comb2 $1 $> };
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
+        | pattern_synonym_decl  { LL $ unitOL $1 }
         | docdecl               { LL $ unitOL $1 }
 
 decl    :: { Located (OrdList (LHsDecl RdrName)) }

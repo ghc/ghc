@@ -118,6 +118,16 @@ data IfaceDecl
                                                 -- beyond .NET
                    ifExtName :: Maybe FastString }
 
+  | IfacePatSyn { ifName          :: OccName,           -- Name of the pattern synonym
+                  ifPatHasWrapper :: Bool,
+                  ifPatIsInfix    :: Bool,
+                  ifPatUnivTvs    :: [IfaceTvBndr],
+                  ifPatExTvs      :: [IfaceTvBndr],
+                  ifPatProvCtxt   :: IfaceContext,
+                  ifPatReqCtxt    :: IfaceContext,
+                  ifPatArgs       :: [IfaceIdBndr],
+                  ifPatTy         :: IfaceType }
+
 -- A bit of magic going on here: there's no need to store the OccName
 -- for a decl on the disk, since we can infer the namespace from the
 -- context; however it is useful to have the OccName in the IfaceDecl
@@ -175,6 +185,18 @@ instance Binary IfaceDecl where
         put_ bh a3
         put_ bh a4
 
+    put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9) = do
+        putByte bh 6
+        put_ bh (occNameFS name)
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+        put_ bh a6
+        put_ bh a7
+        put_ bh a8
+        put_ bh a9
+
     get bh = do
         h <- getByte bh
         case h of
@@ -215,12 +237,24 @@ instance Binary IfaceDecl where
                     a9 <- get bh
                     occ <- return $! mkOccNameFS clsName a2
                     return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8 a9)
-            _ -> do a1 <- get bh
+            5 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
                     return (IfaceAxiom occ a2 a3 a4)
+            6 -> do a1 <- get bh
+                    a2 <- get bh
+                    a3 <- get bh
+                    a4 <- get bh
+                    a5 <- get bh
+                    a6 <- get bh
+                    a7 <- get bh
+                    a8 <- get bh
+                    a9 <- get bh
+                    occ <- return $! mkOccNameFS dataName a1
+                    return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9)
+            _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
 data IfaceSynTyConRhs
   = IfaceOpenSynFamilyTyCon
@@ -980,6 +1014,11 @@ ifaceDeclImplicitBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_tc_occ,
     dc_occ = mkClassDataConOcc cls_tc_occ
     is_newtype = n_sigs + n_ctxt == 1 -- Sigh
 
+ifaceDeclImplicitBndrs (IfacePatSyn{ ifName = ps_occ, ifPatHasWrapper = has_wrapper })
+  = [wrap_occ | has_wrapper]
+  where
+    wrap_occ = mkDataConWrapperOcc ps_occ  -- Id namespace
+
 ifaceDeclImplicitBndrs _ = []
 
 -- -----------------------------------------------------------------------------
@@ -1062,6 +1101,30 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branches })
   = hang (ptext (sLit "axiom") <+> ppr name <> colon)
        2 (vcat $ map (pprAxBranch $ Just tycon) branches)
+
+pprIfaceDecl (IfacePatSyn { ifName = name, ifPatHasWrapper = has_wrap,
+                            ifPatIsInfix = is_infix,
+                            ifPatUnivTvs = univ_tvs, ifPatExTvs = ex_tvs,
+                            ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
+                            ifPatArgs = args,
+                            ifPatTy = ty })
+  = hang (text "pattern" <+> header)
+       4 details
+  where
+    header = ppr name <+> dcolon <+>
+             (pprIfaceForAllPart univ_tvs req_ctxt $
+              pprIfaceForAllPart ex_tvs prov_ctxt $
+              pp_tau)
+
+    details = sep [ if is_infix then text "Infix" else empty
+                  , if has_wrap then text "HasWrapper" else empty
+                  ]
+
+    pp_tau = case map pprParendIfaceType (arg_tys ++ [ty]) of
+        (t:ts) -> fsep (t : map (arrow <+>) ts)
+        []     -> panic "pp_tau"
+
+    arg_tys = map snd args
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing = ptext (sLit "No C type associated")
@@ -1332,6 +1395,13 @@ freeNamesIfDecl d@IfaceClass{} =
 freeNamesIfDecl d@IfaceAxiom{} =
   freeNamesIfTc (ifTyCon d) &&&
   fnList freeNamesIfAxBranch (ifAxBranches d)
+freeNamesIfDecl d@IfacePatSyn{} =
+  freeNamesIfTvBndrs (ifPatUnivTvs d) &&&
+  freeNamesIfTvBndrs (ifPatExTvs d) &&&
+  freeNamesIfContext (ifPatProvCtxt d) &&&
+  freeNamesIfContext (ifPatReqCtxt d) &&&
+  fnList freeNamesIfType (map snd (ifPatArgs d)) &&&
+  freeNamesIfType (ifPatTy d)
 
 freeNamesIfAxBranch :: IfaceAxBranch -> NameSet
 freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars = tyvars

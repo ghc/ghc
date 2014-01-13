@@ -63,7 +63,8 @@ module TypeRep (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon( DataCon, dataConTyCon, dataConName )
+import {-# SOURCE #-} DataCon( dataConTyCon )
+import ConLike ( ConLike(..) )
 import {-# SOURCE #-} Type( noParenPred, isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
@@ -365,7 +366,7 @@ The Class and its associated TyCon have the same Name.
 -- | A typecheckable-thing, essentially anything that has a name
 data TyThing 
   = AnId     Id
-  | ADataCon DataCon
+  | AConLike ConLike
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
   | ACoAxiom (CoAxiom Branched)
   deriving (Eq, Ord)
@@ -382,14 +383,15 @@ pprTyThingCategory (ATyCon tc)
   | otherwise       = ptext (sLit "Type constructor")
 pprTyThingCategory (ACoAxiom _) = ptext (sLit "Coercion axiom")
 pprTyThingCategory (AnId   _)   = ptext (sLit "Identifier")
-pprTyThingCategory (ADataCon _) = ptext (sLit "Data constructor")
+pprTyThingCategory (AConLike (RealDataCon _)) = ptext (sLit "Data constructor")
+pprTyThingCategory (AConLike (PatSynCon _))  = ptext (sLit "Pattern synonym")
 
 
 instance NamedThing TyThing where	-- Can't put this with the type
   getName (AnId id)     = getName id	-- decl, because the DataCon instance
   getName (ATyCon tc)   = getName tc	-- isn't visible there
   getName (ACoAxiom cc) = getName cc
-  getName (ADataCon dc) = dataConName dc
+  getName (AConLike cl) = getName cl
 
 \end{code}
 

@@ -56,6 +56,7 @@ import Kind
 import Var
 import VarSet
 import TyCon
+import ConLike
 import DataCon
 import TysPrim ( liftedTypeKindTyConName, constraintKindTyConName )
 import Class
@@ -628,7 +629,7 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
 
            AGlobal (ATyCon tc) -> inst_tycon (mkTyConApp tc) (tyConKind tc)
 
-           AGlobal (ADataCon dc)
+           AGlobal (AConLike (RealDataCon dc))
              | Just tc <- promoteDataCon_maybe dc
              -> do { data_kinds <- xoptM Opt_DataKinds
                    ; unless data_kinds $ promotionErr name NoDataKinds

@@ -1823,7 +1823,7 @@ mkRecSelBinds tycons
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
 mkRecSelBind (tycon, sel_name)
-  = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
+  = (L loc (IdSig sel_id), unitBag (Generated, L loc sel_bind))
   where
     loc    = getSrcSpan sel_name
     sel_id = Var.mkExportedLocalVar rec_details sel_name

@@ -13,7 +13,7 @@ Pattern-matching constructors
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module MatchCon ( matchConFamily ) where
+module MatchCon ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
 
@@ -21,7 +21,9 @@ import {-# SOURCE #-} Match	( match )
 
 import HsSyn
 import DsBinds
+import ConLike
 import DataCon
+import PatSyn
 import TcType
 import DsMonad
 import DsUtils
@@ -94,17 +96,34 @@ matchConFamily :: [Id]
 -- Each group of eqns is for a single constructor
 matchConFamily (var:vars) ty groups
   = do dflags <- getDynFlags
-       alts <- mapM (matchOneCon vars ty) groups
+       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
        return (mkCoAlgCaseMatchResult dflags var ty alts)
+  where
+    toRealAlt alt = case alt_pat alt of
+        RealDataCon dcon -> alt{ alt_pat = dcon }
+        _ -> panic "matchConFamily: not RealDataCon"
 matchConFamily [] _ _ = panic "matchConFamily []"
+
+matchPatSyn :: [Id]
+            -> Type
+            -> [EquationInfo]
+            -> DsM MatchResult
+matchPatSyn (var:vars) ty eqns
+  = do alt <- fmap toSynAlt $ matchOneConLike vars ty eqns
+       return (mkCoSynCaseMatchResult var ty alt)
+  where
+    toSynAlt alt = case alt_pat alt of
+        PatSynCon psyn -> alt{ alt_pat = psyn }
+        _ -> panic "matchPatSyn: not PatSynCon"
+matchPatSyn _ _ _ = panic "matchPatSyn []"
 
 type ConArgPats = HsConDetails (LPat Id) (HsRecFields Id (LPat Id))
 
-matchOneCon :: [Id]
-            -> Type
-            -> [EquationInfo]
-            -> DsM (DataCon, [Var], MatchResult)
-matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
+matchOneConLike :: [Id]
+                -> Type
+                -> [EquationInfo]
+                -> DsM (CaseAlt ConLike)
+matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
   = do	{ arg_vars <- selectConMatchVars arg_tys args1
 	 	-- Use the first equation as a source of 
 		-- suggestions for the new variables
@@ -116,20 +135,32 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 
 	; match_results <- mapM (match_group arg_vars) groups
 
-      	; return (con1, tvs1 ++ dicts1 ++ arg_vars, 
-		  foldr1 combineMatchResults match_results) }
+        ; return $ MkCaseAlt{ alt_pat = con1,
+                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars,
+                              alt_wrapper = wrapper1,
+                              alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPatOut { pat_con = L _ con1, pat_ty = pat_ty1,
+    ConPatOut { pat_con = L _ con1, pat_ty = pat_ty1, pat_wrap = wrapper1,
 	        pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
 	      = firstPat eqn1
-    fields1 = dataConFieldLabels con1
-	
-    arg_tys  = dataConInstOrigArgTys con1 inst_tys
+    fields1 = case con1 of
+        RealDataCon dcon1 -> dataConFieldLabels dcon1
+	PatSynCon{} -> []
+
+    arg_tys  = inst inst_tys
+      where
+        inst = case con1 of
+            RealDataCon dcon1 -> dataConInstOrigArgTys dcon1
+            PatSynCon psyn1 -> patSynInstArgTys psyn1
     inst_tys = tcTyConAppArgs pat_ty1 ++ 
-	       mkTyVarTys (takeList (dataConExTyVars con1) tvs1)
+	       mkTyVarTys (takeList exVars tvs1)
 	-- Newtypes opaque, hence tcTyConAppArgs
 	-- dataConInstOrigArgTys takes the univ and existential tyvars
 	-- and returns the types of the *value* args, which is what we want
+      where
+        exVars = case con1 of
+            RealDataCon dcon1 -> dataConExTyVars dcon1
+            PatSynCon psyn1 -> patSynExTyVars psyn1
 
     match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
     -- All members of the group have compatible ConArgPats
@@ -167,7 +198,7 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 	lookup_fld rpat = lookupNameEnv_NF fld_var_env 
 		   	  		   (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
-matchOneCon _ _ [] = panic "matchOneCon []"
+matchOneConLike _ _ [] = panic "matchOneCon []"
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool

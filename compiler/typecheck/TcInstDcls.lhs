@@ -887,9 +887,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
                                   , abs_ev_binds = sc_binds
-                                  , abs_binds = unitBag dict_bind }
+                                  , abs_binds = unitBag (Generated, dict_bind) }
 
-       ; return (unitBag (L loc main_bind) `unionBags`
+       ; return (unitBag (Generated, L loc main_bind) `unionBags`
                  listToBag meth_binds)
        }
  where
@@ -1168,7 +1168,7 @@ tcInstanceMethods :: DFunId -> Class -> [TcTyVar]
                   -> ([Located TcSpecPrag], PragFun)
                   -> [(Id, DefMeth)]
                   -> InstBindings Name
-                  -> TcM ([Id], [LHsBind Id])
+                  -> TcM ([Id], [(Origin, LHsBind Id)])
         -- The returned inst_meth_ids all have types starting
         --      forall tvs. theta => ...
 tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
@@ -1183,7 +1183,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
        ; mapAndUnzipM (tc_item hs_sig_fn) op_items }
   where
     ----------------------
-    tc_item :: HsSigFun -> (Id, DefMeth) -> TcM (Id, LHsBind Id)
+    tc_item :: HsSigFun -> (Id, DefMeth) -> TcM (Id, (Origin, LHsBind Id))
     tc_item sig_fn (sel_id, dm_info)
       = case findMethodBind (idName sel_id) binds of
             Just (user_bind, bndr_loc) 
@@ -1192,10 +1192,10 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                            ; tc_default sig_fn sel_id dm_info }
 
     ----------------------
-    tc_body :: HsSigFun -> Id -> Bool -> LHsBind Name
-            -> SrcSpan -> TcM (TcId, LHsBind Id)
+    tc_body :: HsSigFun -> Id -> Bool -> (Origin, LHsBind Name)
+            -> SrcSpan -> TcM (TcId, (Origin, LHsBind Id))
     tc_body sig_fn sel_id generated_code rn_bind bndr_loc
-      = add_meth_ctxt sel_id generated_code rn_bind $
+      = add_meth_ctxt sel_id generated_code (snd rn_bind) $
         do { traceTc "tc_item" (ppr sel_id <+> ppr (idType sel_id))
            ; (meth_id, local_meth_sig) <- setSrcSpan bndr_loc $
                                           mkMethIds sig_fn clas tyvars dfun_ev_vars
@@ -1211,20 +1211,21 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; return (meth_id1, bind) }
 
     ----------------------
-    tc_default :: HsSigFun -> Id -> DefMeth -> TcM (TcId, LHsBind Id)
+    tc_default :: HsSigFun -> Id -> DefMeth -> TcM (TcId, (Origin, LHsBind Id))
 
     tc_default sig_fn sel_id (GenDefMeth dm_name)
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
            ; tc_body sig_fn sel_id False {- Not generated code? -} 
-                     meth_bind inst_loc }
+                     (Generated, meth_bind) inst_loc }
 
     tc_default sig_fn sel_id NoDefMeth     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
            ; (meth_id, _) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
                                        inst_tys sel_id
            ; dflags <- getDynFlags
-           ; return (meth_id, mkVarBind meth_id $
-                              mkLHsWrap lam_wrapper (error_rhs dflags)) }
+           ; return (meth_id,
+                     (Generated, mkVarBind meth_id $
+                                 mkLHsWrap lam_wrapper (error_rhs dflags))) }
       where
         error_rhs dflags = L inst_loc $ HsApp error_fun (error_msg dflags)
         error_fun    = L inst_loc $ wrapId (WpTyApp meth_tau) nO_METHOD_BINDING_ERROR_ID
@@ -1266,13 +1267,13 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
                                  , abs_exports = [export]
                                  , abs_ev_binds = EvBinds (unitBag self_ev_bind)
-                                 , abs_binds    = unitBag meth_bind }
+                                 , abs_binds    = unitBag (Generated, meth_bind) }
              -- Default methods in an instance declaration can't have their own
              -- INLINE or SPECIALISE pragmas. It'd be possible to allow them, but
              -- currently they are rejected with
              --           "INLINE pragma lacks an accompanying binding"
 
-           ; return (meth_id1, L inst_loc bind) }
+           ; return (meth_id1, (Generated, L inst_loc bind)) }
 
     ----------------------
     mk_meth_spec_prags :: Id -> [LTcSpecPrag] -> TcSpecPrags
@@ -1313,7 +1314,6 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
       where
       methodExists meth = isJust (findMethodBind meth binds)
 
-------------------
 mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
 mkGenericDefMethBind clas inst_tys sel_id dm_name
   = 	-- A generic default method

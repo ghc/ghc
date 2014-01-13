@@ -139,7 +139,8 @@ mkBootModDetailsTc hsc_env
               ; dfun_ids   = map instanceDFunId insts'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                 (typeEnvIds type_env) tcs fam_insts
-              ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
+              ; type_env2  = extendTypeEnvWithPatSyns type_env1 (typeEnvPatSyns type_env)
+              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
               }
         ; return (ModDetails { md_types     = type_env'
                              , md_insts     = insts'
@@ -296,6 +297,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
                               , mg_binds     = binds
+                              , mg_patsyns   = patsyns
                               , mg_rules     = imp_rules
                               , mg_vect_info = vect_info
                               , mg_anns      = anns
@@ -331,9 +333,12 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
         ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
                                     isExternalName (idName id)]
+              ; final_patsyns = filter (isExternalName . getName) patsyns
 
-              ; tidy_type_env = tidyTypeEnv omit_prags
-                                      (extendTypeEnvWithIds type_env final_ids)
+              ; type_env' = extendTypeEnvWithIds type_env final_ids
+              ; type_env'' = extendTypeEnvWithPatSyns type_env' final_patsyns
+
+              ; tidy_type_env = tidyTypeEnv omit_prags type_env''
 
               ; tidy_insts    = map (tidyClsInstDFun (lookup_dfun tidy_type_env)) insts
                 -- A DFunId will have a binding in tidy_binds, and so

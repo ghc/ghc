@@ -70,6 +70,7 @@ import Class
 import Inst
 import TyCon
 import CoAxiom
+import ConLike
 import DataCon
 import TcEvidence( TcEvBinds(..) )
 import Id
@@ -1165,7 +1166,7 @@ reifyThing (AGlobal (AnId id))
     }
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
-reifyThing (AGlobal (ADataCon dc))
+reifyThing (AGlobal (AConLike (RealDataCon dc)))
   = do  { let name = dataConName dc
         ; ty <- reifyType (idType (dataConWrapId dc))
         ; fix <- reifyFixity name
