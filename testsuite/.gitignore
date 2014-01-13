@@ -44,7 +44,9 @@ tests/**/*.ps
 *o
 *.hi
 *.dll
-
+*.dylib
+*.so
+*.hpc.*
 *bindisttest_install___dir_bin_ghc.mk
 *bindisttest_install___dir_bin_ghc.exe.mk
 mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
