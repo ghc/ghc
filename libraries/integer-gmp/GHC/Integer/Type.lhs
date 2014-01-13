@@ -43,8 +43,10 @@ import GHC.Integer.GMP.Prim (
     timesInteger#, timesIntegerInt#,
     quotRemInteger#, quotRemIntegerWord#,
     quotInteger#, quotIntegerWord#, remInteger#, remIntegerWord#,
-    divModInteger#, divInteger#, modInteger#,
-    gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
+    divModInteger#, divModIntegerWord#,
+    divInteger#, divIntegerWord#, modInteger#, modIntegerWord#,
+    divExactInteger#, divExactIntegerWord#,
+    gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#,
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
@@ -278,8 +280,13 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
       -- evaluated strictly.
       !d = i `divInt#` j
       !m = i `modInt#` j
-
-divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
+divModInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
+  = case divModIntegerWord# (negateInt# s1) d1 (int2Word# (negateInt# b)) of
+          (# q, r #) -> let !q' = mpzToInteger (mpzNeg q)
+                            !r' = mpzToInteger r
+                        in (# q', r' #)
+divModInteger (J# s1 d1) (S# b)
+  = mpzToInteger2(divModIntegerWord# s1 d1 (int2Word# b))
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
 divModInteger (J# s1 d1) (J# s2 d2) = mpzToInteger2 (divModInteger# s1 d1 s2 d2)
 
@@ -326,9 +333,10 @@ modInteger :: Integer -> Integer -> Integer
 modInteger (S# INT_MINBOUND) b = modInteger minIntAsBig b
 modInteger (S# a) (S# b) = S# (modInt# a b)
 modInteger ia@(S# _) ib@(J# _ _) = modInteger (toBig ia) ib
+modInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
+  = mpzToInteger (mpzNeg (remIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b))))
 modInteger (J# sa a) (S# b)
-  = case int2Integer# b of { (# sb, b' #) ->
-    mpzToInteger (modInteger# sa a sb b') }
+  = mpzToInteger (modIntegerWord# sa a (int2Word# b))
 modInteger (J# sa a) (J# sb b)
   = mpzToInteger (modInteger# sa a sb b)
 
@@ -337,8 +345,10 @@ divInteger :: Integer -> Integer -> Integer
 divInteger (S# INT_MINBOUND) b = divInteger minIntAsBig b
 divInteger (S# a) (S# b) = S# (divInt# a b)
 divInteger ia@(S# _) ib@(J# _ _) = divInteger (toBig ia) ib
+divInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
+  = mpzToInteger (divIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b)))
 divInteger (J# sa a) (S# b)
-  = case int2Integer# b of { (# sb, b' #) -> mpzToInteger (divInteger# sa a sb b') }
+  = mpzToInteger (divIntegerWord# sa a (int2Word# b))
 divInteger (J# sa a) (J# sb b)
   = mpzToInteger (divInteger# sa a sb b)
 \end{code}
@@ -396,9 +406,9 @@ divExact (S# INT_MINBOUND) b = divExact minIntAsBig b
 divExact (S# a) (S# b) = S# (quotInt# a b)
 divExact (S# a) (J# sb b)
   = S# (quotInt# a (integer2Int# sb b))
-divExact (J# sa a) (S# b)
-  = case int2Integer# b of
-    (# sb, b' #) -> mpzToInteger (divExactInteger# sa a sb b')
+divExact (J# sa a) (S# b) | isTrue# (b <# 0#)
+  = mpzToInteger (divExactIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b)))
+divExact (J# sa a) (S# b) = mpzToInteger (divExactIntegerWord# sa a (int2Word# b))
 divExact (J# sa a) (J# sb b) = mpzToInteger (divExactInteger# sa a sb b)
 \end{code}
 

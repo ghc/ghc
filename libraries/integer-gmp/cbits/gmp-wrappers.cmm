@@ -46,11 +46,15 @@ import "integer-gmp" __gmpz_tdiv_q_ui;
 import "integer-gmp" __gmpz_tdiv_r;
 import "integer-gmp" __gmpz_tdiv_r_ui;
 import "integer-gmp" __gmpz_fdiv_q;
+import "integer-gmp" __gmpz_fdiv_q_ui;
 import "integer-gmp" __gmpz_fdiv_r;
+import "integer-gmp" __gmpz_fdiv_r_ui;
 import "integer-gmp" __gmpz_tdiv_qr;
 import "integer-gmp" __gmpz_tdiv_qr_ui;
 import "integer-gmp" __gmpz_fdiv_qr;
+import "integer-gmp" __gmpz_fdiv_qr_ui;
 import "integer-gmp" __gmpz_divexact;
+import "integer-gmp" __gmpz_divexact_ui;
 import "integer-gmp" __gmpz_and;
 import "integer-gmp" __gmpz_xor;
 import "integer-gmp" __gmpz_ior;
@@ -602,8 +606,11 @@ GMP_TAKE1_UL1_RET1(integer_cmm_quotIntegerWordzh,   __gmpz_tdiv_q_ui)
 GMP_TAKE2_RET1(integer_cmm_remIntegerzh,            __gmpz_tdiv_r)
 GMP_TAKE1_UL1_RET1(integer_cmm_remIntegerWordzh,    __gmpz_tdiv_r_ui)
 GMP_TAKE2_RET1(integer_cmm_divIntegerzh,            __gmpz_fdiv_q)
+GMP_TAKE1_UL1_RET1(integer_cmm_divIntegerWordzh,    __gmpz_fdiv_q_ui)
 GMP_TAKE2_RET1(integer_cmm_modIntegerzh,            __gmpz_fdiv_r)
+GMP_TAKE1_UL1_RET1(integer_cmm_modIntegerWordzh,    __gmpz_fdiv_r_ui)
 GMP_TAKE2_RET1(integer_cmm_divExactIntegerzh,       __gmpz_divexact)
+GMP_TAKE1_UL1_RET1(integer_cmm_divExactIntegerWordzh, __gmpz_divexact_ui)
 GMP_TAKE2_RET1(integer_cmm_andIntegerzh,            __gmpz_and)
 GMP_TAKE2_RET1(integer_cmm_orIntegerzh,             __gmpz_ior)
 GMP_TAKE2_RET1(integer_cmm_xorIntegerzh,            __gmpz_xor)
@@ -615,6 +622,7 @@ GMP_TAKE1_RET1(integer_cmm_complementIntegerzh,     __gmpz_com)
 GMP_TAKE2_RET2(integer_cmm_quotRemIntegerzh,        __gmpz_tdiv_qr)
 GMP_TAKE1_UL1_RET2(integer_cmm_quotRemIntegerWordzh,__gmpz_tdiv_qr_ui)
 GMP_TAKE2_RET2(integer_cmm_divModIntegerzh,         __gmpz_fdiv_qr)
+GMP_TAKE1_UL1_RET2(integer_cmm_divModIntegerWordzh, __gmpz_fdiv_qr_ui)
 
 GMP_TAKE3_RET1(integer_cmm_powModIntegerzh,         __gmpz_powm)
 GMP_TAKE3_RET1(integer_cmm_powModSecIntegerzh,      __gmpz_powm_sec)

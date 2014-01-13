@@ -24,9 +24,13 @@ module GHC.Integer.GMP.Prim (
     remIntegerWord#,
 
     divModInteger#,
+    divModIntegerWord#,
     divInteger#,
+    divIntegerWord#,
     modInteger#,
+    modIntegerWord#,
     divExactInteger#,
+    divExactIntegerWord#,
 
     gcdInteger#,
     gcdExtInteger#,
@@ -191,15 +195,24 @@ foreign import prim "integer_cmm_remIntegerWordzh" remIntegerWord#
 --
 foreign import prim "integer_cmm_divModIntegerzh" divModInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# MPZ#, MPZ# #)
+foreign import prim "integer_cmm_divModIntegerWordzh" divModIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> (# MPZ#, MPZ# #)
 foreign import prim "integer_cmm_divIntegerzh" divInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> MPZ#
+foreign import prim "integer_cmm_divIntegerWordzh" divIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> MPZ#
 foreign import prim "integer_cmm_modIntegerzh" modInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> MPZ#
+foreign import prim "integer_cmm_modIntegerWordzh" modIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> MPZ#
 
 -- | Divisor is guaranteed to be a factor of dividend.
 --
 foreign import prim "integer_cmm_divExactIntegerzh" divExactInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> MPZ#
+
+foreign import prim "integer_cmm_divExactIntegerWordzh" divExactIntegerWord#
+  :: Int# -> ByteArray# -> Word# -> MPZ#
 
 -- | Greatest common divisor.
 --
