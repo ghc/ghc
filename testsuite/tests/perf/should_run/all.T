@@ -239,10 +239,11 @@ test('T7257',
 
 test('Conversions',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 78374, 2),
+                      [(wordsize(32), 76768, 2),
                         # 2012-12-18: 55316 Guessed 64-bit value / 2
                         # 2013-02-10: 77472 (x86/OSX)
                         # 2013-02-10: 79276 (x86/Windows)
+                        # 2014-01-13: 76768 (x86/Linux) due to #8647
                        (wordsize(64), 110632, 5)]),
                         # 2012-12-18: 109608 (amd64/OS X)
 
