@@ -3563,7 +3563,7 @@ compilerInfo dflags
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
-       ("Support dynamic-too",         "YES"),
+       ("Support dynamic-too",         if isWindows then "NO" else "YES"),
        ("Support parallel --make",     "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
@@ -3574,6 +3574,8 @@ compilerInfo dflags
        ("LibDir",                      topDir dflags),
        ("Global Package DB",           systemPackageConfig dflags)
       ]
+  where
+    isWindows = platformOS (targetPlatform dflags) == OSMinGW32
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
 
