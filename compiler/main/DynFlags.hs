@@ -3614,6 +3614,11 @@ tARGET_MAX_WORD dflags
 -- Be careful not to introduce potential loops!
 makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Located String])
 makeDynFlagsConsistent dflags
+ -- Disable -dynamic-too on Windows (#8228, #7134, #5987)
+ | os == OSMinGW32 && gopt Opt_BuildDynamicToo dflags
+    = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
+          warn    = "-dynamic-too is not supported on Windows"
+      in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
     = if cGhcWithNativeCodeGen == "YES"
