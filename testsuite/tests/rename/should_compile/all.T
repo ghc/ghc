@@ -201,7 +201,7 @@ test('dodgy',
      multimod_compile,
      ['dodgy', '-v0'])
 test('T7167', normal, compile, [''])
-test('T7336', normal, compile, ['-Wall'])
+test('T7336', expect_broken(7336), compile, ['-Wall'])
 
 test('T2435', normal, multimod_compile, ['T2435','-v0'])
 test('T7963',
