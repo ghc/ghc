@@ -335,41 +335,8 @@ RTS_FUN_DECL(StgReturn);
    PrimOps
    -------------------------------------------------------------------------- */
 
-RTS_FUN_DECL(stg_plusIntegerzh);
-RTS_FUN_DECL(stg_minusIntegerzh);
-RTS_FUN_DECL(stg_timesIntegerzh);
-RTS_FUN_DECL(stg_gcdIntegerzh);
-RTS_FUN_DECL(stg_quotRemIntegerzh);
-RTS_FUN_DECL(stg_quotIntegerzh);
-RTS_FUN_DECL(stg_remIntegerzh);
-RTS_FUN_DECL(stg_divExactIntegerzh);
-RTS_FUN_DECL(stg_divModIntegerzh);
-
-RTS_FUN_DECL(stg_cmpIntegerIntzh);
-RTS_FUN_DECL(stg_cmpIntegerzh);
-RTS_FUN_DECL(stg_integer2Intzh);
-RTS_FUN_DECL(stg_integer2Wordzh);
-RTS_FUN_DECL(stg_gcdIntegerIntzh);
-RTS_FUN_DECL(stg_gcdIntzh);
-
-RTS_FUN_DECL(stg_int2Integerzh);
-RTS_FUN_DECL(stg_word2Integerzh);
-
 RTS_FUN_DECL(stg_decodeFloatzuIntzh);
-RTS_FUN_DECL(stg_decodeDoublezh);
 RTS_FUN_DECL(stg_decodeDoublezu2Intzh);
-
-RTS_FUN_DECL(stg_andIntegerzh);
-RTS_FUN_DECL(stg_orIntegerzh);
-RTS_FUN_DECL(stg_xorIntegerzh);
-RTS_FUN_DECL(stg_complementIntegerzh);
-
-#if SIZEOF_HSINT == 4
-
-RTS_FUN_DECL(stg_int64ToIntegerzh);
-RTS_FUN_DECL(stg_word64ToIntegerzh);
-
-#endif
 
 RTS_FUN_DECL(stg_unsafeThawArrayzh);
 RTS_FUN_DECL(stg_casArrayzh);
