@@ -25,6 +25,9 @@ Thumbs.db
 *.a
 *.o.cmd
 *.depend*
+*.dyn_o
+*.dyn_hi
+
 log
 tags
 
