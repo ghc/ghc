@@ -153,8 +153,9 @@ test('T4801',
      [ # expect_broken(5224),
        # temporarily unbroken (#5227)
       compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
-          [(platform('x86_64-apple-darwin'), 58, 1),
+          [(platform('x86_64-apple-darwin'), 70, 1),
                            # expected value: 58 (amd64/OS X)
+                           # 13/01/2014 - 70
            (wordsize(32), 30, 20),
            (wordsize(64), 60, 20)]),
             # prev:       50 (amd64/Linux)
@@ -166,7 +167,7 @@ test('T4801',
             #                (^ REASON UNKNOWN!)
 
       compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-apple-darwin'), 510938976, 5),
+          [(platform('x86_64-apple-darwin'), 464872776, 5),
                            # expected value: 510938976 (amd64/OS X):
 
            (wordsize(32), 185669232, 10),
@@ -178,7 +179,7 @@ test('T4801',
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
 
       compiler_stats_num_field('max_bytes_used',
-          [(platform('x86_64-apple-darwin'), 21657520, 5),
+          [(platform('x86_64-apple-darwin'), 25145320, 5),
            (wordsize(32), 11829000, 15),
              #              9651948 (x86/OSX)
              #              10290952 (windows)
