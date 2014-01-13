@@ -16,12 +16,20 @@ module ParserM (
     -- Other
     happyError
  ) where
-
+import Control.Applicative
+import Control.Monad (ap, liftM)
 import Data.Word (Word8)
 import Data.Char (ord)
 
 -- Parser Monad
 newtype ParserM a = ParserM (AlexInput -> St -> Either String (AlexInput, St, a))
+
+instance Functor ParserM where
+  fmap = liftM
+
+instance Applicative ParserM where
+  pure  = return
+  (<*>) = ap
 
 instance Monad ParserM where
     ParserM m >>= k = ParserM $ \i s -> case m i s of
