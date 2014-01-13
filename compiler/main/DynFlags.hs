@@ -114,11 +114,9 @@ module DynFlags (
         compilerInfo,
 
 #ifdef GHCI
--- Only in stage 2 can we be sure that the RTS
--- exposes the appropriate runtime boolean
         rtsIsProfiled,
-        dynamicGhc,
 #endif
+        dynamicGhc,
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,

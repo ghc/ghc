@@ -139,10 +139,10 @@ compileOne' m_tc_result mHscMessage
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
-
+       isDynWay    = any (== WayDyn) (ways dflags0)
    -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
    -- the linker can correctly load the object files.
-   let dflags1 = if needsTH
+   let dflags1 = if needsTH && dynamicGhc && not isDynWay
                   then gopt_set dflags0 Opt_BuildDynamicToo
                   else dflags0
 
