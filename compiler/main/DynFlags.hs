@@ -3728,6 +3728,7 @@ data LinkerInfo
   = GnuLD    [Option]
   | GnuGold  [Option]
   | DarwinLD [Option]
+  | SolarisLD [Option]
   | UnknownLD
   deriving Eq
 
