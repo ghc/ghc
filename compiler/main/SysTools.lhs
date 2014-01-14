@@ -679,7 +679,7 @@ getLinkerInfo' dflags = do
              case os of
                OSSolaris2 ->
                  -- Solaris uses its own Solaris linker. Even all
-                 -- GNU C are receommended to configure with Solaris
+                 -- GNU C are recommended to configure with Solaris
                  -- linker instead of using GNU binutils linker. Also
                  -- all GCC distributed with Solaris follows this rule
                  -- precisely so we assume here, the Solaris linker is
