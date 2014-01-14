@@ -72,9 +72,6 @@ endif
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=final $@
 
 binary-dist: binary-dist-prep
-ifeq "$(mingw32_TARGET_OS)" "1"
-	mv bindistprep/*.exe .
-endif
 	mv bindistprep/*.tar.bz2 .
 
 binary-dist-prep:
