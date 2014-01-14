@@ -1,0 +1,5 @@
+
+==================== Strictness signatures ====================
+CaseBinderCPR.f_list_cmp: <L,C(C1(U(U)))><S,1*U><S,1*U>m()
+
+
