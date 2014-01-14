@@ -513,7 +513,7 @@ mkDataConRep dflags fam_envs wrap_name data_con
     	         --      ...(let w = C x in ...(w p q)...)...
     	         -- we want to see that w is strict in its two arguments
 
-    	     wrap_unf = mkInlineUnfolding (Just wrap_arity) wrap_rhs
+             wrap_unf = mkDataConWrapUnfolding wrap_arity wrap_rhs
              wrap_tvs = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
     	     wrap_rhs = mkLams wrap_tvs $ 
     	                mkLams wrap_args $

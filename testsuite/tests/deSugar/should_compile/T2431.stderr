@@ -8,7 +8,7 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a T2431.:~: a
  Str=DmdType,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
+         Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=True)
          Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N}]
 T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N
 

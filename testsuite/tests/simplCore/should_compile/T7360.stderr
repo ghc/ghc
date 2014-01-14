@@ -9,7 +9,7 @@ T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
  Str=DmdType <S,U>m3,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
+         Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=True)
          Tmpl= \ (dt [Occ=Once!] :: GHC.Types.Int) ->
                  case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
                  T7360.Foo3 dt

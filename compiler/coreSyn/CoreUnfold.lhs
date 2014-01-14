@@ -29,6 +29,7 @@ module CoreUnfold (
         mkUnfolding, mkCoreUnfolding,
 	mkTopUnfolding, mkSimpleUnfolding,
 	mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
+        mkDataConWrapUnfolding,
 	mkCompulsoryUnfolding, mkDFunUnfolding,
 
 	interestingArg, ArgSummary(..),
@@ -127,6 +128,16 @@ mkInlineUnfolding mb_arity expr
               
     boring_ok = inlineBoringOk expr'
 
+mkDataConWrapUnfolding :: Arity -> CoreExpr -> Unfolding
+mkDataConWrapUnfolding arity expr
+  = mkCoreUnfolding InlineStable
+                    True
+                    expr' arity
+                    (UnfWhen needSaturated boringCxtOk)
+                    -- Note [Inline data constructor wrappers aggresively]
+  where
+    expr' = simpleOptExpr expr
+
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkInlinableUnfolding dflags expr
   = mkUnfolding dflags InlineStable True is_bot expr'
@@ -198,6 +209,26 @@ b) Residency increases sharply if you occ-anal first.  I'm not
 This can occasionally mean that the guidance is very pessimistic;
 it gets fixed up next round.  And it should be rare, because large
 let-bound things that are dead are usually caught by preInlineUnconditionally
+
+Note [Inline data constructor wrappers aggresively]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The wrappers for strict data type constructors are to be inlined even in
+a boring context. This increases the chance that the demand analyzer will
+see the real constructor and return a nested CPR property.
+
+For example:
+    data P a = P !a !b
+    f :: Int -> P Int Int
+    f x = P x x
+previously, the demand analyzer would only see
+    f x = $WP x x
+and infer a strictness signature of "<S,U>m(,)", i.e. a non-nested CPR property.
+
+But if we inline $WP, we get
+    f x = case x of _ -> P x x
+and we would get "<S,U>,m(t(),t())", i.e. a nested CPR property.
+
+A real world example of this issue is the function mean in [ticket:2289#comment:1].
 
 
 %************************************************************************
