@@ -103,6 +103,14 @@ endif
 
 libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
 
+CLANG = $(findstring clang, $(shell $(CC_STAGE1) --version))
+
+ifeq "$(CLANG)" "clang"
+CCX = $(CLANG)
+else
+CCX = $(CC_STAGE1)
+endif
+
 # 2007-09-26
 #     set -o igncr 
 # is not a valid command on non-Cygwin-systems.
@@ -138,7 +146,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd gmpbuild && \
-	    CC=$(CC_STAGE1) NM=$(NM) AR=$(AR_STAGE1) $(SHELL) ./configure \
+	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) $(SHELL) ./configure \
 	          --enable-shared=no \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
