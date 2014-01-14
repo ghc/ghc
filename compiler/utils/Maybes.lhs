@@ -20,7 +20,8 @@ module Maybes (
 
         MaybeT(..)
     ) where
-
+import Control.Applicative
+import Control.Monad
 import Data.Maybe
 
 infixr 4 `orElse`
@@ -95,6 +96,10 @@ newtype MaybeT m a = MaybeT {runMaybeT :: m (Maybe a)}
 instance Functor m => Functor (MaybeT m) where
   fmap f x = MaybeT $ fmap (fmap f) $ runMaybeT x
 
+instance (Monad m, Functor m) => Applicative (MaybeT m) where
+  pure  = return
+  (<*>) = ap
+
 instance Monad m => Monad (MaybeT m) where
   return = MaybeT . return . Just
   x >>= f = MaybeT $ runMaybeT x >>= maybe (return Nothing) (runMaybeT . f)
@@ -111,6 +116,13 @@ instance Monad m => Monad (MaybeT m) where
 
 \begin{code}
 data MaybeErr err val = Succeeded val | Failed err
+
+instance Functor (MaybeErr err) where
+  fmap = liftM
+
+instance Applicative (MaybeErr err) where
+  pure  = return
+  (<*>) = ap
 
 instance Monad (MaybeErr err) where
   return v = Succeeded v
