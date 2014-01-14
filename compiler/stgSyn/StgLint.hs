@@ -187,7 +187,7 @@ lintStgExpr (StgLetNoEscape _ _ binds body) = do
       addInScopeVars binders $
         lintStgExpr body
 
-lintStgExpr (StgSCC _ _ _ expr) = lintStgExpr expr
+lintStgExpr (StgTick _ expr) = lintStgExpr expr
 
 lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
     _ <- MaybeT $ lintStgExpr scrut
@@ -209,8 +209,6 @@ lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
                         Nothing      -> addErrL bad_bndr
                   where
                      bad_bndr = mkDefltMsg bndr tc
-
-lintStgExpr e = pprPanic "lintStgExpr" (ppr e)
 
 lintStgAlts :: [StgAlt]
             -> Type               -- Type of scrutinee

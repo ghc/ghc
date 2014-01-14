@@ -31,7 +31,7 @@ import StgCmmClosure
 import StgCmmForeign    (emitPrimCall)
 
 import MkGraph
-import CoreSyn          ( AltCon(..) )
+import CoreSyn          ( AltCon(..), tickishIsCode )
 import SMRep
 import Cmm
 import CmmInfo
@@ -50,7 +50,6 @@ import Outputable
 import FastString
 import DynFlags
 
-import Data.Maybe
 import Control.Monad
 
 #if __GLASGOW_HASKELL__ >= 709
@@ -268,14 +267,22 @@ mkRhsClosure    dflags bndr _cc _bi
                 [NonVoid the_fv]                -- Just one free var
                 upd_flag                -- Updatable thunk
                 []                      -- A thunk
-                (StgCase (StgApp scrutinee [{-no args-}])
-                      _ _ _ _   -- ignore uniq, etc.
-                      (AlgAlt _)
-                      [(DataAlt _, params, _use_mask,
-                            (StgApp selectee [{-no args-}]))])
-  |  the_fv == scrutinee                -- Scrutinee is the only free variable
-  && isJust maybe_offset                -- Selectee is a component of the tuple
-  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
+                expr
+  | let strip = snd . stripStgTicksTop (not . tickishIsCode)
+  , StgCase (StgApp scrutinee [{-no args-}])
+         _ _ _ _   -- ignore uniq, etc.
+         (AlgAlt _)
+         [(DataAlt _, params, _use_mask, sel_expr)] <- strip expr
+  , StgApp selectee [{-no args-}] <- strip sel_expr
+  , the_fv == scrutinee                -- Scrutinee is the only free variable
+
+  , let (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps params)
+                                   -- Just want the layout
+  , Just the_offset <- assocMaybe params_w_offsets (NonVoid selectee)
+
+  , let offset_into_int = bytesToWordsRoundUp dflags the_offset
+                          - fixedHdrSizeW dflags
+  , offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
     -- The simplifier may have statically determined that the single alternative
     -- is the only possible case and eliminated the others, even if there are
@@ -284,16 +291,8 @@ mkRhsClosure    dflags bndr _cc _bi
     -- will evaluate to.
     --
     -- srt is discarded; it must be empty
-    cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
-  where
-    lf_info               = mkSelectorLFInfo bndr offset_into_int
-                                 (isUpdatable upd_flag)
-    (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps params)
-                               -- Just want the layout
-    maybe_offset          = assocMaybe params_w_offsets (NonVoid selectee)
-    Just the_offset       = maybe_offset
-    offset_into_int       = bytesToWordsRoundUp dflags the_offset
-                             - fixedHdrSizeW dflags
+    let lf_info = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
+    in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
 
 ---------- Note [Ap thunks] ------------------
 mkRhsClosure    dflags bndr _cc _bi

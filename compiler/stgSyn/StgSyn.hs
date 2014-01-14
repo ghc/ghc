@@ -38,6 +38,7 @@ module StgSyn (
         stgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
         isDllConApp,
         stgArgType,
+        stripStgTicksTop,
 
         pprStgBinding, pprStgBindings,
         pprStgLVs
@@ -46,8 +47,8 @@ module StgSyn (
 #include "HsVersions.h"
 
 import Bitmap
-import CoreSyn     ( AltCon )
-import CostCentre  ( CostCentreStack, CostCentre )
+import CoreSyn     ( AltCon, Tickish )
+import CostCentre  ( CostCentreStack )
 import DataCon
 import DynFlags
 import FastString
@@ -55,7 +56,7 @@ import ForeignCall ( ForeignCall )
 import Id
 import IdInfo      ( mayHaveCafRefs )
 import Literal     ( Literal, literalType )
-import Module
+import Module      ( Module )
 import Outputable
 import Packages    ( isDllName )
 import Platform
@@ -142,6 +143,14 @@ isAddrRep _       = False
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
+
+
+-- | Strip ticks of a given type from an STG expression
+stripStgTicksTop :: (Tickish Id -> Bool) -> StgExpr -> ([Tickish Id], StgExpr)
+stripStgTicksTop p = go []
+   where go ts (StgTick t e) | p t = go (t:ts) e
+         go ts other               = (reverse ts, other)
+
 
 {-
 ************************************************************************
@@ -363,35 +372,18 @@ And so the code for let(rec)-things:
         (GenStgExpr bndr occ)       -- body
 
 {-
-************************************************************************
-*                                                                      *
-\subsubsection{@GenStgExpr@: @scc@ expressions}
-*                                                                      *
-************************************************************************
-
-For @scc@ expressions we introduce a new STG construct.
--}
-
-  | StgSCC
-        CostCentre             -- label of SCC expression
-        !Bool                  -- bump the entry count?
-        !Bool                  -- push the cost centre?
-        (GenStgExpr bndr occ)  -- scc expression
-
-{-
-************************************************************************
-*                                                                      *
-\subsubsection{@GenStgExpr@: @hpc@ expressions}
-*                                                                      *
-************************************************************************
+%************************************************************************
+%*                                                                      *
+\subsubsection{@GenStgExpr@: @hpc@, @scc@ and other debug annotations}
+%*                                                                      *
+%************************************************************************
 
 Finally for @hpc@ expressions we introduce a new STG construct.
 -}
 
   | StgTick
-        Module                 -- the module of the source of this tick
-        Int                    -- tick number
-        (GenStgExpr bndr occ)  -- sub expression
+    (Tickish bndr)
+    (GenStgExpr bndr occ)       -- sub expression
 
 -- END of GenStgExpr
 
@@ -742,16 +734,12 @@ pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
                              char ']'])))
                 2 (ppr expr)]
 
-pprStgExpr (StgSCC cc tick push expr)
-  = sep [ hsep [scc, ppr cc], pprStgExpr expr ]
-  where
-    scc | tick && push = ptext (sLit "_scc_")
-        | tick         = ptext (sLit "_tick_")
-        | otherwise    = ptext (sLit "_push_")
+pprStgExpr (StgTick tickish expr)
+  = sdocWithDynFlags $ \dflags ->
+    if gopt Opt_PprShowTicks dflags
+    then sep [ ppr tickish, pprStgExpr expr ]
+    else pprStgExpr expr
 
-pprStgExpr (StgTick m n expr)
-  = sep [ hsep [ptext (sLit "_tick_"),  pprModule m,text (show n)],
-          pprStgExpr expr ]
 
 pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alt_type alts)
   = sep [sep [ptext (sLit "case"),
