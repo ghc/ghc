@@ -71,7 +71,7 @@ import "integer-gmp" __gmpz_export;
 
 import "integer-gmp" integer_cbits_decodeDouble;
 
-import "integer-gmp" stg_INTLIKE_closure;
+import "rts" stg_INTLIKE_closure;
 
 /* -----------------------------------------------------------------------------
    Arbitrary-precision Integer operations.
