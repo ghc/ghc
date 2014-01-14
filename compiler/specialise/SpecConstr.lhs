@@ -57,9 +57,9 @@ import PrelNames        ( specTyConName )
 
 -- See Note [Forcing specialisation]
 #ifndef GHCI
-import TyCon ( TyCon )
 type SpecConstrAnnotation = ()
 #else
+import TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 #endif
 \end{code}
