@@ -31,7 +31,7 @@ import DataCon
 import Coercion         hiding( substTy, substCo )
 import Rules
 import Type             hiding ( substTy )
-import TyCon            ( isRecursiveTyCon )
+import TyCon            ( isRecursiveTyCon, tyConName )
 import Id
 import MkCore           ( mkImpossibleExpr )
 import Var
@@ -53,11 +53,11 @@ import UniqFM
 import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
-import TyCon            ( TyCon, tyConName )
 import PrelNames        ( specTyConName )
 
 -- See Note [Forcing specialisation]
 #ifndef GHCI
+import TyCon ( TyCon )
 type SpecConstrAnnotation = ()
 #else
 import GHC.Exts( SpecConstrAnnotation(..) )
