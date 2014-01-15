@@ -109,6 +109,7 @@ c) The application rule wouldn't be right either
 --   at most once, so oneify it.
 -- * If e is of an unlifted type, e will be evaluated before the actual call, so
 --   in that sense, the demand on e is strict.
+--   See [Termination information and arguments]
 dmdTransformThunkDmd :: CoreExpr -> Demand -> Demand
 dmdTransformThunkDmd e
   = when (not (exprIsTrivial e))       oneifyDmd .

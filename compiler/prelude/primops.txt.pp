@@ -62,6 +62,7 @@ defaults
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    -- Strictness is turned to terminating in PrimOp.primOpSig, if allowed
+   -- Also see [Termination information and arguments]
    strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topRes }
    fixity           = Nothing
    llvm_only        = False

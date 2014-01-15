@@ -1195,7 +1195,7 @@ postProcessDmdTypeM (Just du) (DmdType fv _ res_ty)
 
 postProcessDmdResult :: DeferAndUse -> DmdResult -> Termination ()
     -- if we use it lazily, there cannot be divergence worrying us
-    -- (Otherwise we'd lose the termination information of constructors in in dmdAnalVarApp, for example)
+    -- See Note [Termination information and arguments]
 postProcessDmdResult (True,_)  _              = Converges ()
 postProcessDmdResult (False,_) (Dunno {})     = Dunno ()
 postProcessDmdResult (False,_) (Converges {}) = Converges ()
@@ -1411,6 +1411,34 @@ and <L,U(U,U)> on the second, then returning a constructor.
 
 If this same function is applied to one arg, all we can say is that it
 uses x with <L,U>, and its arg with demand <L,U>.
+
+
+Note [Termination information and arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A strictness signature of <L>t indicates:
+    If you apply me to one argument, I will surely terminate (even if this
+    argument may diverge).
+Therefore, in postProcessDmdResult, we replace the termination info of a lazy
+argument by Converges.
+
+For strict arguments, we do not do that. But usually, <S>t is not possible anyways:
+Assume such a function is applied to undefined. This diverges, because it is strict,
+and it converges, because of the terminating flag.
+
+One exception to this rule are unlifted arguments. These cannot be undefined, so the
+function is (vacuously) strict in them. But moreover, it is important that we treat
+them as strict! Consider I# (or any function with an unlifted argument type). We
+clearly want "I# 1#" to be terminating, and also "I# x" and "I# (x +# 2#)".
+But not "I# (x `quotInt#` 0#)"! Therefore, we need to analyze the argument with a strict
+demand, so that postProcessDmdResult will not hide the termination result of the argument,
+and bothDmdType takes case of erasing the Converges coming from I#.
+
+This is a property not just of primitive operations. Consider
+  f :: Bool -> (Int# -> b) -> b
+  f b g = g (if b then 1# else 0#)
+Is this strict in `b`? Yes, it is! So we want to consider any function with an
+unlifted argument type as strict. Hence we do that conveniently in dmdTransformThunkDmd.
+And therefore we do not have to worry about the strictness on arguments in primops.txt.pp
 
 \begin{code}
 newtype StrictSig = StrictSig DmdType
