@@ -13,7 +13,7 @@ T4930.foo1 = GHC.Err.error @ GHC.Types.Int lvl
 T4930.foo :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
- Str=DmdType <S,1*U(U)>m,
+ Str=DmdType <S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

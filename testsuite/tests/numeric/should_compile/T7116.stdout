@@ -6,7 +6,7 @@ T7116.dl :: GHC.Types.Double -> GHC.Types.Double
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U(U)>m,
+ Str=DmdType <S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
@@ -24,7 +24,7 @@ T7116.dr :: GHC.Types.Double -> GHC.Types.Double
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U(U)>m,
+ Str=DmdType <S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
@@ -38,7 +38,7 @@ T7116.fl :: GHC.Types.Float -> GHC.Types.Float
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U(U)>m,
+ Str=DmdType <S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
@@ -56,7 +56,7 @@ T7116.fr :: GHC.Types.Float -> GHC.Types.Float
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U(U)>m,
+ Str=DmdType <S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

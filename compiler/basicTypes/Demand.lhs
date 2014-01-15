@@ -11,7 +11,7 @@ module Demand (
         countOnce, countMany,   -- cardinality
 
         Demand, CleanDemand, 
-        mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
+        mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd, strictifyDmd,
         getUsage, toCleanDmd, 
         absDmd, topDmd, botDmd, seqDmd,
         lubDmd, bothDmd, apply1Dmd, apply2Dmd, 
@@ -182,6 +182,10 @@ bothStr (SProd s1) (SProd s2)
     | length s1 == length s2   = mkSProd (zipWith bothMaybeStr s1 s2)
     | otherwise                = HyperStr  -- Weird
 bothStr (SProd _) (SCall _)    = HyperStr
+
+strictifyDmd :: Demand -> Demand
+strictifyDmd (JD Lazy u) = (JD (Str HeadStr) u)
+strictifyDmd (JD s u) = (JD s u)
 
 -- utility functions to deal with memory leaks
 seqStrDmd :: StrDmd -> ()

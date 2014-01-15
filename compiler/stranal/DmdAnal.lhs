@@ -28,7 +28,7 @@ import Id
 import CoreUtils	( exprIsHNF, exprType, exprIsTrivial )
 -- import PprCore	
 import TyCon
-import Type		( eqType )
+import Type		( eqType, isUnLiftedType )
 -- import Pair
 -- import Coercion         ( coercionKind )
 import FamInstEnv
@@ -104,12 +104,18 @@ c) The application rule wouldn't be right either
    evaluation of f in a C(L) demand!
 
 \begin{code}
--- If e is complicated enough to become a thunk, its contents will be evaluated
--- at most once, so oneify it.
+-- This function modifies the demand on a paramater e in a call f e:
+-- * If e is complicated enough to become a thunk, its contents will be evaluated
+--   at most once, so oneify it.
+-- * If e is of an unlifted type, e will be evaluated before the actual call, so
+--   in that sense, the demand on e is strict.
 dmdTransformThunkDmd :: CoreExpr -> Demand -> Demand
 dmdTransformThunkDmd e
-  | exprIsTrivial e = id
-  | otherwise       = oneifyDmd
+  = when (not (exprIsTrivial e))       oneifyDmd .
+    when (isUnLiftedType (exprType e)) strictifyDmd
+  where
+    when True  f = f
+    when False _ = id
 
 -- Do not process absent demands
 -- Otherwise act like in a normal demand analysis

@@ -69,7 +69,7 @@ test('T1969',
              # 2012-10-08 303930948 (x86/Linux, new codegen)
              # 2013-02-10 322937684 (x86/OSX)
              # 2014-01-22 316103268 (x86/Linux)
-           (wordsize(64), 698612512, 5)]),
+           (wordsize(64), 663200424, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -90,6 +90,8 @@ test('T1969',
              #            (^ new demand analyser)
              # 18/10/2013 698612512 (x86_64/Linux)
              #            (fix for #8456)
+             # 2014-01-17 663200424 (amd64/Linux)
+             #            (^ strictify demand on unlifted arguments)
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static')
@@ -395,8 +397,10 @@ test('T6048',
           [(wordsize(32), 48887164, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
-           (wordsize(64), 108578664, 10)])
+           (wordsize(64), 95762056, 10)])
              # 18/09/2012 97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown)
+             # 2014-01-17 95762056 (amd64/Linux)
+             #            (^ strictify demand on unlifted arguments)
       ],
       compile,[''])
