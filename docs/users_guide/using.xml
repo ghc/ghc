@@ -1094,6 +1094,26 @@ test.hs:(5,4)-(6,7):
     <variablelist>
 
       <varlistentry>
+        <term><option>-fwarn-type-holes</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-type-holes</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+            <para>When the compiler encounters an unbound local
+            variable prefixed with <literal>_</literal>, or encounters
+            the literal <literal>_</literal> on the right-hand side of
+            an expression, the error message for the unbound term
+            includes the type it needs to type check. It works
+            particularly well with <link
+            linkend="defer-type-errors">deferred type errors</link>.
+            See <xref linkend="type-holes"/></para>
+
+            <para>This warning is on by default.</para>
+        </listitem>
+      </varlistentry>
+
+
+      <varlistentry>
         <term><option>-fdefer-type-errors</option>:</term>
         <listitem>
           <indexterm><primary><option>-fdefer-type-errors</option></primary>

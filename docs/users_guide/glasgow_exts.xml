@@ -7668,11 +7668,14 @@ with <option>-XNoMonoLocalBinds</option> but type inference becomes less predica
 </sect3>
 </sect2>
 
-<sect2 id="type-holes">
+</sect1>
+<!-- ==================== End of type system extensions =================  -->
+
+<sect1 id="type-holes">
 <title>Type Holes</title>
 
 <para>Type hole support is enabled with the option
-<option>-XTypeHoles</option>.</para>
+<option>-fwarn-type-holes</option>, which is enabled by default.</para>
 
 <para>
 The goal of the type holes extension is not to change the type system, but to help with writing Haskell
@@ -7772,11 +7775,9 @@ Failed, modules loaded: none.
 This ensures that an unbound identifier is never reported with a too polymorphic type, like
 <literal>forall a. a</literal>, when used multiple times for types that can not be unified.
 </para>
-</sect2>
-
 
 </sect1>
-<!-- ==================== End of type system extensions =================  -->
+<!-- ==================== Deferring type errors =================  -->
 
 <sect1 id="defer-type-errors">
 <title>Deferring type errors to runtime</title>

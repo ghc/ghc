@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeHoles #-}
-
 module Holes where
 
 f = _

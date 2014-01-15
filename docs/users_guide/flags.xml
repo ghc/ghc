@@ -1225,12 +1225,6 @@
             <entry><option>-</option></entry>
           </row>
           <row>
-            <entry><option>-XTypeHoles</option></entry>
-            <entry>Enable <link linkend="type-holes">holes</link> in expressions.</entry>
-            <entry>dynamic</entry>
-            <entry><option>--XNoTypeHoles</option></entry>
-          </row>
-          <row>
             <entry><option>-fpackage-trust</option></entry>
             <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworthy modules.</entry>
             <entry>dynamic</entry>
@@ -1525,6 +1519,13 @@
             <entry>warn on definitions conflicting with the Applicative-Monad Proposal (AMP)</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-amp</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-type-holes</option></entry>
+            <entry>Enable <link linkend="type-holes">holes</link> in expressions.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-type-holes</option></entry>
           </row>
 
         </tbody>

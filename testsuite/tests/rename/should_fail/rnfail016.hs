@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-type-holes #-}
 module ShouldFail where
 
 -- !!! Pattern syntax in expressions

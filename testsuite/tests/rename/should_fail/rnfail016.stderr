@@ -1,6 +1,6 @@
 
-rnfail016.hs:5:7: Pattern syntax in expression context: x@x
+rnfail016.hs:6:7: Pattern syntax in expression context: x@x
 
-rnfail016.hs:6:7: Pattern syntax in expression context: ~x
+rnfail016.hs:7:7: Pattern syntax in expression context: ~x
 
-rnfail016.hs:7:7: Pattern syntax in expression context: _
+rnfail016.hs:8:7: Pattern syntax in expression context: _

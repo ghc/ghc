@@ -18,13 +18,14 @@
     <itemizedlist>
         <listitem>
             <para>
-                GHC now supports "type holes" with the
-                <literal>TypeHoles</literal> extension. When enabled, the
-                unbound literal <literal>_</literal> may be used during
-                development in place of a regular identifier, and GHC will
-                respond with the type necessary to "fill in the hole."
+                By default, GHC has a new warning enabled,
+                <literal>-fwarn-type-holes</literal>, which causes the
+                compiler to respond with the types of unbound
+                variables it encounters in the source code. (It is
+                reminiscient of the "holes" feature in languages such
+                as Agda.)
 
-                TODO FIXME: reference.
+                For more information, see <xref linkend="type-holes"/>.
            </para>
        </listitem>
 
