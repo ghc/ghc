@@ -1522,10 +1522,10 @@
           </row>
 
           <row>
-            <entry><option>-fwarn-type-holes</option></entry>
-            <entry>Enable <link linkend="type-holes">holes</link> in expressions.</entry>
+            <entry><option>-fwarn-typed-holes</option></entry>
+            <entry>Enable <link linkend="typed-holes">holes</link> in expressions.</entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-warn-type-holes</option></entry>
+            <entry><option>-fno-warn-typed-holes</option></entry>
           </row>
 
         </tbody>

@@ -19,13 +19,13 @@
         <listitem>
             <para>
                 By default, GHC has a new warning enabled,
-                <literal>-fwarn-type-holes</literal>, which causes the
+                <literal>-fwarn-typed-holes</literal>, which causes the
                 compiler to respond with the types of unbound
                 variables it encounters in the source code. (It is
                 reminiscient of the "holes" feature in languages such
                 as Agda.)
 
-                For more information, see <xref linkend="type-holes"/>.
+                For more information, see <xref linkend="typed-holes"/>.
            </para>
        </listitem>
 

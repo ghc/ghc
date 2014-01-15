@@ -464,7 +464,7 @@ data WarningFlag =
    | Opt_WarnUnsupportedCallingConventions
    | Opt_WarnUnsupportedLlvmVersion
    | Opt_WarnInlineRuleShadowing
-   | Opt_WarnTypeHoles
+   | Opt_WarnTypedHoles
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2575,7 +2575,7 @@ fWarningFlags = [
   ( "warn-identities",                  Opt_WarnIdentities, nop ),
   ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
-  ( "warn-type-holes",                  Opt_WarnTypeHoles, nop ),
+  ( "warn-typed-holes",                 Opt_WarnTypedHoles, nop ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
   ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings,
     \_ -> deprecate "it has no effect, and will be removed in GHC 7.10" ),
@@ -2990,7 +2990,7 @@ standardWarnings
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
         Opt_WarnAMP,
-        Opt_WarnTypeHoles,
+        Opt_WarnTypedHoles,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnPointlessPragmas,
         Opt_WarnDuplicateConstraints,

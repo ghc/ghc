@@ -7671,14 +7671,14 @@ with <option>-XNoMonoLocalBinds</option> but type inference becomes less predica
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
 
-<sect1 id="type-holes">
+<sect1 id="typed-holes">
 <title>Type Holes</title>
 
 <para>Type hole support is enabled with the option
-<option>-fwarn-type-holes</option>, which is enabled by default.</para>
+<option>-fwarn-typed-holes</option>, which is enabled by default.</para>
 
 <para>
-The goal of the type holes extension is not to change the type system, but to help with writing Haskell
+The goal of the type holes warning is not to change the type system, but to help with writing Haskell
 code. Type holes can be used to obtain extra information from the type checker, which might otherwise be hard
 to get.
 Normally, the type checker is used to decide if a module is well typed or not. Using GHCi,
