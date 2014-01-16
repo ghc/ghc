@@ -7,6 +7,15 @@
 --
 -- It gives an in-depth description of implementation details and
 -- decisions.
+--
+-- TODO: Try to use optimized big/small int primops on IL32P64 archs
+-- (mostly Windows/x86_64). Currently, we have to fall back to
+-- unoptimized code-paths for most big/small-int primops, due to
+-- @mpz_*()@ functions using @long@ types, which is smaller than
+-- @mp_limb_t@ on IL32P64. The @mpn_*()@ functions are often safe to
+-- use, as they use @mb_limb_t@ instead of @long@.
+-- (look out for @#if SIZEOF_HSWORD == SIZEOF_LONG@ occurences)
+--
 
 #include "MachDeps.h"
 #if SIZEOF_HSWORD == 4
@@ -39,13 +48,11 @@ import GHC.Integer.GMP.Prim (
     -- GMP-related primitives
     MPZ#,
     cmpInteger#, cmpIntegerInt#,
-    plusInteger#, plusIntegerInt#, minusInteger#, minusIntegerInt#,
-    timesInteger#, timesIntegerInt#,
-    quotRemInteger#, quotRemIntegerWord#,
-    quotInteger#, quotIntegerWord#, remInteger#, remIntegerWord#,
-    divModInteger#, divModIntegerWord#,
-    divInteger#, divIntegerWord#, modInteger#, modIntegerWord#,
-    divExactInteger#, divExactIntegerWord#,
+    plusInteger#, minusInteger#,
+    timesInteger#,
+    quotRemInteger#, quotInteger#, remInteger#,
+    divModInteger#, divInteger#, modInteger#,
+    divExactInteger#,
     gcdInteger#, gcdExtInteger#, gcdIntegerInt#, gcdInt#,
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
@@ -56,6 +63,15 @@ import GHC.Integer.GMP.Prim (
     sizeInBaseInteger#,
     importIntegerFromByteArray#, importIntegerFromAddr#,
     exportIntegerToMutableByteArray#, exportIntegerToAddr#,
+
+#if SIZEOF_HSWORD == SIZEOF_LONG
+    plusIntegerInt#, minusIntegerInt#,
+    timesIntegerInt#,
+    divIntegerWord#, modIntegerWord#, divModIntegerWord#,
+    divExactIntegerWord#,
+    quotIntegerWord#, remIntegerWord#, quotRemIntegerWord#,
+#endif
+
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -258,13 +274,17 @@ quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 quotRemInteger (S# INT_MINBOUND) b = quotRemInteger minIntAsBig b
 quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
                                    (# q, r #) -> (# S# q, S# r #)
+#if SIZEOF_HSWORD == SIZEOF_LONG
 quotRemInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
   = case quotRemIntegerWord# s1 d1 (int2Word# (negateInt# b)) of
           (# q, r #) -> let !q' = mpzToInteger(mpzNeg q)
                             !r' = mpzToInteger(mpzNeg r)
                         in (# q', r' #)
 quotRemInteger (J# s1 d1) (S# b)
-  = mpzToInteger2(quotRemIntegerWord# s1 d1 (int2Word# b))
+  = mpzToInteger2 (quotRemIntegerWord# s1 d1 (int2Word# b))
+#else
+quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
+#endif
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
   = mpzToInteger2(quotRemInteger# s1 d1 s2 d2) -- See Note [Use S# if possible]
@@ -280,6 +300,7 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
       -- evaluated strictly.
       !d = i `divInt#` j
       !m = i `modInt#` j
+#if SIZEOF_HSWORD == SIZEOF_LONG
 divModInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
   = case divModIntegerWord# (negateInt# s1) d1 (int2Word# (negateInt# b)) of
           (# q, r #) -> let !q' = mpzToInteger (mpzNeg q)
@@ -287,6 +308,9 @@ divModInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
                         in (# q', r' #)
 divModInteger (J# s1 d1) (S# b)
   = mpzToInteger2(divModIntegerWord# s1 d1 (int2Word# b))
+#else
+divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
+#endif
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
 divModInteger (J# s1 d1) (J# s2 d2) = mpzToInteger2 (divModInteger# s1 d1 s2 d2)
 
@@ -303,10 +327,14 @@ remInteger ia@(S# a) (J# sb b)
   | otherwise  = S# (0# -# a)
 -}
 remInteger ia@(S# _) ib@(J# _ _) = remInteger (toBig ia) ib
+#if SIZEOF_HSWORD == SIZEOF_LONG
 remInteger (J# sa a) (S# b)
   = mpzToInteger (remIntegerWord# sa a w)
   where
     w = int2Word# (if isTrue# (b <# 0#) then negateInt# b else b)
+#else
+remInteger i1@(J# _ _) i2@(S# _) = remInteger i1 (toBig i2)
+#endif
 remInteger (J# sa a) (J# sb b)
   = mpzToInteger (remInteger# sa a sb b)
 
@@ -321,10 +349,14 @@ quotInteger (S# a) (J# sb b)
   | otherwise  = S# 0
 -}
 quotInteger ia@(S# _) ib@(J# _ _) = quotInteger (toBig ia) ib
+#if SIZEOF_HSWORD == SIZEOF_LONG
 quotInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
   = mpzToInteger (mpzNeg (quotIntegerWord# sa a (int2Word# (negateInt# b))))
 quotInteger (J# sa a) (S# b)
   = mpzToInteger (quotIntegerWord# sa a (int2Word# b))
+#else
+quotInteger i1@(J# _ _) i2@(S# _) = quotInteger i1 (toBig i2)
+#endif
 quotInteger (J# sa a) (J# sb b)
   = mpzToInteger (quotInteger# sa a sb b)
 
@@ -333,10 +365,14 @@ modInteger :: Integer -> Integer -> Integer
 modInteger (S# INT_MINBOUND) b = modInteger minIntAsBig b
 modInteger (S# a) (S# b) = S# (modInt# a b)
 modInteger ia@(S# _) ib@(J# _ _) = modInteger (toBig ia) ib
+#if SIZEOF_HSWORD == SIZEOF_LONG
 modInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
   = mpzToInteger (mpzNeg (remIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b))))
 modInteger (J# sa a) (S# b)
   = mpzToInteger (modIntegerWord# sa a (int2Word# b))
+#else
+modInteger i1@(J# _ _) i2@(S# _) = modInteger i1 (toBig i2)
+#endif
 modInteger (J# sa a) (J# sb b)
   = mpzToInteger (modInteger# sa a sb b)
 
@@ -345,10 +381,14 @@ divInteger :: Integer -> Integer -> Integer
 divInteger (S# INT_MINBOUND) b = divInteger minIntAsBig b
 divInteger (S# a) (S# b) = S# (divInt# a b)
 divInteger ia@(S# _) ib@(J# _ _) = divInteger (toBig ia) ib
+#if SIZEOF_HSWORD == SIZEOF_LONG
 divInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
   = mpzToInteger (divIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b)))
 divInteger (J# sa a) (S# b)
   = mpzToInteger (divIntegerWord# sa a (int2Word# b))
+#else
+divInteger i1@(J# _ _) i2@(S# _) = divInteger i1 (toBig i2)
+#endif
 divInteger (J# sa a) (J# sb b)
   = mpzToInteger (divInteger# sa a sb b)
 \end{code}
@@ -406,9 +446,13 @@ divExact (S# INT_MINBOUND) b = divExact minIntAsBig b
 divExact (S# a) (S# b) = S# (quotInt# a b)
 divExact (S# a) (J# sb b)
   = S# (quotInt# a (integer2Int# sb b))
+#if SIZEOF_HSWORD == SIZEOF_LONG
 divExact (J# sa a) (S# b) | isTrue# (b <# 0#)
   = mpzToInteger (divExactIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b)))
 divExact (J# sa a) (S# b) = mpzToInteger (divExactIntegerWord# sa a (int2Word# b))
+#else
+divExact i1@(J# _ _) i2@(S# _) = divExact i1 (toBig i2)
+#endif
 divExact (J# sa a) (J# sb b) = mpzToInteger (divExactInteger# sa a sb b)
 \end{code}
 
@@ -547,10 +591,18 @@ plusInteger (S# i)      (S# j)   = case addIntC# i j of
                                    (# r, c #) ->
                                        if isTrue# (c ==# 0#)
                                        then S# r
+#if SIZEOF_HSWORD == SIZEOF_LONG
                                        else case int2Integer# i of
                                             (# s, d #) -> mpzToInteger (plusIntegerInt# s d j)
+#else
+                                       else plusInteger (toBig (S# i)) (toBig (S# j))
+#endif
 plusInteger i1@(J# _ _) (S# 0#)   = i1
+#if SIZEOF_HSWORD == SIZEOF_LONG
 plusInteger (J# s1 d1)  (S# j)    = mpzToInteger (plusIntegerInt# s1 d1 j)
+#else
+plusInteger i1@(J# _ _) i2@(S# _) = plusInteger i1 (toBig i2)
+#endif
 plusInteger i1@(S# _) i2@(J# _ _) = plusInteger i2 i1
 plusInteger (J# s1 d1) (J# s2 d2) = mpzToInteger (plusInteger# s1 d1 s2 d2)
 
@@ -559,24 +611,41 @@ minusInteger :: Integer -> Integer -> Integer
 minusInteger (S# i)      (S# j)    = case subIntC# i j of
                                      (# r, c #) ->
                                          if isTrue# (c ==# 0#) then S# r
+#if SIZEOF_HSWORD == SIZEOF_LONG
                                          else case int2Integer# i of
                                               (# s, d #) -> mpzToInteger (minusIntegerInt# s d j)
+#else
+                                         else minusInteger (toBig (S# i)) (toBig (S# j))
+#endif
 minusInteger i1@(J# _ _) (S# 0#)   = i1
-minusInteger (J# s1 d1)  (S# j)    = mpzToInteger (minusIntegerInt# s1 d1 j)
 minusInteger (S# 0#)    (J# s2 d2) = J# (negateInt# s2) d2
+#if SIZEOF_HSWORD == SIZEOF_LONG
+minusInteger (J# s1 d1)  (S# j)    = mpzToInteger (minusIntegerInt# s1 d1 j)
 minusInteger (S# i)     (J# s2 d2) = mpzToInteger (plusIntegerInt# (negateInt# s2) d2 i)
+#else
+minusInteger i1@(J# _ _) i2@(S# _) = minusInteger i1 (toBig i2)
+minusInteger i1@(S# _) i2@(J# _ _) = minusInteger (toBig i1) i2
+#endif
 minusInteger (J# s1 d1) (J# s2 d2) = mpzToInteger (minusInteger# s1 d1 s2 d2)
 
 {-# NOINLINE timesInteger #-}
 timesInteger :: Integer -> Integer -> Integer
 timesInteger (S# i) (S# j)         = if isTrue# (mulIntMayOflo# i j ==# 0#)
                                      then S# (i *# j)
+#if SIZEOF_HSWORD == SIZEOF_LONG
                                      else case int2Integer# i of
                                           (# s, d #) -> mpzToInteger (timesIntegerInt# s d j)
+#else
+                                     else timesInteger (toBig (S# i)) (toBig (S# j))
+#endif
 timesInteger (S# 0#)     _         = S# 0#
 timesInteger (S# -1#)    i2        = negateInteger i2
 timesInteger (S# 1#)     i2        = i2
+#if SIZEOF_HSWORD == SIZEOF_LONG
 timesInteger (S# i1)    (J# s2 d2) = mpzToInteger (timesIntegerInt# s2 d2 i1)
+#else
+timesInteger i1@(S# _) i2@(J# _ _) = timesInteger (toBig i1) i2
+#endif
 timesInteger i1@(J# _ _) i2@(S# _) = timesInteger i2 i1 -- swap args & retry
 timesInteger (J# s1 d1) (J# s2 d2) = mpzToInteger (timesInteger# s1 d1 s2 d2)
 
