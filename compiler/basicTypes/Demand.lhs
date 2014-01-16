@@ -30,7 +30,7 @@ module Demand (
         isBotRes, isTopRes,
         topRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig, 
-        trimCPRInfo, returnsCPR, returnsCPR_maybe,
+        trimCPRInfo, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
         isNopSig, splitStrictSig, increaseStrictSigArity,
 
@@ -804,9 +804,6 @@ trimCPRInfo trim_all trim_sums res
     trimC RetProd      | trim_all  = NoCPR
                        | otherwise = RetProd
     trimC NoCPR = NoCPR
-
-returnsCPR :: DmdResult -> Bool
-returnsCPR dr = isJust (returnsCPR_maybe dr)
 
 returnsCPR_maybe :: DmdResult -> Maybe ConTag
 returnsCPR_maybe (Dunno c)     = retCPR_maybe c
