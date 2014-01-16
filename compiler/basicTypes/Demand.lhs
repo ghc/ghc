@@ -869,20 +869,6 @@ worthSplittingArgDmd dmd
     go (JD {strd=Str HeadStr, absd=Use _ UHead})     = True
 
     go _ = False
-
-worthSplittingThunkDmd :: Demand         -- Demand on the thunk
-                       -> Bool
-worthSplittingThunkDmd dmd
-  = go dmd
-  where
-        -- Split if the thing is unpacked
-    go (JD {strd=Str (SProd {}), absd=Use _ a})     = some_comp_used a
-    go (JD {strd=Str HeadStr, absd=Use _ UProd {}}) = True
-    go _                                            = False
-
-    some_comp_used Used       = True
-    some_comp_used (UProd _ ) = True
-    some_comp_used _          = False
 \end{code}
 
 Note [Worthy functions for Worker-Wrapper split]

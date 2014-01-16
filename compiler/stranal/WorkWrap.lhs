@@ -261,7 +261,7 @@ tryWW dflags is_rec fn_id rhs
   = checkSize dflags new_fn_id rhs $
     splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
 
-  | is_thunk && (worthSplittingThunkDmd fn_dmd || returnsCPR res_info)
+  | is_thunk && (worthSplittingArgDmd fn_dmd || returnsCPR res_info)
   	-- See Note [Thunk splitting]
   = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
     checkSize dflags new_fn_id rhs $
