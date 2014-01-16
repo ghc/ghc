@@ -25,6 +25,7 @@ module SysTools (
         readElfSection,
 
         getLinkerInfo,
+        getCompilerInfo,
 
         linkDynLib,
 
@@ -644,12 +645,12 @@ neededLinkArgs UnknownLD     = []
 -- Grab linker info and cache it in DynFlags.
 getLinkerInfo :: DynFlags -> IO LinkerInfo
 getLinkerInfo dflags = do
-  info <- readIORef (rtldFlags dflags)
+  info <- readIORef (rtldInfo dflags)
   case info of
     Just v  -> return v
     Nothing -> do
       v <- getLinkerInfo' dflags
-      writeIORef (rtldFlags dflags) (Just v)
+      writeIORef (rtldInfo dflags) (Just v)
       return v
 
 -- See Note [Run-time linker info].
@@ -719,6 +720,55 @@ getLinkerInfo' dflags = do
                   text "Make sure you're using GNU ld, GNU gold" <+>
                   text "or the built in OS X linker, etc."
                 return UnknownLD)
+  return info
+
+-- Grab compiler info and cache it in DynFlags.
+getCompilerInfo :: DynFlags -> IO CompilerInfo
+getCompilerInfo dflags = do
+  info <- readIORef (rtccInfo dflags)
+  case info of
+    Just v  -> return v
+    Nothing -> do
+      v <- getCompilerInfo' dflags
+      writeIORef (rtccInfo dflags) (Just v)
+      return v
+
+-- See Note [Run-time linker info].
+getCompilerInfo' :: DynFlags -> IO CompilerInfo
+getCompilerInfo' dflags = do
+  let (pgm,_) = pgm_c dflags
+      -- Try to grab the info from the process output.
+      parseCompilerInfo _stdo stde _exitc
+        -- Regular GCC
+        | any ("gcc version" `isPrefixOf`) stde =
+          return GCC
+        -- Regular clang
+        | any ("clang version" `isPrefixOf`) stde =
+          return Clang
+        -- XCode 5 clang
+        | any ("Apple LLVM version" `isPrefixOf`) stde =
+          return Clang
+        -- XCode 4.1 clang
+        | any ("Apple clang version" `isPrefixOf`) stde =
+          return Clang
+         -- Unknown linker.
+        | otherwise = fail "invalid -v output, or compiler is unsupported"
+
+  -- Process the executable call
+  info <- catchIO (do
+                (exitc, stdo, stde) <- readProcessWithExitCode pgm ["-v"] ""
+                -- Split the output by lines to make certain kinds
+                -- of processing easier.
+                parseCompilerInfo (lines stdo) (lines stde) exitc
+            )
+            (\err -> do
+                debugTraceMsg dflags 2
+                    (text "Error (figuring out compiler information):" <+>
+                     text (show err))
+                errorMsg dflags $ hang (text "Warning:") 9 $
+                  text "Couldn't figure out linker information!" $$
+                  text "Make sure you're using GNU gcc, or clang"
+                return UnknownCC)
   return info
 
 runLink :: DynFlags -> [Option] -> IO ()

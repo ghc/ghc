@@ -138,8 +138,9 @@ module DynFlags (
         isAvx512fEnabled,
         isAvx512pfEnabled,
 
-        -- * Linker information
+        -- * Linker/compiler information
         LinkerInfo(..),
+        CompilerInfo(..),
   ) where
 
 #include "HsVersions.h"
@@ -792,7 +793,10 @@ data DynFlags = DynFlags {
   avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
 
   -- | Run-time linker information (what options we need, etc.)
-  rtldFlags             :: IORef (Maybe LinkerInfo)
+  rtldInfo              :: IORef (Maybe LinkerInfo),
+
+  -- | Run-time compiler information
+  rtccInfo              :: IORef (Maybe CompilerInfo)
  }
 
 class HasDynFlags m where
@@ -1270,7 +1274,8 @@ initDynFlags dflags = do
  refFilesToNotIntermediateClean <- newIORef []
  refGeneratedDumps <- newIORef Set.empty
  refLlvmVersion <- newIORef 28
- refRtldFlags <- newIORef Nothing
+ refRtldInfo <- newIORef Nothing
+ refRtccInfo <- newIORef Nothing
  wrapperNum <- newIORef emptyModuleEnv
  canUseUnicodeQuotes <- do let enc = localeEncoding
                                str = "‛’"
@@ -1288,7 +1293,8 @@ initDynFlags dflags = do
         llvmVersion    = refLlvmVersion,
         nextWrapperNum = wrapperNum,
         useUnicodeQuotes = canUseUnicodeQuotes,
-        rtldFlags      = refRtldFlags
+        rtldInfo      = refRtldInfo,
+        rtccInfo      = refRtccInfo
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
@@ -1438,7 +1444,8 @@ defaultDynFlags mySettings =
         avx512er = False,
         avx512f = False,
         avx512pf = False,
-        rtldFlags = panic "defaultDynFlags: no rtldFlags"
+        rtldInfo = panic "defaultDynFlags: no rtldInfo",
+        rtccInfo = panic "defaultDynFlags: no rtccInfo"
       }
 
 defaultWays :: Settings -> [Way]
@@ -3722,7 +3729,7 @@ isAvx512pfEnabled :: DynFlags -> Bool
 isAvx512pfEnabled dflags = avx512pf dflags
 
 -- -----------------------------------------------------------------------------
--- Linker information
+-- Linker/compiler information
 
 -- LinkerInfo contains any extra options needed by the system linker.
 data LinkerInfo
@@ -3732,6 +3739,13 @@ data LinkerInfo
   | SolarisLD [Option]
   | UnknownLD
   deriving Eq
+
+-- CompilerInfo tells us which C compiler we're using
+data CompilerInfo
+   = GCC
+   | Clang
+   | UnknownCC
+   deriving Eq
 
 -- -----------------------------------------------------------------------------
 -- RTS hooks
