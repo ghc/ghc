@@ -47,8 +47,6 @@ module Demand (
 
         isSingleUsed, reuseEnv, zapDemand, zapStrictSig,
 
-        worthSplittingArgDmd, worthSplittingThunkDmd,
-
         strictifyDictDmd
 
      ) where
@@ -844,32 +842,6 @@ different:
  * Variables not mentioned in the free variables environment are definitely
    unused, so we can use absDmd there.
  * Further arguments *can* be used, of course. Hence topDmd is used.
-
-
-%************************************************************************
-%*                                                                      *
-            Whether a demand justifies a w/w split
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-worthSplittingArgDmd :: Demand    -- Demand on a function argument
-                     -> Bool
-worthSplittingArgDmd dmd
-  = go dmd
-  where
-    go (JD {absd=Abs}) = True      -- Absent arg
-
-    -- See Note [Worker-wrapper for bottoming functions]
-    go (JD {strd=Str HyperStr, absd=Use _ (UProd _)}) = True
-
-    -- See Note [Worthy functions for Worker-Wrapper split]
-    go (JD {strd=Str (SProd {})})                    = True  -- Product arg to evaluate
-    go (JD {strd=Str HeadStr, absd=Use _ (UProd _)}) = True  -- Strictly used product arg
-    go (JD {strd=Str HeadStr, absd=Use _ UHead})     = True
-
-    go _ = False
-\end{code}
 
 Note [Worthy functions for Worker-Wrapper split]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

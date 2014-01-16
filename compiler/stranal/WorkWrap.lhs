@@ -17,7 +17,6 @@ import CoreSyn
 import CoreUnfold	( certainlyWillInline, mkInlineUnfolding, mkWwInlineRule )
 import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
-import Type             ( isVoidTy )
 import Var
 import Id
 import IdInfo
@@ -257,29 +256,20 @@ tryWW dflags is_rec fn_id rhs
 	-- Furthermore, don't even expose strictness info
   = return [ (fn_id, rhs) ]
 
-  | is_fun && (worth_splitting_args wrap_dmds rhs || returnsCPR res_info)
-  = checkSize dflags new_fn_id rhs $
-    splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
-
-  | is_thunk && (worthSplittingArgDmd fn_dmd || returnsCPR res_info)
-  	-- See Note [Thunk splitting]
-  = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
-    checkSize dflags new_fn_id rhs $
-    splitThunk dflags new_fn_id rhs
-
   | otherwise
-  = return [ (new_fn_id, rhs) ]
+  = do
+    let doSplit | is_fun    = splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
+                | is_thunk  = splitThunk dflags is_rec new_fn_id rhs
+	                                        -- See Note [Thunk splitting]
+                | otherwise = return Nothing
+    try <- doSplit
+    case try of
+        Nothing ->    return $ [ (new_fn_id, rhs) ]
+        Just binds -> checkSize dflags new_fn_id rhs binds
 
   where
-    fn_info   	 = idInfo fn_id
-    fn_dmd       = demandInfo fn_info
+    fn_info	 = idInfo fn_id
     inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
-
-    worth_splitting_args [d] (Lam b _)
-      | isAbsDmd d && isVoidTy (idType b)
-      = False  -- Note [Do not split void functions]
-    worth_splitting_args wrap_dmds _
-      = any worthSplittingArgDmd wrap_dmds
 
 	-- In practice it always will have a strictness
 	-- signature, even if it's a uninformative one
@@ -299,8 +289,7 @@ tryWW dflags is_rec fn_id rhs
     is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
-checkSize :: DynFlags -> Id -> CoreExpr
-	  -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
+checkSize :: DynFlags -> Id -> CoreExpr -> [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
 checkSize dflags fn_id rhs thing_inside
   | isStableUnfolding (realIdUnfolding fn_id)
   = return [ (fn_id, rhs) ]
@@ -315,22 +304,22 @@ checkSize dflags fn_id rhs thing_inside
 	-- NB: use idUnfolding because we don't want to apply
 	--     this criterion to a loop breaker!
 
-  | otherwise = thing_inside
+  | otherwise = return thing_inside
   where
     inline_rule = mkInlineUnfolding Nothing rhs
 
 ---------------------
-splitFun :: DynFlags -> Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
-         -> UniqSM [(Id, CoreExpr)]
+splitFun :: DynFlags -> Id -> IdInfo -> [Demand] -> DmdResult -> CoreExpr
+         -> UniqSM (Maybe [(Id, CoreExpr)])
 splitFun dflags fn_id fn_info wrap_dmds res_info rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) )
-    (do {
-	-- The arity should match the signature
-      (work_demands, wrap_fn, work_fn) <- mkWwBodies dflags fun_ty wrap_dmds res_info one_shots
-    ; work_uniq <- getUniqueM
-    ; let
-	work_rhs = work_fn rhs
-	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
+    -- The arity should match the signature
+    stuff <- mkWwBodies dflags fun_ty wrap_dmds res_info one_shots
+    case stuff of
+      Just (work_demands, wrap_fn, work_fn) -> do
+        work_uniq <- getUniqueM
+        let work_rhs = work_fn rhs
+	    work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
 		        `setIdOccInfo` occInfo fn_info
 				-- Copy over occurrence info from parent
 				-- Notably whether it's a loop breaker
@@ -354,25 +343,27 @@ splitFun dflags fn_id fn_info wrap_dmds res_info rhs
                                 -- Set the arity so that the Core Lint check that the
                                 -- arity is consistent with the demand type goes through
 
-	wrap_rhs  = wrap_fn work_id
-	wrap_prag = InlinePragma { inl_inline = Inline
-                                 , inl_sat    = Nothing
-                                 , inl_act    = ActiveAfter 0
-                                 , inl_rule   = rule_match_info }
+	    wrap_rhs  = wrap_fn work_id
+	    wrap_prag = InlinePragma { inl_inline = Inline
+                                     , inl_sat    = Nothing
+                                     , inl_act    = ActiveAfter 0
+                                     , inl_rule   = rule_match_info }
 		-- See Note [Wrapper activation]
 		-- The RuleMatchInfo is (and must be) unaffected
 		-- The inl_inline is bound to be False, else we would not be
 		--    making a wrapper
 
-	wrap_id   = fn_id `setIdUnfolding` mkWwInlineRule wrap_rhs arity
-			  `setInlinePragma` wrap_prag
-		          `setIdOccInfo` NoOccInfo
+            wrap_id   = fn_id `setIdUnfolding` mkWwInlineRule wrap_rhs arity
+			      `setInlinePragma` wrap_prag
+		              `setIdOccInfo` NoOccInfo
 			        -- Zap any loop-breaker-ness, to avoid bleating from Lint
 				-- about a loop breaker with an INLINE rule
+        return $ Just [(work_id, work_rhs), (wrap_id, wrap_rhs)]
+            -- Worker first, because wrapper mentions it
+            -- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
 
-    ; return ([(work_id, work_rhs), (wrap_id, wrap_rhs)]) })
-	-- Worker first, because wrapper mentions it
-	-- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
+      Nothing ->
+        return Nothing
   where
     fun_ty          = idType fn_id
     inl_prag        = inlinePragInfo fn_info
@@ -458,8 +449,11 @@ then the splitting will go deeper too.
 --     -->  x = let x = e in
 --              case x of (a,b) -> let x = (a,b)  in x
 
-splitThunk :: DynFlags -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
-splitThunk dflags fn_id rhs = do
-    (_, wrap_fn, work_fn) <- mkWWstr dflags [fn_id]
-    return [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
+splitThunk :: DynFlags -> RecFlag -> Var -> Expr Var -> UniqSM (Maybe [(Var, Expr Var)])
+splitThunk dflags is_rec fn_id rhs = do
+    (useful,_, wrap_fn, work_fn) <- mkWWstr dflags [fn_id]
+    let res = [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
+    if useful then ASSERT2( isNonRec is_rec, ppr fn_id ) -- The thunk must be non-recursive
+                   return (Just res)
+              else return Nothing
 \end{code}

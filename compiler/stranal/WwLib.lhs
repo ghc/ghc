@@ -105,13 +105,13 @@ the unusable strictness-info into the interfaces.
 
 \begin{code}
 mkWwBodies :: DynFlags
-           -> Type                              -- Type of original function
-           -> [Demand]                          -- Strictness of original function
-           -> DmdResult                         -- Info about function result
-           -> [OneShotInfo]                     -- One-shot-ness of the function, value args only
-           -> UniqSM ([Demand],                 -- Demands for worker (value) args
-                      Id -> CoreExpr,           -- Wrapper body, lacking only the worker Id
-                      CoreExpr -> CoreExpr)     -- Worker body, lacking the original function rhs
+           -> Type                                  -- Type of original function
+           -> [Demand]                              -- Strictness of original function
+           -> DmdResult                             -- Info about function result
+           -> [OneShotInfo]                         -- One-shot-ness of the function, value args only
+           -> UniqSM (Maybe ([Demand],              -- Demands for worker (value) args
+                             Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
+                             CoreExpr -> CoreExpr)) -- Worker body, lacking the original function rhs
 
 -- wrap_fn_args E       = \x y -> E
 -- work_fn_args E       = E x y
@@ -128,15 +128,20 @@ mkWwBodies dflags fun_ty demands res_info one_shots
   = do  { let arg_info = demands `zip` (one_shots ++ repeat NoOneShotInfo)
               all_one_shots = foldr (worstOneShot . snd) OneShotLam arg_info
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
-        ; (work_args, wrap_fn_str,  work_fn_str) <- mkWWstr dflags wrap_args
+        ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
+        ; (useful2, wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args all_one_shots cpr_res_ty
-        ; return ([idDemandInfo v | v <- work_call_args, isId v],
-                  wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
-                  mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
+              worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
+              wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
+              worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
+
+        ; if useful1 && not (only_one_void_argument) || useful2
+          then return (Just (worker_args_dmds, wrapper_body, worker_body))
+          else return Nothing
+        }
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
         -- something trivial like
         --      fw = ...
@@ -144,6 +149,16 @@ mkWwBodies dflags fun_ty demands res_info one_shots
         -- The point is to propagate the coerce to f's call sites, so even though
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
+  where
+    -- Note [Do not split void functions]
+    only_one_void_argument
+      | [d] <- demands
+      , Just (arg_ty1, _) <- splitFunTy_maybe fun_ty
+      , isAbsDmd d && isVoidTy arg_ty1
+      = True
+      | otherwise
+      = False
+
 \end{code}
 
 Note [Always do CPR w/w]
@@ -358,7 +373,8 @@ That's why we carry the TvSubst through mkWWargs
 mkWWstr :: DynFlags
         -> [Var]                                -- Wrapper args; have their demand info on them
                                                 --  *Includes type variables*
-        -> UniqSM ([Var],                       -- Worker args
+        -> UniqSM (Bool,                        -- Is this useful
+                   [Var],                       -- Worker args
                    CoreExpr -> CoreExpr,        -- Wrapper body, lacking the worker call
                                                 -- and without its lambdas
                                                 -- This fn adds the unboxing
@@ -367,12 +383,12 @@ mkWWstr :: DynFlags
                                                 -- and lacking its lambdas.
                                                 -- This fn does the reboxing
 mkWWstr _ []
-  = return ([], nop_fn, nop_fn)
+  = return (False, [], nop_fn, nop_fn)
 
 mkWWstr dflags (arg : args) = do
-    (args1, wrap_fn1, work_fn1) <- mkWWstr_one dflags arg
-    (args2, wrap_fn2, work_fn2) <- mkWWstr dflags args
-    return (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
+    (useful1, args1, wrap_fn1, work_fn1) <- mkWWstr_one dflags arg
+    (useful2, args2, wrap_fn2, work_fn2) <- mkWWstr dflags args
+    return (useful1 || useful2, args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
 \end{code}
 
@@ -405,29 +421,31 @@ as-yet-un-filled-in pkgState files.
 
 \begin{code}
 ----------------------
--- mkWWstr_one wrap_arg = (work_args, wrap_fn, work_fn)
+-- mkWWstr_one wrap_arg = (useful, work_args, wrap_fn, work_fn)
 --   *  wrap_fn assumes wrap_arg is in scope,
 --        brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --        brings into scope wrap_arg (via lets)
-mkWWstr_one :: DynFlags -> Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+mkWWstr_one :: DynFlags -> Var -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one dflags arg
   | isTyVar arg
-  = return ([arg],  nop_fn, nop_fn)
+  = return (False, [arg],  nop_fn, nop_fn)
 
+  -- See Note [Worker-wrapper for bottoming functions]
   | isAbsDmd dmd
   , Just work_fn <- mk_absent_let dflags arg
      -- Absent case.  We can't always handle absence for arbitrary
      -- unlifted types, so we need to choose just the cases we can
      --- (that's what mk_absent_let does)
-  = return ([], nop_fn, work_fn)
+  = return (True, [], nop_fn, work_fn)
 
+  -- See Note [Worthy functions for Worker-Wrapper split]
   | isSeqDmd dmd  -- `seq` demand; evaluate in wrapper in the hope
                   -- of dropping seqs in the worker
   = let arg_w_unf = arg `setIdUnfolding` evaldUnfolding
           -- Tell the worker arg that it's sure to be evaluated
           -- so that internal seqs can be dropped
-    in return ([arg_w_unf], mk_seq_case arg, nop_fn)
+    in return (True, [arg_w_unf], mk_seq_case arg, nop_fn)
                 -- Pass the arg, anyway, even if it is in theory discarded
                 -- Consider
                 --      f x y = x `seq` y
@@ -455,12 +473,12 @@ mkWWstr_one dflags arg
                                               data_con unpk_args
                 rebox_fn       = Let (NonRec arg con_app)
                 con_app        = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
-         ; (worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
-         ; return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
+         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
+         ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                            -- Don't pass the arg, rebox instead
 
   | otherwise   -- Other cases
-  = return ([arg], nop_fn, nop_fn)
+  = return (False, [arg], nop_fn, nop_fn)
 
   where
     dmd = idDemandInfo arg
@@ -530,22 +548,23 @@ left-to-right traversal of the result structure.
 \begin{code}
 mkWWcpr :: Type                              -- function body type
         -> DmdResult                         -- CPR analysis results
-        -> UniqSM (CoreExpr -> CoreExpr,             -- New wrapper
-                   CoreExpr -> CoreExpr,             -- New worker
-                   Type)                        -- Type of worker's body
+        -> UniqSM (Bool,                     -- Is w/w'ing useful?
+                   CoreExpr -> CoreExpr,     -- New wrapper
+                   CoreExpr -> CoreExpr,     -- New worker
+                   Type)                     -- Type of worker's body
 
 mkWWcpr body_ty res
   = case returnsCPR_maybe res of
-       Nothing      -> return (id, id, body_ty)  -- No CPR info
+       Nothing      -> return (False, id, id, body_ty)  -- No CPR info
        Just con_tag | Just stuff <- deepSplitCprType_maybe con_tag body_ty
                     -> mkWWcpr_help stuff
                     |  otherwise
                        -- See Note [non-algebraic or open body type warning]
                     -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
-                       return (id, id, body_ty)
+                       return (False, id, id, body_ty)
 
 mkWWcpr_help :: (DataCon, [Type], [Type], Coercion)
-             -> UniqSM (CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
+             -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | [arg_ty1] <- arg_tys
@@ -558,7 +577,8 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
        ; let arg       = mk_ww_local arg_uniq  arg_ty1
              con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
-       ; return ( \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
+       ; return ( True
+                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
                 , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (Var arg)
                 , arg_ty1 ) }
 
@@ -572,7 +592,8 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
              ubx_tup_app  = mkConApp2 ubx_tup_con arg_tys args
              con_app      = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
-       ; return ( \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)]
+       ; return (True
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)]
                 , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
