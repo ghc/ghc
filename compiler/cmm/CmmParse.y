@@ -89,6 +89,19 @@ High-level only:
   - pushing stack frames:
     push (info_ptr, field1, ..., fieldN) { ... statements ... }
 
+  - reserving temporary stack space:
+
+      reserve N = x { ... }
+
+    this reserves an area of size N (words) on the top of the stack,
+    and binds its address to x (a local register).  Typically this is
+    used for allocating temporary storage for passing to foreign
+    functions.
+
+    Note that if you make any native calls or invoke the GC in the
+    scope of the reserve block, you are responsible for ensuring that
+    the stack you reserved is laid out correctly with an info table.
+
 Low-level only:
 
   - References to Sp, R1-R8, F1-F4 etc.
@@ -302,6 +315,7 @@ import Data.Maybe
         'foreign'       { L _ (CmmT_foreign) }
         'never'         { L _ (CmmT_never) }
         'prim'          { L _ (CmmT_prim) }
+        'reserve'       { L _ (CmmT_reserve) }
         'return'        { L _ (CmmT_return) }
         'returns'       { L _ (CmmT_returns) }
         'import'        { L _ (CmmT_import) }
@@ -614,6 +628,8 @@ stmt    :: { CmmParse () }
                 { cmmIfThenElse $2 $4 $6 }
         | 'push' '(' exprs0 ')' maybe_body
                 { pushStackFrame $3 $5 }
+        | 'reserve' INT '=' lreg maybe_body
+                { reserveStackFrame (fromIntegral $2) $4 $5 }
 
 foreignLabel     :: { CmmParse CmmExpr }
         : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }
@@ -1059,6 +1075,15 @@ pushStackFrame fields body = do
                                            [] updfr_off exprs
   emit g
   withUpdFrameOff new_updfr_off body
+
+reserveStackFrame :: Int -> CmmParse CmmReg -> CmmParse () -> CmmParse ()
+reserveStackFrame size preg body = do
+  dflags <- getDynFlags
+  old_updfr_off <- getUpdFrameOff
+  reg <- preg
+  let frame = old_updfr_off + wORD_SIZE dflags * size
+  emitAssign reg (CmmStackSlot Old frame)
+  withUpdFrameOff frame body
 
 profilingInfo dflags desc_str ty_str
   = if not (gopt Opt_SccProfilingOn dflags)

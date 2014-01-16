@@ -152,6 +152,7 @@ data CmmToken
   | CmmT_foreign
   | CmmT_never
   | CmmT_prim
+  | CmmT_reserve
   | CmmT_return
   | CmmT_returns
   | CmmT_import
@@ -234,7 +235,8 @@ reservedWordsFM = listToUFM $
         ( "foreign",            CmmT_foreign ),
 	( "never",		CmmT_never ),
 	( "prim",		CmmT_prim ),
-	( "return",		CmmT_return ),
+        ( "reserve",            CmmT_reserve ),
+        ( "return",             CmmT_return ),
 	( "returns",		CmmT_returns ),
 	( "import",		CmmT_import ),
 	( "switch",		CmmT_switch ),

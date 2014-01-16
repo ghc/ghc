@@ -571,44 +571,55 @@ stg_deRefWeakzh ( gcptr w )
 stg_decodeFloatzuIntzh ( F_ arg )
 {
     W_ p;
-    W_ mp_tmp1;
-    W_ mp_tmp_w;
+    W_ tmp, mp_tmp1, mp_tmp_w, r1, r2;
 
     STK_CHK_GEN_N (WDS(2));
 
-    mp_tmp1  = Sp - WDS(1);
-    mp_tmp_w = Sp - WDS(2);
+    reserve 2 = tmp {
 
-    /* Perform the operation */
-    ccall __decodeFloat_Int(mp_tmp1 "ptr", mp_tmp_w "ptr", arg);
+      mp_tmp1  = tmp + WDS(1);
+      mp_tmp_w = tmp;
+
+      /* Perform the operation */
+      ccall __decodeFloat_Int(mp_tmp1 "ptr", mp_tmp_w "ptr", arg);
+
+      r1 = W_[mp_tmp1];
+      r2 = W_[mp_tmp_w];
+    }
 
     /* returns: (Int# (mantissa), Int# (exponent)) */
-    return (W_[mp_tmp1], W_[mp_tmp_w]);
+    return (r1, r2);
 }
 
 stg_decodeDoublezu2Intzh ( D_ arg )
 {
-    W_ p;
-    W_ mp_tmp1;
-    W_ mp_tmp2;
-    W_ mp_result1;
-    W_ mp_result2;
+    W_ p, tmp;
+    W_ mp_tmp1, mp_tmp2, mp_result1, mp_result2;
+    W_ r1, r2, r3, r4;
 
     STK_CHK_GEN_N (WDS(4));
 
-    mp_tmp1    = Sp - WDS(1);
-    mp_tmp2    = Sp - WDS(2);
-    mp_result1 = Sp - WDS(3);
-    mp_result2 = Sp - WDS(4);
+    reserve 4 = tmp {
 
-    /* Perform the operation */
-    ccall __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr",
-                                    mp_result1 "ptr", mp_result2 "ptr",
-                                    arg);
+      mp_tmp1    = tmp + WDS(3);
+      mp_tmp2    = tmp + WDS(2);
+      mp_result1 = tmp + WDS(1);
+      mp_result2 = tmp;
+  
+      /* Perform the operation */
+      ccall __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr",
+                                      mp_result1 "ptr", mp_result2 "ptr",
+                                      arg);
+
+      r1 = W_[mp_tmp1];
+      r2 = W_[mp_tmp2];
+      r3 = W_[mp_result1];
+      r4 = W_[mp_result2];
+    }
 
     /* returns:
        (Int# (mant sign), Word# (mant high), Word# (mant low), Int# (expn)) */
-    return (W_[mp_tmp1], W_[mp_tmp2], W_[mp_result1], W_[mp_result2]);
+    return (r1, r2, r3, r4);
 }
 
 /* -----------------------------------------------------------------------------
