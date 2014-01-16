@@ -2124,11 +2124,12 @@ joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles dflags o_files output_fn = do
   let mySettings = settings dflags
       ldIsGnuLd = sLdIsGnuLd mySettings
-      ld_r args = SysTools.runLink dflags ([
+      ld_r args ccInfo = SysTools.runLink dflags ([
                             SysTools.Option "-nostdlib",
-                            SysTools.Option "-nodefaultlibs",
                             SysTools.Option "-Wl,-r"
                             ]
+                         ++ (if ccInfo == Clang then []
+                              else [SysTools.Option "-nodefaultlibs"])
                             -- gcc on sparc sets -Wl,--relax implicitly, but
                             -- -r and --relax are incompatible for ld, so
                             -- disable --relax explicitly.
@@ -2147,19 +2148,20 @@ joinObjectFiles dflags o_files output_fn = do
       ld_build_id | sLdSupportsBuildId mySettings = ["-Wl,--build-id=none"]
                   | otherwise                     = []
 
+  ccInfo <- getCompilerInfo dflags
   if ldIsGnuLd
      then do
           script <- newTempName dflags "ldscript"
           writeFile script $ "INPUT(" ++ unwords o_files ++ ")"
-          ld_r [SysTools.FileOption "" script]
+          ld_r [SysTools.FileOption "" script] ccInfo
      else if sLdSupportsFilelist mySettings
      then do
           filelist <- newTempName dflags "filelist"
           writeFile filelist $ unlines o_files
           ld_r [SysTools.Option "-Wl,-filelist",
-                SysTools.FileOption "-Wl," filelist]
+                SysTools.FileOption "-Wl," filelist] ccInfo
      else do
-          ld_r (map (SysTools.FileOption "") o_files)
+          ld_r (map (SysTools.FileOption "") o_files) ccInfo
 
 -- -----------------------------------------------------------------------------
 -- Misc.
