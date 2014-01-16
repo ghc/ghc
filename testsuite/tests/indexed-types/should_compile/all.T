@@ -226,7 +226,7 @@ test('T8011',
      run_command,
      ['$MAKE -s --no-print-directory T8011'])
 
-# Marshalling of assocatiated types
+# Marshalling of associated types
 test('T8500',
      normal,
      run_command,

@@ -1620,7 +1620,7 @@ Note [Recursive newtypes]
 Newtype deriving works fine, even if the newtype is recursive.
 e.g.    newtype S1 = S1 [T1 ()]
         newtype T1 a = T1 (StateT S1 IO a ) deriving( Monad )
-Remember, too, that type families are curretly (conservatively) given
+Remember, too, that type families are currently (conservatively) given
 a recursive flag, so this also allows newtype deriving to work
 for type famillies.
 

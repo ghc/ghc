@@ -656,7 +656,7 @@ data PromotionErr
   | FamDataConPE     -- Data constructor for a data family
                      -- See Note [AFamDataCon: not promoting data family constructors] in TcRnDriver
 
-  | RecDataConPE     -- Data constructor in a reuursive loop
+  | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [ARecDataCon: recusion and promoting data constructors] in TcTyClsDecls
   | NoDataKinds      -- -XDataKinds not enabled
 
@@ -781,7 +781,7 @@ data ImportAvails
           -- Used
           --
           --   (a) to help construct the usage information in the interface
-          --       file; if we import somethign we need to recompile if the
+          --       file; if we import something we need to recompile if the
           --       export version changes
           --
           --   (b) to specify what child modules to initialise

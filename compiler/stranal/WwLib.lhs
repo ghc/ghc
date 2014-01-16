@@ -465,7 +465,7 @@ mkWWstr_one dflags arg
   , Just (data_con, inst_tys, inst_con_arg_tys, co)
              <- deepSplitProductType_maybe (idType arg)
   , cs `equalLength` inst_con_arg_tys
-      -- See Note [mkWWstr and unsafeCore]
+      -- See Note [mkWWstr and unsafeCoerce]
   =  do { (uniq1:uniqs) <- getUniquesM
         ; let   unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
                 unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
@@ -625,7 +625,7 @@ Here CPR will tell you that `foo` returns a () constructor for sure, but trying
 to create a worker/wrapper for type `a` obviously fails.
 (This was a real example until ee8e792  in libraries/base.)
 
-It does not seem feasilbe to avoid all such cases already in the analyser (and
+It does not seem feasible to avoid all such cases already in the analyser (and
 after all, the analysis is not really wrong), so we simply do nothing here in
 mkWWcpr. But we still want to emit warning with -DDEBUG, to hopefully catch
 other cases where something went avoidably wrong.

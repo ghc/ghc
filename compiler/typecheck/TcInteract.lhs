@@ -1979,7 +1979,7 @@ getCoercibleInst loc ty1 ty2 = do
     -- Coercible NT a                            (see case 4 in [Coercible Instances])
     | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
       Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-      dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
+      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
     = do markDataConsAsUsed rdr_env tc
          ct_ev <- requestCoercible loc concTy ty2
          local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
@@ -1991,7 +1991,7 @@ getCoercibleInst loc ty1 ty2 = do
     -- Coercible a NT                            (see case 4 in [Coercible Instances])
     | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
       Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-      dataConsInScope rdr_env tc -- Do noot look at all tyConsOfTyCon
+      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
     = do markDataConsAsUsed rdr_env tc
          ct_ev <- requestCoercible loc ty1 concTy
          local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
