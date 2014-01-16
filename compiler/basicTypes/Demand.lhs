@@ -62,7 +62,7 @@ import UniqFM
 import Util
 import BasicTypes
 import Binary
-import Maybes           ( isJust, orElse )
+import Maybes           ( orElse )
 
 import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
