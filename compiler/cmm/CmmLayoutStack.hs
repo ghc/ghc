@@ -44,7 +44,7 @@ The job of this pass is to
  - replace the CmmHighStackMark constant used in the stack check with
    the maximum stack usage of the proc.
 
- - save any variables that are live across a calll, and reload them as
+ - save any variables that are live across a call, and reload them as
    necessary.
 
 Before stack allocation, local variables remain live across native
