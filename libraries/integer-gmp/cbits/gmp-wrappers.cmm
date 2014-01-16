@@ -80,6 +80,10 @@ import "rts" stg_INTLIKE_closure;
    the case for all the platforms that GHC supports, currently.
    -------------------------------------------------------------------------- */
 
+#if SIZEOF_MP_LIMB_T != SIZEOF_W
+#error "sizeof(mp_limb_t) != sizeof(W_)"
+#endif
+
 /* This is used when a dummy pointer is needed for a ByteArray# return value
 
    Ideally this would be a statically allocated 'ByteArray#'

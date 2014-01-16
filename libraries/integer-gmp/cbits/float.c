@@ -11,6 +11,7 @@
 /* #include "PosixSource.h" */
 #include "Rts.h"
 #include "gmp.h"
+#include "GmpDerivedConstants.h"
 
 #include <math.h>
 
@@ -21,15 +22,7 @@
  * (lib/fltcode.c).
  */
 
-#ifdef _SHORT_LIMB
-#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_INT
-#else
-#ifdef _LONG_LONG_LIMB
-#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_LONG_LONG
-#else
-#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_LONG
-#endif
-#endif
+#define SIZEOF_LIMB_T SIZEOF_MP_LIMB_T
 
 #if SIZEOF_LIMB_T == 4
 #define GMP_BASE 4294967296.0

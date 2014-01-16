@@ -69,6 +69,7 @@ main(int argc, char *argv[])
     struct_field(MP_INT,_mp_alloc);
     struct_field(MP_INT,_mp_size);
     struct_field(MP_INT,_mp_d);
+    def_size("MP_LIMB_T", sizeof(mp_limb_t));
 
     return 0;
 }
