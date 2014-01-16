@@ -6,6 +6,6 @@ include $(TOP)/mk/test.mk
 # (sourceforge bug #1073501).
 ghciprog004:
 	rm -f ctest.o
-	echo "int foo(){}" >ctest.c
+	echo "int foo(){return 0;}" >ctest.c
 	'$(TEST_HC)' $(TEST_HC_OPTS) -optc-g -c ctest.c
 	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS) -v0 --interactive -ignore-dot-ghci ctest.o
