@@ -221,6 +221,7 @@ import StgCmmLayout     hiding (ArgRep(..))
 import StgCmmTicky
 import StgCmmBind       ( emitBlackHoleCode, emitUpdateFrame )
 
+import CmmOpt
 import MkGraph
 import Cmm
 import CmmUtils
@@ -628,8 +629,8 @@ stmt    :: { CmmParse () }
                 { cmmIfThenElse $2 $4 $6 }
         | 'push' '(' exprs0 ')' maybe_body
                 { pushStackFrame $3 $5 }
-        | 'reserve' INT '=' lreg maybe_body
-                { reserveStackFrame (fromIntegral $2) $4 $5 }
+        | 'reserve' expr '=' lreg maybe_body
+                { reserveStackFrame $2 $4 $5 }
 
 foreignLabel     :: { CmmParse CmmExpr }
         : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }
@@ -1076,12 +1077,21 @@ pushStackFrame fields body = do
   emit g
   withUpdFrameOff new_updfr_off body
 
-reserveStackFrame :: Int -> CmmParse CmmReg -> CmmParse () -> CmmParse ()
-reserveStackFrame size preg body = do
+reserveStackFrame
+  :: CmmParse CmmExpr
+  -> CmmParse CmmReg
+  -> CmmParse ()
+  -> CmmParse ()
+reserveStackFrame psize preg body = do
   dflags <- getDynFlags
   old_updfr_off <- getUpdFrameOff
   reg <- preg
-  let frame = old_updfr_off + wORD_SIZE dflags * size
+  esize <- psize
+  let size = case constantFoldExpr dflags esize of
+               CmmLit (CmmInt n _) -> n
+               _other -> pprPanic "CmmParse: not a compile-time integer: "
+                            (ppr esize)
+  let frame = old_updfr_off + wORD_SIZE dflags * fromIntegral size
   emitAssign reg (CmmStackSlot Old frame)
   withUpdFrameOff frame body
 

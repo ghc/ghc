@@ -171,7 +171,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
       -- Now sink and inline in this block
       (middle', assigs) = walk dflags ann_middles (mapFindWithDefault [] lbl sunk)
-      fold_last = constantFold dflags last
+      fold_last = constantFoldNode dflags last
       (final_last, assigs') = tryToInline dflags live fold_last assigs
 
       -- We cannot sink into join points (successors with more than
@@ -311,7 +311,7 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
     | Just a <- shouldSink dflags node2 = go ns block (a : as1)
     | otherwise                         = go ns block' as'
     where
-      node1 = constantFold dflags node
+      node1 = constantFoldNode dflags node
 
       (node2, as1) = tryToInline dflags live node1 as
 
@@ -320,12 +320,6 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
 
       block' = foldl blockSnoc block dropped `blockSnoc` node2
 
-
-constantFold :: DynFlags -> CmmNode e x -> CmmNode e x
-constantFold dflags node = mapExpDeep f node
-  where f (CmmMachOp op args) = cmmMachOpFold dflags op args
-        f (CmmRegOff r 0) = CmmReg r
-        f e = e
 
 --
 -- Heuristic to decide whether to pick up and sink an assignment
