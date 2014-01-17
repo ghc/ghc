@@ -1740,6 +1740,15 @@
           </row>
 
           <row>
+            <entry><option>-fcpr-depth=N</option></entry>
+            <entry>Analyze the result of functions for constructed product
+              results do that depth. Setting this to zero disables CPR, setting
+              this to one disables nested CPR. (default: 3)</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
             <entry><option>-fno-opt-coercion</option></entry>
             <entry>Turn off the coercion optimiser</entry>
             <entry>static</entry>

@@ -758,6 +758,8 @@ data DynFlags = DynFlags {
 
   maxWorkerArgs         :: Int,
 
+  maxCprDepth           :: Int,
+
   ghciHistSize          :: Int,
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
@@ -1424,6 +1426,8 @@ defaultDynFlags mySettings =
         ufDearOp            = 40,
 
         maxWorkerArgs = 10,
+
+        maxCprDepth = 3,
 
         ghciHistSize = 50, -- keep a log of length 50 by default
 
@@ -2426,6 +2430,8 @@ dynamic_flags = [
   , Flag "funfolding-keeness-factor"     (floatSuffix (\n d -> d {ufKeenessFactor = n}))
 
   , Flag "fmax-worker-args" (intSuffix (\n d -> d {maxWorkerArgs = n}))
+
+  , Flag "fcpr-depth" (intSuffix (\n d -> d {maxCprDepth = n}))
 
   , Flag "fghci-hist-size" (intSuffix (\n d -> d {ghciHistSize = n}))
 

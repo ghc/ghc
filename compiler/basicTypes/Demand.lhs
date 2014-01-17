@@ -56,7 +56,6 @@ module Demand (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import DynFlags
 import Outputable
 import Var ( Var )
@@ -803,22 +802,16 @@ seqCPRResult (RetProd rs) = seqListWith seqDmdResult rs
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
 
--- [cprRes] lets us switch off CPR analysis
--- by making sure that everything uses TopRes
 topRes, convRes, botRes :: DmdResult
 topRes = Dunno NoCPR
 convRes = Converges NoCPR
 botRes = Diverges
 
-cprSumRes :: ConTag -> DmdResult
-cprSumRes tag | opt_CprOff = topRes
-              | otherwise  = Converges $ RetSum tag
+cprSumRes :: Int -> ConTag -> DmdResult
+cprSumRes depth tag = cutDmdResult depth $ Converges $ RetSum tag
 
-cprProdRes :: [DmdResult] -> DmdResult
-cprProdRes arg_ress
-  | opt_CprOff        = topRes
-  | opt_NestedCprOff  = Converges $ cutCPRResult flatCPRDepth $ RetProd arg_ress
-  | otherwise         = Converges $ cutCPRResult maxCPRDepth  $ RetProd arg_ress
+cprProdRes :: Int -> [DmdResult] -> DmdResult
+cprProdRes depth arg_ress = cutDmdResult depth $ Converges $ RetProd arg_ress
 
 getDmdResult :: DmdType -> DmdResult
 getDmdResult (DmdType _ [] r) = r       -- Only for data-typed arguments!
@@ -827,16 +820,6 @@ getDmdResult _                = topRes
 -- Forget that something might converge for sure
 divergeDmdResult :: DmdResult -> DmdResult
 divergeDmdResult r = r `lubDmdResult` botRes
-
-maxCPRDepth :: Int
-maxCPRDepth = 3
-
--- This is the depth we use with -fnested-cpr-off, in order
--- to get precisely the same behaviour as before introduction of nested cpr
--- -fnested-cpr-off can eventually be removed if nested cpr is deemd to be
--- a good thing always.
-flatCPRDepth :: Int
-flatCPRDepth = 1
 
 -- With nested CPR, DmdResult can be arbitrarily deep; consider
 -- data Rec1 = Foo Rec2 Rec2
@@ -847,17 +830,17 @@ flatCPRDepth = 1
 --
 -- So we need to forget information at a certain depth. We do that at all points
 -- where we are constructing new RetProd constructors.
+cutDmdResult :: Int -> DmdResult -> DmdResult
+cutDmdResult 0 _             = topRes
+cutDmdResult _ Diverges      = Diverges
+cutDmdResult n (Converges c) = Converges (cutCPRResult n c)
+cutDmdResult n (Dunno c)     = Dunno     (cutCPRResult n c)
+
 cutCPRResult :: Int -> CPRResult -> CPRResult
 cutCPRResult 0 _               = NoCPR
 cutCPRResult _ NoCPR           = NoCPR
 cutCPRResult _ (RetSum tag)    = RetSum tag
 cutCPRResult n (RetProd rs)    = RetProd (map (cutDmdResult (n-1)) rs)
-  where
-    cutDmdResult :: Int -> DmdResult -> DmdResult
-    cutDmdResult 0 _             = topRes
-    cutDmdResult _ Diverges      = Diverges
-    cutDmdResult n (Converges c) = Converges (cutCPRResult n c)
-    cutDmdResult n (Dunno c)     = Dunno     (cutCPRResult n c)
 
 -- Forget the CPR information, but remember if it converges or diverges
 -- Used for non-strict thunks and non-top-level things with sum type
@@ -1162,13 +1145,12 @@ nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
 litDmdType = DmdType emptyDmdEnv [] convRes
 
-cprProdDmdType :: [DmdResult] -> DmdType
-cprProdDmdType arg_ress
-  = DmdType emptyDmdEnv [] $ cprProdRes arg_ress
+cprProdDmdType :: Int -> [DmdResult] -> DmdType
+cprProdDmdType depth arg_ress
+  = DmdType emptyDmdEnv [] $ cprProdRes depth arg_ress
 
-cprSumDmdType :: ConTag -> DmdType
-cprSumDmdType tag
-  = DmdType emptyDmdEnv [] $ cprSumRes tag
+cprSumDmdType :: Int -> ConTag -> DmdType
+cprSumDmdType depth tag = DmdType emptyDmdEnv [] $ cprSumRes depth tag
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1546,8 +1528,8 @@ nopSig, botSig :: StrictSig
 nopSig = StrictSig nopDmdType
 botSig = StrictSig botDmdType
 
-cprProdSig :: [DmdResult] -> StrictSig
-cprProdSig arg_ress = StrictSig (cprProdDmdType arg_ress)
+cprProdSig :: Int -> [DmdResult] -> StrictSig
+cprProdSig depth arg_ress = StrictSig (cprProdDmdType depth arg_ress)
 
 sigMayDiverge :: StrictSig -> StrictSig
 sigMayDiverge (StrictSig (DmdType env ds res)) = (StrictSig (DmdType env ds (divergeDmdResult res)))
