@@ -209,7 +209,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, bndrs, _)])
 
         -- Build a surely converging, CPR carrying signature for the builder,
         -- and for the components use what we get from the scrunitee
-        case_bndr_sig = mkClosedStrictSig [] (cprProdRes comp_rets)
+        case_bndr_sig = cprProdSig comp_rets
 
         env_w_tc              = env { ae_rec_tc = rec_tc' }
 	env_alt	              = extendAnalEnvs NotTopLevel env_w_tc $
@@ -240,7 +240,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 	(alt_ty, alt')	      = dmdAnalAlt env_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr env alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
-	case_bndr_sig	      = cprProdSig (dataConRepArity dc)
+	case_bndr_sig	      = cprProdSig (replicate (dataConRepArity dc) topRes)
 		-- Inside the alternative, the case binder has the CPR property, and
                 -- is known to converge.
 		-- Meaning that a case on it will successfully cancel.
@@ -570,9 +570,9 @@ dmdAnalVarApp env dmd fun args
   , dataConRepArity con > 0
   , dataConRepArity con < 10
   , let cpr_info
-          | isProductTyCon (dataConTyCon con) = cprProdRes arg_rets
-          | otherwise                         = cprSumRes (dataConTag con)
-        res_ty = foldl bothDmdType (DmdType emptyDmdEnv [] cpr_info) arg_tys
+          | isProductTyCon (dataConTyCon con) = cprProdDmdType arg_rets
+          | otherwise                         = cprSumDmdType (dataConTag con)
+        res_ty = foldl bothDmdType cpr_info arg_tys
   = -- pprTrace "dmdAnalVarApp" (vcat [ ppr con, ppr args, ppr n_val_args, ppr cxt_ds
     --                                , ppr arg_tys, ppr cpr_info, ppr res_ty]) $
     ( res_ty
@@ -1194,7 +1194,8 @@ extendSigsWithLam env id
        -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv NotTopLevel env id (sigMayDiverge (cprProdSig (dataConRepArity dc)))
+  = extendAnalEnv NotTopLevel env id $ sigMayDiverge $
+    cprProdSig (replicate (dataConRepArity dc) topRes)
 
   | otherwise 
   = env

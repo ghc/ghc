@@ -19,7 +19,7 @@ module Demand (
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
 
         DmdType(..), dmdTypeDepth, lubDmdType, lubDmdTypes, bothDmdType,
-        nopDmdType, litDmdType, botDmdType, mkDmdType,
+        nopDmdType, litDmdType, botDmdType, mkDmdType, cprProdDmdType, cprSumDmdType,
         addDemand, removeDmdTyArgs,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
@@ -28,7 +28,7 @@ module Demand (
 
         DmdResult, CPRResult,
         isBotRes, isTopRes, getDmdResult, resTypeArgDmd,
-        topRes, convRes, botRes, cprProdRes, cprSumRes,
+        topRes, convRes, botRes,
         splitNestedRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         returnsCPR_maybe,
@@ -1162,9 +1162,13 @@ nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
 litDmdType = DmdType emptyDmdEnv [] convRes
 
-cprProdDmdType :: Arity -> DmdType
-cprProdDmdType arity
-  = DmdType emptyDmdEnv [] (Dunno (RetProd (replicate arity topRes)))
+cprProdDmdType :: [DmdResult] -> DmdType
+cprProdDmdType arg_ress
+  = DmdType emptyDmdEnv [] $ cprProdRes arg_ress
+
+cprSumDmdType :: ConTag -> DmdType
+cprSumDmdType tag
+  = DmdType emptyDmdEnv [] $ cprSumRes tag
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1542,8 +1546,8 @@ nopSig, botSig :: StrictSig
 nopSig = StrictSig nopDmdType
 botSig = StrictSig botDmdType
 
-cprProdSig :: Arity -> StrictSig
-cprProdSig arity = StrictSig (cprProdDmdType arity)
+cprProdSig :: [DmdResult] -> StrictSig
+cprProdSig arg_ress = StrictSig (cprProdDmdType arg_ress)
 
 sigMayDiverge :: StrictSig -> StrictSig
 sigMayDiverge (StrictSig (DmdType env ds res)) = (StrictSig (DmdType env ds (divergeDmdResult res)))
