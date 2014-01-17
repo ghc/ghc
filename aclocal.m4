@@ -898,11 +898,6 @@ then
     FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.0],
       [AC_MSG_ERROR([Alex version 3.1.0 or later is required to compile GHC.])])[]
 fi
-if test ! -f utils/haddock/src/Haddock/Lex.hs
-then
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.0],
-      [AC_MSG_ERROR([Alex version 3.0 or later is required to compile Haddock.])])[]
-fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 AC_SUBST(Alex3)
