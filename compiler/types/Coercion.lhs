@@ -1185,6 +1185,12 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 --
 -- The function returns @Nothing@ for non-@newtypes@,
 -- or unsaturated applications
+--
+-- This function does *not* look through type families, because it has no access to
+-- the type family environment. If you do have that at hand, consider to use
+-- topNormaliseType_maybe, which should be a drop-in replacement for
+-- topNormaliseNewType_maybe
+--
 topNormaliseNewType_maybe ty
   = go initRecTc Nothing ty
   where

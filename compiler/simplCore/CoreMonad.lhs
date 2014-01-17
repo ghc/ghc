@@ -34,7 +34,7 @@ module CoreMonad (
     
     -- ** Reading from the monad
     getHscEnv, getRuleBase, getModule,
-    getDynFlags, getOrigNameCache,
+    getDynFlags, getOrigNameCache, getPackageFamInstEnv,
     
     -- ** Writing to the monad
     addSimplCount,
@@ -953,6 +953,12 @@ getOrigNameCache :: CoreM OrigNameCache
 getOrigNameCache = do
     nameCacheRef <- fmap hsc_NC getHscEnv
     liftIO $ fmap nsNames $ readIORef nameCacheRef
+
+getPackageFamInstEnv :: CoreM PackageFamInstEnv
+getPackageFamInstEnv = do
+    hsc_env <- getHscEnv
+    eps <- liftIO $ hscEPS hsc_env
+    return $ eps_fam_inst_env eps
 \end{code}
 
 %************************************************************************

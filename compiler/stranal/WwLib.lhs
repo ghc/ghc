@@ -23,6 +23,7 @@ import TysPrim          ( voidPrimTy )
 import TysWiredIn       ( tupleCon )
 import Type
 import Coercion hiding  ( substTy, substTyVarBndr )
+import FamInstEnv
 import BasicTypes       ( TupleSort(..), OneShotInfo(..), worstOneShot )
 import Literal          ( absentLiteralOf )
 import TyCon
@@ -105,6 +106,7 @@ the unusable strictness-info into the interfaces.
 
 \begin{code}
 mkWwBodies :: DynFlags
+           -> FamInstEnvs
            -> Type                                  -- Type of original function
            -> [Demand]                              -- Strictness of original function
            -> DmdResult                             -- Info about function result
@@ -124,14 +126,14 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fun_ty demands res_info one_shots
+mkWwBodies dflags fam_envs fun_ty demands res_info one_shots
   = do  { let arg_info = demands `zip` (one_shots ++ repeat NoOneShotInfo)
               all_one_shots = foldr (worstOneShot . snd) OneShotLam arg_info
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
-        ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags wrap_args
+        ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags fam_envs wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
+        ; (useful2, wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr fam_envs res_ty res_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args all_one_shots cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
@@ -371,6 +373,7 @@ That's why we carry the TvSubst through mkWWargs
 
 \begin{code}
 mkWWstr :: DynFlags
+        -> FamInstEnvs
         -> [Var]                                -- Wrapper args; have their demand info on them
                                                 --  *Includes type variables*
         -> UniqSM (Bool,                        -- Is this useful
@@ -382,12 +385,12 @@ mkWWstr :: DynFlags
                    CoreExpr -> CoreExpr)        -- Worker body, lacking the original body of the function,
                                                 -- and lacking its lambdas.
                                                 -- This fn does the reboxing
-mkWWstr _ []
+mkWWstr _ _ []
   = return (False, [], nop_fn, nop_fn)
 
-mkWWstr dflags (arg : args) = do
-    (useful1, args1, wrap_fn1, work_fn1) <- mkWWstr_one dflags arg
-    (useful2, args2, wrap_fn2, work_fn2) <- mkWWstr dflags args
+mkWWstr dflags fam_envs (arg : args) = do
+    (useful1, args1, wrap_fn1, work_fn1) <- mkWWstr_one dflags fam_envs arg
+    (useful2, args2, wrap_fn2, work_fn2) <- mkWWstr dflags fam_envs args
     return (useful1 || useful2, args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
 \end{code}
@@ -426,8 +429,9 @@ as-yet-un-filled-in pkgState files.
 --        brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --        brings into scope wrap_arg (via lets)
-mkWWstr_one :: DynFlags -> Var -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-mkWWstr_one dflags arg
+mkWWstr_one :: DynFlags -> FamInstEnvs -> Var
+    -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+mkWWstr_one dflags fam_envs arg
   | isTyVar arg
   = return (False, [arg],  nop_fn, nop_fn)
 
@@ -463,7 +467,7 @@ mkWWstr_one dflags arg
   , Just cs <- splitProdDmd_maybe dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
   , Just (data_con, inst_tys, inst_con_arg_tys, co)
-             <- deepSplitProductType_maybe (idType arg)
+             <- deepSplitProductType_maybe fam_envs (idType arg)
   , cs `equalLength` inst_con_arg_tys
       -- See Note [mkWWstr and unsafeCoerce]
   =  do { (uniq1:uniqs) <- getUniquesM
@@ -473,7 +477,7 @@ mkWWstr_one dflags arg
                                               data_con unpk_args
                 rebox_fn       = Let (NonRec arg con_app)
                 con_app        = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
-         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
+         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs unpk_args_w_ds
          ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                            -- Don't pass the arg, rebox instead
 
@@ -503,29 +507,31 @@ If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
 \begin{code}
-deepSplitProductType_maybe :: Type -> Maybe (DataCon, [Type], [Type], Coercion)
+deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
-deepSplitProductType_maybe ty
-  | let (co, ty1) = topNormaliseNewType_maybe ty `orElse` (mkReflCo Representational ty, ty)
+deepSplitProductType_maybe fam_envs ty
+  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
+                    `orElse` (mkReflCo Representational ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
-deepSplitProductType_maybe _ = Nothing
+deepSplitProductType_maybe _ _ = Nothing
 
-deepSplitCprType_maybe :: ConTag -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
+deepSplitCprType_maybe :: FamInstEnvs -> ConTag -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitCprType_maybe n ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
-deepSplitCprType_maybe con_tag ty
-  | let (co, ty1) = topNormaliseNewType_maybe ty `orElse` (mkReflCo Representational ty, ty)
+deepSplitCprType_maybe fam_envs con_tag ty
+  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
+                    `orElse` (mkReflCo Representational ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , isDataTyCon tc
   , let cons = tyConDataCons tc
         con = ASSERT( cons `lengthAtLeast` con_tag ) cons !! (con_tag - fIRST_TAG)
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
-deepSplitCprType_maybe _ _ = Nothing
+deepSplitCprType_maybe _ _ _ = Nothing
 \end{code}
 
 
@@ -546,17 +552,18 @@ left-to-right traversal of the result structure.
 
 
 \begin{code}
-mkWWcpr :: Type                              -- function body type
+mkWWcpr :: FamInstEnvs
+        -> Type                              -- function body type
         -> DmdResult                         -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
                    CoreExpr -> CoreExpr,     -- New wrapper
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr body_ty res
+mkWWcpr fam_envs body_ty res
   = case returnsCPR_maybe res of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
-       Just con_tag | Just stuff <- deepSplitCprType_maybe con_tag body_ty
+       Just con_tag | Just stuff <- deepSplitCprType_maybe fam_envs con_tag body_ty
                     -> mkWWcpr_help stuff
                     |  otherwise
                        -- See Note [non-algebraic or open body type warning]

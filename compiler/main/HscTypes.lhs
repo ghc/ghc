@@ -39,7 +39,7 @@ module HscTypes (
         PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
         lookupIfaceByModule, emptyModIface,
 
-        PackageInstEnv, PackageRuleBase,
+        PackageInstEnv, PackageFamInstEnv, PackageRuleBase,
 
         mkSOName, mkHsSOName, soExt,
 
