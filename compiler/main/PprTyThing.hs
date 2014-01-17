@@ -209,7 +209,9 @@ pprTyCon ss tyCon
     pp_roles suppress_if
       = sdocWithDynFlags $ \dflags ->
         let roles = suppressKinds dflags (tyConKind tyCon) (tyConRoles tyCon)
-        in ppUnless (all suppress_if roles) $
+        in ppUnless (isFamInstTyCon tyCon || all suppress_if roles) $
+             -- Don't display roles for data family instances (yet)
+             -- See discussion on Trac #8672.
            ptext (sLit "type role") <+> ppr tyCon <+> hsep (map ppr roles)
 
     pp_tc_with_kind = vcat [ pp_roles (const True)

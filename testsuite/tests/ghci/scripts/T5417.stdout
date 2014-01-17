@@ -1,5 +1,4 @@
 data B1 a = B1 a
-type role T5417.R:FB1 nominal
 data instance C.F (B1 a) = B2 a
 type role D nominal
 data family D a
