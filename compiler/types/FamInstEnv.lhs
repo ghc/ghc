@@ -178,17 +178,30 @@ pprFamInst famInst
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
-  = pprTyConSort <+> pp_instance <+> pprHead
+  = pprTyConSort <+> pp_instance <+> pp_head
   where
-    (fam_tc, tys) = famInstSplitLHS fi
-
     -- For *associated* types, say "type T Int = blah"
     -- For *top level* type instances, say "type instance T Int = blah"
     pp_instance
       | isTyConAssoc fam_tc = empty
       | otherwise           = ptext (sLit "instance")
 
-    pprHead = pprTypeApp fam_tc tys
+    (fam_tc, etad_lhs_tys) = famInstSplitLHS fi
+    vanilla_pp_head = pprTypeApp fam_tc etad_lhs_tys
+
+    pp_head | DataFamilyInst rep_tc <- flavor
+            , isAlgTyCon rep_tc
+            , let extra_tvs = dropList etad_lhs_tys (tyConTyVars rep_tc)
+            , not (null extra_tvs)
+            = getPprStyle $ \ sty ->
+              if debugStyle sty
+              then vanilla_pp_head   -- With -dppr-debug just show it as-is
+              else pprTypeApp fam_tc (etad_lhs_tys ++ mkTyVarTys extra_tvs)
+                     -- Without -dppr-debug, eta-expand
+                     -- See Trac #8674
+            | otherwise
+            = vanilla_pp_head
+
     pprTyConSort = case flavor of
                      SynFamilyInst        -> ptext (sLit "type")
                      DataFamilyInst tycon
@@ -199,7 +212,6 @@ pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
 
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
-
 \end{code}
 
 Note [Lazy axiom match]
