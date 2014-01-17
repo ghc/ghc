@@ -306,3 +306,11 @@ test('T5949',
      compile_and_run,
      ['-O'])
 
+test('T4267',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64), 130000, 10)]),
+                      # previously, it was >170000 bytes
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O'])
+
