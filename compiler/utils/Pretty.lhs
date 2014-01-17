@@ -173,7 +173,7 @@ module Pretty (
 
         hang, punctuate,
 
-        fullRender, printDoc, showDoc,
+        fullRender, printDoc, printDoc_, showDoc,
         bufLeftRender -- performance hack
   ) where
 
@@ -985,9 +985,16 @@ spaces n | n <=# _ILIT(0) = ""
 
 \begin{code}
 printDoc :: Mode -> Int -> Handle -> Doc -> IO ()
-printDoc LeftMode _ hdl doc
+-- printDoc adds a newline to the end
+printDoc mode cols hdl doc = printDoc_ mode cols hdl (doc $$ text "")
+
+printDoc_ :: Mode -> Int -> Handle -> Doc -> IO ()
+-- printDoc_ does not add a newline at the end, so that
+-- successive calls can output stuff on the same line
+-- Rather like putStr vs putStrLn
+printDoc_ LeftMode _ hdl doc
   = do { printLeftRender hdl doc; hFlush hdl }
-printDoc mode pprCols hdl doc
+printDoc_ mode pprCols hdl doc
   = do { fullRender mode pprCols 1.5 put done doc ;
          hFlush hdl }
   where
@@ -999,7 +1006,7 @@ printDoc mode pprCols hdl doc
     put (ZStr s) next = hPutFZS  hdl s >> next
     put (LStr s l) next = hPutLitString hdl s l >> next
 
-    done = hPutChar hdl '\n'
+    done = return () -- hPutChar hdl '\n'
 
   -- some versions of hPutBuf will barf if the length is zero
 hPutLitString :: Handle -> Ptr a -> Int# -> IO ()

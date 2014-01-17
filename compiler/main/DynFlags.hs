@@ -1485,13 +1485,16 @@ defaultLogAction dflags severity srcSpan style msg
           putStrSDoc = defaultLogActionHPutStrDoc dflags stdout
 
 defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
-defaultLogActionHPrintDoc = defaultLogActionHPutStrDoc
+defaultLogActionHPrintDoc dflags h d sty
+ = defaultLogActionHPutStrDoc dflags h (d $$ text "") sty
+      -- Adds a newline
 
 defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
 defaultLogActionHPutStrDoc dflags h d sty
-    = Pretty.printDoc Pretty.PageMode (pprCols dflags) h doc
-    where
-      doc = runSDoc d (initSDocContext dflags sty)
+  = Pretty.printDoc_ Pretty.PageMode (pprCols dflags) h doc
+  where   -- Don't add a newline at the end, so that successive
+          -- calls to this log-action can output all on the same line
+    doc = runSDoc d (initSDocContext dflags sty)
 
 newtype FlushOut = FlushOut (IO ())
 
