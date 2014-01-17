@@ -511,10 +511,6 @@ dmdTransform :: AnalEnv		-- The strictness environment
 	-- this function plus demand on its free variables
 
 dmdTransform env var dmd
-  | isDataConWorkId var		                 -- Data constructor
-  = dmdTransformDataConSig 
-       (idArity var) (idStrictness var) dmd
-
   | gopt Opt_DmdTxDictSel (ae_dflags env),
     Just _ <- isClassOpId_maybe var -- Dictionary component selector
   = dmdTransformDictSelSig (idStrictness var) dmd
