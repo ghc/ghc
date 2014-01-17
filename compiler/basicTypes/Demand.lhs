@@ -28,7 +28,7 @@ module Demand (
 
         DmdResult, CPRResult,
         isBotRes, isTopRes, getDmdResult, resTypeArgDmd,
-        topRes, convRes, botRes, cprProdRes, vanillaCprProdRes, cprSumRes,
+        topRes, convRes, botRes, cprProdRes, cprSumRes,
         splitNestedRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         returnsCPR_maybe,
@@ -875,9 +875,6 @@ forgetSumCPR_help :: CPRResult -> CPRResult
 forgetSumCPR_help (RetProd ds) = RetProd (map forgetSumCPR ds)
 forgetSumCPR_help (RetSum _)   = NoCPR
 forgetSumCPR_help NoCPR        = NoCPR
-
-vanillaCprProdRes :: Arity -> DmdResult
-vanillaCprProdRes arity = cprProdRes (replicate arity topRes)
 
 splitNestedRes :: DmdResult -> [DmdResult]
 splitNestedRes Diverges      = repeat topRes

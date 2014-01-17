@@ -389,11 +389,9 @@ mkDataConWorkId wkr_name data_con
     wkr_arity = dataConRepArity data_con
     wkr_info  = noCafIdInfo
                 `setArityInfo`       wkr_arity
-                `setStrictnessInfo`  wkr_sig
                 `setUnfoldingInfo`   evaldUnfolding  -- Record that it's evaluated,
                                                      -- even if arity = 0
 
-    wkr_sig = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
         --      Note [Data-con worker strictness]
         -- Notice that we do *not* say the worker is strict
         -- even if the data constructor is declared strict
@@ -426,33 +424,6 @@ mkDataConWorkId wkr_name data_con
                    mkCompulsoryUnfolding $ 
                    mkLams nt_tvs $ Lam id_arg1 $ 
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
-
-dataConCPR :: DataCon -> DmdResult
-dataConCPR con
-  | isDataTyCon tycon     -- Real data types only; that is, 
-                          -- not unboxed tuples or newtypes
-  , isVanillaDataCon con  -- No existentials 
-  , wkr_arity > 0
-  , wkr_arity <= mAX_CPR_SIZE
-  = if is_prod then vanillaCprProdRes (dataConRepArity con)
-               else cprSumRes (dataConTag con)
-  | otherwise
-  = topRes
-  where
-    is_prod = isProductTyCon tycon
-    tycon = dataConTyCon con
-    wkr_arity = dataConRepArity con
-
-    mAX_CPR_SIZE :: Arity
-    mAX_CPR_SIZE = 10
-    -- We do not treat very big tuples as CPR-ish:
-    --      a) for a start we get into trouble because there aren't 
-    --         "enough" unboxed tuple types (a tiresome restriction, 
-    --         but hard to fix), 
-    --      b) more importantly, big unboxed tuples get returned mainly
-    --         on the stack, and are often then allocated in the heap
-    --         by the caller.  So doing CPR for them may in fact make
-    --         things worse.
 \end{code}
 
 -------------------------------------------------
@@ -497,16 +468,12 @@ mkDataConRep dflags fam_envs wrap_name data_con
                     	     -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                     	     -- so it not make sure that the CAF info is sane
 
-             wrap_sig_conv = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
-             wrap_sig | any isBanged (dropList eq_spec wrap_bangs) = sigMayDiverge wrap_sig_conv
-                      | otherwise                                  = wrap_sig_conv
+             wrap_sig = mkClosedStrictSig wrap_arg_dmds topRes
 
     	     wrap_arg_dmds = map mk_dmd (dropList eq_spec wrap_bangs)
     	     mk_dmd str | isBanged str = evalDmd
     	                | otherwise    = topDmd
-    	         -- The Cpr info can be important inside INLINE rhss, where the
-    	         -- wrapper constructor isn't inlined.
-    	         -- And the argument strictness can be important too; we
+    	         -- The argument strictness can be important; we
     	         -- may not inline a contructor when it is partially applied.
     	         -- For example:
     	         --      data W = C !Int !Int !Int
