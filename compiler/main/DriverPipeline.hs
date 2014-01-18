@@ -2124,12 +2124,16 @@ joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles dflags o_files output_fn = do
   let mySettings = settings dflags
       ldIsGnuLd = sLdIsGnuLd mySettings
+      osInfo = platformOS (targetPlatform dflags)
       ld_r args ccInfo = SysTools.runLink dflags ([
                             SysTools.Option "-nostdlib",
                             SysTools.Option "-Wl,-r"
                             ]
                          ++ (if ccInfo == Clang then []
                               else [SysTools.Option "-nodefaultlibs"])
+                         ++ (if osInfo == OSFreeBSD
+                              then [SysTools.Option "-L/usr/lib"]
+                              else [])
                             -- gcc on sparc sets -Wl,--relax implicitly, but
                             -- -r and --relax are incompatible for ld, so
                             -- disable --relax explicitly.
