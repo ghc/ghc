@@ -245,12 +245,12 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
 INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
 {
     StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)p);
-    return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES;
+    return (info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES) ? rtsTrue : rtsFalse;
 }
 
 INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR (StgWord p)
 {
-    return p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p));
+    return (p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p))) ? rtsTrue : rtsFalse;
 }
 
 INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p)

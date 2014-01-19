@@ -68,6 +68,6 @@ extern Capability MainCapability;
 // Change the number of capabilities (only supports increasing the
 // current value at the moment).
 //
-extern void setNumCapabilities (nat new);
+extern void setNumCapabilities (nat new_);
 
 #endif /* RTS_THREADS_H */

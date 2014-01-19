@@ -248,17 +248,17 @@ dbl_link_insert_after(bdescr *bd, bdescr *after)
 }
 
 INLINE_HEADER void
-dbl_link_replace(bdescr *new, bdescr *old, bdescr **list)
+dbl_link_replace(bdescr *new_, bdescr *old, bdescr **list)
 {
-    new->link = old->link;
-    new->u.back = old->u.back;
+    new_->link = old->link;
+    new_->u.back = old->u.back;
     if (old->link) {
-        old->link->u.back = new;
+        old->link->u.back = new_;
     }
     if (old->u.back) {
-        old->u.back->link = new;
+        old->u.back->link = new_;
     } else {
-        *list = new;
+        *list = new_;
     }
 }
 
