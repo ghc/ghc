@@ -90,6 +90,12 @@ differences
      - TcSubCo is not applied as deep as done with mkSubCo
     Reason: they'll get established when we desugar to Coercion
 
+  * TcAxiomInstCo has a [TcCoercion] parameter, and not a [Type] parameter.
+    This differs from the formalism, but corresponds to AxiomInstCo (see
+    [Coercion axioms applied to coercions]).
+    Why can't we use [TcType] here, in code not relevant for the simplifier?
+    Because of coercionToTcCoercion.
+
 \begin{code}
 data TcCoercion 
   = TcRefl Role TcType
