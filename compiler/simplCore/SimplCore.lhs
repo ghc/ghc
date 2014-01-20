@@ -373,54 +373,54 @@ runCorePasses passes guts
        = do { hsc_env <- getHscEnv
             ; let dflags = hsc_dflags hsc_env
             ; liftIO $ showPass dflags pass
-            ; guts' <- doCorePass dflags pass guts
+            ; guts' <- doCorePass pass guts
             ; liftIO $ endPass hsc_env pass (mg_binds guts') (mg_rules guts')
             ; return guts' }
 
-doCorePass :: DynFlags -> CoreToDo -> ModGuts -> CoreM ModGuts
-doCorePass _      pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
-                                              simplifyPgm pass
+doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
+doCorePass pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
+                                       simplifyPgm pass
 
-doCorePass _      CoreCSE                   = {-# SCC "CommonSubExpr" #-}
-                                              doPass cseProgram
+doCorePass CoreCSE                   = {-# SCC "CommonSubExpr" #-}
+                                       doPass cseProgram
 
-doCorePass _      CoreLiberateCase          = {-# SCC "LiberateCase" #-}
-                                              doPassD liberateCase
+doCorePass CoreLiberateCase          = {-# SCC "LiberateCase" #-}
+                                       doPassD liberateCase
 
-doCorePass _      CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
-                                              doPassD floatInwards
+doCorePass CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
+                                       doPassD floatInwards
 
-doCorePass _      (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
-                                              doPassDUM (floatOutwards f)
+doCorePass (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
+                                       doPassDUM (floatOutwards f)
 
-doCorePass _      CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
-                                              doPassU doStaticArgs
+doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
+                                       doPassU doStaticArgs
 
-doCorePass _      CoreDoStrictness          = {-# SCC "NewStranal" #-}
-                                              doPassDFM dmdAnalProgram
+doCorePass CoreDoStrictness          = {-# SCC "NewStranal" #-}
+                                       doPassDFM dmdAnalProgram
 
-doCorePass _      CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
-                                              doPassDFU wwTopBinds
+doCorePass CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
+                                       doPassDFU wwTopBinds
 
-doCorePass dflags CoreDoSpecialising        = {-# SCC "Specialise" #-}
-                                              specProgram dflags
+doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
+                                       specProgram
 
-doCorePass _      CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
-                                              specConstrProgram
+doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
+                                       specConstrProgram
 
-doCorePass _      CoreDoVectorisation       = {-# SCC "Vectorise" #-}
-                                              vectorise
+doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
+                                       vectorise
 
-doCorePass _      CoreDoPrintCore              = observe   printCore
-doCorePass _      (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
-doCorePass _      CoreDoNothing                = return
-doCorePass _      (CoreDoPasses passes)        = runCorePasses passes
+doCorePass CoreDoPrintCore              = observe   printCore
+doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
+doCorePass CoreDoNothing                = return
+doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
 #ifdef GHCI
-doCorePass _      (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
 #endif
 
-doCorePass _      pass = pprPanic "doCorePass" (ppr pass)
+doCorePass pass = pprPanic "doCorePass" (ppr pass)
 \end{code}
 
 %************************************************************************

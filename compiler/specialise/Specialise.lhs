@@ -566,9 +566,10 @@ Hence, the invariant is this:
 %************************************************************************
 
 \begin{code}
-specProgram :: DynFlags -> ModGuts -> CoreM ModGuts
-specProgram dflags guts@(ModGuts { mg_rules = rules, mg_binds = binds })
+specProgram :: ModGuts -> CoreM ModGuts
+specProgram guts@(ModGuts { mg_rules = rules, mg_binds = binds })
   = do { hpt_rules <- getRuleBase
+       ; dflags <- getDynFlags
        ; let local_rules = mg_rules guts
              rule_base = extendRuleBaseList hpt_rules rules
 
