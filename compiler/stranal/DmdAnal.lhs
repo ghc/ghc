@@ -188,8 +188,14 @@ dmdAnal env dmd (Lam var body)
 	env'		 = extendSigsWithLam env var
 	(body_ty, body') = dmdAnal env' body_dmd body
 	(lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty one_shot var
+        lam_ty'          = postProcessUnsat defer_and_use lam_ty
     in
-    (postProcessUnsat defer_and_use lam_ty, Lam var' body')
+    -- pprTrace "dmdAnal:Lam" (vcat [ text "dmd" <+> ppr dmd
+    --                              , text "body_ty" <+> ppr body_ty
+    --                              , text "lam_ty" <+> ppr lam_ty
+    --                              , text "lam_ty'" <+> ppr lam_ty'
+    --                              ]) $
+    (lam_ty', Lam var' body')
 
 dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, bndrs, _)])
   -- Only one alternative with a product constructor, and a complex scrutinee
@@ -337,6 +343,9 @@ dmdAnal env dmd (Let (Rec pairs) body)
         body_ty1                = deleteFVs body_ty (map fst pairs)
 	body_ty2	        = addLazyFVs body_ty1 lazy_fv 
     in
+    -- pprTrace "dmdAnal:LetRec" (vcat [ text "body_ty" <+> ppr body_ty
+    --                                 , text "body_ty1" <+> ppr body_ty1
+    --                                 , text "body_ty2" <+> ppr body_ty2]) $
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
@@ -389,7 +398,10 @@ dmdAnalAlt env dmd (con,bndrs,rhs)
 
 	io_hack_reqd = con == DataAlt unboxedPairDataCon &&
 		       idType (head bndrs) `eqType` realWorldStatePrimTy
-    in	
+    in
+    -- pprTrace "dmdAnalAlt" (vcat [ text "rhs_ty" <+> ppr rhs_ty
+    --                             , text "alt_ty" <+> ppr alt_ty
+    --                             ]) $
     (final_alt_ty, (con, bndrs', rhs'))
 \end{code}
 
