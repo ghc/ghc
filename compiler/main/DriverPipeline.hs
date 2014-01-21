@@ -140,9 +140,10 @@ compileOne' m_tc_result mHscMessage
        mod_graph   = hsc_mod_graph hsc_env0
        needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
        isDynWay    = any (== WayDyn) (ways dflags0)
+       isProfWay   = any (== WayProf) (ways dflags0)
    -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
    -- the linker can correctly load the object files.
-   let dflags1 = if needsTH && dynamicGhc && not isDynWay
+   let dflags1 = if needsTH && dynamicGhc && not isDynWay && not isProfWay
                   then gopt_set dflags0 Opt_BuildDynamicToo
                   else dflags0
 
