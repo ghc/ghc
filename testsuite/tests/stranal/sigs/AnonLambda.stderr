@@ -1,0 +1,6 @@
+
+==================== Strictness signatures ====================
+AnonLambda.f: <S(S),U(U)>
+AnonLambda.g: <S(S),1*U(1*U)>
+
+
