@@ -1,0 +1,276 @@
+\documentclass[parskip=half]{scrartcl}
+
+\usepackage[T1]{fontenc}
+\usepackage[safe]{tipa} % for \textlambda
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{etex}
+\usepackage{stmaryrd}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{mathtools}
+%\usepackage[amsmath,thmmarks]{ntheorem}
+\usepackage[numbers]{natbib}
+\usepackage{mathpazo}
+% Causes problems with MikTeX
+%\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{mathpartir}
+\usepackage{upgreek}
+\usepackage{enumerate}
+\usepackage{paralist}
+\usepackage{textcomp}
+\usepackage{xcolor}
+
+\usepackage{hyperref}
+
+\urlstyle{sf}
+\makeatletter
+% Inspired by http://anti.teamidiot.de/nei/2009/09/latex_url_slash_spacingkerning/
+% but slightly less kern and shorter underscore
+\let\UrlSpecialsOld\UrlSpecials
+\def\UrlSpecials{\UrlSpecialsOld\do\/{\Url@slash}\do\_{\Url@underscore}}%
+\def\Url@slash{\@ifnextchar/{\kern-.11em\mathchar47\kern-.2em}%
+   {\kern-.0em\mathchar47\kern-.08em\penalty\UrlBigBreakPenalty}}
+\def\Url@underscore{\nfss@text{\leavevmode \kern.06em\vbox{\hrule\@width.3em}}}
+\makeatother
+
+%\theorembodyfont{}
+%\newtheorem{theorem}{Theorem}
+%\newtheorem{lemma}[theorem]{Lemma}
+%\theoremstyle{nonumberplain}
+%\theoremheaderfont{\scshape}
+%\theoremsymbol{\ensuremath{\blacksquare}}
+%\theoremseparator{.}
+%\newtheorem{proof}{Proof}
+
+\newcommand{\TODO}[1]{\textcolor{red}{TODO: #1}}
+
+\usepackage{listings}
+\newcommand{\li}{\lstinline[style=Haskell]}
+\lstnewenvironment{haskell}{\lstset{style=Haskell}}{}
+\lstdefinestyle{Haskell}{language=Haskell
+        ,columns=flexible
+	,basewidth={.365em}
+	,keepspaces=True
+        ,texcl=true
+%        ,escapechar=!
+        ,basicstyle=\sffamily
+        ,stringstyle=\itshape
+        ,showstringspaces=false
+        ,literate={->}{$\,\to\,$}2
+                  {<-}{$\,\leftarrow\,$}2
+                  {=>}{$\,\Rightarrow\,$}2
+                  {→}{$\,\to\,$}2
+%                  {\\}{\textlambda}1
+                  {>>}{{>>}\hspace{-1pt}}2
+%                  {+}{{$+$}}1
+                  {[]}{[\,]\ }1
+%                  {--}{{---\ }}1
+                  {++}{{$+\!\!+$}}1
+%                 {\ .}{{$\,\circ\,$}}2
+                  {\ .\ }{{$\,\circ\,$}}2
+                  {~}{{$\sim$}}1 % hack
+                  {|>}{{$\triangleright$}}1 % hack
+	,keywords={%
+	    case,class,data,default,deriving,do,else,%
+	    foreign,if,import,in,infix,infixl,infixr,instance,%
+	    let,forall,letrec,module,newtype,role,of,then,type,where,\_,%
+	}
+        }
+
+\newcommand{\sIde}{\text{Ide}}
+\newcommand{\sExp}{\text{Exp}}
+\newcommand{\sEnv}{\text{Env}}
+
+\newcommand{\sem}[2]{\llbracket #1\rrbracket #2}
+
+\newcommand{\sApp}[2]{#1\,#2}
+\newcommand{\sLam}[2]{\text{\textlambda} #1.\, #2}
+\newcommand{\sCase}[4]{\text{\textsf{case}}\ #1\  \textsf{as}\ #2\ \textsf{of}\ \{#3 \rightarrow #4\}_{i=1}^n}
+\newcommand{\sPCase}[4]{\text{\textsf{case}}\ #1\  \textsf{as}\ #2\ \textsf{of}\ \{#3 \rightarrow #4\}}
+\newcommand{\sLet}[3]{\text{\textsf{let}}\ \{#1 = #2\}_{i=1}^n\ \text{\textsf{in}}\ #3}
+
+\newcommand{\both}[2]{#1\mathbin{\&}#2}
+
+
+\title{Constructd Product Result Analysis -- nested}
+\author{Joachim Breitner}
+
+\begin{document}
+\maketitle
+% \allowdisplaybreaks[1]
+
+\begin{abstract}
+Since many years, GHC is able to optimize functions returning product types by allowing them to return multiple values. We enhance this transformation to nested products, which in turn requires a small termination analysis.
+
+This paper describes the analysis and transformation. It can be considered an extension of \citep{cpr}.
+\end{abstract}
+
+\tableofcontents
+
+\section{The language}
+
+Just like in \citep{cpr}, we present the analysis with regard to a core language that does not involve type annotations, our expressions are of the form:
+%
+\begin{align*}
+x \colon \sIde \\
+e \colon \sExp &\Coloneqq x
+	\mid \sLam x e
+	\mid \sApp {e_1} {e_2}
+	\mid \sApp C {e_1\ldots e_n} \\
+&	\mid \sCase e x {\sApp {C_i} {e_{1_i}\ldots e_{n_i}}} {e_i}
+	\mid \sLet {x_i} {e_i} e
+\end{align*}
+
+\section{The abstract domain}
+
+With nested CPR, we need to know two things about a value:
+\begin{itemize}
+\item Does it return construct and return a data constructor, and
+\item does it so for sure (and without side-effects, which are not modelled in this section).
+\end{itemize}
+
+\newcommand{\dR}{\textbf{R}}
+\newcommand{\dC}{\textbf{C}}
+\newcommand{\dD}{\textbf{D}}
+\newcommand{\noCPR}{\bullet}
+\newcommand{\dunno}[1]{#1?}
+\newcommand{\conv}[1]{#1!}
+\newcommand{\dLam}[1]{(\sLam\bullet{#1})}
+\newcommand{\dApp}[1]{\sApp{#1}\bullet}
+
+In particular, we will need to know this about the parameters of a returned constructor. Therefore, our analysis works with a domain described by these equations:
+\begin{align*}
+\dR \Coloneqq{} & \bot && \text{definite divergence}\\
+\mid{} &\dunno{\dC} && \text{potential convergence}\\
+\mid{} &\conv{\dC} && \text{definite convergence}\\
+\dC \Coloneqq{} & \noCPR && \text{no information about the returned value} \\
+\mid{} & (\dR,\ldots, \dR) && \text{returns a constructed product}
+\end{align*}
+
+We will actually need two different partial orders on $\dR$, one being the refinement of the other. The finer one, $\sqsubseteq$, is generated by the relations
+\begin{itemize}
+\item $\bot \sqsubset \dunno c$,
+\item $\conv{c} \sqsubset \dunno c$,
+\item $(r_1,\ldots, r_n) \sqsubset \noCPR$
+\end{itemize}
+and by mapping $\dunno\cdot$, $\conv\cdot$ and $(\cdot,\ldots,\cdot)$ over relations. The element $\noCPR$ is the top element of $\dC$; $\dunno\noCPR$ the top of $\dR$. There is no bottom element in this partial order.
+
+In the coarser relation $\sqsubseteq'$, we additionally have $\bot \sqsubset' \conv c$. This way, this partial order has a least element.
+
+In slight abuse of notation, $\conv{\cdot} \colon \dR \to\dR$ sets the convergence flag
+\begin{align*}
+\conv{\bot} &= \bot \\
+\conv{\conv{c}} &= \conv{c} \\
+\conv{\dunno{c}} &= \conv{c}
+\end{align*}
+
+The operation $\both{\cdot}{\cdot} \colon \dR \to \dR \to \dR$ adjusts the termination information of the first value based on that of the second:
+\begin{align*}
+\both{\bot}r &= \bot \\
+\both r{\bot} &= \bot \\
+\both{\conv{c_1}}{\conv{c_2}} &= \conv{c_1} \\
+\both{\conv{c_1}}{\dunno{c_2}} &= \dunno{c_1} \\
+\both{\dunno{c_1}}{\conv{c_2}} &= \dunno{c_1} \\
+\both{\dunno{c_1}}{\dunno{c_2}} &= \dunno{c_1}
+\end{align*}
+
+There is a projection operation $\pi_i \colon \dC \to \dR$, defined by
+\begin{align*}
+\pi_i(r_1,\ldots,r_n) &=
+\begin{cases}
+\pi_i (r) & \text{for $1 \le i \le n$}\\
+\dunno\noCPR & \text{otherwise}
+\end{cases}\\
+\pi_i(\noCPR) &= \dunno\noCPR,
+\end{align*}
+and lifted to $\dR$ by
+\begin{align*}
+\pi_i(\bot) &= \dunno\noCPR\\
+\pi_i(\dunno c) &= \pi_i(c) \\
+\pi_i(\conv c) &= \pi_i(c).
+\end{align*}
+
+Furthermore, for functions, we additionally need to know their arity. Conceptually, this yields the product domain $\dD=(\mathbb N, \dR)$, where $\mathbb N$ is descretely ordered, but in analogy to \citep{cpr}, we write
+\begin{align*}
+\dD \Coloneqq \dR \mid \dLam\dD.
+\end{align*}
+Decreasing the arity of $d$ is written $\dApp d$, in analogy to function application, and defined by
+\begin{align*}
+\dApp{\dLam d} = d\\
+\dApp{r} = \dunno\noCPR
+\end{align*}
+The projection operation is also lifted to $\dD$:
+\begin{align*}
+\pi_i\dLam{d} &= \dunno\noCPR\\
+\pi_i(r) &= \pi_i(r) \\
+\end{align*}
+
+
+An environment is a function from identifiers to abstract values:
+\begin{align*}
+\rho \colon \sExp = \sIde \to \dD.
+\end{align*}
+
+\section{The analysis}
+
+So our analysis is a function $\sem{\cdot}\cdot \colon \sExp \to \sEnv \to \dD$, defined as follows:
+%
+\newcommand{\upd}[3]{#1[#2 \mapsto #3]}
+%
+\begin{align*}
+\sem{x}\rho &= \sApp \rho x \\
+\sem{\sLam x e}\rho &= \dLam{\sem e{\upd\rho x{\dunno\noCPR}}} \\
+\sem{\sApp {e_1} {e_2}}\rho &= \dApp{(\sem{e_1}\rho)} \\
+\sem{\sApp C {e_1\ldots e_n}}\rho &= \conv{(\sem{e_1}\rho, \ldots, \sem{e_n}\rho)} \\
+\sem{\sLet {x_i}{e_i} e}\rho &= \sem{e}({\mu \rho'. \upd\rho{x_i}{\sem{e_i}{\rho'}}_{i=1}^n})\\
+\sem{\sPCase e x {\sApp C {x_1}\ldots x_n} {e'}}\rho
+	&= \both{
+	     \sem{e'}{
+		\upd{\upd\rho{x_i}{r_i}_{i=1}^{n}}}
+		    {x}{\conv{(r_1,\ldots,r_{n_i})}}
+	   }r\\
+	   &\quad\quad \text{where }r \coloneqq \sem e\rho, r_i \coloneqq  \pi_i(r)\\
+\sem{\sCase e x {\sApp {C_i} {x_{1_i}\ldots x_{n_i}}} {e_i}}\rho
+	&= \both{\left(
+	     \bigsqcup_{i=1}^n \sem{e_i}{
+		\upd{\upd\rho{x_{i_j}}{\dunno\noCPR}_{j=1}^{n_i}}
+		    {x}{\conv{(\dunno\noCPR,\ldots,\dunno\noCPR)}}}
+	   \right)}r \\
+	   &\quad\quad \text{where } n > 1, r \coloneqq \sem e\rho
+\end{align*}
+
+The equation for variables is straight forward: We just use the data in the environment.
+
+The result of a lambda expression carries the same information as the body, but guarded by $\dLam \cdot$, indicating that this result information will hold if the expression is applied to one argument.
+
+The equation for application is the counterpart: Igoring the second argument, this unwraps one level of $\dLam \cdot$.
+
+A constructor application trivially has a CPR property, and is converging for sure. Therefore, we return that information, and further analyse the components.
+
+The fixed-point operator $(\mu \rho'. f \rho')$ used for recursive lets operates in the coarser partial order $\sqsubseteq'$. In particular
+\[
+(\mu \rho'. f \rho') = {\bigsqcup_{i=0}^\infty}' f^i(\bot)
+\]
+but not necessarily
+\[
+(\mu \rho'. f \rho') = \bigsqcup_{i=0}^\infty f^i(\bot).
+\]
+But this formal technicality has no practical consequences.
+
+For case expressions we use two variants: One for product data type, i.e. those with exactly one constructor, and one general. There are a few things happening here
+\begin{itemize}
+\item In the product type's case, we can use any nested CPR information from the scrunitee to put more information about the case binder and pattern match information into the environment.
+\item The information on the case binder contains at least that it is surely terminating, and an already evaluated constructor. It is not guaranteed that this constructor comes from the current scope, but we want to consider it that way.
+\item Otherwise, nothing is known ($\dunno{\noCPR}$) about the pattern match variables and the components of the case binder.
+\item When there are multiple branches, we combine their information using the least upper bound operator.
+\item And finally we need to mix in the termination information of $e$, using the operator $\&$: The whole expression will only surely terminate if both the scrunitee and all branches are surely terminating.
+\end{itemize}
+
+
+
+
+
+\end{document}
