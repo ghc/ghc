@@ -1,0 +1,5 @@
+
+==================== Strictness signatures ====================
+StreamSig.forever: <L,U>tm(,m(,m(,)))
+
+

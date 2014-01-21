@@ -1160,6 +1160,7 @@ extendAnalEnv top_lvl env var sig
   = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig' }
   where
   sig' | isWeakLoopBreaker (idOccInfo var) = sigMayDiverge sig
+             -- Note [Recursion and nested CPR]
        | isUnLiftedType (idType var)       = convergeSig sig
        | otherwise                         = sig
 
@@ -1283,3 +1284,42 @@ of the Id, and start from "bottom".  Nowadays the Id can have a current
 strictness, because interface files record strictness for nested bindings.
 To know when we are in the first iteration, we look at the ae_virgin
 field of the AnalEnv.
+
+Note [Recursion and nested cpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In extendAnalEnv, we remove possible definite convergence information from loop
+breakers.
+
+This is *not* required to make termination analysis sound: It would be fine
+without this, since we initialize the fixed point iteration with definite
+divergence, and this is sufficient to make sure that, for example, a
+tail-recursive function is not going to be considered terminating.
+
+But we need to do it to avoid the nested CPR w/w-transformation from going
+horribly wrong. Consider this code (also in tests/stranal/sigs/StreamSig.hs):
+
+    data Stream a = Stream a (Stream a)
+    forever :: a -> Stream a
+    forever x = Stream x (forever x)
+
+This should deserve a CPR information of
+
+   tm(,tm(,))
+
+(or deeper, as you wish) because clearly it terminates arbitrarily deep. But if
+we gave it that signature, we would generate the following worker:
+
+  $wforever x = case $wforever x of
+    (# ww1, ww2, ww3 #) -> (# x, ww1, Stream ww2 ww3 #)
+
+which will obviously diverge. By killing the convergence flag for loop breakers
+we ensure that the CPR information is
+
+   tm(,m(,))
+
+and the worker is
+
+  $wforever x = (# x, case $wforever x of (# a, b#) -> Stream a b #)
+
+which is fine (and will later be further simplified).
