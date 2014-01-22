@@ -58,7 +58,7 @@
                 instances created other than the ones in its
                 definition.
 
-                TODO FIXME: reference.
+                For more information, see <xref linkend="closed-type-families"/>
            </para>
        </listitem>
 
@@ -70,7 +70,7 @@
                 increases the type safety of GHC, it is possible that some code
                 that previously compiled will no longer work.
 
-                TODO FIXME: reference.
+                For more information, see <xref linkend="roles"/>
            </para>
        </listitem>
 
@@ -79,16 +79,15 @@
                 GHC now supports overloading list literals using the new
                 <literal>OverloadedLists</literal> extension.
 
-                TODO FIXME: reference.
+                For more information, see <xref linkend="overloaded-lists"/>
            </para>
        </listitem>
 
         <listitem>
             <para>
-                There has been significant overhaul of the type inference engine and
-                constraint solver.
-
-                TODO FIXME: reference.
+                There has been significant overhaul of the type
+                inference engine and constraint solver, meaning it
+                should be faster and less memory intensive.
            </para>
        </listitem>
 
@@ -116,11 +115,11 @@
             <para>
                 The LLVM backend now supports 128- and 256-bit SIMD
                 operations.
-
-                TODO FIXME: reference.
            </para>
             <para>
-                This is only available with the LLVM backend.
+                Note carefully: this is <em>only</em> available with
+                the LLVM backend, and should be considered
+                experimental.
            </para>
        </listitem>
 
@@ -144,8 +143,6 @@
                 compilation. In particular, GHC now has all the
                 necessary patches to support cross compilation to
                 Apple iOS, using the LLVM backend.
-
-                TODO FIXME: reference.
            </para>
        </listitem>
 
@@ -174,7 +171,38 @@
 
         <listitem>
             <para>
-                TODO: mention dynamic changes
+                On Linux and Mac OS X, GHCi now uses the system
+                dynamic linker by default, instead of its built in
+                (static) object linker. This is more robust
+                cross-platform, and fixes many long-standing bugs (for
+                example, both constructors and destructors, weak
+                symbols, etc work correctly, and several edge cases in
+                the RTS are fixed.)
+           </para>
+
+            <para>
+                As a result of this, GHCi (and Template Haskell) must
+                now load <em>dynamic</em> object files, not static
+                ones. To assist this, there is a new compilation flag,
+                <literal>-dynamic-too</literal>, which when used
+                during compilation causes GHC to emit both static and
+                dynamic object files at the same time. GHC itself
+                still defaults to static linking.
+            </para>
+
+            <para>
+                Note that Cabal will correctly handle
+                <literal>-dynamic-too</literal> for you automatically,
+                especially when <literal>-XTemplateHaskell</literal>
+                is needed - but you <em>must</em> tell Cabal you are
+                using the <literal>TemplateHaskell</literal>
+                extension.
+           </para>
+
+            <para>
+                Currently, Dynamic GHCi and
+                <literal>-dynamic-too</literal> are not supported on
+                Windows (32bit or 64bit.)
            </para>
        </listitem>
 
@@ -217,10 +245,12 @@
 
         <listitem>
             <para>
-                GHC now generates warnings when definitions conflict with the
-                Applicative-Monad Proposal (AMP).
-
-                TODO FIXME: reference.
+                In GHC 7.10, <literal>Applicative</literal> will
+                become a superclass of <literal>Monad</literal>,
+                potentially breaking a lot of user code. To ease this
+                transition, GHC now generates warnings when
+                definitions conflict with the Applicative-Monad
+                Proposal (AMP).
            </para>
 
             <para>
@@ -239,6 +269,29 @@
                 using the new flag <literal>-f[no-]warn-amp</literal>.
            </para>
        </listitem>
+
+        <listitem>
+            <para>
+                Using the new <literal>InterruptibleFFI</literal>
+                extension, it's possible to now declare a foreign
+                import as <literal>interruptible</literal>, as opposed
+                to only <literal>safe</literal> or
+                <literal>unsafe</literal>. An
+                <literal>interruptible</literal> foreign call is the
+                same as a <literal>safe</literal> call, but may be
+                interrupted by asynchronous <em>Haskell
+                exceptions</em>, such as those generated by
+                <literal>throwTo</literal> or
+                <literal>timeout</literal>.
+           </para>
+
+            <para>
+                For more information, (including the exact details on
+                how the foreign thread is interrupted,) see <xref
+                linkend="ffi-interruptible"/>
+           </para>
+       </listitem>
+
         <listitem>
             <para>
                 GHC's internal compiler pipeline is now exposed
