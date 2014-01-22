@@ -358,6 +358,14 @@
                 should be considered a preview.
            </para>
        </listitem>
+       <listitem>
+           <para>
+                The LLVM code generator has been fixed to support
+                dynamic linking. This enables runtime-linking
+                (e.g. GHCi) support for architectures without support in
+                GHC's own runtime linker (e.g. ARM).
+           </para>
+       </listitem>
    </itemizedlist>
   </sect2>
 
