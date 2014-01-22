@@ -40,9 +40,10 @@ test('lazy-bs-alloc',
             #             489776 (amd64/Linux)
             # 2013-02-07: 429744 (amd64/Linux)
             # 2013-12-12: 425400 (amd64/Linux)
-           (wordsize(32), 417738, 1)]),
+           (wordsize(32), 411500, 1)]),
             # 2013-02-10: 421296 (x86/Windows)
             # 2013-02-10: 414180 (x86/OSX)
+            # 2014-01-22: 411500 (x86/Linux)
       only_ways(['normal']),
       extra_run_opts('../../numeric/should_run/arith011.stdout'),
       ignore_output
