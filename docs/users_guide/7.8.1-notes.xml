@@ -461,7 +461,7 @@
                     GHC now supports warning about overflow of integer
                     literals, enabled by
                     <literal>-fwarn-overflowed-literals</literal>. It
-                    is enabled by default
+                    is enabled by default.
                </para>
            </listitem>
             <listitem>
