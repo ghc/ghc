@@ -85,6 +85,17 @@
 
         <listitem>
             <para>
+                GHC now supports pattern synonyms, enabled by the
+                <literal>-XPatternSynonym</literal> extension,
+                allowing you to name and abstract over patterns more
+                easily.
+
+                For more information, see TODO FIXME.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
                 There has been significant overhaul of the type
                 inference engine and constraint solver, meaning it
                 should be faster and less memory intensive.
