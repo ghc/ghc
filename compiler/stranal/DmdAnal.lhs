@@ -602,13 +602,14 @@ dmdAnalRhs top_lvl rec_flag env id rhs
   | otherwise
   = (sig_ty, lazy_fv, id', mkLams bndrs' body')
   where
-    (bndrs, body)        = collectBinders rhs
-    env_body             = foldl extendSigsWithLam env bndrs
-    (DmdType body_fv _      body_res, body')  = dmdAnal env_body body_dmd body
-    (DmdType rhs_fv rhs_dmds rhs_res, bndrs') = annotateLamBndrs env (isDFunId id)
-                                                  (DmdType body_fv [] body_res) bndrs
-    sig_ty               = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
-    id'		         = set_idStrictness env id sig_ty
+    (bndrs, body)    = collectBinders rhs
+    env_body         = foldl extendSigsWithLam env bndrs
+    (body_ty, body') = dmdAnal env_body body_dmd body
+    body_ty'         = removeDmdTyArgs body_ty -- zap possible deep CPR info
+    (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
+                     = annotateLamBndrs env (isDFunId id) body_ty' bndrs
+    sig_ty           = mkStrictSig (mkDmdType sig_fv rhs_dmds rhs_res')
+    id'		     = set_idStrictness env id sig_ty
 	-- See Note [NOINLINE and strictness]
 
     -- See Note [Product demands for function body]

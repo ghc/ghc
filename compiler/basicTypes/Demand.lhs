@@ -20,7 +20,7 @@ module Demand (
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
         nopDmdType, botDmdType, mkDmdType,
-        addDemand,
+        addDemand, removeDmdTyArgs,
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
 
         DmdEnv, emptyDmdEnv,
@@ -931,35 +931,48 @@ data DmdType = DmdType
                   DmdEnv        -- Demand on explicitly-mentioned 
                                 --      free variables
                   [Demand]      -- Demand on arguments
-                  DmdResult     -- Nature of result
+                  DmdResult     -- See [Nature of result demand]
 \end{code}
 
 Note [Nature of result demand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We assume the result in a demand type to be either a top or bottom
-in order to represent the information about demand on the function
-result, imposed by its definition. There are not so many things we 
-can say, though. 
+A DmdResult contains information about termination (currently distinguishing
+definite divergence and no information; it is possible to include definite
+convergence here), and CPR information about the result.
 
-For instance, one can consider a function
+The semantics of this depends on whether we are looking at a DmdType, i.e. the
+demand put on by an expression _under a specific incoming demand_ on its
+environment, or at a StrictSig describing a demand transformer.
 
-        h = \v -> error "urk"
+For a
+ * DmdType, the termination information is true given the demand it was
+   generated with, while for
+ * a StrictSig it is olds after applying enough arguments.
 
-Taking the definition of strictness, we can easily see that 
+The CPR information, though, is valid after the number of arguments mentioned
+in the type is given. Therefore, when forgetting the demand on arguments, as in
+dmdAnalRhs, this needs to be considere (via removeDmdTyArgs).
 
-        h undefined = undefined
+Consider
+  b2 x y = x `seq` y `seq` error (show x)
+this has a strictness signature of
+  <S><S>b
+meaning that "b2 `seq` ()" and "b2 1 `seq` ()" might well terminate, but
+for "b2 1 2 `seq` ()" we get definite divergence.
 
-that is, h is strict in v. However, v is not used somehow in the body
-of h How can we know that h is strict in v? In fact, we know it by
-considering a result demand of error and bottom and unleashing it on
-all the variables in scope at a call site (in this case, this is only
-v). We can also consider a case
+For comparision,
+  b1 x = x `seq` error (show x)
+has a strictness signature of
+  <S>b
+and "b1 1 `seq` ()" is known to terminate.
 
-       h = \v -> f x
-
-where we know that the result of f is not hyper-strict (i.e, it is
-lazy, or top). So, we put the same demand on v, which allow us to
-infer a lazy demand that h puts on v.
+Now consider a function h with signature "<C(S)>", and the expression
+  e1 = h b1
+now h puts a demand of <C(S)> onto its argument, and the demand transformer
+turns it into
+  <S>b
+Now the DmdResult "b" does apply to us, even though "b1 `seq` ()" does not
+diverge, and we do not anything being passed to b.
 
 Note [Asymmetry of 'both' for DmdType and DmdResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -988,17 +1001,28 @@ instance Eq DmdType where
                               && ds1 == ds2 && res1 == res2
 
 lubDmdType :: DmdType -> DmdType -> DmdType
-lubDmdType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
-  = DmdType lub_fv (lub_ds ds1 ds2) (r1 `lubDmdResult` r2)
+lubDmdType d1 d2
+  = DmdType lub_fv lub_ds lub_res
   where
+    n = max (dmdTypeDepth d1) (dmdTypeDepth d2)
+    (DmdType fv1 ds1 r1) = ensureArgs n d1
+    (DmdType fv2 ds2 r2) = ensureArgs n d2
+
     lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultDmd r1) fv2 (defaultDmd r2)
+    lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
+    lub_res = lubDmdResult r1 r2
+\end{code}
 
-    -- Extend the shorter argument list to match the longer, using resTypeArgDmd
-    lub_ds (d1:ds1) (d2:ds2) = lubDmd d1 d2                   : lub_ds ds1 ds2
-    lub_ds (d1:ds1) []       = (d1 `lubDmd` resTypeArgDmd r2) : lub_ds ds1 []
-    lub_ds []       (d2:ds2) = (resTypeArgDmd r1 `lubDmd` d2) : lub_ds [] ds2
-    lub_ds []       []       = []
+Note [The need for BothDmdArg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Previously, the right argument to bothDmdType, as well as the return value of
+dmdAnalStar via postProcessDmdTypeM, was a DmdType. But bothDmdType only needs
+to know about the free variables and termination information, but nothing about
+the demand put on arguments, nor cpr information. So we make that explicit by
+only passing the relevant information.
 
+
+\begin{code}
 type BothDmdArg = (DmdEnv, Termination ())
 
 mkBothDmdArg :: DmdEnv -> BothDmdArg
@@ -1053,6 +1077,25 @@ mkDmdType fv ds res = DmdType fv ds res
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
+
+-- Remove any demand on arguments. This is used in dmdAnalRhs on the body
+removeDmdTyArgs :: DmdType -> DmdType
+removeDmdTyArgs = ensureArgs 0
+
+-- This makes sure we can use the demand type with n arguments,
+-- It extends the argument list with the correct resTypeArgDmd
+-- It also adjusts the DmdResult: Divergence survives additional arguments,
+-- CPR information does not (and definite converge also would not).
+ensureArgs :: Arity -> DmdType -> DmdType
+ensureArgs n d | n == depth = d
+               | otherwise  = DmdType fv ds' r'
+  where depth = dmdTypeDepth d
+        DmdType fv ds r = d
+
+        ds' = take n (ds ++ repeat (resTypeArgDmd r))
+        r' | Diverges <- r = r
+           | otherwise     = topRes
+                -- See [Nature of result demand]
 
 seqDmdType :: DmdType -> ()
 seqDmdType (DmdType _env ds res) = 
@@ -1112,6 +1155,7 @@ toCleanDmd (JD { strd = s, absd = u })
 -- This is used in dmdAnalStar when post-processing
 -- a function's argument demand. So we only care about what
 -- does to free variables, and whether it terminates.
+-- see Note [The need for BothDmdArg]
 postProcessDmdTypeM :: DeferAndUseM -> DmdType -> BothDmdArg
 postProcessDmdTypeM Nothing   _  = (emptyDmdEnv, Dunno ())
   -- Incoming demand was Absent, so just discard all usage information
@@ -1200,16 +1244,20 @@ then d1 and d2 is precisely the demand unleashed onto x1 and x2 (similar for
 the free variable environment) and furthermore the result information r is the
 one we want to use.
 
+An anonymous lambda is also an unsaturated function all (needs one argument,
+none given), so this applies to that case as well.
+
 But the demand fed into f might be less than <C(C(S)), C1(C1(S))>. There are a few cases:
  * Not enough demand on the strictness side:
    - In that case, we need to zap all strictness in the demand on arguments and
      free variables.
-   - Furthermore, we need to remove CPR information (after all, "f x1" surely
-     does not return a constructor).
-   - And finally, if r said that f would (possible or definitely) diverge when
-     called with two arguments, then "f x1" may diverge. So we use topRes here.
-     (We could return "Converges NoCPR" if f would converge for sure, but that
-     information would currently not be useful in any way.)
+   - Furthermore, we remove CPR information. It could be left, but given the incoming
+     demand is not enough to evaluate so far we just do not bother.
+   - And finally termination information: If r says that f diverges for sure,
+     then this holds when the demand guarantees that two arguments are going to
+     be passed. If the demand is lower, we may just as well converge.
+     If we were tracking definite convegence, than that would still hold under
+     a weaker demand than expected by the demand transformer.
  * Not enough demand from the usage side: The missing usage can be expanded
    using UCall Many, therefore this is subsumed by the third case:
  * At least one of the uses has a cardinality of Many.
@@ -1230,7 +1278,7 @@ peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
                                (DmdType fv' ds res, dmd)
   where
   fv' = fv `delVarEnv` id
-  -- See note [Default demand on free variables]
+  -- See Note [Default demand on free variables]
   dmd  = lookupVarEnv fv id `orElse` defaultDmd res
 
 addDemand :: Demand -> DmdType -> DmdType
@@ -1314,6 +1362,8 @@ transfomer, namely
 
 This DmdType gives the demands unleashed by the Id when it is applied
 to as many arguments as are given in by the arg demands in the DmdType.
+Also see Note [Nature of result demand] for the meaning of a DmdResult in a
+strictness signature.
 
 If an Id is applied to less arguments than its arity, it means that
 the demand on the function at a call site is weaker than the vanilla
@@ -1321,11 +1371,11 @@ call demand, used for signature inference. Therefore we place a top
 demand on all arguments. Otherwise, the demand is specified by Id's
 signature.
 
-For example, the demand transformer described by the DmdType
-                DmdType {x -> <S(LL),U(UU)>} [V,A] Top
+For example, the demand transformer described by the demand signature
+        StrictSig (DmdType {x -> <S,1*U>} <L,A><L,U(U,U)>m)
 says that when the function is applied to two arguments, it
-unleashes demand <S(LL),U(UU)> on the free var x, V on the first arg,
-and A on the second.  
+unleashes demand <S,1*U> on the free var x, <L,A> on the first arg,
+and <L,U(U,U)> on the second, then returning a constructor.
 
 If this same function is applied to one arg, all we can say is that it
 uses x with <L,U>, and its arg with demand <L,U>.
