@@ -207,10 +207,10 @@ test('T4801',
 test('T3064',
      [# expect_broken( 3064 ),
       compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
-          [(wordsize(32), 18, 20),
+          [(wordsize(32), 23, 20),
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
-
+            # 2014-01-22:     23 (x86/Linux)
            (wordsize(64), 37, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
