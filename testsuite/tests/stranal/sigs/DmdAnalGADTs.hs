@@ -17,7 +17,7 @@ diverges :: Int
 diverges = diverges
 
 -- The result should not have a CPR property
--- Becuase we are lub’ing "m" and "<S,U>m" in the case expression.
+-- Because we are lub’ing "m" and "<S,U>m" in the case expression.
 f :: D x -> x
 f x = case x of
     A -> hasCPR

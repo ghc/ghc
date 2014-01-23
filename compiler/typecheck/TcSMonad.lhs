@@ -1759,7 +1759,7 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
                                         --              or orhs ~ olhs (swapped)
                   -> SwapFlag
                   -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
-                                        -- Should be zonked, becuase we use typeKind on nlhs/nrhs
+                                        -- Should be zonked, because we use typeKind on nlhs/nrhs
                   -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
                   -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
                   -> TcS (Maybe CtEvidence)  -- Of type nlhs ~ nrhs
