@@ -218,13 +218,13 @@
 
         <listitem>
             <para>
-                On Linux and Mac OS X, GHCi now uses the system
-                dynamic linker by default, instead of its built in
-                (static) object linker. This is more robust
+                On Linux, FreeBSD and Mac OS X, GHCi now uses the
+                system dynamic linker by default, instead of its built
+                in (static) object linker. This is more robust
                 cross-platform, and fixes many long-standing bugs (for
-                example: constructors and destructors, weak
-                symbols, etc work correctly, and several edge cases in
-                the RTS are fixed.)
+                example: constructors and destructors, weak symbols,
+                etc work correctly, and several edge cases in the RTS
+                are fixed.)
            </para>
 
             <para>
@@ -1181,7 +1181,7 @@
         <listitem>
             <para>
                 On Windows, we currently don't ship dynamic libraries
-                or use a dynamic GHCi, unlike Linux or OS X.
+                or use a dynamic GHCi, unlike Linux, FreeBSD or OS X.
            </para>
        </listitem>
 
