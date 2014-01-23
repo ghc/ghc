@@ -24,6 +24,17 @@ g :: Int -> Int
 g x = let f' = f x
       in h f'
 
-g2 :: Int -> Int
-g2 x = let f' = f x
+-- Should not get a bottom result
+g' :: Int -> Int
+g' x = let f' = f x
        in h2 True f'
+
+h3 :: (Int -> Int -> Int) -> Int
+h3 f = f 2 `seq` 3
+{-# NOINLINE h3 #-}
+
+
+-- And here we check that the depth of the strictness
+-- of h is applied correctly.
+g3 :: Int -> Int
+g3 x = h3 (\_ _ -> error (show x))
