@@ -18,6 +18,42 @@
     <itemizedlist>
         <listitem>
             <para>
+                OS X Mavericks with XCode 5 is now properly supported
+                by GHC. As a result of this, GHC now uses Clang to
+                preprocess Haskell code by default for Mavericks
+                builds.
+           </para>
+
+            <para>
+                Note that normally, GHC used <literal>gcc</literal> as
+                the preprocessor for Haskell code (as it was the
+                default everywhere,) which implements
+                <literal>-traditional</literal> behavior. However,
+                Clang is not 100% compatible with GCC's
+                <literal>-traditional</literal> as it is rather
+                implementation specified and does not match any
+                specification. Clang is also more strict.
+           </para>
+
+            <para>
+                As a result of this, when using Clang as the
+                preprocessor, some programs which previously used
+                <literal>-XCPP</literal> and the preprocessor will now
+                fail to compile. Users who wish to retain the previous
+                behavior are better off using cpphs as an external
+                preprocessor for the time being.
+           </para>
+
+            <para>
+                In the future, we hope to fix this by adopting a
+                better preprocessor implementation independent of the
+                C compiler (perhaps cpphs itself,) and ship that
+                instead.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
                 By default, GHC has a new warning enabled,
                 <literal>-fwarn-typed-holes</literal>, which causes the
                 compiler to respond with the types of unbound
@@ -452,8 +488,9 @@
            </listitem>
             <listitem>
                 <para>
-                    GHC now supports a <literal>--show-options</literal> flag,
-                    which will dump all of the flags it supports to standard out.
+                    GHC now supports a
+                    <literal>--show-options</literal> flag, which will
+                    dump all of the flags it supports to standard out.
                </para>
            </listitem>
             <listitem>
@@ -627,9 +664,28 @@
            </listitem>
             <listitem>
                 <para>
-                    GHC can now be built with Clang, and use Clang as the
-                    preprocessor for Haskell code. Only Clang version 3.4svn is
+                    GHC can now be built with Clang, and use Clang as
+                    the preprocessor for Haskell code. Only Clang
+                    version 3.4 (or Apple LLVM Clang 5.0) or beyond is
                     reliably supported.
+               </para>
+
+                <para>
+                    Note that normally, GHC uses
+                    <literal>gcc</literal> as the preprocessor for
+                    Haskell code, which implements
+                    <literal>-traditional</literal> behavior. However,
+                    Clang is not 100% compatible with GCC's
+                    <literal>-traditional</literal> as it is rather
+                    implementation specified, and is more strict.
+               </para>
+
+                <para>
+                    As a result of this, when using Clang as the
+                    preprocessor, some programs which previously used
+                    <literal>-XCPP</literal> and the preprocessor will
+                    now fail to compile. Users who wish to retain the
+                    previous behavior are better off using cpphs.
                </para>
            </listitem>
        </itemizedlist>
@@ -1092,5 +1148,50 @@
            </listitem>
        </itemizedlist>
     </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Known bugs</title>
+    <itemizedlist>
+        <listitem>
+            <para>
+                On OS X 10.7 and beyond, with default build settings,
+                the runtime system currently suffers from a fairly
+                large (30%) performance regression in the parallel
+                garbage collector when using
+                <literal>-threaded</literal> impacting its thoroughput
+                and overall scalability.
+           </para>
+            <para>
+                This is due to the fact that the OS X 10.7+ toolchain
+                does not (by default) support register variables, or a
+                fast <literal>__thread</literal> implementation. Note
+                that this can be worked around by building GHC using
+                GCC instead on OS X platforms, but the binary
+                distribution then requires GCC later.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                On Windows, <literal>-dynamic-too</literal> is unsupported.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                On Windows, we currently don't ship dynamic libraries
+                or use a dynamic GHCi, unlike Linux or OS X.
+           </para>
+       </listitem>
+
+        <listitem>
+            <para>
+                On 64bit Windows, the static linker currently suffers
+                from some rather large bugs, which we hope to have
+                some fixes for soon.
+           </para>
+       </listitem>
+   </itemizedlist>
   </sect2>
 </sect1>
