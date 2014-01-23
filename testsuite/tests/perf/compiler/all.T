@@ -47,10 +47,9 @@ test('T1969',
                                  # 2013-02-10 5159748 (x86/Windows)
                                  # 2013-02-10 5030080 (x86/Windows)
                                  # 2013-11-13 7295012 (x86/Windows, 64bit machine)
-           (wordsize(32), 7354788, 1),
+           (wordsize(32), 6149572, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
-             # 2014-01-22 7354788 (x86/Linux)
            (wordsize(64), 11000000, 20)]),
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -63,13 +62,11 @@ test('T1969',
                                  # 2012-10-29 298921816 (x86/Windows)
                                  # 2013-02-10 310633884 (x86/Windows)
                                  # 2013-11-13 317975916 (x86/Windows, 64bit machine)
-           (wordsize(32), 911567836, 1),
+           (wordsize(32), 322937684, 1),
              #            221667908 (x86/OS X)
              #            274932264 (x86/Linux)
              # 2012-10-08 303930948 (x86/Linux, new codegen)
              # 2013-02-10 322937684 (x86/OSX)
-             # 2014-01-22 911567836 (x86/Linux, reason unknown)
-
            (wordsize(64), 698612512, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
@@ -115,13 +112,12 @@ else:
 test('T3294',
      [
       compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(32), 18487364, 15),
+          [(wordsize(32), 24009436, 15),
              #            17725476 (x86/OS X)
              #            14593500 (Windows)
              # 2013-02-10 20651576 (x86/Windows)
              # 2013-02-10 20772984 (x86/OSX)
              # 2013-11-13 24009436 (x86/Windows, 64bit machine)
-             # 2014-01-22 18487364 (x86/Linux)
            (wordsize(64), 43224080, 15)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
@@ -134,12 +130,11 @@ test('T3294',
              #  (reason for increase back to earlier value unknown)
 
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 4692493196, 5),
+          [(wordsize(32), 1478325844, 5),
            # previous:     815479800  (x86/Linux)
            # (^ increase due to new codegen, see #7198)
            # 2012-10-08:  1373514844 (x86/Linux)
            # 2013-11-13: 1478325844 (x86/Windows, 64bit machine)
-           # 2014-01-22: 4692493196 (x86/Linux, reason unknown)
            (wordsize(64), 3083825616, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
@@ -175,9 +170,8 @@ test('T4801',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
                            # expected value: 510938976 (amd64/OS X):
 
-           (wordsize(32), 640727348, 10),
-            # prev:       228286660 (x86/OS X)
-            # 22/01/2014: 640727348 (reason unknown)
+           (wordsize(32), 185669232, 10),
+        # expected value: 228286660 (x86/OS X)
 
            (wordsize(64), 392409984, 10)]),
             # prev:       360243576 (amd64/Linux)
@@ -225,11 +219,10 @@ test('T3064',
             # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
 
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 535412508, 10),
+          [(wordsize(32), 146626504, 10),
             # 2011-06-28: 56380288  (x86/Linux)
-            # 2012-10-30: 111189536 (x86/Windows)
+            # 2012-10-30: 111189536 (x86/Windows) 
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
-            # 2014-01-22: 535412508 (x86/Linux, reason unknown)
            (wordsize(64), 329795912, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
@@ -313,11 +306,10 @@ test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
       # expected value: 175,569,928 (x86/Linux)
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 695927020, 2),
+          [(wordsize(32), 333833658, 2),
             # 2012-10-08: 226907420 (x86/Linux)
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
-            # 2014-01-22: 695927020 (x86/Linux, reason unknown)
            (wordsize(64), 654804144, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
