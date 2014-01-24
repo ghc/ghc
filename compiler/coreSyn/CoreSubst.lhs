@@ -966,6 +966,10 @@ simple_app subst (Lam b e) (a:as)
   where
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
+simple_app subst (Var v) as
+  | isCompulsoryUnfolding (idUnfolding v)
+  -- See Note [Unfold compulsory unfoldings in LHSs]
+  =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
 simple_app subst e as
   = foldl App (simple_opt_expr subst e) as
 
@@ -1112,6 +1116,13 @@ we don't know what phase we're in.  Here's an example
 When inlining 'foo' in 'bar' we want the let-binding for 'inner' 
 to remain visible until Phase 1
 
+Note [Unfold compulsory unfoldings in LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the user writes `map coerce = coerce` as a rule, the rule will only ever
+match if we replace coerce by its unfolding on the LHS, because that is the
+core that the rule matching engine will find. So do that for everything that
+has a compulsory unfolding. Also see Note [Desugaring coerce as cast]
 
 %************************************************************************
 %*                                                                      *
