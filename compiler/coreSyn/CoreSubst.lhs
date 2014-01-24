@@ -61,7 +61,7 @@ import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substC
 
 import TyCon       ( tyConArity )
 import DataCon
-import PrelNames   ( eqBoxDataConKey )
+import PrelNames   ( eqBoxDataConKey, coercibleDataConKey )
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
 import Module	   ( Module )
@@ -1039,7 +1039,7 @@ maybe_substitute subst b r
     trivial | exprIsTrivial r = True
             | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
-            , dc `hasKey` eqBoxDataConKey
+            , dc `hasKey` eqBoxDataConKey || dc `hasKey` coercibleDataConKey
             , all exprIsTrivial args = True -- See Note [Optimise coercion boxes agressively]
             | otherwise = False
 

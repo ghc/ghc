@@ -222,13 +222,14 @@ test('T3064',
             # 2012-10-30: 111189536 (x86/Windows)
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
             # 2014-01-22: 162457940 (x86/Linux)
-           (wordsize(64), 329795912, 5)]),
+           (wordsize(64), 308422280, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
             # (amd64/Linux) (11/09/2013): 290165632, increase from AMP warnings
             # (amd64/Linux) (22/11/2013): 308300448, GND via Coercible and counters for constraints solving
-	    # (amd64/Linux) (02/12/2013): 329795912, Coercible refactor
+	        # (amd64/Linux) (02/12/2013): 329795912, Coercible refactor
+            # (amd64/Linux) (11/02/2014): 308422280, optimize Coercions in simpleOptExpr
 
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 7218200 , 20),
