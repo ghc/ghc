@@ -30,6 +30,7 @@ module Id (
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
         mkLocalId, mkLocalIdWithInfo, mkExportedLocalId,
         mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
+        mkDerivedLocalM,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
         mkWorkerId, mkWiredInIdName,
 
@@ -271,6 +272,10 @@ mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName uniq occ loc) ty
 
 mkUserLocalM :: MonadUnique m => OccName -> Type -> SrcSpan -> m Id
 mkUserLocalM occ ty loc = getUniqueM >>= (\uniq -> return (mkUserLocal occ uniq ty loc))
+
+mkDerivedLocalM :: MonadUnique m => (OccName -> OccName) -> Id -> Type -> m Id
+mkDerivedLocalM deriv_name id ty
+    = getUniqueM >>= (\uniq -> return (mkLocalId (mkDerivedInternalName deriv_name uniq (getName id)) ty))
 
 mkWiredInIdName :: Module -> FastString -> Unique -> Id -> Name
 mkWiredInIdName mod fs uniq id
