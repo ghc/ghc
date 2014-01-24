@@ -730,9 +730,28 @@ match_co renv subst (Refl r1 ty1) co
        Refl r2 ty2
          | r1 == r2 -> match_ty renv subst ty1 ty2
        _            -> Nothing
-match_co _ _ co1 _
-  = pprTrace "match_co: needs more cases" (ppr co1) Nothing
-    -- Currently just deals with CoVarCo and Refl
+match_co renv subst (TyConAppCo r1 tc1 cos1) co2
+  = case co2 of
+       TyConAppCo r2 tc2 cos2
+         | r1 == r2 && tc1 == tc2
+         -> match_cos renv subst cos1 cos2
+       _ -> Nothing
+match_co _ _ co1 co2
+  = pprTrace "match_co: needs more cases" (ppr co1 $$ ppr co2) Nothing
+    -- Currently just deals with CoVarCo, TyConAppCo and Refl
+
+match_cos :: RuleMatchEnv
+         -> RuleSubst
+         -> [Coercion]
+         -> [Coercion]
+         -> Maybe RuleSubst
+match_cos renv subst (co1:cos1) (co2:cos2) =
+    case match_co renv subst co1 co2 of
+       Just subst' -> match_cos renv subst' cos1 cos2
+       Nothing -> Nothing
+match_cos _ subst [] [] = Just subst
+match_cos _ _ cos1 cos2 = pprTrace "match_cos: not same length" (ppr cos1 $$ ppr cos2) Nothing
+
 
 -------------
 rnMatchBndr2 :: RuleMatchEnv -> RuleSubst -> Var -> Var -> RuleMatchEnv
