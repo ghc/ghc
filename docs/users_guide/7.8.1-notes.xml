@@ -365,6 +365,12 @@
                 (e.g. GHCi) support for architectures without support in
                 GHC's own runtime linker (e.g. ARM).
            </para>
+           <para>
+                Note: Tables-next-to-code is disabled when building on
+                ARM with binutil's ld due to a
+                <ulink url="https://sourceware.org/bugzilla/show_bug.cgi?id=16177">
+                bug</ulink> in ld.
+           </para>
        </listitem>
    </itemizedlist>
   </sect2>
