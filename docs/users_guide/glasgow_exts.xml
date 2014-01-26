@@ -875,8 +875,9 @@ data Type = App String [Type]
 </programlisting>
 
 <para>
-Here are some examples of using this representation:
-Using this representation, a function type will look like this:
+Here are some examples of using said representation.
+Consider a few types of the <literal>Type</literal> universe encoded
+like this:
 </para>
 
 <programlisting>
@@ -888,7 +889,7 @@ Using this representation, a function type will look like this:
 <para>
 This representation is very generic in that no types are given special
 treatment. However, some functions might need to handle some known
-types specially, for example the following two functions collects all
+types specially, for example the following two functions collect all
 argument types of (nested) arrow types, and recognize the
 <literal>Int</literal> type, respectively:
 </para>
