@@ -566,7 +566,7 @@ defn of OccInfo here, safely at the bottom
 \begin{code}
 -- | Identifier occurrence information
 data OccInfo
-  = NoOccInfo           -- ^ There are many occurrences, or unknown occurences
+  = NoOccInfo           -- ^ There are many occurrences, or unknown occurrences
 
   | IAmDead             -- ^ Marks unused variables.  Sometimes useful for
                         -- lambda and case-bound variables.

@@ -769,7 +769,7 @@ Note [Worker inlining]
 A worker can get sustituted away entirely.
 	- it might be trivial
 	- it might simply be very small
-We do not treat an InlWrapper as an 'occurrence' in the occurence 
+We do not treat an InlWrapper as an 'occurrence' in the occurrence 
 analyser, so it's possible that the worker is not even in scope any more.
 
 In all all these cases we simply drop the special case, returning to
@@ -843,7 +843,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- We also inline bindings that bind a Eq# box: see
 -- See Note [Optimise coercion boxes agressively].
 --
--- The result is NOT guaranteed occurence-analysed, because
+-- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
 

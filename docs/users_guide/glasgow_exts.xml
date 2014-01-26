@@ -1103,7 +1103,7 @@ pattern (Show b) => ExNumPat b :: (Num a, Eq a) => T a
 <listitem> Matching:
 
 <para>
-A pattern synonym occurance in a pattern is evaluated by first
+A pattern synonym occurrence in a pattern is evaluated by first
 matching against the pattern synonym itself, and then on the argument
 patterns. For example, in the following program, <literal>f</literal>
 and <literal>f'</literal> are equivalent:

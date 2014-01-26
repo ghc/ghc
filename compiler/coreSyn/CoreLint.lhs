@@ -116,7 +116,7 @@ to the type of the binding variable.  lintBinders does this.
 
 For Ids, the type-substituted Id is added to the in_scope set (which
 itself is part of the TvSubst we are carrying down), and when we
-find an occurence of an Id, we fetch it from the in-scope set.
+find an occurrence of an Id, we fetch it from the in-scope set.
 
 
 \begin{code}

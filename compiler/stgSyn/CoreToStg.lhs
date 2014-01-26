@@ -1076,7 +1076,7 @@ type FreeVarsInfo = VarEnv (Var, HowBound, StgBinderInfo)
         --
         -- All case/lambda-bound things are also mapped to
         -- noBinderInfo, since we aren't interested in their
-        -- occurence info.
+        -- occurrence info.
         --
         -- For ILX we track free var info for type variables too;
         -- hence VarEnv not IdEnv

@@ -992,7 +992,7 @@ See also Note [Inlining an InlineRule] in CoreUnfold.
 Note [OccInfo in unfoldings and rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In unfoldings and rules, we guarantee that the template is occ-analysed,
-so that the occurence info on the binders is correct.  This is important,
+so that the occurrence info on the binders is correct.  This is important,
 because the Simplifier does not re-analyse the template when using it. If
 the occurrence info is wrong
   - We may get more simpifier iterations than necessary, because

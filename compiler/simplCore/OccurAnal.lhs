@@ -72,7 +72,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
                              vectVars)
     -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
     -- we only get them *until* the vectoriser runs. Afterwards, these dependencies are
-    -- reflected in 'vectors' — see Note [Vectorisation declarations and occurences].)
+    -- reflected in 'vectors' — see Note [Vectorisation declarations and occurrences].)
 
     -- Note [Preventing loops due to imported functions rules]
     imp_rules_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
@@ -92,7 +92,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
            (final_usage, bind') = occAnalBind env env imp_rules_edges bind bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
-        -- Do occurrence analysis, and discard occurence info returned
+        -- Do occurrence analysis, and discard occurrence info returned
 occurAnalyseExpr = occurAnalyseExpr' True -- do binder swap
 
 occurAnalyseExpr_NoBinderSwap :: CoreExpr -> CoreExpr
@@ -1657,7 +1657,7 @@ From the original
 we will get
      case x of cb(live) { p -> let x = cb in ...x... }
 
-Core Lint never expects to find an *occurence* of an Id marked
+Core Lint never expects to find an *occurrence* of an Id marked
 as Dead, so we must zap the OccInfo on cb before making the
 binding x = cb.  See Trac #5028.
 

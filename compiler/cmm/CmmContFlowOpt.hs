@@ -246,7 +246,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         --   (3) increase number of predecessors of dest by 1
         --   (4) decrease number of predecessors of b' by 1
         --
-        -- Later we will use replaceLabels to substitute all occurences of b'
+        -- Later we will use replaceLabels to substitute all occurrences of b'
         -- with dest.
         | splitting_procs
         , Just b'   <- callContinuation_maybe last

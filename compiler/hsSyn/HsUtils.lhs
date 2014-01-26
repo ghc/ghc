@@ -701,7 +701,7 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- ^ Returns all the /binding/ names of the decl.
 -- The first one is guaranteed to be the name of the decl. For record fields
 -- mentioned in multiple constructors, the SrcLoc will be from the first
--- occurence.  We use the equality to filter out duplicate field names.
+-- occurrence.  We use the equality to filter out duplicate field names.
 --
 -- Each returned (Located name) is wrapped in a @SrcSpan@ of the whole
 -- /declaration/, not just the name itself (which is how it appears in

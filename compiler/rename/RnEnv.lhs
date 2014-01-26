@@ -450,7 +450,7 @@ Thus:
       data G a
     instance C S where
       data G S = Y1 | Y2
-Even though there are two G's in scope (M.G and Blib.G), the occurence
+Even though there are two G's in scope (M.G and Blib.G), the occurrence
 of 'G' in the 'instance C S' decl is unambiguous, because C has only
 one associated type called G. This is exactly what happens for methods,
 and it is only consistent to do the same thing for types. That's the
@@ -611,7 +611,7 @@ When the user writes:
 'Zero' in the type signature of 'foo' is parsed as:
   HsTyVar ("Zero", TcClsName)
 
-When the renamer hits this occurence of 'Zero' it's going to realise
+When the renamer hits this occurrence of 'Zero' it's going to realise
 that it's not in scope. But because it is renaming a type, it knows
 that 'Zero' might be a promoted data constructor, so it will demote
 its namespace to DataName and do a second lookup.

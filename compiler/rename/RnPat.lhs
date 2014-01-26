@@ -153,7 +153,7 @@ Consider
 
   g _ = T1
 
-Arguaby we should report T2 as unused, even though it appears in a
+Arguably we should report T2 as unused, even though it appears in a
 pattern, because it never occurs in a constructed position.  See
 Trac #7336.
 However, implementing this in the face of pattern synonyms would be
@@ -166,7 +166,7 @@ we need to observe the dependency between P1 and P2 so that type
 checking can be done in the correct order (just like for value
 bindings). Dependencies between bindings is analyzed in the renamer,
 where we don't know yet whether P2 is a constructor or a pattern
-synonym. So for now, we do report conid occurances in patterns as
+synonym. So for now, we do report conid occurrences in patterns as
 uses.
 
 %*********************************************************

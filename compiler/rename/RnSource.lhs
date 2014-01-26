@@ -60,7 +60,7 @@ for undefined tyvars, and tyvars in contexts that are ambiguous.
 (Some of this checking has now been moved to module @TcMonoType@,
 since we don't have functional dependency information at this point.)
 \item
-Checks that all variable occurences are defined.
+Checks that all variable occurrences are defined.
 \item
 Checks the @(..)@ etc constraints in the export list.
 \end{enumerate}
