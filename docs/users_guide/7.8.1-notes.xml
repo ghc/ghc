@@ -550,6 +550,11 @@
         <title>GHCi</title>
         <itemizedlist>
             <listitem>
+                    The monomorphism restriction is now turned off
+                    by default in GHCi.
+            </listitem>
+         
+            <listitem>
                 <para>
                     GHCi now supports a <literal>prompt2</literal>
                     setting, which allows you to customize the
