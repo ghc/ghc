@@ -126,7 +126,11 @@
                 allowing you to name and abstract over patterns more
                 easily.
 
-                For more information, see TODO FIXME.
+                For more information, see <xref linkend="pattern-synonyms"/>.
+           </para>
+           <para>
+                Note: For the GHC 7.8.1 version, this language feature
+                should be regarded as a preview.
            </para>
        </listitem>
 

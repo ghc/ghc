@@ -849,6 +849,296 @@ y)</literal> will not be coalesced.
 
 </sect2>
 
+    <!-- ===================== Pattern synonyms ===================  -->
+
+<sect2 id="pattern-synonyms">
+<title>Pattern synonyms
+</title>
+
+<para>
+Pattern synonyms are enabled by the flag <literal>-XPatternSynonyms</literal>.
+More information and examples of view patterns can be found on the
+<ulink url="http://ghc.haskell.org/trac/ghc/wiki/PatternSynonyms">Wiki
+page</ulink>.
+</para>
+
+<para>
+Pattern synonyms enable giving names to parametrized pattern
+schemes. They can also be thought of as abstract constructors that
+don't have a bearing on data representation. For example, in a
+programming language implementation, we might represent types of the
+language as follows:
+</para>
+
+<programlisting>
+data Type = App String [Type]
+</programlisting>
+
+<para>
+Here are some examples of using this representation:
+Using this representation, a function type will look like this:
+</para>
+
+<programlisting>
+  App "->" [t1, t2]          -- t1 -> t2
+  App "Int" []               -- Int
+  App "Maybe" [App "Int" []] -- Maybe Int
+</programlisting>
+
+<para>
+This representation is very generic in that no types are given special
+treatment. However, some functions might need to handle some known
+types specially, for example the following two functions collects all
+argument types of (nested) arrow types, and recognize the
+<literal>Int</literal> type, respectively:
+</para>
+
+<programlisting>
+  collectArgs :: Type -> [Type]
+  collectArgs (App "->" [t1, t2]) = t1 : collectArgs t2
+  collectArgs _                   = []
+
+  isInt :: Type -> Bool
+  isInt (App "Int" []) = True
+  isInt _              = False
+</programlisting>
+
+<para>
+Matching on <literal>App</literal> directly is both hard to read and
+error prone to write. And the situation is even worse when the
+matching is nested:
+</para>
+
+<programlisting>
+  isIntEndo :: Type -> Bool
+  isIntEndo (App "->" [App "Int" [], App "Int" []]) = True
+  isIntEndo _                                       = False
+</programlisting>
+
+<para>
+Pattern synonyms permit abstracting from the representation to expose
+matchers that behave in a constructor-like manner with respect to
+pattern matching. We can create pattern synonyms for the known types
+we care about, without committing the representation to them (note
+that these don't have to be defined in the same module as the
+<literal>Type</literal> type):
+</para>
+
+<programlisting>
+  pattern Arrow t1 t2 = App "->"    [t1, t2]
+  pattern Int         = App "Int"   []
+  pattern Maybe t     = App "Maybe" [t]
+</programlisting>
+
+<para>
+Which enables us to rewrite our functions in a much cleaner style:
+</para>
+
+<programlisting>
+  collectArgs :: Type -> [Type]
+  collectArgs (Arrow t1 t2) = t1 : collectArgs t2
+  collectArgs _             = []
+
+  isInt :: Type -> Bool
+  isInt Int = True
+  isInt _   = False
+
+  isIntEndo :: Type -> Bool
+  isIntEndo (Arrow Int Int) = True
+  isIntEndo _               = False
+</programlisting>
+
+<para>
+  Note that in this example, the pattern synonyms
+  <literal>Int</literal> and <literal>Arrow</literal> can also be used
+  as expressions (they are <emphasis>bidirectional</emphasis>). This
+  is not necessarily the case: <emphasis>unidirectional</emphasis>
+  pattern synonyms can also be declared with the following syntax:
+</para>
+
+<programlisting>
+  pattern Head x &lt;- x:xs
+</programlisting>
+
+<para>
+In this case, <literal>Head</literal> <replaceable>x</replaceable>
+cannot be used in expressions, only patterns, since it wouldn't
+specify a value for the <replaceable>xs</replaceable> on the
+right-hand side.
+</para>
+
+<para>
+The semantics of a unidirectional pattern synonym declaration and
+usage are as follows:
+
+<itemizedlist>
+
+<listitem> Syntax:
+<para>
+A pattern synonym declaration can be either unidirectional or
+bidirectional. The syntax for unidirectional pattern synonyms is:
+</para>
+<programlisting>
+  pattern Name args &lt;- pat
+</programlisting>
+<para>
+  and the syntax for bidirectional pattern synonyms is:
+</para>
+<programlisting>
+  pattern Name args = pat
+</programlisting>
+<para>
+  Pattern synonym declarations can only occur in the top level of a
+  module. In particular, they are not allowed as local
+  definitions. Currently, they also don't work in GHCi, but that is a
+  technical restriction that will be lifted in later versions.
+</para>
+<para>
+  The name of the pattern synonym itself is in the same namespace as
+  proper data constructors. Either prefix or infix syntax can be
+  used. In export/import specifications, you have to prefix pattern
+  names with the <literal>pattern</literal> keyword, e.g.:
+</para>
+<programlisting>
+  module Example (pattern Single) where
+  pattern Single x = [x]
+</programlisting>
+</listitem>
+
+<listitem> Scoping:
+
+<para>
+  The variables in the left-hand side of the definition are bound by
+  the pattern on the right-hand side. For bidirectional pattern
+  synonyms, all the variables of the right-hand side must also occur
+  on the left-hand side; also, wildcard patterns and view patterns are
+  not allowed. For unidirectional pattern synonyms, there is no
+  restriction on the right-hand side pattern.
+</para>
+
+<para>
+  Pattern synonyms cannot be defined recursively.
+</para>
+
+</listitem>
+
+<listitem> Typing:
+
+<para>
+  Given a pattern synonym definition of the form
+</para>
+<programlisting>
+  pattern P var1 var2 ... varN &lt;- pat
+</programlisting>
+<para>
+  it is assigned a <emphasis>pattern type</emphasis> of the form
+</para>
+<programlisting>
+  pattern CProv => P t1 t2 ... tN :: CReq => t
+</programlisting>
+<para>
+  where <replaceable>CProv</replaceable> and
+  <replaceable>CReq</replaceable> are type contexts, and
+  <replaceable>t1</replaceable>, <replaceable>t2</replaceable>, ...,
+  <replaceable>tN</replaceable> and <replaceable>t</replaceable> are
+  types.
+</para>
+
+<para>
+A pattern synonym of this type can be used in a pattern if the
+instatiated (monomorphic) type satisfies the constraints of
+<replaceable>CReq</replaceable>. In this case, it extends the context
+available in the right-hand side of the match with
+<replaceable>CProv</replaceable>, just like how an existentially-typed
+data constructor can extend the context.
+</para>
+
+<para>
+For example, in the following program:
+</para>
+<programlisting>
+{-# LANGUAGE PatternSynonyms, GADTs #-}
+module ShouldCompile where
+
+data T a where
+	MkT :: (Show b) => a -> b -> T a
+
+pattern ExNumPat x = MkT 42 x
+</programlisting>
+
+<para>
+the pattern type of <literal>ExNumPat</literal> is
+</para>
+
+<programlisting>
+pattern (Show b) => ExNumPat b :: (Num a, Eq a) => T a
+</programlisting>
+
+<para>
+  and so can be used in a function definition like the following:
+</para>
+
+<programlisting>
+  f :: (Num t, Eq t) => T t -> String
+  f (ExNumPat x) = show x
+</programlisting>
+
+<para>
+  For bidirectional pattern synonyms, uses as expressions have the type
+</para>
+<programlisting>
+  (CProv, CReq) => t1 -> t2 -> ... -> tN -> t
+</programlisting>
+
+<para>
+  So in the previous example, <literal>ExNumPat</literal>,
+  when used in an expression, has type
+</para>
+<programlisting>
+  ExNumPat :: (Show b, Num a, Eq a) => b -> T t
+</programlisting>
+
+</listitem>
+
+<listitem> Matching:
+
+<para>
+A pattern synonym occurance in a pattern is evaluated by first
+matching against the pattern synonym itself, and then on the argument
+patterns. For example, in the following program, <literal>f</literal>
+and <literal>f'</literal> are equivalent:
+</para>
+
+<programlisting>
+pattern Pair x y &lt;- [x, y]
+
+f (Pair True True) = True
+f _                = False
+
+f' [x, y] | True &lt;- x, True &lt;- y = True
+f' _                                   = False
+</programlisting>
+
+<para>
+  Note that the strictness of <literal>f</literal> differs from that
+  of <literal>g</literal> defined below:
+</para>
+
+<programlisting>
+g [True, True] = True
+g _            = False
+
+*Main> f (False:undefined)
+*** Exception: Prelude.undefined
+*Main> g (False:undefined)
+False
+</programlisting>
+</listitem>
+</itemizedlist>
+</para>
+
+</sect2>
+
     <!-- ===================== n+k patterns ===================  -->
 
 <sect2 id="n-k-patterns">
@@ -2325,6 +2615,15 @@ The following syntax is stolen:
 	</term>
 	<listitem><para>
 	Stolen by: <option>-XBangPatterns</option>
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>pattern</literal>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XPatternSynonyms</option>
 	  </para></listitem>
       </varlistentry>
     </variablelist>
