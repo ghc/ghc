@@ -1368,6 +1368,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/safeHaskell/safeLanguage/SafeLang13
 /tests/safeHaskell/safeLanguage/SafeLang15
 /tests/safeHaskell/unsafeLibs/BadImport02
+/tests/simplCore/prog003/simplCore.oneShot
 /tests/simplCore/should_compile/T3055.simpl
 /tests/simplCore/should_compile/T4138.simpl
 /tests/simplCore/should_compile/T7702plugin/pkg.T7702/

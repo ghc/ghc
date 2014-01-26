@@ -119,7 +119,7 @@ is right here.
 \begin{code}
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId, dollarId]
+  =  [lazyId, dollarId, oneShotId]
   ++ errorIds           -- Defined in MkCore
   ++ ghcPrimIds
 
@@ -1016,7 +1016,7 @@ another gun with which to shoot yourself in the foot.
 \begin{code}
 lazyIdName, unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName, dollarName :: Name
+   magicDictName, coerceName, proxyName, dollarName, oneShotName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
@@ -1028,6 +1028,7 @@ magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDict
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
+oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 \end{code}
 
 \begin{code}
@@ -1118,6 +1119,17 @@ lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
+
+oneShotId :: Id -- See Note [The oneShot function]
+oneShotId = pcMiscPrelId oneShotName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+    ty  = mkForAllTys [alphaTyVar, betaTyVar] (mkFunTy fun_ty fun_ty)
+    fun_ty = mkFunTy alphaTy betaTy
+    [body, x] = mkTemplateLocals [fun_ty, alphaTy]
+    x' = setOneShotLambda x
+    rhs = mkLams [alphaTyVar, betaTyVar, body, x'] $ Var body `App` Var x
 
 
 --------------------------------------------------------------------------------
@@ -1252,6 +1264,32 @@ See Trac #3259 for a real world example.
 
 lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
 appears un-applied, we'll end up just calling it.
+
+Note [The oneShot function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the context of making left-folds fuse somewhat okish (see ticket #7994
+and Note [Left folds via right fold]) it was determined that it would be useful
+if library authors could explicitly tell the compiler that a certain lambda is
+called at most once. The oneShot function allows that.
+
+Like most magic functions it has a compulsary unfolding, so there is no need
+for a real definition somewhere. We have one in GHC.Magic for the convenience
+of putting the documentation there.
+
+It uses `setOneShotLambda` on the lambda's binder. That is the whole magic:
+
+A typical call looks like
+     oneShot (\y. e)
+after unfolding the definition `oneShot = \f \x[oneshot]. f x` we get
+     (\f \x[oneshot]. f x) (\y. e)
+ --> \x[oneshot]. ((\y.e) x)
+ --> \x[oneshot] e[x/y]
+which is what we want.
+
+It is only effective if this bits survives as long as possible and makes it into
+the interface in unfoldings (See Note [Preserve OneShotInfo]). Also see
+https://ghc.haskell.org/trac/ghc/wiki/OneShot.
 
 
 Note [magicDictId magic]

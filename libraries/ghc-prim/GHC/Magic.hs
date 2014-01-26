@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, lazy ) where
+module GHC.Magic ( inline, lazy, oneShot ) where
 
 -- | The call @inline f@ arranges that 'f' is inlined, regardless of
 -- its size. More precisely, the call @inline f@ rewrites to the
@@ -64,3 +64,12 @@ lazy x = x
 -- sees it as lazy.  Then the worker/wrapper phase inlines it.
 -- Result: happiness
 
+
+-- | The 'oneShot' function can be used to give a hint to the compiler that its
+-- argument will be called at most once, which may (or may not) enable certain
+-- optimizations. It can be useful to improve the performance of code in continuation
+-- passing style.
+oneShot :: (a -> b) -> (a -> b)
+oneShot f = f
+-- Implementation note: This is wired in in MkId.lhs, so the code here is
+-- mostly there to have a place for the documentation.

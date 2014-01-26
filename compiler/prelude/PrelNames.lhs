@@ -1666,10 +1666,11 @@ rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
-thenIOIdKey, lazyIdKey, assertErrorIdKey :: Unique
+thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
+oneShotKey                    = mkPreludeMiscIdUnique 106
 
 breakpointIdKey, breakpointCondIdKey, breakpointAutoIdKey,
     breakpointJumpIdKey, breakpointCondJumpIdKey,

@@ -167,10 +167,10 @@ newDefaultBackend = error "no back end for this platform"
 
 -- | Create a new event manager.
 new :: Bool -> IO EventManager
-new oneShot = newWith oneShot =<< newDefaultBackend
+new isOneShot = newWith isOneShot =<< newDefaultBackend
 
 newWith :: Bool -> Backend -> IO EventManager
-newWith oneShot be = do
+newWith isOneShot be = do
   iofds <- fmap (listArray (0, callbackArraySize-1)) $
            replicateM callbackArraySize (newMVar =<< IT.new 8)
   ctrl <- newControl False
@@ -187,7 +187,7 @@ newWith oneShot be = do
                          , emState = state
                          , emUniqueSource = us
                          , emControl = ctrl
-                         , emOneShot = oneShot
+                         , emOneShot = isOneShot
                          , emLock = lockVar
                          }
   registerControlFd mgr (controlReadFd ctrl) evtRead
