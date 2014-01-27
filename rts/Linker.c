@@ -211,9 +211,23 @@ static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
+#if !defined(x86_64_HOST_ARCH)
 static int ocRunInit_PEi386     ( ObjectCode* oc );
+#endif
 static void *lookupSymbolInDLLs ( unsigned char *lbl );
 static void zapTrailingAtSign   ( unsigned char *sym );
+static char *allocateImageAndTrampolines (
+#if defined(x86_64_HOST_ARCH)
+   FILE* f, pathchar* arch_name, char* member_name,
+#endif
+   int size );
+#if defined(x86_64_HOST_ARCH)
+static int ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc );
+static size_t makeSymbolExtra_PEi386( ObjectCode* oc, size_t, char* symbol );
+#define PEi386_IMAGE_OFFSET 4
+#else
+#define PEi386_IMAGE_OFFSET 0
+#endif
 #elif defined(OBJFORMAT_MACHO)
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
@@ -2173,7 +2187,11 @@ void freeObjectCode (ObjectCode *oc)
 
 #else
 
+#ifndef mingw32_HOST_OS
     stgFree(oc->image);
+#else
+    VirtualFree(oc->image - PEi386_IMAGE_OFFSET, 0, MEM_RELEASE);
+#endif
 
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
 #if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
@@ -2546,23 +2564,11 @@ loadArchive( pathchar *path )
 #elif defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-            {
-                int offset;
+            image = allocateImageAndTrampolines(
 #if defined(x86_64_HOST_ARCH)
-                /* We get back 8-byte aligned memory (is that guaranteed?), but
-                   the offsets to the sections within the file are all 4 mod 8
-                   (is that guaranteed?). We therefore need to offset the image
-                   by 4, so that all the pointers are 8-byte aligned, so that
-                   pointer tagging works. */
-                offset = 4;
-#else
-                offset = 0;
+               f, path, fileName,
 #endif
-                image = VirtualAlloc(NULL, memberSize + offset,
-                                     MEM_RESERVE | MEM_COMMIT,
-                                     PAGE_EXECUTE_READWRITE);
-                image += offset;
-            }
+               memberSize);
 #elif defined(darwin_HOST_OS)
             /* See loadObj() */
             misalignment = machoGetMisalignment(f);
@@ -2735,22 +2741,11 @@ loadObj( pathchar *path )
 #   if defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-    {
-        int offset;
+    image = allocateImageAndTrampolines(
 #if defined(x86_64_HOST_ARCH)
-        /* We get back 8-byte aligned memory (is that guaranteed?), but
-           the offsets to the sections within the file are all 4 mod 8
-           (is that guaranteed?). We therefore need to offset the image
-           by 4, so that all the pointers are 8-byte aligned, so that
-           pointer tagging works. */
-        offset = 4;
-#else
-        offset = 0;
+       f, path, "itself",
 #endif
-      image = VirtualAlloc(NULL, fileSize + offset, MEM_RESERVE | MEM_COMMIT,
-                           PAGE_EXECUTE_READWRITE);
-      image += offset;
-    }
+       fileSize);
 #   elif defined(darwin_HOST_OS)
     // In a Mach-O .o file, all sections can and will be misaligned
     // if the total size of the headers is not a multiple of the
@@ -2806,6 +2801,8 @@ loadOc( ObjectCode* oc ) {
        IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
        return r;
    }
+#  elif defined(OBJFORMAT_PEi386) && defined(x86_64_HOST_ARCH)
+   ocAllocateSymbolExtras_PEi386 ( oc );
 #endif
 
    /* verify the in-memory image */
@@ -2878,7 +2875,10 @@ resolveObjs( void )
 #if defined(OBJFORMAT_ELF)
             r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
+#if !defined(x86_64_HOST_ARCH)
+            /* It does not work on x86_64 yet. #8698. */
             r = ocRunInit_PEi386 ( oc );
+#endif
 #elif defined(OBJFORMAT_MACHO)
             r = ocRunInit_MachO ( oc );
 #else
@@ -3460,6 +3460,46 @@ typedef
 #define MYIMAGE_REL_I386_DIR32           0x0006
 #define MYIMAGE_REL_I386_REL32           0x0014
 
+/* We assume file pointer is right at the
+   beginning of COFF object.
+ */
+static char *
+allocateImageAndTrampolines (
+#if defined(x86_64_HOST_ARCH)
+   FILE* f, pathchar* arch_name, char* member_name,
+#endif
+   int size )
+{
+   char* image;
+#if defined(x86_64_HOST_ARCH)
+   /* PeCoff contains number of symbols right in it's header, so
+      we can reserve the room for symbolExtras right here. */
+   COFF_header hdr;
+   size_t n;
+
+   n = fread ( &hdr, 1, sizeof_COFF_header, f );
+   if (n != sizeof( COFF_header ))
+       barf("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
+             member_name, arch_name);
+   fseek( f, -sizeof_COFF_header, SEEK_CUR );
+   
+   /* We get back 8-byte aligned memory (is that guaranteed?), but
+      the offsets to the sections within the file are all 4 mod 8
+      (is that guaranteed?). We therefore need to offset the image
+      by 4, so that all the pointers are 8-byte aligned, so that
+      pointer tagging works. */
+   /* For 32-bit case we don't need this, hence we use macro PEi386_IMAGE_OFFSET,
+      which equals to 4 for 64-bit case and 0 for 32-bit case. */
+   /* We allocate trampolines area for all symbols right behind
+      image data, aligned on pointer size. */
+   size = ((PEi386_IMAGE_OFFSET + size + sizeof(void*)) & ~sizeof(void*))
+              + hdr.NumberOfSymbols * sizeof(void*);
+#endif
+   image = VirtualAlloc(NULL, size,
+                        MEM_RESERVE | MEM_COMMIT,
+                        PAGE_EXECUTE_READWRITE);
+   return image + PEi386_IMAGE_OFFSET;
+}
 
 /* We use myindex to calculate array addresses, rather than
    simply doing the normal subscript thing.  That's because
@@ -3967,8 +4007,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           && 0 != strcmp(".stab", (char*)secname)
           && 0 != strcmp(".stabstr", (char*)secname)
           /* Ignore sections called which contain exception information. */
-          && 0 != strcmp(".pdata", (char*)secname)
-          && 0 != strcmp(".xdata", (char*)secname)
+          && 0 != strncmp(".pdata", (char*)secname, 6)
+          && 0 != strncmp(".xdata", (char*)secname, 6)
           /* ignore section generated from .ident */
           && 0!= strncmp(".debug", (char*)secname, 6)
           /* ignore unknown section that appeared in gcc 3.4.5(?) */
@@ -3983,8 +4023,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       if (kind != SECTIONKIND_OTHER && end >= start) {
-          if ((((size_t)(start)) % sizeof(void *)) != 0) {
-              barf("Misaligned section: %p", start);
+          if ((((size_t)(start)) % 4) != 0) {
+              barf("Misaligned section %s: %p", (char*)secname, start);
           }
 
          addSection(oc, kind, start, end);
@@ -4081,6 +4121,49 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    return 1;
 }
 
+#if defined(x86_64_HOST_ARCH)
+
+/* We've already reserved a room for symbol extras in loadObj,
+ * so simply set correct pointer here.
+ */
+static int
+ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc )
+{
+   /* Remember allocated memory starts at -4 offset from image pointer */
+   oc->symbol_extras = (SymbolExtra*)(oc->image - 4 + ((4 + oc->fileSize + sizeof(void*)) & ~sizeof(void*)));
+   oc->first_symbol_extra = 0;
+   oc->n_symbol_extras = ((COFF_header*)oc->image)->NumberOfSymbols;
+
+   return 1;
+}
+
+static size_t
+makeSymbolExtra_PEi386( ObjectCode* oc, size_t s, char* symbol )
+{
+    unsigned int curr_thunk;
+    SymbolExtra *extra;
+
+    curr_thunk = oc->first_symbol_extra;
+    if (curr_thunk > oc->n_symbol_extras) {
+      barf("Can't allocate thunk for %s", symbol);
+    }
+
+    extra = oc->symbol_extras + curr_thunk;
+
+    // jmp *-14(%rip)
+    static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
+    extra->addr = (uint64_t)s;
+    memcpy(extra->jumpIsland, jmp, 6);
+
+    ghciInsertSymbolTable(oc->fileName, symhash, symbol, extra->jumpIsland,
+            HS_BOOL_FALSE, oc);
+
+    oc->first_symbol_extra++;
+
+    return (size_t)extra->jumpIsland;
+}
+
+#endif
 
 static int
 ocResolve_PEi386 ( ObjectCode* oc )
@@ -4130,13 +4213,21 @@ ocResolve_PEi386 ( ObjectCode* oc )
          information. */
       if (0 == strcmp(".stab", (char*)secname)
           || 0 == strcmp(".stabstr", (char*)secname)
-          || 0 == strcmp(".pdata", (char*)secname)
-          || 0 == strcmp(".xdata", (char*)secname)
+          || 0 == strncmp(".pdata", (char*)secname, 6)
+          || 0 == strncmp(".xdata", (char*)secname, 6)
           || 0 == strncmp(".debug", (char*)secname, 6)
           || 0 == strcmp(".rdata$zzz", (char*)secname)) {
           stgFree(secname);
           continue;
       }
+
+#if defined(x86_64_HOST_ARCH)
+      /* It does not work on x86_64 yet. #8698. */
+      if (0 == strcmp(".ctors", (char*)secname)) {
+          stgFree(secname);
+          continue;
+      }
+#endif
 
       stgFree(secname);
 
@@ -4201,7 +4292,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             COFF_section* section_sym
                = findPEi386SectionCalled ( oc, sym->Name );
             if (!section_sym) {
-               errorBelch("%" PATH_FMT ": can't find section `%s'", oc->fileName, sym->Name);
+               errorBelch("%" PATH_FMT ": can't find section `%s' in %s", oc->fileName, sym->Name, secname);
                return 0;
             }
             S = ((size_t)(oc->image))
@@ -4258,8 +4349,13 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    v = S + ((size_t)A);
                    if (v >> 32) {
                        copyName ( sym->Name, strtab, symbol, 1000-1 );
-                       barf("R_X86_64_32[S]: High bits are set in %zx for %s",
-                            v, (char *)symbol);
+                       S = makeSymbolExtra_PEi386(oc, S, (char *)symbol);
+                       /* And retry */
+                       v = S + ((size_t)A);
+                       if (v >> 32) {
+                           barf("R_X86_64_32[S]: High bits are set in %zx for %s",
+                                v, (char *)symbol);
+                       }
                    }
                    *(UInt32 *)pP = (UInt32)v;
                    break;
@@ -4269,9 +4365,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    intptr_t v;
                    v = ((intptr_t)S) + ((intptr_t)(Int32)A) - ((intptr_t)pP) - 4;
                    if ((v >> 32) && ((-v) >> 32)) {
+                       /* Make the trampoline then */
                        copyName ( sym->Name, strtab, symbol, 1000-1 );
-                       barf("R_X86_64_PC32: High bits are set in %zx for %s",
-                            v, (char *)symbol);
+                       S = makeSymbolExtra_PEi386(oc, S, (char *)symbol);
+                       /* And retry */
+                       v = ((intptr_t)S) + ((intptr_t)(Int32)A) - ((intptr_t)pP) - 4;
+                       if ((v >> 32) && ((-v) >> 32)) {
+                           barf("R_X86_64_PC32: High bits are set in %zx for %s",
+                                v, (char *)symbol);
+                       }
                    }
                    *(UInt32 *)pP = (UInt32)v;
                    break;
@@ -4298,6 +4400,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
    return 1;
 }
 
+/* It does not work on x86_64 yet. #8698. */
+#if !defined(x86_64_HOST_ARCH)
 static int
 ocRunInit_PEi386 ( ObjectCode *oc )
 {
@@ -4340,6 +4444,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
     freeProgEnvv(envc, envv);
     return 1;
 }
+#endif
 
 #endif /* defined(OBJFORMAT_PEi386) */
 

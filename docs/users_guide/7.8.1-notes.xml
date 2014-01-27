@@ -579,9 +579,9 @@
 
             <listitem>
                 <para>
-                    The (static) GHCi linker now runs constructors for
-                    linked libraries. This means for example that C
-                    code using
+                    The (static) GHCi linker (except 64-bit Windows) now runs
+                    constructors for linked libraries. This means for example
+                    that C code using
                     <literal>__attribute__((constructor))</literal>
                     can now properly be loaded into GHCi.
                </para>
@@ -1191,14 +1191,6 @@
             <para>
                 On Windows, we currently don't ship dynamic libraries
                 or use a dynamic GHCi, unlike Linux, FreeBSD or OS X.
-           </para>
-       </listitem>
-
-        <listitem>
-            <para>
-                On 64bit Windows, the static linker currently suffers
-                from some rather large bugs, which we hope to have
-                some fixes for soon.
            </para>
        </listitem>
    </itemizedlist>
