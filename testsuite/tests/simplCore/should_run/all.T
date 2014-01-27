@@ -51,6 +51,7 @@ test('T5453', normal, compile_and_run, [''])
 test('T5441', extra_clean(['T5441a.o','T5441a.hi']), 
               multimod_compile_and_run, ['T5441',''])
 test('T5603', normal, compile_and_run, [''])
+test('T2110', expect_broken(2110), compile_and_run, [''])
 
 # Run these tests *without* optimisation too
 test('T5625', [ only_ways(['normal','optasm']), exit_code(1) ], compile_and_run, [''])
