@@ -12,6 +12,7 @@ module Platform (
         target32Bit,
         isARM,
         osElfTarget,
+        osMachOTarget,
         platformUsesFrameworks,
         platformBinariesAreStaticLibs,
 )
@@ -128,6 +129,11 @@ osElfTarget OSUnknown   = False
  -- ELF-specific functionality.  It is important to have a default for
  -- portability, otherwise we have to answer this question for every
  -- new platform we compile on (even unreg).
+
+-- | This predicate tells us whether the OS support Mach-O shared libraries.
+osMachOTarget :: OS -> Bool
+osMachOTarget OSDarwin = True
+osMachOTarget _ = False
 
 osUsesFrameworks :: OS -> Bool
 osUsesFrameworks OSDarwin = True

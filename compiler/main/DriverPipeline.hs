@@ -1785,6 +1785,15 @@ linkBinary' staticLink dflags o_files dep_packages = do
                               then []
                               else ["-Wl,-rpath-link", "-Wl," ++ l]
               in ["-L" ++ l] ++ rpathlink ++ rpath
+         | osMachOTarget (platformOS platform) &&
+           dynLibLoader dflags == SystemDependent &&
+           not (gopt Opt_Static dflags) &&
+           gopt Opt_RPath dflags
+            = let libpath = if gopt Opt_RelativeDynlibPaths dflags
+                            then "@loader_path" </>
+                                 (l `makeRelativeTo` full_output_fn)
+                            else l
+              in ["-L" ++ l] ++ ["-Wl,-rpath", "-Wl," ++ libpath]
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
@@ -1918,13 +1927,6 @@ linkBinary' staticLink dflags o_files dep_packages = do
                              platformArch platform == ArchX86 &&
                              not staticLink
                           then ["-Wl,-read_only_relocs,suppress"]
-                          else [])
-
-                      ++ (if platformOS platform == OSDarwin &&
-                             not staticLink &&
-                             not (gopt Opt_Static dflags) &&
-                             gopt Opt_RPath dflags
-                          then ["-Wl,-rpath","-Wl," ++ topDir dflags]
                           else [])
 
                       ++ o_files

@@ -1293,7 +1293,8 @@ linkDynLib dflags0 o_files dep_packages
     let pkg_lib_paths = collectLibraryPaths pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
-         | osElfTarget (platformOS (targetPlatform dflags)) &&
+         | ( osElfTarget (platformOS (targetPlatform dflags)) ||
+             osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
            not (gopt Opt_Static dflags)
             = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
@@ -1390,9 +1391,7 @@ linkDynLib dflags0 o_files dep_packages
 
             instName <- case dylibInstallName dflags of
                 Just n -> return n
-                Nothing -> do
-                    pwd <- getCurrentDirectory
-                    return $ pwd `combine` output_fn
+                Nothing -> return $ "@rpath" `combine` (takeFileName output_fn)
             runLink dflags (
                     map Option verbFlags
                  ++ [ Option "-dynamiclib"

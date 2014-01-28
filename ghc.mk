@@ -283,11 +283,6 @@ include rules/build-dependencies.mk
 include rules/include-dependencies.mk
 
 # -----------------------------------------------------------------------------
-# Dynamic library references
-
-include rules/relative-dynlib-references.mk
-
-# -----------------------------------------------------------------------------
 # Build package-data.mk files
 
 include rules/build-package-data.mk
