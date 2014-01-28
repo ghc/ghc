@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -989,10 +989,11 @@ unfoldr f b  =
 -- -----------------------------------------------------------------------------
 
 -- | A strict version of 'foldl'.
-foldl'           :: (b -> a -> b) -> b -> [a] -> b
-foldl' f z0 xs0 = lgo z0 xs0
-    where lgo z []     = z
-          lgo z (x:xs) = let z' = f z x in z' `seq` lgo z' xs
+foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
+foldl' k z0 xs = foldr (\(v::a) (fn::b->b) (z::b) -> z `seq` fn (k z v)) (id :: b -> b) xs z0
+-- Implementing foldl' via foldr is only a good idea if the compiler can optimize
+-- the resulting code (eta-expand the recursive "go"), so this needs -fcall-arity!
+-- Also see #7994
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists.
@@ -1008,32 +1009,15 @@ foldl1' _ []             =  errorEmptyList "foldl1'"
 -- -----------------------------------------------------------------------------
 -- List sum and product
 
-{-# SPECIALISE sum     :: [Int] -> Int #-}
-{-# SPECIALISE sum     :: [Integer] -> Integer #-}
-{-# INLINABLE sum #-}
-{-# SPECIALISE product :: [Int] -> Int #-}
-{-# SPECIALISE product :: [Integer] -> Integer #-}
-{-# INLINABLE product #-}
--- We make 'sum' and 'product' inlinable so that we get specialisations
--- at other types.  See, for example, Trac #7507.
-
 -- | The 'sum' function computes the sum of a finite list of numbers.
 sum                     :: (Num a) => [a] -> a
 -- | The 'product' function computes the product of a finite list of numbers.
 product                 :: (Num a) => [a] -> a
-#ifdef USE_REPORT_PRELUDE
+
+{-# INLINE sum #-}
 sum                     =  foldl (+) 0
+{-# INLINE product #-}
 product                 =  foldl (*) 1
-#else
-sum     l       = sum' l 0
-  where
-    sum' []     a = a
-    sum' (x:xs) a = sum' xs (a+x)
-product l       = prod l 1
-  where
-    prod []     a = a
-    prod (x:xs) a = prod xs (a*x)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Functions on strings
