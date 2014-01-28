@@ -633,11 +633,12 @@ xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
 
 \begin{code}
 foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
-foldr2 _k z []    _ys    = z
-foldr2 _k z _xs   []     = z
-foldr2 k z (x:xs) (y:ys) = k x y (foldr2 k z xs ys)
-
-{-# NOINLINE [1] foldr2 #-}
+foldr2 k z = go
+  where
+	go []    _ys     = z
+	go _xs   []      = z
+	go (x:xs) (y:ys) = k x y (go xs ys)
+{-# INLINE [0] foldr2 #-}
 
 foldr2_left :: (a -> b -> c -> d) -> d -> a -> ([b] -> c) -> [b] -> d
 foldr2_left _k  z _x _r []     = z
