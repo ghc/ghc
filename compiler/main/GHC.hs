@@ -468,11 +468,14 @@ checkBrokenTablesNextToCode :: MonadIO m => DynFlags -> m ()
 checkBrokenTablesNextToCode dflags
   = do { broken <- checkBrokenTablesNextToCode' dflags
        ; when broken
-         $ do { liftIO $ throwIO $ mkApiErr dflags 
-                  (text "Tables-next-to-code not supported on ARM using binutils ld (https://sourceware.org/bugzilla/show_bug.cgi?id=16177)")
+         $ do { _ <- liftIO $ throwIO $ mkApiErr dflags invalidLdErr
               ; fail "unsupported linker"
               }
        }
+  where
+    invalidLdErr = text "Tables-next-to-code not supported on ARM" <+>
+                   text "when using binutils ld (please see:" <+>
+                   text "https://sourceware.org/bugzilla/show_bug.cgi?id=16177)"
 
 checkBrokenTablesNextToCode' :: MonadIO m => DynFlags -> m Bool
 checkBrokenTablesNextToCode' dflags
