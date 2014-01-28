@@ -1206,7 +1206,9 @@ tryEtaExpandRhs env bndr rhs
       = return (exprArity rhs, rhs)
 
       | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
-      , let new_arity = findRhsArity dflags bndr rhs old_arity
+      , let new_arity1 = findRhsArity dflags bndr rhs old_arity
+            new_arity2 = idCallArity bndr
+            new_arity  = max new_arity1 new_arity2
       , new_arity > manifest_arity      -- And the curent manifest arity isn't enough
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }

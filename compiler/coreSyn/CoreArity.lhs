@@ -15,7 +15,7 @@
 
 -- | Arit and eta expansion
 module CoreArity (
-	manifestArity, exprArity, exprBotStrictness_maybe,
+	manifestArity, exprArity, typeArity, exprBotStrictness_maybe,
 	exprEtaExpandArity, findRhsArity, CheapFun, etaExpand
     ) where
 
@@ -1025,4 +1025,3 @@ freshEtaId n subst ty
 		  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
 	subst'  = extendTvInScope subst eta_id'		  
 \end{code}
-

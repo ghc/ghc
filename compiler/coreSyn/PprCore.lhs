@@ -376,10 +376,11 @@ ppIdInfo id info
     else
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
-    , (has_arity,      ptext (sLit "Arity=") <> int arity)
-    , (has_caf_info,   ptext (sLit "Caf=") <> ppr caf_info)
-    , (True,           ptext (sLit "Str=") <> pprStrictness str_info)
-    , (has_unf,        ptext (sLit "Unf=") <> ppr unf_info)
+    , (has_arity,        ptext (sLit "Arity=") <> int arity)
+    , (has_called_arity, ptext (sLit "CallArity=") <> int called_arity)
+    , (has_caf_info,     ptext (sLit "Caf=") <> ppr caf_info)
+    , (True,             ptext (sLit "Str=") <> pprStrictness str_info)
+    , (has_unf,          ptext (sLit "Unf=") <> ppr unf_info)
     , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
         -- printed out with all binders (when debug is on);
@@ -391,6 +392,9 @@ ppIdInfo id info
 
     arity = arityInfo info
     has_arity = arity /= 0
+
+    called_arity = callArityInfo info
+    has_called_arity = called_arity /= 0
 
     caf_info = cafInfo info
     has_caf_info = not (mayHaveCafRefs caf_info)

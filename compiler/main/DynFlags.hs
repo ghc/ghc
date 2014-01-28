@@ -240,6 +240,7 @@ data DumpFlag
    | Opt_D_dump_spec
    | Opt_D_dump_prep
    | Opt_D_dump_stg
+   | Opt_D_dump_call_arity
    | Opt_D_dump_stranal
    | Opt_D_dump_strsigs
    | Opt_D_dump_tc
@@ -288,6 +289,7 @@ data GeneralFlag
    | Opt_PrintExplicitKinds
 
    -- optimisation opts
+   | Opt_CallArity
    | Opt_Strictness
    | Opt_LateDmdAnal
    | Opt_KillAbsence
@@ -2322,6 +2324,7 @@ dynamic_flags = [
   , Flag "ddump-spec"              (setDumpFlag Opt_D_dump_spec)
   , Flag "ddump-prep"              (setDumpFlag Opt_D_dump_prep)
   , Flag "ddump-stg"               (setDumpFlag Opt_D_dump_stg)
+  , Flag "ddump-call-arity"        (setDumpFlag Opt_D_dump_call_arity)
   , Flag "ddump-stranal"           (setDumpFlag Opt_D_dump_stranal)
   , Flag "ddump-strsigs"           (setDumpFlag Opt_D_dump_strsigs)
   , Flag "ddump-tc"                (setDumpFlag Opt_D_dump_tc)
@@ -2623,6 +2626,7 @@ fFlags = [
   ( "error-spans",                      Opt_ErrorSpans, nop ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
   ( "print-explicit-kinds",             Opt_PrintExplicitKinds, nop ),
+  ( "call-arity",                       Opt_CallArity, nop ),
   ( "strictness",                       Opt_Strictness, nop ),
   ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
   ( "specialise",                       Opt_Specialise, nop ),
@@ -2957,6 +2961,7 @@ optLevelFlags
                                          --              in PrelRules
     , ([1,2],   Opt_DoEtaReduction)
     , ([1,2],   Opt_CaseMerge)
+    , ([1,2],   Opt_CallArity)
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_FullLaziness)

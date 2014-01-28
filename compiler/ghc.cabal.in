@@ -350,6 +350,7 @@ Library
         CoreToStg
         StgLint
         StgSyn
+        CallArity
         DmdAnal
         WorkWrap
         WwLib
