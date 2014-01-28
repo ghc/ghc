@@ -1178,12 +1178,39 @@
     <itemizedlist>
         <listitem>
             <para>
+                On OS X Mavericks, when using Clang as the C
+                preprocessor, Haddock has a bug that causes it to fail
+                to generate documentation, with an error similar to
+                the following:
+
+<programlisting>
+&lt;no location info&gt;:
+    module 'xhtml-3000.2.1:Main' is defined in multiple files: dist-bindist/build/tmp-72252/Text/XHtml.hs
+                                                               dist-bindist/build/tmp-72252/Text/XHtml/Frameset.hs
+                                                               dist-bindist/build/tmp-72252/Text/XHtml/Strict.hs
+                                                               dist-bindist/build/tmp-72252/Text/XHtml/Transitional.hs
+...
+</programlisting>
+
+           </para>
+            <para>
+                This only affects certain packages. This is due to a
+                bad interaction with Clang, which we hope to resolve
+                soon.
+           </para>
+            <para>
+                Note that when using <literal>cabal-install</literal>,
+                this only effects the package documentation, not
+                installation or building.
+           </para>
+       </listitem>
+        <listitem>
+            <para>
                 On OS X 10.7 and beyond, with default build settings,
                 the runtime system currently suffers from a fairly
-                large (30%) performance regression in the parallel
-                garbage collector when using
-                <literal>-threaded</literal> impacting its thoroughput
-                and overall scalability.
+                large (approx. 30%) performance regression in the
+                parallel garbage collector when using
+                <literal>-threaded</literal>.
            </para>
             <para>
                 This is due to the fact that the OS X 10.7+ toolchain
