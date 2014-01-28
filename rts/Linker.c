@@ -3671,6 +3671,23 @@ lookupSymbolInDLLs ( UChar *lbl )
                 return sym;
             }
         }
+
+        /* Ticket #2283.
+           Long description: http://support.microsoft.com/kb/132044
+           tl;dr:
+             If C/C++ compiler sees __declspec(dllimport) ... foo ...
+             it generates call __imp_foo, and __imp_foo here has exactly
+             the same semantics as in __imp_foo = GetProcAddress(..., "foo")
+         */
+        if (sym == NULL && strncmp ((const char*)lbl, "__imp_", 6) == 0) {
+            sym = GetProcAddress(o_dll->instance, (char*)(lbl+6));
+            if (sym != NULL) {
+                errorBelch("warning: %s from %S is linked instead of %s",
+                              (char*)(lbl+6), o_dll->name, (char*)lbl);
+                return sym;
+               }
+        }
+
         sym = GetProcAddress(o_dll->instance, (char*)lbl);
         if (sym != NULL) {
             /*debugBelch("found %s in %s\n", lbl,o_dll->name);*/
