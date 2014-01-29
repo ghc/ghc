@@ -519,7 +519,7 @@ insertBy cmp x ys@(y:ys')
 -- It is a special case of 'Data.List.maximumBy', which allows the
 -- programmer to supply their own comparison function.
 maximum                 :: (Ord a) => [a] -> a
-{-# NOINLINE [1] maximum #-}
+{-# INLINE [1] maximum #-}
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
@@ -540,7 +540,7 @@ strictMaximum xs        =  foldl1' max xs
 -- It is a special case of 'Data.List.minimumBy', which allows the
 -- programmer to supply their own comparison function.
 minimum                 :: (Ord a) => [a] -> a
-{-# NOINLINE [1] minimum #-}
+{-# INLINE [1] minimum #-}
 minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
