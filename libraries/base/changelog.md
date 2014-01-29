@@ -19,6 +19,11 @@
 
   * There is now a `Data` instance for `Data.Version`.
 
+  * A new `Data.Bits.FiniteBits` class has been added to represent
+    types with fixed bit-count. The existing `Bits` class is extended
+    with a `bitSizeMaybe` method to replace the now obsolete
+    `bitsize` method.
+
   * There are now `Bits` and `FiniteBits` instances for `Bool`.
 
   * There are now `Eq`, `Ord`, `Show` and `Read` instances for `ZipList`.
