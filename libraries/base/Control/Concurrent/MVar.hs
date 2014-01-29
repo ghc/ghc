@@ -24,12 +24,14 @@
 --   3. As a binary semaphore @'MVar' ()@, with 'takeMVar' and 'putMVar' as
 --      wait and signal.
 --
--- They were introduced in the paper "Concurrent Haskell" by Simon
--- Peyton Jones, Andrew Gordon and Sigbjorn Finne, though some details
--- of their implementation have since then changed (in particular, a
--- put on a full MVar used to error, but now merely blocks.)
+-- They were introduced in the paper
+-- <http://research.microsoft.com/~simonpj/papers/concurrent-haskell.ps.gz "Concurrent Haskell">
+-- by Simon Peyton Jones, Andrew Gordon and Sigbjorn Finne, though
+-- some details of their implementation have since then changed (in
+-- particular, a put on a full 'MVar' used to error, but now merely
+-- blocks.)
 --
--- * Applicability
+-- === Applicability
 --
 -- 'MVar's offer more flexibility than 'IORef's, but less flexibility
 -- than 'STM'.  They are appropriate for building synchronization
@@ -47,7 +49,7 @@
 -- perform a 'takeMVar' before a 'putMVar' as well;  otherwise, they may
 -- block.
 --
--- * Fairness
+-- === Fairness
 --
 -- No thread can be blocked indefinitely on an 'MVar' unless another
 -- thread holds that 'MVar' indefinitely.  One usual implementation of
@@ -55,7 +57,7 @@
 -- served in a first-in-first-out fashion, but this is not guaranteed
 -- in the semantics.
 --
--- * Gotchas
+-- === Gotchas
 --
 -- Like many other Haskell data structures, 'MVar's are lazy.  This
 -- means that if you place an expensive unevaluated thunk inside an
@@ -64,14 +66,14 @@
 -- in an 'MVar' to the appropriate normal form, or utilize a strict
 -- MVar provided by the strict-concurrency package.
 --
--- * Ordering
+-- === Ordering
 --
 -- 'MVar' operations are always observed to take place in the order
 -- they are written in the program, regardless of the memory model of
 -- the underlying machine.  This is in contrast to 'IORef' operations
 -- which may appear out-of-order to another thread in some cases.
 --
--- * Example
+-- === Example
 --
 -- Consider the following concurrent data structure, a skip channel.
 -- This is a channel for an intermittent source of high bandwidth
