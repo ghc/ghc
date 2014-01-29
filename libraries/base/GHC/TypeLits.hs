@@ -174,6 +174,7 @@ type family (m :: Nat) - (n :: Nat) :: Nat
 
 -- | We either get evidence that this function was instantiated with the
 -- same type-level numbers, or 'Nothing'.
+--
 -- /Since: 4.7.0.0/
 sameNat :: (KnownNat a, KnownNat b) =>
            Proxy a -> Proxy b -> Maybe (a :~: b)
@@ -183,6 +184,7 @@ sameNat x y
 
 -- | We either get evidence that this function was instantiated with the
 -- same type-level symbols, or 'Nothing'.
+--
 -- /Since: 4.7.0.0/
 sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
               Proxy a -> Proxy b -> Maybe (a :~: b)
