@@ -75,7 +75,9 @@ We also leave abstract the function \coderef{basicTypes/Literal.lhs}{literalType
 and the judgment \coderef{coreSyn/CoreLint.lhs}{lintTyLit} (written $[[G |-tylit lit : k]]$).
 
 \subsection{Variables}
-
+\enlargethispage{10pt} % without this first line of "z" definition is placed on
+                       % second page and it becomes the only line of text on that
+                       % page, resulting in whole page being empty.
 GHC uses the same datatype to represent term-level variables and type-level
 variables:
 
