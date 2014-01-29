@@ -4,6 +4,10 @@
 
   * Bundled with GHC 7.8.1
 
+  * Add `/Since: 4.[4567].0.0/` Haddock annotations to entities
+    denoting the package version, when the given entity was introduced
+    (or its type signature changed in a non-compatible way)
+
   * The `Control.Category` module now has the `PolyKinds` extension
     enabled, meaning that instances of `Category` no longer need be of
     kind `* -> * -> *`.
@@ -15,6 +19,8 @@
 
   * There is now a `Data` instance for `Data.Version`.
 
+  * There are now `Bits` and `FiniteBits` instances for `Bool`.
+
   * There are now `Eq`, `Ord`, `Show` and `Read` instances for `ZipList`.
 
   * There are now `Eq`, `Ord`, `Show` and `Read` instances for `Down`.
@@ -23,10 +29,15 @@
     for types in GHC.Generics (`U1`, `Par1`, `Rec1`, `K1`, `M1`,
     `(:+:)`, `(:*:)`, `(:.:)`).
 
+  * There are now `Functor` instances for `System.Console.GetOpt`'s
+    `ArgOrder`, `OptDescr`, and `ArgDescr`.
+
   * A zero-width unboxed poly-kinded `Proxy#` was added to
     `GHC.Prim`. It can be used to make it so that there is no the
     operational overhead for passing around proxy arguments to model
     type application.
+
+  * New `Data.Proxy` module providing a concrete, poly-kinded proxy type.
 
   * `Control.Concurrent.MVar` has a new implementation of `readMVar`,
     which fixes a long-standing bug where `readMVar` is only atomic if
@@ -35,12 +46,25 @@
     `putMVar`.  There is also a new `tryReadMVar` which is a
     non-blocking version.
 
-  * There are now byte endian-swapping primitives available in
-    `Data.Word`, which use optimized machine instructions when
-    available.
+  * New `threadWait{Read,Write}STM :: Fd -> IO (STM (), IO ())`
+    functions added to `Control.Concurrent` for waiting on FD
+    readiness with STM actions.
+
+  * Expose `Data.Fixed.Fixed`'s constructor.
+
+  * There are now byte endian-swapping primitives
+    `byteSwap{16,32,64}` available in `Data.Word`, which use
+    optimized machine instructions when available.
 
   * `Data.Bool` now exports `bool :: a -> a -> Bool -> a`, analogously
     to `maybe` and `either` in their respective modules.
+
+  * `Data.Either` now exports `isLeft, isRight :: Either a b -> Bool`.
+
+  * `Debug.Trace` now exports `traceId`, `traceShowId`, `traceM`,
+    and `traceShowM`.
+
+  * `Data.Functor` now exports `($>)` and `void`.
 
   * Rewrote portions of `Text.Printf`, and made changes to `Numeric`
     (added `Numeric.showFFloatAlt` and `Numeric.showGFloatAlt`) and
@@ -58,3 +82,34 @@
   * `Control.Applicative.WrappedMonad`, which can be used to convert a
     `Monad` to an `Applicative`, has now a
     `Monad m => Monad (WrappedMonad m)` instance.
+
+  * Handle `ExitFailure (-sig)` on Unix by killing process with signal `sig`.
+
+  * New module `Data.Type.Bool` providing operations on type-level booleans.
+
+  * Expose `System.Mem.performMinorGC` for triggering minor GCs.
+
+  * New `System.Environment.{set,unset}Env` for manipulating
+    environment variables.
+
+  * Add `Typeable` instance for `(->)` and `RealWorld`.
+
+  * Declare CPP head `<Typeable.h>` officially obsolete as GHC 7.8+
+    does not support hand-written `Typeable` instances anymore.
+
+  * Remove (unmaintained) Hugs98 and NHC98 specific code.
+
+  * Optimize `System.Timeout.timeout` for the threaded RTS.
+
+  * Remove deprecated functions `unsafeInterleaveST`, `unsafeIOToST`,
+    and `unsafeSTToIO` from `Control.Monad.ST`.
+
+  * Remove deprecated functions `blocked`, `unblock`, and `block` from
+    `Control.Exception`.
+
+  * Remove deprecated function `forkIOUnmasked` from `Control.Concurrent`.
+
+  * Remove deprecated function `unsafePerformIO` export from `Foreign`
+    (still available via `System.IO.Unsafe.unsafePerformIO`).
+
+  * Various fixes and other improvements (see Git history for full details).
