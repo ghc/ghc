@@ -1,0 +1,31 @@
+go2:
+    go 2
+    d 1
+nested_go2:
+    go 2
+    go2 2
+    d 1
+    n 1
+d0:
+    go 0
+    d 0
+go2 (in case crut):
+    go 2
+    d 1
+go2 (in function call):
+    go 2
+    d 1
+go2 (using surrounding interesting let; 'go 2' would be good!):
+    go 0
+    d 0
+    n 1
+go2 (using surrounding boring let):
+    go 2
+    d 1
+    z 0
+two recursions (both arity 1 would be good!):
+    d 0
+    n 1
+two recursions (semantically like the previous case):
+    d 1
+    n 1

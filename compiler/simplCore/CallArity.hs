@@ -4,6 +4,7 @@
 
 module CallArity
     ( callArityAnalProgram
+    , callArityRHS -- for testing
     ) where
 
 import VarSet
