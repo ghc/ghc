@@ -718,19 +718,6 @@
   <sect2>
     <title>Libraries</title>
 
-    <para>
-        There have been some changes that have effected multiple
-        libraries:
-    </para>
-
-     <itemizedlist>
-         <listitem>
-             <para>
-                 TODO FIXME
-            </para>
-        </listitem>
-    </itemizedlist>
-
     <sect3>
         <title>array</title>
         <itemizedlist>
