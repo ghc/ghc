@@ -365,6 +365,7 @@ codeblock d =
       where
         p isNewline c
           | isNewline && c == '@' = Nothing
+          | isNewline && isSpace c = Just isNewline
           | otherwise = Just $ c == '\n'
 
 hyperlink :: Parser (Doc a)

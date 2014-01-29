@@ -410,6 +410,14 @@ spec = before initStaticOpts $ do
           , "@"
           ] `shouldParseTo` DocCodeBlock "foo\n@\nbar\n"
 
+      it "accepts horizontal space before the @" $ do
+        unlines [ " @"
+                , " foo"
+                , ""
+                , " bar"
+                , " @"
+                ] `shouldParseTo` DocCodeBlock " foo\n\n bar\n "
+
       it "accepts unicode" $ do
         "@foo 灼眼のシャナ bar@" `shouldParseTo` DocCodeBlock "foo 灼眼のシャナ bar"
 
