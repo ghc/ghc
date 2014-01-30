@@ -10,11 +10,15 @@
 -- Portability :  portable
 --
 -- Basic arrow definitions, based on
+--
 --  * /Generalising Monads to Arrows/, by John Hughes,
 --    /Science of Computer Programming/ 37, pp67-111, May 2000.
+--
 -- plus a couple of definitions ('returnA' and 'loop') from
+--
 --  * /A New Notation for Arrows/, by Ross Paterson, in /ICFP 2001/,
 --    Firenze, Italy, pp229-240.
+--
 -- These papers and more information on arrows can be found at
 -- <http://www.haskell.org/arrows/>.
 
@@ -186,6 +190,7 @@ instance MonadPlus m => ArrowPlus (Kleisli m) where
 
 -- | Choice, for arrows that support it.  This class underlies the
 -- @if@ and @case@ constructs in arrow notation.
+--
 -- Minimal complete definition: 'left', satisfying the laws
 --
 --  * @'left' ('arr' f) = 'arr' ('left' f)@

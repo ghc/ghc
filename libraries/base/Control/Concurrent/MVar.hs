@@ -245,7 +245,7 @@ modifyMVarMasked m io =
     putMVar m a'
     return b
 
-{-# DEPRECATED addMVarFinalizer "use mkWeakMVar instead" #-} -- deprecated in 7.6
+{-# DEPRECATED addMVarFinalizer "use 'mkWeakMVar' instead" #-} -- deprecated in 7.6
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer = GHC.MVar.addMVarFinalizer
 

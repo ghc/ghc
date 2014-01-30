@@ -79,10 +79,10 @@ traceIO msg = do
 foreign import ccall unsafe "HsBase.h debugBelch2"
    debugBelch :: CString -> CString -> IO ()
 
--- | Deprecated. Use 'traceIO'.
+-- |
 putTraceMsg :: String -> IO ()
 putTraceMsg = traceIO
-{-# DEPRECATED putTraceMsg "Use Debug.Trace.traceIO" #-} -- deprecated in 7.4
+{-# DEPRECATED putTraceMsg "Use 'Debug.Trace.traceIO'" #-} -- deprecated in 7.4
 
 
 {-# NOINLINE trace #-}

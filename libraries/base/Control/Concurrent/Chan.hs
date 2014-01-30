@@ -136,7 +136,7 @@ unGetChan (Chan readVar _) val = do
    modifyMVar_ readVar $ \read_end -> do
      putMVar new_read_end (ChItem val read_end)
      return new_read_end
-{-# DEPRECATED unGetChan "if you need this operation, use Control.Concurrent.STM.TChan instead.  See http://hackage.haskell.org/trac/ghc/ticket/4154 for details" #-} -- deprecated in 7.0
+{-# DEPRECATED unGetChan "if you need this operation, use Control.Concurrent.STM.TChan instead.  See <http://ghc.haskell.org/trac/ghc/ticket/4154> for details" #-} -- deprecated in 7.0
 
 -- |Returns 'True' if the supplied 'Chan' is empty.
 isEmptyChan :: Chan a -> IO Bool
@@ -145,7 +145,7 @@ isEmptyChan (Chan readVar writeVar) = do
      w <- readMVar writeVar
      let eq = r == w
      eq `seq` return eq
-{-# DEPRECATED isEmptyChan "if you need this operation, use Control.Concurrent.STM.TChan instead.  See http://hackage.haskell.org/trac/ghc/ticket/4154 for details" #-} -- deprecated in 7.0
+{-# DEPRECATED isEmptyChan "if you need this operation, use Control.Concurrent.STM.TChan instead.  See <http://ghc.haskell.org/trac/ghc/ticket/4154> for details" #-} -- deprecated in 7.0
 
 -- Operators for interfacing with functional streams.
 
