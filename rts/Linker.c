@@ -3491,9 +3491,9 @@ allocateImageAndTrampolines (
    /* For 32-bit case we don't need this, hence we use macro PEi386_IMAGE_OFFSET,
       which equals to 4 for 64-bit case and 0 for 32-bit case. */
    /* We allocate trampolines area for all symbols right behind
-      image data, aligned on pointer size. */
-   size = ((PEi386_IMAGE_OFFSET + size + sizeof(void*)) & ~sizeof(void*))
-              + hdr.NumberOfSymbols * sizeof(void*);
+      image data, aligned on 16. */
+   size = ((PEi386_IMAGE_OFFSET + size + 0xf) & ~0xf)
+              + hdr.NumberOfSymbols * sizeof(SymbolExtra);
 #endif
    image = VirtualAlloc(NULL, size,
                         MEM_RESERVE | MEM_COMMIT,
@@ -4146,8 +4146,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 static int
 ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc )
 {
-   /* Remember allocated memory starts at -4 offset from image pointer */
-   oc->symbol_extras = (SymbolExtra*)(oc->image - 4 + ((4 + oc->fileSize + sizeof(void*)) & ~sizeof(void*)));
+   oc->symbol_extras = (SymbolExtra*)(oc->image - PEi386_IMAGE_OFFSET
+                                      + ((PEi386_IMAGE_OFFSET + oc->fileSize + 0xf) & ~0xf));
    oc->first_symbol_extra = 0;
    oc->n_symbol_extras = ((COFF_header*)oc->image)->NumberOfSymbols;
 
@@ -4172,8 +4172,13 @@ makeSymbolExtra_PEi386( ObjectCode* oc, size_t s, char* symbol )
     extra->addr = (uint64_t)s;
     memcpy(extra->jumpIsland, jmp, 6);
 
-    ghciInsertSymbolTable(oc->fileName, symhash, symbol, extra->jumpIsland,
-            HS_BOOL_FALSE, oc);
+    /* DLL-imported symbols are inserted here.
+       Others are inserted in ocGetNames_PEi386.
+     */
+    if(lookupStrHashTable(symhash, symbol) == NULL) {
+       ghciInsertSymbolTable(oc->fileName, symhash, symbol, extra->jumpIsland,
+               HS_BOOL_FALSE, oc);
+    }
 
     oc->first_symbol_extra++;
 
