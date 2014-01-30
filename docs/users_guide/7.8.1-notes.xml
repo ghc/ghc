@@ -554,8 +554,12 @@
                     guide the processor's caching decisions.
                </para>
                 <para>
-                    Currently, these are only supported with the LLVM
-                    backend and x86/amd64 backends.
+                    Currently, the primops get translated into
+                    the associated hardware supported prefetch
+                    instructions only with the LLVM backend and
+                    x86/amd64 backends. On all other backends,
+                    the prefetch primops are currently erased
+                    at code generation time.
                </para>
            </listitem>
        </itemizedlist>
