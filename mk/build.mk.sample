@@ -14,6 +14,9 @@
 # As above but build GHC using the LLVM backend
 #BuildFlavour = perf-llvm
 
+# Perf build configured for a cross-compiler
+#BuildFlavour = perf-cross
+
 # Fast build with optimised libraries, no profiling (RECOMMENDED):
 #BuildFlavour = quick
 
@@ -83,6 +86,29 @@ GhcStage2HcOpts = -O2 -fllvm
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
 GhcLibWays     += p
+
+endif
+
+# ------- A Perf build configured for cross-compilation ----------------------
+
+ifeq "$(BuildFlavour)" "perf-cross"
+
+SRC_HC_OPTS     = -O -H64m -fllvm
+GhcStage1HcOpts = -O2 -fllvm
+GhcStage2HcOpts = -O2 -fllvm
+GhcHcOpts       = -Rghc-timing
+GhcLibHcOpts    = -O2
+GhcLibWays     += p
+INTEGER_LIBRARY    = integer-simple
+Stage1Only         = YES
+
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+DYNAMIC_BY_DEFAULT   = NO
+DYNAMIC_GHC_PROGRAMS = NO
 
 endif
 
