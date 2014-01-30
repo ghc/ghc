@@ -82,7 +82,6 @@ ppPatSig summary links loc (doc, _argDocs) docname args typ prov req unicode qua
   | summary = pref1
   | otherwise = topDeclElem links loc [docname] pref1 +++ docSection qual doc
   where
-    -- pref1 = leader <+> ppTypeSig summary occnames pp_typ unicode
     pref1 = hsep [ toHtml "pattern"
                  , pp_cxt prov
                  , pp_head
@@ -184,9 +183,7 @@ ppTypeSig summary nms pp_ty unicode =
 
 
 ppTyName :: Name -> Html
-ppTyName name
-  | isNameSym name = parens (ppName name)
-  | otherwise = ppName name
+ppTyName = ppName (Just False)
 
 
 --------------------------------------------------------------------------------
@@ -273,25 +270,28 @@ ppDataBinderWithVars summ decl =
 -- | Print an application of a DocName and a list of HsTypes
 ppAppNameTypes :: DocName -> [HsType DocName] -> Bool -> Qualification -> Html
 ppAppNameTypes n ts unicode qual =
-    ppTypeApp n ts (ppDocName qual) (ppParendType unicode qual)
+    ppTypeApp n ts (ppDocName qual . Just) (ppParendType unicode qual)
 
 
 -- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
 ppAppDocNameNames summ n ns =
-  ppTypeApp n ns (ppBinder summ . nameOccName . getName) ppTyName
-
+    ppTypeApp n ns ppDN ppTyName
+  where
+    ppDN is_infix = ppBinderFixity is_infix summ . nameOccName . getName
+    ppBinderFixity True = ppBinderInfix
+    ppBinderFixity False = ppBinder
 
 -- | General printing of type applications
-ppTypeApp :: DocName -> [a] -> (DocName -> Html) -> (a -> Html) -> Html
+ppTypeApp :: DocName -> [a] -> (Bool -> DocName -> Html) -> (a -> Html) -> Html
 ppTypeApp n (t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
     operator = isNameSym . getName $ n
-    opApp = ppT t1 <+> ppDN n <+> ppT t2
+    opApp = ppT t1 <+> ppDN True n <+> ppT t2
 
-ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
+ppTypeApp n ts ppDN ppT = ppDN False n <+> hsep (map ppT ts)
 
 
 -------------------------------------------------------------------------------
@@ -346,9 +346,8 @@ ppFds fds unicode qual =
   if null fds then noHtml else
         char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
   where
-        fundep (vars1,vars2) = hsep (map (ppDocName qual) vars1) <+> arrow unicode <+>
-                               hsep (map (ppDocName qual) vars2)
-
+        fundep (vars1,vars2) = ppVars vars1 <+> arrow unicode <+> ppVars vars2
+        ppVars = hsep . map (ppDocName qual (Just False))
 
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
                  -> [(DocName, DocForDecl DocName)] -> Bool -> Qualification
@@ -557,7 +556,7 @@ ppConstrHdr forall_ tvs ctxt unicode qual
         <+> darrow unicode +++ toHtml " ")
   where
     ppForall = case forall_ of
-      Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
+      Explicit -> forallSymbol unicode <+> hsep (map (ppName (Just False)) tvs) <+> toHtml ". "
       Implicit -> noHtml
 
 
@@ -721,7 +720,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode qual
     hsep [ppForAll expl tvs ctxt unicode qual, ppr_mono_lty pREC_TOP ty unicode qual]
 
 ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q ty
-ppr_mono_ty _         (HsTyVar name)      _ q = ppDocName q name
+ppr_mono_ty _         (HsTyVar name)      _ q = ppDocName q (Just False) name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u q =
@@ -749,8 +748,7 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode qual <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual
   where
-    ppr_op = if not (isSymOcc occ) then quote (ppLDocName qual op) else ppLDocName qual op
-    occ = nameOccName . getName . unLoc $ op
+    ppr_op = ppLDocName qual (Just True) op
 
 ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 --  = parens (ppr_mono_lty pREC_TOP ty)

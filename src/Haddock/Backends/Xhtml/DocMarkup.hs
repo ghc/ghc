@@ -80,12 +80,12 @@ parHtmlMarkup qual ppId = Markup {
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Qualification -> Doc DocName -> Html
 docToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup qual (ppDocName qual)
+  where fmt = parHtmlMarkup qual (ppDocName qual Nothing)
 
 
 origDocToHtml :: Qualification -> Doc Name -> Html
 origDocToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup qual ppName
+  where fmt = parHtmlMarkup qual (ppName Nothing)
 
 
 rdrDocToHtml :: Qualification -> Doc RdrName -> Html
