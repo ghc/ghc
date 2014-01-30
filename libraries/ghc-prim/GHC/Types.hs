@@ -89,7 +89,7 @@ data (~) a b = Eq# ((~#) a b)
 
 -- | A data constructor used to box up unlifted representational equalities.
 --
--- The type constructor is special as GHC pretends the field of EqR# has type
+-- The type constructor is special as GHC pretends the field of MkCoercible has type
 -- (a ~R# b), which is not representable in Haskell, and turns it into a class.
 data Coercible a b = MkCoercible ((~#) a b)
 
