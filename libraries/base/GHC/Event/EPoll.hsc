@@ -39,7 +39,7 @@ available = False
 #include <sys/epoll.h>
 
 import Control.Monad (when)
-import Data.Bits (Bits, (.|.), (.&.))
+import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
 import Data.Word (Word32)
@@ -163,7 +163,7 @@ newtype ControlOp = ControlOp CInt
 
 newtype EventType = EventType {
       unEventType :: Word32
-    } deriving (Show, Eq, Num, Bits)
+    } deriving (Show, Eq, Num, Bits, FiniteBits)
 
 #{enum EventType, EventType
  , epollIn  = EPOLLIN

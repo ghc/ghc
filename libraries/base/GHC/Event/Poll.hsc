@@ -26,7 +26,7 @@ available = False
 
 import Control.Concurrent.MVar (MVar, newMVar, swapMVar)
 import Control.Monad ((=<<), liftM, liftM2, unless)
-import Data.Bits (Bits, (.|.), (.&.))
+import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
 import Data.Word
@@ -150,7 +150,7 @@ data PollFd = PollFd {
     } deriving (Show)
 
 newtype Event = Event CShort
-    deriving (Eq, Show, Num, Storable, Bits)
+    deriving (Eq, Show, Num, Storable, Bits, FiniteBits)
 
 -- We have to duplicate the whole enum like this in order for the
 -- hsc2hs cross-compilation mode to work

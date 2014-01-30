@@ -27,7 +27,7 @@ available = False
 #else
 
 import Control.Monad (when)
-import Data.Bits (Bits(..))
+import Data.Bits (Bits(..), FiniteBits(..))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
 import Data.Word (Word16, Word32)
@@ -180,7 +180,7 @@ newtype Flag = Flag Word32
 #else
 newtype Flag = Flag Word16
 #endif
-    deriving (Bits, Eq, Num, Show, Storable)
+    deriving (Bits, FiniteBits, Eq, Num, Show, Storable)
 
 #{enum Flag, Flag
  , flagAdd     = EV_ADD
@@ -193,7 +193,7 @@ newtype Filter = Filter Word32
 #else
 newtype Filter = Filter Word16
 #endif
-    deriving (Bits, Eq, Num, Show, Storable)
+    deriving (Bits, FiniteBits, Eq, Num, Show, Storable)
 
 filterRead :: Filter
 filterRead = Filter (#const EVFILT_READ)
