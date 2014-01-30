@@ -45,6 +45,9 @@ module GHC.Exts
         -- * Ids with special behaviour
         lazy, inline,
 
+        -- * Safe coercions
+        GHC.Prim.coerce, GHC.Prim.Coercible,
+
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the,
 
@@ -66,8 +69,9 @@ module GHC.Exts
 
 import Prelude
 
-import GHC.Prim
-import GHC.Base
+import GHC.Prim hiding (coerce, Coercible)
+import qualified GHC.Prim
+import GHC.Base hiding (coerce, Coercible)
 import GHC.Word
 import GHC.Int
 import GHC.Ptr
