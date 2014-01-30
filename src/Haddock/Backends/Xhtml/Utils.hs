@@ -103,7 +103,9 @@ hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
 
 infixr 8 <+>
 (<+>) :: Html -> Html -> Html
-a <+> b = a +++ toHtml " " +++ b
+a <+> b = a +++ sep +++ b
+  where
+    sep = if isNoHtml a || isNoHtml b then noHtml else toHtml " "
 
 
 keyword :: String -> Html
