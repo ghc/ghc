@@ -87,10 +87,55 @@ newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 -- has kind (? -> ? -> Fact) rather than (* -> * -> *)
 data (~) a b = Eq# ((~#) a b)
 
--- | A data constructor used to box up unlifted representational equalities.
+
+-- Despite this not being exported here, the documentation will
+-- be used by haddock, hence the user-facing blurb here, and not in primops.txt.pp:
+
+-- | This two-parameter class has instances for types @a@ and @b@ if
+--      the compiler can infer that they have the same representation. This class
+--      does not have regular instances; instead they are created on-the-fly during
+--      type-checking. Trying to manually declare an instance of @Coercible@
+--      is an error.
 --
--- The type constructor is special as GHC pretends the field of MkCoercible has type
--- (a ~R# b), which is not representable in Haskell, and turns it into a class.
+--      Nevertheless one can pretend that the following three kinds of instances
+--      exist. First, as a trivial base-case:
+--
+--      @instance a a@
+--
+--      Furthermore, for every type constructor there is
+--      an instance that allows to coerce under the type constructor. For
+--      example, let @D@ be a prototypical type constructor (@data@ or
+--      @newtype@) with three type arguments, which have roles @nominal@,
+--      @representational@ resp. @phantom@. Then there is an instance of
+--      the form
+--
+--      @instance Coercible b b\' => Coercible (D a b c) (D a b\' c\')@
+--
+--      Note that the @nominal@ type arguments are equal, the
+--      @representational@ type arguments can differ, but need to have a
+--      @Coercible@ instance themself, and the @phantom@ type arguments can be
+--      changed arbitrarily.
+--
+--      In SafeHaskell code, this instance is only usable if the constructors of
+--      every type constructor used in the definition of @D@ (including
+--      those of @D@ itself) are in scope.
+--
+--      The third kind of instance exists for every @newtype NT = MkNT T@ and
+--      comes in two variants, namely
+--
+--      @instance Coercible a T => Coercible a NT@
+--
+--      @instance Coercible T b => Coercible NT b@
+--
+--      This instance is only usable if the constructor @MkNT@ is in scope.
+--
+--      If, as a library author of a type constructor like @Set a@, you
+--      want to prevent a user of your module to write
+--      @coerce :: Set T -> Set NT@,
+--      you need to set the role of @Set@\'s type parameter to @nominal@,
+--      by writing
+--
+--      @type role Set nominal@
 data Coercible a b = MkCoercible ((~#) a b)
 
 -- | Alias for tagToEnum#. Returns True of its parameter is 1# and False
