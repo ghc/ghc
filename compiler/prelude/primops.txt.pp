@@ -2365,47 +2365,6 @@ pseudoop   "coerce"
    }
 
 primclass Coercible a b
-   { This two-parameter class has instances for types {\tt a} and {\tt b} if
-     the compiler can infer that they have the same representation. This class
-     does not have regular instances; instead they are created on-the-fly during
-     type-checking. Trying to manually declare an instance of {\tt Coercible}
-     is an error.
-
-     Nevertheless one can pretend that the following three kinds of instances
-     exist. First, as a trivial base-case:
-
-     {\tt instance a a}
-
-     Furthermore, for every type constructor there is
-     an instance that allows to coerce under the type constructor. For
-     example, let {\tt D} be a prototypical type constructor ({\tt data} or {\tt
-     newtype}) with three type arguments, which have roles Nominal,
-     Representational resp. Phantom. Then there is an instance of the form
-
-     {\tt instance Coercible b b' => Coercible (D a b c) (D a b' c')}
-
-     Note that the nominal type arguments are equal, the representational type
-     arguments can differ, but need to have a {\tt Coercible} instance
-     themself, and the phantom type arguments can be changed arbitrarily.
-
-     In SafeHaskell code, this instance is only usable if the constructors of
-     every type constructor used in the definition of {\tt D} (including
-     those of {\tt D} itself) are in scope.
-
-     The third kind of instance exists for every {\tt newtype NT = MkNT T} and
-     comes in two variants, namely
-
-     {\tt instance Coercible a T => Coercible a NT}
-
-     {\tt instance Coercible T b => Coercible NT b}
-
-     This instance is only usable if the constructor {\tt MkNT} is in scope.
-
-     If, as a library author of a type constructor like {\tt Set a}, you
-     want to prevent a user of your module to write
-     {\tt coerce :: Set T -> Set NT},
-     you need to set the role of {\tt Set}'s type parameter to Nominal.
-   }
 
 ------------------------------------------------------------------------
 section "SIMD Vectors"
