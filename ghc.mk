@@ -1153,7 +1153,6 @@ sdist-testsuite-prep :
 	mkdir $(SRC_DIST_TESTSUITE_DIR)
 	mkdir $(SRC_DIST_TESTSUITE_DIR)/testsuite
 	cd $(SRC_DIST_TESTSUITE_DIR)/testsuite && lndir $(TOP)/testsuite
-	$(call removeTrees,$(SRC_DIST_TESTSUITE_DIR)/testsuite/.git)
 
 .PHONY: sdist
 sdist : sdist-ghc-prep sdist-windows-tarballs-prep sdist-testsuite-prep
