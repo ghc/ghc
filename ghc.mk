@@ -1159,11 +1159,21 @@ sdist-testsuite-prep :
 	cd $(SRC_DIST_TESTSUITE_DIR)/testsuite && lndir $(TOP)/testsuite
 	$(call removeTrees,$(SRC_DIST_TESTSUITE_DIR)/testsuite/.git)
 
-.PHONY: sdist
-sdist : sdist-ghc-prep sdist-windows-tarballs-prep sdist-testsuite-prep
+.PHONY: sdist-ghc
+sdist-ghc: sdist-ghc-prep
 	cd $(SRC_DIST_GHC_ROOT)              && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log               | bzip2 > $(TOP)/$(SRC_DIST_GHC_TARBALL)
+
+.PHONY: sdist-windows-tarballs
+sdist-windows-tarballs: sdist-windows-tarballs-prep
 	cd $(SRC_DIST_WINDOWS_TARBALLS_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> windows_extra_src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_WINDOWS_TARBALLS_TARBALL)
+
+.PHONY: sdist-testsuite
+sdist-testsuite: sdist-testsuite-prep
 	cd $(SRC_DIST_TESTSUITE_ROOT)        && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> testsuite_log             | bzip2 > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
+
+
+.PHONY: sdist
+sdist : sdist-ghc sdist-windows-tarballs sdist-testsuite
 
 sdist-manifest : $(SRC_DIST_GHC_TARBALL)
 	tar tjf $(SRC_DIST_GHC_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
