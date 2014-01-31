@@ -104,13 +104,32 @@ Convenient boxed Integer PrimOps.
 \begin{code}
 -- | Arbitrary-precision integers.
 data Integer
-   = S# Int#                            -- small integers
-   | J# Int# ByteArray#                 -- large integers
+   = S# Int#            -- ^ \"small\" integers fitting into an 'Int#'
+   | J# Int# ByteArray# -- ^ \"big\" integers represented as GMP's @mpz_t@ structure.
+     --
+     -- The 'Int#' field corresponds to @mpz_t@'s @_mp_size@ field,
+     -- which encodes the sign and the number of /limbs/ stored in the
+     -- 'ByteArray#' field (i.e. @mpz_t@'s @_mp_d@ field). Note: The
+     -- 'ByteArray#' may have been over-allocated, and thus larger
+     -- than the size denoted by the 'Int#' field.
+     --
+     -- This representation tries to avoid using the GMP number
+     -- representation for small integers that fit into a native
+     -- 'Int#'. This allows to reduce (or at least defer) calling into GMP
+     -- for operations whose results remain in the 'Int#'-domain.
+     --
+     -- Note: It does __not__ constitute a violation of invariants to
+     -- represent an integer which would fit into an 'Int#' with the
+     -- 'J#'-constructor. For instance, the value @0@ has (only) two valid
+     -- representations, either @'S#' 0#@ or @'J#' 0 _@.
 
-mkInteger :: Bool   -- non-negative?
-          -> [Int]  -- absolute value in 31 bit chunks, least significant first
-                    -- ideally these would be Words rather than Ints, but
-                    -- we don't have Word available at the moment.
+-- | Construct 'Integer' value from list of 'Int's.
+--
+-- This function is used by GHC for constructing 'Integer' literals.
+mkInteger :: Bool   -- ^ sign of integer ('True' if non-negative)
+          -> [Int]  -- ^ absolute value expressed in 31 bit chunks, least significant first
+
+                    -- (ideally these would be machine-word 'Word's rather than 31-bit truncated 'Int's)
           -> Integer
 mkInteger nonNegative is = let abs = f is
                            in if nonNegative then abs else negateInteger abs
@@ -416,6 +435,8 @@ gcdInteger (J# sa a) (J# sb b)   = mpzToInteger (gcdInteger# sa a sb b)
 --
 -- For @/a/@ and @/b/@, compute their greatest common divisor @/g/@
 -- and the coefficient @/s/@ satisfying @/a//s/ + /b//t/ = /g/@.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE gcdExtInteger #-}
 gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
 gcdExtInteger a@(S# _)   b@(S# _) = gcdExtInteger (toBig a) (toBig b)
@@ -464,6 +485,8 @@ divExact (J# sa a) (J# sb b) = mpzToInteger (divExactInteger# sa a sb b)
 %*********************************************************
 
 \begin{code}
+
+-- | /Since: 0.5.1.0/
 {-# NOINLINE eqInteger# #-}
 eqInteger# :: Integer -> Integer -> Int#
 eqInteger# (S# i)     (S# j)     = i ==# j
@@ -471,6 +494,7 @@ eqInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i ==# 0#
 eqInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i ==# 0#
 eqInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==# 0#
 
+-- | /Since: 0.5.1.0/
 {-# NOINLINE neqInteger# #-}
 neqInteger# :: Integer -> Integer -> Int#
 neqInteger# (S# i)     (S# j)     = i /=# j
@@ -490,6 +514,7 @@ instance  Eq Integer  where
 
 ------------------------------------------------------------------------
 
+-- | /Since: 0.5.1.0/
 {-# NOINLINE leInteger# #-}
 leInteger# :: Integer -> Integer -> Int#
 leInteger# (S# i)     (S# j)     = i <=# j
@@ -497,6 +522,7 @@ leInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <=# 0#
 leInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i >=# 0#
 leInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=# 0#
 
+-- | /Since: 0.5.1.0/
 {-# NOINLINE gtInteger# #-}
 gtInteger# :: Integer -> Integer -> Int#
 gtInteger# (S# i)     (S# j)     = i ># j
@@ -504,6 +530,7 @@ gtInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i ># 0#
 gtInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i <# 0#
 gtInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ># 0#
 
+-- | /Since: 0.5.1.0/
 {-# NOINLINE ltInteger# #-}
 ltInteger# :: Integer -> Integer -> Int#
 ltInteger# (S# i)     (S# j)     = i <# j
@@ -511,6 +538,7 @@ ltInteger# (J# s d)   (S# i)     = cmpIntegerInt# s d i <# 0#
 ltInteger# (S# i)     (J# s d)   = cmpIntegerInt# s d i ># 0#
 ltInteger# (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <# 0#
 
+-- | /Since: 0.5.1.0/
 {-# NOINLINE geInteger# #-}
 geInteger# :: Integer -> Integer -> Int#
 geInteger# (S# i)     (S# j)     = i >=# j
@@ -759,12 +787,15 @@ shiftRInteger :: Integer -> Int# -> Integer
 shiftRInteger j@(S# _) i = shiftRInteger (toBig j) i
 shiftRInteger (J# s d) i = mpzToInteger (fdivQ2ExpInteger# s d i)
 
+-- | /Since: 0.5.1.0/
 {-# NOINLINE testBitInteger #-}
 testBitInteger :: Integer -> Int# -> Bool
 testBitInteger j@(S# _) i = testBitInteger (toBig j) i
 testBitInteger (J# s d) i = isTrue# (testBitInteger# s d i /=# 0#)
 
 -- | \"@'powInteger' /b/ /e/@\" computes base @/b/@ raised to exponent @/e/@.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE powInteger #-}
 powInteger :: Integer -> Word# -> Integer
 powInteger j@(S# _) e = powInteger (toBig j) e
@@ -778,6 +809,8 @@ powInteger (J# s d) e = mpzToInteger (powInteger# s d e)
 -- exponents unless it is guaranteed the inverse exists, as failure to
 -- do so will likely cause program abortion due to a divide-by-zero
 -- fault. See also 'recipModInteger'.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE powModInteger #-}
 powModInteger :: Integer -> Integer -> Integer -> Integer
 powModInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
@@ -792,6 +825,8 @@ powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
 -- @mpz_powm_sec()@ function which is designed to be resilient to side
 -- channel attacks and is therefore intended for cryptographic
 -- applications.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE powModSecInteger #-}
 powModSecInteger :: Integer -> Integer -> Integer -> Integer
 powModSecInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
@@ -805,6 +840,8 @@ powModSecInteger b e m = powModSecInteger (toBig b) (toBig e) (toBig m)
 -- Note: The implementation exploits the undocumented property of
 -- @mpz_invert()@ to not mangle the result operand (which is initialized
 -- to 0) in case of non-existence of the inverse.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE recipModInteger #-}
 recipModInteger :: Integer -> Integer -> Integer
 recipModInteger j@(S# _) m@(S# _)   = recipModInteger (toBig j) (toBig m)
@@ -826,6 +863,8 @@ recipModInteger (J# s d) (J# ms md) = mpzToInteger (recipModInteger# s d ms md)
 -- The @/k/@ argument controls how many test rounds are performed for
 -- determining a /probable prime/. For more details, see
 -- <http://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fprobab_005fprime_005fp-360 GMP documentation for `mpz_probab_prime_p()`>.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE testPrimeInteger #-}
 testPrimeInteger :: Integer -> Int# -> Int#
 testPrimeInteger j@(S# _) reps = testPrimeInteger (toBig j) reps
@@ -837,6 +876,8 @@ testPrimeInteger (J# s d) reps = testPrimeInteger# s d reps
 -- @mpz_nextprime()@ \"uses a probabilistic algorithm to identify
 -- primes. For practical purposes it's adequate, the chance of a
 -- composite passing will be extremely small.\"
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE nextPrimeInteger #-}
 nextPrimeInteger :: Integer -> Integer
 nextPrimeInteger j@(S# _) = nextPrimeInteger (toBig j)
@@ -863,6 +904,8 @@ nextPrimeInteger (J# s d) = mpzToInteger (nextPrimeInteger# s d)
 --
 -- * \"@'sizeInBaseInteger' /i/ 2#@\" can be used to determine the most
 --   significant bit of @/i/@.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE sizeInBaseInteger #-}
 sizeInBaseInteger :: Integer -> Int# -> Word#
 sizeInBaseInteger (J# s d) b = sizeInBaseInteger# s d b
@@ -872,9 +915,7 @@ sizeInBaseInteger j@(S# _) b = sizeInBaseInteger (toBig j) b -- TODO
 --
 -- The call
 --
--- @
--- 'exportIntegerToMutableByteArray' /i/ /mba/ /offset/ /order/
--- @
+-- @'exportIntegerToMutableByteArray' /i/ /mba/ /offset/ /order/@
 --
 -- writes
 --
@@ -895,6 +936,8 @@ sizeInBaseInteger j@(S# _) b = sizeInBaseInteger (toBig j) b -- TODO
 -- It's recommended to avoid calling 'exportIntegerToMutableByteArray' for small
 -- integers as this function would currently convert those to big
 -- integers in order to call @mpz_export()@.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE exportIntegerToMutableByteArray #-}
 exportIntegerToMutableByteArray :: Integer -> MutableByteArray# s -> Word# -> Int# -> State# s -> (# State# s, Word# #)
 exportIntegerToMutableByteArray (J# s d) mba o e = exportIntegerToMutableByteArray# s d mba o e
@@ -902,11 +945,11 @@ exportIntegerToMutableByteArray j@(S# _) mba o e = exportIntegerToMutableByteArr
 
 -- | Dump 'Integer' (without sign) to @/addr/@ in base-256 representation.
 --
--- @
--- 'exportIntegerToAddr' /addr/ /o/ /e/
--- @
+-- @'exportIntegerToAddr' /addr/ /o/ /e/@
 --
 -- See description of 'exportIntegerToMutableByteArray' for more details.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE exportIntegerToAddr #-}
 exportIntegerToAddr :: Integer -> Addr# -> Int# -> State# s -> (# State# s, Word# #)
 exportIntegerToAddr (J# s d) addr o e = exportIntegerToAddr# s d addr o e
@@ -916,9 +959,7 @@ exportIntegerToAddr j@(S# _) addr o e = exportIntegerToAddr (toBig j) addr o e -
 --
 -- The call
 --
--- @
--- 'importIntegerFromByteArray' /ba/ /offset/ /size/ /order/
--- @
+-- @'importIntegerFromByteArray' /ba/ /offset/ /size/ /order/@
 --
 -- reads
 --
@@ -928,6 +969,8 @@ exportIntegerToAddr j@(S# _) addr o e = exportIntegerToAddr (toBig j) addr o e -
 --   significant byte first if @/order/@ is @-1#@, and
 --
 -- * returns a new 'Integer'
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE importIntegerFromByteArray #-}
 importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
 importIntegerFromByteArray ba o l e = mpzToInteger (importIntegerFromByteArray# ba o l e)
@@ -935,11 +978,11 @@ importIntegerFromByteArray ba o l e = mpzToInteger (importIntegerFromByteArray# 
 -- | Read 'Integer' (without sign) from memory location at @/addr/@ in
 -- base-256 representation.
 --
--- @
--- 'importIntegerFromAddr' /addr/ /size/ /order/
--- @
+-- @'importIntegerFromAddr' /addr/ /size/ /order/@
 --
 -- See description of 'importIntegerFromByteArray' for more details.
+--
+-- /Since: 0.5.1.0/
 {-# NOINLINE importIntegerFromAddr #-}
 importIntegerFromAddr :: Addr# -> Word# -> Int# -> State# s -> (# State# s, Integer #)
 importIntegerFromAddr addr l e st = case importIntegerFromAddr# addr l e st of
@@ -956,9 +999,11 @@ importIntegerFromAddr addr l e st = case importIntegerFromAddr# addr l e st of
 \begin{code}
 -- This is used by hashUnique
 
--- | hashInteger returns the same value as 'fromIntegral', although in
+-- | 'hashInteger' returns the same value as 'fromIntegral', although in
 -- unboxed form.  It might be a reasonable hash function for 'Integer',
 -- given a suitable distribution of 'Integer' values.
+--
+-- Note: 'hashInteger' is currently just an alias for 'integerToInt'.
 
 hashInteger :: Integer -> Int#
 hashInteger = integerToInt

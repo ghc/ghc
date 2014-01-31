@@ -8,7 +8,16 @@ maintainer:     libraries@haskell.org
 bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29&keywords=integer-gmp
 synopsis:       Integer library based on GMP
 description:
-    This package contains an Integer library based on GMP.
+    This package provides the low-level implementation of the standard
+    'Integer' type based on the
+    <http://gmplib.org/ GNU Multiple Precision Arithmetic Library (GMP)>.
+    .
+    This package provides access to the internal representation of
+    'Integer' as well as primitive operations with no proper error
+    handling, and should only be used directly with the utmost care.
+    .
+    For more details about the design of @integer-gmp@, see
+    <https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/Integer GHC Commentary: Libraries/Integer>.
 build-type:     Configure
 cabal-version:  >=1.10
 
