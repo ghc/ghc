@@ -1,7 +1,3 @@
-{-# LANGUAGE NoMonoLocalBinds #-}
--- Norman likes local bindings
--- If this module lives on I'd like to get rid of this extension in due course
-
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
   -- optimized, CPS converted and native-call-less C--.  The latter
@@ -383,4 +379,3 @@ dumpWith dflags flag txt g = do
    dumpIfSet_dyn dflags flag txt (ppr g)
    when (not (dopt flag dflags)) $
       dumpIfSet_dyn dflags Opt_D_dump_cmm txt (ppr g)
-
