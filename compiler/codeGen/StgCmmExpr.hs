@@ -737,10 +737,16 @@ cgIdApp fun_id args = do
 --
 --   * Whenever we are compiling a function, we set that information to reflect
 --     the fact that function currently being compiled can be jumped to, instead
---     of called. We also have to emit a label to which we will be jumping. Both
---     things are done in closureCodyBody in StgCmmBind.
+--     of called. This is done in closureCodyBody in StgCmmBind.
 --
---   * When we began compilation of another closure we remove the additional
+--   * We also have to emit a label to which we will be jumping. We make sure
+--     that the label is placed after a stack check but before the heap
+--     check. The reason is that making a recursive tail-call does not increase
+--     the stack so we only need to check once. But it may grow the heap, so we
+--     have to repeat the heap check in every self-call. This is done in
+--     do_checks in StgCmmHeap.
+--
+--   * When we begin compilation of another closure we remove the additional
 --     information from the environment. This is done by forkClosureBody
 --     in StgCmmMonad. Other functions that duplicate the environment -
 --     forkLneBody, forkAlts, codeOnly - duplicate that information. In other
@@ -755,8 +761,8 @@ cgIdApp fun_id args = do
 --     arity. (d) loopification is turned on via -floopification command-line
 --     option.
 --
---   * Command line option to control turn loopification on and off is
---     implemented in DynFlags
+--   * Command line option to turn loopification on and off is implemented in
+--     DynFlags.
 --
 
 

@@ -531,7 +531,7 @@ heapStackCheckGen stk_hwm mb_bytes
        lretry <- newLabelC
        emitLabel lretry
        call <- mkCall generic_gc (GC, GC) [] [] updfr_sz []
-       do_checks stk_hwm False  mb_bytes (call <*> mkBranch lretry)
+       do_checks stk_hwm False mb_bytes (call <*> mkBranch lretry)
 
 -- Note [Single stack check]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -569,11 +569,11 @@ heapStackCheckGen stk_hwm mb_bytes
 -- number of bytes of stack that the function will use, so we use a
 -- special late-bound CmmLit, namely
 --       CmmHighStackMark
--- to stand for the number of bytes needed. When the stack is made 
+-- to stand for the number of bytes needed. When the stack is made
 -- manifest, the number of bytes needed is calculated, and used to
 -- replace occurrences of CmmHighStackMark
 --
--- The (Maybe CmmExpr) passed to do_checks is usually 
+-- The (Maybe CmmExpr) passed to do_checks is usually
 --     Just (CmmLit CmmHighStackMark)
 -- but can also (in certain hand-written RTS functions)
 --     Just (CmmLit 8)  or some other fixed valuet
@@ -615,13 +615,22 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     Nothing -> return ()
     Just stk_hwm -> tickyStackCheck >> (emit =<< mkCmmIfGoto (sp_oflo stk_hwm) gc_id)
 
+  -- Emit new label that might potentially be a header
+  -- of a self-recursive tail call.
+  -- See Note [Self-recursive loop header].
+  self_loop_info <- getSelfLoop
+  case self_loop_info of
+    Just (_, loop_header_id, _)
+        | checkYield && isJust mb_stk_hwm -> emitLabel loop_header_id
+    _otherwise -> return ()
+
   if (isJust mb_alloc_lit)
     then do
      tickyHeapCheck
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
     else do
-      when (not (gopt Opt_OmitYields dflags) && checkYield) $ do
+      when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq dflags)
                                   [CmmReg (CmmGlobal HpLim),
@@ -637,3 +646,27 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
                 -- stack check succeeds.  Otherwise we might end up
                 -- with slop at the end of the current block, which can
                 -- confuse the LDV profiler.
+
+-- Note [Self-recursive loop header]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Self-recursive loop header is required by loopification optimization (See
+-- Note [Self-recursive tail calls] in StgCmmExpr). We emit it if:
+--
+--  1. There is information about self-loop in the FCode environment. We don't
+--     check the binder (first component of the self_loop_info) because we are
+--     certain that if the self-loop info is present then we are compiling the
+--     binder body. Reason: the only possible way to get here with the
+--     self_loop_info present is from closureCodeBody.
+--
+--  2. checkYield && isJust mb_stk_hwm. checkYield tells us that it is possible
+--     to preempt the heap check (see #367 for motivation behind this check). It
+--     is True for heap checks placed at the entry to a function and
+--     let-no-escape heap checks but false for other heap checks (eg. in case
+--     alternatives or created from hand-written high-level Cmm). The second
+--     check (isJust mb_stk_hwm) is true for heap checks at the entry to a
+--     function and some heap checks created in hand-written Cmm. Otherwise it
+--     is Nothing. In other words the only situation when both conditions are
+--     true is when compiling stack and heap checks at the entry to a
+--     function. This is the only situation when we want to emit a self-loop
+--     label.

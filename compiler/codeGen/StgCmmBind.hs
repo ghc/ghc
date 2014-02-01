@@ -472,25 +472,21 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
             \(_offset, node, arg_regs) -> do
                 -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode bndr cl_info arg_regs
-
                 ; dflags <- getDynFlags
                 ; let node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
-                -- Emit new label that might potentially be a header
-                -- of a self-recursive tail call. See Note
-                -- [Self-recursive tail calls] in StgCmmExpr
                 ; loop_header_id <- newLabelC
-                ; emitLabel loop_header_id
-                ; when node_points (ldvEnterClosure cl_info (CmmLocal node))
                 -- Extend reader monad with information that
                 -- self-recursive tail calls can be optimized into local
-                -- jumps
+                -- jumps. See Note [Self-recursive tail calls] in StgCmmExpr.
                 ; withSelfLoop (bndr, loop_header_id, arg_regs) $ do
                 {
                 -- Main payload
                 ; entryHeapCheck cl_info node' arity arg_regs $ do
-                { -- ticky after heap check to avoid double counting
-                  tickyEnterFun cl_info
+                { -- emit LDV code when profiling
+                  when node_points (ldvEnterClosure cl_info (CmmLocal node))
+                -- ticky after heap check to avoid double counting
+                ; tickyEnterFun cl_info
                 ; enterCostCentreFun cc
                     (CmmMachOp (mo_wordSub dflags)
                          [ CmmReg (CmmLocal node) -- See [NodeReg clobbered with loopification]
