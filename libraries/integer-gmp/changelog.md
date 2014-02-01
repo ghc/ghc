@@ -7,7 +7,7 @@
   * Improved Haddock documentation
 
   * New [PrimBool](https://ghc.haskell.org/trac/ghc/wiki/PrimBool)
-    versions of comparision predicates in `GHC.Integer`:
+    versions of comparison predicates in `GHC.Integer`:
 
         eqInteger# :: Integer -> Integer -> Int#
         geInteger# :: Integer -> Integer -> Int#
