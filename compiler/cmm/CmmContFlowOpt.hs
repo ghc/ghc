@@ -46,25 +46,20 @@ import Prelude hiding (succ, unzip, zip)
 -- Note [Control-flow optimisations]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- This optimisation does four things:
+-- This optimisation does three things:
 --
 --   - If a block finishes in an unconditonal branch to another block
 --     and that is the only jump to that block we concatenate the
 --     destination block at the end of the current one.
---
---   - If a block finishes in an unconditional branch, we may be able
---     to shortcut the destination block.
 --
 --   - If a block finishes in a call whose continuation block is a
 --     goto, then we can shortcut the destination, making the
 --     continuation block the destination of the goto - but see Note
 --     [Shortcut call returns].
 --
---   - For block finishing in conditional branch we try to invert the
---     condition and shortcut destination of alternatives.
---
 --   - For any block that is not a call we try to shortcut the
---     destination(s).
+--     destination(s). Additionally, if a block ends with a
+--     conditional branch we try to invert the condition.
 --
 -- Blocks are processed using postorder DFS traversal. A side effect
 -- of determining traversal order with a graph search is elimination
@@ -204,11 +199,8 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         --   (2) remove b' from the map of blocks
         --   (3) remove information about b' from predecessors map
         --
-        -- This guard must be first so that we always eliminate blocks that have
-        -- only one predecessor. If we had a target block that is both
-        -- shorcutable and has only one predecessor and attempted to shortcut it
-        -- first we would make that block unreachable but would not remove it
-        -- from the graph.
+        -- Since we know that the block has only one predecessor we call
+        -- mapDelete directly instead of calling decPreds.
         --
         -- Note that we always maintain an up-to-date list of predecessors, so
         -- we can ignore the contents of shortcut_map
@@ -219,20 +211,6 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
           in ( mapDelete bid' $ mapInsert bid (splice head blk') blocks
              , shortcut_map
              , mapDelete b' backEdges )
-
-        -- If:
-        --   (1) current block ends with unconditional branch to b' and
-        --   (2) we can shortcut block b'
-        -- Then:
-        --   (1) concatenate b' at the end of current block, effectively
-        --       changing target of uncondtional jump from b' to dest
-        --   (2) increase number of predecessors of dest by 1
-        --   (3) decrease number of predecessors of b' by 1
-        | CmmBranch b' <- last
-        , Just blk' <- mapLookup b' blocks
-        , Just dest <- canShortcut blk'
-        = ( mapInsert bid (splice head blk') blocks, shortcut_map,
-            decPreds b' $ incPreds dest backEdges )
 
         -- If:
         --   (1) we are splitting proc points (see Note
@@ -263,7 +241,10 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         --       conditional
         --   (2) attempt to shortcut all destination blocks
         --   (3) if new successors of a block are different from the old ones
-        --       we update the of predecessors accordingly
+        --       update the of predecessors accordingly
+        --
+        -- A special case of this is a situation when a block ends with an
+        -- unconditional jump to a block that can be shortcut.
         | Nothing <- callContinuation_maybe last
         = let oldSuccs = successors last
               newSuccs = successors swapcond_last
@@ -394,14 +375,14 @@ predMap blocks = foldr add_preds mapEmpty blocks
 -- Removing unreachable blocks
 removeUnreachableBlocksProc :: CmmDecl -> CmmDecl
 removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
-   | length used_blocks < mapSize (toBlockMap g) 
-   = CmmProc info' lbl live g' 
+   | length used_blocks < mapSize (toBlockMap g)
+   = CmmProc info' lbl live g'
    | otherwise
    = proc
    where
      g'    = ofBlockList (g_entry g) used_blocks
      info' = info { info_tbls = keep_used (info_tbls info) }
-             -- Remove any info_tbls for unreachable 
+             -- Remove any info_tbls for unreachable
 
      keep_used :: BlockEnv CmmInfoTable -> BlockEnv CmmInfoTable
      keep_used bs = mapFoldWithKey keep emptyBlockMap bs
