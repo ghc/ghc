@@ -183,7 +183,6 @@ Library
         CmmOpt
         CmmParse
         CmmProcPoint
-        CmmRewriteAssignments
         CmmSink
         CmmType
         CmmUtils

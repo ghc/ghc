@@ -189,16 +189,10 @@ cmmLayoutStack :: DynFlags -> ProcPointSet -> ByteOff -> CmmGraph
 cmmLayoutStack dflags procpoints entry_args
                graph0@(CmmGraph { g_entry = entry })
   = do
-    -- pprTrace "cmmLayoutStack" (ppr entry_args) $ return ()
-
-    -- We need liveness info.  We could do removeDeadAssignments at
-    -- the same time, but it buys nothing over doing cmmSink later,
-    -- and costs a lot more than just cmmLocalLiveness.
-    -- (graph, liveness) <- removeDeadAssignments graph0
+    -- We need liveness info. Dead assignments are removed later
+    -- by the sinking pass.
     let (graph, liveness) = (graph0, cmmLocalLiveness dflags graph0)
-
-    -- pprTrace "liveness" (ppr liveness) $ return ()
-    let blocks = postorderDfs graph
+        blocks = postorderDfs graph
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
@@ -206,10 +200,7 @@ cmmLayoutStack dflags procpoints entry_args
                    rec_stackmaps rec_high_sp blocks
 
     new_blocks' <- mapM (lowerSafeForeignCall dflags) new_blocks
-
-    -- pprTrace ("Sp HWM") (ppr _final_high_sp) $ return ()
     return (ofBlockList entry new_blocks', final_stackmaps)
-
 
 
 layout :: DynFlags
@@ -252,8 +243,6 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
                      (pprPanic "no stack map for" (ppr entry_lbl))
                      entry_lbl acc_stackmaps
 
-       -- pprTrace "layout" (ppr entry_lbl <+> ppr stack0) $ return ()
-
        -- (a) Update the stack map to include the effects of
        --     assignments in this block
        let stack1 = foldBlockNodesF (procMiddle acc_stackmaps) middle0 stack0
@@ -272,8 +261,6 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
        (middle2, sp_off, last1, fixup_blocks, out)
            <- handleLastNode dflags procpoints liveness cont_info
                              acc_stackmaps stack1 middle0 last0
-
-       -- pprTrace "layout(out)" (ppr out) $ return ()
 
        -- (d) Manifest Sp: run over the nodes in the block and replace
        --     CmmStackSlot with CmmLoad from Sp with a concrete offset.
@@ -514,11 +501,8 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
         = do
              let cont_args = mapFindWithDefault 0 l cont_info
                  (stack2, assigs) =
-                      --pprTrace "first visit to proc point"
-                      --             (ppr l <+> ppr stack1) $
                       setupStackFrame dflags l liveness (sm_ret_off stack0)
-                                                       cont_args stack0
-             --
+                                                        cont_args stack0
              (tmp_lbl, block) <- makeFixupBlock dflags sp0 l stack2 assigs
              return (l, tmp_lbl, stack2, block)
 
@@ -682,8 +666,6 @@ allocate :: DynFlags -> ByteOff -> LocalRegSet -> StackMap
 allocate dflags ret_off live stackmap@StackMap{ sm_sp = sp0
                                               , sm_regs = regs0 }
  =
-  -- pprTrace "allocate" (ppr live $$ ppr stackmap) $
-
    -- we only have to save regs that are not already in a slot
    let to_save = filter (not . (`elemUFM` regs0)) (Set.elems live)
        regs1   = filterUFM (\(r,_) -> elemRegSet r live) regs0
@@ -923,8 +905,7 @@ elimStackStores stackmap stackmaps area_off nodes
          CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r))
             | Just (_,off) <- lookupUFM (sm_regs stackmap) r
             , area_off area + m == off
-            -> -- pprTrace "eliminated a node!" (ppr r) $
-               go stackmap ns
+            -> go stackmap ns
          _otherwise
             -> n : go (procMiddle stackmaps n stackmap) ns
 
