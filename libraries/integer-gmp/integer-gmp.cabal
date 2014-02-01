@@ -27,6 +27,7 @@ extra-source-files:
     cbits/float.c
     cbits/gmp-wrappers.cmm
     cbits/longlong.c
+    changelog.md
     config.guess
     config.sub
     configure
