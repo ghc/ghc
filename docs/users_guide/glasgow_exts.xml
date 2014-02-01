@@ -8212,9 +8212,7 @@ Wiki page</ulink>.
       constructions.  You need to use the flag
       <option>-XTemplateHaskell</option>
 	<indexterm><primary><option>-XTemplateHaskell</option></primary>
-      </indexterm>to switch these syntactic extensions on
-      (<option>-XTemplateHaskell</option> is no longer implied by
-      <option>-fglasgow-exts</option>).</para>
+      </indexterm>to switch these syntactic extensions on.</para>
 
 	<itemizedlist>
 	      <listitem><para>

@@ -706,7 +706,7 @@
         <tbody>
           <row>
             <entry><option>-fglasgow-exts</option></entry>
-            <entry>Enable most language extensions; see <xref linkend="options-language"/> for exactly which ones.</entry>
+            <entry>Deprecated. Enable most language extensions; see <xref linkend="options-language"/> for exactly which ones.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-glasgow-exts</option></entry>
           </row>
@@ -802,8 +802,7 @@
           </row>
           <row>
             <entry><option>-XForeignFunctionInterface</option></entry>
-            <entry>Enable <link linkend="ffi">foreign function interface</link> (implied by
-              <option>-fglasgow-exts</option>)</entry>
+            <entry>Enable <link linkend="ffi">foreign function interface</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoForeignFunctionInterface</option></entry>
           </row>
@@ -831,8 +830,7 @@
           </row>
           <row>
             <entry><option>-XImplicitParams</option></entry>
-            <entry>Enable <link linkend="implicit-parameters">Implicit Parameters</link>.
-              Implied by <option>-fglasgow-exts</option>.</entry>
+            <entry>Enable <link linkend="implicit-parameters">Implicit Parameters</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoImplicitParams</option></entry>
           </row>
@@ -947,14 +945,13 @@
           <row>
             <entry><option>-XScopedTypeVariables</option></entry>
             <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
-              Implied by <option>-fglasgow-exts</option>.</entry>
+              </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoScopedTypeVariables</option></entry>
           </row>
           <row>
             <entry><option>-XTemplateHaskell</option></entry>
-            <entry>Enable <link linkend="template-haskell">Template Haskell</link>.
-              No longer implied by <option>-fglasgow-exts</option>.</entry>
+            <entry>Enable <link linkend="template-haskell">Template Haskell</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTemplateHaskell</option></entry>
           </row>
