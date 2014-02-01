@@ -606,7 +606,7 @@ coerceFlt2Dbl x = do
 
 -- Condition Codes -------------------------------------------------------------
 --
--- Evaluate a comparision, and get the result into a register.
+-- Evaluate a comparison, and get the result into a register.
 -- 
 -- Do not fill the delay slots here. you will confuse the register allocator.
 --

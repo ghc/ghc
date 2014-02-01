@@ -1179,7 +1179,7 @@ seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
 
 %************************************************************************
 %*                                                                      *
-                Comparision for types
+                Comparison for types
         (We don't use instances so that we know where it happens)
 %*                                                                      *
 %************************************************************************

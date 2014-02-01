@@ -276,7 +276,7 @@ Several special cases:
 Note [Do not rely on compare]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's a bad idea to define only 'compare', and build the other binary
-comparisions on top of it; see Trac #2130, #4019.  Reason: we don't
+comparisons on top of it; see Trac #2130, #4019.  Reason: we don't
 want to laboriously make a three-way comparison, only to extract a
 binary result, something like this:
      (>) (I# x) (I# y) = case <# x y of

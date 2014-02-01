@@ -960,7 +960,7 @@ this has a strictness signature of
 meaning that "b2 `seq` ()" and "b2 1 `seq` ()" might well terminate, but
 for "b2 1 2 `seq` ()" we get definite divergence.
 
-For comparision,
+For comparison,
   b1 x = x `seq` error (show x)
 has a strictness signature of
   <S>b

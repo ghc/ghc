@@ -1699,7 +1699,7 @@ This includes things like (==# a# b#)::Bool so that we simplify
 to just
       x
 This particular example shows up in default methods for
-comparision operations (e.g. in (>=) for Int.Int32)
+comparison operations (e.g. in (>=) for Int.Int32)
 
 Note [Case elimination: lifted case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

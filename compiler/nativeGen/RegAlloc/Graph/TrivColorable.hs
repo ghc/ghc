@@ -30,7 +30,7 @@ import Panic
 --              (which are disjoint) ie. x86, x86_64 and ppc
 --
 --      The number of allocatable regs is hard coded in here so we can do
---              a fast comparision in trivColorable.
+--              a fast comparison in trivColorable.
 --
 --      It's ok if these numbers are _less_ than the actual number of free
 --              regs, but they can't be more or the register conflict
