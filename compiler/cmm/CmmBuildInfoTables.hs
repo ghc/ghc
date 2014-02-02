@@ -1,8 +1,4 @@
-{-# LANGUAGE GADTs, NoMonoLocalBinds #-}
-
--- Norman likes local bindings
--- If this module lives on I'd like to get rid of the NoMonoLocalBinds
--- extension in due course
+{-# LANGUAGE GADTs #-}
 
 -- Todo: remove -fno-warn-warnings-deprecations
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
