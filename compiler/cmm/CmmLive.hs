@@ -14,7 +14,6 @@ module CmmLive
     )
 where
 
-import UniqSupply
 import DynFlags
 import BlockId
 import Cmm
