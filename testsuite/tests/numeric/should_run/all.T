@@ -61,3 +61,4 @@ test('T7014',
 
 test('T7233', normal, compile_and_run, [''])
 test('NumDecimals', normal, compile_and_run, [''])
+test('T8726', normal, compile_and_run, [''])
