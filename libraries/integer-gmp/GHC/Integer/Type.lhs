@@ -296,9 +296,9 @@ quotRemInteger (S# i) (S# j) = case quotRemInt# i j of
 #if SIZEOF_HSWORD == SIZEOF_LONG
 quotRemInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
   = case quotRemIntegerWord# s1 d1 (int2Word# (negateInt# b)) of
-          (# q, r #) -> let !q' = mpzToInteger(mpzNeg q)
-                            !r' = mpzToInteger(mpzNeg r)
-                        in (# q', r' #)
+          (# q, r #) -> let !q' = mpzToInteger (mpzNeg q)
+                            !r' = mpzToInteger r
+                        in (# q', r' #) -- see also Trac #8726
 quotRemInteger (J# s1 d1) (S# b)
   = mpzToInteger2 (quotRemIntegerWord# s1 d1 (int2Word# b))
 #else
@@ -322,9 +322,9 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
 #if SIZEOF_HSWORD == SIZEOF_LONG
 divModInteger (J# s1 d1) (S# b) | isTrue# (b <# 0#)
   = case divModIntegerWord# (negateInt# s1) d1 (int2Word# (negateInt# b)) of
-          (# q, r #) -> let !q' = mpzToInteger (mpzNeg q)
-                            !r' = mpzToInteger r
-                        in (# q', r' #)
+          (# q, r #) -> let !q' = mpzToInteger q
+                            !r' = mpzToInteger (mpzNeg r)
+                        in (# q', r' #) -- see also Trac #8726
 divModInteger (J# s1 d1) (S# b)
   = mpzToInteger2(divModIntegerWord# s1 d1 (int2Word# b))
 #else
@@ -386,7 +386,7 @@ modInteger (S# a) (S# b) = S# (modInt# a b)
 modInteger ia@(S# _) ib@(J# _ _) = modInteger (toBig ia) ib
 #if SIZEOF_HSWORD == SIZEOF_LONG
 modInteger (J# sa a) (S# b) | isTrue# (b <# 0#)
-  = mpzToInteger (mpzNeg (remIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b))))
+  = mpzToInteger (mpzNeg (modIntegerWord# (negateInt# sa) a (int2Word# (negateInt# b))))
 modInteger (J# sa a) (S# b)
   = mpzToInteger (modIntegerWord# sa a (int2Word# b))
 #else
