@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- See Note [Deprecations in Hoopl] in Hoopl module
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module CmmLive

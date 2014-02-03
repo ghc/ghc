@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Todo: remove -fno-warn-warnings-deprecations
+-- See Note [Deprecations in Hoopl] in Hoopl module
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal
