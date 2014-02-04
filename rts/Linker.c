@@ -3491,8 +3491,8 @@ allocateImageAndTrampolines (
    /* For 32-bit case we don't need this, hence we use macro PEi386_IMAGE_OFFSET,
       which equals to 4 for 64-bit case and 0 for 32-bit case. */
    /* We allocate trampolines area for all symbols right behind
-      image data, aligned on 16. */
-   size = ((PEi386_IMAGE_OFFSET + size + 0xf) & ~0xf)
+      image data, aligned on 8. */
+   size = ((PEi386_IMAGE_OFFSET + size + 0x7) & ~0x7)
               + hdr.NumberOfSymbols * sizeof(SymbolExtra);
 #endif
    image = VirtualAlloc(NULL, size,
@@ -4147,7 +4147,7 @@ static int
 ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc )
 {
    oc->symbol_extras = (SymbolExtra*)(oc->image - PEi386_IMAGE_OFFSET
-                                      + ((PEi386_IMAGE_OFFSET + oc->fileSize + 0xf) & ~0xf));
+                                      + ((PEi386_IMAGE_OFFSET + oc->fileSize + 0x7) & ~0x7));
    oc->first_symbol_extra = 0;
    oc->n_symbol_extras = ((COFF_header*)oc->image)->NumberOfSymbols;
 
@@ -4161,7 +4161,7 @@ makeSymbolExtra_PEi386( ObjectCode* oc, size_t s, char* symbol )
     SymbolExtra *extra;
 
     curr_thunk = oc->first_symbol_extra;
-    if (curr_thunk > oc->n_symbol_extras) {
+    if (curr_thunk >= oc->n_symbol_extras) {
       barf("Can't allocate thunk for %s", symbol);
     }
 
@@ -4171,14 +4171,6 @@ makeSymbolExtra_PEi386( ObjectCode* oc, size_t s, char* symbol )
     static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
     extra->addr = (uint64_t)s;
     memcpy(extra->jumpIsland, jmp, 6);
-
-    /* DLL-imported symbols are inserted here.
-       Others are inserted in ocGetNames_PEi386.
-     */
-    if(lookupStrHashTable(symhash, symbol) == NULL) {
-       ghciInsertSymbolTable(oc->fileName, symhash, symbol, extra->jumpIsland,
-               HS_BOOL_FALSE, oc);
-    }
 
     oc->first_symbol_extra++;
 
