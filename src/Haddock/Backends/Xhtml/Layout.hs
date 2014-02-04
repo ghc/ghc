@@ -29,6 +29,7 @@ module Haddock.Backends.Xhtml.Layout (
   subArguments,
   subAssociatedTypes,
   subConstructors,
+  subEquations,
   subFields,
   subInstances,
   subMethods,
@@ -163,6 +164,10 @@ subConstructors qual = divSubDecls "constructors" "Constructors" . subTable qual
 
 subFields :: Qualification -> [SubDecl] -> Html
 subFields qual = divSubDecls "fields" "Fields" . subDlist qual
+
+
+subEquations :: Qualification -> [SubDecl] -> Html
+subEquations qual = divSubDecls "equations" "Equations" . subTable qual
 
 
 subInstances :: Qualification -> String -> [SubDecl] -> Html

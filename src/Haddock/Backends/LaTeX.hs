@@ -284,7 +284,7 @@ ppDecl :: LHsDecl DocName
 ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs = case decl of
   TyClD d@(FamDecl {})          -> ppTyFam False loc doc d unicode
   TyClD d@(DataDecl {})
-                                -> ppDataDecl instances subdocs loc doc d unicode
+                                -> ppDataDecl instances subdocs loc (Just doc) d unicode
   TyClD d@(SynDecl {})          -> ppTySyn loc (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
 --  TyClD d@(TySynonym {})
@@ -560,9 +560,11 @@ ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
 
 
 ppInstHead :: Bool -> InstHead DocName -> LaTeX
-ppInstHead unicode ([],   n, ts) = ppAppNameTypes n ts unicode
-ppInstHead unicode (ctxt, n, ts) = ppContextNoLocs ctxt unicode <+> ppAppNameTypes n ts unicode
-
+ppInstHead unicode (n, ts, ClassInst ctx) = ppContextNoLocs ctx unicode <+> ppAppNameTypes n ts unicode
+ppInstHead unicode (n, ts, TypeInst rhs) = keyword "type"
+  <+> ppAppNameTypes n ts unicode <+> equals <+> ppType unicode rhs
+ppInstHead _unicode (_n, _ts, DataInst _dd) =
+  error "data instances not supported by --latex yet"
 
 lookupAnySubdoc :: (Eq name1) =>
                    name1 -> [(name1, DocForDecl name2)] -> DocForDecl name2
@@ -577,8 +579,8 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
 
 
 ppDataDecl :: [DocInstance DocName] ->
-              [(DocName, DocForDecl DocName)] ->
-              SrcSpan -> Documentation DocName -> TyClDecl DocName -> Bool ->
+              [(DocName, DocForDecl DocName)] -> SrcSpan ->
+              Maybe (Documentation DocName) -> TyClDecl DocName -> Bool ->
               LaTeX
 ppDataDecl instances subdocs _loc doc dataDecl unicode
 
@@ -590,7 +592,7 @@ ppDataDecl instances subdocs _loc doc dataDecl unicode
     cons      = dd_cons (tcdDataDefn dataDecl)
     resTy     = (con_res . unLoc . head) cons
 
-    body = catMaybes [constrBit, documentationToLaTeX doc]
+    body = catMaybes [constrBit, doc >>= documentationToLaTeX]
 
     (whereBit, leaders)
       | null cons = (empty,[])

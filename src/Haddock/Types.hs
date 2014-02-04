@@ -23,7 +23,7 @@ module Haddock.Types (
 import Data.Foldable
 import Data.Traversable
 import Control.Exception
-import Control.Arrow
+import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
 import Data.Typeable
 import Data.Map (Map)
@@ -31,6 +31,7 @@ import qualified Data.Map as Map
 import GHC hiding (NoLink)
 import DynFlags (ExtensionFlag, Language)
 import OccName
+import Outputable
 import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
 
@@ -45,6 +46,7 @@ type DocMap a      = Map Name (Doc a)
 type ArgMap a      = Map Name (Map Int (Doc a))
 type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
+type InstMap       = Map SrcSpan Name
 type SrcMap        = Map PackageId FilePath
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
@@ -112,6 +114,7 @@ data Interface = Interface
 
     -- | Instances exported by the module.
   , ifaceInstances       :: ![ClsInst]
+  , ifaceFamInstances    :: ![FamInst]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
@@ -273,14 +276,23 @@ instance NamedThing DocName where
 -- * Instances
 -----------------------------------------------------------------------------
 
+-- | The three types of instances
+data InstType name
+  = ClassInst [HsType name]  -- ^ Context
+  | TypeInst  (HsType name)  -- ^ Body (right-hand side)
+  | DataInst (TyClDecl name) -- ^ Data constructors
+
+instance OutputableBndr a => Outputable (InstType a) where
+  ppr (ClassInst a) = text "ClassInst" <+> ppr a
+  ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
+  ppr (DataInst  a) = text "DataInst"  <+> ppr a
 
 -- | An instance head that may have documentation.
 type DocInstance name = (InstHead name, Maybe (Doc name))
 
-
--- | The head of an instance. Consists of a context, a class name and a list
--- of instance types.
-type InstHead name = ([HsType name], name, [HsType name])
+-- | The head of an instance. Consists of a class name, a list of parameters
+-- and an instance type
+type InstHead name = (name, [HsType name], InstType name)
 
 -----------------------------------------------------------------------------
 -- * Documentation comments

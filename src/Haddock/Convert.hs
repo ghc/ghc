@@ -30,6 +30,7 @@ import CoAxiom
 import ConLike
 import DataCon
 import PatSyn
+import FamInstEnv
 import BasicTypes ( TupleSort(..) )
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
@@ -38,6 +39,7 @@ import Bag ( emptyBag )
 import Unique ( getUnique )
 import SrcLoc ( Located, noLoc, unLoc )
 import Data.List( partition )
+import Haddock.Types
 
 
 -- the main function here! yay!
@@ -62,7 +64,7 @@ tyThingToLHsDecl t = noLoc $ case t of
            extractFamilyDecl _           =
              error "tyThingToLHsDecl: impossible associated tycon"
 
-           atTyClDecls = [synifyTyCon at_tc | (at_tc, _) <- classATItems cl]
+           atTyClDecls = [synifyTyCon Nothing at_tc | (at_tc, _) <- classATItems cl]
            atFamDecls  = map extractFamilyDecl atTyClDecls in
        TyClD $ ClassDecl
          { tcdCtxt = synifyCtx (classSCTheta cl)
@@ -80,7 +82,7 @@ tyThingToLHsDecl t = noLoc $ case t of
          , tcdDocs = [] --we don't have any docs at this point
          , tcdFVs = placeHolderNames }
     | otherwise
-    -> TyClD (synifyTyCon tc)
+    -> TyClD (synifyTyCon Nothing tc)
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
@@ -119,13 +121,13 @@ synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
 
   | Just ax' <- isClosedSynFamilyTyCon_maybe tc
   , getUnique ax' == getUnique ax   -- without the getUniques, type error
-  = TyClD (synifyTyCon tc)
+  = TyClD (synifyTyCon (Just ax) tc)
 
   | otherwise
   = error "synifyAxiom: closed/open family confusion"
 
-synifyTyCon :: TyCon -> TyClDecl Name
-synifyTyCon tc
+synifyTyCon :: Maybe (CoAxiom br) -> TyCon -> TyClDecl Name
+synifyTyCon coax tc
   | isFunTyCon tc || isPrimTyCon tc 
   = DataDecl { tcdLName = synifyName tc
              , tcdTyVars =       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
@@ -181,7 +183,10 @@ synifyTyCon tc
   let
   alg_nd = if isNewTyCon tc then NewType else DataType
   alg_ctx = synifyCtx (tyConStupidTheta tc)
-  name = synifyName tc
+  name = case coax of
+    Just a -> synifyName a -- Data families are named according to their
+                           -- CoAxioms, not their TyCons
+    _ -> synifyName tc
   tyvars = synifyTyVars (tyConTyVars tc)
   kindSig = Just (tyConKind tc)
   -- The data constructors.
@@ -365,10 +370,19 @@ synifyTyLit (StrTyLit s) = HsStrTy s
 synifyKindSig :: Kind -> LHsKind Name
 synifyKindSig k = synifyType WithinType k
 
-synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
-                  ([HsType Name], Name, [HsType Name])
+synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
 synifyInstHead (_, preds, cls, ts) =
-  ( map (unLoc . synifyType WithinType) preds
-  , getName cls
+  ( getName cls
   , map (unLoc . synifyType WithinType) ts
+  , ClassInst $ map (unLoc . synifyType WithinType) preds
+  )
+
+-- Convert a family instance, this could be a type family or data family
+synifyFamInst :: FamInst -> InstHead Name
+synifyFamInst fi =
+  ( fi_fam fi
+  , map (unLoc . synifyType WithinType) $ fi_tys fi
+  , case fi_flavor fi of
+      SynFamilyInst -> TypeInst . unLoc . synifyType WithinType $ fi_rhs fi
+      DataFamilyInst c -> DataInst $ synifyTyCon (Just $ famInstAxiom fi) c
   )

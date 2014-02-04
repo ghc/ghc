@@ -258,11 +258,14 @@ renameLContext (L loc context) = do
 
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
-renameInstHead (preds, className, types) = do
-  preds' <- mapM renameType preds
+renameInstHead (className, types, rest) = do
   className' <- rename className
   types' <- mapM renameType types
-  return (preds', className', types')
+  rest' <- case rest of
+    ClassInst cs -> ClassInst <$> mapM renameType cs
+    TypeInst  ts -> TypeInst  <$> renameType ts
+    DataInst  dd -> DataInst  <$> renameTyClD dd
+  return (className', types', rest')
 
 
 renameLDecl :: LHsDecl Name -> RnM (LHsDecl DocName)

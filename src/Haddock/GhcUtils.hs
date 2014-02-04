@@ -91,6 +91,17 @@ getMainDeclBinder (ForD (ForeignImport name _ _ _)) = [unLoc name]
 getMainDeclBinder (ForD (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
+-- Extract the source location where an instance is defined. This is used
+-- to correlate InstDecls with their Instance/CoAxiom Names, via the
+-- instanceMap.
+getInstLoc :: InstDecl name -> SrcSpan
+getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = L l _ })) = l
+getInstLoc (DataFamInstD (DataFamInstDecl { dfid_tycon = L l _ })) = l
+getInstLoc (TyFamInstD (TyFamInstDecl
+  -- Since CoAxioms' Names refer to the whole line for type family instances
+  -- in particular, we need to dig a bit deeper to pull out the entire
+  -- equation. This does not happen for data family instances, for some reason.
+  { tfid_eqn = L _ (TyFamInstEqn { tfie_rhs = L l _ })})) = l
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..

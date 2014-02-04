@@ -420,6 +420,19 @@ div#style-menu-holder {
   margin: 0;
 }
 
+.subs ul {
+  height: 100%;
+  padding: 0.5em;
+  margin: 0;
+}
+
+.subs ul,
+.subs ul li.src {
+  list-style: none;
+  margin-left: 1em;
+}
+
+
 .top p.src {
   border-top: 1px solid #ccc;
 }
@@ -456,6 +469,12 @@ div#style-menu-holder {
 /* @end */
 
 /* @group Auxillary Pages */
+
+
+.extension-list {
+    list-style-type: none;
+    margin-left: 0;
+}
 
 #mini {
   margin: 0 auto;

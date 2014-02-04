@@ -23,6 +23,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Class
+import FamInstEnv
 import FastString
 import GHC
 import GhcMonad (withSession)
@@ -64,16 +65,17 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
             export {
               expItemInstances =
                 case mb_info of
-                  Just (_, _, cls_instances, _fam_instances) ->
-{-
-                    let insts = map (first synifyInstHead) $ sortImage (first instHead)
-                                [ (instanceSig i, getName i) | i <- instances ]
--}
-                    let insts = map (first synifyInstHead) $ sortImage (first instHead) $
-                                filter (\((_,_,cls,tys),_) -> not $ isInstanceHidden expInfo cls tys)
-                                [ (instanceHead' i, getName i) | i <- cls_instances ]
-                    in [ (inst, lookupInstDoc name iface ifaceMap instIfaceMap)
-                       | (inst, name) <- insts ]
+                  Just (_, _, cls_instances, fam_instances) ->
+                    let fam_insts = [ (synifyFamInst i, n)
+                                    | i <- sortImage instFam fam_instances
+                                    , let n = lookupInstDoc (getName i) iface ifaceMap instIfaceMap
+                                    ]
+                        cls_insts = [ (synifyInstHead i, lookupInstDoc n iface ifaceMap instIfaceMap)
+                                    | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
+                                    , (i@(_,_,cls,tys), n) <- sortImage (first instHead) is
+                                    , not $ isInstanceHidden expInfo cls tys
+                                    ]
+                    in cls_insts ++ fam_insts
                   Nothing -> []
             }
       return export'
@@ -139,22 +141,27 @@ data SimpleType = SimpleType Name [SimpleType]
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])
 instHead (_, _, cls, args)
   = (map argCount args, className cls, map simplify args)
-  where
-    argCount (AppTy t _) = argCount t + 1
-    argCount (TyConApp _ ts) = length ts
-    argCount (FunTy _ _ ) = 2
-    argCount (ForAllTy _ t) = argCount t
-    argCount _ = 0
 
-    simplify (ForAllTy _ t) = simplify t
-    simplify (FunTy t1 t2) = 
-      SimpleType funTyConName [simplify t1, simplify t2]
-    simplify (AppTy t1 t2) = SimpleType s (ts ++ [simplify t2])
-      where (SimpleType s ts) = simplify t1
-    simplify (TyVarTy v) = SimpleType (tyVarName v) []
-    simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
-    simplify (LitTy l) = SimpleTyLit l
+argCount :: Type -> Int
+argCount (AppTy t _) = argCount t + 1
+argCount (TyConApp _ ts) = length ts
+argCount (FunTy _ _ ) = 2
+argCount (ForAllTy _ t) = argCount t
+argCount _ = 0
 
+simplify :: Type -> SimpleType
+simplify (ForAllTy _ t) = simplify t
+simplify (FunTy t1 t2) = SimpleType funTyConName [simplify t1, simplify t2]
+simplify (AppTy t1 t2) = SimpleType s (ts ++ [simplify t2])
+  where (SimpleType s ts) = simplify t1
+simplify (TyVarTy v) = SimpleType (tyVarName v) []
+simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
+simplify (LitTy l) = SimpleTyLit l
+
+-- Used for sorting
+instFam :: FamInst -> ([Int], Name, [SimpleType], Int, SimpleType)
+instFam FamInst { fi_fam = n, fi_tys = ts, fi_rhs = t }
+  = (map argCount ts, n, map simplify ts, argCount t, simplify t)
 
 -- sortImage f = sortBy (\x y -> compare (f x) (f y))
 sortImage :: Ord b => (a -> b) -> [a] -> [a]

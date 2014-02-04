@@ -41,7 +41,7 @@ ppDecl :: Bool -> LinksInfo -> LHsDecl DocName ->
           DocForDecl DocName -> [DocInstance DocName] -> [(DocName, DocForDecl DocName)] ->
           Bool -> Qualification -> Html
 ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances subdocs unicode qual = case decl of
-  TyClD (FamDecl d)         -> ppTyFam summ False links loc mbDoc d unicode qual
+  TyClD (FamDecl d)         -> ppTyFam summ False links instances loc mbDoc d unicode qual
   TyClD d@(DataDecl {})     -> ppDataDecl summ links instances subdocs loc mbDoc d unicode qual
   TyClD d@(SynDecl {})      -> ppTySyn summ links loc (mbDoc, fnArgsDoc) d unicode qual
   TyClD d@(ClassDecl {})    -> ppClassDecl summ links instances loc mbDoc subdocs d unicode qual
@@ -212,9 +212,9 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
     Nothing   -> noHtml
   )
 
-ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Documentation DocName ->
+ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan -> Documentation DocName ->
               FamilyDecl DocName -> Bool -> Qualification -> Html
-ppTyFam summary associated links loc doc decl unicode qual
+ppTyFam summary associated links instances loc doc decl unicode qual
 
   | summary   = ppTyFamHeader True associated decl unicode qual
   | otherwise = header_ +++ docSection qual doc +++ instancesBit
@@ -225,16 +225,19 @@ ppTyFam summary associated links loc doc decl unicode qual
     header_ = topDeclElem links loc [docname] (ppTyFamHeader summary associated decl unicode qual)
 
     instancesBit
-      | FamilyDecl { fdInfo = ClosedTypeFamily _eqns } <- decl
+      | FamilyDecl { fdInfo = ClosedTypeFamily eqns } <- decl
       , not summary
-      = noHtml -- TODO: print eqns
+      = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
       = ppInstances instances docname unicode qual
 
-    -- TODO: get the instances
-    instances = []
-
+    -- Individual equation of a closed type family
+    ppTyFamEqn TyFamInstEqn { tfie_tycon = n, tfie_rhs = rhs
+                            , tfie_pats = HsWB { hswb_cts = ts }}
+      = ( ppAppNameTypes (unLoc n) (map unLoc ts) unicode qual
+          <+> equals <+> ppType unicode qual (unLoc rhs)
+        , Nothing, [] )
 
 --------------------------------------------------------------------------------
 -- * Associated Types
@@ -244,7 +247,7 @@ ppTyFam summary associated links loc doc decl unicode qual
 ppAssocType :: Bool -> LinksInfo -> DocForDecl DocName -> LFamilyDecl DocName -> Bool
             -> Qualification -> Html
 ppAssocType summ links doc (L loc decl) unicode qual =
-   ppTyFam summ True links loc (fst doc) decl unicode qual
+   ppTyFam summ True links [] loc (fst doc) decl unicode qual
 
 
 --------------------------------------------------------------------------------
@@ -423,10 +426,14 @@ ppInstances instances baseName unicode qual
     instName = getOccString $ getName baseName
     instDecl :: DocInstance DocName -> SubDecl
     instDecl (inst, maybeDoc) = (instHead inst, maybeDoc, [])
-    instHead ([],   n, ts) = ppAppNameTypes n ts unicode qual
-    instHead (ctxt, n, ts) = ppContextNoLocs ctxt unicode qual
+    instHead (n, ts, ClassInst cs) = ppContextNoLocs cs unicode qual
         <+> ppAppNameTypes n ts unicode qual
-
+    instHead (n, ts, TypeInst rhs) = keyword "type"
+        <+> ppAppNameTypes n ts unicode qual
+        <+> equals <+> ppType unicode qual rhs
+    instHead (n, ts, DataInst dd) = keyword "data"
+        <+> ppAppNameTypes n ts unicode qual
+        <+> ppShortDataDecl False True dd unicode qual
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
@@ -438,9 +445,8 @@ lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
 
 
 -- TODO: print contexts
-ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> TyClDecl DocName -> Bool
-                -> Qualification -> Html
-ppShortDataDecl summary _links _loc dataDecl unicode qual
+ppShortDataDecl :: Bool -> Bool -> TyClDecl DocName -> Bool -> Qualification -> Html
+ppShortDataDecl summary dataInst dataDecl unicode qual
 
   | [] <- cons = dataHeader
 
@@ -455,7 +461,9 @@ ppShortDataDecl summary _links _loc dataDecl unicode qual
       +++ shortSubDecls (map doGADTConstr cons)
 
   where
-    dataHeader = ppDataHeader summary dataDecl unicode qual
+    dataHeader
+      | dataInst  = noHtml
+      | otherwise = ppDataHeader summary dataDecl unicode qual
     doConstr c con = toHtml [c] <+> ppShortConstr summary (unLoc con) unicode qual
     doGADTConstr con = ppShortConstr summary (unLoc con) unicode qual
 
@@ -469,7 +477,7 @@ ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               Qualification -> Html
 ppDataDecl summary links instances subdocs loc doc dataDecl unicode qual
 
-  | summary   = ppShortDataDecl summary links loc dataDecl unicode qual
+  | summary   = ppShortDataDecl summary False dataDecl unicode qual
   | otherwise = header_ +++ docSection qual doc +++ constrBit +++ instancesBit
 
   where

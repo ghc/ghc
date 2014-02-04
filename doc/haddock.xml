@@ -1093,11 +1093,19 @@ square x = x * x
 	  <para>A <literal>newtype</literal> declaration,</para>
 	</listitem>
 	<listitem>
-	  <para>A <literal>type</literal> declaration, or</para>
+	  <para>A <literal>type</literal> declaration</para>
 	</listitem>
 	<listitem>
-	  <para>A <literal>class</literal> declaration.</para>
+	  <para>A <literal>class</literal> declaration,</para>
 	</listitem>
+        <listitem>
+          <para>A <literal>data family</literal> or
+            <literal>type family</literal> declaration, or</para>
+        </listitem>
+        <listitem>
+          <para>A <literal>data instance</literal> or
+            <literal>type instance</literal> declaration.</para>
+        </listitem>
       </itemizedlist>
 
       <para>If the annotation is followed by a different kind of
