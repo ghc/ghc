@@ -109,6 +109,10 @@
   * Remove deprecated functions `unsafeInterleaveST`, `unsafeIOToST`,
     and `unsafeSTToIO` from `Control.Monad.ST`.
 
+  * Add a new superclass `SomeAsyncException` for all asynchronous exceptions
+    and makes the existing `AsyncException` and `Timeout` exception children
+    of `SomeAsyncException` in the hierarchy.
+
   * Remove deprecated functions `blocked`, `unblock`, and `block` from
     `Control.Exception`.
 
