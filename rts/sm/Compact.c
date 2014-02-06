@@ -248,6 +248,20 @@ thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
 }
 
 STATIC_INLINE StgPtr
+thread_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
+{
+    while (size > 0) {
+        if ((bitmap & 1) == 0) {
+            thread((StgClosure **)p);
+        }
+        p++;
+        bitmap = bitmap >> 1;
+        size--;
+    }
+    return p;
+}
+
+STATIC_INLINE StgPtr
 thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
@@ -269,14 +283,7 @@ thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
 	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-	while (size > 0) {
-	    if ((bitmap & 1) == 0) {
-		thread((StgClosure **)p);
-	    }
-	    p++;
-	    bitmap = bitmap >> 1;
-	    size--;
-	}
+        p = thread_small_bitmap(p, size, bitmap);
 	break;
     }
     return p;
@@ -315,14 +322,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    p++;
 	    // NOTE: the payload starts immediately after the info-ptr, we
 	    // don't have an StgHeader in the same sense as a heap closure.
-	    while (size > 0) {
-		if ((bitmap & 1) == 0) {
-		    thread((StgClosure **)p);
-		}
-		p++;
-		bitmap = bitmap >> 1;
-		size--;
-	    }
+            p = thread_small_bitmap(p, size, bitmap);
 	    continue;
 
 	case RET_BCO: {
@@ -394,14 +394,7 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     default:
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-	while (size > 0) {
-	    if ((bitmap & 1) == 0) {
-		thread((StgClosure **)p);
-	    }
-	    p++;
-	    bitmap = bitmap >> 1;
-	    size--;
-	}
+        p = thread_small_bitmap(p, size, bitmap);
 	break;
     }
 
