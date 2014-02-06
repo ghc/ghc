@@ -123,7 +123,7 @@ sub git {
     });
 }
 
-sub readgit {
+sub readgitline {
     my $dir = shift;
     my @args = @_;
 
@@ -138,12 +138,26 @@ sub readgit {
     });
 }
 
+sub readgit {
+    my $dir = shift;
+    my @args = @_;
+
+    &inDir($dir, sub {
+        open my $fh, '-|', 'git', @args
+            or die "Executing git @args failed: $!";
+        my $ret;
+        $ret .= $_ while <$fh>;
+        close $fh;
+        return $ret;
+    });
+}
+
 sub configure_repository {
     my $localpath = shift;
 
     &git($localpath, "config", "--local", "core.ignorecase", "true");
 
-    my $autocrlf = &readgit($localpath, 'config', '--get', 'core.autocrlf');
+    my $autocrlf = &readgitline($localpath, 'config', '--get', 'core.autocrlf');
     if ($autocrlf eq "true") {
         &git($localpath, "config", "--local", "core.autocrlf", "false");
         &git($localpath, "reset", "--hard");
@@ -161,17 +175,17 @@ sub getrepo {
         # Figure out where to get the other repositories from,
         # based on where this GHC repo came from.
         my $git_dir = $bare_flag ? "ghc.git" : ".";
-        my $branch = &readgit($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
+        my $branch = &readgitline($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
         die "Bad branch: $branch"
             unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-        my $remote = &readgit($git_dir, "config", "branch.$branch.remote");
+        my $remote = &readgitline($git_dir, "config", "branch.$branch.remote");
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
             $remote = "origin";
         }
         die "Bad remote: $remote"
             unless $remote =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-        $repo = &readgit($git_dir, "config", "remote.$remote.url");
+        $repo = &readgitline($git_dir, "config", "remote.$remote.url");
     }
 
     my $repo_base;
@@ -402,7 +416,7 @@ sub gitall {
                 }
                 close($lsremote);
 
-                my $myhead = &readgit('.', 'rev-parse', '--verify', 'HEAD');
+                my $myhead = &readgitline('.', 'rev-parse', '--verify', 'HEAD');
 
                 if (not defined($remote_heads{$myhead})) {
                     die "Sub module $localpath needs to be pushed; see http://ghc.haskell.org/trac/ghc/wiki/Repositories/Upstream";
@@ -539,11 +553,11 @@ sub gitall {
             }
             print "$localpath";
             print (' ' x (40 - length($localpath)));
-            my $branch = &readgit($localpath, "rev-parse", "--abbrev-ref", "HEAD");
+            my $branch = &readgitline($localpath, "rev-parse", "--abbrev-ref", "HEAD");
             die "Bad branch: $branch"
                 unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-            my $us   = &readgit(".", "ls-remote", $localpath, "refs/heads/$branch");
-            my $them = &readgit(".", "ls-remote", $compareto, "refs/heads/$branch");
+            my $us   = &readgitline(".", "ls-remote", $localpath, "refs/heads/$branch");
+            my $them = &readgitline(".", "ls-remote", $compareto, "refs/heads/$branch");
             $us   =~ s/[[:space:]].*//;
             $them =~ s/[[:space:]].*//;
             die "Bad commit of mine: $us"     unless (length($us)   eq 40);
@@ -567,13 +581,19 @@ sub gitInitSubmodules {
     &git(".", "submodule", "init", @_);
 
     my ($repo_base, $checked_out_tree, $repo_local) = getrepo();
+
+    my $submodulespaths = &readgit(".", "config", "--get-regexp", "^submodule[.].*[.]url");
+    # if we came from github, change the urls appropriately
+    while ($submodulespaths =~ m!^(submodule.libraries/[a-zA-Z0-9]+.url) git://github.com/ghc/packages/([a-zA-Z0-9]+).git$!gm) {
+        &git(".", "config", $1, "git://github.com/ghc/packages-$2");
+    }
+
     # if we came from a local repository, grab our submodules from their
     # checkouts over there, if they exist.
     if ($repo_local) {
-        my $gitConfig = &tryReadFile(".git/config");
-        foreach $_ (split /^/, $gitConfig) {
-            if ($_ =~ /^\[submodule "(.*)"\]$/ and -e "$repo_base/$1/.git") {
-                &git(".", "config", "submodule.$1.url", "$repo_base/$1");
+        while ($submodulespaths =~ m!^(submodule.(libraries/[a-zA-Z0-9]+).url) .*$!gm) {
+            if (-e "$repo_base/$2/.git") {
+                &git(".", "config", $1, "$repo_base/$2");
             }
         }
     }
@@ -1043,7 +1063,7 @@ EOF
     }
 
     message "== Checking for obsolete Git repo URL";
-    my $repo_url = &readgit(".", 'config', '--get', 'remote.origin.url');
+    my $repo_url = &readgitline(".", 'config', '--get', 'remote.origin.url');
     if ($repo_url =~ /^http:\/\/darcs.haskell.org/) {
             print <<EOF;
 ============================
