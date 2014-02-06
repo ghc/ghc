@@ -7862,8 +7862,8 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 4.5.5</ulink>
 of the Haskell Report)
 can be completely switched off by
-<option>-XNoMonomorphismRestriction</option>. Since GHC 7.8.1, it is
-switched off by default in GHCi.
+<option>-XNoMonomorphismRestriction</option>. Since GHC 7.8.1, the monomorphism
+restriction is switched off by default in GHCi.
 </para>
 </sect3>
 
