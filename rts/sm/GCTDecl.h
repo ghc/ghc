@@ -57,7 +57,7 @@ extern StgWord8 the_gc_thread[];
 
    Also, the iOS Clang compiler doesn't support __thread either for
    some bizarre reason, so there's not much we can do about that... */
-#if (defined(llvm_CC_FLAVOR) && (CC_SUPPORTS_TLS == 0)) || defined(ios_HOST_OS)
+#if defined(llvm_CC_FLAVOR) && (CC_SUPPORTS_TLS == 0)
 #define gct ((gc_thread *)(pthread_getspecific(gctKey)))
 #define SET_GCT(to) (pthread_setspecific(gctKey, to))
 #define DECLARE_GCT ThreadLocalKey gctKey;
