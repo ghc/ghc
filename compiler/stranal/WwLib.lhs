@@ -529,7 +529,9 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , isDataTyCon tc
   , let cons = tyConDataCons tc
-        con = ASSERT( cons `lengthAtLeast` con_tag ) cons !! (con_tag - fIRST_TAG)
+  , cons `lengthAtLeast` con_tag -- This might not be true if we import the
+                                 -- type constructor via a .hs-bool file (#8743)
+  , let con  = cons !! (con_tag - fIRST_TAG)
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
 deepSplitCprType_maybe _ _ _ = Nothing
 \end{code}
