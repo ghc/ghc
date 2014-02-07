@@ -18,3 +18,5 @@ test('newtype', req_profiling, compile, ['-prof -auto-all'])
 test('T1988', normal, compile, [''])
 test('T8467', normal, compile, [''])
 test('T8037', normal, compile, [''])
+test('T8743', [ expect_broken(8743), extra_clean(['T8743.o-boot', 'T8743.hi-boot']) ], multimod_compile, ['T8743', '-v0'])
+
