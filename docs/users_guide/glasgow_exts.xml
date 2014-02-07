@@ -6652,6 +6652,18 @@ See also <ulink url="http://ghc.haskell.org/trac/ghc/ticket/7347">Trac #7347</ul
 </para>
 </sect2>
 
+<sect2>
+<title>Promoting type operators</title>
+<para>
+Type operators are <emphasis>not</emphasis> promoted to the kind level. Why not? Because
+<literal>*</literal> is a kind, parsed the way identifiers are. Thus, if a programmer
+tried to write <literal>Either * Bool</literal>, would it be <literal>Either</literal>
+applied to <literal>*</literal> and <literal>Bool</literal>? Or would it be
+<literal>*</literal> applied to <literal>Either</literal> and <literal>Bool</literal>.
+To avoid this quagmire, we simply forbid promoting type operators to the kind level.
+</para>
+</sect2>
+
 
 </sect1>
 
