@@ -675,7 +675,7 @@ def test_common_work (name, opts, func, args):
                     result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
                     if result != 0:
                         framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
-            except e:
+            except:
                 framework_fail(name, 'cleaning', 'clean-command exception')
 
         package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
@@ -738,7 +738,7 @@ def do_test(name, way, func, args):
                 result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + preCmd)
                 if result != 0:
                     framework_fail(name, way, 'pre-command failed: ' + str(result))
-        except e:
+        except:
             framework_fail(name, way, 'pre-command exception')
 
         try:
