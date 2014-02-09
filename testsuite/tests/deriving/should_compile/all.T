@@ -42,3 +42,4 @@ test('T7710', normal, compile, [''])
 test('AutoDeriveTypeable', normal, compile, [''])
 
 test('T8138', reqlib('primitive'), compile, ['-O2'])
+test('T8631', normal, compile, [''])
