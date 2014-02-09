@@ -100,7 +100,7 @@
 	<para>We might want documentation in multiple formats - online
 	and printed, for example.  Haddock comes with HTML, LaTeX,
   and Hoogle backends, and it is structured in such a way that adding new
-	back-ends is straightforward.</para>
+	backends is straightforward.</para>
       </listitem>
     </itemizedlist>
 
@@ -1229,17 +1229,71 @@ f  :: Int      -- ^ The 'Int' argument
     <section>
       <title>The module description</title>
 
-      <para>A module may contain a documentation comment before the
-      module header, in which case this comment is interpreted by
-      Haddock as an overall description of the module itself, and
-      placed in a section entitled <quote>Description</quote> in the
-      documentation for the module.  For example:</para>
+      <para>A module itself may be documented with multiple fields
+      that can then be displayed by the backend. In particular, the
+      HTML backend displays all the fields it currently knows
+      about. We first show the most complete module documentation
+      example and then talk about the fields.</para>
 
 <programlisting>
--- | This is the description for module "Foo"
-module Foo where
+{-|
+Module      : W
+Description : Short description
+Copyright   : (c) Some Guy, 2013
+                  Someone Else, 2014
+License     : GPL-3
+Maintainer  : sample@email.com
+Stability   : experimental
+Portability : POSIX
+
+Here is a longer description of this module, containing some
+commentary with @some markup@.
+-}
+module W where
 ...
 </programlisting>
+
+      <para>The <quote>Module</quote> field should be clear. It
+      currently doesn't affect the output of any of the backends but
+      you might want to include it for human information or for any
+      other tools that might be parsing these comments without the
+      help of GHC.</para>
+
+      <para>The <quote>Description</quote> field accepts some short text
+      which outlines the general purpose of the module. If you're
+      generating HTML, it will show up next to the module link in
+      the module index.</para>
+
+      <para>The <quote>Copyright</quote>, <quote>License</quote>,
+      <quote>Maintainer</quote> and <quote>Stability</quote> fields
+      should be obvious. An alternative spelling for the
+      <quote>License</quote> field is accepted as
+      <quote>Licence</quote> but the output will always prefer
+      <quote>License</quote>.</para>
+
+      <para>The <quote>Portability</quote> field has seen varied use
+      by different library authors. Some people put down things like
+      operating system constraints there while others put down which
+      GHC extensions used. Note that you might want to consider using
+      the <quote>show-extensions</quote> module flag for the
+      latter.</para>
+
+      <para>Finally, a module may contain a documentation comment
+      before the module header, in which case this comment is
+      interpreted by Haddock as an overall description of the module
+      itself, and placed in a section entitled
+      <quote>Description</quote> in the documentation for the module.
+      All usual Haddock markup is valid in this comment.</para>
+
+      <para>All fields are optional but they must be in order if they
+      do appear. Multi-line fields are accepted but the consecutive
+      lines have to start indented more than their label. If your
+      label is indented one space as is often the case with
+      <quote>--</quote> syntax, the consecutive lines have to start at
+      two spaces at the very least. Please note that we do not enforce
+      the format for any of the fields and the established formats are
+      just a convention.</para>
+
     </section>
 
     <section>
