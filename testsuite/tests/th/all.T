@@ -317,3 +317,5 @@ test('T8577',
      ['T8577', '-v0 ' + config.ghc_th_way_flags])
 test('T8633', normal, compile_and_run, [''])
 test('T8625', normal, ghci_script, ['T8625.script'])
+test('T8759', normal, compile_fail, ['-v0'])
+test('T8759a', normal, compile_fail, ['-v0'])

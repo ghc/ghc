@@ -70,6 +70,7 @@ import Class
 import Inst
 import TyCon
 import CoAxiom
+import PatSyn ( patSynId )
 import ConLike
 import DataCon
 import TcEvidence( TcEvBinds(..) )
@@ -1173,6 +1174,8 @@ reifyThing (AGlobal (AConLike (RealDataCon dc)))
         ; return (TH.DataConI (reifyName name) ty
                               (reifyName (dataConOrigTyCon dc)) fix)
         }
+reifyThing (AGlobal (AConLike (PatSynCon ps)))
+  = noTH (sLit "pattern synonyms") (ppr $ patSynId ps)
 
 reifyThing (ATcId {tct_id = id})
   = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
