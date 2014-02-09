@@ -1263,6 +1263,7 @@ distclean : clean
 	$(call removeFiles,docs/index.html)
 	$(call removeFiles,libraries/prologue.txt)
 	$(call removeFiles,distrib/configure.ac)
+	$(call removeFiles,ch01.html ch02.html index.html)
 
 # ./configure also makes these.
 	$(call removeFiles,mk/config.h)
