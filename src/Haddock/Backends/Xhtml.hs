@@ -291,7 +291,7 @@ mkNodeList qual ss p ts = case ts of
 
 mkNode :: Qualification -> [String] -> String -> ModuleTree -> Html
 mkNode qual ss p (Node s leaf pkg short ts) =
-  htmlModule +++ shortDescr +++ htmlPkg +++ subtree
+  htmlModule <+> shortDescr +++ htmlPkg +++ subtree
   where
     modAttrs = case (ts, leaf) of
       (_:_, False) -> collapseControl p True "module"
