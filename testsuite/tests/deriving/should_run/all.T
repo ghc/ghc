@@ -36,4 +36,4 @@ test('T5628', exit_code(1), compile_and_run, [''])
 test('T5712', normal, compile_and_run, [''])
 test('T7931', normal, compile_and_run, [''])
 test('T8280', normal, compile_and_run, [''])
-test('T8631', normal, compile, [''])
+
