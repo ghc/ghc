@@ -523,13 +523,8 @@ sigT t k
       t' <- t
       return $ SigT t' k
 
-equalityT :: TypeQ -> TypeQ -> TypeQ
-equalityT tleft tright
-  = do
-      tleft1  <- tleft
-      tright1 <- tright
-      let typ = AppT (AppT EqualityT tleft1) tright1
-      return typ
+equalityT :: TypeQ
+equalityT = return EqualityT
 
 promotedT :: Name -> TypeQ
 promotedT = return . PromotedT
