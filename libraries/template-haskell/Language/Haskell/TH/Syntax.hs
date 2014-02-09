@@ -1346,6 +1346,9 @@ data AnnTarget = ModuleAnnotation
 
 type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 
+-- | Since the advent of @ConstraintKinds@, constraints are really just types.
+-- Equality constraints use the 'EqualityT' constructor. Constraints may also
+-- be tuples of other constraints.
 type Pred = Type
 
 data Strict = IsStrict | NotStrict | Unpacked
