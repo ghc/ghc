@@ -486,6 +486,21 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
+dnl ** Which ar to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([AR], [ar], [ar])
+ArCmd="$AR"
+fp_prog_ar="$AR"
+AC_SUBST([ArCmd])
+
+dnl ** Which ranlib to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([RANLIB], [ranlib], [ranlib])
+RanlibCmd="$RANLIB"
+RANLIB="$RanlibCmd"
+AC_SUBST([RanlibCmd])
+
+
 # Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
 case $HostOS_CPP in
 cygwin32|mingw32)
