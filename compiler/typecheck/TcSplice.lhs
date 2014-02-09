@@ -1426,6 +1426,7 @@ reify_tc_app tc tys
          | tc `hasKey` listTyConKey   = TH.ListT
          | tc `hasKey` nilDataConKey  = TH.PromotedNilT
          | tc `hasKey` consDataConKey = TH.PromotedConsT
+         | tc `hasKey` eqTyConKey     = TH.EqualityT
          | otherwise                  = TH.ConT (reifyName tc)
     removeKinds :: Kind -> [TypeRep.Type] -> [TypeRep.Type]
     removeKinds (FunTy k1 k2) (h:t)
@@ -1441,38 +1442,7 @@ reifyPred ty
   -- We could reify the implicit paramter as a class but it seems
   -- nicer to support them properly...
   | isIPPred ty = noTH (sLit "implicit parameters") (ppr ty)
-  | otherwise
-   = case classifyPredType ty of
-  ClassPred cls tys -> do { tys' <- reifyTypes tys
-                          ; let { name = reifyName cls
-                                ; typ  = foldl TH.AppT (TH.ConT name) tys'
-                                }
-                          ; return typ
-                          }
-  EqPred ty1 ty2    -> do { ty1' <- reifyType ty1
-                          ; ty2' <- reifyType ty2
-                          ; return $ TH.AppT (TH.AppT TH.EqualityT ty1') ty2'
-                          }
-  TuplePred xs      -> do { xs' <- reifyTypes xs
-                          ; let { size = length xs'
-                                ; typ  = foldl TH.AppT (TH.TupleT size) xs'
-                                }
-                          ; return typ }
-  IrredPred _
-      | Just (ty1, ty2) <- splitAppTy_maybe ty
-        -> do { ty1' <- reifyType ty1
-              ; ty2' <- reifyType ty2
-              ; return $ TH.AppT ty1' ty2'
-              }
-      | Just (tyCon, tys) <- splitTyConApp_maybe ty
-        -> do { tys' <- reifyTypes tys
-              ; let { name = reifyName (tyConName tyCon)
-                    ; typ  = foldl TH.AppT (TH.ConT name) tys'
-                    }
-              ; return typ
-              }
-      | otherwise -> noTH (sLit "unsupported irreducible predicates") (ppr ty)
-
+  | otherwise   = reifyType ty
 
 ------------------------------
 reifyName :: NamedThing n => n -> TH.Name

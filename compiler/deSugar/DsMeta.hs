@@ -767,6 +767,7 @@ repPred (HsParTy ty)
   = repLPred ty
 repPred ty
   | Just (cls, tys) <- splitHsClassTy_maybe ty
+             -- works even when cls is not a class (ConstraintKinds)
   = do
       cls1 <- lookupOcc cls
       tyco <- repNamedTyCon cls1
@@ -776,14 +777,15 @@ repPred (HsEqTy tyleft tyright)
   = do
       tyleft1  <- repLTy tyleft
       tyright1 <- repLTy tyright
-      repTequality tyleft1 tyright1
+      eq       <- repTequality
+      repTapps eq [tyleft1, tyright1]
 repPred (HsTupleTy _ lps)
   = do
       tupTy <- repTupleTyCon size
-      foldM go tupTy lps
+      tys'  <- mapM repLTy lps
+      repTapps tupTy tys'
   where
     size = length lps
-    go ty' lp = repTapp ty' =<< repLPred lp
 repPred ty
   = notHandled "Exotic predicate type" (ppr ty)
 
@@ -1818,8 +1820,8 @@ repTapps f (t:ts) = do { f1 <- repTapp f t; repTapps f1 ts }
 repTSig :: Core TH.TypeQ -> Core TH.Kind -> DsM (Core TH.TypeQ)
 repTSig (MkC ty) (MkC ki) = rep2 sigTName [ty, ki]
 
-repTequality :: Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.TypeQ)
-repTequality (MkC t1) (MkC t2) = rep2 equalityTName [t1, t2]
+repTequality :: DsM (Core TH.TypeQ)
+repTequality = rep2 equalityTName []
 
 repTPromotedList :: [Core TH.TypeQ] -> DsM (Core TH.TypeQ)
 repTPromotedList []     = repPromotedNilTyCon
@@ -2715,22 +2717,22 @@ arrowTIdKey         = mkPreludeMiscIdUnique 385
 listTIdKey          = mkPreludeMiscIdUnique 386
 appTIdKey           = mkPreludeMiscIdUnique 387
 sigTIdKey           = mkPreludeMiscIdUnique 388
-equalityTIdKey      = mkPreludeMiscIdUnique 362
-litTIdKey           = mkPreludeMiscIdUnique 389
-promotedTIdKey      = mkPreludeMiscIdUnique 390
-promotedTupleTIdKey = mkPreludeMiscIdUnique 391
-promotedNilTIdKey   = mkPreludeMiscIdUnique 392
-promotedConsTIdKey  = mkPreludeMiscIdUnique 393
+equalityTIdKey      = mkPreludeMiscIdUnique 389
+litTIdKey           = mkPreludeMiscIdUnique 390
+promotedTIdKey      = mkPreludeMiscIdUnique 391
+promotedTupleTIdKey = mkPreludeMiscIdUnique 392
+promotedNilTIdKey   = mkPreludeMiscIdUnique 393
+promotedConsTIdKey  = mkPreludeMiscIdUnique 394
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique
-numTyLitIdKey = mkPreludeMiscIdUnique 394
-strTyLitIdKey = mkPreludeMiscIdUnique 395
+numTyLitIdKey = mkPreludeMiscIdUnique 395
+strTyLitIdKey = mkPreludeMiscIdUnique 396
 
 -- data TyVarBndr = ...
 plainTVIdKey, kindedTVIdKey :: Unique
-plainTVIdKey       = mkPreludeMiscIdUnique 396
-kindedTVIdKey      = mkPreludeMiscIdUnique 397
+plainTVIdKey       = mkPreludeMiscIdUnique 397
+kindedTVIdKey      = mkPreludeMiscIdUnique 398
 
 -- data Role = ...
 nominalRIdKey, representationalRIdKey, phantomRIdKey, inferRIdKey :: Unique
