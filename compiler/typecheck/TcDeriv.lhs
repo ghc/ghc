@@ -1969,7 +1969,8 @@ genInst standalone_deriv oflag comauxs
                     , iBinds  = InstBindings
                         { ib_binds = gen_Newtype_binds loc clas tvs tys rhs_ty
                         , ib_pragmas = []
-                        , ib_extensions = [Opt_ImpredicativeTypes]
+                        , ib_extensions = [ Opt_ImpredicativeTypes
+                                          , Opt_RankNTypes ]
                         , ib_standalone_deriving = standalone_deriv } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
