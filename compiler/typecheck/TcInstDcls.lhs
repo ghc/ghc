@@ -572,6 +572,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                    , iBinds = InstBindings
                                      { ib_binds = binds
                                      , ib_pragmas = uprags
+                                     , ib_extensions = []
                                      , ib_standalone_deriving = False } }
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts) }
@@ -1175,13 +1176,17 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   (spec_inst_prags, prag_fn)
                   op_items (InstBindings { ib_binds = binds
                                          , ib_pragmas = sigs
+                                         , ib_extensions = exts
                                          , ib_standalone_deriving
                                               = standalone_deriv })
   = do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; let hs_sig_fn = mkHsSigFun sigs
        ; checkMinimalDefinition
-       ; mapAndUnzipM (tc_item hs_sig_fn) op_items }
+       ; set_exts exts $ mapAndUnzipM (tc_item hs_sig_fn) op_items }
   where
+    set_exts :: [ExtensionFlag] -> TcM a -> TcM a
+    set_exts es thing = foldr setXOptM thing es
+    
     ----------------------
     tc_item :: HsSigFun -> (Id, DefMeth) -> TcM (Id, (Origin, LHsBind Id))
     tc_item sig_fn (sel_id, dm_info)

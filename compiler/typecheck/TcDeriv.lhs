@@ -469,11 +469,13 @@ renameDeriv is_boot inst_infos bagBinds
 
   where
     rn_inst_info :: InstInfo RdrName -> TcM (InstInfo Name, FreeVars)
-    rn_inst_info inst_info@(InstInfo { iSpec = inst
-                                     , iBinds = InstBindings
-                                                  { ib_binds = binds
-                                                  , ib_pragmas = sigs
-                                                  , ib_standalone_deriving = sa } })
+    rn_inst_info
+      inst_info@(InstInfo { iSpec = inst
+                          , iBinds = InstBindings
+                            { ib_binds = binds
+                            , ib_pragmas = sigs
+                            , ib_extensions = exts -- only for type-checking
+                            , ib_standalone_deriving = sa } })
         =       -- Bring the right type variables into
                 -- scope (yuk), and rename the method binds
            ASSERT( null sigs )
@@ -481,6 +483,7 @@ renameDeriv is_boot inst_infos bagBinds
            do { (rn_binds, fvs) <- rnMethodBinds (is_cls_nm inst) (\_ -> []) binds
               ; let binds' = InstBindings { ib_binds = rn_binds
                                            , ib_pragmas = []
+                                           , ib_extensions = exts
                                            , ib_standalone_deriving = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
         where
@@ -1966,6 +1969,7 @@ genInst standalone_deriv oflag comauxs
                     , iBinds  = InstBindings
                         { ib_binds = gen_Newtype_binds loc clas tvs tys rhs_ty
                         , ib_pragmas = []
+                        , ib_extensions = [Opt_ImpredicativeTypes]
                         , ib_standalone_deriving = standalone_deriv } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
@@ -1981,6 +1985,7 @@ genInst standalone_deriv oflag comauxs
                                   , iBinds  = InstBindings
                                                 { ib_binds = meth_binds
                                                 , ib_pragmas = []
+                                                , ib_extensions = []
                                                 , ib_standalone_deriving = standalone_deriv } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
