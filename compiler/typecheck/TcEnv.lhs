@@ -715,6 +715,10 @@ data InstBindings a
       { ib_binds :: (LHsBinds a)  -- Bindings for the instance methods
       , ib_pragmas :: [LSig a]    -- User pragmas recorded for generating 
                                   -- specialised instances
+      , ib_extensions :: [ExtensionFlag] -- any extra extensions that should
+                                         -- be enabled when type-checking this
+                                         -- instance; needed for
+                                         -- GeneralizedNewtypeDeriving
                       
       , ib_standalone_deriving :: Bool
            -- True <=> This code came from a standalone deriving clause
