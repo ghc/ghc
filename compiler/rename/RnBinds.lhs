@@ -434,9 +434,16 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
        ; return (bind { fun_id = L nameLoc newname }) } 
 
 rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
-  = do { addLocM checkConName rdrname
+  = do { unless (isTopRecNameMaker name_maker) $
+           addErr localPatternSynonymErr
+       ; addLocM checkConName rdrname
        ; name <- applyNameMaker name_maker rdrname
        ; return (bind{ patsyn_id = L nameLoc name }) }
+  where
+    localPatternSynonymErr :: SDoc
+    localPatternSynonymErr
+      = hang (ptext (sLit "Illegal pattern synonym declaration"))
+           2 (ptext (sLit "Pattern synonym declarations are only valid in the top-level scope"))
 
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 

@@ -23,6 +23,7 @@ module RnPat (-- main entry points
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
                                              --   sometimes we want to make top (qualified) names.
+              isTopRecNameMaker,
 
               rnHsRecFields1, HsRecFieldContext(..),
 
@@ -192,6 +193,10 @@ data NameMaker
 
 topRecNameMaker :: MiniFixityEnv -> NameMaker
 topRecNameMaker fix_env = LetMk TopLevel fix_env
+
+isTopRecNameMaker :: NameMaker -> Bool
+isTopRecNameMaker (LetMk TopLevel _) = True
+isTopRecNameMaker _ = False
 
 localRecNameMaker :: MiniFixityEnv -> NameMaker
 localRecNameMaker fix_env = LetMk NotTopLevel fix_env 
