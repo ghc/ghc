@@ -427,7 +427,7 @@ endif
 
 # We normally install only the packages down to this point
 REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifeq "$(Stage1Only)" "NO"
+ifneq "$(Stage1Only)" "YES"
 REGULAR_INSTALL_PACKAGES += compiler
 endif
 REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
@@ -464,7 +464,7 @@ endif
 
 # If we want to just install everything, then we want all the packages
 SUPERSIZE_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifeq "$(Stage1Only)" "NO"
+ifneq "$(Stage1Only)" "YES"
 SUPERSIZE_INSTALL_PACKAGES += compiler
 endif
 SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
@@ -653,7 +653,7 @@ BUILD_DIRS += compiler
 BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
-ifeq "$(Stage1Only)" "NO"
+ifneq "$(Stage1Only)" "YES"
 BUILD_DIRS += utils/ghctags
 endif
 BUILD_DIRS += utils/dll-split
