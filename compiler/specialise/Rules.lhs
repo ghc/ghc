@@ -682,6 +682,7 @@ match renv subst (Lam x1 e1) (Lam x2 e2)
 -- It's important that this is *after* the let rule,
 -- so that      (\x.M)  ~  (let y = e in \y.N)
 -- does the let thing, and then gets the lam/lam rule above
+-- See Note [Eta expansion in match]
 match renv subst (Lam x1 e1) e2
   = match renv' subst e1 (App e2 (varToCoreExpr new_x))
   where
@@ -997,6 +998,24 @@ at all.
 
 That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
+
+Note [Eta expansion in match]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At a first glance, this (eta-expansion of the thing to match if the template
+contains a lambda) might waste work. For example
+    {-# RULES "f/expand" forall n. f (\x -> foo n x) = \x -> foo n x #-}
+(for a non-inlined "f = id") will turn
+    go n = app (f (foo n))
+into
+    go n = app (\x -> foo n x)
+and if foo had arity 1 and app calls its argument many times, are wasting work.
+
+In practice this does not occur (or at least I could not tickle this "bug")
+because CSE turns it back into
+    go n = let lvl = foo n in app (\x -> lvl x)
+which is fine.
+
+
 
 %************************************************************************
 %*                                                                      *
