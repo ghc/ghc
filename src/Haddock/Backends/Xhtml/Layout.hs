@@ -187,7 +187,7 @@ declElem = paragraph ! [theclass "src"]
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> [DocName] -> Html -> Html
 topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc names html =
-    declElem << (html +++ srcLink +++ wikiLink)
+    declElem << (html <+> srcLink <+> wikiLink)
   where srcLink =
           case Map.lookup origPkg sourceMap of
             Nothing  -> noHtml
@@ -216,4 +216,3 @@ topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc names html =
         fname = case loc of
                 RealSrcSpan l -> unpackFS (srcSpanFile l)
                 UnhelpfulSpan _ -> error "topDeclElem UnhelpfulSpan"
-
