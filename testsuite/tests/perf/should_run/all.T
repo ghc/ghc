@@ -57,8 +57,9 @@ test('lazy-bs-alloc',
 
 test('T876',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 1263712 , 5),
+          [(wordsize(64), 63216 , 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
+              # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
            (wordsize(32), 663712, 5)]),
       only_ways(['normal']),
       extra_run_opts('10000')
@@ -289,7 +290,8 @@ test('T7797',
 test('T7954',
       [stats_num_field('bytes allocated',
                       [(wordsize(32), 1380051408, 10),
-                       (wordsize(64), 2720051528, 10)]),
+                       (wordsize(64), 1680051336, 10)]),
+              # 2014-02-10: 1680051336 (x86_64/Linux), call arity analysis
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -313,8 +315,10 @@ test('T5949',
 
 test('T4267',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 130000, 10)]),
+                      [ (wordsize(64), 40992, 10)]),
                       # previously, it was >170000 bytes
+                      # 2014-01-17: 130000
+                      # 2014-02-10: 40992 (x86_64/Linux), call arity analysis
       only_ways(['normal'])],
      compile_and_run,
      ['-O'])

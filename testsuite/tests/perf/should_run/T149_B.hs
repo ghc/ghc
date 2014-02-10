@@ -22,5 +22,5 @@ playerMostOccur2 (x:xs)
     where pmo = playerMostOccur2 xs
 
 numOccur :: Int -> [Int] -> Int
-numOccur i is = length $ filter (i ==) is
+numOccur i is = length is
 

@@ -21,5 +21,5 @@ playerMostOccur1 (x:xs)
  | otherwise = playerMostOccur1 xs
 
 numOccur :: Int -> [Int] -> Int
-numOccur i is = length $ filter (i ==) is
+numOccur i is = length is
 
