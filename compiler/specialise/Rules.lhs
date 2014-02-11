@@ -681,14 +681,6 @@ match renv subst (Lam x1 e1) e2
                      , rv_fltR = delBndr (rv_fltR renv) x2 }
     in  match renv' subst e1 e2
 
--- Eta expansion the other way
---      M  ~  (\y.N)    iff   M y     ~  N
-match renv subst e1 (Lam x2 e2)
-  = match renv' subst (App e1 (varToCoreExpr new_x)) e2
-  where
-    (rn_env', new_x) = rnEtaR (rv_lcl renv) x2
-    renv' = renv { rv_lcl = rn_env' }
-
 match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do  { subst1 <- match_ty renv subst ty1 ty2
         ; subst2 <- match renv subst1 e1 e2
