@@ -578,6 +578,9 @@ data RuleMatchEnv
        , rv_unf :: IdUnfoldingFun
        }
 
+rvInScopeEnv :: RuleMatchEnv -> InScopeEnv
+rvInScopeEnv renv = (rnInScopeSet (rv_lcl renv), rv_unf renv)
+
 data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
                     , rs_id_subst :: IdSubstEnv   --   template variables
                     , rs_binds    :: BindWrapper  -- Floated bindings
@@ -638,7 +641,8 @@ match renv subst e1 (Var v2)      -- Note [Expanding variables]
         -- because of the not-inRnEnvR
 
 match renv subst e1 (Let bind e2)
-  | okToFloat (rv_lcl renv) (bindFreeVars bind)        -- See Note [Matching lets]
+  | -- pprTrace "match:Let" (vcat [ppr bind, ppr $ okToFloat (rv_lcl renv) (bindFreeVars bind)]) $
+    okToFloat (rv_lcl renv) (bindFreeVars bind)        -- See Note [Matching lets]
   = match (renv { rv_fltR = flt_subst' })
           (subst { rs_binds = rs_binds subst . Let bind'
                  , rs_bndrs = extendVarSetList (rs_bndrs subst) new_bndrs })
@@ -671,23 +675,11 @@ match renv subst (App f1 a1) (App f2 a2)
   = do  { subst' <- match renv subst f1 f2
         ; match renv subst' a1 a2 }
 
-match renv subst (Lam x1 e1) (Lam x2 e2)
-  = match renv' subst e1 e2
-  where
-    renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
-                 , rv_fltR = delBndr (rv_fltR renv) x2 }
-
--- This rule does eta expansion
---              (\x.M)  ~  N    iff     M  ~  N x
--- It's important that this is *after* the let rule,
--- so that      (\x.M)  ~  (let y = e in \y.N)
--- does the let thing, and then gets the lam/lam rule above
--- See Note [Eta expansion in match]
 match renv subst (Lam x1 e1) e2
-  = match renv' subst e1 (App e2 (varToCoreExpr new_x))
-  where
-    (rn_env', new_x) = rnEtaL (rv_lcl renv) x1
-    renv' = renv { rv_lcl = rn_env' }
+  | Just (x2, e2) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
+  = let renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
+                     , rv_fltR = delBndr (rv_fltR renv) x2 }
+    in  match renv' subst e1 e2
 
 -- Eta expansion the other way
 --      M  ~  (\y.N)    iff   M y     ~  N
@@ -1017,23 +1009,6 @@ at all.
 
 That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
-
-Note [Eta expansion in match]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At a first glance, this (eta-expansion of the thing to match if the template
-contains a lambda) might waste work. For example
-    {-# RULES "f/expand" forall n. f (\x -> foo n x) = \x -> foo n x #-}
-(for a non-inlined "f = id") will turn
-    go n = app (f (foo n))
-into
-    go n = app (\x -> foo n x)
-and if foo had arity 1 and app calls its argument many times, are wasting work.
-
-In practice this does not occur (or at least I could not tickle this "bug")
-because CSE turns it back into
-    go n = let lvl = foo n in app (\x -> lvl x)
-which is fine.
-
 
 
 %************************************************************************
