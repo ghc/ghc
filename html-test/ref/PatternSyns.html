@@ -1,0 +1,241 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >PatternSyns</title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_PatternSyns.html");};
+//]]>
+</script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href="index.html"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="doc-index.html"
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      >&nbsp;</p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>PatternSyns</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >Testing some pattern synonyms</p
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    > <a href="#t:FooType"
+	    >FooType</a
+	    > x = <a href="#v:FooCtor"
+	    >FooCtor</a
+	    > x</li
+	  ><li class="src short"
+	  >pattern  <a href="#v:Foo"
+	    >Foo</a
+	    > t ::  <a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t</li
+	  ><li class="src short"
+	  >pattern  <a href="#v:Bar"
+	    >Bar</a
+	    > t ::  <a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > (<a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t)</li
+	  ><li class="src short"
+	  >pattern  t <a href="#v::-60--45--62-"
+	    >:&lt;-&gt;</a
+	    > t ::  (<a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t, <a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > (<a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t))</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    > a <a href="#t:-62--60-"
+	    >&gt;&lt;</a
+	    > b = <a href="#v:Empty"
+	    >Empty</a
+	    ></li
+	  ><li class="src short"
+	  >pattern  <a href="#v:E"
+	    >E</a
+	    > ::  <a href="PatternSyns.html#t:-62--60-"
+	    >(&gt;&lt;)</a
+	    > k t t</li
+	  ></ul
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a name="t:FooType" class="def"
+	    >FooType</a
+	    > x</p
+	  ><div class="doc"
+	  ><p
+	    >FooType doc</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a name="v:FooCtor" class="def"
+		  >FooCtor</a
+		  > x</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >pattern  <a name="v:Foo" class="def"
+	    >Foo</a
+	    > t ::  <a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t</p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="PatternSyns.html#v:Foo"
+		>Foo</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >pattern  <a name="v:Bar" class="def"
+	    >Bar</a
+	    > t ::  <a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > (<a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t)</p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="PatternSyns.html#v:Bar"
+		>Bar</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >pattern  t <a name="v::-60--45--62-" class="def"
+	    >:&lt;-&gt;</a
+	    > t ::  (<a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t, <a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > (<a href="PatternSyns.html#t:FooType"
+	    >FooType</a
+	    > t))</p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for (<code
+	      ><a href="PatternSyns.html#v::-60--45--62-"
+		>:&lt;-&gt;</a
+		></code
+	      >)</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > a <a name="t:-62--60-" class="def"
+	    >&gt;&lt;</a
+	    > b</p
+	  ><div class="doc"
+	  ><p
+	    >Doc for (<code
+	      >&gt;&lt;</code
+	      >)</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a name="v:Empty" class="def"
+		  >Empty</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >pattern  <a name="v:E" class="def"
+	    >E</a
+	    > ::  <a href="PatternSyns.html#t:-62--60-"
+	    >(&gt;&lt;)</a
+	    > k t t</p
+	  ><div class="doc"
+	  ><p
+	    >Pattern for <code
+	      ><a href="PatternSyns.html#v:Empty"
+		>Empty</a
+		></code
+	      ></p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ><p
+      >Produced by <a href="http://www.haskell.org/haddock/"
+	>Haddock</a
+	> version 2.14.0</p
+      ></div
+    ></body
+  ></html
+>
