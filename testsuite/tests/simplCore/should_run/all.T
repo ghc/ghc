@@ -21,6 +21,7 @@ test('simplrun009', normal, compile_and_run, [''])
 test('simplrun010', [extra_run_opts('24 16 8 +RTS -M10m -RTS'),
                      exit_code(251)]
                   , compile_and_run, [''])
+test('simplrun011', normal, compile_and_run, [''])
 
 # Really we'd like to run T2486 too, to check that its
 # runtime has not gone up, but here I just compile it so that
