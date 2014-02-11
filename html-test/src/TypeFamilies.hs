@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances, PolyKinds, TypeOperators, DataKinds, MultiParamTypeClasses #-}
 
 -- | Doc for: module TypeFamilies
 module TypeFamilies where
@@ -21,7 +21,7 @@ instance Test X
 instance Test Y
 
 -- | Doc for: type family Foo a
-type family Foo a
+type family Foo a :: k
 
 -- | Doc for: type instance Foo X = Y
 type instance Foo X = Y
@@ -66,3 +66,13 @@ instance Assoc Y where
 type family Bar b where
   Bar X = X
   Bar y = Y
+
+type family (<>) (a :: k) (b :: k) :: k
+
+type instance X <> a = X
+type instance Y <> a = a
+
+type instance XXX <> XX = 'X
+
+class (><) (a :: k) (b :: k)
+instance XX >< XXX

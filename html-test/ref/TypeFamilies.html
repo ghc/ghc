@@ -90,7 +90,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    >type family</span
 	    > <a href="#t:Foo"
 	    >Foo</a
-	    > a</li
+	    > a :: k</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data family</span
@@ -124,6 +124,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    >type family</span
 	    > <a href="#t:Bar"
 	    >Bar</a
+	    > b</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >type family</span
+	    > a <a href="#t:-60--62-"
+	    >&lt;&gt;</a
+	    > b :: k</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >class</span
+	    > a <a href="#t:-62--60-"
+	    >&gt;&lt;</a
 	    > b</li
 	  ></ul
 	></div
@@ -186,7 +198,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Assoc"
 		    >Assoc</a
-		    > <a href="TypeFamilies.html#t:X"
+		    > * <a href="TypeFamilies.html#t:X"
 		    >X</a
 		    ></td
 		  ><td class="doc"
@@ -198,7 +210,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Test"
 		    >Test</a
-		    > <a href="TypeFamilies.html#t:X"
+		    > * <a href="TypeFamilies.html#t:X"
 		    >X</a
 		    ></td
 		  ><td class="doc"
@@ -208,30 +220,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		  ></tr
 		><tr
 		><td class="src"
-		  ><span class="keyword"
-		    >data</span
-		    > <a href="TypeFamilies.html#t:AssocD"
-		    >AssocD</a
+		  ><a href="TypeFamilies.html#t:-62--60-"
+		    >(&gt;&lt;)</a
 		    > <a href="TypeFamilies.html#t:X"
 		    >X</a
-		    > = <a name="v:AssocX" class="def"
-		    >AssocX</a
-		    ></td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><span class="keyword"
-		    >type</span
-		    > <a href="TypeFamilies.html#t:AssocT"
-		    >AssocT</a
-		    > <a href="TypeFamilies.html#t:X"
-		    >X</a
-		    > = <a href="TypeFamilies.html#t:Foo"
-		    >Foo</a
-		    > <a href="TypeFamilies.html#t:X"
-		    >X</a
+		    > <a href="TypeFamilies.html#v:XX"
+		    >XX</a
+		    > <a href="TypeFamilies.html#v:XXX"
+		    >XXX</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -279,10 +275,40 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><tr
 		><td class="src"
 		  ><span class="keyword"
+		    >data</span
+		    > <a href="TypeFamilies.html#t:AssocD"
+		    >AssocD</a
+		    > * <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > = <a name="v:AssocX" class="def"
+		    >AssocX</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:AssocT"
+		    >AssocT</a
+		    > * <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > = <a href="TypeFamilies.html#t:Foo"
+		    >Foo</a
+		    > * <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
 		    >type</span
 		    > <a href="TypeFamilies.html#t:Foo"
 		    >Foo</a
-		    > <a href="TypeFamilies.html#t:X"
+		    > * <a href="TypeFamilies.html#t:X"
 		    >X</a
 		    > = <a href="TypeFamilies.html#t:Y"
 		    >Y</a
@@ -291,6 +317,38 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		  ><p
 		    >Doc for: type instance Foo X = Y</p
 		    ></td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:-60--62-"
+		    >(&lt;&gt;)</a
+		    > * <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > a = <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:-60--62-"
+		    >(&lt;&gt;)</a
+		    > <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > <a href="TypeFamilies.html#v:XXX"
+		    >XXX</a
+		    > <a href="TypeFamilies.html#v:XX"
+		    >XX</a
+		    > = <a href="TypeFamilies.html#v:X"
+		    >X</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
 		  ></tr
 		></table
 	      ></div
@@ -316,7 +374,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Assoc"
 		    >Assoc</a
-		    > <a href="TypeFamilies.html#t:Y"
+		    > * <a href="TypeFamilies.html#t:Y"
 		    >Y</a
 		    ></td
 		  ><td class="doc"
@@ -328,43 +386,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Test"
 		    >Test</a
-		    > <a href="TypeFamilies.html#t:Y"
+		    > * <a href="TypeFamilies.html#t:Y"
 		    >Y</a
 		    ></td
 		  ><td class="doc"
 		  ><p
 		    >Doc for: instance Test Y</p
 		    ></td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><span class="keyword"
-		    >data</span
-		    > <a href="TypeFamilies.html#t:AssocD"
-		    >AssocD</a
-		    > <a href="TypeFamilies.html#t:Y"
-		    >Y</a
-		    > = <a name="v:AssocY" class="def"
-		    >AssocY</a
-		    ></td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><span class="keyword"
-		    >type</span
-		    > <a href="TypeFamilies.html#t:AssocT"
-		    >AssocT</a
-		    > <a href="TypeFamilies.html#t:Y"
-		    >Y</a
-		    > = <a href="TypeFamilies.html#t:Bat"
-		    >Bat</a
-		    > <a href="TypeFamilies.html#t:Y"
-		    >Y</a
-		    ></td
-		  ><td class="doc empty"
-		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
@@ -399,10 +427,40 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><tr
 		><td class="src"
 		  ><span class="keyword"
+		    >data</span
+		    > <a href="TypeFamilies.html#t:AssocD"
+		    >AssocD</a
+		    > * <a href="TypeFamilies.html#t:Y"
+		    >Y</a
+		    > = <a name="v:AssocY" class="def"
+		    >AssocY</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:AssocT"
+		    >AssocT</a
+		    > * <a href="TypeFamilies.html#t:Y"
+		    >Y</a
+		    > = <a href="TypeFamilies.html#t:Bat"
+		    >Bat</a
+		    > <a href="TypeFamilies.html#t:Y"
+		    >Y</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
 		    >type</span
 		    > <a href="TypeFamilies.html#t:Foo"
 		    >Foo</a
-		    > <a href="TypeFamilies.html#t:Y"
+		    > * <a href="TypeFamilies.html#t:Y"
 		    >Y</a
 		    > = <a href="TypeFamilies.html#t:X"
 		    >X</a
@@ -411,6 +469,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		  ><p
 		    >Doc for: type instance Foo Y = X</p
 		    ></td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:-60--62-"
+		    >(&lt;&gt;)</a
+		    > * <a href="TypeFamilies.html#t:Y"
+		    >Y</a
+		    > a = a</td
+		  ><td class="doc empty"
+		  >&nbsp;</td
 		  ></tr
 		></table
 	      ></div
@@ -436,7 +506,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Test"
 		    >Test</a
-		    > <a href="TypeFamilies.html#t:Y"
+		    > * <a href="TypeFamilies.html#t:Y"
 		    >Y</a
 		    ></td
 		  ><td class="doc"
@@ -448,7 +518,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Test"
 		    >Test</a
-		    > <a href="TypeFamilies.html#t:X"
+		    > * <a href="TypeFamilies.html#t:X"
 		    >X</a
 		    ></td
 		  ><td class="doc"
@@ -466,7 +536,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    >type family</span
 	    > <a name="t:Foo" class="def"
 	    >Foo</a
-	    > a</p
+	    > a :: k</p
 	  ><div class="doc"
 	  ><p
 	    >Doc for: type family Foo a</p
@@ -482,7 +552,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		    >type</span
 		    > <a href="TypeFamilies.html#t:Foo"
 		    >Foo</a
-		    > <a href="TypeFamilies.html#t:Y"
+		    > * <a href="TypeFamilies.html#t:Y"
 		    >Y</a
 		    > = <a href="TypeFamilies.html#t:X"
 		    >X</a
@@ -498,7 +568,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		    >type</span
 		    > <a href="TypeFamilies.html#t:Foo"
 		    >Foo</a
-		    > <a href="TypeFamilies.html#t:X"
+		    > * <a href="TypeFamilies.html#t:X"
 		    >X</a
 		    > = <a href="TypeFamilies.html#t:Y"
 		    >Y</a
@@ -646,7 +716,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Assoc"
 		    >Assoc</a
-		    > <a href="TypeFamilies.html#t:Y"
+		    > * <a href="TypeFamilies.html#t:Y"
 		    >Y</a
 		    ></td
 		  ><td class="doc"
@@ -658,7 +728,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		><td class="src"
 		  ><a href="TypeFamilies.html#t:Assoc"
 		    >Assoc</a
-		    > <a href="TypeFamilies.html#t:X"
+		    > * <a href="TypeFamilies.html#t:X"
 		    >X</a
 		    ></td
 		  ><td class="doc"
@@ -708,6 +778,96 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 		>&nbsp;</td
 		></tr
 	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type family</span
+	    > a <a name="t:-60--62-" class="def"
+	    >&lt;&gt;</a
+	    > b :: k</p
+	  ><div class="subs instances"
+	  ><p id="control.i:-60--62-" class="caption collapser" onclick="toggleSection('i:-60--62-')"
+	    >Instances</p
+	    ><div id="section.i:-60--62-" class="show"
+	    ><table
+	      ><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:-60--62-"
+		    >(&lt;&gt;)</a
+		    > * <a href="TypeFamilies.html#t:Y"
+		    >Y</a
+		    > a = a</td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:-60--62-"
+		    >(&lt;&gt;)</a
+		    > * <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > a = <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><span class="keyword"
+		    >type</span
+		    > <a href="TypeFamilies.html#t:-60--62-"
+		    >(&lt;&gt;)</a
+		    > <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > <a href="TypeFamilies.html#v:XXX"
+		    >XXX</a
+		    > <a href="TypeFamilies.html#v:XX"
+		    >XX</a
+		    > = <a href="TypeFamilies.html#v:X"
+		    >X</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		></table
+	      ></div
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > a <a name="t:-62--60-" class="def"
+	    >&gt;&lt;</a
+	    > b</p
+	  ><div class="subs instances"
+	  ><p id="control.i:-62--60-" class="caption collapser" onclick="toggleSection('i:-62--60-')"
+	    >Instances</p
+	    ><div id="section.i:-62--60-" class="show"
+	    ><table
+	      ><tr
+		><td class="src"
+		  ><a href="TypeFamilies.html#t:-62--60-"
+		    >(&gt;&lt;)</a
+		    > <a href="TypeFamilies.html#t:X"
+		    >X</a
+		    > <a href="TypeFamilies.html#v:XX"
+		    >XX</a
+		    > <a href="TypeFamilies.html#v:XXX"
+		    >XXX</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		></table
+	      ></div
 	    ></div
 	  ></div
 	></div

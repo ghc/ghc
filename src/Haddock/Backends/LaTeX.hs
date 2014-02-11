@@ -560,10 +560,10 @@ ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
 
 
 ppInstHead :: Bool -> InstHead DocName -> LaTeX
-ppInstHead unicode (n, ts, ClassInst ctx) = ppContextNoLocs ctx unicode <+> ppAppNameTypes n ts unicode
-ppInstHead unicode (n, ts, TypeInst rhs) = keyword "type"
-  <+> ppAppNameTypes n ts unicode <+> equals <+> ppType unicode rhs
-ppInstHead _unicode (_n, _ts, DataInst _dd) =
+ppInstHead unicode (n, ks, ts, ClassInst ctx) = ppContextNoLocs ctx unicode <+> ppAppNameTypes n ks ts unicode
+ppInstHead unicode (n, ks, ts, TypeInst rhs) = keyword "type"
+  <+> ppAppNameTypes n ks ts unicode <+> equals <+> ppType unicode rhs
+ppInstHead _unicode (_n, _ks, _ts, DataInst _dd) =
   error "data instances not supported by --latex yet"
 
 lookupAnySubdoc :: (Eq name1) =>
@@ -749,27 +749,27 @@ ppDataHeader _ _ = error "ppDataHeader: illegal argument"
 --------------------------------------------------------------------------------
 
 
--- | Print an application of a DocName and a list of HsTypes
-ppAppNameTypes :: DocName -> [HsType DocName] -> Bool -> LaTeX
-ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
+-- | Print an application of a DocName and two lists of HsTypes (kinds, types)
+ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName] -> Bool -> LaTeX
+ppAppNameTypes n ks ts unicode = ppTypeApp n ks ts ppDocName (ppParendType unicode)
 
 
 -- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> LaTeX
 ppAppDocNameNames _summ n ns =
-  ppTypeApp n ns (ppBinder . nameOccName . getName) ppSymName
+  ppTypeApp n [] ns (ppBinder . nameOccName . getName) ppSymName
 
 
 -- | General printing of type applications
-ppTypeApp :: DocName -> [a] -> (DocName -> LaTeX) -> (a -> LaTeX) -> LaTeX
-ppTypeApp n (t1:t2:rest) ppDN ppT
+ppTypeApp :: DocName -> [a] -> [a] -> (DocName -> LaTeX) -> (a -> LaTeX) -> LaTeX
+ppTypeApp n [] (t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
     operator = isNameSym . getName $ n
     opApp = ppT t1 <+> ppDN n <+> ppT t2
 
-ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
+ppTypeApp n ks ts ppDN ppT = ppDN n <+> hsep (map ppT $ ks ++ ts)
 
 
 -------------------------------------------------------------------------------

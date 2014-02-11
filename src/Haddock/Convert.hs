@@ -21,7 +21,7 @@ import HsSyn
 import TcType ( tcSplitSigmaTy )
 import TypeRep
 import Type(isStrLitTy)
-import Kind ( splitKindFunTys, synTyConResKind )
+import Kind ( splitKindFunTys, synTyConResKind, isKind )
 import Name
 import Var
 import Class
@@ -371,18 +371,22 @@ synifyKindSig :: Kind -> LHsKind Name
 synifyKindSig k = synifyType WithinType k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
-synifyInstHead (_, preds, cls, ts) =
+synifyInstHead (_, preds, cls, types) =
   ( getName cls
+  , map (unLoc . synifyType WithinType) ks
   , map (unLoc . synifyType WithinType) ts
   , ClassInst $ map (unLoc . synifyType WithinType) preds
   )
+  where (ks,ts) = break (not . isKind) types
 
 -- Convert a family instance, this could be a type family or data family
 synifyFamInst :: FamInst -> InstHead Name
 synifyFamInst fi =
   ( fi_fam fi
-  , map (unLoc . synifyType WithinType) $ fi_tys fi
+  , map (unLoc . synifyType WithinType) ks
+  , map (unLoc . synifyType WithinType) ts
   , case fi_flavor fi of
       SynFamilyInst -> TypeInst . unLoc . synifyType WithinType $ fi_rhs fi
       DataFamilyInst c -> DataInst $ synifyTyCon (Just $ famInstAxiom fi) c
   )
+  where (ks,ts) = break (not . isKind) $ fi_tys fi

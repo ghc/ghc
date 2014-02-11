@@ -235,7 +235,7 @@ ppTyFam summary associated links instances loc doc decl unicode qual
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamInstEqn { tfie_tycon = n, tfie_rhs = rhs
                             , tfie_pats = HsWB { hswb_cts = ts }}
-      = ( ppAppNameTypes (unLoc n) (map unLoc ts) unicode qual
+      = ( ppAppNameTypes (unLoc n) [] (map unLoc ts) unicode qual
           <+> equals <+> ppType unicode qual (unLoc rhs)
         , Nothing, [] )
 
@@ -270,31 +270,31 @@ ppDataBinderWithVars summ decl =
 --------------------------------------------------------------------------------
 
 
--- | Print an application of a DocName and a list of HsTypes
-ppAppNameTypes :: DocName -> [HsType DocName] -> Bool -> Qualification -> Html
-ppAppNameTypes n ts unicode qual =
-    ppTypeApp n ts (ppDocName qual . Just) (ppParendType unicode qual)
+-- | Print an application of a DocName and two lists of HsTypes (kinds, types)
+ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName] -> Bool -> Qualification -> Html
+ppAppNameTypes n ks ts unicode qual =
+    ppTypeApp n ks ts (ppDocName qual . Just) (ppParendType unicode qual)
 
 
 -- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
 ppAppDocNameNames summ n ns =
-    ppTypeApp n ns ppDN ppTyName
+    ppTypeApp n [] ns ppDN ppTyName
   where
     ppDN is_infix = ppBinderFixity is_infix summ . nameOccName . getName
     ppBinderFixity True = ppBinderInfix
     ppBinderFixity False = ppBinder
 
 -- | General printing of type applications
-ppTypeApp :: DocName -> [a] -> (Bool -> DocName -> Html) -> (a -> Html) -> Html
-ppTypeApp n (t1:t2:rest) ppDN ppT
+ppTypeApp :: DocName -> [a] -> [a] -> (Bool -> DocName -> Html) -> (a -> Html) -> Html
+ppTypeApp n [] (t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
     operator = isNameSym . getName $ n
     opApp = ppT t1 <+> ppDN True n <+> ppT t2
 
-ppTypeApp n ts ppDN ppT = ppDN False n <+> hsep (map ppT ts)
+ppTypeApp n ks ts ppDN ppT = ppDN False n <+> hsep (map ppT $ ks ++ ts)
 
 
 -------------------------------------------------------------------------------
@@ -426,13 +426,13 @@ ppInstances instances baseName unicode qual
     instName = getOccString $ getName baseName
     instDecl :: DocInstance DocName -> SubDecl
     instDecl (inst, maybeDoc) = (instHead inst, maybeDoc, [])
-    instHead (n, ts, ClassInst cs) = ppContextNoLocs cs unicode qual
-        <+> ppAppNameTypes n ts unicode qual
-    instHead (n, ts, TypeInst rhs) = keyword "type"
-        <+> ppAppNameTypes n ts unicode qual
+    instHead (n, ks, ts, ClassInst cs) = ppContextNoLocs cs unicode qual
+        <+> ppAppNameTypes n ks ts unicode qual
+    instHead (n, ks, ts, TypeInst rhs) = keyword "type"
+        <+> ppAppNameTypes n ks ts unicode qual
         <+> equals <+> ppType unicode qual rhs
-    instHead (n, ts, DataInst dd) = keyword "data"
-        <+> ppAppNameTypes n ts unicode qual
+    instHead (n, ks, ts, DataInst dd) = keyword "data"
+        <+> ppAppNameTypes n ks ts unicode qual
         <+> ppShortDataDecl False True dd unicode qual
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2

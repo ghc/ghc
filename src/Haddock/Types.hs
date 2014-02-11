@@ -290,9 +290,9 @@ instance OutputableBndr a => Outputable (InstType a) where
 -- | An instance head that may have documentation.
 type DocInstance name = (InstHead name, Maybe (Doc name))
 
--- | The head of an instance. Consists of a class name, a list of parameters
--- and an instance type
-type InstHead name = (name, [HsType name], InstType name)
+-- | The head of an instance. Consists of a class name, a list of kind
+-- parameters, a list of type parameters and an instance type
+type InstHead name = (name, [HsType name], [HsType name], InstType name)
 
 -----------------------------------------------------------------------------
 -- * Documentation comments

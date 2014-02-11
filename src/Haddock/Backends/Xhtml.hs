@@ -605,7 +605,7 @@ ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
 ppTyClBinderWithVarsMini mdl decl =
   let n = tcdName decl
       ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
-  in ppTypeApp n ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
+  in ppTypeApp n [] ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
 
 
 ppModuleContents :: Qualification -> [ExportItem DocName] -> Html

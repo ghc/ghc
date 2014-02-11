@@ -29,6 +29,8 @@ Changes in version 2.14.0
 
  * Print type/data family instances
 
+ * Fix display of poly-kinded type operators
+
 Changes in version 2.13.2
 
  * Handle HsExplicitListTy in renamer (#213)
