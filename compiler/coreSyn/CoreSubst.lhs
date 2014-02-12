@@ -1357,7 +1357,7 @@ pushCoercionIntoLambda
 pushCoercionIntoLambda in_scope x e co
     -- This implements the Push rule from the paper on coercions
     -- Compare with simplCast in Simplify
-    | ASSERT (not (isTyVar x) && not (isCoVar x)) True
+    | ASSERT(not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_s1,_s2) <- splitFunTy_maybe s1s2
     , Just (t1,_t2) <- splitFunTy_maybe t1t2
