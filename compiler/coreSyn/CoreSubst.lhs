@@ -1307,7 +1307,7 @@ Note [exprIsLiteral_maybe]
 
 This function will, given an expression `e`, try to turn it into the form
 `Lam v e'` (returned as `Just (v,e')`). Besides using lambdas, it looks through
-casts (using the Push rule), and it unfoldes function calls if the unfolding
+casts (using the Push rule), and it unfolds function calls if the unfolding
 has a greater arity than arguments are present.
 
 Currently, it is used in Rules.match, and is required to make
@@ -1321,7 +1321,7 @@ exprIsLambda_maybe :: InScopeEnv -> CoreExpr -> Maybe (Var, CoreExpr)
 exprIsLambda_maybe _ (Lam x e)
     = Just (x, e)
 
--- Also possible: A casted lambda. Push the coercion insinde
+-- Also possible: A casted lambda. Push the coercion inside
 exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
     | Just (x, e) <- exprIsLambda_maybe (in_scope_set, id_unf) casted_e
     -- Only do value lambdas.
@@ -1337,7 +1337,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) e
     | (Var f, as) <- collectArgs e
     , let unfolding = id_unf f
     , Just rhs <- expandUnfolding_maybe unfolding
-    -- Make sure there is hope to get a lamda
+    -- Make sure there is hope to get a lambda
     , unfoldingArity unfolding > length (filter isValArg as)
     -- Optimize, for beta-reduction
     , let e' =  simpleOptExprWith (mkEmptySubst in_scope_set) (rhs `mkApps` as)

@@ -335,7 +335,7 @@ I wonder if SpecConstr couldn't be extended to handle this? After all,
 lambda is a sort of constructor for functions and perhaps it already
 has most of the necessary machinery?
 
-Furthermore, there's an immediate win, because you don't need to allocate the lamda
+Furthermore, there's an immediate win, because you don't need to allocate the lambda
 at the call site; and if perchance it's called in the recursive call, then you
 may avoid allocating it altogether.  Just like for constructors.
 
