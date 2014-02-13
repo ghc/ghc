@@ -1,0 +1,5 @@
+
+T8773.hs:5:1:
+    Roles other than ‛nominal’ for class parameters can lead to incoherence.
+    Use IncoherentInstances to allow this; bad role found
+    while checking a role annotation for ‛C2’
