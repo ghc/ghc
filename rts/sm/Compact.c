@@ -183,7 +183,7 @@ loop:
 // A word-aligned memmove will be faster for small objects than libc's or gcc's.
 // Remember, the two regions *might* overlap, but: to <= from.
 STATIC_INLINE void
-move(StgPtr to, StgPtr from, W_ size)
+move(StgPtr to, StgPtr from, StgWord size)
 {
     for(; size > 0; --size) {
 	*to++ = *from++;
@@ -225,7 +225,7 @@ thread_static( StgClosure* p )
 }
 
 STATIC_INLINE void
-thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, W_ size )
+thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
 {
     W_ i, b;
     StgWord bitmap;
@@ -252,7 +252,7 @@ thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
     StgWord bitmap;
-    W_ size;
+    StgWord size;
 
     p = (StgPtr)args;
     switch (fun_info->f.fun_type) {
@@ -287,7 +287,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 {
     const StgRetInfoTable* info;
     StgWord bitmap;
-    W_ size;
+    StgWord size;
     
     // highly similar to scavenge_stack, but we do pointer threading here.
     
@@ -327,7 +327,6 @@ thread_stack(StgPtr p, StgPtr stack_end)
 
 	case RET_BCO: {
 	    StgBCO *bco;
-	    nat size;
 	    
 	    p++;
 	    bco = (StgBCO *)*p;
@@ -773,7 +772,7 @@ update_fwd_compact( bdescr *blocks )
 #endif
     bdescr *bd, *free_bd;
     StgInfoTable *info;
-    nat size;
+    StgWord size;
     StgWord iptr;
 
     bd = blocks;
@@ -858,7 +857,8 @@ update_bkwd_compact( generation *gen )
 #endif
     bdescr *bd, *free_bd;
     StgInfoTable *info;
-    W_ size, free_blocks;
+    StgWord size;
+    W_ free_blocks;
     StgWord iptr;
 
     bd = free_bd = gen->old_blocks;
