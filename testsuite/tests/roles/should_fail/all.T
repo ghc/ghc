@@ -7,3 +7,4 @@ test('Roles11', normal, compile_fail, [''])
 test('Roles12',
      extra_clean(['Roles12.o-boot', 'Roles12.hi-boot']),
      run_command, ['$MAKE --no-print-directory -s Roles12'])
+test('T8773', normal, compile_fail, [''])

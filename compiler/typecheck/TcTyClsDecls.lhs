@@ -1694,6 +1694,15 @@ checkValidRoleAnnots role_annots thing
                 ; checkTc (type_vars `equalLength` the_role_annots)
                           (wrongNumberOfRoles type_vars decl)
                 ; _ <- zipWith3M checkRoleAnnot type_vars the_role_annots type_roles
+                -- Representational or phantom roles for class parameters
+                -- quickly lead to incoherence. So, we require
+                -- IncoherentInstances to have them. See #8773.
+                ; incoherent_roles_ok <- xoptM Opt_IncoherentInstances
+                ; checkTc (  incoherent_roles_ok
+                          || (not $ isClassTyCon tc)
+                          || (all (== Nominal) type_roles))
+                          incoherentRoles
+                  
                 ; lint <- goptM Opt_DoCoreLinting
                 ; when lint $ checkValidRoles tc }
 
@@ -2179,6 +2188,11 @@ needXRoleAnnotations :: TyCon -> SDoc
 needXRoleAnnotations tc
   = ptext (sLit "Illegal role annotation for") <+> ppr tc <> char ';' $$
     ptext (sLit "did you intend to use RoleAnnotations?")
+
+incoherentRoles :: SDoc
+incoherentRoles = (text "Roles other than" <+> quotes (text "nominal") <+>
+                   text "for class parameters can lead to incoherence.") $$
+                  (text "Use IncoherentInstances to allow this; bad role found")
 
 addTyThingCtxt :: TyThing -> TcM a -> TcM a
 addTyThingCtxt thing
