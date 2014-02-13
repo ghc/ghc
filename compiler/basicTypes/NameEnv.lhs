@@ -58,7 +58,7 @@ depAnal get_defs get_uses nodes
   = stronglyConnCompFromEdgedVertices (map mk_node keyed_nodes)
   where
     keyed_nodes = nodes `zip` [(1::Int)..]
-    mk_node (node, key) = (node, key, mapCatMaybes (lookupNameEnv key_map) (get_uses node))
+    mk_node (node, key) = (node, key, mapMaybe (lookupNameEnv key_map) (get_uses node))
 
     key_map :: NameEnv Int   -- Maps a Name to the key of the decl that defines it
     key_map = mkNameEnv [(name,key) | (node, key) <- keyed_nodes, name <- get_defs node]                        

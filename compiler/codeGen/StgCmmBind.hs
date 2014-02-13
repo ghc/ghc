@@ -46,9 +46,9 @@ import Util
 import BasicTypes
 import Outputable
 import FastString
-import Maybes
 import DynFlags
 
+import Data.Maybe
 import Control.Monad
 
 ------------------------------------------------------------------------
@@ -268,7 +268,7 @@ mkRhsClosure    dflags bndr _cc _bi
                       [(DataAlt _, params, _use_mask,
                             (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee                -- Scrutinee is the only free variable
-  && maybeToBool maybe_offset           -- Selectee is a component of the tuple
+  && isJust maybe_offset                -- Selectee is a component of the tuple
   && offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
     -- The simplifier may have statically determined that the single alternative

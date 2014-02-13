@@ -341,8 +341,9 @@ findMethodBind sel_name binds
 findMinimalDef :: [LSig Name] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
+    toMinimalDef :: LSig Name -> Maybe ClassMinimalDef
     toMinimalDef (L _ (MinimalSig bf)) = Just (fmap unLoc bf)
-    toMinimalDef _ = Nothing
+    toMinimalDef _                     = Nothing
 \end{code}
 
 Note [Polymorphic methods]

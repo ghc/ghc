@@ -41,7 +41,6 @@ import ErrUtils
 import PrelNames
 import DynFlags
 import Util
-import Maybes
 import ListSetOps
 import SrcLoc
 import Outputable
@@ -49,6 +48,7 @@ import FastString
 import BasicTypes ( Arity )
 
 import Control.Monad
+import Data.Maybe
 import Data.List        ( (\\) )
 \end{code}
  
@@ -1124,7 +1124,7 @@ checkFamInstRhs :: [Type]                  -- lhs
                 -> [(TyCon, [Type])]       -- type family instances
                 -> [MsgDoc]
 checkFamInstRhs lhsTys famInsts
-  = mapCatMaybes check famInsts
+  = mapMaybe check famInsts
   where
    size = sizeTypes lhsTys
    fvs  = fvTypes lhsTys

@@ -371,7 +371,7 @@ calcRecFlags boot_details is_boot mrole_env tyclss
         , rti_is_rec     = is_rec }
   where
     rec_tycon_names = mkNameSet (map tyConName all_tycons)
-    all_tycons = mapCatMaybes getTyCon tyclss
+    all_tycons = mapMaybe getTyCon tyclss
                    -- Recursion of newtypes/data types can happen via
                    -- the class TyCon, so tyclss includes the class tycons
 

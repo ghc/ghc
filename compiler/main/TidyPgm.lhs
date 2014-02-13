@@ -563,7 +563,7 @@ See CorePrep Note [Data constructor workers].
 
 \begin{code}
 getTyConImplicitBinds :: TyCon -> [CoreBind]
-getTyConImplicitBinds tc = map get_defn (mapCatMaybes dataConWrapId_maybe (tyConDataCons tc))
+getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]
 getClassImplicitBinds cls = map get_defn (classAllSelIds cls)

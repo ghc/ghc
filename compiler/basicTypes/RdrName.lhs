@@ -586,7 +586,7 @@ pickGREs rdr_name gres
   = ASSERT2( isSrcRdrName rdr_name, ppr rdr_name )
     candidates
   where
-    candidates = mapCatMaybes pick gres
+    candidates = mapMaybe pick gres
     internal_candidates = filter (isInternalName . gre_name) candidates
 
     rdr_is_unqual = isUnqual rdr_name
@@ -700,7 +700,7 @@ shadow_name env name
   = alterOccEnv (fmap alter_fn) env (nameOccName name)
   where
     alter_fn :: [GlobalRdrElt] -> [GlobalRdrElt]
-    alter_fn gres = mapCatMaybes (shadow_with name) gres
+    alter_fn gres = mapMaybe (shadow_with name) gres
 
     shadow_with :: Name -> GlobalRdrElt -> Maybe GlobalRdrElt
     shadow_with new_name old_gre@(GRE { gre_name = old_name, gre_prov = LocalDef })
@@ -719,7 +719,7 @@ shadow_name env name
        | null imp_specs' = Nothing
        | otherwise       = Just (old_gre { gre_prov = Imported imp_specs' })
        where
-         imp_specs' = mapCatMaybes (shadow_is new_name) imp_specs
+         imp_specs' = mapMaybe (shadow_is new_name) imp_specs
 
     shadow_is :: Name -> ImportSpec -> Maybe ImportSpec
     shadow_is new_name is@(ImpSpec { is_decl = id_spec })

@@ -38,7 +38,6 @@ import Var
 import VarSet
 import VarEnv
 import Bag
-import Maybes
 import ErrUtils         ( ErrMsg, makeIntoWarning, pprLocErrMsg )
 import BasicTypes 
 import Util
@@ -47,6 +46,8 @@ import Outputable
 import SrcLoc
 import DynFlags
 import ListSetOps       ( equivClasses )
+
+import Data.Maybe
 import Data.List        ( partition, mapAccumL, zip4 )
 \end{code}
 
@@ -1033,7 +1034,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
-      , (orig:origs) <- mapCatMaybes get_good_orig (cec_encl ctxt)
+      , (orig:origs) <- mapMaybe get_good_orig (cec_encl ctxt)
       = [sep [ ptext (sLit "add") <+> pprParendType pred
                <+> ptext (sLit "to the context of")
 	     , nest 2 $ ppr_skol orig $$ 
@@ -1102,7 +1103,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
             ispecs = [ispec | (ispec, _) <- matches]
 
             givens = getUserGivens ctxt
-            matching_givens = mapCatMaybes matchable givens
+            matching_givens = mapMaybe matchable givens
 
             matchable (evvars,skol_info,loc) 
               = case ev_vars_matching of

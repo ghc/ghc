@@ -1218,9 +1218,9 @@ cond_stdOK Nothing (_, rep_tc, _)
   | not (null con_whys) = Just (vcat con_whys $$ suggestion)
   | otherwise           = Nothing
   where
-    suggestion  = ptext (sLit "Possible fix: use a standalone deriving declaration instead")
-    data_cons   = tyConDataCons rep_tc
-    con_whys = mapCatMaybes check_con data_cons
+    suggestion = ptext (sLit "Possible fix: use a standalone deriving declaration instead")
+    data_cons  = tyConDataCons rep_tc
+    con_whys   = mapMaybe check_con data_cons
 
     check_con :: DataCon -> Maybe SDoc
     check_con con

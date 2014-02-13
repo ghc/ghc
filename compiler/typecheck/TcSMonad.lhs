@@ -134,7 +134,7 @@ import TcRnTypes
 import BasicTypes
 import Unique
 import UniqFM
-import Maybes ( orElse, catMaybes, firstJust )
+import Maybes ( orElse, catMaybes, firstJusts )
 import Pair ( pSnd )
 
 import TrieMap
@@ -723,9 +723,9 @@ lookupFlatEqn fam_tc tys
   = do { IS { inert_solved_funeqs = solved_funeqs
             , inert_flat_cache = flat_cache
             , inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
-       ; return (findFunEq solved_funeqs fam_tc tys  `firstJust`
-                 lookup_inerts inert_funeqs          `firstJust`
-                 findFunEq flat_cache fam_tc tys) }
+       ; return (firstJusts [findFunEq solved_funeqs fam_tc tys,
+                             lookup_inerts inert_funeqs,
+                             findFunEq flat_cache fam_tc tys]) }
   where
     lookup_inerts inert_funeqs
       | (ct:_) <- findFunEqs inert_funeqs fam_tc tys

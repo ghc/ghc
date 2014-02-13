@@ -936,7 +936,7 @@ mk_mod_usage_info :: PackageIfaceTable
               -> NameSet
               -> [Usage]
 mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
-  = mapCatMaybes mkUsage usage_mods
+  = mapMaybe mkUsage usage_mods
   where
     hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env

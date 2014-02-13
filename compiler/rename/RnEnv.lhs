@@ -1103,7 +1103,7 @@ type MiniFixityEnv = FastStringEnv (Located Fixity)
 
 addLocalFixities :: MiniFixityEnv -> [Name] -> RnM a -> RnM a
 addLocalFixities mini_fix_env names thing_inside
-  = extendFixityEnv (mapCatMaybes find_fixity names) thing_inside
+  = extendFixityEnv (mapMaybe find_fixity names) thing_inside
   where
     find_fixity name
       = case lookupFsEnv mini_fix_env (occNameFS occ) of

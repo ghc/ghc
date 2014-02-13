@@ -32,6 +32,7 @@ import Util
 import Unify
 import ListSetOps
 import InstEnv
+import Control.Monad   ( zipWithM )
 \end{code}
 
 %************************************************************************
@@ -534,7 +535,7 @@ matchAxiom sym ax@(CoAxiom { co_ax_tc = tc }) ind co
                     , cab_rhs   = rhs }) = coAxiomNthBranch ax ind in
     case liftCoMatch (mkVarSet qtvs) (if sym then (mkTyConApp tc lhs) else rhs) co of
       Nothing    -> Nothing
-      Just subst -> allMaybes (zipWith (liftCoSubstTyVar subst) roles qtvs)
+      Just subst -> zipWithM (liftCoSubstTyVar subst) roles qtvs
 
 -------------
 compatible_co :: Coercion -> Coercion -> Bool

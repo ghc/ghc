@@ -704,7 +704,7 @@ type PragFun = Name -> [LSig Name]
 mkPragFun :: [LSig Name] -> LHsBinds Name -> PragFun
 mkPragFun sigs binds = \n -> lookupNameEnv prag_env n `orElse` []
   where
-    prs = mapCatMaybes get_sig sigs
+    prs = mapMaybe get_sig sigs
 
     get_sig :: LSig Name -> Maybe (Located Name, LSig Name)
     get_sig (L l (SpecSig nm ty inl)) = Just (nm, L l $ SpecSig  nm ty (add_arity nm inl))
