@@ -19,6 +19,7 @@ import Haddock.Convert
 
 import Control.Arrow
 import Data.List
+import Data.Ord (comparing)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -67,12 +68,12 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
                 case mb_info of
                   Just (_, _, cls_instances, fam_instances) ->
                     let fam_insts = [ (synifyFamInst i, n)
-                                    | i <- sortImage instFam fam_instances
+                                    | i <- sortBy (comparing instFam) fam_instances
                                     , let n = lookupInstDoc (getName i) iface ifaceMap instIfaceMap
                                     ]
                         cls_insts = [ (synifyInstHead i, lookupInstDoc n iface ifaceMap instIfaceMap)
                                     | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
-                                    , (i@(_,_,cls,tys), n) <- sortImage (first instHead) is
+                                    , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                                     , not $ isInstanceHidden expInfo cls tys
                                     ]
                     in cls_insts ++ fam_insts
@@ -162,11 +163,6 @@ simplify (LitTy l) = SimpleTyLit l
 instFam :: FamInst -> ([Int], Name, [SimpleType], Int, SimpleType)
 instFam FamInst { fi_fam = n, fi_tys = ts, fi_rhs = t }
   = (map argCount ts, n, map simplify ts, argCount t, simplify t)
-
--- sortImage f = sortBy (\x y -> compare (f x) (f y))
-sortImage :: Ord b => (a -> b) -> [a] -> [a]
-sortImage f xs = map snd $ sortBy cmp_fst [(f x, x) | x <- xs]
- where cmp_fst (x,_) (y,_) = compare x y
 
 
 funTyConName :: Name
