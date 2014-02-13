@@ -195,7 +195,8 @@ processModule verbosity modsum flags modMap instIfaceMap = do
                          else n
 
     out verbosity normal coverageMsg
-    when (Flag_PrintMissingDocs `elem` flags && (header || not (null undocumentedExports))) $ do
+    when (Flag_PrintMissingDocs `elem` flags
+          && not (null undocumentedExports && header)) $ do
       out verbosity normal "  Missing documentation for:"
       unless header $ out verbosity normal "    Module header"
       mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
