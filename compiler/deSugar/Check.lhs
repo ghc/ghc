@@ -421,8 +421,8 @@ compare_cons _ _ = panic "Check.compare_cons: Not ConPatOut with RealDataCon"
 
 remove_dups :: [Pat Id] -> [Pat Id]
 remove_dups []     = []
-remove_dups (x:xs) | or (map (\y -> compare_cons x y) xs) = remove_dups  xs
-                   | otherwise                            = x : remove_dups xs
+remove_dups (x:xs) | any (\y -> compare_cons x y) = remove_dups  xs
+                   | otherwise                    = x : remove_dups xs
 
 get_used_cons :: [(EqnNo, EquationInfo)] -> [Pat Id]
 get_used_cons qs = remove_dups [pat | q <- qs, let pat = firstPatN q,

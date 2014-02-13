@@ -788,7 +788,7 @@ i386_insert_ffrees
         -> [GenBasicBlock Instr]
 
 i386_insert_ffrees blocks
-   | or (map (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ])
+   | any (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ]
    = map insertGFREEs blocks
    | otherwise
    = blocks
