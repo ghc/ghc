@@ -291,6 +291,7 @@
                 explicitly declare the minimal complete definition of
                 a class. Should an instance not provide the minimal
                 required definitions, a warning will be emitted.
+                See <xref linkend="minimal-pragma"/> for details.
            </para>
        </listitem>
 
