@@ -465,6 +465,8 @@ extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
 extern StgWord      CCS_SYSTEM[];
 extern unsigned int RTS_VAR(CC_ID);            /* global ids */
 extern unsigned int RTS_VAR(CCS_ID);
+RTS_FUN_DECL(enterFunCCS);
+RTS_FUN_DECL(pushCostCentre);
 
 // Capability.c
 extern unsigned int n_capabilities;
