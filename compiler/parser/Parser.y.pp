@@ -1155,6 +1155,8 @@ atype :: { LHsType RdrName }
         | SIMPLEQUOTE  '(' ')'                        { LL $ HsTyVar $ getRdrName unitDataCon }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')' { LL $ HsExplicitTupleTy [] ($3 : $5) }
         | SIMPLEQUOTE  '[' comma_types0 ']'           { LL $ HsExplicitListTy placeHolderKind $3 }
+        | SIMPLEQUOTE '(' qconop ')'                  { LL $ HsTyVar (unLoc $3) }
+        | SIMPLEQUOTE '(' varop  ')'                  { LL $ HsTyVar (unLoc $3) }
         | '[' ctype ',' comma_types1 ']'              { LL $ HsExplicitListTy placeHolderKind ($2 : $4) }
         | INTEGER            {% mkTyLit $ LL $ HsNumTy $ getINTEGER $1 }
         | STRING             {% mkTyLit $ LL $ HsStrTy $ getSTRING  $1 }
