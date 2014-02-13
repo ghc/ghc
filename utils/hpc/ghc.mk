@@ -15,4 +15,7 @@ utils/hpc_PACKAGE                      = hpc-bin
 utils/hpc_dist-install_INSTALL         = YES
 utils/hpc_dist-install_INSTALL_INPLACE = YES
 utils/hpc_dist-install_PROGNAME        = hpc
+utils/hpc_dist-install_SHELL_WRAPPER   = YES
+utils/hpc_dist-install_INSTALL_SHELL_WRAPPER_NAME = hpc
+
 $(eval $(call build-prog,utils/hpc,dist-install,1))
