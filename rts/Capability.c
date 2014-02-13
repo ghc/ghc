@@ -357,15 +357,18 @@ moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
         // BaseReg (eg. unregisterised), so in this case
 	// capabilities[0] must coincide with &MainCapability.
         capabilities[0] = &MainCapability;
+        initCapability(&MainCapability, 0);
     }
-
-    for (i = 0; i < to; i++) {
-        if (i < from) {
-            capabilities[i] = old_capabilities[i];
-        } else {
-            capabilities[i] = stgMallocBytes(sizeof(Capability),
-                                             "moreCapabilities");
-            initCapability(capabilities[i], i);
+    else
+    {
+        for (i = 0; i < to; i++) {
+            if (i < from) {
+                capabilities[i] = old_capabilities[i];
+            } else {
+                capabilities[i] = stgMallocBytes(sizeof(Capability),
+                                                 "moreCapabilities");
+                initCapability(capabilities[i], i);
+            }
         }
     }
 
@@ -983,7 +986,8 @@ freeCapabilities (void)
     nat i;
     for (i=0; i < n_capabilities; i++) {
         freeCapability(capabilities[i]);
-        stgFree(capabilities[i]);
+        if (capabilities[i] != &MainCapability)
+            stgFree(capabilities[i]);
     }
 #else
     freeCapability(&MainCapability);
