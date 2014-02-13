@@ -240,6 +240,7 @@ typedef StgFunPtr       F_;
 #include "stg/MiscClosures.h"
 #endif
 
+#include "stg/Prim.h" /* ghc-prim fallbacks */
 #include "stg/SMP.h" // write_barrier() inline is required
 
 /* -----------------------------------------------------------------------------
