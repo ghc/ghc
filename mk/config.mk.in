@@ -422,6 +422,16 @@ BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 #
 SRC_HC_OPTS += -H32m -O
 
+# Disable -O2 optimization. Otherwise amount of generated C code
+# makes things very slow to compile (~5 minutes on core-i7 for 'compiler/hsSyn/HsExpr.lhs')
+# and sometimes not compile at all (powerpc64 overflows something
+# on 'compiler/hsSyn/HsExpr.lhs').
+ifeq "$(GhcUnregisterised)" "YES"
+GhcStage1HcOpts=
+GhcStage2HcOpts=
+GhcStage3HcOpts=
+endif
+
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
 
