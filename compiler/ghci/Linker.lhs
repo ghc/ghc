@@ -378,7 +378,16 @@ preloadLib dflags lib_paths framework_paths lib_spec
              -> do maybe_errstr <- loadDLL (mkSOName platform dll_unadorned)
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
-                      Just mm -> preloadFailed mm lib_paths lib_spec
+                      Just mm | platformOS platform /= OSDarwin ->
+                        preloadFailed mm lib_paths lib_spec
+                      Just mm | otherwise -> do
+                        -- As a backup, on Darwin, try to also load a .so file
+                        -- since (apparently) some things install that way - see
+                        -- ticket #8770.
+                        err2 <- loadDLL $ ("lib" ++ dll_unadorned) <.> "so"
+                        case err2 of
+                          Nothing -> maybePutStrLn dflags "done"
+                          Just _  -> preloadFailed mm lib_paths lib_spec
 
           DLLPath dll_path
              -> do maybe_errstr <- loadDLL dll_path
