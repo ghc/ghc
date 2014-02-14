@@ -701,6 +701,13 @@ enumDeltaToIntegerFB c n x delta lim
   | delta >= 0 = up_fb c n x delta lim
   | otherwise  = dn_fb c n x delta lim
 
+{-# RULES
+"enumDeltaToInteger1"   [0] forall c n x . enumDeltaToIntegerFB c n x 1 = up_fb c n x 1
+ #-}
+-- This rule ensures that in the common case (delta = 1), we do not do the check here,
+-- and also that we have the chance to inline up_fb, which would allow the constuctor to be
+-- inlined and good things to happen.
+
 {-# NOINLINE [1] enumDeltaToInteger #-}
 enumDeltaToInteger :: Integer -> Integer -> Integer -> [Integer]
 enumDeltaToInteger x delta lim
