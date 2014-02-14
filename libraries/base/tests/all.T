@@ -155,7 +155,7 @@ test('topHandler03',
      ], compile_and_run, [''])
 
 
-test('T8374',
+test('T8766',
         [ stats_num_field('bytes allocated', (16828144, 5)),
 	# with GHC-7.6.3: 83937384 (but faster execution than the next line)
 	# before:         58771216 (without call-arity-analysis)
