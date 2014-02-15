@@ -3,6 +3,8 @@
 -- | Doc for: module TypeFamilies
 module TypeFamilies where
 
+import qualified TypeFamilies2 as TF
+
 -- | Doc for: data X
 data X
   = X   -- ^ Doc for: X
@@ -76,3 +78,9 @@ type instance XXX <> XX = 'X
 
 class (><) (a :: k) (b :: k)
 instance XX >< XXX
+
+-- | External instance
+
+type instance TF.Foo X = Y
+
+data instance TF.Bar Y
