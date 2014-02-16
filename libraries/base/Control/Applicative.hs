@@ -27,9 +27,9 @@
 -- it admits more sharing than the monadic interface.  The names here are
 -- mostly based on parsing work by Doaitse Swierstra.
 --
--- For more details, see /Applicative Programming with Effects/,
--- by Conor McBride and Ross Paterson, online at
--- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
+-- For more details, see
+-- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html Applicative Programming with Effects>,
+-- by Conor McBride and Ross Paterson.
 
 module Control.Applicative (
     -- * Applicative functors
@@ -73,34 +73,39 @@ infixl 4 <*>, <*, *>, <**>
 -- functions satisfying the following laws:
 --
 -- [/identity/]
+--
 --      @'pure' 'id' '<*>' v = v@
 --
 -- [/composition/]
+--
 --      @'pure' (.) '<*>' u '<*>' v '<*>' w = u '<*>' (v '<*>' w)@
 --
 -- [/homomorphism/]
+--
 --      @'pure' f '<*>' 'pure' x = 'pure' (f x)@
 --
 -- [/interchange/]
+--
 --      @u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
 -- The other methods have the following default definitions, which may
 -- be overridden with equivalent specialized implementations:
 --
--- @
---      u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v
---      u '<*' v = 'pure' 'const' '<*>' u '<*>' v
--- @
+--   * @u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v@
+--
+--   * @u '<*' v = 'pure' 'const' '<*>' u '<*>' v@
 --
 -- As a consequence of these laws, the 'Functor' instance for @f@ will satisfy
 --
--- @
---      'fmap' f x = 'pure' f '<*>' x
--- @
+--   * @'fmap' f x = 'pure' f '<*>' x@
 --
--- If @f@ is also a 'Monad', it should satisfy @'pure' = 'return'@ and
--- @('<*>') = 'ap'@ (which implies that 'pure' and '<*>' satisfy the
--- applicative functor laws).
+-- If @f@ is also a 'Monad', it should satisfy
+--
+--   * @'pure' = 'return'@
+--
+--   * @('<*>') = 'ap'@
+--
+-- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 
 class Functor f => Applicative f where
     -- | Lift a value.
