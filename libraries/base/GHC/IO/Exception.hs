@@ -145,9 +145,9 @@ data AsyncException
         -- the program should take action to reduce the amount of
         -- live data it has. Notes:
         --
-        --      * It is undefined which thread receives this exception.
+        --   * It is undefined which thread receives this exception.
         --
-        --      * GHC currently does not throw 'HeapOverflow' exceptions.
+        --   * GHC currently does not throw 'HeapOverflow' exceptions.
   | ThreadKilled
         -- ^This exception is raised by another thread
         -- calling 'Control.Concurrent.killThread', or by the system

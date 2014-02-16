@@ -72,7 +72,7 @@ The 'Bits' class defines bitwise operations over integral types.
 Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
 ('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
 'bitSize', 'isSigned', 'testBit', 'bit', and 'popCount'.  The latter three can
-be implemented using `testBitDefault', 'bitDefault, and 'popCountDefault', if
+be implemented using `testBitDefault', 'bitDefault', and 'popCountDefault', if
 @a@ is also an instance of 'Num'.
 -}
 class Eq a => Bits a where
