@@ -14,10 +14,10 @@ import DynFlags ( DynFlags )
 import BasicTypes
 import CoreSyn
 import Id
-import CoreArity
+import CoreArity ( exprArity, typeArity )
+import CoreUtils ( exprIsHNF )
 
 import Control.Arrow ( second )
-import Data.Maybe ( isJust )
 
 
 {-
@@ -68,7 +68,7 @@ sufficiently.
 The work-hourse of the analysis is the function `callArityAnal`, with the
 following type:
 
-    type CallArityEnv = VarEnv (Maybe Arity)
+    type CallArityEnv = VarEnv CallCount
     callArityAnal ::
         Arity ->  -- The arity this expression is called with
         VarSet -> -- The set of interesting variables
@@ -86,13 +86,23 @@ and the following specification:
     * The domain of `callArityEnv` is a subset of `interestingIds`.
     * Any variable from interestingIds that is not mentioned in the `callArityEnv`
       is absent, i.e. not called at all.
-    * Of all the variables that are mapped to a non-Nothing value by `callArityEnv`,
+    * Of all the variables that are mapped to a OnceAndOnly value by `callArityEnv`,
       at most one is being called, with at least that many arguments.
-    * Nothing can be said about variables mapped to Noting.
+    * Variables mapped to Many are called an unknown number of times, but if they
+      are called, then with at least that many arguments.
   Furthermore, expr' is expr with the callArity field of the `IdInfo` updated.
 
-The (pointwise) top of the domain is `Nothing`; the least upper bound coincides
-with the mininum on `Maybe Int` with the usual `Ord` instance for `Maybe`.
+The (pointwise) domain is hence:
+
+                Many 0
+               /      \
+              Many 1   OnceAndOnly 0
+             /      \     /
+            Many 2   OnceAndOnly 1
+           /      \     /
+         ...       OnceAndOnly 2
+                      /
+                    ...
 
 The at-most-once is important for various reasons:
 
@@ -158,21 +168,23 @@ Note [Which variables are interesting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Unfortunately, the set of interesting variables is not irrelevant for the
-precision of the analysis. Consider this example
+precision of the analysis. Consider this example (and ignore the pointlessnes
+of `d` recursing into itself): 
 
     let n = ... :: Int
-    in  let go = \x -> let d = case ... of
-                                  False -> go (x+1)
-                                  True  -> id
-                       in \z -> d (x + z)
-        in go n 0
+    in  let d = let d = case ... of
+                           False -> d
+                           True  -> id
+                in \z -> d (x + z)
+        in d 0
 
-Of course, `go` should be interesting. If we consider `n` as interesting as
+Of course, `d` should be interesting. If we consider `n` as interesting as
 well, then the body of the second let will return
-    { go |-> Nothing , n |-> Just 0 }
+    { go |-> Many 1 ,       n |-> OnceAndOnly 0 }
 or
-    { go |-> 2, n |-> Nothing}.
+    { go |-> OnceAndOnly 1, n |-> Many 0}.
 Only the latter is useful, but it is hard to decide that locally.
+(Returning OnceAndOnly for both would be wrong, as both are being called.)
 
 So the heuristics is:
 
@@ -192,8 +204,8 @@ But this is not uniformly a win. Consider:
     in go n 0
 
 Now `n` is not going to be considered interesting (its type is `Int -> Int`).
-But this will prevent us from detecting how the body of the let calls `d`, and
-we will not find out anything.
+But this will prevent us from detecting how often the body of the let calls
+`d`, and we will not find out anything.
 
 It might be possible to be smarter here; this needs find-tuning as we find more
 examples.
@@ -204,18 +216,19 @@ Note [Recursion and fixpointing]
 
 For a recursive let, we begin by analysing the body, using the same incoming
 arity as for the whole expression.
- * If we do not get useful information about how we are calling the rhs, we
-   analyse the rhs using an incoming demand of 0 (which is always ok), and use
-   `forgetGoodCalls` to ignore any information coming from the rhs.
- * If we do get useful information from the body, we use that as the incoming
-   demand on the rhs. Then we check if the rhs calls itself with the same arity.
+ * We use the arity from the body on the variable as the incoming demand on the
+   rhs. Then we check if the rhs calls itself with the same arity.
    - If so, we are done.
    - If not, we re-analise the rhs with the reduced arity. We do that until
      we are down to the exprArity, which then is certainly correct.
-   We can `lubEnv` the results from the body and the rhs: The body calls *either*
-   the rhs *or* one of the other mentioned variables. Similarly, the rhs calls
-   *either* itself again *or* one of the other mentioned variables. This precision
-   is required!
+ * If the rhs calls itself many times, we must (conservatively) pass the result
+   through forgetOnceCalls.
+ * Similarly, if the body calls the variable many times, we must pass the
+   result of the fixpointing through forgetOnceCalls.
+ * Then we can `lubEnv` the results from the body and the rhs: If all mentioned
+   calls are OnceAndOnly calls, then the body calls *either* the rhs *or* one
+   of the other mentioned variables. Similarly, the rhs calls *either* itself
+   again *or* one of the other mentioned variables. This precision is required!
 
 We do not analyse mutually recursive functions. This can be done once we see it
 in the wild.
@@ -231,8 +244,8 @@ similarly, how to combine the information from the callee and argument of an
 `App`?
 
 It would not be correct to just `lubEnv` then: `f n` obviously calls *both* `f`
-and `n`. We need to forget about the calls from one side using `forgetGoodCalls`. But
-which one?
+and `n`. We need to forget about the cardinality of calls from one side using
+`forgetOnceCalls`. But which one?
 
 Both are correct, and sometimes one and sometimes the other is more precise
 (also see example in [Which variables are interesting]).
@@ -257,7 +270,13 @@ callArityRHS :: CoreExpr -> CoreExpr
 callArityRHS = snd . callArityAnal 0 emptyVarSet
 
 
-type CallArityEnv = VarEnv (Maybe Arity)
+data CallCount = OnceAndOnly Arity
+               | Many Arity
+
+topCallCount :: CallCount
+topCallCount = Many 0
+
+type CallArityEnv = VarEnv CallCount
 
 callArityAnal ::
     Arity ->  -- The arity this expression is called with
@@ -285,7 +304,7 @@ callArityAnal arity int (Cast e co)
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
 callArityAnal arity int e@(Var v)
     | v `elemVarSet` int
-    = (unitVarEnv v (Just arity), e)
+    = (unitVarEnv v (OnceAndOnly arity), e)
     | otherwise
     = (emptyVarEnv, e)
 
@@ -295,7 +314,7 @@ callArityAnal 0     int (Lam v e)
     = (ae', Lam v e')
   where
     (ae, e') = callArityAnal 0 int e
-    ae' = forgetGoodCalls ae
+    ae' = forgetOnceCalls ae
 -- We have a lambda that we are calling. decrease arity.
 callArityAnal arity int (Lam v e)
     = (ae, Lam v e')
@@ -311,36 +330,30 @@ callArityAnal arity int (Let (NonRec v rhs) e)
     (ae_rhs, rhs') = callArityAnal 0 int rhs
     (ae_body, e')  = callArityAnal arity int e
     ae_body' = ae_body `delVarEnv` v
-    ae_final = forgetGoodCalls ae_rhs `lubEnv` ae_body'
+    ae_final = forgetOnceCalls ae_rhs `lubEnv` ae_body'
 
 -- Non-recursive let. Find out how the body calls the rhs, analise that,
 -- and combine the results, convervatively using both
 callArityAnal arity int (Let (NonRec v rhs) e)
-
-    -- We are tail-calling into the rhs. So a tail-call in the RHS is a
-    -- tail-call for everything
-    | Just n <- rhs_arity
-    = let (ae_rhs, rhs') = callArityAnal n int rhs
-          final_ae       = ae_rhs `lubEnv` ae_body'
-          v'             = v `setIdCallArity` n
-      in -- pprTrace "callArityAnal:LetNonRecTailCall"
-         --          (vcat [ppr v, ppr arity, ppr n, ppr final_ae ])
-         (final_ae, Let (NonRec v' rhs') e')
-
-    -- We are calling the rhs in any other way (or not at all), so kill the
-    -- tail-call information from there
-    | otherwise
-    = let (ae_rhs, rhs') = callArityAnal 0 int rhs
-          final_ae = forgetGoodCalls ae_rhs `lubEnv` ae_body'
-          v'             = v `setIdCallArity` 0
-      in -- pprTrace "callArityAnal:LetNonRecNonTailCall"
-         --          (vcat [ppr v, ppr arity, ppr final_ae ])
-         (final_ae, Let (NonRec v' rhs') e')
+  = -- pprTrace "callArityAnal:LetNonRec"
+    --          (vcat [ppr v, ppr arity, ppr n, ppr final_ae ])
+    (final_ae, Let (NonRec v' rhs') e')
   where
+    is_thunk = not (exprIsHNF rhs)
     int_body = int `extendVarSet` v
     (ae_body, e') = callArityAnal arity int_body e
-    ae_body' = ae_body `delVarEnv` v
-    rhs_arity = lookupWithDefaultVarEnv ae_body Nothing v
+    rhs_arity = lookupWithDefaultVarEnv ae_body topCallCount v
+
+    safe_arity = case rhs_arity of
+        OnceAndOnly n       -> n
+        Many n | is_thunk   -> 0 -- A thunk! Do not eta-expand
+               | otherwise -> n
+
+    (ae_rhs, rhs') = callArityAnal safe_arity int rhs
+    ae_rhs' | isOnceCall rhs_arity = ae_rhs
+            | otherwise            = forgetOnceCalls ae_rhs
+    final_ae = ae_rhs' `lubEnv` (ae_body `delVarEnv` v)
+    v' = v `setIdCallArity` safe_arity
 
 -- Boring recursive let, i.e. no eta expansion possible. do not be smart about this
 callArityAnal arity int (Let (Rec [(v,rhs)]) e)
@@ -349,33 +362,32 @@ callArityAnal arity int (Let (Rec [(v,rhs)]) e)
   where
     (ae_rhs, rhs') = callArityAnal 0 int rhs
     (ae_body, e')  = callArityAnal arity int e
-    ae_final = (forgetGoodCalls ae_rhs `lubEnv` ae_body) `delVarEnv` v
+    ae_final = (forgetOnceCalls ae_rhs `lubEnv` ae_body) `delVarEnv` v
 
 -- Recursive let.
 -- See Note [Recursion and fixpointing]
 callArityAnal arity int (Let (Rec [(v,rhs)]) e)
-    -- We are tail-calling into the rhs. So a tail-call in the RHS is a
-    -- tail-call for everything
-    | Just n <- rhs_arity
-    = let (ae_rhs, rhs_arity', rhs') = callArityFix n int_body v rhs
-          final_ae = (ae_rhs `lubEnv` ae_body) `delVarEnv` v
-          v'             = v `setIdCallArity` rhs_arity'
-      in -- pprTrace "callArityAnal:LetRecTailCall"
-         --          (vcat [ppr v, ppr arity, ppr n, ppr rhs_arity', ppr final_ae ])
-         (final_ae, Let (Rec [(v',rhs')]) e')
-    -- We are calling the body in any other way (or not at all), so kill the
-    -- tail-call information from there. No need to iterate there.
-    | otherwise
-    = let (ae_rhs, rhs') = callArityAnal 0 int_body rhs
-          final_ae = (forgetGoodCalls ae_rhs `lubEnv` ae_body) `delVarEnv` v
-          v'             = v `setIdCallArity` 0
-      in -- pprTrace "callArityAnal:LetRecNonTailCall"
-         --          (vcat [ppr v, ppr arity, ppr final_ae ])
-         (final_ae, Let (Rec [(v',rhs')]) e')
+  = -- pprTrace "callArityAnal:LetRec"
+    --         (vcat [ppr v, ppr arity, ppr safe_arity, ppr rhs_arity', ppr final_ae ])
+    (final_ae, Let (Rec [(v',rhs')]) e')
   where
+    is_thunk = not (exprIsHNF rhs)
     int_body = int `extendVarSet` v
     (ae_body, e') = callArityAnal arity int_body e
-    rhs_arity = lookupWithDefaultVarEnv ae_body Nothing v
+    rhs_arity = lookupWithDefaultVarEnv ae_body topCallCount v
+
+    safe_arity = case rhs_arity of
+        OnceAndOnly n       -> n
+        Many n | is_thunk   -> 0 -- A thunk! Do not eta-expand
+               | otherwise -> n
+
+    (ae_rhs, new_arity, rhs') = callArityFix safe_arity int_body v rhs
+    ae_rhs' | isOnceCall rhs_arity = ae_rhs
+            | otherwise            = forgetOnceCalls ae_rhs
+    final_ae = (ae_rhs' `lubEnv` ae_body) `delVarEnv` v
+    v' = v `setIdCallArity` new_arity
+
+
 
 -- Mutual recursion. Do nothing serious here, for now
 callArityAnal arity int (Let (Rec binds) e)
@@ -383,7 +395,7 @@ callArityAnal arity int (Let (Rec binds) e)
   where
     (aes, binds') = unzip $ map go binds
     go (i,e) = let (ae,e') = callArityAnal 0 int e
-               in (forgetGoodCalls ae, (i,e'))
+               in (forgetOnceCalls ae, (i,e'))
     (ae, e') = callArityAnal arity int e
     final_ae = foldl lubEnv ae aes `delVarEnvList` map fst binds
 
@@ -421,40 +433,54 @@ callArityFix arity int v e
     | arity <= min_arity
     -- The incoming arity is already lower than the exprArity, so we can
     -- ignore the arity coming from the RHS
-    = (ae `delVarEnv` v, 0, e')
+    = (final_ae `delVarEnv` v, 0, e')
 
     | otherwise
-    = case new_arity of
-        -- Not nicely recursive, rerun with arity 0
-        -- (which will do at most one iteration, see above)
-        -- (Or not recursive at all, but that was hopefully handled by the simplifier before)
-        Nothing -> callArityFix 0 int v e
+    = if safe_arity < arity
+      -- RHS puts a lower arity on itself, so try that
+      then callArityFix safe_arity int v e
 
-        Just n -> if n < arity
-            -- RHS puts a lower arity on itself, but still a nice call, so try with that
-            then callArityFix n int v e
-
-            -- RHS calls itself with at least as many arguments as the body of
-            -- the let: Great!
-            else (ae `delVarEnv` v, n, e')
+      -- RHS calls itself with at least as many arguments as the body of the let: Great!
+      else (final_ae `delVarEnv` v, safe_arity, e')
   where
     (ae, e') = callArityAnal arity int e
-    new_arity = lookupWithDefaultVarEnv ae Nothing v
+    new_arity = lookupWithDefaultVarEnv ae topCallCount v
     min_arity = exprArity e
+    is_thunk = not (exprIsHNF e)
 
+    safe_arity = case new_arity of
+        OnceAndOnly n      -> n
+        Many n | is_thunk  -> 0 -- A thunk! Do not eta-expand
+               | otherwise -> n
 
-anyGoodCalls :: VarEnv (Maybe Arity) -> Bool
-anyGoodCalls = foldVarEnv ((||) . isJust) False
+    final_ae | isOnceCall new_arity = ae
+             | otherwise            = forgetOnceCalls ae
 
-forgetGoodCalls :: VarEnv (Maybe Arity) -> VarEnv (Maybe Arity)
-forgetGoodCalls = mapVarEnv (const Nothing)
+anyGoodCalls :: CallArityEnv -> Bool
+anyGoodCalls = foldVarEnv ((||) . isOnceCall) False
+
+isOnceCall :: CallCount -> Bool
+isOnceCall (OnceAndOnly _) = True
+isOnceCall (Many _)        = False
+
+forgetOnceCalls :: CallArityEnv -> CallArityEnv
+forgetOnceCalls = mapVarEnv go
+  where
+    go (OnceAndOnly a) = Many a
+    go (Many a)        = Many a
 
 -- See Note [Case and App: Which side to take?]
 useBetterOf :: CallArityEnv -> CallArityEnv -> CallArityEnv
-useBetterOf ae1 ae2 | anyGoodCalls ae1 = ae1 `lubEnv` forgetGoodCalls ae2
-useBetterOf ae1 ae2 | otherwise        = forgetGoodCalls ae1 `lubEnv` ae2
+useBetterOf ae1 ae2 | anyGoodCalls ae1 = ae1 `lubEnv` forgetOnceCalls ae2
+useBetterOf ae1 ae2 | otherwise        = forgetOnceCalls ae1 `lubEnv` ae2
+
+lubCallCount :: CallCount -> CallCount -> CallCount
+lubCallCount (OnceAndOnly arity1) (OnceAndOnly arity2) = OnceAndOnly (arity1 `min` arity2)
+lubCallCount (Many arity1)        (OnceAndOnly arity2) = Many        (arity1 `min` arity2)
+lubCallCount (OnceAndOnly arity1) (Many arity2)        = Many        (arity1 `min` arity2)
+lubCallCount (Many arity1)        (Many arity2)        = Many        (arity1 `min` arity2)
 
 -- Used when combining results from alternative cases; take the minimum
 lubEnv :: CallArityEnv -> CallArityEnv -> CallArityEnv
-lubEnv = plusVarEnv_C min
+lubEnv = plusVarEnv_C lubCallCount
 

@@ -15,9 +15,9 @@ go2 (in case crut):
 go2 (in function call):
     go 2
     d 1
-go2 (using surrounding interesting let; 'go 2' would be good!):
-    go 0
-    d 0
+go2 (using surrounding interesting let):
+    go 2
+    d 1
     n 1
 go2 (using surrounding boring let):
     go 2
@@ -29,3 +29,27 @@ two recursions (both arity 1 would be good!):
 two recursions (semantically like the previous case):
     d 1
     n 1
+two thunks, one called multiple times (both arity 1 would be bad!):
+    d 0
+    n 1
+two thunks (recursive), one called multiple times (both arity 1 would be bad!):
+    d 0
+    n 1
+two functions, not thunks:
+    go 2
+    go2 2
+a thunk, called multiple times via a forking recursion (d 1 would be bad!):
+    go2 2
+    d 0
+a function, one called multiple times via a forking recursion:
+    go 2
+    go2 2
+two functions (recursive):
+    go 2
+    go2 2
+mutual recursion (thunks), called mutiple times (both arity 1 would be bad!):
+    d 0
+    n 0
+mutual recursion (functions), but no thunks (both arity 2 would be good):
+    go 0
+    go2 0
