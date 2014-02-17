@@ -1,4 +1,5 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 --
@@ -76,6 +77,7 @@ import Data.Maybe
 
 main :: IO ()
 main = do
+   defaultsHook
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -818,3 +820,5 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
+
+foreign import ccall safe "defaultsHook" defaultsHook :: IO ()
