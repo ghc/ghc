@@ -143,7 +143,7 @@ exprBotStrictness_maybe e
 	Nothing -> Nothing
 	Just ar -> Just (ar, sig ar)
   where
-    env    = AE { ae_bndrs = [], ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
+    env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
     sig ar = mkClosedStrictSig (replicate ar topDmd) botRes
                   -- For this purpose we can be very simple
 \end{code}
@@ -325,12 +325,8 @@ this transformation.  So we try to limit it as much as possible:
 
  (3) Do NOT move a lambda outside a case unless 
      (a) The scrutinee is ok-for-speculation, or
-     (b) There is an enclosing value \x, and the scrutinee is x
-         E.g.  let x = case y of ( DEFAULT -> \v -> blah }
-     We don't move the \y out.  This is pretty arbitrary; but it
-     catches the common case of doing `seq` on y.
-     This is the reason for the under_lam argument to arityType.
-     See Trac #5625
+     (b) more liberally: the scrunitee is cheap and -fpedantic-bottoms is not
+         enforced
 
 Of course both (1) and (2) are readily defeated by disguising the bottoms.
 
@@ -492,8 +488,7 @@ exprEtaExpandArity dflags e
       ATop oss -> length oss
       ABot n   -> n
   where
-    env = AE { ae_bndrs    = []
-             , ae_cheap_fn = mk_cheap_fn dflags isCheapApp
+    env = AE { ae_cheap_fn = mk_cheap_fn dflags isCheapApp
              , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
 
 getBotArity :: ArityType -> Maybe Arity
@@ -562,8 +557,7 @@ rhsEtaExpandArity dflags cheap_app e
       ATop []             -> 0
       ABot n              -> n
   where
-    env = AE { ae_bndrs    = []
-             , ae_cheap_fn = mk_cheap_fn dflags cheap_app
+    env = AE { ae_cheap_fn = mk_cheap_fn dflags cheap_app
              , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
 
     has_lam (Tick _ e) = has_lam e
@@ -698,9 +692,7 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 	-- of the expression; Nothing means "don't know"
 
 data ArityEnv 
-  = AE { ae_bndrs :: [Id]          -- Enclosing value-lambda Ids
-                                   -- See Note [Dealing with bottom (3)]
-       , ae_cheap_fn :: CheapFun
+  = AE { ae_cheap_fn :: CheapFun
        , ae_ped_bot  :: Bool       -- True <=> be pedantic about bottoms
   }
 
@@ -734,19 +726,14 @@ arityType _ (Var v)
 
 	-- Lambdas; increase arity
 arityType env (Lam x e)
-  | isId x    = arityLam x (arityType env' e)
+  | isId x    = arityLam x (arityType env e)
   | otherwise = arityType env e
-  where
-    env' = env { ae_bndrs = x : ae_bndrs env }
 
 	-- Applications; decrease arity, except for types
 arityType env (App fun (Type _))
    = arityType env fun
 arityType env (App fun arg )
-   = arityApp (arityType env' fun) (ae_cheap_fn env arg Nothing) 
-   where
-     env' = env { ae_bndrs = case ae_bndrs env of
-                                { [] -> []; (_:xs) -> xs } }
+   = arityApp (arityType env fun) (ae_cheap_fn env arg Nothing)
 
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
@@ -767,16 +754,10 @@ arityType env (Case scrut _ _ alts)
     			               -- See Note [Dealing with bottom (2)]
 
      ATop as | not (ae_ped_bot env)    -- Check -fpedantic-bottoms
-             , is_under scrut             -> ATop as
+             , ae_cheap_fn env scrut Nothing -> ATop as
              | exprOkForSpeculation scrut -> ATop as
              | otherwise                  -> ATop (takeWhile isOneShotInfo as)
   where
-    -- is_under implements Note [Dealing with bottom (3)]
-    is_under (Var f)           = f `elem` ae_bndrs env
-    is_under (App f (Type {})) = is_under f
-    is_under (Cast f _)        = is_under f
-    is_under _                 = False
-
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
 arityType env (Let b e) 
