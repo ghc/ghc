@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 -- | Unsafe as uses GND
 module UnsafeInfered03_A where
 

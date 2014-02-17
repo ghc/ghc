@@ -15,11 +15,10 @@ test('SafeLang03', normal, compile, [''])
 test('SafeLang04', normal, compile_and_run, [''])
 test('SafeLang05', normal, compile_and_run, [''])
 
-# SafeLang06 was a test involving GeneralizedNewtypeDeriving, but the code
-# fails to compile with roles; thus the test is no longer valid and has
-# been removed
+# SafeLang06 and SafeLang07 wwere tests involving
+# GeneralizedNewtypeDeriving, but the code failed to compile with
+# roles; thus the tests were no longer valid and have been removed
 
-test('SafeLang07', normal, compile_fail, [''])
 test('SafeLang08', normal, compile_fail, [''])
 test('SafeLang09',
      [exit_code(1),
