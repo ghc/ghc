@@ -77,7 +77,7 @@ import Data.Maybe
 
 main :: IO ()
 main = do
-   defaultsHook
+   defaultsHook -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -821,4 +821,23 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
 
+{- Note [-Bsymbolic and hooks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Bsymbolic is a flag that prevents the binding of references to global
+symbols to symbols outside the shared library being compiled (see `man
+ld`). When dynamically linking, we don't use -Bsymbolic on the RTS
+package: that is because we want hooks to be overridden by the user,
+we don't want to constrain them to the RTS package.
+
+Unfortunately this seems to have broken somehow on OS X: as a result,
+defaultHooks (in hschooks.c) is not called, which does not initialize
+the GC stats. As a result, this breaks things like `:set +s` in GHCi
+(#8754). As a hacky workaround, we instead call 'defaultHooks'
+directly to initalize the flags in the RTS.
+
+A biproduct of this, I believe, is that hooks are likely broken on OS
+X when dynamically linking. But this probably doesn't affect most
+people since we're linking GHC dynamically, but most things themselves
+link statically.
+-}
 foreign import ccall safe "defaultsHook" defaultsHook :: IO ()
