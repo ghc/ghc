@@ -707,6 +707,8 @@ enumDeltaToIntegerFB c n x delta lim
 -- This rule ensures that in the common case (delta = 1), we do not do the check here,
 -- and also that we have the chance to inline up_fb, which would allow the constuctor to be
 -- inlined and good things to happen.
+-- We do not do it for Int this way because hand-tuned code already exists, and
+-- the sepcial case varies more from the general case, due to the issue of overflows.
 
 {-# NOINLINE [1] enumDeltaToInteger #-}
 enumDeltaToInteger :: Integer -> Integer -> Integer -> [Integer]
