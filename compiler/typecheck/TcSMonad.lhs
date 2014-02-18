@@ -1638,14 +1638,10 @@ See Note [Coercion evidence terms] in TcEvidence.
 
 Note [Do not create Given kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not want to create a Given like
+We do not want to create a Given kind equality like
 
-     kv ~ k            -- kv is a skolem kind variable
-                       -- Reason we don't yet support non-Refl kind equalities
-
-or   t1::k1 ~ t2::k2   -- k1 and k2 are un-equal kinds
-                       -- Reason: (~) is kind-uniform at the moment, and
-                       -- k1/k2 may be distinct kind skolems
+   [G]  kv ~ k   -- kv is a skolem kind variable
+                 -- Reason we don't yet support non-Refl kind equalities
 
 This showed up in Trac #8566, where we had a data type
    data I (u :: U *) (r :: [*]) :: * where
@@ -1656,13 +1652,23 @@ so A has type
         (u ~ AA * k t as) => I u r
 
 There is no direct kind equality, but in a pattern match where 'u' is
-instantiated to, say, (AA * kk t1 as1), we'd decompose to get
+instantiated to, say, (AA * kk (t1:kk) as1), we'd decompose to get
    k ~ kk, t ~ t1, as ~ as1
-This is bad.  We "fix" this by simply ignoring
-  *     the Given kind equality
-  * AND the Given type equality (t:k1) ~ (t1:kk)
-
+This is bad.  We "fix" this by simply ignoring the Given kind equality
 But the Right Thing is to add kind equalities!
+
+But note (Trac #8705) that we *do* create Given (non-canonical) equalities
+with un-equal kinds, e.g.
+   [G]  t1::k1 ~ t2::k2   -- k1 and k2 are un-equal kinds
+Reason: k1 or k2 might be unification variables that have already been
+unified (at this point we have not canonicalised the types), so we want
+to emit this t1~t2 as a (non-canonical) Given in the work-list. If k1/k2 
+have been unified, we'll find that when we canonicalise it, and the 
+t1~t2 information may be crucial (Trac #8705 is an example).
+
+If it turns out that k1 and k2 are really un-equal, then it'll end up
+as an Irreducible (see Note [Equalities with incompatible kinds] in
+TcCanonical), and will do no harm.
 
 \begin{code}
 xCtEvidence :: CtEvidence            -- Original flavor
@@ -1677,8 +1683,8 @@ xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
   where
     -- See Note [Do not create Given kind equalities]
     bad_given_pred (pred_ty, _)
-      | EqPred t1 t2 <- classifyPredType pred_ty
-      = isKind t1 || not (typeKind t1 `tcEqKind` typeKind t2)
+      | EqPred t1 _ <- classifyPredType pred_ty
+      = isKind t1
       | otherwise
       = False
 
