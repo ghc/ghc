@@ -126,10 +126,15 @@ exprs =
      Let (Rec [ (n, mkACase (mkLams [y] $ mkLit 0) (Var d))
               , (d, mkACase (mkLams [y] $ mkLit 0) (Var n))]) $
          Var n `mkApps` [Var d `mkApps` [Var d `mkApps` [mkLit 0]]]
-  , ("mutual recursion (functions), but no thunks (both arity 2 would be good)",) $
+  , ("mutual recursion (functions), but no thunks",) $
      Let (Rec [ (go,  mkLams [x] (mkACase (mkLams [y] $ mkLit 0) (Var go2 `mkVarApps` [x])))
               , (go2, mkLams [x] (mkACase (mkLams [y] $ mkLit 0) (Var go `mkVarApps` [x])))]) $
          Var go `mkApps` [go2 `mkLApps` [0,1], mkLit 0]
+  , ("mutual recursion (functions), one boring (d 1 would be bad)",) $
+     mkLet d (f `mkLApps` [0]) $
+         Let (Rec [ (go,  mkLams [x, y] (Var d `mkApps` [go2 `mkLApps` [1,2]]))
+                  , (go2, mkLams [x] (mkACase (mkLams [y] $ mkLit 0) (Var go `mkVarApps` [x])))]) $
+             Var d `mkApps` [go2 `mkLApps` [0,1]]
   ]
 
 main = do

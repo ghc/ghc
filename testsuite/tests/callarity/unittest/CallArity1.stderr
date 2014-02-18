@@ -7,7 +7,7 @@ nested_go2:
     d 1
     n 1
 d0:
-    go 0
+    go 1
     d 0
 go2 (in case crut):
     go 2
@@ -50,6 +50,10 @@ two functions (recursive):
 mutual recursion (thunks), called mutiple times (both arity 1 would be bad!):
     d 0
     n 0
-mutual recursion (functions), but no thunks (both arity 2 would be good):
+mutual recursion (functions), but no thunks:
+    go 2
+    go2 2
+mutual recursion (functions), one boring (d 1 would be bad):
     go 0
-    go2 0
+    go2 2
+    d 0
