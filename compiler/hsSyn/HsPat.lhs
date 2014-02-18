@@ -16,8 +16,8 @@ module HsPat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
-        isBangHsBind, isLiftedPatBind,
-        isBangLPat, hsPatNeedsParens,
+        isStrictHsBind, looksLazyPatBind,
+        isStrictLPat, hsPatNeedsParens,
         isIrrefutableHsPat,
 
         pprParendLPat
@@ -358,34 +358,34 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
-isBangLPat :: LPat id -> Bool
-isBangLPat (L _ (BangPat {})) = True
-isBangLPat (L _ (ParPat p))   = isBangLPat p
-isBangLPat _                  = False
+isStrictLPat :: LPat id -> Bool
+isStrictLPat (L _ (ParPat p))             = isStrictLPat p
+isStrictLPat (L _ (BangPat {}))           = True
+isStrictLPat (L _ (TuplePat _ Unboxed _)) = True
+isStrictLPat _                            = False
 
-isBangHsBind :: HsBind id -> Bool
--- A pattern binding with an outermost bang
+isStrictHsBind :: HsBind id -> Bool
+-- A pattern binding with an outermost bang or unboxed tuple must be matched strictly
 -- Defined in this module because HsPat is above HsBinds in the import graph
-isBangHsBind (PatBind { pat_lhs = p }) = isBangLPat p
-isBangHsBind _                         = False
+isStrictHsBind (PatBind { pat_lhs = p }) = isStrictLPat p
+isStrictHsBind _                         = False
 
-isLiftedPatBind :: HsBind id -> Bool
--- A pattern binding with a compound pattern, not just a variable
---    (I# x)       yes
---    (# a, b #)   no, even if a::Int#
---    x            no, even if x::Int#
--- We want to warn about a missing bang-pattern on the yes's
-isLiftedPatBind (PatBind { pat_lhs = p }) = isLiftedLPat p
-isLiftedPatBind _                         = False
+looksLazyPatBind :: HsBind id -> Bool
+-- Returns True of anything *except*
+--     a StrictHsBind (as above) or 
+--     a VarPat
+-- In particular, returns True of a pattern binding with a compound pattern, like (I# x)
+looksLazyPatBind (PatBind { pat_lhs = p }) = looksLazyLPat p
+looksLazyPatBind _                         = False
 
-isLiftedLPat :: LPat id -> Bool
-isLiftedLPat (L _ (ParPat p))   = isLiftedLPat p
-isLiftedLPat (L _ (BangPat p))  = isLiftedLPat p
-isLiftedLPat (L _ (AsPat _ p))  = isLiftedLPat p
-isLiftedLPat (L _ (TuplePat _ Unboxed _)) = False
-isLiftedLPat (L _ (VarPat {}))            = False
-isLiftedLPat (L _ (WildPat {}))           = False
-isLiftedLPat _                            = True
+looksLazyLPat :: LPat id -> Bool
+looksLazyLPat (L _ (ParPat p))             = looksLazyLPat p
+looksLazyLPat (L _ (AsPat _ p))            = looksLazyLPat p
+looksLazyLPat (L _ (BangPat {}))           = False
+looksLazyLPat (L _ (TuplePat _ Unboxed _)) = False
+looksLazyLPat (L _ (VarPat {}))            = False
+looksLazyLPat (L _ (WildPat {}))           = False
+looksLazyLPat _                            = True
 
 isIrrefutableHsPat :: OutputableBndr id => LPat id -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
