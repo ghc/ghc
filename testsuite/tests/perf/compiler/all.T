@@ -133,15 +133,14 @@ test('T3294',
            # 2012-10-08:  1373514844 (x86/Linux)
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
-           (wordsize(64), 3083825616, 5)]),
+           (wordsize(64), 2897630040, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
             # 18/09/2012: 2717327208 (amd64/Linux)
-            # 08/06/2013: 2901451552 (amd64/Linux)
-            # (^ reason unknown)
-            # 12/12/2013: 3083825616 (amd64/Linux)
-            # (^ reason unknown)
+            # 08/06/2013: 2901451552 (amd64/Linux) (reason unknown)
+            # 12/12/2013: 3083825616 (amd64/Linux) (reason unknown)
+            # 18/02/2014: 2897630040 (amd64/Linux) (call arity improvements)
       conf_3294
       ],
      compile,
@@ -185,7 +184,7 @@ test('T4801',
              # 2013-02-10:  11207828 (x86/OSX)
              # (some date): 11139444
              # 2013-11-13:  11829000 (x86/Windows, 64bit machine)
-           (wordsize(64), 22646000, 10)]),
+           (wordsize(64), 25002136, 10)]),
                 # prev:       20486256 (amd64/OS X)
                 # 30/08/2012: 17305600--20391920 (varies a lot)
                 # 19/10/2012: 26882576 (-fPIC turned on)
@@ -193,6 +192,7 @@ test('T4801',
                 # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
                 # 10/01/2014: 25166280 
                 # 13/01/2014: 22646000 (mostly due to #8647)
+                # 18/02/2014: 25002136 (call arity analysis changes)
        only_ways(['normal']),
        extra_hc_opts('-static')
       ],
@@ -283,9 +283,10 @@ test('T5631',
      [compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 392904228, 10),
         # expected value: 392904228 (x86/Linux)
-           (wordsize(64), 735486328, 5)]),
+           (wordsize(64), 690742040, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
+        # expected value: 690742040 (amd64/Linux) Call Arity improvements
        only_ways(['normal'])
       ],
      compile,
@@ -391,8 +392,9 @@ test('T6048',
           [(wordsize(32), 48887164, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
-           (wordsize(64), 108578664, 10)])
+           (wordsize(64), 95960720, 10)])
              # 18/09/2012 97247032 amd64/Linux
-             # 16/01/2014 108578664 amd64/Linux (unknown)
+             # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
+             # 18/01/2014 95960720 amd64/Linux Call Arity improvements
       ],
       compile,[''])
