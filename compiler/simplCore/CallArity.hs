@@ -68,7 +68,7 @@ sufficiently.
 The work-hourse of the analysis is the function `callArityAnal`, with the
 following type:
 
-    data Count = OnceAndOnly | Many
+    data Count = Many | OnceAndOnly
     type CallCount = (Count, Arity)
     type CallArityEnv = VarEnv (CallCount, Arity)
     callArityAnal ::
@@ -269,7 +269,7 @@ callArityRHS :: CoreExpr -> CoreExpr
 callArityRHS = snd . callArityAnal 0 emptyVarSet
 
 
-data Count = OnceAndOnly | Many
+data Count = Many | OnceAndOnly deriving (Eq, Ord)
 type CallCount = (Count, Arity)
 
 topCallCount :: CallCount
@@ -336,19 +336,12 @@ callArityAnal arity int (Let (NonRec v rhs) e)
     --          (vcat [ppr v, ppr arity, ppr n, ppr final_ae ])
     (final_ae, Let (NonRec v' rhs') e')
   where
-    is_thunk = not (exprIsHNF rhs)
     int_body = int `extendVarSet` v
     (ae_body, e') = callArityAnal arity int_body e
-    (count, rhs_arity) = lookupWithDefaultVarEnv ae_body topCallCount v
+    callcount = lookupWithDefaultVarEnv ae_body topCallCount v
 
-    safe_arity | OnceAndOnly <- count = rhs_arity
-               | is_thunk             = 0 -- A thunk! Do not eta-expand
-               | otherwise            = rhs_arity
-
-    (ae_rhs, rhs') = callArityAnal safe_arity int rhs
-    ae_rhs' | OnceAndOnly <- count = ae_rhs
-            | otherwise            = forgetOnceCalls ae_rhs
-    final_ae = ae_rhs' `lubEnv` (ae_body `delVarEnv` v)
+    (ae_rhs, safe_arity, rhs') = callArityBound callcount int rhs
+    final_ae = ae_rhs `lubEnv` (ae_body `delVarEnv` v)
     v' = v `setIdCallArity` safe_arity
 
 -- Boring recursive let, i.e. no eta expansion possible. do not be smart about this
@@ -367,19 +360,12 @@ callArityAnal arity int (Let (Rec [(v,rhs)]) e)
     --         (vcat [ppr v, ppr arity, ppr safe_arity, ppr rhs_arity', ppr final_ae ])
     (final_ae, Let (Rec [(v',rhs')]) e')
   where
-    is_thunk = not (exprIsHNF rhs)
     int_body = int `extendVarSet` v
     (ae_body, e') = callArityAnal arity int_body e
-    (count, rhs_arity) = lookupWithDefaultVarEnv ae_body topCallCount v
+    callcount = lookupWithDefaultVarEnv ae_body topCallCount v
 
-    safe_arity | OnceAndOnly <- count = rhs_arity
-               | is_thunk             = 0 -- A thunk! Do not eta-expand
-               | otherwise            = rhs_arity
-
-    (ae_rhs, new_arity, rhs') = callArityFix safe_arity int_body v rhs
-    ae_rhs' | OnceAndOnly <- count = ae_rhs
-            | otherwise            = forgetOnceCalls ae_rhs
-    final_ae = (ae_rhs' `lubEnv` ae_body) `delVarEnv` v
+    (ae_rhs, new_arity, rhs') = callArityFix callcount int_body v rhs
+    final_ae = (ae_rhs `lubEnv` ae_body) `delVarEnv` v
     v' = v `setIdCallArity` new_arity
 
 
@@ -422,33 +408,45 @@ callArityAnal arity int (Case scrut bndr ty alts)
     -- See Note [Case and App: Which side to take?]
     final_ae = scrut_ae `useBetterOf` alt_ae
 
-callArityFix :: Arity -> VarSet -> Id -> CoreExpr -> (CallArityEnv, Arity, CoreExpr)
+callArityFix :: CallCount -> VarSet -> Id -> CoreExpr -> (CallArityEnv, Arity, CoreExpr)
 callArityFix arity int v e
 
-    | arity <= min_arity
+    | arity `lteCallCount` min_arity
     -- The incoming arity is already lower than the exprArity, so we can
     -- ignore the arity coming from the RHS
-    = (final_ae `delVarEnv` v, 0, e')
+    = (ae `delVarEnv` v, 0, e')
 
     | otherwise
-    = if safe_arity < arity
+    = if new_arity `ltCallCount` arity
       -- RHS puts a lower arity on itself, so try that
-      then callArityFix safe_arity int v e
+      then callArityFix new_arity int v e
 
       -- RHS calls itself with at least as many arguments as the body of the let: Great!
-      else (final_ae `delVarEnv` v, safe_arity, e')
+      else (ae `delVarEnv` v, safe_arity, e')
   where
-    (ae, e') = callArityAnal arity int e
-    (count, new_arity) = lookupWithDefaultVarEnv ae topCallCount v
-    min_arity = exprArity e
+    (ae, safe_arity, e') = callArityBound arity int e
+    new_arity = lookupWithDefaultVarEnv ae topCallCount v
+    min_arity = (Many, exprArity e)
+
+-- This is a variant of callArityAnal that takes a CallCount (i.e. an arity with a
+-- cardinality) and adjust the resulting environment accordingly. It is to be used
+-- on bound expressions that can possibly be shared.
+-- It also returns the safe arity used: For a thunk that is called multiple
+-- times, this will be 0!
+callArityBound :: CallCount -> VarSet -> CoreExpr -> (CallArityEnv, Arity, CoreExpr)
+callArityBound (count, arity) int e = (final_ae, safe_arity, e')
+ where
     is_thunk = not (exprIsHNF e)
 
-    safe_arity | OnceAndOnly <- count = new_arity
+    safe_arity | OnceAndOnly <- count = arity
                | is_thunk             = 0 -- A thunk! Do not eta-expand
-               | otherwise            = new_arity
+               | otherwise            = arity
+
+    (ae, e') = callArityAnal safe_arity int e
 
     final_ae | OnceAndOnly <- count = ae
              | otherwise            = forgetOnceCalls ae
+
 
 anyGoodCalls :: CallArityEnv -> Bool
 anyGoodCalls = foldVarEnv ((||) . isOnceCall) False
@@ -472,6 +470,13 @@ lubCallCount (count1, arity1) (count2, arity2)
 lubCount :: Count -> Count -> Count
 lubCount OnceAndOnly OnceAndOnly = OnceAndOnly
 lubCount _           _           = Many
+
+lteCallCount :: CallCount -> CallCount -> Bool
+lteCallCount (count1, arity1) (count2, arity2)
+    = count1 <= count2 && arity1 <= arity2
+
+ltCallCount :: CallCount -> CallCount -> Bool
+ltCallCount c1 c2 = c1 `lteCallCount` c2 && c1 /= c2
 
 -- Used when combining results from alternative cases; take the minimum
 lubEnv :: CallArityEnv -> CallArityEnv -> CallArityEnv
