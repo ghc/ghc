@@ -16,6 +16,7 @@ import CoreSyn
 import Id
 import CoreArity ( exprArity, typeArity )
 import CoreUtils ( exprIsHNF )
+import Outputable
 
 import Control.Arrow ( first, second )
 
@@ -482,3 +483,6 @@ ltCallCount c1 c2 = c1 `lteCallCount` c2 && c1 /= c2
 lubEnv :: CallArityEnv -> CallArityEnv -> CallArityEnv
 lubEnv = plusVarEnv_C lubCallCount
 
+instance Outputable Count where
+    ppr Many        = text "Many"
+    ppr OnceAndOnly = text "OnceAndOnly"
