@@ -165,9 +165,9 @@ dsStrictBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 strictMatchOnly :: HsBind Id -> Bool
 strictMatchOnly (AbsBinds { abs_binds = binds })
   = anyBag (strictMatchOnly . unLoc . snd) binds
-strictMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = ty })
-  =  isUnLiftedType ty 
-  || isBangLPat lpat   
+strictMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = rhs_ty })
+  =  isUnLiftedType rhs_ty
+  || isStrictLPat lpat
   || any (isUnLiftedType . idType) (collectPatBinders lpat)
 strictMatchOnly (FunBind { fun_id = L _ id })
   = isUnLiftedType (idType id)
