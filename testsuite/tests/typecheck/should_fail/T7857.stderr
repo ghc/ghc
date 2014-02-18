@@ -2,7 +2,7 @@
 T7857.hs:8:11:
     Could not deduce (PrintfType s0) arising from a use of ‛printf’
     from the context (PrintfArg t)
-      bound by the inferred type of g :: PrintfArg t => t -> s
+      bound by the inferred type of g :: PrintfArg t => t -> b
       at T7857.hs:8:1-21
     The type variable ‛s0’ is ambiguous
     Note: there are several potential instances:

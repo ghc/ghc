@@ -318,24 +318,25 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
          -- arg1_ty = arg2_ty -> op_res_ty
          -- And arg2_ty maybe polymorphic; that's the point
 
-       -- Make sure that the argument and result types have kind '*'
+       -- Make sure that the argument type has kind '*'
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
        --    (which gives a seg fault)
        -- We do this by unifying with a MetaTv; but of course
        -- it must allow foralls in the type it unifies with (hence PolyTv)!
+       --
+       -- The result type can have any kind (Trac #8739),
+       -- so we can just use res_ty
 
-       -- ($) :: forall ab. (a->b) -> a -> b
+       -- ($) :: forall (a:*) (b:Open). (a->b) -> a -> b
        ; a_ty <- newPolyFlexiTyVarTy
-       ; b_ty <- newPolyFlexiTyVarTy
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
 
-       ; co_res <- unifyType b_ty res_ty        -- b ~ res
-       ; co_a   <- unifyType arg2_ty   a_ty     -- arg2 ~ a
-       ; co_b   <- unifyType op_res_ty b_ty     -- op_res ~ b
+       ; co_a   <- unifyType arg2_ty   a_ty      -- arg2 ~ a
+       ; co_b   <- unifyType op_res_ty res_ty    -- op_res ~ res
        ; op_id  <- tcLookupId op_name
 
-       ; let op' = L loc (HsWrap (mkWpTyApps [a_ty, b_ty]) (HsVar op_id))
-       ; return $ mkHsWrapCo (co_res) $
+       ; let op' = L loc (HsWrap (mkWpTyApps [a_ty, res_ty]) (HsVar op_id))
+       ; return $
          OpApp (mkLHsWrapCo (mkTcFunCo Nominal co_a co_b) $
                 mkLHsWrapCo co_arg1 arg1')
                op' fix

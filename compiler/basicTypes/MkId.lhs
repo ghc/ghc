@@ -125,7 +125,7 @@ is right here.
 \begin{code}
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId]
+  =  [lazyId, dollarId]
   ++ errorIds		-- Defined in MkCore
   ++ ghcPrimIds
 
@@ -1040,20 +1040,32 @@ another gun with which to shoot yourself in the foot.
 \begin{code}
 lazyIdName, unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName :: Name
-unsafeCoerceName  = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
-nullAddrName      = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
-seqName           = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
-realWorldName     = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPrimIdKey realWorldPrimId
-voidPrimIdName    = mkWiredInIdName gHC_PRIM (fsLit "void#")         voidPrimIdKey      voidPrimId
-lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")         lazyIdKey           lazyId
-coercionTokenName = mkWiredInIdName gHC_PRIM (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM (fsLit "magicDict")     magicDictKey magicDictId
-coerceName        = mkWiredInIdName gHC_PRIM (fsLit "coerce")        coerceKey          coerceId
-proxyName         = mkWiredInIdName gHC_PRIM (fsLit "proxy#")        proxyHashKey       proxyHashId
+   magicDictName, coerceName, proxyName, dollarName :: Name
+unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
+nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
+seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
+realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
+voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
+lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
+coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
+magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
+coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
+proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
+dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
 \end{code}
 
 \begin{code}
+dollarId :: Id  -- Note [dollarId magic]
+dollarId = pcMiscPrelId dollarName ty
+             (noCafIdInfo `setUnfoldingInfo` unf)
+  where
+    fun_ty = mkFunTy alphaTy openBetaTy
+    ty     = mkForAllTys [alphaTyVar, openBetaTyVar] $
+             mkFunTy fun_ty fun_ty
+    unf    = mkInlineUnfolding (Just 2) rhs
+    [f,x]  = mkTemplateLocals [fun_ty, alphaTy]
+    rhs    = mkLams [alphaTyVar, openBetaTyVar, f, x] $
+             App (Var f) (Var x)
 
 ------------------------------------------------
 -- proxy# :: forall a. Proxy# a
@@ -1159,6 +1171,20 @@ coerceId = pcMiscPrelId coerceName ty info
           mkWildCase (Var eqR) eqRTy bTy $
 	  [(DataAlt coercibleDataCon, [eq], Cast (Var x) (CoVarCo eq))]
 \end{code}
+
+Note [dollarId magic]
+~~~~~~~~~~~~~~~~~~~~~
+The only reason that ($) is wired in is so that its type can be
+    forall (a:*, b:Open). (a->b) -> a -> b
+That is, the return type can be unboxed.  E.g. this is OK
+    foo $ True    where  foo :: Bool -> Int#
+because ($) doesn't inspect or move the result of the call to foo.
+See Trac #8739.
+
+There is a special typing rule for ($) in TcExpr, so the type of ($)
+isn't looked at there, BUT Lint subsequently (and rightly) complains
+if sees ($) applied to Int# (say), unless we give it a wired-in type
+as we do here.
 
 Note [Unsafe coerce magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
