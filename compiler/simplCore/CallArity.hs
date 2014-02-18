@@ -329,6 +329,10 @@ callArityAnal arity int e@(Var v)
     | otherwise
     = (emptyVarEnv, e)
 
+-- Non-value lambdas are ignored
+callArityAnal arity int (Lam v e) | not (isId v)
+    = second (Lam v) $ callArityAnal arity int e
+
 -- We have a lambda that we are not sure to call. Tail calls therein
 -- are no longer OneAndOnly calls
 callArityAnal 0     int (Lam v e)
@@ -355,6 +359,8 @@ callArityAnal arity int (Let bind e)
 
 -- Application. Increase arity for the called expresion, nothing to know about
 -- the second
+callArityAnal arity int (App e (Type t))
+    = second (\e -> App e (Type t)) $ callArityAnal arity int e
 callArityAnal arity int (App e1 e2)
     = (final_ae, App e1' e2')
   where
