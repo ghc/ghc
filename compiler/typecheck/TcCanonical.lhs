@@ -732,7 +732,8 @@ canEvVarsCreated (ev : evs)
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs
   | null evs  = return ()
-  | otherwise = updWorkListTcS (extendWorkListCts (map mk_nc evs))
+  | otherwise = do { traceTcS "Emitting fresh work" (vcat (map ppr evs))
+                   ; updWorkListTcS (extendWorkListCts (map mk_nc evs)) }
   where
     mk_nc ev = mkNonCanonical ev
 
@@ -889,7 +890,8 @@ canDecomposableTyConApp ev tc1 tys1 tc2 tys2
     -- Fail straight away for better error messages
   = canEqFailure ev (mkTyConApp tc1 tys1) (mkTyConApp tc2 tys2)
   | otherwise
-  = canDecomposableTyConAppOK ev tc1 tys1 tys2
+  = do { traceTcS "canDecomposableTyConApp" (ppr ev $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
+       ; canDecomposableTyConAppOK ev tc1 tys1 tys2 }
 
 canDecomposableTyConAppOK :: CtEvidence
                           -> TyCon -> [TcType] -> [TcType]
@@ -1143,7 +1145,7 @@ canEqTyVar2 :: DynFlags
             -> TcS StopOrContinue
 -- LHS is an inert type variable, 
 -- and RHS is fully rewritten, but with type synonyms
--- preserved as must as possible
+-- preserved as much as possible
 
 canEqTyVar2 dflags ev swapped tv1 xi2 co2
   | Just tv2 <- getTyVar_maybe xi2
@@ -1241,6 +1243,8 @@ checkKind :: CtEvidence         -- t1~t2
 -- for the type equality; and continue with the kind equality constraint.
 -- When the latter is solved, it'll kick out the irreducible equality for
 -- a second attempt at solving
+--
+-- See Note [Equalities with incompatible kinds]
 
 checkKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible kinds]
   = ASSERT( isKind k1 && isKind k2 )
