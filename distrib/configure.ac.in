@@ -114,6 +114,7 @@ AC_SUBST(WordSize)
 #
 dnl ** how to invoke `ar' and `ranlib'
 #
+FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
 
 FP_SETTINGS
