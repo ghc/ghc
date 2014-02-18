@@ -17,7 +17,7 @@ import Id
 import CoreArity ( exprArity, typeArity )
 import CoreUtils ( exprIsHNF )
 
-import Control.Arrow ( second )
+import Control.Arrow ( first, second )
 
 
 {-
@@ -68,7 +68,9 @@ sufficiently.
 The work-hourse of the analysis is the function `callArityAnal`, with the
 following type:
 
-    type CallArityEnv = VarEnv CallCount
+    data Count = OnceAndOnly | Many
+    type CallCount = (Count, Arity)
+    type CallArityEnv = VarEnv (CallCount, Arity)
     callArityAnal ::
         Arity ->  -- The arity this expression is called with
         VarSet -> -- The set of interesting variables
@@ -86,23 +88,20 @@ and the following specification:
     * The domain of `callArityEnv` is a subset of `interestingIds`.
     * Any variable from interestingIds that is not mentioned in the `callArityEnv`
       is absent, i.e. not called at all.
-    * Of all the variables that are mapped to a OnceAndOnly value by `callArityEnv`,
-      at most one is being called, with at least that many arguments.
+    * Of all the variables that are mapped to OnceAndOnly by the `callArityEnv`,
+      at most one is being called, at most once, with at least that many
+      arguments.
     * Variables mapped to Many are called an unknown number of times, but if they
       are called, then with at least that many arguments.
   Furthermore, expr' is expr with the callArity field of the `IdInfo` updated.
 
-The (pointwise) domain is hence:
+The (pointwise) domain is a product domain:
 
-                Many 0
-               /      \
-              Many 1   OnceAndOnly 0
-             /      \     /
-            Many 2   OnceAndOnly 1
-           /      \     /
-         ...       OnceAndOnly 2
-                      /
-                    ...
+          Many               0
+           |         ×       |
+       OneAndOnly            1
+                             |
+                            ...
 
 The at-most-once is important for various reasons:
 
@@ -180,9 +179,9 @@ of `d` recursing into itself):
 
 Of course, `d` should be interesting. If we consider `n` as interesting as
 well, then the body of the second let will return
-    { go |-> Many 1 ,       n |-> OnceAndOnly 0 }
+    { go |-> (Many, 1) ,       n |-> (OnceAndOnly, 0) }
 or
-    { go |-> OnceAndOnly 1, n |-> Many 0}.
+    { go |-> (OnceAndOnly, 1), n |-> (Many, 0)}.
 Only the latter is useful, but it is hard to decide that locally.
 (Returning OnceAndOnly for both would be wrong, as both are being called.)
 
@@ -263,18 +262,18 @@ callArityAnalProgram :: DynFlags -> CoreProgram -> CoreProgram
 callArityAnalProgram _dflags = map callArityBind
 
 callArityBind :: CoreBind -> CoreBind
-callArityBind (NonRec id rhs) = NonRec id (callArityRHS rhs) 
+callArityBind (NonRec id rhs) = NonRec id (callArityRHS rhs)
 callArityBind (Rec binds) = Rec $ map (\(id,rhs) -> (id, callArityRHS rhs)) binds
 
 callArityRHS :: CoreExpr -> CoreExpr
 callArityRHS = snd . callArityAnal 0 emptyVarSet
 
 
-data CallCount = OnceAndOnly Arity
-               | Many Arity
+data Count = OnceAndOnly | Many
+type CallCount = (Count, Arity)
 
 topCallCount :: CallCount
-topCallCount = Many 0
+topCallCount = (Many, 0)
 
 type CallArityEnv = VarEnv CallCount
 
@@ -283,9 +282,7 @@ callArityAnal ::
     VarSet -> -- The set of interesting variables
     CoreExpr ->  -- The expression to analyse
     (CallArityEnv, CoreExpr)
-        -- How this expression uses its interesting variables:
-        --   Just n  => a tail call with that arity
-        --   Nothing => other uses
+        -- How this expression uses its interesting variables
         -- and the expression with IdInfo updated
 
 -- The trivial base cases
@@ -304,12 +301,12 @@ callArityAnal arity int (Cast e co)
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
 callArityAnal arity int e@(Var v)
     | v `elemVarSet` int
-    = (unitVarEnv v (OnceAndOnly arity), e)
+    = (unitVarEnv v (OnceAndOnly, arity), e)
     | otherwise
     = (emptyVarEnv, e)
 
 -- We have a lambda that we are not sure to call. Tail calls therein
--- are no longer tail calls
+-- are no longer OneAndOnly calls
 callArityAnal 0     int (Lam v e)
     = (ae', Lam v e')
   where
@@ -342,15 +339,14 @@ callArityAnal arity int (Let (NonRec v rhs) e)
     is_thunk = not (exprIsHNF rhs)
     int_body = int `extendVarSet` v
     (ae_body, e') = callArityAnal arity int_body e
-    rhs_arity = lookupWithDefaultVarEnv ae_body topCallCount v
+    (count, rhs_arity) = lookupWithDefaultVarEnv ae_body topCallCount v
 
-    safe_arity = case rhs_arity of
-        OnceAndOnly n       -> n
-        Many n | is_thunk   -> 0 -- A thunk! Do not eta-expand
-               | otherwise -> n
+    safe_arity | OnceAndOnly <- count = rhs_arity
+               | is_thunk             = 0 -- A thunk! Do not eta-expand
+               | otherwise            = rhs_arity
 
     (ae_rhs, rhs') = callArityAnal safe_arity int rhs
-    ae_rhs' | isOnceCall rhs_arity = ae_rhs
+    ae_rhs' | OnceAndOnly <- count = ae_rhs
             | otherwise            = forgetOnceCalls ae_rhs
     final_ae = ae_rhs' `lubEnv` (ae_body `delVarEnv` v)
     v' = v `setIdCallArity` safe_arity
@@ -374,15 +370,14 @@ callArityAnal arity int (Let (Rec [(v,rhs)]) e)
     is_thunk = not (exprIsHNF rhs)
     int_body = int `extendVarSet` v
     (ae_body, e') = callArityAnal arity int_body e
-    rhs_arity = lookupWithDefaultVarEnv ae_body topCallCount v
+    (count, rhs_arity) = lookupWithDefaultVarEnv ae_body topCallCount v
 
-    safe_arity = case rhs_arity of
-        OnceAndOnly n       -> n
-        Many n | is_thunk   -> 0 -- A thunk! Do not eta-expand
-               | otherwise -> n
+    safe_arity | OnceAndOnly <- count = rhs_arity
+               | is_thunk             = 0 -- A thunk! Do not eta-expand
+               | otherwise            = rhs_arity
 
     (ae_rhs, new_arity, rhs') = callArityFix safe_arity int_body v rhs
-    ae_rhs' | isOnceCall rhs_arity = ae_rhs
+    ae_rhs' | OnceAndOnly <- count = ae_rhs
             | otherwise            = forgetOnceCalls ae_rhs
     final_ae = (ae_rhs' `lubEnv` ae_body) `delVarEnv` v
     v' = v `setIdCallArity` new_arity
@@ -444,30 +439,26 @@ callArityFix arity int v e
       else (final_ae `delVarEnv` v, safe_arity, e')
   where
     (ae, e') = callArityAnal arity int e
-    new_arity = lookupWithDefaultVarEnv ae topCallCount v
+    (count, new_arity) = lookupWithDefaultVarEnv ae topCallCount v
     min_arity = exprArity e
     is_thunk = not (exprIsHNF e)
 
-    safe_arity = case new_arity of
-        OnceAndOnly n      -> n
-        Many n | is_thunk  -> 0 -- A thunk! Do not eta-expand
-               | otherwise -> n
+    safe_arity | OnceAndOnly <- count = new_arity
+               | is_thunk             = 0 -- A thunk! Do not eta-expand
+               | otherwise            = new_arity
 
-    final_ae | isOnceCall new_arity = ae
+    final_ae | OnceAndOnly <- count = ae
              | otherwise            = forgetOnceCalls ae
 
 anyGoodCalls :: CallArityEnv -> Bool
 anyGoodCalls = foldVarEnv ((||) . isOnceCall) False
 
 isOnceCall :: CallCount -> Bool
-isOnceCall (OnceAndOnly _) = True
-isOnceCall (Many _)        = False
+isOnceCall (OnceAndOnly, _) = True
+isOnceCall (Many, _)        = False
 
 forgetOnceCalls :: CallArityEnv -> CallArityEnv
-forgetOnceCalls = mapVarEnv go
-  where
-    go (OnceAndOnly a) = Many a
-    go (Many a)        = Many a
+forgetOnceCalls = mapVarEnv (first (const Many))
 
 -- See Note [Case and App: Which side to take?]
 useBetterOf :: CallArityEnv -> CallArityEnv -> CallArityEnv
@@ -475,10 +466,12 @@ useBetterOf ae1 ae2 | anyGoodCalls ae1 = ae1 `lubEnv` forgetOnceCalls ae2
 useBetterOf ae1 ae2 | otherwise        = forgetOnceCalls ae1 `lubEnv` ae2
 
 lubCallCount :: CallCount -> CallCount -> CallCount
-lubCallCount (OnceAndOnly arity1) (OnceAndOnly arity2) = OnceAndOnly (arity1 `min` arity2)
-lubCallCount (Many arity1)        (OnceAndOnly arity2) = Many        (arity1 `min` arity2)
-lubCallCount (OnceAndOnly arity1) (Many arity2)        = Many        (arity1 `min` arity2)
-lubCallCount (Many arity1)        (Many arity2)        = Many        (arity1 `min` arity2)
+lubCallCount (count1, arity1) (count2, arity2)
+    = (count1 `lubCount` count2, arity1 `min` arity2)
+
+lubCount :: Count -> Count -> Count
+lubCount OnceAndOnly OnceAndOnly = OnceAndOnly
+lubCount _           _           = Many
 
 -- Used when combining results from alternative cases; take the minimum
 lubEnv :: CallArityEnv -> CallArityEnv -> CallArityEnv
