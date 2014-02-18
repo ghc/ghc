@@ -396,21 +396,16 @@ interestingBinds bind =
   where
     go (v,e) = exprArity e < length (typeArity (idType v))
 
-boringBinds :: CoreBind -> [Var]
-boringBinds bind =
-    map fst $ filter go $ case bind of (NonRec v e) -> [(v,e)]
-                                       (Rec ves)    -> ves
-  where
-    go (v,e) = exprArity e >= length (typeArity (idType v))
-
 addInterestingBinds :: VarSet -> CoreBind -> VarSet
 addInterestingBinds int bind
     = int `delVarSetList`    bindersOf bind -- Possible shadowing
           `extendVarSetList` interestingBinds bind
 
-addBoringCalls :: CallArityEnv -> CoreBind -> CallArityEnv
-addBoringCalls ae bind
-    = ae `lubEnv` (mkVarEnv $ zip (boringBinds bind) (repeat topCallCount))
+-- This function pretens a (Many 0) call for every variable bound in the binder
+-- that is not interesting, as calls to these are not reported by the analysis.
+fakeBoringCalls :: VarSet -> CoreBind -> CallArityEnv
+fakeBoringCalls int bind
+    = mkVarEnv [ (v, topCallCount) | v <- bindersOf bind, not (v `elemVarSet` int) ]
 
 -- Used for both local and top-level binds
 -- First argument is the demand from the body
@@ -433,7 +428,7 @@ callArityBind ae_body int b@(Rec binds)
   where
     int_body = int `addInterestingBinds` b
     -- We are ignoring calls to boring binds, so we need to pretend them here!
-    ae_body' = ae_body `addBoringCalls` b
+    ae_body' = ae_body `lubEnv` (fakeBoringCalls int_body b)
     (ae_rhs, binds') = callArityFix ae_body' int_body [(i,Nothing,e) | (i,e) <- binds]
     final_ae = ae_rhs `delVarEnvList` interestingBinds b
 
