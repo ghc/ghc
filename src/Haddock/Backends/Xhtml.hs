@@ -587,18 +587,18 @@ processForMiniSynopsis mdl unicode qual (ExportDecl (L _loc decl0) _doc _ _insts
         (ClassDecl {}) -> [keyword "class" <+> b]
         _ -> []
     SigD (TypeSig lnames (L _ _)) ->
-      map (ppNameMini False mdl . nameOccName . getName . unLoc) lnames
+      map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
     _ -> []
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
   [groupTag lvl << docToHtml qual txt]
 processForMiniSynopsis _ _ _ _ = []
 
 
-ppNameMini :: Bool -> Module -> OccName -> Html
-ppNameMini is_infix mdl nm =
+ppNameMini :: Notation -> Module -> OccName -> Html
+ppNameMini notation mdl nm =
     anchor ! [ href (moduleNameUrl mdl nm)
              , target mainFrameName ]
-      << ppBinder' is_infix nm
+      << ppBinder' notation nm
 
 
 ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
@@ -654,10 +654,10 @@ processExport summary _ _ qual (ExportGroup lev id0 doc)
 processExport summary links unicode qual (ExportDecl decl doc subdocs insts)
   = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode qual
 processExport summary _ _ qual (ExportNoDecl y [])
-  = processDeclOneLiner summary $ ppDocName qual (Just False) y
+  = processDeclOneLiner summary $ ppDocName qual Prefix y
 processExport summary _ _ qual (ExportNoDecl y subs)
   = processDeclOneLiner summary $
-      ppDocName qual (Just False) y +++ parenList (map (ppDocName qual (Just False)) subs)
+      ppDocName qual Prefix y +++ parenList (map (ppDocName qual Prefix) subs)
 processExport summary _ _ qual (ExportDoc doc)
   = nothingIf summary $ docSection_ qual doc
 processExport summary _ _ _ (ExportModule mdl)

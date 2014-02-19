@@ -13,9 +13,7 @@
 module Haddock.Backends.Xhtml.Names (
   ppName, ppDocName, ppLDocName, ppRdrName, ppUncheckedLink,
   ppBinder, ppBinderInfix, ppBinder',
-  ppModule, ppModuleRef,
-  ppIPName,
-  linkId
+  ppModule, ppModuleRef, ppIPName, linkId, Notation(..)
 ) where
 
 
@@ -34,6 +32,12 @@ import RdrName
 import FastString (unpackFS)
 
 
+-- | Indicator of how to render a 'DocName' into 'Html'
+data Notation = Raw -- ^ Render as-is.
+              | Infix -- ^ Render using infix notation.
+              | Prefix -- ^ Render using prefix notation.
+                deriving (Eq, Show)
+
 ppOccName :: OccName -> Html
 ppOccName = toHtml . occNameString
 
@@ -50,87 +54,83 @@ ppUncheckedLink _ (mdl, occ) = linkIdOcc' mdl (Just occ) << ppOccName occ -- TOD
 
 
 -- The Bool indicates if it is to be rendered in infix notation
-ppLDocName :: Qualification -> Maybe Bool -> Located DocName -> Html
-ppLDocName qual is_infix (L _ d) = ppDocName qual is_infix d
+ppLDocName :: Qualification -> Notation -> Located DocName -> Html
+ppLDocName qual notation (L _ d) = ppDocName qual notation d
 
-
--- The Bool indicates if it is to be rendered in infix notation
--- Nothing means print it raw, i.e. don't force it to either infix or prefix
--- TODO: instead of Maybe Bool, add a bespoke datatype
-ppDocName :: Qualification -> Maybe Bool -> DocName -> Html
-ppDocName qual is_infix docName =
+ppDocName :: Qualification -> Notation -> DocName -> Html
+ppDocName qual notation docName =
   case docName of
     Documented name mdl ->
-      linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual is_infix name mdl
+      linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual notation name mdl
     Undocumented name
       | isExternalName name || isWiredInName name ->
-          ppQualifyName qual is_infix name (nameModule name)
-      | otherwise -> ppName is_infix name
+          ppQualifyName qual notation name (nameModule name)
+      | otherwise -> ppName notation name
 
 
 -- | Render a name depending on the selected qualification mode
-ppQualifyName :: Qualification -> Maybe Bool -> Name -> Module -> Html
-ppQualifyName qual is_infix name mdl =
+ppQualifyName :: Qualification -> Notation -> Name -> Module -> Html
+ppQualifyName qual notation name mdl =
   case qual of
-    NoQual   -> ppName is_infix name
-    FullQual -> ppFullQualName is_infix mdl name
+    NoQual   -> ppName notation name
+    FullQual -> ppFullQualName notation mdl name
     LocalQual localmdl ->
       if moduleString mdl == moduleString localmdl
-        then ppName is_infix name
-        else ppFullQualName is_infix mdl name
+        then ppName notation name
+        else ppFullQualName notation mdl name
     RelativeQual localmdl ->
       case List.stripPrefix (moduleString localmdl) (moduleString mdl) of
         -- local, A.x -> x
-        Just []      -> ppName is_infix name
+        Just []      -> ppName notation name
         -- sub-module, A.B.x -> B.x
         Just ('.':m) -> toHtml $ m ++ '.' : getOccString name
         -- some module with same prefix, ABC.x -> ABC.x
-        Just _       -> ppFullQualName is_infix mdl name
+        Just _       -> ppFullQualName notation mdl name
         -- some other module, D.x -> D.x
-        Nothing      -> ppFullQualName is_infix mdl name
+        Nothing      -> ppFullQualName notation mdl name
     AliasedQual aliases localmdl ->
       case (moduleString mdl == moduleString localmdl,
             M.lookup mdl aliases) of
-        (False, Just alias) -> ppQualName is_infix alias name
-        _ -> ppName is_infix name
+        (False, Just alias) -> ppQualName notation alias name
+        _ -> ppName notation name
 
 
-ppFullQualName :: Maybe Bool -> Module -> Name -> Html
-ppFullQualName is_infix mdl name = wrapInfix is_infix (getOccName name) qname
+ppFullQualName :: Notation -> Module -> Name -> Html
+ppFullQualName notation mdl name = wrapInfix notation (getOccName name) qname
   where
     qname = toHtml $ moduleString mdl ++ '.' : getOccString name
 
-ppQualName :: Maybe Bool -> ModuleName -> Name -> Html
-ppQualName is_infix mdlName name = wrapInfix is_infix (getOccName name) qname
+ppQualName :: Notation -> ModuleName -> Name -> Html
+ppQualName notation mdlName name = wrapInfix notation (getOccName name) qname
   where
     qname = toHtml $ moduleNameString mdlName ++ '.' : getOccString name
 
-ppName :: Maybe Bool -> Name -> Html
-ppName is_infix name = wrapInfix is_infix (getOccName name) $ toHtml (getOccString name)
+ppName :: Notation -> Name -> Html
+ppName notation name = wrapInfix notation (getOccName name) $ toHtml (getOccString name)
 
 
 ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' False n
+ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' Prefix n
 ppBinder False n = namedAnchor (nameAnchorId n) ! [theclass "def"]
-                        << ppBinder' False n
+                        << ppBinder' Prefix n
 
 ppBinderInfix :: Bool -> OccName -> Html
-ppBinderInfix True n = linkedAnchor (nameAnchorId n) << ppBinder' True n
+ppBinderInfix True n = linkedAnchor (nameAnchorId n) << ppBinder' Infix n
 ppBinderInfix False n = namedAnchor (nameAnchorId n) ! [theclass "def"]
-                             << ppBinder' True n
+                             << ppBinder' Infix n
 
-ppBinder' :: Bool -> OccName -> Html
--- The Bool indicates if it is to be rendered in infix notation
-ppBinder' is_infix n = wrapInfix (Just is_infix) n $ ppOccName n
+ppBinder' :: Notation -> OccName -> Html
+ppBinder' notation n = wrapInfix notation n $ ppOccName n
 
-wrapInfix :: Maybe Bool -> OccName -> Html -> Html
-wrapInfix Nothing _ = id
-wrapInfix (Just is_infix) n | is_star_kind = id
-                            | is_infix && not is_sym = quote
-                            | not is_infix && is_sym = parens
-                            | otherwise = id
+wrapInfix :: Notation -> OccName -> Html -> Html
+wrapInfix notation n = case notation of
+  Infix | is_star_kind -> id
+        | not is_sym -> quote
+  Prefix | is_star_kind -> id
+         | is_sym -> parens
+  _ -> id
   where
     is_sym = isSymOcc n
     is_star_kind = isTcOcc n && occNameString n == "*"
