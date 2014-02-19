@@ -347,14 +347,10 @@ instance Bits Int where
 
     testBit = testBitDefault
 
-    (I# x#) .&.   (I# y#)  = I# (word2Int# (int2Word# x# `and#` int2Word# y#))
-
-    (I# x#) .|.   (I# y#)  = I# (word2Int# (int2Word# x# `or#`  int2Word# y#))
-
-    (I# x#) `xor` (I# y#)  = I# (word2Int# (int2Word# x# `xor#` int2Word# y#))
-
-    complement (I# x#)     = I# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
-
+    (I# x#) .&.   (I# y#)          = I# (x# `andI#` y#)
+    (I# x#) .|.   (I# y#)          = I# (x# `orI#`  y#)
+    (I# x#) `xor` (I# y#)          = I# (x# `xorI#` y#)
+    complement (I# x#)             = I# (notI# x#)
     (I# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
         | otherwise                = I# (x# `iShiftRA#` negateInt# i#)
@@ -365,11 +361,9 @@ instance Bits Int where
 
     {-# INLINE rotate #-} 	-- See Note [Constant folding for rotate]
     (I# x#) `rotate` (I# i#) =
-        I# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
-                       (x'# `uncheckedShiftRL#` (wsib -# i'#))))
+        I# ((x# `uncheckedIShiftL#` i'#) `orI#` (x# `uncheckedIShiftRL#` (wsib -# i'#)))
       where
-        !x'# = int2Word# x#
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+        !i'# = i# `andI#` (wsib -# 1#)
         !wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSizeMaybe i         = Just (finiteBitSize i)
     bitSize i              = finiteBitSize i
@@ -402,7 +396,7 @@ instance Bits Word where
         | isTrue# (i'# ==# 0#) = W# x#
         | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
         where
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+        !i'# = i# `andI#` (wsib -# 1#)
         !wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
     bitSizeMaybe i           = Just (finiteBitSize i)
     bitSize i                = finiteBitSize i
