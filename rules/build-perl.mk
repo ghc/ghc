@@ -56,7 +56,6 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$(BINDIST)" "YES"
 $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$$$(unlit_INPLACE) | $$$$(dir $$$$@)/.
 	"$$(unlit_INPLACE)" $$(UNLIT_OPTS) $$< $$@
-endif
 
 $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
 	$$(call removeFiles,$$@)
@@ -69,6 +68,15 @@ $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
 	"$$(CP)" $$< $$@
 	$$(EXECUTABLE_FILE) $$@
 
+endif
+endif
+
+ifeq "$$($1_$2_INSTALL)" "YES"
+ifeq "$$($1_$2_TOPDIR)" "YES"
+INSTALL_TOPDIRS  += $$($1_$2_INPLACE)
+else
+INSTALL_BINS     += $$($1_$2_INPLACE)
+endif
 endif
 
 $(call profEnd, build-perl($1,$2))
