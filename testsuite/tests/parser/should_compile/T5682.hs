@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveDataTypeable, StandaloneDeriving, TypeOperators #-}
+{-# LANGUAGE DataKinds, PolyKinds, DeriveDataTypeable, StandaloneDeriving, TypeOperators #-}
 
 module T5682 where
 
@@ -10,3 +10,4 @@ data Foo = Bool :+: Bool
 type X = True ':+: False
 
 deriving instance Typeable '(:+:)
+deriving instance Typeable '(,,)
