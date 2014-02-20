@@ -30,6 +30,7 @@
 #include "Stats.h"
 #include "ProfHeap.h"
 #include "Apply.h"
+#include "Stable.h" /* markStableTables */
 #include "sm/Storage.h" // for END_OF_STATIC_LIST
 
 /*
