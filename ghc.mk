@@ -1109,6 +1109,9 @@ define sdist_ghc_file
 	mv $(SRC_DIST_GHC_DIR)/$1/$3/$4/$5.$6 $(SRC_DIST_GHC_DIR)/$1/$3/$4/$5.$6.source
 endef
 
+# Extra packages which shouldn't be in the source distribution: see #8801
+EXTRA_PACKAGES=parallel stm random primitive vector dph
+
 .PHONY: sdist-ghc-prep
 sdist-ghc-prep :
 	$(call removeTrees,$(SRC_DIST_GHC_ROOT))
@@ -1123,6 +1126,7 @@ sdist-ghc-prep :
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
+	for i in $(EXTRA_PACKAGES); do $(RM) $(RM_OPTS_REC) $(SRC_DIST_GHC_DIR)/libraries/$$i/; done
 	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmLex,x)
 	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmParse,y)
 	$(call sdist_ghc_file,compiler,stage2,parser,,Lexer,x)
