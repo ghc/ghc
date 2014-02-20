@@ -1151,12 +1151,11 @@ atype :: { LHsType RdrName }
         | TH_ID_SPLICE                   { LL $ mkHsSpliceTy $ L1 $ HsVar $
                                            mkUnqual varName (getTH_ID_SPLICE $1) }
                                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qconid                          { LL $ HsTyVar $ unLoc $2 }
-        | SIMPLEQUOTE  '(' ')'                        { LL $ HsTyVar $ getRdrName unitDataCon }
+        | SIMPLEQUOTE qcon                            { LL $ HsTyVar $ unLoc $2 }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')' { LL $ HsExplicitTupleTy [] ($3 : $5) }
         | SIMPLEQUOTE  '[' comma_types0 ']'           { LL $ HsExplicitListTy placeHolderKind $3 }
-        | SIMPLEQUOTE '(' qconop ')'                  { LL $ HsTyVar (unLoc $3) }
-        | SIMPLEQUOTE '(' varop  ')'                  { LL $ HsTyVar (unLoc $3) }
+        | SIMPLEQUOTE var                             { LL $ HsTyVar $ unLoc $2 }
+
         | '[' ctype ',' comma_types1 ']'              { LL $ HsExplicitListTy placeHolderKind ($2 : $4) }
         | INTEGER            {% mkTyLit $ LL $ HsNumTy $ getINTEGER $1 }
         | STRING             {% mkTyLit $ LL $ HsStrTy $ getSTRING  $1 }
