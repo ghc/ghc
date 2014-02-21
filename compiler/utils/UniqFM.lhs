@@ -58,6 +58,7 @@ module UniqFM (
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         eltsUFM, keysUFM, splitUFM,
+        ufmToSet_Directly,
         ufmToList,
         joinUFM
     ) where
@@ -69,6 +70,7 @@ import Compiler.Hoopl   hiding (Unique)
 
 import Data.Function (on)
 import qualified Data.IntMap as M
+import qualified Data.IntSet as S
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 import Data.Typeable
@@ -180,6 +182,7 @@ lookupWithDefaultUFM_Directly
                 :: UniqFM elt -> elt -> Unique -> elt
 keysUFM         :: UniqFM elt -> [Unique]       -- Get the keys
 eltsUFM         :: UniqFM elt -> [elt]
+ufmToSet_Directly :: UniqFM elt -> S.IntSet
 ufmToList       :: UniqFM elt -> [(Unique, elt)]
 
 \end{code}
@@ -293,6 +296,7 @@ lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
 keysUFM (UFM m) = map getUnique $ M.keys m
 eltsUFM (UFM m) = M.elems m
+ufmToSet_Directly (UFM m) = M.keysSet m
 ufmToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
 
 -- Hoopl

@@ -57,11 +57,12 @@ exprs =
                         mkLams [z] $ Var d `mkVarApps` [x] )$
                     Var go2 `mkApps` [mkLit 1] ) $
         go `mkLApps` [0, 0]
-  , ("d0",) $
+  , ("d0 (go 2 would be bad)",) $
      mkRFun go [x]
         (mkLet d (mkACase (Var go `mkVarApps` [x])
                           (mkLams [y] $ Var y)
-                  ) $ mkLams [z] $ Var f `mkApps` [ Var d `mkVarApps` [x],  Var d `mkVarApps` [x] ]) $
+                  ) $
+            mkLams [z] $ Var f `mkApps` [ Var d `mkVarApps` [x],  Var d `mkVarApps` [x] ]) $
         go `mkLApps` [0, 0]
   , ("go2 (in case crut)",) $
      mkRFun go [x]
@@ -90,7 +91,11 @@ exprs =
                               (mkLams [y] $ Var y)
                       ) $ mkLams [z] $ Var d `mkVarApps` [x]) $
             Var f `mkApps` [Var z,  go `mkLApps` [0, 0]]
-  , ("two recursions (both arity 1 would be good!)",) $
+  , ("two calls, one from let and from body (d 1 would be bad)",) $
+     mkLet  d (mkACase (mkLams [y] $ mkLit 0) (mkLams [y] $ mkLit 0)) $
+     mkFun go [x,y] (mkVarApps (Var d) [x]) $
+     mkApps (Var d) [mkLApps go [1,2]]
+  , ("two recursions",) $
      mkRLet n (mkACase (mkLams [y] $ mkLit 0) (Var n)) $
      mkRLet d (mkACase (mkLams [y] $ mkLit 0) (Var d)) $
          Var n `mkApps` [d `mkLApps` [0]]
@@ -135,6 +140,29 @@ exprs =
          Let (Rec [ (go,  mkLams [x, y] (Var d `mkApps` [go2 `mkLApps` [1,2]]))
                   , (go2, mkLams [x] (mkACase (mkLams [y] $ mkLit 0) (Var go `mkVarApps` [x])))]) $
              Var d `mkApps` [go2 `mkLApps` [0,1]]
+  , ("a thunk (non-function-type), called twice, still calls once",) $
+    mkLet d (f `mkLApps` [0]) $
+        mkLet x (d `mkLApps` [1]) $
+            Var f `mkVarApps` [x, x]
+  , ("a thunk (function type), called multiple times, still calls once",) $
+    mkLet d (f `mkLApps` [0]) $
+        mkLet n (Var f `mkApps` [d `mkLApps` [1]]) $
+            mkLams [x] $ Var n `mkVarApps` [x]
+  , ("a thunk (non-function-type), in mutual recursion, still calls once (d 1 would be good)",) $
+    mkLet d (f `mkLApps` [0]) $
+        Let (Rec [ (x, Var d `mkApps` [go `mkLApps` [1,2]])
+                 , (go, mkLams [x] $ mkACase (mkLams [z] $ Var x) (Var go `mkVarApps` [x]) ) ]) $
+            Var go `mkApps` [mkLit 0, go `mkLApps` [0,1]]
+  , ("a thunk (function type), in mutual recursion, still calls once (d 1 would be good)",) $
+    mkLet d (f `mkLApps` [0]) $
+        Let (Rec [ (n, Var go `mkApps` [d `mkLApps` [1]])
+                 , (go, mkLams [x] $ mkACase (Var n) (Var go `mkApps` [Var n `mkVarApps` [x]]) ) ]) $
+            Var go `mkApps` [mkLit 0, go `mkLApps` [0,1]]
+  , ("a thunk (function type), in mutual recursion, still calls once, d part of mutual recursion (d 1 would be good)",) $
+    Let (Rec [ (d, Var f `mkApps` [n `mkLApps` [1]])
+             , (n, Var go `mkApps` [d `mkLApps` [1]])
+             , (go, mkLams [x] $ mkACase (Var n) (Var go `mkApps` [Var n `mkVarApps` [x]]) ) ]) $
+        Var go `mkApps` [mkLit 0, go `mkLApps` [0,1]]
   ]
 
 main = do

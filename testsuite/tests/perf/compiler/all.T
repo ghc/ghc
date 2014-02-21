@@ -392,10 +392,11 @@ test('T6048',
           [(wordsize(32), 48887164, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
-           (wordsize(64), 95960720, 10)])
+           (wordsize(64), 110646312, 10)])
              # 18/09/2012 97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014 95960720 amd64/Linux Call Arity improvements
              # 28/02/2014 105556793 amd64/Linux (unknown, tweak in base/4d9e7c9e3 resulted in change)
+             # 05/03/2014 110646312 amd64/Linux Call Arity became more elaborate
       ],
       compile,[''])

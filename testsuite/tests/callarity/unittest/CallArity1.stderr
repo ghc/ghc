@@ -6,7 +6,7 @@ nested_go2:
     go2 2
     d 1
     n 1
-d0:
+d0 (go 2 would be bad):
     go 1
     d 0
 go2 (in case crut):
@@ -23,8 +23,11 @@ go2 (using surrounding boring let):
     go 2
     d 1
     z 0
-two recursions (both arity 1 would be good!):
+two calls, one from let and from body (d 1 would be bad):
+    go 2
     d 0
+two recursions:
+    d 1
     n 1
 two recursions (semantically like the previous case):
     d 1
@@ -54,6 +57,24 @@ mutual recursion (functions), but no thunks:
     go 2
     go2 2
 mutual recursion (functions), one boring (d 1 would be bad):
-    go 0
+    go 2
     go2 2
     d 0
+a thunk (non-function-type), called twice, still calls once:
+    x 0
+    d 1
+a thunk (function type), called multiple times, still calls once:
+    d 1
+    n 0
+a thunk (non-function-type), in mutual recursion, still calls once (d 1 would be good):
+    go 2
+    x 0
+    d 1
+a thunk (function type), in mutual recursion, still calls once (d 1 would be good):
+    go 1
+    d 1
+    n 0
+a thunk (function type), in mutual recursion, still calls once, d part of mutual recursion (d 1 would be good):
+    go 1
+    d 1
+    n 0

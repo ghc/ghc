@@ -14,9 +14,10 @@ import DynFlags ( DynFlags )
 import BasicTypes
 import CoreSyn
 import Id
-import CoreArity ( exprArity, typeArity )
+import CoreArity ( typeArity )
 import CoreUtils ( exprIsHNF )
-import Outputable
+--import Outputable
+import UnVarGraph
 
 import Control.Arrow ( first, second )
 
@@ -58,55 +59,142 @@ The specification of the `calledArity` field is:
 
     No work will be lost if you eta-expand me to the arity in `calledArity`.
 
-The specification of the analysis
----------------------------------
+What we want to know for a variable
+-----------------------------------
 
-The analysis only does a conservative approximation, there are plenty of
-situations where eta-expansion would be ok, but we do not catch it. We are
-content if all the code that foldl-via-foldr generates is being optimized
-sufficiently.
+For every let-bound variable we'd like to know:
+  1. A lower bound on the arity of all calls to the variable, and
+  2. whether the variable is being called at most once or possible multiple
+     times.
 
-The work-hourse of the analysis is the function `callArityAnal`, with the
-following type:
+It is always ok to lower the arity, or pretend that there are multiple calls.
+In particular, "Minimum arity 0 and possible called multiple times" is always
+correct.
 
-    data Count = Many | OnceAndOnly
-    type CallCount = (Count, Arity)
-    type CallArityEnv = VarEnv (CallCount, Arity)
-    callArityAnal ::
-        Arity ->  -- The arity this expression is called with
-        VarSet -> -- The set of interesting variables
-        CoreExpr ->  -- The expression to analyse
-        (CallArityEnv, CoreExpr)
 
-and the following specification:
+What we want to know from an expression
+---------------------------------------
 
-  (callArityEnv, expr') = callArityEnv arity interestingIds expr
+In order to obtain that information for variables, we analyize expression and
+obtain bits of information:
 
-                            <=>
+ I.  The arity analysis:
+     For every variable, whether it is absent, or called,
+     and if called, which what arity.
 
-  Assume the expression `expr` is being passed `arity` arguments. Then it calls
-  the functions mentioned in `interestingIds` according to `callArityEnv`:
-    * The domain of `callArityEnv` is a subset of `interestingIds`.
-    * Any variable from interestingIds that is not mentioned in the `callArityEnv`
-      is absent, i.e. not called at all.
-    * Of all the variables that are mapped to OnceAndOnly by the `callArityEnv`,
-      at most one is being called, at most once, with at least that many
-      arguments.
-    * Variables mapped to Many are called an unknown number of times, but if they
-      are called, then with at least that many arguments.
-  Furthermore, expr' is expr with the callArity field of the `IdInfo` updated.
+ II. The Co-Called analysis:
+     For every two variables, whether there is a possibility that both are being
+     called.
+     We obtain as a special case: For every variables, whether there is a
+     possibility that it is being called twice.
 
-The (pointwise) domain is a product domain:
+For efficiency reasons, we gather this information only for a set of
+*interesting variables*, to avoid spending time on, e.g., variables from pattern matches.
 
-          Many               0
-           |         ×       |
-       OneAndOnly            1
-                             |
-                            ...
+The two analysis are not completely independent, as a higher arity can improve
+the information about what variables are being called once or multiple times.
 
-The at-most-once is important for various reasons:
+Note [Analysis I: The arity analyis]
+------------------------------------
 
- 1. Consider:
+The arity analysis is quite straight forward: The information about an
+expression is an
+    VarEnv Arity
+where absent variables are bound to Nothing and otherwise to a lower bound to
+their arity.
+
+When we analyize an expression, we analyize it with a given context arity.
+Lambdas decrease and applications increase the incoming arity. Analysizing a
+variable will put that arity in the environment. In lets or cases all the
+results from the various subexpressions are lubed, which takes the point-wise
+minimum (considering Nothing an infinity).
+
+
+Note [Analysis II: The Co-Called analysis]
+------------------------------------------
+
+The second part is more sophisticated. For reasons explained below, it is not
+sufficient to simply know how often an expression evalutes a variable. Instead
+we need to know which variables are possibly called together.
+
+The data structure here is an undirected graph of variables, which is provided
+by the abstract
+    UnVarGraph
+
+It is safe to return a larger graph, i.e. one with more edges. The worst case
+(i.e. the least useful and always correct result) is the complete graph on all
+free variables, which means that anything can be called together with anything
+(including itself).
+
+Notation for the following:
+C(e)  is the co-called result for e.
+G₁∪G₂ is the union of two graphs
+fv    is the set of free variables (conveniently the domain of the arity analysis result)
+S₁×S₂ is the complete bipartite graph { {a,b} | a ∈ S₁, b ∈ S₂ }
+S²    is the complete graph on the set of variables S, S² = S×S
+C'(e) is a variant for bound expression:
+      If e is called at most once, or it is and stays a thunk (after the analysis),
+      it is simply C(e). Otherwise, the expression can be called multiple times
+      and we return (fv e)²
+
+The interesting cases of the analysis:
+ * Var v:
+   No other variables are being called.
+   Return {} (the empty graph)
+ * Lambda v e, under arity 0:
+   This means that e can be evaluated many times and we cannot get
+   any useful co-call information.
+   Return (fv e)²
+ * Case alternatives alt₁,alt₂,...:
+   Only one can be execuded, so
+   Return (alt₁ ∪ alt₂ ∪...)
+ * App e₁ e₂ (and analogously Case scrut alts):
+   We get the results from both sides. Additionally, anything called by e₁ can
+   possibly called with anything from e₂.
+   Return: C(e₁) ∪ C(e₂) ∪ (fv e₁) × (fv e₂)
+ * Let v = rhs in body:
+   In addition to the results from the subexpressions, add all co-calls from
+   everything that the body calls together with v to everthing that is called
+   by v.
+   Return: C'(rhs) ∪ C(body) ∪ (fv rhs) × {v'| {v,v'} ∈ C(body)}
+ * Letrec v₁ = rhs₁ ... vₙ = rhsₙ in body
+   Tricky.
+   We assume that it is really mutually recursive, i.e. that every variable
+   calls one of the others, and that this is strongly connected (otherwise we
+   return an over-approximation, so that's ok), see note [Recursion and fixpointing].
+
+   Let V = {v₁,...vₙ}.
+   Assume that the vs have been analysed with an incoming demand and
+   cardinality consistent with the final result (this is the fixed-pointing).
+   Again we can use the results from all subexpressions.
+   In addition, for every variable vᵢ, we need to find out what it is called
+   with (calls this set Sᵢ). There are two cases:
+    * If vᵢ is a function, we need to go through all right-hand-sides and bodies,
+      and collect every variable that is called together with any variable from V:
+      Sᵢ = {v' | j ∈ {1,...,n},      {v',vⱼ} ∈ C'(rhs₁) ∪ ... ∪ C'(rhsₙ) ∪ C(body) }
+    * If vᵢ is a thunk, then its rhs is evaluated only once, so we need to
+      exclude it from this set:
+      Sᵢ = {v' | j ∈ {1,...,n}, j≠i, {v',vⱼ} ∈ C'(rhs₁) ∪ ... ∪ C'(rhsₙ) ∪ C(body) }
+   Finally, combine all this:
+   Return: C(body) ∪
+           C'(rhs₁) ∪ ... ∪ C'(rhsₙ) ∪
+           (fv rhs₁) × S₁) ∪ ... ∪ (fv rhsₙ) × Sₙ)
+
+Using the result: Eta-Expansion
+-------------------------------
+
+We use the result of these two analyses to decide whether we can eta-expand the
+rhs of a let-bound variable.
+
+If the variable is already a function (exprIsHNF), and all calls to the
+variables have a higher arity than the current manifest arity (i.e. the number
+of lambdas), expand.
+
+If the variable is a thunk we must be careful: Eta-Expansion will prevent
+sharing of work, so this is only safe if there is at most one call to the
+function. Therefore, we check whether {v,v} ∈ G.
+
+    Example:
 
         let n = case .. of .. -- A thunk!
         in n 0 + n 1
@@ -121,7 +209,46 @@ The at-most-once is important for various reasons:
     once in the body of the outer let. So we need to know, for each variable
     individually, that it is going to be called at most once.
 
- 2. We need to know it for non-thunks as well, because they might call a thunk:
+
+Why the co-call graph?
+----------------------
+
+Why is it not sufficient to simply remember which variables are called once and
+which are called multiple times? It would be in the previous example, but consider
+
+        let n = case .. of ..
+        in case .. of
+            True -> let go = \y -> case .. of
+                                     True -> go (y + n 1)
+                                     False > n
+                    in go 1
+            False -> n
+
+vs.
+
+        let n = case .. of ..
+        in case .. of
+            True -> let go = \y -> case .. of
+                                     True -> go (y+1)
+                                     False > n
+                    in go 1
+            False -> n
+
+In both cases, the body and the rhs of the inner let call n at most once.
+But only in the second case that holds for the whole expression! The
+crucial difference is that in the first case, the rhs of `go` can call
+*both* `go` and `n`, and hence can call `n` multiple times as it recurses,
+while in the second case find out that `go` and `n` are not called together.
+
+
+Why co-call information for functions?
+--------------------------------------
+
+Although for eta-expansion we need the information only for thunks, we still
+need to know whether functions are being called once or multiple times, and
+together with what other functions.
+
+    Example:
 
         let n = case .. of ..
             f x = n (x+1)
@@ -137,138 +264,72 @@ The at-most-once is important for various reasons:
     Here, the body of f calls n exactly once, but f itself is being called
     multiple times, so eta-expansion is not allowed.
 
- 3. We need to know that at most one of the interesting functions is being
-    called, because of recursion. Consider:
 
-        let n = case .. of ..
-        in case .. of
-            True -> let go = \y -> case .. of
-                                     True -> go (y + n 1)
-                                     False > n
-                    in go 1
-            False -> n
+Note [Analysis type signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    vs.
+The work-hourse of the analysis is the function `callArityAnal`, with the
+following type:
 
-        let n = case .. of ..
-        in case .. of
-            True -> let go = \y -> case .. of
-                                     True -> go (y+1)
-                                     False > n
-                    in go 1
-            False -> n
+    type CallArityRes = (UnVarGraph, VarEnv Arity)
+    callArityAnal ::
+        Arity ->  -- The arity this expression is called with
+        VarSet -> -- The set of interesting variables
+        CoreExpr ->  -- The expression to analyse
+        (CallArityRes, CoreExpr)
 
-    In both cases, the body and the rhs of the inner let call n at most once.
-    But only in the second case that holds for the whole expression! The
-    crucial difference is that in the first case, the rhs of `go` can call
-    *both* `go` and `n`, and hence can call `n` multiple times as it recurses,
-    while in the second case it calls `go` or `n`, but not both.
+and the following specification:
+
+  ((coCalls, callArityEnv), expr') = callArityEnv arity interestingIds expr
+
+                            <=>
+
+  Assume the expression `expr` is being passed `arity` arguments. Then it holds that
+    * The domain of `callArityEnv` is a subset of `interestingIds`.
+    * Any variable from `interestingIds` that is not mentioned in the `callArityEnv`
+      is absent, i.e. not called at all.
+    * Every call from `expr` to a variable bound to n in `callArityEnv` has at
+      least n value arguments.
+    * For two interesting variables `v1` and `v2`, they are not adjacent in `coCalls`,
+      then in no execution of `expr` both are being called.
+  Furthermore, expr' is expr with the callArity field of the `IdInfo` updated.
+
 
 Note [Which variables are interesting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unfortunately, the set of interesting variables is not irrelevant for the
-precision of the analysis. Consider this example (and ignore the pointlessnes
-of `d` recursing into itself): 
-
-    let n = ... :: Int
-    in  let d = let d = case ... of
-                           False -> d
-                           True  -> id
-                in \z -> d (x + z)
-        in d 0
-
-Of course, `d` should be interesting. If we consider `n` as interesting as
-well, then the body of the second let will return
-    { go |-> (Many, 1) ,       n |-> (OnceAndOnly, 0) }
-or
-    { go |-> (OnceAndOnly, 1), n |-> (Many, 0)}.
-Only the latter is useful, but it is hard to decide that locally.
-(Returning OnceAndOnly for both would be wrong, as both are being called.)
-
-So the heuristics is:
-
-    Variables are interesting if their RHS has a lower exprArity than
-    typeArity.
-
-(which is precisely the those variables where this analysis can actually cause
-some eta-expansion.)
-
-But this is not uniformly a win. Consider:
-
-    let go = \x -> let d = case ... of
-                              False -> go (x+1)
-                              True  -> id
-                       n x = d (x+1)
-                   in \z -> n (x + z)
-    in go n 0
-
-Now `n` is not going to be considered interesting (its type is `Int -> Int`).
-But this will prevent us from detecting how often the body of the let calls
-`d`, and we will not find out anything.
-
-It might be possible to be smarter here; this needs find-tuning as we find more
-examples.
-
+The analysis would quickly become prohibitive expensive if we would analyse all
+variables; for most variables we simply do not care about how often they are
+called, i.e. variables bound in a pattern match. So interesting are variables that are
+ * top-level or let bound
+ * and possibly functions (typeArity > 0)
 
 Note [Recursion and fixpointing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For a recursive let, we begin by analysing the body, using the same incoming
-arity as for the whole expression.
- * We use the arity from the body on the variable as the incoming demand on the
-   rhs. Then we check if the rhs calls itself with the same arity.
-   - If so, we are done.
-   - If not, we re-analise the rhs with the reduced arity. We do that until
-     we are down to the exprArity, which then is certainly correct.
- * If the rhs calls itself many times, we must (conservatively) pass the result
-   through forgetOnceCalls.
- * Similarly, if the body calls the variable many times, we must pass the
-   result of the fixpointing through forgetOnceCalls.
- * Then we can `lubEnv` the results from the body and the rhs: If all mentioned
-   calls are OnceAndOnly calls, then the body calls *either* the rhs *or* one
-   of the other mentioned variables. Similarly, the rhs calls *either* itself
-   again *or* one of the other mentioned variables. This precision is required!
-   If the recursive function is called by the body, or the rhs, tagged with Many
-   then we can also just `lubEnv`, because the result will no longer contain
-   any OnceAndOnly values.
-
-Note [Case and App: Which side to take?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Combining the case branches is easy, just `lubEnv` them – at most one branch is
-taken.
-
-But how to combine that with the information coming from the scrunitee? Very
-similarly, how to combine the information from the callee and argument of an
-`App`?
-
-It would not be correct to just `lubEnv` then: `f n` obviously calls *both* `f`
-and `n`. We need to forget about the cardinality of calls from one side using
-`forgetOnceCalls`. But which one?
-
-Both are correct, and sometimes one and sometimes the other is more precise
-(also see example in [Which variables are interesting]).
-
-So currently, we first check the scrunitee (resp. the callee) if the returned
-value has any usesful information, and if so, we use that; otherwise we use the
-information from the alternatives (resp. the argument).
-
-It might be smarter to look for “more important” variables first, i.e. the
-innermost recursive variable.
+For a mutually recursive let, we begin by
+ 1. analysing the body, using the same incoming arity as for the whole expression.
+ 2. Then we iterate, memoizing for each of the bound variables the last
+    analysis call, i.e. incoming arity, whether it is called once, and the CallArityRes.
+ 3. We combine the analysis result from the body and the memoized results for
+    the arguments (if already present).
+ 4. For each variable, we find out the incoming arity and whether it is called
+    once, based on the the current analysis result. If this differs from the
+    memoized results, we re-analyse the rhs and update the memoized table.
+ 5. If nothing had to be reanalized, we are done.
+    Otherwise, repeat from step 3.
 
 Note [Analysing top-level binds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We can eta-expand top-level-binds if they are not exported, as we see all calls
 to them. The plan is as follows: Treat the top-level binds as nested lets around
-a body representing “all external calls”, which returns a CallArityEnv that calls
-every exported function with the top of the lattice.
-
-This means that the incoming arity on all top-level binds will have a Many
-attached, and we will never eta-expand CAFs. Which is good.
+a body representing “all external calls”, which returns a pessimistic
+CallArityRes (the co-call graph is the complete graph, all arityies 0).
 
 -}
+
+-- Main entry point
 
 callArityAnalProgram :: DynFlags -> CoreProgram -> CoreProgram
 callArityAnalProgram _dflags binds = binds'
@@ -276,13 +337,14 @@ callArityAnalProgram _dflags binds = binds'
     (_, binds') = callArityTopLvl [] emptyVarSet binds
 
 -- See Note [Analysing top-level-binds]
-callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityEnv, [CoreBind])
+callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])
 callArityTopLvl exported _ []
-    = (mkVarEnv $ zip exported (repeat topCallCount), [])
+    = ( calledMultipleTimes $ (emptyUnVarGraph, mkVarEnv $ [(v, 0) | v <- exported])
+      , [] )
 callArityTopLvl exported int1 (b:bs)
     = (ae2, b':bs')
   where
-    int2 = interestingBinds b
+    int2 = bindersOf b
     exported' = filter isExportedId int2 ++ exported
     int' = int1 `addInterestingBinds` b
     (ae1, bs') = callArityTopLvl exported' int' bs
@@ -292,30 +354,22 @@ callArityTopLvl exported int1 (b:bs)
 callArityRHS :: CoreExpr -> CoreExpr
 callArityRHS = snd . callArityAnal 0 emptyVarSet
 
-
-data Count = Many | OnceAndOnly deriving (Eq, Ord)
-type CallCount = (Count, Arity)
-
-topCallCount :: CallCount
-topCallCount = (Many, 0)
-
-type CallArityEnv = VarEnv CallCount
-
+-- The main analysis function. See Note [Analysis type signature]
 callArityAnal ::
     Arity ->  -- The arity this expression is called with
     VarSet -> -- The set of interesting variables
     CoreExpr ->  -- The expression to analyse
-    (CallArityEnv, CoreExpr)
+    (CallArityRes, CoreExpr)
         -- How this expression uses its interesting variables
         -- and the expression with IdInfo updated
 
 -- The trivial base cases
 callArityAnal _     _   e@(Lit _)
-    = (emptyVarEnv, e)
+    = (emptyArityRes, e)
 callArityAnal _     _   e@(Type _)
-    = (emptyVarEnv, e)
+    = (emptyArityRes, e)
 callArityAnal _     _   e@(Coercion _)
-    = (emptyVarEnv, e)
+    = (emptyArityRes, e)
 -- The transparent cases
 callArityAnal arity int (Tick t e)
     = second (Tick t) $ callArityAnal arity int e
@@ -325,37 +379,26 @@ callArityAnal arity int (Cast e co)
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
 callArityAnal arity int e@(Var v)
     | v `elemVarSet` int
-    = (unitVarEnv v (OnceAndOnly, arity), e)
+    = (unitArityRes v arity, e)
     | otherwise
-    = (emptyVarEnv, e)
+    = (emptyArityRes, e)
 
 -- Non-value lambdas are ignored
 callArityAnal arity int (Lam v e) | not (isId v)
     = second (Lam v) $ callArityAnal arity (int `delVarSet` v) e
 
--- We have a lambda that we are not sure to call. Tail calls therein
--- are no longer OneAndOnly calls
+-- We have a lambda that may be called multiple times, so its free variables
+-- can all be co-called.
 callArityAnal 0     int (Lam v e)
     = (ae', Lam v e')
   where
     (ae, e') = callArityAnal 0 (int `delVarSet` v) e
-    ae' = forgetOnceCalls ae
+    ae' = calledMultipleTimes ae
 -- We have a lambda that we are calling. decrease arity.
 callArityAnal arity int (Lam v e)
     = (ae, Lam v e')
   where
     (ae, e') = callArityAnal (arity - 1) (int `delVarSet` v) e
-
--- For lets, use callArityBind
-callArityAnal arity int (Let bind e)
-  = -- pprTrace "callArityAnal:Let"
-    --          (vcat [ppr v, ppr arity, ppr n, ppr final_ae ])
-    (final_ae, Let bind' e')
-  where
-    int_body = int `addInterestingBinds` bind
-    (ae_body, e') = callArityAnal arity int_body e
-    (final_ae, bind') = callArityBind ae_body int bind
-
 
 -- Application. Increase arity for the called expresion, nothing to know about
 -- the second
@@ -367,13 +410,9 @@ callArityAnal arity int (App e1 e2)
     (ae1, e1') = callArityAnal (arity + 1) int e1
     (ae2, e2') = callArityAnal 0           int e2
     -- See Note [Case and App: Which side to take?]
-    final_ae = ae1 `useBetterOf` ae2
+    final_ae = ae1 `both` ae2
 
--- Case expression. Here we decide whether
--- we want to look at calls from the scrunitee or the alternatives;
--- one of them we set to Nothing.
--- Naive idea: If there are interesting calls in the scrunitee,
--- zap the alternatives
+-- Case expression.
 callArityAnal arity int (Case scrut bndr ty alts)
     = -- pprTrace "callArityAnal:Case"
       --          (vcat [ppr scrut, ppr final_ae])
@@ -382,147 +421,201 @@ callArityAnal arity int (Case scrut bndr ty alts)
     (alt_aes, alts') = unzip $ map go alts
     go (dc, bndrs, e) = let (ae, e') = callArityAnal arity int e
                         in  (ae, (dc, bndrs, e'))
-    alt_ae = foldl lubEnv emptyVarEnv alt_aes
+    alt_ae = lubRess alt_aes
     (scrut_ae, scrut') = callArityAnal 0 int scrut
     -- See Note [Case and App: Which side to take?]
-    final_ae = scrut_ae `useBetterOf` alt_ae
+    final_ae = scrut_ae `both` alt_ae
+
+-- For lets, use callArityBind
+callArityAnal arity int (Let bind e)
+  = -- pprTrace "callArityAnal:Let"
+    --          (vcat [ppr v, ppr arity, ppr n, ppr final_ae ])
+    (final_ae, Let bind' e')
+  where
+    int_body = int `addInterestingBinds` bind
+    (ae_body, e') = callArityAnal arity int_body e
+    (final_ae, bind') = callArityBind ae_body int bind
+
+-- This is a variant of callArityAnal that is additionally told whether
+-- the expression is called once or multiple times, and treats thunks appropriately.
+-- It also returns the actual arity that can be used for this expression.
+callArityBound :: Bool -> Arity -> VarSet -> CoreExpr -> (CallArityRes, Arity, CoreExpr)
+callArityBound called_once arity int e
+    = -- pprTrace "callArityBound" (vcat [ppr (called_once, arity), ppr is_thunk, ppr safe_arity]) $
+      (final_ae, safe_arity, e')
+ where
+    is_thunk = not (exprIsHNF e)
+
+    safe_arity | called_once = arity
+               | is_thunk    = 0      -- A thunk! Do not eta-expand
+               | otherwise   = arity
+
+    (ae, e') = callArityAnal safe_arity int e
+
+    final_ae | called_once     = ae
+             | safe_arity == 0 = ae -- If it is not a function, its body is evaluated only once
+             | otherwise       = calledMultipleTimes ae
+
 
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
 interestingBinds :: CoreBind -> [Var]
-interestingBinds bind =
-    map fst $ filter go $ case bind of (NonRec v e) -> [(v,e)]
-                                       (Rec ves)    -> ves
-  where
-    go (v,e) = exprArity e < length (typeArity (idType v))
+interestingBinds = filter go . bindersOf
+  where go v = 0 < length (typeArity (idType v))
 
 addInterestingBinds :: VarSet -> CoreBind -> VarSet
 addInterestingBinds int bind
     = int `delVarSetList`    bindersOf bind -- Possible shadowing
           `extendVarSetList` interestingBinds bind
 
--- This function pretens a (Many 0) call for every variable bound in the binder
--- that is not interesting, as calls to these are not reported by the analysis.
-fakeBoringCalls :: VarSet -> CoreBind -> CallArityEnv
-fakeBoringCalls int bind
-    = mkVarEnv [ (v, topCallCount) | v <- bindersOf bind, not (v `elemVarSet` int) ]
-
 -- Used for both local and top-level binds
 -- First argument is the demand from the body
-callArityBind :: CallArityEnv -> VarSet -> CoreBind -> (CallArityEnv, CoreBind)
-
+callArityBind :: CallArityRes -> VarSet -> CoreBind -> (CallArityRes, CoreBind)
 -- Non-recursive let
 callArityBind ae_body int (NonRec v rhs)
+  | otherwise
   = -- pprTrace "callArityBind:NonRec"
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
     (final_ae, NonRec v' rhs')
   where
-    callcount = lookupWithDefaultVarEnv ae_body topCallCount v
-    (ae_rhs, safe_arity, rhs') = callArityBound callcount int rhs
-    final_ae = ae_rhs `lubEnv` (ae_body `delVarEnv` v)
+    (arity, called_once)  = lookupCallArityRes ae_body v
+    (ae_rhs, safe_arity, rhs') = callArityBound called_once arity int rhs
+    final_ae = callArityNonRecEnv v ae_rhs ae_body
     v' = v `setIdCallArity` safe_arity
 
 -- Recursive let. See Note [Recursion and fixpointing]
 callArityBind ae_body int b@(Rec binds)
-  = (final_ae, Rec binds')
+  = -- pprTrace "callArityBind:Rec"
+    --           (vcat [ppr (Rec binds'), ppr ae_body, ppr int, ppr ae_rhs]) $
+    (final_ae, Rec binds')
   where
     int_body = int `addInterestingBinds` b
-    -- We are ignoring calls to boring binds, so we need to pretend them here!
-    ae_body' = ae_body `lubEnv` (fakeBoringCalls int_body b)
-    (ae_rhs, binds') = callArityFix ae_body' int_body [(i,Nothing,e) | (i,e) <- binds]
-    final_ae = ae_rhs `delVarEnvList` interestingBinds b
+    (ae_rhs, binds') = fix initial_binds
+    final_ae = bindersOf b `resDelList` ae_rhs
 
--- Here we do the fix-pointing for possibly mutually recursive values.  The
--- idea is that we start with the calls coming from the body, and analyize
--- every called value with that arity, adding lub these calls into the
--- environment. We also remember for each variable the CallCount we analised it
--- with.  Then we check for every variable if in the new envrionment, it is
--- called with a different (i.e. lower) arity. If so, we reanalize that, and
--- lub the result back into the environment.  If we had a change for any of the
--- variables, we repeat this step, otherwise we are done.
-callArityFix ::
-    CallArityEnv -> VarSet ->
-    [(Id, Maybe CallCount, CoreExpr)] ->
-    (CallArityEnv, [(Id, CoreExpr)])
-callArityFix ae int ann_binds
-    | any_change
-    = callArityFix ae' int ann_binds'
-    | otherwise
-    = (ae', map (\(i, a, e) -> (i `setArity` a, e)) ann_binds')
-  where
-    (changes, ae's, ann_binds') = unzip3 $ map rerun ann_binds
-    any_change = or changes
-    ae' = foldl lubEnv ae ae's
+    initial_binds = [(i,Nothing,e) | (i,e) <- binds]
 
-    rerun (i, mbArity, rhs)
-
-        | mb_new_arity == mbArity
-        -- No change. No need to re-analize, and no need to change the arity
-        -- environment
-        = (False, emptyVarEnv, (i,mbArity, rhs))
-
-        | Just new_arity <- mb_new_arity
-        -- We previously analized this with a different arity (or not at all)
-        = let (ae_rhs, safe_arity, rhs') = callArityBound new_arity int rhs
-          in (True, ae_rhs, (i `setIdCallArity` safe_arity, mb_new_arity, rhs'))
-
+    fix :: [(Id, Maybe (Bool, Arity, CallArityRes), CoreExpr)] -> (CallArityRes, [(Id, CoreExpr)])
+    fix ann_binds
+        | -- pprTrace "callArityBind:fix" (vcat [ppr ann_binds, ppr any_change, ppr ae]) $
+          any_change
+        = fix ann_binds'
         | otherwise
-        -- No call to this yet, so do nothing
-        = (False, emptyVarEnv, (i, mbArity, rhs))
+        = (ae, map (\(i, _, e) -> (i, e)) ann_binds')
       where
-        mb_new_arity = lookupVarEnv ae i
+        aes_old = [ (i,ae) | (i, Just (_,_,ae), _) <- ann_binds ]
+        ae = callArityRecEnv aes_old ae_body
 
-    setArity i Nothing = i -- Completely absent value
-    setArity i (Just (_, a)) = i `setIdCallArity` a
+        rerun (i, mbLastRun, rhs)
+            | i `elemVarSet` int_body && not (i `elemUnVarSet` domRes ae)
+            -- No call to this yet, so do nothing
+            = (False, (i, Nothing, rhs))
 
+            | Just (old_called_once, old_arity, _) <- mbLastRun
+            , called_once == old_called_once
+            , new_arity == old_arity
+            -- No change, no need to re-analize
+            = (False, (i, mbLastRun, rhs))
 
--- This is a variant of callArityAnal that takes a CallCount (i.e. an arity with a
--- cardinality) and adjust the resulting environment accordingly. It is to be used
--- on bound expressions that can possibly be shared.
--- It also returns the safe arity used: For a thunk that is called multiple
--- times, this will be 0!
-callArityBound :: CallCount -> VarSet -> CoreExpr -> (CallArityEnv, Arity, CoreExpr)
-callArityBound (count, arity) int e = (final_ae, safe_arity, e')
- where
-    is_thunk = not (exprIsHNF e)
+            | otherwise
+            -- We previously analized this with a different arity (or not at all)
+            = let (ae_rhs, safe_arity, rhs') = callArityBound called_once new_arity int_body rhs
+              in (True, (i `setIdCallArity` safe_arity, Just (called_once, new_arity, ae_rhs), rhs'))
+          where
+            (new_arity, called_once)  = lookupCallArityRes ae i
 
-    safe_arity | OnceAndOnly <- count = arity
-               | is_thunk             = 0 -- A thunk! Do not eta-expand
-               | otherwise            = arity
+        (changes, ann_binds') = unzip $ map rerun ann_binds
+        any_change = or changes
 
-    (ae, e') = callArityAnal safe_arity int e
+-- Combining the results from body and rhs, non-recursive case
+-- See Note [Analysis II: The Co-Called analysis]
+callArityNonRecEnv :: Var -> CallArityRes -> CallArityRes -> CallArityRes
+callArityNonRecEnv v ae_rhs ae_body
+    = addCrossCoCalls called_by_v called_with_v $ ae_rhs `lubRes` resDel v ae_body
+  where
+    called_by_v = domRes ae_rhs
+    called_with_v = calledWith ae_body v `delUnVarSet` v
 
-    final_ae | OnceAndOnly <- count = ae
-             | otherwise            = forgetOnceCalls ae
+-- Combining the results from body and rhs, (mutually) recursive case
+-- See Note [Analysis II: The Co-Called analysis]
+callArityRecEnv :: [(Var, CallArityRes)] -> CallArityRes -> CallArityRes
+callArityRecEnv ae_rhss ae_body
+    = -- pprTrace "callArityRecEnv" (vcat [ppr ae_rhss, ppr ae_body, ppr ae_new])
+      ae_new
+  where
+    vars = map fst ae_rhss
 
+    ae_combined = lubRess (map snd ae_rhss) `lubRes` ae_body
 
-anyGoodCalls :: CallArityEnv -> Bool
-anyGoodCalls = foldVarEnv ((||) . isOnceCall) False
+    cross_calls = unionUnVarGraphs $ map cross_call ae_rhss
+    cross_call (v, ae_rhs) = completeBipartiteGraph called_by_v called_with_v
+      where
+        is_thunk = idCallArity v == 0
+        -- What rhs are relevant as happening before (or after) calling v?
+        --    If v is a thunk, everything from all the _other_ variables
+        --    If v is not a thunk, everything can happen.
+        ae_before_v | is_thunk  = lubRess (map snd $ filter ((/= v) . fst) ae_rhss) `lubRes` ae_body
+                    | otherwise = ae_combined
+        -- What do we want to know from these?
+        -- Which calls can happen next to any recursive call.
+        called_with_v
+            = unionUnVarSets $ map (calledWith ae_before_v) vars
+        called_by_v = domRes ae_rhs
 
-isOnceCall :: CallCount -> Bool
-isOnceCall (OnceAndOnly, _) = True
-isOnceCall (Many, _)        = False
+    ae_new = first (cross_calls `unionUnVarGraph`) ae_combined
 
-forgetOnceCalls :: CallArityEnv -> CallArityEnv
-forgetOnceCalls = mapVarEnv (first (const Many))
+---------------------------------------
+-- Functions related to CallArityRes --
+---------------------------------------
 
--- See Note [Case and App: Which side to take?]
-useBetterOf :: CallArityEnv -> CallArityEnv -> CallArityEnv
-useBetterOf ae1 ae2 | anyGoodCalls ae1 = ae1 `lubEnv` forgetOnceCalls ae2
-useBetterOf ae1 ae2 | otherwise        = forgetOnceCalls ae1 `lubEnv` ae2
+-- Result type for the two analyses.
+-- See Note [Analysis I: The arity analyis]
+-- and Note [Analysis II: The Co-Called analysis]
+type CallArityRes = (UnVarGraph, VarEnv Arity)
 
-lubCallCount :: CallCount -> CallCount -> CallCount
-lubCallCount (count1, arity1) (count2, arity2)
-    = (count1 `lubCount` count2, arity1 `min` arity2)
+emptyArityRes :: CallArityRes
+emptyArityRes = (emptyUnVarGraph, emptyVarEnv)
 
-lubCount :: Count -> Count -> Count
-lubCount OnceAndOnly OnceAndOnly = OnceAndOnly
-lubCount _           _           = Many
+unitArityRes :: Var -> Arity -> CallArityRes
+unitArityRes v arity = (emptyUnVarGraph, unitVarEnv v arity)
+
+resDelList :: [Var] -> CallArityRes -> CallArityRes
+resDelList vs ae = foldr resDel ae vs
+
+resDel :: Var -> CallArityRes -> CallArityRes
+resDel v (g, ae) = (g `delNode` v, ae `delVarEnv` v)
+
+domRes :: CallArityRes -> UnVarSet
+domRes (_, ae) = varEnvDom ae
+
+-- In the result, find out the minimum arity and whether the variable is called
+-- at most once.
+lookupCallArityRes :: CallArityRes -> Var -> (Arity, Bool)
+lookupCallArityRes (g, ae) v
+    = case lookupVarEnv ae v of
+        Just a -> (a, not (v `elemUnVarSet` (neighbors g v)))
+        Nothing -> (0, False)
+
+calledWith :: CallArityRes -> Var -> UnVarSet
+calledWith (g, _) v = neighbors g v
+
+addCrossCoCalls :: UnVarSet -> UnVarSet -> CallArityRes -> CallArityRes
+addCrossCoCalls set1 set2 = first (completeBipartiteGraph set1 set2 `unionUnVarGraph`)
+
+-- Replaces the co-call graph by a complete graph (i.e. no information)
+calledMultipleTimes :: CallArityRes -> CallArityRes
+calledMultipleTimes res = first (const (completeGraph (domRes res))) res
+
+-- Used for application and cases
+both :: CallArityRes -> CallArityRes -> CallArityRes
+both r1 r2 = addCrossCoCalls (domRes r1) (domRes r2) $ r1 `lubRes` r2
 
 -- Used when combining results from alternative cases; take the minimum
-lubEnv :: CallArityEnv -> CallArityEnv -> CallArityEnv
-lubEnv = plusVarEnv_C lubCallCount
+lubRes :: CallArityRes -> CallArityRes -> CallArityRes
+lubRes (g1, ae1) (g2, ae2) = (g1 `unionUnVarGraph` g2, ae1 `lubArityEnv` ae2)
 
-instance Outputable Count where
-    ppr Many        = text "Many"
-    ppr OnceAndOnly = text "OnceAndOnly"
+lubArityEnv :: VarEnv Arity -> VarEnv Arity -> VarEnv Arity
+lubArityEnv = plusVarEnv_C min
+
+lubRess :: [CallArityRes] -> CallArityRes
+lubRess = foldl lubRes emptyArityRes
