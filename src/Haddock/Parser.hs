@@ -306,8 +306,6 @@ birdtracks = DocCodeBlock . DocString . intercalate "\n" . stripSpace <$> many1 
   where
     line = skipHorizontalSpace *> ">" *> takeLine
 
--- | Strip leading spaces, but ignore blank lines. If any of the lines don't
---   start with a ' ', however, we don't touch the block.
 stripSpace :: [String] -> [String]
 stripSpace = fromMaybe <*> mapM strip
   where

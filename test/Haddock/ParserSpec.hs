@@ -360,23 +360,26 @@ spec = before initStaticOpts $ do
           ]
         `shouldParseTo` DocCodeBlock "foo\nbar\nbaz"
 
-      it "ignores single leading spaces" $ do
+      it "strips one leading space from each line of the block" $ do
         unlines [
             "> foo"
-          , "> bar"
+          , ">  bar"
           , "> baz"
-          ] `shouldParseTo` DocCodeBlock "foo\nbar\nbaz"
+          ] `shouldParseTo` DocCodeBlock "foo\n bar\nbaz"
 
+      it "ignores empty lines when stripping spaces" $ do
         unlines [
             "> foo"
           , ">"
           , "> bar"
           ] `shouldParseTo` DocCodeBlock "foo\n\nbar"
 
-        unlines [
-            ">foo"
-          , ">  bar"
-          ] `shouldParseTo` DocCodeBlock "foo\n  bar"
+      context "when any non-empty line does not start with a space" $ do
+        it "does not strip any spaces" $ do
+          unlines [
+              ">foo"
+            , ">  bar"
+            ] `shouldParseTo` DocCodeBlock "foo\n  bar"
 
       it "ignores nested markup" $ do
         unlines [
