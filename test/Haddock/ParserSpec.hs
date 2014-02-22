@@ -360,6 +360,24 @@ spec = before initStaticOpts $ do
           ]
         `shouldParseTo` DocCodeBlock "foo\nbar\nbaz"
 
+      it "ignores single leading spaces" $ do
+        unlines [
+            "> foo"
+          , "> bar"
+          , "> baz"
+          ] `shouldParseTo` DocCodeBlock "foo\nbar\nbaz"
+
+        unlines [
+            "> foo"
+          , ">"
+          , "> bar"
+          ] `shouldParseTo` DocCodeBlock "foo\n\nbar"
+
+        unlines [
+            ">foo"
+          , ">  bar"
+          ] `shouldParseTo` DocCodeBlock "foo\n  bar"
+
       it "ignores nested markup" $ do
         unlines [
             ">/foo/"

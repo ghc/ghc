@@ -65,6 +65,12 @@ This belongs to the list above!
     > nested
     > bird
     > tracks
+    >
+    > another line
+    >   with indentation
+
+    >nested bird tracks
+    >  without leading space
 
     * Next list
     More of the indented list.

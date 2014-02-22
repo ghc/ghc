@@ -302,9 +302,18 @@ takeNonEmptyLine = do
     (++ "\n") . decodeUtf8 <$> (takeWhile1 (/= '\n') >>= nonSpace) <* "\n"
 
 birdtracks :: Parser (Doc a)
-birdtracks = DocCodeBlock . DocString . intercalate "\n" <$> many1 line
+birdtracks = DocCodeBlock . DocString . intercalate "\n" . stripSpace <$> many1 line
   where
     line = skipHorizontalSpace *> ">" *> takeLine
+
+-- | Strip leading spaces, but ignore blank lines. If any of the lines don't
+--   start with a ' ', however, we don't touch the block.
+stripSpace :: [String] -> [String]
+stripSpace = fromMaybe <*> mapM strip
+  where
+    strip (' ':xs) = Just xs
+    strip "" = Just ""
+    strip _  = Nothing
 
 -- | Parses examples. Examples are a paragraph level entitity (separated by an empty line).
 -- Consecutive examples are accepted.
