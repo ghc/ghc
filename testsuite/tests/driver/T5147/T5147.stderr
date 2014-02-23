@@ -1,5 +1,5 @@
 
 A.hs:6:15:
-    No instance for (Show (Fields v)) arising from a use of ‛show’
+    No instance for (Show (Fields v)) arising from a use of ‘show’
     In the expression: show a
-    In an equation for ‛showField’: showField a = show a
+    In an equation for ‘showField’: showField a = show a

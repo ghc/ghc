@@ -1,10 +1,10 @@
 
 mod19.hs:3:1:
-    Multiple declarations of ‛C’
+    Multiple declarations of ‘C’
     Declared at: mod19.hs:2:1
                  mod19.hs:3:1
 
 mod19.hs:3:17:
-    Multiple declarations of ‛m’
+    Multiple declarations of ‘m’
     Declared at: mod19.hs:2:17
                  mod19.hs:3:17

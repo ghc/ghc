@@ -1,2 +1,2 @@
 
-tcfail056.hs:10:15: ‛<=’ is not a (visible) method of class ‛Eq’
+tcfail056.hs:10:15: ‘<=’ is not a (visible) method of class ‘Eq’

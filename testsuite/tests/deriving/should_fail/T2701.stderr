@@ -1,5 +1,5 @@
 
 T2701.hs:10:32:
-    Can't make a derived instance of ‛Data Foo’:
-      Don't know how to derive ‛Data’ for type ‛Int#’
-    In the data declaration for ‛Foo’
+    Can't make a derived instance of ‘Data Foo’:
+      Don't know how to derive ‘Data’ for type ‘Int#’
+    In the data declaration for ‘Foo’

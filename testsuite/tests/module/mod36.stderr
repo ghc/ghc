@@ -1,2 +1,2 @@
 
-mod36.hs:5:5: Not in scope: ‛const’
+mod36.hs:5:5: Not in scope: ‘const’

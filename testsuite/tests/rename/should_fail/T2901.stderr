@@ -1,4 +1,4 @@
 
-T2901.hs:6:5: Not in scope: data constructor ‛F.Foo’
+T2901.hs:6:5: Not in scope: data constructor ‘F.Foo’
 
-T2901.hs:6:13: ‛F.field’ is not a (visible) constructor field name
+T2901.hs:6:13: ‘F.field’ is not a (visible) constructor field name

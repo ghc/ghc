@@ -1,6 +1,6 @@
 
 tcfail135.hs:6:23:
-    Expecting one more argument to ‛f’
-    Expected a type, but ‛f’ has kind ‛k0 -> *’
-    In the type ‛f a -> f’
-    In the class declaration for ‛Foo’
+    Expecting one more argument to ‘f’
+    Expected a type, but ‘f’ has kind ‘k0 -> *’
+    In the type ‘f a -> f’
+    In the class declaration for ‘Foo’

@@ -1,19 +1,19 @@
 
 <interactive>:4:9: Warning:
-    Couldn't match type ‛[Dec]’ with ‛Exp’
+    Couldn't match type ‘[Dec]’ with ‘Exp’
     Expected type: Q Exp
       Actual type: DecsQ
     In the expression: [d| a = () |] :: Q Exp
-    In an equation for ‛x’: x = [d| a = () |] :: Q Exp
+    In an equation for ‘x’: x = [d| a = () |] :: Q Exp
 
 <interactive>:1:1:
     Exception when trying to run compile-time code:
       <interactive>:4:9:
-    Couldn't match type ‛[Dec]’ with ‛Exp’
+    Couldn't match type ‘[Dec]’ with ‘Exp’
     Expected type: Q Exp
       Actual type: DecsQ
     In the expression: [d| a = () |] :: Q Exp
-    In an equation for ‛x’: x = [d| a = () |] :: Q Exp
+    In an equation for ‘x’: x = [d| a = () |] :: Q Exp
 (deferred type error)
     Code: x
     In the splice: $x

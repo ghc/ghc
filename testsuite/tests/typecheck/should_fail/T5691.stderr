@@ -1,16 +1,16 @@
 
 T5691.hs:14:9:
-    Couldn't match type ‛p’ with ‛PrintRuleInterp’
+    Couldn't match type ‘p’ with ‘PrintRuleInterp’
     Expected type: PrintRuleInterp a
       Actual type: p a
     In the pattern: f :: p a
-    In an equation for ‛test’: test (f :: p a) = MkPRI $ printRule_ f
-    In the instance declaration for ‛Test PrintRuleInterp’
+    In an equation for ‘test’: test (f :: p a) = MkPRI $ printRule_ f
+    In the instance declaration for ‘Test PrintRuleInterp’
 
 T5691.hs:15:24:
-    Couldn't match type ‛p’ with ‛PrintRuleInterp’
+    Couldn't match type ‘p’ with ‘PrintRuleInterp’
     Expected type: PrintRuleInterp a
       Actual type: p a
     Relevant bindings include f :: p a (bound at T5691.hs:14:9)
-    In the first argument of ‛printRule_’, namely ‛f’
-    In the second argument of ‛($)’, namely ‛printRule_ f’
+    In the first argument of ‘printRule_’, namely ‘f’
+    In the second argument of ‘($)’, namely ‘printRule_ f’

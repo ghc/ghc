@@ -2,4 +2,4 @@
 ClosedFam4.hs:5:1:
     You may omit the equations in a closed type family
     only in a .hs-boot file
-    In the type family declaration for ‛Foo’
+    In the type family declaration for ‘Foo’

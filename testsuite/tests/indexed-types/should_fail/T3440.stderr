@@ -4,14 +4,14 @@ T3440.hs:11:22:
     from the context (Fam a ~ Fam a1)
       bound by a pattern with constructor
                  GADT :: forall a. a -> Fam a -> GADT (Fam a),
-               in an equation for ‛unwrap’
+               in an equation for ‘unwrap’
       at T3440.hs:11:9-16
-      ‛a1’ is a rigid type variable bound by
+      ‘a1’ is a rigid type variable bound by
            a pattern with constructor
              GADT :: forall a. a -> Fam a -> GADT (Fam a),
-           in an equation for ‛unwrap’
+           in an equation for ‘unwrap’
            at T3440.hs:11:9
-      ‛a’ is a rigid type variable bound by
+      ‘a’ is a rigid type variable bound by
           the type signature for unwrap :: GADT (Fam a) -> (a, Fam a)
           at T3440.hs:10:11
     Relevant bindings include

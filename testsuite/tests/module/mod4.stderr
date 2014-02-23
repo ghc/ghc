@@ -1,4 +1,4 @@
 
 mod4.hs:2:10:
-    The export item ‛T(K1, K2)’
+    The export item ‘T(K1, K2)’
     attempts to export constructors or class methods that are not visible here

@@ -1,2 +1,2 @@
 
-Bar.hs:3:7: Not in scope: ‛nonexistent’
+Bar.hs:3:7: Not in scope: ‘nonexistent’

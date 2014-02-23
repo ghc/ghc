@@ -1,10 +1,10 @@
 
 T7903.hs:5:10: Warning:
     No explicit implementation for
-      either ‛==’ or ‛/=’
-    In the instance declaration for ‛Eq (a -> b)’
+      either ‘==’ or ‘/=’
+    In the instance declaration for ‘Eq (a -> b)’
 
 T7903.hs:6:10: Warning:
     No explicit implementation for
-      either ‛compare’ or ‛<=’
-    In the instance declaration for ‛Ord (a -> b)’
+      either ‘compare’ or ‘<=’
+    In the instance declaration for ‘Ord (a -> b)’

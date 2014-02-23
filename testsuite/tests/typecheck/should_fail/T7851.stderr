@@ -1,7 +1,7 @@
 
 T7851.hs:5:10:
-    Couldn't match expected type ‛IO a0’ with actual type ‛a1 -> IO ()’
-    Probable cause: ‛print’ is applied to too few arguments
+    Couldn't match expected type ‘IO a0’ with actual type ‘a1 -> IO ()’
+    Probable cause: ‘print’ is applied to too few arguments
     In a stmt of a 'do' block: print
     In the expression:
       do { print;

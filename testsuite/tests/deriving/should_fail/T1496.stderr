@@ -1,10 +1,10 @@
 
 T1496.hs:10:32:
-    Could not coerce from ‛c Int’ to ‛c Moo’
-      because ‛c Int’ and ‛c Moo’ are different types.
-      arising from the coercion of the method ‛isInt’ from type
-                   ‛forall (c :: * -> *). c Int -> c Int’ to type
-                   ‛forall (c :: * -> *). c Int -> c Moo’
+    Could not coerce from ‘c Int’ to ‘c Moo’
+      because ‘c Int’ and ‘c Moo’ are different types.
+      arising from the coercion of the method ‘isInt’ from type
+                   ‘forall (c :: * -> *). c Int -> c Int’ to type
+                   ‘forall (c :: * -> *). c Int -> c Moo’
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself

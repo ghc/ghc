@@ -1,8 +1,8 @@
 
-rnfail018.hs:12:37: Not in scope: type variable ‛a’
+rnfail018.hs:12:37: Not in scope: type variable ‘a’
 
-rnfail018.hs:12:42: Not in scope: type variable ‛m’
+rnfail018.hs:12:42: Not in scope: type variable ‘m’
 
-rnfail018.hs:12:47: Not in scope: type variable ‛m’
+rnfail018.hs:12:47: Not in scope: type variable ‘m’
 
-rnfail018.hs:12:49: Not in scope: type variable ‛a’
+rnfail018.hs:12:49: Not in scope: type variable ‘a’

@@ -1,8 +1,8 @@
 
 rn066.hs:13:7: Warning:
-    In the use of ‛op’ (imported from Rn066_A):
+    In the use of ‘op’ (imported from Rn066_A):
     "Is that really a good idea?"
 
 rn066.hs:13:10: Warning:
-    In the use of data constructor ‛C’ (imported from Rn066_A):
+    In the use of data constructor ‘C’ (imported from Rn066_A):
     "Are you sure you want to do that?"

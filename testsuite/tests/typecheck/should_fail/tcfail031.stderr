@@ -1,6 +1,6 @@
 
 tcfail031.hs:3:10:
-    Couldn't match expected type ‛Bool’ with actual type ‛Char’
+    Couldn't match expected type ‘Bool’ with actual type ‘Char’
     In the expression: 'a'
     In the expression: if 'a' then 1 else 2
-    In an equation for ‛f’: f x = if 'a' then 1 else 2
+    In an equation for ‘f’: f x = if 'a' then 1 else 2

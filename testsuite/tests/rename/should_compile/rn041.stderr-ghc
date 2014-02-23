@@ -1,6 +1,6 @@
 
-rn041.hs:7:1: Warning: Defined but not used: ‛f’
+rn041.hs:7:1: Warning: Defined but not used: ‘f’
 
-rn041.hs:9:1: Warning: Defined but not used: ‛g’
+rn041.hs:9:1: Warning: Defined but not used: ‘g’
 
-rn041.hs:10:1: Warning: Defined but not used: ‛h’
+rn041.hs:10:1: Warning: Defined but not used: ‘h’

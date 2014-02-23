@@ -1,8 +1,8 @@
 
 T2713.hs:11:10:
-    The fixity signature for ‛.*.’ lacks an accompanying binding
-      (The fixity signature must be given where ‛.*.’ is declared)
+    The fixity signature for ‘.*.’ lacks an accompanying binding
+      (The fixity signature must be given where ‘.*.’ is declared)
 
 T2713.hs:12:1:
-    The type signature for ‛f’ lacks an accompanying binding
-      (The type signature must be given where ‛f’ is declared)
+    The type signature for ‘f’ lacks an accompanying binding
+      (The type signature must be given where ‘f’ is declared)

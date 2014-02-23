@@ -1,5 +1,5 @@
 
 tcfail018.hs:5:10:
-    No instance for (Num [t0]) arising from the literal ‛1’
+    No instance for (Num [t0]) arising from the literal ‘1’
     In the expression: 1
     In a pattern binding: (a : []) = 1

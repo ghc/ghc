@@ -1,7 +1,7 @@
 
 T1133A.hs:6:28:
-    Can't make a derived instance of ‛Enum X’:
-      ‛X’ must be an enumeration type
+    Can't make a derived instance of ‘Enum X’:
+      ‘X’ must be an enumeration type
       (an enumeration consists of one or more nullary, non-GADT constructors)
       Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
-    In the newtype declaration for ‛X’
+    In the newtype declaration for ‘X’

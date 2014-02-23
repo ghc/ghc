@@ -1,2 +1,2 @@
 
-mod79.hs:3:16: Module ‛Prelude’ does not export ‛C’
+mod79.hs:3:16: Module ‘Prelude’ does not export ‘C’

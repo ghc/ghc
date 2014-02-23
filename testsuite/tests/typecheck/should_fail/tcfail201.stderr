@@ -1,7 +1,7 @@
 
 tcfail201.hs:17:27:
-    Couldn't match expected type ‛a’ with actual type ‛HsDoc t0’
-      ‛a’ is a rigid type variable bound by
+    Couldn't match expected type ‘a’ with actual type ‘HsDoc t0’
+      ‘a’ is a rigid type variable bound by
           the type signature for
             gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
                        -> (forall g. g -> c g) -> a -> c a

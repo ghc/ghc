@@ -1,2 +1,2 @@
 
-T7892.hs:5:4: Couldn't match kind ‛*’ against ‛* -> *’
+T7892.hs:5:4: Couldn't match kind ‘*’ against ‘* -> *’

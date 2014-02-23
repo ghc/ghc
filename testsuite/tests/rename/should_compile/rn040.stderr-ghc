@@ -1,4 +1,4 @@
 
-rn040.hs:6:12: Warning: Defined but not used: ‛y’
+rn040.hs:6:12: Warning: Defined but not used: ‘y’
 
-rn040.hs:8:8: Warning: Defined but not used: ‛w’
+rn040.hs:8:8: Warning: Defined but not used: ‘w’

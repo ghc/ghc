@@ -1,6 +1,6 @@
 
 tcfail005.hs:3:9:
-    Couldn't match expected type ‛[t]’ with actual type ‛(t0, Char)’
+    Couldn't match expected type ‘[t]’ with actual type ‘(t0, Char)’
     Relevant bindings include
       h :: t (bound at tcfail005.hs:3:2)
       i :: [t] (bound at tcfail005.hs:3:4)

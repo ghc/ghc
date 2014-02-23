@@ -830,7 +830,7 @@ as if there was an "import qualified M" declaration for every
 module.
 
 If we fail we just return Nothing, rather than bleating
-about "attempting to use module ‛D’ (./D.hs) which is not loaded"
+about "attempting to use module ‘D’ (./D.hs) which is not loaded"
 which is what loadSrcInterface does.
 
 Note [Safe Haskell and GHCi]

@@ -3,9 +3,9 @@ tcfail125.hs:1:14: Warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail125.hs:11:4:
-    No instance for (Show a) arising from a use of ‛LiftObs’
+    No instance for (Show a) arising from a use of ‘LiftObs’
     Possible fix:
       add (Show a) to the context of
         the type signature for f :: Obs a -> String
     In the pattern: LiftObs _ _
-    In an equation for ‛f’: f (LiftObs _ _) = "yes"
+    In an equation for ‘f’: f (LiftObs _ _) = "yes"

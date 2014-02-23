@@ -1,6 +1,6 @@
 
 tcfail010.hs:3:17:
-    No instance for (Num [t0]) arising from a use of ‛+’
+    No instance for (Num [t0]) arising from a use of ‘+’
     In the expression: z + 2
     In the expression: \ (y : z) -> z + 2
-    In an equation for ‛q’: q = \ (y : z) -> z + 2
+    In an equation for ‘q’: q = \ (y : z) -> z + 2

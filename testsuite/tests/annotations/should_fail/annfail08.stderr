@@ -5,5 +5,5 @@ annfail08.hs:9:1:
     In the annotation: {-# ANN f (id + 1) #-}
 
 annfail08.hs:9:15:
-    No instance for (Num (a0 -> a0)) arising from a use of ‛+’
+    No instance for (Num (a0 -> a0)) arising from a use of ‘+’
     In the annotation: {-# ANN f (id + 1) #-}

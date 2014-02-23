@@ -1,5 +1,5 @@
 
 tcfail070.hs:15:15:
-    ‛[Int]’ is applied to too many type arguments
-    In the type ‛[Int] Bool’
-    In the type declaration for ‛State’
+    ‘[Int]’ is applied to too many type arguments
+    In the type ‘[Int] Bool’
+    In the type declaration for ‘State’

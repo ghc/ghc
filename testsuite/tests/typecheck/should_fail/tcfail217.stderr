@@ -1,4 +1,4 @@
 
 tcfail217.hs:7:1:
     Cycle in class declaration (via superclasses): A -> Aish -> A
-    In the class declaration for ‛A’
+    In the class declaration for ‘A’

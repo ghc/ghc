@@ -4,7 +4,7 @@ T7734.hs:4:13:
     Relevant bindings include
       x :: t2 -> t1 (bound at T7734.hs:4:1)
       f :: (t2 -> t1) -> t -> t1 (bound at T7734.hs:4:1)
-    In the first argument of ‛x’, namely ‛x’
+    In the first argument of ‘x’, namely ‘x’
     In the expression: x x
 
 T7734.hs:5:13:
@@ -12,5 +12,5 @@ T7734.hs:5:13:
     Relevant bindings include
       x :: t2 -> t1 (bound at T7734.hs:5:5)
       (&) :: (t2 -> t1) -> t -> t1 (bound at T7734.hs:5:1)
-    In the first argument of ‛x’, namely ‛x’
+    In the first argument of ‘x’, namely ‘x’
     In the expression: x x

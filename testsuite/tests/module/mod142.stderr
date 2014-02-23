@@ -1,7 +1,7 @@
 
 mod142.hs:2:21:
-    Conflicting exports for ‛x’:
-       ‛module Mod142_A’ exports ‛Mod142_A.x’
-         imported from ‛Mod142_A’ at mod142.hs:4:1-15
+    Conflicting exports for ‘x’:
+       ‘module Mod142_A’ exports ‘Mod142_A.x’
+         imported from ‘Mod142_A’ at mod142.hs:4:1-15
          (and originally defined at Mod142_A.hs:3:1)
-       ‛module M’ exports ‛M.x’ defined at mod142.hs:6:1
+       ‘module M’ exports ‘M.x’ defined at mod142.hs:6:1

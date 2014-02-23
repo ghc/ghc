@@ -1,6 +1,6 @@
 
 UnsafeInfered12.hs:2:16: Warning:
-    ‛UnsafeInfered12’ has been inferred as unsafe!
+    ‘UnsafeInfered12’ has been inferred as unsafe!
     Reason:
         UnsafeInfered12.hs:1:14:
             -XTemplateHaskell is not allowed in Safe Haskell

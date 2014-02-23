@@ -6,5 +6,5 @@ T7354.hs:28:11:
       Actual type: Prim [a] a -> a
     Relevant bindings include
       foo :: Prim [a] a -> t (bound at T7354.hs:28:1)
-    In the first argument of ‛ana’, namely ‛alg’
+    In the first argument of ‘ana’, namely ‘alg’
     In the expression: ana alg

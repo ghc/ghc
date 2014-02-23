@@ -1,7 +1,7 @@
 
 mod153.hs:2:11:
-    Ambiguous occurrence ‛id’
-    It could refer to either ‛M.id’, defined at mod153.hs:2:21
-                          or ‛Prelude.id’,
-                             imported from ‛Prelude’ at mod153.hs:2:8
-                             (and originally defined in ‛GHC.Base’)
+    Ambiguous occurrence ‘id’
+    It could refer to either ‘M.id’, defined at mod153.hs:2:21
+                          or ‘Prelude.id’,
+                             imported from ‘Prelude’ at mod153.hs:2:8
+                             (and originally defined in ‘GHC.Base’)

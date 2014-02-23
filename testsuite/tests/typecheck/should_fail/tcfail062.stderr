@@ -1,6 +1,6 @@
 
 tcfail062.hs:34:6:
-    Not in scope: type variable ‛behaviouralExpression’
+    Not in scope: type variable ‘behaviouralExpression’
 
 tcfail062.hs:34:29:
-    Not in scope: type variable ‛behaviouralExpression’
+    Not in scope: type variable ‘behaviouralExpression’

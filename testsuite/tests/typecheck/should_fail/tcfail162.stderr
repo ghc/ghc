@@ -1,7 +1,7 @@
 
 tcfail162.hs:10:33:
-    Expecting one more argument to ‛ForeignPtr’
-    Expected a type, but ‛ForeignPtr’ has kind ‛* -> *’
-    In the type ‛ForeignPtr’
-    In the definition of data constructor ‛Foo’
-    In the data declaration for ‛Foo’
+    Expecting one more argument to ‘ForeignPtr’
+    Expected a type, but ‘ForeignPtr’ has kind ‘* -> *’
+    In the type ‘ForeignPtr’
+    In the definition of data constructor ‘Foo’
+    In the data declaration for ‘Foo’

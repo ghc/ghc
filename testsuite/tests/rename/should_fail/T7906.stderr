@@ -1,4 +1,4 @@
 
 T7906.hs:5:16:
-    The INLINABLE pragma for ‛foo’ lacks an accompanying binding
+    The INLINABLE pragma for ‘foo’ lacks an accompanying binding
       (You cannot give a INLINABLE pragma for a record selector or class method)

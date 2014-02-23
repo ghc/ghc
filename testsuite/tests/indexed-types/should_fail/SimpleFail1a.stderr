@@ -1,4 +1,4 @@
 
 SimpleFail1a.hs:4:1:
-    Couldn't match kind ‛* -> *’ against ‛*’
-    In the data instance declaration for ‛T1’
+    Couldn't match kind ‘* -> *’ against ‘*’
+    In the data instance declaration for ‘T1’

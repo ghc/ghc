@@ -1,5 +1,5 @@
 
 tc115.hs:12:10: Warning:
     No explicit implementation for
-      ‛foo’
-    In the instance declaration for ‛Foo [m a] (m a)’
+      ‘foo’
+    In the instance declaration for ‘Foo [m a] (m a)’

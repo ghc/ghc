@@ -1,6 +1,6 @@
 
 T3811d.hs:6:11:
-    Unexpected type ‛D Char’
-    In the class declaration for ‛C’
+    Unexpected type ‘D Char’
+    In the class declaration for ‘C’
     A class declaration should have form
       class C a b c where ...

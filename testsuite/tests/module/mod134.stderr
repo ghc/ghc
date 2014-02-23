@@ -1,7 +1,7 @@
 
 mod134.hs:6:19:
-    Not in scope: ‛Prelude.head’
+    Not in scope: ‘Prelude.head’
     Perhaps you meant one of these:
-      ‛Prelude.read’ (imported from Prelude),
-      ‛Prelude.reads’ (imported from Prelude),
-      ‛Prelude.snd’ (imported from Prelude)
+      ‘Prelude.read’ (imported from Prelude),
+      ‘Prelude.reads’ (imported from Prelude),
+      ‘Prelude.snd’ (imported from Prelude)

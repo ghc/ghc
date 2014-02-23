@@ -1,6 +1,6 @@
 
 readFail025.hs:5:8:
-    Unexpected type ‛String’
-    In the data declaration for ‛T’
+    Unexpected type ‘String’
+    In the data declaration for ‘T’
     A data declaration should have form
       data T a b c = ...

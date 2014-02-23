@@ -7,7 +7,7 @@ T4179.hs:26:16:
                  fCon :: (Functor x, DoC (FCon x)) =>
                          Con x -> A2 (FCon x) -> A3 (FCon x)
       at T4179.hs:25:9-72
-    NB: ‛A3’ is a type function, and may not be injective
+    NB: ‘A3’ is a type function, and may not be injective
     Expected type: x (A2 (FCon x) -> A3 (FCon x))
                    -> A2 (FCon x) -> A3 (FCon x)
       Actual type: x (A2 (FCon x) -> A3 (FCon x))
@@ -16,5 +16,5 @@ T4179.hs:26:16:
     Relevant bindings include
       fCon :: Con x -> A2 (FCon x) -> A3 (FCon x)
         (bound at T4179.hs:26:1)
-    In the first argument of ‛foldDoC’, namely ‛op’
+    In the first argument of ‘foldDoC’, namely ‘op’
     In the expression: foldDoC op

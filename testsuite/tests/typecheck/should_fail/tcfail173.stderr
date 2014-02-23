@@ -1,4 +1,4 @@
 
 tcfail173.hs:5:12:
-    Illegal declaration of a type or class operator ‛<.>’
+    Illegal declaration of a type or class operator ‘<.>’
       Use TypeOperators to declare operators in type and declarations

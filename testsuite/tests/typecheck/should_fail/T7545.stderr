@@ -2,4 +2,4 @@
 T7545.hs:8:9:
     Method signature does not match class; it should be
       f :: forall b1. (a -> b) -> b1
-    In the instance declaration for ‛C (a -> b)’
+    In the instance declaration for ‘C (a -> b)’

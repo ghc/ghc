@@ -1,10 +1,10 @@
 
 T3092.hs:5:1:
-    Illegal family instance for ‛T’
+    Illegal family instance for ‘T’
       (T is not an indexed type family)
-    In the data instance declaration for ‛T’
+    In the data instance declaration for ‘T’
 
 T3092.hs:8:1:
-    Illegal family instance for ‛S’
+    Illegal family instance for ‘S’
       (S is not an indexed type family)
-    In the type instance declaration for ‛S’
+    In the type instance declaration for ‘S’

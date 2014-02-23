@@ -1,4 +1,4 @@
 
 tcfail215.hs:8:15:
-    Expecting a lifted type, but ‛Int#’ is unlifted
-    In the type signature for ‛foo’: foo :: ?x :: Int# => Int
+    Expecting a lifted type, but ‘Int#’ is unlifted
+    In the type signature for ‘foo’: foo :: ?x :: Int# => Int

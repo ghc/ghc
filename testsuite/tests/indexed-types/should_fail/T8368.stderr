@@ -1,6 +1,6 @@
 
 T8368.hs:9:3:
-    Data constructor ‛MkFam’ returns type ‛Foo’
-      instead of an instance of its parent type ‛Fam a’
-    In the definition of data constructor ‛MkFam’
-    In the data instance declaration for ‛Fam’
+    Data constructor ‘MkFam’ returns type ‘Foo’
+      instead of an instance of its parent type ‘Fam a’
+    In the definition of data constructor ‘MkFam’
+    In the data instance declaration for ‘Fam’

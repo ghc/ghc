@@ -1,6 +1,6 @@
 
 overloadedlistsfail03.hs:3:27:
-    Couldn't match expected type ‛Char’ with actual type ‛[Char]’
+    Couldn't match expected type ‘Char’ with actual type ‘[Char]’
     In the expression: "b"
-    In the first argument of ‛length’, namely ‛['a', "b"]’
-    In the first argument of ‛print’, namely ‛(length ['a', "b"])’
+    In the first argument of ‘length’, namely ‘['a', "b"]’
+    In the first argument of ‘print’, namely ‘(length ['a', "b"])’

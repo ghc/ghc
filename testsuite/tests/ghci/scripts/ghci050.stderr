@@ -1,8 +1,8 @@
 
 <interactive>:6:49:
-    Couldn't match expected type ‛ListableElem (a, a)’
-                with actual type ‛a’
-      ‛a’ is a rigid type variable bound by
+    Couldn't match expected type ‘ListableElem (a, a)’
+                with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
           the instance declaration at <interactive>:6:10
     Relevant bindings include
       b :: a (bound at <interactive>:6:43)

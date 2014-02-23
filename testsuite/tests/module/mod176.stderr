@@ -1,4 +1,4 @@
 
 mod176.hs:4:1: Warning:
-    The import of ‛return, Monad’
-    from module ‛Control.Monad’ is redundant
+    The import of ‘return, Monad’
+    from module ‘Control.Monad’ is redundant

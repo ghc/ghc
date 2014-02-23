@@ -1,2 +1,2 @@
 
-mod123.hs:5:6: Not in scope: type constructor or class ‛T’
+mod123.hs:5:6: Not in scope: type constructor or class ‘T’

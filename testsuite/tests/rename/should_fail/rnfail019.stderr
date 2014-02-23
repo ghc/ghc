@@ -1,6 +1,6 @@
 
 rnfail019.hs:5:9:
-    The operator ‛:’ [infixr 5] of a section
+    The operator ‘:’ [infixr 5] of a section
         must have lower precedence than that of the operand,
-          namely ‛:’ [infixr 5]
-        in the section: ‛x : y :’
+          namely ‘:’ [infixr 5]
+        in the section: ‘x : y :’

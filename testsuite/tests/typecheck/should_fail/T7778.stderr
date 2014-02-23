@@ -1,5 +1,5 @@
 
 T7778.hs:3:19:
-    Expecting one more argument to ‛Num’
-    Expected a type, but ‛Num’ has kind ‛* -> Constraint’
-    In the type signature for ‛v’: v :: (Num Int => Num) () => ()
+    Expecting one more argument to ‘Num’
+    Expected a type, but ‘Num’ has kind ‘* -> Constraint’
+    In the type signature for ‘v’: v :: (Num Int => Num) () => ()

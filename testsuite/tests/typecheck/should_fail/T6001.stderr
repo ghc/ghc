@@ -2,4 +2,4 @@
 T6001.hs:8:18:
     Method signature does not match class; it should be
       fromInteger :: Integer -> DayKind
-    In the instance declaration for ‛Num DayKind’
+    In the instance declaration for ‘Num DayKind’

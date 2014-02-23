@@ -16,11 +16,11 @@ drvfail-foldable-traversable1.hs:13:22:
     When deriving the instance for (Traversable Trivial2)
 
 drvfail-foldable-traversable1.hs:17:22:
-    Can't make a derived instance of ‛Foldable Infinite’:
-      Constructor ‛Infinite’ must not contain function types
-    In the data declaration for ‛Infinite’
+    Can't make a derived instance of ‘Foldable Infinite’:
+      Constructor ‘Infinite’ must not contain function types
+    In the data declaration for ‘Infinite’
 
 drvfail-foldable-traversable1.hs:21:22:
-    Can't make a derived instance of ‛Traversable (Cont r)’:
-      Constructor ‛Cont’ must not contain function types
-    In the data declaration for ‛Cont’
+    Can't make a derived instance of ‘Traversable (Cont r)’:
+      Constructor ‘Cont’ must not contain function types
+    In the data declaration for ‘Cont’

@@ -1,4 +1,4 @@
 
 mod61.hs:3:11:
     Precedence parsing error
-        cannot mix ‛==’ [infix 4] and ‛==’ [infix 4] in the same infix expression
+        cannot mix ‘==’ [infix 4] and ‘==’ [infix 4] in the same infix expression

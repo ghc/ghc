@@ -1,5 +1,5 @@
 
 tcfail114.hs:11:20:
-    ‛foo’ is not a record selector
+    ‘foo’ is not a record selector
     In the expression: undefined {foo = ()}
-    In an equation for ‛test’: test = undefined {foo = ()}
+    In an equation for ‘test’: test = undefined {foo = ()}

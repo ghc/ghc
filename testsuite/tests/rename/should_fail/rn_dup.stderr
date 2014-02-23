@@ -1,22 +1,22 @@
 
 rn_dup.hs:9:10:
-    Multiple declarations of ‛MkT’
+    Multiple declarations of ‘MkT’
     Declared at: rn_dup.hs:7:10
                  rn_dup.hs:7:16
                  rn_dup.hs:9:10
 
 rn_dup.hs:12:16:
-    Multiple declarations of ‛rf’
+    Multiple declarations of ‘rf’
     Declared at: rn_dup.hs:11:16
                  rn_dup.hs:11:27
                  rn_dup.hs:12:16
 
 rn_dup.hs:17:3:
-    Multiple declarations of ‛CT’
+    Multiple declarations of ‘CT’
     Declared at: rn_dup.hs:15:3
                  rn_dup.hs:17:3
 
 rn_dup.hs:18:3:
-    Multiple declarations of ‛f’
+    Multiple declarations of ‘f’
     Declared at: rn_dup.hs:16:3
                  rn_dup.hs:18:3

@@ -1,5 +1,5 @@
 
 T5686.hs:4:29:
-    Can't make a derived instance of ‛Functor U’:
-      Constructor ‛U’ must use the type variable only as the last argument of a data type
-    In the data declaration for ‛U’
+    Can't make a derived instance of ‘Functor U’:
+      Constructor ‘U’ must use the type variable only as the last argument of a data type
+    In the data declaration for ‘U’

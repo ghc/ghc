@@ -1,6 +1,6 @@
 
 tcfail185.hs:7:46:
-    Couldn't match expected type ‛Int -> Int’ with actual type ‛Bool’
+    Couldn't match expected type ‘Int -> Int’ with actual type ‘Bool’
     In the expression: x
     In the expression:
       let

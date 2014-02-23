@@ -1,5 +1,5 @@
 
 tcfail187.hs:7:6:
-    Constructor ‛:::’ should have no arguments, but has been given 2
+    Constructor ‘:::’ should have no arguments, but has been given 2
     In the pattern: x ::: y
-    In an equation for ‛foo’: foo (x ::: y) = ()
+    In an equation for ‘foo’: foo (x ::: y) = ()

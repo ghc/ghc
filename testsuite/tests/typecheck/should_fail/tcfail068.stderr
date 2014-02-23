@@ -5,10 +5,10 @@ tcfail068.hs:14:9:
       bound by the type signature for
                  itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
       at tcfail068.hs:11:10-55
-      ‛s1’ is a rigid type variable bound by
+      ‘s1’ is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:13:9
-      ‛s’ is a rigid type variable bound by
+      ‘s’ is a rigid type variable bound by
           the type signature for
             itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
           at tcfail068.hs:11:10
@@ -17,8 +17,8 @@ tcfail068.hs:14:9:
     Relevant bindings include
       itgen :: (Int, Int) -> a -> IndTree s a
         (bound at tcfail068.hs:12:1)
-    In the first argument of ‛runST’, namely
-      ‛(newSTArray ((1, 1), n) x)’
+    In the first argument of ‘runST’, namely
+      ‘(newSTArray ((1, 1), n) x)’
     In the expression: runST (newSTArray ((1, 1), n) x)
 
 tcfail068.hs:19:21:
@@ -28,12 +28,12 @@ tcfail068.hs:19:21:
                  itiap :: Constructed a =>
                           (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
       at tcfail068.hs:16:10-75
-      ‛s’ is a rigid type variable bound by
+      ‘s’ is a rigid type variable bound by
           the type signature for
             itiap :: Constructed a =>
                      (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
           at tcfail068.hs:16:10
-      ‛s1’ is a rigid type variable bound by
+      ‘s1’ is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:18:9
     Expected type: STArray s1 (Int, Int) a
@@ -42,8 +42,8 @@ tcfail068.hs:19:21:
       arr :: IndTree s a (bound at tcfail068.hs:17:11)
       itiap :: (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:17:1)
-    In the first argument of ‛readSTArray’, namely ‛arr’
-    In the first argument of ‛(>>=)’, namely ‛readSTArray arr i’
+    In the first argument of ‘readSTArray’, namely ‘arr’
+    In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
 
 tcfail068.hs:24:35:
     Could not deduce (s ~ s1)
@@ -52,12 +52,12 @@ tcfail068.hs:24:35:
                  itrap :: Constructed a =>
                           ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
       at tcfail068.hs:23:10-87
-      ‛s’ is a rigid type variable bound by
+      ‘s’ is a rigid type variable bound by
           the type signature for
             itrap :: Constructed a =>
                      ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
           at tcfail068.hs:23:10
-      ‛s1’ is a rigid type variable bound by
+      ‘s1’ is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:24:29
     Expected type: GHC.ST.ST s1 (IndTree s a)
@@ -71,7 +71,7 @@ tcfail068.hs:24:35:
       itrap :: ((Int, Int), (Int, Int))
                -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:24:1)
-    In the first argument of ‛runST’, namely ‛(itrap' i k)’
+    In the first argument of ‘runST’, namely ‘(itrap' i k)’
     In the expression: runST (itrap' i k)
 
 tcfail068.hs:36:46:
@@ -87,7 +87,7 @@ tcfail068.hs:36:46:
                                -> IndTree s b
                                -> (c, IndTree s b)
       at tcfail068.hs:(34,15)-(35,62)
-      ‛s’ is a rigid type variable bound by
+      ‘s’ is a rigid type variable bound by
           the type signature for
             itrapstate :: Constructed b =>
                           ((Int, Int), (Int, Int))
@@ -98,7 +98,7 @@ tcfail068.hs:36:46:
                           -> IndTree s b
                           -> (c, IndTree s b)
           at tcfail068.hs:34:15
-      ‛s1’ is a rigid type variable bound by
+      ‘s1’ is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (c, IndTree s b)
            at tcfail068.hs:36:40
     Expected type: GHC.ST.ST s1 (c, IndTree s b)
@@ -117,5 +117,5 @@ tcfail068.hs:36:46:
                     -> IndTree s b
                     -> (c, IndTree s b)
         (bound at tcfail068.hs:36:1)
-    In the first argument of ‛runST’, namely ‛(itrapstate' i k s)’
+    In the first argument of ‘runST’, namely ‘(itrapstate' i k s)’
     In the expression: runST (itrapstate' i k s)

@@ -4,4 +4,4 @@ tcfail108.hs:7:10:
     (Use FlexibleContexts to permit this)
     In the context: (Eq (f (Rec f)))
     While checking an instance declaration
-    In the instance declaration for ‛Eq (Rec f)’
+    In the instance declaration for ‘Eq (Rec f)’
