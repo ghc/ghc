@@ -325,7 +325,7 @@ ppContext cxt unicode qual = ppContextNoLocs (map unLoc cxt) unicode qual
 
 ppHsContext :: [HsType DocName] -> Bool -> Qualification-> Html
 ppHsContext []  _       _     = noHtml
-ppHsContext [p] unicode qual = ppType unicode qual p
+ppHsContext [p] unicode qual = ppCtxType unicode qual p
 ppHsContext cxt unicode qual = parenList (map (ppType unicode qual) cxt)
 
 
@@ -669,14 +669,16 @@ tupleParens _              = parenList
 --------------------------------------------------------------------------------
 
 
-pREC_TOP, pREC_FUN, pREC_OP, pREC_CON :: Int
+pREC_TOP, pREC_CTX, pREC_FUN, pREC_OP, pREC_CON :: Int
 
 pREC_TOP = 0 :: Int   -- type in ParseIface.y in GHC
-pREC_FUN = 1 :: Int   -- btype in ParseIface.y in GHC
+pREC_CTX = 1 :: Int   -- Used for single contexts, eg. ctx => type
+                      -- (as opposed to (ctx1, ctx2) => type)
+pREC_FUN = 2 :: Int   -- btype in ParseIface.y in GHC
                       -- Used for LH arg of (->)
-pREC_OP  = 2 :: Int   -- Used for arg of any infix operator
+pREC_OP  = 3 :: Int   -- Used for arg of any infix operator
                       -- (we don't keep their fixities around)
-pREC_CON = 3 :: Int   -- Used for arg of type applicn:
+pREC_CON = 4 :: Int   -- Used for arg of type applicn:
                       -- always parenthesise unless atomic
 
 maybeParen :: Int           -- Precedence of context
@@ -693,8 +695,10 @@ ppLParendType unicode qual y = ppParendType unicode qual (unLoc y)
 ppLFunLhType  unicode qual y = ppFunLhType unicode qual (unLoc y)
 
 
-ppType, ppParendType, ppFunLhType :: Bool -> Qualification-> HsType DocName -> Html
+ppType, ppCtxType, ppParendType, ppFunLhType :: Bool -> Qualification
+                                             -> HsType DocName -> Html
 ppType       unicode qual ty = ppr_mono_ty pREC_TOP ty unicode qual
+ppCtxType    unicode qual ty = ppr_mono_ty pREC_CTX ty unicode qual
 ppParendType unicode qual ty = ppr_mono_ty pREC_CON ty unicode qual
 ppFunLhType  unicode qual ty = ppr_mono_ty pREC_FUN ty unicode qual
 
@@ -735,7 +739,8 @@ ppr_mono_ty _         (HsKindSig ty kind) u q =
     parens (ppr_mono_lty pREC_TOP ty u q <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TOP ty u q)
-ppr_mono_ty _         (HsIParamTy n ty)   u q = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q)
+ppr_mono_ty ctxt_prec (HsIParamTy n ty)   u q =
+    maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
 ppr_mono_ty _         (HsRecTy {})        _ _ = error "ppr_mono_ty HsRecTy"

@@ -46,7 +46,7 @@ ppRdrName :: RdrName -> Html
 ppRdrName = ppOccName . rdrNameOcc
 
 ppIPName :: HsIPName -> Html
-ppIPName = toHtml . unpackFS . hsIPNameFS
+ppIPName = toHtml . ('?':) . unpackFS . hsIPNameFS
 
 
 ppUncheckedLink :: Qualification -> (ModuleName, OccName) -> Html
