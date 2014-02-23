@@ -1,6 +1,6 @@
 
 ds022.hs:20:1: Warning:
     Pattern match(es) are overlapped
-    In an equation for ‛i’:
+    In an equation for ‘i’:
         i 1 0.011e2 = ...
         i 2 2.20000 = ...

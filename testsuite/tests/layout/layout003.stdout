@@ -1,7 +1,7 @@
 Running with -XNoAlternativeLayoutRule
 Running with -XAlternativeLayoutRule
 
-layout003.hs:11:4: parse error on input ‛|’
+layout003.hs:11:4: parse error on input ‘|’
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
 
 layout003.hs:11:4: Warning:

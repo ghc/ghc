@@ -1,6 +1,6 @@
 
 <interactive>:3:68:
-    Multiple declarations of ‛f’
+    Multiple declarations of ‘f’
     Declared at: <interactive>:3:32
                  <interactive>:3:68
     In the Template Haskell quotation

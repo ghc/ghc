@@ -2,4 +2,4 @@
 tcfail073.hs:8:10:
     Duplicate instance declarations:
       instance Eq a => Eq (a, b) -- Defined at tcfail073.hs:8:10
-      instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‛GHC.Classes’
+      instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’

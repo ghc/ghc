@@ -1,5 +1,5 @@
 
 T7164.hs:8:1:
-    Multiple declarations of ‛derp’
+    Multiple declarations of ‘derp’
     Declared at: T7164.hs:5:5
                  T7164.hs:8:1

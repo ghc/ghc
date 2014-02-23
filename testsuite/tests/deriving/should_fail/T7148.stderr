@@ -1,23 +1,23 @@
 
 T7148.hs:27:40:
-    Could not coerce from ‛SameType b1 b’ to ‛SameType b1 (Tagged a b)’
-      because the second type argument of ‛SameType’ has role Nominal,
-      but the arguments ‛b’ and ‛Tagged a b’ differ
-      arising from the coercion of the method ‛iso2’ from type
-                   ‛forall b. SameType b () -> SameType b b’ to type
-                   ‛forall b. SameType b () -> SameType b (Tagged a b)’
+    Could not coerce from ‘SameType b1 b’ to ‘SameType b1 (Tagged a b)’
+      because the second type argument of ‘SameType’ has role Nominal,
+      but the arguments ‘b’ and ‘Tagged a b’ differ
+      arising from the coercion of the method ‘iso2’ from type
+                   ‘forall b. SameType b () -> SameType b b’ to type
+                   ‘forall b. SameType b () -> SameType b (Tagged a b)’
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself
     When deriving the instance for (IsoUnit (Tagged a b))
 
 T7148.hs:27:40:
-    Could not coerce from ‛SameType b b1’ to ‛SameType (Tagged a b) b1’
-      because the first type argument of ‛SameType’ has role Nominal,
-      but the arguments ‛b’ and ‛Tagged a b’ differ
-      arising from the coercion of the method ‛iso1’ from type
-                   ‛forall b. SameType () b -> SameType b b’ to type
-                   ‛forall b. SameType () b -> SameType (Tagged a b) b’
+    Could not coerce from ‘SameType b b1’ to ‘SameType (Tagged a b) b1’
+      because the first type argument of ‘SameType’ has role Nominal,
+      but the arguments ‘b’ and ‘Tagged a b’ differ
+      arising from the coercion of the method ‘iso1’ from type
+                   ‘forall b. SameType () b -> SameType b b’ to type
+                   ‘forall b. SameType () b -> SameType (Tagged a b) b’
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself

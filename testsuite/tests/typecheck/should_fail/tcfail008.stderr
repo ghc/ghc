@@ -1,20 +1,20 @@
 
 tcfail008.hs:3:5:
-    No instance for (Num a0) arising from the literal ‛1’
-    The type variable ‛a0’ is ambiguous
+    No instance for (Num a0) arising from the literal ‘1’
+    The type variable ‘a0’ is ambiguous
     Relevant bindings include o :: [a0] (bound at tcfail008.hs:3:1)
     Note: there are several potential instances:
-      instance Num Double -- Defined in ‛GHC.Float’
-      instance Num Float -- Defined in ‛GHC.Float’
+      instance Num Double -- Defined in ‘GHC.Float’
+      instance Num Float -- Defined in ‘GHC.Float’
       instance Integral a => Num (GHC.Real.Ratio a)
-        -- Defined in ‛GHC.Real’
+        -- Defined in ‘GHC.Real’
       ...plus three others
-    In the first argument of ‛(:)’, namely ‛1’
+    In the first argument of ‘(:)’, namely ‘1’
     In the expression: 1 : 2
-    In an equation for ‛o’: o = 1 : 2
+    In an equation for ‘o’: o = 1 : 2
 
 tcfail008.hs:3:7:
-    No instance for (Num [a0]) arising from the literal ‛2’
-    In the second argument of ‛(:)’, namely ‛2’
+    No instance for (Num [a0]) arising from the literal ‘2’
+    In the second argument of ‘(:)’, namely ‘2’
     In the expression: 1 : 2
-    In an equation for ‛o’: o = 1 : 2
+    In an equation for ‘o’: o = 1 : 2

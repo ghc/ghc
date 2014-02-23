@@ -1,7 +1,7 @@
 
 gadt10.hs:6:24:
-    Expecting one more argument to ‛RInt’
-    Expected kind ‛*’, but ‛RInt’ has kind ‛k0 -> *’
-    In the type ‛RInt’
-    In the definition of data constructor ‛R’
-    In the data declaration for ‛RInt’
+    Expecting one more argument to ‘RInt’
+    Expected kind ‘*’, but ‘RInt’ has kind ‘k0 -> *’
+    In the type ‘RInt’
+    In the definition of data constructor ‘R’
+    In the data declaration for ‘RInt’

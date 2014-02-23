@@ -1,4 +1,4 @@
 
 GadtOverlap.hs:19:1: Warning:
     Pattern match(es) are non-exhaustive
-    In an equation for ‛h’: Patterns not matched: T3
+    In an equation for ‘h’: Patterns not matched: T3

@@ -1,4 +1,4 @@
 
 tcfail078.hs:5:6:
-    ‛Integer’ is applied to too many type arguments
-    In the type signature for ‛f’: f :: Integer i => i
+    ‘Integer’ is applied to too many type arguments
+    In the type signature for ‘f’: f :: Integer i => i

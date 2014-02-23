@@ -1,2 +1,2 @@
 
-T8448.hs:5:21: ‛r’ is not a (visible) field of constructor ‛[]’
+T8448.hs:5:21: ‘r’ is not a (visible) field of constructor ‘[]’

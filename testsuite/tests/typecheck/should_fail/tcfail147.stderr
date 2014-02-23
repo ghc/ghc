@@ -1,7 +1,7 @@
 
 tcfail147.hs:7:19:
-    Expecting one more argument to ‛XClass’
-    Expected a type, but ‛XClass’ has kind ‛k0 -> Constraint’
-    In the type ‛XClass’
-    In the definition of data constructor ‛XCon’
-    In the data declaration for ‛XData’
+    Expecting one more argument to ‘XClass’
+    Expected a type, but ‘XClass’ has kind ‘k0 -> Constraint’
+    In the type ‘XClass’
+    In the definition of data constructor ‘XCon’
+    In the data declaration for ‘XData’

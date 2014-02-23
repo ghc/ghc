@@ -1,7 +1,7 @@
 
 T7453.hs:10:30:
-    Couldn't match expected type ‛t1’ with actual type ‛t’
-      because type variable ‛t1’ would escape its scope
+    Couldn't match expected type ‘t1’ with actual type ‘t’
+      because type variable ‘t1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for z :: Id t1
       at T7453.hs:8:16-19
@@ -10,12 +10,12 @@ T7453.hs:10:30:
       z :: Id t1 (bound at T7453.hs:9:11)
       v :: t (bound at T7453.hs:7:7)
       cast1 :: t -> a (bound at T7453.hs:7:1)
-    In the first argument of ‛Id’, namely ‛v’
+    In the first argument of ‘Id’, namely ‘v’
     In the expression: Id v
 
 T7453.hs:16:33:
-    Couldn't match expected type ‛t2’ with actual type ‛t’
-      because type variable ‛t2’ would escape its scope
+    Couldn't match expected type ‘t2’ with actual type ‘t’
+      because type variable ‘t2’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for z :: () -> t2
       at T7453.hs:14:16-22
@@ -24,12 +24,12 @@ T7453.hs:16:33:
       z :: () -> t2 (bound at T7453.hs:15:11)
       v :: t (bound at T7453.hs:13:7)
       cast2 :: t -> t1 (bound at T7453.hs:13:1)
-    In the first argument of ‛const’, namely ‛v’
+    In the first argument of ‘const’, namely ‘v’
     In the expression: const v
 
 T7453.hs:21:15:
-    Couldn't match expected type ‛t1’ with actual type ‛a’
-      because type variable ‛t1’ would escape its scope
+    Couldn't match expected type ‘t1’ with actual type ‘a’
+      because type variable ‘t1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for z :: t1
       at T7453.hs:20:16
@@ -39,7 +39,7 @@ T7453.hs:21:15:
       v :: a (bound at T7453.hs:19:7)
       cast3 :: a -> t (bound at T7453.hs:19:1)
     In the expression: v
-    In an equation for ‛z’:
+    In an equation for ‘z’:
         z = v
           where
               aux = const v

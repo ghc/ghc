@@ -1,5 +1,5 @@
 
 tcfail058.hs:6:7:
-    Expecting one more argument to ‛Array a’
-    Expected a constraint, but ‛Array a’ has kind ‛* -> *’
-    In the type signature for ‛f’: f :: Array a => a -> b
+    Expecting one more argument to ‘Array a’
+    Expected a constraint, but ‘Array a’ has kind ‘* -> *’
+    In the type signature for ‘f’: f :: Array a => a -> b

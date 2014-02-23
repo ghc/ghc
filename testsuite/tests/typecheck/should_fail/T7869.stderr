@@ -1,7 +1,7 @@
 
 T7869.hs:3:12:
-    Couldn't match type ‛a’ with ‛a1’
-      because type variable ‛a1’ would escape its scope
+    Couldn't match type ‘a’ with ‘a1’
+      because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       an expression type signature: [a1] -> b1
       at T7869.hs:3:5-27
@@ -12,11 +12,11 @@ T7869.hs:3:12:
       f :: [a] -> b (bound at T7869.hs:3:1)
     In the expression: f x
     In the expression: (\ x -> f x) :: [a] -> b
-    In an equation for ‛f’: f = (\ x -> f x) :: [a] -> b
+    In an equation for ‘f’: f = (\ x -> f x) :: [a] -> b
 
 T7869.hs:3:12:
-    Couldn't match type ‛b’ with ‛b1’
-      because type variable ‛b1’ would escape its scope
+    Couldn't match type ‘b’ with ‘b1’
+      because type variable ‘b1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       an expression type signature: [a1] -> b1
       at T7869.hs:3:5-27
@@ -25,4 +25,4 @@ T7869.hs:3:12:
     Relevant bindings include f :: [a] -> b (bound at T7869.hs:3:1)
     In the expression: f x
     In the expression: (\ x -> f x) :: [a] -> b
-    In an equation for ‛f’: f = (\ x -> f x) :: [a] -> b
+    In an equation for ‘f’: f = (\ x -> f x) :: [a] -> b

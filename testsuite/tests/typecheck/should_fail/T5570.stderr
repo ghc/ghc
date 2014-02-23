@@ -3,6 +3,6 @@ T5570.hs:7:16:
     Kind incompatibility when matching types:
       s0 :: *
       Double# :: #
-    In the second argument of ‛($)’, namely ‛D# $ 3.0##’
+    In the second argument of ‘($)’, namely ‘D# $ 3.0##’
     In the expression: print $ D# $ 3.0##
-    In an equation for ‛main’: main = print $ D# $ 3.0##
+    In an equation for ‘main’: main = print $ D# $ 3.0##

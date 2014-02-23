@@ -1,8 +1,8 @@
 
 T8806.hs:5:6:
-    Expected a constraint, but ‛Int’ has kind ‛*’
-    In the type signature for ‛f’: f :: Int => Int
+    Expected a constraint, but ‘Int’ has kind ‘*’
+    In the type signature for ‘f’: f :: Int => Int
 
 T8806.hs:8:7:
-    Expected a constraint, but ‛Int’ has kind ‛*’
-    In the type signature for ‛g’: g :: Int => Show a => Int
+    Expected a constraint, but ‘Int’ has kind ‘*’
+    In the type signature for ‘g’: g :: Int => Show a => Int

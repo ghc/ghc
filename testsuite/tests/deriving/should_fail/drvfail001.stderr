@@ -1,7 +1,7 @@
 
 drvfail001.hs:16:33:
     No instance for (Show (f (f a)))
-      arising from the first field of ‛ZeroS’ (type ‛f (f a)’)
+      arising from the first field of ‘ZeroS’ (type ‘f (f a)’)
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself

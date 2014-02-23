@@ -1,6 +1,6 @@
 
 readFail039.hs:8:14:
-    Can't make a derived instance of ‛C Foo’:
-      ‛C’ is not a derivable class
+    Can't make a derived instance of ‘C Foo’:
+      ‘C’ is not a derivable class
       Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
-    In the newtype declaration for ‛Foo’
+    In the newtype declaration for ‘Foo’

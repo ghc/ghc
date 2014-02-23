@@ -1,6 +1,6 @@
 
 T8570.hs:6:18:
-    Constructor ‛Image’ does not have field ‛filepath’
+    Constructor ‘Image’ does not have field ‘filepath’
     In the pattern: Image {filepath = x}
     In a pattern binding: Image {filepath = x} = logo
     In the expression: let Image {filepath = x} = logo in x

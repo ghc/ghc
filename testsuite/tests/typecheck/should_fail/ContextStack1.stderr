@@ -4,4 +4,4 @@ ContextStack1.hs:10:5:
     Use -fcontext-stack=N to increase stack size to N
       Cls [[[[[[[[[[[()]]]]]]]]]]]
     In the expression: meth
-    In an equation for ‛t’: t = meth
+    In an equation for ‘t’: t = meth

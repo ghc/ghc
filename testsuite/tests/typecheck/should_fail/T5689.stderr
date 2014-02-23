@@ -1,6 +1,6 @@
 
 T5689.hs:10:36:
-    Couldn't match expected type ‛Bool’ with actual type ‛t’
+    Couldn't match expected type ‘Bool’ with actual type ‘t’
     Relevant bindings include
       v :: t (bound at T5689.hs:10:28)
       r :: IORef (t -> t) (bound at T5689.hs:7:14)
@@ -8,7 +8,7 @@ T5689.hs:10:36:
     In the expression: if v then False else True
 
 T5689.hs:10:43:
-    Couldn't match expected type ‛t’ with actual type ‛Bool’
+    Couldn't match expected type ‘t’ with actual type ‘Bool’
     Relevant bindings include
       v :: t (bound at T5689.hs:10:28)
       r :: IORef (t -> t) (bound at T5689.hs:7:14)
@@ -16,7 +16,7 @@ T5689.hs:10:43:
     In the expression: if v then False else True
 
 T5689.hs:10:54:
-    Couldn't match expected type ‛t’ with actual type ‛Bool’
+    Couldn't match expected type ‘t’ with actual type ‘Bool’
     Relevant bindings include
       v :: t (bound at T5689.hs:10:28)
       r :: IORef (t -> t) (bound at T5689.hs:7:14)
@@ -24,9 +24,9 @@ T5689.hs:10:54:
     In the expression: if v then False else True
 
 T5689.hs:14:23:
-    Couldn't match expected type ‛t’ with actual type ‛Bool’
+    Couldn't match expected type ‘t’ with actual type ‘Bool’
     Relevant bindings include
       c :: t -> t (bound at T5689.hs:12:13)
       r :: IORef (t -> t) (bound at T5689.hs:7:14)
-    In the first argument of ‛c’, namely ‛True’
-    In the second argument of ‛($)’, namely ‛c True’
+    In the first argument of ‘c’, namely ‘True’
+    In the second argument of ‘($)’, namely ‘c True’

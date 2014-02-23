@@ -1,2 +1,2 @@
 
-mod49.hs:5:3: ‛y’ is not a (visible) method of class ‛C’
+mod49.hs:5:3: ‘y’ is not a (visible) method of class ‘C’

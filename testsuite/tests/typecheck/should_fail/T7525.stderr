@@ -1,9 +1,9 @@
 
 T7525.hs:5:30:
     Could not deduce (?b::Bool)
-      arising from a use of implicit parameter ‛?b’
+      arising from a use of implicit parameter ‘?b’
     from the context (?a::Bool)
       bound by the implicit-parameter bindings for ?a at T7525.hs:5:7-31
-    In the second argument of ‛(&&)’, namely ‛?b’
+    In the second argument of ‘(&&)’, namely ‘?b’
     In the expression: ?a && ?b
     In the expression: let ?a = True in ?a && ?b

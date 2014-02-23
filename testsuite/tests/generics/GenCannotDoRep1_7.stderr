@@ -1,6 +1,6 @@
 
 GenCannotDoRep1_7.hs:9:32:
-    Can't make a derived instance of ‛Generic1 I’:
-      Constructor ‛I’ applies a type to an argument involving the last parameter
+    Can't make a derived instance of ‘Generic1 I’:
+      Constructor ‘I’ applies a type to an argument involving the last parameter
                       but the applied type is not of kind * -> *
-    In the data declaration for ‛I’
+    In the data declaration for ‘I’

@@ -1,54 +1,54 @@
 
 WarnMinimal.hs:16:10: Warning:
     No explicit implementation for
-      either ‛foo1’ or ‛foo2’
-    In the instance declaration for ‛Foo Int’
+      either ‘foo1’ or ‘foo2’
+    In the instance declaration for ‘Foo Int’
 
 WarnMinimal.hs:60:10: Warning:
     No explicit implementation for
-      either ‛join'’ or ‛bind'’
-    In the instance declaration for ‛Monad' ((->) e)’
+      either ‘join'’ or ‘bind'’
+    In the instance declaration for ‘Monad' ((->) e)’
 
 WarnMinimal.hs:66:10: Warning:
     No explicit implementation for
-      ‛return'’
-    In the instance declaration for ‛Monad' Id’
+      ‘return'’
+    In the instance declaration for ‘Monad' Id’
 
 WarnMinimal.hs:72:10: Warning:
     No explicit implementation for
-      ‛return'’
-    In the instance declaration for ‛Monad' Id2’
+      ‘return'’
+    In the instance declaration for ‘Monad' Id2’
 
 WarnMinimal.hs:79:10: Warning:
     No explicit implementation for
-      ‛return'’ and (either (‛fmap'’ and ‛join'’) or ‛bind'’)
-    In the instance declaration for ‛Monad' Id3’
+      ‘return'’ and (either (‘fmap'’ and ‘join'’) or ‘bind'’)
+    In the instance declaration for ‘Monad' Id3’
 
 WarnMinimal.hs:84:1: Warning:
     The MINIMAL pragma does not require:
-      ‛cheater’
+      ‘cheater’
     but there is no default implementation.
-    In the class declaration for ‛Cheater’
+    In the class declaration for ‘Cheater’
 
 WarnMinimal.hs:92:1: Warning:
     The MINIMAL pragma does not require:
-      ‛cheater3b’
+      ‘cheater3b’
     but there is no default implementation.
-    In the class declaration for ‛Cheater3’
+    In the class declaration for ‘Cheater3’
 
 WarnMinimal.hs:99:10: Warning:
     No explicit implementation for
-      ‛+’, ‛*’, ‛abs’, ‛signum’, ‛fromInteger’, and (either ‛negate’
+      ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
                                                             or
-                                                            ‛-’)
-    In the instance declaration for ‛Num Bool’
+                                                            ‘-’)
+    In the instance declaration for ‘Num Bool’
 
 WarnMinimal.hs:105:10: Warning:
     No explicit implementation for
-      ‛needed’
-    In the instance declaration for ‛NoExplicit Int’
+      ‘needed’
+    In the instance declaration for ‘NoExplicit Int’
 
 WarnMinimal.hs:116:10: Warning:
     No explicit implementation for
-      either ‛===’ or ‛/==’
-    In the instance declaration for ‛Eq' Blarg’
+      either ‘===’ or ‘/==’
+    In the instance declaration for ‘Eq' Blarg’

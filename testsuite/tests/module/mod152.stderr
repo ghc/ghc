@@ -1,14 +1,14 @@
 
 mod152.hs:2:26:
-    Ambiguous occurrence ‛id’
-    It could refer to either ‛M.id’, defined at mod152.hs:2:36
-                          or ‛Prelude.id’,
-                             imported from ‛Prelude’ at mod152.hs:2:8
-                             (and originally defined in ‛GHC.Base’)
+    Ambiguous occurrence ‘id’
+    It could refer to either ‘M.id’, defined at mod152.hs:2:36
+                          or ‘Prelude.id’,
+                             imported from ‘Prelude’ at mod152.hs:2:8
+                             (and originally defined in ‘GHC.Base’)
 
 mod152.hs:2:26:
-    Conflicting exports for ‛id’:
-       ‛module Prelude’ exports ‛Prelude.id’
-         imported from ‛Prelude’ at mod152.hs:2:8
-         (and originally defined in ‛GHC.Base’)
-       ‛id’ exports ‛M.id’ defined at mod152.hs:2:36
+    Conflicting exports for ‘id’:
+       ‘module Prelude’ exports ‘Prelude.id’
+         imported from ‘Prelude’ at mod152.hs:2:8
+         (and originally defined in ‘GHC.Base’)
+       ‘id’ exports ‘M.id’ defined at mod152.hs:2:36

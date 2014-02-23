@@ -460,7 +460,7 @@ cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 quotes d =
       sdocWithDynFlags $ \dflags ->
       if useUnicodeQuotes dflags
-      then char '‛' <> d <> char '’'
+      then char '‘' <> d <> char '’'
       else SDoc $ \sty ->
            let pp_d = runSDoc d sty
                str  = show pp_d

@@ -3,8 +3,8 @@ tcfail133.hs:2:61: Warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail133.hs:68:7:
-    No instance for (Show s0) arising from a use of ‛show’
-    The type variable ‛s0’ is ambiguous
+    No instance for (Show s0) arising from a use of ‘show’
+    The type variable ‘s0’ is ambiguous
     Note: there are several potential instances:
       instance Show Zero -- Defined at tcfail133.hs:8:29
       instance Show One -- Defined at tcfail133.hs:9:28
@@ -13,14 +13,14 @@ tcfail133.hs:68:7:
       ...plus 27 others
     In the expression: show
     In the expression: show $ add (One :@ Zero) (One :@ One)
-    In an equation for ‛foo’:
+    In an equation for ‘foo’:
         foo = show $ add (One :@ Zero) (One :@ One)
 
 tcfail133.hs:68:14:
     No instance for (AddDigit (Zero :@ (One :@ One)) One s0)
-      arising from a use of ‛add’
-    In the second argument of ‛($)’, namely
-      ‛add (One :@ Zero) (One :@ One)’
+      arising from a use of ‘add’
+    In the second argument of ‘($)’, namely
+      ‘add (One :@ Zero) (One :@ One)’
     In the expression: show $ add (One :@ Zero) (One :@ One)
-    In an equation for ‛foo’:
+    In an equation for ‘foo’:
         foo = show $ add (One :@ Zero) (One :@ One)

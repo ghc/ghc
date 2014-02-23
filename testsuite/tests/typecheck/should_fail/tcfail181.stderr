@@ -1,16 +1,16 @@
 
 tcfail181.hs:17:9:
-    Could not deduce (Monad m0) arising from a use of ‛foo’
+    Could not deduce (Monad m0) arising from a use of ‘foo’
     from the context (Monad m)
       bound by the inferred type of
                wog :: Monad m => t -> Something (m Bool) e
       at tcfail181.hs:17:1-30
-    The type variable ‛m0’ is ambiguous
+    The type variable ‘m0’ is ambiguous
     Note: there are several potential instances:
-      instance Monad ((->) r) -- Defined in ‛GHC.Base’
-      instance Monad IO -- Defined in ‛GHC.Base’
-      instance Monad [] -- Defined in ‛GHC.Base’
+      instance Monad ((->) r) -- Defined in ‘GHC.Base’
+      instance Monad IO -- Defined in ‘GHC.Base’
+      instance Monad [] -- Defined in ‘GHC.Base’
       ...plus one other
     In the expression: foo
     In the expression: foo {bar = return True}
-    In an equation for ‛wog’: wog x = foo {bar = return True}
+    In an equation for ‘wog’: wog x = foo {bar = return True}

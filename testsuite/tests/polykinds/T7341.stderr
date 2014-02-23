@@ -1,6 +1,6 @@
 
 T7341.hs:11:12:
-    Expecting one more argument to ‛[]’
-    The first argument of ‛C’ should have kind ‛*’,
-      but ‛[]’ has kind ‛* -> *’
-    In the instance declaration for ‛C []’
+    Expecting one more argument to ‘[]’
+    The first argument of ‘C’ should have kind ‘*’,
+      but ‘[]’ has kind ‘* -> *’
+    In the instance declaration for ‘C []’

@@ -1,10 +1,10 @@
 
 tc078.hs:7:10: Warning:
     No explicit implementation for
-      either ‛==’ or ‛/=’
-    In the instance declaration for ‛Eq (Bar a)’
+      either ‘==’ or ‘/=’
+    In the instance declaration for ‘Eq (Bar a)’
 
 tc078.hs:8:10: Warning:
     No explicit implementation for
-      either ‛compare’ or ‛<=’
-    In the instance declaration for ‛Ord (Bar a)’
+      either ‘compare’ or ‘<=’
+    In the instance declaration for ‘Ord (Bar a)’

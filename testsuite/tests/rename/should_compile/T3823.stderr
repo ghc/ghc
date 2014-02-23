@@ -1,5 +1,5 @@
 
 T3823B.hs:8:7:
-    Couldn't match expected type ‛A’ with actual type ‛Bool’
-    In the first argument of ‛y’, namely ‛a’
+    Couldn't match expected type ‘A’ with actual type ‘Bool’
+    In the first argument of ‘y’, namely ‘a’
     In the expression: y a

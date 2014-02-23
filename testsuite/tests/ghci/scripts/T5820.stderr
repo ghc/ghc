@@ -1,5 +1,5 @@
 
 T5820.hs:3:10: Warning:
     No explicit implementation for
-      either ‛==’ or ‛/=’
-    In the instance declaration for ‛Eq Foo’
+      either ‘==’ or ‘/=’
+    In the instance declaration for ‘Eq Foo’

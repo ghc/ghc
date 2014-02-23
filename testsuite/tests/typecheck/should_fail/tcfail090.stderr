@@ -4,4 +4,4 @@ tcfail090.hs:11:9:
       a0 :: *
       ByteArray# :: #
     In the expression: my_undefined
-    In an equation for ‛die’: die _ = my_undefined
+    In an equation for ‘die’: die _ = my_undefined

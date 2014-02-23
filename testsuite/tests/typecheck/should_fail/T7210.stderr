@@ -1,6 +1,6 @@
 
 T7210.hs:5:19:
     Unexpected strictness annotation: !IntMap
-    In the type ‛!IntMap Int’
-    In the definition of data constructor ‛C’
-    In the data declaration for ‛T’
+    In the type ‘!IntMap Int’
+    In the definition of data constructor ‘C’
+    In the data declaration for ‘T’

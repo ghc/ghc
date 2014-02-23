@@ -2,4 +2,4 @@
 tcfail197.hs:5:8:
     Illegal polymorphic or qualified type: forall a. a
     Perhaps you intended to use ImpredicativeTypes
-    In the type signature for ‛foo’: foo :: [forall a. a] -> Int
+    In the type signature for ‘foo’: foo :: [forall a. a] -> Int

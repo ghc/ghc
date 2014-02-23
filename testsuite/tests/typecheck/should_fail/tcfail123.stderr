@@ -3,6 +3,6 @@ tcfail123.hs:11:9:
     Kind incompatibility when matching types:
       t0 :: *
       GHC.Prim.Int# :: #
-    In the first argument of ‛f’, namely ‛3#’
+    In the first argument of ‘f’, namely ‘3#’
     In the expression: f 3#
-    In an equation for ‛h’: h v = f 3#
+    In an equation for ‘h’: h v = f 3#

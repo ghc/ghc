@@ -1,7 +1,7 @@
 
 mod110.hs:11:10:
-    Ambiguous occurrence ‛Eq’
-    It could refer to either ‛M.Eq’, defined at mod110.hs:7:1
-                          or ‛Prelude.Eq’,
-                             imported from ‛Prelude’ at mod110.hs:4:1-14
-                             (and originally defined in ‛GHC.Classes’)
+    Ambiguous occurrence ‘Eq’
+    It could refer to either ‘M.Eq’, defined at mod110.hs:7:1
+                          or ‘Prelude.Eq’,
+                             imported from ‘Prelude’ at mod110.hs:4:1-14
+                             (and originally defined in ‘GHC.Classes’)

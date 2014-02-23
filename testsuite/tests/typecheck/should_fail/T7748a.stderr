@@ -1,7 +1,7 @@
 
 T7748a.hs:14:24:
-    Couldn't match expected type ‛a’ with actual type ‛Maybe t0’
-      ‛a’ is a rigid type variable bound by
+    Couldn't match expected type ‘a’ with actual type ‘Maybe t0’
+      ‘a’ is a rigid type variable bound by
           the type signature for test :: a -> r -> () at T7748a.hs:11:9
     Relevant bindings include
       zd :: a (bound at T7748a.hs:12:6)

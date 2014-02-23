@@ -2,4 +2,4 @@
 TH_Roles1.hs:7:4:
     Illegal role annotation for T;
     did you intend to use RoleAnnotations?
-    while checking a role annotation for ‛T’
+    while checking a role annotation for ‘T’

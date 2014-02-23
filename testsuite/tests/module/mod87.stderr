@@ -1,2 +1,2 @@
 
-mod87.hs:4:5: Not in scope: data constructor ‛Left’
+mod87.hs:4:5: Not in scope: data constructor ‘Left’

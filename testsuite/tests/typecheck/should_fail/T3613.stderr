@@ -1,16 +1,16 @@
 
 T3613.hs:14:20:
-    Couldn't match type ‛IO’ with ‛Maybe’
+    Couldn't match type ‘IO’ with ‘Maybe’
     Expected type: Maybe ()
       Actual type: IO ()
-    In the first argument of ‛(>>)’, namely ‛bar’
-    In the first argument of ‛fooThen’, namely ‛(bar >> undefined)’
+    In the first argument of ‘(>>)’, namely ‘bar’
+    In the first argument of ‘fooThen’, namely ‘(bar >> undefined)’
 
 T3613.hs:17:24:
-    Couldn't match type ‛IO’ with ‛Maybe’
+    Couldn't match type ‘IO’ with ‘Maybe’
     Expected type: Maybe ()
       Actual type: IO ()
     In a stmt of a 'do' block: bar
-    In the first argument of ‛fooThen’, namely
-      ‛(do { bar;
+    In the first argument of ‘fooThen’, namely
+      ‘(do { bar;
              undefined })’

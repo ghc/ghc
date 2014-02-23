@@ -1,2 +1,2 @@
 
-rnfail037.hs:8:7: Not in scope: data constructor ‛Rn037Help.C’
+rnfail037.hs:8:7: Not in scope: data constructor ‘Rn037Help.C’

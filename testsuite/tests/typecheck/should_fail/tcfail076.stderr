@@ -1,10 +1,10 @@
 
 tcfail076.hs:18:82:
-    Couldn't match type ‛res’ with ‛res1’
-      ‛res’ is a rigid type variable bound by
+    Couldn't match type ‘res’ with ‘res1’
+      ‘res’ is a rigid type variable bound by
             a type expected by the context: (a -> m res) -> m res
             at tcfail076.hs:18:28
-      ‛res1’ is a rigid type variable bound by
+      ‘res1’ is a rigid type variable bound by
              a type expected by the context: (b -> m res1) -> m res1
              at tcfail076.hs:18:64
     Expected type: m res1
@@ -13,4 +13,4 @@ tcfail076.hs:18:82:
       cont' :: b -> m res1 (bound at tcfail076.hs:18:73)
       cont :: a -> m res (bound at tcfail076.hs:18:37)
     In the expression: cont a
-    In the first argument of ‛KContT’, namely ‛(\ cont' -> cont a)’
+    In the first argument of ‘KContT’, namely ‘(\ cont' -> cont a)’

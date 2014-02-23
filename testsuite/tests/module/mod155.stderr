@@ -1,7 +1,7 @@
 
 mod155.hs:2:10:
-    Conflicting exports for ‛id’:
-       ‛module M’ exports ‛M.id’
-         imported from ‛Prelude’ at mod155.hs:4:1-19
-         (and originally defined in ‛GHC.Base’)
-       ‛module M’ exports ‛M.id’ defined at mod155.hs:5:1
+    Conflicting exports for ‘id’:
+       ‘module M’ exports ‘M.id’
+         imported from ‘Prelude’ at mod155.hs:4:1-19
+         (and originally defined in ‘GHC.Base’)
+       ‘module M’ exports ‘M.id’ defined at mod155.hs:5:1

@@ -1,4 +1,4 @@
 
 readFail046.hs:1:14:
     Unsupported extension: ExistientialQuantification
-    Perhaps you meant ‛ExistentialQuantification’ or ‛NoExistentialQuantification’
+    Perhaps you meant ‘ExistentialQuantification’ or ‘NoExistentialQuantification’

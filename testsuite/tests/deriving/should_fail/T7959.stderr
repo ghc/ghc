@@ -1,8 +1,8 @@
 
 T7959.hs:5:1:
     Cannot derive instances for nullary classes
-    In the stand-alone deriving instance for ‛A’
+    In the stand-alone deriving instance for ‘A’
 
 T7959.hs:6:17:
     Cannot derive instances for nullary classes
-    In the data declaration for ‛B’
+    In the data declaration for ‘B’

@@ -1,10 +1,10 @@
 
 tcfail212.hs:10:7:
-    Expecting one more argument to ‛Maybe’
-    The first argument of a tuple should have kind ‛*’,
-      but ‛Maybe’ has kind ‛* -> *’
-    In the type signature for ‛f’: f :: (Maybe, Either Int)
+    Expecting one more argument to ‘Maybe’
+    The first argument of a tuple should have kind ‘*’,
+      but ‘Maybe’ has kind ‘* -> *’
+    In the type signature for ‘f’: f :: (Maybe, Either Int)
 
 tcfail212.hs:13:7:
-    Expecting a lifted type, but ‛Int#’ is unlifted
-    In the type signature for ‛g’: g :: (Int#, Int#)
+    Expecting a lifted type, but ‘Int#’ is unlifted
+    In the type signature for ‘g’: g :: (Int#, Int#)

@@ -3,11 +3,11 @@ overloadedlistsfail02.hs:6:8:
     No instance for (GHC.Exts.IsList Foo)
       arising from an overloaded list
     In the expression: [7]
-    In an equation for ‛test’: test = [7]
+    In an equation for ‘test’: test = [7]
 
 overloadedlistsfail02.hs:6:9:
     No instance for (Num (GHC.Exts.Item Foo))
-      arising from the literal ‛7’
+      arising from the literal ‘7’
     In the expression: 7
     In the expression: [7]
-    In an equation for ‛test’: test = [7]
+    In an equation for ‘test’: test = [7]

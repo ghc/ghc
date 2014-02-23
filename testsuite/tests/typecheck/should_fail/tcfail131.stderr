@@ -4,10 +4,10 @@ tcfail131.hs:7:9:
     from the context (Num b)
       bound by the type signature for g :: Num b => b -> b
       at tcfail131.hs:6:8-22
-      ‛b’ is a rigid type variable bound by
+      ‘b’ is a rigid type variable bound by
           the type signature for g :: Num b => b -> b at tcfail131.hs:6:8
     Relevant bindings include
       x :: b (bound at tcfail131.hs:7:5)
       g :: b -> b (bound at tcfail131.hs:7:3)
     In the expression: f x x
-    In an equation for ‛g’: g x = f x x
+    In an equation for ‘g’: g x = f x x

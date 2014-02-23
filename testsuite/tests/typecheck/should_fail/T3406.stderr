@@ -1,10 +1,10 @@
 
 T3406.hs:11:6:
-    The type variables ‛a, b’
-    should be bound by the pattern signature ‛ItemColID a b’
+    The type variables ‘a, b’
+    should be bound by the pattern signature ‘ItemColID a b’
     but are actually discarded by a type synonym
     To fix this, expand the type synonym
     [Note: I hope to lift this restriction in due course]
     In the pattern: x :: ItemColID a b
-    In an equation for ‛get’:
+    In an equation for ‘get’:
         get (x :: ItemColID a b) = x :: ItemColID a b

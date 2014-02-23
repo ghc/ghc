@@ -1,5 +1,5 @@
 
 drvfail005.hs:4:13:
-    Can't make a derived instance of ‛Show a (Test a)’:
-      ‛Show a’ is not a class
-    In the data declaration for ‛Test’
+    Can't make a derived instance of ‘Show a (Test a)’:
+      ‘Show a’ is not a class
+    In the data declaration for ‘Test’

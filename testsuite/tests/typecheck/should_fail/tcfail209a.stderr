@@ -2,5 +2,5 @@
 tcfail209a.hs:3:6:
     Illegal tuple constraint: (Show a, Num a)
       (Use ConstraintKinds to permit this)
-    In the type signature for ‛g’:
+    In the type signature for ‘g’:
       g :: ((Show a, Num a), Eq a) => a -> a

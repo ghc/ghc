@@ -1,6 +1,6 @@
 
 T4489.hs:4:1: Warning:
-    The module ‛Data.Maybe’ does not have an explicit import list
+    The module ‘Data.Maybe’ does not have an explicit import list
 
 T4489.hs:5:1: Warning:
-    The import item ‛Maybe(..)’ does not have an explicit import list
+    The import item ‘Maybe(..)’ does not have an explicit import list

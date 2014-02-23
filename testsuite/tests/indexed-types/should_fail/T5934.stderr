@@ -1,7 +1,7 @@
 
 T5934.hs:12:7:
-    Cannot instantiate unification variable ‛a0’
+    Cannot instantiate unification variable ‘a0’
     with a type involving foralls: (forall s. GenST s) -> Int
       Perhaps you want ImpredicativeTypes
     In the expression: 0
-    In an equation for ‛run’: run = 0
+    In an equation for ‘run’: run = 0

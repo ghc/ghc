@@ -1,5 +1,5 @@
 
 mod60.hs:3:4:
-    Constructor ‛Left’ should have 1 argument, but has been given none
+    Constructor ‘Left’ should have 1 argument, but has been given none
     In the pattern: Left
-    In an equation for ‛f’: f (Left) = error "foo"
+    In an equation for ‘f’: f (Left) = error "foo"

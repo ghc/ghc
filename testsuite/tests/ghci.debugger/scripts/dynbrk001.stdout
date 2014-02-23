@@ -2,4 +2,4 @@ Breakpoint 1 does not exist
 No breakpoints found at that location.
 No active breakpoints.
 [4,8,15,16,23,42]
-map :: forall a b. (a -> b) -> [a] -> [b] 	-- Defined in ‛GHC.Base’
+map :: forall a b. (a -> b) -> [a] -> [b] 	-- Defined in ‘GHC.Base’

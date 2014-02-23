@@ -1,4 +1,4 @@
-data (->) a b 	-- Defined in ‛GHC.Prim’
-instance Monad ((->) r) -- Defined in ‛GHC.Base’
-instance Functor ((->) r) -- Defined in ‛GHC.Base’
-instance Monoid b => Monoid (a -> b) -- Defined in ‛Data.Monoid’
+data (->) a b 	-- Defined in ‘GHC.Prim’
+instance Monad ((->) r) -- Defined in ‘GHC.Base’
+instance Functor ((->) r) -- Defined in ‘GHC.Base’
+instance Monoid b => Monoid (a -> b) -- Defined in ‘Data.Monoid’

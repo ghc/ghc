@@ -1,9 +1,9 @@
 
 tcfail208.hs:4:19:
-    Could not deduce (Eq (m a)) arising from a use of ‛==’
+    Could not deduce (Eq (m a)) arising from a use of ‘==’
     from the context (Monad m, Eq a)
       bound by the type signature for
                  f :: (Monad m, Eq a) => a -> m a -> Bool
       at tcfail208.hs:3:6-40
     In the expression: (return x == y)
-    In an equation for ‛f’: f x y = (return x == y)
+    In an equation for ‘f’: f x y = (return x == y)

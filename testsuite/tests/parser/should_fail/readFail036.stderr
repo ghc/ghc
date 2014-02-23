@@ -1,5 +1,5 @@
 
 readFail036.hs:4:16:
-    Illegal kind signature: ‛*’
+    Illegal kind signature: ‘*’
       Perhaps you intended to use KindSignatures
-    In the data type declaration for ‛Foo’
+    In the data type declaration for ‘Foo’

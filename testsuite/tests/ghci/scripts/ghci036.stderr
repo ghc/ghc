@@ -1,16 +1,16 @@
 
-<interactive>:1:1: Not in scope: ‛nubBy’
+<interactive>:1:1: Not in scope: ‘nubBy’
 
-<interactive>:1:1: Not in scope: ‛nub’
+<interactive>:1:1: Not in scope: ‘nub’
 
-<interactive>:1:1: Not in scope: ‛nubBy’
+<interactive>:1:1: Not in scope: ‘nubBy’
 
-<interactive>:1:1: Not in scope: ‛nub’
+<interactive>:1:1: Not in scope: ‘nub’
 
 <interactive>:1:1:
-    Not in scope: ‛nub’
-    Perhaps you meant ‛L.nub’ (imported from Data.List)
+    Not in scope: ‘nub’
+    Perhaps you meant ‘L.nub’ (imported from Data.List)
 
-<interactive>:1:1: Not in scope: ‛L.nub’
+<interactive>:1:1: Not in scope: ‘L.nub’
 
-<interactive>:1:1: Not in scope: ‛nub’
+<interactive>:1:1: Not in scope: ‘nub’

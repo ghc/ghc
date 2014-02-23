@@ -1,9 +1,9 @@
 
 T8155.hs:26:14:
     Could not deduce (Integral (BoundsOf (a -> a)))
-      arising from a use of ‛buildV’
+      arising from a use of ‘buildV’
     from the context (Num a)
       bound by the instance declaration at T8155.hs:25:10-32
     In the expression: buildV
-    In an equation for ‛build'’: build' = buildV
-    In the instance declaration for ‛Build (a -> a)’
+    In an equation for ‘build'’: build' = buildV
+    In the instance declaration for ‘Build (a -> a)’

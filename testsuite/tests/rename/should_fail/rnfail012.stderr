@@ -1,5 +1,5 @@
 
 rnfail012.hs:8:1:
-    Multiple declarations of ‛A’
+    Multiple declarations of ‘A’
     Declared at: rnfail012.hs:2:1
                  rnfail012.hs:8:1

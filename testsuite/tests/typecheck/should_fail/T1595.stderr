@@ -1,6 +1,6 @@
 
 T1595.hs:8:15:
-    Not in scope: type constructor or class ‛DoesNotExist’
+    Not in scope: type constructor or class ‘DoesNotExist’
 
 T1595.hs:13:22:
-    Not in scope: type constructor or class ‛DoesNotExist’
+    Not in scope: type constructor or class ‘DoesNotExist’

@@ -1,9 +1,9 @@
 
 tcfail165.hs:15:23:
-    Couldn't match expected type ‛forall a. Show a => a -> String’
-                with actual type ‛b0 -> String’
-    In the second argument of ‛putMVar’, namely
-      ‛(show :: forall b. Show b => b -> String)’
+    Couldn't match expected type ‘forall a. Show a => a -> String’
+                with actual type ‘b0 -> String’
+    In the second argument of ‘putMVar’, namely
+      ‘(show :: forall b. Show b => b -> String)’
     In a stmt of a 'do' block:
       putMVar var (show :: forall b. Show b => b -> String)
     In the expression:

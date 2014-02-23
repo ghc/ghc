@@ -4,13 +4,13 @@ B.hs:4:1: Warning:
       answer_to_live_the_universe_and_everything :: Int
 
 B.hs:5:13: Warning:
-    Defaulting the following constraint(s) to type ‛Integer’
-      (Num a0) arising from the literal ‛1’ at B.hs:5:13
+    Defaulting the following constraint(s) to type ‘Integer’
+      (Num a0) arising from the literal ‘1’ at B.hs:5:13
       (Enum a0)
-        arising from the arithmetic sequence ‛1 .. 23 * 2’ at B.hs:5:12-20
+        arising from the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
     In the expression: 1
-    In the first argument of ‛length’, namely ‛[1 .. 23 * 2]’
-    In the first argument of ‛(-)’, namely ‛length [1 .. 23 * 2]’
+    In the first argument of ‘length’, namely ‘[1 .. 23 * 2]’
+    In the first argument of ‘(-)’, namely ‘length [1 .. 23 * 2]’
 
 A.hs:7:1: Warning:
     Top-level binding with no type signature: main :: IO ()
@@ -20,13 +20,13 @@ B.hs:4:1: Warning:
       answer_to_live_the_universe_and_everything :: Int
 
 B.hs:5:13: Warning:
-    Defaulting the following constraint(s) to type ‛Integer’
-      (Num a0) arising from the literal ‛1’ at B.hs:5:13
+    Defaulting the following constraint(s) to type ‘Integer’
+      (Num a0) arising from the literal ‘1’ at B.hs:5:13
       (Enum a0)
-        arising from the arithmetic sequence ‛1 .. 23 * 2’ at B.hs:5:12-20
+        arising from the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
     In the expression: 1
-    In the first argument of ‛length’, namely ‛[1 .. 23 * 2]’
-    In the first argument of ‛(-)’, namely ‛length [1 .. 23 * 2]’
+    In the first argument of ‘length’, namely ‘[1 .. 23 * 2]’
+    In the first argument of ‘(-)’, namely ‘length [1 .. 23 * 2]’
 
 A.hs:7:1: Warning:
     Top-level binding with no type signature: main :: IO ()

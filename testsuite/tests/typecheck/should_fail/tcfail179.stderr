@@ -1,17 +1,17 @@
 
 tcfail179.hs:14:39:
-    Couldn't match expected type ‛s’ with actual type ‛x’
-      ‛x’ is a rigid type variable bound by
+    Couldn't match expected type ‘s’ with actual type ‘x’
+      ‘x’ is a rigid type variable bound by
           a pattern with constructor
             T :: forall s x. (s -> (x -> s) -> (x, s, Int)) -> T s,
           in a case alternative
           at tcfail179.hs:14:14
-      ‛s’ is a rigid type variable bound by
+      ‘s’ is a rigid type variable bound by
           the type signature for run :: T s -> Int at tcfail179.hs:12:8
     Relevant bindings include
       x :: x (bound at tcfail179.hs:14:26)
       g :: s -> (x -> s) -> (x, s, Int) (bound at tcfail179.hs:14:16)
       ts :: T s (bound at tcfail179.hs:13:5)
       run :: T s -> Int (bound at tcfail179.hs:13:1)
-    In the first argument of ‛g’, namely ‛x’
+    In the first argument of ‘g’, namely ‘x’
     In the expression: g x id

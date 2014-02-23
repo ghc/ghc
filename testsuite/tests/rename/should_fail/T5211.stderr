@@ -1,5 +1,5 @@
 
 T5211.hs:5:1: Warning:
-    The qualified import of ‛Foreign.Storable’ is redundant
-      except perhaps to import instances from ‛Foreign.Storable’
+    The qualified import of ‘Foreign.Storable’ is redundant
+      except perhaps to import instances from ‘Foreign.Storable’
     To import instances alone, use: import Foreign.Storable()

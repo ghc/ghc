@@ -1,3 +1,3 @@
 
 GHC/Word.hs:10:23:
-    Warning: {-# SOURCE #-} unnecessary in import of  ‛GHC.Unicode’
+    Warning: {-# SOURCE #-} unnecessary in import of  ‘GHC.Unicode’

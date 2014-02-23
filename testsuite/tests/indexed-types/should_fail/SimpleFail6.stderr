@@ -1,5 +1,5 @@
 
 SimpleFail6.hs:7:11:
-    Conflicting definitions for ‛a’
+    Conflicting definitions for ‘a’
     Bound at: SimpleFail6.hs:7:11
               SimpleFail6.hs:7:13

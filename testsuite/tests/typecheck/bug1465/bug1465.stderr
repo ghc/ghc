@@ -1,8 +1,8 @@
 
 C.hs:6:11:
-    Couldn't match expected type ‛bug1465-1.0:A.T’
-                with actual type ‛A.T’
-    NB: ‛bug1465-1.0:A.T’ is defined in ‛A’ in package ‛bug1465-1.0’
-        ‛A.T’ is defined in ‛A’ in package ‛bug1465-2.0’
+    Couldn't match expected type ‘bug1465-1.0:A.T’
+                with actual type ‘A.T’
+    NB: ‘bug1465-1.0:A.T’ is defined in ‘A’ in package ‘bug1465-1.0’
+        ‘A.T’ is defined in ‘A’ in package ‘bug1465-2.0’
     In the expression: B2.f
     In the expression: [B1.f, B2.f]

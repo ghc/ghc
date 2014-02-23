@@ -1,11 +1,11 @@
 
 T7368a.hs:8:6:
-    Couldn't match type ‛f’ with ‛Bad’
-      ‛f’ is a rigid type variable bound by
+    Couldn't match type ‘f’ with ‘Bad’
+      ‘f’ is a rigid type variable bound by
           the type signature for fun :: f (Bad f) -> Bool at T7368a.hs:7:15
     Expected type: f (Bad f)
       Actual type: Bad t0
     Relevant bindings include
       fun :: f (Bad f) -> Bool (bound at T7368a.hs:8:1)
     In the pattern: Bad x
-    In an equation for ‛fun’: fun (Bad x) = True
+    In an equation for ‘fun’: fun (Bad x) = True

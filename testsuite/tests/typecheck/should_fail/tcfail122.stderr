@@ -11,7 +11,7 @@ tcfail122.hs:8:9:
     In the expression:
       [undefined :: forall a b. a b,
        undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d]
-    In an equation for ‛foo’:
+    In an equation for ‘foo’:
         foo
           = [undefined :: forall a b. a b,
              undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d]

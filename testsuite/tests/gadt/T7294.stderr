@@ -1,9 +1,9 @@
 
 T7294.hs:25:5: Warning:
-    Couldn't match type ‛'False’ with ‛'True’
+    Couldn't match type ‘'False’ with ‘'True’
     Inaccessible code in
       a pattern with constructor
         Nil :: forall a. Vec a 'Zero,
-      in an equation for ‛nth’
+      in an equation for ‘nth’
     In the pattern: Nil
-    In an equation for ‛nth’: nth Nil _ = undefined
+    In an equation for ‘nth’: nth Nil _ = undefined

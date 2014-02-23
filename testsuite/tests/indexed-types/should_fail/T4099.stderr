@@ -1,21 +1,21 @@
 
 T4099.hs:11:30:
-    Couldn't match expected type ‛T a0’ with actual type ‛T b’
-    NB: ‛T’ is a type function, and may not be injective
-    The type variable ‛a0’ is ambiguous
+    Couldn't match expected type ‘T a0’ with actual type ‘T b’
+    NB: ‘T’ is a type function, and may not be injective
+    The type variable ‘a0’ is ambiguous
     Relevant bindings include
       x :: T b (bound at T4099.hs:11:8)
       a :: b (bound at T4099.hs:11:6)
       bar1 :: b -> T b -> Int (bound at T4099.hs:11:1)
-    In the second argument of ‛foo’, namely ‛x’
+    In the second argument of ‘foo’, namely ‘x’
     In the expression: foo (error "urk") x
 
 T4099.hs:14:30:
-    Couldn't match expected type ‛T a1’ with actual type ‛Maybe b’
-    The type variable ‛a1’ is ambiguous
+    Couldn't match expected type ‘T a1’ with actual type ‘Maybe b’
+    The type variable ‘a1’ is ambiguous
     Relevant bindings include
       x :: Maybe b (bound at T4099.hs:14:8)
       a :: b (bound at T4099.hs:14:6)
       bar2 :: b -> Maybe b -> Int (bound at T4099.hs:14:1)
-    In the second argument of ‛foo’, namely ‛x’
+    In the second argument of ‘foo’, namely ‘x’
     In the expression: foo (error "urk") x

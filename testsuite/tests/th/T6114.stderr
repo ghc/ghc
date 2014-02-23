@@ -1,6 +1,6 @@
 
 T6114.hs:6:17:
-    The exact Name ‛x’ is not in scope
+    The exact Name ‘x’ is not in scope
       Probable cause: you used a unique Template Haskell name (NameU), 
       perhaps via newName, but did not bind it
       If that's it, then -ddump-splices might be useful

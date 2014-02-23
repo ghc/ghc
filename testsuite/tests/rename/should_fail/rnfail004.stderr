@@ -1,10 +1,10 @@
 
 rnfail004.hs:6:5:
-    Conflicting definitions for ‛a’
+    Conflicting definitions for ‘a’
     Bound at: rnfail004.hs:6:5
               rnfail004.hs:7:10
 
 rnfail004.hs:7:6:
-    Conflicting definitions for ‛b’
+    Conflicting definitions for ‘b’
     Bound at: rnfail004.hs:7:6
               rnfail004.hs:8:8

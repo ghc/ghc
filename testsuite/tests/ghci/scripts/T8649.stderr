@@ -1,8 +1,8 @@
 
 <interactive>:5:4:
-    Couldn't match expected type ‛Ghci1.X’
-                with actual type ‛X’
-    NB: ‛Ghci1.X’ is defined at <interactive>:2:1-14
-        ‛X’ is defined at <interactive>:4:1-25
-    In the first argument of ‛f’, namely ‛(Y 3)’
+    Couldn't match expected type ‘Ghci1.X’
+                with actual type ‘X’
+    NB: ‘Ghci1.X’ is defined at <interactive>:2:1-14
+        ‘X’ is defined at <interactive>:4:1-25
+    In the first argument of ‘f’, namely ‘(Y 3)’
     In the expression: f (Y 3)

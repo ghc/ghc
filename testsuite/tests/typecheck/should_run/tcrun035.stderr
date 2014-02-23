@@ -1,11 +1,11 @@
 
 tcrun035.hs:13:7:
-    Couldn't match type ‛IO a’
-                  with ‛forall (m :: * -> *). Monad m => m a’
+    Couldn't match type ‘IO a’
+                  with ‘forall (m :: * -> *). Monad m => m a’
     Expected type: (forall (m :: * -> *). Monad m => m a) -> IO a
       Actual type: IO a -> IO a
     Relevant bindings include
       foo :: (forall (m :: * -> *). Monad m => m a) -> IO a
         (bound at tcrun035.hs:13:1)
     In the expression: id . id
-    In an equation for ‛foo’: foo = id . id
+    In an equation for ‘foo’: foo = id . id

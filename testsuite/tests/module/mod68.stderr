@@ -1,5 +1,5 @@
 
 mod68.hs:4:1:
-    Duplicate type signatures for ‛f’
+    Duplicate type signatures for ‘f’
     at mod68.hs:3:1
        mod68.hs:4:1

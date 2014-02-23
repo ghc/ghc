@@ -1,7 +1,7 @@
 
 annfail04.hs:14:12:
     GHC stage restriction:
-      instance for ‛Thing
+      instance for ‘Thing
                       Int’ is used in a top-level splice or annotation,
       and must be imported, not defined locally
     In the annotation: {-# ANN f (thing :: Int) #-}

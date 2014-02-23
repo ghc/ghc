@@ -1,7 +1,7 @@
 
 mod165.hs:9:5:
-    Ambiguous occurrence ‛A.D1’
-    It could refer to either ‛A.D1’,
-                             imported from ‛Mod164_A’ at mod165.hs:4:1-20
-                          or ‛A.D1’, imported from ‛Mod164_B’ at mod165.hs:5:1-20
+    Ambiguous occurrence ‘A.D1’
+    It could refer to either ‘A.D1’,
+                             imported from ‘Mod164_A’ at mod165.hs:4:1-20
+                          or ‘A.D1’, imported from ‘Mod164_B’ at mod165.hs:5:1-20
 exit(1)

@@ -1,6 +1,6 @@
 
 tcfail180.hs:10:9:
-    Couldn't match expected type ‛f0 b0’ with actual type ‛Bool’
+    Couldn't match expected type ‘f0 b0’ with actual type ‘Bool’
     In the pattern: True
     In a case alternative: True -> ()
     In the expression: case p of { True -> () }

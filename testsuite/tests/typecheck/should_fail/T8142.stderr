@@ -1,14 +1,14 @@
 
 T8142.hs:6:18:
-    Couldn't match type ‛Nu ((,) t0)’ with ‛Nu ((,) t)’
-    NB: ‛Nu’ is a type function, and may not be injective
-    The type variable ‛t0’ is ambiguous
+    Couldn't match type ‘Nu ((,) t0)’ with ‘Nu ((,) t)’
+    NB: ‘Nu’ is a type function, and may not be injective
+    The type variable ‘t0’ is ambiguous
     Expected type: Nu ((,) t) -> Nu f
       Actual type: Nu ((,) t0) -> Nu f0
-    When checking that ‛h’
-      has the inferred type ‛forall t (f :: * -> *). Nu ((,) t) -> Nu f’
+    When checking that ‘h’
+      has the inferred type ‘forall t (f :: * -> *). Nu ((,) t) -> Nu f’
     Probable cause: the inferred type is ambiguous
-    In an equation for ‛tracer’:
+    In an equation for ‘tracer’:
         tracer
           = h
           where
@@ -24,5 +24,5 @@ T8142.hs:6:57:
       Actual type: Nu ((,) t) -> (t, Nu ((,) t))
     Relevant bindings include
       h :: Nu ((,) t) -> Nu f1 (bound at T8142.hs:6:18)
-    In the second argument of ‛(.)’, namely ‛out’
+    In the second argument of ‘(.)’, namely ‘out’
     In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out

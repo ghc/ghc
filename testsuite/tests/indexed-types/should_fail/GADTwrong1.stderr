@@ -6,12 +6,12 @@ GADTwrong1.hs:12:19:
                  T :: forall a. a -> T (Const a),
                in a case alternative
       at GADTwrong1.hs:12:12-14
-      ‛a1’ is a rigid type variable bound by
+      ‘a1’ is a rigid type variable bound by
            a pattern with constructor
              T :: forall a. a -> T (Const a),
            in a case alternative
            at GADTwrong1.hs:12:12
-      ‛b’ is a rigid type variable bound by
+      ‘b’ is a rigid type variable bound by
           the type signature for coerce :: a -> b at GADTwrong1.hs:10:20
     Relevant bindings include
       y :: a1 (bound at GADTwrong1.hs:12:14)

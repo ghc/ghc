@@ -1,10 +1,10 @@
 
 <interactive>:4:16:
-    Multiple declarations of ‛A’
+    Multiple declarations of ‘A’
     Declared at: <interactive>:4:12
                  <interactive>:4:16
 
 <interactive>:6:16:
-    Multiple declarations of ‛A’
+    Multiple declarations of ‘A’
     Declared at: <interactive>:6:12
                  <interactive>:6:16

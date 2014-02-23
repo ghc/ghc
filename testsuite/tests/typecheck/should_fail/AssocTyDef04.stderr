@@ -1,7 +1,7 @@
 
 AssocTyDef04.hs:6:18:
-    Expecting one more argument to ‛Maybe’
-    Expected kind ‛*’, but ‛Maybe’ has kind ‛* -> *’
-    In the type ‛Maybe’
-    In the type instance declaration for ‛Typ’
-    In the class declaration for ‛Cls’
+    Expecting one more argument to ‘Maybe’
+    Expected kind ‘*’, but ‘Maybe’ has kind ‘* -> *’
+    In the type ‘Maybe’
+    In the type instance declaration for ‘Typ’
+    In the class declaration for ‘Cls’

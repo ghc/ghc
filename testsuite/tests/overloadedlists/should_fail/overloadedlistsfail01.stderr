@@ -1,36 +1,36 @@
 
 overloadedlistsfail01.hs:5:8:
-    No instance for (Show a0) arising from a use of ‛print’
-    The type variable ‛a0’ is ambiguous
+    No instance for (Show a0) arising from a use of ‘print’
+    The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
-      instance Show Double -- Defined in ‛GHC.Float’
-      instance Show Float -- Defined in ‛GHC.Float’
+      instance Show Double -- Defined in ‘GHC.Float’
+      instance Show Float -- Defined in ‘GHC.Float’
       instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
-        -- Defined in ‛GHC.Real’
+        -- Defined in ‘GHC.Real’
       ...plus 24 others
     In the expression: print [1]
-    In an equation for ‛main’: main = print [1]
+    In an equation for ‘main’: main = print [1]
 
 overloadedlistsfail01.hs:5:14:
     No instance for (GHC.Exts.IsList a0)
       arising from an overloaded list
-    The type variable ‛a0’ is ambiguous
+    The type variable ‘a0’ is ambiguous
     Note: there is a potential instance available:
-      instance GHC.Exts.IsList [a] -- Defined in ‛GHC.Exts’
-    In the first argument of ‛print’, namely ‛[1]’
+      instance GHC.Exts.IsList [a] -- Defined in ‘GHC.Exts’
+    In the first argument of ‘print’, namely ‘[1]’
     In the expression: print [1]
-    In an equation for ‛main’: main = print [1]
+    In an equation for ‘main’: main = print [1]
 
 overloadedlistsfail01.hs:5:15:
     No instance for (Num (GHC.Exts.Item a0))
-      arising from the literal ‛1’
-    The type variable ‛a0’ is ambiguous
+      arising from the literal ‘1’
+    The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
-      instance Num Double -- Defined in ‛GHC.Float’
-      instance Num Float -- Defined in ‛GHC.Float’
+      instance Num Double -- Defined in ‘GHC.Float’
+      instance Num Float -- Defined in ‘GHC.Float’
       instance Integral a => Num (GHC.Real.Ratio a)
-        -- Defined in ‛GHC.Real’
+        -- Defined in ‘GHC.Real’
       ...plus three others
     In the expression: 1
-    In the first argument of ‛print’, namely ‛[1]’
+    In the first argument of ‘print’, namely ‘[1]’
     In the expression: print [1]

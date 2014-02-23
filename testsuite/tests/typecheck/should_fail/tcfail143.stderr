@@ -1,5 +1,5 @@
 
 tcfail143.hs:29:9:
-    No instance for (MinMax (S Z) Z Z Z) arising from a use of ‛extend’
+    No instance for (MinMax (S Z) Z Z Z) arising from a use of ‘extend’
     In the expression: n1 `extend` n0
-    In an equation for ‛t2’: t2 = n1 `extend` n0
+    In an equation for ‘t2’: t2 = n1 `extend` n0
