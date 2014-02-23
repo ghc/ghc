@@ -750,7 +750,7 @@ ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q = quote $ parenList $ map (p
 ppr_mono_ty _         (HsWrapTy {})       _ _ = error "ppr_mono_ty HsWrapTy"
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode qual
-  = maybeParen ctxt_prec pREC_OP $
+  = maybeParen ctxt_prec pREC_CTX $
     ppr_mono_lty pREC_OP ty1 unicode qual <+> char '~' <+> ppr_mono_lty pREC_OP ty2 unicode qual
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode qual

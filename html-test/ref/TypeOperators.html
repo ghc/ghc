@@ -41,63 +41,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	><p class="caption"
 	>TypeOperators</p
 	></div
-      ><div id="table-of-contents"
-      ><p class="caption"
-	>Contents</p
-	><ul
-	><li
-	  ><a href=""
-	    >stuff</a
-	    ></li
-	  ></ul
-	></div
-      ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > a <a href=""
-	    >:-:</a
-	    > b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > (a <a href=""
-	    >:+:</a
-	    > b) c</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href=""
-	    >Op</a
-	    > a b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href=""
-	    >O</a
-	    > g f a = <a href=""
-	    >O</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href=""
-		>unO</a
-		> :: g (f a)</li
-	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><a href=""
-	    >biO</a
-	    > ::  (g `<a href=""
-	    >O</a
-	    >` f) a</li
-	  ></ul
-	></div
       ><div id="interface"
-      ><h1 id="g:1"
-	>stuff</h1
+      ><h1
+	>Documentation</h1
 	><div class="top"
 	><p class="src"
 	  ><span class="keyword"
@@ -164,17 +110,61 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	  ></div
 	><div class="top"
 	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > a <a name="t:-60--61--62-" class="def"
+	    >&lt;=&gt;</a
+	    > b</p
+	  ></div
+	><div class="top"
+	><p class="src"
 	  ><a name="v:biO" class="def"
 	    >biO</a
-	    > ::  (g `<a href=""
-	    >O</a
-	    >` f) a</p
+	    > ::  (g <a href="TypeOperators.html#t:O"
+	    >`O`</a
+	    > f) a</p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:f" class="def"
+	    >f</a
+	    > :: (a ~ b) =&gt; a -&gt; b</p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:g" class="def"
+	    >g</a
+	    > :: (a ~ b, b ~ c) =&gt; a -&gt; c</p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:x" class="def"
+	    >x</a
+	    > :: (a <a href="TypeOperators.html#t::-45-:"
+	    >:-:</a
+	    > a) <a href="TypeOperators.html#t:-60--61--62-"
+	    >&lt;=&gt;</a
+	    > (a <a href="TypeOperators.html#t:Op"
+	    >`Op`</a
+	    > a) =&gt; a</p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:y" class="def"
+	    >y</a
+	    > :: (a <a href="TypeOperators.html#t:-60--61--62-"
+	    >&lt;=&gt;</a
+	    > a, (a <a href="TypeOperators.html#t:Op"
+	    >`Op`</a
+	    > a) <a href="TypeOperators.html#t:-60--61--62-"
+	    >&lt;=&gt;</a
+	    > a) =&gt; a</p
 	  ></div
 	></div
       ></div
     ><div id="footer"
     ><p
-      >Produced by <a href=""
+      >Produced by <a href="http://www.haskell.org/haddock/"
 	>Haddock</a
 	> version 2.14.0</p
       ></div
