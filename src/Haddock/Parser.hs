@@ -307,11 +307,11 @@ birdtracks = DocCodeBlock . DocString . intercalate "\n" . stripSpace <$> many1 
     line = skipHorizontalSpace *> ">" *> takeLine
 
 stripSpace :: [String] -> [String]
-stripSpace = fromMaybe <*> mapM strip
+stripSpace = fromMaybe <*> mapM strip'
   where
-    strip (' ':xs) = Just xs
-    strip "" = Just ""
-    strip _  = Nothing
+    strip' (' ':xs') = Just xs'
+    strip' "" = Just ""
+    strip' _  = Nothing
 
 -- | Parses examples. Examples are a paragraph level entitity (separated by an empty line).
 -- Consecutive examples are accepted.
