@@ -55,18 +55,18 @@ ppUncheckedLink _ (mdl, occ) = linkIdOcc' mdl (Just occ) << ppOccName occ -- TOD
 
 -- The Bool indicates if it is to be rendered in infix notation
 ppLDocName :: Qualification -> Notation -> Located DocName -> Html
-ppLDocName qual notation (L _ d) = ppDocName qual notation d
+ppLDocName qual notation (L _ d) = ppDocName qual notation True d
 
-ppDocName :: Qualification -> Notation -> DocName -> Html
-ppDocName qual notation docName =
+ppDocName :: Qualification -> Notation -> Bool -> DocName -> Html
+ppDocName qual notation insertAnchors docName =
   case docName of
     Documented name mdl ->
-      linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual notation name mdl
+      linkIdOcc mdl (Just (nameOccName name)) insertAnchors
+      << ppQualifyName qual notation name mdl
     Undocumented name
       | isExternalName name || isWiredInName name ->
           ppQualifyName qual notation name (nameModule name)
       | otherwise -> ppName notation name
-
 
 -- | Render a name depending on the selected qualification mode
 ppQualifyName :: Qualification -> Notation -> Name -> Module -> Html
@@ -136,11 +136,14 @@ wrapInfix notation n = case notation of
     is_star_kind = isTcOcc n && occNameString n == "*"
 
 linkId :: Module -> Maybe Name -> Html -> Html
-linkId mdl mbName = linkIdOcc mdl (fmap nameOccName mbName)
+linkId mdl mbName = linkIdOcc mdl (fmap nameOccName mbName) True
 
 
-linkIdOcc :: Module -> Maybe OccName -> Html -> Html
-linkIdOcc mdl mbName = anchor ! [href url]
+linkIdOcc :: Module -> Maybe OccName -> Bool -> Html -> Html
+linkIdOcc mdl mbName insertAnchors =
+  if insertAnchors
+  then anchor ! [href url]
+  else id
   where
     url = case mbName of
       Nothing   -> moduleUrl mdl

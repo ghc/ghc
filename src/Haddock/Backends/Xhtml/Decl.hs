@@ -273,7 +273,7 @@ ppDataBinderWithVars summ decl =
 -- | Print an application of a DocName and two lists of HsTypes (kinds, types)
 ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName] -> Bool -> Qualification -> Html
 ppAppNameTypes n ks ts unicode qual =
-    ppTypeApp n ks ts (ppDocName qual) (ppParendType unicode qual)
+    ppTypeApp n ks ts (\p -> ppDocName qual p True) (ppParendType unicode qual)
 
 
 -- | Print an application of a DocName and a list of Names
@@ -350,7 +350,7 @@ ppFds fds unicode qual =
         char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
   where
         fundep (vars1,vars2) = ppVars vars1 <+> arrow unicode <+> ppVars vars2
-        ppVars = hsep . map (ppDocName qual Prefix)
+        ppVars = hsep . map (ppDocName qual Prefix True)
 
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
                  -> [(DocName, DocForDecl DocName)] -> Bool -> Qualification
@@ -732,7 +732,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode qual
     hsep [ppForAll expl tvs ctxt unicode qual, ppr_mono_lty pREC_TOP ty unicode qual]
 
 ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q ty
-ppr_mono_ty _         (HsTyVar name)      _ q = ppDocName q Prefix name
+ppr_mono_ty _         (HsTyVar name)      _ q = ppDocName q Prefix True name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u q =

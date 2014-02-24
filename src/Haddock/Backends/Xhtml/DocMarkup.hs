@@ -14,6 +14,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docToHtml,
   rdrDocToHtml,
   origDocToHtml,
+  docToHtmlNoAnchors,
 
   docElement, docSection, docSection_,
 ) where
@@ -31,13 +32,14 @@ import Data.Maybe (fromMaybe)
 
 import GHC
 
-parHtmlMarkup :: Qualification -> (a -> Html) -> DocMarkup a Html
-parHtmlMarkup qual ppId = Markup {
+parHtmlMarkup :: Qualification -> Bool
+              -> (Bool -> a -> Html) -> DocMarkup a Html
+parHtmlMarkup qual insertAnchors ppId = Markup {
   markupEmpty                = noHtml,
   markupString               = toHtml,
   markupParagraph            = paragraph,
   markupAppend               = (+++),
-  markupIdentifier           = thecode . ppId,
+  markupIdentifier           = thecode . ppId insertAnchors,
   markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
   markupModule               = \m -> let (mdl,ref) = break (=='#') m
                                      in ppModuleRef (mkModuleName mdl) ref,
@@ -49,7 +51,11 @@ parHtmlMarkup qual ppId = Markup {
   markupOrderedList          = ordList,
   markupDefList              = defList,
   markupCodeBlock            = pre,
-  markupHyperlink            = \(Hyperlink url mLabel) -> anchor ! [href url] << fromMaybe url mLabel,
+  markupHyperlink            = \(Hyperlink url mLabel)
+                               -> if insertAnchors
+                                  then anchor ! [href url]
+                                       << fromMaybe url mLabel
+                                  else toHtml $ fromMaybe url mLabel,
   markupAName                = \aname -> namedAnchor aname << "",
   markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
   markupProperty             = pre . toHtml,
@@ -80,17 +86,22 @@ parHtmlMarkup qual ppId = Markup {
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Qualification -> Doc DocName -> Html
 docToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup qual (ppDocName qual Raw)
+  where fmt = parHtmlMarkup qual True (ppDocName qual Raw)
 
+-- | Same as 'docToHtml' but it doesn't insert the 'anchor' element
+-- in links. This is used to generate the Contents box elements.
+docToHtmlNoAnchors :: Qualification -> Doc DocName -> Html
+docToHtmlNoAnchors qual = markup fmt . cleanup
+  where fmt = parHtmlMarkup qual False (ppDocName qual Raw)
 
 origDocToHtml :: Qualification -> Doc Name -> Html
 origDocToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup qual (ppName Raw)
+  where fmt = parHtmlMarkup qual True (const $ ppName Raw)
 
 
 rdrDocToHtml :: Qualification -> Doc RdrName -> Html
 rdrDocToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup qual ppRdrName
+  where fmt = parHtmlMarkup qual True (const ppRdrName)
 
 
 docElement :: (Html -> Html) -> Html -> Html

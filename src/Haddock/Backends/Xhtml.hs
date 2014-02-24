@@ -625,14 +625,14 @@ ppModuleContents qual exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-        html = linkedAnchor (groupId id0) << docToHtml qual doc +++ mk_subsections ssecs
+        html = linkedAnchor (groupId id0)
+               << docToHtmlNoAnchors qual doc +++ mk_subsections ssecs
         (ssecs, rest1) = process lev rest
         (secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
 
   mk_subsections [] = noHtml
   mk_subsections ss = unordList ss
-
 
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
@@ -654,10 +654,11 @@ processExport summary _ _ qual (ExportGroup lev id0 doc)
 processExport summary links unicode qual (ExportDecl decl doc subdocs insts)
   = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode qual
 processExport summary _ _ qual (ExportNoDecl y [])
-  = processDeclOneLiner summary $ ppDocName qual Prefix y
+  = processDeclOneLiner summary $ ppDocName qual Prefix True y
 processExport summary _ _ qual (ExportNoDecl y subs)
   = processDeclOneLiner summary $
-      ppDocName qual Prefix y +++ parenList (map (ppDocName qual Prefix) subs)
+      ppDocName qual Prefix True y
+      +++ parenList (map (ppDocName qual Prefix True) subs)
 processExport summary _ _ qual (ExportDoc doc)
   = nothingIf summary $ docSection_ qual doc
 processExport summary _ _ _ (ExportModule mdl)
