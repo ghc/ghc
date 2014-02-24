@@ -1281,9 +1281,9 @@ module W where
 
       <para>The <quote>Portability</quote> field has seen varied use
       by different library authors. Some people put down things like
-      operating system constraints there while others put down which
-      GHC extensions used. Note that you might want to consider using
-      the <quote>show-extensions</quote> module flag for the
+      operating system constraints there while others put down which GHC
+      extensions are used in the module. Note that you might want to
+      consider using the <quote>show-extensions</quote> module flag for the
       latter.</para>
 
       <para>Finally, a module may contain a documentation comment
