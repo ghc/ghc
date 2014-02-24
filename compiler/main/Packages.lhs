@@ -1047,10 +1047,22 @@ isDllName :: DynFlags -> PackageId -> Module -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the synbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName dflags this_pkg this_mod name
+isDllName dflags _this_pkg this_mod name
   | gopt Opt_Static dflags = False
   | Just mod <- nameModule_maybe name
-    = if modulePackageId mod /= this_pkg
+    -- Issue #8696 - when GHC is dynamically linked, it will attempt
+    -- to load the dynamic dependencies of object files at compile
+    -- time for things like QuasiQuotes or
+    -- TemplateHaskell. Unfortunately, this interacts badly with
+    -- intra-package linking, because we don't generate indirect
+    -- (dynamic) symbols for intra-package calls. This means that if a
+    -- module with an intra-package call is loaded without its
+    -- dependencies, then GHC fails to link. This is the cause of #
+    --
+    -- In the mean time, always force dynamic indirections to be
+    -- generated: when the module name isn't the module being
+    -- compiled, references are dynamic.
+    = if mod /= this_mod
       then True
       else case dllSplit dflags of
            Nothing -> False
