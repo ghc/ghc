@@ -31,6 +31,7 @@ import Data.Ord
 import Control.Applicative
 import Control.DeepSeq
 import Control.Monad
+import Data.Function (on)
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
@@ -255,7 +256,7 @@ mkMaps :: DynFlags
        -> ErrMsgM Maps
 mkMaps dflags gre instances decls = do
   (a, b, c, d) <- unzip4 <$> mapM mappings decls
-  return (f a, f b, f c, f d, instanceMap)
+  return (f $ map (nubBy ((==) `on` fst)) a , f b, f c, f d, instanceMap)
   where
     f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
     f = M.fromListWith (<>) . concat

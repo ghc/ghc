@@ -1218,6 +1218,29 @@ data R a b =
         Haddock - for example doc comments can appear before or after
         the comma in separated lists such as the list of record fields
         above.</para>
+
+        <para>In case that more than one constructor exports a field
+        with the same name, the documentation attached to the first
+        occurence of the field will be used, even if a comment is not
+        present.
+        </para>
+
+<programlisting>
+data T a = A { someField :: a -- ^ Doc for someField of A
+             }
+         | B { someField :: a -- ^ Doc for someField of B
+             }
+</programlisting>
+
+        <para>In the above example, all occurences of
+        <literal>someField</literal> in the documentation are going to
+        be documented with <literal>Doc for someField of A</literal>.
+        Note that Haddock versions 2.14.0 and before would join up
+        documentation of each field and render the result. The reason
+        for this seemingly weird behaviour is the fact that
+        <literal>someField</literal> is actually the same (partial)
+        function.</para>
+
       </section>
 
       <section>
