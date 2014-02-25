@@ -373,6 +373,14 @@
                 bug</ulink> in ld.
            </para>
        </listitem>
+
+        <listitem>
+            <para>
+                GHC now uses Unicode <emphasis>left/right single qoutation
+                marks</emphasis> (i.e. U+2018 and U+2019) in compiler messages
+                if the current locale supports Unicode characters.
+           </para>
+       </listitem>
    </itemizedlist>
   </sect2>
 
