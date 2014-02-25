@@ -196,7 +196,7 @@ tyConString = tyConName
 class Typeable a where
   typeRep# :: Proxy# a -> TypeRep
 
---  Takes a value of type @a@ and returns a concrete representation
+-- | Takes a value of type @a@ and returns a concrete representation
 -- of that type.
 --
 -- /Since: 4.7.0.0/

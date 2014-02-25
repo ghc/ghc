@@ -35,10 +35,12 @@
 -- and type-safe cast (but not dynamics) to support the \"Scrap your
 -- boilerplate\" style of generic programming.
 --
+-- == Compatibility Notes
+--
 -- Since GHC 7.8, 'Typeable' is poly-kinded. The changes required for this might
 -- break some old programs involving 'Typeable'. More details on this, including
--- how to fix your code, are on the wiki page:
--- <https://ghc.haskell.org/trac/ghc/wiki/GhcKinds/PolyTypeable>
+-- how to fix your code, can be found on the
+-- <https://ghc.haskell.org/trac/ghc/wiki/GhcKinds/PolyTypeable PolyTypeable wiki page>
 --
 -----------------------------------------------------------------------------
 
