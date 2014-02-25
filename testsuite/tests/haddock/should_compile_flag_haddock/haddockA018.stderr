@@ -1,6 +1,6 @@
 
 ==================== Parser ====================
-<document comment>
+ module header bla bla 
 module A where
 
 

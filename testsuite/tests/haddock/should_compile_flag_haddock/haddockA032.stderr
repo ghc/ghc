@@ -2,9 +2,9 @@
 ==================== Parser ====================
 module ShouldCompile where
 data R a
-    = R {field1 :: a,
-	 field2 :: a <document comment>,
-	 field3 :: a <document comment>,
-	 field4 :: a <document comment>}
+  = R {field1 :: a,
+       field2 :: a  comment for field2,
+       field3 :: a  comment for field3,
+       field4 :: a  comment for field4 }
 
 

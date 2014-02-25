@@ -1,6 +1,7 @@
 
 ==================== Parser ====================
 module ShouldCompile where
-data A = <document comment> A | <document comment> B | <document comment> C | D
+data A
+  =  comment for A  A |  comment for B  B |  comment for C   C | D
 
 

@@ -2,8 +2,7 @@
 ==================== Parser ====================
 module ShouldCompile where
 data (<-->) a b = Mk a b
-test ::
-  [a] <document comment> -> (a <--> (b -> [a])) <document comment>
+test :: [a]  doc1  -> (a <--> (b -> [a]))  blabla
 test xs ys = xs
 
 

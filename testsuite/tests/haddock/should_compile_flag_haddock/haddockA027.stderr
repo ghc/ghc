@@ -2,10 +2,9 @@
 ==================== Parser ====================
 module ShouldCompile where
 test ::
-  [a] <document comment>
+  [a]  doc1 
   -> forall b. Ord b =>
-     [b] <document comment>
-     -> forall c. Num c => [c] <document comment> -> [a]
+     [b]  doc2  -> forall c. Num c => [c]  doc3 -> [a]
 test xs ys zs = xs
 
 
