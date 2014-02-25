@@ -1,5 +1,4 @@
 {-# LANGUAGE Unsafe             #-}
-{-# LANGUAGE ConstraintKinds    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -21,6 +20,7 @@
            , MagicHash
            , KindSignatures
            , PolyKinds
+           , ConstraintKinds
            , DeriveDataTypeable
            , StandaloneDeriving #-}
 
