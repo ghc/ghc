@@ -376,7 +376,7 @@
 
         <listitem>
             <para>
-                GHC now uses Unicode <emphasis>left/right single qoutation
+                GHC now uses Unicode <emphasis>left/right single quotation
                 marks</emphasis> (i.e. U+2018 and U+2019) in compiler messages
                 if the current locale supports Unicode characters.
            </para>
