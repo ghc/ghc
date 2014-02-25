@@ -139,6 +139,7 @@ module Control.Concurrent.MVar
         , tryPutMVar
         , isEmptyMVar
         , withMVar
+        , withMVarMasked
         , modifyMVar_
         , modifyMVar
         , modifyMVarMasked_
@@ -185,6 +186,21 @@ withMVar m io =
   mask $ \restore -> do
     a <- takeMVar m
     b <- restore (io a) `onException` putMVar m a
+    putMVar m a
+    return b
+
+{-|
+  Like 'withMVar', but the @IO@ action in the second argument is executed
+  with asynchronous exceptions masked.
+
+  /Since: 4.7.0.0/
+-}
+{-# INLINE withMVarMasked #-}
+withMVarMasked :: MVar a -> (a -> IO b) -> IO b
+withMVarMasked m io =
+  mask_ $ do
+    a <- takeMVar m
+    b <- io a `onException` putMVar m a
     putMVar m a
     return b
 

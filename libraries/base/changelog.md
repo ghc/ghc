@@ -51,6 +51,10 @@
     `putMVar`.  There is also a new `tryReadMVar` which is a
     non-blocking version.
 
+  * New `Control.Concurrent.MVar.withMVarMasked` which executes
+    `IO` action with asynchronous exceptions masked in the same style
+    as the existing `modifyMVarMasked` and `modifyMVarMasked_`.
+
   * New `threadWait{Read,Write}STM :: Fd -> IO (STM (), IO ())`
     functions added to `Control.Concurrent` for waiting on FD
     readiness with STM actions.
