@@ -321,3 +321,4 @@ test('T8759', normal, compile_fail, ['-v0'])
 test('T8759a', normal, compile_fail, ['-v0'])
 test('T7021',
      extra_clean(['T7021a.hi', 'T7021a.o']), multimod_compile, ['T7021','-v0'])
+test('T8807', normal, compile, ['-v0'])

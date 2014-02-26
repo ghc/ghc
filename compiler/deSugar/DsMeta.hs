@@ -754,40 +754,8 @@ repLContext :: LHsContext Name -> DsM (Core TH.CxtQ)
 repLContext (L _ ctxt) = repContext ctxt
 
 repContext :: HsContext Name -> DsM (Core TH.CxtQ)
-repContext ctxt = do preds <- repList predQTyConName repLPred ctxt
+repContext ctxt = do preds <- repList typeQTyConName repLTy ctxt
                      repCtxt preds
-
--- represent a type predicate
---
-repLPred :: LHsType Name -> DsM (Core TH.PredQ)
-repLPred (L _ p) = repPred p
-
-repPred :: HsType Name -> DsM (Core TH.PredQ)
-repPred (HsParTy ty)
-  = repLPred ty
-repPred ty
-  | Just (cls, tys) <- splitHsClassTy_maybe ty
-             -- works even when cls is not a class (ConstraintKinds)
-  = do
-      cls1 <- lookupOcc cls
-      tyco <- repNamedTyCon cls1
-      tys' <- mapM repLTy tys
-      repTapps tyco tys'
-repPred (HsEqTy tyleft tyright)
-  = do
-      tyleft1  <- repLTy tyleft
-      tyright1 <- repLTy tyright
-      eq       <- repTequality
-      repTapps eq [tyleft1, tyright1]
-repPred (HsTupleTy _ lps)
-  = do
-      tupTy <- repTupleTyCon size
-      tys'  <- mapM repLTy lps
-      repTapps tupTy tys'
-  where
-    size = length lps
-repPred ty
-  = notHandled "Exotic predicate type" (ppr ty)
 
 -- yield the representation of a list of types
 --
@@ -843,6 +811,11 @@ repTy (HsTupleTy _ tys)     = do tys1 <- repLTys tys
 repTy (HsOpTy ty1 (_, n) ty2) = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
                                    `nlHsAppTy` ty2)
 repTy (HsParTy t)           = repLTy t
+repTy (HsEqTy t1 t2) = do
+                         t1' <- repLTy t1
+                         t2' <- repLTy t2
+                         eq  <- repTequality
+                         repTapps eq [t1', t2']
 repTy (HsKindSig t k)       = do
                                 t1 <- repLTy t
                                 k1 <- repLKind k
@@ -858,6 +831,7 @@ repTy (HsExplicitTupleTy _ tys) = do
 repTy (HsTyLit lit) = do
                         lit' <- repTyLit lit
                         repTLit lit'
+                          
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> DsM (Core TH.TyLitQ)
