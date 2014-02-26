@@ -387,8 +387,8 @@ endif
 BIN_DIST_NAME         = ghc-$(ProjectVersion)
 BIN_DIST_PREP_DIR     = bindistprep/$(BIN_DIST_NAME)
 BIN_DIST_PREP_TAR     = bindistprep/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar
-BIN_DIST_PREP_TAR_BZ2 = $(BIN_DIST_PREP_TAR).bz2
-BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
+BIN_DIST_PREP_TAR_COMP = $(BIN_DIST_PREP_TAR).$(TAR_COMP_EXT)
+BIN_DIST_TAR_COMP     = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.$(TAR_COMP_EXT)
 
 # -----------------------------------------------------------------------------
 # Utilities programs: flags
