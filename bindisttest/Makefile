@@ -21,9 +21,9 @@ include $(TOP)/mk/tree.mk
 include $(TOP)/mk/config.mk
 
 ifeq "$(TEST_PREP)" "YES"
-BIN_DIST_TEST_TAR_BZ2 = ../$(BIN_DIST_PREP_TAR_BZ2)
+BIN_DIST_TEST_TAR_COMP = ../$(BIN_DIST_PREP_TAR_COMP)
 else
-BIN_DIST_TEST_TAR_BZ2 = ../$(BIN_DIST_TAR_BZ2)
+BIN_DIST_TEST_TAR_COMP = ../$(BIN_DIST_TAR_COMP)
 endif
 
 all:
@@ -36,7 +36,7 @@ all:
 # NB. tar has funny interpretation of filenames sometimes (thinking
 # c:/foo is a remote file), so it's safer to bzip and then pipe into
 # tar rather than using tar -xjf:
-	cd a/b/c/ && $(BZIP2_CMD) -cd ../../../$(BIN_DIST_TEST_TAR_BZ2) | $(TAR_CMD) -xf -
+	cd a/b/c/ && $(TAR_COMP_CMD) -cd ../../../$(BIN_DIST_TEST_TAR_COMP) | $(TAR_CMD) -xf -
 ifeq "$(Windows)" "YES"
 	mv a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
