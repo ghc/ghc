@@ -697,6 +697,24 @@ PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@
 BZIP2_CMD      = bzip2
 GZIP_CMD       = gzip
+XZ_CMD         = xz
+
+# bzip2 is default compression
+TAR_COMP      = bzip2
+
+# select compression command and .tar extension based on TAR_COMP value
+ifeq "$(TAR_COMP)" "bzip2"
+TAR_COMP_CMD  = $(BZIP2_CMD)
+TAR_COMP_EXT  = bz2
+else ifeq "$(TAR_COMP)" "gzip"
+TAR_COMP_CMD  = $(GZIP_CMD)
+TAR_COMP_EXT  = gz
+else ifeq "$(TAR_COMP)" "xz"
+TAR_COMP_CMD  = $(XZ_CMD)
+TAR_COMP_EXT  = xz
+else
+$(error $$(TAR_COMP) set to unknown value "$(TAR_COMP)" (supported: "bzip2", "gzip", "xz"))
+endif
 
 ifeq "$(Windows_Host)" "YES"
 TOUCH_CMD      = $(utils/touchy_dist_INPLACE)

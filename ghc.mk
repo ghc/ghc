@@ -1009,12 +1009,12 @@ unix-binary-dist-prep:
 	$(call removeFiles,$(BIN_DIST_PREP_TAR))
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	cd bindistprep && "$(TAR_CMD)" hcf - -T ../bindist-list | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
+	cd bindistprep && "$(TAR_CMD)" hcf - -T ../bindist-list | $(TAR_COMP_CMD) -c > ../$(BIN_DIST_PREP_TAR_COMP)
 
 windows-binary-dist-prep:
 	$(call removeTrees,bindistprep/)
 	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
-	cd bindistprep && "$(TAR_CMD)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
+	cd bindistprep && "$(TAR_CMD)" cf - $(BIN_DIST_NAME) | $(TAR_COMP_CMD) -c > ../$(BIN_DIST_PREP_TAR_COMP)
 
 # tryTimes tries to run its third argument multiple times, until it
 # succeeds. Don't call it directly; call try10Times instead.
@@ -1032,7 +1032,7 @@ try10Times = $(call tryTimes,,x x x x x x x x x x,$1) { echo Failed; false; }
 
 .PHONY: publish-binary-dist
 publish-binary-dist:
-	$(call try10Times,$(PublishCp) $(BIN_DIST_TAR_BZ2) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(BIN_DIST_TAR_COMP) $(PublishLocation)/dist)
 
 ifeq "$(mingw32_TARGET_OS)" "1"
 DOCDIR_TO_PUBLISH = $(BIN_DIST_INST_DIR)/doc
@@ -1072,17 +1072,17 @@ SRC_DIST_BASE_NAME = ghc-$(ProjectVersion)
 SRC_DIST_GHC_NAME                 = ghc-$(ProjectVersion)-src
 SRC_DIST_GHC_ROOT                 = $(SRC_DIST_ROOT)/ghc
 SRC_DIST_GHC_DIR                  = $(SRC_DIST_GHC_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_GHC_TARBALL              = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME).tar.bz2
+SRC_DIST_GHC_TARBALL              = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME).tar.$(TAR_COMP_EXT)
 
 SRC_DIST_WINDOWS_TARBALLS_NAME    = ghc-$(ProjectVersion)-windows-extra-src
 SRC_DIST_WINDOWS_TARBALLS_ROOT    = $(SRC_DIST_ROOT)/windows-tarballs
 SRC_DIST_WINDOWS_TARBALLS_DIR     = $(SRC_DIST_WINDOWS_TARBALLS_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_WINDOWS_TARBALLS_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_WINDOWS_TARBALLS_NAME).tar.bz2
+SRC_DIST_WINDOWS_TARBALLS_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_WINDOWS_TARBALLS_NAME).tar.$(TAR_COMP_EXT)
 
 SRC_DIST_TESTSUITE_NAME           = ghc-$(ProjectVersion)-testsuite
 SRC_DIST_TESTSUITE_ROOT           = $(SRC_DIST_ROOT)/testsuite-ghc
 SRC_DIST_TESTSUITE_DIR            = $(SRC_DIST_TESTSUITE_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).tar.bz2
+SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).tar.$(TAR_COMP_EXT)
 
 #
 # Files to include in source distributions
@@ -1161,15 +1161,15 @@ sdist-testsuite-prep :
 
 .PHONY: sdist-ghc
 sdist-ghc: sdist-ghc-prep
-	cd $(SRC_DIST_GHC_ROOT)              && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log               | bzip2 > $(TOP)/$(SRC_DIST_GHC_TARBALL)
+	cd $(SRC_DIST_GHC_ROOT)              && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log               | $(TAR_COMP_CMD) -c > $(TOP)/$(SRC_DIST_GHC_TARBALL)
 
 .PHONY: sdist-windows-tarballs
 sdist-windows-tarballs: sdist-windows-tarballs-prep
-	cd $(SRC_DIST_WINDOWS_TARBALLS_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> windows_extra_src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_WINDOWS_TARBALLS_TARBALL)
+	cd $(SRC_DIST_WINDOWS_TARBALLS_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> windows_extra_src_ghc_log | $(TAR_COMP_CMD) -c > $(TOP)/$(SRC_DIST_WINDOWS_TARBALLS_TARBALL)
 
 .PHONY: sdist-testsuite
 sdist-testsuite: sdist-testsuite-prep
-	cd $(SRC_DIST_TESTSUITE_ROOT)        && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> testsuite_log             | bzip2 > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
+	cd $(SRC_DIST_TESTSUITE_ROOT)        && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> testsuite_log             | $(TAR_COMP_CMD) -c > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
 
 
 .PHONY: sdist
