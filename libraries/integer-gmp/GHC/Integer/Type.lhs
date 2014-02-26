@@ -18,6 +18,8 @@
 --
 
 #include "MachDeps.h"
+#include "HsIntegerGmp.h"
+
 #if SIZEOF_HSWORD == 4
 #define INT_MINBOUND (-2147483648#)
 #define NEG_INT_MINBOUND (S# 2147483647# `plusInteger` S# 1#)
@@ -826,12 +828,20 @@ powModInteger b e m = powModInteger (toBig b) (toBig e) (toBig m)
 -- channel attacks and is therefore intended for cryptographic
 -- applications.
 --
+-- This primitive is only available when the underlying GMP library
+-- supports it (GMP >= 5). Otherwise, it internally falls back to
+-- @'powModInteger'@, and a warning will be emitted when used.
+--
 -- /Since: 0.5.1.0/
 {-# NOINLINE powModSecInteger #-}
 powModSecInteger :: Integer -> Integer -> Integer -> Integer
 powModSecInteger (J# s1 d1) (J# s2 d2) (J# s3 d3) =
     mpzToInteger (powModSecInteger# s1 d1 s2 d2 s3 d3)
 powModSecInteger b e m = powModSecInteger (toBig b) (toBig e) (toBig m)
+
+#if HAVE_SECURE_POWM == 0
+{-# WARNING powModSecInteger "The underlying GMP library does not support a secure version of powModInteger which is side-channel resistant - you need at least GMP version 5 to support this" #-}
+#endif
 
 -- | \"@'recipModInteger' /x/ /m/@\" computes the inverse of @/x/@ modulo @/m/@. If
 -- the inverse exists, the return value @/y/@ will satisfy @0 < /y/ <

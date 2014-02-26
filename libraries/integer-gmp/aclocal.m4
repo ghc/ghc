@@ -6,12 +6,17 @@ dnl--------------------------------------------------------------------
 AC_DEFUN([LOOK_FOR_GMP_LIB],[
     if test "$HaveFrameworkGMP" = "NO"
     then
-        AC_CHECK_LIB([gmp],  [__gmpz_powm_sec],
+        AC_CHECK_LIB([gmp],  [__gmpz_powm],
                      [HaveLibGmp=YES; GMP_LIBS=gmp])
         if test "$HaveLibGmp" = "NO"
         then
-            AC_CHECK_LIB([gmp3], [__gmpz_powm_sec],
+            AC_CHECK_LIB([gmp3], [__gmpz_powm],
                          [HaveLibGmp=YES; GMP_LIBS=gmp3])
+        fi
+        if test "$HaveLibGmp" = "YES"
+        then
+            AC_CHECK_LIB([$GMP_LIBS], [__gmpz_powm_sec],
+                         [HaveSecurePowm=1])
         fi
     fi
 ])

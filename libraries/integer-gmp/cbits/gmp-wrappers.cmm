@@ -27,6 +27,7 @@
 
 #include "Cmm.h"
 #include "GmpDerivedConstants.h"
+#include "HsIntegerGmp.h"
 
 import "integer-gmp" __gmpz_add;
 import "integer-gmp" __gmpz_add_ui;
@@ -61,7 +62,9 @@ import "integer-gmp" __gmpz_ior;
 import "integer-gmp" __gmpz_com;
 import "integer-gmp" __gmpz_pow_ui;
 import "integer-gmp" __gmpz_powm;
+#if HAVE_SECURE_POWM == 1
 import "integer-gmp" __gmpz_powm_sec;
+#endif
 import "integer-gmp" __gmpz_invert;
 import "integer-gmp" __gmpz_nextprime;
 import "integer-gmp" __gmpz_probab_prime_p;
@@ -629,7 +632,12 @@ GMP_TAKE2_RET2(integer_cmm_divModIntegerzh,         __gmpz_fdiv_qr)
 GMP_TAKE1_UL1_RET2(integer_cmm_divModIntegerWordzh, __gmpz_fdiv_qr_ui)
 
 GMP_TAKE3_RET1(integer_cmm_powModIntegerzh,         __gmpz_powm)
+#if HAVE_SECURE_POWM == 1
 GMP_TAKE3_RET1(integer_cmm_powModSecIntegerzh,      __gmpz_powm_sec)
+#else
+GMP_TAKE3_RET1(integer_cmm_powModSecIntegerzh,      __gmpz_powm)
+#endif
+
 GMP_TAKE2_RET1(integer_cmm_recipModIntegerzh,       __gmpz_invert)
 GMP_TAKE1_UL1_RET1(integer_cmm_powIntegerzh,        __gmpz_pow_ui)
 

@@ -35,6 +35,7 @@ extra-source-files:
     gmp/config.mk.in
     install-sh
     integer-gmp.buildinfo.in
+    include/HsIntegerGmp.h.in
 
 extra-tmp-files:
     autom4te.cache
@@ -42,6 +43,7 @@ extra-tmp-files:
     config.status
     gmp/config.mk
     integer-gmp.buildinfo
+    include/HsIntegerGmp.h
 
 source-repository head
     type:     git
@@ -73,6 +75,7 @@ Library
         GHC.Integer.Type
 
     c-sources: cbits/cbits.c
+    include-dirs: include
 
     build-depends: ghc-prim >= 0.3.1 && < 0.4
 

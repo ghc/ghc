@@ -47,6 +47,7 @@ HaveLibGmp=NO
 GMP_LIBS=
 HaveFrameworkGMP=NO
 GMP_FRAMEWORK=
+HaveSecurePowm=0
 
 if test "$GMP_FORCE_INTREE" != "YES"
 then
@@ -74,8 +75,9 @@ AC_SUBST(GMP_LIB_DIRS)
 AC_SUBST(GMP_FRAMEWORK)
 AC_SUBST(HaveLibGmp)
 AC_SUBST(HaveFrameworkGMP)
+AC_SUBST(HaveSecurePowm)
 
-AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk])
+AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk include/HsIntegerGmp.h])
 
 dnl--------------------------------------------------------------------
 dnl * Generate the header cbits/GmpDerivedConstants.h
