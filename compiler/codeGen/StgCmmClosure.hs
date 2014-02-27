@@ -450,25 +450,27 @@ in TcGenDeriv.) -}
 whether or not it has free variables, and whether we're running
 sequentially or in parallel.
 
-Closure                               Node   Argument   Enter
-Characteristics                  Par   Req'd  Passing    Via
--------------------------------------------------------------------------------
-Unknown                         & no & yes & stack      & node
-Known fun (>1 arg), no fvs      & no & no  & registers  & fast entry (enough args)
-                                                        & slow entry (otherwise)
-Known fun (>1 arg), fvs         & no & yes & registers  & fast entry (enough args)
-0 arg, no fvs \r,\s             & no & no  & n/a        & direct entry
-0 arg, no fvs \u                & no & yes & n/a        & node
-0 arg, fvs \r,\s                & no & yes & n/a        & direct entry
-0 arg, fvs \u                   & no & yes & n/a        & node
-Unknown                         & yes & yes & stack     & node
-Known fun (>1 arg), no fvs      & yes & no  & registers & fast entry (enough args)
-                                                        & slow entry (otherwise)
-Known fun (>1 arg), fvs         & yes & yes & registers & node
-0 arg, no fvs \r,\s             & yes & no  & n/a       & direct entry
-0 arg, no fvs \u                & yes & yes & n/a       & node
-0 arg, fvs \r,\s                & yes & yes & n/a       & node
-0 arg, fvs \u                   & yes & yes & n/a       & node
+Closure                           Node   Argument   Enter
+Characteristics              Par   Req'd  Passing    Via
+---------------------------------------------------------------------------
+Unknown                     & no  & yes & stack     & node
+Known fun (>1 arg), no fvs  & no  & no  & registers & fast entry (enough args)
+                                                    & slow entry (otherwise)
+Known fun (>1 arg), fvs     & no  & yes & registers & fast entry (enough args)
+0 arg, no fvs \r,\s         & no  & no  & n/a       & direct entry
+0 arg, no fvs \u            & no  & yes & n/a       & node
+0 arg, fvs \r,\s,selector   & no  & yes & n/a       & node
+0 arg, fvs \r,\s            & no  & yes & n/a       & direct entry
+0 arg, fvs \u               & no  & yes & n/a       & node
+Unknown                     & yes & yes & stack     & node
+Known fun (>1 arg), no fvs  & yes & no  & registers & fast entry (enough args)
+                                                    & slow entry (otherwise)
+Known fun (>1 arg), fvs     & yes & yes & registers & node
+0 arg, fvs \r,\s,selector   & yes & yes & n/a       & node
+0 arg, no fvs \r,\s         & yes & no  & n/a       & direct entry
+0 arg, no fvs \u            & yes & yes & n/a       & node
+0 arg, fvs \r,\s            & yes & yes & n/a       & node
+0 arg, fvs \u               & yes & yes & n/a       & node
 
 When black-holing, single-entry closures could also be entered via node
 (rather than directly) to catch double-entry. -}
@@ -519,7 +521,8 @@ getCallMethod dflags _name _ lf_info _n_args _cg_loc _self_loop_info
         -- fetched since we allocated it.
     EnterIt
 
-getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _cg_loc _self_loop_info
+getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _cg_loc
+              _self_loop_info
   | n_args == 0    = ASSERT( arity /= 0 )
                      ReturnIt        -- No args at all
   | n_args < arity = SlowCall        -- Not enough args
@@ -531,7 +534,8 @@ getCallMethod _ _name _ LFUnLifted n_args _cg_loc _self_loop_info
 getCallMethod _ _name _ (LFCon _) n_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun) n_args _cg_loc _self_loop_info
+getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
+              n_args _cg_loc _self_loop_info
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
                 -- is the fast-entry code]
@@ -544,6 +548,12 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun) n_args
          of jumping directly to the entry code is still valid.  --SDM
         -}
   = EnterIt
+
+  -- even a non-updatable selector thunk can be updated by the garbage
+  -- collector, so we must enter it. (#8817)
+  | SelectorThunk{} <- std_form_info
+  = EnterIt
+
     -- We used to have ASSERT( n_args == 0 ), but actually it is
     -- possible for the optimiser to generate
     --   let bot :: Int = error Int "urk"
@@ -553,7 +563,8 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun) n_args
 
   | otherwise        -- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    DirectEntry (thunkEntryLabel dflags name (idCafInfo id) std_form_info updatable) 0
+    DirectEntry (thunkEntryLabel dflags name (idCafInfo id) std_form_info
+                updatable) 0
 
 getCallMethod _ _name _ (LFUnknown True) _n_arg _cg_locs _self_loop_info
   = SlowCall -- might be a function
@@ -562,7 +573,8 @@ getCallMethod _ name _ (LFUnknown False) n_args _cg_loc _self_loop_info
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
     EnterIt -- Not a function
 
-getCallMethod _ _name _ LFLetNoEscape _n_args (LneLoc blk_id lne_regs) _self_loop_info
+getCallMethod _ _name _ LFLetNoEscape _n_args (LneLoc blk_id lne_regs)
+              _self_loop_info
   = JumpToIt blk_id lne_regs
 
 getCallMethod _ _ _ _ _ _ _ = panic "Unknown call method"
