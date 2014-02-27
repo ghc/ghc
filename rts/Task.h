@@ -37,12 +37,20 @@
    Ownership of Task
    -----------------
 
-   The OS thread named in the Task structure has exclusive access to
-   the structure, as long as it is the running_task of its Capability.
-   That is, if (task->cap->running_task == task), then task->id owns
-   the Task.  Otherwise the Task is owned by the owner of the parent
-   data structure on which it is sleeping; for example, if the task is
-   sleeping on spare_workers field of a Capability, then the owner of the
+   Task ownership is a little tricky.  The default situation is that
+   the Task is an OS-thread-local structure that is owned by the OS
+   thread named in task->id.  An OS thread not currently executing
+   Haskell code might call newBoundTask() at any time, which assumes
+   that it has access to the Task for the current OS thread.
+
+   The all_next and all_prev fields of a Task are owned by
+   all_tasks_mutex, which must also be taken if we want to create or
+   free a Task.
+
+   For an OS thread in Haskell, if (task->cap->running_task != task),
+   then the Task is owned by the owner of the parent data structure on
+   which it is sleeping; for example, if the task is sleeping on
+   spare_workers field of a Capability, then the owner of the
    Capability has access to the Task.
 
    When a task is migrated from sleeping on one Capability to another,
@@ -147,7 +155,7 @@ typedef struct Task_ {
     // on spare_workers.
     struct Task_ *next;
 
-    // Links tasks on the all_tasks list
+    // Links tasks on the all_tasks list; need ACQUIRE_LOCK(&all_tasks_mutex)
     struct Task_ *all_next;
     struct Task_ *all_prev;
 
@@ -169,15 +177,23 @@ extern Task *all_tasks;
 void initTaskManager (void);
 nat  freeTaskManager (void);
 
-// Create a new Task for a bound thread
-// Requires: sched_mutex.
+// Create a new Task for a bound thread.  This Task must be released
+// by calling boundTaskExiting.  The Task is cached in
+// thread-local storage and will remain even after boundTaskExiting()
+// has been called; to free the memory, see freeMyTask().
 //
 Task *newBoundTask (void);
 
 // The current task is a bound task that is exiting.
-// Requires: sched_mutex.
 //
 void boundTaskExiting (Task *task);
+
+// Free a Task if one was previously allocated by newBoundTask().
+// This is not necessary unless the thread that called newBoundTask()
+// will be exiting, or if this thread has finished calling Haskell
+// functions.
+//
+void freeMyTask(void);
 
 // Notify the task manager that a task has stopped.  This is used
 // mainly for stats-gathering purposes.

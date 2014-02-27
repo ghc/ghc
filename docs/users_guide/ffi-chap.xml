@@ -213,6 +213,40 @@ newtype {-# CTYPE            "useconds_t" #-} T = ...
 </programlisting>
         </para>
       </sect2>
+
+      <sect2>
+        <title><literal>hs_thread_done()</literal></title>
+
+<programlisting>
+void hs_thread_done(void);
+</programlisting>
+
+        <para>
+          GHC allocates a small amount of thread-local memory when a
+          thread calls a Haskell function via a <literal>foreign
+          export</literal>.  This memory is not normally freed until
+          <literal>hs_exit()</literal>; the memory is cached so that
+          subsequent calls into Haskell are fast.  However, if your
+          application is long-running and repeatedly creates new
+          threads that call into Haskell, you probably want to arrange
+          that this memory is freed in those threads that have
+          finished calling Haskell functions.  To do this, call
+          <literal>hs_thread_done()</literal> from the thread whose
+          memory you want to free.
+        </para>
+
+        <para>
+          Calling <literal>hs_thread_done()</literal> is entirely
+          optional.  You can call it as often or as little as you
+          like.  It is safe to call it from a thread that has never
+          called any Haskell functions, or one that never will.  If
+          you forget to call it, the worst that can happen is that
+          some memory remains allocated until
+          <literal>hs_exit()</literal> is called.  If you call it too
+          often, the worst that can happen is that the next call to a
+          Haskell function incurs some extra overhead.
+        </para>
+      </sect2>
   </sect1>
 
   <sect1 id="ffi-ghc">

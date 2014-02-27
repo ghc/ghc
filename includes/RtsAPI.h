@@ -223,6 +223,19 @@ void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
+/*
+ * The RTS allocates some thread-local data when you make a call into
+ * Haskell using one of the rts_eval() functions.  This data is not
+ * normally freed until hs_exit().  If you want to free it earlier
+ * than this, perhaps because the thread is about to exit, then call
+ * rts_done() from the thread.
+ *
+ * It is safe to make more rts_eval() calls after calling rts_done(),
+ * but the next one will cause allocation of the thread-local memory
+ * again.
+ */
+void rts_done (void);
+
 /* --------------------------------------------------------------------------
    Wrapper closures
 

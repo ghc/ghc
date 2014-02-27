@@ -84,6 +84,9 @@ T5435_dyn_asm :
 T6006_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs
 
+T8124_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs
+
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 T7037_CONST = const
 else

@@ -614,3 +614,9 @@ rts_unlock (Capability *cap)
       traceTaskDelete(task);
     }
 }
+
+void rts_done (void)
+{
+    freeMyTask();
+}
+
