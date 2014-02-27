@@ -662,20 +662,22 @@ move_STACK (StgStack *src, StgStack *dest)
 }
 
 /* -----------------------------------------------------------------------------
-   allocate()
+   StgPtr allocate (Capability *cap, W_ n)
 
-   This allocates memory in the current thread - it is intended for
-   use primarily from STG-land where we have a Capability.  It is
-   better than allocate() because it doesn't require taking the
-   sm_mutex lock in the common case.
+   Allocates an area of memory n *words* large, from the nursery of
+   the supplied Capability, or from the global block pool if the area
+   requested is larger than LARGE_OBJECT_THRESHOLD.  Memory is not
+   allocated from the current nursery block, so as not to interfere
+   with Hp/HpLim.
 
-   Memory is allocated directly from the nursery if possible (but not
-   from the current nursery block, so as not to interfere with
-   Hp/HpLim).
+   The address of the allocated memory is returned. allocate() never
+   fails; if it returns, the returned value is a valid address.  If
+   the nursery is already full, then another block is allocated from
+   the global block pool.  If we need to get memory from the OS and
+   that operation fails, then the whole process will be killed.
    -------------------------------------------------------------------------- */
 
-StgPtr
-allocate (Capability *cap, W_ n)
+StgPtr allocate (Capability *cap, W_ n)
 {
     bdescr *bd;
     StgPtr p;
