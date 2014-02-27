@@ -134,6 +134,44 @@ allocTask (void)
     }
 }
 
+void freeMyTask (void)
+{
+    Task *task;
+
+    task = myTask();
+
+    if (task == NULL) return;
+
+    if (!task->stopped) {
+        errorBelch(
+            "freeMyTask() called, but the Task is not stopped; ignoring");
+        return;
+    }
+
+    if (task->worker) {
+        errorBelch("freeMyTask() called on a worker; ignoring");
+        return;
+    }
+
+    ACQUIRE_LOCK(&all_tasks_mutex);
+
+    if (task->all_prev) {
+        task->all_prev->all_next = task->all_next;
+    } else {
+        all_tasks = task->all_next;
+    }
+    if (task->all_next) {
+        task->all_next->all_prev = task->all_prev;
+    }
+
+    taskCount--;
+
+    RELEASE_LOCK(&all_tasks_mutex);
+
+    freeTask(task);
+    setMyTask(NULL);
+}
+
 static void
 freeTask (Task *task)
 {
@@ -219,7 +257,7 @@ newInCall (Task *task)
         task->spare_incalls = incall->next;
         task->n_spare_incalls--;
     } else {
-        incall = stgMallocBytes((sizeof(InCall)), "newBoundTask");
+        incall = stgMallocBytes((sizeof(InCall)), "newInCall");
     }
 
     incall->tso = NULL;
