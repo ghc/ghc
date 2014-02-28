@@ -24,6 +24,9 @@
     with a `bitSizeMaybe` method to replace the now obsolete
     `bitsize` method.
 
+  * `Data.Bits.Bits` gained a new `zeroBits` method which completes the
+    `Bits` API with a direct way to introduce a value with all bits cleared.
+
   * There are now `Bits` and `FiniteBits` instances for `Bool`.
 
   * There are now `Eq`, `Ord`, `Show` and `Read` instances for `ZipList`.

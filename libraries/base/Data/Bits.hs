@@ -25,6 +25,7 @@ module Data.Bits (
     complement,
     shift,
     rotate,
+    zeroBits,
     bit,
     setBit,
     clearBit,
@@ -131,7 +132,26 @@ class Eq a => Bits a where
                   | i>0  = (x `shift` i) .|. (x `shift` (i-bitSize x))
     -}
 
-    -- | @bit i@ is a value with the @i@th bit set and all other bits clear
+    -- | 'zeroBits' is the value with all bits unset.
+    --
+    -- The following laws ought to hold (for all valid bit indices @/n/@):
+    --
+    --   * @'clearBit' 'zeroBits' /n/ == 'zeroBits'@
+    --   * @'setBit'   'zeroBits' /n/ == 'bit' /n/@
+    --   * @'testBit'  'zeroBits' /n/ == False@
+    --   * @'popCount' 'zeroBits'   == 0@
+    --
+    -- This method uses @'clearBit' ('bit' 0) 0@ as its default
+    -- implementation (which ought to be equivalent to 'zeroBits' for
+    -- types which possess a 0th bit).
+    --
+    -- /Since: 4.7.0.0/
+    zeroBits :: a
+    zeroBits = clearBit (bit 0) 0
+
+    -- | @bit /i/@ is a value with the @/i/@th bit set and all other bits clear.
+    --
+    -- See also 'zeroBits'.
     bit               :: Int -> a
 
     -- | @x \`setBit\` i@ is the same as @x .|. bit i@
