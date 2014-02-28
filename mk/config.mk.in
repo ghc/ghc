@@ -697,7 +697,7 @@ PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@
 BZIP2_CMD      = bzip2
 GZIP_CMD       = gzip
-XZ_CMD         = xz
+XZ_CMD         = xz -9e
 
 # bzip2 is default compression
 TAR_COMP      = bzip2
