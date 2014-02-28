@@ -256,6 +256,12 @@
            </para>
 
             <para>
+                Note that you must be using Cabal and Cabal-install
+                1.18 for it to correctly build dynamic shared libraries
+                for you.
+           </para>
+
+            <para>
                 Currently, Dynamic GHCi and
                 <literal>-dynamic-too</literal> are not supported on
                 Windows (32bit or 64bit.)
