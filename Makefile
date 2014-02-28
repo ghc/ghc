@@ -72,7 +72,7 @@ endif
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=final $@
 
 binary-dist: binary-dist-prep
-	mv bindistprep/*.tar.bz2 .
+	mv bindistprep/*.tar.$(TAR_COMP_EXT) .
 
 binary-dist-prep:
 ifeq "$(mingw32_TARGET_OS)" "1"
