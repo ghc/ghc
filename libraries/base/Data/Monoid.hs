@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE AutoDeriveTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -41,7 +44,9 @@ import GHC.Enum
 import GHC.Num
 import GHC.Read
 import GHC.Show
+import GHC.Generics
 import Data.Maybe
+import Data.Proxy
 
 {-
 -- just for testing
@@ -140,9 +145,14 @@ instance Monoid Ordering where
         EQ `mappend` y = y
         GT `mappend` _ = GT
 
+instance Monoid (Proxy s) where
+    mempty = Proxy
+    mappend _ _ = Proxy
+    mconcat _ = Proxy
+
 -- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
 newtype Dual a = Dual { getDual :: a }
-        deriving (Eq, Ord, Read, Show, Bounded)
+        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
 
 instance Monoid a => Monoid (Dual a) where
         mempty = Dual mempty
@@ -150,6 +160,7 @@ instance Monoid a => Monoid (Dual a) where
 
 -- | The monoid of endomorphisms under composition.
 newtype Endo a = Endo { appEndo :: a -> a }
+               deriving (Generic)
 
 instance Monoid (Endo a) where
         mempty = Endo id
@@ -157,7 +168,7 @@ instance Monoid (Endo a) where
 
 -- | Boolean monoid under conjunction.
 newtype All = All { getAll :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded)
+        deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
 instance Monoid All where
         mempty = All True
@@ -165,7 +176,7 @@ instance Monoid All where
 
 -- | Boolean monoid under disjunction.
 newtype Any = Any { getAny :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded)
+        deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
 instance Monoid Any where
         mempty = Any False
@@ -173,7 +184,7 @@ instance Monoid Any where
 
 -- | Monoid under addition.
 newtype Sum a = Sum { getSum :: a }
-        deriving (Eq, Ord, Read, Show, Bounded)
+        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
 
 instance Num a => Monoid (Sum a) where
         mempty = Sum 0
@@ -181,7 +192,7 @@ instance Num a => Monoid (Sum a) where
 
 -- | Monoid under multiplication.
 newtype Product a = Product { getProduct :: a }
-        deriving (Eq, Ord, Read, Show, Bounded)
+        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
 
 instance Num a => Monoid (Product a) where
         mempty = Product 1
@@ -233,7 +244,7 @@ instance Monoid a => Monoid (Maybe a) where
 
 -- | Maybe monoid returning the leftmost non-Nothing value.
 newtype First a = First { getFirst :: Maybe a }
-        deriving (Eq, Ord, Read, Show)
+        deriving (Eq, Ord, Read, Show, Generic, Generic1)
 
 instance Monoid (First a) where
         mempty = First Nothing
@@ -242,7 +253,7 @@ instance Monoid (First a) where
 
 -- | Maybe monoid returning the rightmost non-Nothing value.
 newtype Last a = Last { getLast :: Maybe a }
-        deriving (Eq, Ord, Read, Show)
+        deriving (Eq, Ord, Read, Show, Generic, Generic1)
 
 instance Monoid (Last a) where
         mempty = Last Nothing

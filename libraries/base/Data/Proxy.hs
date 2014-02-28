@@ -21,8 +21,6 @@ module Data.Proxy
       , KProxy(..)
   ) where
 
-import Data.Monoid
-
 import GHC.Base
 import GHC.Show
 import GHC.Read
@@ -74,14 +72,6 @@ instance Bounded (Proxy s) where
 instance Functor Proxy where
     fmap _ _ = Proxy
     {-# INLINE fmap #-}
-
-instance Monoid (Proxy s) where
-    mempty = Proxy
-    {-# INLINE mempty #-}
-    mappend _ _ = Proxy
-    {-# INLINE mappend #-}
-    mconcat _ = Proxy
-    {-# INLINE mconcat #-}
 
 instance Monad Proxy where
     return _ = Proxy

@@ -1,4 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE AutoDeriveTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -59,6 +61,7 @@ import Text.ParserCombinators.ReadP (ReadP)
 import Text.ParserCombinators.ReadPrec (ReadPrec)
 
 import GHC.Conc (STM, retry, orElse)
+import GHC.Generics
 
 infixl 3 <|>
 infixl 4 <*>, <*, *>, <**>
@@ -231,6 +234,7 @@ instance ArrowPlus a => Alternative (ArrowMonad a) where
 -- new instances
 
 newtype Const a b = Const { getConst :: a }
+                  deriving (Generic, Generic1)
 
 instance Functor (Const m) where
     fmap _ (Const v) = Const v
@@ -245,6 +249,7 @@ instance Monoid m => Applicative (Const m) where
     Const f <*> Const v = Const (f `mappend` v)
 
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
+                         deriving (Generic, Generic1)
 
 instance Monad m => Functor (WrappedMonad m) where
     fmap f (WrapMonad v) = WrapMonad (liftM f v)
@@ -263,6 +268,7 @@ instance MonadPlus m => Alternative (WrappedMonad m) where
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
 
 newtype WrappedArrow a b c = WrapArrow { unwrapArrow :: a b c }
+                           deriving (Generic, Generic1)
 
 instance Arrow a => Functor (WrappedArrow a b) where
     fmap f (WrapArrow a) = WrapArrow (a >>> arr f)
@@ -279,7 +285,8 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
 --
 -- @f '<$>' 'ZipList' xs1 '<*>' ... '<*>' 'ZipList' xsn = 'ZipList' (zipWithn f xs1 ... xsn)@
 --
-newtype ZipList a = ZipList { getZipList :: [a] } deriving (Show, Eq, Ord, Read)
+newtype ZipList a = ZipList { getZipList :: [a] }
+                  deriving (Show, Eq, Ord, Read, Generic, Generic1)
 
 instance Functor ZipList where
     fmap f (ZipList xs) = ZipList (map f xs)
