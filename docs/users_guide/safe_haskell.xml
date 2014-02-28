@@ -186,18 +186,18 @@
       </para>
 
       <para>
-      The use of the <option>-XSafe</option> flag to compile the Danger module
-      restricts the features of Haskell that can be used to a
-      <link linkend="safe-language">safe subset</link>. This includes
-      disallowing <literal>unsafePerformIO</literal>, Template Haskell, pure
-      FFI functions, Generalized Newtype Deriving, RULES and restricting the
-      operation of Overlapping Instances. The <option>-XSafe</option> flag also
-      restricts the modules can be imported by Danger to only those that are
-      considered trusted. Trusted modules are those compiled with
-      <option>-XSafe</option>, where GHC provides a mechanical guarantee that
-      the code is safe. Or those modules compiled with
-      <option>-XTrustworthy</option>, where the module author claims that the
-      module is Safe.
+      The use of the <option>-XSafe</option> flag to compile the
+      Danger module restricts the features of Haskell that can be used
+      to a <link linkend="safe-language">safe subset</link>. This
+      includes disallowing <literal>unsafePerformIO</literal>,
+      Template Haskell, pure FFI functions, RULES and restricting the
+      operation of Overlapping Instances. The <option>-XSafe</option>
+      flag also restricts the modules can be imported by Danger to
+      only those that are considered trusted. Trusted modules are
+      those compiled with <option>-XSafe</option>, where GHC provides
+      a mechanical guarantee that the code is safe. Or those modules
+      compiled with <option>-XTrustworthy</option>, where the module
+      author claims that the module is Safe.
       </para>
 
       <para>
@@ -254,6 +254,7 @@
         for example, that the <literal>unsafePerformIO :: IO a -> a</literal>
         function is disallowed in the safe language.
       </listitem>
+
       <listitem><emphasis>Module boundary control</emphasis> &mdash; Haskell
         code compiled using the safe language is guaranteed to only access
         symbols that are publicly available to it through other modules export
@@ -263,10 +264,8 @@
         through careful use of its export list then code compiled using the
         safe language that imports M is guaranteed to respect those invariants.
         Because of this, <emphasis><link linkend="template-haskell">Template
-        Haskell</link></emphasis> and <emphasis>
-        <link linkend="newtype-deriving">GeneralizedNewtypeDeriving</link>
-        </emphasis> are disabled in the safe language as they can be used
-        to violate this property.
+        Haskell</link></emphasis> is disabled in the safe language as it can be
+        used to violate this property.
       </listitem>
       <listitem><emphasis>Semantic consistency</emphasis> &mdash; The safe
         language is strictly a subset of Haskell as implemented by GHC. Any
@@ -294,10 +293,6 @@
     following features:
 
     <itemizedlist>
-      <listitem><emphasis>GeneralizedNewtypeDeriving</emphasis> &mdash; It can
-        be used to violate constructor access control, by allowing untrusted
-        code to manipulate protected data types in ways the data type author
-        did not intend, breaking invariants they have established.</listitem>
       <listitem><emphasis>TemplateHaskell</emphasis> &mdash; Is particularly
         dangerous, as it can cause side effects even at compilation time and
         can be used to access constructors of abstract data types.</listitem>

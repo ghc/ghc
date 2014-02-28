@@ -107,7 +107,12 @@
                 that previously compiled will no longer work.
 
                 For more information, see <xref linkend="roles"/>.
-           </para>
+          </para>
+           <para>
+                As a result of this change,
+                <literal>GeneralizedNewtypeDeriving</literal> can now
+                be used with Safe Haskell.
+          </para>
        </listitem>
 
         <listitem>
@@ -462,9 +467,9 @@
                      that have the same run-time-presentation, such as
                      newtypes, but also newtypes inside containers. See the
                      haddock documentation of
-                     <ulink url="&libraryBaseLocation;/GHC-Exts.html#v%3Acoerce">coerce</ulink>
+                     <ulink url="&libraryBaseLocation;/Data-Coerce.html#v%3Acoerce">coerce</ulink>
                      and of the class
-                     <ulink url="&libraryBaseLocation;/GHC-Exts.html#t%3ACoercible">Coercible</ulink>
+                     <ulink url="&libraryBaseLocation;/Data-Coerce.html#t%3ACoercible">Coercible</ulink>
                      for more details.
                </para>
                 <para>
@@ -772,6 +777,20 @@
              <listitem>
                 <para>
                     There is now a <literal>Data</literal> instance for <literal>Data.Version</literal>.
+               </para>
+           </listitem>
+             <listitem>
+                <para>
+                    There are now <literal>Data</literal>,
+                    <literal>Typeable</literal>, and
+                    <literal>Generic</literal> instances for the types
+                    in <literal>Data.Monoid</literal> and
+                    <literal>Control.Applicative</literal>
+               </para>
+           </listitem>
+             <listitem>
+                <para>
+                    There are now <literal>Num</literal> instances for <literal>Data.Monoid.Product</literal> and <literal>Data.Monoid.Sum</literal>
                </para>
            </listitem>
              <listitem>
