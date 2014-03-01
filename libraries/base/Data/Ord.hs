@@ -43,8 +43,9 @@ comparing p x y = compare (p x) (p y)
 -- This is particularly useful when sorting in generalised list comprehensions,
 -- as in: @then sortWith by 'Down' x@
 --
+-- Provides 'Show' and 'Read' instances (/since: 4.7.0.0/).
+--
 -- /Since: 4.6.0.0/
--- Show and Read instances /Since: 4.7.0.0/
 newtype Down a = Down a deriving (Eq, Show, Read)
 
 instance Ord a => Ord (Down a) where
