@@ -136,6 +136,8 @@ data (~) a b = Eq# ((~#) a b)
 --      by writing
 --
 --      @type role Set nominal@
+--
+--      /Since: 4.7.0.0/
 data Coercible a b = MkCoercible ((~#) a b)
 
 -- | Alias for tagToEnum#. Returns True of its parameter is 1# and False
