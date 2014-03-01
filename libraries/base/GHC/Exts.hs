@@ -46,6 +46,10 @@ module GHC.Exts
         lazy, inline,
 
         -- * Safe coercions
+        --
+        -- | These are available from the /Trustworthy/ module "Data.Coerce" as well
+        --
+        -- /Since: 4.7.0.0/
         Data.Coerce.coerce, Data.Coerce.Coercible,
 
         -- * Transform comprehensions

@@ -15,7 +15,7 @@
   * There are now `Foldable` and `Traversable` instances for `Either a`,
    `Const r`, and `(,) a`.
 
-  * There is now a `Monoid` instance for `Const`.
+  * There is now a `Monoid`, `Generic`, and `Generic1` instance for `Const`.
 
   * There is now a `Data` instance for `Data.Version`.
 
@@ -29,13 +29,20 @@
 
   * There are now `Bits` and `FiniteBits` instances for `Bool`.
 
-  * There are now `Eq`, `Ord`, `Show` and `Read` instances for `ZipList`.
+  * There are now `Eq`, `Ord`, `Show`, `Read`, `Generic`. and `Generic1`
+    instances for `ZipList`.
 
   * There are now `Eq`, `Ord`, `Show` and `Read` instances for `Down`.
 
   * There are now `Eq`, `Ord`, `Show`, `Read` and `Generic` instances
     for types in GHC.Generics (`U1`, `Par1`, `Rec1`, `K1`, `M1`,
     `(:+:)`, `(:*:)`, `(:.:)`).
+
+  * `Data.Monoid`: There are now `Generic` instances for `Dual`, `Endo`,
+    `All`, `Any`, `Sum`, `Product`, `First`, and `Last`; as well as
+    `Generic1` instances for `Dual`, `Sum`, `Product`, `First`, and `Last`.
+
+  * The `Data.Monoid.{Product,Sum}` newtype wrappers now have `Num` instances.
 
   * There are now `Functor` instances for `System.Console.GetOpt`'s
     `ArgOrder`, `OptDescr`, and `ArgDescr`.
@@ -46,6 +53,10 @@
     type application.
 
   * New `Data.Proxy` module providing a concrete, poly-kinded proxy type.
+
+  * New `Data.Coerce` module which exports the new `Coercible` class
+    together with the `coerce` primitive which provide safe coercion
+    (wrt role checking) between types with same representation.
 
   * `Control.Concurrent.MVar` has a new implementation of `readMVar`,
     which fixes a long-standing bug where `readMVar` is only atomic if
@@ -95,6 +106,9 @@
     `Monad` to an `Applicative`, has now a
     `Monad m => Monad (WrappedMonad m)` instance.
 
+  * There is now a `Generic` and a `Generic1` instance for `WrappedMonad`
+    and `WrappedArrow`.
+
   * Handle `ExitFailure (-sig)` on Unix by killing process with signal `sig`.
 
   * New module `Data.Type.Bool` providing operations on type-level booleans.
@@ -106,7 +120,7 @@
 
   * Add `Typeable` instance for `(->)` and `RealWorld`.
 
-  * Declare CPP head `<Typeable.h>` officially obsolete as GHC 7.8+
+  * Declare CPP header `<Typeable.h>` officially obsolete as GHC 7.8+
     does not support hand-written `Typeable` instances anymore.
 
   * Remove (unmaintained) Hugs98 and NHC98 specific code.
