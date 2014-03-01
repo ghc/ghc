@@ -363,6 +363,8 @@ instance Bits Int where
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
 
+    zeroBits = 0
+
     bit     = bitDefault
 
     testBit = testBitDefault
@@ -437,6 +439,7 @@ instance Bits Integer where
                      | otherwise = shiftRInteger x (negateInt# i#)
    testBit x (I# i) = testBitInteger x i
 
+   zeroBits   = 0
    bit        = bitDefault
    popCount   = popCountDefault
 
