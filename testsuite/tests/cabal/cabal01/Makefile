@@ -28,7 +28,7 @@ cabal01:
 # we get a warning if dynlibs are enabled by default that:
 # 	Warning: -rtsopts and -with-rtsopts have no effect with -shared.
 # so we filter the flag out
-	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(VANILLA) $(PROF) $(DYN)
+	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(VANILLA) $(PROF) $(DYN) --libsubdir='$$pkgid'
 	./setup build -v0
 	./setup copy -v0
 	echo install1:
@@ -42,4 +42,3 @@ cabal01:
 	echo dist:
 	ls -1 dist
 	if [ "$(CLEANUP)" != "" ]; then $(MAKE) clean; fi
-
