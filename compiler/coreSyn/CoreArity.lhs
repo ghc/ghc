@@ -325,7 +325,7 @@ this transformation.  So we try to limit it as much as possible:
 
  (3) Do NOT move a lambda outside a case unless 
      (a) The scrutinee is ok-for-speculation, or
-     (b) more liberally: the scrunitee is cheap and -fpedantic-bottoms is not
+     (b) more liberally: the scrutinee is cheap and -fpedantic-bottoms is not
          enforced
 
 Of course both (1) and (2) are readily defeated by disguising the bottoms.

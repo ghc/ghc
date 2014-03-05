@@ -835,7 +835,7 @@ the GC stats. As a result, this breaks things like `:set +s` in GHCi
 (#8754). As a hacky workaround, we instead call 'defaultHooks'
 directly to initalize the flags in the RTS.
 
-A biproduct of this, I believe, is that hooks are likely broken on OS
+A byproduct of this, I believe, is that hooks are likely broken on OS
 X when dynamically linking. But this probably doesn't affect most
 people since we're linking GHC dynamically, but most things themselves
 link statically.
