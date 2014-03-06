@@ -123,21 +123,24 @@ dmdAnalStar env dmd e
   = (postProcessDmdTypeM defer_and_use dmd_ty, e')
 
 -- Main Demand Analsysis machinery
-dmdAnal :: AnalEnv
+dmdAnal, dmdAnal' :: AnalEnv
         -> CleanDemand 	       -- The main one takes a *CleanDemand*
         -> CoreExpr -> (DmdType, CoreExpr)
 
 -- The CleanDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
-dmdAnal _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal _ _ (Type ty)     = (nopDmdType, Type ty)	-- Doesn't happen, in fact
-dmdAnal _ _ (Coercion co) = (nopDmdType, Coercion co)
+dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
+                  dmdAnal' env d e
 
-dmdAnal env dmd (Var var)
+dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
+dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)	-- Doesn't happen, in fact
+dmdAnal' _ _ (Coercion co) = (nopDmdType, Coercion co)
+
+dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
-dmdAnal env dmd (Cast e co)
+dmdAnal' env dmd (Cast e co)
   = (dmd_ty, Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd e
@@ -155,24 +158,24 @@ dmdAnal env dmd (Cast e co)
 	-- a fixpoint.  So revert to a vanilla Eval demand
 -}
 
-dmdAnal env dmd (Tick t e)
+dmdAnal' env dmd (Tick t e)
   = (dmd_ty, Tick t e')
   where
     (dmd_ty, e') = dmdAnal env dmd e
 
-dmdAnal env dmd (App fun (Type ty))
+dmdAnal' env dmd (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
 
-dmdAnal sigs dmd (App fun (Coercion co))
+dmdAnal' sigs dmd (App fun (Coercion co))
   = (fun_ty, App fun' (Coercion co))
   where
     (fun_ty, fun') = dmdAnal sigs dmd fun
 
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
-dmdAnal env dmd (App fun arg)	-- Non-type arguments
+dmdAnal' env dmd (App fun arg)	-- Non-type arguments
   = let				-- [Type arg handled above]
         call_dmd          = mkCallDmd dmd
 	(fun_ty, fun') 	  = dmdAnal env call_dmd fun
@@ -190,7 +193,7 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
     (res_ty `bothDmdType` arg_ty, App fun' arg')
 
 -- this is an anonymous lambda, since @dmdAnalRhs@ uses @collectBinders@
-dmdAnal env dmd (Lam var body)
+dmdAnal' env dmd (Lam var body)
   | isTyVar var
   = let 
 	(body_ty, body') = dmdAnal env dmd body
@@ -209,7 +212,7 @@ dmdAnal env dmd (Lam var body)
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
-dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
+dmdAnal' env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isProductTyCon tycon 
@@ -267,7 +270,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty [alt'])
 
-dmdAnal env dmd (Case scrut case_bndr ty alts)
+dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
 	(alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd) alts
 	(scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
@@ -281,7 +284,7 @@ dmdAnal env dmd (Case scrut case_bndr ty alts)
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
 
-dmdAnal env dmd (Let (NonRec id rhs) body)
+dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 annotated_rhs) body')                    
   where
     (sig, lazy_fv, id1, rhs') = dmdAnalRhs NotTopLevel Nothing env id rhs
@@ -306,7 +309,7 @@ dmdAnal env dmd (Let (NonRec id rhs) body)
 	-- the vanilla call demand seem to be due to (b).  So we don't
 	-- bother to re-analyse the RHS.
 
-dmdAnal env dmd (Let (Rec pairs) body)
+dmdAnal' env dmd (Let (Rec pairs) body)
   = let
 	(env', lazy_fv, pairs') = dmdFix NotTopLevel env pairs
 	(body_ty, body')        = dmdAnal env' dmd body
