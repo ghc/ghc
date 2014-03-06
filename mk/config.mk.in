@@ -95,8 +95,7 @@ TargetElf = YES
 endif
 
 # Some platforms don't support shared libraries
-NoSharedLibsPlatformList = arm-unknown-linux \
-	powerpc-unknown-linux \
+NoSharedLibsPlatformList = powerpc-unknown-linux \
 	x86_64-unknown-mingw32 \
 	i386-unknown-mingw32 \
 	sparc-sun-solaris2 \
