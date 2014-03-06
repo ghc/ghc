@@ -316,7 +316,12 @@ printTimes dflags allocs psecs
             secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
-                         text (show allocs) <+> text "bytes")))
+                         text (separateThousands allocs) <+> text "bytes")))
+  where
+    separateThousands n = reverse . sep . reverse . show $ n
+      where sep n'
+              | length n' <= 3 = n'
+              | otherwise = take 3 n' ++ "," ++ sep (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
